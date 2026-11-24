@@ -5,11 +5,21 @@ import type {
   SavedValueRecord,
   SavedValueSeal,
 } from "../saved-values.js";
+import type { SavedValuesJoin, SavedValuesMember, SavedValuesRosterEntry } from "../saved-values-trust.js";
 
-/** What the cloud holds for an owner's synced saved values: device keys, and record ids and times. */
+/**
+ * What the cloud holds for an owner's synced saved values: the devices' list
+ * (signed by the devices), devices asking to join, each device's last
+ * check-in, and record ids and times.
+ */
 export type SavedValuesState = {
+  /** Each device's check-in: when it was last seen, and the seal key it has now. */
   devices: SavedValueDevice[];
   records: SavedValueHead[];
+  roster: SavedValuesRosterEntry[];
+  joins: SavedValuesJoin[];
+  /** The account's computers and their long-standing device keys (Ed25519 SPKI, base64), for the founding. */
+  computers: { deviceId: string; identityKey: string; name?: string }[];
 };
 
 export type SavedValueCalls = {
@@ -37,9 +47,45 @@ export type SavedValueCalls = {
       updatedAt: number;
       updatedBy: string;
       deleted?: true;
+      /** A deletion's signature by `updatedBy` (signDeletion). */
+      deleteSig?: string;
       sealed?: Record<string, SavedValueSeal>;
     };
     result: { accepted: boolean; head: SavedValueHead };
+  };
+  /** Add the next entry to the devices' list (the cloud checks it chains; devices check it too). */
+  "savedValues.rosterAppend": {
+    args: { entry: SavedValuesRosterEntry };
+    result: { seq: number };
+  };
+  /** Start the list over from this device (every device of the account lost or unavailable). */
+  "savedValues.rosterReset": {
+    args: { entry: SavedValuesRosterEntry };
+    result: { seq: number };
+  };
+  /** A device not on the list asks to join. */
+  "savedValues.joinStart": {
+    args: { joinId: string; device: SavedValuesMember; commit: string };
+    result: SavedValuesJoin;
+  };
+  /** A device on the list adds its random number (step 2). */
+  "savedValues.joinAnswer": {
+    args: { joinId: string; by: string; listedNonce: string };
+    result: SavedValuesJoin;
+  };
+  /** The joining device reveals its random number (step 3). */
+  "savedValues.joinReveal": {
+    args: { joinId: string; joinerNonce: string };
+    result: SavedValuesJoin;
+  };
+  /** The user allowed or declined it on a device on the list. */
+  "savedValues.joinDecide": {
+    args: { joinId: string; by: string; state: "allowed" | "declined" };
+    result: SavedValuesJoin;
+  };
+  "savedValues.joinCancel": {
+    args: { joinId: string };
+    result: { canceled: boolean };
   };
 };
 

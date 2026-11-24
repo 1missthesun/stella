@@ -41,8 +41,6 @@ export const SAVED_VALUE_MAX_PAYLOAD_BYTES = 64 * 1024;
 export const SAVED_VALUES_MAX_RECORDS = 2_000;
 /** How many devices one owner seals to. */
 export const SAVED_VALUES_MAX_DEVICES = 32;
-/** A device that hasn't been seen this long stops being sealed to. */
-export const SAVED_VALUES_DEVICE_IDLE_MS = 90 * 24 * 60 * 60_000;
 /** How often a running device refreshes its card. */
 export const SAVED_VALUES_DEVICE_REFRESH_MS = 24 * 60 * 60_000;
 
@@ -74,6 +72,8 @@ export type SavedValueHead = Readonly<{
   updatedAt: number;
   updatedBy: string;
   deleted?: true;
+  /** A deletion's signature by `updatedBy`, which devices check before deleting. */
+  deleteSig?: string;
   /** The recipients the record is sealed to. */
   recipients: readonly string[];
 }>;
@@ -140,16 +140,6 @@ export const savedValueSealSalt = (aadSha256Hex: string): Uint8Array =>
 export const isSavedValueDeviceKind = (value: unknown): value is SavedValueDeviceKind =>
   typeof value === "string" && (SAVED_VALUE_DEVICE_KINDS as readonly string[]).includes(value);
 
-/** The devices a record should be sealed to now: every card seen recently enough. */
-export const savedValueRecipients = (
-  devices: readonly SavedValueDevice[],
-  now: number,
-): SavedValueDevice[] =>
-  devices
-    .filter((device) => now - device.updatedAt < SAVED_VALUES_DEVICE_IDLE_MS)
-    .slice()
-    .sort((left, right) => left.deviceId.localeCompare(right.deviceId));
-
 export const parseSavedValuePayload = (text: string): SavedValuePayload | null => {
   try {
     const value = JSON.parse(text) as Partial<SavedValuePayload> | null;
@@ -186,15 +176,55 @@ export const parseSavedValuePayload = (text: string): SavedValuePayload | null =
   }
 };
 
-/** This computer's sync of saved values, for Settings. */
+/** A device on the list, for Settings. */
+export type SavedValuesListedDevice = Readonly<{
+  deviceId: string;
+  name: string;
+  kind: SavedValueDeviceKind;
+  thisDevice: boolean;
+  lastSeenAt?: number;
+  /** Not seen for a while: nothing new is sealed to it until it's back. */
+  quiet: boolean;
+}>;
+
+/** A device asking to be allowed, as a device on the list shows it. */
+export type SavedValuesJoinRequest = Readonly<{
+  joinId: string;
+  name: string;
+  kind: SavedValueDeviceKind;
+  /** The 6 digits both screens show; null until both devices have added their numbers. */
+  code: string | null;
+  createdAt: number;
+}>;
+
+/** A cloud task's use of a saved value on this computer. */
+export type SavedValueReleaseLogEntry = Readonly<{
+  at: number;
+  label: string;
+  service: string;
+  taskName?: string;
+  /** Not released: too many uses in the last hour, so the task asked the user. */
+  refused?: true;
+}>;
+
+/** This device's sync of saved values, for Settings. */
 export type SavedValuesSyncStatus = Readonly<{
   /** Off only when the user turned it off. */
   enabled: boolean;
   /** Signed in and connected: values are syncing. */
   active: boolean;
-  /** Devices that hold saved values, this one included. */
-  devices: number;
+  /**
+   * member: on the devices' list. waiting: asking to be allowed by a device
+   * on it. problem: the list couldn't be checked, so nothing syncs. off.
+   */
+  standing: "member" | "waiting" | "problem" | "off";
+  /** While waiting: the code to compare once it can be made, and whether the last ask was declined. */
+  waiting?: Readonly<{ code: string | null; declined?: boolean; approvers: readonly string[] }>;
+  problem?: "reset" | "rollback" | "fork" | "invalid";
+  devices: readonly SavedValuesListedDevice[];
+  requests: readonly SavedValuesJoinRequest[];
   records: number;
+  releases: readonly SavedValueReleaseLogEntry[];
   lastSyncedAt?: number;
   error?: string;
 }>;
@@ -216,6 +246,8 @@ export type SavedValueReleaseRequest = Readonly<{
   recipientKey: import("./user-ask.js").UserAskRecipientKey;
   conversationId?: string;
   threadId?: string;
+  /** The task's name, for this computer's log of uses. */
+  taskName?: string;
 }>;
 
 export type SavedValueReleaseResult =
@@ -238,7 +270,7 @@ export type SavedValueReleaseResult =
       /** What is saved, by name only, when the computer that answered has nothing for the service. */
       savedHere: readonly import("./user-ask.js").SavedSecureValueSummary[];
       /** Why nothing came back: nothing saved, or no computer that could answer. */
-      reason: "not_saved" | "no_computer" | "sync_off";
+      reason: "not_saved" | "no_computer" | "sync_off" | "limit";
       /** When several saved values fit and the task must name the account. */
       message?: string;
     }>;

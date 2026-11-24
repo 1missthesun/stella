@@ -742,6 +742,7 @@ export const serveTurnUserAskRequest = async (
           ? { conversationId: turn.conversationId ?? turn.originConversationId }
           : {}),
         ...(turn.threadId ? { threadId: turn.threadId } : {}),
+        ...(turn.description ? { taskName: turn.description.slice(0, 240) } : {}),
       },
       ownerGeneration: turn.ownerGeneration,
     })) as RpcResponse;

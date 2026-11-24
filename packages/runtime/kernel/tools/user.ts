@@ -296,6 +296,9 @@ const cloudNotSavedNote = (service: string, found: SecureInputNotSaved): string 
   if (found.reason === "no_computer") {
     return `None of the user's computers that hold their saved values is online, so Stella could not look for "${service}". ${retry}`;
   }
+  if (found.reason === "limit") {
+    return `The user's computer that holds "${service}" has given saved values to cloud tasks many times in the last hour, so this one needs the user. ${retry}`;
+  }
   if (found.reason === "sync_off") {
     return `The user's saved values don't sync to any computer Stella can ask, so nothing saved was found for "${service}". ${retry}`;
   }

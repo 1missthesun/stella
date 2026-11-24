@@ -12,16 +12,30 @@ import {
   type SavedValueReleaseResult,
   type SavedValueSeal,
 } from "@stella/contracts/saved-values";
+import {
+  SAVED_VALUES_JOIN_TTL_MS,
+  SAVED_VALUES_MAX_ROSTER_ENTRIES,
+  checkRoster,
+  deletionValid,
+  joinCommit,
+  type SavedValuesJoin,
+  type SavedValuesMember,
+  type SavedValuesRosterEntry,
+} from "@stella/contracts/saved-values-trust";
 import { array, json, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
 /**
- * Saved private values synced across the owner's devices. The cloud keeps
- * each device's public key and every record sealed to each device; it holds
- * no key that opens one. A cloud task gets a value only from a computer that
- * releases it (`savedValues.release`), sealed to that task's own key.
+ * Saved private values synced across the owner's devices. The cloud keeps the
+ * devices' list (each entry signed by a device on it; see
+ * saved-values-trust.ts), each device's check-in, devices asking to join, and
+ * every record sealed to each listed device; it holds no key that opens one or
+ * that signs an entry. The checks here keep bad data out; devices don't rely
+ * on them and check everything again. A cloud task gets a value only from a
+ * computer that releases it (`savedValues.release`), sealed to that task's own
+ * key.
  */
 
 export const SAVED_VALUES_MIGRATION = {
@@ -40,7 +54,17 @@ export const SAVED_VALUES_MIGRATION = {
        updated_by TEXT NOT NULL,
        deleted INTEGER NOT NULL DEFAULT 0,
        recipients TEXT NOT NULL,
-       sealed TEXT
+       sealed TEXT,
+       delete_sig TEXT
+     )`,
+    `CREATE TABLE saved_value_roster (
+       seq INTEGER PRIMARY KEY,
+       entry TEXT NOT NULL
+     )`,
+    `CREATE TABLE saved_value_joins (
+       join_id TEXT PRIMARY KEY,
+       data TEXT NOT NULL,
+       expires_at INTEGER NOT NULL
      )`,
   ],
 };
@@ -66,6 +90,7 @@ type RecordRow = {
   deleted: number;
   recipients: string;
   sealed: string | null;
+  delete_sig: string | null;
 };
 
 const deviceOf = (row: DeviceRow): SavedValueDevice => ({
@@ -90,16 +115,63 @@ const headOf = (row: RecordRow): SavedValueHead => ({
   updatedAt: row.updated_at,
   updatedBy: row.updated_by,
   ...(row.deleted ? { deleted: true as const } : {}),
+  ...(row.deleted && row.delete_sig ? { deleteSig: row.delete_sig } : {}),
   recipients: recipientsOf(row.recipients),
 });
 
-const readState = (db: OwnerDbReader): SavedValuesState => ({
+const readRoster = (db: OwnerDbReader): SavedValuesRosterEntry[] =>
+  db
+    .all<{ seq: number; entry: string }>("SELECT seq, entry FROM saved_value_roster ORDER BY seq")
+    .flatMap((row) => {
+      try {
+        return [JSON.parse(row.entry) as SavedValuesRosterEntry];
+      } catch {
+        return [];
+      }
+    });
+
+/** A decided ask stays visible a little while, so the asking device learns the answer. */
+const DECIDED_JOIN_VISIBLE_MS = 5 * 60_000;
+const MAX_OPEN_JOINS = 8;
+
+const readJoins = (db: OwnerDbReader, now: number): SavedValuesJoin[] =>
+  db
+    .all<{ data: string; expires_at: number }>("SELECT data, expires_at FROM saved_value_joins ORDER BY join_id")
+    .flatMap((row) => {
+      try {
+        const join = JSON.parse(row.data) as SavedValuesJoin;
+        return row.expires_at > now ? [join] : [];
+      } catch {
+        return [];
+      }
+    });
+
+const readComputers = (db: OwnerDbReader): SavedValuesState["computers"] => {
+  try {
+    return db
+      .all<{ device_id: string; public_key: string | null; name: string | null }>(
+        "SELECT device_id, public_key, name FROM devices WHERE public_key IS NOT NULL AND public_key != '' ORDER BY device_id",
+      )
+      .map((row) => ({
+        deviceId: row.device_id,
+        identityKey: row.public_key!,
+        ...(row.name ? { name: row.name } : {}),
+      }));
+  } catch {
+    return [];
+  }
+};
+
+const readState = (db: OwnerDbReader, now: number): SavedValuesState => ({
+  roster: readRoster(db),
+  joins: readJoins(db, now),
+  computers: readComputers(db),
   devices: db
     .all<DeviceRow>("SELECT * FROM saved_value_devices ORDER BY device_id")
     .map(deviceOf),
   records: db
     .all<RecordRow>(
-      "SELECT id, updated_at, updated_by, deleted, recipients, NULL AS sealed FROM saved_value_records ORDER BY id",
+      "SELECT id, updated_at, updated_by, deleted, recipients, NULL AS sealed, delete_sig FROM saved_value_records ORDER BY id",
     )
     .map(headOf),
 });
@@ -207,6 +279,15 @@ const putRecord = (
 ): SavedValueCalls["savedValues.put"]["result"] => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "savedValues.put", { count: 600, windowMs: 60 * 60_000 },
     "Too many saved value changes. Please wait a moment.");
+  if (args.deleted) {
+    const listed = checkRoster(readRoster(ctx.db));
+    if (
+      !listed.ok ||
+      !deletionValid({ id: args.id, updatedAt: args.updatedAt, by: args.updatedBy, sig: args.deleteSig, roster: listed.roster })
+    ) {
+      throw new RpcError("FORBIDDEN", "A deletion must be signed by a device on the list.");
+    }
+  }
   const sealed = args.deleted ? null : parseSealed(args.sealed);
   const recipients = sealed ? Object.keys(sealed).sort() : [];
   const current = ctx.db.one<RecordRow>("SELECT * FROM saved_value_records WHERE id = ?", args.id);
@@ -228,15 +309,17 @@ const putRecord = (
     }
   }
   ctx.db.run(
-    `INSERT INTO saved_value_records (id, updated_at, updated_by, deleted, recipients, sealed) VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO saved_value_records (id, updated_at, updated_by, deleted, recipients, sealed, delete_sig) VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (id) DO UPDATE SET updated_at = excluded.updated_at, updated_by = excluded.updated_by,
-       deleted = excluded.deleted, recipients = excluded.recipients, sealed = excluded.sealed`,
+       deleted = excluded.deleted, recipients = excluded.recipients, sealed = excluded.sealed,
+       delete_sig = excluded.delete_sig`,
     args.id,
     args.updatedAt,
     args.updatedBy,
     args.deleted ? 1 : 0,
     JSON.stringify(recipients),
     sealed ? JSON.stringify(sealed) : null,
+    args.deleted ? args.deleteSig ?? null : null,
   );
   return { accepted: true, head: headOf(ctx.db.one<RecordRow>("SELECT * FROM saved_value_records WHERE id = ?", args.id)!) };
 };
@@ -254,6 +337,167 @@ const getRecords = (ctx: OwnerContext, ids: readonly string[]): SavedValueRecord
     return [{ ...headOf(row), ...(sealed ? { sealed } : {}) }];
   });
 
+const parseEntry = (value: unknown): SavedValuesRosterEntry => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new RpcError("BAD_REQUEST", "entry must be a list entry.");
+  }
+  return value as SavedValuesRosterEntry;
+};
+
+const writeEntry = (ctx: OwnerContext, entry: SavedValuesRosterEntry) => {
+  ctx.db.run("INSERT INTO saved_value_roster (seq, entry) VALUES (?, ?)", entry.seq, JSON.stringify(entry));
+};
+
+/** What follows from an entry: a device taken off, or added with new keys, loses its seals and its check-in. */
+const afterEntry = (ctx: OwnerContext, entry: SavedValuesRosterEntry) => {
+  if (entry.op === "remove") {
+    dropSealsFor(ctx, entry.target);
+    ctx.db.run("DELETE FROM saved_value_devices WHERE device_id = ?", entry.target);
+  } else if (entry.op === "add") {
+    const card = ctx.db.one<{ public_key: string }>(
+      "SELECT public_key FROM saved_value_devices WHERE device_id = ?",
+      entry.device.deviceId,
+    );
+    if (card && card.public_key !== entry.device.sealKey) dropSealsFor(ctx, entry.device.deviceId);
+  }
+};
+
+const rosterAppend = (ctx: OwnerContext, raw: unknown): { seq: number } => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "savedValues.roster", { count: 60, windowMs: 60 * 60_000 },
+    "Too many changes to your devices. Please wait a moment.");
+  const entry = parseEntry(raw);
+  const entries = readRoster(ctx.db);
+  if (entries.length >= SAVED_VALUES_MAX_ROSTER_ENTRIES) {
+    throw new RpcError("CONFLICT", "Your devices' list is full.", { retryable: false });
+  }
+  if (entry.seq !== entries.length) {
+    throw new RpcError("CONFLICT", "The list changed; read it again.", { retryable: true });
+  }
+  const checked = checkRoster([...entries, entry]);
+  if (!checked.ok) {
+    throw new RpcError("BAD_REQUEST", `That entry doesn't fit the list (${checked.detail ?? checked.reason}).`);
+  }
+  writeEntry(ctx, entry);
+  afterEntry(ctx, entry);
+  return { seq: entry.seq };
+};
+
+const rosterReset = (ctx: OwnerContext, raw: unknown): { seq: number } => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "savedValues.rosterReset", { count: 5, windowMs: 24 * 60 * 60_000 },
+    "Your devices' list was started over too often today.");
+  const entry = parseEntry(raw);
+  // A new start carries no computers: whoever starts over adds the others again.
+  if (entry.op !== "found" || entry.carried.length > 0 || !checkRoster([entry]).ok) {
+    throw new RpcError("BAD_REQUEST", "A new list starts with one device, signed by itself.");
+  }
+  ctx.db.run("DELETE FROM saved_value_roster");
+  ctx.db.run("DELETE FROM saved_value_joins");
+  writeEntry(ctx, entry);
+  return { seq: 0 };
+};
+
+const loadJoin = (ctx: OwnerContext, joinId: string): SavedValuesJoin => {
+  const row = ctx.db.one<{ data: string; expires_at: number }>(
+    "SELECT data, expires_at FROM saved_value_joins WHERE join_id = ?",
+    joinId,
+  );
+  if (!row || row.expires_at <= ctx.now) throw new RpcError("NOT_FOUND", "That request to join has ended.");
+  return JSON.parse(row.data) as SavedValuesJoin;
+};
+
+const saveJoin = (ctx: OwnerContext, join: SavedValuesJoin, expiresAt = join.expiresAt) => {
+  ctx.db.run(
+    `INSERT INTO saved_value_joins (join_id, data, expires_at) VALUES (?, ?, ?)
+     ON CONFLICT (join_id) DO UPDATE SET data = excluded.data, expires_at = excluded.expires_at`,
+    join.joinId,
+    JSON.stringify(join),
+    expiresAt,
+  );
+  return join;
+};
+
+const NONCE = /^[A-Za-z0-9_-]{43}$/;
+
+const joinStart = (
+  ctx: OwnerContext,
+  args: { joinId: string; device: unknown; commit: string },
+): SavedValuesJoin => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "savedValues.join", { count: 30, windowMs: 60 * 60_000 },
+    "Too many requests to add a device. Please wait a moment.");
+  ctx.db.run("DELETE FROM saved_value_joins WHERE expires_at <= ?", ctx.now);
+  const device = args.device as SavedValuesMember;
+  if (
+    !device ||
+    typeof device.deviceId !== "string" ||
+    (device.kind !== "computer" && device.kind !== "phone") ||
+    typeof device.name !== "string" ||
+    !BASE64URL.test(device.signKey ?? "") ||
+    !BASE64URL.test(device.sealKey ?? "") ||
+    !/^[0-9a-f]{64}$/.test(args.commit)
+  ) {
+    throw new RpcError("BAD_REQUEST", "A request to join needs the device's keys and a commitment.");
+  }
+  // One open ask per device: a new one replaces it.
+  for (const join of readJoins(ctx.db, ctx.now)) {
+    if (join.device.deviceId === device.deviceId) {
+      ctx.db.run("DELETE FROM saved_value_joins WHERE join_id = ?", join.joinId);
+    }
+  }
+  const open = readJoins(ctx.db, ctx.now).filter((join) => join.state === "open");
+  if (open.length >= MAX_OPEN_JOINS) {
+    throw new RpcError("RATE_LIMITED", "Too many devices are waiting to be added.");
+  }
+  return saveJoin(ctx, {
+    joinId: args.joinId,
+    device: {
+      deviceId: device.deviceId,
+      kind: device.kind,
+      name: device.name.slice(0, 120),
+      signKey: device.signKey,
+      sealKey: device.sealKey,
+    },
+    commit: args.commit,
+    createdAt: ctx.now,
+    expiresAt: ctx.now + SAVED_VALUES_JOIN_TTL_MS,
+    state: "open",
+  });
+};
+
+const listedDevice = (ctx: OwnerContext, deviceId: string) => {
+  const checked = checkRoster(readRoster(ctx.db));
+  if (!checked.ok || !checked.roster.members.has(deviceId)) {
+    throw new RpcError("FORBIDDEN", "Only a device on the list can do that.");
+  }
+};
+
+const joinAnswer = (ctx: OwnerContext, args: { joinId: string; by: string; listedNonce: string }): SavedValuesJoin => {
+  const join = loadJoin(ctx, args.joinId);
+  listedDevice(ctx, args.by);
+  if (!NONCE.test(args.listedNonce)) throw new RpcError("BAD_REQUEST", "listedNonce must be 32 random bytes.");
+  if (join.state !== "open" || join.listedNonce) return join;
+  return saveJoin(ctx, { ...join, answeredBy: args.by, listedNonce: args.listedNonce });
+};
+
+const joinReveal = (ctx: OwnerContext, args: { joinId: string; joinerNonce: string }): SavedValuesJoin => {
+  const join = loadJoin(ctx, args.joinId);
+  if (!join.listedNonce) throw new RpcError("CONFLICT", "No device on the list has answered yet.", { retryable: true });
+  if (join.joinerNonce) return join;
+  if (!NONCE.test(args.joinerNonce) || joinCommit(args.joinerNonce) !== join.commit) {
+    throw new RpcError("BAD_REQUEST", "That number doesn't match the request.");
+  }
+  return saveJoin(ctx, { ...join, joinerNonce: args.joinerNonce });
+};
+
+const joinDecide = (
+  ctx: OwnerContext,
+  args: { joinId: string; by: string; state: "allowed" | "declined" },
+): SavedValuesJoin => {
+  const join = loadJoin(ctx, args.joinId);
+  listedDevice(ctx, args.by);
+  if (join.state !== "open") return join;
+  return saveJoin(ctx, { ...join, state: args.state, decidedBy: args.by }, ctx.now + DECIDED_JOIN_VISIBLE_MS);
+};
+
 const releaseParser = object({
   releaseId: string({ min: 1, max: 128 }),
   service: string({ min: 1, max: 240 }),
@@ -263,6 +507,7 @@ const releaseParser = object({
   recipientKey: json({ maxBytes: 1024 }),
   conversationId: optional(string({ max: 512 })),
   threadId: optional(string({ max: 512 })),
+  taskName: optional(string({ max: 240 })),
 });
 
 /**
@@ -305,7 +550,7 @@ export const savedValuesDomain = {
   views: {
     "savedValues.state": {
       parse: object({}),
-      read: (ctx) => readState(ctx.db),
+      read: (ctx) => readState(ctx.db, ctx.now),
     },
   },
   calls: {
@@ -341,9 +586,51 @@ export const savedValuesDomain = {
         updatedAt: number({ int: true, min: 1 }),
         updatedBy: ID,
         deleted: optional(literal(true)),
+        deleteSig: optional(string({ max: 128 })),
         sealed: optional(json({ maxBytes: (MAX_SEAL_CHARS + 512) * SAVED_VALUES_MAX_DEVICES })),
       }) as never,
       handler: putRecord,
+    },
+    "savedValues.rosterAppend": {
+      scope: "owner",
+      maxBodyBytes: 16 * 1024,
+      parse: object({ entry: json({ maxBytes: 12 * 1024 }) }) as never,
+      handler: (ctx, args: { entry: unknown }) => rosterAppend(ctx, args.entry),
+    },
+    "savedValues.rosterReset": {
+      scope: "owner",
+      maxBodyBytes: 16 * 1024,
+      parse: object({ entry: json({ maxBytes: 12 * 1024 }) }) as never,
+      handler: (ctx, args: { entry: unknown }) => rosterReset(ctx, args.entry),
+    },
+    "savedValues.joinStart": {
+      scope: "owner",
+      parse: object({ joinId: ID, device: json({ maxBytes: 2048 }), commit: string({ min: 64, max: 64 }) }) as never,
+      handler: joinStart as never,
+    },
+    "savedValues.joinAnswer": {
+      scope: "owner",
+      parse: object({ joinId: ID, by: ID, listedNonce: string({ min: 1, max: 64 }) }),
+      handler: joinAnswer,
+    },
+    "savedValues.joinReveal": {
+      scope: "owner",
+      parse: object({ joinId: ID, joinerNonce: string({ min: 1, max: 64 }) }),
+      handler: joinReveal,
+    },
+    "savedValues.joinDecide": {
+      scope: "owner",
+      parse: object({ joinId: ID, by: ID, state: literal("allowed", "declined") }),
+      handler: joinDecide,
+    },
+    "savedValues.joinCancel": {
+      scope: "owner",
+      parse: object({ joinId: ID }),
+      handler: (ctx, args) => {
+        const held = ctx.db.one("SELECT join_id FROM saved_value_joins WHERE join_id = ?", args.joinId);
+        ctx.db.run("DELETE FROM saved_value_joins WHERE join_id = ?", args.joinId);
+        return { canceled: held !== null };
+      },
     },
   },
   internal: {
@@ -360,6 +647,8 @@ export const savedValuesDomain = {
   purge: (ctx) => {
     ctx.db.run("DELETE FROM saved_value_records");
     ctx.db.run("DELETE FROM saved_value_devices");
+    ctx.db.run("DELETE FROM saved_value_roster");
+    ctx.db.run("DELETE FROM saved_value_joins");
     return { pending: false };
   },
 } satisfies OwnerDomain;

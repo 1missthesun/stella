@@ -12,6 +12,17 @@ import {
   SOURCE_EXTENSIONS,
 } from "./modules.js";
 import { RENDERER_ORIGIN } from "./origin.js";
+import {
+  buildPageBundleApart,
+  liveShim,
+  notePageBundleStarted,
+  pageBundleId,
+  readPageBundleMeta,
+  takePageBundleCode,
+  type PageBundleMeta,
+  type PageBundleRequest,
+} from "./page-bundle.js";
+import { BUNDLE_SCRIPT_PREFIX } from "./page-bundle-paths.js";
 import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createRouteTreeGenerator } from "./routes.js";
 import { loadDepTools, loadOxcTools, loadRouteTools, loadTailwindTools } from "./tools.js";
@@ -22,6 +33,9 @@ const HTML_ENTRIES = ["index.html", "overlay.html", "companion.html"];
 const HOT_CLIENT_URL = "/src/platform/hot/hot-client.ts";
 const PDF_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.mjs";
 const PACK_PREFIX = "/@pack/";
+const LIVE_PREFIX = "/@live/";
+/** Long enough for the page that asked, and whatever an agent is still editing, to settle. */
+const BUNDLE_DELAY_MS = 5_000;
 const GRAPH_FORMAT_VERSION = "1";
 const ROOT_MODULE_URL = "/src/app-root.tsx";
 const SWAP_PAGE = "index.html";
@@ -137,13 +151,14 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   const mode = options.mode;
   const hot = mode === "development";
   const env = loadRendererEnv(options.envDir, mode);
+  const defines = envDefines(env);
   const graph = createModuleGraph({
     tools: await loadOxcTools(),
     uiRoot,
     repoRoot,
     cacheDir: options.cacheDir,
     development: hot,
-    defines: envDefines(env),
+    defines,
   });
   const routes = createRouteTreeGenerator(loadRouteTools, uiRoot, options.cacheDir);
   const publicDir = path.join(uiRoot, "public");
@@ -154,6 +169,9 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     "graphs",
     `${createHash("sha256").update(`${repoRoot}\0${mode}`).digest("hex").slice(0, 16)}.json`,
   );
+
+  type PageInputs = { id: string; request: PageBundleRequest };
+  let pageInputs = new Map<string, Promise<PageInputs | null>>();
 
   const depFiles = new Set<string>();
   let deps: DepBundle | null = null;
@@ -169,6 +187,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       apart: true,
     }).then((bundle) => {
       deps = bundle;
+      pageInputs = new Map();
       return bundle;
     });
     depsBuild = build;
@@ -447,8 +466,136 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     }
   };
 
-  const rendered = new Map<string, Promise<Uint8Array>>();
+  /** Served modules, per bundle (`""`: for pages loaded module by module). */
+  const rendered = new Map<string, Map<string, Promise<Uint8Array>>>();
+  const renderedFor = (bundle: string) => {
+    let modules = rendered.get(bundle);
+    if (!modules) rendered.set(bundle, (modules = new Map()));
+    return modules;
+  };
   let generation = 0;
+
+  /**
+   * A bundle a page was served. Modules are known to that page by the bundle's
+   * id (`?b=`): what the bundle holds it takes from there (`liveShim`), except
+   * modules changed since the page loaded (`floor`).
+   */
+  type HeldBundle = PageBundleMeta & { id: string; floor: number };
+  const held = new Map<string, HeldBundle>();
+  const holding = async (id: string | null): Promise<HeldBundle | null> => {
+    if (!id) return null;
+    const known = held.get(id);
+    if (known) return known;
+    const meta = await readPageBundleMeta(options.cacheDir, id);
+    if (!meta) return null;
+    const bundle = held.get(id) ?? { ...meta, id, floor: 0 };
+    held.set(id, bundle);
+    return bundle;
+  };
+  const versionFor = (file: string, bundle: HeldBundle | null) => {
+    const version = versions.get(file);
+    return version !== undefined && version > (bundle?.floor ?? 0) ? version : undefined;
+  };
+  /** The address a page that holds `bundle` knows a source module by. */
+  const moduleUrl = (url: string, file: string, bundle: HeldBundle | null) => {
+    if (!bundle) return withVersion(url, file);
+    const version = versionFor(file, bundle);
+    return version === undefined ? `${url}?b=${bundle.id}` : `${url}?b=${bundle.id}&t=${version}`;
+  };
+
+  const readPageInputs = async (page: string): Promise<PageInputs | null> => {
+    const pack = packs.get(page);
+    const bundle = deps;
+    if (!pack || !bundle) return null;
+    const sources: { file: string; node: GraphNode }[] = [];
+    const data = new Set<string>();
+    const seen = new Set<string>();
+    const pending = [pack.entry];
+    while (pending.length > 0) {
+      const file = pending.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const node = nodes.get(file);
+      if (!node) return null;
+      sources.push({ file, node });
+      for (const edge of node.edges) {
+        if (edge.dynamic) continue;
+        if (edge.kind === "source") pending.push(edge.file);
+        else if (edge.kind === "dep" && !bundle.entries.has(edge.file)) return null;
+        else if (edge.kind === "asset" && path.extname(edge.file).toLowerCase() === ".json") data.add(edge.file);
+      }
+    }
+    sources.sort((a, b) => (a.file < b.file ? -1 : 1));
+    const jsonFiles = [...data].sort();
+    const id = pageBundleId(page, [
+      graph.cacheTag,
+      repoRoot,
+      uiRoot,
+      bundle.dir,
+      pack,
+      sources.map(({ file, node }) => [file, node.stamp.key ?? [node.stamp.mtimeMs, node.stamp.size], node.edges]),
+      jsonFiles.map((file) => [file, fileDigest(file)]),
+    ]);
+    return {
+      id,
+      request: {
+        kind: "page",
+        id,
+        entryFile: pack.entry,
+        packUrl: `${PACK_PREFIX}${page}`,
+        packedStylesheets: pack.stylesheets,
+        uiRoot,
+        repoRoot,
+        cacheDir: options.cacheDir,
+        defines,
+        depEntries: Object.fromEntries(bundle.entries),
+        files: sources.map(({ file, node }) => ({ file, key: node.stamp.key })),
+        jsonFiles,
+      },
+    };
+  };
+  const inputsOf = (page: string): Promise<PageInputs | null> => {
+    let inputs = pageInputs.get(page);
+    if (!inputs) {
+      inputs = readPageInputs(page).catch(() => null);
+      pageInputs.set(page, inputs);
+    }
+    return inputs;
+  };
+  /** The bundle that is exactly what the files hold now, if it was built. */
+  const builtBundle = async (page: string) => {
+    if (hot) return null;
+    const inputs = await inputsOf(page);
+    return inputs && holding(inputs.id);
+  };
+
+  const failedBundles = new Set<string>();
+  let bundleTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Bundles are for the pages loaded next: a page never waits for one to be
+   * built, it loads module by module until one is there.
+   */
+  const buildBundlesLater = () => {
+    if (hot) return;
+    if (bundleTimer) clearTimeout(bundleTimer);
+    bundleTimer = setTimeout(() => {
+      bundleTimer = null;
+      void (async () => {
+        await chain;
+        for (const page of packs.keys()) {
+          const inputs = await inputsOf(page);
+          if (!inputs || failedBundles.has(inputs.id) || (await holding(inputs.id))) continue;
+          try {
+            await buildPageBundleApart(inputs.request, log);
+          } catch (error) {
+            failedBundles.add(inputs.id);
+            log(`[bundle] ${page} stays unbundled: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+      })();
+    }, BUNDLE_DELAY_MS);
+    bundleTimer.unref?.();
+  };
 
   let chain: Promise<void> = Promise.resolve();
   const sync = (reason: "start" | "page") => {
@@ -460,7 +607,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         graph.invalidate();
         rendered.clear();
       } else {
-        for (const file of result.changed) rendered.delete(file);
+        for (const modules of rendered.values()) for (const file of result.changed) modules.delete(file);
       }
       const bundle = deps;
       if (!bundle || [...depFiles].some((file) => !bundle.entries.has(file))) {
@@ -469,9 +616,11 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       }
       releaseDependencyBuilder();
       if (result.moved || packs.size === 0) await planPacks();
+      pageInputs = new Map();
       generation += 1;
       log(`[source] ${result.count} modules ready in ${Date.now() - startedAt}ms (${reason}, ${result.loaded} read)`);
       prewarm();
+      buildBundlesLater();
     });
     chain = run.catch(() => undefined);
     return run;
@@ -502,6 +651,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const page = packs.get("index.html");
     if (page) void packModule("index.html").catch(() => undefined);
     void (async () => {
+      const bundle = await builtBundle("index.html");
       const order: string[] = [];
       const seen = new Set<string>();
       const deferred: string[] = [];
@@ -521,26 +671,29 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       }
       for (const file of order) {
         if (generation !== mine) return;
-        await renderModule(file).catch(() => undefined);
+        const url = graph.urlForFile(file);
+        if (bundle && (url === bundle.entryUrl || bundle.modules[url])) continue;
+        await renderModule(file, bundle).catch(() => undefined);
         await new Promise((resolve) => setImmediate(resolve));
       }
     })();
   };
 
 
-  const renderModule = (file: string): Promise<Uint8Array> => {
-    let render = rendered.get(file);
+  const renderModule = (file: string, bundle: HeldBundle | null): Promise<Uint8Array> => {
+    const modules = renderedFor(bundle?.id ?? "");
+    let render = modules.get(file);
     if (!render) {
-      render = renderModuleNow(file).then(bytes);
-      rendered.set(file, render);
+      render = renderModuleNow(file, bundle).then(bytes);
+      modules.set(file, render);
       render.catch(() => {
-        if (rendered.get(file) === render) rendered.delete(file);
+        if (modules.get(file) === render) modules.delete(file);
       });
     }
     return render;
   };
 
-  const renderModuleNow = async (file: string): Promise<string> => {
+  const renderModuleNow = async (file: string, bundle: HeldBundle | null): Promise<string> => {
     const module = await graph.load(file);
     const missing: string[] = [];
     const imported = new Set<string>();
@@ -564,7 +717,15 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
           if (resolved.kind === "source" || path.extname(resolved.file) === ".css") {
             imported.add(resolved.file);
           }
-          return withVersion(resolved.url, resolved.file);
+          if (!bundle) return withVersion(resolved.url, resolved.file);
+          if (resolved.kind === "source") {
+            return !ref.dynamic && bundle.modules[resolved.url] && versionFor(resolved.file, bundle) === undefined
+              ? `${LIVE_PREFIX}${bundle.id}${resolved.url}`
+              : moduleUrl(resolved.url, resolved.file, bundle);
+          }
+          return !ref.dynamic && bundle.json[resolved.url]
+            ? `${LIVE_PREFIX}${bundle.id}${resolved.url}`
+            : withVersion(resolved.url, resolved.file);
         }
         const entry = deps?.entries.get(resolved.file);
         if (!entry) {
@@ -590,7 +751,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     rendered.clear();
     await buildDeps();
     options.onReloadNeeded();
-    return await renderModuleNow(file);
+    return await renderModuleNow(file, bundle);
   };
 
   const stylesheet = async (file: string): Promise<string> => {
@@ -650,6 +811,17 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
           ? javascript(await fs.promises.readFile(file))
           : respond("Not found", "text/plain", 404);
       }
+      if (pathname.startsWith(BUNDLE_SCRIPT_PREFIX)) {
+        const [id = "", what] = pathname.slice(BUNDLE_SCRIPT_PREFIX.length).split("/");
+        if (what === "started") await notePageBundleStarted(options.cacheDir, id);
+        return respond("", "text/plain");
+      }
+      if (pathname.startsWith(LIVE_PREFIX)) {
+        const [id = "", ...rest] = pathname.slice(LIVE_PREFIX.length).split("/");
+        const bundle = await holding(id);
+        const shim = bundle && liveShim(bundle, `/${decodeURIComponent(rest.join("/"))}${url.searchParams.has("import") ? "?import" : ""}`);
+        return shim ? javascript(shim) : respond("Not found", "text/plain", 404);
+      }
       if (pathname.startsWith(PACK_PREFIX)) {
         const name = pathname.slice(PACK_PREFIX.length);
         const body = await packModule(name);
@@ -690,7 +862,28 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         return javascript(`export default ${JSON.stringify(pathname)};\n`);
       }
       if (ext === ".css") return respond(await stylesheet(file), CONTENT_TYPES[".css"]!);
-      if (!isPublic && SOURCE_EXTENSIONS.has(ext)) return javascript(await renderModule(file));
+      if (!isPublic && SOURCE_EXTENSIONS.has(ext)) {
+        const id = url.searchParams.get("b");
+        if (id) {
+          const bundle = await holding(id);
+          if (!bundle) throw new Error("The code this window loaded is gone; load the window again.");
+          const shim = versionFor(file, bundle) === undefined ? liveShim(bundle, graph.urlForFile(file)) : null;
+          return javascript(shim ?? (await renderModule(file, bundle)));
+        }
+        const page = hot || url.search ? undefined : [...packs].find(([, pack]) => pack.entry === file)?.[0];
+        const bundle = page ? await builtBundle(page) : null;
+        const code = bundle && (await takePageBundleCode(options.cacheDir, bundle.id));
+        if (bundle && code) {
+          if (bundle.floor !== lastVersion) rendered.delete(bundle.id);
+          bundle.floor = lastVersion;
+          for (const dataUrl of Object.keys(bundle.json)) {
+            const data = graph.fileForUrlPath(dataUrl.split("?")[0]!);
+            if (data) servedData.add(data);
+          }
+          return javascript(code);
+        }
+        return javascript(await renderModule(file, null));
+      }
       if (!isPublic && ext === ".html") return respond(await html(file), CONTENT_TYPES[".html"]!);
       return respond(
         await fs.promises.readFile(file),
@@ -708,6 +901,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
 
   const isRendererInput = (file: string) =>
     file === lockfile ||
+    nodes.has(file) ||
     servedImports.has(file) ||
     servedStylesheets.has(file) ||
     HTML_ENTRIES.some((name) => file === path.join(uiRoot, name)) ||
@@ -722,8 +916,8 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   const rootFile = graph.fileForUrlPath(ROOT_MODULE_URL);
   const describe = (file: string) => path.relative(uiRoot, file);
 
-  const planSwap = (changed: Set<string>, ran: RanImports | null): Promise<ApplyResult> => {
-    const planned = chain.then(() => planSwapNow(changed, ran));
+  const planSwap = (changed: Set<string>, ran: RanImports | null, bundleId: string | null): Promise<ApplyResult> => {
+    const planned = chain.then(() => planSwapNow(changed, ran, bundleId));
     chain = planned.then(
       () => undefined,
       () => undefined,
@@ -731,7 +925,11 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     return planned;
   };
 
-  const planSwapNow = async (changed: Set<string>, ran: RanImports | null): Promise<ApplyResult> => {
+  const planSwapNow = async (
+    changed: Set<string>,
+    ran: RanImports | null,
+    bundleId: string | null,
+  ): Promise<ApplyResult> => {
     const reload = (reason: string): ApplyResult => {
       log(`[source] reload: ${reason}`);
       return { mode: "reload", reason };
@@ -749,12 +947,16 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       graph.invalidate();
       await planPacks();
     }
+    pageInputs = new Map();
     const bundle = deps;
     if (!bundle || [...depFiles].some((file) => !bundle.entries.has(file))) {
       await buildDeps();
       return reload("it uses a package the window has not loaded");
     }
     generation += 1;
+    buildBundlesLater();
+    const pageBundle = await holding(bundleId);
+    if (bundleId && !pageBundle) return reload("the window's bundle is gone");
     if (!ran || !rootFile) return reload("the window cannot take a swap");
 
     const importers = new Map<string, string[]>();
@@ -841,7 +1043,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       mode: "swap",
       payload: {
         version,
-        root: swapped.length > 0 ? withVersion(ROOT_MODULE_URL, rootFile) : null,
+        root: swapped.length > 0 ? moduleUrl(ROOT_MODULE_URL, rootFile, pageBundle) : null,
         css,
         modules: swapped.map((file) => graph.urlForFile(file)),
       },
@@ -849,13 +1051,19 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     };
   };
 
-  const applyChanges = async (repoPaths: string[], ran: RanImports | null = null): Promise<ApplyResult> => {
+  const applyChanges = async (
+    repoPaths: string[],
+    ran: RanImports | null = null,
+    /** The bundle the full window runs, if it runs one. */
+    bundleId: string | null = null,
+  ): Promise<ApplyResult> => {
     await prepare();
     const changed = new Set(
       repoPaths.map((repoPath) => path.resolve(repoRoot, repoPath)).filter(isRendererInput),
     );
     if (changed.size === 0) return { mode: "none" };
     rendered.clear();
+    pageInputs = new Map();
     packCss.clear();
     for (const file of changed) graph.invalidate(file);
     const tailwindChanged = [...changed].some(
@@ -879,7 +1087,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     if ([...changed].some(reloads)) return { mode: "reload", reason: "a page or public file changed" };
     const data = [...changed].find((file) => servedData.has(file));
     if (data) return { mode: "reload", reason: `${describe(data)} is data the window keeps by its address` };
-    if (!hot) return await planSwap(changed, ran);
+    if (!hot) return await planSwap(changed, ran, bundleId);
 
     const importers = new Map<string, string[]>();
     for (const [importer, imported] of servedImports) {
@@ -984,6 +1192,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     handle,
     applyChanges,
     dispose: () => {
+      if (bundleTimer) clearTimeout(bundleTimer);
       servedImports.clear();
       servedStylesheets.clear();
       servedData.clear();

@@ -9,7 +9,7 @@ import { WindowManager } from "../windows/window-manager.js";
 import { TrayController } from "../windows/tray-controller.js";
 import { configureNotificationActivationHandling } from "../services/notification-service.js";
 import { configureStellaSessionPermissions } from "./session-permissions.js";
-import { resolveRendererBuildMode, serveRendererSource, } from "../source/renderer-protocol.js";
+import { rendererCacheDir, resolveRendererBuildMode, serveRendererSource, } from "../source/renderer-protocol.js";
 import { getAllWindows, } from "./context.js";
 import { startDeferredStartup } from "./deferred-startup.js";
 import { getMainLogger } from "../observability/main-logger.js";
@@ -47,7 +47,7 @@ const initializeWindowShell = (context) => {
     });
     const pruneCache = setTimeout(() => {
         const startedAt = Date.now();
-        void pruneRendererCache(path.join(app.getPath("userData"), "Renderer Source Cache"))
+        void pruneRendererCache(rendererCacheDir())
             .then((result) => getMainLogger()?.process("renderer.cache-pruned", { ...result, ms: Date.now() - startedAt }))
             .catch(() => undefined);
     }, RENDERER_CACHE_PRUNE_DELAY_MS);

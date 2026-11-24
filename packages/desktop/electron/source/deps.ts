@@ -12,8 +12,19 @@ export type DepBundle = {
   entries: Map<string, string>;
 };
 
-const BUNDLE_FORMAT_VERSION = "1";
+const BUNDLE_FORMAT_VERSION = "2";
 const FACADE_PREFIX = "\0stella-facade:";
+
+/**
+ * Only whitespace goes: names stay readable in stack traces, and minifying
+ * further measured no gain. ASCII keeps a script one byte per character in
+ * the renderer.
+ */
+export const COMPACT = {
+  compress: false,
+  mangle: false,
+  codegen: { removeWhitespace: true, asciiOnly: true, legalComments: "none" as const },
+};
 
 const entryName = (file: string): string => {
   const marker = "/node_modules/";
@@ -130,7 +141,7 @@ export const bundleDependencies = (options: {
   return build;
 };
 
-export type DepsBuildRequest = { files: string[]; dir: string; mode: string };
+export type DepsBuildRequest = { kind?: "deps"; files: string[]; dir: string; mode: string };
 const DEPS_BUILDER_URL = new URL("./deps-builder.js", import.meta.url);
 const DEPS_BUILD_TIMEOUT_MS = 120_000;
 
@@ -175,10 +186,10 @@ export const releaseDependencyBuilder = () => {
   spare = null;
 };
 
-const buildDependenciesApart = (
-  request: DepsBuildRequest,
+export const runBuilder = (
+  request: { kind?: string },
   log: (message: string) => void,
-): Promise<DepBundle> =>
+): Promise<void> =>
   new Promise((resolve, reject) => {
     const child = spare ?? spawnBuilder();
     spare = null;
@@ -200,17 +211,21 @@ const buildDependenciesApart = (
     child.on("close", (code, signal) => {
       clearTimeout(timer);
       if (pending) log(pending);
-      try {
-        if (code !== 0) throw new Error(stderr.trim() || `exited with ${signal ?? code}`);
-        const manifest = JSON.parse(fs.readFileSync(path.join(request.dir, "manifest.json"), "utf8")) as Record<string, string>;
-        resolve({ dir: request.dir, entries: new Map(Object.entries(manifest)) });
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
+      if (code === 0) resolve();
+      else reject(new Error(stderr.trim() || `exited with ${signal ?? code}`));
     });
     child.stdin.on("error", () => undefined);
     child.stdin.end(`${JSON.stringify(request)}\n`);
   });
+
+const buildDependenciesApart = async (
+  request: DepsBuildRequest,
+  log: (message: string) => void,
+): Promise<DepBundle> => {
+  await runBuilder(request, log);
+  const manifest = JSON.parse(fs.readFileSync(path.join(request.dir, "manifest.json"), "utf8")) as Record<string, string>;
+  return { dir: request.dir, entries: new Map(Object.entries(manifest)) };
+};
 
 export const buildDependencyBundle = async (
   options: DepsBuildRequest & {
@@ -263,6 +278,7 @@ export const buildDependencyBundle = async (
     await bundle.write({
       dir: staging,
       format: "esm",
+      ...(options.mode === "production" ? { minify: COMPACT } : {}),
       entryFileNames: "[name].js",
       chunkFileNames: "chunk-[hash].js",
       assetFileNames: "asset-[hash][extname]",

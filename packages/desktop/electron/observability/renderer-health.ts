@@ -1,4 +1,6 @@
 import { app, type WebContents } from "electron";
+import { resolveBundleFrames } from "../source/bundle-stacks.js";
+import { rendererCacheDir } from "../source/renderer-protocol.js";
 import { getMainLogger } from "./main-logger.js";
 
 /**
@@ -239,8 +241,9 @@ export class RendererHealthMonitor {
     });
     const stack = await collectStack(contents);
     if (stack) {
+      const inSource = await resolveBundleFrames(stack, rendererCacheDir()).catch(() => stack);
       logger?.error("main.renderer-stall-stack", {
-        stack: stack.replace(/\s*\n\s*/g, " | ").slice(0, 4_000),
+        stack: inSource.replace(/\s*\n\s*/g, " | ").slice(0, 4_000),
       });
     }
   }

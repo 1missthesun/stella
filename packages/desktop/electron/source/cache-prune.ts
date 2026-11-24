@@ -16,7 +16,7 @@ export const touchCacheEntry = (entry: string) => {
 };
 
 // The bulk; graphs, routes and Tailwind results are a few small files per checkout.
-const SECTIONS = ["modules", "deps"];
+const SECTIONS = ["modules", "deps", "bundles"];
 
 export const pruneRendererCache = async (
   cacheDir: string,

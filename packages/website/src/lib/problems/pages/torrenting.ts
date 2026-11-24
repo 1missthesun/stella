@@ -693,7 +693,7 @@ export const TORRENTING_PAGES: ProblemPage[] = [
         a: "Yes, without a script: give each category its own save path and turn on Automatic Torrent Management, and qBittorrent moves finished downloads there itself. That moves the files rather than unpacking them.",
       },
     ],
-    related: ["torrenting/rename-organize-downloads-for-plex", "files-folders/open-rar-file", "torrenting/set-up-qbittorrent"],
+    related: ["torrenting/rename-organize-downloads-for-plex", "torrenting/download-from-seedbox-automatically", "files-folders/open-rar-file"],
     lastChecked: "2026-11-23",
     sources: [
       { label: "qBittorrent wiki: external programs", href: "https://github.com/qbittorrent/qBittorrent/wiki/External-programs-How-to" },
@@ -806,12 +806,241 @@ export const TORRENTING_PAGES: ProblemPage[] = [
         a: "Yes. Copy the data folders, then convert the paths with `qbt_migrate`, which changes the slashes with `-t Linux` or `-t Mac`.",
       },
     ],
-    related: ["torrenting/extract-rar-after-torrent-downloads", "files-folders/compare-two-folders", "torrenting/set-up-qbittorrent"],
+    related: ["torrenting/switch-utorrent-to-qbittorrent", "torrenting/extract-rar-after-torrent-downloads", "torrenting/download-from-seedbox-automatically", "files-folders/compare-two-folders"],
     lastChecked: "2026-11-23",
     sources: [
       { label: "qBittorrent wiki: FAQ (where settings and torrents are saved)", href: "https://github.com/qbittorrent/qBittorrent/wiki/Frequently-Asked-Questions" },
       { label: "qBittorrent wiki: status of missing files at start up", href: "https://github.com/qbittorrent/qBittorrent/wiki/Status-of-Missing-files-at-start-up-or-after-restart" },
       { label: "qbt_migrate on GitHub", href: "https://github.com/jslay88/qbt_migrate" },
+    ],
+  },
+  {
+    slug: "switch-utorrent-to-qbittorrent",
+    niche: "torrenting",
+    searchPhrases: [
+      "utorrent to qbittorrent",
+      "utorrent to qbittorrent migration",
+      "transfer utorrent to qbittorrent",
+      "import utorrent to qbittorrent",
+      "export utorrent to qbittorrent",
+      "utorrent to qbittorrent migration tool",
+    ],
+    title: "Move from uTorrent to qBittorrent with labels and progress",
+    description:
+      "Bring every uTorrent download into qBittorrent with its label, folder and progress, and download nothing again. Free with bt2qbt, or let Stella (stella.sh) do it.",
+    h1: "Switch from uTorrent to qBittorrent",
+    short: "Move uTorrent to qBittorrent",
+    lede: "Every torrent across with its label, folder and progress, and nothing downloaded again.",
+    answer:
+      "uTorrent keeps its list in `resume.dat`; qBittorrent keeps one `.fastresume` per torrent in `BT_backup`. The free bt2qbt converts one to the other, labels included: close both programs, run it, start qBittorrent and Force recheck. Stella (stella.sh) does the whole switch on your computer: it reads uTorrent's list, checks the files you already have, and brings each torrent over with its label as a category, its folder, its progress and whether it was stopped.",
+    stellaSteps: [
+      "Reads uTorrent's saved list with each torrent's label, folder, added date, progress and state",
+      "Checks the files on disk against every torrent, so the unfinished one keeps only the parts it really has",
+      "Saves a copy of qBittorrent's profile, then writes each torrent into it with the label as a category",
+      "Starts qBittorrent to confirm what's complete, what's stopped and what's still partial",
+      "Leaves uTorrent and the downloads untouched and says how to undo it",
+    ],
+    prompt:
+      "I'm switching from uTorrent to qBittorrent (it's in Apps\\qBittorrent). Move all my torrents over with their labels and progress so nothing downloads again. Leave its network settings as they are, and just give me a short summary when it's done.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-23",
+      platform: "Windows 11",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "In about 5 minutes all 6 uTorrent downloads were in qBittorrent with their labels as categories, their folders, their added dates and the one stopped torrent still stopped. Checked afterwards by us: we started that qBittorrent and forced a full recheck. Five came out at 100%, the half-finished one kept its 46%, and every file was unchanged.",
+      note: "The uTorrent list and downloads were made by us: synthetic clips under Creative Commons and public-domain titles, an album by an invented band and a made-up ISO, with a portable qBittorrent kept to this PC. The wait is sped up 55×.",
+      video: {
+        src: `${PROOFS}/torrenting/switch-utorrent-to-qbittorrent/proof.mp4`,
+        cuts: webCuts("torrenting/switch-utorrent-to-qbittorrent"),
+        poster: `${PROOFS}/torrenting/switch-utorrent-to-qbittorrent/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 30.57,
+        realDuration: 334,
+      },
+      moments: [
+        { at: 0, text: "Stella on Windows 11, with uTorrent's saved list of six torrents and an empty portable qBittorrent." },
+        { at: 4, text: "The prompt: move every torrent over with labels and progress, download nothing again, short summary." },
+        { at: 11, text: "Stella starts moving the torrents, leaving qBittorrent's network settings alone." },
+        { at: 14.7, text: "Reading uTorrent's list, checking files and writing them into qBittorrent, sped up 55×." },
+        { at: 20, text: "Done: all six across, five at 100%, Tears of Steel at 45.8%, and one still stopped as it was." },
+        { at: 25, text: "uTorrent is untouched, and the old qBittorrent profile is saved for an undo." },
+      ],
+    },
+    manualTitle: "Switch it yourself",
+    manualSteps: [
+      {
+        title: "Prepare both programs",
+        body: "In uTorrent open Options › Preferences › General and untick Append .!ut to incomplete files, or half-finished downloads won't be recognised. Exit both programs from their menus, not just the window, and check the tray. Copy `%APPDATA%\\uTorrent`, `%APPDATA%\\qBittorrent` and `%LOCALAPPDATA%\\qBittorrent` somewhere safe.",
+      },
+      {
+        title: "Set qBittorrent's storage to Fastresume files",
+        body: "Open qBittorrent once and go to Options › Advanced › Resume data storage type and choose Fastresume files, which bt2qbt needs on qBittorrent 5. Exit it again.",
+      },
+      {
+        title: "Run bt2qbt",
+        body: "Download bt2qbt from its GitHub releases page and double-click it. By default it reads `%APPDATA%\\uTorrent` and writes to `%LOCALAPPDATA%\\qBittorrent\\BT_backup` and `%APPDATA%\\qBittorrent\\categories.json`, turning labels into categories. For other folders run it from a prompt: `bt2qbt.exe -s \"D:\\uTorrent\" -d \"D:\\qBittorrent\\BT_backup\" -c \"D:\\qBittorrent\\categories.json\"`.",
+      },
+      {
+        title: "Change drive letters on the way",
+        body: "If the downloads also moved, add `-r \"C:/Torrents,E:/Torrents\"` with single slashes. If some `.torrent` files are in another folder, add `-t` with that folder, once for each.",
+      },
+      {
+        title: "Start qBittorrent and force a recheck",
+        body: "All torrents appear with their categories. Select all, right-click and choose Force recheck: torrents still partial show 100% until then, so keep them stopped until the check has finished. Finished ones go back to 100% and seed. Anything that stays short is either unfinished or in a folder bt2qbt didn't find.",
+      },
+      {
+        title: "Only a few torrents?",
+        body: "Open each `.torrent` file from `%APPDATA%\\uTorrent` in qBittorrent, choose the folder that already holds the data, and tick Skip hash check only for the ones you know are complete. Set the category by hand.",
+      },
+      {
+        title: "Retire uTorrent",
+        body: "Once the list looks right in qBittorrent, turn off uTorrent's start with Windows, and uninstall it when you're happy.",
+      },
+    ],
+    platforms: ["windows"],
+    faq: [
+      {
+        q: "Does qBittorrent import from uTorrent by itself?",
+        a: "No, it has no built-in import. You add the `.torrent` files pointing at the existing folders, or convert the whole list with a tool such as bt2qbt.",
+      },
+      {
+        q: "Will my downloads start again?",
+        a: "No, when the folders match and you force a recheck. qBittorrent reads what's there and only downloads what is missing.",
+      },
+      {
+        q: "Do uTorrent labels come across?",
+        a: "Yes. bt2qbt writes labels as qBittorrent categories or tags unless you turn it off with `--without-labels` or `--without-tags`.",
+      },
+      {
+        q: "What isn't moved?",
+        a: "uTorrent's overall statistics and its settings, such as speed limits and RSS feeds, stay behind. Set those again in qBittorrent's options.",
+      },
+      {
+        q: "Where does uTorrent keep its torrents?",
+        a: "In `%APPDATA%\\uTorrent`: `resume.dat` holds the list and progress, and the `.torrent` files sit beside it. The program folder in Program Files holds no list.",
+      },
+    ],
+    related: ["torrenting/move-qbittorrent-to-new-drive-or-computer", "torrenting/extract-rar-after-torrent-downloads", "torrenting/download-from-seedbox-automatically", "torrenting/rename-organize-downloads-for-plex"],
+    lastChecked: "2026-11-23",
+    sources: [
+      { label: "bt2qbt on GitHub", href: "https://github.com/rumanzo/bt2qbt" },
+      { label: "qBittorrent wiki: FAQ (importing torrents, data locations)", href: "https://github.com/qbittorrent/qBittorrent/wiki/Frequently-Asked-Questions" },
+    ],
+  },
+  {
+    slug: "download-from-seedbox-automatically",
+    niche: "torrenting",
+    searchPhrases: [
+      "download from seedbox",
+      "auto download from seedbox",
+      "download files from seedbox",
+      "sync seedbox to nas",
+      "fastest way to download from seedbox",
+      "seedbox setup",
+    ],
+    title: "Download from your seedbox automatically every night",
+    description:
+      "Pull finished seedbox downloads over SFTP on a schedule, skip unfinished files and never fetch the same thing twice. With free rclone, or Stella (stella.sh).",
+    h1: "Download from a seedbox automatically",
+    short: "Pull seedbox downloads every night",
+    lede: "Finished downloads come home at night, once each, while the seedbox keeps seeding.",
+    answer:
+      "Have the seedbox hard-link each finished download into an outbox folder, then run `rclone move` from that outbox over SFTP on a nightly schedule: only finished files come down, nothing comes twice, and the originals keep seeding. rclone is free. Stella (stella.sh) sets up the nightly pull on your computer instead, with no change on the seedbox: it skips unfinished downloads, remembers what it already fetched even after you move it, and does the first pull right away.",
+    stellaSteps: [
+      "Reads the login from your file and looks through the seedbox's downloads over SFTP without changing anything there",
+      "Gets rclone, the free transfer tool, and tells finished downloads from ones still marked .!qB",
+      "Writes a pull script with a list of everything fetched, so moving or deleting files at home doesn't bring them back",
+      "Does the first pull, checks the sizes, and tries a repeat run",
+      "Schedules it in Windows Task Scheduler for 3am every night, with a log",
+    ],
+    prompt:
+      "Set up my PC to pull finished downloads from my seedbox into Downloads\\Seedbox every night at 3am. Only finished ones, and don't download anything twice, even after I move things out of that folder. The login is in Documents\\seedbox.txt. Do the first pull now, and just give me a short summary when it's done.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-23",
+      platform: "Windows 11",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "In under 4 minutes Stella pulled the 3 finished downloads, left the 2 unfinished ones, and scheduled the pull for 3am. Checked afterwards by us: we moved one download away and deleted another at home, let two more finish on the seedbox, and ran the scheduled task's own command. The two new ones came down, the moved and deleted ones did not come back, and nothing unfinished was fetched.",
+      note: "The seedbox was an SFTP server on the same PC holding synthetic clips under Creative Commons film titles and an album by an invented band; the 3am run was started by us rather than waited for. The wait is sped up 32×.",
+      video: {
+        src: `${PROOFS}/torrenting/download-from-seedbox-automatically/proof.mp4`,
+        cuts: webCuts("torrenting/download-from-seedbox-automatically"),
+        poster: `${PROOFS}/torrenting/download-from-seedbox-automatically/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 32.7,
+        realDuration: 227,
+      },
+      moments: [
+        { at: 0, text: "Stella on Windows 11. The seedbox holds three finished downloads and two still downloading." },
+        { at: 4, text: "The prompt: pull finished downloads every night at 3am, nothing twice, and do the first pull now." },
+        { at: 11, text: "Stella starts on the 3am pull and the first download." },
+        { at: 15.8, text: "Connecting, writing the pull script, fetching and scheduling, sped up 32×." },
+        { at: 21.5, text: "Done: Big Buck Bunny, Night Ferry and Sintel are home; Cosmos Laundromat and Tears of Steel wait until they finish." },
+        { at: 26, text: "It moved Sintel out, ran the pull again, and nothing downloaded twice." },
+      ],
+    },
+    manualTitle: "Set it up yourself",
+    manualSteps: [
+      {
+        title: "Install rclone and add the seedbox",
+        body: "Install it with `winget install Rclone.Rclone` (Windows), `brew install rclone` (Mac) or the script on rclone.org (Linux). Run `rclone config`, choose `n` for a new remote, name it `seedbox`, pick `sftp`, and enter the host, port, user and password from your provider's panel. Set `known_hosts_file` if you want the server's key checked. Test it with `rclone lsd seedbox:`.",
+      },
+      {
+        title: "Give the seedbox an outbox of finished downloads",
+        body: "On the seedbox, make a folder such as `~/outbox` on the same disk as the downloads. In its qBittorrent open Options › Downloads, tick Run on torrent finished and enter `cp -al \"%F\" /home/you/outbox/`. `%F` is the finished content, and `-l` makes hard links: they take no extra space and the original keeps seeding. Because it runs only when a torrent finishes, half-done files never reach the outbox. rTorrent and Deluge have their own finished hooks for the same command.",
+      },
+      {
+        title: "Pull and empty the outbox",
+        body: "Try it first: `rclone move seedbox:outbox \"D:\\Seedbox\" --delete-empty-src-dirs --dry-run -v`. Then run it without `--dry-run`. `move` copies each file, then removes it from the outbox when the copy succeeded, so it is never fetched again even if you move or delete it at home. The downloads folder itself is not touched.",
+      },
+      {
+        title: "Already have finished downloads there?",
+        body: "Hard-link them into the outbox once from a shell on the seedbox: `cp -al ~/downloads/\"Some Finished Download\" ~/outbox/`. Leave out anything with a `.!qB` file in it, the ending qBittorrent gives unfinished files when Append .!qB extension to incomplete files is on.",
+      },
+      {
+        title: "Use more connections if it's slow",
+        body: "Add `--transfers 4` for several files at once and `--multi-thread-streams 4` for large single files. A seedbox far away usually gains the most from parallel connections.",
+      },
+      {
+        title: "Schedule it for the night",
+        body: "On Windows put the command in `C:\\Scripts\\seedbox.cmd` and run `schtasks /create /tn \"Seedbox pull\" /sc daily /st 03:00 /tr \"C:\\Scripts\\seedbox.cmd\"`. On Linux or a NAS add `0 3 * * * rclone move seedbox:outbox /volume1/Seedbox --delete-empty-src-dirs --log-file /var/log/seedbox.log` with `crontab -e`; on a Mac use cron or launchd. Read the log after the first night.",
+      },
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "What's the fastest way to download from a seedbox?",
+        a: "SFTP with several connections at once: rclone with `--transfers` and `--multi-thread-streams`, or lftp's `mirror --parallel` with `--use-pget-n`. One plain FTP connection is usually the slowest.",
+      },
+      {
+        q: "How do I avoid downloading unfinished files?",
+        a: "Turn on Append .!qB extension to incomplete files in the seedbox's qBittorrent and exclude `*.!qB`, or keep unfinished torrents in a separate folder with Keep incomplete torrents in, and only pull the finished folder.",
+      },
+      {
+        q: "Can I sync a seedbox to a NAS?",
+        a: "Yes. Install rclone on the NAS and run the same command from its task scheduler, or use Syncthing with the seedbox folder set to send only and the NAS folder to receive only.",
+      },
+      {
+        q: "Will pulling files stop them seeding?",
+        a: "No. Copying reads the files, and moving hard links from the outbox removes only the link. The torrent's own files stay where they are.",
+      },
+      {
+        q: "Does my computer need to be on?",
+        a: "The scheduled task runs when the computer is on. In Task Scheduler tick Wake the computer to run this task and Run task as soon as possible after a scheduled start is missed.",
+      },
+    ],
+    related: ["torrenting/rename-organize-downloads-for-plex", "torrenting/extract-rar-after-torrent-downloads", "torrenting/move-qbittorrent-to-new-drive-or-computer", "files-folders/compare-two-folders"],
+    lastChecked: "2026-11-23",
+    sources: [
+      { label: "rclone: SFTP", href: "https://rclone.org/sftp/" },
+      { label: "rclone: install", href: "https://rclone.org/install/" },
+      { label: "rclone: move", href: "https://rclone.org/commands/rclone_move/" },
+      { label: "Microsoft: schtasks create", href: "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/schtasks-create" },
+      { label: "qBittorrent wiki: external programs", href: "https://github.com/qbittorrent/qBittorrent/wiki/External-programs-How-to" },
     ],
   },
   {

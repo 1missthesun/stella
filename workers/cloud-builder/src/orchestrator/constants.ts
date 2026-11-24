@@ -1,5 +1,6 @@
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { APPEND_WINDOW_MAX_BYTES } from "../conversation-types.js";
+import { CLOUD_BUILDER_BODY_LIMITS } from "../request-ingress.js";
 
 export const CONNECT_CARD_WAIT_MS = 5 * 60_000;
 export const CONNECT_CARD_POLL_MS = 2_000;
@@ -18,7 +19,6 @@ export const piThreadKey = (threadId: string): string =>
 export const PI_JOURNAL_IMPORT_BATCH = 200;
 export const PI_MIRRORED_KEY = "piMirroredEntry";
 export const PI_LIVE_KEY = "piLive";
-/** Tasks that waited while their schedules could not be listed: threadId -> since (ms). */
 export const PI_WAKE_RECHECK_KEY = "piWakeRecheck";
 export const PI_WAKE_RECHECK_EVERY_MS = 60_000;
 export const PI_WAKE_RECHECK_FOR_MS = 24 * 60 * 60_000;
@@ -30,23 +30,9 @@ export const BRAIN_HANDOFF_KEY = "brainHandoff";
 export const AGENT_RECONCILE_INTERVAL_MS = 60_000;
 export const AGENTS_VIEW_KEY = "runningAgentsView";
 
-/**
- * Durable key: when this conversation first settled the running agents no
- * owner keeps a record of (`reconcileRunningAgents`).
- */
 export const AGENTS_UNOWNED_SETTLED_KEY = "agentsUnownedSettledAt";
-/**
- * An agent started this recently may not have reached its owner's records
- * yet (a computer's start is queued like its turn), so that first pass
- * leaves it alone.
- */
 export const AGENT_OWNER_RECORD_LAG_MS = 10 * 60_000;
 export const PI_HEARTBEAT_MS = 30_000;
-/**
- * While a chat turn runs, its alarm fires at least this often. The alarm is
- * what wakes a replaced object (a deploy, an eviction) so the wake can resume
- * the turn; without the beat a lost turn sat until its watchdog.
- */
 export const CHAT_TURN_HEARTBEAT_MS = 15_000;
 export const CHAT_RESUME_MAX = 2;
 export const CHAT_RESUME_MAX_AGE_MS = 15 * 60_000;
@@ -67,11 +53,7 @@ export const CHAT_TURN_MODEL_CAPABILITY_KEY = "turnModelCapability";
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
 export const LOCAL_TURN_LEASE_MS = 2 * 60_000;
 export const LOCAL_TURN_CANCEL_GRACE_MS = 45_000;
-// `userMessageJson` is nested inside the outer JSON request, so the Worker
-// temporarily retains the request bytes, decoded outer text, parsed nested
-// string, and parsed message. Keep this aligned with the outer ingress ceiling;
-// larger messages need a streaming/direct-body protocol instead.
-export const LOCAL_TURN_BEGIN_MAX_BYTES = 8 * 1024 * 1024;
+export const LOCAL_TURN_BEGIN_MAX_BYTES = CLOUD_BUILDER_BODY_LIMITS.localTurnBegin;
 export const LOCAL_TURN_FINISH_MAX_ROWS = 1_024;
 export const LOCAL_TURN_FINISH_MAX_BYTES = APPEND_WINDOW_MAX_BYTES;
 export const LOCAL_TURN_LEASE_KEY = "localTurnLease";

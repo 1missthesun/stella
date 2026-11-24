@@ -407,7 +407,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     if (this.schemaReady) return;
     const startedAt = performance.now();
     for (const statement of DDL) this.ctx.storage.sql.exec(statement);
-    // Existing owner objects predate durable desktop completion receipts.
     const dispatchColumns = this.ctx.storage.sql
       .exec<{ name: string }>("PRAGMA table_info(dispatches)")
       .toArray();
@@ -504,17 +503,9 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     );
   }
 
-  /**
-   * Blocks the owner fence for a purge. Grant issuance closes (a durable
-   * barrier, replayed by the alarm if this isolate dies) and every model
-   * reader is frozen before the fence changes, so no model request carrying
-   * owner memory starts or continues across a purge.
-   */
   protected async beginOwnerFence(
     input: OwnerFenceBeginInput,
   ): Promise<OwnerFenceBeginResult> {
-    // Same key order as the old `/owner-fence/begin` body, so a barrier left
-    // by the previous Worker is the same operation.
     const body = {
       mode: input.mode,
       requestId: input.requestId,

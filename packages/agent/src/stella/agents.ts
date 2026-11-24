@@ -846,7 +846,7 @@ const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDel
           : delivery.outcome === "resumed"
             ? " It was idle, so this started its next run."
             : delivery.outcome === "queued"
-              ? " That Stella reads it as its next turn."
+              ? " It goes to them as soon as they can take it."
               : delivery.outcome === "held"
                 ? " It is held until it can take it."
                 : ""

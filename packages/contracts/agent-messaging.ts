@@ -69,7 +69,7 @@ export const DONE_ONLY_FOR_AGENTS = "done is for agents reporting to whoever sta
 
 /** The tool result for a finished report: it goes out as the turn ends. */
 export const DONE_ACCEPTED_TEXT =
-  "Sent: your report goes to whoever started you as this turn ends, and your task is then done. Nothing else is needed; end your turn."; anything you write after this stays in your own thread.";
+  "Sent: your report goes to whoever started you as this turn ends, and your task is then done. Nothing else is needed; end your turn.";
 
 /** A second finished report in one turn: the first already goes out as the turn ends. */
 export const DONE_ALREADY_SENT =

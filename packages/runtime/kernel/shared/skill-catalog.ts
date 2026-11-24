@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { extractFrontmatterAsync } from "../frontmatter.js";
+import { extractFrontmatter } from "../frontmatter.js";
 import { statSignature } from "./fs-signature.js";
 import { renderInlineSkillCatalogBlock } from "./skill-catalog-render.js";
 
@@ -128,9 +128,7 @@ const readSkillCatalogEntry = async (
       ? ""
       : await fs.readFile(skillPath, "utf-8").catch(() => "");
 
-  const parsed = docs
-    ? await extractFrontmatterAsync(docs)
-    : { metadata: {}, body: "" };
+  const parsed = docs ? extractFrontmatter(docs) : { metadata: {}, body: "" };
   const looseHeader = docs ? parseLooseHeader(docs) : {};
   const name =
     asNonEmptyString(parsed.metadata.name) ??

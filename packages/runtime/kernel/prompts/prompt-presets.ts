@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { extractFrontmatterAsync } from "../frontmatter.js";
+import { extractFrontmatter } from "../frontmatter.js";
 import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 
 export const CUSTOMIZABLE_PROMPT_AGENT_IDS = [
@@ -60,12 +60,12 @@ const presetPath = (
 const isSafePresetId = (id: string): boolean =>
   /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && id !== DEFAULT_PROMPT_PRESET_ID;
 
-const parsePreset = async (
+const parsePreset = (
   agentId: CustomizablePromptAgentId,
   id: string,
   raw: string,
-): Promise<PromptPreset> => {
-  const parsed = await extractFrontmatterAsync(raw);
+): PromptPreset => {
+  const parsed = extractFrontmatter(raw);
   const name =
     typeof parsed.metadata.name === "string" && parsed.metadata.name.trim()
       ? parsed.metadata.name.trim()
@@ -84,7 +84,7 @@ export const readPromptPreset = async (
       presetPath(stellaDataDir, agentId, id),
       "utf-8",
     );
-    const preset = await parsePreset(agentId, id, raw);
+    const preset = parsePreset(agentId, id, raw);
     return preset.content ? preset : null;
   } catch {
     return null;

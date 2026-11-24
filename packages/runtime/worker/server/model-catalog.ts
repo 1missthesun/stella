@@ -11,20 +11,29 @@ import * as HostBus from "./host-bus.js";
 import type { RuntimeRunner } from "./types.js";
 
 /**
- * The catalog as the host receives it: the picker's fields only. A composed
- * model also carries transport details (compat, prices, thinking maps) that
- * would double what every boot pushes to each window.
+ * The catalog as the host receives it: the picker's fields only, as one
+ * compact row per model grouped by provider (`modelsByProvider`; see
+ * `RuntimeModelCatalogRow`). A composed model also carries transport details
+ * (compat, prices, thinking maps) that would double what every boot pushes to
+ * each window. Windows read it with `expandRuntimeModelCatalogModels`, which
+ * also reads the older `models` array: an Update swaps the windows before it
+ * restarts the runtime, so a new window briefly talks to the old runtime.
  */
 export const toCatalogWire = ({
   models,
   ...rest
 }: ModelRuntimeSnapshot): RuntimeModelCatalogSnapshot => {
-  const modelsByProvider: Record<string, RuntimeModelCatalogRow[]> = {};
+  // Provider ids come from users' models.json too, so a Map, not `obj[id]`
+  // (an id like "constructor" would hit Object.prototype). Stella's own
+  // models are left out: the renderer lists them from the backend and drops
+  // them from this catalog anyway.
+  const byProvider = new Map<string, RuntimeModelCatalogRow[]>();
   for (const model of models) {
     if (model.api === "stella" || model.provider === "stella") continue;
     const flags =
       (model.reasoning ? 1 : 0) | (model.input.includes("image") ? 2 : 0);
-    const list = (modelsByProvider[model.provider] ??= []);
+    let list = byProvider.get(model.provider);
+    if (!list) byProvider.set(model.provider, (list = []));
     list.push([
       model.id,
       model.name && model.name !== model.id ? model.name : 0,
@@ -35,7 +44,7 @@ export const toCatalogWire = ({
   }
   return {
     ...rest,
-    modelsByProvider,
+    modelsByProvider: Object.fromEntries(byProvider),
   };
 };
 

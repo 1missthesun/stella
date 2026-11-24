@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inflateRawSync } from "node:zlib";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -13,6 +14,7 @@ const CATALOG_ROOTS = [
   {
     name: "mobile (generated)",
     dir: join(repoRoot, "packages/mobile/src/i18n/locales"),
+    packsDir: join(repoRoot, "packages/mobile/src/i18n/packs"),
   },
 ];
 
@@ -56,31 +58,95 @@ const leafPaths = (node, prefix = "", out = new Set()) => {
   return out;
 };
 
+const orderedLeafPaths = (node, prefix = "", out = []) => {
+  if (
+    typeof node === "string" ||
+    Array.isArray(node) ||
+    isPluralNode(node) ||
+    node === null ||
+    typeof node !== "object"
+  ) {
+    out.push(prefix);
+    return out;
+  }
+  for (const [key, child] of Object.entries(node)) {
+    orderedLeafPaths(child, prefix ? `${prefix}.${key}` : key, out);
+  }
+  return out;
+};
+
+const readSingleFileZipJson = (zipPath) => {
+  const buf = readFileSync(zipPath);
+  if (buf.length < 30 || buf.readUInt32LE(0) !== 0x04034b50) {
+    throw new Error(`Invalid zip header in ${zipPath}`);
+  }
+  const method = buf.readUInt16LE(8);
+  const compSize = buf.readUInt32LE(18);
+  const nameLen = buf.readUInt16LE(26);
+  const extraLen = buf.readUInt16LE(28);
+  const start = 30 + nameLen + extraLen;
+  const payload = buf.subarray(start, start + compSize);
+  const raw = method === 0 ? payload : inflateRawSync(payload);
+  return JSON.parse(raw.toString("utf8"));
+};
+
 const readCatalog = (dir, locale) =>
   JSON.parse(readFileSync(join(dir, `${locale}.json`), "utf8"));
 
-const checkRoot = ({ name, dir }) => {
-  const locales = readdirSync(dir)
+const checkRoot = ({ name, dir, packsDir }) => {
+  const jsonLocales = readdirSync(dir)
     .filter((file) => file.endsWith(".json"))
     .map((file) => file.slice(0, -".json".length))
     .sort();
-  if (!locales.includes("en")) {
+  if (!jsonLocales.includes("en")) {
     throw new Error(`${name}: no en.json in ${dir}`);
   }
 
-  const english = leafPaths(readCatalog(dir, "en"));
+  const englishCatalog = readCatalog(dir, "en");
+  const englishOrder = orderedLeafPaths(englishCatalog);
+  const english = new Set(englishOrder);
   const report = [];
-  for (const locale of locales) {
+
+  for (const locale of jsonLocales) {
     if (locale === "en") continue;
     const translated = leafPaths(readCatalog(dir, locale));
     const missing = [...english].filter((path) => !translated.has(path)).sort();
     const extra = [...translated].filter((path) => !english.has(path)).sort();
     if (missing.length || extra.length) report.push({ locale, missing, extra });
   }
+
+  const packLocales =
+    packsDir && existsSync(packsDir)
+      ? readdirSync(packsDir)
+          .filter((file) => file.endsWith(".zip"))
+          .map((file) => file.slice(0, -".zip".length))
+          .sort()
+      : [];
+
+  for (const locale of packLocales) {
+    const values = readSingleFileZipJson(join(packsDir, `${locale}.zip`));
+    const missing = [];
+    const extra = [];
+    if (!Array.isArray(values)) {
+      missing.push("(pack payload is not an array)");
+    } else {
+      for (let i = 0; i < englishOrder.length; i += 1) {
+        if (i >= values.length || values[i] === null || values[i] === undefined) {
+          missing.push(englishOrder[i]);
+        }
+      }
+      if (values.length > englishOrder.length) {
+        extra.push(`(${values.length - englishOrder.length} trailing values)`);
+      }
+    }
+    if (missing.length || extra.length) report.push({ locale, missing, extra });
+  }
+
+  const allLocales = new Set([...jsonLocales, ...packLocales]);
   return {
     name,
     dir,
-    localeCount: locales.length,
+    localeCount: allLocales.size,
     keyCount: english.size,
     report,
   };

@@ -19,6 +19,9 @@ import {
   unprotectValue,
 } from "@stella/node-shared/shared/protected-storage";
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
+import { matchSavedFields } from "@stella/contracts/saved-values";
+
+export { matchSavedFields };
 
 const INDEX_FILE = "user-ask-saved-values.json";
 const LEGACY_FILE = "user-ask-secrets.json";
@@ -248,84 +251,6 @@ const decodePayload = (payload: string | null): Record<string, string> | null =>
 };
 
 const newHandle = () => `${USER_ASK_SECRET_HANDLE_PREFIX}${randomUUID()}`;
-
-const fieldKey = (value: string) =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, "");
-
-/** Names a sign-in's account field goes by: a login saved with "Email" answers a request for "Username". */
-const ACCOUNT_FIELD_KEYS = new Set([
-  "username", "user", "userid", "login", "loginid", "email", "emailaddress",
-  "usernameoremail", "emailorusername", "account", "accountname",
-]);
-
-/** The name a field is paired by: its own, or "account" for any of the account names. */
-const pairingKey = (value: string) => {
-  const key = fieldKey(value);
-  return ACCOUNT_FIELD_KEYS.has(key) ? "account" : key;
-};
-
-type MatchableField = Pick<UserAskField, "id" | "label" | "type" | "sensitive">;
-
-/** A one-time code is never saved, so no saved field answers one. */
-const sameKind = (saved: SavedField, field: MatchableField) =>
-  field.type !== "code" &&
-  saved.sensitive === field.sensitive &&
-  (saved.type === "secret") === (field.type === "secret");
-
-/**
- * Pairs requested fields with saved ones, one to one: by id, then by label,
- * then by what the field is (any account name pairs with any other), then
- * (so a renamed field still finds its value) the only unclaimed saved field
- * of the same kind when exactly one requested field of that kind is left over.
- * No saved field is ever paired with two requested fields, so every field keeps
- * its own value and its own handle.
- */
-export const matchSavedFields = (
-  saved: readonly SavedField[],
-  fields: readonly MatchableField[],
-): Map<string, SavedField> => {
-  const matched = new Map<string, SavedField>();
-  const claimed = new Set<SavedField>();
-  const pair = (field: MatchableField, candidate: SavedField | undefined) => {
-    if (!candidate || claimed.has(candidate) || matched.has(field.id)) return;
-    matched.set(field.id, candidate);
-    claimed.add(candidate);
-  };
-  for (const field of fields) {
-    if (field.type === "code") continue;
-    pair(field, saved.find((candidate) => candidate.id === field.id));
-  }
-  for (const field of fields) {
-    if (matched.has(field.id) || field.type === "code") continue;
-    const label = fieldKey(field.label);
-    pair(
-      field,
-      saved.find((candidate) => !claimed.has(candidate) && fieldKey(candidate.label) === label),
-    );
-  }
-  for (const field of fields) {
-    if (matched.has(field.id)) continue;
-    const keys = new Set([pairingKey(field.id), pairingKey(field.label)]);
-    pair(
-      field,
-      saved.find(
-        (candidate) =>
-          !claimed.has(candidate) &&
-          sameKind(candidate, field) &&
-          (keys.has(pairingKey(candidate.id)) || keys.has(pairingKey(candidate.label))),
-      ),
-    );
-  }
-  for (const field of fields) {
-    if (matched.has(field.id)) continue;
-    const open = saved.filter((candidate) => !claimed.has(candidate) && sameKind(candidate, field));
-    const rivals = fields.filter(
-      (other) => !matched.has(other.id) && open.some((candidate) => sameKind(candidate, other)),
-    );
-    if (open.length === 1 && rivals.length === 1) pair(field, open[0]);
-  }
-  return matched;
-};
 
 export class SavedSecureValues {
   private readonly getDir: () => string | null;

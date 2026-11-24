@@ -964,6 +964,9 @@ const sealUtf8Bytes = (value: string): Uint8Array => {
   return new Uint8Array(bytes);
 };
 
+/** UTF-8 bytes of a value's stable JSON (sorted keys): the binding sealed values carry as AAD. */
+export const sealBindingBytes = (value: unknown): Uint8Array => sealUtf8Bytes(sealStableJson(value));
+
 export const userAskSealAadString = (binding: UserAskSealBinding): string =>
   sealStableJson({
     schemaVersion: USER_ASK_SCHEMA_VERSION,

@@ -15,7 +15,7 @@ export type SourceWorkerData = {
 
 export type SourceWorkerRequest =
   | { type: "request"; id: number; url: string }
-  | { type: "apply"; id: number; paths: string[]; ran: RanImports | null };
+  | { type: "apply"; id: number; paths: string[]; ran: RanImports | null; bundle: string | null };
 
 export type SourceWorkerMessage =
   | { type: "response"; id: number; status: number; contentType: string; body: Uint8Array }
@@ -133,7 +133,7 @@ port.listen((message) => {
       );
   } else if (message.type === "apply") {
     void source
-      .then((ready) => ready.applyChanges(message.paths, message.ran))
+      .then((ready) => ready.applyChanges(message.paths, message.ran, message.bundle))
       .then(
         (result) => post({ type: "applied", id: message.id, result }),
         (error: unknown) =>

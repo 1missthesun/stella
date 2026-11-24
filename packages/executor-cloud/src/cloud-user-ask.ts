@@ -5,19 +5,38 @@ import {
   clampUserAskTimeoutMs,
   normalizeUserAskDeclineReason,
   normalizeUserAskNote,
+  savedValueLabel,
   USER_ASK_EXPIRED_NOTE,
   userAskDeclinedNote,
   userAskDefaultedResolution,
+  userAskFieldIsRememberable,
+  type SecureInputNotSaved,
   type UserAskAnswer,
   type UserAskDetail,
+  type UserAskField,
   type UserAskResolution,
+  type UserAskSavedValueNote,
+  type UserAskSealedValue,
   type UserAskState,
 } from "@stella/contracts/user-ask";
+import type { SavedValueReleaseResult } from "@stella/contracts/saved-values";
+import type { CloudBrowserBridge } from "@stella/runtime/kernel/tools/types.js";
 import type {
   AskUserRequest,
   SecureInputRequest,
+  SecureValueUseRequest,
   UserToolsConfig,
 } from "@stella/runtime/kernel/tools/user.js";
+import {
+  useCloudSecureValue,
+  type CloudSecureCommandScope,
+  type CloudSecureValueStore,
+} from "./cloud-secure-values.js";
+import {
+  createTaskRecipientKey,
+  openSealedValue,
+  type TaskRecipientKey,
+} from "./user-ask-seal.js";
 
 export const CLOUD_USER_ASK_PATH = "/api/cloud/user-ask";
 
@@ -88,10 +107,48 @@ const answeredResolution = (
   };
 };
 
+/** What a field's value became: text the task reads, or a handle held here. */
+type Opened = {
+  values: Record<string, string>;
+  handles: Record<string, string>;
+  asHandles: string[];
+  freshUntil: number;
+};
+
+const emptyOpened = (): Opened => ({ values: {}, handles: {}, asHandles: [], freshUntil: 0 });
+
+/** The fields a release asks for: what request_secure_input normalized, no more. */
+const releaseFields = (fields: readonly UserAskField[]) =>
+  fields.map((field) => ({
+    id: field.id,
+    label: field.label,
+    type: field.type,
+    sensitive: field.sensitive,
+    ...(field.optional ? { optional: true } : {}),
+  }));
+
+/**
+ * A masked field is never readable by a cloud task: the answering devices
+ * seal only sensitive fields, and a value that reaches the cloud in plain
+ * text is one the cloud could read.
+ */
+const cloudFields = (fields: readonly UserAskField[]): readonly UserAskField[] =>
+  fields.map((field) =>
+    field.type === "secret" && !field.sensitive ? { ...field, sensitive: true } : field,
+  );
+
 export const createCloudUserAskHost = (args: {
   post: (route: string, body: unknown) => Promise<Response>;
   turnId: string;
   conversationId: string;
+  /** The thread the task runs for: its handles work only for it. */
+  threadId: string;
+  /** Holds the values this task is given; absent, sensitive fields are refused. */
+  secureValues?: CloudSecureValueStore;
+  /** Where use_secure_value runs a command. */
+  commandScope?: CloudSecureCommandScope;
+  /** The cloud browser use_secure_value fills. */
+  browser?: CloudBrowserBridge;
 }): CloudUserAskHost => {
   const openAsks = new Set<string>();
   let shutdownNote: string | null = null;
@@ -172,6 +229,8 @@ export const createCloudUserAskHost = (args: {
     askId: string;
     deadlineAt: number | null;
     onDefault: () => UserAskResolution;
+    /** Turns an answer into the resolution (a secure input opens its sealed fields). */
+    onAnswer?: (read: AnswerRead) => Promise<UserAskResolution>;
   }): Promise<UserAskResolution> => {
     let delay = FIRST_POLL_MS;
     let failingSince: number | null = null;
@@ -216,6 +275,19 @@ export const createCloudUserAskHost = (args: {
         };
       }
       delay = ANSWER_POLL_MS;
+      if (read.answer && input.onAnswer) {
+        openAsks.delete(input.askId);
+        try {
+          return await input.onAnswer(read);
+        } catch (error) {
+          return {
+            outcome: "canceled",
+            askId: input.askId,
+            at: Date.now(),
+            note: `The answer could not be opened here: ${(error as Error).message}`,
+          };
+        }
+      }
       const resolution = answeredResolution(input.askId, read);
       if (resolution) {
         openAsks.delete(input.askId);
@@ -270,23 +342,155 @@ export const createCloudUserAskHost = (args: {
     });
   };
 
+  const ownerOf = (request: { agentId?: string; conversationId?: string }): string =>
+    request.agentId || request.conversationId || args.threadId;
+
+  /**
+   * One field's value: a sensitive one (or a readable one Stella would hide
+   * from the task anyway) is held here behind a handle; the rest is text.
+   */
+  const place = async (
+    opened: Opened,
+    field: UserAskField,
+    value: string,
+    owner: string,
+  ): Promise<void> => {
+    const store = args.secureValues!;
+    const hidden = !field.sensitive && store.hides(value);
+    if (!field.sensitive && !hidden) {
+      opened.values[field.id] = value;
+      return;
+    }
+    const held = await store.hold(value, field.label, owner);
+    opened.handles[field.id] = held.handle;
+    opened.freshUntil = Math.max(opened.freshUntil, held.expiresAt);
+    if (hidden) opened.asHandles.push(field.id);
+  };
+
+  const openField = (
+    key: TaskRecipientKey,
+    askId: string,
+    fieldId: string,
+    sealed: UserAskSealedValue,
+  ): string => openSealedValue({ sealed, key, askId, fieldId });
+
+  /** Ask the user's computers for a value they saved, sealed to this request's key. */
+  const release = async (input: {
+    releaseId: string;
+    key: TaskRecipientKey;
+    secureRequest: SecureInputRequest;
+    fields: readonly UserAskField[];
+    service: string;
+    account?: string;
+  }): Promise<SavedValueReleaseResult> => {
+    try {
+      return (await request({
+        op: "release",
+        releaseId: input.releaseId,
+        service: input.service,
+        ...(input.account ? { account: input.account } : {}),
+        purpose: input.secureRequest.purpose,
+        fields: releaseFields(input.fields),
+        recipientKey: input.key.recipientKey,
+      })) as SavedValueReleaseResult;
+    } catch (error) {
+      // No computer answered in time, or the cloud can't ask: the card
+      // still reaches the user.
+      console.error(`saved value release failed: ${(error as Error).message}`);
+      return { found: false, savedHere: [], reason: "no_computer" };
+    }
+  };
+
   const requestSecureInput = async (
     secureRequest: SecureInputRequest,
-  ): Promise<UserAskResolution> => {
-    const fields = secureRequest.fields ?? [];
+  ): Promise<UserAskResolution | SecureInputNotSaved> => {
+    const fields = cloudFields(secureRequest.fields ?? []);
     if (fields.length === 0) {
       throw new Error("Describe at least one field to collect.");
     }
-    const refused = fields.filter(
-      (field) => field.sensitive || field.type === "secret",
-    );
-    if (refused.length > 0) {
+    const store = args.secureValues;
+    if (!store && fields.some((field) => field.sensitive)) {
       throw new Error(
-        `A value this agent must never see (${refused
-          .map((field) => field.label)
-          .join(", ")}) can only be collected or used on one of the user's own computers: logins and cards the user saved in Stella are kept there, a new one is sealed to a key the asking computer holds, and this agent runs in Stella's cloud with nowhere safe to keep one. Do the part that needs it on one of their computers (move there with switch_destination, or start a helper there with spawn_agent's destination); there request_secure_input finds a saved value without asking them. Here, ask only for values you may read, such as an address or a preference.`,
+        "This task has nowhere to keep a sensitive value, so it can ask only for values it may read.",
       );
     }
+    const owner = ownerOf(secureRequest);
+    const service = secureRequest.save?.service ?? "";
+    const account = secureRequest.save?.account ?? "";
+    const replace = secureRequest.save?.replace === true;
+    const byId = new Map(fields.map((field) => [field.id, field]));
+
+    // A saved value first: one of the user's computers releases it sealed
+    // to a key that exists only in this process.
+    let prefill: { opened: Opened; covered: string[]; saved: UserAskSavedValueNote } | null = null;
+    if (service && !replace && store) {
+      const releaseId = randomUUID();
+      const key = createTaskRecipientKey();
+      const released = await release({
+        releaseId,
+        key,
+        secureRequest,
+        fields,
+        service,
+        ...(account ? { account } : {}),
+      });
+      if (released.found) {
+        const opened = emptyOpened();
+        const covered: string[] = [];
+        for (const [fieldId, sealed] of Object.entries(released.sealed)) {
+          const field = byId.get(fieldId);
+          if (!field) continue;
+          const value = openField(key, releaseId, fieldId, sealed);
+          if (!value) continue;
+          await place(opened, field, value, owner);
+          covered.push(fieldId);
+        }
+        const saved: UserAskSavedValueNote = {
+          label: released.saved.label,
+          ...(released.saved.account ? { account: released.saved.account } : {}),
+          reused: true,
+          remembered: true,
+          savedAt: released.saved.savedAt,
+          ...(released.saved.service
+            ? { service: released.saved.service, askedService: released.saved.askedService ?? service }
+            : {}),
+        };
+        const missing = fields.filter((field) => !field.optional && !covered.includes(field.id));
+        if (missing.length === 0) {
+          return {
+            outcome: "answered",
+            askId: `saved:${releaseId}`,
+            ...(Object.keys(opened.values).length > 0 ? { values: opened.values } : {}),
+            ...(Object.keys(opened.handles).length > 0 ? { handles: opened.handles } : {}),
+            ...(opened.asHandles.length > 0 ? { asHandles: opened.asHandles } : {}),
+            ...(opened.freshUntil ? { freshUntil: opened.freshUntil } : {}),
+            heldBy: "cloud_task",
+            saved,
+            answeredAt: Date.now(),
+          };
+        }
+        if (covered.length > 0) prefill = { opened, covered, saved };
+      } else {
+        if (released.message && !secureRequest.savedOnly) throw new Error(released.message);
+        if (secureRequest.savedOnly) {
+          return {
+            outcome: "not_saved",
+            savedHere: released.savedHere,
+            reason: released.reason,
+            ...(released.message ? { message: released.message } : {}),
+          };
+        }
+      }
+    }
+    if (secureRequest.savedOnly) {
+      return { outcome: "not_saved", savedHere: [], reason: "not_saved" };
+    }
+
+    // Nothing saved answers: a secure card, answered on any of the user's
+    // devices and sealed to this request's own key.
+    const key = createTaskRecipientKey();
+    const askFields = prefill ? fields.filter((field) => !prefill!.covered.includes(field.id)) : fields;
+    const label = service ? savedValueLabel(service, account) || secureRequest.purpose : "";
     const askId = await register({
       kind: "secure_input",
       toolCallId: secureRequest.toolCallId ?? randomUUID(),
@@ -296,8 +500,20 @@ export const createCloudUserAskHost = (args: {
         kind: "secure_input",
         purpose: secureRequest.purpose,
         ...(secureRequest.detail ? { detail: secureRequest.detail } : {}),
-        fields,
+        fields: askFields,
+        ...(service
+          ? {
+              save: {
+                service,
+                ...(account ? { account } : {}),
+                label: prefill ? prefill.saved.label : label,
+                ...(replace ? { replacing: true } : {}),
+                ...(prefill ? { usingSaved: true } : {}),
+              },
+            }
+          : {}),
       },
+      ...(store ? { recipientKey: key.recipientKey } : {}),
     });
     return await waitForAnswer({
       askId,
@@ -308,13 +524,87 @@ export const createCloudUserAskHost = (args: {
         at: Date.now(),
         note: "That request for values was closed before it was answered.",
       }),
+      onAnswer: async (read) => {
+        const answer = read.answer!;
+        if (answer.kind !== "fields") {
+          throw new Error("The answer was not field values.");
+        }
+        const opened = prefill?.opened ?? emptyOpened();
+        const given: UserAskField[] = [];
+        for (const entry of answer.fields) {
+          const field = byId.get(entry.fieldId);
+          if (!field) continue;
+          if (entry.kind === "plain" && field.sensitive) {
+            throw new Error(`${field.label} came back unsealed, so it was not used.`);
+          }
+          const value =
+            entry.kind === "sealed"
+              ? openField(key, askId, entry.fieldId, entry.sealed)
+              : entry.value;
+          if (!value && field.optional) continue;
+          if (store) await place(opened, field, value, owner);
+          else opened.values[field.id] = value;
+          given.push(field);
+        }
+        let saved: UserAskSavedValueNote | undefined;
+        if (service && given.some((field) => field.sensitive && userAskFieldIsRememberable(field))) {
+          // The device the user answered on saves it when they chose to.
+          const remembered = answer.remember !== false;
+          saved = {
+            label: prefill ? prefill.saved.label : label,
+            ...(account ? { account } : {}),
+            reused: false,
+            remembered,
+            ...(remembered && replace ? { replaced: true } : {}),
+          };
+        }
+        if (prefill) {
+          saved = {
+            ...(saved ?? { remembered: false }),
+            label: prefill.saved.label,
+            reused: false,
+            fromSaved: prefill.covered,
+            ...(prefill.saved.service
+              ? { service: prefill.saved.service, askedService: prefill.saved.askedService! }
+              : {}),
+          };
+        }
+        const userNote = normalizeUserAskNote(answer.note);
+        return {
+          outcome: "answered",
+          askId,
+          ...(Object.keys(opened.values).length > 0 ? { values: opened.values } : {}),
+          ...(Object.keys(opened.handles).length > 0 ? { handles: opened.handles } : {}),
+          ...(opened.asHandles.length > 0 ? { asHandles: opened.asHandles } : {}),
+          ...(opened.freshUntil ? { freshUntil: opened.freshUntil } : {}),
+          ...(store ? { heldBy: "cloud_task" as const } : {}),
+          ...(saved ? { saved } : {}),
+          ...(userNote ? { userNote } : {}),
+          answeredAt: read.answeredAt ?? Date.now(),
+          ...(read.late ? { late: true } : {}),
+        };
+      },
     });
   };
 
-  const useSecureValue = async (): Promise<never> => {
-    throw new Error(
-      "A secure value handle lives only on the computer that collected it, and this agent runs in Stella's cloud, which keeps no secret store. Have an agent on that computer spend the handle.",
-    );
+  const useSecureValue = async (useRequest: SecureValueUseRequest) => {
+    if (!args.secureValues || !args.commandScope) {
+      return {
+        handle: useRequest.handle,
+        target: useRequest.target.kind,
+        usedAt: Date.now(),
+        detail: "This task holds no secure values.",
+        ok: false,
+      };
+    }
+    return await useCloudSecureValue({
+      store: args.secureValues,
+      owner: ownerOf(useRequest),
+      handle: useRequest.handle,
+      target: useRequest.target,
+      scope: args.commandScope,
+      ...(args.browser ? { browser: args.browser } : {}),
+    });
   };
 
   return {

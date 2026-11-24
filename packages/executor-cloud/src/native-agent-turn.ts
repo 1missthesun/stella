@@ -73,6 +73,10 @@ import {
   restoreNativeStateOwner,
   sandboxedClaudeLaunch,
 } from "./claude-sandbox.js";
+import {
+  SANDBOX_FINGERPRINTS_ENV,
+  SANDBOX_FINGERPRINTS_FILE,
+} from "./secure-value-fingerprints.js";
 import { CLOUD_TOOL_HOME, toolStateEnvironment } from "@stella/contracts/cloud-tool-home";
 import { WORLD_ROOT } from "./workspace-paths.js";
 import {
@@ -858,6 +862,8 @@ export const runCloudClaude = async (options: {
     USER: CLOUD_TOOL_PROCESS_IDENTITY.user,
     LOGNAME: CLOUD_TOOL_PROCESS_IDENTITY.user,
     TMPDIR: "/tmp",
+    // The redaction hook's secure-value fingerprints (read-only, inside the sandbox).
+    [SANDBOX_FINGERPRINTS_ENV]: SANDBOX_FINGERPRINTS_FILE,
   };
   const claudeCommand = resolveExternalCliPath("claude");
   const sandbox = await prepareClaudeSandbox({

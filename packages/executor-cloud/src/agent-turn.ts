@@ -35,6 +35,8 @@ import {
 } from "@stella/runtime/kernel/tools/types.js";
 import { openAgentInbox } from "./agent-inbox.js";
 import { createCloudUserAskHost } from "./cloud-user-ask.js";
+import { createCloudSecureValueStore } from "./cloud-secure-values.js";
+import { ensureFingerprints, storeFingerprints } from "./secure-value-fingerprints.js";
 import {
   materializeDriveFiles,
   type DriveSyncResult,
@@ -49,6 +51,11 @@ import { cloudGeneralToolNames } from "./cloud-general-tools.js";
 import { createBrokerConnectClient } from "./cloud-code-services.js";
 import { createBrokerCloudBrowser } from "./cloud-browser-client.js";
 import { CODE_TOOL_CLOUD_AGENT_DESCRIPTION } from "@stella/runtime/kernel/tools/defs/code-def.js";
+import {
+  REQUEST_SECURE_INPUT_CLOUD_DESCRIPTION,
+  USE_SECURE_VALUE_CLOUD_DESCRIPTION,
+  USE_SECURE_VALUE_CLOUD_PARAMETERS,
+} from "@stella/runtime/kernel/tools/defs/secure-input.js";
 import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
 import {
   END_TURN_WAITING_DESCRIPTION,
@@ -430,12 +437,40 @@ export const runAgentTurn = (
         body: unknown,
       ): Promise<Response> => await broker.postJson(route, body);
 
+      // The secure values this task is given live only in this process; their
+      // fingerprints go where Claude Code's redaction hook reads them (the
+      // same thread key as its sandbox).
+      const fingerprintsKey = cloudClaudeRoleProfile({
+        role: "agent",
+        threadId: input.threadId,
+        conversationId: input.conversationId,
+      }).sessionKey;
+      const secureValues = yield* Effect.tryPromise({
+        try: () =>
+          createCloudSecureValueStore({
+            load: async () => (await ensureFingerprints(fingerprintsKey)).fingerprints,
+            persist: (fingerprints) => storeFingerprints(fingerprintsKey, fingerprints),
+          }),
+        catch: asError,
+      });
+      const cloudBrowser = createBrokerCloudBrowser({
+        post: postJson,
+        turnId: input.turnId,
+      });
       const userAsks = yield* Effect.acquireRelease(
         Effect.sync(() =>
           createCloudUserAskHost({
             post: postJson,
             turnId: input.turnId,
             conversationId: input.conversationId,
+            threadId: input.threadId,
+            secureValues,
+            commandScope: {
+              identity: { ...CLOUD_TOOL_PROCESS_IDENTITY, home: workspaceRoot },
+              workspaceRoot,
+              toolHome,
+            },
+            browser: cloudBrowser,
           }),
         ),
         (host) =>
@@ -505,10 +540,6 @@ export const runAgentTurn = (
         threadId: input.threadId,
         ...(input.skills ? { skills: input.skills } : {}),
         drive: driveSync,
-      });
-      const cloudBrowser = createBrokerCloudBrowser({
-        post: postJson,
-        turnId: input.turnId,
       });
       const toolHost = yield* Effect.acquireRelease(
         Effect.sync(() =>
@@ -597,7 +628,15 @@ export const runAgentTurn = (
         ...claudeToolSet.tools.map((tool) =>
           tool.name === "code"
             ? { ...tool, description: CODE_TOOL_CLOUD_AGENT_DESCRIPTION }
-            : tool,
+            : tool.name === "request_secure_input"
+              ? { ...tool, description: REQUEST_SECURE_INPUT_CLOUD_DESCRIPTION }
+              : tool.name === "use_secure_value"
+                ? {
+                    ...tool,
+                    description: USE_SECURE_VALUE_CLOUD_DESCRIPTION,
+                    parameters: USE_SECURE_VALUE_CLOUD_PARAMETERS as ToolMetadata["parameters"],
+                  }
+                : tool,
         ),
         cloudAgentMoveTool,
         endTurnWaitingTool,

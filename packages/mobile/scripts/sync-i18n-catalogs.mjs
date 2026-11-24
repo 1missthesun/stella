@@ -1,15 +1,49 @@
 #!/usr/bin/env node
 /**
- * Syncs mobile translation catalogs from `packages/desktop-ui/src/shared/i18n/locales/*.json`.
+ * Derives the phone's translation catalogs from the desktop ones
+ * (`packages/desktop-ui/src/shared/i18n/locales/*.json`) into
+ * `packages/mobile/src/i18n/`, so Metro can resolve them from inside the
+ * mobile project root.
  *
- * Only English (`src/i18n/locales/en.json`) is bundled into the Hermes JS bytecode.
- * The remaining locales are pruned to mobile-used keys, encoded as value-only arrays
- * in English leaf-path order (avoiding 27x repetition of key names), and packed as
- * minimal single-entry `.zip` static assets under `src/i18n/packs/*.zip` (`.zip` is
- * a stock Metro asset extension, requiring no custom Metro or native config). At
- * runtime the active non-English locale is unpacked on demand and cached in
- * `expo-file-system`, so all 28 languages work including on offline first launch
- * while keeping Hermes `.hbc` English-only.
+ * WHY A COPY AND NOT A CROSS-PACKAGE IMPORT
+ * -----------------------------------------
+ * The desktop catalogs live OUTSIDE Metro's `projectRoot` (`packages/mobile`).
+ * Reaching them directly would need `watchFolders: [monorepoRoot]`, which makes
+ * Metro crawl the entire repo on every start, and a dependency on
+ * `@stella/desktop-ui`, which mobile deliberately does not have. The outputs
+ * are git-tracked inside `src/`, which is what makes an EAS build work (EAS
+ * uploads the git-tracked tree before any build hook runs).
+ *
+ * WHAT IS WRITTEN
+ * ---------------
+ * - `locales/en.json`: English, the only catalog inside the Hermes bundle. It
+ *   is also every other language's per-key fallback.
+ * - `packs/<locale>.zip`: the other 27 languages as Metro static assets
+ *   (`.zip` is a stock Metro asset extension: no metro.config.js). Each is a
+ *   single-entry zip of a JSON array of values in English's key order (the key
+ *   names are not repeated 27 times). expo-updates downloads an asset only
+ *   when its content hash changes, while the JS bundle is downloaded whole on
+ *   every OTA, so translations no longer ride along with every update. The app
+ *   unpacks the active language on demand (`src/i18n/catalogs.ts`, offline
+ *   first launch included) and caches the result on disk under `hash`.
+ * - `catalog-registry.generated.ts`: the static `require()` map (Metro cannot
+ *   resolve a `require()` whose argument is a variable) plus each pack's hash.
+ *
+ * PRUNING
+ * -------
+ * The desktop catalogs hold ~2,700 keys, most of them desktop-only. The outputs
+ * keep only the keys the phone can reach: any key or key subtree named by a
+ * string literal (or by the static prefix of a built key, `prefix.${…}` or
+ * "prefix." + value) anywhere in the mobile package or in the workspace
+ * packages it depends on (found from package.json). Everything under `mobile.*`
+ * is always kept. A key the phone builds from a value that is not a literal
+ * anywhere in those sources must be listed in `ALWAYS_INCLUDED_PREFIXES`; in
+ * development the app warns when a key resolves to nothing. CI
+ * (`check:generated`) and `publish-ota.sh` refuse outputs that are stale
+ * against the sources.
+ *
+ * Run: `node scripts/sync-i18n-catalogs.mjs` (wired into the mobile
+ * `start` / `ios` / `android` / `typecheck` scripts).
  */
 
 import { createHash } from "node:crypto";
@@ -35,6 +69,9 @@ const banner = (source) =>
   `// GENERATED FILE — DO NOT EDIT.\n` +
   `// Derived from packages/desktop-ui/src/shared/i18n/${source}\n` +
   `// by packages/mobile/scripts/sync-i18n-catalogs.mjs.\n`;
+
+// Bump when the pack layout or how the app reads it changes.
+const PACK_FORMAT = "stella-i18n-pack/1";
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
 // Keep all mobile-owned keys; shared workspace packages (`@stella/contracts`,
@@ -306,7 +343,15 @@ export const buildI18nCatalogOutputs = ({
     });
     const jsonBuf = Buffer.from(JSON.stringify(values), "utf8");
     const zipBuf = buildSingleFileZip(`${locale}.json`, jsonBuf);
-    const hash = createHash("sha256").update(zipBuf).digest("hex").slice(0, 12);
+    // The app caches each unpacked catalog on disk under this hash, and a pack
+    // is only positions in English's key order, so the hash must change when
+    // that order changes even if the values don't (a renamed key would
+    // otherwise keep reading the old cached catalog).
+    const hash = createHash("sha256")
+      .update(`${PACK_FORMAT}\n${JSON.stringify(keyOrder)}\n`)
+      .update(zipBuf)
+      .digest("hex")
+      .slice(0, 12);
     const packName = `${locale}.zip`;
     packFiles.push(packName);
     outputs.set(`packs/${packName}`, zipBuf);

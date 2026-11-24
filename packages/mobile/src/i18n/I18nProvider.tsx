@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -49,48 +50,94 @@ export interface I18nProviderProps {
   children: ReactNode;
 }
 
+// `settled` is false only for the timed-out boot stand-in below, whose locale
+// is a guess: layout direction must not be flipped (an app reload) on a guess.
+type I18nState = { locale: Locale; catalog: Catalog; settled: boolean };
+
+// Bounds how long the first screen waits for its language; past it the app
+// shows English and swaps in the language when it arrives.
+const I18N_BOOT_TIMEOUT_MS = 1500;
+
+const readStoredLocale = async (): Promise<Locale | null> => {
+  try {
+    const stored = await AsyncStorage.getItem(LOCALE_STORAGE_KEY);
+    return isSupportedLocale(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+};
+
+// Non-English catalogs are unpacked from their pack on the first launch (and
+// after an update that changed them), which is asynchronous. The first screen
+// must not mount until its language is known and loaded, or it would paint in
+// English (or the device language instead of the chosen one) and then switch.
+// This starts at module load, so it runs alongside the font load that holds
+// the first render anyway, and `I18nProvider` renders nothing until it lands.
+let bootState: I18nState | null = null;
+let bootTimedOut = false;
+const bootLoad: Promise<I18nState> = (async () => {
+  const locale = (await readStoredLocale()) ?? initialLocale();
+  const catalog = getCachedCatalogSync(locale) ?? (await loadCatalogAsync(locale));
+  return { locale, catalog, settled: true };
+})();
+const boot: Promise<I18nState> = Promise.race([
+  bootLoad,
+  new Promise<I18nState>((resolve) => {
+    setTimeout(() => {
+      bootTimedOut = true;
+      resolve({ locale: DEFAULT_LOCALE, catalog: getEnglishCatalog(), settled: false });
+    }, I18N_BOOT_TIMEOUT_MS);
+  }),
+]).then((state) => {
+  bootState = state;
+  return state;
+});
+
 export function I18nProvider({ children }: I18nProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale);
-  const [catalog, setCatalog] = useState<Catalog>(
-    () => getCachedCatalogSync(locale) ?? getEnglishCatalog(),
-  );
+  const [state, setState] = useState<I18nState | null>(() => bootState);
+  const requestedLocale = useRef<Locale | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void AsyncStorage.getItem(LOCALE_STORAGE_KEY)
-      .then((stored) => {
-        if (cancelled) return;
-        if (isSupportedLocale(stored)) setLocaleState(stored);
-      })
-      .catch(() => undefined);
+    void boot.then((booted) => {
+      if (cancelled) return;
+      setState((current) => current ?? booted);
+      if (!bootTimedOut) return;
+      // Late language: swap it in unless the user has picked one since.
+      void bootLoad.then((late) => {
+        if (cancelled || requestedLocale.current !== null) return;
+        setState(late);
+      });
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    const sync = getCachedCatalogSync(locale);
-    if (sync) {
-      setCatalog(sync);
-      return;
-    }
-    let cancelled = false;
-    void loadCatalogAsync(locale).then((loaded) => {
-      if (!cancelled) setCatalog(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [locale]);
+  const locale = state?.locale ?? DEFAULT_LOCALE;
+  const catalog = state?.catalog ?? getEnglishCatalog();
+  const settled = state?.settled ?? false;
 
   useEffect(() => {
-    syncLayoutDirection(locale);
-  }, [locale]);
+    if (settled) syncLayoutDirection(locale);
+  }, [locale, settled]);
 
   const setLocale = useCallback((next: Locale) => {
     if (!isSupportedLocale(next)) return;
-    setLocaleState(next);
+    requestedLocale.current = next;
     void AsyncStorage.setItem(LOCALE_STORAGE_KEY, next).catch(() => undefined);
+    // The language and its strings switch together, once its pack is loaded
+    // (a few milliseconds; synchronous when it was used before).
+    const cached = getCachedCatalogSync(next);
+    if (cached) {
+      setState({ locale: next, catalog: cached, settled: true });
+    } else {
+      void loadCatalogAsync(next).then((loaded) => {
+        if (requestedLocale.current === next) {
+          setState({ locale: next, catalog: loaded, settled: true });
+        }
+      });
+    }
     void applyLayoutDirection(next);
   }, []);
 
@@ -124,6 +171,9 @@ export function I18nProvider({ children }: I18nProviderProps) {
     }),
     [locale, setLocale, t, tArray, tPlural],
   );
+
+  // Held under the native splash until the language is loaded (see `boot`).
+  if (!state) return null;
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

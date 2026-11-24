@@ -1,3 +1,5 @@
+import type { ConversationId } from "@earendil-works/pi-durable";
+
 /**
  * The user's next message took over what the main chat was doing: the step in
  * flight ends so that message is read now. Unlike Stop, the conversation goes
@@ -26,3 +28,19 @@ export const noteCutCall = (callId: string): void => {
 };
 
 export const isCutCall = (callId: string): boolean => cut.has(callId);
+
+const cutAt = new Map<ConversationId, number>();
+
+/** A step of this conversation was cut for the user's next message. */
+export const noteCut = (conversationId: ConversationId): void => {
+  cutAt.delete(conversationId);
+  cutAt.set(conversationId, Date.now());
+  while (cutAt.size > LIMIT) {
+    const oldest = cutAt.keys().next().value;
+    if (oldest === undefined) break;
+    cutAt.delete(oldest);
+  }
+};
+
+export const cutWithin = (conversationId: ConversationId, ms: number): boolean =>
+  Date.now() - (cutAt.get(conversationId) ?? 0) < ms;

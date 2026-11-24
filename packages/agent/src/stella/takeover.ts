@@ -39,7 +39,7 @@ import { isStopMessage } from "@stella/contracts/stop-message";
 import { yieldToolCall } from "@stella/runtime/kernel/tools/tool-call-yield";
 import { LOCAL_PROVIDER_ID } from "../provider/byok.ts";
 import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
-import { isCutCall, noteCutCall, TakenOver } from "../engine/taken-over.ts";
+import { isCutCall, noteCutCall, noteCut, TakenOver } from "../engine/taken-over.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 export const TAKEOVER_EXTENSION = "stella-takeover";
@@ -50,6 +50,8 @@ const CALL_GRACE_MS = 1_500;
 const YIELD_GRACE_MS = 1_500;
 /** Reply text that stops coming this long no longer holds the message back. */
 const TEXT_STALL_MS = 4_000;
+/** A reply being written gets this long to finish once a message waits. */
+const TEXT_FINISH_MS = 8_000;
 /** A stopped request whose connection or process doesn't let go by then is left behind. */
 const ABORT_SETTLE_MS = 10_000;
 const TICK_MS = 250;
@@ -183,6 +185,10 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
   let rootSession: string | undefined;
   let queuedAtRequest = false;
   let cut = false;
+  const markCut = () => {
+    cut = true;
+    if (root) noteCut(root.id);
+  };
   let under: { now: boolean } | undefined;
   const streams = new Map<string, ActiveStream>();
   const stalls = new Map<string, number>();
@@ -250,16 +256,21 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
           : "The model stopped responding, also when Stella tried again. Your message is kept: send it again, or pick another model.";
       end({ ...messageOf(model, partial), content: [], stopReason: "error", errorMessage }, new Error(errorMessage));
     };
+    let wantedAt: number | undefined;
     const active: ActiveStream = {
       wanted: queuedAtRequest || options.userWaiting?.() === true,
       now: false,
-      writing: () => phase === "text" && Date.now() - lastEventAt < TEXT_STALL_MS,
+      writing: () =>
+        phase === "text" &&
+        Date.now() - lastEventAt < TEXT_STALL_MS &&
+        (wantedAt === undefined || Date.now() - wantedAt < TEXT_FINISH_MS),
       check() {
         if (ended) return;
         const at = Date.now();
         if (active.wanted && !engines.some((engine) => engine.compacting(sessionId))) {
+          wantedAt ??= at;
           if (active.now || !active.writing()) {
-            cut = true;
+            markCut();
             return end(messageOf(model, partial), new TakenOver());
           }
         }
@@ -323,12 +334,12 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
       const waited = Date.now() - first;
       if (!now && waited < CALL_GRACE_MS) continue;
       if (!now && !yielded.has(slot.callId) && yieldToolCall(slot.callId)) {
-        cut = true;
+        markCut();
         yielded.add(slot.callId);
         continue;
       }
       if (yielded.has(slot.callId) && waited < CALL_GRACE_MS + YIELD_GRACE_MS) continue;
-      cut = true;
+      markCut();
       noteCutCall(slot.callId);
       await harness!.abortTask(slot.taskId, context);
     }
@@ -377,7 +388,7 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
         beforeTool: async (call, api, context) => {
           if (api.conversationId !== root?.id) return undefined;
           if (!engines.some((engine) => engine.ownsCall(call.id)) && (await userQueued(api, api.conversationId, context))) {
-            cut = true;
+            markCut();
             return { block: UNSTARTED_CALL_TEXT };
           }
           const limit = CALL_LIMITS_MS[call.name] ?? CALL_LIMIT_MS;

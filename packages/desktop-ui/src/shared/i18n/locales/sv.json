@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Den här enheten kan inte kryptera det än",
       "unnamedComputer": "Dator · {id}",
       "waitingBadge": "Väntar på dig",
-      "remember": "Kom ihåg på datorn som frågade",
+      "remember": "Kom ihåg till nästa gång",
       "rememberOn": "Sparat som ”{label}”. Stella återanvänder det utan att fråga dig igen.",
-      "rememberOff": "Används en gång och raderas sedan.",
+      "rememberOff": "Används bara för den här uppgiften och glöms sedan bort.",
       "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade.",
       "usingSaved": "Resten kommer från ditt sparade ”{label}”. Bara det nedan behövs."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Byt namn",
       "renameSave": "Spara",
       "renameCancel": "Avbryt",
-      "renameLabel": "Namn"
+      "renameLabel": "Namn",
+      "sync": "Synka till dina andra enheter",
+      "syncHint": "Krypterat från början till slut: bara dina egna datorer och din telefon kan öppna dem, inte Stellas servrar. Av behåller dem bara på den här datorn."
     },
     "googleComposio": {
       "title": "Använd Composio för Google",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Kom ihåg på den här datorn",
-      "rememberRelayed": "Kom ihåg på datorn som frågade",
+      "remember": "Kom ihåg till nästa gång",
+      "rememberRelayed": "Kom ihåg till nästa gång",
       "rememberOn": "Sparat som ”{label}”. Stella återanvänder det utan att fråga dig igen; du kan radera det när som helst i {place}.",
-      "rememberOff": "Används en gång och raderas sedan.",
+      "rememberOff": "Används bara för den här uppgiften och glöms sedan bort.",
       "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade.",
       "usingSaved": "Resten kommer från ditt sparade ”{label}”. Bara det nedan behövs.",
       "note": "Lägg till en anteckning (valfritt)",

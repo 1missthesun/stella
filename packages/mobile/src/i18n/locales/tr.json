@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Bu cihaz bunu henüz şifreleyemiyor",
       "unnamedComputer": "Bilgisayar · {id}",
       "waitingBadge": "Seni bekliyor",
-      "remember": "Soran bilgisayarda hatırla",
+      "remember": "Bir dahaki sefer için hatırla",
       "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır.",
-      "rememberOff": "Bir kez kullanılır, sonra silinir.",
+      "rememberOff": "Yalnızca bu görev için kullanılır, sonra unutulur.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
       "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Yeniden adlandır",
       "renameSave": "Kaydet",
       "renameCancel": "İptal",
-      "renameLabel": "Ad"
+      "renameLabel": "Ad",
+      "sync": "Diğer cihazlarınla eşitle",
+      "syncHint": "Uçtan uca şifreli: Onları yalnızca kendi bilgisayarların ve telefonun açabilir, Stella’nın sunucuları açamaz. Kapalıyken yalnızca bu bilgisayarda kalırlar."
     },
     "googleComposio": {
       "title": "Google için Composio kullan",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Bu bilgisayarda hatırla",
-      "rememberRelayed": "Soran bilgisayarda hatırla",
+      "remember": "Bir dahaki sefer için hatırla",
+      "rememberRelayed": "Bir dahaki sefer için hatırla",
       "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır; istediğiniz zaman {place} bölümünden silebilirsiniz.",
-      "rememberOff": "Bir kez kullanılır, sonra silinir.",
+      "rememberOff": "Yalnızca bu görev için kullanılır, sonra unutulur.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
       "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli.",
       "note": "Not ekle (isteğe bağlı)",

@@ -1728,9 +1728,9 @@
       "sensitiveUnavailable": "Este dispositivo ainda não consegue cifrar isto",
       "unnamedComputer": "Computador · {id}",
       "waitingBadge": "Está à tua espera",
-      "remember": "Memorizar no computador que pediu",
+      "remember": "Lembrar para a próxima vez",
       "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar.",
-      "rememberOff": "Usado uma vez e depois apagado.",
+      "rememberOff": "Usado só nesta tarefa e depois esquecido.",
       "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
       "usingSaved": "O resto vem do seu valor salvo “{label}”. Só falta o que está abaixo."
     }
@@ -2601,7 +2601,9 @@
       "rename": "Mudar o nome",
       "renameSave": "Guardar",
       "renameCancel": "Cancelar",
-      "renameLabel": "Nome"
+      "renameLabel": "Nome",
+      "sync": "Sincronizar com seus outros dispositivos",
+      "syncHint": "Criptografia de ponta a ponta: só seus computadores e seu celular podem abri-los, não os servidores da Stella. Desativado, ficam apenas neste computador."
     },
     "googleComposio": {
       "title": "Usar Composio para o Google",
@@ -3136,10 +3138,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Memorizar neste computador",
-      "rememberRelayed": "Memorizar no computador que pediu",
+      "remember": "Lembrar para a próxima vez",
+      "rememberRelayed": "Lembrar para a próxima vez",
       "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar; pode apagá-lo a qualquer momento em {place}.",
-      "rememberOff": "Usado uma vez e depois apagado.",
+      "rememberOff": "Usado só nesta tarefa e depois esquecido.",
       "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
       "usingSaved": "O resto vem do seu valor salvo “{label}”. Só falta o que está abaixo.",
       "note": "Adicione uma nota (opcional)",

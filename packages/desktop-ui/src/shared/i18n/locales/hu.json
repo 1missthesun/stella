@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Ez a készülék még nem tudja titkosítani",
       "unnamedComputer": "Számítógép · {id}",
       "waitingBadge": "Rád vár",
-      "remember": "Megjegyzés a kérdező számítógépen",
+      "remember": "Megjegyzés legközelebbre",
       "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne.",
-      "rememberOff": "Egyszer használva, majd törölve.",
+      "rememberOff": "Csak ehhez a feladathoz használjuk, utána elfelejtjük.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
       "usingSaved": "A többi a mentett „{label}” értékből jön. Csak az alábbiak kellenek."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Átnevezés",
       "renameSave": "Mentés",
       "renameCancel": "Mégse",
-      "renameLabel": "Név"
+      "renameLabel": "Név",
+      "sync": "Szinkronizálás a többi eszközödre",
+      "syncHint": "Végpontok közötti titkosítás: csak a saját számítógépeid és a telefonod nyithatják meg, a Stella szerverei nem. Kikapcsolva csak ezen a számítógépen maradnak."
     },
     "googleComposio": {
       "title": "Composio használata a Google-hoz",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Megjegyzés ezen a számítógépen",
-      "rememberRelayed": "Megjegyzés a kérdező számítógépen",
+      "remember": "Megjegyzés legközelebbre",
+      "rememberRelayed": "Megjegyzés legközelebbre",
       "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne; bármikor törölheted itt: {place}.",
-      "rememberOff": "Egyszer használva, majd törölve.",
+      "rememberOff": "Csak ehhez a feladathoz használjuk, utána elfelejtjük.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
       "usingSaved": "A többi a mentett „{label}” értékből jön. Csak az alábbiak kellenek.",
       "note": "Megjegyzés hozzáadása (nem kötelező)",

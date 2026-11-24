@@ -1708,9 +1708,9 @@
       "sensitiveUnavailable": "此裝置暫時無法加密",
       "unnamedComputer": "電腦 · {id}",
       "waitingBadge": "正在等你",
-      "remember": "在提問的那台電腦上記住",
+      "remember": "記住，下次使用",
       "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你。",
-      "rememberOff": "僅使用一次，然後刪除。",
+      "rememberOff": "僅用於這個任務，之後會被忘掉。",
       "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
       "usingSaved": "其餘內容來自你儲存的「{label}」。只需填寫下面的內容。"
     }
@@ -2581,7 +2581,9 @@
       "rename": "重新命名",
       "renameSave": "儲存",
       "renameCancel": "取消",
-      "renameLabel": "名稱"
+      "renameLabel": "名稱",
+      "sync": "同步到你的其他裝置",
+      "syncHint": "端對端加密：只有你自己的電腦和手機能打開，Stella 的伺服器無法打開。關閉後只保存在這台電腦上。"
     },
     "googleComposio": {
       "title": "Google 使用 Composio",
@@ -3098,10 +3100,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "在這台電腦上記住",
-      "rememberRelayed": "在提問的那台電腦上記住",
+      "remember": "記住，下次使用",
+      "rememberRelayed": "記住，下次使用",
       "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你；你可以隨時在「{place}」中刪除。",
-      "rememberOff": "僅使用一次，然後刪除。",
+      "rememberOff": "僅用於這個任務，之後會被忘掉。",
       "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
       "usingSaved": "其餘內容來自你儲存的「{label}」。只需填寫下面的內容。",
       "note": "新增備註（選填）",

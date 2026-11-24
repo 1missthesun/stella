@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Denne enhed kan ikke kryptere det endnu",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Venter på dig",
-      "remember": "Husk på den computer, der spurgte",
+      "remember": "Husk til næste gang",
       "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen.",
-      "rememberOff": "Brugt én gang og derefter slettet.",
+      "rememberOff": "Bruges kun til denne opgave og glemmes derefter.",
       "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
       "usingSaved": "Resten kommer fra din gemte “{label}”. Kun det nedenfor mangler."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Omdøb",
       "renameSave": "Gem",
       "renameCancel": "Annuller",
-      "renameLabel": "Navn"
+      "renameLabel": "Navn",
+      "sync": "Synkroniser til dine andre enheder",
+      "syncHint": "End-to-end-krypteret: kun dine egne computere og din telefon kan åbne dem, ikke Stellas servere. Slået fra bliver de kun på denne computer."
     },
     "googleComposio": {
       "title": "Brug Composio til Google",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Husk på denne computer",
-      "rememberRelayed": "Husk på den computer, der spurgte",
+      "remember": "Husk til næste gang",
+      "rememberRelayed": "Husk til næste gang",
       "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen; du kan slette den når som helst under {place}.",
-      "rememberOff": "Brugt én gang og derefter slettet.",
+      "rememberOff": "Bruges kun til denne opgave og glemmes derefter.",
       "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
       "usingSaved": "Resten kommer fra din gemte “{label}”. Kun det nedenfor mangler.",
       "note": "Tilføj en note (valgfrit)",

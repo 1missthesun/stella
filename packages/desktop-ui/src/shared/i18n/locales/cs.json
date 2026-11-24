@@ -1738,9 +1738,9 @@
       "sensitiveUnavailable": "Tohle zařízení to zatím nedokáže zašifrovat",
       "unnamedComputer": "Počítač · {id}",
       "waitingBadge": "Čeká na tebe",
-      "remember": "Zapamatovat na počítači, který se ptal",
+      "remember": "Zapamatovat pro příště",
       "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala.",
-      "rememberOff": "Použito jednou, pak smazáno.",
+      "rememberOff": "Použije se jen pro tento úkol a pak se zapomene.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
       "usingSaved": "Zbytek pochází z vaší uložené hodnoty „{label}“. Stačí vyplnit, co je níže."
     }
@@ -2611,7 +2611,9 @@
       "rename": "Přejmenovat",
       "renameSave": "Uložit",
       "renameCancel": "Zrušit",
-      "renameLabel": "Název"
+      "renameLabel": "Název",
+      "sync": "Synchronizovat s ostatními zařízeními",
+      "syncHint": "Koncově šifrováno: otevřít je mohou jen vaše počítače a telefon, ne servery Stelly. Vypnuto je ponechá jen v tomto počítači."
     },
     "googleComposio": {
       "title": "Používat Composio pro Google",
@@ -3154,10 +3156,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Zapamatovat na tomto počítači",
-      "rememberRelayed": "Zapamatovat na počítači, který se ptal",
+      "remember": "Zapamatovat pro příště",
+      "rememberRelayed": "Zapamatovat pro příště",
       "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala; kdykoli to můžete smazat v {place}.",
-      "rememberOff": "Použito jednou, pak smazáno.",
+      "rememberOff": "Použije se jen pro tento úkol a pak se zapomene.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
       "usingSaved": "Zbytek pochází z vaší uložené hodnoty „{label}“. Stačí vyplnit, co je níže.",
       "note": "Přidat poznámku (nepovinné)",

@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "This device can't encrypt it yet",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Waiting on you",
-      "remember": "Remember on the computer that asked",
+      "remember": "Remember for next time",
       "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again.",
-      "rememberOff": "Used once, then deleted.",
+      "rememberOff": "Used for this task only, then forgotten.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
       "usingSaved": "The rest comes from your saved “{label}”. Only what’s below is needed."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Rename",
       "renameSave": "Save",
       "renameCancel": "Cancel",
-      "renameLabel": "Name"
+      "renameLabel": "Name",
+      "sync": "Sync to your other devices",
+      "syncHint": "End-to-end encrypted: only your own computers and phone can open them, not Stella’s servers. Off keeps them on this computer only."
     },
     "googleComposio": {
       "title": "Use Composio for Google",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Remember on this computer",
-      "rememberRelayed": "Remember on the computer that asked",
+      "remember": "Remember for next time",
+      "rememberRelayed": "Remember for next time",
       "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again; delete it any time in {place}.",
-      "rememberOff": "Used once, then deleted.",
+      "rememberOff": "Used for this task only, then forgotten.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
       "usingSaved": "The rest comes from your saved “{label}”. Only what’s below is needed.",
       "note": "Add a note (optional)",

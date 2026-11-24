@@ -102,6 +102,7 @@ import type {
   UserAskState,
   UserAskStoredSecureValue,
 } from "../user-ask.js";
+import type { SavedValuesSyncStatus } from "../saved-values.js";
 import type { AppSourceActionResult, AppSourceState } from "./app-source.js";
 import type {
   BrowserExtensionClientsState,
@@ -431,6 +432,8 @@ import {
   IPC_USER_ASK_SECURE_VALUES_DELETE,
   IPC_USER_ASK_SECURE_VALUES_RENAME,
   IPC_USER_ASK_SECURE_VALUES_LIST,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_GET,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_SET,
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_OPENED,
@@ -1370,6 +1373,11 @@ export type IpcInvokeContract = {
   [IPC_USER_ASK_SECURE_VALUES_RENAME]: Invoke<
     [payload: { id: string; label: string }],
     OkErrorResult
+  >;
+  [IPC_USER_ASK_SECURE_VALUES_SYNC_GET]: Invoke<[], SavedValuesSyncStatus>;
+  [IPC_USER_ASK_SECURE_VALUES_SYNC_SET]: Invoke<
+    [payload: { enabled: boolean }],
+    SavedValuesSyncStatus
   >;
   [IPC_USER_ASK_POLICY_GET]: Invoke<[], UserAskEscalationPolicy>;
   [IPC_USER_ASK_POLICY_SET]: Invoke<

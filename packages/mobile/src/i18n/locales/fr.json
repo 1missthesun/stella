@@ -1728,9 +1728,9 @@
       "sensitiveUnavailable": "Cet appareil ne peut pas encore le chiffrer",
       "unnamedComputer": "Ordinateur · {id}",
       "waitingBadge": "Attend ta réponse",
-      "remember": "Mémoriser sur l’ordinateur qui l’a demandé",
+      "remember": "Mémoriser pour la prochaine fois",
       "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander.",
-      "rememberOff": "Utilisé une fois, puis supprimé.",
+      "rememberOff": "Utilisé pour cette tâche uniquement, puis oublié.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
       "usingSaved": "Le reste vient de votre valeur enregistrée « {label} ». Seul ce qui suit est nécessaire."
     }
@@ -2601,7 +2601,9 @@
       "rename": "Renommer",
       "renameSave": "Enregistrer",
       "renameCancel": "Annuler",
-      "renameLabel": "Nom"
+      "renameLabel": "Nom",
+      "sync": "Synchroniser avec vos autres appareils",
+      "syncHint": "Chiffré de bout en bout : seuls vos ordinateurs et votre téléphone peuvent les ouvrir, pas les serveurs de Stella. Désactivé, elles restent uniquement sur cet ordinateur."
     },
     "googleComposio": {
       "title": "Utiliser Composio pour Google",
@@ -3136,10 +3138,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Mémoriser sur cet ordinateur",
-      "rememberRelayed": "Mémoriser sur l’ordinateur qui l’a demandé",
+      "remember": "Mémoriser pour la prochaine fois",
+      "rememberRelayed": "Mémoriser pour la prochaine fois",
       "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander ; supprimez-le quand vous voulez dans {place}.",
-      "rememberOff": "Utilisé une fois, puis supprimé.",
+      "rememberOff": "Utilisé pour cette tâche uniquement, puis oublié.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
       "usingSaved": "Le reste vient de votre valeur enregistrée « {label} ». Seul ce qui suit est nécessaire.",
       "note": "Ajouter une note (facultatif)",

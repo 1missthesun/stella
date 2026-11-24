@@ -1738,9 +1738,9 @@
       "sensitiveUnavailable": "To urządzenie nie potrafi tego jeszcze zaszyfrować",
       "unnamedComputer": "Komputer · {id}",
       "waitingBadge": "Czeka na ciebie",
-      "remember": "Zapamiętaj na komputerze, który pytał",
+      "remember": "Zapamiętaj na następny raz",
       "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania.",
-      "rememberOff": "Użyto raz, a potem usunięto.",
+      "rememberOff": "Użyte tylko do tego zadania, potem zapomniane.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
       "usingSaved": "Reszta pochodzi z zapisanej wartości „{label}”. Potrzebne jest tylko to, co poniżej."
     }
@@ -2611,7 +2611,9 @@
       "rename": "Zmień nazwę",
       "renameSave": "Zapisz",
       "renameCancel": "Anuluj",
-      "renameLabel": "Nazwa"
+      "renameLabel": "Nazwa",
+      "sync": "Synchronizuj z innymi urządzeniami",
+      "syncHint": "Szyfrowanie end-to-end: otworzyć je mogą tylko Twoje komputery i telefon, nie serwery Stelli. Po wyłączeniu zostają tylko na tym komputerze."
     },
     "googleComposio": {
       "title": "Używaj Composio dla Google",
@@ -3154,10 +3156,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Zapamiętaj na tym komputerze",
-      "rememberRelayed": "Zapamiętaj na komputerze, który pytał",
+      "remember": "Zapamiętaj na następny raz",
+      "rememberRelayed": "Zapamiętaj na następny raz",
       "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania; możesz to w każdej chwili usunąć w {place}.",
-      "rememberOff": "Użyto raz, a potem usunięto.",
+      "rememberOff": "Użyte tylko do tego zadania, potem zapomniane.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
       "usingSaved": "Reszta pochodzi z zapisanej wartości „{label}”. Potrzebne jest tylko to, co poniżej.",
       "note": "Dodaj notatkę (opcjonalnie)",

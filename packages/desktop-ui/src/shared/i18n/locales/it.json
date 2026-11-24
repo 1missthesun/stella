@@ -1728,9 +1728,9 @@
       "sensitiveUnavailable": "Questo dispositivo non può ancora crittografarlo",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Sta aspettando te",
-      "remember": "Ricorda sul computer che l’ha chiesto",
+      "remember": "Ricorda per la prossima volta",
       "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo.",
-      "rememberOff": "Usato una volta, poi eliminato.",
+      "rememberOff": "Usato solo per questa attività, poi dimenticato.",
       "replacing": "Il valore salvato per «{label}» non ha funzionato. Inserisci quello giusto; sostituirà quello salvato.",
       "usingSaved": "Il resto viene dal tuo valore salvato “{label}”. Serve solo quanto segue."
     }
@@ -2601,7 +2601,9 @@
       "rename": "Rinomina",
       "renameSave": "Salva",
       "renameCancel": "Annulla",
-      "renameLabel": "Nome"
+      "renameLabel": "Nome",
+      "sync": "Sincronizza con gli altri tuoi dispositivi",
+      "syncHint": "Crittografia end-to-end: solo i tuoi computer e il tuo telefono possono aprirli, non i server di Stella. Se disattivato, restano solo su questo computer."
     },
     "googleComposio": {
       "title": "Usa Composio per Google",
@@ -3136,10 +3138,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Ricorda su questo computer",
-      "rememberRelayed": "Ricorda sul computer che l’ha chiesto",
+      "remember": "Ricorda per la prossima volta",
+      "rememberRelayed": "Ricorda per la prossima volta",
       "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo; puoi eliminarlo quando vuoi in {place}.",
-      "rememberOff": "Usato una volta, poi eliminato.",
+      "rememberOff": "Usato solo per questa attività, poi dimenticato.",
       "replacing": "Il valore salvato per «{label}» non ha funzionato. Inserisci quello giusto; sostituirà quello salvato.",
       "usingSaved": "Il resto viene dal tuo valore salvato “{label}”. Serve solo quanto segue.",
       "note": "Aggiungi una nota (facoltativa)",

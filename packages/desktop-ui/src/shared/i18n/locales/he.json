@@ -1728,9 +1728,9 @@
       "sensitiveUnavailable": "המכשיר הזה עוד לא יכול להצפין את זה",
       "unnamedComputer": "מחשב · {id}",
       "waitingBadge": "ממתינה לך",
-      "remember": "לזכור במחשב ששאל",
+      "remember": "לזכור לפעם הבאה",
       "rememberOn": "נשמר בשם “{label}”. Stella תשתמש בו שוב בלי לשאול אותך.",
-      "rememberOff": "בשימוש פעם אחת ואז נמחק.",
+      "rememberOff": "משמש רק למשימה הזו ואז נשכח.",
       "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור.",
       "usingSaved": "השאר מגיע מ־„{label}” השמור שלך. נדרש רק מה שלמטה."
     }
@@ -2601,7 +2601,9 @@
       "rename": "שינוי שם",
       "renameSave": "שמירה",
       "renameCancel": "ביטול",
-      "renameLabel": "שם"
+      "renameLabel": "שם",
+      "sync": "סנכרון למכשירים האחרים שלך",
+      "syncHint": "מוצפן מקצה לקצה: רק המחשבים והטלפון שלך יכולים לפתוח אותם, לא השרתים של Stella. כשכבוי, הם נשארים רק במחשב הזה."
     },
     "googleComposio": {
       "title": "שימוש ב-Composio עבור Google",
@@ -3136,10 +3138,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "לזכור במחשב הזה",
-      "rememberRelayed": "לזכור במחשב ששאל",
+      "remember": "לזכור לפעם הבאה",
+      "rememberRelayed": "לזכור לפעם הבאה",
       "rememberOn": "נשמר בשם “{label}”. Stella תשתמש בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת ב-{place}.",
-      "rememberOff": "בשימוש פעם אחת ואז נמחק.",
+      "rememberOff": "משמש רק למשימה הזו ואז נשכח.",
       "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור.",
       "usingSaved": "השאר מגיע מ־„{label}” השמור שלך. נדרש רק מה שלמטה.",
       "note": "הוסף הערה (אופציונלי)",

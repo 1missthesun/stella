@@ -1708,9 +1708,9 @@
       "sensitiveUnavailable": "この端末ではまだ暗号化できません",
       "unnamedComputer": "コンピュータ · {id}",
       "waitingBadge": "あなたを待っています",
-      "remember": "要求元のコンピュータに記憶する",
+      "remember": "次回のために記憶する",
       "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。",
-      "rememberOff": "一度だけ使用し、その後削除します。",
+      "rememberOff": "このタスクにだけ使い、その後は破棄します。",
       "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。",
       "usingSaved": "残りは保存済みの「{label}」から使います。必要なのは下の項目だけです。"
     }
@@ -2581,7 +2581,9 @@
       "rename": "名前を変更",
       "renameSave": "保存",
       "renameCancel": "キャンセル",
-      "renameLabel": "名前"
+      "renameLabel": "名前",
+      "sync": "ほかのデバイスと同期",
+      "syncHint": "エンドツーエンドで暗号化されます。開けるのはあなた自身のコンピューターとスマートフォンだけで、Stella のサーバーは開けません。オフにすると、このコンピューターにだけ保存されます。"
     },
     "googleComposio": {
       "title": "Google に Composio を使う",
@@ -3098,10 +3100,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "このコンピュータに記憶する",
-      "rememberRelayed": "要求元のコンピュータに記憶する",
+      "remember": "次回のために記憶する",
+      "rememberRelayed": "次回のために記憶する",
       "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。{place} からいつでも削除できます。",
-      "rememberOff": "一度だけ使用し、その後削除します。",
+      "rememberOff": "このタスクにだけ使い、その後は破棄します。",
       "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。",
       "usingSaved": "残りは保存済みの「{label}」から使います。必要なのは下の項目だけです。",
       "note": "メモを追加（任意）",

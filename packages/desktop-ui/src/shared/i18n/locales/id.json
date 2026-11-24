@@ -1708,9 +1708,9 @@
       "sensitiveUnavailable": "Perangkat ini belum bisa mengenkripsinya",
       "unnamedComputer": "Komputer · {id}",
       "waitingBadge": "Menunggumu",
-      "remember": "Ingat di komputer yang meminta",
+      "remember": "Ingat untuk lain kali",
       "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda.",
-      "rememberOff": "Dipakai sekali, lalu dihapus.",
+      "rememberOff": "Hanya dipakai untuk tugas ini, lalu dilupakan.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
       "usingSaved": "Sisanya diambil dari “{label}” yang Anda simpan. Hanya yang di bawah ini yang diperlukan."
     }
@@ -2581,7 +2581,9 @@
       "rename": "Ganti nama",
       "renameSave": "Simpan",
       "renameCancel": "Batal",
-      "renameLabel": "Nama"
+      "renameLabel": "Nama",
+      "sync": "Sinkronkan ke perangkat Anda yang lain",
+      "syncHint": "Terenkripsi end-to-end: hanya komputer dan ponsel Anda sendiri yang bisa membukanya, bukan server Stella. Jika mati, nilai tetap hanya di komputer ini."
     },
     "googleComposio": {
       "title": "Gunakan Composio untuk Google",
@@ -3098,10 +3100,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Ingat di komputer ini",
-      "rememberRelayed": "Ingat di komputer yang meminta",
+      "remember": "Ingat untuk lain kali",
+      "rememberRelayed": "Ingat untuk lain kali",
       "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di {place}.",
-      "rememberOff": "Dipakai sekali, lalu dihapus.",
+      "rememberOff": "Hanya dipakai untuk tugas ini, lalu dilupakan.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
       "usingSaved": "Sisanya diambil dari “{label}” yang Anda simpan. Hanya yang di bawah ini yang diperlukan.",
       "note": "Tambahkan catatan (opsional)",

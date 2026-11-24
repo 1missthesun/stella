@@ -186,6 +186,19 @@ export const parseSavedValuePayload = (text: string): SavedValuePayload | null =
   }
 };
 
+/** This computer's sync of saved values, for Settings. */
+export type SavedValuesSyncStatus = Readonly<{
+  /** Off only when the user turned it off. */
+  enabled: boolean;
+  /** Signed in and connected: values are syncing. */
+  active: boolean;
+  /** Devices that hold saved values, this one included. */
+  devices: number;
+  records: number;
+  lastSyncedAt?: number;
+  error?: string;
+}>;
+
 /** A cloud task asking the user's computers for a saved value (the release). */
 export type SavedValueReleaseRequest = Readonly<{
   /** Binds the sealed fields; the task opens them with its own key. */
@@ -226,6 +239,8 @@ export type SavedValueReleaseResult =
       savedHere: readonly import("./user-ask.js").SavedSecureValueSummary[];
       /** Why nothing came back: nothing saved, or no computer that could answer. */
       reason: "not_saved" | "no_computer" | "sync_off";
+      /** When several saved values fit and the task must name the account. */
+      message?: string;
     }>;
 
 const fieldKey = (value: string) =>

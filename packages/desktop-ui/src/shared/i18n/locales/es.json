@@ -1728,9 +1728,9 @@
       "sensitiveUnavailable": "Este dispositivo aún no puede cifrarlo",
       "unnamedComputer": "Ordenador · {id}",
       "waitingBadge": "Te está esperando",
-      "remember": "Recordar en el ordenador que lo pide",
+      "remember": "Recordar para la próxima vez",
       "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte.",
-      "rememberOff": "Se usa una vez y se borra.",
+      "rememberOff": "Se usa solo para esta tarea y luego se olvida.",
       "replacing": "El valor guardado para «{label}» no funcionó. Introduce el correcto; sustituirá al guardado.",
       "usingSaved": "El resto sale de tu valor guardado «{label}». Solo falta lo de abajo."
     }
@@ -2601,7 +2601,9 @@
       "rename": "Cambiar nombre",
       "renameSave": "Guardar",
       "renameCancel": "Cancelar",
-      "renameLabel": "Nombre"
+      "renameLabel": "Nombre",
+      "sync": "Sincronizar con tus otros dispositivos",
+      "syncHint": "Cifrado de extremo a extremo: solo tus ordenadores y tu teléfono pueden abrirlos, no los servidores de Stella. Desactivado, se quedan solo en este ordenador."
     },
     "googleComposio": {
       "title": "Usar Composio para Google",
@@ -3136,10 +3138,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Recordar en este ordenador",
-      "rememberRelayed": "Recordar en el ordenador que lo pide",
+      "remember": "Recordar para la próxima vez",
+      "rememberRelayed": "Recordar para la próxima vez",
       "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte; puedes borrarlo cuando quieras en {place}.",
-      "rememberOff": "Se usa una vez y se borra.",
+      "rememberOff": "Se usa solo para esta tarea y luego se olvida.",
       "replacing": "El valor guardado para «{label}» no funcionó. Introduce el correcto; sustituirá al guardado.",
       "usingSaved": "El resto sale de tu valor guardado «{label}». Solo falta lo de abajo.",
       "note": "Añade una nota (opcional)",

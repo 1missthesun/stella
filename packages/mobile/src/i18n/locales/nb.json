@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Denne enheten kan ikke kryptere det ennå",
       "unnamedComputer": "Datamaskin · {id}",
       "waitingBadge": "Venter på deg",
-      "remember": "Husk på datamaskinen som spurte",
+      "remember": "Husk til neste gang",
       "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt.",
-      "rememberOff": "Brukt én gang og deretter slettet.",
+      "rememberOff": "Brukes bare til denne oppgaven, og glemmes så.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
       "usingSaved": "Resten kommer fra din lagrede «{label}». Bare det nedenfor trengs."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Gi nytt navn",
       "renameSave": "Lagre",
       "renameCancel": "Avbryt",
-      "renameLabel": "Navn"
+      "renameLabel": "Navn",
+      "sync": "Synkroniser til de andre enhetene dine",
+      "syncHint": "Ende-til-ende-kryptert: bare dine egne datamaskiner og telefonen din kan åpne dem, ikke Stellas servere. Av beholder dem bare på denne datamaskinen."
     },
     "googleComposio": {
       "title": "Bruk Composio for Google",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Husk på denne datamaskinen",
-      "rememberRelayed": "Husk på datamaskinen som spurte",
+      "remember": "Husk til neste gang",
+      "rememberRelayed": "Husk til neste gang",
       "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i {place}.",
-      "rememberOff": "Brukt én gang og deretter slettet.",
+      "rememberOff": "Brukes bare til denne oppgaven, og glemmes så.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
       "usingSaved": "Resten kommer fra din lagrede «{label}». Bare det nedenfor trengs.",
       "note": "Legg til et notat (valgfritt)",

@@ -76,6 +76,8 @@ import {
   IPC_USER_ASK_SECURE_VALUES_DELETE,
   IPC_USER_ASK_SECURE_VALUES_RENAME,
   IPC_USER_ASK_SECURE_VALUES_LIST,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_GET,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_SET,
   IPC_DEVICE_GET_ID,
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
@@ -533,6 +535,18 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted secure value rename.");
         }
         return options.renameStoredSecureValue(payload);
+    });
+    handleIpc(IPC_USER_ASK_SECURE_VALUES_SYNC_GET, (event) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_SECURE_VALUES_SYNC_GET)) {
+            throw new Error("Blocked untrusted saved value sync request.");
+        }
+        return options.getSavedValuesSync();
+    });
+    handleIpc(IPC_USER_ASK_SECURE_VALUES_SYNC_SET, (event, payload) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_SECURE_VALUES_SYNC_SET)) {
+            throw new Error("Blocked untrusted saved value sync change.");
+        }
+        return options.setSavedValuesSync({ enabled: payload?.enabled !== false });
     });
     handleIpc(IPC_CONNECTOR_CONNECT_RESPOND, (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CONNECT_RESPOND)) {

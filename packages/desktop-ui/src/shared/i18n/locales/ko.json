@@ -1708,9 +1708,9 @@
       "sensitiveUnavailable": "이 기기에서는 아직 암호화할 수 없어요",
       "unnamedComputer": "컴퓨터 · {id}",
       "waitingBadge": "기다리고 있어요",
-      "remember": "요청한 컴퓨터에 기억하기",
+      "remember": "다음을 위해 기억",
       "rememberOn": "“{label}”(으)로 저장했어요. Stella가 다시 묻지 않고 재사용해요.",
-      "rememberOff": "한 번 사용한 뒤 삭제돼요.",
+      "rememberOff": "이 작업에만 사용한 뒤 잊습니다.",
       "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요.",
       "usingSaved": "나머지는 저장된 “{label}”에서 가져옵니다. 아래 항목만 입력하면 됩니다."
     }
@@ -2581,7 +2581,9 @@
       "rename": "이름 바꾸기",
       "renameSave": "저장",
       "renameCancel": "취소",
-      "renameLabel": "이름"
+      "renameLabel": "이름",
+      "sync": "다른 기기와 동기화",
+      "syncHint": "종단 간 암호화: 내 컴퓨터와 휴대폰만 열 수 있으며 Stella 서버는 열 수 없습니다. 끄면 이 컴퓨터에만 남습니다."
     },
     "googleComposio": {
       "title": "Google에 Composio 사용",
@@ -3098,10 +3100,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "이 컴퓨터에 기억하기",
-      "rememberRelayed": "요청한 컴퓨터에 기억하기",
+      "remember": "다음을 위해 기억",
+      "rememberRelayed": "다음을 위해 기억",
       "rememberOn": "“{label}”(으)로 저장했어요. Stella가 다시 묻지 않고 재사용해요. {place}에서 언제든지 삭제할 수 있어요.",
-      "rememberOff": "한 번 사용한 뒤 삭제돼요.",
+      "rememberOff": "이 작업에만 사용한 뒤 잊습니다.",
       "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요.",
       "usingSaved": "나머지는 저장된 “{label}”에서 가져옵니다. 아래 항목만 입력하면 됩니다.",
       "note": "메모 추가 (선택)",

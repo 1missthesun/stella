@@ -69,6 +69,12 @@ export const handleDeviceRequestRoute = async (
   ) {
     return deviceRequestErrorResponse("bad_request", "Malformed device request.");
   }
+  if (method === "savedValues.release") {
+    return deviceRequestErrorResponse(
+      "forbidden",
+      "Saved values reach a cloud task through Stella's cloud only.",
+    );
+  }
   if (isDeviceMcpRequestMethod(method)) {
     return deviceRequestErrorResponse(
       "forbidden",

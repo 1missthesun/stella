@@ -34,6 +34,8 @@ export type DeviceRequestHandlers = {
   }) => Promise<string>;
   voiceConfig: (payload: Record<string, unknown>) => Promise<unknown>;
   voiceExecuteTool: (payload: Record<string, unknown>) => Promise<unknown>;
+  /** A cloud task's request for a saved value, answered sealed to its key. */
+  releaseSavedValue?: (payload: Record<string, unknown>) => Promise<unknown>;
   claudeLogin?: {
     start: (payload: Record<string, unknown>) => Promise<unknown>;
     finish: (payload: Record<string, unknown>) => Promise<unknown>;
@@ -159,6 +161,12 @@ export const serveDeviceRequest = async (
               ? login.finish
               : login.cancel;
         return json(await run(request.params));
+      }
+      case "savedValues.release": {
+        if (!handlers.releaseSavedValue) {
+          return { ok: false, code: "failed", message: "Saved values aren't available on this computer." };
+        }
+        return json(await handlers.releaseSavedValue(request.params));
       }
       default:
         return { ok: false, code: "bad_request", message: "Unknown request." };

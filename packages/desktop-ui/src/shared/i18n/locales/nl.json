@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Dit apparaat kan dit nog niet versleutelen",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Wacht op je",
-      "remember": "Onthouden op de computer die het vroeg",
+      "remember": "Onthouden voor de volgende keer",
       "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen.",
-      "rememberOff": "Eén keer gebruikt en daarna verwijderd.",
+      "rememberOff": "Alleen voor deze taak gebruikt en daarna vergeten.",
       "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde.",
       "usingSaved": "De rest komt uit je opgeslagen ‘{label}’. Alleen wat hieronder staat is nodig."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Naam wijzigen",
       "renameSave": "Opslaan",
       "renameCancel": "Annuleren",
-      "renameLabel": "Naam"
+      "renameLabel": "Naam",
+      "sync": "Synchroniseren met je andere apparaten",
+      "syncHint": "End-to-end versleuteld: alleen je eigen computers en telefoon kunnen ze openen, niet de servers van Stella. Uit houdt ze alleen op deze computer."
     },
     "googleComposio": {
       "title": "Composio gebruiken voor Google",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Onthouden op deze computer",
-      "rememberRelayed": "Onthouden op de computer die het vroeg",
+      "remember": "Onthouden voor de volgende keer",
+      "rememberRelayed": "Onthouden voor de volgende keer",
       "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen; je kunt het altijd verwijderen in {place}.",
-      "rememberOff": "Eén keer gebruikt en daarna verwijderd.",
+      "rememberOff": "Alleen voor deze taak gebruikt en daarna vergeten.",
       "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde.",
       "usingSaved": "De rest komt uit je opgeslagen ‘{label}’. Alleen wat hieronder staat is nodig.",
       "note": "Notitie toevoegen (optioneel)",

@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Dieses Gerät kann das noch nicht verschlüsseln",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Wartet auf dich",
-      "remember": "Auf dem anfragenden Computer merken",
+      "remember": "Für das nächste Mal merken",
       "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen.",
-      "rememberOff": "Einmal verwendet, dann gelöscht.",
+      "rememberOff": "Nur für diese Aufgabe verwendet, danach vergessen.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
       "usingSaved": "Der Rest kommt aus deinem gespeicherten „{label}“. Nur das Folgende fehlt noch."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Umbenennen",
       "renameSave": "Speichern",
       "renameCancel": "Abbrechen",
-      "renameLabel": "Name"
+      "renameLabel": "Name",
+      "sync": "Mit deinen anderen Geräten synchronisieren",
+      "syncHint": "Ende-zu-Ende-verschlüsselt: Nur deine eigenen Computer und dein Handy können sie öffnen, nicht die Server von Stella. Aus bleiben sie nur auf diesem Computer."
     },
     "googleComposio": {
       "title": "Composio für Google verwenden",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Auf diesem Computer merken",
-      "rememberRelayed": "Auf dem anfragenden Computer merken",
+      "remember": "Für das nächste Mal merken",
+      "rememberRelayed": "Für das nächste Mal merken",
       "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit unter {place} löschen.",
-      "rememberOff": "Einmal verwendet, dann gelöscht.",
+      "rememberOff": "Nur für diese Aufgabe verwendet, danach vergessen.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
       "usingSaved": "Der Rest kommt aus deinem gespeicherten „{label}“. Nur das Folgende fehlt noch.",
       "note": "Notiz hinzufügen (optional)",

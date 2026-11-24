@@ -19,7 +19,11 @@ import {
   unprotectValue,
 } from "@stella/node-shared/shared/protected-storage";
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
-import { matchSavedFields } from "@stella/contracts/saved-values";
+import {
+  SAVED_VALUES_FORMAT_VERSION,
+  matchSavedFields,
+  type SavedValuePayload,
+} from "@stella/contracts/saved-values";
 
 export { matchSavedFields };
 
@@ -252,8 +256,14 @@ const decodePayload = (payload: string | null): Record<string, string> | null =>
 
 const newHandle = () => `${USER_ASK_SECRET_HANDLE_PREFIX}${randomUUID()}`;
 
+/** A change made on this computer (not one taken from another device), for sync. */
+export type SavedValuesChange =
+  | { kind: "saved"; id: string }
+  | { kind: "removed"; ids: string[]; at: number };
+
 export class SavedSecureValues {
   private readonly getDir: () => string | null;
+  private readonly listeners = new Set<(change: SavedValuesChange) => void>();
   private readonly fresh = new Map<string, FreshValue>();
   private readonly expired = new Set<string>();
   private ready: Promise<void> | null = null;
@@ -261,6 +271,22 @@ export class SavedSecureValues {
 
   constructor(getDir: () => string | null) {
     this.getDir = getDir;
+  }
+
+  /** Called after every change made on this computer. */
+  onChange(listener: (change: SavedValuesChange) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit(change: SavedValuesChange) {
+    for (const listener of this.listeners) {
+      try {
+        listener(change);
+      } catch {
+        // A listener's failure never undoes the change.
+      }
+    }
   }
 
   private indexPath(dir: string) {
@@ -537,6 +563,7 @@ export class SavedSecureValues {
       fields,
       values,
     });
+    this.emit({ kind: "saved", id: entry.id });
     const handles: Record<string, string> = {};
     for (const { field } of input.fields) {
       const stored = placed.get(field.id);
@@ -673,7 +700,10 @@ export class SavedSecureValues {
       for (const handle of this.fresh.keys()) this.expired.add(handle);
       this.fresh.clear();
     }
-    if (targets.length > 0) this.writeIndex(dir, index);
+    if (targets.length > 0) {
+      this.writeIndex(dir, index);
+      this.emit({ kind: "removed", ids: targets.map((entry) => entry.id), at: Date.now() });
+    }
     return targets.length;
   }
 
@@ -685,8 +715,89 @@ export class SavedSecureValues {
     const entry = index.entries[id];
     if (!entry) return false;
     entry.label = next;
+    entry.updatedAt = Math.max(Date.now(), entry.updatedAt + 1);
     this.writeIndex(dir, index);
+    this.emit({ kind: "saved", id });
     return true;
+  }
+
+  /** Every record on this computer, with when it last changed. */
+  async heads(): Promise<{ id: string; updatedAt: number }[]> {
+    const dir = await this.ensureReady();
+    return dir
+      ? Object.values(this.readIndex(dir).entries).map((entry) => ({ id: entry.id, updatedAt: entry.updatedAt }))
+      : [];
+  }
+
+  /** A record as it syncs: names, fields with their handles, and values. */
+  async payloadOf(id: string): Promise<SavedValuePayload | null> {
+    const entry = await this.get(id);
+    if (!entry) return null;
+    const values = await this.readValues(entry);
+    if (!values) return null;
+    return {
+      v: SAVED_VALUES_FORMAT_VERSION,
+      id: entry.id,
+      service: entry.service,
+      account: entry.account,
+      label: entry.label,
+      fields: entry.fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        type: field.type,
+        sensitive: field.sensitive,
+        ...(field.handle ? { handle: field.handle } : {}),
+      })),
+      values,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    };
+  }
+
+  /**
+   * Takes a record another device saved: stored here under the same id and
+   * handles, so a handle works on every device. Not reported as a change.
+   */
+  async applySynced(payload: SavedValuePayload): Promise<void> {
+    const dir = await this.ensureReady();
+    if (!dir) return;
+    const existing = this.readIndex(dir).entries[payload.id] ?? null;
+    const base: SavedEntry = {
+      id: payload.id,
+      service: normalizeSavedValuePart(payload.service),
+      account: normalizeSavedValuePart(payload.account),
+      label: normalizeSavedValuePart(payload.label, 120) || payload.service || "Saved value",
+      fields: payload.fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        type: field.type,
+        sensitive: field.sensitive,
+        ...(field.sensitive && field.handle ? { handle: field.handle } : {}),
+      })),
+      store: existing?.store ?? "protected_file",
+      ...(existing?.chunks ? { chunks: existing.chunks } : {}),
+      createdAt: payload.createdAt,
+      updatedAt: payload.updatedAt,
+      ...(existing?.lastUsedAt ? { lastUsedAt: existing.lastUsedAt } : {}),
+    };
+    const placed = await this.writePayload(base, encodePayload({ ...payload.values }));
+    if (existing && existing.store !== placed.store) await this.removePayload(existing);
+    const { chunks: _chunks, valueProtected: _valueProtected, ...rest } = base;
+    const index = this.readIndex(dir);
+    index.entries[payload.id] = { ...rest, ...placed };
+    this.writeIndex(dir, index);
+  }
+
+  /** Removes a record another device removed. Not reported as a change. */
+  async removeSynced(id: string): Promise<void> {
+    const dir = await this.ensureReady();
+    if (!dir) return;
+    const index = this.readIndex(dir);
+    const entry = index.entries[id];
+    if (!entry) return;
+    await this.removePayload(entry);
+    delete index.entries[id];
+    this.writeIndex(dir, index);
   }
 
   async valuesKey(): Promise<string> {

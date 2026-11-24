@@ -1728,9 +1728,9 @@
       "sensitiveUnavailable": "Acest dispozitiv nu poate încă să cripteze asta",
       "unnamedComputer": "Calculator · {id}",
       "waitingBadge": "Te așteaptă",
-      "remember": "Ține minte pe computerul care a cerut",
+      "remember": "Ține minte pentru data viitoare",
       "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe.",
-      "rememberOff": "Folosit o dată, apoi șters.",
+      "rememberOff": "Folosit doar pentru această sarcină, apoi uitat.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
       "usingSaved": "Restul vine din valoarea salvată „{label}”. E nevoie doar de ce e mai jos."
     }
@@ -2601,7 +2601,9 @@
       "rename": "Redenumește",
       "renameSave": "Salvează",
       "renameCancel": "Anulează",
-      "renameLabel": "Nume"
+      "renameLabel": "Nume",
+      "sync": "Sincronizează pe celelalte dispozitive",
+      "syncHint": "Criptare end-to-end: doar computerele și telefonul tău le pot deschide, nu serverele Stella. Dezactivat, rămân doar pe acest computer."
     },
     "googleComposio": {
       "title": "Folosește Composio pentru Google",
@@ -3136,10 +3138,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Ține minte pe acest computer",
-      "rememberRelayed": "Ține minte pe computerul care a cerut",
+      "remember": "Ține minte pentru data viitoare",
+      "rememberRelayed": "Ține minte pentru data viitoare",
       "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe; îl poți șterge oricând din {place}.",
-      "rememberOff": "Folosit o dată, apoi șters.",
+      "rememberOff": "Folosit doar pentru această sarcină, apoi uitat.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
       "usingSaved": "Restul vine din valoarea salvată „{label}”. E nevoie doar de ce e mai jos.",
       "note": "Adaugă o notă (opțional)",

@@ -1718,9 +1718,9 @@
       "sensitiveUnavailable": "Tämä laite ei voi vielä salata sitä",
       "unnamedComputer": "Tietokone · {id}",
       "waitingBadge": "Odottaa sinua",
-      "remember": "Muista kysyneellä tietokoneella",
+      "remember": "Muista ensi kerralla",
       "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta.",
-      "rememberOff": "Käytetään kerran ja poistetaan sitten.",
+      "rememberOff": "Käytetään vain tähän tehtävään ja unohdetaan sitten.",
       "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun.",
       "usingSaved": "Loput tulevat tallentamastasi kohteesta ”{label}”. Vain alla oleva tarvitaan."
     }
@@ -2591,7 +2591,9 @@
       "rename": "Nimeä uudelleen",
       "renameSave": "Tallenna",
       "renameCancel": "Peruuta",
-      "renameLabel": "Nimi"
+      "renameLabel": "Nimi",
+      "sync": "Synkronoi muihin laitteisiisi",
+      "syncHint": "Päästä päähän salattu: vain omat tietokoneesi ja puhelimesi voivat avata ne, eivät Stellan palvelimet. Pois päältä ne pysyvät vain tässä tietokoneessa."
     },
     "googleComposio": {
       "title": "Käytä Composiota Googlelle",
@@ -3118,10 +3120,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Muista tällä tietokoneella",
-      "rememberRelayed": "Muista kysyneellä tietokoneella",
+      "remember": "Muista ensi kerralla",
+      "rememberRelayed": "Muista ensi kerralla",
       "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa kohdasta {place}.",
-      "rememberOff": "Käytetään kerran ja poistetaan sitten.",
+      "rememberOff": "Käytetään vain tähän tehtävään ja unohdetaan sitten.",
       "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun.",
       "usingSaved": "Loput tulevat tallentamastasi kohteesta ”{label}”. Vain alla oleva tarvitaan.",
       "note": "Lisää huomautus (valinnainen)",

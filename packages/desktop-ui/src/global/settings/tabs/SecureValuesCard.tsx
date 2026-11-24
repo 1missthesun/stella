@@ -1,6 +1,8 @@
 import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { UserAskStoredSecureValue } from "@stella/contracts/user-ask";
+import type { SavedValuesSyncStatus } from "@stella/contracts/saved-values";
+import { Switch } from "@/ui/switch";
 import { Button } from "@/ui/button";
 import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
@@ -22,6 +24,7 @@ export function SecureValuesCard() {
   const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(
     null,
   );
+  const [sync, setSync] = useState<SavedValuesSyncStatus | null>(null);
 
   const load = useCallback(async () => {
     const bridge = getElectronApi()?.userAsk;
@@ -36,6 +39,23 @@ export function SecureValuesCard() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const bridge = getElectronApi()?.userAsk;
+    if (!bridge?.secureValuesSyncGet) return;
+    void bridge.secureValuesSyncGet().then(setSync, () => undefined);
+  }, []);
+
+  const toggleSync = useCallback(async (enabled: boolean) => {
+    const bridge = getElectronApi()?.userAsk;
+    if (!bridge?.secureValuesSyncSet) return;
+    setBusy("sync");
+    try {
+      setSync(await bridge.secureValuesSyncSet({ enabled }));
+    } finally {
+      setBusy(null);
+    }
+  }, []);
 
   const remove = useCallback(
     async (payload: { id?: string; all?: boolean }) => {
@@ -92,6 +112,27 @@ export function SecureValuesCard() {
       <p className="settings-card-desc">
         {t("settings.secureValues.description")}
       </p>
+      {sync ? (
+        <div className="settings-row" data-testid="secure-values-sync">
+          <div className="settings-row-info">
+            <div className="settings-row-label">
+              {t("settings.secureValues.sync")}
+            </div>
+            <div className="settings-row-sublabel">
+              {t("settings.secureValues.syncHint")}
+            </div>
+          </div>
+          <div className="settings-row-control">
+            <Switch
+              checked={sync.enabled}
+              disabled={busy === "sync"}
+              aria-label={t("settings.secureValues.sync")}
+              hideLabel
+              onCheckedChange={(next) => void toggleSync(next)}
+            />
+          </div>
+        </div>
+      ) : null}
       {values.length === 0 ? (
         <p className="settings-card-desc">{t("settings.secureValues.empty")}</p>
       ) : null}

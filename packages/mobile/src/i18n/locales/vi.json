@@ -1708,9 +1708,9 @@
       "sensitiveUnavailable": "Thiết bị này chưa thể mã hóa nội dung đó",
       "unnamedComputer": "Máy tính · {id}",
       "waitingBadge": "Đang chờ bạn",
-      "remember": "Ghi nhớ trên máy tính đã hỏi",
+      "remember": "Ghi nhớ cho lần sau",
       "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn.",
-      "rememberOff": "Dùng một lần rồi xóa.",
+      "rememberOff": "Chỉ dùng cho tác vụ này, sau đó quên đi.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
       "usingSaved": "Phần còn lại lấy từ “{label}” bạn đã lưu. Chỉ cần điền phần bên dưới."
     }
@@ -2581,7 +2581,9 @@
       "rename": "Đổi tên",
       "renameSave": "Lưu",
       "renameCancel": "Hủy",
-      "renameLabel": "Tên"
+      "renameLabel": "Tên",
+      "sync": "Đồng bộ với các thiết bị khác của bạn",
+      "syncHint": "Mã hóa đầu cuối: chỉ máy tính và điện thoại của bạn mới mở được, máy chủ của Stella thì không. Khi tắt, chúng chỉ ở trên máy tính này."
     },
     "googleComposio": {
       "title": "Dùng Composio cho Google",
@@ -3098,10 +3100,10 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "remember": "Ghi nhớ trên máy tính này",
-      "rememberRelayed": "Ghi nhớ trên máy tính đã hỏi",
+      "remember": "Ghi nhớ cho lần sau",
+      "rememberRelayed": "Ghi nhớ cho lần sau",
       "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong {place}.",
-      "rememberOff": "Dùng một lần rồi xóa.",
+      "rememberOff": "Chỉ dùng cho tác vụ này, sau đó quên đi.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
       "usingSaved": "Phần còn lại lấy từ “{label}” bạn đã lưu. Chỉ cần điền phần bên dưới.",
       "note": "Thêm ghi chú (không bắt buộc)",

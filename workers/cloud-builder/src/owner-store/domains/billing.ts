@@ -34,7 +34,14 @@ import {
   verifyStripePrice,
   type BillingConfig,
 } from "../../billing/plans.js";
-import { stripeRequest, StripeError, type StripeEvent } from "../../billing/stripe.js";
+import type { StripeEvent } from "../../billing/stripe.js";
+
+const loadStripe = () => import("../../billing/stripe.js");
+
+const isStripeError = (error: unknown): error is Error & { status: number } =>
+  error instanceof Error &&
+  error.name === "StripeError" &&
+  typeof (error as { status?: unknown }).status === "number";
 import { costExportJobs, purgeCostExport, scheduleCostExport } from "./billing-costs.js";
 import { empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -1019,10 +1026,10 @@ const withCheckoutStatus = (returnUrl: string, status: "success" | "cancel"): st
 const stripeUnavailable = (error: unknown): RpcError =>
   new RpcError(
     "UNAVAILABLE",
-    error instanceof StripeError && error.status < 500
+    isStripeError(error) && error.status < 500
       ? error.message
       : "Billing is temporarily unavailable. Try again.",
-    { retryable: !(error instanceof StripeError && error.status < 500) },
+    { retryable: !(isStripeError(error) && error.status < 500) },
   );
 
 const requireBilling = (env: Cloudflare.Env): void => {
@@ -1034,6 +1041,7 @@ const requireBilling = (env: Cloudflare.Env): void => {
 const ensureCustomer = async (ctx: OwnerContext): Promise<string> => {
   const row = ensureAccount(ctx.db, ctx.now);
   if (row.stripe_customer_id) return row.stripe_customer_id;
+  const { stripeRequest } = await loadStripe();
   const customer = await stripeRequest<{ id: string }>(
     ctx.env,
     "POST",
@@ -1055,6 +1063,7 @@ const liveStripeSubscription = async (
   ctx: OwnerContext,
   customer: string,
 ): Promise<StripeSubscription | null> => {
+  const { stripeRequest } = await loadStripe();
   const list = await stripeRequest<{ data?: StripeSubscription[] }>(ctx.env, "GET", "/subscriptions", {
     customer,
     status: "all",
@@ -1097,6 +1106,7 @@ const checkout = async (
       throw new RpcError("CONFLICT", ALREADY_SUBSCRIBED);
     }
     const metadata = { ownerId: ctx.ownerId, plan: args.plan, source };
+    const { stripeRequest, StripeError } = await loadStripe();
     const priceId = await verifyStripePrice(ctx.env, config, args.plan);
     const session = await stripeRequest<{ id: string; url: string | null }>(ctx.env, "POST", "/checkout/sessions", {
       mode: "subscription",
@@ -1145,6 +1155,7 @@ const creditCheckout = async (
   );
   const returnUrl = normalizeReturnUrl(args.returnUrl);
   try {
+    const { stripeRequest, StripeError } = await loadStripe();
     const customer = await ensureCustomer(ctx);
     const metadata = { ownerId: ctx.ownerId, purpose: "usage_credit", amountCents: String(amountCents) };
     const session = await stripeRequest<{ id: string; url: string | null }>(ctx.env, "POST", "/checkout/sessions", {
@@ -1192,6 +1203,7 @@ const portal = async (
     "Too many billing requests. Please wait a moment and try again.",
   );
   try {
+    const { stripeRequest } = await loadStripe();
     const session = await stripeRequest<{ url: string }>(ctx.env, "POST", "/billing_portal/sessions", {
       customer,
       return_url: normalizeReturnUrl(args.returnUrl),
@@ -1251,10 +1263,12 @@ const syncSubscription = (ctx: OwnerContext, subscription: StripeSubscription): 
   });
 };
 
-const fetchSubscription = (ctx: OwnerContext, id: string) =>
-  stripeRequest<StripeSubscription>(ctx.env, "GET", `/subscriptions/${encodeURIComponent(id)}`, {
+const fetchSubscription = async (ctx: OwnerContext, id: string) => {
+  const { stripeRequest } = await loadStripe();
+  return await stripeRequest<StripeSubscription>(ctx.env, "GET", `/subscriptions/${encodeURIComponent(id)}`, {
     expand: ["default_payment_method"],
   });
+};
 
 const subscriptionIdOf = (object: Record<string, unknown>): string | null => {
   const direct = object.subscription;
@@ -1358,6 +1372,7 @@ export const stopStripeRenewal = async (ctx: OwnerContext): Promise<void> => {
   const row = readAccount(ctx.db, ctx.now);
   if (!row.stripe_subscription_id || row.cancel_at_period_end === 1) return;
   if (!ACTIVE_SUBSCRIPTION_STATUSES.has(row.subscription_status ?? "")) return;
+  const { stripeRequest, StripeError } = await loadStripe();
   try {
     await stripeRequest(ctx.env, "POST", `/subscriptions/${encodeURIComponent(row.stripe_subscription_id)}`, {
       cancel_at_period_end: true,
@@ -1372,6 +1387,7 @@ export const stopStripeRenewal = async (ctx: OwnerContext): Promise<void> => {
 export const closeStripeCustomer = async (ctx: OwnerContext): Promise<void> => {
   const row = readAccount(ctx.db, ctx.now);
   if (!row.stripe_customer_id) return;
+  const { stripeRequest, StripeError } = await loadStripe();
   try {
     await stripeRequest(ctx.env, "DELETE", `/customers/${encodeURIComponent(row.stripe_customer_id)}`);
   } catch (error) {

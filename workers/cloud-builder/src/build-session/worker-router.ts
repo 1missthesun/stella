@@ -1,11 +1,4 @@
-import {
-  mintWorkspaceAppAccess,
-  serveWorkspaceApp,
-  serveWorkspaceAppPreview,
-} from "../workspace-app-access.js";
 import { worldName } from "../workspace.js";
-
-import { handleSlackRoute } from "../slack/routes.js";
 import { Hono, type MiddlewareHandler } from "hono";
 import { TURN_BROKER_HEADERS } from "@stella/contracts/turn-credential-broker";
 import { JOURNAL_CHECKPOINT_PATH, JOURNAL_CHECKPOINT_SUMMARY_MAX_BYTES } from "@stella/contracts/journal-checkpoint";
@@ -30,6 +23,15 @@ import {
   TURN_OWNER_GENERATION_HEADER,
   TURN_OWNER_ID_HEADER,
 } from "@stella/contracts/turn-plane/turn-start";
+import {
+  GOOGLE_OAUTH_CALLBACK_PATH,
+  X_OAUTH_CALLBACK_PATH,
+} from "@stella/contracts/backend/integrations";
+import { PROVIDER_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/providers";
+import { WEB_RENDERER_UPLOAD_PREFIX } from "@stella/contracts/backend/app-source";
+import { PREVIEW_SESSION_CAPABILITY_PATH } from "@stella/contracts/gateway/api";
+import { MAPS_RESOLVE_PATH } from "@stella/contracts/map-artifact";
+import { STELLA_MODELS_PATH, STELLA_PROMPTS_PATH } from "@stella/contracts/stella-api";
 import { bearerCredential } from "../../../shared/bearer.js";
 import { verifyUserToken, type VerifiedToken } from "../auth-jwt.js";
 import { admitSession, ownerGateRevocations } from "../session-revocation.js";
@@ -37,17 +39,8 @@ import { noteOwnerIdentity } from "../owner-identity.js";
 import { readBoundedRequestText } from "../bounded-body.js";
 import { withBrowserCors } from "../browser-cors.js";
 import { withSecurityHeaders } from "../http/security-headers.js";
-import { handleVoiceRoute, ownerDictationControl } from "../voice/routes.js";
 import { handleBackendRoute } from "../owner-store/routes.js";
-import { handleMediaRoute } from "../media/routes.js";
-import { handleMapsRoute } from "../maps/routes.js";
-import { handleDictationTranscribeRoute } from "../dictation/transcribe-route.js";
-import { handleIntegrationsRoute } from "../integrations/routes.js";
-import { handleProjectsRoute } from "../projects/routes.js";
-import { handleAppSourceBootstrap } from "../app-source-bootstrap.js";
 import { handleAppSourceReleases } from "../app-source-releases.js";
-import { handleWebRendererRoute } from "../web-renderer.js";
-import { handleUserCloudHomeRoute, ownerAccess } from "../cloud-home-routes.js";
 import {
   HEADER_ISSUER,
   HEADER_OWNER,
@@ -73,28 +66,19 @@ import {
   dispatchErrorResponse,
   parseDispatchSubmitRequest,
 } from "../dispatch-policy.js";
-import { handleMuseTranscribeSocket } from "../muse-transcribe-socket.js";
-import { STELLA_PROMPTS_PATH } from "@stella/contracts/stella-api";
-import { stellaPromptsResponse } from "../prompts/route.js";
 import {
   HEADER_PRESENCE_DEVICE_ID,
-  OwnerGate,
+  type OwnerGate,
 } from "../owner-gate.js";
 import { normalizeOwnerGeneration } from "../owner-generation.js";
 import { evaluateCloudBuilderReadiness } from "../readiness.js";
 import {
   boundedBodyStatus,
+  bufferBoundedJsonRequest,
   CLOUD_BUILDER_BODY_LIMITS,
 } from "../request-ingress.js";
 import { verifyServiceBearerRequestWithAny } from "../service-bearer.js";
 import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
-import { handleBillingRoute } from "../billing/routes.js";
-import { handleAdminRoute } from "../admin/routes.js";
-import { handleStellaModelsRoute } from "../catalog/models.js";
-import { handlePreviewSessionCapabilityRoute } from "../billing/preview-session-capability.js";
-import { handleDevicesRoute } from "../devices/routes.js";
-import { handleUserAsksRoute } from "../user-asks/routes.js";
-import { handleDeviceRequestRoute } from "../devices/device-request-route.js";
 import { DEVICE_REQUEST_LIMITS } from "@stella/contracts/turn-plane/device-requests";
 import { validateTurnBrokerTarget } from "../turn-credential-broker.js";
 import type { TurnAuthKind } from "../turn-start-request.js";
@@ -104,12 +88,6 @@ import {
   serviceOnlyTurnFields,
   turnStartErrorResponse,
 } from "../turn-start-request.js";
-import {
-  boundedIngressRequest,
-  cloudHomeLeaseRunner,
-  handleWorldRoute,
-} from "./owner-purge-transfer.js";
-import { retireSandboxInstance } from "./session-sandbox.js";
 import type { Env } from "./shared/env.js";
 import {
   HEADER_CONVERSATION_ID,
@@ -820,6 +798,57 @@ const mount = (handle: SubRouter): MiddlewareHandler<RouterEnv> =>
     await next();
   };
 
+const mountLazy = (
+  matches: (pathname: string) => boolean,
+  load: () => Promise<SubRouter>,
+): MiddlewareHandler<RouterEnv> =>
+  async (c, next) => {
+    if (!matches(c.req.path)) {
+      await next();
+      return;
+    }
+    const handle = await load();
+    const ctx = {
+      waitUntil: (promise: Promise<unknown>) => c.executionCtx.waitUntil(promise),
+      passThroughOnException: () => c.executionCtx.passThroughOnException(),
+    } as ExecutionContext;
+    const response = await handle(c.req.raw, c.env, ctx);
+    if (response) return response;
+    await next();
+  };
+
+const boundedIngressRequest = async (
+  request: Request,
+  maxBytes: number,
+): Promise<Request | Response> => {
+  try {
+    return await bufferBoundedJsonRequest(request, maxBytes);
+  } catch (error) {
+    const status = boundedBodyStatus(error);
+    if (status === null) throw error;
+    return json(
+      {
+        code: status === 413 ? "request_too_large" : "bad_request",
+        message:
+          status === 413
+            ? "Request body is too large."
+            : "Malformed JSON request.",
+      },
+      status,
+    );
+  }
+};
+
+const isIntegrationPath = (path: string): boolean =>
+  path.startsWith("/api/native-integrations/") ||
+  path.startsWith("/api/native-oauth/") ||
+  path.startsWith("/api/x/") ||
+  path === "/api/gmail/push" ||
+  path === "/api/admin/native-integrations/upsert" ||
+  path === GOOGLE_OAUTH_CALLBACK_PATH ||
+  path === X_OAUTH_CALLBACK_PATH ||
+  path === PROVIDER_OAUTH_CALLBACK_PATH;
+
 const userAuth = (
   { socket }: { socket?: "conversation" | "presence" } = {},
 ): MiddlewareHandler<RouterEnv> =>
@@ -934,7 +963,10 @@ app.get("/readyz", (c) => {
     readiness.ready ? 200 : 503,
   );
 });
-app.get(STELLA_PROMPTS_PATH, (c) => stellaPromptsResponse(c.req.raw));
+app.get(STELLA_PROMPTS_PATH, async (c) => {
+  const { stellaPromptsResponse } = await import("../prompts/route.js");
+  return stellaPromptsResponse(c.req.raw);
+});
 app.get("/.well-known/stella", async (c) => {
   const { discoveryRoute } = await import("../selfhost/discovery.js");
   return await discoveryRoute(c.env as unknown as Cloudflare.Env);
@@ -952,18 +984,23 @@ app.all("/api/auth/:rest{.*}", async (c) => {
   return await handleAuthRoute(c.req.raw, c.env);
 });
 
-app.all(`/internal/worlds/:world{${WORLD_KEY}}/:op{export|changes|push}`, (c) => {
+app.all(`/internal/worlds/:world{${WORLD_KEY}}/:op{export|changes|push}`, async (c) => {
   const op = c.req.param("op") as "export" | "changes" | "push";
+  const { handleWorldRoute } = await import("./owner-purge-transfer.js");
   return handleWorldRoute(c.req.raw, c.env, c.req.param("world"), { kind: op });
 });
-app.all(`/internal/worlds/:world{${WORLD_KEY}}/blob/:sha256{[0-9a-f]{64}}`, (c) =>
-  handleWorldRoute(c.req.raw, c.env, c.req.param("world"), {
+app.all(`/internal/worlds/:world{${WORLD_KEY}}/blob/:sha256{[0-9a-f]{64}}`, async (c) => {
+  const { handleWorldRoute } = await import("./owner-purge-transfer.js");
+  return handleWorldRoute(c.req.raw, c.env, c.req.param("world"), {
     kind: "blob",
     sha256: c.req.param("sha256"),
-  }),
-);
+  });
+});
 
-app.all("/workspace-apps/:rest{.*}", (c) => serveWorkspaceApp(c.req.raw, c.env, c.executionCtx));
+app.all("/workspace-apps/:rest{.*}", async (c) => {
+  const { serveWorkspaceApp } = await import("../workspace-app-access.js");
+  return serveWorkspaceApp(c.req.raw, c.env, c.executionCtx);
+});
 
 // ── User-authenticated ────────────────────────────────────────────────────
 // A signed-in user presents a user JWT, not the shared secret. Each route
@@ -971,7 +1008,11 @@ app.all("/workspace-apps/:rest{.*}", (c) => serveWorkspaceApp(c.req.raw, c.env, 
 // headers, stripping whatever the client sent under those names first.
 
 const listOwnerApps = async (env: Env, ownerId: string) => {
-  const world = env.WORLDS.getByName(await worldName(ownerId));
+  const [{ ownerAccess }, name] = await Promise.all([
+    import("../cloud-home-routes.js"),
+    worldName(ownerId),
+  ]);
+  const world = env.WORLDS.getByName(name);
   await ownerAccess(env, ownerId);
   const apps = released(await world.listWorkspaceApps());
   return { world, apps };
@@ -987,6 +1028,7 @@ app.post(`/owners/me/apps/:slug{${APP_SLUG}}/session`, userAuth(), async (c) => 
   const { apps } = await listOwnerApps(c.env, ownerId);
   if (!apps.some((app) => app.slug === slug && app.status === "ready"))
     return json({ error: "App not found" }, 404);
+  const { mintWorkspaceAppAccess } = await import("../workspace-app-access.js");
   return json(await mintWorkspaceAppAccess(c.env, ownerId, slug));
 });
 app.all(`/owners/me/apps/:slug{${APP_SLUG}}/session`, methodNotAllowed("Method not allowed"));
@@ -996,31 +1038,107 @@ app.get(`/owners/me/apps/:slug{${APP_SLUG}}/preview`, userAuth(), async (c) => {
   const { world, apps } = await listOwnerApps(c.env, ownerId);
   const app = apps.find((entry) => entry.slug === slug && entry.status === "ready");
   if (!app) return json({ error: "App not found" }, 404);
+  const { serveWorkspaceAppPreview } = await import("../workspace-app-access.js");
   return await serveWorkspaceAppPreview(c.env, ownerId, app, world);
 });
 app.all(`/owners/me/apps/:slug{${APP_SLUG}}/preview`, methodNotAllowed("Method not allowed"));
 
 app.use(mount(handleBackendRoute));
-app.use(mount(handleStellaModelsRoute));
-app.use(mount(handlePreviewSessionCapabilityRoute));
-app.use(mount(handleMediaRoute));
-app.use(mount(handleMapsRoute));
-app.use(mount(handleDictationTranscribeRoute));
-app.use(mount(handleProjectsRoute));
-app.use(mount(handleAppSourceBootstrap));
-app.use(mount(handleAppSourceReleases));
 app.use(
-  mount((request, env, ctx) =>
-    handleWebRendererRoute(request, env, (promise) => ctx.waitUntil(promise)),
+  mountLazy(
+    (path) => path === STELLA_MODELS_PATH,
+    async () => (await import("../catalog/models.js")).handleStellaModelsRoute,
   ),
 );
-app.use(mount(handleBillingRoute));
-app.use(mount(handleAdminRoute));
-app.use(mount(handleDevicesRoute));
-app.use(mount(handleUserAsksRoute));
-app.use(mount(handleVoiceRoute));
-app.use(mount(handleIntegrationsRoute));
-app.use(mount(handleSlackRoute));
+app.use(
+  mountLazy(
+    (path) => path === PREVIEW_SESSION_CAPABILITY_PATH,
+    async () => (await import("../billing/preview-session-capability.js")).handlePreviewSessionCapabilityRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/api/media/v1/"),
+    async () => (await import("../media/routes.js")).handleMediaRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path === MAPS_RESOLVE_PATH,
+    async () => (await import("../maps/routes.js")).handleMapsRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path === "/api/dictation/transcribe",
+    async () => (await import("../dictation/transcribe-route.js")).handleDictationTranscribeRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/api/cloud/projects/github/"),
+    async () => (await import("../projects/routes.js")).handleProjectsRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path === "/api/app-source/bootstrap",
+    async () => (await import("../app-source-bootstrap.js")).handleAppSourceBootstrap,
+  ),
+);
+app.use(mount(handleAppSourceReleases));
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/web-renderer/") || path.startsWith(WEB_RENDERER_UPLOAD_PREFIX),
+    async () => {
+      const { handleWebRendererRoute } = await import("../web-renderer.js");
+      return (request, env, ctx) =>
+        handleWebRendererRoute(request, env, (promise) => ctx.waitUntil(promise));
+    },
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path === "/api/stripe/webhook",
+    async () => (await import("../billing/routes.js")).handleBillingRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/api/admin/"),
+    async () => (await import("../admin/routes.js")).handleAdminRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/api/mobile/"),
+    async () => (await import("../devices/routes.js")).handleDevicesRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path === "/api/user-asks" || path.startsWith("/api/user-asks/"),
+    async () => (await import("../user-asks/routes.js")).handleUserAsksRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/api/voice/"),
+    async () => (await import("../voice/routes.js")).handleVoiceRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    isIntegrationPath,
+    async () => (await import("../integrations/routes.js")).handleIntegrationsRoute,
+  ),
+);
+app.use(
+  mountLazy(
+    (path) => path.startsWith("/api/slack/"),
+    async () => (await import("../slack/routes.js")).handleSlackRoute,
+  ),
+);
 
 app.all("/dictation/socket", socketOnly, async (c) => {
   const receivedAt = Date.now();
@@ -1032,6 +1150,10 @@ app.all("/dictation/socket", socketOnly, async (c) => {
     { purpose: "dictation", resource: "" },
   );
   if (!auth.ok) return auth.response;
+  const [{ handleMuseTranscribeSocket }, { ownerDictationControl }] = await Promise.all([
+    import("../muse-transcribe-socket.js"),
+    import("../voice/routes.js"),
+  ]);
   return await handleMuseTranscribeSocket({
     request: c.req.raw,
     env: c.env,
@@ -1055,8 +1177,10 @@ app.post(
   "/owners/me/devices/:deviceId{[A-Za-z0-9._~-]{1,256}}/requests",
   userAuth(),
   jsonBody(DEVICE_REQUEST_LIMITS.paramsBytes + 1024),
-  (c) =>
-    handleDeviceRequestRoute(c.req.raw, c.env, c.req.param("deviceId"), c.var.caller),
+  async (c) => {
+    const { handleDeviceRequestRoute } = await import("../devices/device-request-route.js");
+    return handleDeviceRequestRoute(c.req.raw, c.env, c.req.param("deviceId"), c.var.caller);
+  },
 );
 app.get(DEVICES_PATH, userAuth(), async (c) => {
   try {
@@ -1216,6 +1340,10 @@ localTurn("finish", CLOUD_BUILDER_BODY_LIMITS.localTurnFinish);
 localTurn("tool", CLOUD_BUILDER_BODY_LIMITS.tinyControl);
 
 app.all("/cloud-home/:rest{.*}", userAuth(), async (c, next) => {
+  const [{ handleUserCloudHomeRoute }, { cloudHomeLeaseRunner }] = await Promise.all([
+    import("../cloud-home-routes.js"),
+    import("./owner-purge-transfer.js"),
+  ]);
   const response = await handleUserCloudHomeRoute({
     request: c.req.raw,
     env: c.env,
@@ -1281,9 +1409,10 @@ app.post("/sessions/:sessionId/expire", serviceSecret, jsonBody(tinyControl), (c
     c.req.raw,
   ),
 );
-app.post("/internal/sandboxes/retire", serviceSecret, jsonBody(tinyControl), (c) =>
-  retireSandboxInstance(c.env, c.req.raw),
-);
+app.post("/internal/sandboxes/retire", serviceSecret, jsonBody(tinyControl), async (c) => {
+  const { retireSandboxInstance } = await import("./session-sandbox.js");
+  return retireSandboxInstance(c.env, c.req.raw);
+});
 
 app.notFound(async (c) =>
   (await verifyServiceBearerRequestWithAny(c.req.raw, builderServiceSecrets(c.env)))

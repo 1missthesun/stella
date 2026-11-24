@@ -4,7 +4,7 @@ import {
   SLACK_INSTALL_START_PATH,
   SLACK_WORKSPACES_PATH,
 } from "@stella/contracts/slack-workspace";
-import { browserClientOrigins } from "./auth/auth.js";
+import { browserClientOrigins } from "./auth/config.js";
 const ALLOWED_HEADERS = new Set([
   "authorization",
   "content-type",

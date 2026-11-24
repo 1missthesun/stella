@@ -15,7 +15,6 @@
  * at once and handled in `waitUntil`.
  */
 
-import { createAuth } from "../auth/auth.js";
 import { readOttCookie, withClearedOttCookie } from "../auth/ott-cookie.js";
 import { slackCall, slackTry, type SlackResponse } from "./api.js";
 import {
@@ -513,8 +512,10 @@ type AuthApi = {
   }>;
 };
 
-const authApi = (env: Cloudflare.Env): AuthApi =>
-  (createAuth(env as never) as unknown as { api: AuthApi }).api;
+const authApi = async (env: Cloudflare.Env): Promise<AuthApi> => {
+  const { createAuth } = await import("../auth/auth.js");
+  return (createAuth(env as never) as unknown as { api: AuthApi }).api;
+};
 
 const linkStart = async (
   request: Request,
@@ -535,7 +536,7 @@ const linkStart = async (
   const callbackURL = `${origin}${SLACK_PATHS.linkFinish}?s=${encodeURIComponent(token)}`;
   const headers = new Headers({ origin });
   if (form.get("method") === "google" && slackGoogleEnabled(env)) {
-    const started = await authApi(env).signInSocial({
+    const started = await (await authApi(env)).signInSocial({
       body: { provider: "google", callbackURL, disableRedirect: true },
       headers,
     });
@@ -556,7 +557,7 @@ const linkStart = async (
     );
   }
   try {
-    await authApi(env).signInMagicLink({
+    await (await authApi(env)).signInMagicLink({
       body: { email, callbackURL },
       headers,
     });
@@ -592,7 +593,7 @@ const linkFinish = async (
   let user: { id?: unknown; email?: unknown } | undefined;
   try {
     user = (
-      await authApi(env).verifyOneTimeToken({
+      await (await authApi(env)).verifyOneTimeToken({
         body: { token: ott },
         headers: new Headers({ origin: slackPublicOrigin(env, request) }),
         returnHeaders: true,

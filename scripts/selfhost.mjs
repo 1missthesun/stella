@@ -214,6 +214,7 @@ const validatePrefix = (prefix) => {
 
 const names = (prefix) => ({
   workers: {
+    appCompiler: `${prefix}-app-compiler`,
     cloudBuilder: `${prefix}-cloud-builder`,
     modelGateway: `${prefix}-model-gateway`,
     browserGateway: `${prefix}-browser-gateway`,
@@ -477,6 +478,7 @@ const buildConfigs = (state, { billing }) => {
   cb.services = (cb.services ?? [])
     .filter((service) => service.binding !== "TELEMETRY")
     .map((service) => {
+      if (service.binding === "APP_COMPILER") return { ...service, service: N.workers.appCompiler };
       if (service.binding === "BROWSER_GATEWAY") return { ...service, service: N.workers.browserGateway };
       if (service.binding.startsWith("MODEL_GATEWAY")) return { ...service, service: N.workers.modelGateway };
       throw new Fatal(`cloud-builder has a service binding this script doesn't know: ${service.binding}. Update scripts/selfhost.mjs.`);
@@ -544,6 +546,11 @@ const buildConfigs = (state, { billing }) => {
   }));
   if (mg.secrets?.required) mg.secrets.required = mg.secrets.required.filter((name) => name !== "OPENROUTER_API_KEY");
   configs["model-gateway"] = mg;
+
+  const ac = commonWorker(absolutize("app-compiler", readWorkerConfig("app-compiler")), N.workers.appCompiler);
+  ac.workers_dev = false;
+  ac.preview_urls = false;
+  configs["app-compiler"] = ac;
 
   const bg = commonWorker(absolutize("browser-gateway", readWorkerConfig("browser-gateway")), N.workers.browserGateway);
   bg.workers_dev = false;
@@ -1237,6 +1244,7 @@ const deployEverything = async (state, { first, waitForPrices }) => {
   const secrets = await planSecrets(state, files);
   files = writeConfigs(buildConfigs(state, { billing: true }));
   await migrate(state, files);
+  await deployWorker(state, "app-compiler", files["app-compiler"], { label: "app-compiler (cloud app build worker)" });
   await deployWorker(state, "browser-gateway", files["browser-gateway"], { secrets: secrets["browser-gateway"], label: "browser-gateway (cloud browser)" });
   const builderLive = await workerExists(state.accountId, N.workers.cloudBuilder);
   if (!builderLive) {
@@ -1574,7 +1582,7 @@ const destroy = async () => {
       if (!res.ok) problems.push(`queue ${queue.queue_name} consumer: ${cfErrors(res)}`);
     }
   }
-  for (const name of [N.workers.sites, N.workers.canvasShare, N.workers.appsHost, N.workers.modelGateway, N.workers.cloudBuilder, N.workers.browserGateway]) {
+  for (const name of [N.workers.sites, N.workers.canvasShare, N.workers.appsHost, N.workers.modelGateway, N.workers.cloudBuilder, N.workers.browserGateway, N.workers.appCompiler]) {
     if (!workerNames.includes(name)) continue;
     const res = await cf("DELETE", `/accounts/${accountId}/workers/scripts/${name}?force=true`);
     if (!res.ok) problems.push(`worker ${name}: ${cfErrors(res)}`);

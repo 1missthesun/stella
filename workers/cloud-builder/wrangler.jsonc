@@ -11,7 +11,6 @@
   "upload_source_maps": true,
   "rules": [
     { "type": "ESModule", "globs": ["**/*.js"], "fallthrough": true },
-    { "type": "CompiledWasm", "fallthrough": false, "globs": ["**/*.wasm"] },
   ],
   "build": {
     "command": "node scripts/build-worker.mjs",
@@ -135,6 +134,11 @@
       "binding": "MODEL_GATEWAY_CONTROL",
       "service": "stella-v2-model-gateway-dev",
       "entrypoint": "ModelGatewayControl",
+    },
+    {
+      "binding": "APP_COMPILER",
+      "service": "stella-v2-app-compiler-dev",
+      "entrypoint": "AppCompiler",
     },
   ],
   "r2_buckets": [
@@ -371,6 +375,11 @@
         "service": "stella-v2-model-gateway-dev",
         "entrypoint": "ModelGatewayControl",
       },
+      {
+        "binding": "APP_COMPILER",
+        "service": "stella-v2-app-compiler-dev",
+        "entrypoint": "AppCompiler",
+      },
     ],
     "r2_buckets": [
       {
@@ -526,6 +535,11 @@
           "binding": "MODEL_GATEWAY_CONTROL",
           "service": "stella-v2-model-gateway-dev",
           "entrypoint": "ModelGatewayControl",
+        },
+        {
+          "binding": "APP_COMPILER",
+          "service": "stella-v2-app-compiler-dev",
+          "entrypoint": "AppCompiler",
         },
       ],
       "r2_buckets": [
@@ -749,6 +763,11 @@
           "binding": "MODEL_GATEWAY_CONTROL",
           "service": "stella-v2-model-gateway",
           "entrypoint": "ModelGatewayControl",
+        },
+        {
+          "binding": "APP_COMPILER",
+          "service": "stella-v2-app-compiler-prod",
+          "entrypoint": "AppCompiler",
         },
       ],
       "r2_buckets": [

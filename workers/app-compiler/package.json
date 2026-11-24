@@ -1,0 +1,24 @@
+{
+  "name": "@stella/app-compiler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env=\"\"",
+    "deploy:dev": "wrangler deploy --env=\"\"",
+    "deploy:production": "wrangler deploy --env production --strict",
+    "build:dry-run": "wrangler deploy --dry-run --env=\"\"",
+    "types:generate": "wrangler types worker-configuration.d.ts --include-runtime false --env=\"\"",
+    "types:check": "wrangler types worker-configuration.d.ts --include-runtime false --env=\"\" --check",
+    "typecheck": "bun run types:check && tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/worker-bundler": "^0.2.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261004.1",
+    "bun": "1.4.4",
+    "typescript": "npm:typescript@^7.0.2",
+    "wrangler": "4.147.0"
+  }
+}

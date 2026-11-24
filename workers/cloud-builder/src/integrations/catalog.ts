@@ -5,7 +5,6 @@ import type {
   IntegrationConnector,
 } from "@stella/contracts/backend/integrations";
 import { RpcError } from "../owner-store/errors.js";
-import { effectiveGoogleAdsActionSchema } from "./google-ads.js";
 
 export const SAFE_INTEGRATION_ID = /^[a-z0-9][a-z0-9_-]{0,127}$/u;
 export const SAFE_ACTION_NAME = /^[A-Z][A-Z0-9_]{1,127}$/u;
@@ -204,13 +203,15 @@ const optionalText = (value: unknown, max: number): string | undefined | null =>
   return trimmed.length > max ? null : trimmed;
 };
 
-const normalizeActions = (value: unknown, toolkit: string): StoredAction[] => {
+const normalizeActions = async (value: unknown, toolkit: string): Promise<StoredAction[]> => {
   if (!Array.isArray(value) || value.length === 0) {
     throw new RpcError("BAD_REQUEST", "At least one schema-bearing action is required.");
   }
   if (value.length > MAX_ACTIONS) {
     throw new RpcError("BAD_REQUEST", `Integration action count exceeds ${MAX_ACTIONS}.`);
   }
+  const googleAds =
+    toolkit.toLowerCase() === "googleads" ? await import("./google-ads.js") : null;
   const names = new Set<string>();
   const actions = value.map((raw): StoredAction => {
     if (!isRecord(raw)) throw new RpcError("BAD_REQUEST", "Every integration action must be an object.");
@@ -227,7 +228,9 @@ const normalizeActions = (value: unknown, toolkit: string): StoredAction[] => {
     if (!isRecord(raw.inputSchema)) {
       throw new RpcError("BAD_REQUEST", `Integration action is missing an object input schema: ${name}.`);
     }
-    const inputSchema = effectiveGoogleAdsActionSchema(toolkit, name, raw.inputSchema);
+    const inputSchema = googleAds
+      ? googleAds.effectiveGoogleAdsActionSchema(toolkit, name, raw.inputSchema)
+      : raw.inputSchema;
     if (new TextEncoder().encode(JSON.stringify(inputSchema)).byteLength > MAX_SCHEMA_BYTES) {
       throw new RpcError("BAD_REQUEST", `Integration action schema is too large: ${name}.`);
     }
@@ -276,7 +279,7 @@ export const publishIntegration = async (
   if (typeof body.enabled !== "boolean" || !readString(body.usagePolicy)) {
     throw new RpcError("BAD_REQUEST", "Integration enabled and usagePolicy are required.");
   }
-  const actions = normalizeActions(body.actions, id);
+  const actions = await normalizeActions(body.actions, id);
   const text = (key: string, max: number) => {
     const value = optionalText(body[key], max);
     if (value === null) throw new RpcError("BAD_REQUEST", `Integration ${key} is invalid.`);

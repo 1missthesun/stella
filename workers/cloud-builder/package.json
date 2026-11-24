@@ -22,7 +22,6 @@
     "@better-auth/passkey": "1.7.7",
     "@cloudflare/codemode": "0.5.3",
     "@cloudflare/sandbox": "1.0.0",
-    "@cloudflare/worker-bundler": "^0.2.5",
     "@earendil-works/chord": "1.6.0",
     "@earendil-works/pi-ai": "1.6.0",
     "@earendil-works/pi-durable": "1.6.0",

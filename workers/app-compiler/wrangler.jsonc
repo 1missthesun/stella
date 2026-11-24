@@ -1,0 +1,38 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "stella-v2-app-compiler-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "rules": [
+    { "type": "CompiledWasm", "fallthrough": false, "globs": ["**/*.wasm"] }
+  ],
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "issues": { "enabled": true },
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.05
+    }
+  },
+  "vars": {
+    "ENVIRONMENT": "development"
+  },
+  "env": {
+    "production": {
+      "name": "stella-v2-app-compiler-prod",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "ENVIRONMENT": "production"
+      }
+    }
+  }
+}

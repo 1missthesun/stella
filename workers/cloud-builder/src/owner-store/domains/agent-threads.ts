@@ -105,7 +105,7 @@ import {
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
-import { relocatedAgentBrief } from "@stella/agent/stella/execution";
+import { relocatedAgentBrief } from "@stella/agent/stella/relocated-brief";
 import { AGENT_LOG_CLOUD_HOLDER, agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
 import { array, boolean, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";

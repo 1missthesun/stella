@@ -2,14 +2,6 @@
 // `credentials.provider` (the model gateway's BYOK lane).
 
 import type { Api, Model, OAuthCredential, OAuthAuth } from "@earendil-works/pi-ai";
-import { Cause, Effect, Exit, Fiber } from "effect";
-import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
-import { githubCopilotProvider } from "@earendil-works/pi-ai/providers/github-copilot";
-import { kimiCodingProvider } from "@earendil-works/pi-ai/providers/kimi-coding";
-import { metaProvider } from "@earendil-works/pi-ai/providers/meta";
-import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
-import { accountProviderBaseUrls, accountProviderModels } from "@stella/agent/provider/account-byok";
-import { runToolEffect, toolsRuntime } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import {
   isAccountProviderId,
   PROVIDER_OAUTH_CALLBACK_PATH,
@@ -183,20 +175,21 @@ const authMethodsOf = (entry: CatalogEntry): ProviderAuthMethod[] => [
 ];
 
 let oauthRegistered = false;
-const deviceOAuth = (provider: string): OAuthAuth | undefined => {
+const deviceOAuth = async (provider: string): Promise<OAuthAuth | undefined> => {
   if (!oauthRegistered) {
+    const { registerBunOAuthFlows } = await import("@earendil-works/pi-ai/bun-oauth");
     registerBunOAuthFlows();
     oauthRegistered = true;
   }
   switch (provider) {
     case "github-copilot":
-      return githubCopilotProvider().auth.oauth;
+      return (await import("@earendil-works/pi-ai/providers/github-copilot")).githubCopilotProvider().auth.oauth;
     case "xai":
-      return xaiProvider().auth.oauth;
+      return (await import("@earendil-works/pi-ai/providers/xai")).xaiProvider().auth.oauth;
     case "meta":
-      return metaProvider().auth.oauth;
+      return (await import("@earendil-works/pi-ai/providers/meta")).metaProvider().auth.oauth;
     case "kimi-coding":
-      return kimiCodingProvider().auth.oauth;
+      return (await import("@earendil-works/pi-ai/providers/kimi-coding")).kimiCodingProvider().auth.oauth;
     default:
       return undefined;
   }
@@ -450,12 +443,17 @@ const newChangeSignal = () => {
 };
 
 const waitForChange = async (flow: DeviceFlow, ms: number): Promise<void> => {
-  await runToolEffect(
-    Effect.raceFirst(
-      Effect.promise(() => flow.changed()),
-      Effect.sleep(ms),
-    ),
-  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      flow.changed(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 };
 
 const flowView = (flow: DeviceFlow): ProviderOAuthFlow => ({
@@ -494,55 +492,58 @@ const startDeviceFlow = async (ctx: OwnerContext, entry: CatalogEntry, oauth: OA
     }
   }
   flows.set(flowKey(ctx.ownerId, flowId), flow);
-  const login = Effect.tryPromise({
-    try: (abortSignal) =>
-      oauth.login({
-        signal: abortSignal,
-        prompt: async (prompt) => {
-          if (entry.id === "github-copilot" && prompt.type === "text") return GITHUB_PUBLIC_DOMAIN;
-          throw new Error("This sign-in needs input Stella can't give it here.");
-        },
-        notify: (event) => {
-          if (event.type === "device_code") {
-            flow.step = {
-              kind: "device_code",
-              userCode: event.userCode,
-              verificationUri: event.verificationUri,
-              intervalMs: Math.max(2_000, (event.intervalSeconds ?? 5) * 1000),
-            };
-            if (event.expiresInSeconds) {
-              flow.expiresAt = Math.min(flow.expiresAt, Date.now() + event.expiresInSeconds * 1000);
-            }
-          } else if (event.type === "auth_url") {
-            flow.step = { kind: "open_url", url: event.url, ...(event.instructions ? { instructions: event.instructions } : {}) };
-          } else if (event.type === "progress" && flow.step?.kind !== "device_code") {
-            flow.step = { kind: "working", message: event.message };
+  const controller = new AbortController();
+  let cancelled = false;
+  const timeout = setTimeout(() => {
+    cancelled = true;
+    controller.abort();
+  }, FLOW_TTL_MS);
+  flow.cancel = () => {
+    cancelled = true;
+    clearTimeout(timeout);
+    controller.abort();
+  };
+  void oauth
+    .login({
+      signal: controller.signal,
+      prompt: async (prompt) => {
+        if (entry.id === "github-copilot" && prompt.type === "text") return GITHUB_PUBLIC_DOMAIN;
+        throw new Error("This sign-in needs input Stella can't give it here.");
+      },
+      notify: (event) => {
+        if (event.type === "device_code") {
+          flow.step = {
+            kind: "device_code",
+            userCode: event.userCode,
+            verificationUri: event.verificationUri,
+            intervalMs: Math.max(2_000, (event.intervalSeconds ?? 5) * 1000),
+          };
+          if (event.expiresInSeconds) {
+            flow.expiresAt = Math.min(flow.expiresAt, Date.now() + event.expiresInSeconds * 1000);
           }
-          flow.notifyChange();
-        },
-      }),
-    catch: (error) => error,
-  }).pipe(
-    Effect.timeout(FLOW_TTL_MS),
-    Effect.onExit((exit) =>
-      Effect.sync(() => {
-        if (Exit.isSuccess(exit)) {
-          flow.credential = exit.value;
-          flow.step = { kind: "working", message: "Saving…" };
-        } else {
-          const error = Cause.squash(exit.cause);
-          const cancelled = Cause.hasInterrupts(exit.cause) || Cause.isTimeoutError(error);
-          flow.status = cancelled && Date.now() >= flow.expiresAt ? "expired" : "failed";
-          flow.error = cancelled ? "The sign-in was cancelled or timed out." : signInMessage(error);
+        } else if (event.type === "auth_url") {
+          flow.step = { kind: "open_url", url: event.url, ...(event.instructions ? { instructions: event.instructions } : {}) };
+        } else if (event.type === "progress" && flow.step?.kind !== "device_code") {
+          flow.step = { kind: "working", message: event.message };
         }
         flow.notifyChange();
-      }),
-    ),
-  );
-  const fiber = toolsRuntime.runFork(login);
-  flow.cancel = () => {
-    toolsRuntime.runFork(Fiber.interrupt(fiber));
-  };
+      },
+    })
+    .then(
+      (credential) => {
+        clearTimeout(timeout);
+        flow.credential = credential;
+        flow.step = { kind: "working", message: "Saving…" };
+        flow.notifyChange();
+      },
+      (error: unknown) => {
+        clearTimeout(timeout);
+        const aborted = cancelled || controller.signal.aborted;
+        flow.status = aborted && Date.now() >= flow.expiresAt ? "expired" : "failed";
+        flow.error = aborted ? "The sign-in was cancelled or timed out." : signInMessage(error);
+        flow.notifyChange();
+      },
+    );
   await waitForChange(flow, STEP_WAIT_MS);
   return flowView(flow);
 };
@@ -665,7 +666,7 @@ const startOAuth = async (
   if (!entry.oauth) throw new RpcError("BAD_REQUEST", `${entry.label} connects with an API key, not a sign-in.`);
   await currentCredentialKey(ctx.env).key;
   if (entry.id === "openrouter") return await startOpenRouter(ctx);
-  const oauth = deviceOAuth(entry.id);
+  const oauth = await deviceOAuth(entry.id);
   if (!oauth) throw new RpcError("BAD_REQUEST", `${entry.label} sign-in isn't available here.`);
   return await startDeviceFlow(ctx, entry, oauth);
 };
@@ -749,11 +750,12 @@ const resolveAccess = async (ctx: OwnerContext, provider: string): Promise<Provi
     );
     row = { ...row, payload };
   }
+  const { accountProviderBaseUrls } = await import("@stella/agent/provider/account-byok");
   const baseUrls = accountProviderBaseUrls(provider);
   if (stored.type === "api_key") {
     return { apiKey: stored.key, baseUrls, expiresAt: Date.now() + API_KEY_ACCESS_TTL_MS };
   }
-  const oauth = deviceOAuth(provider);
+  const oauth = await deviceOAuth(provider);
   if (!oauth) return null;
   let credential: OAuthCredential = stored;
   if (credential.expires <= Date.now() + ACCESS_REFRESH_MARGIN_MS) {
@@ -854,6 +856,7 @@ const listModels = async (
   const provider = providerArg(args.provider);
   const row = rowOf(ctx.db, provider);
   if (!row) throw new RpcError("NOT_FOUND", "Connect this provider first.");
+  const { accountProviderModels } = await import("@stella/agent/provider/account-byok");
   let models = accountProviderModels(provider);
   models = [...models, ...unlistedLiveModels(provider, models, await liveModels(ctx, provider, row))];
   if (row.method === "oauth") {

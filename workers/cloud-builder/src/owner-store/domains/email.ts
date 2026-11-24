@@ -9,6 +9,7 @@ import {
 import {
   applyEmailPageUpdate,
   describeEmailPage,
+  EMAIL_PAGE_SECTIONS,
   readEmailPage,
   type EmailPage,
   type EmailPageItem,
@@ -387,6 +388,12 @@ export const EMAIL_STELLA_MIGRATION = {
     "ALTER TABLE email_state ADD COLUMN wake_day TEXT",
     "ALTER TABLE email_state ADD COLUMN wakes_today INTEGER NOT NULL DEFAULT 0",
   ],
+};
+
+/** What Stella was last shown of the page and the rules, so a read repeats them only when they changed. */
+export const EMAIL_TOLD_MIGRATION = {
+  id: "email.8-told-digest",
+  statements: ["ALTER TABLE email_state ADD COLUMN told_digest TEXT"],
 };
 
 type StateRow = {
@@ -1221,7 +1228,7 @@ const toYou = (row: MailRow): string => {
  * a mailing list with several emails folded to one line, each with the ids
  * the other actions take. Reading it marks it read.
  */
-const inbox = (ctx: OwnerContext, zone: string): string => {
+const inbox = (ctx: OwnerContext, zone: string, full = false): string => {
   const rows = unreadRows(ctx.db);
   const incoming = rows.filter((row) => row.direction === "in");
   const sent = rows.filter((row) => row.direction === "out");
@@ -1286,13 +1293,37 @@ const inbox = (ctx: OwnerContext, zone: string): string => {
       lines.push(`- ${clock(row.received_at, zone, true)} to ${row.to_line.slice(0, 160)} · "${row.subject}" · account ${row.account} · thread ${row.thread_id}`);
     }
   }
-  lines.push("", rulesText(ctx.db), "", describeEmailPage(page));
+  const standing = pageAndRules(ctx.db, page);
+  if (full || standing.digest !== toldDigest(ctx.db)) {
+    lines.push("", standing.text);
+    tellDigest(ctx, standing.digest);
+  } else {
+    lines.push("", `The Email page and the user's email rules are as at your last read (${pageCounts(page)}); email \`page\` with nothing to change shows them.`);
+  }
   if (rows.length > 0) {
     ctx.db.run("UPDATE email_mail SET read_at = ? WHERE read_at IS NULL", ctx.now);
   }
   writePage(ctx, { ...page, readAt: ctx.now });
   return lines.join("\n");
 };
+
+const pageAndRules = (db: OwnerDbReader, page: EmailPage): { text: string; digest: string } => {
+  const text = `${rulesText(db)}\n\n${describeEmailPage(page)}`;
+  let hash = 0xcbf29ce484222325n;
+  for (let index = 0; index < text.length; index += 1) hash = ((hash ^ BigInt(text.charCodeAt(index))) * 0x100000001b3n) & 0xffffffffffffffffn;
+  return { text, digest: `${text.length}:${hash.toString(16)}` };
+};
+
+const toldDigest = (db: OwnerDbReader): string | null =>
+  db.one<{ told_digest: string | null }>("SELECT told_digest FROM email_state WHERE id = 1")?.told_digest ?? null;
+
+const tellDigest = (ctx: OwnerContext, digest: string): void => {
+  ctx.db.run("UPDATE email_state SET told_digest = ? WHERE id = 1", digest);
+};
+
+const pageCounts = (page: EmailPage): string =>
+  EMAIL_PAGE_SECTIONS.map((section) => `${page.items.filter((item) => item.section === section).length} ${section}`).join(", ") +
+  `, ${page.ignored.count} ignored`;
 
 const readThreadText = async (ctx: OwnerContext, zone: string, args: ToolArgs): Promise<string> => {
   const thread = text(args, "thread", 128);
@@ -1428,6 +1459,11 @@ const archive = async (ctx: OwnerContext, args: ToolArgs): Promise<string> => {
 };
 
 const updatePage = async (ctx: OwnerContext, args: ToolArgs): Promise<string> => {
+  if (!Array.isArray(args.items) && !Array.isArray(args.remove) && !(args.ignored && typeof args.ignored === "object")) {
+    const standing = pageAndRules(ctx.db, readPage(ctx.db, ctx.now));
+    tellDigest(ctx, standing.digest);
+    return standing.text;
+  }
   const update: EmailPageUpdate = {
     ...(Array.isArray(args.items) ? { items: args.items as EmailPageUpdate["items"] } : {}),
     ...(Array.isArray(args.remove) ? { remove: (args.remove as unknown[]).filter((id): id is string => typeof id === "string") } : {}),
@@ -1465,6 +1501,8 @@ const updatePage = async (ctx: OwnerContext, args: ToolArgs): Promise<string> =>
   for (const item of newlyUrgent) {
     await pushUrgent(ctx, item).catch((error: unknown) => log("push_failed", { message: errorText(error) }));
   }
+  // She wrote it, so she has it: the next read repeats the page only for changes not hers.
+  tellDigest(ctx, pageAndRules(ctx.db, page).digest);
   const needs = page.items.filter((item) => item.section === "needs_you").length;
   return [
     `Updated the Email page: ${needs} need${needs === 1 ? "s" : ""} the user.${newlyUrgent.length ? ` ${newlyUrgent.length} urgent reached their phone.` : ""}`,
@@ -1528,7 +1566,7 @@ const emailTool = async (ctx: OwnerContext, raw: unknown): Promise<{ text: strin
   if (action === "inbox") {
     // Mail Gmail hasn't pushed yet would otherwise wait for the next read.
     await runSync(ctx, {}).catch((error: unknown) => log("sync_failed", { owner: ctx.ownerId.slice(0, 12), message: errorText(error) }));
-    return { text: inbox(ctx, zone) };
+    return { text: inbox(ctx, zone, args.full === true) };
   }
   if (action === "page") return { text: await updatePage(ctx, args) };
   if (action === "off") {
@@ -1585,6 +1623,7 @@ const runningEmailDomain = {
     EMAIL_TODAY_MIGRATION,
     EMAIL_OWN_KEY_MIGRATION,
     EMAIL_STELLA_MIGRATION,
+    EMAIL_TOLD_MIGRATION,
     FAKE_GMAIL_MIGRATION,
   ],
   calls: {

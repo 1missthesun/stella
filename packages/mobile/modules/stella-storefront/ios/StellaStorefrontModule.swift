@@ -1,12 +1,6 @@
 import ExpoModulesCore
 import StoreKit
 
-// Surfaces the device's current App Store storefront country code to
-// JavaScript. This is Apple's own determination of which App Store the
-// signed-in Apple Account belongs to (StoreKit `Storefront`), which is the
-// App-Review-defensible signal Apple and Stripe direct apps to use for
-// region-gated external purchase behavior. It is deliberately NOT device
-// locale, Apple ID region guesses, or IP geolocation.
 public final class StellaStorefrontModule: Module {
   private var storefrontObserver: Task<Void, Never>?
 

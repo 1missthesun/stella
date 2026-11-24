@@ -1,25 +1,4 @@
 #!/usr/bin/env bash
-# Safe OTA publish ritual. Born from the 2026-07-02 boot-crash postmortem:
-# `eas update` was run from a DIRTY working tree, so the bundle labeled
-# `cc5808e` actually contained a mid-refactor ChatPane referencing an
-# unimported <ActivityTray/> — ReferenceError on first render, instant
-# release-mode crash on every launch of builds 95/96.
-#
-# This script refuses dirty trees, pins the OTA target to the build the stores
-# actually serve, exports locally, proves (via the Hermes sourcemap's
-# sourcesContent) that the bundle matches HEAD byte-for-byte, and only then
-# publishes with the real commit stamped in the message.
-#
-# Usage: scripts/publish-ota.sh <channel> [platform]
-#   e.g. scripts/publish-ota.sh preview ios
-# Set STELLA_OTA_IOS_TESTFLIGHT_BUILD=<App Store build number> to target a
-# TestFlight build that is live for testers before the store version is: the
-# build must still exist in App Store Connect and match this tree's
-# fingerprint, so the guarantees below are unchanged.
-# Set STELLA_OTA_PIN_STORE_RUNTIME=1 when only the fingerprint drifted (it
-# hashes bun's store paths, so a lockfile dedupe moves it): the store build's
-# commit is checked to have the same native package versions and native
-# inputs, and the update is published under the store build's runtime version.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -47,8 +26,6 @@ fi
 
 scripts/check-bun-pin.sh
 
-# The bundled translation catalogs are pruned to the keys this tree's sources
-# name; a stale copy would show raw keys for strings added since the last sync.
 if ! node scripts/sync-i18n-catalogs.mjs --check; then
   echo "REFUSING to publish: src/i18n is stale. Run \`bun run i18n:sync\` and commit." >&2
   exit 1
@@ -71,7 +48,6 @@ if [[ "${STELLA_OTA_PIN_STORE_RUNTIME:-}" == "1" ]]; then
   TARGETS_JSON="$(bun scripts/resolve-public-mobile-builds.ts --platform "${PLATFORM}" \
     --channel "${CHANNEL}" --native-match ${TESTFLIGHT_ARGS[@]+"${TESTFLIGHT_ARGS[@]}"})"
   echo "${TARGETS_JSON}"
-  # Publish under the store builds' runtime versions; app.json is restored on exit.
   cp app.json "${TMPDIR:-/tmp}/stella-ota-app.json"
   trap 'cp "${TMPDIR:-/tmp}/stella-ota-app.json" app.json' EXIT
   TARGETS_JSON="${TARGETS_JSON}" node -e '

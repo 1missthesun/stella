@@ -4,19 +4,6 @@ import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import type { LocalChatEventRecord } from "@stella/node-shared/storage/shared";
 
-/**
- * Whether a phone or another of the owner's computers may read a path on
- * this computer, given the paths Stella linked or shared.
- *
- * A linked file grants itself. A linked HTML or markdown document also grants
- * the images, video, audio, stylesheets, scripts and fonts in its own folder
- * tree (no hidden file or folder), which it loads by relative path. A linked
- * folder grants itself and everything
- * inside it, judged on real paths so a symlink inside the folder cannot
- * reach out of it. A linked path that is itself a symlink grants nothing:
- * a link planted by a prompt-injected agent must not become a way out.
- */
-
 export const isPathInside = (candidate: string, base: string): boolean =>
   candidate === base || candidate.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
 

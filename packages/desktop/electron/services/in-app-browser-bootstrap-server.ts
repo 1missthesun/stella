@@ -252,9 +252,7 @@ export class InAppBrowserBootstrapServer {
         } else {
           try {
             server.close();
-          } catch {
-            // The listen error may have left the server unopened.
-          }
+          } catch {}
         }
       }
       this.removeOwnedEndpoint();
@@ -370,9 +368,6 @@ export class InAppBrowserBootstrapServer {
     data?: InAppBrowserBootstrapResult | { connected: boolean | null },
     request?: Readonly<{ action: string; receivedAt: number }>,
   ) {
-    // Record callers that left before their answer, and how long the answer
-    // took: callers with short deadlines (the 2 s extension check) give up
-    // when this side is slow.
     const answerMs = request ? Date.now() - request.receivedAt : 0;
     const callerLeft = () => {
       if (!request) return;
@@ -442,11 +437,7 @@ export class InAppBrowserBootstrapServer {
         try {
           linkSync(preservedPath, filesystemEndpointPath!);
           rmSync(preservedPath, { force: true });
-        } catch {
-          // linkSync never replaces a path that appeared while closing.
-          // Retaining the preserved endpoint is safer than unlinking either
-          // foreign owner.
-        }
+        } catch {}
       }
     }
   }

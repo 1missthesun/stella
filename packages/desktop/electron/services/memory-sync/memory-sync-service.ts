@@ -51,8 +51,6 @@ const ERROR_RETRY_MIN_MS = 60_000;
 const ERROR_RETRY_MAX_MS = 30 * 60_000;
 const NOT_READY_RETRY_MS = 30_000;
 const MERGE_SHOWN_MS = 24 * 60 * 60_000;
-// A file the cloud refused is offered again after this even if unchanged: the
-// refusal can come from an older backend whose limits have since moved.
 const REFUSED_RETRY_MS = 6 * 60 * 60_000;
 
 type Refusal = { sha: string; at: number; reason: string };
@@ -64,9 +62,7 @@ type SyncState = {
   owner: string | null;
   epoch: string | null;
   files: Record<string, SyncedPair>;
-  /** Files the cloud would not take, by the local sha it refused. */
   refused: Record<string, string>;
-  /** When and why each refused file was refused (absent in older state files). */
   refusals?: Record<string, Omit<Refusal, "sha">>;
   merges: PendingMerge[];
   lastSyncedAt: number | null;
@@ -103,7 +99,6 @@ const parseState = (raw: string): SyncState => {
     refused[file] = sha;
     const detail = value.refusals?.[file];
     refusals[file] = {
-      // A refusal recorded before `refusals` existed is retried at once.
       at: typeof detail?.at === "number" ? detail.at : 0,
       reason: typeof detail?.reason === "string" ? detail.reason : "",
     };
@@ -241,8 +236,6 @@ export class MemorySyncService {
   private disposed = false;
   private passSubject: string | null = null;
   private preserved: PendingMerge[] = [];
-  // Memory written without an account stays on this computer until the user
-  // picks keep-or-sync after signing in. Held until the app says otherwise.
   private heldForChoice = true;
 
   constructor(private readonly options: MemorySyncServiceOptions) {
@@ -419,9 +412,7 @@ export class MemorySyncService {
           this.memoriesWatcher?.close();
           this.memoriesWatcher = null;
         });
-      } catch {
-        // No memories/ yet; polling attaches the watcher when it appears.
-      }
+      } catch {}
     };
     const poll = (file: string, changed: (exists: boolean) => void) => {
       const listener = (current: Stats, previous: Stats) => {

@@ -5,11 +5,9 @@ export type MergeFrom = "upstream" | "remote" | "draft";
 
 export type DispatchedAgent = { conversationId: string; threadId: string };
 
-/** The one merge Stella sent an agent to draft. Kept in the git common dir. */
 export type MergeRecord = {
   draft: string;
   from: MergeFrom;
-  /** For a stale draft: its tip when the agent was sent, to tell it apart from the agent's result. */
   tip: string;
   since: number;
   agent: DispatchedAgent | null;
@@ -17,7 +15,6 @@ export type MergeRecord = {
 
 export type MergeStatus = "dispatched" | "drafting" | "ready" | "stale" | "abandoned";
 
-/** What git and the runtime say about the record's draft right now. */
 export type MergeFacts = {
   worktree: boolean;
   tip: string | null;

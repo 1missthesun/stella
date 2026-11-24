@@ -12,11 +12,6 @@ import {
 import { classifyUpdate, installs, relaunches, type UpdatePlan } from "./update-plan.js";
 import { mergeInBackground, type ModelResolve } from "./update-merge.js";
 
-/**
- * How far a conflicting merge may be taken while preparing: not at all, with
- * resolutions git already knows (free), or with a model too (spends the
- * user's model use, so the caller decides).
- */
 export type ResolveLevel = "none" | "rerere" | "model";
 
 const LEVELS: ResolveLevel[] = ["none", "rerere", "model"];
@@ -41,7 +36,6 @@ export type PreparedUpdate = {
   bundles: boolean;
   dir: string;
   ms: number;
-  /** For a conflicting merge: how far preparing went, and what it could not resolve. */
   resolve?: ResolveLevel;
   resolvedBy?: "rerere" | "model";
   unresolved?: string[];
@@ -84,7 +78,6 @@ export class UpdatePreparer {
     this.model = options.model ?? (() => null);
   }
 
-  /** A record from a lower resolve level than the job asks for is prepared again. */
   private settles(job: Pick<PrepareJob, "resolve">, record: PreparedUpdate | undefined) {
     if (!record) return false;
     if (record.plan?.kind !== "conflict" || record.to) return true;
@@ -120,7 +113,6 @@ export class UpdatePreparer {
     return this.settles({ resolve }, this.records.get(prepareKey(head, tip)));
   }
 
-  /** What preparing found, settled or not. */
   async peek(head: string, tip: string): Promise<PreparedUpdate | null> {
     await this.load();
     return this.records.get(prepareKey(head, tip)) ?? null;
@@ -140,7 +132,6 @@ export class UpdatePreparer {
     this.next();
   }
 
-  /** A merge a model is resolving keeps going: it only touches its scratch worktree, and stopping it wastes what it spent. */
   pause() {
     this.paused += 1;
     if (this.running?.level !== "model") this.running?.abort.abort();

@@ -34,7 +34,6 @@ export type DeviceRequestHandlers = {
   }) => Promise<string>;
   voiceConfig: (payload: Record<string, unknown>) => Promise<unknown>;
   voiceExecuteTool: (payload: Record<string, unknown>) => Promise<unknown>;
-  /** A cloud task's request for a saved value, answered sealed to its key. */
   releaseSavedValue?: (payload: Record<string, unknown>) => Promise<unknown>;
   claudeLogin?: {
     start: (payload: Record<string, unknown>) => Promise<unknown>;

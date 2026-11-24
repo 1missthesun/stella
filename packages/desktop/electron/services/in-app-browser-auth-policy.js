@@ -33,14 +33,6 @@ export const buildInAppBrowserUserAgent = (
   );
 };
 
-/**
- * Host suffixes whose window.open popups are genuine auth / reauth / OAuth flows
- * and must be allowed to open as a real child window that KEEPS its opener, so
- * the challenge can postMessage / redirect back to the page that spawned it.
- *
- * Kept intentionally tight and focused on the providers that actually run
- * step-up popups. Extend deliberately.
- */
 export const AUTH_ORIGIN_HOST_SUFFIXES = [
   "accounts.google.com",
   "accounts.youtube.com",
@@ -51,14 +43,6 @@ export const AUTH_ORIGIN_HOST_SUFFIXES = [
   "appleid.apple.com",
 ];
 
-/**
- * Device transports a WebAuthn / passkey / security-key reauth legitimately
- * needs (external FIDO keys are HID/USB; a few are serial). Scoped tightly:
- * these are only ever allowed on an auth origin (see shouldAllowAuthDevice).
- *
- * Sensitive, auth-irrelevant permissions — geolocation, camera, microphone,
- * notifications, etc. — are deliberately NOT here and stay denied everywhere.
- */
 export const AUTH_DEVICE_PERMISSIONS = new Set(["hid", "usb", "serial"]);
 
 const urlHost = (value) => {

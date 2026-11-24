@@ -9,7 +9,6 @@ const RUNTIME_PREFIXES = [
   "packages/agent/",
   "packages/node-shared/",
 ];
-/** Names the Bun the launcher starts the runtime with; only a relaunch through the launcher picks it up. */
 const LAUNCHER_MANIFEST = "packages/desktop/launcher.json";
 export const restartsRuntime = (paths: string[]) =>
   paths.some(
@@ -20,7 +19,6 @@ export const relaunches = (paths: string[]) =>
   paths.some((file) => file === LAUNCHER_MANIFEST || file.startsWith(RESTART_PREFIX));
 
 const INTERFACE_PREFIX = "packages/desktop-ui/src/";
-/** Only the interface's own source: nothing the main process, the runtime or an install reads. */
 export const interfaceOnly = (paths: string[]) =>
   paths.length > 0 && !installs(paths) && paths.every((file) => file.startsWith(INTERFACE_PREFIX));
 

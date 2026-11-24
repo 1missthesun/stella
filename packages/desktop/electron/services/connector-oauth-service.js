@@ -4,8 +4,6 @@ const COMPOSIO_OAUTH_HOSTS = new Set([
     "connect.composio.dev",
     "backend.composio.dev",
 ]);
-// Stella's own Google sign-in: Google's consent page, returning to a Stella
-// server's Google callback (which only shows a code the app redeems).
 const STELLA_GOOGLE_CALLBACK_PATH = "/api/google/oauth_callback";
 const isStellaGoogleOAuthUrl = (parsed) => {
     if (parsed.hostname !== "accounts.google.com" || !parsed.pathname.startsWith("/o/oauth2/")) {

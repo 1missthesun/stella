@@ -139,11 +139,6 @@ export const pidRunsExecutable = (
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/**
- * Stops a process this app recorded, re-checking `stillOwned` before each
- * signal and the start time before the SIGKILL so a PID reused during the
- * grace period is left alone. Every signal is logged to the kill log.
- */
 export const terminateOwnedProcess = async (
   pid: number,
   stillOwned: () => boolean,

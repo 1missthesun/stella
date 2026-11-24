@@ -6,15 +6,6 @@ import path from "node:path";
 import { isDirectoryLink, linkDirectorySync, removeDirectoryLinkSync, removeTree } from "./dir-links.js";
 import { git } from "./git.js";
 
-/**
- * A draft's packages come from a package set: one full install (the
- * self-modification tools included) per set of dependencies, kept beside the
- * app checkout and linked into every draft and scratch merge that has those
- * dependencies. The app itself installs only what it runs, and nothing a
- * draft does reaches its packages: a task that deletes a draft through its
- * links (git and some shells follow Windows junctions) can only damage the
- * package set, which is checked and rebuilt before its next use.
- */
 export type DraftDependencies = { mode: "ready" | "linked" | "installed"; ms: number };
 
 const lstat = (file: string) => fs.lstatSync(file, { throwIfNoEntry: false });
@@ -55,7 +46,6 @@ const patchFiles = (root: string): string[] => {
   }
 };
 
-/** What an install depends on: the lockfile, every manifest and every patch. */
 const manifestFiles = (root: string) => [
   "bun.lock",
   "package.json",
@@ -98,7 +88,6 @@ const setName = (fingerprint: string) => fingerprint.slice(0, process.platform =
 
 const READY = ".stella-ready";
 
-/** Every package in the set's store still has its files (a deletion through a link leaves holes). */
 const intact = (store: string): boolean => {
   const bunStore = path.join(store, "node_modules", ".bun");
   let entries: string[];
@@ -119,8 +108,6 @@ const intact = (store: string): boolean => {
 
 const install = (bun: string, cwd: string, timeoutMs: number) =>
   new Promise<void>((resolve, reject) => {
-    // No lifecycle scripts: a draft needs packages to typecheck and preview,
-    // not a second Electron, browser or Office binary.
     const child = spawn(bun, ["install", "--frozen-lockfile", "--ignore-scripts", "--no-summary"], {
       cwd,
       stdio: ["ignore", "ignore", "pipe"],
@@ -144,7 +131,6 @@ const install = (bun: string, cwd: string, timeoutMs: number) =>
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** One builder per set at a time; a lock left by a process that died is taken over. */
 const withLock = async <T>(lock: string, timeoutMs: number, work: () => Promise<T>): Promise<T> => {
   const until = Date.now() + timeoutMs;
   for (;;) {
@@ -157,9 +143,7 @@ const withLock = async <T>(lock: string, timeoutMs: number, work: () => Promise<
       let holder = 0;
       try {
         holder = Number(fs.readFileSync(path.join(lock, "pid"), "utf8"));
-      } catch {
-        // Being written.
-      }
+      } catch {}
       const alive = (() => {
         if (!holder) return true;
         try {
@@ -235,11 +219,6 @@ const isInside = (parent: string, child: string) => {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 };
 
-/**
- * A workspace's own `node_modules` from the set, rebuilt in `into`: package
- * links keep pointing into the set's store, links to a workspace package
- * point at the draft's own copy of it.
- */
 const mirrorWorkspaceModules = (store: string, root: string, from: string, into: string) => {
   fs.mkdirSync(into, { recursive: true });
   for (const entry of fs.readdirSync(from, { withFileTypes: true, encoding: "utf8" })) {
@@ -278,7 +257,6 @@ const linkedTo = (root: string, store: string) => {
   }
 };
 
-/** Links `root` (a draft or a scratch merge) to its package set. */
 export const linkPackageSet = async (root: string, store: string) => {
   const modules = path.join(root, "node_modules");
   if (!linkedTo(root, store)) {
@@ -293,7 +271,6 @@ export const linkPackageSet = async (root: string, store: string) => {
   }
 };
 
-/** Package sets nothing uses any more: not the app's, not a worktree's, not being built. */
 export const removeUnusedPackageSets = async (appRoot: string, keep: string[]) => {
   const sets = packageSetsDir(appRoot);
   let names: string[];
@@ -332,9 +309,7 @@ export const ignoreLinkedModules = (appRoot: string) => {
     if (text.split(/\r?\n/).includes("/node_modules")) return;
     fs.mkdirSync(path.dirname(exclude), { recursive: true });
     fs.appendFileSync(exclude, `${text && !text.endsWith("\n") ? "\n" : ""}/node_modules\n`);
-  } catch {
-    // Not a checkout we can write: git shows the link, nothing breaks.
-  }
+  } catch {}
 };
 
 export const prepareDraftDependencies = async (options: {

@@ -8,8 +8,6 @@ import {
 
 export type MemoryMerge = { path: string; copy: string };
 
-// Only the files in every turn's context have a size that matters to a merge;
-// sync carries an area file of any ordinary size.
 const limitNote = (relative: string): string =>
   relative === MAIN_MEMORY_RELATIVE_PATH || relative === RULES_MEMORY_RELATIVE_PATH
     ? ` (at most ${memoryFileMaxChars(relative).toLocaleString("en-US")} characters)`

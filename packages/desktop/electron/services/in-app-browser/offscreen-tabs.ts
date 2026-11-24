@@ -40,8 +40,6 @@ import {
 
 const DEFAULT_BOUNDS = { width: 1280, height: 720 };
 const MIRROR_FRAME_RATE = 60;
-// A frame the mirror never acknowledged (its renderer reloaded or died) stops
-// blocking newer frames after this long.
 const MIRROR_ACK_TIMEOUT_MS = 1_000;
 
 const MIRROR_HTML = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>
@@ -135,7 +133,6 @@ export class OffscreenTabs {
     this.options = options;
   }
 
-  /** Extra web preferences that make a new tab render offscreen. */
   webPreferences() {
     return { offscreen: { deviceScaleFactor: 1 } } as const;
   }
@@ -160,9 +157,7 @@ export class OffscreenTabs {
     if (!host || host.isDestroyed()) return;
     try {
       host.contentView.removeChildView(tab.view);
-    } catch {
-      // Host teardown can race tab cleanup.
-    }
+    } catch {}
   }
 
   resize() {
@@ -211,7 +206,6 @@ export class OffscreenTabs {
     };
   }
 
-  /** The view the panel shows in place of `tab`, now drawing that tab. */
   mirrorFor(tab: ManagedTab): WebContentsView {
     const mirror = this.ensureMirror();
     if (this.binding?.tab === tab) return mirror;
@@ -339,7 +333,6 @@ export class OffscreenTabs {
     return mirror;
   }
 
-  /** Sends the latest painted region unless the mirror is still drawing one. */
   private flush(binding: MirrorBinding) {
     const mirror = this.mirror;
     if (this.binding !== binding || !mirror || mirror.webContents.isDestroyed()) {

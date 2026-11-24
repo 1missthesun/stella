@@ -113,8 +113,6 @@ export class EngineAccountAccess {
     this.chatGptConnect = controller;
     const client = this.ensureClient();
     if (!client || !this.subject) throw new Error("Sign in to Stella first.");
-    // The loopback page ChatGPT redirects to runs in the runtime; the
-    // connect itself goes through Stella's backend from here.
     const listenerId = randomUUID();
     const closeListener = () =>
       void callRuntimeAppService("closeChatGptCallbackListener", { listenerId }).catch(

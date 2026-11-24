@@ -42,7 +42,6 @@ const SHORTCUT = "Alt+Shift+S";
 const FALLBACK_SHORTCUT = "Control+Alt+S";
 const UNDO_SHORTCUT = "CommandOrControl+Z";
 const DISCARD_SHORTCUT = "Escape";
-/** A second press this soon after the start is the same press. */
 const RESTART_GUARD_MS = 400;
 const MAX_DURATION_MS = 10 * 60_000;
 const RECORDER_STOP_TIMEOUT_MS = 15_000;
@@ -54,14 +53,10 @@ const RECORDING_KEEP_MS = 7 * 24 * 60 * 60_000;
 const CAPTURE_KEEP_MS = 30 * 24 * 60 * 60_000;
 const CAPTURES_DIR = "captures";
 const SAID_PREVIEW_CHARS = 140;
-/** A finish card nobody answers goes to the composer after this, at the latest. */
 const REVIEW_SAFETY_MS = 3 * 60_000;
-/** An untouched finish card goes to the composer this long after it's ready. */
 const KEEP_AFTER_MS = 20_000;
-/** A pointer merely resting on the card holds it this long after it's ready, at most. */
 const HOVER_HOLD_MAX_MS = 60_000;
 const CARD_TOP = 14;
-/** A send the main window hasn't taken by then goes to the composer instead. */
 const SEND_TIMEOUT_MS = 2 * 60_000;
 
 type OverlayApi = {
@@ -88,7 +83,6 @@ export type ShowStellaControllerOptions = {
   getStellaDataDir: () => string | null;
   getOverlay: () => OverlayApi | null;
   getFullWindow: () => BrowserWindow | null;
-  /** The main window, made hidden if it was closed: it transcribes and sends captures. */
   ensureFullWindow: () => BrowserWindow | null;
   showFullWindow: () => void;
   input: InputHook;
@@ -114,22 +108,16 @@ type Recording = {
 
 type Pending = { id: string; dir: string; durationMs: number; hasAudio: boolean };
 
-/** The finish card shown while another app is in front. */
 type Review = {
   id: string;
   dir: string;
   durationMs: number;
-  /** The recorded display, in screen points. */
   display: { x: number; y: number; width: number; height: number };
-  /** Top of the usable area (below the menu bar), in screen points. */
   top: number;
   capture: ShowCaptureAttachment | null;
   timer: NodeJS.Timeout | null;
-  /** The native card: someone is hovering, typing, or has a note. */
   engaged: boolean;
-  /** The native card's note has focus or text: it stays until answered (or the safety timer). */
   typing: boolean;
-  /** When the capture was ready on the card. */
   readyAt: number | null;
   keepTimer: NodeJS.Timeout | null;
 };
@@ -169,7 +157,6 @@ const runBuilder = (helper: string, dir: string): Promise<string> =>
 export class ShowStellaController {
   private recording: Recording | null = null;
   private readonly pending = new Map<string, Pending>();
-  /** Stops and builds in flight: the recording is between the bar and its card. */
   private finishing = 0;
   private activeShortcut = "";
   private lastStartAt = 0;
@@ -178,10 +165,8 @@ export class ShowStellaController {
   private reviewing: Review | null = null;
   private panel: ShowPanel | null = null;
   private cardStrings: ShowStellaCardStrings | null = null;
-  /** Captures sent from the finish card before they were ready, with their notes. */
   private readonly sendWhenReady = new Map<string, string>();
   private readonly discarded = new Set<string>();
-  /** Sends waiting for the main window to take them. */
   private readonly outbox = new Map<
     string,
     { request: ShowStellaSendRequest; timer: NodeJS.Timeout; handedOver: boolean }
@@ -189,16 +174,11 @@ export class ShowStellaController {
 
   constructor(private readonly options: ShowStellaControllerOptions) {}
 
-  /**
-   * A capture is recording or its finish card is open. Updates wait: a
-   * reload would end the overlay's recording or close the card.
-   */
   isActive(): boolean {
     return Boolean(this.recording || this.reviewing || this.finishing > 0 || this.pending.size > 0);
   }
 
   registerShortcut(): string {
-    // Without the builder there is nothing to make a capture with; leave the keys to other apps.
     if (!supportedPlatform() || !resolveNativeHelperPath(HELPER)) return "";
     for (const shortcut of [SHORTCUT, FALLBACK_SHORTCUT]) {
       const result = applyShortcutRegistration({
@@ -261,7 +241,6 @@ export class ShowStellaController {
       }
     }
     if (process.platform === "darwin" && !this.askedForInk && !hasMacPermission("accessibility", false)) {
-      // Ink, pins and clicks need Accessibility; the capture still runs without it.
       this.askedForInk = true;
       void requestMacPermission("accessibility");
     }
@@ -325,7 +304,6 @@ export class ShowStellaController {
       },
       inkEnabled,
       onInk: (ink) => {
-        // The native panel catches ⇧-clicks by itself (armed below).
         if (ink.kind === "catch" && panel) return;
         overlay.sendShowStellaInk(ink);
       },
@@ -338,9 +316,7 @@ export class ShowStellaController {
 
     try {
       globalShortcut.register(DISCARD_SHORTCUT, () => void this.stop(true));
-    } catch {
-      // Esc stays with the app in front; Done and the shortcut still work.
-    }
+    } catch {}
 
     const bounds = display.bounds;
     const shown = await overlay.startShowStella({
@@ -418,7 +394,6 @@ export class ShowStellaController {
     return recording.input?.finish() ?? { strokes: [], events: [], cursor: [] };
   }
 
-  /** Stops the recording; `discard` throws it away (Esc). */
   async stop(discard: boolean): Promise<void> {
     this.finishing += 1;
     try {
@@ -434,7 +409,6 @@ export class ShowStellaController {
     recording.phase = "stopping";
     recording.discard = discard;
     const durationMs = Date.now() - recording.startedAtMs;
-    // Finished from another app: Stella stays in the background.
     const quiet = !this.stellaInFront();
     const timeline = this.releaseInput(recording);
     const overlay = this.options.getOverlay();
@@ -523,14 +497,12 @@ export class ShowStellaController {
     this.requestTranscript(pending);
   }
 
-  /** Whether one of Stella's own windows (not the overlay) has focus. */
   private stellaInFront(): boolean {
     const focused = BrowserWindow.getFocusedWindow();
     if (!focused || focused.isDestroyed()) return false;
     return focused.webContents !== this.options.getOverlay()?.getWebContents();
   }
 
-  /** The main window gets the words from the user's dictation engine, then calls build. */
   private requestTranscript(pending: Pending): void {
     const full = this.options.getFullWindow() ?? this.options.ensureFullWindow();
     if (!full || full.isDestroyed()) {
@@ -543,7 +515,6 @@ export class ShowStellaController {
       });
       return;
     }
-    // A window still loading asks for waiting recordings once it's up.
     if (!full.webContents.isLoading()) {
       full.webContents.send(IPC_SHOW_STELLA_RECORDED, {
         captureId: pending.id,
@@ -553,7 +524,6 @@ export class ShowStellaController {
     }
   }
 
-  /** What a main window that just opened still has to do. */
   pendingRecordings(): { recordings: ShowStellaRecorded[]; sends: ShowStellaSendRequest[] } {
     return {
       recordings: [...this.pending.values()]
@@ -563,8 +533,6 @@ export class ShowStellaController {
           durationMs: pending.durationMs,
           hasAudio: pending.hasAudio,
         })),
-      // A send goes to one page once; one a reloaded page lost falls back to
-      // the composer at its timeout instead of being sent twice.
       sends: [...this.outbox.values()]
         .filter((entry) => !entry.handedOver)
         .map((entry) => {
@@ -622,7 +590,6 @@ export class ShowStellaController {
     return this.panel;
   }
 
-  /** The overlay's Done button and the card's words, for the native panels. */
   overlayInfo(info: ShowStellaOverlayInfo): void {
     this.cardStrings = info.strings;
     const recording = this.recording;
@@ -648,7 +615,6 @@ export class ShowStellaController {
       case "engaged":
         if (!review) return;
         review.engaged = event.on;
-        // A helper without the typing flag counts any engagement as typing.
         review.typing = event.typing ?? event.on;
         this.scheduleKeep(review);
         return;
@@ -657,11 +623,6 @@ export class ShowStellaController {
     }
   }
 
-  /**
-   * An untouched native card goes to the composer a little after it's ready.
-   * A pointer resting on it only delays that, up to a minute; a note being
-   * written keeps it until it's answered or the safety timer.
-   */
   private scheduleKeep(review: Review): void {
     if (review.keepTimer) clearTimeout(review.keepTimer);
     review.keepTimer = null;
@@ -679,7 +640,6 @@ export class ShowStellaController {
     if (this.reviewing) this.options.getOverlay()?.setShowStellaFocusable(focusable);
   }
 
-  /** The finish card's answer: send, open in Stella, keep in the composer, or discard. */
   async review(action: ShowStellaReviewAction): Promise<boolean> {
     const review = this.reviewing;
     if (!review || review.id !== action.captureId) return false;
@@ -710,7 +670,6 @@ export class ShowStellaController {
     }
   }
 
-  /** Sends a capture as a message from the main window, which stays where it is. */
   private dispatchSend(capture: ShowCaptureAttachment, note: string): void {
     if (capture.status !== "ready") {
       this.options.captureService.upsertShowCapture(capture, { add: true });
@@ -731,7 +690,6 @@ export class ShowStellaController {
     }
   }
 
-  /** The main window's answer to a send; one it couldn't make lands in the composer. */
   sent(requestId: string, ok: boolean): void {
     const entry = this.outbox.get(requestId);
     if (!entry) return;
@@ -740,7 +698,6 @@ export class ShowStellaController {
     if (!ok) this.options.captureService.upsertShowCapture(entry.request.capture, { add: true });
   }
 
-  /** A built (or failed) capture goes to its finish card, its send, or the composer. */
   private deliver(capture: ShowCaptureAttachment): void {
     if (this.discarded.delete(capture.id)) {
       void fs.rm(capture.dir, { recursive: true, force: true }).catch(() => undefined);
@@ -907,10 +864,6 @@ export class ShowStellaController {
     return null;
   }
 
-  /**
-   * Recordings, sound and the frame stream go after a week; the rest of a
-   * capture (moments, contact sheet, summary) after a month.
-   */
   private async prune(root: string): Promise<void> {
     const now = Date.now();
     const days = await fs.readdir(root, { withFileTypes: true }).catch(() => []);

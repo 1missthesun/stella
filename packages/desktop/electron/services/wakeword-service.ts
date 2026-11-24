@@ -41,8 +41,6 @@ type WakewordOptions = {
 
 const RESTART_BACKOFF_MS = 5000;
 const MAX_CONSECUTIVE_START_FAILURES = 5;
-// wakeword_listener exits with this code when its input device went away or
-// the system default input changed; it is respawned at once on the new device.
 const INPUT_CHANGED_EXIT_CODE = 75;
 
 // Windows refuses to start a process whose imports can't be resolved and
@@ -163,9 +161,6 @@ export class WakewordService {
 
     let child: ChildProcess;
     try {
-      // stdin stays open and unwritten: if this process dies without
-      // stopping the listener, the pipe closes and the listener exits rather
-      // than keeping the microphone open.
       child = spawn(binaryPath, args, {
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -194,9 +189,7 @@ export class WakewordService {
     if (!stdout || !stderr) {
       try {
         child.kill();
-      } catch {
-        // already gone
-      }
+      } catch {}
       this.child = null;
       this.noteStartFailure("the listener spawned without stdio pipes");
       return;
@@ -287,9 +280,7 @@ export class WakewordService {
     });
     try {
       child.kill();
-    } catch {
-      // Already dead — ignore.
-    }
+    } catch {}
   }
 
   private noteStartFailure(

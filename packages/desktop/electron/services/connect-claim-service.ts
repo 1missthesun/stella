@@ -1,12 +1,6 @@
 import { Notification } from "electron";
 import { FINISH_CONNECT_PATH } from "@stella/contracts/backend/integrations";
 
-/**
- * Finishes a Google connection whose browser sign-in handed this app a
- * one-time code (stella://connect?code=…). The code is redeemed as this
- * app's own signed-in Stella user, so a code made for anyone else does
- * nothing.
- */
 export type ConnectClaimDeps = {
   getBackendUrl: () => string | null;
   getAuthToken: () => Promise<string | null>;

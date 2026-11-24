@@ -70,13 +70,10 @@ import {
   sealUserAskValue,
 } from "./user-ask-seal.js";
 const KEYCHAIN_FALLBACK_FILE = "user-ask-keychain.json";
-/** How many saved records a task is shown, by name, when its lookup found nothing. */
 const SAVED_SUMMARY_LIMIT = 60;
-/** A cloud task gets a saved value from this computer by itself at most this often; past it, the user answers a card. */
 const RELEASES_PER_HOUR = 20;
 const RELEASE_LOG_FILE = "saved-value-releases.json";
 const RELEASE_LOG_LIMIT = 50;
-/** The user counts as at this computer when its keyboard or mouse was used this recently. */
 const USER_ACTIVE_IDLE_SECONDS = 120;
 const KEYCHAIN_SCOPE_PREFIX = "user-ask-keychain";
 const COMMAND_PLACEHOLDER = "{{secret}}";
@@ -132,11 +129,6 @@ const accountFromAnswer = (fields, values) => {
     return "";
 };
 const sameAccount = (left, right) => left.trim().toLowerCase() === right.trim().toLowerCase();
-/**
- * An account that names nothing (redacted text the task copied back, the
- * service's own name) is treated as no account, so it can't split one login
- * into several saved records.
- */
 const usableAccount = (service, account) => {
     const value = normalizeSavedValuePart(account);
     if (!value ||
@@ -616,11 +608,6 @@ export class UserAskService {
         });
         return { ok: true };
     }
-    /**
-     * A cloud task's ask has no computer of its own to save the answer, so the
-     * one that answers it with Remember on keeps it, and sync carries it to the
-     * user's other devices. An ask from another computer is saved there.
-     */
     async rememberCloudAnswer(ask, payload, answer) {
         const detail = ask?.detail;
         const service = normalizeSavedValuePart(detail?.save?.service);
@@ -727,13 +714,6 @@ export class UserAskService {
             saveContext: save ? { ...save, replaceId, ...(prefill ? { prefill } : {}) } : null,
         });
     }
-    /**
-     * A cloud task asks for a saved value (through Stella's cloud, from
-     * `savedValues.release`): when this computer has one that answers every
-     * field, each field is sealed to the task's own key, which only that task's
-     * sandbox holds, and nothing readable leaves this computer. Never shows a
-     * card; with nothing saved, the task gets the names of what is.
-     */
     async releaseSaved(params) {
         const releaseId = typeof params?.releaseId === "string" ? params.releaseId.slice(0, 128) : "";
         const recipientKey = params?.recipientKey;
@@ -781,7 +761,6 @@ export class UserAskService {
             ...(taskName ? { taskName } : {}),
         };
         if (this.releasesInLastHour() >= RELEASES_PER_HOUR) {
-            // Past the hourly cap this computer stops answering by itself: the task asks the user.
             this.logRelease({ ...use, refused: true });
             return { found: false, reason: "limit", savedHere: [] };
         }
@@ -816,7 +795,6 @@ export class UserAskService {
             deviceId: this.options.getDeviceId() ?? "",
         };
     }
-    /** Marks a saved-value note when this computer's saved values sync to the user's other devices. */
     syncedFlag() {
         return this.sync.getStatus().standing === "member" ? { synced: true } : {};
     }
@@ -824,7 +802,6 @@ export class UserAskService {
         const dir = this.options.getStellaAppDir();
         return dir ? path.join(dir, RELEASE_LOG_FILE) : null;
     }
-    /** Cloud tasks' uses of saved values on this computer, newest first, for Settings and the bell. */
     releaseLog() {
         const file = this.releaseLogPath();
         if (!file) {
@@ -851,7 +828,6 @@ export class UserAskService {
         writePrivateFileSync(file, JSON.stringify({ v: 1, entries }, null, 2));
         this.sync.noteReleaseLogChanged();
     }
-    /** What is saved on this computer, by name only (never a value), for a task that found nothing under the name it tried. */
     async savedSummaries() {
         return (await this.saved.list()).slice(0, SAVED_SUMMARY_LIMIT).map((entry) => ({
             service: entry.service || entry.label,
@@ -859,10 +835,6 @@ export class UserAskService {
             fields: entry.fieldLabels,
         }));
     }
-    /**
-     * The fields of one record that answer these, as readable values and
-     * handles, plus which fields it covered; null when its store can't be read.
-     */
     async savedFieldsFor(entry, fields) {
         const stored = await this.saved.readValues(entry);
         if (!stored) {
@@ -895,12 +867,6 @@ export class UserAskService {
         }
         return handlesAreDistinct(handles) ? { values, handles, covered, missing } : null;
     }
-    /**
-     * Looks through the saved records that may be for this service: one that
-     * answers every field is used without asking anyone (`whole`); otherwise
-     * the newest one that answers some of them fills those, and the card asks
-     * only for the rest (`partial`).
-     */
     async findSaved(save, fields, matches, request) {
         if (matches.length === 0) {
             return null;
@@ -920,8 +886,6 @@ export class UserAskService {
                 partial = { entry, answer };
             }
         }
-        // Records for one account (an older save and a newer one) are one
-        // choice, the newest; only different accounts need the task to pick.
         const accounts = [...new Set(whole.map(({ entry }) => usableAccount(entry.service, entry.account).toLowerCase() || entry.label))];
         if (accounts.length > 1 && !save.account) {
             throw new Error(`Several saved values for ${save.service} are on this computer, for different accounts (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
@@ -970,12 +934,6 @@ export class UserAskService {
             },
         };
     }
-    /**
-     * Readable values go back as text, except one that Stella would redact
-     * from the task's view anyway (the same text is saved as a secret, or it
-     * looks like a key): that one comes back as a handle, so the task can
-     * still fill it instead of seeing [REDACTED] and asking again.
-     */
     async readableOrHandles(values, fields, owner) {
         const fingerprints = await this.getSecureValueFingerprints();
         const kept = {};
@@ -1265,13 +1223,8 @@ export class UserAskService {
             if (!field.sensitive || (handles[field.id] && !shared.has(handles[field.id]))) {
                 continue;
             }
-            // Every sensitive field gets a handle of its own; one not saved (or
-            // that more than one field would share) is kept for this task only,
-            // usable again and again until it expires.
             handles[field.id] = this.saved.rememberFresh(value, field.label, owner);
             freshUntil = this.saved.freshExpiresAt(handles[field.id]) ?? freshUntil;
-            // Its fingerprint outlives it, so the value stays redacted from
-            // whatever output it later turns up in.
             this.retainedFingerprints = mergeFingerprints(this.retainedFingerprints, fingerprintSecrets([value], fingerprintParams));
         }
         this.fingerprintCache = null;
@@ -1291,8 +1244,6 @@ export class UserAskService {
         }
         this.fingerprintCache = null;
         const userNote = normalizeUserAskNote(payload.note);
-        // A card that asked only for what the saved record lacked: the saved
-        // fields join the answer as if they had been on the card.
         const prefill = save?.prefill ?? null;
         const answerValues = prefill ? { ...prefill.values, ...readable.values } : readable.values;
         const answerHandles = prefill ? { ...prefill.handles, ...handles } : handles;
@@ -1376,11 +1327,6 @@ export class UserAskService {
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
     }
-    /**
-     * The record a new answer for this service updates: the one for the same
-     * account, else the only record the service has when it names no account
-     * (or this answer names none), so one login stays one record.
-     */
     existingRecordFor(matches, account) {
         const same = matches.find((entry) => sameAccount(usableAccount(entry.service, entry.account), account));
         if (same) {
@@ -1400,7 +1346,6 @@ export class UserAskService {
         }
         return "Stella never issued that handle, so it was probably copied wrong. Pass the exact handle for this field from the `handles` of your request_secure_input result (handles.<field id>); calling request_secure_input again with the same service returns remembered values without asking the user.";
     }
-    /** The value behind a handle for the task asking, or the reason it isn't usable. */
     async resolveHandle(handle, request) {
         return await this.saved.resolve(handle, ownerOfRequest(request));
     }

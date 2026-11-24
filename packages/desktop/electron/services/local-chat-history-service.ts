@@ -83,9 +83,7 @@ export class LocalChatHistoryService {
   warmCloudConversationCache(): void {
     try {
       this.getCloudConversationCacheStore();
-    } catch {
-      // Best-effort startup warm-up.
-    }
+    } catch {}
   }
 
   private getCloudConversationCacheStore(): CloudConversationCacheClient {

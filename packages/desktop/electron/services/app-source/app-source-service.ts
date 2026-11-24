@@ -98,12 +98,6 @@ import {
 
 type AppSourceServiceOptions = {
   stellaAppDir: string;
-  /**
-   * Stella runs as an install (under its launcher), or a test sandbox stands
-   * in for one. Otherwise it runs from a developer's own checkout, which its
-   * updates leave alone: no syncing, announcing, preparing, catching up,
-   * adding or undoing; only the history is read.
-   */
   installed: boolean;
   broadcast: (state: AppSourceState) => void;
   isAnyWindowVisible: () => boolean;
@@ -112,13 +106,9 @@ type AppSourceServiceOptions = {
     paths: string[],
     options?: { reload?: boolean },
   ) => Promise<RendererApplyOutcome> | undefined;
-  /** Milliseconds since the user last touched Stella; null when no window can say. */
   userQuietFor?: () => Promise<number | null>;
-  /** The user is not looking at Stella or has left the computer. */
   isUserAway?: () => boolean;
-  /** A screen recording or its finish card is open; a reload would end it. */
   recordingOpen?: () => boolean;
-  /** Stella is mid-reply on this computer; a restart of the runtime would cut it off. */
   replying?: () => Promise<boolean>;
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
@@ -134,13 +124,9 @@ type AppSourceServiceOptions = {
   reportPrepared?: (prepared: { lockHash?: string; head?: string }) => void;
   updateScratchDir: string;
   dispatchAgentBrief?: (brief: AgentBrief) => Promise<DispatchedAgent>;
-  /** Sends `text` to the task `agentId`; false when it could not be reached. */
   tellAgent?: (agentId: string, messageId: string, text: string) => Promise<boolean>;
-  /** null: the runtime can't be asked right now. */
   agentRunning?: (agent: DispatchedAgent) => Promise<boolean | null>;
-  /** This computer's id on the account, once it has one. */
   getDeviceId?: () => string | null;
-  /** A model that resolves merge conflicts without a task; spends the user's model use. */
   modelResolve?: ModelResolve;
 };
 
@@ -158,7 +144,6 @@ type TakeSource = {
   pendingDraft: string;
   pendingDraftExists: boolean;
   settle?: (to: string) => Promise<void>;
-  /** When a task has to draft it: the press it answers, so the draft is applied once it is ready. */
   wanted?: Wanted;
 };
 
@@ -181,7 +166,6 @@ const AUTO_APPLY_RETRY_MS = 500;
 const SWAPS_BEFORE_RELOAD = 12;
 const RELOAD_WHEN_AWAY_POLL_MS = 30_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
-/** Packages an earlier install left are removed once Stella has settled after a start. */
 const TIDY_PACKAGES_DELAY_MS = 90_000;
 const SYNC_RETRY_MS = 30_000;
 const SYNC_RETRY_MAX_MS = 10 * 60_000;
@@ -206,9 +190,7 @@ const CHANGE_TAG_PREFIX = `refs/tags/${CHANGE_TAG}`;
 const FORK_CHANGES_PREFIX = "refs/stella/fork-changes/";
 const BOOTSTRAP_PATH = "/api/app-source/bootstrap";
 const RESULT_REF = "refs/stella/update-result";
-/** Where a fetch lands first: the tracked ref only moves to history this checkout shares. */
 const INCOMING_REF = "refs/stella/incoming";
-/** How often a computer asks to be the one that merges a version in the background. */
 const CLAIM_RETRY_MS = 5 * 60_000;
 const PLAN_TTL_MS = 10 * 60_000;
 const APPLY_ANNOUNCE_TIMEOUT_MS = 8_000;
@@ -232,7 +214,6 @@ const EMPTY_STATE: AppSourceState = {
 
 type Offer = { tip: string; real: boolean; catchUp: boolean };
 
-/** A failure Stella means to tell the user, by kind (the window words it). */
 class PlainFailure extends Error {
   constructor(
     readonly reason: AppSourceFailure,
@@ -242,14 +223,12 @@ class PlainFailure extends Error {
   }
 }
 
-/** A developer's own checkout (no launcher) is left alone by Stella's updates. */
 const checkoutRefusal = () =>
   new PlainFailure(
     "unavailable",
     "Stella runs from a developer checkout here; updates don't change its working tree.",
   );
 
-/** The windows could not show the change, and the checkout is back where it was. */
 class RendererRejected extends Error {
   constructor(
     message: string,
@@ -270,7 +249,6 @@ const deviceName = () =>
     .trim()
     .replace(/\.(local|localdomain|lan|home)$/i, "");
 
-/** The name this computer is registered under on the account. */
 const accountDeviceName = () => hostname().trim().slice(0, 96);
 
 const errorMessage = (error: unknown) =>
@@ -283,9 +261,7 @@ const failureOf = (error: unknown): { reason: AppSourceFailure; detail?: string 
       ? { reason: "taken-back", detail: error.detail }
       : { reason: "unexpected", detail: errorMessage(error) };
 
-/** Longest an update waits for a screen recording: past its 10-minute cap, building and its card. */
 const RECORDING_HOLD_MAX_MS = 20 * 60_000;
-/** Longest an update that restarts the runtime waits for Stella to finish her reply. */
 const REPLY_HOLD_MAX_MS = 3 * 60_000;
 
 const delay = (ms: number) =>
@@ -344,16 +320,11 @@ export class AppSourceService {
   private access: SourceAccess | null = null;
   private forkBranch: string | null = null;
   private forkUnrelated = false;
-  /**
-   * Merges of this computer's changes with the account's copy, by
-   * `${forkTip}:${head}`: the merge to push, or why none could be shared.
-   */
   private shares = new Map<string, Share>();
   private notShared: "conflict" | "build" | null = null;
   private sharing = false;
   private shareAgain = false;
   private upstreamTracked = false;
-  /** Whether this checkout is a linked worktree of another one; unknown until checked. */
   private linkedCheckout: boolean | null = null;
   private linkedCheck: Promise<void> | null = null;
   private merge: MergeRecord | null | undefined;
@@ -380,10 +351,8 @@ export class AppSourceService {
   private readonly claimTried = new Map<string, number>();
   private readonly reported = new Set<string>();
   private fetchingResult: string | null = null;
-  /** A shared merge result checked here and found to carry changes this checkout lacks. */
   private resultUnusable: string | null = null;
   private wantTimer: NodeJS.Timeout | null = null;
-  /** The version whose merge is prepared and can be applied at once. */
   private versionReady: string | null = null;
   private versionConflicts: AppSourceConflicts | null = null;
 
@@ -416,7 +385,6 @@ export class AppSourceService {
     this.timers = [poll];
     if (this.options.installed && this.options.launcherPreparesOnRelaunch) {
       const tidy = setTimeout(() => {
-        // In the queue, so no install runs while it looks at the packages.
         this.queue = this.queue.then(() => this.tidyPackages());
       }, TIDY_PACKAGES_DELAY_MS);
       tidy.unref?.();
@@ -435,13 +403,6 @@ export class AppSourceService {
     void this.refresh();
   }
 
-  /**
-   * A linked worktree shares its main checkout's refs and git files, so a
-   * Stella run from one (a test copy beside the installed app) would rewrite
-   * the installed copy's view of its updates when it fetches, shares or
-   * announces, even from another account or backend. Such a copy keeps to
-   * itself: its drafts work, nothing is synced.
-   */
   private checkLinkedCheckout(): Promise<void> {
     this.linkedCheck ??= this.readLinkedCheckout();
     return this.linkedCheck;
@@ -459,26 +420,16 @@ export class AppSourceService {
     if (this.linkedCheckout) this.options.log("app-source.linked-worktree", { commonDir });
   }
 
-  /**
-   * The backend this checkout syncs its updates with; none for a developer's
-   * checkout, a linked worktree, or before that is known. Without one nothing
-   * is fetched, pushed, shared, announced or merged in the background.
-   */
   private backendUrl(): string | null {
     return this.options.installed && this.linkedCheckout === false
       ? this.options.getBackendUrl()
       : null;
   }
 
-  /** A developer's own checkout is never changed by Stella's updates. */
   private refuseInCheckout() {
     if (!this.options.installed) throw checkoutRefusal();
   }
 
-  /**
-   * Every merge resolved in this checkout (by a task in a draft, or here) is
-   * remembered by git, so the same conflict is never resolved twice.
-   */
   private async rememberResolutions() {
     if (!this.options.installed) return;
     const cwd = this.options.stellaAppDir;
@@ -708,13 +659,6 @@ export class AppSourceService {
     });
   }
 
-  /**
-   * The user's Update. `targets` are the other computers it is for too (null:
-   * every one, []: this one only); they apply it by themselves. Here it is
-   * applied at once when it is prepared. When it isn't yet (a merge that
-   * still needs resolving), the press is the go-ahead: it is applied by
-   * itself once it is ready, with no second press.
-   */
   applyUpstream(targets: string[] | null = null) {
     return this.exclusive(async (cwd) => {
       if (!this.upstreamTracked) throw new PlainFailure("nothing", "No update is available.");
@@ -902,7 +846,6 @@ export class AppSourceService {
     );
   }
 
-  /** Where the recorded merge stands; a settled one is cleared. */
   private async mergeStatus(
     cwd: string,
     head: string,
@@ -966,9 +909,6 @@ export class AppSourceService {
   private exclusive(
     task: (cwd: string) => Promise<void | { background: true }>,
   ): Promise<AppSourceActionResult> {
-    // Every action here changes the checkout (Add, Get, Update, Undo, what
-    // was asked for elsewhere, a catch-up): a developer's own is refused
-    // before anything is announced, wanted or merged.
     if (!this.options.installed) {
       const refusal = checkoutRefusal();
       return Promise.resolve({ ok: false, error: refusal.message, ...failureOf(refusal) });
@@ -1148,11 +1088,6 @@ export class AppSourceService {
     }
   }
 
-  /**
-   * The windows refused the change: the checkout goes back to where it was
-   * and the windows are given those files again, by a reload when the change
-   * already cost them one or cannot be taken out in place.
-   */
   private async takeBack(
     cwd: string,
     from: string,
@@ -1176,7 +1111,6 @@ export class AppSourceService {
     });
   }
 
-  /** The task that made a change the window refused hears why, once per commit, so it can fix it. */
   private async tellItsTask(cwd: string, name: string, tip: string, detail: string) {
     if (isStellaDraft(name) || this.toldTasks.has(tip)) return;
     this.toldTasks.add(tip);
@@ -1189,11 +1123,6 @@ export class AppSourceService {
     this.options.log("app-source.rejection-sent", { draft: name, told: told === true });
   }
 
-  /**
-   * Every change taken in place leaves the modules it replaced in memory. Once
-   * enough have piled up, the windows load again the next time nobody is
-   * looking; until then nothing is checked.
-   */
   private reloadWhenAway() {
     if (this.reloadTimer || this.disposed) return;
     const timer = setInterval(() => {
@@ -1215,11 +1144,6 @@ export class AppSourceService {
     this.reloadTimer = timer;
   }
 
-  /**
-   * A finished change that only touches the interface is added without a
-   * click, once, as soon as the user's hands are off Stella. One that fails
-   * stays in Updates with what went wrong.
-   */
   private considerAutoApply(state: AppSourceState) {
     if (this.autoTimer || this.disposed || state.busy || state.merging) return;
     const offer = state.waiting.find(
@@ -1255,7 +1179,6 @@ export class AppSourceService {
     this.autoTimer = setTimeout(() => void attempt(), 0);
   }
 
-  /** A HEAD the launcher refuses to sign is moved back, so Stella never runs on an unsigned version. */
   private async moveHead(cwd: string, from: string, to: string) {
     this.refuseInCheckout();
     await git(cwd, ["merge", "--ff-only", to]);
@@ -1327,16 +1250,11 @@ export class AppSourceService {
     };
   }
 
-  /**
-   * An update waits while a screen recording or its finish card is open:
-   * swapping or reloading the windows would end the recording.
-   */
   private async waitForRecording() {
     if (!this.options.recordingOpen?.()) return;
     this.heldForRecording = true;
     this.publish({ ...this.state, heldForRecording: true });
     this.options.log("app-source.held-for-recording", {});
-    // Bounded, so a recording that never settles can't hold updates forever.
     const until = Date.now() + RECORDING_HOLD_MAX_MS;
     while (!this.disposed && Date.now() < until && this.options.recordingOpen?.()) await delay(500);
     this.heldForRecording = false;
@@ -1344,11 +1262,6 @@ export class AppSourceService {
     this.publish(rest);
   }
 
-  /**
-   * An update that restarts the runtime waits while Stella is mid-reply here: the restart would cut the reply off
-   * between a tool call and its result. Bounded, so a reply that never ends can't hold updates forever; one cut off
-   * then resumes after the restart.
-   */
   private async waitForReply() {
     const replying = this.options.replying;
     if (!replying || !(await replying().catch(() => false))) return false;
@@ -1423,8 +1336,6 @@ export class AppSourceService {
       this.recentLog(cwd),
     ]);
     if (!this.options.installed) {
-      // Drafts, versions and other computers' changes are neither prepared
-      // nor offered here, so nothing can be added without or with a click.
       return {
         remote: { status: "none", count: 0 },
         upstream: NO_UPSTREAM,
@@ -1469,11 +1380,9 @@ export class AppSourceService {
     const drafting = worktrees.some((tree) =>
       tree.branch?.startsWith(DRAFT_REF_PREFIX),
     );
-    if (drafting) {
-      // Its base must not move under the agent; caught up once it is done.
-    } else if (forkRef && forkOffer?.catchUp) {
+    if (!drafting && forkRef && forkOffer?.catchUp) {
       this.catchUpLater(forkRef, forkOffer.tip, head);
-    } else if (upstreamOffer?.catchUp) {
+    } else if (!drafting && upstreamOffer?.catchUp) {
       this.catchUpLater(UPSTREAM_REF, upstreamOffer.tip, head);
     }
     const skippedNow = await this.skippedKeys(cwd);
@@ -1534,9 +1443,6 @@ export class AppSourceService {
     const wantedVersion =
       version !== null &&
       intent.wanted.some((entry) => entry.kind === "version" && entry.version === version);
-    // Named by the newest change it brings, not by the other computer's tip:
-    // that tip also moves when the other computer only takes a version, and a
-    // change skipped or dismissed here must not come back for that.
     const forkChange =
       forkRef && forkOffer?.real ? await this.forkChange(cwd, head, forkOffer.tip) : null;
     const forkKey = forkChange ? `other:${forkChange.sha}` : null;
@@ -1645,8 +1551,6 @@ export class AppSourceService {
     this.offeredKeys = offered.map((offer) => offer.key);
     const skipped = skippedNow;
     await this.pruneWanted(cwd, head, intent, drafts, worktrees);
-    // Only while it is still the latest thing that happened here: after any
-    // later change, its Undo would no longer mean "back to before this update".
     const arrived =
       intent.arrived && (intent.arrived.revert ?? intent.arrived.sha) === head
         ? intent.arrived
@@ -1683,10 +1587,6 @@ export class AppSourceService {
     return this.intent;
   }
 
-  /**
-   * Writes go one at a time: an update landing notes its arrival and prunes
-   * what was asked for at the same moment, and each write is the whole file.
-   */
   private async saveIntent(change: (intent: UpdateIntent) => void) {
     const intent = await this.loadIntent();
     change(intent);
@@ -1713,7 +1613,6 @@ export class AppSourceService {
     });
   }
 
-  /** Drops what was asked for once it is in, or can no longer arrive. */
   private async pruneWanted(
     cwd: string,
     head: string,
@@ -1727,8 +1626,6 @@ export class AppSourceService {
       if (Date.now() - entry.at >= WANTED_MAX_AGE_MS) continue;
       if (entry.kind === "version") {
         if (await isAncestor(cwd, entry.version, head)) {
-          // It came in another way (catching up with the computer that
-          // merged it); still say so, as if it came in by itself.
           arrived = entry;
           continue;
         }
@@ -1757,12 +1654,6 @@ export class AppSourceService {
     }
   }
 
-  /**
-   * Where this computer gets `version` from: the merge the account already
-   * made of it when that merge brings nothing this checkout lacks but the
-   * version itself (the same personal changes, so the same answer); then the
-   * fork, when another computer already took it; else the published version.
-   */
   private async updateTarget(cwd: string, head: string, version: string) {
     const result = this.update?.version === version ? this.update.result : null;
     const own = result ? await this.preparer.peek(head, version) : null;
@@ -1783,7 +1674,6 @@ export class AppSourceService {
     };
   }
 
-  /** `merged` holds `version` and nothing but changes this checkout already has (by content). */
   private async usableResult(cwd: string, head: string, merged: string, version: string) {
     if (!(await isAncestor(cwd, version, merged))) return false;
     const extra = await gitRaw(cwd, [
@@ -1826,21 +1716,12 @@ export class AppSourceService {
     }
   }
 
-  /**
-   * How far preparing may take a conflicting merge of `version`. Resolutions
-   * git already knows are free and always used. A model only when the user
-   * said yes (an Update press, here or for this computer elsewhere), or in the
-   * background on a paid plan when this is the one computer on the account
-   * that merges this version.
-   */
   private async resolveLevel(head: string, version: string, tip: string): Promise<ResolveLevel> {
     const record = await this.preparer.peek(head, tip);
     const rerereFailed =
       record?.plan?.kind === "conflict" && !record.to && record.resolve !== undefined && record.resolve !== "none";
     if (!rerereFailed || !this.options.modelResolve) return "rerere";
     if (this.waitingOnOther(version)) return "rerere";
-    // Another computer with these same changes already asked a model and it
-    // was not sure; asking again here would spend the same for the same answer.
     const update = this.update?.version === version ? this.update : null;
     const me = this.options.getDeviceId?.();
     if (update?.unresolved && update.preparer && update.preparer.deviceId !== me && update.preparer.base === head) {
@@ -1875,7 +1756,6 @@ export class AppSourceService {
     );
   }
 
-  /** Another computer on the account is merging `version` right now; this one waits for it. */
   private waitingOnOther(version: string) {
     const me = this.options.getDeviceId?.();
     const update = this.update;
@@ -1917,11 +1797,6 @@ export class AppSourceService {
     }
   }
 
-  /**
-   * A merge preparing could not finish is shown (with what conflicts), except
-   * while another computer on the account is merging the same version: its
-   * result is what this one will take.
-   */
   private conflictsToShow(version: string, record: PreparedUpdate): AppSourceConflicts | undefined {
     const files = record.unresolved ?? [];
     if (record.resolve === "model") return { files, why: "unsure" };
@@ -1936,7 +1811,6 @@ export class AppSourceService {
     return { files, why: "unsure" };
   }
 
-  /** A version merged here goes to the account, so other computers with the same changes take it as is. */
   private async shareResult(version: string, head: string, record: PreparedUpdate) {
     const me = this.options.getDeviceId?.();
     const baseUrl = this.backendUrl();
@@ -1985,7 +1859,6 @@ export class AppSourceService {
     }
   }
 
-  /** A version a task merged here goes to the account too, before Stella relaunches into it. */
   private async shareTaskMerge(name: string, to: string) {
     if (!isUpdateDraft(name)) return;
     const cwd = this.options.stellaAppDir;
@@ -2007,7 +1880,6 @@ export class AppSourceService {
     if (before !== JSON.stringify(update)) void this.refresh();
   }
 
-  /** Update pressed on another computer, for this one too: it is applied here by itself. */
   private async takeIncoming(update: AppSourceUpdate | null) {
     const apply = update?.apply;
     const me = this.options.getDeviceId?.();
@@ -2072,10 +1944,6 @@ export class AppSourceService {
     }
   }
 
-  /**
-   * What was asked for is applied as soon as it is ready, when the user's
-   * hands are off Stella (or they're away), one at a time.
-   */
   private considerWanted(state: AppSourceState) {
     if (this.wantTimer || this.disposed || state.busy || state.merging) return;
     const intent = this.intent;
@@ -2096,7 +1964,6 @@ export class AppSourceService {
           action = () => this.exclusive((cwd) => this.takeUpstream(cwd, entry));
         } else if (!entry.task && this.versionNeedsTask(entry)) {
           action = async () => {
-            // Things may have moved while waiting for a quiet moment.
             if (!this.versionNeedsTask(entry)) return { ok: true };
             await this.want({ ...entry, task: true });
             return await this.exclusive((cwd) => this.takeUpstream(cwd, entry));
@@ -2143,19 +2010,11 @@ export class AppSourceService {
     this.wantTimer = setTimeout(() => void attempt(), 0);
   }
 
-  /**
-   * The background merge was not sure, so a task merges it (the press was the
-   * go-ahead). A press from another computer first waits for that computer's
-   * result: with the same changes here it is taken as is, and only a computer
-   * whose own changes differ merges it itself.
-   */
   private versionNeedsTask(entry: Extract<Wanted, { kind: "version" }>) {
     if (this.versionConflicts?.why !== "unsure" || this.waitingOnOther(entry.version)) return false;
     const update = this.update?.version === entry.version ? this.update : null;
     const waited = Date.now() - entry.at >= MERGE_WAIT_MS;
     if (entry.from && !update?.result && !waited) return false;
-    // A merge from another computer is on its way: fetch and check it first,
-    // and merge here only when it carries changes this checkout lacks.
     if (update?.result && this.resultUnusable !== update.result.sha && !waited) return false;
     return true;
   }
@@ -2416,7 +2275,6 @@ export class AppSourceService {
     return (await this.mergedTree(cwd, onto, tip)) === withPublished;
   }
 
-  /** The newest change of the user's own that the other computer's `tip` brings. */
   private async forkChange(cwd: string, head: string, tip: string) {
     const out = await git(cwd, [
       "log",
@@ -2580,7 +2438,6 @@ export class AppSourceService {
     this.forkWatch = { baseUrl: watchFork, stop };
   }
 
-  /** The account's record of the published version on its way to its computers. */
   private followUpdates(baseUrl: string | null) {
     if (this.updateWatch?.baseUrl === baseUrl) return;
     this.updateWatch?.stop();
@@ -2779,11 +2636,6 @@ export class AppSourceService {
     this.upstreamTracked = true;
   }
 
-  /**
-   * Moves `ref` to what was just fetched, only when that shares history with
-   * this checkout: unrelated history (another backend's copy) never replaces
-   * what is tracked here.
-   */
   private async adoptFetched(cwd: string, ref: string) {
     try {
       if ((await gitRaw(cwd, ["merge-base", "HEAD", INCOMING_REF])).code !== 0) return false;
@@ -2816,9 +2668,6 @@ export class AppSourceService {
     if (forkTip === head || (await isAncestor(cwd, head, forkTip))) {
       this.notShared = null;
     } else if (!(await isAncestor(cwd, forkTip, head))) {
-      // Another computer's change is on the account's copy and not here
-      // (skipped, or not taken yet): this computer's own changes can only
-      // reach it inside a merge of the two.
       this.shareLater(cwd, fork);
     } else {
       this.notShared = null;
@@ -2845,7 +2694,6 @@ export class AppSourceService {
     }
   }
 
-  /** Shares this computer's changes in the background: a merge is checked by building it first. */
   private shareLater(cwd: string, fork: ForkAccess) {
     if (this.sharing) {
       this.shareAgain = true;
@@ -2904,12 +2752,6 @@ export class AppSourceService {
     this.reportForkPush(share.merge);
   }
 
-  /**
-   * The account's copy with this computer's changes merged in, built first
-   * like any merge Stella makes: the other computers take it as it is. A
-   * clash, or a merge that would not build, is held back, so this computer's
-   * changes stay here as they did before, and the Updates tab says so.
-   */
   private async mergeToShare(cwd: string, forkTip: string, head: string): Promise<Share> {
     const merged = await gitRaw(cwd, ["merge-tree", "--write-tree", forkTip, head]);
     if (merged.code === 1) {

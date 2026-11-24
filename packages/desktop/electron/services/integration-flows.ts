@@ -1,8 +1,3 @@
-// Connector work (the catalog, which integrations are on, their accounts and
-// sign-ins) runs in the runtime. A sign-in step that needs a window (an
-// approval card, a device code, the browser) comes back to main as the
-// requestConnectorSignIn host handler, which routes it to the UI handlers the
-// caller registered for that flow.
 import { randomUUID } from "node:crypto";
 import { callRuntimeAppService } from "./runtime-app-services.js";
 
@@ -48,7 +43,6 @@ export const runIntegrationFlow = async <T>(
   }
 };
 
-/** The requestConnectorSignIn host handler. */
 export const deliverConnectorSignIn = async (request: unknown): Promise<SignInOutcome> => {
   const { flowId, kind, payload } = (request ?? {}) as {
     flowId?: unknown;

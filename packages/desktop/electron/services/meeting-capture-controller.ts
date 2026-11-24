@@ -113,9 +113,7 @@ export class MeetingCaptureController {
 
     try {
       await fs.mkdir(path.join(this.stellaDataDir, "meetings"), { recursive: true });
-    } catch {
-      // daemon will retry creating dirs
-    }
+    } catch {}
 
     const child = spawn(bin, ["daemon", "--root", this.stellaDataDir], {
       detached: true,
@@ -165,14 +163,10 @@ export class MeetingCaptureController {
       }
     }
 
-    // Best-effort mic: prompt once if undetermined, but never block the
-    // recording on a denied mic — system audio alone is still useful.
     if (process.platform === "darwin" && !this.getMicPermission()) {
       try {
         await systemPreferences.askForMediaAccess("microphone");
-      } catch {
-        // ignored — recording proceeds without the mic
-      }
+      } catch {}
     }
 
     const segmentSeconds = Math.max(

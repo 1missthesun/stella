@@ -58,17 +58,6 @@ import { protectValue, unprotectValue } from "@stella/node-shared/shared/protect
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 import type { SavedSecureValues, SavedValuesChange } from "./saved-secure-values.js";
 
-/**
- * Keeps this computer's saved private values in step with the owner's other
- * devices. The local store stays the one tasks read; what syncs is each record
- * sealed separately to every device's own key, so Stella's cloud holds only
- * ciphertext. Which devices those are is the devices' own signed list
- * (saved-values-trust.ts), checked here, never the cloud's word: a computer
- * joins it when the user allows it on a device already on it and confirms
- * here, both screens showing the same code. Off when signed out or when the user turns sync
- * off: then the values stay on this computer only.
- */
-
 const STATE_FILE = "saved-values-sync.json";
 const PROTECT_SCOPE = "saved-values-sync";
 const SPKI_X25519_PREFIX = Buffer.from("302a300506032b656e032100", "hex");
@@ -80,29 +69,19 @@ const GET_BATCH = 50;
 
 type SyncState = {
   v: 1;
-  /** Off only when the user turned it off; on by default. */
   enabled: boolean;
   deviceId: string;
   publicKey: string;
   privateKeyProtected: string;
-  /** The owner this computer last synced with; a different one starts clean. */
   ownerId?: string;
-  /** Per record, the version this computer and the cloud last agreed on. */
   synced: Record<string, number>;
-  /** Records removed here that the cloud hasn't heard about yet. */
   removed: Record<string, number>;
-  /** The account each record synced with: a record never moves to another account that signs in here. */
   owners: Record<string, string>;
   cardAt?: number;
-  /** This computer's signing key (Ed25519 secret, protected). */
   signSecretProtected?: string;
-  /** The newest entry of the devices' list this computer has checked, for this account. */
   pin?: SavedValuesRosterPin;
-  /** Don't ask to join by itself again: the last ask was declined, or this computer was taken off. */
   joinPaused?: "declined" | "removed";
-  /** This computer's ask to join, kept across restarts until it's settled. */
   ownJoin?: OwnJoin;
-  /** Per record, the device whose signature the copy here carried: re-signed here if that device leaves the list. */
   signers?: Record<string, string>;
 };
 
@@ -114,17 +93,12 @@ export type SavedValuesSyncOptions = {
   getBackendUrl: () => string | null | undefined;
   getAuthToken: () => Promise<string | null | undefined>;
   log?: (event: string, detail?: Record<string, unknown>) => void;
-  /** Told when values on this computer changed because another device changed them. */
   onSyncedChange?: () => void;
-  /** Told whenever what Settings shows changed. */
   onStatus?: (status: SavedValuesSyncStatus) => void;
-  /** The user is at this computer now: only then does it answer a device asking to join. */
   isUserActive?: () => boolean;
-  /** Recent uses by cloud tasks, for Settings. */
   getReleaseLog?: () => readonly SavedValueReleaseLogEntry[];
 };
 
-/** This computer's ask, and the first answer it saw (frozen: the code and the list it accepts come from it). */
 type OwnJoin = {
   joinId: string;
   nonce: string;
@@ -133,11 +107,9 @@ type OwnJoin = {
   startedAt: number;
   answer?: { by: string; name: string; listedNonce: string; pin: SavedValuesRosterPin };
   revealed?: boolean;
-  /** The user confirmed here that the other screen shows the same code. */
   confirmed?: boolean;
 };
 
-/** What this computer sent when it answered someone's ask: the only basis for its code and its Allow. */
 type Answered = Pick<SavedValuesJoin, "joinId" | "device" | "commit"> & {
   listedNonce: string;
   pin: SavedValuesRosterPin;
@@ -170,7 +142,6 @@ const sealKey = (shared: Buffer, binding: SavedValueSealBinding) => {
   return { aad, key };
 };
 
-/** Seals a record's payload to one recipient's key. */
 export const sealSavedValue = (
   plaintext: string,
   recipientPublicKey: string,
@@ -192,7 +163,6 @@ export const sealSavedValue = (
   };
 };
 
-/** Opens a seal addressed to this device; null when it isn't, or was altered. */
 export const openSavedValue = (
   seal: SavedValueSeal,
   privateKey: KeyObject,
@@ -224,7 +194,6 @@ export class SavedValuesSync {
   private lease: { baseUrl: string; value: BackendClientLease } | null = null;
   private stopWatch: (() => void) | null = null;
   private latest: SavedValuesState | null = null;
-  /** The list as last checked, while this computer is on it. */
   private roster: SavedValuesRoster | null = null;
   private answered = new Map<string, Answered>();
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -286,7 +255,6 @@ export class SavedValuesSync {
         signers: { ...(stored.signers ?? {}) },
       };
     } else {
-      // A new key: this computer's first sync, or its identity changed.
       const pair = generateKeyPairSync("x25519");
       this.privateKey = pair.privateKey;
       this.state = {
@@ -311,7 +279,6 @@ export class SavedValuesSync {
       const bytes = randomBytes(32);
       this.signing = signingKeyFromSecret(new Uint8Array(bytes));
       this.state.signSecretProtected = protectValue(SIGN_SCOPE, bytes.toString("base64"));
-      // A new signing key isn't on any list yet.
       delete this.state.pin;
       delete this.state.ownJoin;
     }
@@ -351,7 +318,6 @@ export class SavedValuesSync {
     return this.lease.value.client;
   }
 
-  /** Starts syncing when signed in and on; safe to call again (sign-in, wake). */
   start(): void {
     const state = this.loadState();
     this.setStatus({ enabled: state?.enabled !== false });
@@ -414,15 +380,10 @@ export class SavedValuesSync {
     this.options.onStatus?.(this.getStatus());
   }
 
-  /** Tells Settings something it shows changed (a use by a cloud task). */
   noteReleaseLogChanged(): void {
     this.options.onStatus?.(this.getStatus());
   }
 
-  /**
-   * Sync on: this computer publishes its key and its values. Off: the cloud
-   * stops sealing to this computer, and its values stay here only.
-   */
   async setEnabled(enabled: boolean): Promise<SavedValuesSyncStatus> {
     const state = this.loadState();
     if (!state) return this.getStatus();
@@ -444,7 +405,6 @@ export class SavedValuesSync {
     return this.getStatus();
   }
 
-  /** The user allowed (or not) a device asking to join, after comparing the code. */
   async decideJoin(joinId: string, allow: boolean): Promise<{ ok: boolean; error?: string }> {
     const state = this.loadState();
     const client = this.client();
@@ -459,7 +419,6 @@ export class SavedValuesSync {
       this.schedule(0);
       return { ok: true };
     }
-    // Only what this computer sent when it answered, never what the cloud shows now.
     if (!joinCode({ ...answered, joinerNonce: join.joinerNonce })) return { ok: false, error: "That request isn't ready yet." };
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const fresh = this.latest ? checkRoster(this.latest.roster, state.pin) : null;
@@ -482,7 +441,6 @@ export class SavedValuesSync {
     return { ok: false, error: "Your devices kept changing. Try again." };
   }
 
-  /** The user confirmed on this computer that the other device shows the same code. */
   confirmJoin(): void {
     const state = this.loadState();
     if (!state?.ownJoin?.answer) return;
@@ -491,7 +449,6 @@ export class SavedValuesSync {
     this.schedule(0);
   }
 
-  /** Take a device off the list: nothing is sealed to it again. */
   async removeListedDevice(deviceId: string): Promise<{ ok: boolean; error?: string }> {
     const state = this.loadState();
     const client = this.client();
@@ -515,7 +472,6 @@ export class SavedValuesSync {
     return { ok: false, error: "Your devices' list kept changing. Try again." };
   }
 
-  /** Ask again (after a decline, after being taken off, or to be allowed on another device). */
   askAgain(): void {
     const state = this.loadState();
     if (!state) return;
@@ -528,7 +484,6 @@ export class SavedValuesSync {
     this.schedule(0);
   }
 
-  /** None of the devices on the list is available: start a new list with only this computer. */
   async startOver(): Promise<{ ok: boolean; error?: string }> {
     const state = this.loadState();
     const client = this.client();
@@ -620,7 +575,6 @@ export class SavedValuesSync {
     if (!state?.enabled || !client || !remote || !this.privateKey || !this.signing || !self) return;
     const { ownerId } = await client.call("owner.identity", {});
     if (state.ownerId !== ownerId) {
-      // Another account: what this computer agreed with the last one says nothing here.
       state.ownerId = ownerId;
       state.synced = {};
       state.cardAt = undefined;
@@ -641,22 +595,17 @@ export class SavedValuesSync {
       });
       state.cardAt = now;
       this.saveState();
-      // The new card arrives through the watch.
       if (!card || card.publicKey !== state.publicKey) return;
     }
 
-    // The devices' list, checked here.
     let check = checkRoster(remote.roster, state.pin);
     if (!check.ok && check.reason === "reset") {
-      // Started over on another device: this computer is on that list only once it's allowed there.
       delete state.pin;
       this.saveState();
       this.roster = null;
       check = checkRoster(remote.roster);
     }
     if (!check.ok && check.reason === "empty") {
-      // No list yet: this computer founds it, alone. (A lying cloud showing an
-      // empty list gets nothing: a list of one seals only to itself.)
       await client
         .call("savedValues.rosterAppend", { entry: foundRoster({ self, key: this.signing, at: now }) })
         .catch((error: { code?: string }) => {
@@ -671,7 +620,6 @@ export class SavedValuesSync {
       return;
     }
     if (check.roster.members.size === 0) {
-      // Every device left the list: start a new one alone.
       await client.call("savedValues.rosterReset", { entry: foundRoster({ self, key: this.signing, at: now }) });
       delete state.pin;
       this.saveState();
@@ -684,7 +632,6 @@ export class SavedValuesSync {
       return;
     }
 
-    // On the list.
     state.pin = roster.head;
     delete state.joinPaused;
     if (state.ownJoin) {
@@ -699,12 +646,6 @@ export class SavedValuesSync {
     await this.syncRecords(state, roster, remote, ownerId, now);
   }
 
-  /**
-   * Whether this computer takes the list as its own. With a pin, any list that
-   * extends it and has this computer on it. Without one, only a list this
-   * computer founded, or the list the device that answered its ask had (its
-   * pin, frozen in the code), once the user confirmed the code here.
-   */
   private accepted(state: SyncState, roster: SavedValuesRoster, remote: SavedValuesState, self: SavedValuesMember): boolean {
     if (!onRoster(roster, self)) return false;
     if (state.pin) return true;
@@ -726,7 +667,6 @@ export class SavedValuesSync {
   ) {
     const client = this.client()!;
     if (state.pin && roster.removed.has(state.deviceId)) {
-      // Taken off the list on another device: what came from the other devices goes too.
       await this.forgetSynced(state);
       delete state.pin;
       delete state.ownJoin;
@@ -752,7 +692,6 @@ export class SavedValuesSync {
       return;
     }
     if (!own || !live || live.expiresAt <= now) {
-      // Ask only while the user is here, so devices nobody is at don't get asked.
       if (own && live?.state !== "allowed") {
         delete state.ownJoin;
         this.saveState();
@@ -768,7 +707,6 @@ export class SavedValuesSync {
       this.setStatus({ standing: "waiting", waiting: { code: null }, devices: [], requests: [] });
       return;
     }
-    // The first answer seen is the one the code is made from; a later one is ignored.
     if (!own.answer && live.answeredBy && live.listedNonce && live.pin) {
       own.answer = {
         by: live.answeredBy,
@@ -805,11 +743,6 @@ export class SavedValuesSync {
     });
   }
 
-  /**
-   * Answers a device asking to join while the user is at this computer, so
-   * the pair is the two devices in front of them. What it sends is kept: the
-   * code and the Allow here come only from that.
-   */
   private async answerJoins(state: SyncState, remote: SavedValuesState, roster: SavedValuesRoster, now: number) {
     const client = this.client()!;
     for (const [joinId, answered] of this.answered) {
@@ -853,7 +786,6 @@ export class SavedValuesSync {
         };
       })
       .sort((left, right) => Number(right.thisDevice) - Number(left.thisDevice) || left.name.localeCompare(right.name) || left.addedAt - right.addedAt);
-    // Only asks this computer answered, with the code from what it sent.
     const requests: SavedValuesJoinRequest[] = remote.joins.flatMap((join) => {
       const answered = this.answered.get(join.joinId);
       if (!answered || join.state !== "open" || join.expiresAt <= now) return [];
@@ -865,7 +797,6 @@ export class SavedValuesSync {
     this.setStatus({ standing: "member", waiting: undefined, problem: undefined, devices, requests });
   }
 
-  /** This computer was taken off the list: values it got through sync, or sent, go. */
   private async forgetSynced(state: SyncState) {
     for (const id of Object.keys(state.synced)) {
       if (state.owners[id] === undefined || state.owners[id] === state.ownerId) {
@@ -892,7 +823,6 @@ export class SavedValuesSync {
     const signers = (state.signers ??= {});
     let changedHere = false;
 
-    // Take what other devices changed, if a device on the list wrote it.
     const toFetch: SavedValueHead[] = [];
     for (const head of heads.values()) {
       const mine = local.get(head.id);
@@ -940,9 +870,6 @@ export class SavedValuesSync {
       }
     }
 
-    // A record whose copy here was signed by a device since taken off the list
-    // is signed again here, as a newer version, so devices that check it still
-    // take it. (It was checked while that device was on the list.)
     for (const [id, updatedAt] of local) {
       const signer = signers[id];
       if (!signer || signer === state.deviceId || roster.members.has(signer)) continue;
@@ -955,7 +882,6 @@ export class SavedValuesSync {
       signers[id] = state.deviceId;
     }
 
-    // Send what changed here, and seal to devices that joined.
     for (const [id, at] of Object.entries(state.removed)) {
       const head = heads.get(id);
       if (head && (head.deleted || head.updatedAt > at)) {
@@ -963,7 +889,6 @@ export class SavedValuesSync {
         continue;
       }
       if (!head && state.synced[id] === undefined) {
-        // Never synced: nothing to remove in the cloud.
         delete state.removed[id];
         continue;
       }
@@ -1005,9 +930,7 @@ export class SavedValuesSync {
             recipientId: device.deviceId,
             updatedAt: payload.updatedAt,
           });
-        } catch {
-          // A malformed key is skipped; the others still get the value.
-        }
+        } catch {}
       }
       if (Object.keys(sealed).length === 0) continue;
       const result = await client.call("savedValues.put", {

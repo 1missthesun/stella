@@ -51,10 +51,6 @@ export class CaptureService {
         }
         this.lastBroadcastChatContextVersion = this.chatContextVersion;
     }
-    /**
-     * Adds or updates a Show Stella capture card in the composer. An update to
-     * a card the user already removed is dropped unless `add` is set.
-     */
     upsertShowCapture(capture, { add = false } = {}) {
         const ctx = this.getChatContextSnapshot() ?? this.emptyContext();
         const list = ctx.showCaptures ?? [];
@@ -296,9 +292,7 @@ export class CaptureService {
         try {
             globalShortcut.unregister('Escape');
         }
-        catch {
-            // Shortcut may already be gone if capture was interrupted externally.
-        }
+        catch {}
         this.options.overlay.endRegionCapture();
     }
     async startRegionCapture() {

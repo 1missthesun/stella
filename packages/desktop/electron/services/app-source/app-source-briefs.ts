@@ -110,7 +110,6 @@ Keep what the change was for: take the current version's code, then carry the ch
 
 const REJECTED_ERROR_CHARS = 4_000;
 
-/** Sent to the task whose finished change the window could not show. */
 export const rejectedDraftNote = (name: string, error: string): string =>
   `Stella added your finished change (\`draft/${name}\`) and the window could not show it, so Stella took it back by itself. Nothing is broken for the user; the change is simply not in, and its card says so.
 

@@ -1,16 +1,8 @@
-// Messages between Electron main and the panel mirror of an offscreen agent tab
-// (offscreen-tabs.ts and electron/offscreen-tab-mirror-preload.ts).
-
 export const MIRROR_FRAME_CHANNEL = "offscreen-mirror:frame";
 export const MIRROR_FRAME_ACK_CHANNEL = "offscreen-mirror:frame-ack";
 export const MIRROR_CURSOR_CHANNEL = "offscreen-mirror:cursor";
 export const MIRROR_INPUT_CHANNEL = "offscreen-mirror:input";
 
-/**
- * One painted region of the tab (offscreen tabs render at scale 1, so these
- * are CSS pixels too). The payload sent with it is the region's BGRA
- * premultiplied pixels, row by row.
- */
 export type MirrorFrame = {
   frameWidth: number;
   frameHeight: number;
@@ -29,7 +21,6 @@ export type MirrorModifier =
   | "middlebuttondown"
   | "rightbuttondown";
 
-/** Input in page CSS pixels, shaped like Electron's `sendInputEvent` events. */
 export type MirrorInput =
   | {
       type: "mouseDown" | "mouseUp" | "mouseMove" | "mouseLeave";

@@ -70,9 +70,7 @@ export class ReleaseChannel {
       });
       try {
         socket.close();
-      } catch {
-        // Already gone.
-      }
+      } catch {}
       this.scheduleReconnect();
     }, REQUEST_BUDGET_MS.connect);
     this.connectTimer.unref?.();
@@ -108,9 +106,7 @@ export class ReleaseChannel {
       });
       this.scheduleReconnect();
     };
-    socket.onerror = () => {
-      // `onclose` follows and reconnects.
-    };
+    socket.onerror = () => {};
   }
 
   private startPing(socket: WebSocket) {
@@ -121,17 +117,13 @@ export class ReleaseChannel {
         this.stopPing();
         try {
           socket.close();
-        } catch {
-          // Already gone.
-        }
+        } catch {}
         this.scheduleReconnect();
         return;
       }
       try {
         socket.send(SOCKET_KEEPALIVE_PING);
-      } catch {
-        // `onclose` reconnects.
-      }
+      } catch {}
     }, PING_INTERVAL_MS);
     this.pingTimer.unref?.();
   }
@@ -168,9 +160,7 @@ export class ReleaseChannel {
     if (socket) {
       try {
         socket.close();
-      } catch {
-        // Already gone.
-      }
+      } catch {}
     }
   }
 }

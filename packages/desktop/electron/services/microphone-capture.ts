@@ -8,7 +8,6 @@ const FRAME_HEADER_BYTES = 9;
 const FRAME_AUDIO = 1;
 const FRAME_EVENT = 2;
 const RESPAWN_BACKOFF_MS = 5_000;
-/** Audio held for a window that has not asked for it yet: one minute. */
 const MAX_HELD_BYTES = 60 * 32_000;
 
 export type CaptureEvent =
@@ -36,12 +35,6 @@ type Capture = {
 
 type HelperEvent = { event?: unknown; ms?: unknown; message?: unknown };
 
-/**
- * Dictation's microphone on a Mac. The helper process runs with no device open
- * (the system's microphone indicator stays off) so that opening the microphone
- * costs only what the hardware needs. A capture can be opened before the window
- * that wants it is ready; what it hears meanwhile is held for that window.
- */
 export class MicrophoneCapture {
   private child: HelperChild | null = null;
   private buffered: Buffer = Buffer.alloc(0);
@@ -52,7 +45,6 @@ export class MicrophoneCapture {
 
   constructor(private readonly isAllowed: () => boolean) {}
 
-  /** Starts the helper, without opening the microphone. */
   prepare(): boolean {
     return this.isAllowed() && this.ensureChild() !== null;
   }
@@ -93,7 +85,6 @@ export class MicrophoneCapture {
     return true;
   }
 
-  /** Ends the capture; what was said up to now still arrives before "ended". */
   close(id: string): void {
     const capture = this.current;
     if (!capture || capture.id !== id || capture.closing) return;

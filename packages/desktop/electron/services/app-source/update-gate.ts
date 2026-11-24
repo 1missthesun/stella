@@ -4,41 +4,6 @@ import { pathToFileURL } from "node:url";
 import { DirectoryLinkError, linkDirectory, removeScratchDir } from "./dir-links.js";
 import { git, gitRaw, run } from "./git.js";
 
-/**
- * The check a merged update has to pass before it is applied by itself, and
- * the build that gets a relaunch ready.
- *
- * Both are the build the launcher already runs on every start: Electron main
- * and the sandboxed preload, esbuild bundles over `packages/desktop/electron`,
- * `packages/contracts`, `packages/node-shared` and the runtime's bridge client. That is deliberately the one
- * check worth gating on here — a main or preload that does not build is a
- * Stella that does not start, which is the only outcome a user cannot ask
- * Stella to fix. It costs about a second and needs no install.
- *
- * It runs on a scratch copy of the version, never on the checkout, so an
- * abort leaves nothing half-merged: the checkout is only touched by the final
- * fast-forward, after this returns. The copy is written from git's objects
- * through a private index (`read-tree` and `checkout-index`), which leaves no
- * worktree for git or anyone listing worktrees to see.
- *
- * `node_modules` is linked in rather than installed (a junction on Windows,
- * see `dir-links.ts`; removed link-first, never followed). The root directory
- * holds no workspace packages (bun puts `@stella/*` in each package's own
- * `node_modules`), and the bundle resolves every workspace package main can
- * reach (`@stella/contracts`, `@stella/node-shared`, `@stella/runtime`, …) through
- * esbuild aliases computed from the tree it is building — so the sources
- * under test are the merged ones, while third-party packages come from the
- * checkout. A merge that needs dependencies the checkout does not have yet
- * therefore fails the gate rather than passing it blindly, and the failure
- * goes to an agent. A bundle kept for the relaunch was built against the
- * checkout's packages from before the update's install; the apply only adopts
- * it when the install left them unchanged (`adoptElectronBundles`).
- *
- * What it does not cover: the renderer, which is served from source and
- * type-checked nowhere on this path. A renderer that breaks is recoverable
- * from inside the running app; main and preload are not.
- */
-
 export type GateResult = { ok: true } | { ok: false; output: string };
 
 type Log = (event: string, data: Record<string, unknown>) => void;
@@ -137,10 +102,6 @@ export const linkNodeModules = async (cwd: string, scratch: string) => {
   }
 };
 
-/**
- * What the check says when this computer can't link the app's packages into
- * a scratch copy: the change goes to a task, whose draft installs its own.
- */
 export const linkFailureOutput = (error: DirectoryLinkError) =>
   [
     "The build check couldn't run on this computer, because the app's packages could not be linked into the check's scratch folder:",
@@ -175,14 +136,6 @@ const recordedBundleInputs = async (cwd: string) => {
   }
 };
 
-/**
- * Whether the update changes a file the running main process was built from
- * (the inputs recorded with its bundle). The main bundle carries contracts,
- * node-shared and the runtime's bridge client too, so such a change needs a
- * relaunch onto a rebuilt main, not only a runtime restart or a renderer
- * swap. Other runtime and agent code is not in it, so it only restarts the
- * runtime.
- */
 export const changesMainBundle = async (cwd: string, files: string[]) => {
   const recorded = await recordedBundleInputs(cwd);
   return files.some((file) => recorded.has(file));
@@ -285,14 +238,6 @@ export const checkMergedUpdate = async (
   return result.ok ? { ok: true } : { ok: false, output: result.output };
 };
 
-/**
- * Get main and preload ready in the checkout itself, ahead of a relaunch, so
- * the next process finds them fresh and only has to start. With `prepared`
- * (outputs built from this same tree before it was applied), they are taken
- * as they are; otherwise, or when that fails, it is the same build the next
- * launch would run, from the same tree. A failure is logged and left to that
- * launch. Never throws.
- */
 export const prebuildElectronBundles = async (
   cwd: string,
   runner: string,
@@ -332,13 +277,6 @@ export const prebuildElectronBundles = async (
   }
 };
 
-/**
- * Run the launcher's own setup step (native helpers, the browser, office
- * previews) for the checkout as it now stands, ahead of a relaunch. It notes
- * the commit it prepared, so the launcher's run of it on the way back up
- * returns at once instead of holding the restart. Never throws: the launcher
- * runs it again regardless.
- */
 export const prepareInstallAhead = async (cwd: string, log: Log): Promise<boolean> => {
   const startedAt = Date.now();
   const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
@@ -374,9 +312,7 @@ const lockedPackages = (text: string) => {
       if (at <= 0 || !/^\d/.test(spec.slice(at + 1))) continue;
       found.add(spec);
     }
-  } catch {
-    // An unreadable lockfile warms nothing.
-  }
+  } catch {}
   return found;
 };
 
@@ -434,8 +370,6 @@ export const warmDependencies = async (args: {
       signal,
     });
     let electron: number | null = null;
-    // A Mac launcher runs Stella from its signed Stella.app, so the binary in
-    // node_modules is never installed there and nothing needs its download.
     const ownElectron =
       process.platform !== "darwin" ||
       process.execPath.includes(`${path.sep}node_modules${path.sep}`);

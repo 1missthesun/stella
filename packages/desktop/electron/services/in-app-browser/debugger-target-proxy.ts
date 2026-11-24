@@ -53,14 +53,9 @@ const DRAWABLE_HOST_BOUNDS: Rectangle = {
 };
 const DRAWABLE_HOST_FRAME_PUMP_MS = 16;
 const DEFAULT_DEBUGGER_RECOVERY_TIMEOUT_MS = 1_000;
-// Longest a tab stays in the hidden host under one lease. A command that never
-// settles would otherwise keep the tab there, and out of the panel, for good.
 const HIDDEN_MOUNT_LIMIT_MS = 30_000;
 // A freshly mounted view needs one frame to get its layout viewport.
 const HIDDEN_MOUNT_LAYOUT_MS = 16;
-// Agent commands come in bursts (one locator action is several CDP calls), so
-// the tab stays mounted briefly between them instead of paying a mount and a
-// layout frame on every call.
 const HIDDEN_MOUNT_LINGER_MS = 1_000;
 
 // Chromium hands debugger events and replies to JS from inside its own call
@@ -172,7 +167,6 @@ export class DebuggerTargetProxy {
   ): Promise<unknown> {
     const tabId = tab.id;
     const tabDebugger = tab.view.webContents.debugger;
-    // An offscreen tab always has its viewport and its own frames.
     if (tab.offscreen) {
       return await tabDebugger.sendCommand(method, params, debuggerSessionId);
     }
@@ -451,9 +445,7 @@ export class DebuggerTargetProxy {
     if (contents.isDestroyed() || !contents.debugger.isAttached()) return;
     try {
       await this.guardSession(tab, sessionId);
-    } catch {
-      // A frame that went away while being guarded has nothing left to open.
-    } finally {
+    } catch {} finally {
       if (waitingForDebugger && !contents.isDestroyed()) {
         try {
           await contents.debugger.sendCommand(
@@ -461,9 +453,7 @@ export class DebuggerTargetProxy {
             {},
             sessionId,
           );
-        } catch {
-          // Detached frames don't wait.
-        }
+        } catch {}
       }
     }
   }
@@ -726,9 +716,7 @@ export class DebuggerTargetProxy {
     lease.mountedInHiddenHost = false;
     try {
       host.contentView.removeChildView(tab.view);
-    } catch {
-      // Host teardown can race tab cleanup.
-    }
+    } catch {}
   }
 
   private releaseDrawableHost(tabId: string) {

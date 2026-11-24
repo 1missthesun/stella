@@ -79,9 +79,7 @@ const readError = async (response: Response): Promise<PeerDeviceFileError> => {
     if (typeof parsed?.error?.message === "string" && parsed.error.message.trim()) {
       message = parsed.error.message.trim();
     }
-  } catch {
-    // Keep the generic copy.
-  }
+  } catch {}
   return new PeerDeviceFileError(message, code);
 };
 

@@ -73,9 +73,7 @@ export const run = (
     if (options.background && child.pid) {
       try {
         setPriority(child.pid, constants.priority.PRIORITY_LOW);
-      } catch {
-        // It runs at normal priority.
-      }
+      } catch {}
     }
   });
 

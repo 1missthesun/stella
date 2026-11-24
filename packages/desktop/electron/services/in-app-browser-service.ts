@@ -94,10 +94,6 @@ type InAppBrowserServiceOptions = {
     name: string,
     options: { offscreen?: { deviceScaleFactor: number } },
   ) => Promise<InAppBrowserPreview>;
-  /**
-   * Preload of the panel mirror for offscreen agent tabs. Agent tabs render
-   * offscreen on Linux when it is set (see in-app-browser/offscreen-tabs.ts).
-   */
   offscreenMirrorPreloadPath?: string;
   offscreenAgentTabs?: boolean;
 };
@@ -261,7 +257,6 @@ export class InAppBrowserService {
         : null;
   }
 
-  /** Agent tabs render offscreen where a hidden tab can't get frames. */
   private rendersOffscreen(ownerId: string) {
     return this.offscreenTabs !== null && ownerId !== MANUAL_OWNER_ID;
   }
@@ -317,9 +312,7 @@ export class InAppBrowserService {
       let connected = false;
       try {
         connected = await this.options.getExtensionStatus();
-      } catch {
-        // Daemon startup races the first status probe; poll below.
-      }
+      } catch {}
       if (connected) {
         this.updateConnection("connected");
         return this.snapshot();
@@ -355,9 +348,7 @@ export class InAppBrowserService {
     await this.connectPromise?.catch(() => undefined);
     try {
       await this.options.reconnectExtension?.();
-    } catch {
-      // The attempts below report whatever state the bridge is left in.
-    }
+    } catch {}
     await this.ensureConnectionOnDemand();
     return this.snapshot();
   }
@@ -416,16 +407,6 @@ export class InAppBrowserService {
     }
   }
 
-  /**
-   * Bring the bridge up for a caller that needs it right now, repairing a cold
-   * or dead transport rather than reporting it.
-   *
-   * One poll window is not a terminal answer (an asleep MV3 service worker or
-   * a daemon mid-respawn can miss it), and `connect()`'s dedupe would hand the
-   * caller whatever attempt happened to be in flight. So the caller waits out
-   * any in-flight attempt, then drives its own attempts with backoff until the
-   * budget runs out.
-   */
   private async ensureConnectionOnDemand(): Promise<boolean> {
     if (this.disposed) return false;
     const pending = this.connectPromise;
@@ -545,9 +526,7 @@ export class InAppBrowserService {
       });
     try {
       view.webContents.setUserAgent(this.browserUserAgent);
-    } catch {
-      // Injected/mock views in tests may not implement setUserAgent.
-    }
+    } catch {}
     const tab = this.addTab({
       id,
       view,
@@ -846,11 +825,6 @@ export class InAppBrowserService {
     return command.finally(resumePainting);
   }
 
-  /**
-   * File choosers in agent tabs are intercepted (see debugger-target-proxy).
-   * When the user, not the agent, opens one in the tab the panel shows, a
-   * picker parented to the visible Stella window fills it in.
-   */
   private openFileChooserForUser({ tab, sessionId, params }: FileChooserOpened) {
     const window = this.attachedWindow;
     const backendNodeId = params.backendNodeId;
@@ -981,12 +955,6 @@ export class InAppBrowserService {
         this.options.runtimeUserAgent ?? this.browserSession.getUserAgent?.();
       this.browserUserAgent = buildInAppBrowserUserAgent(runtimeUserAgent);
       this.browserSession.setUserAgent(this.browserUserAgent);
-      // Permission policy: deny by default, but allow the WebAuthn / security-key
-      // access that reauth needs and ONLY on trusted auth origins. Sensitive,
-      // auth-irrelevant permissions (camera, microphone, geolocation,
-      // notifications) stay denied everywhere. The request handler's permission
-      // union excludes hid/usb/serial, so it stays effectively deny-all; the
-      // check + device handlers are where security-key access is granted.
       this.browserSession.setPermissionRequestHandler(
         (webContents, permission, callback) => {
           const origin = webContents?.getURL?.() ?? "";
@@ -1017,10 +985,7 @@ export class InAppBrowserService {
     do {
       try {
         if (await this.options.getExtensionStatus()) return true;
-      } catch {
-        // Native-host registration and daemon startup can race any individual
-        // probe. A failed attempt is not a terminal connection result.
-      }
+      } catch {}
       const bridgeFailure = this.options.getBrowserBridgeStatus?.()?.reason;
       if (
         bridgeFailure === "bridge_missing" ||
@@ -1373,9 +1338,6 @@ export class InAppBrowserService {
       return;
     }
     if (this.debuggerProxy.isMountedInHiddenHost(tab.id)) {
-      // The panel is showing this tab, so it comes back now rather than when
-      // an agent's lease ends. A lease that never ended used to leave the tab
-      // blank in the panel for good.
       this.debuggerProxy.takeBackForPanel(tab);
     }
     if (!tab.offscreen) this.offscreenTabs?.unbindMirror();
@@ -1407,9 +1369,7 @@ export class InAppBrowserService {
       window.contentView.addChildView(this.visibilityNudge);
       this.visibilityNudge.setBounds({ x: 0, y: 0, width: 1, height: 1 });
       window.contentView.removeChildView(this.visibilityNudge);
-    } catch {
-      // A window torn down mid-attach has nothing to recompute.
-    }
+    } catch {}
   }
 
   private detachAttachedView(options: { keepMirror?: boolean } = {}) {
@@ -1421,9 +1381,7 @@ export class InAppBrowserService {
     if (!view || !window || window.isDestroyed()) return;
     try {
       window.contentView.removeChildView(view);
-    } catch {
-      // Window teardown may have already detached its child views.
-    }
+    } catch {}
     const tab = this.tabs.findByView(view);
     if (tab) this.debuggerProxy.remountLeased(tab);
   }

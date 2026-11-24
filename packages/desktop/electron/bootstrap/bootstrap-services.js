@@ -145,14 +145,14 @@ export const createBootstrapServices = (options) => {
         getRunner: () => lifecycle.getRunner(),
         getInAppBrowserService: () => state.inAppBrowserService,
         getBackendUrl: () => authService.getBackendUrl(),
-        getAuthToken: () => authService.getAuthToken(),
+        getAuthToken: (request) => authService.getBackendToken(request),
         notificationContext: { state },
         log: (event, data) => getMainLogger()?.process(event, data),
     });
     void startupAppPainted.then(() => userAskService.startMirror());
     const engineAccountAccess = new EngineAccountAccess({
         getBackendUrl: () => authService.getBackendUrl(),
-        getAuthToken: () => authService.getAuthToken(),
+        getAuthToken: (request) => authService.getBackendToken(request),
     });
     const claudeCliUpdater = new CliUpdater(config.stellaDataDirPath, CLAUDE_CLI_UPDATER);
     const antigravityCliUpdater = new CliUpdater(config.stellaDataDirPath, ANTIGRAVITY_CLI_UPDATER);

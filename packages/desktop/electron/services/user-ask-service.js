@@ -343,7 +343,7 @@ export class UserAskService {
             getDataDir: () => this.options.getStellaAppDir() ?? null,
             getDeviceId: () => this.options.getDeviceId() ?? null,
             getBackendUrl: () => this.options.getBackendUrl?.() ?? null,
-            getAuthToken: async () => (await this.options.getAuthToken?.()) ?? null,
+            getAuthToken: async (request) => (await this.options.getAuthToken?.(request)) ?? null,
             log: (event, detail) => this.options.log?.(event, detail),
             onSyncedChange: () => {
                 this.fingerprintCache = null;
@@ -1855,7 +1855,7 @@ export class UserAskService {
             baseUrl,
             lease: leaseBackendClient({
                 baseUrl,
-                getToken: async () => (await this.options.getAuthToken?.()) ?? null,
+                getToken: async (request) => (await this.options.getAuthToken?.(request)) ?? null,
             }),
         };
         return this.backend.lease.client;

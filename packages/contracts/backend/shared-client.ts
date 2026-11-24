@@ -1,5 +1,6 @@
 import {
   BackendClient,
+  backendTokenSubject,
   type BackendClientOptions,
   type TokenProvider,
 } from "./client.js";
@@ -19,24 +20,6 @@ type Entry = {
 const entries = new Map<string, Entry>();
 
 const keyOf = (baseUrl: string): string => baseUrl.trim().replace(/\/+$/, "");
-
-export const backendTokenSubject = (
-  token: string | null | undefined,
-): string | null => {
-  const segment = token?.split(".")[1];
-  if (!segment) return null;
-  const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - (normalized.length % 4)) % 4),
-    "=",
-  );
-  try {
-    const json = JSON.parse(atob(padded)) as { sub?: unknown };
-    return typeof json.sub === "string" ? json.sub : null;
-  } catch {
-    return null;
-  }
-};
 
 const entryFor = (
   key: string,
@@ -86,7 +69,7 @@ export const leaseBackendClient = (
       const subject = backendTokenSubject(next);
       if (subject === entry.subject) return;
       entry.subject = subject;
-      entry.client.reconnect();
+      entry.client.noteSubject(subject);
     },
     release() {
       if (released) return;

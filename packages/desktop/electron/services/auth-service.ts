@@ -1534,6 +1534,11 @@ export class AuthService {
     return allowStale || !this.isHostAuthTokenExpired(last) ? last : null;
   }
 
+  async getBackendToken(request?: { force?: boolean }): Promise<string | null> {
+    if (!request?.force) return await this.getAuthToken();
+    return (await this.refreshRuntimeAuth()).token;
+  }
+
   async whenRuntimeAuthenticated(): Promise<boolean> {
     await this.awaitPendingResync();
     return Boolean(await this.getAuthToken());

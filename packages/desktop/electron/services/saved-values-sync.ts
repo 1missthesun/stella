@@ -12,6 +12,7 @@ import {
 } from "node:crypto";
 import path from "node:path";
 import { hostname } from "node:os";
+import type { TokenProvider } from "@stella/contracts/backend/client";
 import { leaseBackendClient, type BackendClientLease } from "@stella/contracts/backend/shared-client";
 import type { SavedValuesState } from "@stella/contracts/backend/saved-values";
 import {
@@ -91,7 +92,7 @@ export type SavedValuesSyncOptions = {
   getDataDir: () => string | null;
   getDeviceId: () => string | null | undefined;
   getBackendUrl: () => string | null | undefined;
-  getAuthToken: () => Promise<string | null | undefined>;
+  getAuthToken: TokenProvider;
   log?: (event: string, detail?: Record<string, unknown>) => void;
   onSyncedChange?: () => void;
   onStatus?: (status: SavedValuesSyncStatus) => void;
@@ -312,7 +313,7 @@ export class SavedValuesSync {
       this.lease?.value.release();
       this.lease = {
         baseUrl,
-        value: leaseBackendClient({ baseUrl, getToken: async () => (await this.options.getAuthToken()) ?? null }),
+        value: leaseBackendClient({ baseUrl, getToken: (request) => this.options.getAuthToken(request) }),
       };
     }
     return this.lease.value.client;

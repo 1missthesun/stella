@@ -1,4 +1,9 @@
 import type {
+  BackendLiveEvent,
+  BackendLiveUnwatchRequest,
+  BackendLiveWatchRequest,
+} from "./backend-live.js";
+import type {
   ChatContext,
   ChatContextUpdate,
   LocalCronJobRecord,
@@ -237,6 +242,11 @@ import {
   IPC_COMPANION_STATE,
   IPC_COMPANION_TOGGLE_EXPANDED,
   IPC_COMPANION_VISIBLE_CHANGED,
+  IPC_BACKEND_LIVE_ACCOUNT,
+  IPC_BACKEND_LIVE_EVENT,
+  IPC_BACKEND_LIVE_NUDGE,
+  IPC_BACKEND_LIVE_UNWATCH,
+  IPC_BACKEND_LIVE_WATCH,
   IPC_CONNECTOR_CONNECT_REQUEST,
   IPC_CONNECTOR_CONNECT_RESPOND,
   IPC_CONNECTOR_CONNECT_UPDATE,
@@ -1084,6 +1094,8 @@ export type IpcInvokeContract = {
   >;
 
   [IPC_COMPANION_GET_STATE]: Invoke<[], CompanionState | null>;
+  [IPC_BACKEND_LIVE_WATCH]: Invoke<[request: BackendLiveWatchRequest], boolean>;
+
   [IPC_COMPANION_GET_VISIBLE]: Invoke<[], CompanionVisibility>;
   [IPC_COMPANION_SET_VISIBLE]: Invoke<[visible: boolean], CompanionVisibility>;
 
@@ -1632,6 +1644,9 @@ export type IpcSyncContract = {
 };
 
 export type IpcSendContract = {
+  [IPC_BACKEND_LIVE_UNWATCH]: [request: BackendLiveUnwatchRequest];
+  [IPC_BACKEND_LIVE_ACCOUNT]: [subject: string | null];
+  [IPC_BACKEND_LIVE_NUDGE]: [];
   [IPC_UI_STATE_KV_APPLY]: [changes: Record<string, string | null>];
   [IPC_UI_STATE_KV_CLEAR]: [];
   [IPC_DISPLAY_SET_SELECTED_DEVICE]: [deviceId: string | null];
@@ -1721,6 +1736,7 @@ export type IpcSendContract = {
 };
 
 export type IpcEventContract = {
+  [IPC_BACKEND_LIVE_EVENT]: BackendLiveEvent;
   [IPC_MEMORY_SYNC_STATUS]: MemorySyncStatus;
   [IPC_DISPLAY_UPDATE]: unknown;
   [IPC_DISPLAY_OPEN_SHARE_LINK]: { url: string };

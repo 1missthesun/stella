@@ -37,7 +37,6 @@ const QUERY_TABLES_CACHE_MAX = 4_096;
 const JOB_DEFAULT_MAX_ATTEMPTS = 20;
 const CONTRACTING_STATEMENT = /\bDROP\s+(?:TABLE|COLUMN)\b|\bRENAME\b/i;
 const JOB_MAX_BACKOFF_MS = 60 * 60_000;
-/** A failed job's first retry; well above the alarm floor so retries never stack into a burst. */
 const JOB_RETRY_BASE_MS = 5_000;
 
 const PLATFORM_DDL = [
@@ -90,7 +89,6 @@ const markLiveClosed = (socket: WebSocket, attachment: LiveAttachment): void => 
   try {
     socket.serializeAttachment({ ...attachment, closed: true } satisfies LiveAttachment);
   } catch {
-    // Already gone.
   }
 };
 
@@ -486,13 +484,7 @@ export class OwnerStore {
       .some((row) => open.has(row.conn_id));
   }
 
-  /**
-   * Open live sockets. A socket this side closed stays in `getWebSockets()`
-   * until its peer answers the close, and a peer that is gone (a laptop
-   * asleep, a phone in the background) never does. Counting those kept a
-   * past-due token deadline in `nextDeadline`, which re-armed the alarm every
-   * second and kept the object awake around the clock.
-   */
+  /** `getWebSockets()` keeps a socket this side closed until its peer answers the close, which a vanished peer never does. */
   liveSockets(): WebSocket[] {
     let sockets: WebSocket[];
     try {
@@ -673,7 +665,6 @@ export class OwnerStore {
     try {
       socket.close(1000, "");
     } catch {
-      // Already closed.
     }
   }
 
@@ -814,7 +805,6 @@ export class OwnerStore {
     try {
       socket.send(JSON.stringify(frame));
     } catch {
-      // The close handler cleans up.
     }
   }
 
@@ -834,7 +824,6 @@ export class OwnerStore {
     try {
       socket.close(code, reason);
     } catch {
-      // Already closed.
     }
   }
 
@@ -882,11 +871,6 @@ export class OwnerStore {
     await this.runDueJobs(now);
   }
 
-  /**
-   * Runs every job due at `now`, in batches, so one alarm clears a backlog
-   * rather than a batch per wake. A job that reschedules itself into the past
-   * runs once per call; the next alarm picks it up.
-   */
   async runDueJobs(now = Date.now()): Promise<number> {
     this.ensureSchema();
     const ran = new Set<string>();
@@ -908,13 +892,6 @@ export class OwnerStore {
     return ran.size;
   }
 
-  /**
-   * Jobs running in this isolate. An alarm and a request (`closeOwner`, any
-   * call that drains jobs) can both reach `runDueJobs` while the other awaits,
-   * and both would pick the same due row: two account purges sent the same
-   * conversation two `/purge` calls, the second dying on tables the first had
-   * just dropped. A job already running is left to that run.
-   */
   private readonly runningJobs = new Set<string>();
 
   private async runJobs(due: JobRow[], now: number): Promise<void> {

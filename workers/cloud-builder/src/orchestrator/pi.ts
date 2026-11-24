@@ -145,7 +145,6 @@ import { crewScopeForConversation } from "../slack/scope.js";
 import { OrchestratorCloudAgents } from "./cloud-agents.js";
 import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
 
-/** A schedule list slower than this counts as not listed. */
 const WAKE_SCHEDULE_LIST_MS = 15_000;
 
 export abstract class OrchestratorPi extends OrchestratorCloudAgents {
@@ -347,8 +346,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 }),
               ),
             ).catch(async (error: unknown) => {
-              // Not listed is not "none": the wait stands, and the task is
-              // checked again once its schedules can be listed.
               log("info", "pi_wake_schedules_unlisted", { threadId, message: errorMessage(error) });
               await this.noteWakeRecheck(threadId).catch(() => undefined);
               return undefined;
@@ -789,8 +786,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ...(outcome === "completed" && event.ended.waitingFor
           ? { resultJson: waitingResultJson((text ?? "").slice(0, 30_000), event.ended.waitingFor) }
           : outcome === "completed" && text
-            ? // Every completed end of a cloud pi task is a finished report (explicit messaging).
-              { resultJson: doneResultJson(text.slice(0, 30_000)) }
+            ? { resultJson: doneResultJson(text.slice(0, 30_000)) }
             : {}),
         ...(outcome === "failed"
           ? { errorMessage: (text || "The agent failed.").slice(0, 2_000) }
@@ -1287,10 +1283,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     });
   }
 
-  /**
-   * Tasks that waited while their schedules could not be listed are checked
-   * again: with nothing live once everything can be listed, each is told so.
-   */
   protected async recheckUnlistedWaits(): Promise<void> {
     const pending = await this.ctx.storage.get<Record<string, number>>(PI_WAKE_RECHECK_KEY);
     if (!pending || Object.keys(pending).length === 0) return;
@@ -1872,23 +1864,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     }));
   }
 
-  /**
-   * Settle what the journal of a conversation pi never ran in still shows
-   * as running and has in fact ended: there its cards are what lists them.
-   *
-   * Whoever owns an agent's record writes the card that ends it: its report,
-   * the owner's agent threads for a computer's agents. But the owner's post
-   * is best effort, and an agent that ended before those cards existed has
-   * none, so it read as running for good (the phantom "N agents running" a
-   * phone showed). When a client connects, each agent the journal lists as
-   * running is checked against the owner's agent threads (a computer's
-   * agents, cloud agents, agents on a device). One that ended is settled
-   * with how it ended; one still running there is left alone, and a computer
-   * settles its own on its next start (`computer-agent-reconcile`).
-   *
-   * The first pass in a conversation also settles what no owner knows at all:
-   * an agent its journal has carried since before any owner recorded agents.
-   */
   protected async reconcileRunningAgents(): Promise<void> {
     if (this.purged()) return;
     const running = this.journal.runningAgents();
@@ -1991,7 +1966,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     history?: import("../cloud-code-tool.js").CloudHistoryClient,
     delivery?: import("../pi-runtime.js").PiAgentFileDelivery,
   ): Promise<CloudCodeSourceAgentTool[]> {
-    // A Stella Crew agent works in its Slack workspace's own drive space.
     const crewScope = await crewScopeForConversation(this.env, authority.conversationId);
     const ownerInternal = async (name: string, args: unknown) =>
       unwrapRpc(

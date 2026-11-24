@@ -230,15 +230,6 @@ const OUTPUT_FILE_CARD_MAX = 20;
 const DISPATCH_MAX_ATTEMPTS = 3;
 const DISPATCH_RETRY_MS = 15_000;
 const DEVICE_AVAILABILITY_RETRY_MS = 10_000;
-/**
- * How long work for a computer that is away waits for it: an attempt that
- * has not started yet, or a held message. A computer off overnight or for a
- * weekend is ordinary, so this is only the ceiling for one that never comes
- * back; past it the attempt fails saying so. (An attempt already running
- * there waits however long it takes: the owner gate keeps it.) Its computer
- * coming back wakes the waiting work at once (`agentThreads.deviceReady`);
- * the backed-off rechecks only cover a missed signal.
- */
 const DEVICE_AVAILABILITY_WAIT_MS = 7 * 24 * 60 * 60_000;
 const DEVICE_AVAILABILITY_RECHECK_MAX_MS = 10 * 60_000;
 const deviceWaitDelay = (retries: number): number =>
@@ -258,7 +249,6 @@ const COMMAND_WAIT_MS: Record<AgentControlCommand["kind"], number> = {
   stop: DEVICE_AVAILABILITY_WAIT_MS,
 };
 const COMMAND_TTL_MS = 8 * 24 * 60 * 60_000;
-/** `paused` is a stopped attempt from builds before `stop_agent`, which the migration renames. */
 const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled"]);
 type TerminalStatus = "completed" | "failed" | "canceled";
 
@@ -419,15 +409,6 @@ const sha256Hex = async (text: string): Promise<string> =>
 
 const CARD_REPORT_MAX_CHARS = 2_000;
 
-/**
- * The lifecycle card of one attempt of an agent the conversation's own turns
- * do not report: a computer's agent (`computerThreads.*`), or a cloud agent a
- * desktop started, whose report goes to that desktop rather than waking the
- * conversation. The conversation's running-agent list (what a phone's top bar
- * counts) is folded from its journal, so without these an agent that ended
- * without a wake prompt (stopped, or canceled when Stella quit) read as running
- * for good.
- */
 const agentLifecycleCard = (
   row: ThreadRow,
   outcome: { kind: "started" } | { kind: TerminalStatus; text?: string | null } | { kind: "waiting"; waitingFor: string },
@@ -740,12 +721,6 @@ const waitForAvailableDevice = (
 const deviceWaitExpiredMessage = (message: string): string =>
   `${message} It did not come back within ${Math.round(DEVICE_AVAILABILITY_WAIT_MS / (24 * 60 * 60_000))} days, so this agent never started. send_message to it to try again (it waits for that computer again), or carry it on elsewhere with send_message's destination.`;
 
-/**
- * Where a recheck of an attempt waiting for its computer stands: `away`
- * skips the placement while the computer is known to be offline; `gone` is a
- * computer no longer on the account, which will never take it. (Online but
- * not ready, or asking for consent, still goes to the gate, which asks again.)
- */
 const waitingDeviceStanding = async (ctx: OwnerContext, deviceId: string): Promise<"away" | "gone" | "check"> => {
   const devices = await ctx.host.deviceDestinations().catch(() => undefined);
   if (!devices) return "check";
@@ -754,10 +729,6 @@ const waitingDeviceStanding = async (ctx: OwnerContext, deviceId: string): Promi
   return device.online ? "check" : "away";
 };
 
-/**
- * A computer is back and ready: attempts waiting for it start now instead of
- * at their next recheck, and messages held for it are offered again.
- */
 const deviceReady = (ctx: OwnerContext, raw: unknown): { woke: number; scheduled: number } => {
   const { deviceId } = object({ deviceId: id(256) })(raw);
   let woke = 0;
@@ -1640,14 +1611,8 @@ const moveReplay = (ctx: OwnerContext, args: MoveArgs): MoveResult | null => {
   };
 };
 
-/** A task on Claude Code (spawned with a `claude-code/…` model): it can't run where Claude Code isn't signed in. */
 const runsOnClaudeCode = (thread: ThreadRow): boolean => /^claude-code(?:\/|$)/u.test(thread.requested_model?.trim() ?? "");
 
-/**
- * A Claude Code task's computer is online but reports its Claude sign-in gone
- * (computers that report their sign-ins at all): the task waits there for
- * someone to sign in again.
- */
 const claudeSignInGone = (device: DeviceDestination | undefined, thread: ThreadRow): boolean =>
   device?.online === true &&
   runsOnClaudeCode(thread) &&
@@ -1662,7 +1627,6 @@ const unavailableBecause = (
   if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) return "declined";
   if (device.availability && !device.availability.ready) return "not_ready";
   if (thread.hold_reason !== null) return "usage_limit";
-  // Its run waits there for a Claude sign-in (the computer can't take Claude work).
   if (claudeSignInGone(device, thread)) return "not_ready";
   return null;
 };
@@ -1750,9 +1714,6 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
     thread.thread_id,
     thread.attempt_generation,
   );
-  // A turn still waiting to start on that computer (a schedule's fire or a
-  // message that arrived while it was off) never reached it: its input goes
-  // with the move instead of being canceled with the turn.
   const unstarted = running
     ? ctx.db.one<{ prompt: string; attachments: string | null }>(
         "SELECT prompt, attachments FROM agent_dispatch_prompts WHERE turn_id = ?",
@@ -1799,8 +1760,6 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
     detail: { via: "agentThreads.move", requester: args.requesterThreadId ?? args.conversationId, outside: receipt },
   });
   supersedeHeldStops(ctx, thread.thread_id, args.moveId);
-  // Inputs held for the computer it left (a schedule's fire, a message) go
-  // where it runs now, instead of waiting out their retries for the old one.
   let rerouted = 0;
   for (const pending of ctx.db.all<{ command_id: string }>(
     "SELECT command_id FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume') ORDER BY created_at ASC",
@@ -2054,8 +2013,6 @@ const conversationOfThread = (ctx: OwnerContext, threadId: string): string | nul
 const crossesSlackBoundary = (ctx: OwnerContext, from: string, to: string): boolean => {
   const fromConversation = conversationOfThread(ctx, from) ?? from;
   const toConversation = conversationOfThread(ctx, to) ?? to;
-  // A Stella Crew conversation reaches only its own agents; nothing else
-  // reaches it.
   if (isSlackConversationId(fromConversation) || isSlackConversationId(toConversation)) {
     return fromConversation !== toConversation;
   }
@@ -2095,7 +2052,6 @@ const RESUME_TEXT = "Continue where you left off.";
 const senderThread = (ctx: OwnerContext, from: Pick<AgentMessageSender, "threadId">): ThreadRow | null =>
   readThread(ctx.db, isPlacementThreadId(from.threadId) ? (placementAliasThreadId(ctx.db, from.threadId) ?? from.threadId) : from.threadId);
 
-/** Whether `to` (already resolved) is whoever started the task: its lead, or for a top-level task the chat it belongs to. */
 const isStarterOf = (thread: ThreadRow, to: string): boolean =>
   thread.parent_thread_id
     ? to === thread.parent_thread_id
@@ -2110,12 +2066,6 @@ type TaskMessageArgs = {
   done?: boolean | undefined;
 };
 
-/**
- * A cloud task's send_message, from its turn broker: the sender is the
- * turn's thread. A message is routed like any agent message; `done` only
- * checks that the finished report is for whoever started the task and that
- * none of its helpers still works, since the report is filed as the turn ends.
- */
 const taskMessage = async (ctx: OwnerContext, args: TaskMessageArgs): Promise<AgentTaskMessageResult> => {
   const sender = readThread(ctx.db, args.threadId);
   if (!sender || (sender.owner_generation !== null && sender.owner_generation !== args.ownerGeneration)) {
@@ -2206,8 +2156,6 @@ const deliverAgentMessage = async (
       { reason: "message_target_not_found" },
     );
   }
-  // A task's message to the lead that started it goes the way its reports
-  // do: through the outbox, retried, and held for a computer that is off.
   if (args.kind === "message" && senderThread(ctx, args.from)?.parent_thread_id === thread.thread_id) {
     queueAgentNote(ctx, {
       noteId: `msg:${(await sha256Hex(args.commandId)).slice(0, 48)}`,
@@ -2234,17 +2182,11 @@ const deliverAgentMessage = async (
   ).result;
 };
 
-/** The ledger's id for an agent thread a schedule may target, or null when it has none. */
 export const scheduleTargetThread = (db: OwnerDbReader, threadId: string): ThreadRow | null => {
   const id = isPlacementThreadId(threadId) ? (placementAliasThreadId(db, threadId) ?? threadId) : threadId;
   return readThread(db, id);
 };
 
-/**
- * A schedule's fire, as a message to an existing agent thread: it routes like
- * send_message (steers, resumes, or is held for an offline computer), and the
- * agent's report goes where its reports always go.
- */
 export const deliverScheduledMessage = async (
   ctx: OwnerContext,
   args: { scheduleId: string; name: string; fireId: string; ownerGeneration: string; threadId: string; text: string },
@@ -2292,19 +2234,9 @@ type ControlInput = {
   source: string;
   detail?: Record<string, unknown>;
   next?: NextAttempt;
-  /** Refuse a message to a thread whose computer is offline instead of holding it for that computer. */
   refuseOffline?: true;
 };
 
-/**
- * Why a command waits in the outbox instead of landing now: its computer is
- * offline (`unreachable`), didn't answer (`timeout`), or the agent is running
- * but between runs (`between_runs`: starting up, reconnecting or just
- * finishing, or its attempt waiting to start on a computer that is online),
- * so no run takes a steer at this moment. Each is retried (`commandRetryDelay`)
- * until it lands, starts the agent's next run, or expires; its computer
- * coming back offers it again at once.
- */
 type CommandHold = "unreachable" | "timeout" | "between_runs" | "stopped";
 
 type Routed =
@@ -2494,7 +2426,6 @@ const holdCommand = (
   deviceId: string | null,
   reason: CommandHold,
 ): void => {
-  // Held for a stopped agent: no retry; resuming the agent sends it on.
   if (reason !== "stopped") {
     ctx.jobs.schedule(
       COMMAND_JOB,
@@ -2538,19 +2469,11 @@ const supersedeHeldStops = (ctx: OwnerContext, threadId: string, commandId: stri
   }
 };
 
-/** Marks a message or resume that was on its way to an agent when it was stopped: it waits until the agent is resumed. */
 const STOP_HELD = HELD_WHILE_STOPPED;
 
 const stoppedByStop = (thread: Pick<ThreadRow, "status" | "error_message">): boolean =>
   agentStanding(recordedAgentFacts({ status: thread.status, errorMessage: thread.error_message })).state === "stopped";
 
-/**
- * Who sent an input, for the shared rules: a report, a note or a schedule's
- * fire is no one's on purpose; a message is its sender's, and counts as the
- * starter's when it comes from the task's lead (or Stella's chat, for a task
- * she started). One with no sender on record (an older path) keeps going
- * through as before.
- */
 const inputSender = (input: ControlInput): AgentInputSender => {
   if (input.source === "owner:report-outbox" || input.source.startsWith("schedule:")) return "other";
   const from = typeof input.detail?.from === "string" ? input.detail.from : undefined;
@@ -2564,10 +2487,6 @@ const inputSender = (input: ControlInput): AgentInputSender => {
   return agentInputSender({ id: input.commandId, byStarter });
 };
 
-/**
- * A stop holds whatever was on its way to the agent (messages queued for its
- * next step or for its computer), so none of it starts the agent again.
- */
 const holdInputsForStop = (ctx: OwnerContext, threadId: string, stopCommandId: string): number => {
   const pending = ctx.db.all<{ command_id: string }>(
     `SELECT command_id FROM agent_commands
@@ -2594,7 +2513,6 @@ const holdInputsForStop = (ctx: OwnerContext, threadId: string, stopCommandId: s
   return pending.length;
 };
 
-/** The agent was resumed on purpose: what waited for that goes to it now, oldest first. */
 const releaseInputsAfterStop = (ctx: OwnerContext, threadId: string, resumedBy: string): void => {
   const waiting = ctx.db.all<{ command_id: string }>(
     `SELECT command_id FROM agent_commands
@@ -2640,7 +2558,6 @@ const routeCommand = async (
   return routed;
 };
 
-/** Hands a message to the computer that runs the task (one started there, or a turn it runs there by itself). */
 const messageOnComputer = async (ctx: OwnerContext, input: ControlInput, deviceId: string): Promise<Routed> => {
   const { thread } = input;
   const sent = await ctx.host.messageLocalAgent({
@@ -2649,8 +2566,6 @@ const messageOnComputer = async (ctx: OwnerContext, input: ControlInput, deviceI
     ownerGeneration: input.ownerGeneration,
     messageId: input.commandId,
     text: input.text,
-    // The computer applies the same rule to its own copy of the task, which
-    // may know of a stop the cloud hasn't heard of yet.
     ...(input.kind === "message" ? { sender: inputSender(input) } : {}),
   });
   switch (sent.outcome) {
@@ -2714,15 +2629,11 @@ const routeInput = async (
     }
     case "dispatch": {
       if (deviceId && hostedAttemptRunning(ctx.db, thread)) {
-        // Its computer runs a turn of it by itself: the message goes to that
-        // computer, which steers it in as for a task started there.
         return await messageOnComputer(ctx, input, deviceId);
       }
       if (ACTIVE_STATUSES.has(thread.status)) {
         const turn = runningTurn(ctx.db, thread);
         if (turn && attemptWaitingToStart(ctx.db, turn.turn_id)) {
-          // Its attempt waits for its computer (or is about to start): the
-          // message is held and steered in once that attempt runs.
           return { hold: deviceId && (await deviceStanding(ctx, deviceId)).online ? "between_runs" : "unreachable" };
         }
         const steered = turn?.dispatch_id
@@ -2739,9 +2650,6 @@ const routeInput = async (
           return { outcome: "steered" };
         }
         if (steered.reason === "unreachable" || steered.reason === "timeout") return { hold: steered.reason };
-        // Running, but no run takes a steer right now (its dispatch is being
-        // reconciled after a reconnect, or the run is starting or finishing).
-        // Hold it: a retry steers the next run, or starts one once this attempt ends.
         return { hold: "between_runs" };
       }
       const destination = await assertDeviceDestination(ctx, executor.deviceId);
@@ -2797,7 +2705,6 @@ const nextAttempt = (ctx: OwnerContext, input: ControlInput): void => {
   });
 };
 
-/** Tells the computer a stopped task lives on (one it started on or was placed on), so it ends there too. */
 const tellComputerOfStop = async (
   ctx: OwnerContext,
   input: ControlInput,
@@ -2823,19 +2730,11 @@ const routeStop = async (
     return { outcome: "stopped" };
   }
   if (endedWaiting(thread)) {
-    // Its turn ended waiting (end_turn_waiting): nothing runs, but it still
-    // holds its task, so the stop is what ends it. Its computer hears too
-    // (where it was started there or placed there), so the task shows as
-    // stopped there, its leftover processes end, and what it waits on there
-    // (background commands, wake-ups) no longer starts it.
-    // An offline computer hears once it is back: the stop stays held and is
-    // offered again, while the cloud already counts the task as stopped.
     const told = await tellComputerOfStop(ctx, input, executor, deviceId);
     await markEndedWaitingStopped(ctx, thread, input.source, input.commandId);
     return told === "stopped" ? { outcome: "stopped" } : { hold: told };
   }
   if (stoppedByStop(thread) && (readCommand(ctx.db, input.commandId)?.attempts ?? 0) > 0) {
-    // This stop already ended it here while its computer was away: tell the computer now.
     const told = await tellComputerOfStop(ctx, input, executor, deviceId);
     return told === "stopped" ? { outcome: "stopped" } : { hold: told };
   }
@@ -2867,8 +2766,6 @@ const routeStop = async (
       return { outcome: "not_running", note: "Its conversation's Stella reports it is not running now, so it is recorded as stopped." };
     }
     case "dispatch": {
-      // A turn its computer started by itself has no run of the cloud's to
-      // cancel: the computer is told, as for a task started there.
       const hosted = hostedAttemptRunning(ctx.db, thread);
       await stopDeviceAttempt(ctx, thread, input.commandId, input.source);
       if (!hosted) return { outcome: "stopped" };
@@ -2927,8 +2824,6 @@ const commandResult = async (
     outcome = "held";
     note = `${threadId} is stopped, so this waits and reaches it when someone resumes it with send_message. It does not start it again.`;
   } else if ("hold" in routed && routed.hold === "between_runs") {
-    // Not "held": that reads as offline to the sender. The agent is running and
-    // takes the message at its next step, as a steer would.
     outcome = "queued";
     note = `It is between runs ${where} (starting up, reconnecting or just finishing), so the message waits and reaches it at its next step, or starts its next run if this one ended. No need to send it again.`;
   } else if ("hold" in routed) {
@@ -3007,25 +2902,14 @@ const recordMessageLanded = (
   );
 };
 
-/**
- * When a held command is offered again. Its computer coming back flushes it
- * at once (`flushDeviceCommands`), so a long absence backs off to a slow
- * recheck; one waiting for its attempt to start there rechecks within a minute.
- */
 const commandRetryDelay = (hold: Exclude<CommandHold, "stopped">, attempts: number): number =>
   hold === "unreachable"
     ? Math.max(COMMAND_RETRY_MS, deviceWaitDelay(attempts))
     : Math.min(60_000, Math.max(COMMAND_RETRY_MS, deviceWaitDelay(attempts)));
 
-/** An attempt not yet running on its computer: its start (or its wait for that computer) is still queued. */
 const attemptWaitingToStart = (db: OwnerDbReader, turnId: string): boolean =>
   db.one<{ id: string }>("SELECT id FROM owner_jobs WHERE id = ?", `dispatch:${turnId}`) !== null;
 
-/**
- * A schedule's fire for an agent that is still waiting on an earlier fire of
- * the same schedule (held for its computer, or its run waiting to start
- * there) is covered by that one: missed fires catch up once, not once each.
- */
 const coveredScheduleFire = async (
   ctx: OwnerContext,
   input: ControlInput,
@@ -3148,8 +3032,6 @@ const dropCommand = (ctx: OwnerContext, row: CommandRow, reason: string): void =
     reason,
     attempts: row.attempts,
   });
-  // A finished turn's report waited for this input to start the next turn;
-  // no turn comes of it, so the report goes out now.
   deriveAgentReport(ctx.db, row.thread_id, ctx.now);
 };
 
@@ -3293,10 +3175,6 @@ const stopCloudAttempt = async (
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
 };
 
-/**
- * Ends a cloud attempt whose executor no longer has it (its finish was lost),
- * so nothing will report it: the owner row is the only place it can end.
- */
 const settleCloudAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -3398,11 +3276,6 @@ const armLiveness = (jobs: OwnerJobs, thread: ThreadRow, at: number): void => {
   );
 };
 
-/**
- * Asks the executor of a cloud attempt the owner still lists as running
- * whether it still has it, and settles it failed once it has been gone (or
- * silent, or finished without delivering) for longer than a delivery can take.
- */
 const checkLiveness = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const job = raw as Partial<LivenessJob> | null;
   if (typeof job?.threadId !== "string") return;
@@ -3549,7 +3422,6 @@ const markWaitingThreadStopped = async (
   }
 };
 
-/** An agent whose turn ended waiting, stopped: it no longer waits, and shows as stopped everywhere. */
 const markEndedWaitingStopped = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -3591,11 +3463,6 @@ const markEndedWaitingStopped = async (
   }
 };
 
-/**
- * A stopped agent sends no report, so a starter whose turn ended waiting with
- * this as its last helper at work would wait for good: it hears that the
- * helper was stopped, which starts its next turn like any message.
- */
 const wakeWaitingStarter = async (
   ctx: OwnerContext,
   stopped: ThreadRow,
@@ -3645,12 +3512,6 @@ const deviceStanding = async (
   }
 };
 
-/**
- * Everything below an agent that a stop must reach, deepest first: the ones
- * running or waiting for the user, the ones whose turn ended waiting
- * (end_turn_waiting: a finished command, a schedule's fire or a helper's
- * report would start them again), and the ones a message is on its way to.
- */
 const stoppableDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
   db
     .all<ThreadRow & { pending_input: number }>(
@@ -3786,7 +3647,6 @@ const stopReplay = (db: OwnerDbReader, commandId: string): StopResult | null => 
   return receipt ? readAgentStopResult(JSON.parse(receipt.result_json) as StopResult) : null;
 };
 
-/** `agentThreads.pause`, as builds before `stop_agent` call it: a stop, answered in their words. */
 const legacyPauseAgent = async (
   ctx: OwnerContext,
   args: AgentThreadCalls["agentThreads.pause"]["args"],
@@ -3897,8 +3757,6 @@ const acknowledgeDelivery = (
         thread.thread_id,
       ),
   );
-  // A build that still reads this path took the report, so the report
-  // outbox must not hand the same report to Stella again.
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
   ctx.db.run(
     `UPDATE agent_report_outbox SET state = 'delivered', delivered_via = ?, updated_at = ?, delivered_at = ?
@@ -3912,19 +3770,6 @@ const acknowledgeDelivery = (
   return { acknowledged: true, superseded: false };
 };
 
-/**
- * A task placed on a computer runs there under the thread the cloud keeps,
- * whose parent (the lead, or Stella) the cloud records. Besides the runs the
- * cloud sends it, that computer runs turns of it by itself: its own background
- * work finishing, a monitor's event, a schedule there firing. Those "hosted"
- * turns are recorded on the same thread as attempts of their own, so their
- * report is routed by the thread's record (to the lead that started it), never
- * by where the task sits in that computer's copy of Stella's chat.
- *
- * The computer numbers its turns its own way, so each one is mapped here to the
- * attempt that records it: `attempt_generation` NULL while the turn joined a
- * run that was already under way (its terminal settles it later).
- */
 export const AGENT_HOSTED_TURNS_MIGRATION = {
   id: "agent-threads.17-hosted-turns",
   statements: [
@@ -3948,7 +3793,6 @@ type HostedTurnRow = {
   created_at: number;
 };
 
-/** The placed thread this computer runs, when it is the one the thread is placed on. */
 const hostedThread = (
   db: OwnerDbReader,
   args: { threadId: string; originDeviceId: string; ownerGeneration: string },
@@ -3985,7 +3829,6 @@ const bindHostedTurn = (
   );
 };
 
-/** The thread's current attempt is a turn its computer started by itself (no run the cloud sent). */
 export const hostedAttemptRunning = (db: OwnerDbReader, thread: ThreadRow): boolean =>
   ACTIVE_STATUSES.has(thread.status) &&
   db.one<{ found: number }>(
@@ -3994,7 +3837,6 @@ export const hostedAttemptRunning = (db: OwnerDbReader, thread: ThreadRow): bool
     thread.attempt_generation,
   ) !== null;
 
-/** Opens the next attempt of a placed thread for a turn its computer runs by itself. */
 const beginHostedAttempt = (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -4046,7 +3888,6 @@ const beginHostedAttempt = (
   );
 };
 
-/** Ends the running attempt with what the computer's own turn left. */
 const endHostedAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -4129,12 +3970,9 @@ const startHostedTurn = (
   if (readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration)) return { threadId: thread.thread_id };
   if (stoppedByStop(thread)) {
     recordHostedTurnIgnored(ctx, thread, deviceId, args.attemptGeneration, "stopped");
-    // `attempt_stale`: every app build drops a start refused for this reason instead of retrying it.
     throw rejectStart("attempt_stale", "That agent was stopped; its computer runs nothing more of it until it is resumed.");
   }
   if (ACTIVE_STATUSES.has(thread.status) || thread.status === "waiting_for_user") {
-    // A run is already under way (one the cloud sent, its terminal possibly
-    // still on its way): this turn joins it, and settles once that run has ended.
     bindHostedTurn(ctx.db, {
       threadId: thread.thread_id,
       deviceId,
@@ -4169,7 +4007,6 @@ const completeHostedTurn = async (
     return await endHostedAttempt(ctx, thread, deviceId, ended);
   }
   if (ACTIVE_STATUSES.has(thread.status) || thread.status === "waiting_for_user") {
-    // An earlier turn of its own that never reported its end: this later one supersedes it.
     if (hostedAttemptRunning(ctx.db, thread)) {
       bindHostedTurn(ctx.db, {
         threadId: thread.thread_id,
@@ -4180,23 +4017,16 @@ const completeHostedTurn = async (
       });
       return await endHostedAttempt(ctx, thread, deviceId, ended);
     }
-    // The run the cloud sent has not settled yet (its terminal is on its way):
-    // this turn's end waits for it, so neither replaces the other's report.
     throw new RpcError("CONFLICT", `${thread.thread_id} has a run whose end has not arrived yet; try again.`, {
       retryable: true,
       reason: "thread_busy",
     });
   }
-  // A stop's own echo (the computer ending the turn the stop cut short) changes nothing.
   if (status === "canceled") return { updated: false, status: thread.status };
   if (stoppedByStop(thread)) {
-    // A stopped task's computer finished a turn of it anyway: the stop stands,
-    // nothing it says starts a report, and the audit counts it.
     recordHostedTurnIgnored(ctx, thread, deviceId, args.attemptGeneration, "stopped");
     return { updated: false, status: thread.status };
   }
-  // A turn that joined the run the cloud sent and ended with the same words is
-  // that run's own end, already recorded.
   if (
     thread.status === status &&
     resultTextOf(thread.result_json) === (result?.trim() ?? "") &&
@@ -4234,11 +4064,6 @@ const cancelHostedTurn = async (
 const rejectStart = (reason: string, message: string): RpcError =>
   new RpcError("CONFLICT", message, { reason });
 
-/**
- * The latest stop of a task still on its way to its computer (the computer
- * was away when it was stopped). Until the computer hears it, what it runs of
- * the task began without knowing, so none of it counts: the stop is the fence.
- */
 const unheardStop = (db: OwnerDbReader, threadId: string, deviceId: string): CommandRow | null =>
   db.one<CommandRow>(
     `SELECT * FROM agent_commands
@@ -4254,12 +4079,6 @@ const fencedAttempt = (db: OwnerDbReader, threadId: string, attemptGeneration: n
     `turn_fenced:${threadId}:${attemptGeneration}:start`,
   ) !== null;
 
-/**
- * A computer's start or turn end for a task it ran without hearing of its
- * stop: kept as history (with what it said), never delivered, and it does not
- * start the task again. A task still counted as running is stopped now: its
- * computer has finished with that turn, and the stop reaches it all the same.
- */
 const fenceTurn = async (
   ctx: OwnerContext,
   thread: ThreadRow,
@@ -4349,9 +4168,6 @@ const startComputerThread = async (
         ),
     );
     await postAgentLifecycleCard(ctx, readThread(ctx.db, existing.thread_id)!, { kind: "started" });
-    // Resumed on its computer (by its starter or the user there): what the
-    // cloud held while it was stopped goes to it now, as when the cloud
-    // resumes it. Left held, it would also keep this attempt's report waiting.
     if (resumedFromStop) releaseInputsAfterStop(ctx, existing.thread_id, `device-resume:${existing.thread_id}:${args.attemptGeneration}`);
     return { threadId: existing.thread_id };
   }
@@ -4416,10 +4232,6 @@ const completeComputerThread = async (
     throw new RpcError("NOT_FOUND", "That agent no longer exists.");
   }
   const result = args.result?.trim() ? args.result : undefined;
-  // Run without hearing of its stop: the stop is still on its way to this
-  // computer, or this turn's start was fenced by it, or it ends a turn the
-  // cloud never saw start of a task it counts as stopped (a computer drops
-  // the starts it queued before hearing a stop). Kept as history only.
   const stop = unheardStop(ctx.db, known.thread_id, args.originDeviceId);
   if (
     (stop && args.attemptGeneration >= known.attempt_generation) ||
@@ -4429,9 +4241,6 @@ const completeComputerThread = async (
     await fenceTurn(ctx, known, "end", { ...args, text: result ?? args.error }, stop);
     return { updated: false, status: readThread(ctx.db, known.thread_id)?.status ?? known.status };
   }
-  // A newer attempt whose start never arrived (the computer restarted, or its
-  // start was refused before sign-in) still ends here; dropping its terminal
-  // would lose its report.
   if (args.attemptGeneration > known.attempt_generation) {
     const resumedFromStop = stoppedByStop(known);
     recordAgentChange(
@@ -4457,8 +4266,6 @@ const completeComputerThread = async (
     if (resumedFromStop) releaseInputsAfterStop(ctx, known.thread_id, `device-resume:${known.thread_id}:${args.attemptGeneration}`);
   }
   const row = readComputerThread(ctx.db, args) ?? known;
-  // Stopped on its computer after its turn ended waiting: it is stopped now,
-  // as when the cloud stops it, so what no one sent it on purpose is held.
   if (
     row.attempt_generation === args.attemptGeneration &&
     endedWaiting(row) &&
@@ -4470,7 +4277,6 @@ const completeComputerThread = async (
     return { updated: now?.status === "canceled", status: now?.status ?? row.status };
   }
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
-    // An earlier turn's end, after a later one began: what it said is kept.
     if (args.attemptGeneration < row.attempt_generation && args.status === "completed") {
       const said = result !== undefined && !isPlaceholderAgentResult(JSON.stringify({ finalText: result })) ? result : "";
       fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined, args.done === true);
@@ -4486,10 +4292,6 @@ const completeComputerThread = async (
     ) {
       return upgradePlaceholderResult(ctx, row, result, args.originDeviceId);
     }
-    // A second, different end of a turn that already ended: a computer that
-    // numbered a new turn as the one before (desktops before the fix gave the
-    // turns they start by themselves no number of their own). What it said
-    // reaches no one, so it is filed where the invariants count it.
     if (
       row.attempt_generation === args.attemptGeneration &&
       row.status !== "running" &&
@@ -4549,9 +4351,6 @@ const completeComputerThread = async (
   return { updated: true, status };
 };
 
-// The first terminal for an attempt wins. When that one carried no words (a
-// settle racing the real terminal), the real result replaces it, and so does
-// the report while it has not reached its requester yet.
 const upgradePlaceholderResult = (
   ctx: OwnerContext,
   row: ThreadRow,
@@ -4773,10 +4572,6 @@ const resumeHeldAgent = async (ctx: OwnerContext, thread: ThreadRow & { owner_ge
   }
 };
 
-/**
- * The held agent's timer: at the reset it resumes the agent; a monthly hold
- * (or a resume that keeps failing) ends it failed instead of holding forever.
- */
 const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
   const payload = raw as { threadId?: unknown; attemptGeneration?: unknown } | null;
   if (typeof payload?.threadId !== "string" || typeof payload.attemptGeneration !== "number") return;
@@ -4987,13 +4782,6 @@ const noteUsageLimit = async (
   return { posted };
 };
 
-/**
- * Resume pressed on a chat's usage-limit card. Cloud work the limit holds
- * for the chat (its reply and its tasks) continues now instead of at the
- * reset; the Resume card it posts tells every computer to wake what it
- * holds. Each piece of work re-runs on the account and engine selected now,
- * and one that is still limited pauses again with a fresh card.
- */
 const resumeUsageLimit = async (
   ctx: OwnerContext,
   args: AgentThreadCalls["usageLimits.resume"]["args"],
@@ -5366,10 +5154,7 @@ export const applyAgentThreadEvent = (
           },
         );
       }
-      // It ended waiting after a message from Stella, which started it: a waiting
-      // turn sends no report, so its last words reach her as its reply.
       const reply = status === "completed" ? resultWaitingReply(resultJson) : undefined;
-      // A helper's reply to its lead's message goes to that lead the same way.
       if (reply && thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id && thread.owner_generation) {
         queueAgentNote(
           { db, now: event.completedAt },
@@ -5387,7 +5172,6 @@ export const applyAgentThreadEvent = (
         queueStellaNote(
           { db, now: event.completedAt },
           {
-            // Also the message's clientMsgId, so it must stay within 64 URL-safe characters.
             noteId: agentReportReceipt(`waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
             conversationId: thread.origin_conversation_id ?? thread.conversation_id,
             ownerGeneration: thread.owner_generation,
@@ -5421,14 +5205,6 @@ const waitingFinalText = (resultJson: string | undefined): string => {
   }
 };
 
-/**
- * A cloud task whose turn ended waiting: whether anything could start its
- * next turn by itself (a helper at work or waiting, a message or report on its
- * way, a schedule aimed at it, its starter holding its reply). Its background
- * commands end with the turn, so they never count. With nothing, it is told at
- * once ("tell"); a turn that was already that news and waits on nothing again
- * ends as its report ("report") rather than wait unseen.
- */
 const waitingWake = (db: OwnerDbReader, thread: ThreadRow, resultJson: string | undefined): "live" | "tell" | "report" => {
   if (resultWaitingFor(resultJson) === undefined || resultWaitingReply(resultJson) !== undefined) return "live";
   const id = thread.thread_id;
@@ -6047,11 +5823,6 @@ export const agentThreadsDomain = {
           : [];
       });
     },
-    /**
-     * The threads a conversation lists as running: the ones whose cards it
-     * would show (`postAgentLifecycleCard`), read here rather than folded
-     * from the cards, which a lost post leaves running for good.
-     */
     "agentThreads.runningIn": async (ctx, raw) => {
       const args = object({ ownerGeneration: generation, conversationId: id(256) })(raw);
       await assertGeneration(ctx, args.ownerGeneration);

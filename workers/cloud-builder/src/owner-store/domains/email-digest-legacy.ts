@@ -2,14 +2,6 @@ import type { EmailDigest, EmailDigestFeed } from "@stella/contracts/backend/ema
 import { empty } from "../args.js";
 import type { OwnerDbReader, OwnerDomain } from "../registry.js";
 
-/**
- * The October email digest, retired. Desktop and phone builds from before the
- * email redesign still open its section, so its calls answer as an idle
- * digest that found nothing new: the section looks quiet, not broken, and
- * still lists the digests the owner already had. Nothing is checked or sent.
- * Its tables (`email_digests`, `email_digest_state`, `email_digest_seen`)
- * are kept; nothing writes to them.
- */
 const OLD_TABLES = ["email_digests", "email_digest_state", "email_digest_seen"] as const;
 
 const hasTable = (db: OwnerDbReader, name: string): boolean =>
@@ -40,7 +32,6 @@ const parseItems = (json: string): EmailDigest["items"] => {
   }
 };
 
-/** The owner's October digests, when their table is still the October one. */
 const oldDigests = (db: OwnerDbReader): EmailDigest[] => {
   try {
     if (!hasTable(db, "email_digests")) return [];
@@ -72,7 +63,6 @@ export const emailDigestLegacyDomain = {
   },
   purge: (ctx) => {
     for (const table of OLD_TABLES) {
-      // On dev stores `email_digests` may be the first version of the new table; clearing it is right there too.
       if (hasTable(ctx.db, table)) ctx.db.run(`DELETE FROM ${table}`);
     }
     return { pending: false };

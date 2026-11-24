@@ -203,9 +203,6 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       preparation: CloudChatPreparation;
     },
   ): Promise<Response> {
-    // These headers are trustable because a Durable Object namespace is not
-    // publicly addressable: only the Worker can produce this request, and it
-    // strips any client-supplied x-stella-* before forwarding.
     const ownerId = request.headers.get(HEADER_OWNER)?.trim() ?? "";
     const authKind = request.headers.get(HEADER_TURN_AUTH_KIND)?.trim() ?? "";
     if (!ownerId || (authKind !== "user" && authKind !== "service")) {

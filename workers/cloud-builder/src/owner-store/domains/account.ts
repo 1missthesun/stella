@@ -56,8 +56,6 @@ const ACCOUNT_CONVERSATION_SOCKETS_MIGRATION = {
   ],
 };
 
-// Longer than a Stella JWT lives, so it outlasts every token it can refuse
-// and every socket authenticated by one.
 const REVOKED_SESSION_HOLD_MS = 20 * 60_000;
 
 export type OwnerState = {
@@ -129,7 +127,6 @@ export const readSessionRevocations = (db: OwnerDb): SessionRevocations => ({
 export const callerSessionRevoked = (db: OwnerDb, caller: SessionHolder): boolean =>
   sessionRevokedBy(readSessionRevocations(db), caller);
 
-/** A conversation socket authenticated now; it can carry data until its token expires. */
 export const noteConversationSocket = (db: OwnerDb, conversationId: string, now: number): void => {
   db.run(
     "INSERT OR REPLACE INTO conversation_sockets (conversation_id, noted_at) VALUES (?, ?)",
@@ -200,13 +197,6 @@ const PURGE_WAIT_BASE_MS = 5_000;
 const PURGE_WAIT_MAX_MS = 30 * 60_000;
 const PURGE_WAIT_LOUD_AFTER = 12;
 
-/**
- * Runs passes until every store reports done. A pass that is still waiting on
- * a store (a conversation draining R2, a peer service down) is normal, not a
- * failure: it comes back with a capped backoff, and keeps coming back for as
- * long as it takes, so a purge is never dropped half done. It turns loud once
- * it has waited long enough that something is stuck.
- */
 const runAccountPurge = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { purge } = readOwnerState(ctx.db);
   if (!purge) return;

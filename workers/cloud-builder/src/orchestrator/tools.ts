@@ -69,7 +69,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
     catalog: readonly CloudCodeSourceAgentTool[];
   }> {
     const slack = isSlackConversationId(turn.conversationId);
-    // Stella Crew works in its Slack workspace's own drive space and world.
     const crewScope = slack
       ? await crewScopeForConversation(this.env, turn.conversationId)
       : undefined;

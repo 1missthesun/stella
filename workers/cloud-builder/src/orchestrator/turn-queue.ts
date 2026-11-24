@@ -520,8 +520,6 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       }
       const cancelDeadlineAt = current.phase.deadlineAt;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, current);
-      // Replace (rather than retain) an earlier watchdog. alarm() must never
-      // interpret an unrelated/old alarm as the end of the desktop ACK grace.
       await this.ctx.storage.setAlarm(cancelDeadlineAt);
 
       let phase =
@@ -629,25 +627,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     if (queued.length > 0) await this.ensureQueueAlarm();
   }
 
-  /**
-   * The wake guarantee, made true rather than nearly true: for as long as any
-   * turn is durable under `queued:`, this object has a pending alarm.
-   *
-   * `/turn` establishes it; every path that ENDS an alarm has to restore it.
-   * Firing is one of those paths — Cloudflare consumes the alarm when it
-   * delivers it and never re-arms — so a watchdog that fires while a second
-   * turn sits queued leaves that turn with no wake signal at all. The
-   * in-memory queue still drains it, right up until the isolate is evicted;
-   * after that nothing in Cloudflare ever wakes this object on its
-   * own, and a turn that was accepted with a 202 and an `agent_turns` row
-   * reading "running" is stranded until a user happens to open the
-   * conversation, which may be days later or never.
-   *
-   * Arms only when nothing is pending, and never deletes: a live watchdog or a
-   * 30 s terminal-delivery rung must not be shortened or dropped by a call to
-   * this. The critical section is what makes the read and the write one step
-   * against `/turn` and against the completed path's `deleteAlarm`.
-   */
+  /** Cloudflare consumes an alarm when it delivers it and never re-arms it. */
   protected async ensureQueueAlarm(): Promise<void> {
     await this.ctx.blockConcurrencyWhile(async () => {
       if ((await this.ctx.storage.getAlarm()) !== null) return;

@@ -75,7 +75,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     totalMs: number;
   };
   protected queue: Promise<unknown> = Promise.resolve();
-  /** What the user sent while another turn was ahead of it. */
   protected readonly waitingUserTurns = new Set<string>();
   protected readonly turnExecutions = new Map<
     string,
@@ -88,7 +87,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
 
   protected readonly journal: Journal;
   protected readonly archive: ConversationArchive;
-  /** Images this conversation's pi entries hold by reference (`conversation-images.ts`). */
   protected readonly images: ConversationImages;
   protected readonly index: ConversationIndex;
   protected readonly hub: ConversationHub;
@@ -104,18 +102,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   } | null = null;
   protected finalizedTurnId: string | null = null;
 
-  /**
-   * This object has been purged, whatever its journal now says.
-   *
-   * `handlePurge` ends in `deleteAll()` plus a fresh `bootstrap()`, so the
-   * durable tombstone is gone and `journal.isDeleted()` reads false again the
-   * moment it returns. Any request that checked the tombstone before the purge
-   * and was still awaiting something when it landed would otherwise resume
-   * against that empty journal and write rows — and R2 objects — into a
-   * conversation the owner has already recorded as deleted, where no purge, sweep
-   * or manifest will ever name them again. The durable tombstone fences the
-   * window before `deleteAll()`; this fences the window after it.
-   */
   protected sealed = false;
 
   protected turnAdmissionTail: Promise<void> = Promise.resolve();
@@ -125,7 +111,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected currentTurnCancellation?: TurnRetryCancellation;
   protected currentPiRun?: {
     abort(): void;
-    /** It ends between two steps for the user's next message. */
     makesRoom: boolean;
   };
   protected piRuntime?: Promise<
@@ -273,9 +258,7 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       log("info", "conversation_wake_timing", this.wakeTiming);
     });
     this.readerReady = wake;
-    // Registration must follow durable identity restore, but must not be
-    // awaited inside blockConcurrencyWhile: OwnerGate may synchronously call
-    // this reader during freeze and would otherwise deadlock the object.
+    // Not awaited inside blockConcurrencyWhile: OwnerGate calls back into this object while it registers.
     ctx.waitUntil(
       wake.then(async () => {
         const identity = this.indexIdentity();
@@ -468,25 +451,10 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     return this.slackRelay;
   }
 
-  /**
-   * Deleted, by either fence: the durable tombstone, or the in-memory seal that
-   * outlives the `deleteAll()` which destroys it. Every write path asks this
-   * rather than the journal directly.
-   */
   protected purged(): boolean {
     return this.sealed || this.journal.isDeleted();
   }
 
-  /**
-   * Raise the in-memory seal from outside `handlePurge`.
-   *
-   * The only caller is the index flush learning from the owner that this
-   * conversation id is fenced as purged — which is the one fact this isolate
-   * cannot derive for itself. A DO restarted after its purge has an empty
-   * journal and a false `sealed`, and there is no request that would ever tell
-   * it otherwise. This is a stop, not a delete: no storage is touched, because
-   * an object in this state has none of the user's data left to remove.
-   */
   protected sealPurged(reason: string): void {
     if (this.sealed) return;
     this.sealed = true;

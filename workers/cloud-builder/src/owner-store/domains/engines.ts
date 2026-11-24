@@ -1,6 +1,3 @@
-// Claude logins stay in each place's own Claude Code CLI; this domain keeps
-// only identities. ChatGPT tokens leave it only through `credentials.chatgpt`.
-
 import { resolveCloudSpawnExecution } from "../../cloud-spawn-model.js";
 import {
   isLegacyCloudExecution,
@@ -243,11 +240,6 @@ export const ENGINE_CLAUDE_ONE_CHOICE_MIGRATION = {
   ],
 };
 
-/**
- * When each cloud login ends (Anthropic ends a claude.ai login a fixed time
- * after signing in), read from the cloud's stored logins after each sign-in
- * and each Claude turn.
- */
 export const ENGINE_CLAUDE_LOGIN_END_MIGRATION = {
   id: "engines.9-claude-login-end",
   statements: [
@@ -256,11 +248,6 @@ export const ENGINE_CLAUDE_LOGIN_END_MIGRATION = {
   ],
 };
 
-/**
- * The model the account last picked on each plan it connects, kept when a later
- * pick runs elsewhere. Seeded from the current pick, or the last one before it
- * that wasn't on a provider key.
- */
 export const ENGINE_PLAN_PICKS_MIGRATION = {
   id: "engines.10-plan-picks",
   statements: [
@@ -609,7 +596,6 @@ const connectedProvidersOf = (db: OwnerDbReader): string[] =>
     .all<{ provider: string }>("SELECT provider FROM provider_credentials WHERE status = 'ok' ORDER BY provider")
     .map((row) => row.provider);
 
-/** A cloud Claude login that has reached its end can't run turns until someone signs in again. */
 const cloudClaudeLoginEnded = (db: OwnerDbReader): boolean => {
   const accountId = claudeActiveByPlace(db).get(CLOUD_PLACE);
   if (!accountId) return false;
@@ -622,7 +608,6 @@ const cloudClaudeLoginEnded = (db: OwnerDbReader): boolean => {
   );
 };
 
-/** The account's last pick on a plan, with its reasoning level. */
 const lastPickOn = (db: OwnerDbReader, provider: EngineProvider): CloudExecutionSelection | null => {
   const row = db.one<{ execution: string }>(
     "SELECT execution FROM engine_plan_picks WHERE provider = ?",
@@ -632,10 +617,6 @@ const lastPickOn = (db: OwnerDbReader, provider: EngineProvider): CloudExecution
   return pick?.engine === provider ? pick : null;
 };
 
-/**
- * What the cloud runs when the account's pick can't: a connected plan, on the
- * model last picked there, then Stella's own model.
- */
 const connectedPlanDefault = (
   db: OwnerDbReader,
   connectedEngines: NonNullable<OwnerSnapshot["connectedEngines"]>,
@@ -848,11 +829,6 @@ const loginEndOf = (row: { login_ends_at: number | null; login_ended: number }) 
   ...(row.login_ended === 1 ? { loginEnded: true } : {}),
 });
 
-/**
- * Records when each cloud login ends, as the cloud's stored logins say
- * (keyed by account directory). Logins the cloud no longer holds are left
- * as they are: signing out removes their row.
- */
 const noteClaudeCloudLogins = async (
   ctx: OwnerContext,
   logins: readonly ClaudeCloudLoginHealth[],
@@ -1172,7 +1148,6 @@ const finishClaudeCloud = async (
     CLOUD_PLACE,
     Date.now(),
   );
-  // A fresh sign-in replaces whatever ended before it.
   ctx.db.run(
     "UPDATE engine_claude_places SET login_ends_at = NULL, login_ended = 0 WHERE account_id = ? AND place = ?",
     accountId,
@@ -1740,7 +1715,6 @@ const cancelClaudeDeviceLogin = async (
   return null;
 };
 
-/** Selects `pick` (a spawn-style model name) for the owner's cloud turns, keeping the current effort. */
 export const selectCloudModel = (ctx: OwnerContext, pick: string): CloudExecutionSelection => {
   const execution = parseExecution(resolveCloudSpawnExecution(pick, readSelection(ctx.db).selection));
   writeSelection(ctx, execution);

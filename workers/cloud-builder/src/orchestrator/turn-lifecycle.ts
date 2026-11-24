@@ -132,11 +132,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return phase?.turnId === turnId && phase.s === "terminal";
   }
 
-  /**
-   * The only way a cloud turn ends. The first claim wins and every later
-   * claimant gets the winner back, so a caller proceeds to journal and
-   * deliver its outcome only when the returned value is the one it passed.
-   */
   protected async claimTerminal(
     turnId: string,
     owed: OwedTerminal,
@@ -168,11 +163,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     });
   }
 
-  /**
-   * Sends the owner the outcome this turn owes. A failed send leaves the
-   * phase undelivered and the alarm retries it; past the retry budget the
-   * outcome is abandoned so the conversation can move on.
-   */
   protected async deliverTerminal(
     turn: ChatTurnRequest,
     owed: OwedTerminal,
@@ -187,10 +177,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
         {
           terminal: true,
           eventSeq,
-          // A turn's first event is its `started`, emitted as it begins
-          // running (`runTurn`); a terminal that takes the first number
-          // ended a turn that never ran (canceled while queued, refused
-          // before starting).
           began: eventSeq > 1,
           ...(owed.kind !== "completed" ? { errorMessage: owed.message } : {}),
           ...(owed.resultJson ? { resultJson: owed.resultJson } : {}),
@@ -240,11 +226,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     this.recordTerminal(turn, "completed", undefined, wallClockMs);
     await this.deliverTerminal(turn, completedOwed);
     await this.afterTerminal(turn);
-    // Keep the alarm alive while queued turns remain: it is the wake
-    // guarantee that lets a restarted DO drain the durable queue. The read
-    // and the delete are one step against `/turn`'s enqueue — otherwise a
-    // turn accepted between them is left durable under `queued:` with the
-    // alarm it was promised already deleted.
     await this.ctx.blockConcurrencyWhile(async () => {
       const queued = await this.ctx.storage.list({
         prefix: "queued:",
@@ -271,13 +252,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     return json({ ok: true, text: finalText });
   }
 
-  /**
-   * The turn's attached images as conversation references. Each was uploaded
-   * to the Drive when attached and its model-ready copy prepared in the
-   * background as its upload finalized, so this only copies them into the
-   * conversation, all at once; an image sent before its copy was ready is
-   * prepared here, the oversized ones fitted at most two at a time.
-   */
   protected async loadChatAttachmentImages(
     turn: ChatTurnRequest,
     signal?: AbortSignal,
@@ -307,7 +281,6 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
           const driveKey = entry.key;
           const name = await sha256Hex(driveKey);
           try {
-            // Usually prepared in the background when it was attached.
             const ready = await this.images.adopt(await attachmentImageKey(turn.ownerId, driveKey), name);
             signal?.throwIfAborted();
             if (ready !== "missing") {
@@ -409,22 +382,11 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
     const role = (message as { role?: string }).role;
     if (role !== "user" && role !== "assistant" && role !== "toolResult")
       return null;
-    // An assistant message with no usable output is never persisted: ONE such
-    // row poisons every future Anthropic request for this conversation. The
-    // predicate is the retry ladder's own — a message it would pop from the
-    // live context on resume must never have reached the journal, or the
-    // transcript keeps a reply the model no longer has and the next turn
-    // rebuilds history with two consecutive assistant messages. This covers
-    // the errored placeholder (empty text) and the thinking-only completion
-    // that hit the output cap while reasoning.
+    // Anthropic rejects every later request of a conversation whose history holds an assistant message with no usable output.
     if (!assistantMessageHasUsableOutput(message)) return null;
     let stored = message;
     let payloadJson = JSON.stringify(message);
     if (utf8Length(payloadJson) > MAX_ROW_BYTES) {
-      // No R2 round trip is available here: the Agent's event sink drops
-      // returned promises, so an oversize loop row is truncated in place with
-      // an explicit marker rather than silently lost. Nothing in the pinned
-      // tool set can currently produce a message this large.
       stored = truncateMessage(message, MAX_ROW_BYTES);
       payloadJson = JSON.stringify(stored);
       log("error", "conversation_row_truncated", {

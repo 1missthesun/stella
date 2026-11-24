@@ -135,10 +135,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
         413,
       );
     }
-    // "voice": a desktop voice transcript; "import": chat history made on
-    // the computer before it synced (signed out), copied in once; "note": a
-    // hidden note for Stella that runs no turn (a computer restarted and
-    // resumed its tasks), read with her next turn wherever she runs.
     const source: "voice" | "import" | "note" = body.source;
     const receiptKey = `${source}:${deviceId}:${localTurnId}`;
     const turnId = `${source}:${deviceId}:${localTurnId}`;
@@ -405,12 +401,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     }
   }
 
-  /**
-   * Oversize rows go to R2 rather than throwing a >2 MB INSERT. Assistant
-   * messages are truncated instead of spilled: a placeholder for an assistant
-   * message would drop its toolCall blocks and orphan every result that
-   * follows, which is the one degradation the provider rejects outright.
-   */
+  /** Durable Object SQLite refuses a row over 2 MB. Providers reject a tool result whose assistant tool call is missing, so an oversize assistant message is truncated rather than spilled. */
   protected async prepareOversize(
     role: MessageRole,
     message: AgentMessage,
@@ -546,14 +537,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     }
   }
 
-  /**
-   * A choice on the conversation's unresolved safety block, made on any of
-   * the owner's devices. The journal is what every host builds a model's
-   * context from, so the choice is settled here first: `remove` takes every
-   * message since the last completed turn out of model context, `clear`
-   * starts the context over after the card. The card then tells each host
-   * to apply the same to the copy it holds.
-   */
   protected async handleSafeguard(request: Request): Promise<Response> {
     let body: {
       ownerId?: string;
@@ -693,37 +676,8 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     });
   }
 
-  /**
-   * Tombstone, quiesce, snapshot, drain, then destroy — in that order and no
-   * other. `deleteAll()` destroys the segment manifest, which is the only
-   * record of the R2 keys; running it before the drain leaves the user's
-   * deleted transcript in R2 forever with nothing left that can find it.
-   *
-   * The two middle steps are what make the snapshot complete rather than
-   * merely current. A rollover or a spill that was already in flight when the
-   * tombstone landed registers its key AFTER this handler would otherwise have
-   * read the manifest — and an object named by nobody survives `deleteAll()`
-   * with no per-conversation path left that can ever reach it. So: the
-   * tombstone stops new writes starting, `quiesce()` waits out the ones
-   * already running, and only then is the key list taken.
-   *
-   * Incomplete drains report `purged: false` and are retried by the owner
-   * object's `conversations.purge` job (and its reset/delete purge hook)
-   * rather than by a DO alarm: the alarm belongs to the turn lifecycle, and
-   * borrowing it here would put a deletion bug inside the terminal-delivery
-   * ladder. The 202 is load-bearing in `owner-store/purge.ts`, which reads
-   * this body's `purged`, never the status class, precisely because
-   * `response.ok` is true for it.
-   */
   private purgeInFlight?: Promise<{ body: Record<string, unknown>; status: number }>;
 
-  /**
-   * One purge at a time per object: a second `/purge` (a retried owner job, a
-   * reset racing an account deletion) joins the one running. Two used to
-   * interleave, and the later one read the segment manifest after the earlier
-   * one's `deleteAll()`, failing on `no such table: segments` and reporting the
-   * conversation as not purged.
-   */
   protected async handlePurge(): Promise<Response> {
     this.purgeInFlight ??= this.purgeOnce().finally(() => {
       this.purgeInFlight = undefined;
@@ -752,13 +706,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       );
     }
     await this.archive.quiesce();
-    // A conversation object that never served a turn, or one on an older
-    // journal schema, gets the current tables (all `IF NOT EXISTS`) before the
-    // manifest is read, so an empty or old object purges instead of failing.
     await this.journal.bootstrap();
-    // `segments` and `spills` outlive the drain — only the queue rows are
-    // removed — so what has already been offered has to be remembered here, or
-    // the re-check below would re-delete every key on every purge.
     const enqueued = new Set<string>();
     const enqueueNewKeys = (): number => {
       const keys = [
@@ -772,16 +720,11 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     };
     enqueueNewKeys();
     let { pending } = await this.archive.drainPurge();
-    // The images its turns stored in R2 go with it; the turn runtime was
-    // discarded above, so nothing stores another behind the sweep.
     const images = await this.images.purge().catch((error: unknown) => {
       log("error", "conversation_images_purge_failed", { message: errorMessage(error) });
       return { deleted: 0, done: false };
     });
     if (!images.done) pending += 1;
-    // The drain itself awaits, and a tombstone is a fence rather than a lock.
-    // Re-reading the manifest costs two queries and is what turns "nothing can
-    // have been added behind us" from an argument into a check.
     if (pending === 0 && enqueueNewKeys() > 0) {
       pending = (await this.archive.drainPurge()).pending;
     }
@@ -794,18 +737,6 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     }
     const purgedId = this.conversationId();
     await this.ctx.storage.deleteAll();
-    // The queue and its wake signal, explicitly and last.
-    //
-    // `deleteAll()` swept the queue that existed when this handler started; a
-    // dispatch delivered while it was awaiting writes a fresh `queued:` key
-    // behind it. In this isolate the seal drops that turn — but the seal is
-    // in-memory, and a cold start after an eviction would re-enqueue it and run
-    // a turn against the empty journal of a conversation the owner has already
-    // recorded as deleted. Dropping the key is the durable half of the seal.
-    //
-    // The alarm goes with it rather than being left to `deleteAll()`: nothing
-    // is queued any more, so there is no wake to guarantee, and an alarm
-    // surviving here wakes a destroyed conversation on a timer for no work.
     const dropped: ChatTurnRequest[] = [];
     await this.ctx.blockConcurrencyWhile(async () => {
       const stragglers = await this.ctx.storage.list<ChatTurnRequest>({
@@ -824,15 +755,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       }
     });
     for (const straggler of dropped) await this.releaseOwnerGate(straggler);
-    // `deleteAll()` drops the tables, but THIS instance keeps serving: its
-    // `Journal` was bootstrapped in the constructor and every method still
-    // issues SQL. Without re-running the DDL the next request to reach this
-    // object — a stale tab's socket upgrade, the dev probe, a retried sweep —
-    // dies on `no such table: segments` and the worker answers 500 until the
-    // platform happens to evict the object. Re-bootstrapping leaves an empty,
-    // unbound journal; the in-memory seal is what keeps a stale tab from
-    // adopting it, and the socket closes 4404 "That conversation no longer
-    // exists."
+    // `deleteAll()` drops the tables while this instance keeps serving.
     await this.journal.bootstrap();
     if (this.ctx.id.name) this.journal.setConversationId(this.ctx.id.name);
     if (identity) {

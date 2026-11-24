@@ -69,11 +69,6 @@ export const PROJECTS_MIGRATION = {
   ],
 };
 
-/**
- * The repositories the GitHub user who connected an installation can reach,
- * with their permission. NULL on installations connected before it was
- * recorded: those back no new project until reconnected.
- */
 const PROJECTS_USER_REPOS_MIGRATION = {
   id: "projects.2-user-repos",
   statements: [

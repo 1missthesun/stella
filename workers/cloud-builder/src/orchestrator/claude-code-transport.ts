@@ -42,7 +42,6 @@ export type CloudClaudeCodeTurn = {
 
 export type CloudClaudeCodeHost = {
   env: BuildSessionEnv;
-  /** The chat turn running now; waits briefly for one to bind. */
   turn(signal: AbortSignal): Promise<CloudClaudeCodeTurn>;
   nextAttempt(): Promise<number>;
   adoption(turn: CloudClaudeCodeTurn): Promise<CloudOrchestratorCliAdoptedSession | null>;
@@ -50,7 +49,6 @@ export type CloudClaudeCodeHost = {
   models: { read(): Promise<CloudClaudeCodeModels | undefined>; write(models: CloudClaudeCodeModels): Promise<void> };
   sleep(ms: number, signal: AbortSignal): Promise<void>;
   log(event: string, fields: Record<string, unknown>): void;
-  /** Stored images back inline: Claude Code's tool results carry bytes, never a URL. */
   inlineImages?<T extends { type: string }>(content: readonly T[]): Promise<readonly T[]>;
 };
 

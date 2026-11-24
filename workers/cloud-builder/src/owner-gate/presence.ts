@@ -10,11 +10,7 @@ import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot"
 import type { DevicePresenceState } from "../dispatch-policy.js";
 import { isRecord } from "./support.js";
 
-/**
- * Everything a presence socket needs to be understood after a hibernation
- * eviction. There is deliberately no in-memory socket map: `getWebSockets()`
- * plus `deserializeAttachment()` is the only thing that survives eviction.
- */
+/** `getWebSockets()` and `deserializeAttachment()` are all that survive a hibernation eviction. */
 export type PresenceAttachment = {
   v: 1;
   deviceId: string;

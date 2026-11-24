@@ -63,12 +63,6 @@ export const AGENT_LOG_ORPHAN_SWEEP_JOB = "agentLogs.sweepOrphanSegments";
 const AGENT_LOG_ARCHIVE_JOB_ID = "agent-logs:archive";
 const AGENT_LOG_ORPHAN_SWEEP_JOB_ID = "agent-logs:sweep-orphans";
 
-/**
- * One sweep per owner for segments a failed archive pass uploaded and never
- * recorded: before the archive UPDATE was bounded, every pass that reached a
- * thread with 99+ cold records uploaded its segment and then failed on the
- * bound-parameter cap, leaving the object in R2 with no row naming it.
- */
 export const AGENT_LOGS_ORPHAN_SWEEP_MIGRATION = {
   id: "agent-logs.4-sweep-orphan-segments",
   statements: [
@@ -142,10 +136,7 @@ const archiveColdRecords = async (ctx: OwnerContext): Promise<void> => {
       key,
       await gzip(JSON.stringify({ threadId: oldest.thread_id, records } satisfies SegmentBody)),
     );
-    // A seq range under the same filters names exactly the rows read above
-    // (they are a seq-ordered prefix, and nothing older than the cutoff is
-    // appended meanwhile), in five bound parameters: an IN list of up to 200
-    // seqs exceeded the Durable Object SQLite cap of 100.
+    // Durable Object SQLite caps bound parameters at 100.
     let archived: number;
     try {
       ctx.db.run(
@@ -168,7 +159,6 @@ const archiveColdRecords = async (ctx: OwnerContext): Promise<void> => {
           key,
         )?.count ?? 0;
     } catch (error) {
-      // The rows still hold their payloads; don't leave a copy nothing names.
       await bucket.delete(key).catch(() => undefined);
       throw error;
     }
@@ -182,12 +172,6 @@ const archiveColdRecords = async (ctx: OwnerContext): Promise<void> => {
 const ORPHAN_SWEEP_PAGE = 1_000;
 const ORPHAN_MIN_AGE_MS = 60 * 60_000;
 
-/**
- * Deletes this owner's agent-log segments that no record names, one listing
- * page per run. A key is `<sha256(thread)>/<first>-<last>-<nonce>.json.gz`, so
- * a live segment is found by its thread's first seq; one younger than an hour
- * is left alone in case its archive pass is still between upload and UPDATE.
- */
 const sweepOrphanSegments = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const bucket = ctx.env.CONVERSATION_ARCHIVE;
   if (!bucket) return;

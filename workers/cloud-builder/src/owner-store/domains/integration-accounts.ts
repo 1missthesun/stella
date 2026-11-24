@@ -95,11 +95,7 @@ const sessionInUse = (db: OwnerDbReader, sessionId: string): boolean =>
       db.one("SELECT 1 AS used FROM integration_connections WHERE session_id = ?", sessionId),
   );
 
-/**
- * The integration's link session: the unpinned session whose connect links
- * add accounts. Multi-account integrations need one created in Composio's
- * multi-account mode so a second link adds an account instead of replacing.
- */
+/** Composio adds a second account through a link only from a session created in its multi-account mode. */
 export const ensureLinkSession = async (
   ctx: OwnerContext,
   config: ComposioConfig,
@@ -299,11 +295,6 @@ const reconcile = async (
   return activeIds;
 };
 
-/**
- * Brings `integration_accounts` in line with the user's Composio accounts
- * for this toolkit: pins a session to each new account, adopts a
- * pre-multi-account connection as the primary, and drops deleted ones.
- */
 export const syncIntegrationAccounts = async (
   ctx: OwnerContext,
   config: ComposioConfig,
@@ -367,7 +358,6 @@ const toResolved = (row: AccountRow, index: number): ResolvedIntegrationAccount 
   primary: row.is_primary === 1,
 });
 
-/** The account an action runs as: the one named by email (or id), else the primary. */
 export const resolveIntegrationAccount = async (
   ctx: OwnerContext,
   config: ComposioConfig,

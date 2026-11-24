@@ -1,6 +1,3 @@
-// Provider keys and tokens leave this domain only through
-// `credentials.provider` (the model gateway's BYOK lane).
-
 import type { Api, Model, OAuthCredential, OAuthAuth } from "@earendil-works/pi-ai";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { runToolEffect, toolsRuntime } from "@stella/runtime/kernel/tools/effect-runtime.js";
@@ -427,7 +424,6 @@ type DeviceFlow = {
   notifyChange: () => void;
 };
 
-/** In-progress device sign-ins, by owner and flow; a restarted object forgets them (they read as expired). */
 const flows = new Map<string, DeviceFlow>();
 const flowKey = (ownerId: string, flowId: string) => `${ownerId}|${flowId}`;
 
@@ -814,7 +810,6 @@ const LIVE_MODEL_LIST_TTL_MS = 10 * 60_000;
 const LIVE_MODEL_LIST_CACHE_ENTRIES = 512;
 const liveModelLists = new Map<string, { at: number; models: LiveProviderModel[] }>();
 
-/** A provider that is unreachable or rejects the key adds nothing: the bundled list still answers. */
 const liveModels = async (ctx: OwnerContext, provider: string, row: CredentialRow): Promise<LiveProviderModel[]> => {
   if (!hasLiveProviderModelList(provider)) return [];
   const needsKey = liveProviderModelListNeedsKey(provider);

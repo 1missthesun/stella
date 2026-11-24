@@ -19,7 +19,6 @@ export const HOSTING_BUDGET_MESSAGE =
 export const HOSTING_CAP_MESSAGE =
   "It served more requests today than Stella allows for one account. It will be back tomorrow.";
 export const DISPATCH_RECONCILE_MAX_MS = 3_600_000;
-/** How long a stop waits for the computer it was sent to, like any work held for a computer (`DEVICE_AVAILABILITY_WAIT_MS`). */
 export const DISPATCH_STOP_HOLD_MS = 7 * 24 * 60 * 60_000;
 export const DISPATCH_CLOUD_RETRY_DELAY_MS = 1_000;
 export const DISPATCH_CLOUD_MAX_ATTEMPTS = 2;
@@ -49,22 +48,11 @@ export const AGENT_MESSAGE_OUTCOMES: ReadonlySet<string> =
     "refused",
   ]);
 
-/**
- * The floor under every re-arm. A deadline that is already past due would
- * otherwise schedule a wake a quarter-second out, which turns any deadline the
- * object cannot clear into a hot alarm loop.
- */
 export const ALARM_MIN_DELAY_MS = 1_000;
 export const ALARM_HOT_REARM_MS = 2_000;
 export const ALARM_HOT_STREAK_KEY = "alarmHotStreak";
-/** The backoff in force: deadlines from `sources` wait until `until`. */
 export const ALARM_BACKOFF_KEY = "alarmBackoff";
 export type AlarmBackoff = { until: number; sources: string[] };
-/**
- * Alarm runs in a row that may each re-arm within `ALARM_HOT_REARM_MS` before
- * the re-arm backs off. Enough for legitimate catch-up (a batch of expired
- * leases or due jobs drained one pass at a time), never a standing loop.
- */
 export const ALARM_HOT_STREAK_LIMIT = 10;
 export const ALARM_MAX_BACKOFF_MS = 60_000;
 export const DISPATCH_RENEW_WRITE_BELOW_MS = (DISPATCH_ACCEPTED_LEASE_MS * 3) / 4;

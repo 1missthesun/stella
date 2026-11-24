@@ -256,19 +256,11 @@ const googleProviderOf = (db: OwnerDbReader): GoogleProviderState["provider"] =>
     ? "composio"
     : "stella";
 
-/** New Google connections go through Stella's own Google app unless the user chose Composio. */
 const connectsWithStellaGoogle = (ctx: OwnerContext, integrationId: string): boolean =>
   isStellaGoogleIntegration(integrationId) &&
   stellaGoogleAvailable(ctx.env) &&
   googleProviderOf(ctx.db) === "stella";
 
-/**
- * Whether this integration runs on Stella's own Google actions. It does once
- * any account is connected through Stella; accounts connected through
- * Composio before that keep working alongside them (see stellaRouteAccounts).
- * Without a Stella account, a working Composio connection keeps its own
- * actions.
- */
 const usesStellaGoogle = async (ctx: OwnerContext, integrationId: string): Promise<boolean> => {
   if (!isStellaGoogleIntegration(integrationId) || !stellaGoogleAvailable(ctx.env)) return false;
   if (stellaGoogleAccounts(ctx.db, integrationId).length > 0) return true;
@@ -298,16 +290,8 @@ const setGooglePrimaryChoice = (ctx: OwnerContext, integrationId: string, value:
 
 type StellaRoutePrimary = { kind: "stella"; email?: string } | { kind: "composio"; id: string; ref: string } | null;
 
-/** How resolveIntegrationAccount finds a Composio account (it matches case-insensitively). */
 const composioRef = (account: IntegrationAccount): string => account.email ?? account.label;
 
-/**
- * The accounts of a Google service on Stella's actions: the ones connected
- * through Stella, plus each Composio-connected account whose address hasn't
- * been reconnected through Stella yet. The Composio primary stays primary
- * until the user picks another; once its address is reconnected through
- * Stella, that Stella entry takes its place.
- */
 const stellaRouteAccounts = async (
   ctx: OwnerContext,
   integrationId: string,
@@ -349,7 +333,6 @@ const stellaRouteAccounts = async (
   };
 };
 
-/** Which connection an action on Stella's Google actions runs as. */
 const resolveStellaRouteAccount = async (
   ctx: OwnerContext,
   integrationId: string,
@@ -378,7 +361,6 @@ const resolveStellaRouteAccount = async (
   );
 };
 
-/** Runs one of Stella's Google actions as a Composio-connected account, through Composio's proxy. */
 const runComposioGoogleAction = async (
   ctx: OwnerContext,
   integrationId: string,
@@ -425,7 +407,6 @@ const connectionState = async (
   return await composioConnectionState(ctx, integrationId, options);
 };
 
-/** Which Google integrations run on Stella's own Google connection, for the agent's catalog. */
 const googleRoutes = async (ctx: OwnerContext): Promise<Record<string, "stella" | "composio">> => {
   const routes: Record<string, "stella" | "composio"> = {};
   for (const service of GOOGLE_SERVICES) {

@@ -145,7 +145,6 @@ export type DispatchRow = {
   updated_at: number;
 };
 
-/** Columns a transition may write besides `state`; `gate_held` has its own writer. */
 export type DispatchPatch = Partial<
   Pick<
     DispatchRow,

@@ -14,16 +14,6 @@ export const RATE_LIMIT_MIGRATION = {
 
 type RateWindow = { windowStart: number; count: number };
 
-/**
- * A fixed-window limit on one owner action. Throws `RATE_LIMITED` with the
- * wait until the window resets.
- *
- * The count is kept in memory (`OwnerDb.memory`) and written only when a
- * window opens and when it fills: a row write per request was about a tenth
- * of the owner object's writes. A filled window survives an eviction; a
- * partly used one restarts from its stored count, which only ever allows
- * more, never blocks early.
- */
 export const enforceOwnerRateLimit = (
   db: OwnerDb,
   now: number,

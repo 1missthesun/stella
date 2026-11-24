@@ -15,7 +15,6 @@ import type { ScheduledTurnStart, ScheduledTurnStarted } from "./registry.js";
 export class ScheduledTurnError extends Error {
   readonly retryable: boolean;
   readonly conversationGone: boolean;
-  /** A computer-only run found its computer unavailable; nothing ran anywhere. */
   readonly computerAway: boolean;
   constructor(
     message: string,
@@ -39,8 +38,6 @@ const startOnDesktop = async (
       idempotencyKey: input.clientMsgId,
       kind: "chat",
       ingress: "schedule",
-      // A "computer" subject is never handed to the cloud when the computer
-      // can't take it: the dispatch is blocked instead.
       subject: input.computerOnly ? "computer" : "cloud",
       targetMode: "device",
       targetDeviceId: input.targetDeviceId,

@@ -1,8 +1,3 @@
-/**
- * Every backend domain, in migration order. A domain's migrations run after
- * the ones listed before it, so append new domains at the end.
- */
-
 import { empty } from "./args.js";
 import { agentEventsDomain } from "./domains/agent-events.js";
 import { agentReportsDomain } from "./domains/agent-reports.js";

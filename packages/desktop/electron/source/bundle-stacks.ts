@@ -8,28 +8,13 @@ const FRAME = new RegExp(`${RENDERER_ORIGIN}${BUNDLE_SCRIPT_PREFIX}([\\w-]+)\\.j
 const KEEP_MAP_MS = 30_000;
 
 let kept: { id: string; map: Promise<SourceMap | null> } | null = null;
-let fallbackBundleCacheDir: string | undefined;
-
-export const setPrebuiltBundleCacheDir = (dir: string | undefined): void => {
-  fallbackBundleCacheDir = dir;
-};
-
-const readMap = async (cacheDir: string, id: string): Promise<SourceMap | null> => {
-  const dirs = fallbackBundleCacheDir ? [cacheDir, fallbackBundleCacheDir] : [cacheDir];
-  for (const dir of dirs) {
-    try {
-      const body = await fs.promises.readFile(path.join(bundlesDirIn(dir), `${id}.js.map`), "utf8");
-      return new SourceMap(JSON.parse(body));
-    } catch {
-      // Try next cache root.
-    }
-  }
-  return null;
-};
 
 const mapFor = (cacheDir: string, id: string): Promise<SourceMap | null> => {
   if (kept?.id !== id) {
-    const map = readMap(cacheDir, id);
+    const map = fs.promises
+      .readFile(path.join(bundlesDirIn(cacheDir), `${id}.js.map`), "utf8")
+      .then((body) => new SourceMap(JSON.parse(body)))
+      .catch(() => null);
     const mine = { id, map };
     kept = mine;
     setTimeout(() => {

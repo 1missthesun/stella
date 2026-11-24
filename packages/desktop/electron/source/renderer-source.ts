@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { absolutizeCssUrls, createTailwindBuild, cssModule, isTailwindStylesheet, type TailwindBuild } from "./css.js";
 import { bundleDependencies, fileDigest, prewarmDependencyBuilder, releaseDependencyBuilder, type DepBundle } from "./deps.js";
-import { envDefines, loadRendererEnv, runtimeEnvDefines } from "./env.js";
+import { envDefines, loadRendererEnv } from "./env.js";
 import {
   createModuleGraph,
   isInNodeModules,
@@ -13,7 +13,6 @@ import {
 } from "./modules.js";
 import { RENDERER_ORIGIN } from "./origin.js";
 import {
-  buildPageBundle,
   buildPageBundleApart,
   liveShim,
   notePageBundleStarted,
@@ -33,7 +32,6 @@ export { RENDERER_ORIGIN, RENDERER_SCHEME } from "./origin.js";
 const HTML_ENTRIES = ["index.html", "overlay.html", "companion.html"];
 const HOT_CLIENT_URL = "/src/platform/hot/hot-client.ts";
 const PDF_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.mjs";
-const ENV_MODULE_URL = "/@env";
 const PACK_PREFIX = "/@pack/";
 const LIVE_PREFIX = "/@live/";
 /** Long enough for the page that asked, and whatever an agent is still editing, to settle. */
@@ -132,20 +130,10 @@ export type RendererSourceOptions = {
   repoRoot: string;
   envDir: string;
   cacheDir: string;
-  /** Read-only prebuilt cache root (e.g. `packages/desktop/.prebuilt-renderer`). */
-  fallbackCacheDir?: string;
   mode: RendererBuildMode;
   log: (message: string) => void;
   onReloadNeeded: () => void;
   tailwind?: (file: string, source: string) => Promise<string>;
-  /** Build dependency bundles in a child process (default true). */
-  apart?: boolean;
-  /** Skip delayed background page-bundle builds (used by offline prebuild). */
-  skipAutoBundle?: boolean;
-  /** Skip eager post-sync module rendering (used by offline prebuild). */
-  skipPrewarm?: boolean;
-  /** Delay before warming cached Tailwind compiler; 0 disables background warming. */
-  tailwindWarmDelayMs?: number;
 };
 
 type Edge = { file: string; kind: "source" | "dep" | "asset"; dynamic: boolean; bare: boolean };
@@ -159,32 +147,28 @@ type StoredGraph = {
 };
 
 export const createRendererSource = async (options: RendererSourceOptions) => {
-  const { uiRoot, repoRoot, log, fallbackCacheDir } = options;
+  const { uiRoot, repoRoot, log } = options;
   const mode = options.mode;
   const hot = mode === "development";
-  const runtimeEnv = !hot;
   const env = loadRendererEnv(options.envDir, mode);
-  const defines = runtimeEnv ? runtimeEnvDefines(mode) : envDefines(env);
-  const envPrelude = `globalThis.__stellaEnv=${JSON.stringify(env)};`;
+  const defines = envDefines(env);
   const graph = createModuleGraph({
     tools: await loadOxcTools(),
     uiRoot,
     repoRoot,
     cacheDir: options.cacheDir,
-    fallbackCacheDir,
     development: hot,
     defines,
   });
-  const routes = createRouteTreeGenerator(loadRouteTools, uiRoot, options.cacheDir, fallbackCacheDir);
+  const routes = createRouteTreeGenerator(loadRouteTools, uiRoot, options.cacheDir);
   const publicDir = path.join(uiRoot, "public");
   const lockfile = path.join(repoRoot, "bun.lock");
   const hotClientFile = path.join(uiRoot, HOT_CLIENT_URL);
-  const graphRel = path.join(
+  const graphFile = path.join(
+    options.cacheDir,
     "graphs",
     `${createHash("sha256").update(`${repoRoot}\0${mode}`).digest("hex").slice(0, 16)}.json`,
   );
-  const graphFile = path.join(options.cacheDir, graphRel);
-  const fallbackGraphFile = fallbackCacheDir ? path.join(fallbackCacheDir, graphRel) : null;
 
   type PageInputs = { id: string; request: PageBundleRequest };
   let pageInputs = new Map<string, Promise<PageInputs | null>>();
@@ -197,11 +181,10 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       loadTools: loadDepTools,
       files: depFiles,
       cacheDir: options.cacheDir,
-      fallbackCacheDir,
       lockfile,
       mode,
       log,
-      apart: options.apart ?? true,
+      apart: true,
     }).then((bundle) => {
       deps = bundle;
       pageInputs = new Map();
@@ -219,14 +202,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     ((file: string, source: string) => {
       let build = tailwindBuilds.get(file);
       if (!build) {
-        build = createTailwindBuild({
-          loadTools: loadTailwindTools,
-          file,
-          root: uiRoot,
-          cacheDir: options.cacheDir,
-          fallbackCacheDir,
-          warmDelayMs: options.tailwindWarmDelayMs,
-        });
+        build = createTailwindBuild({ loadTools: loadTailwindTools, file, root: uiRoot, cacheDir: options.cacheDir });
         tailwindBuilds.set(file, build);
       }
       return build.build(source);
@@ -261,14 +237,12 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
 
 
   let nodes = new Map<string, GraphNode>();
-  let entryFiles = new Set<string>();
   let packs = new Map<string, { entry: string; stylesheets: string[] }>();
   let packed = new Map<string, Set<string>>();
-  let pendingGraphWrite: Promise<void> = Promise.resolve();
 
-  const readGraphFrom = async (file: string, lock: string): Promise<StoredGraph | null> => {
+  const readGraph = async (lock: string): Promise<StoredGraph | null> => {
     try {
-      const stored = JSON.parse(await fs.promises.readFile(file, "utf8")) as StoredGraph;
+      const stored = JSON.parse(await fs.promises.readFile(graphFile, "utf8")) as StoredGraph;
       return stored.version === GRAPH_FORMAT_VERSION && stored.tag === graph.cacheTag && stored.lock === lock
         ? stored
         : null;
@@ -276,10 +250,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       return null;
     }
   };
-
-  const readGraph = async (lock: string): Promise<StoredGraph | null> =>
-    (await readGraphFrom(graphFile, lock)) ??
-    (fallbackGraphFile ? await readGraphFrom(fallbackGraphFile, lock) : null);
 
   const writeGraph = async (stored: StoredGraph) => {
     await fs.promises.mkdir(path.dirname(graphFile), { recursive: true });
@@ -338,9 +308,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const next = new Map<string, GraphNode>();
     const seen = new Set<string>();
     let loaded = 0;
-    const htmlEntries = HTML_ENTRIES.flatMap(htmlEntryModules);
-    entryFiles = new Set(htmlEntries);
-    let frontier = [...new Set([...(hot ? [hotClientFile] : []), ...htmlEntries])];
+    let frontier = [...new Set([...(hot ? [hotClientFile] : []), ...HTML_ENTRIES.flatMap(htmlEntryModules)])];
     while (frontier.length > 0) {
       const following: string[] = [];
       await Promise.all(
@@ -406,7 +374,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
           if (stats) dirStamps[dir] = stats.mtimeMs;
         }),
       );
-      pendingGraphWrite = writeGraph({
+      void writeGraph({
         version: GRAPH_FORMAT_VERSION,
         tag: graph.cacheTag,
         lock,
@@ -518,7 +486,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     if (!id) return null;
     const known = held.get(id);
     if (known) return known;
-    const meta = await readPageBundleMeta(options.cacheDir, id, fallbackCacheDir);
+    const meta = await readPageBundleMeta(options.cacheDir, id);
     if (!meta) return null;
     const bundle = held.get(id) ?? { ...meta, id, floor: 0 };
     held.set(id, bundle);
@@ -563,7 +531,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       graph.cacheTag,
       repoRoot,
       uiRoot,
-      path.basename(bundle.dir),
+      bundle.dir,
       pack,
       sources.map(({ file, node }) => [file, node.stamp.key ?? [node.stamp.mtimeMs, node.stamp.size], node.edges]),
       jsonFiles.map((file) => [file, fileDigest(file)]),
@@ -574,13 +542,11 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         kind: "page",
         id,
         entryFile: pack.entry,
-        envUrl: runtimeEnv ? ENV_MODULE_URL : undefined,
         packUrl: `${PACK_PREFIX}${page}`,
         packedStylesheets: pack.stylesheets,
         uiRoot,
         repoRoot,
         cacheDir: options.cacheDir,
-        fallbackCacheDir,
         defines,
         depEntries: Object.fromEntries(bundle.entries),
         files: sources.map(({ file, node }) => ({ file, key: node.stamp.key })),
@@ -610,7 +576,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
    * built, it loads module by module until one is there.
    */
   const buildBundlesLater = () => {
-    if (hot || options.skipAutoBundle) return;
+    if (hot) return;
     if (bundleTimer) clearTimeout(bundleTimer);
     bundleTimer = setTimeout(() => {
       bundleTimer = null;
@@ -680,7 +646,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   };
 
   const prewarm = () => {
-    if (hot || options.skipPrewarm) return;
+    if (hot) return;
     const mine = generation;
     const page = packs.get("index.html");
     if (page) void packModule("index.html").catch(() => undefined);
@@ -733,10 +699,8 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const imported = new Set<string>();
     const skipped = packed.get(file);
     const page = [...packs].find(([, pack]) => pack.entry === file)?.[0];
-    const isHtmlEntry = page !== undefined || entryFiles.has(file);
     const importsLater = !hot && module.imports.some((ref) => ref.dynamic);
     const prefix = [
-      runtimeEnv && isHtmlEntry ? `import ${JSON.stringify(ENV_MODULE_URL)};` : "",
       hot && file !== hotClientFile ? HOT_HEADER : "",
       importsLater ? IMPORT_HEADER : "",
       page ? `import ${JSON.stringify(`${PACK_PREFIX}${page}`)};` : "",
@@ -839,7 +803,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const url = new URL(requestUrl);
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
     try {
-      if (pathname === ENV_MODULE_URL) return javascript(`${envPrelude}\n`);
       if (path.extname(pathname) !== ".html") await ready();
       if (pathname.startsWith("/@deps/")) {
         const bundle = deps ?? (await depsBuild);
@@ -909,7 +872,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         }
         const page = hot || url.search ? undefined : [...packs].find(([, pack]) => pack.entry === file)?.[0];
         const bundle = page ? await builtBundle(page) : null;
-        const code = bundle && (await takePageBundleCode(options.cacheDir, bundle.id, fallbackCacheDir));
+        const code = bundle && (await takePageBundleCode(options.cacheDir, bundle.id));
         if (bundle && code) {
           if (bundle.floor !== lastVersion) rendered.delete(bundle.id);
           bundle.floor = lastVersion;
@@ -1224,38 +1187,8 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     };
   };
 
-  const prebuild = async () => {
-    await ready();
-    await pendingGraphWrite;
-    // Wait past the current millisecond so files written by route generation
-    // have mtimes strictly older than the Tailwind scan timestamp.
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    await Promise.all([...packs.keys()].map((name) => packModule(name)));
-    await Promise.all([...tailwindBuilds.values()].map((build) => build.flush()));
-    const builtPages: string[] = [];
-    for (const page of packs.keys()) {
-      const inputs = await inputsOf(page);
-      if (!inputs) continue;
-      if (!(await holding(inputs.id))) {
-        await buildPageBundle({
-          request: inputs.request,
-          loadTools: async () => ({ ...(await loadDepTools()), ...(await loadOxcTools()) }),
-          log,
-        });
-      }
-      builtPages.push(page);
-    }
-    return {
-      pages: builtPages,
-      modules: nodes.size,
-      deps: depFiles.size,
-      depsDir: deps?.dir ?? null,
-    };
-  };
-
   return {
     prepare,
-    prebuild,
     handle,
     applyChanges,
     dispose: () => {

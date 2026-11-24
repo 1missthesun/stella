@@ -104,7 +104,6 @@ export const bundleDependencies = (options: {
   loadTools: () => Promise<DepTools>;
   files: Iterable<string>;
   cacheDir: string;
-  fallbackCacheDir?: string;
   lockfile: string;
   mode: string;
   log: (message: string) => void;
@@ -123,18 +122,7 @@ export const bundleDependencies = (options: {
     touchCacheEntry(path.join(dir, "manifest.json"));
     return Promise.resolve({ dir, entries: new Map(Object.entries(manifest)) });
   } catch {
-    // Not built yet in primary cache.
-  }
-  if (options.fallbackCacheDir) {
-    const fallbackDir = path.join(options.fallbackCacheDir, "deps", key);
-    try {
-      const manifest = JSON.parse(
-        fs.readFileSync(path.join(fallbackDir, "manifest.json"), "utf8"),
-      ) as Record<string, string>;
-      return Promise.resolve({ dir: fallbackDir, entries: new Map(Object.entries(manifest)) });
-    } catch {
-      // Not built in prebuilt cache either.
-    }
+    // Not built yet.
   }
   let build = building.get(dir);
   if (!build) {

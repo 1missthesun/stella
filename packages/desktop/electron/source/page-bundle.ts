@@ -14,7 +14,7 @@ import type { DepTools, OxcTools } from "./tools.js";
  * later (`import()`, a swap) reaches the bundled modules through `liveShim`,
  * which re-exports the script's own bindings.
  */
-const PAGE_BUNDLE_FORMAT_VERSION = "3";
+const PAGE_BUNDLE_FORMAT_VERSION = "2";
 const KEPT_PER_PAGE = 3;
 const ENTRY_ID = "\0stella-page-entry";
 const EMPTY_ID = "\0stella-empty";
@@ -46,13 +46,11 @@ export type PageBundleRequest = {
   kind: "page";
   id: string;
   entryFile: string;
-  envUrl?: string;
   packUrl: string;
   packedStylesheets: string[];
   uiRoot: string;
   repoRoot: string;
   cacheDir: string;
-  fallbackCacheDir?: string;
   defines: Record<string, string>;
   depEntries: Record<string, string>;
   files: PageBundleFile[];
@@ -69,28 +67,19 @@ export const pageBundleId = (page: string, inputs: unknown): string => {
 
 const BUNDLE_ID = /^[a-z0-9_]+-[0-9a-f]{20}$/i;
 
-export const readPageBundleMeta = async (
-  cacheDir: string,
-  id: string,
-  fallbackCacheDir?: string,
-): Promise<PageBundleMeta | null> => {
+export const readPageBundleMeta = async (cacheDir: string, id: string): Promise<PageBundleMeta | null> => {
   if (!BUNDLE_ID.test(id)) return null;
-  const readFrom = async (base: string, touch: boolean): Promise<PageBundleMeta | null> => {
-    const file = path.join(bundlesDirIn(base), `${id}.json`);
-    try {
-      const meta = JSON.parse(await fs.promises.readFile(file, "utf8")) as PageBundleMeta;
-      if (meta.version !== PAGE_BUNDLE_FORMAT_VERSION) return null;
-      if (touch) {
-        for (const extension of ["json", "js", "js.map"]) {
-          touchCacheEntry(path.join(bundlesDirIn(base), `${id}.${extension}`));
-        }
-      }
-      return meta;
-    } catch {
-      return null;
+  const file = path.join(bundlesDirIn(cacheDir), `${id}.json`);
+  try {
+    const meta = JSON.parse(await fs.promises.readFile(file, "utf8")) as PageBundleMeta;
+    if (meta.version !== PAGE_BUNDLE_FORMAT_VERSION) return null;
+    for (const extension of ["json", "js", "js.map"]) {
+      touchCacheEntry(path.join(bundlesDirIn(cacheDir), `${id}.${extension}`));
     }
-  };
-  return (await readFrom(cacheDir, true)) ?? (fallbackCacheDir ? await readFrom(fallbackCacheDir, false) : null);
+    return meta;
+  } catch {
+    return null;
+  }
 };
 
 const MAX_UNANSWERED = 2;
@@ -100,25 +89,13 @@ const startsFile = (cacheDir: string, id: string) => path.join(bundlesDirIn(cach
  * The script, unless the last pages that got it never ran it to its end
  * (`notePageBundleStarted`): those load module by module again.
  */
-export const takePageBundleCode = async (
-  cacheDir: string,
-  id: string,
-  fallbackCacheDir?: string,
-): Promise<Uint8Array | null> => {
-  const [primary, starts] = await Promise.all([
+export const takePageBundleCode = async (cacheDir: string, id: string): Promise<Uint8Array | null> => {
+  const [code, starts] = await Promise.all([
     fs.promises.readFile(path.join(bundlesDirIn(cacheDir), `${id}.js`)).catch(() => null),
     fs.promises.readFile(startsFile(cacheDir, id), "utf8").then(Number, () => 0),
   ]);
-  if (starts >= MAX_UNANSWERED) return null;
-  const code =
-    primary ??
-    (fallbackCacheDir
-      ? await fs.promises.readFile(path.join(bundlesDirIn(fallbackCacheDir), `${id}.js`)).catch(() => null)
-      : null);
-  if (!code) return null;
-  const startsPath = startsFile(cacheDir, id);
-  await fs.promises.mkdir(path.dirname(startsPath), { recursive: true }).catch(() => undefined);
-  await fs.promises.writeFile(startsPath, String(starts + 1)).catch(() => undefined);
+  if (!code || starts >= MAX_UNANSWERED) return null;
+  await fs.promises.writeFile(startsFile(cacheDir, id), String(starts + 1)).catch(() => undefined);
   return code;
 };
 
@@ -181,7 +158,6 @@ export const buildPageBundle = async (options: {
     uiRoot: request.uiRoot,
     repoRoot: request.repoRoot,
     cacheDir: request.cacheDir,
-    fallbackCacheDir: request.fallbackCacheDir,
     development: false,
     defines: request.defines,
   });
@@ -227,11 +203,7 @@ export const buildPageBundle = async (options: {
 
   const modules: Record<string, BundledModule> = {};
   const json: Record<string, string> = {};
-  const entryLines = [
-    ...(request.envUrl ? [`import ${JSON.stringify(request.envUrl)};`] : []),
-    `import ${JSON.stringify(request.packUrl)};`,
-    `import ${JSON.stringify(request.entryFile)};`,
-  ];
+  const entryLines = [`import ${JSON.stringify(request.packUrl)};`, `import ${JSON.stringify(request.entryFile)};`];
   for (const { file } of request.files) {
     if (file === request.entryFile) continue;
     const { names, stars } = collect(file, new Set());
@@ -251,11 +223,7 @@ export const buildPageBundle = async (options: {
     name: "stella-page-bundle",
     resolveId(source: string, importer: string | undefined, extra: { kind?: string }) {
       if (source === ENTRY_ID || source === EMPTY_ID || source.startsWith(ASSET_PREFIX)) return source;
-      if (importer === ENTRY_ID) {
-        return source === request.packUrl || (request.envUrl !== undefined && source === request.envUrl)
-          ? { id: source, external: true }
-          : source;
-      }
+      if (importer === ENTRY_ID) return source === request.packUrl ? { id: source, external: true } : source;
       if (!importer || extra.kind === "dynamic-import") return { id: source, external: true };
       const resolved = graph.resolveImport(source, importer);
       if (!resolved) return { id: source, external: true };

@@ -37,11 +37,6 @@ const steps = [
     "packages/stella-office/scripts/ensure-native.js",
     "--best-effort",
   ],
-  [
-    "prebuilt renderer",
-    "packages/desktop/scripts/prebuild-renderer.mjs",
-    "--best-effort",
-  ],
 ];
 
 const env = { ...process.env };

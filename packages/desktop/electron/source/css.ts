@@ -14,7 +14,6 @@ export const createTailwindBuild = (options: {
   file: string;
   root: string;
   cacheDir?: string;
-  fallbackCacheDir?: string;
   warmDelayMs?: number;
 }) => {
   type Compiler = Awaited<ReturnType<TailwindTools["compileTailwind"]>>;
@@ -35,17 +34,15 @@ export const createTailwindBuild = (options: {
     return false;
   };
   const inputs = new Set<string>();
-  const cacheRel = path.join(
-    "tailwind",
-    `${createHash("sha256").update(options.file).digest("hex").slice(0, 16)}.json`,
-  );
-  const cacheFile = options.cacheDir ? path.join(options.cacheDir, cacheRel) : null;
-  const fallbackCacheFile = options.fallbackCacheDir
-    ? path.join(options.fallbackCacheDir, cacheRel)
+  const cacheFile = options.cacheDir
+    ? path.join(
+        options.cacheDir,
+        "tailwind",
+        `${createHash("sha256").update(options.file).digest("hex").slice(0, 16)}.json`,
+      )
     : null;
   const digest = (source: string) =>
     createHash("sha256").update(`${TAILWIND_CACHE_VERSION}\0${source}`).digest("hex");
-  let pendingPersist: Promise<void> = Promise.resolve();
 
   const compile = async (source: string): Promise<string> => {
     if (await stale()) {
@@ -76,9 +73,7 @@ export const createTailwindBuild = (options: {
     const startedAt = Date.now();
     for (const candidate of current.scanner.scan()) current.candidates.add(candidate);
     const css = current.compiler.build([...current.candidates]);
-    if (cacheFile) {
-      pendingPersist = persist(current, source, css, startedAt).catch(() => undefined);
-    }
+    if (cacheFile) void persist(current, source, css, startedAt).catch(() => undefined);
     return css;
   };
 
@@ -121,17 +116,17 @@ export const createTailwindBuild = (options: {
     await fs.promises.rename(temporary, cacheFile!);
   };
 
-  const cachedFrom = async (file: string | null, source: string): Promise<string | null> => {
-    if (!file) return null;
+  const cached = async (source: string): Promise<string | null> => {
+    if (!cacheFile) return null;
     let entry: { digest: string; files: [string, number, number][]; dirs: [string, number, number][]; css: string };
     try {
-      entry = JSON.parse(await fs.promises.readFile(file, "utf8"));
+      entry = JSON.parse(await fs.promises.readFile(cacheFile, "utf8"));
     } catch {
       return null;
     }
     if (entry.digest !== digest(source)) return null;
-    const unchanged = async ([target, mtimeMs, size]: [string, number, number], isDir: boolean) => {
-      const stats = await fs.promises.stat(target).catch(() => null);
+    const unchanged = async ([file, mtimeMs, size]: [string, number, number], isDir: boolean) => {
+      const stats = await fs.promises.stat(file).catch(() => null);
       return Boolean(stats && stats.mtimeMs === mtimeMs && (isDir || stats.size === size));
     };
     const checks = await Promise.all([
@@ -140,9 +135,6 @@ export const createTailwindBuild = (options: {
     ]);
     return checks.every(Boolean) ? entry.css : null;
   };
-
-  const cached = async (source: string): Promise<string | null> =>
-    (await cachedFrom(cacheFile, source)) ?? (await cachedFrom(fallbackCacheFile, source));
 
   let queue: Promise<unknown> = Promise.resolve();
   const serially = <T>(task: () => Promise<T>): Promise<T> => {
@@ -154,13 +146,12 @@ export const createTailwindBuild = (options: {
 
   return {
     inputs,
-    flush: () => pendingPersist,
     build: (source: string): Promise<string> =>
       serially(async () => {
         if (!state) {
           const hit = await cached(source);
           if (hit !== null) {
-            if (!warmTimer && options.warmDelayMs !== 0) {
+            if (!warmTimer) {
               warmTimer = setTimeout(() => {
                 void serially(async () => {
                   if (!state) await compile(source);

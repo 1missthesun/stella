@@ -4,8 +4,6 @@ import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { app, protocol, session, utilityProcess, webContents } from "electron";
 import { RENDERER_ORIGIN, RENDERER_SCHEME, SOURCE_DATA_ARG } from "./origin.js";
-import { setPrebuiltBundleCacheDir } from "./bundle-stacks.js";
-import { resolvePrebuiltRendererDir } from "./prebuilt-cache.js";
 import { MEDIA_SCHEME_PRIVILEGES, serveMediaProtocol } from "./media-protocol.js";
 import { CANVAS_SCHEME_PRIVILEGES, serveCanvasProtocol } from "./canvas-protocol.js";
 import type { RanImports } from "./renderer-source.js";
@@ -277,16 +275,12 @@ export const serveRendererSource = (options: {
   };
   const fullPage = () => pages().find((contents) => pageName(contents.getURL()) === SWAP_PAGE) ?? null;
   const uiRoot = path.join(options.sourceRoot, "packages", "desktop-ui");
-  const cacheDir = rendererCacheDir();
-  if (options.mode === "production") {
-    setPrebuiltBundleCacheDir(resolvePrebuiltRendererDir(options.sourceRoot, cacheDir));
-  }
   const source = startSourceWorker({
     workerData: {
       uiRoot,
       repoRoot: options.sourceRoot,
       envDir: path.join(options.envRoot ?? options.sourceRoot, "packages", "desktop-ui"),
-      cacheDir,
+      cacheDir: rendererCacheDir(),
       mode: options.mode,
     },
     isolate: options.isolate ?? "thread",

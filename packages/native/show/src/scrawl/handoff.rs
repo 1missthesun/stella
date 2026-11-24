@@ -1,6 +1,3 @@
-//! Stand-ins for Scrawl's app config (`handoff.rs`): Stella has no `config.json`, so
-//! experiments are off and auto-crop uses its defaults.
-
 use std::path::{Path, PathBuf};
 
 pub const AGENT_CONTEXT: &str = "agentContext";

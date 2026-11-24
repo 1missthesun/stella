@@ -1,8 +1,3 @@
-// window_info - Returns JSON info about the window at a given screen point
-// Usage: window_info <x> <y> [--exclude-pids=1,2,3] [--screenshot=path.png] [--set-bounds=x,y,w,h]
-// Build: swiftc -O -o window_info src/window_info.swift -framework CoreGraphics -framework AppKit
-// Output: {"title":"...","process":"...","pid":123,"bounds":{"x":0,"y":0,"width":800,"height":600}}
-
 import AppKit
 import ApplicationServices
 import CoreGraphics
@@ -92,17 +87,10 @@ func escapeJson(_ s: String) -> String {
     return out
 }
 
-/// Topmost on-screen window containing `point`, as a JSON object string
-/// (`{title,process,pid,bounds}`) or nil. Shares the same layer-0 / area /
-/// exclude-pid filtering as the single-point path; used by the batch
-/// `--points` mode so a single `CGWindowListCopyWindowInfo` answers many
-/// points instead of one process spawn per point.
 func windowJson(at point: CGPoint, in windowList: [[String: Any]], excludedPids: Set<Int>) -> String? {
     windowMatch(at: point, in: windowList, excludedPids: excludedPids)?.json
 }
 
-/// The window `windowJson` describes, with its window-server id and size so
-/// the serve loop can screenshot it.
 func windowMatch(
     at point: CGPoint,
     in windowList: [[String: Any]],
@@ -139,13 +127,9 @@ private final class WindowScreenshotResult: @unchecked Sendable {
     var wasWritten: Bool { lock.lock(); defer { lock.unlock() }; return written }
 }
 
-/// Writes a PNG of one window, isolated from whatever overlaps it, using
-/// ScreenCaptureKit in this process. The desktop asks the long-lived
-/// `--serve` daemon for these rather than spawning a capture process per
-/// screenshot: macOS attributes every screen capture to the capturing
-/// process, and systemstatusd keeps failing to resolve capture clients that
-/// have already exited. Returns false when the capture failed or missed its
-/// deadline (replayd not answering).
+/// macOS attributes every screen capture to the capturing process, and
+/// systemstatusd keeps failing to resolve capture clients that have already
+/// exited, so screenshots come from the long-lived `--serve` process.
 func writeWindowScreenshot(windowID: CGWindowID, size: CGSize, to path: String) -> Bool {
     guard windowID != 0 else { return false }
     let result = WindowScreenshotResult()
@@ -305,15 +289,6 @@ func setAXWindowBounds(pid: Int, title: String, oldBounds: CGRect, newBounds: CG
     return (moved, axFrame(window))
 }
 
-// Persistent daemon: `window_info --serve` answers point/batch queries over
-// stdin/stdout so the desktop avoids a process spawn (Swift + framework load,
-// ~40ms each) per hover/morph probe. `<x> <y> --screenshot=<path>` also works
-// here, so window screenshots come from this long-lived process instead of a
-// short-lived one per capture (see writeWindowScreenshot). --set-bounds stays
-// one-shot.
-// Protocol mirrors the Windows daemon:
-//   request:  <id>\t<token>\t<token>...   (tokens mirror the one-shot CLI)
-//   response: <id>\t<json>\n
 func serveResponse(forTokens tokens: [String]) -> String {
     let slice = tokens[...]
     let excludedPids = parseExcludedPids(slice)
@@ -378,10 +353,6 @@ if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "--serve" {
     exit(0)
 }
 
-// Batch mode: `window_info --points=x1,y1;x2,y2;...` answers many points from
-// a single window-list copy and prints a JSON array (one entry per point, in
-// order; null when no window is found). Used by the morph-visibility gate so a
-// transition probes N sample points with one process spawn instead of N.
 if let batchPoints = parsePoints(CommandLine.arguments.dropFirst()) {
     let excludedPids = parseExcludedPids(CommandLine.arguments.dropFirst())
     guard let windowList = CGWindowListCopyWindowInfo(
@@ -411,7 +382,6 @@ let excludedPids = parseExcludedPids(extraArgs)
 let screenshotPath = parseScreenshotPath(extraArgs)
 let setBounds = parseSetBounds(extraArgs)
 
-// Get all on-screen windows (excluding desktop elements)
 guard let windowList = CGWindowListCopyWindowInfo(
     [.optionOnScreenOnly, .excludeDesktopElements],
     kCGNullWindowID
@@ -420,7 +390,6 @@ guard let windowList = CGWindowListCopyWindowInfo(
     exit(0)
 }
 
-// Find the topmost window whose bounds contain the point
 for window in windowList {
     guard let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
           let wx = boundsDict["X"],
@@ -462,7 +431,6 @@ for window in windowList {
     """
     print(json.trimmingCharacters(in: .whitespacesAndNewlines))
 
-    // Capture screenshot if requested (ScreenCaptureKit replaces deprecated CGWindowListCreateImage)
     if let ssPath = screenshotPath, windowID != 0 {
         _ = writeWindowScreenshot(windowID: windowID, size: CGSize(width: ww, height: wh), to: ssPath)
     }

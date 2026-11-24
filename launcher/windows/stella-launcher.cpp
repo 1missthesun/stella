@@ -1111,8 +1111,7 @@ static void downloadOnce(const string &url, const wstring &dest, const string &s
 
 // GitHub release downloads answer 502/504 or time out (error 12002) for
 // minutes at a time, so a GitHub asset is fetched from Stella's mirror of it
-// first (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with
-// a growing pause. The checksum makes either source equally trustworthy.
+// first.
 static void download(const string &url, const wstring &dest, const string &sha256) {
     static const string kGitHub = "https://github.com/";
     vector<string> sources;
@@ -1256,8 +1255,6 @@ struct Recovery {
     wstring capturePath;
 };
 
-// Files changed outside Stella's updates: the working tree as git would commit
-// it, compared with the newest commit this launcher signed.
 struct OutsideChanges {
     struct File {
         string kind, path;
@@ -1544,9 +1541,6 @@ static const IID kIID_CapturePreviewCompleted = {0x697e05e9, 0x3d8f, 0x45fa, {0x
 static const IID kIID_Controller2 = {0xc979903e, 0xd4ca, 0x4228, {0x92, 0xeb, 0x47, 0xee, 0x3f, 0xa9, 0x6e, 0xab}};
 static const IID kIID_Settings3 = {0xfdb5ab74, 0xaf33, 0x4854, {0x84, 0xf0, 0x0a, 0x63, 0x1d, 0xeb, 0x5e, 0xba}};
 
-// A COM callback from a lambda: each WebView2 handler interface is IUnknown
-// plus one Invoke. Created with one reference, which the creator releases
-// after handing it to WebView2 (which holds its own).
 template <typename I, typename M = decltype(&I::Invoke)> class Callback;
 template <typename I, typename... A> class Callback<I, HRESULT (STDMETHODCALLTYPE I::*)(A...)> final : public I {
 public:
@@ -2440,7 +2434,6 @@ static void cloneSource() {
         bootstrapAccess(remote, token);
         args.push_back("--branch");
         args.push_back(kUpstreamBranch);
-        // Through the environment: the token stays out of argv and the clone's config.
         env = {{L"GIT_CONFIG_COUNT", L"2"},
                {L"GIT_CONFIG_KEY_0", L"http.extraHeader"},
                {L"GIT_CONFIG_VALUE_0", wide("Authorization: Bearer " + token)},
@@ -2471,8 +2464,6 @@ static bool parseVersion(const string &text, unsigned long long &out) {
     return true;
 }
 
-// What `exe --version` says; 0 when it can't say (a launcher from before
-// versions ignores the flag, finds the lock taken and exits).
 static unsigned long long launcherVersionOf(const wstring &exe) {
     try {
         CmdResult r = runCmd({exe, L"--version"}, parentDir(exe), currentEnvironment(), L"", 10);
@@ -2592,10 +2583,6 @@ static void verifySigner(const wstring &path) {
     if (signer != kUpdateSigner) fail("it is signed by \"" + utf8(signer) + "\", not " + utf8(kUpdateSigner));
 }
 
-// Make `update` the installed launcher. The installed copy (perhaps this
-// very process) moves to Stella.exe.old; when that name is taken by a
-// launcher still running from it, the installed copy isn't running and can
-// simply be deleted.
 static void stageUpdate(const wstring &update, unsigned long long version) {
     std::lock_guard<std::mutex> lock(gUpdateLock);
     wstring installed = installedLauncher(), old = installed + L".old";
@@ -2830,8 +2817,6 @@ static string newestSignedAncestor(const string &head) {
     return string();
 }
 
-// The tree `git add -A` would produce, built in a scratch copy of the index so
-// the checkout's own index is untouched.
 static string workingTree() {
     wstring index = wide(gGit->run({"rev-parse", "--git-path", "index"}, P.app()));
     for (auto &c : index)
@@ -2881,9 +2866,6 @@ static bool outsideChanges(OutsideChanges &out) {
 
 static string signHead(const string &expected);
 
-// Makes exactly `seen` the trusted state: commits the working tree as it was
-// shown, then signs it. Changes nothing when the checkout no longer matches
-// what the user saw; the next check shows it again.
 static void acceptOutsideChanges(const OutsideChanges &seen) {
     OutsideChanges now;
     if (!outsideChanges(now)) return;
@@ -2915,11 +2897,8 @@ static string signHead(const string &expected) {
     return head;
 }
 
-// On install, after a relaunch request and after a rollback. Returns electron.exe.
 // Electron keeps its own name: it decides app.isPackaged from the executable's
-// name, and launcher runs are source runs (the macOS launcher keeps
-// CFBundleExecutable "Electron" for the same reason). Stella's identity comes
-// from the AppUserModelID shortcut instead.
+// name, and launcher runs are source runs.
 static wstring prepare() {
     wstring app = P.app();
     string lockHash = sha256File(app + L"\\bun.lock");
@@ -3434,7 +3413,7 @@ static Outcome supervise(const wstring &electron) {
                 process->forceKill();
             }
         } else {
-            Sleep(300);  // let the output reader drain the pipe
+            Sleep(300);
             vector<string> output = process->output->lastLines();
             string detail = format("exit %lu", event.code);
             LOG("supervisor: Electron exited (%s)", detail.c_str());
@@ -3507,18 +3486,6 @@ static void returnToKnownGood() {
     signHead("");
 }
 
-// Stella versions from 2026-10-14 until the fix (dir-links.ts) build their
-// update check on a scratch copy with the app's node_modules linked in by a
-// plain directory symlink, which Windows refuses without admin rights or
-// Developer Mode (EPERM). On such a version every update that restarts
-// Stella fails inside the app, so the app can never update past it by
-// itself. The launcher, which updates itself, takes it over the hump once:
-// before starting Stella it moves the checkout to the published version when
-// that version has the fix, the way an Update would (a fast-forward, or a
-// clean merge over the user's own changes), and signs it. A conflict, a
-// failure or an unpublished fix leaves everything as it was. Tried once per
-// published version (state caughtUpTo), so a version that won't start and is
-// rolled back to the last working one is not retried.
 static const char *kBrokenUpdateCheck = "packages/desktop/electron/services/app-source/update-gate.ts";
 static const char *kFixedUpdateCheck = "packages/desktop/electron/services/app-source/dir-links.ts";
 

@@ -103,9 +103,8 @@ final class OutputPipe {
     }
 }
 
-/// One Electron process: spawned with responsibility disclaimed (so Stella.app,
-/// not the launcher, owns its TCC prompts), fd 3 a socketpair for the
-/// launcher channel, stdout/stderr captured.
+/// Spawned with responsibility disclaimed so Stella.app, not the launcher,
+/// owns its TCC prompts.
 final class ElectronProcess {
     enum Event {
         case message([String: Any])
@@ -245,7 +244,6 @@ final class ElectronProcess {
         DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { events.post(.timer(name)) }
     }
 
-    /// False when processes Electron started still hold the pipe open.
     func drainOutputAfterExit() -> Bool {
         !outputPipe.readAvailable()
     }

@@ -7,8 +7,6 @@ cxx="${MINGW_CXX:-$triple-g++}"
 if command -v "$triple-g++-posix" >/dev/null 2>&1; then cxx="$triple-g++-posix"; fi
 mkdir -p build/include
 
-# WebView2's COM interfaces: only WebView2.h, from the pinned NuGet package.
-# Stella.exe finds the installed runtime itself, so no WebView2Loader.dll.
 webview2_version=1.0.4258.31
 webview2_sha256=56f7f4b8bf9aee4b8efefbbdd4f67d5f74ebd1b100ed0806da71bf76af481aa9
 if [ "$(cat build/include/WebView2.version 2>/dev/null)" != "$webview2_version" ]; then

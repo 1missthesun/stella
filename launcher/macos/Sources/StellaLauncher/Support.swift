@@ -294,9 +294,7 @@ enum Net {
     }
 
     /// GitHub release downloads answer 502/504 or time out for minutes at a
-    /// time, so a GitHub asset is fetched from Stella's mirror of it first
-    /// (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with a
-    /// growing pause. The checksum makes either source equally trustworthy.
+    /// time, so a GitHub asset is fetched from Stella's mirror of it first.
     static func download(_ url: URL, to destination: URL, sha256 expected: String) throws {
         let github = "https://github.com/"
         var sources = [url]

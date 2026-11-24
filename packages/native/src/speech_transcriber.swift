@@ -1,26 +1,7 @@
-// speech_transcriber - On-device speech recognition for Stella (macOS).
-//
-// Usage:
-//   speech_transcriber probe [--locale ID]...
-//   speech_transcriber stream [--locale ID]... [--prompt]
-//   speech_transcriber file <audio-file> [--locale ID]... [--prompt]
-//
-// The first `--locale` whose language the engine supports wins; none given
-// means the system's locale. Another language is never substituted. Recognition never leaves the Mac: macOS 26+ uses
-// SpeechAnalyzer (no Speech Recognition permission), older versions use
-// SFSpeechRecognizer with `requiresOnDeviceRecognition`, which needs that
-// permission. Without `--prompt` an undetermined permission is reported, never
-// requested, because TCC charges the request to the responsible app.
-//
-// `stream` reads 16 kHz mono signed 16-bit little-endian PCM on stdin until
-// EOF. Output is NDJSON on stdout:
-//   {"type":"ready","engine":"analyzer"|"sfspeech","locale":"en-US"}
-//   {"type":"partial","text":"..."}
-//   {"type":"final","text":"...","words":[{"w":"Hello","s":0.42,"e":0.71}]}
-//   {"type":"error","code":"...","message":"..."}
-// `probe` prints one object:
-//   {"available":true,"engine":"...","locale":"...","authorization":"...",
-//    "reason":"...","locales":["en-US",...]}
+// macOS 26+ SpeechAnalyzer needs no Speech Recognition permission; older
+// versions' SFSpeechRecognizer with `requiresOnDeviceRecognition` needs it.
+// Without `--prompt` an undetermined permission is reported, never requested,
+// because TCC charges the request to the responsible app.
 
 @preconcurrency import AVFoundation
 import Foundation
@@ -89,8 +70,6 @@ func sameRegion(_ a: Locale, _ b: Locale) -> Bool {
     sameLanguage(a, b) && a.region == b.region
 }
 
-/// The best supported locale for the first candidate that has one: exact
-/// region first, then the language with the system's region, then any.
 func pickLocale(_ candidates: [Locale], supported: [Locale]) -> Locale? {
     for candidate in candidates {
         if let exact = supported.first(where: { sameRegion($0, candidate) }) { return exact }
@@ -217,7 +196,6 @@ func fileBuffers(_ path: String) throws -> [AVAudioPCMBuffer] {
     return buffers
 }
 
-/// Feeds audio from stdin or a file into `push`, then calls `end`.
 func feedAudio(_ options: Options, push: @escaping (AVAudioPCMBuffer) -> Void, end: @escaping () -> Void) {
     if let path = options.file {
         DispatchQueue.global().async {
@@ -238,8 +216,6 @@ func feedAudio(_ options: Options, push: @escaping (AVAudioPCMBuffer) -> Void, e
     }
     input.startReading()
 }
-
-// MARK: - SFSpeechRecognizer (macOS 14-15, and 26 when SpeechTranscriber is unavailable)
 
 func legacyLocale(_ candidates: [Locale]) -> Locale? {
     let supported = SFSpeechRecognizer.supportedLocales().filter {
@@ -358,8 +334,6 @@ func runLegacy(_ options: Options, candidates: [Locale]) -> Never {
     dispatchMain()
 }
 
-// MARK: - SpeechAnalyzer (macOS 26+)
-
 @available(macOS 26.0, *)
 func analyzerLocale(_ candidates: [Locale]) async -> Locale? {
     let supported = await SpeechTranscriber.supportedLocales
@@ -446,8 +420,6 @@ func runAnalyzer(_ options: Options, locale: Locale) async {
         fail("analyzer", error.localizedDescription)
     }
 }
-
-// MARK: - Commands
 
 func probe(_ options: Options) async -> [String: Any] {
     let candidates = candidateLocales(options.locales)

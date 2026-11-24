@@ -1,5 +1,3 @@
-//! Scrawl's `agentContext` experiment is off in Stella; `sketch` asks for it only when on.
-
 use crate::model::ScrawlBundle;
 
 pub struct FrameText {

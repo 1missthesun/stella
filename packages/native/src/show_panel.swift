@@ -1,31 +1,9 @@
-// show_panel: Show Stella's clickable surfaces on macOS, as panels that never
-// bring Stella forward. Electron's own "panel" windows are plain windows that
-// activate the app (and raise its windows) on any click, so the parts of Show
-// Stella that take clicks while another app is in front live here:
-//
-//   - a catch layer over the recorded display while ⇧ alone is held, so pin
-//     clicks and ⇧-drags never reach the app below. The helper watches ⇧
-//     itself, so the layer is up before a quick ⇧-click lands;
-//   - click areas over the recording bar's buttons (Done);
-//   - the finish card: thumbnail, length, a note field, Send, Open in Stella,
-//     and discard. Typing in its note field doesn't activate Stella either.
-//
-// Protocol: one JSON object per line on stdin, one per line on stdout.
-// Rects are Electron screen points (top-left origin of the primary display).
-//
-//   in:  {"cmd":"arm","rect":{x,y,width,height}|null}  (null disarms)
-//        {"cmd":"hit","id":"done","rect":{...}|null}
-//        {"cmd":"card","card":{"x":centerX,"y":top,"title":"…","status":"…"|null,
-//          "image":"/path.png"|null,"sendEnabled":true,
-//          "strings":{"note":"…","send":"…","open":"…","discard":"…"}}}
-//        {"cmd":"hideCard"}  {"cmd":"quit"}
-//   out: {"event":"ready"}  {"event":"hit","id":"done"}
-//        {"event":"card","action":"send"|"open"|"discard","note":"…"}
-//        {"event":"engaged","on":true,"typing":false}
+// Electron's own "panel" windows are plain windows that activate the app (and
+// raise its windows) on any click, so Show Stella's clickable surfaces live
+// here as panels that never bring Stella forward. Rects arrive as Electron
+// screen points (top-left origin of the primary display).
 
 import AppKit
-
-// MARK: - Output
 
 let outLock = NSLock()
 func emit(_ object: [String: Any]) {
@@ -37,8 +15,6 @@ func emit(_ object: [String: Any]) {
   outLock.unlock()
 }
 
-// MARK: - Geometry
-
 func appKitRect(_ rect: [String: Any]) -> NSRect? {
   guard let x = (rect["x"] as? NSNumber)?.doubleValue,
     let y = (rect["y"] as? NSNumber)?.doubleValue,
@@ -49,10 +25,6 @@ func appKitRect(_ rect: [String: Any]) -> NSRect? {
   return NSRect(x: x, y: primaryHeight - y - h, width: w, height: h)
 }
 
-// MARK: - Panels
-
-/// A borderless panel that takes clicks (and, for the card, keys) without
-/// activating this app or Stella. Never captured.
 final class StellaPanel: NSPanel {
   var keyable = false
   override var canBecomeKey: Bool { keyable }
@@ -74,7 +46,6 @@ final class StellaPanel: NSPanel {
   }
 }
 
-/// Swallows every click (the catch layer) or reports it (a hit area).
 final class ClickView: NSView {
   var onClick: (() -> Void)?
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -103,13 +74,9 @@ var armedFrame: NSRect?
 var watcher: Timer?
 var catching = false
 
-/// Armed area in Quartz (top-left origin) coordinates, for the event tap.
 var armedQuartz: CGRect?
 var tap: CFMachPort?
 
-/// Drops ⇧-clicks and ⇧-drags inside the armed area before any app sees
-/// them. Stella's own listener (earlier in the chain) has already recorded
-/// them as pins and ink. Needs Accessibility, which ink needs anyway.
 func startTap() -> Bool {
   if tap != nil { return true }
   let types: [CGEventType] = [
@@ -139,8 +106,6 @@ func startTap() -> Bool {
   return true
 }
 
-/// While armed, ⇧-clicks inside the area never reach the app below: an
-/// event tap drops them, or (without one) a catch layer goes up while ⇧ is held.
 func setArmed(_ rect: [String: Any]?) {
   armedFrame = rect.flatMap(appKitRect)
   armedQuartz = rect.flatMap { r -> CGRect? in
@@ -183,8 +148,6 @@ func setHit(_ id: String, _ rect: [String: Any]?) {
   panel.orderFrontRegardless()
 }
 
-// MARK: - Finish card
-
 let ink = NSColor(srgbRed: 0xf4 / 255, green: 0xf2 / 255, blue: 0xec / 255, alpha: 1)
 let muted = NSColor(srgbRed: 0xa9 / 255, green: 0xa7 / 255, blue: 0xa0 / 255, alpha: 1)
 let surface = NSColor(srgbRed: 22 / 255, green: 22 / 255, blue: 26 / 255, alpha: 0.96)
@@ -192,8 +155,6 @@ let dark = NSColor(srgbRed: 0x16 / 255, green: 0x16 / 255, blue: 0x1a / 255, alp
 
 func uiFont(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont { .systemFont(ofSize: size, weight: weight) }
 
-/// The contact sheet, filling its box from the top-left like `object-fit: cover`.
-/// The record glyph shown with Record screen everywhere: a ring around a filled dot.
 final class RecordGlyph: NSView {
   override var intrinsicContentSize: NSSize { NSSize(width: 13, height: 13) }
   override func draw(_ dirtyRect: NSRect) {
@@ -223,7 +184,6 @@ final class ThumbView: NSView {
   }
 }
 
-/// A flat button drawn to match the recording bar.
 final class FlatButton: NSButton {
   enum Style { case primary, outline, icon }
   let style: Style
@@ -322,7 +282,6 @@ final class Card: NSObject, NSTextFieldDelegate {
         self?.reportEngaged()
       }
     }
-    // Shown after the recording has ended, so it can appear in screenshots.
     panel.sharingType = .readOnly
     panel.hasShadow = true
     send = FlatButton(title: "Send", style: .primary, target: self, action: #selector(sendClicked))
@@ -508,8 +467,6 @@ final class HoverView: NSView {
   override func mouseExited(with event: NSEvent) { onHover?(false) }
 }
 
-// MARK: - Input
-
 var card: Card?
 
 func process(_ line: String) {
@@ -541,7 +498,6 @@ var buffer = Data()
 FileHandle.standardInput.readabilityHandler = { handle in
   let chunk = handle.availableData
   if chunk.isEmpty {
-    // Stella went away.
     DispatchQueue.main.async { exit(0) }
     return
   }

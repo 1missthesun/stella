@@ -1,6 +1,3 @@
-// stella-computer-helper.exe - Windows UI Automation + Win32 bridge for Stella.
-// Usage: stella-computer-helper.exe <operation.json>
-
 #define NOMINMAX
 #include <windows.h>
 #include <UIAutomationClient.h>
@@ -373,9 +370,6 @@ static bool envFlag(const char* name) {
     return v == "1" || v == "true" || v == "yes" || v == "on";
 }
 
-// This is the same 23x24 cursor artwork used by the browser agent cursor. Keep
-// the bytes in the native helper so background Win32 input can have the same
-// visual affordance without involving Stella's renderer.
 static const char* kAgentCursorPngBase64 =
     "iVBORw0KGgoAAAANSUhEUgAAAC4AAAAwCAYAAABuZUjcAAAABmJLR0QA/wD/AP+gvaeTAAAEeklEQVRoge2YXWgcVRTHf2dndzOzm6+KiUUMhNooNG0qeQhNJaZpEiNFm6ItPhQSxYBiBeubCmJ9ENsH0QcRpakWLJogQdpSUCJpkgcJJimIGLGlsMU8pEpr0jQfm93k+DCTr5pkszuzTcH9wzCXYff+f+cy95xzBzLKKKN7UpLoB6pqAk3AY8AvwFciMpluMFdSVVNV+3S5/lTVZlX1bTTfqlLVl1VVY19e09HGAR07HtHYyMx8AIOqWrdRbIlWrRRg8tzfRKMGoxdvE2mJMHLqJrMTc+VAp6r2qmpN+lGXKxH4rwBU3M+0BohqgKkZP8Ptk/Q33SDSNk18SquALieA/XfrFVpzc6pqCPgjfj32UKQlwtSMn6gG7CCw75obZMuhICWNQiAEwGXgY+CMiIxvCLgD3wycHjl1k+H2yWXQ80FMi0EsF0r2QXkj5BcCMA60AydF5OeNAPcB/bMTc+X9TTeYuGX8B3rCDxMGTBowlQVbd8HuetheBmI7DAFtQJuIXLkr4A58HdAZaZvmt9bYqtB3jsMPwN5qqK2EosKF6S4B54ELwKCIzKUN3IHvjU9p1feHZ7g16k8IvXQcy4JHS6ChHBp2QFH+wrTXgR+AHqBHRK6mA7wG6Br6RulrlaSgY6Z9j5v2eMuDsHcr1BdDRQEEF/PQMNAHDDjXoIiMugJ34Htjk1R9cRj+iaYGHTMhnrU4DoagcjPUFED1fVAWhvBiILPAWeClOwNIFnw/cLbrJHSfcw8dzwKxwDKVkKVYlhK2lG05sDMMFaZQZxgIdIjIQTfgPuD30b945P1X7XznJbRlOeMlz44SYA/GHJArIhPzLElVOScDfJRfaKe8dEOvpVTK8xlgfHd9eqE3IbxCgGoMgO+WrnZK4CJyG2jbXmbnaa+hCy14AT+fkcVTGIi9OVu8WHGAVhG7uHgFHbaUZywfnxLkAH6yoAt4XEQOrJQSUwJ3eo+h2kpvoB8OwYdWgNcIkINcBupFpFZEflqNwU0L2lZUaFdEN9B12cInZoBSfFHgGFAmIj8mMncD/jXYZTwV6LCpHM01eDcYIBu5BuwRkfdEJLoe85TBnb7iUsOO5KFzTOVYnp/n/AbYm2+niPQl4+/2tHK+KN/uPZKBPpHnp8bwAZwGDorIWLLGbsEvgN0wrQc6ZCpv5xlU2NDHReRFEYmnYuwWfBAYqS9e30Z8Pdeg3jAAPheRt9wYuwJ3WoDOigK7y1sL+slsWfpOH3Hj6xrcUU/QB7s2rw5dHII3gn6Aq0CziMy6NfUCvBugtpBVK+Kbpp9sJAo8n8pGXEmuwZ20OPzEJlbsPZ62fJTaNh+IyKBrYkdefbzpKwtDeIWGqRk/wBXghEdegHfgA2EfbMtZ/p4/i0GOfVY5IiLTHnkB2MvhgQbAPm6N+Rb76X329F0i0umRz4K8WvFBIF5p+hZOLofs1hTgHY880iNV/XZOVbs1rt0a1zn7U3THRnMllKrmq2qHqsadq0NV8xP/8x6Rqlqqam00R0YZZZTR/0T/AonhuxCuMeKdAAAAAElFTkSuQmCC";
 
@@ -399,8 +393,6 @@ public:
     AgentCursorOverlay(const AgentCursorOverlay&) = delete;
     AgentCursorOverlay& operator=(const AgentCursorOverlay&) = delete;
 
-    // Returns once the software cursor has arrived at the action point. The
-    // caller intentionally dispatches the real input only after this returns.
     bool moveToAndWait(POINT target, HWND targetWindow) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (!startupOk_ || stopping_) return false;
@@ -537,8 +529,6 @@ private:
         graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
         graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
 
-        // A soft blue radial glow, deliberately limited to the cursor. There
-        // is no click ring, pulse, or tail in the Windows contract.
         Gdiplus::GraphicsPath glowPath;
         glowPath.AddEllipse(Gdiplus::RectF(8.0f, 8.0f, 48.0f, 48.0f));
         Gdiplus::PathGradientBrush glowBrush(&glowPath);
@@ -1926,8 +1916,6 @@ static AdaptiveSettle waitForTargetQuiet(
     bool loading = false;
     const unsigned long long graceDeadline = start + (state.pendingActionCount > 0 ? 700 : 60);
     while (GetTickCount64() < graceDeadline) {
-        // Require provider events after the latest action, not an earlier
-        // batched action or the synthetic invalidateForAction revision.
         if (state.pendingActionCount > 0 && state.tracker &&
             state.tracker->eventCount.load() > state.lastActionBaselineEventCount) break;
         Sleep(5);
@@ -3311,9 +3299,6 @@ static std::string staleObservationJson(
     return out.str();
 }
 
-// Returns an empty string when the target still matches the observation. The
-// daemon handles one request at a time, so a successful check is adjacent to
-// dispatch and cannot be interleaved by another Stella session.
 static std::string validateAtomicPrecondition(
     IUIAutomation* uia,
     const Json& command,
@@ -3394,8 +3379,6 @@ static std::string executeAtomicBatchOperation(IUIAutomation* uia, const Json& o
         throw std::runtime_error("atomic_batch commands must contain between 1 and 64 operations");
     }
 
-    // Validate every member before dispatching any member. This prevents a
-    // stale command later in a batch from causing a partial mutation.
     for (size_t index = 0; index < commands->arrayValue.size(); index++) {
         const Json& item = commands->arrayValue[index];
         const Json* command = item.get("command");
@@ -3522,11 +3505,6 @@ static std::string executeOperation(IUIAutomation* uia, const Json& operation) {
         throw std::runtime_error("unsupported dispatch mode: " + dispatch);
     }
 
-    // The software cursor is deliberately driven from the same native action
-    // boundary as the real input. Background PostMessage/CG-style delivery
-    // does not move the user's physical cursor, so the visual cursor must
-    // arrive before the click or drag is injected. A failed/disabled overlay
-    // never changes the action's dispatch semantics.
     if (!envFlag("STELLA_COMPUTER_NO_OVERLAY") && gAgentCursorOverlay &&
         (tool == "click" || tool == "drag")) {
         POINT visualPoint = {};
@@ -3758,8 +3736,6 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    // Start the passive overlay only after GDI+ and UI Automation are ready;
-    // the helper's process lifetime owns it in both one-shot and daemon mode.
     if (!envFlag("STELLA_COMPUTER_NO_OVERLAY")) {
         gAgentCursorOverlay = new AgentCursorOverlay();
     }

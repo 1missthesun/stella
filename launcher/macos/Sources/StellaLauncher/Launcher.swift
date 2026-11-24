@@ -251,8 +251,6 @@ final class Launcher {
         state = LauncherState.load(paths)
     }
 
-    /// The launch runs an older signed Stella.app; fetch the one for this
-    /// Electron meanwhile so the next launch uses it.
     private func retryIdentityInBackground(_ version: String) {
         guard identityRetry != version else { return }
         identityRetry = version
@@ -423,7 +421,6 @@ final class Launcher {
                     guard readyAt == nil else { break }
                     readyAt = Date()
                     log("supervisor: ready")
-                    // The new window opened over the held frame; let go a beat later.
                     hold.hide(after: 0.25)
                     ui.update(show: .hide) {
                         $0.phase = .running

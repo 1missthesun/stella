@@ -1,48 +1,4 @@
 <!doctype html>
-<!--
-  Stella's launcher window, shared by launcher/{linux,macos,windows}. Each
-  launcher shows this page in the platform webview (WebKitGTK, WKWebView,
-  WebView2) and embeds it in its binary, so it never depends on the checkout
-  the launcher may be recovering. Self-contained: fonts are subset woff2
-  data URIs (Mona Sans for the wordmark, Manrope for text) and the
-  mark is inline SVG. No network, no external files.
-
-  Native -> page: window.stellaLauncher.render(state), where state is
-    {
-      platform: "linux" | "macos" | "windows",
-      phase: "idle" | "starting" | "running" | "stopping" | "failed" | "changed",
-      status: string,        // starting: what is happening now, in plain words
-      progress: number,      // starting: 0..1, the part of setup that is done
-      progressTo: number,    // starting: 0..1, where the current step ends; the
-                             //   bar eases from progress toward it meanwhile
-      title: string,         // failed: headline; "" = "Stella couldn't start"
-      offerRecovery: boolean,// failed: show "Return to last working version" / "Reinstall"
-      reason: string,        // failed: one sentence
-      output: string[],      // failed: Electron's last lines (Settings > Last error)
-      hasKnownGood: boolean, // "Return to last working version" is possible
-      version: string,       // short HEAD, "" before install
-      changes: {path, kind}[],// changed: files changed outside Stella, relative
-                             //   to the checkout; kind "changed" | "added" | "removed"
-      moreChanges: number    // changed: how many more files are not listed
-    }
-  Any field may be omitted; it keeps its previous value.
-  window.stellaLauncher.showSettings(open) opens or closes Settings
-  (self-test captures).
-
-  Page -> native: one JSON string per message,
-    {"action": "loaded"}      the page can render; show the window now
-    {"action": "start"}       idle: start Stella; failed: try again
-    {"action": "shutdown"}    running: ask Stella to quit
-    {"action": "return"}      return to the last working version, then start
-    {"action": "reinstall"}   reinstall, then start
-    {"action": "openLogs"}    open the logs folder
-    {"action": "accept"}      changed: trust these changes, then start
-    {"action": "reveal", "index": n}  changed: show changes[n] in the file manager
-    {"action": "close"}       Linux only (undecorated): the close button
-    {"action": "drag"}        Linux only: a press on the background; move the window
-  through window.webkit.messageHandlers.stella (WebKitGTK, WKWebView) or
-  window.chrome.webview (WebView2).
--->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />

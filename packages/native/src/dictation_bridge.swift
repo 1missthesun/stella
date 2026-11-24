@@ -1,18 +1,3 @@
-// dictation_bridge - Native macOS helpers for dictation paste/routing.
-//
-// Usage:
-//   dictation_bridge probe
-//   dictation_bridge paste <text>
-//   dictation_bridge mute-output
-//   dictation_bridge restore-output <previousVolume>
-//
-// probe output:
-//   {"ok":true,"frontmostBundleId":"com.apple.Safari","frontmostPid":123,"focusedEditable":true}
-//
-// Build:
-//   swiftc -O -o out/darwin/dictation_bridge src/dictation_bridge.swift \
-//     -framework AppKit -framework ApplicationServices -framework Carbon -framework CoreAudio -framework AudioToolbox
-
 import AppKit
 import ApplicationServices
 import AudioToolbox

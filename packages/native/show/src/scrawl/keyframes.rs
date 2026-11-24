@@ -6,7 +6,6 @@ const THUMB_HEIGHT: usize = 36;
 const THUMB_PIXELS: usize = THUMB_WIDTH * THUMB_HEIGHT;
 const FRAME_GAP_MS: u64 = 750;
 
-/// Sample the centers of a fixed grid; cost is independent of capture resolution.
 fn luma_thumbnail(frame: &RgbaFrame) -> [f32; THUMB_PIXELS] {
     let mut thumbnail = [0.0; THUMB_PIXELS];
     if frame.width == 0 || frame.height == 0 {
@@ -34,9 +33,6 @@ fn thumbnail_diff(a: &[f32; THUMB_PIXELS], b: &[f32; THUMB_PIXELS]) -> f32 {
     (a.iter().zip(b).map(|(x, y)| (x - y).abs()).sum::<f32>() / THUMB_PIXELS as f32).clamp(0.0, 1.0)
 }
 
-/// Combines global luma diff with localized `8×6`-block diff (using the 4th-highest block
-/// so a moving cursor straddling up to a 2×2 block corner in a small region capture never
-/// false-triggers, while real UI transitions across ≥4 blocks register cleanly).
 fn scene_transition_diff(a: &[f32; THUMB_PIXELS], b: &[f32; THUMB_PIXELS]) -> f32 {
     let global = thumbnail_diff(a, b);
     const COLS: usize = 8;
@@ -66,8 +62,6 @@ fn scene_transition_diff(a: &[f32; THUMB_PIXELS], b: &[f32; THUMB_PIXELS]) -> f3
 
 const GRID: usize = 128;
 
-/// Mean luma over a grid of up to `GRID`×`GRID` cells, so a thin line that appears changes its
-/// cell.
 struct LumaGrid {
     columns: usize,
     rows: usize,
@@ -77,7 +71,6 @@ struct LumaGrid {
 fn luma_grid(frame: &RgbaFrame) -> LumaGrid {
     let (width, height) = (frame.width as usize, frame.height as usize);
     let (columns, rows) = (width.min(GRID), height.min(GRID));
-    // Large frames are sampled at up to four pixels per cell side.
     let step = (width.max(height) / (GRID * 4)).max(1);
     let cell_x: Vec<usize> = (0..width)
         .step_by(step)
@@ -106,7 +99,6 @@ fn luma_grid(frame: &RgbaFrame) -> LumaGrid {
     }
 }
 
-/// The share of cells inside `rect` (normalized `[x0, y0, x1, y1]`) whose luma changed.
 fn region_diff(a: &LumaGrid, b: &LumaGrid, rect: [f32; 4]) -> f32 {
     if (a.columns, a.rows) != (b.columns, b.rows) || a.cells.is_empty() {
         return 1.0;
@@ -155,27 +147,16 @@ fn nearest_frame(frames: &[&RgbaFrame], t: u64) -> usize {
     }
 }
 
-/// Speech that starts a new thought: after clause punctuation, a pause, or a recognizer segment.
 const CLAUSE_GAP_MS: u64 = 1_500;
-/// A spoken cue only cuts a keyframe if its image differs from every keyframe already chosen.
 const CUE_NOVELTY: f32 = 0.03;
-/// Marks share a keyframe while the screen around their ink (`INK_CONTEXT` beyond it, as a
-/// fraction of the frame) differs from the latest one's by less than this.
 const SAME_SCREEN: f32 = 0.05;
 const INK_CONTEXT: f32 = 0.08;
 const CELL_CHANGE: f32 = 0.04;
-/// A group of marks on one screen closes past this span or this much ink, so one frame stays
-/// legible and its words stay near its ink.
 const GROUP_MS: u64 = 20_000;
 const GROUP_STROKES: usize = 12;
-/// A keyframe owns too much when its stretch holds more words or time than this; a frame from
-/// inside the stretch is added if the screen changed there.
 const COVERAGE_WORDS: f32 = 100.0;
 const COVERAGE_MS: f32 = 35_000.0;
 
-/// Marks in drawing order, grouped while they were drawn on the same screen with no click or drag
-/// (`actions`, sorted times) between them; then neighbouring groups merge until they fit `budget`,
-/// same-screen pairs with the least ink first, else the most alike. Flags stay on their own.
 fn group_marks(
     frames: &[&RgbaFrame],
     marks: &[Mark],
@@ -211,8 +192,6 @@ fn group_marks(
     };
     let drawn = |group: &[usize]| marks[group[0]].shape != Shape::Flag;
     let ink = |group: &[usize]| group.iter().map(|&i| marks[i].strokes.len()).sum::<usize>();
-    // How far the screen around the marks' ink was, as each was drawn, from the screen at
-    // `last`, where the keyframe will be.
     let spread = |group: &[usize], last: usize| {
         let [x0, y0, x1, y1] =
             group
@@ -263,9 +242,6 @@ fn group_marks(
             _ => groups.push(vec![i]),
         }
     }
-    // `costs[k]` ranks merging group `k` into `k - 1`: on one screen by the ink they'd carry
-    // together, so same-screen merges stay balanced, else by how far the screens differ. Flags
-    // never merge.
     let cost = |groups: &[Vec<usize>], k: usize| {
         if k == 0 || !drawn(&groups[k - 1]) || !drawn(&groups[k]) {
             return None;
@@ -298,9 +274,6 @@ fn group_marks(
     groups
 }
 
-/// Words that point at the screen. The strong ones are deliberate cues ("now", "look");
-/// the rest are just as often filler ("I see why", "here and there", "that's weird"), so they
-/// rank with ordinary scene changes and only break ties when they coincide with one.
 fn spoken_cue(word: &str) -> Option<(&'static str, f32, bool)> {
     let word = word
         .trim_matches(|c: char| !c.is_alphanumeric())
@@ -333,10 +306,6 @@ fn word_count(text: &str) -> usize {
         .max(1)
 }
 
-/// Each keyframe's text runs from the start of the clause in progress at its anchor (when its
-/// action began, or the cue word) until the next keyframe's start, so the transcript is
-/// partitioned in order with nothing repeated or dropped. Speech before the first keyframe
-/// belongs to it.
 fn align_transcript(
     selected: &mut [(Keyframe, RgbaFrame)],
     anchors: &[u64],
@@ -351,8 +320,6 @@ fn align_transcript(
     }
 }
 
-/// `align_transcript` for keyframes at `times` (anchored at `anchors`, or their own time where
-/// missing): each one's words, or `None`.
 pub fn said_per_keyframe(
     times: &[u64],
     anchors: &[u64],
@@ -412,7 +379,6 @@ pub fn said_per_keyframe(
         if let Some(&prev) = starts.last()
             && start <= prev
         {
-            // Two keyframes in one clause: the later one takes the words from its own moment.
             start = anchor.max(prev + 1);
         }
         starts.push(start);
@@ -428,7 +394,6 @@ pub fn said_per_keyframe(
         // ASR words normally include their punctuation; separate punctuation tokens
         // and contractions should still produce natural text.
         let attached = unit.starts_with([',', '.', '!', '?', ';', ':', '’', '\'', ')', ']', '”']);
-        // A separate punctuation token at a keyframe's start ends the one before.
         if attached && text[index].is_empty() && index > 0 {
             index -= 1;
         }
@@ -447,8 +412,6 @@ pub fn said_per_keyframe(
         .collect()
 }
 
-/// Select representative captured frames. Callers use `keyframe_budget` for the
-/// default limit; an explicit zero requests no keyframes.
 pub fn select_keyframes(
     frames: &[RgbaFrame],
     strokes: &[Stroke],
@@ -529,8 +492,6 @@ pub fn select_keyframes(
                 let before = frames
                     .partition_point(|frame| frame.t_ms < *t)
                     .saturating_sub(1);
-                // A short delay captures the result of the action rather than the
-                // mouse-down state. Prefer an actual post-action frame when present.
                 let first_after = frames.partition_point(|frame| frame.t_ms < end);
                 let after = nearest_frame(&frames, end.saturating_add(250))
                     .max(first_after.min(frames.len() - 1));
@@ -577,8 +538,6 @@ pub fn select_keyframes(
             cursor,
         });
     }
-    // A run of changing frames is one transition. Its last changed frame is
-    // the settled view, avoiding several near-identical animation keyframes.
     let mut transitions: Vec<(usize, (u64, u64), f32)> = Vec::new();
     let mut transition: Option<(usize, u64, f32)> = None;
     for (i, &delta) in deltas.iter().enumerate() {
@@ -596,7 +555,6 @@ pub fn select_keyframes(
     if let Some((frame, start_t, diff)) = transition {
         transitions.push((frame, (start_t, frames[frame].t_ms), diff));
     }
-    // A mark group's keyframe already shows the screen its marks were drawn on.
     let drawing: Vec<(u64, u64)> = candidates
         .iter()
         .filter(|c| !c.marks.is_empty())
@@ -608,10 +566,6 @@ pub fn select_keyframes(
             candidates.push(scene_candidate(frame, span, diff));
         }
     }
-    // A pointing word is a deliberate cue ("if I say now, find the right image"). It looks for
-    // a transition that starts around the word; otherwise it takes what was on screen as it
-    // was said. Speech alone never cuts a keyframe over an unchanged screen: cues must show
-    // something new (checked during selection), and pauses never cut at all.
     if !transcript.estimated {
         for word in &transcript.words {
             let Some((cue, score, strong)) = spoken_cue(&word.text) else {
@@ -675,7 +629,6 @@ pub fn select_keyframes(
         if !candidate.marks.is_empty() {
             return true;
         }
-        // Too close to a chosen frame, or among the marks drawn into one, whose screen it repeats.
         let t = frames[candidate.frame].t_ms;
         if selected.iter().any(|other| {
             frames[other.frame].t_ms.abs_diff(t) < FRAME_GAP_MS
@@ -707,7 +660,6 @@ pub fn select_keyframes(
         transcript,
         &admissible,
     );
-    // Past the base, keyframes are only for marks and coverage.
     for slot in pending.iter_mut() {
         if selected.len() >= max_keyframes.min(BASE_KEYFRAMES) {
             break;
@@ -716,8 +668,6 @@ pub fn select_keyframes(
             selected.push(candidate);
         }
     }
-    // Order-independent novelty pass: if a speech cue duplicates the screen of any visual/input
-    // keyframe selected after it, drop the redundant speech cue (keeping at least one frame).
     if selected.len() > 1 {
         let non_speech_frames: Vec<usize> = selected
             .iter()
@@ -769,11 +719,6 @@ pub fn select_keyframes(
     out
 }
 
-/// Splits stretches a keyframe owns that hold more than `COVERAGE_WORDS` or `COVERAGE_MS`, with a
-/// frame from inside them when the screen changed there: the best-ranked candidate that leaves no
-/// part above three quarters of the stretch, else the most even split. Like the transcript, the
-/// first keyframe's stretch starts at the beginning; but a frame added before it must also split
-/// that lead-in evenly, so it lands mid-gap rather than beside the first keyframe.
 fn cover_long_stretches(
     selected: &mut Vec<Candidate>,
     pending: &mut [Option<Candidate>],
@@ -813,8 +758,6 @@ fn cover_long_stretches(
             - counted[words.partition_point(|w| w.0 < a)];
         (said as f32 / COVERAGE_WORDS).max((b - a) as f32 / COVERAGE_MS)
     };
-    // What each keyframe owns, or (`seen`) what each frame shows until the next, with the lead-in
-    // apart.
     let stretches = |anchors: &[u64], seen: bool| -> Vec<(u64, u64)> {
         let bounds: Vec<u64> = std::iter::once(0)
             .chain(anchors.iter().skip(usize::from(!seen)).copied())
@@ -830,7 +773,6 @@ fn cover_long_stretches(
             .fold(0.0, f32::max)
     };
     let anchor = |c: &Candidate| c.span.0.min(frames[c.frame].t_ms);
-    // The best-ranked frame goes first, as it would without coverage.
     if selected.is_empty()
         && let Some(slot) = pending
             .iter_mut()
@@ -850,7 +792,6 @@ fn cover_long_stretches(
         long.sort_by(|x, y| y.0.total_cmp(&x.0));
         let mut pick = None;
         'stretches: for (whole, (a, b)) in long {
-            // (uneven, worst part, worst part of what was seen, rank)
             let mut options: Vec<(bool, f32, f32, usize)> = Vec::new();
             for (i, slot) in pending.iter().enumerate() {
                 let Some(candidate) = slot.as_ref().filter(|_| !rejected[i]) else {

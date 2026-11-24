@@ -123,10 +123,13 @@ export const antigravityModelOptions = (reported?: readonly string[]): EngineMod
   }));
 };
 
+export const antigravityModelRemoved = (model: string): boolean =>
+  Object.hasOwn(ANTIGRAVITY_REPLACED_MODELS, antigravityModelBase(model));
+
 /** The model that runs for a pick: itself, or what replaces one Google removed. */
 export const antigravityModelInUse = (model: string, reported?: readonly string[]): string => {
   const base = antigravityModelBase(model);
-  const successor = Object.hasOwn(ANTIGRAVITY_REPLACED_MODELS, base)
+  const successor = antigravityModelRemoved(model)
     ? ANTIGRAVITY_REPLACED_MODELS[base]!
     : model;
   const listed = antigravityModelsOf(reported);

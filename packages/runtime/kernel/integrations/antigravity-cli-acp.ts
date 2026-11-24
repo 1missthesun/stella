@@ -6,7 +6,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
-import { antigravityModelInUse, antigravityModelName, antigravityModelsOf } from "@stella/contracts/engine-model-catalog";
+import { antigravityModelBase, antigravityModelInUse, antigravityModelName, antigravityModelRemoved, antigravityModelsOf } from "@stella/contracts/engine-model-catalog";
 import type { ImageContent, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import {
   createClaudeCodeToolMcpHost,
@@ -683,8 +683,11 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     request.onSessionId(sessionId);
     const { wire, replaced } = resolveModel(proc.models, request.model, request.thinkingLevel);
     if (replaced && request.ref.role === "orchestrator" && claimAntigravityRemovalNotice(config.home(), request.model)) {
+      const [gone, runs] = [antigravityModelName(antigravityModelBase(request.model)), antigravityModelName(replaced)];
       request.onModelFallback(
-        `Google Antigravity no longer has ${antigravityModelName(request.model)}, so Stella now uses ${antigravityModelName(replaced)} instead.`,
+        antigravityModelRemoved(request.model)
+          ? `Google is removing ${gone} from Antigravity, so Stella now uses ${runs} instead.`
+          : `Your Google account doesn't have ${gone} in Antigravity, so Stella uses ${runs} instead.`,
       );
     }
     if (wire && wire !== proc.currentModel) {

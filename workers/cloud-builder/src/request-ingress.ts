@@ -8,10 +8,6 @@ export const CLOUD_BUILDER_BODY_LIMITS = {
   turn: 2 * MiB,
   conversationAppend: 5 * MiB,
   localTurnFinish: 17 * MiB,
-  // This route currently carries JSON inside JSON (`userMessageJson`). Keep the
-  // outer request well below the isolate ceiling because buffering, UTF-8
-  // decoding, and both JSON parses coexist transiently. Restoring the prior
-  // 64 MiB product limit requires a streaming/direct-body protocol.
   localTurnBegin: 8 * MiB,
 } as const;
 

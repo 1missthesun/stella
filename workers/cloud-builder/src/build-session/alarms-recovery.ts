@@ -103,11 +103,7 @@ export const runScheduledTurnAlarm = async (
       Number.isFinite(watchdogDeadlineAt) &&
       watchdogDeadlineAt > Date.now()
     ) {
-      // setAlarm() can race an alarm delivery that Cloudflare has already
-      // begun. That stale callback then observes the successor turn and,
-      // without this durable deadline fence, mistakes its live executor for
-      // an orphan. Re-arm the real watchdog; only its actual deadline may
-      // enter crash recovery while the local Effect fiber is still alive.
+      // setAlarm() can race an alarm delivery that Cloudflare has already begun.
       await host.setExactTurnAlarm(
         turn,
         Math.min(watchdogDeadlineAt, Date.now() + AGENT_TURN_HEARTBEAT_MS),
@@ -126,12 +122,6 @@ export const runScheduledTurnAlarm = async (
       Number.isFinite(watchdogDeadlineAt) &&
       watchdogDeadlineAt <= Date.now()
     ) {
-      // The watchdog passed while this isolate still holds the run's fiber,
-      // so the loop is hung, or stuck in a settlement it cannot finish.
-      // Give it the bounded interrupt a Stop would, then drop the handle:
-      // recovery below then treats the attempt the way it treats a replaced
-      // isolate, instead of re-interrupting a fiber that never settles on
-      // every alarm until the builder fallback gives up.
       log("error", "agent_watchdog_interrupting_hung_execution", {
         turnId: turn.turnId,
         threadId: turn.threadId,
@@ -352,10 +342,6 @@ export const runAlarm = async (
         await host.setExactTurnAlarm(turn, Date.now() + 30_000);
         return;
       }
-      // Every retry boots the lost container again to read its disk. A
-      // recovery that keeps failing must end, or the thread stays
-      // "running" forever while an alarm restarts a container every
-      // thirty seconds for nobody.
       log("error", "agent_builder_fallback_abandoned", {
         turnId: turn.turnId,
         threadId: turn.threadId,

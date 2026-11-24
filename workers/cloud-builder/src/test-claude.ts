@@ -1,5 +1,3 @@
-// Only `@test.stella.local` owners on a deployment with STELLA_TEST_ACCOUNTS=1.
-
 export const TEST_CLAUDE_EMAIL = "claude@test.stella.local";
 
 const TEST_ACCOUNT_SUFFIX = "@test.stella.local";
@@ -25,7 +23,6 @@ export const isTestAccountOwner = async (env: unknown, ownerId: string): Promise
   return Boolean(row?.emailVerified) && email.endsWith(TEST_ACCOUNT_SUFFIX);
 };
 
-/** 2100-01-01: a setup token has no refresh, and this one never needs one. */
 const TEST_CREDENTIALS_EXPIRE_AT = 4_102_444_800_000;
 
 export const testClaudeCredentials = (env: unknown): string | null => {

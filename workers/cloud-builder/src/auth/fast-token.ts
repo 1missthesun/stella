@@ -12,30 +12,6 @@ import {
   stellaJwtClaims,
 } from "./config.js";
 
-/**
- * `GET /api/auth/token` for a signed `Authorization: Bearer` session token,
- * answered without building Better Auth: the same HMAC check as its bearer()
- * plugin, one D1 round trip (session + user, and the JWKS rows), and the
- * decrypted signing key kept in the isolate.
- *
- * It mints exactly the JWT Better Auth's jwt() plugin would (same key choice,
- * header, claims and claim order; RS256 is deterministic, so the bytes match)
- * and only for a session Better Auth would answer without writing. Anything
- * else returns `null` and Better Auth answers: no or unsigned bearer, a bad
- * signature, an unknown, expired or user-less session, a session due for its
- * daily sliding refresh (Better Auth extends it and sends `set-auth-token`),
- * and a JWKS with no live RS256 key (Better Auth mints one).
- *
- * The signing key is chosen from the rows read on every request, as Better
- * Auth's resolveSigningKey does; only the decrypted CryptoKey is cached, keyed
- * by key id, ciphertext and the secret, so a rotated, removed or re-encrypted
- * key is never used after D1 changes.
- *
- * Unlike Better Auth's handler, the request is not counted by its per-IP
- * limiter (100 per 10 s on /token). Only a caller holding a validly signed,
- * live session reaches this path; everyone else still goes through it.
- */
-
 const SESSION_EXPIRES_IN_MS = SESSION_EXPIRES_IN_SECONDS * 1000;
 const SESSION_UPDATE_AGE_MS = SESSION_UPDATE_AGE_SECONDS * 1000;
 const SIGNING_ALG = "RS256";
@@ -161,9 +137,7 @@ export const tryFastAuthToken = async (
   const issuer = backendUrl(env);
   if (!issuer) return null;
 
-  // Better Auth's bearer({ requireSignature: true }): `<token>.<HMAC-SHA256>`
-  // under its current secret. A bearer signed with the previous secret was
-  // re-signed by resignLegacySessionCredentials before this runs.
+  // Better Auth's bearer({ requireSignature: true }): `<token>.<HMAC-SHA256>` under its current secret.
   const presented = bearerCredential(request.headers.get("authorization"));
   if (!presented) return null;
   const decoded = decodeBearer(presented);

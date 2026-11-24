@@ -20,12 +20,6 @@ const EndAfterRound = defineTask<null, { phase: "done" }, AfterToolsDecision>({
   abort: (_task, runtime, context) => runtime.commit(() => ({ status: "terminal", outcome: { status: "aborted" } }), context),
 });
 
-/**
- * Each message is a turn of its own here, queued behind the one under way. A
- * run one waits behind ends once its step's calls have finished, so the model
- * reads their results and the message together before it chooses the next
- * step, as a message sent on a computer is read.
- */
 export const nextMessageExtension = (waits: (conversation: ConversationId) => boolean): Extension =>
   defineExtension({
     name: "stella-next-message",

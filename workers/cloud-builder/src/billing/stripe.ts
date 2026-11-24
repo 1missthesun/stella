@@ -1,10 +1,3 @@
-/**
- * The few Stripe REST calls billing makes, over fetch: no SDK in the Worker
- * bundle. Parameters are form-encoded the way Stripe expects nested objects
- * (`a[b][0][c]=...`). Webhooks are verified with the endpoint secret over
- * `t.payload`, as Stripe signs them.
- */
-
 const STRIPE_API = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = "2026-05-27.dahlia";
 const STRIPE_TIMEOUT_MS = 30_000;

@@ -1,22 +1,7 @@
 #!/usr/bin/env node
-// Container image metadata is the difference between a working sandbox and
-// `Image or container snapshot must be set`. A Worker version that carries no
-// `containers` array cannot start one, and the metadata is per version: any
-// upload that is not a full Wrangler deploy of this config — a dashboard
-// settings save, a raw API script PUT, an account-wide workers.dev rewrite —
-// publishes a version without it and silently removes sandboxes from the
-// deployment. Production ran that way on 2026-10-07.
-//
-// The sandbox image holds no Stella code: an agent container installs the code
-// bundle its Worker version serves from its static assets (`ASSETS`,
-// src/sandbox-code.ts). A version without that binding starts containers that
-// cannot run an executor, so the same checks cover it.
-//
-// `--config` refuses to deploy a config that would upload without containers
-// or the code bundle's assets. `--deployed` reads the version actually
-// receiving traffic and fails when its metadata lost either.
-// `bun run containers:check` runs both. `--wrangler-config <path>` checks
-// another config (a self-hosted install's generated one, scripts/selfhost.mjs).
+// Container metadata is per Worker version: any upload that is not a full
+// Wrangler deploy of this config (a dashboard settings save, a raw API script
+// PUT, an account-wide workers.dev rewrite) publishes a version without it.
 
 import { spawnSync } from "node:child_process";
 import path from "node:path";

@@ -184,7 +184,6 @@ export const ownerEventBase = (
 const finishesAttempt = (event: OwnerEvent): boolean =>
   event.kind === "thread.completed" || (event.kind === "turn.event" && event.terminal === true);
 
-/** Drops the oldest progress events past the cap; an attempt's finish is never dropped. */
 const capOwnerEventDebt = (events: OwnerEvent[]): OwnerEvent[] => {
   let excess = events.length - OWNER_EVENT_DEBT_MAX;
   if (excess <= 0) return events;
@@ -653,11 +652,6 @@ export const settleTerminalTransientWrites = async (
   turn: TurnRequest,
 ): Promise<boolean> => await settleNativeTransientBackup(host, turn);
 
-/**
- * A turn stored before app builds left BuildSession (1a6b6092e, 2026-09-11)
- * has no live path left: retire its owner lease and storage so its alarm
- * ends instead of entering agent recovery with an app turn's identity.
- */
 export const retireLegacyAppTurn = async (
   host: Pick<
     SessionCoreHost,

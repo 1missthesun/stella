@@ -180,14 +180,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       await this.deliverTerminal(turn, phase.owed, { retry: true });
     }
     await this.releaseOwnerGate(turn);
-    // Before the projection work, not after it. Every exit above has now
-    // either re-armed the alarm for its own retry or consumed it for good, so
-    // this is the first moment the queue can be honestly re-fenced — and
-    // `finalizeTerminalTurn` below is the window the finding turns on: an
-    // index flush (an owner round trip with a 30 s timeout) and a possible R2
-    // segment cut, during which the isolate can be evicted or redeployed. Arm
-    // first and that eviction costs a wake-up; arm after and it costs the
-    // queued turn.
     await this.ensureQueueAlarm();
     await this.finalizeTerminalTurn(turn);
   }
@@ -277,8 +269,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         log("error", "slack_stop_turn_failed", { turnId, message: errorMessage(error) });
       }
     }
-    // Every agent running here, the request's own and any it started in
-    // turn, then once more for one that was starting while the first pass ran.
     const stopped = new Set<string>();
     const runtime = await this.openPiRuntime(this.piGatewayOrigin());
     const { contextFor } = await import("./pi-runtime.js");
@@ -470,8 +460,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         !queuedMatches &&
         !appendMatches
       ) {
-        // register may commit remotely before the caller persists its domain
-        // row. The receipt is the exact local recovery identity for that gap.
         if (
           !(await this.retireOwnerFenceLeaseReceipt(leaseReceipt, generation))
         ) {
@@ -584,12 +572,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         : undefined;
       if (execution) {
         try {
-          // The durable terminal bit fences callbacks; interrupting the Effect
-          // supervisor also closes the local admission latch and boundedly
-          // joins any promise-native setup/provider/tool work. Without this,
-          // an owner purge during pre-Agent setup could return 409 after merely
-          // calling abort() on no Agent at all, then let setup keep mutating the
-          // conversation until a later assertion happened to notice.
           await execution.interrupt(
             new Error("Owner cloud activity is being purged."),
           );
@@ -626,8 +608,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         await request.json().catch(() => null),
       );
       if (!cancellation) {
-        // Legacy conversation-wide cancellation is intentionally retired. It
-        // cannot prove which turn it owns and must never stop a newer one.
         return json(
           { canceled: false, reason: "exact_turn_identity_required" },
           400,
@@ -676,16 +656,10 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
       return json({ error: "Expected a WebSocket upgrade." }, 426);
     }
-    // These headers are trustable because a Durable Object namespace is not
-    // publicly addressable: only the worker can produce this request, and it
-    // strips any client-supplied x-stella-* before forwarding. Their absence
-    // means the request did not come through that path.
+    // A Durable Object namespace is not publicly addressable.
     const identity = parseSocketIdentity(request);
     if (!identity) return json({ error: "Unauthorized." }, 401);
-    // No tombstone pre-check here. A plain 4xx before the 101 reaches a browser
-    // as close code 1006 with no detail, so "deleted" would be indistinguishable
-    // from a network fault. The hub completes the handshake and closes 4410 with
-    // a readable `error` frame first.
+    // A plain 4xx before the 101 reaches a browser as close code 1006 with no detail.
     return this.hub.upgrade(request, identity);
   }
 

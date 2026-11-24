@@ -248,7 +248,6 @@ export const createWorldFilesWithDrive = (
       ].filter((value): value is string => value !== undefined);
       const boundary = bounds.length > 0 ? bounds.sort()[0] : undefined;
       let entries = [
-        // A world that stored the drive before it moved out may still list it.
         ...stored.entries.filter((entry) => !isWorldDrivePath(entry.path)),
         ...held.entries,
       ]

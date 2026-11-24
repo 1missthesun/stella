@@ -536,11 +536,6 @@ export const preflightTurnBrokerRequest = async (args: {
   return { ok: true, target, sequence, requestId };
 };
 
-/**
- * Authorize and consume exactly one broker sequence. The caller must persist
- * the returned record atomically before any upstream I/O; a crash after that
- * point may fail the turn, but it can never replay the authority.
- */
 export const claimTurnBrokerRequest = async (args: {
   record: TurnBrokerRecord;
   live: TurnBrokerLiveFence;

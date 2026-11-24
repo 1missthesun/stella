@@ -83,26 +83,9 @@ export type TurnExecution<T> = {
   join(): Promise<void>;
 };
 
-/**
- * Start promise-native cloud work under an Effect fiber.
- *
- * Fiber interruption aborts the signal handed to the work. Stop then performs
- * resource teardown and *boundedly confirms* that the promise-native work has
- * unwound before it acknowledges cancellation. This second join matters:
- * interrupting Effect.tryPromise detaches an underlying platform promise that
- * ignores AbortSignal, and that promise could otherwise create a fresh
- * sandbox/session after teardown. Every external side effect must still call
- * `assertActive()` immediately before admission so the bounded join converges
- * instead of allowing new work after cancellation.
- */
 export const startTurnExecution = <T>(args: {
   work: (context: TurnExecutionContext) => Promise<T>;
   onInterrupt?: (reason: unknown) => void | Promise<void>;
-  /**
-   * Final resource sweep after promise-native work has physically settled.
-   * This closes the create-after-destroy race for platform APIs that ignore
-   * AbortSignal while provisioning a sandbox or session.
-   */
   afterInterrupt?: (reason: unknown) => void | Promise<void>;
   cleanupTimeoutMs?: number;
 }): TurnExecution<T> => {
@@ -195,10 +178,6 @@ export const startTurnExecution = <T>(args: {
         } catch (error) {
           settlementError = error;
         }
-        // A pending createSession() can resolve after the immediate destroy.
-        // Sweep once more only after that promise has either settled or hit
-        // the bounded timeout. Stop is acknowledged only if both settlement
-        // and this final cleanup succeed.
         let finalCleanupError: unknown;
         if (args.afterInterrupt) {
           try {
@@ -217,10 +196,8 @@ export const startTurnExecution = <T>(args: {
       await joined.catch(() => undefined);
       // Fiber.interrupt settles the Effect fiber as soon as interruption has
       // been delivered. Effect.tryPromise cannot force a promise-native
-      // operation to stop, though, so the underlying work may still be
-      // unwinding after `joined` resolves. Replayed Stop requests use join()
-      // rather than calling interrupt() a second time; make their ACK obey the
-      // same bounded physical-settlement contract as the first request.
+      // operation to stop, so the underlying work may still be unwinding
+      // after `joined` resolves.
       await awaitUnderlyingSettlement();
     },
   };

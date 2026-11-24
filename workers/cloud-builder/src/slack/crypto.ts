@@ -114,7 +114,6 @@ const constantTimeEqual = (a: string, b: string): boolean => {
   return diff === 0;
 };
 
-/** Slack's `v0` request signature, with a five-minute replay window. */
 export const verifySlackSignature = async (
   signingSecret: string,
   rawBody: string,

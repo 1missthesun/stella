@@ -1,17 +1,3 @@
-/**
- * The owner gate's half of a paired phone's request to one of the owner's
- * computers (`packages/contracts/turn-plane/device-requests.ts`).
- *
- * The phone's HTTP request stays open while the computer answers over its
- * presence socket; each response frame is written straight into that open
- * response. Nothing is buffered beyond the stream's own queue and nothing is
- * stored: when the request ends, so does every byte of it.
- *
- * Pending requests live in memory only. That is sound because the phone's
- * open request keeps this Durable Object resident: if the object goes away,
- * the request it was serving went with it.
- */
-
 import {
   DEVICE_REQUEST_ERROR_STATUS,
   DEVICE_REQUEST_IDLE_TIMEOUT_MS,
@@ -182,7 +168,6 @@ export class DeviceRequestRelay {
           try {
             entry.controller?.close();
           } catch {
-            // Already closed by a cancel.
           }
         }
         this.finish(entry);
@@ -246,7 +231,6 @@ export class DeviceRequestRelay {
       try {
         entry.controller?.error(new Error(message));
       } catch {
-        // Already closed.
       }
     }
     if (tellDevice) {

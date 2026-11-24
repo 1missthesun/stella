@@ -294,11 +294,7 @@ export const readSandboxDestroyDebt = async (
   return debt && sameSandboxTarget(debt.target, target) ? debt : null;
 };
 
-/**
- * Persist first, then arm the earliest alarm. Durable Objects have one alarm,
- * so a destroy retry must never postpone an earlier watchdog or terminal wake.
- * Callers must complete this before destroy I/O.
- */
+// Durable Objects have one alarm.
 export const persistSandboxDestroyDebt = async (
   storage: Pick<SandboxLifecycleStorage, "transaction">,
   debt: SandboxDestroyDebt,

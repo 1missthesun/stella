@@ -154,9 +154,6 @@ export const handleDeviceRequestRoute = async (
     }
     asker = deviceRequesterLabel(requesterDeviceId);
   } else if (!hasMobilePairingProofHeaders(request.headers)) {
-    // A phone authorised by its account session. It reaches the computers on
-    // its account: any of their files, and the rest only on the computer it
-    // chose.
     const phone = readMobileSessionPhone(request.headers);
     const notConnected = deviceRequestErrorResponse(
       "forbidden",

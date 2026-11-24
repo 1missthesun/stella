@@ -119,9 +119,6 @@ const actions = async (request: Request, env: RouteEnv): Promise<Response> => {
   if (limit !== null && !/^\d{1,3}$/u.test(limit)) return fail(400, "Action page limit must be an integer from 1 to 100.");
   const query = params.get("query")?.trim();
   if (query && query.length > 200) return fail(400, "Action query is too long.");
-  // The caller's own actions: a Google service that runs on Stella's own
-  // Google connection lists Stella's actions, the ones /run executes for it,
-  // not the published Composio catalog's (whose inputs differ).
   const published = {
     catalog: async () => [],
     actions: (args: Parameters<typeof listIntegrationActions>[1]) => listIntegrationActions(env, args),
@@ -277,13 +274,8 @@ const sameSecret = (left: string, right: string): boolean => {
   return diff === 0;
 };
 
-/**
- * Gmail's Pub/Sub push: "this address changed". It carries no mail, only the
- * address, so a forged one can at most make that inbox sync early; each owner
- * store debounces syncs. Always 204 for a known token so Pub/Sub doesn't retry.
- */
+// Pub/Sub retries every push that is not answered with a success status.
 const gmailPush = async (request: Request, env: RouteEnv): Promise<Response> => {
-  // Email is off on this backend: nothing to wake, and 204 keeps Pub/Sub from retrying.
   if (!emailFeatureOnFor(env)) return new Response(null, { status: 204 });
   const expected = String((env as unknown as Record<string, unknown>).GMAIL_PUSH_TOKEN ?? "").trim();
   const token = new URL(request.url).searchParams.get("token")?.trim() ?? "";

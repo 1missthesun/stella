@@ -105,12 +105,6 @@ const storage = async (url: URL, env: AdminEnv): Promise<Response> => {
 
 const INVARIANT_OWNERS_MAX = 200;
 
-/**
- * The task-rule checks (owner store `agentThreads.invariants`) for one owner
- * (`ownerId`), a list (`ownerIds`, comma-separated), or the owners with any
- * cost recorded in the window (`recent=N`), summed, with the owners that broke
- * a rule and examples.
- */
 const agentInvariantsReport = async (url: URL, env: AdminEnv): Promise<Response> => {
   const days = Number(url.searchParams.get("days") ?? "7");
   if (!Number.isInteger(days) || days < 1 || days > 90) return fail(400, "days must be 1 to 90.");
@@ -164,7 +158,6 @@ const agentInvariantsReport = async (url: URL, env: AdminEnv): Promise<Response>
   return json({ days, owners: owners.length, totals, hostedTurns: hosted, byOwner });
 };
 
-/** One task's recorded history (`agentEvents.forThread`), to explain a check's example. */
 const agentThreadEvents = async (url: URL, env: AdminEnv): Promise<Response> => {
   const ownerId = ownerIdOf(url.searchParams.get("ownerId"));
   const threadId = url.searchParams.get("threadId")?.trim();
@@ -429,7 +422,6 @@ const conversationRestart = async (request: Request, env: AdminEnv): Promise<Res
   return json(await env.ORCHESTRATOR_SESSIONS.getByName(conversationId).restartForVerification());
 };
 
-/** Test accounts only: runs an email-domain internal call (`readNow` starts Stella's read; `tool` runs the email tool with `args`; `import` puts `args.raw`, an RFC 822 email, in the inbox). */
 const emailProbeRoute = async (request: Request, env: AdminEnv): Promise<Response> => {
   const { testAccountsEnabled } = await import("../auth/auth.js");
   if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
@@ -462,11 +454,6 @@ const emailProbeRoute = async (request: Request, env: AdminEnv): Promise<Respons
   return response.ok ? json(response.value) : fail(rpcErrorStatus(response.error.code), response.error.message);
 };
 
-/**
- * Moves every Stella Crew workspace's folder out of its owner's personal Drive
- * into the workspace's own drive space (the gate adopts it on the first Crew
- * call), and reports what each space and personal Drive now hold there.
- */
 const crewDriveSpaces = async (env: AdminEnv): Promise<Response> => {
   const { results } = await db(env)
     .prepare(

@@ -1,12 +1,4 @@
-/**
- * Mobile read-aloud over HLS. Native players (AVPlayer, ExoPlayer) cannot
- * play a length-less `audio/mpeg` stream, so one synthesis streams the TTS
- * provider's MP3 frames (`tts.ts`), cuts them into ~2 s packed-audio segments and
- * writes each to `MEDIA` at `tts/<ticket>/seg-<n>.mp3`, updating
- * `tts/<ticket>/index.json` after every segment. The playlist route reads
- * that manifest, so the first segment plays while synthesis continues.
- * A bucket lifecycle rule deletes `tts/` after a day.
- */
+// AVPlayer and ExoPlayer cannot play a length-less `audio/mpeg` stream.
 
 import { concat, readFrame } from "./mp3.js";
 import { estimateTtsUsage, openTtsAudio, type TtsProvider, type TtsUsage } from "./tts.js";
@@ -129,8 +121,6 @@ export const synthesizeHls = async (input: {
     return await finish("error");
   }
 
-  // Audio arrives much faster than it plays, so segments come in bursts: a
-  // burst's segments are stored together, then the manifest lists them once.
   const cut: { bytes: Uint8Array; duration: number }[] = [];
   const cutSegment = () => {
     if (frames.length === 0) return;
@@ -155,7 +145,6 @@ export const synthesizeHls = async (input: {
     firstSegmentMs ??= Date.now() - startedAt;
   };
 
-  // `openTtsAudio` yields whole frames only.
   const ingest = async (mp3: Uint8Array) => {
     let cursor = 0;
     while (cursor < mp3.length) {

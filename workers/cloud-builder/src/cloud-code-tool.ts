@@ -72,10 +72,6 @@ const MAX_LIFTED_SCREENSHOTS = 3;
 
 type LiftedScreenshot = CloudBrowserScreenshot["image"];
 
-/**
- * Tools that never appear inside code. Same set the device kernel excludes:
- * code itself (no recursion), its legacy alias, and the parallel dispatcher.
- */
 const CODE_EXCLUDED_TOOL_NAMES: ReadonlySet<string> = new Set([
   CODE_TOOL_NAME,
   LEGACY_NODE_REPL_TOOL_NAME,
@@ -259,13 +255,8 @@ const collectLiftedMaps = (
   }
 };
 
-/**
- * TypeBox's `Value.Check` validates without code generation, which is what
- * makes it usable inside workerd: Workers forbid `new Function`, so an
- * Ajv-compiled validator can never run here. The module is loaded lazily,
- * only once a turn actually builds the Code tool, so it stays off the
- * Durable Object's startup path.
- */
+// Workers forbid `new Function`, so only a validator without code generation
+// (TypeBox's `Value.Check`, not Ajv) can run here.
 type TypeBoxValueModule = typeof TypeBoxValue;
 
 let typeBoxValuePromise: Promise<TypeBoxValueModule> | undefined;
@@ -288,10 +279,6 @@ const definitionForAgentTool = (
     ? "required"
     : "not_required",
   execute: async (input, context) => {
-    // TypeBox schemas can be checked without eval in workerd. Some discovered
-    // MCP sources provide plain JSON Schema instead; those tools retain their
-    // own host-side validation rather than compiling untrusted schemas with
-    // Ajv/new Function in the Worker.
     if (
       Object.getOwnPropertySymbols(tool.parameters).includes(
         Symbol.for("TypeBox.Kind"),
@@ -531,7 +518,6 @@ const browserIntrinsic =
   };
 
 export type CloudCodeAgentTool = AgentTool & {
-  /** The same tool with these nested tools out of its reach. */
   without(names: readonly string[]): AgentTool;
 };
 

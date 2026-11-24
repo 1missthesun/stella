@@ -1,33 +1,3 @@
-/**
- * `stellaHandoff()`: the browser-to-app sign-in handoffs and the app
- * integrity challenge, as Better Auth plugin endpoints under `/api/auth`.
- *
- *   POST /link/send               email a magic link; returns {requestId}
- *   GET  /link/status             {status: pending | completed | expired}
- *   POST /link/claim              {requestId, claimSecret} → {token}, once
- *   GET  /link/verify             magic-link landing; the one-time token
- *                                 arrives in a short-lived HttpOnly cookie,
- *                                 and the page asks the person to confirm
- *   POST /link/verify             the confirmation; releases the session
- *   POST /desktop-social/start    {claimHash} → {requestId, callbackURL, url?}
- *   GET  /desktop-social/verify   social landing; same cookie and confirmation
- *   POST /desktop-social/verify   the confirmation; releases the session
- *   POST /browser-social/start    {returnTo} → {callbackURL, url?}
- *   GET  /browser-social/verify   social landing; the token moves into a fragment
- *   POST /integrity/challenge     {purpose} → {nonce, expiresAt}
- *
- * The app never sees a session credential in a URL: it sends SHA-256 of a
- * claim secret, the server exchanges the one-time token for the session token
- * and stores it encrypted under BETTER_AUTH_SECRET, and only the holder of the
- * secret can claim it. Anyone can start a handoff for any email or claim
- * hash, so the browser that finishes it must confirm with a click (a
- * same-origin POST; the SameSite=Lax cookie never rides a cross-site one)
- * before the session reaches the app.
- *
- * The starts take no bearer. Older clients still send one (and
- * `requireAnonymousOwner`); both are ignored.
- */
-
 import { isAppIntegrityPurpose } from "@stella/contracts/app-integrity";
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";

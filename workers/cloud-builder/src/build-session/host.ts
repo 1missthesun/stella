@@ -399,11 +399,6 @@ export interface BuildSessionInternals {
   }>;
 }
 
-/**
- * The one BuildSessionInternals for a BuildSession object: its in-memory
- * state plus every module function, each called with this host first. The
- * modules reach one another only through it.
- */
 export const createBuildSessionHost = (
   ctx: DurableObjectState,
   env: Env,

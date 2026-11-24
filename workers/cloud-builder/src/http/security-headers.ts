@@ -25,8 +25,6 @@ export const withSecurityHeaders = (request: Request, response: Response): Respo
   const pathname = new URL(request.url).pathname;
   const changes = securityHeadersFor(pathname, response);
   if (isAuthPath(pathname) && response.status !== 101 && !response.webSocket) {
-    // Auth responses carry or lead to credentials: never send a Referer from them, and
-    // never let a browser or proxy cache them. The public JWKS stays cacheable.
     const needsReferrer = !response.headers.has("referrer-policy");
     const needsNoStore = !response.headers.has("cache-control") && pathname !== "/api/auth/jwks";
     if (needsReferrer || needsNoStore) {

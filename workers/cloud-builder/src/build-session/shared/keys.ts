@@ -23,7 +23,6 @@ export const AGENT_CONTAINER_SIZE_KEY = "agentContainerSize";
 
 export const CONTAINER_OOM_BASELINE_KEY = "containerOomBaseline";
 
-/** A BuildSession is one agent thread, so its size keys are its own. */
 export const BUILD_SESSION_CONTAINER_SIZE_KEYS = {
   size: AGENT_CONTAINER_SIZE_KEY,
   oomBaseline: CONTAINER_OOM_BASELINE_KEY,
@@ -296,12 +295,6 @@ export const nativeStateThreadHash = async (
 
 export const AGENT_WATCHDOG_DEADLINE_KEY = "agentWatchdogDeadlineAt";
 
-/**
- * How many alarm passes a builder-fallback recovery may fail before the turn
- * is failed outright. Each pass boots the lost container again; unbounded,
- * a container whose disk can no longer be read kept a thread "running" and a
- * container restarting every thirty seconds indefinitely.
- */
 export const BUILDER_FALLBACK_MAX_RETRIES = 10;
 
 export const builderFallbackRetryKey = (
@@ -309,14 +302,6 @@ export const builderFallbackRetryKey = (
   attemptGeneration: number,
 ): string => `builderFallbackRetries:${turnId}:${attemptGeneration}`;
 
-/**
- * How often a live agent turn re-arms its alarm when nothing else (a world
- * lease renewal) would. The alarm is the only thing that notices a turn whose
- * isolate was replaced under it — a deploy, an eviction — so without this a
- * turn lost that way sat as "running" until its full watchdog deadline,
- * holding the owner's agent lane for the whole wait. A beat on a live turn is
- * a few storage reads.
- */
 export const AGENT_TURN_HEARTBEAT_MS = 15_000;
 
 export const AGENT_RECOVERY_PENDING_KEY = "agentRecoveryPending";
@@ -406,16 +391,7 @@ export const sweepR2Prefix = async (
   return { deleted, done: false };
 };
 
-/**
- * Where the broker credential is handed to the executor: a one-shot file in
- * `directory` (a container attempt's root-only directory, or `/workspace` for
- * an attached tool host), above the checkpointed world, with a random
- * name so nothing can be waiting on a known path.
- *
- * Deliberately not an env var on the exec session: the executor's own
- * environment is inherited by every shell the agent spawns, and `unsetenv`
- * does not scrub `/proc/<pid>/environ`, so an env handoff stays readable for
- * the whole turn — which is the defect this avoids.
- */
+// Not an env var: every shell the agent spawns inherits the executor's
+// environment, and `unsetenv` does not scrub `/proc/<pid>/environ`.
 export const turnBrokerCredentialsPath = (directory: string): string =>
   `${directory}/.turn-broker-${crypto.randomUUID()}.json`;

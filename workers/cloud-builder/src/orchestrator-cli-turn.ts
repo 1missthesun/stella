@@ -353,15 +353,6 @@ export const dispatchOrchestratorCliTurn = async (args: {
   }
 };
 
-/**
- * Stop one CLI attempt through the BuildSession's existing exact
- * cancellation (`POST https://build-session/cancel`): it runs the container
- * kill ladder, delivers the canceled terminal to this conversation's
- * `/internal/cli-turn/terminal`, and only then answers 200 `{ canceled: true,
- * joined: true }`. No checkpoint is taken; the session keeps the native state
- * it had before this attempt. Callers must not hold a lock the terminal route
- * needs across this call.
- */
 export const cancelOrchestratorCliTurn = async (args: {
   env: BuildSessionEnv;
   ownerId: string;

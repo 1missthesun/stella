@@ -1,29 +1,3 @@
-/**
- * Stella previews of Worker apps: a server-rendered app (TanStack Start,
- * Astro, Remix, Hono… on Cloudflare Workers) runs here as a Dynamic Worker
- * (`LOADER`), never on the client's Cloudflare account.
- *
- * `stella-publish` builds the app in the agent's container and uploads its
- * server modules (`stella-worker.json`), its static files (`assets/`) and a
- * snapshot of each D1 database's schema and rows (`d1/<binding>.json`,
- * from the container's local database or the repository's migrations).
- * Requests for a file in `assets/` are served from R2; everything else goes
- * to the app's own `fetch`.
- *
- * The app sees only what this module gives it:
- *  - its plain `vars` (never secrets: the client's secrets stay theirs);
- *  - per-preview stand-ins for D1 (a SQLite Durable Object per database,
- *    seeded from the snapshot), KV (the same object's storage) and R2
- *    (a prefix of APP_BUILDS with a size cap), so writes stay in the preview;
- *  - its ASSETS binding (the uploaded files);
- *  - email, queues and Durable Object namespaces that do nothing (or say
- *    they aren't available), so a preview never sends mail or runs jobs.
- * Service bindings, AI, Hyperdrive and the rest are left out, so an app
- * falls back the way it does in local development. Its outbound fetches may
- * reach the public internet, but none of Stella's own hosts. It runs on the
- * preview's own stellasites.app origin and never sees Stella's cookies.
- */
-
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { KEY_PREFIX, cleanPath, extensionOf, previewBucket, servingHeaders, decodePath } from "./preview-helpers.js";
 
@@ -316,12 +290,6 @@ const blockedHosts = (env: Cloudflare.Env): string[] => {
   return [...hosts];
 };
 
-/**
- * Requests reach the app as if on its own host (`https://localhost`, the host
- * every app accepts in development, unless the project names another), so
- * host checks, origin checks and absolute links work; responses are mapped
- * back to the preview's origin.
- */
 type Origins = { app: string; preview: string };
 
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -360,7 +328,6 @@ const toApp = (request: Request, origins: Origins): Request => {
 
 const REWRITE_TYPES = /^(text\/html|application\/json|text\/x-component|application\/javascript|text\/javascript|text\/plain)/u;
 
-/** Swap the app's origin for the preview's in a text stream, chunk by chunk. */
 const rewriteStream = (body: ReadableStream<Uint8Array>, origins: Origins): ReadableStream<Uint8Array> => {
   const pattern = appOriginPattern(origins);
   const decoder = new TextDecoder();

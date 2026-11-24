@@ -4,7 +4,6 @@ const PREFIX = "sr2";
 const DOMAIN = "stella.slack-repo.v2";
 const MAX_TTL_MS = 60 * 60_000;
 
-/** One agent container's access to its conversation's repository, for as long as that container's turn credentials. */
 export type SlackRepoClaims = { team: string; repo: string; conversation: string; exp: number };
 
 const base64Url = (bytes: Uint8Array): string => {

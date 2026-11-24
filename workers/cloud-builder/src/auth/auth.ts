@@ -46,6 +46,7 @@ import {
   SESSION_EXPIRES_IN_SECONDS,
   SESSION_UPDATE_AGE_SECONDS,
   STELLA_JWT_AUDIENCE,
+  STELLA_JWT_TTL_SECONDS,
   stellaJwtClaims,
   TEST_ACCOUNT_EMAIL_SUFFIX,
   testAccountsEnabled,
@@ -245,7 +246,6 @@ const endingSession = async (ctx: {
   try {
     bearer = decodeURIComponent(credential);
   } catch {
-    // A malformed escape is no bearer; the context's own session still counts.
   }
   const resolved =
     (await getSessionFromCtx(ctx as never).catch(() => null)) ??
@@ -290,8 +290,6 @@ const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
   },
 });
 
-// Ends a signed-in device's Stella access (owner sessions, phone push) once
-// its auth session is revoked, for /revoke-session and /devices/revoke alike.
 const endOwnerSession = async (env: AuthEnv, userId: string, sessionId: string) => {
   await revokeOwnerSessions(env, userId, { sessionId });
   await ownerInternalCall(env, userId, "devices.pushSessionEnded", { sessionId }).catch((error: unknown) => {
@@ -328,10 +326,8 @@ const revokedSessionTeardown = (env: AuthEnv): BetterAuthPlugin => ({
   },
 });
 
-// Settings › Signed-in devices. Better Auth's own /list-sessions only answers
-// a session younger than `freshAge` (a day) and hands out every session's
-// token, so a desktop signed in for longer always got 403. These answer any
-// valid session, never return tokens, and revoke by id on the server.
+// Better Auth's own /list-sessions only answers a session younger than
+// `freshAge` (a day) and hands out every session's token.
 const signedInDevices = (env: AuthEnv): BetterAuthPlugin => ({
   id: "stella-signed-in-devices",
   endpoints: {
@@ -457,7 +453,6 @@ const buildOptions = (env: AuthEnv) => {
         isAnonymous: { type: "boolean", required: false, defaultValue: false, input: false },
         identityLevel: { type: "number", required: false, defaultValue: 0, input: false },
       },
-      // /delete-user is answered by account-deletion.ts (queued deletion).
       deleteUser: { enabled: false },
     },
     account: {
@@ -539,7 +534,6 @@ const buildOptions = (env: AuthEnv) => {
                 typeof session.ipAddress === "string" ? session.ipAddress : null;
               await sendNewSignInAlertEmail(env, email, userAgent, ipAddress);
             } catch {
-              // Alerts never fail a sign-in.
             }
           },
         },
@@ -569,13 +563,11 @@ const buildOptions = (env: AuthEnv) => {
         jwt: {
           issuer: backend,
           audience: STELLA_JWT_AUDIENCE,
-          expirationTime: "15m",
+          expirationTime: `${STELLA_JWT_TTL_SECONDS}s`,
           definePayload: ({ user, session }) => stellaJwtClaims(env, user, session),
         },
       }),
-      // Passkeys bind to the auth domain: enroll and sign in from the web
-      // shell served on that origin. Desktop and mobile native sign-in are
-      // unchanged; a passkey is an additional method, never the only one.
+      // Passkeys bind to the auth domain.
       passkey({
         rpID: (() => {
           try {

@@ -198,11 +198,6 @@ export const signR2Request = async (
   };
 };
 
-/**
- * A URL that carries its own authority: anyone holding it may `method` this
- * one object until it expires. Only `host` is signed, so the caller may send
- * any content type, and the body is unsigned.
- */
 export const presignR2Url = async (
   signer: R2Signer,
   args: {

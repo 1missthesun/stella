@@ -33,10 +33,6 @@ const generatedPath = path.join(
   "defaults.generated.ts",
 );
 
-/**
- * Frozen prompts for desktops from before explicit messaging; every prompt not
- * here is served to them as it is today.
- */
 const legacyRoot = path.join(workerRoot, "src", "prompts", "legacy");
 const legacyGeneratedPath = path.join(
   workerRoot,

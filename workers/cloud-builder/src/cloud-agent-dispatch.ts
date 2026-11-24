@@ -581,7 +581,6 @@ export type PiThreadAttempt = Readonly<{
   attemptGeneration: number;
   originDeviceId?: string;
   lineage: AgentLineage;
-  /** A spawn's `workspace: "large"`: the agent's container starts heavy. */
   workspace?: AgentWorkspaceSize;
 }>;
 
@@ -618,11 +617,6 @@ export type PiThreadStop = Readonly<{
 
 export type PiThreadStopResult = "stopped" | "terminal" | "changed" | "unknown";
 
-/**
- * What an executor knows of one cloud agent attempt the owner still lists as
- * running: still running it, decided its outcome but has not delivered it yet,
- * or no longer has it at all.
- */
 export type CloudAgentAttemptState =
   | "running"
   | "finishing"

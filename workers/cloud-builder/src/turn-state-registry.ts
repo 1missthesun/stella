@@ -7,11 +7,6 @@ export const TURN_STATE_MAX_ARCHIVE_BYTES =
   5 * 1024 * 1024 * 1024 - 5 * 1024 * 1024;
 const MAX_CANDIDATES = 8;
 
-/**
- * The object-key segment that used to hold the workspace name. An owner has
- * exactly one world now, so it is a constant; it stays in the key so the
- * on-disk layout keeps its owner/world/thread/turn shape.
- */
 export const WORLD_REGISTRY_SEGMENT = "world";
 
 export type TurnStateObjectKind = "native";
@@ -853,12 +848,6 @@ export type ConfirmedTurnStateRestore = {
   confirmationReceipt: string;
 };
 
-/**
- * Promote only after the caller has restored and verified the exact
- * thread-native state returned by resolveTurnState. Keeping probe and
- * confirmation separate prevents a corrupt/missing candidate from retiring
- * the last recoverable committed state before its bytes have been consumed.
- */
 export const confirmTurnStateRestore = async (
   storage: StrongTurnStateStorage,
   args: {

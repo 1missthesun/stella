@@ -46,10 +46,6 @@ const isBoundedNonEmptySecret = (
   value.length > 0 &&
   value.length <= MAX_BEARER_CREDENTIAL_LENGTH;
 
-/**
- * Fixed-length fallback for test/non-Workers runtimes. Production Workerd uses
- * `SubtleCrypto.timingSafeEqual`; both inputs have already been SHA-256 hashed.
- */
 const equalFixedLengthBytes = (
   left: ArrayBuffer,
   right: ArrayBuffer,

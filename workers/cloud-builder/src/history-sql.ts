@@ -23,11 +23,6 @@ class QueryAnswered extends Error {
   }
 }
 
-/**
- * Runs the query as if the messages in `without` were not stored: they are
- * deleted inside the transaction and the transaction is then rolled back, so
- * no shape of SELECT can reach them and nothing is lost.
- */
 export const runHistoryQueryWithout = (
   storage: DurableObjectStorage,
   without: readonly HistorySpan[],
@@ -62,7 +57,6 @@ export const runHistoryQuery = (
 ): Record<string, SqlStorageValue>[] =>
   storage.transactionSync(() => selectRows(storage, query, params, maxBytes));
 
-/** Must run inside a transaction: a statement that writes throws, which rolls it back. */
 const selectRows = (
   storage: DurableObjectStorage,
   query: string,

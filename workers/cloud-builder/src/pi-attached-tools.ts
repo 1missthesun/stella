@@ -93,8 +93,6 @@ export const piAttachedCoding = (run: PiAttachedToolRun): Extension =>
       name,
       description,
       parameters: parameters as unknown as TSchema,
-      // A command or a write may already have crossed into the world: a
-      // rerun after an eviction must not run it twice.
       replay: replay === "safe" ? ("safe" as const) : ("unsafe" as const),
       async execute(args: unknown, api: { conversationId: number; callId: string }, context: Context) {
         return asResult(

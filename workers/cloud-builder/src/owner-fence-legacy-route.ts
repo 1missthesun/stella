@@ -19,12 +19,6 @@ import {
 } from "./turn-state-owner-routes.js";
 import { json } from "./http/response.js";
 
-/**
- * Mixed-version window only: serves OwnerGate's old `/owner-fence/*` fetch
- * routes for objects still running the Worker from before the typed fence
- * methods, with the old response bodies. Delete with the client fallback in
- * owner-fence-client.ts once no deployed Worker predates them.
- */
 export type LegacyOwnerFenceTarget = {
   register(input: OwnerFenceLeaseInput): Promise<OwnerFenceRegisterResult>;
   unregister(

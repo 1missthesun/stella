@@ -1,5 +1,3 @@
-/** MPEG audio frames, for read-aloud MP3 passed through from the provider. */
-
 const MPEG1_L3_BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
 const MPEG2_L3_BITRATES = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
 const SAMPLE_RATES: Record<"1" | "2" | "2.5", number[]> = {
@@ -49,11 +47,6 @@ const id3Length = (buf: Uint8Array): number | null => {
   return 10 + size + (buf[5]! & 0x10 ? 10 : 0);
 };
 
-/**
- * Cuts one MP3 file arriving in pieces into whole frames: its leading ID3
- * tag is dropped, so several files can be played back to back as one
- * stream, and the audio length is counted as frames pass.
- */
 export const createMp3Framer = () => {
   let pending: Uint8Array = EMPTY;
   let tagSkipped = false;

@@ -1,9 +1,3 @@
-/**
- * Expo push sends: authenticated with EXPO_ACCESS_TOKEN when set (required
- * once the Expo project turns on Enhanced Push Security), and off entirely on
- * owner-mode servers, which have no push relay.
- */
-
 import { ownerModeEnabled } from "./selfhost/owner-mode.js";
 
 export const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";

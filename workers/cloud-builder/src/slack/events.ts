@@ -240,7 +240,6 @@ const safeFileName = (name: string): string =>
     .replace(/^\.+/u, "_")
     .slice(0, 120) || "file";
 
-/** A drive call in the Slack workspace's own space, never the owner's personal Drive. */
 const ownerInternal = async (
   env: Cloudflare.Env,
   install: SlackInstallation,

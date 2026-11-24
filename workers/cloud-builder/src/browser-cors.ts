@@ -61,8 +61,7 @@ export async function withBrowserCors(
   path.startsWith(SLACK_WORKSPACES_PATH) ||
   path === SLACK_INSTALL_START_PATH ||
   path === SLACK_INSTALL_FINISH_PATH;
-  // Packaged Electron has an opaque file origin; isolated dev runs use random
-  // loopback ports. These routes require a bearer JWT and never use cookies.
+  // Packaged Electron has an opaque file origin.
   const allowed =
     isBrowserClientOrigin(env, origin) ||
     (appRoute &&

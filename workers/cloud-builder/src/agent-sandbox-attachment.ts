@@ -414,9 +414,6 @@ export const createAgentSandboxAttachment = (
         JSON.stringify(handoff),
       );
       deps.context.assertActive();
-      // The daemon is trusted root code: it holds the broker capability and
-      // serves a root-only socket, so it must not be dropped to the tool
-      // account the way a model-controlled command is.
       const daemonCommand = `exec setsid --fork --wait ${quoted([
         ...DAEMON_ARGV,
         "--dir",

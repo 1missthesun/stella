@@ -54,7 +54,6 @@ export class OwnerHomeContextCache {
             return cached;
           }
         } catch {
-          // Reload only on policy/fence change. The fresh policy must pass too.
         }
       }
       const loaded = {
@@ -68,8 +67,7 @@ export class OwnerHomeContextCache {
           0) !== revision
       )
         continue;
-      // SQLite KV values are capped at 128 KiB. Oversized catalogs stay resident
-      // and refill once after eviction, rather than failing an otherwise valid turn.
+      // SQLite KV values are capped at 128 KiB.
       if (
         new TextEncoder().encode(JSON.stringify(loaded)).byteLength < 100_000
       ) {

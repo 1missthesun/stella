@@ -1,10 +1,3 @@
-/**
- * Caller-side view of one sandbox Durable Object (`src/sandbox-container.ts`)
- * over plain RPC: a session is a stored cwd/env/timeout that each call
- * carries to the object, and a process is an id the object resolves against
- * its process directory. Nothing here holds a live connection to the
- * container.
- */
 import type {
   Sandbox,
   SandboxReleaseOptions,
@@ -198,7 +191,6 @@ export const sandboxClient = (
   };
 };
 
-/** A 0.12 SDK backup descriptor, still read from old checkpoint records. */
 export type LegacyDirectoryBackup = {
   readonly id: string;
   readonly dir: string;

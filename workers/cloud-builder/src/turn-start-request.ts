@@ -27,11 +27,6 @@ import {
 } from "@stella/contracts/turn-plane/turn-start";
 import { AGENT_MESSAGE_FRAMED_MAX_CHARS } from "./agent-messaging.js";
 
-/**
- * How the Worker authenticated the caller of a forwarded turn start. Stamped
- * only by the Worker on a request it builds, so its presence proves the route
- * was taken.
- */
 export const HEADER_TURN_AUTH_KIND = "x-stella-turn-auth";
 export type TurnAuthKind = "user" | "service";
 
@@ -85,10 +80,6 @@ export const parseCloudExecutionSelection = (
   } as CloudExecutionSelection;
 };
 
-/**
- * A client's pick that runs only on the user's computers (Google Antigravity):
- * the account may hold it, and the cloud answers with its own choice instead.
- */
 export const isComputerOnlyExecution = (value: unknown): boolean =>
   isRecord(value) && value.engine === "provider" && isComputerOnlyProviderId(value.provider);
 

@@ -43,8 +43,6 @@ const MODELS_DEV_ALIASES: Record<string, string[]> = {
   "x-ai/grok-4.5": ["xai/grok-4.5", "vercel/xai/grok-4.5"],
 };
 
-// Slugs that name the vendor, not the serving provider: prefer the serving
-// provider's row so billing matches what Stella pays.
 const MODELS_DEV_PREFERRED_ALIASES: Record<string, string[]> = {
   "google/gemini-3.8-flash": ["openrouter/google/gemini-3.8-flash"],
   "google/gemini-3.1-flash-lite": ["openrouter/google/gemini-3.1-flash-lite"],
@@ -233,8 +231,6 @@ export async function readManagedModelPrices(env: Pick<Cloudflare.Env, "DB">): P
          cache_write_per_million_usd, reasoning_per_million_usd, synced_at FROM model_prices`,
     ).all<StoredPrice>();
   let { results } = await read();
-  // A new deployment has no rows until the daily Cron Trigger; sync now
-  // rather than refuse every managed request until then.
   if (results.length === 0) {
     await syncModelPrices(env).catch((error: unknown) => console.error("[prices] first sync failed", error));
     ({ results } = await read());

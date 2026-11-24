@@ -54,18 +54,11 @@ export const isContentlessSearchTable = (
   return /contentless_delete\s*=\s*1/u.test(row?.sql ?? "");
 };
 
-/** What seals a side text: the conversation's key, or none (kept compressed only). */
 export type SideTextSealer = {
   sealBytes(plain: Uint8Array): Uint8Array;
   openBytes(sealed: Uint8Array): Uint8Array;
 } | null;
 
-/**
- * A snippet's source text as stored in `<table>_text`: deflated, then sealed
- * under the conversation's key when it has one, as a BLOB. First byte 0x01 is
- * sealed, 0x00 plain. A TEXT value is the older form (`enc1.` ciphertext or
- * plaintext) and still reads.
- */
 export const sealSideText = (sealer: SideTextSealer, text: string): Uint8Array => {
   const packed = deflateRawSync(Buffer.from(text, "utf8"));
   if (sealer) return sealer.sealBytes(packed);
@@ -122,12 +115,6 @@ const capUtf8 = (value: string, maxBytes: number): string => {
     .replace(/\uFFFD$/u, "");
 };
 
-/**
- * Privacy codec for an index whose owner encrypts at rest: the FTS table
- * then holds keyed hash tokens instead of words, and the readable text a
- * snippet is built from lives encrypted in `<table>_text`. Without a codec
- * the index keeps its original plaintext form.
- */
 export type TranscriptSearchCodec = {
   indexedText: (text: string) => string;
   encryptSideText: (text: string) => string | null;

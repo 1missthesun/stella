@@ -67,8 +67,7 @@ export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
     platform: "browser",
     loader: { ".md": "text", ".txt": "text" },
     conditions: ["workerd", "worker", "browser"],
-    // nodejs_compat supplies built-ins at runtime. Never replace native
-    // subscription dependencies with stubs to shrink the Worker.
+    // nodejs_compat supplies built-ins at runtime.
     external: ["cloudflare:*", "node:*", ...builtinModules],
     define: {
       "process.env.NODE_ENV": '"production"',

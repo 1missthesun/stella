@@ -1,17 +1,3 @@
-/**
- * The cloud's way back from the pi-durable 1.5 storage upgrade.
- *
- * pi keeps a conversation's runs in tables of the orchestrator's Durable Object, beside Stella's journal. pi-durable
- * 1.4 and later migrate those tables from schema version 1 (what 1.1.0 wrote) to 2 the first time they open them, and
- * 1.1.0 refuses version 2. Restoring the whole object to an earlier point would also undo the journal, so instead the
- * first open on this version copies pi's tables, as 1.1.0 left them, into tables of their own in the same object.
- *
- * `restorePiTables` puts the copies back for a build on 1.1.0 and moves pi's ID and commit counters past every one the
- * upgraded tables used, so nothing written afterwards reuses an entry ID that the journal already keys a message by.
- * It is plain SQL, so a rollback build can carry this file without carrying pi-durable 1.5.
- */
-
-/** The part of a Durable Object's storage this needs: `ctx.storage` there, a thin wrapper over a SQLite file elsewhere. */
 export type PiTableSnapshotStorage = {
   sql: { exec(query: string, ...bindings: unknown[]): { toArray(): Record<string, unknown>[] } };
   transactionSync<T>(closure: () => T): T;
@@ -31,7 +17,6 @@ const PI_TABLES = [
 ] as const;
 
 export const PI_SNAPSHOT_PREFIX = "pi110_";
-/** The copied tables' and indexes' definitions, so a restore rebuilds them exactly, constraints included. */
 const DEFINITIONS = `${PI_SNAPSHOT_PREFIX}definitions`;
 const PRE_UPGRADE_SCHEMA = 1;
 
@@ -50,10 +35,6 @@ const counters = (storage: PiTableSnapshotStorage, table: string): { nextId: big
   return { nextId: BigInt(String(row.next_id)), nextSeq: Number(row.next_seq) };
 };
 
-/**
- * Copy pi's tables as pi-durable 1.1.0 left them, once, before this version opens them. Nothing to copy in an object
- * pi has not used, one already migrated, or one whose copy exists. One transaction: a copy is whole or absent.
- */
 export function snapshotPiTablesBeforeUpgrade(storage: PiTableSnapshotStorage): "taken" | "kept" | "none" {
   if (tableExists(storage, DEFINITIONS)) return "kept";
   if (schemaVersion(storage) !== PRE_UPGRADE_SCHEMA) return "none";
@@ -73,11 +54,6 @@ export function snapshotPiTablesBeforeUpgrade(storage: PiTableSnapshotStorage): 
   return "taken";
 }
 
-/**
- * The way back to pi-durable 1.1.0: pi's tables are rebuilt from the copy, with the counters moved past the upgraded
- * tables'. What pi recorded after the upgrade is gone from pi's tables; the journal still has every message. The copy
- * stays, so a later upgrade starts from it again rather than taking a second one.
- */
 export function restorePiTables(storage: PiTableSnapshotStorage): "restored" | "none" {
   if (!tableExists(storage, DEFINITIONS) || !tableExists(storage, "durable_metadata")) return "none";
   storage.transactionSync(() => {
@@ -100,10 +76,8 @@ export function restorePiTables(storage: PiTableSnapshotStorage): "restored" | "
   return "restored";
 }
 
-/** The copy's measured size, kept beside it: it never changes, and measuring reads every row once. */
 const SIZE = `${PI_SNAPSHOT_PREFIX}bytes`;
 
-/** Bytes the copy takes in the database, from SQLite's page stats where it has them, else from its rows' lengths. */
 const measureCopy = (storage: PiTableSnapshotStorage): number => {
   const copies = PI_TABLES.map((table) => `${PI_SNAPSHOT_PREFIX}${table}`).filter((table) => tableExists(storage, table));
   try {
@@ -125,10 +99,6 @@ const measureCopy = (storage: PiTableSnapshotStorage): number => {
   return bytes;
 };
 
-/**
- * How much of the database the pre-upgrade copy takes, 0 without one. Size limits that guard the conversation leave it
- * out: it is a fixed safety copy, and trimming the journal cannot shrink it.
- */
 export function piTableSnapshotBytes(storage: PiTableSnapshotStorage): number {
   if (!tableExists(storage, DEFINITIONS)) return 0;
   if (tableExists(storage, SIZE)) {
@@ -143,15 +113,9 @@ export function piTableSnapshotBytes(storage: PiTableSnapshotStorage): number {
   return bytes;
 }
 
-/**
- * Whether to keep the pre-upgrade copies. Kept unless the Worker's `PI_UPGRADE_COPIES` is `drop`, which ends the way
- * back for every conversation: each drops its copy the next time it opens, and none takes a new one. Set it once 1.5
- * has run clean (DEPLOY.md, "Pi's pre-upgrade copies").
- */
 export const keepPiTableSnapshots = (env: { PI_UPGRADE_COPIES?: string }): boolean =>
   env.PI_UPGRADE_COPIES?.trim().toLowerCase() !== "drop";
 
-/** Drop the copy once the upgrade is settled and there is no going back to 1.1.0. */
 export function dropPiTableSnapshot(storage: PiTableSnapshotStorage): "dropped" | "none" {
   if (!tableExists(storage, DEFINITIONS)) return "none";
   storage.transactionSync(() => {

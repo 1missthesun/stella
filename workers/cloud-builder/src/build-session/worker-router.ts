@@ -115,13 +115,7 @@ import { ownerGateStub, released } from "../rpc-release.js";
 
 const SOCKET_HANDOFF_TIMEOUT_MS = 15_000;
 
-/**
- * Verify the caller. `wantsSocket` decides only how a refusal is shaped: a
- * WebSocket client that gets an HTTP 4xx before the 101 sees close code 1006
- * and cannot tell "refresh your token" from "the network dropped" — opposite
- * responses — so refusals there complete the handshake and close with a real
- * code instead.
- */
+// A WebSocket client that gets an HTTP 4xx before the 101 sees close code 1006.
 const authenticateConversationCaller = async (
   request: Request,
   env: Env,
@@ -591,9 +585,6 @@ const handleDispatchSubmitRoute = async (
   }
 
   if (caller.kind === "user" && submitted.ingress === "mobile") {
-    // A phone authorised by its session: the computer it may reach is the one
-    // it chose (or, letting Stella choose, the one it prefers); without one
-    // the send runs in the cloud.
     const phone = readMobileSessionPhone(request.headers);
     const desktopDeviceId =
       submitted.targetMode === "device"
@@ -1009,11 +1000,6 @@ app.all("/workspace-apps/:rest{.*}", async (c) => {
   const { serveWorkspaceApp } = await import("../workspace-app-access.js");
   return serveWorkspaceApp(c.req.raw, c.env, c.executionCtx);
 });
-
-// ── User-authenticated ────────────────────────────────────────────────────
-// A signed-in user presents a user JWT, not the shared secret. Each route
-// verifies it and forwards the proven identity to the DO in x-stella-*
-// headers, stripping whatever the client sent under those names first.
 
 const listOwnerApps = async (env: Env, ownerId: string) => {
   const [{ ownerAccess }, name] = await Promise.all([

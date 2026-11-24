@@ -33,12 +33,7 @@ export const RESIDENT_ROLLOVER_TOKENS = 1_500_000;
 export const HOT_MAX_BYTES = 48 * 1024 * 1024;
 export const CUT_SCAN_PAGE_ROWS = 1_000;
 export const CUT_SCAN_MAX_ROWS = 100_000;
-/**
- * Storage pressure on a conversation's whole SQLite database (journal, pi's tables, spill, search index), not counting
- * pi's pre-upgrade copy. A Durable Object holds up to 10 GB and refuses writes past it; storage costs $0.20 per GB-month
- * and neither wake time nor sync size grows with it, so these only guard that limit. Above them the journal keeps fewer
- * live rows (the rest move to R2 segments), which also shortens the history a desktop brain loads.
- */
+/** A Durable Object holds up to 10 GB of SQLite and refuses writes past it. */
 export const DB_PRESSURE_AGGRESSIVE_BYTES = 1024 * 1024 * 1024;
 export const DB_PRESSURE_EMERGENCY_BYTES = 4 * 1024 * 1024 * 1024;
 export const DB_PRESSURE_AGGRESSIVE_ROWS = 500;
@@ -108,7 +103,6 @@ export type JournalMessageRecord = {
   createdAtMs: number;
   role: MessageRole;
   hidden: boolean;
-  /** Ties this committed row to the advisory deltas that preceded it. */
   streamId?: string;
   clientMsgId?: string;
   payload: unknown;
@@ -160,13 +154,8 @@ export type JournalRange = {
 export type LiveTurnSnapshot = {
   turnId: string;
   streamId: string | null;
-  /**
-   * Always empty. Assistant text is delivered whole on the committed record,
-   * so a turn in flight has no partial reply to hand a mid-turn joiner. The
-   * field stays on the wire while clients still read it; it is retired with
-   * their delta handling.
-   */
-  partialText: string;
+  /** Older clients still read this field. */
+  partialText: "";
   tools: Array<{
     toolCallId: string;
     name: string;
@@ -211,11 +200,6 @@ export const HEADER_SESSION = "x-stella-session";
 export const HEADER_TOKEN_EXP = "x-stella-token-exp";
 export const HEADER_IDENTITY_LEVEL = "x-stella-identity-level";
 export const HEADER_TOKEN_IAT = "x-stella-token-iat";
-/**
- * The pinned backend origin the worker verified against. It rides along so the
- * DO can verify a mid-life `auth` frame without needing its own copy of the
- * issuer configuration — the worker's isolate globals are not the DO's.
- */
 export const HEADER_ISSUER = "x-stella-auth-issuer";
 export const STELLA_HEADER_PREFIX = "x-stella-";
 
@@ -276,21 +260,11 @@ export type ConversationLogger = (
 export interface ConversationHubDeps {
   ctx: DurableObjectState;
   reader: JournalReader;
-  /**
-   * Resolves the conversation's owner for a verified connector. The session
-   * is the owner authority: a bound conversation answers from its journal
-   * (null when the connector is not its owner), and an unbound one adopts
-   * the verified connector — conversation ids are client-minted UUIDs, so
-   * the first authenticated caller is by construction the client that
-   * minted the id. Null means the hub must close 4404.
-   */
   lookupOwner: (
     identity: SocketIdentity,
   ) => Promise<ConversationOwnerRecord | null>;
   cancelTurn: (turnId: string) => Promise<void>;
-  /** Storage flushes a lagging owner index row on first connect. */
   onConnect: () => void;
-  /** A socket authenticated, on connect or by a refreshed token. */
   onSocketAuthenticated: (ownerId: string) => void;
   conversationId: () => string;
   log: ConversationLogger;
@@ -309,13 +283,6 @@ export type ConversationHubFactory = (
   deps: ConversationHubDeps,
 ) => ConversationHub;
 
-/**
- * A hub that accepts nothing. It is what runs before the socket half of this
- * migration lands, and what runs if that half is ever reverted: the DO keeps
- * its transcript and its turn lifecycle either way, and clients fall back to
- * the owner event projection. Deliberately not an error — a missing socket
- * layer must degrade, never break turns.
- */
 export class NullConversationHub implements ConversationHub {
   async upgrade(): Promise<Response> {
     return Response.json(
@@ -346,12 +313,6 @@ export class NullConversationHub implements ConversationHub {
 
 let hubFactory: ConversationHubFactory | null = null;
 
-/**
- * The one wiring point between the two halves. The socket module registers
- * itself at import time; `index.ts` importing that module is what turns the
- * hub on. Registration rather than a direct import so each half can land,
- * typecheck and deploy on its own.
- */
 export const registerConversationHubFactory = (
   factory: ConversationHubFactory,
 ): void => {

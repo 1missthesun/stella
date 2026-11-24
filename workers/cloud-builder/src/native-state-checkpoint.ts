@@ -166,8 +166,6 @@ const validNativeStateCheckpointMacWith = async (args: {
   const expected = bytesToHex(
     await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)),
   );
-  // Equal-length, fixed-work comparison. Web Crypto does not expose a
-  // constant-time compare operation in Workers.
   let difference = 0;
   for (let index = 0; index < expected.length; index += 1) {
     difference |=

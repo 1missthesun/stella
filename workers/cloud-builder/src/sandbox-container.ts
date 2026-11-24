@@ -63,7 +63,6 @@ export type SandboxBoot = {
   workload: SandboxWorkloadKind;
   idleTimeoutMs?: number;
   world?: string;
-  // The owner whose budget pays for the container's running time.
   owner?: string;
 };
 
@@ -142,10 +141,6 @@ const TRUST_CONTAINERS_CA = `for i in $(seq 1 50); do [ -s ${CONTAINERS_CA} ] &&
 cp ${CONTAINERS_CA} /usr/local/share/ca-certificates/stella-egress.crt
 update-ca-certificates >/dev/null 2>&1`;
 
-/**
- * Commands no longer inherit an environment from a long-lived session shell,
- * and `exec()` inherits only PATH from `start()`. Every command gets this base.
- */
 const BASE_ENV: Readonly<Record<string, string>> = Object.freeze({
   PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
   HOME: "/root",
@@ -299,8 +294,6 @@ export class SandboxCode extends WorkerEntrypoint<Env, { sha256: string }> {
     ) {
       return new Response("Not found.\n", { status: 404 });
     }
-    // A Sandbox object still running an earlier version asks for that
-    // version's bundle, but this entrypoint always runs the current one.
     if (sha256 !== sandboxCode().sha256) {
       return new Response(
         `This deployment serves code bundle ${sandboxCode().sha256}, not ${sha256}.\n`,
@@ -452,16 +445,6 @@ export class Sandbox extends DurableObject<Env> {
     return this.env.SANDBOX_SNAPSHOTS === "1";
   }
 
-  /**
-   * Start from the latest snapshot any of the owner's agent containers of
-   * this disk class took (`diskClass`), when it was taken on the image this deploy runs, so a world projection,
-   * caches and installed dependencies are already on disk; the world catches
-   * up by sync. A snapshot cannot cross images; any other case starts clean,
-   * with the owner's caches and dependencies brought back from their archive.
-   * The image holds no Stella code, so a deploy of Stella source keeps the
-   * image and its snapshots; every agent container installs the code bundle
-   * its Worker version names as it starts, from either source.
-   */
   async #start(boot: SandboxBoot): Promise<void> {
     const container = this.#container;
     const image = container.images.sandbox!;
@@ -514,9 +497,6 @@ export class Sandbox extends DurableObject<Env> {
     if ("error" in installed) {
       await this.#container.destroy().catch(() => undefined);
       if (boot.workload === "world" && (await this.#codeSuperseded())) {
-        // This object runs an earlier version than the one now deployed,
-        // which no longer serves its bundle. Resetting it makes the next call
-        // (the turn's own, after its prewarm) run the current version.
         console.log(
           JSON.stringify({
             level: "warn",
@@ -748,13 +728,7 @@ export class Sandbox extends DurableObject<Env> {
     });
   }
 
-  /**
-   * Stop the container. Unless the caller is only resizing it, the owner's
-   * latest snapshot is forgotten too when it is this container's, so the next
-   * start cannot bring back the state being discarded; another container's
-   * newer one is kept. The platform has no snapshot delete; an unreferenced
-   * one expires in 30 days.
-   */
+  // The platform has no snapshot delete; an unreferenced one expires in 30 days.
   async destroy(options: { keepSnapshot?: boolean } = {}): Promise<void> {
     if (!options.keepSnapshot) {
       this.ctx.storage.kv.delete(RELEASE_DUE_KEY);
@@ -870,9 +844,7 @@ export class Sandbox extends DurableObject<Env> {
     }
   }
 
-  // An alarm counts as Durable Object activity and restarts the platform's
-  // inactivity timeout, so while the meter ticks this object stops an idle
-  // container itself; that needs when the last call ended.
+  // An alarm counts as Durable Object activity and restarts the platform's inactivity timeout.
   #touch(): void {
     const now = Date.now();
     this.#lastActiveAt = now;
@@ -881,8 +853,6 @@ export class Sandbox extends DurableObject<Env> {
     this.ctx.storage.kv.put(LAST_ACTIVE_KEY, now);
   }
 
-  // Processes the meter stopped for want of budget report that, not an
-  // out-of-memory kill, so the turn ends with the budget message.
   #throwIfBudgetStopped(): void {
     const message = this.ctx.storage.kv.get<string>(BUDGET_STOP_KEY);
     if (message) throw containerBudgetError(message);
@@ -948,8 +918,7 @@ export class Sandbox extends DurableObject<Env> {
     await this.#armAlarm();
   }
 
-  // The VM's CPU counter starts at its boot; a container that came up long
-  // before this run's start (not expected) is measured from now instead.
+  // The VM's CPU counter starts at its boot.
   async #meterBaseline(): Promise<void> {
     const kv = this.ctx.storage.kv;
     const meter = kv.get<ContainerMeter>(METER_KEY);
@@ -963,8 +932,6 @@ export class Sandbox extends DurableObject<Env> {
     kv.put(METER_KEY, { ...meter, cpuUsec: freshBoot ? 0 : reading });
   }
 
-  // A container that stopped without this object (inactivity timeout, crash)
-  // stopped between the last tick that saw it and now: charge to the middle.
   #lostStopTime(meter: ContainerMeter): number {
     const now = Date.now();
     return Math.max(meter.settledThrough, Math.min(now, meter.lastSeenAt + (now - meter.lastSeenAt) / 2));
@@ -1107,7 +1074,6 @@ export class Sandbox extends DurableObject<Env> {
     if (this.#booting) await this.#booting.catch(() => undefined);
     if (!this.ctx.container?.running) return;
     const cpuUsec = await this.#readCpu();
-    // A stop that fails leaves the inactivity timeout to do it.
     let failure: string | undefined;
     this.#stopping = this.#container
       .destroy()
@@ -1262,8 +1228,6 @@ export class Sandbox extends DurableObject<Env> {
         bytes: probe.bytes,
         takenAt: Date.now(),
       };
-      // Last writer wins: concurrent releases each replace the one before,
-      // and each deletes what it replaced, so no archive is left unnamed.
       const replaced = await world.replaceDependencyBackup(
         next,
         diskClass(size),
@@ -1370,7 +1334,6 @@ export class Sandbox extends DurableObject<Env> {
       try {
         await this.#fs.writeFile(path, bytes);
       } catch (error) {
-        // 0.12 created missing parents.
         if (!SandboxFileError.is(error) || error.code !== "ENOENT") throw error;
         await this.#fs.mkdir(parent, { recursive: true });
         await this.#fs.writeFile(path, bytes);
@@ -1450,8 +1413,6 @@ export class Sandbox extends DurableObject<Env> {
 
   async getProcess(id: string): Promise<SandboxProcessInfo | null> {
     return await this.#active(async () => {
-      // A stopped container took every process with it, most often by running
-      // out of memory; 137 is what the OOM handling recognizes.
       if (!this.ctx.container?.running) {
         this.#throwIfBudgetStopped();
         return { id, status: "killed", exitCode: 137 };

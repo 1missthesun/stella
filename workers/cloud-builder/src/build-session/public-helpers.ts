@@ -63,7 +63,6 @@ export const parseAgentExecutorResult = (
     "finalText",
     "error",
     "waitingFor",
-    // Still sent by an executor image from before explicit messaging; ignored.
     "waitingReply",
     "usage",
     "checkpointPolicy",

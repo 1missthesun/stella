@@ -68,16 +68,6 @@ export class ConversationArchive {
 
   private readonly inFlight = new Set<Promise<unknown>>();
 
-  /**
-   * Set by the purge, never cleared. The durable tombstone cannot carry this
-   * fence on its own: `deleteAll()` destroys it, and the purge handler then
-   * re-bootstraps an empty journal so the object can keep refusing requests —
-   * which means `journal.isDeleted()` reads false again the moment the purge
-   * returns. A request that was already in flight resumes against that empty
-   * journal and writes an R2 object under the deleted conversation's prefix
-   * that no manifest, queue or sweep has ever heard of. This flag is what stays
-   * true across the wipe, for as long as the isolate lives.
-   */
   private sealed = false;
 
   seal(): void {
@@ -117,19 +107,6 @@ export class ConversationArchive {
     return tracked;
   }
 
-  /**
-   * Waits until no R2 write this object started is still running. Called by the
-   * purge after the tombstone is set and before it snapshots the keys to
-   * delete: the tombstone stops new writes from starting, this waits out the
-   * ones that had already started, and together they make "the manifest names
-   * every object" true rather than probable.
-   *
-   * Settled, not fulfilled: a write that failed still owes its key to the
-   * manifest, and a rejection propagating from here would abandon the purge.
-   * The pass limit bounds the wait — a tracked write that spawns another can
-   * otherwise keep this loop alive, and the purge is holding an HTTP request
-   * open.
-   */
   async quiesce(): Promise<void> {
     for (let pass = 0; pass < 4 && this.inFlight.size > 0; pass += 1) {
       await Promise.allSettled([...this.inFlight]);
@@ -269,7 +246,6 @@ export class ConversationArchive {
   } | null {
     const hot = this.journal.hotStats();
     const databaseBytes = this.journal.databaseSize();
-    // pi's pre-upgrade copy is a fixed safety copy that trimming the journal cannot shrink.
     const copyBytes = databaseBytes > DB_PRESSURE_AGGRESSIVE_BYTES && this.storage ? piTableSnapshotBytes(this.storage) : 0;
     const dbBytes = databaseBytes - copyBytes;
     if (dbBytes > DB_PRESSURE_AGGRESSIVE_BYTES) {
@@ -289,8 +265,6 @@ export class ConversationArchive {
         0,
       );
       if (desired === null) return null;
-      // Rows past the context summary are what a desktop brain rebuilds its context from, and cutting any of them
-      // retires the summary. Only the emergency tier, near the object's storage limit, cuts there.
       const ceiling =
         tier === "aggressive" && checkpoint !== undefined
           ? Math.min(desired, checkpoint)
@@ -434,15 +408,6 @@ export class ConversationArchive {
     });
   }
 
-  /**
-   * Every column travels, `writer_key` included, so re-importing a segment is
-   * a byte-identical no-op against the UNIQUE index.
-   *
-   * `contentEncoding` is deliberately NOT set: whether the R2 binding
-   * transparently decodes a gzip-encoded body on `get()` is exactly the kind
-   * of ambiguity that works in one runtime and not the next. The `.gz` suffix
-   * carries the meaning and this module always decompresses explicitly.
-   */
   private async upload(
     key: string,
     header: SegmentHeader,
@@ -539,11 +504,6 @@ export class ConversationArchive {
     };
   }
 
-  /**
-   * Re-read the segments archived before agents' reports and messages were
-   * searched, once, so their hidden prompts join the search index. Each
-   * segment is remembered as done, so an interrupted pass resumes.
-   */
   async reindexArchivedSearch(): Promise<void> {
     if (!this.bucket || this.sealed || this.journal.isDeleted()) return;
     const running = this.reindexing;
@@ -592,23 +552,11 @@ export class ConversationArchive {
       try {
         rows.push(JSON.parse(line) as JournalRow);
       } catch {
-        // A corrupt line degrades scrollback; it must not fail the read.
       }
     }
     return rows;
   }
 
-  /**
-   * Drains `purge_queue`, removing only keys R2 confirmed. The caller must not
-   * call `deleteAll()` until this reports zero pending: `deleteAll()` destroys
-   * the manifest, which is the only record of the keys, and the objects would
-   * then be unreachable forever.
-   *
-   * The caller must also have tombstoned the conversation and awaited
-   * `quiesce()` before it snapshotted those keys. A key that reaches the
-   * manifest after the snapshot is a key this drain never sees, and the
-   * `deleteAll()` behind it takes the last record of the object with it.
-   */
   async drainPurge(): Promise<{ pending: number }> {
     if (!this.bucket) {
       for (;;) {

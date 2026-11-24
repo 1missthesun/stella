@@ -1,20 +1,3 @@
-/**
- * Per-conversation envelope encryption for the journal, synchronous because
- * the journal's writes and reads are synchronous SQLite transactions.
- *
- * Each conversation holds a random data-encryption key (DEK), wrapped with
- * the deployment key-encryption key (`OWNER_SECRETS_KEK`, the same secret
- * that wraps owner credentials) and stored beside the data it protects.
- * A database or R2 snapshot without the KEK is unreadable, and deleting a
- * conversation destroys its wrapped DEK with the rest of its storage, which
- * crypto-shreds any copy that survives elsewhere.
- *
- * Encoded form: `enc1.<iv>.<tag>.<ciphertext>` (base64), AES-256-GCM. A DEK
- * wrapped under OWNER_SECRETS_KEK_V2 carries a `kek2.` prefix in front.
- * Anything without the prefix is a pre-encryption plaintext row and reads
- * back unchanged, so old segments and spills keep working.
- */
-
 import { Buffer } from "node:buffer";
 import {
   createCipheriv,
@@ -44,7 +27,6 @@ const keyFromBase64 = (value: string): Buffer | null => {
     const decoded = Buffer.from(raw, "base64");
     if (decoded.byteLength === 32) return decoded;
   } catch {
-    // Fall through to hashing the configured string.
   }
   return createHash("sha256").update(raw, "utf8").digest();
 };

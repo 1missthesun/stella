@@ -196,47 +196,6 @@ export type NativeTransientBackup = {
 
 export type WorkspaceBackupDebt = { backupIds: string[] };
 
-/**
- * THE LIST. Every store outside the owner object that holds data belonging to one owner,
- * how it is addressed, and what deletes it. `purgeOwnerStorage` walks exactly
- * this list; a store that is not here is a store account deletion does not
- * reach, so adding one to the system without adding it here is the defect.
- *
- *  id                | where                    | addressed by
- *  ------------------|--------------------------|--------------------------------
- *  agent-home        | R2 AGENT_HOME            | `agent-home/<sha256(owner)>/`
- *  conversations     | R2 CONVERSATION_ARCHIVE  | `conversations/<sha256(owner)>/`
- *  backups           | R2 BACKUP_BUCKET         | `backups/<backupId>/` — the id
- *                    |                          | is only in the KV descriptor
- *  builds            | R2 APP_BUILDS            | app
- *                    |                          | `builds/<ownerHash>/<buildId>/`
- *                    |                          | (legacy exact `builds/<buildId>/`)
- *  checkpoints       | KV APP_ROUTES            | `ws:<sha256(owner:workspace)>`
- *                    |                          | and `…:size`
- *  native-checkpoints| KV + R2 BACKUP_BUCKET    | `ws:<hash>:native-state:<threadHash>`
- *                    |                          | plus its descriptor/name-derived backup
- *  routes            | KV APP_ROUTES            | `app:<slug>`, owner in the value
- *
- * Deliberately NOT here, with the reason:
- *  - OrchestratorSession DO SQLite and the R2 objects its manifest names are
- *    purged per conversation by the owner object's purge hook
- *    (`owner-store/purge.ts`, run as this route's `owner-data` step), because
- *    only the DO can say its own storage is gone. The `conversations/` prefix
- *    sweep above is the backstop for segments whose index row was already lost.
- *  - BuildSession DOs hold no durable owner state. The world's Sandbox DO
- *    keeps a handle to its last container filesystem snapshot; an owner purge
- *    destroys that sandbox, which drops the handle. Cloudflare has no snapshot
- *    delete, so the unreferenced snapshot itself expires after 30 days.
- *    A workspace that must survive is a `backups/` archive, which IS here.
- *  - The drive's R2 objects are deleted by the owner object's drive domain
- *    purge hook, which knows its own file rows.
- *
- * The two hash prefixes are duplicated from their owners deliberately —
- * importing `ConversationArchive` or `AgentHome` here would pull a DO-shaped
- * module into the worker entry for two string literals. They must stay in step
- * with `archive.ts` (`conversations/<hash>/`) and `agent-home.ts:163`
- * (`agent-home/<hash>/`).
- */
 export type OwnerPurgeRequest = {
   ownerId?: string;
   ownerGeneration?: string;

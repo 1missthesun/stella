@@ -83,12 +83,6 @@ export type OwnerModelGrant = OwnerModelGrantIdentity &
     updatedAt: number;
   }>;
 
-/**
- * `active` until revoked; `revoking` while readers are being frozen (a failed
- * freeze leaves it there for the next revokeAll); `revoked` rows stay until
- * expiry so a replayed issue answers `revoked` instead of re-issuing. The
- * table's CHECK also allows `retired`, which nothing has ever written.
- */
 export type OwnerModelGrantState = "active" | "revoking" | "revoked";
 
 export type OwnerModelGrantRecord = OwnerModelGrantIdentity &

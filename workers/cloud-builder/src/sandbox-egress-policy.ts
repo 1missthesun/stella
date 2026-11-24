@@ -15,21 +15,12 @@ export const GENERAL_AGENT_EGRESS_ALLOWED_PORTS = [80, 443, 22] as const;
 const EGRESS_RATE_WINDOW_MS = 60_000;
 const EGRESS_STATE_RETENTION_MS = 60 * 60_000;
 
-/**
- * This outbound fetch handler only observes the plain-HTTP requests the
- * Sandbox object's intercept routes to it; HTTPS leaves directly. It is not a
- * firewall for non-HTTP traffic: port 22 remains
- * enabled for legitimate Git SSH traffic and is outside this byte/rate meter.
- * Quota state is isolate-local and intentionally not described as durable.
- */
-
 type EgressRefusalReason = NonNullable<EgressDestinationTelemetry["reason"]>;
 type EgressDecision =
   | { decision: "allow"; reason?: never }
   | { decision: "deny"; reason?: EgressRefusalReason };
 
 type SandboxOutboundContext = {
-  /** Stable sandbox Durable Object id. Agents share one id per owner world. */
   containerId: string;
 };
 
@@ -82,8 +73,6 @@ const emitDestinationTelemetry = (
     const event = egressDestinationTelemetry(request, fields);
     if (event) console.log(JSON.stringify(event));
   } catch {
-    // Observability must never widen app-build egress or break intentional
-    // general-agent connectivity. The policy decision remains authoritative.
   }
 };
 
@@ -118,11 +107,8 @@ const boundedContentLength = (response: Response): number | null => {
 
 const cancelBestEffort = (cancel: () => Promise<void>): void => {
   try {
-    // Refusal must not wait for a broken upstream cancellation handshake.
-    // Attach a rejection handler so fire-and-forget cancellation stays quiet.
     void cancel().catch(() => undefined);
   } catch {
-    // Some implementations can throw synchronously (for example if locked).
   }
 };
 
@@ -231,12 +217,6 @@ const meteredResponse = (args: {
   });
 };
 
-/**
- * Stateful policy factory. Production keys an isolate-local Map by
- * `ctx.containerId`, Stella's owner-world sandbox id. Idle entries reset after
- * one hour when a later request sweeps them; this is not a durable quota.
- * Tests inject small limits and a clock.
- */
 export const createGeneralAgentEgress = (
   overrides: Partial<GeneralAgentEgressDeps> = {},
 ): ((

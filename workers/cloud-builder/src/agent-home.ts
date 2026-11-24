@@ -26,10 +26,6 @@ export class AgentHomeUnavailableError extends Error {
 
 const DISPLAY_PREFIX = "~/.stella/";
 
-/**
- * Owners whose memory from before it moved into the world is already there
- * (`CloudHomeStore.importLegacyMemory`), per isolate.
- */
 const legacyMemoryImported = new Set<string>();
 
 export class AgentHome {
@@ -63,11 +59,6 @@ export class AgentHome {
     return this.cloud;
   }
 
-  /**
-   * Memory kept before it moved into the world (the owner's `memory_docs`
-   * and their R2 copies) is copied into the world once, before the world is
-   * read, so it does not disappear from turns.
-   */
   private importLegacyMemory(): Promise<void> {
     const cloud = this.cloud;
     if (!cloud || legacyMemoryImported.has(this.ownerId)) {

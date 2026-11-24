@@ -14,9 +14,6 @@ const HOLD_MS = 15 * 60_000;
 const MINIMUM_HOLD_MS = 2 * 60_000;
 const HOLD_TTL_MS = 20 * 60_000;
 
-// Running time and CPU of one container run, kept in its Sandbox object so a
-// restart or eviction loses no time. `cpuUsec` is the VM's busy CPU counter
-// at `settledThrough`; it is absent when it could not be read.
 export type ContainerMeter = {
   owner: string;
   size: InstanceSize;
@@ -35,8 +32,6 @@ const tier = (size: InstanceSize) => {
   return { memoryGib: memoryBytes / 1024 ** 3, diskGb: diskBytes / 1000 ** 3, vcpu: vCpu };
 };
 
-// What to hold before (and while) a container runs: its provisioned size with
-// every vCPU busy, so a CPU-heavy interval still fits the hold.
 export const containerHold = (size: InstanceSize, now: number) => {
   const { memoryGib, diskGb, vcpu } = tier(size);
   const cost = (ms: number) =>
@@ -104,8 +99,6 @@ const BUDGET_ERROR_TAG = "[stella-budget] ";
 
 export const containerBudgetError = (message: string): Error => new Error(`${BUDGET_ERROR_TAG}${message}`);
 
-// The user-facing text of an error the Sandbox threw because the owner's
-// budget cannot cover the container, or null for any other error.
 export const containerBudgetMessage = (error: unknown): string | null => {
   const text = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const at = text.indexOf(BUDGET_ERROR_TAG);

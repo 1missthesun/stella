@@ -28,14 +28,6 @@ import {
   worldMaterializationFailure,
 } from "./world-materialization.js";
 
-/*
- * One agent container's lifecycle, shared by BuildSession's Claude agent
- * turns and the workspace compute of pi agents running in their
- * conversation: the sandbox handle at the agent's size, the owner's
- * container slot, the world attached into a session, the after-run memory
- * and disk probe that raises the agent's size, and the release.
- */
-
 type Log = (level: "info" | "error", event: string, fields: Record<string, unknown>) => void;
 
 export type AgentContainerTarget = {
@@ -60,11 +52,7 @@ export const agentContainerHandle = (
   });
 };
 
-/**
- * Whether the container is running now, answered by its sandbox object and
- * never by the container: any container RPC starts it. An unanswerable state
- * counts as not running.
- */
+// Any container RPC starts the container.
 export const agentContainerRunning = async (sandbox: SandboxHandle, log?: Log): Promise<boolean> => {
   try {
     const state = await withInfrastructureDeadline(sandbox.getState(), 10_000, "Sandbox state read did not settle.");
@@ -84,7 +72,6 @@ export class AgentContainerRefusedError extends Error {
 
 type GateEnv = Pick<Cloudflare.Env, "OWNER_GATES">;
 
-/** Takes one of the owner's agent container slots (container-cap); refused when the plan has none. */
 export const acquireAgentContainerSlot = async (
   env: GateEnv,
   ownerId: string,
@@ -101,7 +88,6 @@ export const releaseAgentContainerSlot = async (env: GateEnv, ownerId: string, s
     .catch(() => undefined);
 };
 
-/** A session for one run; a failed attach leaves its session behind, so an existing one is replaced, never reused. */
 export const openAgentSession = async (
   sandbox: SandboxHandle,
   options: { id: string; cwd: string; commandTimeoutMs: number; env: Record<string, string> },
@@ -112,10 +98,6 @@ export const openAgentSession = async (
     return await sandbox.createSession(options);
   });
 
-/**
- * Brings the owner's world (or a Crew workspace's) into the session's
- * workspace root from the world's export, with a capability for this run.
- */
 export const materializeAgentWorld = async (
   session: ExecutionSession,
   args: {
@@ -147,7 +129,6 @@ export const materializeAgentWorld = async (
   return { ok: true };
 };
 
-/** Where an agent's size floor and its container's last seen OOM count are kept. */
 export type AgentContainerSizeKeys = { size: string; oomBaseline: string; legacyLarge?: string };
 
 export const piAgentContainerSizeKeys = (threadId: string): AgentContainerSizeKeys => ({
@@ -155,7 +136,6 @@ export const piAgentContainerSizeKeys = (threadId: string): AgentContainerSizeKe
   oomBaseline: `piContainerOomBaseline:${threadId}`,
 });
 
-/** The size an agent's next container gets: what this run asks for, never below what earlier runs grew to. */
 export const agentContainerSize = async (
   storage: Pick<DurableObjectStorage, "get">,
   keys: AgentContainerSizeKeys,
@@ -192,12 +172,6 @@ type ContainerOomBaseline = { bootId: string; oomKills: number };
 
 export type AgentContainerPressure = { note: string; resizedTo?: InstanceSize };
 
-/**
- * After a run: whether the container killed a process for memory since the
- * last probe (the kernel's oom_kill count on this boot) or is nearly out of
- * disk. Either raises the agent's stored size for its next run and returns
- * the note its report carries.
- */
 export const probeAgentContainerPressure = async (args: {
   sandbox: SandboxHandle;
   size: InstanceSize;
@@ -247,13 +221,6 @@ export const probeAgentContainerPressure = async (args: {
 
 const quoted = (value: string) => `'${value.replace(/'/gu, `'"'"'`)}'`;
 
-/**
- * Ends one run's use of an agent container: the owner's slot, the attached
- * tool daemon's process group and directory, the run's session, then the
- * container itself, which snapshots and stops (after the warm window unless
- * `release` says otherwise). Each step is best-effort and bounded; a
- * container that is not running holds none of them.
- */
 export const releaseAgentContainer = async (args: {
   env: GateEnv;
   ownerId?: string;

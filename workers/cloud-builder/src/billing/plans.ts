@@ -134,9 +134,6 @@ export class StripePriceMismatchError extends Error {}
 const PRICE_CHECK_TTL_MS = 10 * 60_000;
 const verifiedPrices = new Map<string, number>();
 
-// A configured price must be exactly the catalog's amount, in USD, billed
-// monthly. Anything else would charge a customer a different amount than
-// every display and allowance in Stella promises.
 export const priceMismatch = (plan: PaidBillingPlan, price: StripePrice): string | null => {
   const definition = PLAN_CATALOG[plan];
   if (!price.active) return `${price.id} is archived`;

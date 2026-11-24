@@ -48,11 +48,6 @@ export type CloudHomeEndpoint = {
   control: HomeControl;
   ownerId: string;
   ownerGeneration: string;
-  /**
-   * Proves that the caller still owns a registered worker-side owner activity
-   * lease. The lease itself must remain held until the enclosing publication
-   * returns; purge waits for that lease before sweeping the owner prefix.
-   */
   assertExternalWrite?: () => Promise<void>;
 };
 
@@ -442,10 +437,6 @@ export class CloudHomeStore {
           "Cloud-home publication requires an owner activity lease.",
         );
       }
-      // This is deliberately the last await before PUT. Owner generation
-      // fencing alone cannot make an external R2 write transactional with a
-      // reset. The still-held worker lease makes purge wait for this operation
-      // before its exhaustive owner-prefix sweep.
       await this.endpoint.assertExternalWrite();
       await this.bucket.put(key, bytes, {
         onlyIf: { etagDoesNotMatch: "*" },
@@ -475,10 +466,6 @@ export class CloudHomeStore {
     return { preference };
   }
 
-  /**
-   * Copy the owner's memory from before it moved into the world (the home's
-   * `memory_docs` and their R2 copies) into the world, once; a no-op after.
-   */
   async importLegacyMemory(): Promise<void> {
     await this.control("memory.legacyImport", {});
   }

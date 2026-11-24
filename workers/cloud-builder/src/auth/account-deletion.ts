@@ -70,12 +70,6 @@ const revokeTokensIssuedBefore = async (env: Cloudflare.Env, userId: string, min
 
 const reply = (status: number, body: Record<string, unknown>) => Response.json(body, { status });
 
-/**
- * POST /api/auth/delete-user. Records the request, disables the account and
- * signs out every device; the hourly cron deletes it after the grace period.
- * Any failure before the request is fully recorded is reported and undone,
- * so the caller stays signed in.
- */
 export const requestAccountDeletion = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const session = await createAuth(env)
     .api.getSession({ headers: request.headers })
@@ -158,7 +152,6 @@ export const requestAccountDeletion = async (request: Request, env: Cloudflare.E
   });
 };
 
-/** A sign-in during the grace period keeps the account. */
 export const cancelAccountDeletion = async (env: Cloudflare.Env, userId: string): Promise<boolean> => {
   const row = await d1(env)
     .prepare("SELECT * FROM account_deletions WHERE user_id = ? AND status = 'pending'")
@@ -277,7 +270,6 @@ const advanceDeleting = async (env: Cloudflare.Env, row: DeletionRow, now: numbe
   log("info", "account_deletion_completed", { requestedAt: row.requested_at, startedAt: row.started_at });
 };
 
-/** Hourly: cancel on sign-in, retry confirmations and renewal-off, delete due accounts, finish purges. */
 export const runAccountDeletions = async (env: Cloudflare.Env, now = Date.now()): Promise<void> => {
   const { results } = await d1(env)
     .prepare(

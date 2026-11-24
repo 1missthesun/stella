@@ -1,15 +1,6 @@
 import { DBusConnection, DBusError, variant } from "./dbus.js";
 
-/**
- * AT-SPI over Stella's own D-Bus client: reads an app window's accessibility
- * tree and acts on its elements (actions, text, values, focus, scrolling).
- * Everything here works on a window in the background: nothing moves the
- * user's pointer or changes which window has focus.
- *
- * The approach (window-relative extents, pid-matched application roots,
- * semantic actions before any raw input) follows Cua's platform-linux
- * driver (MIT, trycua/cua); see LICENSE-cua beside this file.
- */
+// Follows Cua's platform-linux driver (MIT, trycua/cua); see LICENSE-cua beside this file.
 
 export type AtspiRef = Readonly<{ bus: string; path: string }>;
 
@@ -22,7 +13,6 @@ export type AtspiNode = {
   description: string;
   states: Set<string>;
   interfaces: Set<string>;
-  /** Window-relative logical pixels; null when the app gave none or junk. */
   bounds: Rect | null;
   actions: string[];
   text?: string;
@@ -31,7 +21,6 @@ export type AtspiNode = {
   value?: { current: number; min: number; max: number; step: number };
   children: AtspiNode[];
   childCount: number;
-  /** Children not read because of the node budget. */
   omittedChildren: number;
 };
 
@@ -40,7 +29,6 @@ export type AtspiApp = Readonly<{
   pid: number;
   name: string;
   childCount: number;
-  /** "GTK", "Qt", "Chromium", … when the app says. */
   toolkit: string;
 }>;
 
@@ -107,7 +95,6 @@ const ROOT_PATH = "/org/a11y/atspi/accessible/root";
 const NULL_PATH = "/org/a11y/atspi/null";
 const IFACE = "org.a11y.atspi";
 
-/** Roles whose text content is worth reading beyond their name. */
 const TEXT_ROLES = new Set([
   "text",
   "entry",
@@ -157,10 +144,8 @@ export type ReadTreeOptions = Readonly<{
   maxNodes?: number;
   maxDepth?: number;
   maxChildren?: number;
-  /** Skip subtrees the app reports as not showing. */
   showingOnly?: boolean;
   textLimit?: number;
-  /** Stop descending after this long; unread children count as omitted. */
   budgetMs?: number;
 }>;
 
@@ -281,7 +266,6 @@ export class AtspiClient {
       .map(([bus, path]) => ({ bus, path }));
   }
 
-  /** Every application registered on the accessibility bus, with its pid. */
   async apps(): Promise<AtspiApp[]> {
     const roots = await this.children({ bus: REGISTRY, path: ROOT_PATH });
     const apps = await Promise.all(
@@ -536,7 +520,6 @@ export class AtspiClient {
     return Boolean(ok);
   }
 
-  /** Scrolls the element's ancestors so its top-left lands at a window point. */
   async scrollToPoint(ref: AtspiRef, x: number, y: number): Promise<boolean> {
     const [ok] = await this.call(
       ref,

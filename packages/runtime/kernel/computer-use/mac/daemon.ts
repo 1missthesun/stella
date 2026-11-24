@@ -179,10 +179,6 @@ const automationAccessibilityWaitMs = () =>
     30_000,
   );
 const automationAccessibilityPollIntervalMs = 500;
-// 30s covers heavy AppKit apps (Mail with thousands of messages, Notes with
-// large note bodies, Music with full library indexed) where the AX walk
-// reaches the maxNodes cap of 1500 before the daemon can return. Lighter
-// apps (Spotify, Notes empty) finish in 1–3s.
 export const automationDaemonRequestTimeoutMs = 30_000;
 
 const delayMs = abortableComputerDelay;
@@ -201,13 +197,6 @@ export const automationPidPath = (sessionPaths: SessionPaths) =>
 const automationLogPath = (sessionPaths: SessionPaths) =>
   path.join(sessionPaths.sessionDir, "automation-daemon.log");
 
-/**
- * Pid of the Electron host that spawned the current daemon. macOS TCC
- * attribution follows the responsible process recorded at spawn time, so a
- * daemon spawned by a host that has since exited loses its "Stella"
- * Accessibility attribution — it must be restarted by the current live host.
- */
-/** A daemon is spawned with `--pid-file <its pid file>`: that names it uniquely. */
 const daemonTarget = (sessionPaths: SessionPaths) => ({
   commandIncludes: ["--pid-file", automationPidPath(sessionPaths)],
 });
@@ -237,10 +226,6 @@ export const stopAutomationDaemon = (sessionPaths: SessionPaths) => {
   return pid !== null;
 };
 
-/**
- * SIGTERM first so the helper restores app focus state on the way out, then
- * SIGKILL its process group if it is still alive after the grace period.
- */
 export const stopAutomationDaemonGracefully = async (
   sessionPaths: SessionPaths,
   graceMs = 2_000,
@@ -268,9 +253,7 @@ export const stopAutomationDaemonGracefully = async (
 const writeAutomationHostPid = (sessionPaths: SessionPaths, pid: number) => {
   try {
     fs.writeFileSync(automationHostPidPath(sessionPaths), String(pid), "utf8");
-  } catch {
-    // Best-effort bookkeeping; worst case the staleness check is skipped.
-  }
+  } catch {}
 };
 
 const automationDaemonSpawnedByDeadHost = (sessionPaths: SessionPaths) => {
@@ -292,9 +275,7 @@ const truncateAutomationLog = (sessionPaths: SessionPaths) => {
   try {
     fs.mkdirSync(sessionPaths.sessionDir, { recursive: true });
     fs.writeFileSync(automationLogPath(sessionPaths), "", "utf8");
-  } catch {
-    // Best-effort; an unwritable log only degrades error detail.
-  }
+  } catch {}
 };
 
 const accessibilityGuidance =
@@ -325,12 +306,6 @@ const filteredAutomationDaemonEnv = () =>
 type AutomationAccessibilityState =
   | {
       ok: true;
-      /**
-       * True when the helper's own AXIsProcessTrusted() check (run from this
-       * process tree) passed. False when only the Electron host vouched for
-       * the grant — valid for a host-spawned daemon (the host's TCC identity
-       * is what matters there) but not for a locally spawned one.
-       */
       helperTrusted: boolean;
       hostGranted: boolean;
     }
@@ -418,12 +393,10 @@ const promptForAutomationAccessibility = async (
 
   const hostRequest = await requestViaHost();
   if (hostRequest.ok && hostRequest.granted) {
-    // Re-verify with the helper's own check instead of trusting the host
-    // blindly: the host answers for the Stella.app TCC identity, while a
-    // helper spawned from this (worker) process tree can carry a different —
-    // possibly orphaned — attribution. A disagreement here is expected when
-    // the worker outlived a previous Stella.app instance; the daemon must
-    // then be spawned by the live host (see ensureAutomationDaemon).
+    // macOS TCC attributes a helper to the responsible process recorded at
+    // spawn time: the host answers for the Stella.app identity, while a helper
+    // spawned from this worker's process tree can carry a different, possibly
+    // orphaned, attribution.
     lastResult = await checkAccessibility(false);
     return { ok: true, helperTrusted: lastResult.ok, hostGranted: true };
   }
@@ -501,9 +474,7 @@ const spawnAutomationDaemonLocally = (
   try {
     logFd = fs.openSync(automationLogPath(sessionPaths), "a");
     stdio = ["ignore", logFd, logFd];
-  } catch {
-    // Unwritable log only degrades error detail.
-  }
+  } catch {}
   let child: ReturnType<typeof spawn>;
   try {
     child = spawn(
@@ -549,9 +520,6 @@ const ensureAutomationDaemon = async (
   const socketPath = automationSocketPath(sessionPaths);
   const socketPathBytes = Buffer.byteLength(socketPath, "utf8");
   if (socketPathBytes > maxAutomationSocketPathBytes) {
-    // The daemon enforces the 104-byte BSD sockaddr_un cap with an opaque
-    // "Daemon socket path is too long"; fail here with the actual path so
-    // the problem (an unusually long home directory) is diagnosable.
     return {
       ok: false,
       error: `desktop_automation daemon socket path "${socketPath}" is ${socketPathBytes} bytes, above the ${maxAutomationSocketPathBytes}-byte limit imposed by the macOS 104-byte Unix socket path cap. Your home directory path is too long for desktop automation.`,
@@ -607,11 +575,6 @@ const ensureAutomationDaemon = async (
       permission.hostGranted &&
       !permission.helperTrusted
     ) {
-      // The Stella app has Accessibility, but this detached worker's process
-      // tree no longer inherits that grant (its spawning app instance is
-      // gone) and no live host is reachable to spawn the daemon under the
-      // app's identity. A locally spawned daemon would just exit; fail with
-      // an actionable message instead.
       return {
         ok: false,
         error: `Stella has macOS Accessibility, but the automation daemon cannot inherit it because the Stella app that granted it is no longer running. Fully quit and reopen Stella, then retry. ${accessibilityGuidance}`,
@@ -704,9 +667,6 @@ export const runAutomationDaemonCommand = async (
     };
     const onAbort = () => {
       const reason = signal?.reason;
-      // Helper-style requests share the same serial daemon as typed
-      // operations. Revoke it on cancellation as well, otherwise a blocked
-      // helper remains at the head of the queue and wedges the next call.
       recoverAutomationDaemon(sessionPaths);
       settle({
         status: 1,
@@ -824,9 +784,6 @@ export const runAutomationDaemonTypedOperation = async (
     };
     const onAbort = () => {
       const reason = signal?.reason;
-      // The daemon serves requests serially. Dropping only this socket leaves
-      // a wedged native operation blocking every later request, so revoke the
-      // daemon generation and let the next call start a clean process.
       recoverAutomationDaemon(sessionPaths);
       settle(
         reason instanceof Error

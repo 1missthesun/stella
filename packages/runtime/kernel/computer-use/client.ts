@@ -23,12 +23,7 @@ type CommonAction = {
   window_id?: string | number;
   state_id?: string;
   observation_id?: string;
-  /**
-   * Windows: "background" (default) or "foreground". "auto" is accepted from
-   * older callers and means "background".
-   */
   delivery?: ComputerUseInputDelivery | "auto";
-  /** Windows: "auto" (default) or "window" for never-still windows. */
   stale_check?: ComputerUseStaleCheck;
 };
 

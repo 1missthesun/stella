@@ -15,18 +15,10 @@ import {
 } from "./desktop.js";
 
 /**
- * Hyprland: window list, focus and pointer over its control socket, single
- * window capture with `grim -T` (ext-image-copy-capture of one toplevel,
- * which works for covered windows and windows on other workspaces), and
- * foreground input through Hyprland's own dispatchers (focus, cursor move,
- * send_shortcut / send_key_state).
- *
  * Stock Hyprland cannot deliver pointer input to a window that does not
  * have the pointer, and only delivers keys to an unfocused window by
  * handing it the keyboard focus for the duration of the key, which the
- * user's window notices (it gets a focus-out/in). So the background routes
- * are AT-SPI only; this file is used for raw input only when an action asks
- * for delivery: "foreground".
+ * user's window notices (it gets a focus-out/in).
  */
 
 type HyprClient = {
@@ -65,7 +57,6 @@ type Dispatch = { lua: string; legacy: string };
 const REQUEST_TIMEOUT_MS = 1_500;
 const CAPTURE_TIMEOUT_MS = 5_000;
 const HIDDEN_CATCH_UP_MS = 300;
-/** Tag Stella toggles to make Hyprland re-evaluate a window's rules. */
 const RULE_REFRESH_TAG = "stella-computer-use";
 
 const luaString = (value: string) =>
@@ -82,12 +73,6 @@ const processAlive = (pid: number) => {
   }
 };
 
-/**
- * The Hyprland session Stella runs in: from HYPRLAND_INSTANCE_SIGNATURE, or,
- * when Stella was started without the session's environment, the one live
- * instance in the user's runtime directory (none when there are several).
- * Hyprland's lock file names its pid and Wayland socket.
- */
 export const findHyprlandInstance = (): HyprlandInstance | null => {
   const runtimeDir = process.env.XDG_RUNTIME_DIR?.trim();
   if (!runtimeDir) return null;
@@ -137,7 +122,6 @@ export const findHyprlandInstance = (): HyprlandInstance | null => {
 
 const sleep = sleepMs;
 
-/** Decodes grim's binary PPM (P6, maxval 255). */
 const decodePpm = (bytes: Buffer) => {
   let offset = 0;
   const tokens: string[] = [];
@@ -173,7 +157,6 @@ const decodePpm = (bytes: Buffer) => {
   };
 };
 
-/** Area-averaged resize of packed RGB to RGBA. */
 const resizeRgbToRgba = (
   rgb: Uint8Array,
   sourceWidth: number,
@@ -272,7 +255,6 @@ const runCapture = (args: string[], waylandDisplay: string): Promise<Buffer> =>
     });
   });
 
-/** US-layout characters that need Shift on their base key. */
 const SHIFTED: Record<string, string> = {
   "!": "1",
   "@": "2",
@@ -360,7 +342,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     return JSON.parse(await this.request(`j/${command}`)) as T;
   }
 
-  /** Runs dispatches in one batch, in whichever syntax this Hyprland takes. */
   async dispatch(calls: readonly Dispatch[]): Promise<void> {
     if (calls.length === 0) return;
     const run = (lua: boolean) =>
@@ -458,7 +439,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     return client.stableId;
   }
 
-  /** Window properties Stella set, to unset on release. */
   private readonly propsSet = new Map<string, Set<string>>();
 
   private async setWindowProp(
@@ -479,7 +459,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     return true;
   }
 
-  /** When each window was last asked to keep drawing while hidden. */
   private readonly renderingSince = new Map<string, number>();
 
   /**
@@ -516,8 +495,6 @@ export class HyprlandDesktop implements LinuxDesktop {
   async captureWindow(window: LinuxWindow): Promise<LinuxCapture> {
     if (window.offscreen || window.minimized) {
       await this.prepareWindow(window).catch(() => undefined);
-      // A hidden app needs a few frames (15 a second) to catch up once
-      // Hyprland lets it draw again.
       const since = this.renderingSince.get(window.id);
       if (since !== undefined) {
         const wait = since + HIDDEN_CATCH_UP_MS - Date.now();
@@ -530,8 +507,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     );
     const width = Math.max(1, Math.round(window.width));
     const height = Math.max(1, Math.round(window.height));
-    // grim returns the window's buffer; scale it to layout pixels so
-    // screenshot coordinates and accessibility extents agree.
     const targetWidth = Math.min(width, ppm.width);
     const targetHeight =
       Math.round((ppm.height * targetWidth) / ppm.width) || height;
@@ -550,7 +525,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     };
   }
 
-  /** Unsets every window property Stella set (the user's own rules stay). */
   async release(windowIds: readonly string[]): Promise<void> {
     await Promise.all(
       windowIds.map(async (id) => {
@@ -565,13 +539,11 @@ export class HyprlandDesktop implements LinuxDesktop {
         // some window on that timer closes; idle apps draw nothing then.
         if (props.has("render_unfocused"))
           calls.push(this.tagDispatch(id, `-${RULE_REFRESH_TAG}`));
-        // A window that closed meanwhile refuses these; nothing to undo then.
         await this.dispatch(calls).catch(() => undefined);
       }),
     );
   }
 
-  /** Keys go to the given window (it has the keyboard focus by then). */
   private chordDispatch(chord: LinuxKeyChord, windowId: string): Dispatch {
     const mods = chord.mods.join(" ");
     return {
@@ -580,7 +552,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     };
   }
 
-  /** The output layout's bounding box in logical pixels (virtual pointer extent). */
   private async layoutBox() {
     const monitors = await this.monitors();
     let left = Infinity;
@@ -626,7 +597,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     await device.roundtrip();
   }
 
-  /** Drops the virtual pointer device (it is created again when needed). */
   async closeInput() {
     const device = this.pointerDevice;
     this.pointerDevice = null;
@@ -661,7 +631,6 @@ export class HyprlandDesktop implements LinuxDesktop {
     },
     movePointer: async (x: number, y: number) => {
       await this.pointerTo(x, y);
-      // Let the app see the pointer arrive before buttons.
       await sleep(16);
     },
     click: async (button: "left" | "right" | "middle", count: number) => {
@@ -684,7 +653,6 @@ export class HyprlandDesktop implements LinuxDesktop {
       device.button("left", true);
       await device.roundtrip();
       try {
-        // Move in small steps so apps see a drag, not a jump.
         let from = first;
         for (const point of rest) {
           const steps = Math.max(

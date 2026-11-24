@@ -53,11 +53,6 @@ export const pidIsRunning = (pid: number | null | undefined) => {
   }
 };
 
-/**
- * What a pid must still be before it is signalled: our own unreaped child,
- * or a process whose command line holds these parts (for pids read back
- * from a pid file, which may name someone else's process by now).
- */
 export type KillTarget = { ownChild: true } | { commandIncludes: readonly string[] };
 
 const sigkill = (
@@ -261,12 +256,6 @@ export const normalizeTargetKey = (value: string) =>
 export const targetStatePathForKey = (targetsDir: string, key: string) =>
   path.join(targetsDir, key, "last-snapshot.json");
 
-// Emit a "[stella-attach-image]" marker line that the runtime layer can
-// detect when reading shell output to auto-attach the image as a vision
-// content block to the next assistant turn. The line is also human-readable
-// so it does no harm if the host doesn't auto-detect it. We include the
-// width/height so callers can pre-budget vision token cost without a follow-
-// up `Read` step.
 export const formatScreenshotMarker = (input: {
   path?: string | null;
   widthPx?: number | null;

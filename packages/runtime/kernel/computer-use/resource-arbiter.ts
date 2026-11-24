@@ -408,7 +408,6 @@ export class ComputerUseResourceStaleError extends Error {
       nativeObserved?: JsonObject;
       nativeCurrent?: JsonObject;
       nativeReason?: string;
-      /** Replaces the generic advice at the end of the message. */
       hint?: string;
     } = {},
   ) {

@@ -2642,7 +2642,8 @@
       "askAgain": "ขออีกครั้ง",
       "waitingFor": "กำลังรอ {name}…",
       "cloudUses": "งานบนคลาวด์ที่ใช้",
-      "refused": "ไม่ได้ให้"
+      "refused": "ไม่ได้ให้",
+      "added": "เพิ่มเมื่อ {added}"
     },
     "googleComposio": {
       "title": "ใช้ Composio สำหรับ Google",

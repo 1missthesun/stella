@@ -2662,7 +2662,8 @@
       "askAgain": "לבקש שוב",
       "waitingFor": "ממתין ל-{name}…",
       "cloudUses": "בשימוש משימות ענן",
-      "refused": "לא נמסר"
+      "refused": "לא נמסר",
+      "added": "נוסף ב-{added}"
     },
     "googleComposio": {
       "title": "שימוש ב-Composio עבור Google",

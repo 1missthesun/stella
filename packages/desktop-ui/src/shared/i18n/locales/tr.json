@@ -2652,7 +2652,8 @@
       "askAgain": "Tekrar sor",
       "waitingFor": "{name} bekleniyor…",
       "cloudUses": "Bulut görevleri kullandı",
-      "refused": "Verilmedi"
+      "refused": "Verilmedi",
+      "added": "Eklendi: {added}"
     },
     "googleComposio": {
       "title": "Google için Composio kullan",

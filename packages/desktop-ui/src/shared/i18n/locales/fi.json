@@ -2652,7 +2652,8 @@
       "askAgain": "Pyydä uudelleen",
       "waitingFor": "Odotetaan: {name}…",
       "cloudUses": "Pilvitehtävien käyttämät",
-      "refused": "Ei annettu"
+      "refused": "Ei annettu",
+      "added": "Lisätty {added}"
     },
     "googleComposio": {
       "title": "Käytä Composiota Googlelle",

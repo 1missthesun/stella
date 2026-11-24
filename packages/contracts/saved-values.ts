@@ -182,6 +182,8 @@ export type SavedValuesListedDevice = Readonly<{
   name: string;
   kind: SavedValueDeviceKind;
   thisDevice: boolean;
+  /** When it joined the list; tells apart devices with the same name. */
+  addedAt: number;
   lastSeenAt?: number;
   /** Not seen for a while: nothing new is sealed to it until it's back. */
   quiet: boolean;

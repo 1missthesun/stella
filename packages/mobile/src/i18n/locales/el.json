@@ -2652,7 +2652,8 @@
       "askAgain": "Ξανά αίτημα",
       "waitingFor": "Αναμονή για {name}…",
       "cloudUses": "Χρήση από εργασίες cloud",
-      "refused": "Δεν δόθηκε"
+      "refused": "Δεν δόθηκε",
+      "added": "Προστέθηκε {added}"
     },
     "googleComposio": {
       "title": "Χρήση Composio για Google",

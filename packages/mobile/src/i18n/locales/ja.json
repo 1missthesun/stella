@@ -2642,7 +2642,8 @@
       "askAgain": "もう一度依頼",
       "waitingFor": "{name} を待っています…",
       "cloudUses": "クラウドタスクでの使用",
-      "refused": "渡していません"
+      "refused": "渡していません",
+      "added": "{added} に追加"
     },
     "googleComposio": {
       "title": "Google に Composio を使う",

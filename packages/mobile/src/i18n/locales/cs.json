@@ -2672,7 +2672,8 @@
       "askAgain": "Zeptat se znovu",
       "waitingFor": "Čeká se na {name}…",
       "cloudUses": "Použito úlohami v cloudu",
-      "refused": "Nevydáno"
+      "refused": "Nevydáno",
+      "added": "Přidáno {added}"
     },
     "googleComposio": {
       "title": "Používat Composio pro Google",

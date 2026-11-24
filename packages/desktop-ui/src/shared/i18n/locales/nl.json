@@ -2652,7 +2652,8 @@
       "askAgain": "Opnieuw vragen",
       "waitingFor": "Wachten op {name}…",
       "cloudUses": "Gebruikt door cloudtaken",
-      "refused": "Niet gegeven"
+      "refused": "Niet gegeven",
+      "added": "Toegevoegd op {added}"
     },
     "googleComposio": {
       "title": "Composio gebruiken voor Google",

@@ -2652,7 +2652,8 @@
       "askAgain": "Spør igjen",
       "waitingFor": "Venter på {name}…",
       "cloudUses": "Brukt av skyoppgaver",
-      "refused": "Ikke utlevert"
+      "refused": "Ikke utlevert",
+      "added": "Lagt til {added}"
     },
     "googleComposio": {
       "title": "Bruk Composio for Google",

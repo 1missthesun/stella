@@ -2652,7 +2652,8 @@
       "askAgain": "Újrakérés",
       "waitingFor": "Várakozás erre: {name}…",
       "cloudUses": "Felhőfeladatok használták",
-      "refused": "Nem adtuk ki"
+      "refused": "Nem adtuk ki",
+      "added": "Hozzáadva: {added}"
     },
     "googleComposio": {
       "title": "Composio használata a Google-hoz",

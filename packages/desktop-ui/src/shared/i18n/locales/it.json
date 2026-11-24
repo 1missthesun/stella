@@ -2662,7 +2662,8 @@
       "askAgain": "Chiedi di nuovo",
       "waitingFor": "In attesa di {name}…",
       "cloudUses": "Usati da attività cloud",
-      "refused": "Non fornito"
+      "refused": "Non fornito",
+      "added": "Aggiunto il {added}"
     },
     "googleComposio": {
       "title": "Usa Composio per Google",

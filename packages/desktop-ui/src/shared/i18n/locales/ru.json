@@ -2672,7 +2672,8 @@
       "askAgain": "Спросить снова",
       "waitingFor": "Ждём {name}…",
       "cloudUses": "Использовано облачными задачами",
-      "refused": "Не выдано"
+      "refused": "Не выдано",
+      "added": "Добавлено {added}"
     },
     "googleComposio": {
       "title": "Использовать Composio для Google",

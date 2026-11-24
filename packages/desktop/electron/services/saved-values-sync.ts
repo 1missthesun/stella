@@ -847,11 +847,12 @@ export class SavedValuesSync {
           name: member.name,
           kind: member.kind,
           thisDevice,
+          addedAt: member.addedAt,
           ...(card ? { lastSeenAt: card.updatedAt } : {}),
           quiet: !thisDevice && (!card || card.publicKey !== member.sealKey || now - card.updatedAt >= SAVED_VALUES_QUIET_MS),
         };
       })
-      .sort((left, right) => Number(right.thisDevice) - Number(left.thisDevice) || left.name.localeCompare(right.name));
+      .sort((left, right) => Number(right.thisDevice) - Number(left.thisDevice) || left.name.localeCompare(right.name) || left.addedAt - right.addedAt);
     // Only asks this computer answered, with the code from what it sent.
     const requests: SavedValuesJoinRequest[] = remote.joins.flatMap((join) => {
       const answered = this.answered.get(join.joinId);

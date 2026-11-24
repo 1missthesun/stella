@@ -331,15 +331,18 @@ function SyncDevices({
       {standing === "member" && sync.devices.length > 0 ? (
         <>
           <div className="settings-card-desc">{t("settings.secureValues.devices")}</div>
-          {sync.devices.map((device) => (
+          {sync.devices.map((device) => {
+            const sameName = sync.devices.some((other) => other !== device && other.name === device.name);
+            const details = [
+              device.thisDevice ? t("settings.secureValues.thisComputer") : null,
+              !device.thisDevice && device.quiet ? t("settings.secureValues.quiet") : null,
+              sameName ? t("settings.secureValues.added", { added: formatWhen(device.addedAt) }) : null,
+            ].filter(Boolean);
+            return (
             <div className="settings-row" key={device.deviceId} data-testid="secure-values-device">
               <div className="settings-row-info">
                 <div className="settings-row-label">{device.name}</div>
-                {device.thisDevice || device.quiet ? (
-                  <div className="settings-row-sublabel">
-                    {device.thisDevice ? t("settings.secureValues.thisComputer") : t("settings.secureValues.quiet")}
-                  </div>
-                ) : null}
+                {details.length > 0 ? <div className="settings-row-sublabel">{details.join(" · ")}</div> : null}
               </div>
               {device.thisDevice ? null : (
                 <div className="settings-row-control">
@@ -355,7 +358,8 @@ function SyncDevices({
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </>
       ) : null}
       {sync.releases.length > 0 ? (

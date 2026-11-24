@@ -2642,7 +2642,8 @@
       "askAgain": "다시 요청",
       "waitingFor": "{name} 기다리는 중…",
       "cloudUses": "클라우드 작업 사용 내역",
-      "refused": "제공 안 함"
+      "refused": "제공 안 함",
+      "added": "{added}에 추가됨"
     },
     "googleComposio": {
       "title": "Google에 Composio 사용",

@@ -188,18 +188,20 @@ const savedValueNote = (saved: UserAskSavedValueNote, cloud = false): string => 
     : "If it turns out to be wrong (the login fails), call request_secure_input again with the same service and account and replace_saved: true to ask once for the right one.";
   if (cloud) return cloudSavedValueNote(saved, under, replace);
   if (saved.reused) {
-    return `Reused the value saved on this computer for "${saved.label}" without asking the user.${under} ${replace}`;
+    return `Reused the value the user saved${saved.synced ? " in Stella" : " on this computer"} for "${saved.label}" without asking the user.${under} ${replace}`;
   }
   if (saved.fromSaved?.length) {
     const kept = saved.remembered
       ? " What they gave was added to the saved value."
       : "";
-    return `${saved.fromSaved.join(", ")} came from the value saved on this computer for "${saved.label}"; the user gave only the rest.${kept}${under} ${replace}`;
+    return `${saved.fromSaved.join(", ")} came from the value the user saved${saved.synced ? " in Stella" : " on this computer"} for "${saved.label}"; the user gave only the rest.${kept}${under} ${replace}`;
   }
   if (saved.remembered) {
     return saved.replaced
       ? `The user gave a replacement; it overwrote the saved value for "${saved.label}".`
-      : `The user chose to remember this on this computer as "${saved.label}"; later requests with the same service and account reuse it without asking.`;
+      : saved.synced
+        ? `The user chose to remember this as "${saved.label}"; it is saved on their devices, so later requests with the same service and account reuse it without asking, here, on their other devices, and in cloud tasks while one of their computers is online.`
+        : `The user chose to remember this on this computer as "${saved.label}"; later requests with the same service and account reuse it without asking.`;
   }
   return "The user chose not to remember this on this computer.";
 };

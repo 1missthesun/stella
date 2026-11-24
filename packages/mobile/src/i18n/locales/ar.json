@@ -2692,7 +2692,8 @@
       "askAgain": "اطلب مجددًا",
       "waitingFor": "بانتظار {name}…",
       "cloudUses": "استخدمتها مهام سحابية",
-      "refused": "لم يُمنح"
+      "refused": "لم يُمنح",
+      "added": "أُضيف في {added}"
     },
     "googleComposio": {
       "title": "استخدام Composio مع Google",

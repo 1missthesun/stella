@@ -2662,7 +2662,8 @@
       "askAgain": "Cere din nou",
       "waitingFor": "Se așteaptă {name}…",
       "cloudUses": "Folosite de sarcini din cloud",
-      "refused": "Nefurnizat"
+      "refused": "Nefurnizat",
+      "added": "Adăugat pe {added}"
     },
     "googleComposio": {
       "title": "Folosește Composio pentru Google",

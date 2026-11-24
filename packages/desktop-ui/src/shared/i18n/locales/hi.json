@@ -2652,7 +2652,8 @@
       "askAgain": "फिर से माँगें",
       "waitingFor": "{name} की प्रतीक्षा…",
       "cloudUses": "क्लाउड कार्यों ने इस्तेमाल किया",
-      "refused": "नहीं दिया गया"
+      "refused": "नहीं दिया गया",
+      "added": "{added} को जोड़ा गया"
     },
     "googleComposio": {
       "title": "Google के लिए Composio इस्तेमाल करें",

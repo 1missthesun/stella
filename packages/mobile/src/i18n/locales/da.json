@@ -2652,7 +2652,8 @@
       "askAgain": "Spørg igen",
       "waitingFor": "Venter på {name}…",
       "cloudUses": "Brugt af cloudopgaver",
-      "refused": "Ikke udleveret"
+      "refused": "Ikke udleveret",
+      "added": "Tilføjet {added}"
     },
     "googleComposio": {
       "title": "Brug Composio til Google",

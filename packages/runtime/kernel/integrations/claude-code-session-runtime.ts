@@ -370,7 +370,7 @@ const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
  * per-call cap (`MCP_TOOL_TIMEOUT`) stays at its default: a secure card can
  * wait on the user for an hour.
  */
-const CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS = 40 * 1000;
 const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
 const MAX_ADRIFT_LINES = 50_000;
 const ADRIFT_TOOL_TURN_WAIT_MS = 2 * 60 * 1000;

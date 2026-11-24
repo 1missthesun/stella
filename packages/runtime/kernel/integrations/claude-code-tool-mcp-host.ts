@@ -50,7 +50,7 @@ const MAX_HOOK_BODY_BYTES = 32 * 1024 * 1024;
  * below 30 s), even while the tool is healthy (a long code cell, a human
  * answering a secure card). Every in-flight call reports progress this often.
  */
-const PROGRESS_HEARTBEAT_MS = 15_000;
+const PROGRESS_HEARTBEAT_MS = 15_000 * 1000;
 
 export type ClaudeCodeToolMcpActiveTurn = {
   identityScope?: string;

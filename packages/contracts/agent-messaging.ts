@@ -40,7 +40,7 @@ export const idleWaitingFor = (wakers: readonly string[] | undefined): string =>
 /** Marks the one nudge a quiet turn gets, so the host can tell it from any other input. */
 export const IDLE_STOP_NUDGE_MARK = "[Not delivered]";
 
-export const IDLE_STOP_NUDGE = `${IDLE_STOP_NUDGE_MARK} Your plain text isn't delivered to Stella or whoever started you. If you finished the work or answered something, send it now with send_message to whoever started you (with done: true when the work is finished); otherwise just stop.`;
+export const IDLE_STOP_NUDGE = `${IDLE_STOP_NUDGE_MARK} Your plain text isn't delivered to Stella or whoever started you. If it holds a finished report or an answer they are waiting for, send that now with send_message (done: true for a finished report). If nothing needs sending (you only acknowledged, or there is nothing new), stop now without sending anything.`;
 
 export const isIdleStopNudge = (text: string): boolean => text.trimStart().startsWith(IDLE_STOP_NUDGE_MARK);
 

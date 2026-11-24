@@ -51,15 +51,16 @@ import { createBrokerCloudBrowser } from "./cloud-browser-client.js";
 import { CODE_TOOL_CLOUD_AGENT_DESCRIPTION } from "@stella/runtime/kernel/tools/defs/code-def.js";
 import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
 import {
-  END_TURN_WAITING_DESCRIPTION,
-  END_TURN_WAITING_MISSING,
-  END_TURN_WAITING_PARAMETERS,
-  END_TURN_WAITING_TOOL,
-  endTurnWaitingResult,
-  parseWaitingFor,
-  starterMessageSender,
-  unansweredWaitingReply,
-} from "@stella/contracts/agent-waiting";
+  CLOUD_AGENT_MESSAGE_TOOL,
+  cloudAgentMessageTool,
+  createCloudAgentMessenger,
+} from "./cloud-agent-message.js";
+import { starterMessageSender } from "@stella/contracts/agent-waiting";
+import {
+  IDLE_STOP_NUDGE,
+  idleWaitingFor,
+  silentEndReport,
+} from "@stella/contracts/agent-messaging";
 import {
   toolStateDir,
   worldDriveWorkspace,
@@ -132,9 +133,8 @@ export type AgentTurnTerminalResult = {
   ok: boolean;
   finalText: string;
   error?: string;
+  /** The turn ended without its finished report: the task is idle, and no report is filed. */
   waitingFor?: string;
-  /** The turn ended waiting after a message from its starter: this goes to the starter as its reply. */
-  waitingReply?: string;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   usage: { inputTokens: number; outputTokens: number; llmCalls: number };
   checkpointMs?: number;
@@ -156,6 +156,7 @@ export const createBuilderFallbackAgentTurnResult = (args: {
   finalText: string;
   notice?: string;
   error?: string;
+  waitingFor?: string;
   usage: AgentTurnTerminalResult["usage"];
   historyCursor: string;
   messages: NonNullable<AgentTurnTerminalResult["builderFallback"]>["messages"];
@@ -165,8 +166,9 @@ export const createBuilderFallbackAgentTurnResult = (args: {
 }): AgentTurnTerminalResult => ({
   ok: !args.error,
   finalText:
-    `${args.finalText || (args.error ? "" : "The agent finished without a report.")}${args.notice ?? ""}`.trim(),
+    `${args.finalText || (args.error || args.waitingFor ? "" : "The agent finished without a report.")}${args.waitingFor ? "" : (args.notice ?? "")}`.trim(),
   ...(args.error ? { error: args.error } : {}),
+  ...(!args.error && args.waitingFor ? { waitingFor: args.waitingFor } : {}),
   checkpointPolicy: "builder_fallback",
   usage: args.usage,
   builderFallback: {
@@ -585,14 +587,10 @@ export const runAgentTurn = (
         toolHome,
         allowedToolNames: claudeToolSet.tools.map((tool) => tool.name),
       });
-      let waitingFor: string | undefined;
       // What the turn took in: its prompt and the messages that reached it mid-turn.
       const turnInputs: string[] = [input.prompt];
-      const endTurnWaitingTool: ToolMetadata = {
-        name: END_TURN_WAITING_TOOL,
-        description: END_TURN_WAITING_DESCRIPTION,
-        parameters: END_TURN_WAITING_PARAMETERS as unknown as ToolMetadata["parameters"],
-      };
+      const messenger = createCloudAgentMessenger(postJson, input.turnId);
+      let nudged = false;
       const cloudToolMetadata = [
         ...claudeToolSet.tools.map((tool) =>
           tool.name === "code"
@@ -600,7 +598,7 @@ export const runAgentTurn = (
             : tool,
         ),
         cloudAgentMoveTool,
-        endTurnWaitingTool,
+        cloudAgentMessageTool,
       ];
       const executeCloudTool = async (
         toolCallId: string,
@@ -613,11 +611,8 @@ export const runAgentTurn = (
         if (name === CLOUD_AGENT_MOVE_TOOL) {
           return await runCloudAgentMove(postJson, input.turnId, params);
         }
-        if (name === END_TURN_WAITING_TOOL) {
-          const waiting = parseWaitingFor(params);
-          if (!waiting) return { error: END_TURN_WAITING_MISSING };
-          waitingFor = waiting;
-          return { result: endTurnWaitingResult(waiting) };
+        if (name === CLOUD_AGENT_MESSAGE_TOOL) {
+          return await messenger.run(toolCallId, params);
         }
         const result = await toolHost.executeTool(
           name,
@@ -713,28 +708,29 @@ export const runAgentTurn = (
                 : {}),
               claudeToolHost: claudeToolMcpHost,
               onStreamEvent: cloudAgentProgressFromStream(emitEvent),
-              // A message that reaches the turn after end_turn_waiting
-              // resumes it in place: the turn no longer ends waiting.
               inbox: {
                 take: async () => {
                   const taken = await inbox.take();
                   turnInputs.push(...taken);
-                  if (taken.length > 0) waitingFor = undefined;
                   return taken;
                 },
                 close: async () => {
                   const late = await inbox.close();
-                  if (late.length > 0) waitingFor = undefined;
+                  turnInputs.push(...late);
                   return late;
                 },
                 reopen: () => inbox.reopen(),
               },
-              // Its own background command finishing wakes the agent in
-              // place, as a message does.
-              backgroundWait: {
-                waiting: () => waitingFor !== undefined,
-                resume: () => {
-                  waitingFor = undefined;
+              // Its plain text reaches no one: a quiet end gets one nudge
+              // when it took in a message from whoever started it, or when
+              // nothing can wake it any more.
+              quietEnd: {
+                done: () => messenger.report() !== undefined,
+                nudge: (live) => {
+                  if (nudged || messenger.report() !== undefined || messenger.sentToStarter()) return undefined;
+                  if (live && !starterMessageSender(turnInputs)) return undefined;
+                  nudged = true;
+                  return IDLE_STOP_NUDGE;
                 },
               },
               ...(await claudeKeeper.then((client) =>
@@ -870,12 +866,12 @@ export const runAgentTurn = (
               identity: { ...CLOUD_TOOL_PROCESS_IDENTITY, home: workspaceRoot },
               sync: driveSync,
               before: driveBefore,
-              linked: [
-                ...extractLocalFileLinkPaths(execution.finalText),
-                ...extractDriveLinkPaths(execution.finalText).map((drivePath) =>
+              linked: messenger.sent().flatMap((text) => [
+                ...extractLocalFileLinkPaths(text),
+                ...extractDriveLinkPaths(text).map((drivePath) =>
                   path.join(driveWorkspace.root, drivePath),
                 ),
-              ],
+              ]),
               post: postJson,
             });
             return {
@@ -938,6 +934,15 @@ export const runAgentTurn = (
         );
       });
 
+      const ending = (): { finalText: string; waitingFor?: string } =>
+        execution.errorMessage
+          ? { finalText: execution.finalText }
+          : explicitEnding({
+              report: messenger.report(),
+              nudged,
+              sentToStarter: messenger.sentToStarter(),
+              lastWords: lastAssistantText(produced) || execution.finalText,
+            });
       if (forceBuilderFallback || shutdownFailures.length > 0) {
         const shutdownReason = shutdownFailures[0]?.message;
         const error =
@@ -996,7 +1001,7 @@ export const runAgentTurn = (
         checkpointMs = Math.round(performance.now() - checkpointStarted);
         if ("error" in checkpointAttempt) {
           return createBuilderFallbackAgentTurnResult({
-            finalText: execution.finalText,
+            ...ending(),
             notice: outputs.notice,
             ...(execution.errorMessage
               ? { error: execution.errorMessage }
@@ -1012,27 +1017,49 @@ export const runAgentTurn = (
         turnStateCheckpoint = checkpointAttempt.receipt;
       }
 
-      const finalText = execution.finalText;
       const error = execution.errorMessage;
-      const waiting = error ? undefined : waitingFor;
-      // A cloud agent has no send_message: when its starter messaged it this
-      // turn and it ends waiting, its last words are the reply, and the waiting
-      // note alone would lose them.
-      const waitingReply =
-        waiting && starterMessageSender(turnInputs) ? unansweredWaitingReply(finalText ?? "", waiting) : undefined;
+      const ended = ending();
       return {
         ok: !error,
-        finalText:
-          `${finalText || (error || waiting ? "" : "The agent finished without a report.")}${outputs.notice}`.trim(),
+        finalText: `${ended.finalText}${ended.waitingFor ? "" : outputs.notice}`.trim(),
         ...(error ? { error } : {}),
-        ...(waiting ? { waitingFor: waiting } : {}),
-        ...(waitingReply ? { waitingReply } : {}),
+        ...(ended.waitingFor ? { waitingFor: ended.waitingFor } : {}),
         usage: { inputTokens, outputTokens, llmCalls },
         checkpointMs,
         ...(turnStateCheckpoint ? { turnStateCheckpoint } : {}),
       } satisfies AgentTurnResult;
     }),
   );
+
+/**
+ * How a turn that didn't fail ends. Its finished report (send_message with
+ * done) is the attempt's result. Without one it is idle and nothing is filed,
+ * unless it stayed quiet after its nudge: nothing is left in the cloud that
+ * could wake it, so its task ends with the silent-end report.
+ */
+export const explicitEnding = (turn: {
+  report: string | undefined;
+  nudged: boolean;
+  sentToStarter: boolean;
+  lastWords: string;
+}): { finalText: string; waitingFor?: string } => {
+  if (turn.report !== undefined) return { finalText: turn.report };
+  if (turn.nudged && !turn.sentToStarter) return { finalText: silentEndReport(turn.lastWords) };
+  return { finalText: turn.lastWords, waitingFor: idleWaitingFor([]) };
+};
+
+const lastAssistantText = (messages: readonly AgentMessage[]): string => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index] as { role?: string; content?: unknown };
+    if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
+    const text = message.content
+      .map((part) => (part && typeof part === "object" && (part as { type?: unknown }).type === "text" ? String((part as { text?: unknown }).text ?? "") : ""))
+      .join("")
+      .trim();
+    if (text) return text;
+  }
+  return "";
+};
 
 export const previousNativeStateIntegrityKeys = (input: {
   nativeStatePreviousIntegrityKeys?: unknown;

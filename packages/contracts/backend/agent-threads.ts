@@ -125,6 +125,9 @@ export const agentMessageDelivery = (result: AgentControlResult): AgentMessageDe
   ...(result.note ? { note: result.note } : {}),
 });
 
+/** The owner's answer to a cloud task's send_message: the tool result, and whether it was for whoever started the task. */
+export type AgentTaskMessageResult = { text: string; starter: boolean };
+
 export type AgentThreadPlacement = "cloud" | "computer";
 
 export type AgentThreadSummary = {

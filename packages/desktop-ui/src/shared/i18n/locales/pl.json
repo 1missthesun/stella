@@ -1091,6 +1091,21 @@
       "later": "Nie teraz",
       "note": "Możesz to zmienić w każdej chwili w Ustawieniach › Prywatność.",
       "title": "Pozwolić Stelli na Twoich innych urządzeniach uruchamiać pracę na tym komputerze?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Zezwolić na {name}?",
+      "allowCheck": "Sprawdź, czy pokazuje ten kod.",
+      "notNow": "Nie teraz",
+      "allow": "Zezwól",
+      "failed": "Nie udało się. Spróbuj ponownie.",
+      "matchTitle": "Sprawdź, czy {name} pokazuje ten kod",
+      "otherDevice": "Twoje inne urządzenie",
+      "useAnother": "Inne urządzenie",
+      "matches": "Zgadza się",
+      "getTitle": "Pobierz tu swoje loginy",
+      "getBody": "Otwórz Stellę na innym urządzeniu.",
+      "ok": "OK",
+      "cloudUsed": "Zadanie w chmurze użyło {label}"
     }
   },
   "mobile": {
@@ -2610,7 +2625,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Nie udało się zmienić nazwy tej wartości. Spróbuj ponownie."
+        "rename": "Nie udało się zmienić nazwy tej wartości. Spróbuj ponownie.",
+        "devices": "Nie udało się. Spróbuj ponownie."
       },
       "lastUsed": "Ostatnio użyto {used}",
       "neverUsed": "Jeszcze nieużyta",
@@ -2619,7 +2635,19 @@
       "renameCancel": "Anuluj",
       "renameLabel": "Nazwa",
       "sync": "Synchronizuj z innymi urządzeniami",
-      "syncHint": "Szyfrowanie end-to-end: otworzyć je mogą tylko Twoje komputery i telefon, nie serwery Stelli. Po wyłączeniu zostają tylko na tym komputerze."
+      "syncHint": "Szyfrowanie end-to-end: otworzyć je mogą tylko Twoje komputery i telefon, nie serwery Stelli. Po wyłączeniu zostają tylko na tym komputerze.",
+      "devices": "Urządzenia",
+      "thisComputer": "Ten komputer",
+      "quiet": "Dawno niewidziane",
+      "removeDevice": "Usuń",
+      "problem": "Nie można sprawdzić urządzeń",
+      "startOver": "Zacznij od nowa",
+      "removedHere": "Usunięto z Twoich urządzeń",
+      "declined": "Brak zgody",
+      "askAgain": "Zapytaj ponownie",
+      "waitingFor": "Czekam na {name}…",
+      "cloudUses": "Użyte przez zadania w chmurze",
+      "refused": "Nie wydano"
     },
     "googleComposio": {
       "title": "Używaj Composio dla Google",

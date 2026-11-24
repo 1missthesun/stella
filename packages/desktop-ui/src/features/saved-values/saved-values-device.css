@@ -1,0 +1,9 @@
+.saved-values-device-code {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 8px 0 4px;
+  color: var(--text-strong, var(--text-base));
+}

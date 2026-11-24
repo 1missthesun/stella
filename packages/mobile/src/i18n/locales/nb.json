@@ -1071,6 +1071,21 @@
       "later": "Ikke nå",
       "note": "Du kan når som helst endre dette under Innstillinger › Personvern.",
       "title": "Vil du la Stella på de andre enhetene dine starte arbeid på denne datamaskinen?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Tillate {name}?",
+      "allowCheck": "Sjekk at den viser denne koden.",
+      "notNow": "Ikke nå",
+      "allow": "Tillat",
+      "failed": "Det gikk ikke. Prøv igjen.",
+      "matchTitle": "Sjekk at {name} viser denne koden",
+      "otherDevice": "den andre enheten din",
+      "useAnother": "Annen enhet",
+      "matches": "Det stemmer",
+      "getTitle": "Hent innloggingene dine hit",
+      "getBody": "Åpne Stella på en annen enhet.",
+      "ok": "OK",
+      "cloudUsed": "Skyoppgave brukte {label}"
     }
   },
   "mobile": {
@@ -2590,7 +2605,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Kunne ikke gi verdien nytt navn. Prøv igjen."
+        "rename": "Kunne ikke gi verdien nytt navn. Prøv igjen.",
+        "devices": "Det gikk ikke. Prøv igjen."
       },
       "lastUsed": "Sist brukt {used}",
       "neverUsed": "Ikke brukt ennå",
@@ -2599,7 +2615,19 @@
       "renameCancel": "Avbryt",
       "renameLabel": "Navn",
       "sync": "Synkroniser til de andre enhetene dine",
-      "syncHint": "Ende-til-ende-kryptert: bare dine egne datamaskiner og telefonen din kan åpne dem, ikke Stellas servere. Av beholder dem bare på denne datamaskinen."
+      "syncHint": "Ende-til-ende-kryptert: bare dine egne datamaskiner og telefonen din kan åpne dem, ikke Stellas servere. Av beholder dem bare på denne datamaskinen.",
+      "devices": "Enheter",
+      "thisComputer": "Denne datamaskinen",
+      "quiet": "Ikke sett på lenge",
+      "removeDevice": "Fjern",
+      "problem": "Kan ikke sjekke enhetene dine",
+      "startOver": "Start på nytt",
+      "removedHere": "Fjernet fra enhetene dine",
+      "declined": "Ikke tillatt",
+      "askAgain": "Spør igjen",
+      "waitingFor": "Venter på {name}…",
+      "cloudUses": "Brukt av skyoppgaver",
+      "refused": "Ikke utlevert"
     },
     "googleComposio": {
       "title": "Bruk Composio for Google",

@@ -1081,6 +1081,21 @@
       "later": "Agora não",
       "note": "Você pode mudar isso a qualquer momento em Ajustes › Privacidade.",
       "title": "Permitir que a Stella nos seus outros dispositivos inicie trabalho neste computador?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Permitir {name}?",
+      "allowCheck": "Confira se aparece este código.",
+      "notNow": "Agora não",
+      "allow": "Permitir",
+      "failed": "Não deu certo. Tente de novo.",
+      "matchTitle": "Confira se {name} mostra este código",
+      "otherDevice": "seu outro dispositivo",
+      "useAnother": "Usar outro dispositivo",
+      "matches": "Confere",
+      "getTitle": "Traga seus logins para cá",
+      "getBody": "Abra a Stella em outro dispositivo.",
+      "ok": "OK",
+      "cloudUsed": "Uma tarefa na nuvem usou {label}"
     }
   },
   "mobile": {
@@ -2600,7 +2615,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Não foi possível mudar o nome desse valor. Tente novamente."
+        "rename": "Não foi possível mudar o nome desse valor. Tente novamente.",
+        "devices": "Não deu certo. Tente de novo."
       },
       "lastUsed": "Último uso {used}",
       "neverUsed": "Ainda não usado",
@@ -2609,7 +2625,19 @@
       "renameCancel": "Cancelar",
       "renameLabel": "Nome",
       "sync": "Sincronizar com seus outros dispositivos",
-      "syncHint": "Criptografia de ponta a ponta: só seus computadores e seu celular podem abri-los, não os servidores da Stella. Desativado, ficam apenas neste computador."
+      "syncHint": "Criptografia de ponta a ponta: só seus computadores e seu celular podem abri-los, não os servidores da Stella. Desativado, ficam apenas neste computador.",
+      "devices": "Dispositivos",
+      "thisComputer": "Este computador",
+      "quiet": "Sem atividade recente",
+      "removeDevice": "Remover",
+      "problem": "Não foi possível verificar seus dispositivos",
+      "startOver": "Recomeçar",
+      "removedHere": "Removido dos seus dispositivos",
+      "declined": "Não permitido",
+      "askAgain": "Pedir de novo",
+      "waitingFor": "Aguardando {name}…",
+      "cloudUses": "Usados por tarefas na nuvem",
+      "refused": "Não fornecido"
     },
     "googleComposio": {
       "title": "Usar Composio para o Google",

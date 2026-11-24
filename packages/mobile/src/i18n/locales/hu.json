@@ -1071,6 +1071,21 @@
       "later": "Most nem",
       "note": "Ezt bármikor módosíthatod a Beállítások › Adatvédelem menüben.",
       "title": "Engedélyezed, hogy a többi eszközödön futó Stella munkát indítson ezen a számítógépen?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Engedélyezed: {name}?",
+      "allowCheck": "Nézd meg, hogy ezt a kódot mutatja-e.",
+      "notNow": "Most nem",
+      "allow": "Engedélyezés",
+      "failed": "Ez nem sikerült. Próbáld újra.",
+      "matchTitle": "Nézd meg, hogy {name} ezt a kódot mutatja-e",
+      "otherDevice": "a másik eszközöd",
+      "useAnother": "Másik eszköz",
+      "matches": "Egyezik",
+      "getTitle": "Hozd ide a belépéseidet",
+      "getBody": "Nyisd meg a Stellát egy másik eszközön.",
+      "ok": "OK",
+      "cloudUsed": "Felhőfeladat használta: {label}"
     }
   },
   "mobile": {
@@ -2590,7 +2605,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Nem sikerült átnevezni az értéket. Próbáld újra."
+        "rename": "Nem sikerült átnevezni az értéket. Próbáld újra.",
+        "devices": "Ez nem sikerült. Próbáld újra."
       },
       "lastUsed": "Utoljára használva: {used}",
       "neverUsed": "Még nem használt",
@@ -2599,7 +2615,19 @@
       "renameCancel": "Mégse",
       "renameLabel": "Név",
       "sync": "Szinkronizálás a többi eszközödre",
-      "syncHint": "Végpontok közötti titkosítás: csak a saját számítógépeid és a telefonod nyithatják meg, a Stella szerverei nem. Kikapcsolva csak ezen a számítógépen maradnak."
+      "syncHint": "Végpontok közötti titkosítás: csak a saját számítógépeid és a telefonod nyithatják meg, a Stella szerverei nem. Kikapcsolva csak ezen a számítógépen maradnak.",
+      "devices": "Eszközök",
+      "thisComputer": "Ez a számítógép",
+      "quiet": "Rég nem látott",
+      "removeDevice": "Eltávolítás",
+      "problem": "Nem ellenőrizhetők az eszközeid",
+      "startOver": "Újrakezdés",
+      "removedHere": "Eltávolítva az eszközeid közül",
+      "declined": "Nem engedélyezett",
+      "askAgain": "Újrakérés",
+      "waitingFor": "Várakozás erre: {name}…",
+      "cloudUses": "Felhőfeladatok használták",
+      "refused": "Nem adtuk ki"
     },
     "googleComposio": {
       "title": "Composio használata a Google-hoz",

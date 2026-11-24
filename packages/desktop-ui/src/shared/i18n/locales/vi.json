@@ -1061,6 +1061,21 @@
       "later": "Để sau",
       "note": "Bạn có thể thay đổi bất cứ lúc nào trong Cài đặt › Quyền riêng tư.",
       "title": "Cho phép Stella trên các thiết bị khác của bạn bắt đầu công việc trên máy tính này?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Cho phép {name}?",
+      "allowCheck": "Kiểm tra xem có hiện mã này không.",
+      "notNow": "Để sau",
+      "allow": "Cho phép",
+      "failed": "Chưa thực hiện được. Hãy thử lại.",
+      "matchTitle": "Kiểm tra {name} hiện mã này",
+      "otherDevice": "thiết bị khác của bạn",
+      "useAnother": "Thiết bị khác",
+      "matches": "Khớp",
+      "getTitle": "Đưa thông tin đăng nhập về đây",
+      "getBody": "Mở Stella trên thiết bị khác.",
+      "ok": "OK",
+      "cloudUsed": "Tác vụ đám mây đã dùng {label}"
     }
   },
   "mobile": {
@@ -2580,7 +2595,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Không đổi tên được giá trị đó. Hãy thử lại."
+        "rename": "Không đổi tên được giá trị đó. Hãy thử lại.",
+        "devices": "Chưa thực hiện được. Hãy thử lại."
       },
       "lastUsed": "Dùng lần cuối {used}",
       "neverUsed": "Chưa dùng",
@@ -2589,7 +2605,19 @@
       "renameCancel": "Hủy",
       "renameLabel": "Tên",
       "sync": "Đồng bộ với các thiết bị khác của bạn",
-      "syncHint": "Mã hóa đầu cuối: chỉ máy tính và điện thoại của bạn mới mở được, máy chủ của Stella thì không. Khi tắt, chúng chỉ ở trên máy tính này."
+      "syncHint": "Mã hóa đầu cuối: chỉ máy tính và điện thoại của bạn mới mở được, máy chủ của Stella thì không. Khi tắt, chúng chỉ ở trên máy tính này.",
+      "devices": "Thiết bị",
+      "thisComputer": "Máy tính này",
+      "quiet": "Lâu không thấy",
+      "removeDevice": "Gỡ",
+      "problem": "Không kiểm tra được thiết bị",
+      "startOver": "Làm lại từ đầu",
+      "removedHere": "Đã gỡ khỏi thiết bị của bạn",
+      "declined": "Không được phép",
+      "askAgain": "Hỏi lại",
+      "waitingFor": "Đang chờ {name}…",
+      "cloudUses": "Tác vụ đám mây đã dùng",
+      "refused": "Không cấp"
     },
     "googleComposio": {
       "title": "Dùng Composio cho Google",

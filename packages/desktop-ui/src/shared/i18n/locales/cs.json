@@ -1091,6 +1091,21 @@
       "later": "Teď ne",
       "note": "Kdykoli to můžete změnit v Nastavení › Soukromí.",
       "title": "Povolit Stelle na vašich dalších zařízeních spouštět práci na tomto počítači?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Povolit {name}?",
+      "allowCheck": "Zkontrolujte, že ukazuje tento kód.",
+      "notNow": "Teď ne",
+      "allow": "Povolit",
+      "failed": "Nepodařilo se to. Zkuste to znovu.",
+      "matchTitle": "Zkontrolujte, že {name} ukazuje tento kód",
+      "otherDevice": "vaše jiné zařízení",
+      "useAnother": "Jiné zařízení",
+      "matches": "Shoduje se",
+      "getTitle": "Získat přihlášení sem",
+      "getBody": "Otevřete Stellu na jiném zařízení.",
+      "ok": "OK",
+      "cloudUsed": "Úloha v cloudu použila {label}"
     }
   },
   "mobile": {
@@ -2610,7 +2625,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Hodnotu se nepodařilo přejmenovat. Zkuste to znovu."
+        "rename": "Hodnotu se nepodařilo přejmenovat. Zkuste to znovu.",
+        "devices": "Nepodařilo se to. Zkuste to znovu."
       },
       "lastUsed": "Naposledy použito {used}",
       "neverUsed": "Zatím nepoužito",
@@ -2619,7 +2635,19 @@
       "renameCancel": "Zrušit",
       "renameLabel": "Název",
       "sync": "Synchronizovat s ostatními zařízeními",
-      "syncHint": "Koncově šifrováno: otevřít je mohou jen vaše počítače a telefon, ne servery Stelly. Vypnuto je ponechá jen v tomto počítači."
+      "syncHint": "Koncově šifrováno: otevřít je mohou jen vaše počítače a telefon, ne servery Stelly. Vypnuto je ponechá jen v tomto počítači.",
+      "devices": "Zařízení",
+      "thisComputer": "Tento počítač",
+      "quiet": "Dlouho neviděno",
+      "removeDevice": "Odebrat",
+      "problem": "Zařízení nelze ověřit",
+      "startOver": "Začít znovu",
+      "removedHere": "Odebráno z vašich zařízení",
+      "declined": "Nepovoleno",
+      "askAgain": "Zeptat se znovu",
+      "waitingFor": "Čeká se na {name}…",
+      "cloudUses": "Použito úlohami v cloudu",
+      "refused": "Nevydáno"
     },
     "googleComposio": {
       "title": "Používat Composio pro Google",

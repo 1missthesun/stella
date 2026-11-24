@@ -239,6 +239,12 @@ export type SavedValuesSyncStatus = Readonly<{
   error?: string;
 }>;
 
+/** What the user did about the devices' list in Settings or on a card. */
+export type SavedValuesSyncAction =
+  | Readonly<{ action: "allow" | "decline"; joinId: string }>
+  | Readonly<{ action: "confirm" | "askAgain" | "startOver" }>
+  | Readonly<{ action: "remove"; deviceId: string }>;
+
 /** A cloud task asking the user's computers for a saved value (the release). */
 export type SavedValueReleaseRequest = Readonly<{
   /** Binds the sealed fields; the task opens them with its own key. */

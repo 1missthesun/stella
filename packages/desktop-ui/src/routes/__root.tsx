@@ -93,6 +93,7 @@ import { CompanionBridge } from "@/shell/companion/use-companion-bridge";
 import { AppSourceNotifications } from "@/features/app-source/AppSourceNotifications";
 import { EmailNotifications } from "@/features/email/EmailNotifications";
 import { MemorySyncNotifications } from "@/features/cloud/MemorySyncNotifications";
+import { SavedValuesNotifications } from "@/features/saved-values/SavedValuesNotifications";
 import { useDisplayPayloadRouting } from "@/shell/root-chrome/use-display-payload-routing";
 import { useLastLocationRestore } from "@/shell/root-chrome/use-last-location-restore";
 import { usePersistLastLocation } from "@/shell/root-chrome/use-persist-last-location";
@@ -690,6 +691,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
       <AppSourceNotifications conversationId={conversationId} />
       <EmailNotifications />
       <MemorySyncNotifications />
+      <SavedValuesNotifications />
       <ScheduleZoneReporter />
       {platformCapabilities.phoneAccess ? (
         <MobileActivityNotificationsBridge />

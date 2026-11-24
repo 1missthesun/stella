@@ -1081,6 +1081,21 @@
       "later": "Nu acum",
       "note": "Poți schimba asta oricând din Setări › Confidențialitate.",
       "title": "Permiți ca Stella de pe celelalte dispozitive să pornească lucru pe acest computer?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Permiți {name}?",
+      "allowCheck": "Verifică dacă apare acest cod.",
+      "notNow": "Nu acum",
+      "allow": "Permite",
+      "failed": "Nu a mers. Încearcă din nou.",
+      "matchTitle": "Verifică dacă {name} arată acest cod",
+      "otherDevice": "celălalt dispozitiv",
+      "useAnother": "Alt dispozitiv",
+      "matches": "Se potrivește",
+      "getTitle": "Adu-ți autentificările aici",
+      "getBody": "Deschide Stella pe alt dispozitiv.",
+      "ok": "OK",
+      "cloudUsed": "O sarcină din cloud a folosit {label}"
     }
   },
   "mobile": {
@@ -2600,7 +2615,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Valoarea nu a putut fi redenumită. Încearcă din nou."
+        "rename": "Valoarea nu a putut fi redenumită. Încearcă din nou.",
+        "devices": "Nu a mers. Încearcă din nou."
       },
       "lastUsed": "Folosit ultima dată {used}",
       "neverUsed": "Nefolosit încă",
@@ -2609,7 +2625,19 @@
       "renameCancel": "Anulează",
       "renameLabel": "Nume",
       "sync": "Sincronizează pe celelalte dispozitive",
-      "syncHint": "Criptare end-to-end: doar computerele și telefonul tău le pot deschide, nu serverele Stella. Dezactivat, rămân doar pe acest computer."
+      "syncHint": "Criptare end-to-end: doar computerele și telefonul tău le pot deschide, nu serverele Stella. Dezactivat, rămân doar pe acest computer.",
+      "devices": "Dispozitive",
+      "thisComputer": "Acest computer",
+      "quiet": "Nevăzut de mult",
+      "removeDevice": "Elimină",
+      "problem": "Nu pot verifica dispozitivele",
+      "startOver": "Ia-o de la capăt",
+      "removedHere": "Eliminat din dispozitivele tale",
+      "declined": "Nepermis",
+      "askAgain": "Cere din nou",
+      "waitingFor": "Se așteaptă {name}…",
+      "cloudUses": "Folosite de sarcini din cloud",
+      "refused": "Nefurnizat"
     },
     "googleComposio": {
       "title": "Folosește Composio pentru Google",

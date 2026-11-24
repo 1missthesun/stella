@@ -1071,6 +1071,21 @@
       "later": "Ikke nu",
       "note": "Du kan altid ændre det under Indstillinger › Privatliv.",
       "title": "Vil du lade Stella på dine andre enheder starte arbejde på denne computer?"
+    },
+    "savedValuesDevices": {
+      "allowTitle": "Tillad {name}?",
+      "allowCheck": "Tjek, at den viser denne kode.",
+      "notNow": "Ikke nu",
+      "allow": "Tillad",
+      "failed": "Det gik ikke igennem. Prøv igen.",
+      "matchTitle": "Tjek, at {name} viser denne kode",
+      "otherDevice": "din anden enhed",
+      "useAnother": "Anden enhed",
+      "matches": "Det passer",
+      "getTitle": "Hent dine logins hertil",
+      "getBody": "Åbn Stella på en anden enhed.",
+      "ok": "OK",
+      "cloudUsed": "Cloudopgave brugte {label}"
     }
   },
   "mobile": {
@@ -2590,7 +2605,8 @@
       "errors": {
         "load": "Couldn’t load stored values.",
         "delete": "Couldn’t delete that value. Try again.",
-        "rename": "Værdien kunne ikke omdøbes. Prøv igen."
+        "rename": "Værdien kunne ikke omdøbes. Prøv igen.",
+        "devices": "Det gik ikke igennem. Prøv igen."
       },
       "lastUsed": "Sidst brugt {used}",
       "neverUsed": "Ikke brugt endnu",
@@ -2599,7 +2615,19 @@
       "renameCancel": "Annuller",
       "renameLabel": "Navn",
       "sync": "Synkroniser til dine andre enheder",
-      "syncHint": "End-to-end-krypteret: kun dine egne computere og din telefon kan åbne dem, ikke Stellas servere. Slået fra bliver de kun på denne computer."
+      "syncHint": "End-to-end-krypteret: kun dine egne computere og din telefon kan åbne dem, ikke Stellas servere. Slået fra bliver de kun på denne computer.",
+      "devices": "Enheder",
+      "thisComputer": "Denne computer",
+      "quiet": "Ikke set længe",
+      "removeDevice": "Fjern",
+      "problem": "Kan ikke tjekke dine enheder",
+      "startOver": "Start forfra",
+      "removedHere": "Fjernet fra dine enheder",
+      "declined": "Ikke tilladt",
+      "askAgain": "Spørg igen",
+      "waitingFor": "Venter på {name}…",
+      "cloudUses": "Brugt af cloudopgaver",
+      "refused": "Ikke udleveret"
     },
     "googleComposio": {
       "title": "Brug Composio til Google",

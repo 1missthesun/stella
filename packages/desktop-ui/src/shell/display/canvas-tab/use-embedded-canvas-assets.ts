@@ -69,11 +69,6 @@ const embedFromDeviceCopies = (
     signal,
   );
 
-/**
- * A Drive document's images and videos point at their signed Drive URLs, so
- * video streams with range requests instead of being inlined; its styles and
- * scripts are inlined.
- */
 const embedFromDrive = (
   html: string,
   documentPath: string,

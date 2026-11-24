@@ -21,7 +21,6 @@ import "./email-section.css";
 
 const EMAIL_PAGE_IDENTITY = { canvas: EMAIL_PAGE_CANVAS, title: "Email" };
 
-/** Removing a rule and turning Email off happen here; every other tap goes to Stella. */
 const runHostAction = async (event: CanvasActionEvent): Promise<CanvasActionOutcome> => {
   try {
     if (event.id === EMAIL_PAGE_OFF_ACTION) {
@@ -39,11 +38,6 @@ const runHostAction = async (event: CanvasActionEvent): Promise<CanvasActionOutc
   }
 };
 
-/**
- * The Email page: the frame that ships with Stella (email-page.ts), fed the
- * page Stella keeps. Its buttons are canvas actions; a tap reaches Stella in
- * the chat as the user's message.
- */
 function EmailPageFrame({ state }: { state: EmailPageState }) {
   const { locale } = useI18n();
   const { resolvedColorMode, colors } = useTheme();
@@ -77,13 +71,11 @@ function EmailPageFrame({ state }: { state: EmailPageState }) {
   );
 }
 
-/** Email shows only where it is turned on (see `email-feature.ts`). */
 export function EmailSection({ active }: { active: boolean }) {
   return useEmailFeature() ? <EmailSectionBody active={active} /> : null;
 }
 
 function EmailSectionBody({ active: selected }: { active: boolean }) {
-  // The section stays selected behind the Chat tab; it is only on screen while the panel is open.
   const panelOpen = useDisplayPanelOpen();
   const active = selected && panelOpen;
   const { t } = useI18n();
@@ -125,7 +117,6 @@ function EmailSectionBody({ active: selected }: { active: boolean }) {
 
   const value = feed.value;
   const hasAccounts = (value?.gmailConnected.length ?? 0) > 0;
-  // Looking at the section clears the unseen badge, including mail that arrives while it is open.
   useEffect(() => {
     if (active && value) markEmailSeen();
   }, [active, value]);
@@ -146,7 +137,6 @@ function EmailSectionBody({ active: selected }: { active: boolean }) {
   }
 
   if (!value) {
-    // Signed in but the session token isn't ready yet (right after launch): it loads by itself.
     if (feed.status === "error" && feed.error.code !== "UNAUTHENTICATED") {
       return <EmptyState motif="mail" title={t("email.section.loadErrorTitle")} body={t("email.section.loadErrorBody")} />;
     }

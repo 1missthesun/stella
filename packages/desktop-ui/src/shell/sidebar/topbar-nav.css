@@ -143,7 +143,6 @@
   pointer-events: none;
 }
 
-/* Only while the session is paused ("Signed out"). */
 .shell-topbar-account-status {
   flex-shrink: 0;
   color: var(--text-weak);

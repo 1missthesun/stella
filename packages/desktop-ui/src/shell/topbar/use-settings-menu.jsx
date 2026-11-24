@@ -43,9 +43,7 @@ export function useSettingsMenu() {
   const [connectorsOpen, setConnectorsOpen] = useState(false);
   const pendingPopoverRef = useRef(null);
 
-  // Opens whichever popover a menu item queued, returning `true` when it did so
-  // the caller can `preventDefault()` the dropdown's focus restore. The dropdown
-  // otherwise restores focus to the trigger while the next Radix layer is
+  // Radix restores focus to the dropdown's trigger while the next layer is
   // mounting, and that focus-out dismisses the new popover as soon as it opens.
   const applyPendingPopover = () => {
     const pendingPopover = pendingPopoverRef.current;

@@ -129,13 +129,6 @@ export function useFullShellChat({
     activeConversationId,
   );
   const pendingAutoSendTextRef = useRef<string | null>(null);
-  // Auth scope is a hard renderer privacy boundary. Composer content,
-  // attachment handles, per-tab memories and everything remembered about
-  // the view (route, open items) belong to the scope they were written under
-  // and are cleared in a layout effect when it changes, so no frame paints
-  // the previous owner's things. The owner is remembered
-  // with the content: a reload, a restart or an interface change arriving
-  // under the same owner keeps it.
   useLayoutEffect(() => {
     if (sessionIsLoading) return;
     const scope = `${accountScope}\0${storageMode}`;
@@ -535,8 +528,6 @@ export function useFullShellChat({
   const hasMessages = displayMessages.length > 0;
   const conversationAsks = useConversationUserAsks(activeConversationId);
   const hasOpenQuestion = conversationAsks.length > 0;
-  // "ready" names the journal's head before its records arrive: the journal
-  // is only known once the records on hand reach that head.
   const journalCaughtUp =
     journalState.recordsSource === "canonical" &&
     (journalState.records.at(-1)?.seq ?? -1) >= journalState.headSeq;

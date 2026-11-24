@@ -41,7 +41,6 @@ const useThisDeviceId = () => {
   return id;
 };
 
-/** The account's other computers; empty with one computer, so nothing extra shows. */
 const useOtherComputers = (enabled: boolean): OtherComputer[] => {
   const self = useThisDeviceId();
   const list = useBackendValue("devices.list", enabled && self ? {} : "skip");
@@ -58,10 +57,6 @@ const useOtherComputers = (enabled: boolean): OtherComputer[] => {
   );
 };
 
-/**
- * A small chevron beside Update: Update goes to every computer by default;
- * this narrows it to some of them, or to this one only.
- */
 const UpdateTargets = ({
   computers,
   disabled,

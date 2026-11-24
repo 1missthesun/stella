@@ -3,21 +3,11 @@ import { useEffect, useLayoutEffect, type RefObject } from "react";
 const OPEN_TAB = '.topbar-tabs__tab[data-tab-id][data-active="true"]';
 const LEFT = "--topbar-open-tab-left";
 const RIGHT = "--topbar-open-tab-right";
-// The feet reach 8px past the tab (`--topbar-tab-foot`). The stage's edge
-// starts again under the last pixel of each foot, where the foot's own edge
-// lies level with it in the same colour, so the two meet without a gap at
-// any scale.
 const FOOT_REACH = 7;
-/** `--topbar-tab-foot`: how far a foot stands out from the tab. */
 const FOOT_SIZE = 8;
 const REACH_GAP = 12;
 const REACH_GROW_DELAY_MS = 500;
 
-/**
- * Tell the stage where the open tab stands, so its top edge stops at the
- * tab's feet and starts again past them (see `.workspace-stage`). Nothing is
- * painted over the edge: under the tab there is no edge.
- */
 export function syncOpenTabNotch(strip: HTMLElement | null): void {
   if (strip) markStripScroll(strip);
   const root = document.documentElement;
@@ -32,8 +22,6 @@ export function syncOpenTabNotch(strip: HTMLElement | null): void {
       ?.getBoundingClientRect();
     left = Math.max(tab.left - FOOT_REACH, chat?.right ?? bounds.left);
     right = Math.min(tab.right + FOOT_REACH, bounds.right);
-    // Scrolled under the pinned Chat tab, the open tab is cut at Chat's edge
-    // so its feet do not show through below Chat.
     const hidden = chat ? chat.right - (tab.left - FOOT_SIZE) : 0;
     const clip =
       hidden > 0 ? `inset(0 -${FOOT_SIZE}px 0 ${hidden - FOOT_SIZE}px)` : "";
@@ -59,11 +47,6 @@ export function syncOpenTabNotch(strip: HTMLElement | null): void {
   }
 }
 
-/**
- * Say whether tabs are scrolled under the pinned Chat tab or run on under
- * the + button: only then do those two need an opaque backing, which would
- * otherwise show as a box on a theme whose bar is not the stage's colour.
- */
 function markStripScroll(strip: HTMLElement): void {
   const scrolled = strip.scrollLeft > 0.5;
   const overflowing = strip.scrollWidth > strip.clientWidth + 0.5;
@@ -77,10 +60,6 @@ function markStripScroll(strip: HTMLElement): void {
   }
 }
 
-/**
- * When the strip gets narrower than its tabs, keep the open tab (with its
- * feet) inside the part that shows, clear of the pinned Chat tab.
- */
 export function revealOpenTab(strip: HTMLElement): void {
   if (strip.dataset.reordering === "true") return;
   const open = strip.querySelector<HTMLElement>(OPEN_TAB);
@@ -97,8 +76,6 @@ export function revealOpenTab(strip: HTMLElement): void {
   else if (under > 0.5) strip.scrollLeft -= under;
 }
 
-/** Keep the notch under the open tab as the strip resizes, scrolls or is
-    reordered. `revision` changes whenever the tabs themselves do. */
 export function useOpenTabNotch(
   stripRef: RefObject<HTMLDivElement | null>,
   revision: unknown,
@@ -150,13 +127,6 @@ export function useOpenTabNotch(
   );
 }
 
-/**
- * Let the tabs use the empty part of the bar's middle column, up to the
- * centred activity mark. The mark is measured, never moved: the tabs' side
- * of the bar is only allowed to reach that far over the column. Room that
- * opens up is taken after a pause, so the mark changing its label does not
- * make the tabs jump out and back.
- */
 export function useTabStripReach(
   stripRef: RefObject<HTMLDivElement | null>,
 ): void {

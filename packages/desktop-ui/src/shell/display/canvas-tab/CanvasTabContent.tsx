@@ -55,9 +55,6 @@ const CanvasIllustrationSpot = ({ label }: { label?: ReactNode }) => (<div class
     {label ? (<div className="canvas-tab__illustration-label">{label}</div>) : null}
   </div>);
 const LocalFileCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
-    // Same-slug canvases overwrite the same file in place; folding
-    // `createdAt` into the key re-resolves (and the iframe below remounts)
-    // so a re-opened/re-rendered canvas never shows stale content.
     const key = `${item.filePath}\0${item.createdAt}`;
     const [resolved, setResolved] = useState<{
         key: string;
@@ -128,8 +125,6 @@ const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = fals
     const location = drivePath
         ? canvasDocumentLocation(drivePath, true)
         : canvasDocumentLocation(item.filePath, Boolean(item.driveBacked));
-    // On the web a canvas renders in the canvas host page, so it carries the
-    // same bridges Electron main serves every canvas with.
     const bridged = useMemo(
         () => (html && !hasCanvasOrigin ? injectCanvasBridge(injectCanvasActionBridge(html)) : html),
         [html, hasCanvasOrigin],
@@ -195,7 +190,6 @@ const canvasIdentity = (item: CanvasHtmlItem) => ({
 });
 const CanvasHeroFrameDocument = ({ item, location, frame, error, loading, limited = false, actions, }: {
   item: CanvasHtmlItem;
-  /** Where the canvas file lives; its relative links resolve against it. */
   location: CanvasDocumentLocation | null;
   frame: CanvasFrameSource | null;
   error: string | null;

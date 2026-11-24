@@ -94,8 +94,6 @@ const TERMINAL_ROW_AUTOHIDE_MS = 30 * 60 * 1000;
 const activityRowText = (row: ActivityRow): string =>
   getActivityRowSearchText(row);
 
-// ── Row enter / exit / reorder motion ───────────────────────────────
-
 const TaskListGapContext = createContext(0);
 
 const hiddenRow = (gap: number) => ({ height: 0, opacity: 0, marginTop: -gap });
@@ -796,28 +794,6 @@ export const WorkspaceSections = memo(function WorkspaceSections({
     [activityRows],
   );
 
-  // Files produced by each agent, keyed by agentId, nested under that agent's
-  // expanded row (replacing the old standalone Files section).
-  //
-  // Sourcing merges two feeds so files show up LIVE while an agent works:
-  //  - `activity.activities` (lifecycle events) carries the
-  //    `agent-completed` rollup — the only file source for engines that
-  //    report changes on the turn result (e.g. claude-code agents).
-  //  - `filesFeed.files` carries agent-attributed `tool_result` events as
-  //    each tool finishes, so a native agent's files appear the moment
-  //    they're written. The files store only refetches on file-bearing
-  //    events, so this input is quiet during pure text streaming.
-  // `mergeAgentFileEvents` dedupes overlap by event id; per-path dedupe in
-  // `deriveConversationFiles` keeps live + rollup copies from double-listing.
-  //
-  // `activity.activities` gets a fresh array identity on every streamed delta
-  // (the activity window is refetched per `localChat:updated`), so a plain
-  // `useMemo([activity.activities])` re-ran the heavy per-agent file
-  // derivation on every token — the 44ms sidebar offender in the trace. Gate
-  // the recompute on a cheap content signature of the file-contributing
-  // events so it only re-runs when an agent's files actually change; the
-  // returned Map keeps a stable reference across deltas otherwise (so the
-  // memoized task rows that take it as a prop also stop re-reconciling).
   const agentFileEvents = useMemo(
     () => mergeAgentFileEvents(activity.activities, filesFeed.files),
     [activity.activities, filesFeed.files],
@@ -835,13 +811,6 @@ export const WorkspaceSections = memo(function WorkspaceSections({
     return result;
   }, [agentFileEvents]);
 
-  // Files list under the agent that produced them rather than in a standalone
-  // section, but a flat file index is still essential as a global search
-  // result. Use the same merged live + completion-rollup source as the agent
-  // rows above: some engines report a file only on `agent-completed`, so
-  // indexing `filesFeed.files` alone can find the containing thread while
-  // missing the file itself. Query changes only scan the normalized path
-  // index built here.
   const searchableFiles = useMemo(
     () =>
       deriveConversationFiles(agentFileEvents).map((entry) => ({

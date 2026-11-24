@@ -11,8 +11,6 @@
   --companion-stack-width: 340px;
 }
 
-/* The arc sits beside and below the mark, so only the voice button (in the
-   upper valley, ~110px above the mark's bottom) needs extra lift. */
 .companion-root[data-voice][data-hovered],
 .companion-root[data-voice][data-expanded] {
   --companion-stack-lift: 120px;
@@ -247,8 +245,6 @@ html[data-stella-platform="win32"] .companion-hull[data-active] {
   }
 }
 
-/* Above the hull: its 208px hover circle reaches the composer and dictation
-   pill now that they sit close to the mark, and would eat their clicks. */
 .companion-stack {
   position: absolute;
   z-index: 3;
@@ -288,8 +284,6 @@ html[data-stella-platform="win32"] .companion-hull[data-active] {
   visibility: hidden;
 }
 
-/* The composer is the main chat's .composer-shell (full-shell.composer.css);
-   only its placement in the pet differs. */
 .companion-composer.composer-shell {
   max-width: none;
   box-shadow:

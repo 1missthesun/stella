@@ -155,8 +155,6 @@
   padding-top: 8px;
 }
 
-/* In the top bar its buttons join the bar's own row and rhythm (see
-   shell-topbar-full.css). */
 .global-models-control--topbar {
   display: contents;
 }

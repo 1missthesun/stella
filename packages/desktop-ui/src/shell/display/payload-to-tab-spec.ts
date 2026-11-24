@@ -220,8 +220,6 @@ export const removeGeneratedMediaItem = (
   return generatedMediaSnapshot;
 };
 
-// Files used to retarget the sidebar's hidden Files tab here. They now open
-// in the floating viewer, so a background tab never changes under you.
 const rememberInFiles = (spec: DisplayTabSpec): DisplayTabSpec => spec;
 
 const indexInFiles = (

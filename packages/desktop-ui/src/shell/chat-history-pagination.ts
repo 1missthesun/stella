@@ -42,9 +42,6 @@ export class ChatHistoryPaginationGate {
   } {
     const previous = this.requestPhase;
 
-    // Subscription re-keying briefly reports `hasMore=false` while retaining
-    // the prior rows. Loading wins over that transient so the accepted request
-    // cannot settle until its larger window actually resolves.
     if (guards.isLoading) {
       this.requestPhase = "loading";
     } else if (this.requestPhase === "loading") {

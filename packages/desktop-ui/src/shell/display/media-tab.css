@@ -216,10 +216,6 @@
   max-height: 100%;
 }
 
-/* ---------------- In the file viewer: the media is the hero ---------- */
-
-/* The viewer's header carries the name and actions, so the body is only
-   the media, edge to edge with a small breathing gap. */
 .media-tab--viewer {
   padding: 0;
 }
@@ -256,7 +252,6 @@
   background: transparent;
 }
 
-/* A generated item's prompt, as a quiet one-line caption under it. */
 .media-tab__viewer-prompt {
   flex: 0 0 auto;
   max-width: 72ch;

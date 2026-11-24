@@ -17,7 +17,6 @@
   overflow-y: hidden;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
-  /* Room for the last tab's foot, taken back so + stays beside the tabs. */
   padding-right: 8px;
   margin-right: -6px;
   -webkit-app-region: no-drag;
@@ -39,9 +38,6 @@
   initial-value: 0px;
 }
 
-/* A tab fills the bar's height. Its look is drawn behind the label: a soft
-   pill on hover, and for the tab on the stage an outline in the stage's own
-   colours that runs down into the stage's top edge. */
 .topbar-tabs__tab {
   --topbar-tab-edge: var(--panel-surface-border, var(--border));
   --topbar-tab-fill: var(--background);
@@ -71,10 +67,6 @@
   transition: background 0.12s ease;
 }
 
-/* Every tab but Chat is the same width whatever its title, as in Chrome.
-   152px holds the longest built-in name in any language beside the icon and
-   the close button; a crowded strip narrows them all together, down to the
-   icon alone, before it scrolls. */
 .topbar-tabs__tab[data-tab-id] {
   flex: 0 1 152px;
   width: 152px;
@@ -82,27 +74,19 @@
   max-width: 152px;
 }
 
-/* Chat is the pinned tab: sized to its name, never narrowed, and still
-   reachable when many tabs make the strip scroll. */
 .topbar-tabs__tab--chat {
   position: sticky;
   left: 0;
   z-index: 3;
   flex-shrink: 0;
-  /* With the strip's gap, room for the first tab's foot. */
   margin-right: 6px;
 }
 
-/* Tabs scrolled under Chat are hidden by a backing, there only while they
-   are (open-tab-notch.ts): on a theme whose bar isn't the stage's colour it
-   would show as a box. It stops clear of the bar's last pixel, where the
-   stage's edge runs. */
 .topbar-tabs__strip[data-scrolled="true"] .topbar-tabs__tab--chat {
   background: linear-gradient(var(--background), var(--background)) top / 100%
     calc(100% - 2px) no-repeat;
 }
 
-/* With too little room for every title, Chat gives its name up first. */
 .topbar-tabs__tab--chat[data-compact="true"] .topbar-tabs__target {
   justify-content: center;
   width: 40px;
@@ -121,20 +105,14 @@
   background: color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
-/* Chat showing is marked by its strong word alone. A fill there would be the
-   bar's only filled shape, and in this bar a fill means a menu is open. */
 .topbar-tabs__tab[data-active="true"] {
   color: var(--text-strong);
 }
 
-/* The tab on the stage: the stage's own fill and edge, open at the base.
-   The stage's top edge stops at this tab's feet (open-tab-notch.ts), so
-   nothing is drawn across the base and nothing here has to hide a line. */
 .topbar-tabs__tab[data-tab-id][data-active="true"] {
   z-index: 2;
 }
 
-/* Top and sides, down to where the feet begin. */
 .topbar-tabs__tab[data-tab-id][data-active="true"]::before {
   inset: 6px 0 calc(var(--topbar-tab-foot) + 1px);
   border: 1px solid var(--topbar-tab-edge);
@@ -144,8 +122,6 @@
   transition: none;
 }
 
-/* The base: fill between the sides, and a foot at each side whose edge
-   curves outward to meet the stage's top edge where it starts again. */
 .topbar-tabs__tab[data-tab-id][data-active="true"]::after {
   --foot: calc(var(--topbar-tab-foot) + 1px);
   content: "";
@@ -154,13 +130,9 @@
   right: calc(var(--topbar-tab-foot) * -1);
   bottom: 0;
   height: var(--foot);
-  /* The fill starts under each foot's last pixel, so no gap can open
-     between them at fractional scales. */
   padding: 0 var(--topbar-tab-foot);
   box-sizing: border-box;
   pointer-events: none;
-  /* Each foot is its edge drawn over its own fill, so it is opaque along
-     the curve whatever the edge colour's transparency. */
   background:
     radial-gradient(
         circle at 0 0,
@@ -215,20 +187,15 @@
   cursor: default;
 }
 
-/* `.app button` resets every button's weight; the tabs say theirs again so
-   they keep the bar's one text style. */
 .topbar-tabs .topbar-tabs__target {
   font-weight: var(--weight-medium, 500);
 }
 
-/* Room for the close button is always kept, so it never covers the title. */
 .topbar-tabs__tab[data-tab-id] .topbar-tabs__target {
   flex: 1 1 auto;
   padding-right: 26px;
 }
 
-/* Narrowed tabs give that room back to the title; their close button takes
-   the icon's place on hover instead (see below). */
 .topbar-tabs__tab[data-tab-id][data-tight="true"]
   .topbar-tabs__target {
   padding-right: 10px;
@@ -268,7 +235,6 @@
   box-shadow: 0 0 0 1.5px var(--background);
 }
 
-/* A title that is cut off fades at its trailing edge, as Chrome's does. */
 .topbar-tabs__label {
   min-width: 0;
   overflow: hidden;
@@ -286,8 +252,6 @@
   --topbar-tab-fade-to: 2px;
 }
 
-/* The close button sits in room the tab always keeps for it, so showing it
-   never changes the tab's width. The open tab shows it all the time. */
 .topbar-tabs__close {
   position: absolute;
   top: 11px;
@@ -328,9 +292,6 @@
   box-shadow: var(--focus-ring);
 }
 
-/* A narrowed tab swaps its icon for the close button on hover. Down at icon
-   only, just the open tab does: there the button would cover the whole
-   tab, and a click meant to open a tab would close it. */
 .topbar-tabs__tab[data-compact="true"] .topbar-tabs__close {
   right: calc(50% - 8px);
 }
@@ -354,8 +315,6 @@
   opacity: 0;
 }
 
-/* Reordering: the dragged tab follows the pointer above the others, which
-   slide aside; nothing reacts to hover until it is dropped. */
 .topbar-tabs__strip[data-reordering="true"] .topbar-tabs__tab[data-tab-id] {
   transition:
     color 0.12s ease,
@@ -436,9 +395,6 @@
   -webkit-app-region: no-drag;
 }
 
-/* Opaque like the pinned Chat tab while the strip runs on under it, so the
-   strip is cut cleanly at the + rather than showing a tab's icon through
-   it. */
 .topbar-tabs__strip[data-overflowing="true"] + .topbar-tabs__new {
   background: var(--background);
 }

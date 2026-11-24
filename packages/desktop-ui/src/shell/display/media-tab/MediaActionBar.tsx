@@ -45,7 +45,6 @@ export const MediaActionBar = ({
   const [message, setMessage] = useState<string | null>(null);
   const [manualCopy, setManualCopy] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
-  // A Drive file is named by its Drive path, not the stand-in path in its asset.
   const drivePath = useContext(DisplayFileSourceContext)?.drivePath ?? null;
   const disarmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filePath = useMemo(() => filePathsForItem(item)[0] ?? null, [item]);

@@ -80,8 +80,6 @@ const parsePreviewMeta = (html?: string, kind?: ArtifactKind) => {
   };
 };
 
-// The preview runs no script (the frame is sandboxed and inherits the app's
-// CSP), so the sheet tabs live in the panel and the chosen sheet is shown by CSS.
 const injectPreviewChrome = (
   html: string,
   zoomPercent: number,

@@ -38,7 +38,6 @@ type CompanionComposerProps = {
   focusRequestId: number;
   onSend: () => void;
   onEscape: () => void;
-  /** The + menu or its file picker is about to take focus from the panel. */
   onHoldOpen: (hold: boolean) => void;
 };
 
@@ -49,9 +48,6 @@ const hasAttachments = (context: ChatContext | null) =>
       context?.pastedTexts?.length,
   );
 
-// Same shell, form and auto-grow as the main chat composer (Composer.tsx), so
-// the pill grows into the multi-line layout with the same padding, radius and
-// max height.
 export function CompanionComposer({
   message,
   setMessage,

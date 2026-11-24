@@ -60,8 +60,6 @@ export function useDisplayPayloadRouting({
     };
   }, [rightSidebarRef]);
 
-  // Generated media already shows inline in the chat: register it for the
-  // viewer's strip without adding a top-bar tab for every image.
   const routeMaterializedPayload = useCallback(
     (payload: DisplayTabPayload) => {
       rightSidebarRef.current?.update(payload, { tab: false });

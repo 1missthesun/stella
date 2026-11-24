@@ -2,10 +2,6 @@ import { useEffect, useRef, type RefObject } from "react";
 import { resolveCanvasLink, type CanvasDocumentLocation } from "@stella/contracts/canvas-links";
 import { openCanvasLink } from "./open-canvas-link";
 
-/**
- * Opens the links a canvas's bridge posts the way the same link opens from
- * chat, resolved against where the canvas file lives.
- */
 export function useCanvasLinks(
   frameRef: RefObject<HTMLIFrameElement | null>,
   location: CanvasDocumentLocation | null,
@@ -19,8 +15,6 @@ export function useCanvasLinks(
       const frameWindow = frameRef.current?.contentWindow;
       if (!frameWindow || event.source !== frameWindow) return;
       const data = event.data;
-      // `stella:canvas-open-external` is what canvases served by an
-      // older main send for web links.
       const href =
         data?.type === "stella:canvas-link" && typeof data.href === "string"
           ? data.href

@@ -101,9 +101,7 @@ export const AudioPlayer = ({
             setScrubbing(false);
             try {
               e.currentTarget.releasePointerCapture(e.pointerId);
-            } catch {
-              // pointer already released
-            }
+            } catch {}
           }}
           onKeyDown={(e) => {
             const audio = audioRef.current;

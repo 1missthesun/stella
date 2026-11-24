@@ -5,23 +5,13 @@ import { readDisplayFileOnce } from "@/shared/hooks/use-display-file-data";
 import { useDriveFileVersion } from "@/features/cloud/drive-file-versions";
 import { driveFileLink, readDriveFile } from "@/features/cloud/CloudFileSource";
 
-/**
- * Small pictures for the viewer's strip. A strip item used to load the
- * whole original (a full read and a full-size decode per photo, a whole
- * video pipeline per clip) every time the viewer opened, which held up the
- * file being opened. Each thumbnail is now made once, a few at a time and
- * after the open has had its moment, then kept for the session.
- */
-
 const EDGE_PX = 120;
 const ENCODE_TYPE = "image/webp";
 const ENCODE_QUALITY = 0.82;
 const MAX_KEPT = 600;
 const RUNNING_AT_ONCE = 2;
-/** Thumbnails wait this long, so the file being opened goes first. */
 const START_DELAY_MS = 260;
 const VIDEO_TIMEOUT_MS = 10_000;
-/** Bigger originals aren't read just for a thumbnail. */
 const DRIVE_IMAGE_MAX_BYTES = 40 * 1024 * 1024;
 const PDF_MAX_BYTES = 64 * 1024 * 1024;
 
@@ -87,7 +77,6 @@ const imageThumb = async (
 };
 
 const imageThumbOf = async (blob: Blob): Promise<string | null> => {
-  // Decoded off the main thread, straight to about the size it's drawn at.
   const probe = await createImageBitmap(blob, {
     resizeWidth: EDGE_PX * 2,
     resizeQuality: "medium",
@@ -99,7 +88,6 @@ const imageThumbOf = async (blob: Blob): Promise<string | null> => {
   } finally {
     probe.close();
   }
-  // Wide pictures: size by height instead so the crop isn't blurry.
   const wide = await createImageBitmap(blob, {
     resizeHeight: EDGE_PX,
     resizeQuality: "medium",
@@ -132,8 +120,6 @@ const once = (
 
 const videoThumb = async (src: string): Promise<string | null> => {
   const video = document.createElement("video");
-  // The media scheme (and the Drive's links) answer CORS for the app, so the
-  // frame can be read back.
   video.crossOrigin = "anonymous";
   video.muted = true;
   video.playsInline = true;
@@ -158,7 +144,6 @@ const videoThumb = async (src: string): Promise<string | null> => {
   }
 };
 
-/** The top of the first page, as the document opens. */
 const pdfThumbOf = async (bytes: Uint8Array): Promise<string | null> => {
   const { pdfjs } = await import("react-pdf");
   const worker = `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`;
@@ -180,7 +165,6 @@ const pdfThumbOf = async (bytes: Uint8Array): Promise<string | null> => {
     context.fillStyle = "#fff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvas, canvasContext: context, viewport }).promise;
-    // Square from the top, where a document's title is.
     const side = Math.min(canvas.width, canvas.height);
     const top = new OffscreenCanvas(side, side);
     top.getContext("2d")?.drawImage(canvas, (canvas.width - side) / 2, 0, side, side, 0, 0, side, side);
@@ -199,11 +183,6 @@ const pdfThumb = async (
   return await pdfThumbOf(file.bytes);
 };
 
-/**
- * A Drive file's thumbnail. On the desktop it is the still the chat's Drive
- * tiles use (made once per file version by the app and kept on disk, so a
- * message's files usually have one already); elsewhere it is made here.
- */
 const driveThumb = async (
   kind: StripThumbKind,
   drivePath: string,
@@ -257,12 +236,10 @@ const pump = () => {
     return;
   }
   while (running < RUNNING_AT_ONCE) {
-    // Newest asks first: what the strip is showing right now.
     const job = queue.pop();
     if (!job) return;
     const thumb = thumbs.get(job.key);
     if (!thumb || thumb.done || thumb.listeners.size === 0) {
-      // Nobody is looking any more; ask again when someone is.
       if (thumb && !thumb.done) thumbs.delete(job.key);
       continue;
     }
@@ -277,8 +254,6 @@ const pump = () => {
         running -= 1;
         thumb.url = url;
         thumb.done = true;
-        // A read that failed (offline, a link that ran out) is tried again
-        // the next time the item is shown; one that can't be made is kept.
         if (failed && thumbs.get(job.key) === thumb) thumbs.delete(job.key);
         notify(thumb);
         forgetOldest();
@@ -287,7 +262,6 @@ const pump = () => {
   }
 };
 
-/** Hold thumbnail work back for a moment: something bigger is loading. */
 export const deferStripThumbnails = () => {
   delayUntil = performance.now() + START_DELAY_MS;
 };
@@ -298,7 +272,6 @@ const request = (
 ): Thumb => {
   const existing = thumbs.get(key);
   if (existing) {
-    // Most recently used last, so the oldest go first.
     thumbs.delete(key);
     thumbs.set(key, existing);
     return existing;
@@ -326,7 +299,6 @@ const useThumb = (
     if (!key) return;
     const thumb = request(key, () => runRef.current());
     const update = () => {
-      // A newer version keeps showing the older still until it is made.
       if (thumb.done) setShown({ key, url: thumb.url });
     };
     thumb.listeners.add(update);
@@ -338,7 +310,6 @@ const useThumb = (
   return shown.url;
 };
 
-/** The thumbnail's URL once it is made (null until then, or if it can't be). */
 export const useStripThumbnail = (
   kind: StripThumbKind,
   filePath: string,
@@ -356,10 +327,6 @@ export const useStripThumbnail = (
   );
 };
 
-/**
- * A Drive file's thumbnail, made again when the Drive holds a new version
- * of it (until the version is known, the one made from the current link).
- */
 export const useDriveStripThumbnail = (
   kind: StripThumbKind,
   drivePath: string,

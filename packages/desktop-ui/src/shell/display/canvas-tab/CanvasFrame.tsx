@@ -3,17 +3,10 @@ import { injectCanvasActionBridge } from "@stella/contracts/canvas-actions";
 import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
 import { CANVAS_FRAME_SANDBOX, CANVAS_HOST_FILE, canvasHostMessageType } from "@stella/contracts/canvas-host";
 
-/** A canvas served from its own address (desktop), or HTML for the web's canvas host page. */
 export type CanvasFrameSource = { src: string } | { html: string };
 
 const canvasHostUrl = (): string => new URL(CANVAS_HOST_FILE, document.baseURI).href;
 
-/**
- * The sandboxed iframe a canvas runs in (see canvas-host.ts). `onDocument`
- * runs each time the canvas document is in place: on desktop its load; on
- * the web once the host page has written it. `onNavigatedAway` runs when a
- * desktop canvas loads a second document.
- */
 export function CanvasFrame({
   frameRef,
   source,
@@ -67,8 +60,6 @@ export function CanvasFrame({
       onLoad={() => {
         if (hosted) return;
         onDocumentRef.current?.();
-        // The first load is the canvas document. Main stops a canvas
-        // navigating itself, so a later load means something got past that.
         loadsRef.current += 1;
         if (loadsRef.current > 1) {
           loadsRef.current = 0;
@@ -79,11 +70,6 @@ export function CanvasFrame({
   );
 }
 
-/**
- * Where HTML the app holds renders: registered with Electron main and served
- * from `stella-canvas:` on desktop, or handed to the canvas host page on the
- * web, with the same bridges either way.
- */
 export function useHtmlCanvasSource(html: string): { source: CanvasFrameSource | null; error: string | null } {
   const display = typeof window === "undefined" ? undefined : window.electronAPI?.display;
   const register = typeof display?.canvasHtmlUrl === "function" ? display.canvasHtmlUrl : null;

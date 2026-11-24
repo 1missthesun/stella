@@ -57,10 +57,6 @@ function ChatDisplayTab({
   );
 }
 
-/**
- * The Chat tab: the conversation shown in the viewer while you're on another
- * route (Billing, Apps) and something sends text to Stella.
- */
 export function openChatDisplayTab(
   openRequest: ChatPanelOpenRequest | null = null,
   opts?: OpenTabOptions,
@@ -96,7 +92,6 @@ export function openTrashDisplayTab(): void {
 }
 
 export function openModelPicker(): void {
-  // The Models control lives in the top bar; it opens in place.
   engineOverlay.setOpen(true);
 }
 

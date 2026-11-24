@@ -121,8 +121,6 @@ export const addCanvasHtmlItem = (
   };
   const existing = itemsByPath.get(payload.filePath);
   if (existing) {
-    // Mutate in-place so the entry keeps its identity and we still bump
-    // createdAt (used as the iframe refresh key).
     existing.title = next.title;
     existing.createdAt = next.createdAt;
     if (next.slug) existing.slug = next.slug;

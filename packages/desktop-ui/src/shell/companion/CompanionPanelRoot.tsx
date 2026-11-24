@@ -34,8 +34,6 @@ import { useCompanionWindow } from "./use-companion-window";
 import { useMarkPress } from "./use-mark-press";
 import "./companion.css";
 
-// Seats the buttons in the star's valleys with an even ~10px gap to its
-// outline (measured from the rendered mark).
 const ARC_RADIUS = 58;
 const ARC_ANGLES_BY_EDGE: Record<
   CompanionEdgeH,
@@ -104,8 +102,6 @@ export function CompanionPanelRoot() {
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
   const holdOpenRef = useRef(false);
-  // The + menu's file picker takes focus from the panel; that one blur must
-  // not collapse the composer.
   const holdOpen = useCallback((hold: boolean) => {
     holdOpenRef.current = hold;
   }, []);
@@ -222,7 +218,6 @@ export function CompanionPanelRoot() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      // Escape first closes the composer's + menu, not the whole composer.
       if (
         event.target instanceof Element &&
         event.target.closest("[role='menu']")

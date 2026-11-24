@@ -178,20 +178,51 @@ export function DesignPlayer() {
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
+    // Fetch the looks well before the player scrolls in, but only once the page has loaded and the
+    // main thread is idle, so the chunk never competes with the first paint or hydration.
+    // If the player itself scrolls into view first, fetch right away.
+    let started = false;
+    let cancelIdle = () => {};
+    const start = () => {
+      if (started) return;
+      started = true;
+      cancelIdle();
+      void loadRedesigns().then(setMod);
+    };
+    const fetchLooks = () => {
+      if (started) return;
+      if (typeof window.requestIdleCallback === "function") {
+        const id = window.requestIdleCallback(start, { timeout: 1500 });
+        cancelIdle = () => window.cancelIdleCallback(id);
+      } else {
+        const id = window.setTimeout(start, 200);
+        cancelIdle = () => window.clearTimeout(id);
+      }
+    };
     const near = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting) return;
         near.disconnect();
-        void loadRedesigns().then(setMod);
+        if (document.readyState === "complete") fetchLooks();
+        else window.addEventListener("load", fetchLooks, { once: true });
       },
       { rootMargin: "150% 0px 150% 0px" },
     );
-    const seen = new IntersectionObserver(([entry]) => setVisible(entry?.isIntersecting ?? false), { threshold: 0.35 });
+    const seen = new IntersectionObserver(
+      ([entry]) => {
+        const on = entry?.isIntersecting ?? false;
+        if (on) start();
+        setVisible(on);
+      },
+      { threshold: 0.35 },
+    );
     near.observe(el);
     seen.observe(el);
     return () => {
       near.disconnect();
       seen.disconnect();
+      window.removeEventListener("load", fetchLooks);
+      cancelIdle();
     };
   }, []);
 

@@ -88,9 +88,9 @@ export default function Pricing() {
                     Choose {plan.label}
                   </Link>
                 ) : (
-                  <Link className={pr.cta} href="#get">
+                  <a className={pr.cta} href="#get">
                     Get Stella
-                  </Link>
+                  </a>
                 )}
                 <ul className={pr.features}>
                   {plan.includes.map((line) => (

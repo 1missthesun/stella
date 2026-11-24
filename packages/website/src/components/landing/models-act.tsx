@@ -61,7 +61,7 @@ export function ModelsAct() {
             style={{ ["--i" as string]: i, ["--glow" as string]: lead.glow }}
           >
             <span className={f.tile} data-tile={lead.tile}>
-              <img src={lead.logo} alt="" width={160} height={160} />
+              <img src={lead.logo} alt="" width={160} height={160} loading="lazy" decoding="async" />
             </span>
             <b>{lead.name}</b>
           </li>

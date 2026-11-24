@@ -37,11 +37,15 @@
 
 .col {
   margin: 0;
-  font-family: var(--l-mono);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: clamp(10px, 0.95vw, 14px);
   line-height: 1.75;
   color: rgba(10, 10, 13, 0.13);
   white-space: pre;
+}
+
+.source[data-near="1"] .col {
+  font-family: var(--l-mono), ui-monospace, monospace;
 }
 
 .col:nth-child(1) {

@@ -42,32 +42,40 @@ export function Opening() {
     const el = mascotMoveRef.current;
     if (!el || prefersReducedMotion()) return;
     const anim = el.animate(HOP_FRAMES, { duration: HOP_MS, iterations: Infinity, delay: 1400 });
-    let raf = 0;
-    let lastLoop = -1;
-    const watch = () => {
-      raf = requestAnimationFrame(watch);
+    let timer = 0;
+    let visible = false;
+    const scheduleSparkle = () => {
+      if (!visible) return;
       const t = Number(anim.currentTime ?? 0) - 1400;
-      if (t < 0) return;
-      const loop = Math.floor(t / HOP_MS);
-      if (loop !== lastLoop && (t % HOP_MS) / HOP_MS >= SPARKLE_AT) {
-        lastLoop = loop;
+      const target = SPARKLE_AT * HOP_MS;
+      const wait =
+        t < 0
+          ? -t + target
+          : (() => {
+              const into = t % HOP_MS;
+              return into < target ? target - into : HOP_MS - into + target;
+            })();
+      timer = window.setTimeout(() => {
+        if (!visible) return;
         mascotHandle.current?.sparkle(16);
-      }
+        timer = window.setTimeout(scheduleSparkle, 200);
+      }, Math.max(16, wait));
     };
     const io = new IntersectionObserver(([entry]) => {
-      if (entry?.isIntersecting) {
+      visible = entry?.isIntersecting ?? false;
+      window.clearTimeout(timer);
+      if (visible) {
         anim.play();
-        if (!raf) raf = requestAnimationFrame(watch);
+        scheduleSparkle();
       } else {
         anim.pause();
-        cancelAnimationFrame(raf);
-        raf = 0;
       }
     });
     io.observe(el);
     return () => {
+      visible = false;
       io.disconnect();
-      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
       anim.cancel();
     };
   }, []);
@@ -75,10 +83,7 @@ export function Opening() {
   return (
     <section className={o.hero} data-tone="light" data-tone-follow="" data-bg="#ffffff" aria-labelledby="hero-title">
       <div className={o.aurora}>
-        <AuroraField className={o.auroraCanvas} />
-      </div>
-      <div className={o.darkAurora}>
-        <AuroraField className={o.auroraCanvas} dark />
+        <AuroraField className={o.auroraCanvas} followScene />
       </div>
 
       <div ref={mascotRef} className={o.mascot} aria-hidden="true">

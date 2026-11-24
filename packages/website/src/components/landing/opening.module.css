@@ -11,32 +11,37 @@
   overflow: hidden;
 }
 
-.aurora,
-.darkAurora {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1);
+/* One canvas draws both the light and the dark aurora (the shader eases uDark on scene
+   change); the fade-out edge eases between the two looks' masks on the same curve. */
+@property --aurora-solid {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+
+@property --aurora-clear {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 97%;
 }
 
 .aurora {
+  --aurora-solid: 50%;
+  --aurora-clear: 97%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   animation: fadeIn 1600ms ease both;
-  -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 97%);
-  mask-image: linear-gradient(to bottom, #000 50%, transparent 97%);
-}
-
-.darkAurora {
-  opacity: 0;
-  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
-  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 var(--aurora-solid), transparent var(--aurora-clear));
+  mask-image: linear-gradient(to bottom, #000 var(--aurora-solid), transparent var(--aurora-clear));
+  transition:
+    --aurora-solid 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    --aurora-clear 900ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 :global([data-scene="dark"]) .aurora {
-  opacity: 0;
-}
-
-:global([data-scene="dark"]) .darkAurora {
-  opacity: 1;
+  --aurora-solid: 55%;
+  --aurora-clear: 100%;
 }
 
 .auroraCanvas {
@@ -112,7 +117,7 @@
 
 .titleLine {
   display: block;
-  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) both;
+  animation: titleRise 1100ms cubic-bezier(0.2, 1, 0.3, 1) both;
 }
 
 .titleLine + .titleLine {
@@ -161,6 +166,13 @@
 
 :global([data-scene="dark"]) .free {
   color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes titleRise {
+  from {
+    opacity: 0.02;
+    transform: translateY(40px);
+  }
 }
 
 @keyframes rise {
@@ -222,6 +234,8 @@
   .cta {
     flex-wrap: wrap;
     row-gap: 14px;
+    min-height: 142px;
+    align-content: flex-start;
   }
 }
 

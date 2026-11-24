@@ -93,8 +93,10 @@ export function ThemeGradient({
   className,
   style,
   on,
+  defer = false,
 }: {
   on?: boolean;
+  defer?: boolean;
   theme: WindowThemeKey;
   width?: number;
   height?: number;
@@ -106,12 +108,33 @@ export function ThemeGradient({
 
   useEffect(() => {
     const canvas = ref.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx || !gradient) return;
-    const image = ctx.createImageData(width, height);
-    renderGradientPixels(image.data, width, height, gradient.bg, gradient.blobs);
-    ctx.putImageData(image, 0, 0);
-  }, [gradient, width, height]);
+    if (!canvas || !gradient) return;
+    let cancelled = false;
+    const paint = () => {
+      if (cancelled) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const image = ctx.createImageData(width, height);
+      renderGradientPixels(image.data, width, height, gradient.bg, gradient.blobs);
+      ctx.putImageData(image, 0, 0);
+    };
+    if (!defer) {
+      paint();
+      return;
+    }
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(paint, { timeout: 1200 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(id);
+      };
+    }
+    const id = window.setTimeout(paint, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [gradient, width, height, defer]);
 
   if (!gradient) return null;
   return (

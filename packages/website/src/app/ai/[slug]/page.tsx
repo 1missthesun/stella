@@ -20,6 +20,7 @@ import {
 import { getSiteUrl } from "@/lib/site-url";
 import a from "./answer.module.css";
 import { ChangeCardDemo } from "./change-card-demo";
+import { ModelAnswerPage } from "./model-page";
 
 export const dynamicParams = false;
 
@@ -170,6 +171,10 @@ export default async function AnswerPage({
       <Backdrop />
       <LandingHeader />
       <main>
+        {page.demo ? (
+          <ModelAnswerPage page={page} />
+        ) : (
+          <>
         <section className={a.hero} data-tone="light" data-bg="#ffffff" aria-labelledby="answer-title">
           <nav className={a.crumbs} aria-label="Breadcrumb">
             <Link href="/ai">Stella answers</Link>
@@ -241,6 +246,8 @@ export default async function AnswerPage({
             </div>
           ))}
         </nav>
+          </>
+        )}
 
         <Finale />
       </main>

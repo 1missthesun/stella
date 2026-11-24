@@ -147,7 +147,7 @@ export function DownloadOptions() {
       <section id="get" className={`${pg.hero} ${pg.center} ${d.hero}`} data-tone="light" data-bg="#ffffff">
         <p className={pg.eyebrow}>Download</p>
         <h1 className={pg.title}>Get Stella.</h1>
-        <p className={pg.lede}>The easy way to use ChatGPT or Claude on your computer. Free with the plan you already have.</p>
+        <p className={pg.lede}>The easy way to use ChatGPT, Claude or Gemini on your computer. Free with the plan you already have.</p>
         <div className={pg.cta}>
           <DownloadButton />
         </div>

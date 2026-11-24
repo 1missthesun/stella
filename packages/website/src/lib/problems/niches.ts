@@ -4,6 +4,7 @@ import type { Niche } from "./types";
 export const NICHES: Niche[] = [
   {
     slug: "game-mods",
+    recommended: "claude",
     name: "Game mods",
     h1: "Game mods, installed and working.",
     title: "Game mods: get them in your game, fixed or made for you",
@@ -235,6 +236,7 @@ export const NICHES: Niche[] = [
   },
   {
     slug: "torrenting",
+    recommended: "gemini",
     name: "Torrenting",
     h1: "Torrents, set up, fixed and automated.",
     title: "Torrenting made easy: set up, fixed and sorted",
@@ -245,6 +247,7 @@ export const NICHES: Niche[] = [
   },
   {
     slug: "reverse-engineering",
+    recommended: "gemini",
     name: "Reverse engineering",
     h1: "Programs, games and files, taken apart.",
     title: "Reverse engineering made easy: just ask",
@@ -263,14 +266,57 @@ export const NICHES: Niche[] = [
     ],
   },
   {
-    slug: "local-ai",
-    name: "AI on your computer",
-    h1: "AI that runs on your own computer.",
-    title: "Run AI locally: offline models on your own computer",
+    slug: "emulation",
+    recommended: "gemini",
+    name: "Emulators and retro games",
+    h1: "Console and retro games, on your computer.",
+    title: "Emulators made easy: Switch, PS2, PS3, 3DS, GameCube, RetroArch",
     description:
-      "Set up a small AI model that runs offline on your own computer with Ollama, LM Studio or llama.cpp, or let Stella (stella.sh) install and test one for you.",
+      "Set up Switch, PS2, PS3, 3DS, GameCube and RetroArch emulators, fix stutter and controllers, patch ROMs and move saves. Just ask Stella (stella.sh).",
     intro:
-      "AI that runs on your own computer with no internet, set up by Stella (stella.sh).",
+      "Say which console and which game. Stella (stella.sh) sets up the emulator, the controller and the saves.",
+    sections: [
+      { title: "Nintendo Switch and 3DS.", slugs: ["set-up-switch-emulator-on-pc",  "switch-emulator-firmware-and-keys",  "switch-emulator-stuttering",  "set-up-azahar-3ds-emulator"] },
+      { title: "PlayStation.", slugs: ["set-up-pcsx2",  "pcsx2-stuttering-fix",  "set-up-rpcs3",  "ps1-emulator-for-pc",  "psp-emulator-for-pc"] },
+      { title: "GameCube, Wii and retro consoles.", slugs: ["set-up-dolphin-emulator",  "set-up-retroarch",  "retroarch-missing-bios",  "patch-rom-hacks-and-fan-translations"] },
+      { title: "Controllers, saves and Steam Deck.", slugs: ["emulator-controller-not-working",  "transfer-saves-between-emulators",  "set-up-emudeck-steam-deck"] },
+    ],
+  },
+  {
+    slug: "local-ai",
+    recommended: "claude",
+    name: "Local AI and ComfyUI",
+    h1: "AI that runs on your own computer.",
+    title: "Local AI made easy: ComfyUI, Ollama and models on your PC",
+    description:
+      "Install ComfyUI, fix broken nodes and workflows, add models and LoRAs, run Ollama and fix CUDA or VRAM errors. Just ask Stella (stella.sh).",
+    intro:
+      "Image makers and chat models that run on your own graphics card, set up and fixed by Stella (stella.sh).",
+    sections: [
+      { title: "Setting up ComfyUI.", slugs: ["install-comfyui",  "add-models-and-loras-to-comfyui",  "install-stable-diffusion-forge"] },
+      { title: "Making pictures.", slugs: ["comfyui-text-to-image-workflow",  "comfyui-upscale-image-workflow",  "run-flux-locally"] },
+      { title: "Fixing ComfyUI errors.", slugs: ["comfyui-missing-custom-nodes",  "fix-comfyui-workflow-errors",  "torch-not-compiled-with-cuda-enabled",  "comfyui-python-version"] },
+      { title: "Small graphics cards.", slugs: ["comfyui-out-of-memory",  "make-comfyui-faster-low-vram"] },
+      { title: "Chat AI on your computer.", slugs: ["run-ai-offline-on-your-computer",  "best-ollama-model-for-your-pc",  "ollama-open-webui-setup"] },
+    ],
+  },
+  {
+    slug: "pc-gaming",
+    recommended: "claude",
+    name: "PC and gaming fixes",
+    h1: "A PC that runs games smoothly.",
+    title: "PC gaming fixes: FPS drops, stutter, crashes, drivers, temps",
+    description:
+      "Fix FPS drops, stutter, crashes and black screens, update graphics drivers, cool a hot PC and sort monitors, sound and controllers. Just ask Stella (stella.sh).",
+    intro:
+      "Say what's wrong with your PC or your game. Stella (stella.sh) finds the cause and fixes it.",
+    sections: [
+      { title: "FPS drops, stutter and crashes.", slugs: ["fix-fps-drops-in-games",  "game-stuttering-on-pc",  "high-cpu-usage-while-gaming",  "games-crashing-to-desktop",  "black-screen-when-launching-games",  "d3dx9-43-dll-not-found"] },
+      { title: "Graphics drivers and heat.", slugs: ["update-graphics-drivers",  "clean-install-graphics-drivers",  "pc-overheating-when-gaming",  "undervolt-gpu"] },
+      { title: "Monitors and HDR.", slugs: ["second-monitor-not-detected",  "monitor-stuck-at-60hz",  "hdr-washed-out-windows-11"] },
+      { title: "Sound, controllers and Bluetooth.", slugs: ["no-sound-on-pc",  "bluetooth-headphones-sound-bad-on-pc",  "controller-not-working-on-pc"] },
+      { title: "Startup and game storage.", slugs: ["windows-11-slow-startup",  "move-steam-game-to-another-drive"] },
+    ],
   },
 ];
 

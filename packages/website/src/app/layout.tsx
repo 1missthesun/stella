@@ -13,7 +13,7 @@ import "./globals.css";
 
 const siteUrl = getSiteUrl();
 const description =
-  "Stella is a personal AI assistant that uses your computer, browses the web, works with your files and makes images and video, all from one chat. For Mac, Windows, Linux, iPhone, Android and the web. Free with the ChatGPT or Claude plan you already have. Open source.";
+  "Stella is a personal AI assistant that uses your computer, browses the web, works with your files and makes images and video, all from one chat. For Mac, Windows, Linux, iPhone, Android and the web. Free with the ChatGPT, Claude or Gemini plan you already have. Open source.";
 const sans = Manrope({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -152,7 +152,7 @@ const jsonLd = {
         "Several tasks at once, on your computer or in the cloud (paid plans)",
         "Image, video, music and 3D generation (paid plans)",
         "Dictation and “Hey Stella” wake word",
-        "Runs on the ChatGPT or Claude plan you already have (Claude through Claude Code), your own API keys, local models or Stella's models",
+        "Runs on the ChatGPT, Claude or Gemini plan you already have (Claude through Claude Code, Gemini on a Google AI plan), your own API keys, local models or Stella's models",
         "Changes itself on request: rewrites any part of its own app, with preview and undo",
         "Open source under MIT",
       ],

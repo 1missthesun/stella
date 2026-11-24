@@ -85,4 +85,6 @@ export type Niche = {
    * slugs in this niche; published pages not listed land in a final "More" group.
    */
   sections?: { title: string; slugs: string[] }[];
+  /** The plan we'd pick for this topic, marked in the quiet model line under the hero. */
+  recommended?: "claude" | "gemini" | "chatgpt";
 };

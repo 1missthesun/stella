@@ -37,7 +37,7 @@ const INCLUDED_ICONS: Record<(typeof INCLUDED_IN_EVERY_PLAN)[number], LucideIcon
   "Desktop, web and mobile apps": MonitorSmartphone,
   "Change Stella by asking it": Wand2,
   "Work with your files and apps": FolderOpen,
-  "Use your own Claude or ChatGPT subscription": Bot,
+  "Use your own Claude, ChatGPT or Gemini plan": Bot,
   "Bring your own models and keys": KeyRound,
   "Top up with extra credit anytime": Plus,
 };
@@ -53,7 +53,7 @@ const QUESTIONS = [
   },
   {
     q: "Do my own models count against it?",
-    a: "No. When Stella runs on your own Claude or ChatGPT subscription, your API keys, or a local model, those runs don't touch your budget.",
+    a: "No. When Stella runs on your own Claude, ChatGPT or Gemini plan, your API keys, or a local model, those runs don't touch your budget.",
   },
   {
     q: "Can I change or cancel?",
@@ -78,7 +78,7 @@ export default function Pricing() {
               <article key={id} className={pr.col} data-featured={featured ? "1" : "0"} style={{ ["--i" as string]: i }}>
                 <p className={pr.flag}>{featured ? "Recommended" : "\u00a0"}</p>
                 <h2 className={pr.name}>{plan.label}</h2>
-                <p className={pr.tagline}>{id === "free" ? "On the ChatGPT or Claude plan you already have" : plan.tagline}</p>
+                <p className={pr.tagline}>{id === "free" ? "On the ChatGPT, Claude or Gemini plan you already have" : plan.tagline}</p>
                 <p className={pr.price}>
                   <span className={pr.amount}>{formatPlanPrice(plan.monthlyPriceCents)}</span>
                   <span className={pr.period}>{plan.interval ? "per month" : "No card needed"}</span>

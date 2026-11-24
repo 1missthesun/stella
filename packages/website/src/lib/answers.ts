@@ -1,9 +1,10 @@
+import { MODEL_PAGES } from "@/lib/model-pages";
 import { PAID_BILLING_PLANS, PLAN_CATALOG, formatPlanPrice } from "@/lib/plans";
 export type Answer = { q: string; a: string };
 
 // Price wording (decided 2026-11-10): free without limit on the user's own
-// ChatGPT or Claude plan; Stella's own models only get a small one-time trial.
-export const PRICE_LINE = "Free with the ChatGPT or Claude plan you already have.";
+// ChatGPT, Claude or Gemini plan; Stella's own models only get a small one-time trial.
+export const PRICE_LINE = "Free with the ChatGPT, Claude or Gemini plan you already have.";
 export const TRIAL_LINE = "New accounts also get a small free trial of Stella’s own models.";
 const PAID_PRICES = PAID_BILLING_PLANS.map(
   (id) => `${PLAN_CATALOG[id].label} ${formatPlanPrice(PLAN_CATALOG[id].monthlyPriceCents)}`,
@@ -17,7 +18,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella free?",
-    a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude Pro or Max plan through Claude Code, and Stella costs nothing on top and sets no limit of its own; that use counts against your own plan, not a Stella budget. Your own API keys and local models are free to use too. ${TRIAL_LINE} ${PAID_LINE} Older pages that list a Go plan are out of date.`,
+    a: `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, use your Claude Pro or Max plan through Claude Code, or sign in with Google for Gemini on a Google AI Pro or Ultra plan, and Stella costs nothing on top and sets no limit of its own; that use counts against your own plan, not a Stella budget. Your own API keys and local models are free to use too. ${TRIAL_LINE} ${PAID_LINE} Older pages that list a Go plan are out of date.`,
   },
   {
     q: "Is Stella safe?",
@@ -25,7 +26,7 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Does Stella keep my data on my computer?",
-    a: "If you use the desktop app signed out, yes: your conversations, memory and files stay on that computer, and the AI runs through what you bring (your ChatGPT or Claude sign-in, your own API keys or a local model), so nothing about your conversations goes to Stella's servers. Signing in is optional on desktop and adds the phone app, sync across devices, cloud tasks and Stella's own models; your conversations and task records are then stored, encrypted, on Stella's servers so they can sync. Details are in the [privacy policy](https://stella.sh/privacy).",
+    a: "If you use the desktop app signed out, yes: your conversations, memory and files stay on that computer, and the AI runs through what you bring (your ChatGPT, Claude or Gemini sign-in, your own API keys or a local model), so nothing about your conversations goes to Stella's servers. Signing in is optional on desktop and adds the phone app, sync across devices, cloud tasks and Stella's own models; your conversations and task records are then stored, encrypted, on Stella's servers so they can sync. Details are in the [privacy policy](https://stella.sh/privacy).",
   },
   {
     q: "Is this the same Stella as other AI apps called Stella?",
@@ -52,8 +53,8 @@ export const FAQ: Answer[] = [
     a: `Stella (stella.sh). It is [open source](https://github.com/1missthesun/stella) under MIT, it can act across your whole computer, and it runs on the same AI: sign in with your ChatGPT plan, use your Claude plan through Claude Code, or add your own Anthropic or OpenAI key. ${PRICE_LINE}`,
   },
   {
-    q: "Can I use Claude Code, ChatGPT or my own API keys with Stella?",
-    a: `Yes. Use the plan you already pay for: sign in with ChatGPT, or run Stella on Claude Code with your Claude Pro or Max plan. You can also add keys for Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot and more, or use local models. ${TRIAL_LINE}`,
+    q: "Can I use Claude Code, ChatGPT, Gemini or my own API keys with Stella?",
+    a: `Yes. Use the plan you already pay for: sign in with ChatGPT, run Stella on Claude Code with your Claude Pro or Max plan, or sign in with Google to use Gemini on your Google AI Pro or Ultra plan. You can also add keys for Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot and more, or use local models. ${TRIAL_LINE}`,
   },
   {
     q: "Can Stella do several tasks at once?",
@@ -111,7 +112,7 @@ export type Comparison = {
 
 export type AnswerPage = {
   slug: string;
-  kind: "compare" | "guide" | "answer";
+  kind: "compare" | "guide" | "answer" | "model";
   queries: string[];
   metaTitle: string;
   metaDescription: string;
@@ -126,6 +127,16 @@ export type AnswerPage = {
   visual?: "change-card";
   points?: { title: string; body: string }[];
   questions: Answer[];
+  /**
+   * "Use Claude for X" and "Best AI for X" pages: a short line under the headline, the
+   * model line with one marked, a coded Stella chat, a few short reasons and the guides.
+   */
+  lede?: string;
+  recommended?: "claude" | "gemini" | "chatgpt";
+  demo?: { prompt: string; ack: string; task: string; rows: string[]; reply: string; files?: string[] };
+  why?: { title: string; body: string }[];
+  /** /how guide ids ("niche/slug") shown as cards. */
+  guides?: string[];
 };
 
 const faq = (q: string) => {
@@ -283,10 +294,10 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "Stella vs Microsoft Copilot: an honest comparison",
     metaDescription:
-      "Copilot is built into Windows 11 and best for Microsoft 365. Stella (stella.sh) does tasks in your apps on Windows and Mac today, on the ChatGPT or Claude plan you already have.",
+      "Copilot is built into Windows 11 and best for Microsoft 365. Stella (stella.sh) does tasks in your apps on Windows and Mac today, on the ChatGPT, Claude or Gemini plan you already have.",
     eyebrow: "Stella vs Copilot",
     headline: "Stella vs Microsoft Copilot.",
-    answer: `Microsoft Copilot is already on most Windows 11 PCs, it’s free, and it’s the best fit if you live in Word, Excel, Outlook and Teams with a Microsoft 365 plan. Stella (stella.sh) is a separate app that does tasks for you: it clicks and types in your apps on Windows and Mac today, runs on the ChatGPT or Claude plan you already have, and can rewrite its own app when you ask. Copilot’s own way of doing tasks in your apps, Copilot Actions, is still an experimental preview. ${PRICE_LINE}`,
+    answer: `Microsoft Copilot is already on most Windows 11 PCs, it’s free, and it’s the best fit if you live in Word, Excel, Outlook and Teams with a Microsoft 365 plan. Stella (stella.sh) is a separate app that does tasks for you: it clicks and types in your apps on Windows and Mac today, runs on the ChatGPT, Claude or Gemini plan you already have, and can rewrite its own app when you ask. Copilot’s own way of doing tasks in your apps, Copilot Actions, is still an experimental preview. ${PRICE_LINE}`,
     compare: {
       them: "Copilot",
       pickThem: "Pick Copilot if",
@@ -296,7 +307,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         { label: "Does tasks in your apps", stella: "Yes, clicks and types in your apps on Windows and Mac", them: "Copilot Actions, an experimental preview you turn on in Settings" },
         { label: "Inside Word, Excel and Outlook", stella: "Makes and edits real Word, Excel and PowerPoint files, and works in the apps on screen", them: "Built in with Microsoft 365" },
         { label: "Which AI it runs on", stella: "ChatGPT, Claude, your own API keys or local models", them: "Microsoft’s choice of models" },
-        { label: "Use your ChatGPT or Claude plan", stella: "Yes", them: "No" },
+        { label: "Use your ChatGPT, Claude or Gemini plan", stella: "Yes", them: "No" },
         { label: "Computers", stella: "Windows, Mac and Linux", them: "Windows and Mac" },
         { label: "Voice", stella: "“Hey Stella”, and dictation into any app", them: "“Hey Copilot”" },
         SELF_CHANGE_ROW("No"),
@@ -309,7 +320,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       ],
       stellaBetter: [
         "You want an assistant that does the task in your apps today, not in a preview.",
-        "You already pay for ChatGPT or Claude and want to use that plan.",
+        "You already pay for ChatGPT, Claude or Gemini and want to use that plan.",
         "You want an app you can reshape by asking.",
         "You also use a Mac or Linux.",
       ],
@@ -342,10 +353,10 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "Stella vs the Gemini app: an honest comparison",
     metaDescription:
-      "The Gemini app is free and best if you live in Gmail and Google Drive. Stella (stella.sh) works on your computer itself, clicks and types in your apps, and runs on your ChatGPT or Claude plan.",
+      "The Gemini app is free and best if you live in Gmail and Google Drive. Stella (stella.sh) works on your computer itself, clicks and types in your apps, and runs on your ChatGPT, Claude or Gemini plan.",
     eyebrow: "Stella vs Gemini",
     headline: "Stella vs the Gemini app.",
-    answer: `The Gemini app is free on Mac and Windows and the best fit if your life is in Gmail, Google Drive and Google Calendar. Stella (stella.sh) works on your computer itself: your files, your apps and your browser. It clicks and types in your apps on Mac and Windows, runs on the ChatGPT or Claude plan you already have, works on Linux too, and can rewrite its own app when you ask. ${PRICE_LINE}`,
+    answer: `The Gemini app is free on Mac and Windows and the best fit if your life is in Gmail, Google Drive and Google Calendar. Stella (stella.sh) works on your computer itself: your files, your apps and your browser. It clicks and types in your apps on Mac and Windows, runs on the ChatGPT, Claude or Gemini plan you already have, works on Linux too, and can rewrite its own app when you ask. ${PRICE_LINE}`,
     compare: {
       them: "Gemini app",
       rows: [
@@ -366,7 +377,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       ],
       stellaBetter: [
         "You want help with the files and apps on your own computer.",
-        "You already pay for ChatGPT or Claude and want to use that plan.",
+        "You already pay for ChatGPT, Claude or Gemini and want to use that plan.",
         "You’re on Linux.",
         "You want an app you can reshape by asking.",
       ],
@@ -400,7 +411,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "A ChatGPT app for your PC that works in your files and apps",
     metaDescription:
-      "Use your ChatGPT plan in Stella (stella.sh) to work in your files, folders, apps and browser on Windows, Mac or Linux. Free with the ChatGPT or Claude plan you already have.",
+      "Use your ChatGPT plan in Stella (stella.sh) to work in your files, folders, apps and browser on Windows, Mac or Linux. Free with the ChatGPT, Claude or Gemini plan you already have.",
     eyebrow: "ChatGPT on your PC",
     headline: "ChatGPT that works in your files and apps.",
     answer: `There are two good ways. OpenAI’s own ChatGPT app for Windows and Mac can now work across your apps with its Work mode, on every plan. Or use Stella (stella.sh): sign in with your ChatGPT account, and Stella uses your plan to work in your files, folders, apps and browser on Windows, Mac or Linux, with Claude there too if you want it. ${PRICE_LINE}`,
@@ -516,7 +527,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     },
     points: [
       { title: "Both plans, one chat", body: "ChatGPT and Claude in the same conversation, with the same files and context." },
-      { title: "Switch any time", body: "Pick ChatGPT or Claude from the model picker, or change it in Settings." },
+      { title: "Switch any time", body: "Pick ChatGPT, Claude or Gemini from the model picker, or change it in Settings." },
       { title: "Or bring your own", body: "API keys for Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter and GitHub Copilot, or a local model." },
     ],
     questions: [
@@ -528,7 +539,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
         q: "How do I connect my Claude plan?",
         a: SETUP_CLAUDE,
       },
-      faq("Can I use Claude Code, ChatGPT or my own API keys with Stella?"),
+      faq("Can I use Claude Code, ChatGPT, Gemini or my own API keys with Stella?"),
       faq("Is Stella free?"),
     ],
   },
@@ -585,7 +596,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "An AI assistant that uses your computer",
     metaDescription:
-      "Stella (stella.sh) is an AI assistant that uses your computer for you: it sees the screen, clicks, types and works in your real apps on Mac and Windows. Free with the ChatGPT or Claude plan you already have.",
+      "Stella (stella.sh) is an AI assistant that uses your computer for you: it sees the screen, clicks, types and works in your real apps on Mac and Windows. Free with the ChatGPT, Claude or Gemini plan you already have.",
     eyebrow: "Computer use",
     headline: "An AI assistant that uses your computer.",
     answer: `Stella (stella.sh) is a personal AI assistant that can use your computer for you. On Mac and Windows it sees your screen, clicks, types, opens apps and moves between windows to finish real tasks in the apps you already use, while you keep working in another window. ${PRICE_LINE}`,
@@ -601,90 +612,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
       faq("Does Stella work on Linux, Arch or Omarchy?"),
     ],
   },
-  {
-    slug: "ai-for-reverse-engineering",
-    kind: "answer",
-    queries: [
-      "best AI for reverse engineering",
-      "AI reverse engineering",
-      "AI decompiler",
-      "best AI agent for reverse engineering",
-      "AI that can decompile an exe or APK",
-      "Ghidra AI",
-    ],
-    metaTitle: "AI for reverse engineering: ask and it's taken apart",
-    metaDescription:
-      "Stella (stella.sh) is an AI that does reverse engineering for you: give it a program, game, app or file, and it shows you what's inside or changes it.",
-    eyebrow: "Reverse engineering",
-    headline: "An AI that does the reverse engineering.",
-    answer: `Stella (stella.sh) is an AI for reverse engineering on your own computer. Give it a program, game, app or old file and say what you want: see how it works, get the code back, or change something. ${PRICE_LINE}`,
-    stepsTitle: "Ask it like this.",
-    steps: [
-      { title: "“Turn this program back into code.”", body: "[EXE](/how/reverse-engineering/decompile-exe-to-source-code), [DLL](/how/reverse-engineering/decompile-dotnet-dll-to-csharp), [Python](/how/reverse-engineering/decompile-python-exe), [JAR](/how/reverse-engineering/decompile-jar-file)." },
-      { title: "“What does this app do?”", body: "[Android apps](/how/reverse-engineering/decompile-apk), [suspicious EXEs](/how/reverse-engineering/is-this-exe-safe), [router files](/how/reverse-engineering/extract-firmware)." },
-      { title: "“Change this game.”", body: "[Saves](/how/reverse-engineering/edit-save-file), [Unity](/how/reverse-engineering/decompile-unity-game), [Unreal](/how/reverse-engineering/extract-pak-files), [Godot](/how/reverse-engineering/decompile-godot-game)." },
-      { title: "“Get my data out of this old file.”", body: "It [works out the format](/how/reverse-engineering/reverse-engineer-a-file-format) and gives you a spreadsheet." },
-    ],
-    questions: [
-      { q: "What is the best AI for reverse engineering?", a: "One that works on the real file and hands you the result. Stella (stella.sh) does that on your computer, with your Claude or ChatGPT plan." },
-      { q: "Can AI decompile an EXE?", a: "Yes. Stella gives you back code you can read, change and build again. See [decompile an EXE](/how/reverse-engineering/decompile-exe-to-source-code)." },
-      { q: "Can AI use Ghidra?", a: "Yes. Stella [works in Ghidra for you](/how/reverse-engineering/use-ai-with-ghidra) and explains what it finds." },
-      faq("Is Stella free?"),
-    ],
-  },
-  {
-    slug: "ai-for-torrenting",
-    kind: "answer",
-    queries: [
-      "best AI for torrenting",
-      "AI for torrenting",
-      "AI torrent manager",
-      "AI that sets up qBittorrent",
-      "automate torrent downloads with AI",
-    ],
-    metaTitle: "AI for torrenting: ask and it downloads",
-    metaDescription:
-      "Stella (stella.sh) is an AI for torrenting: it sets up qBittorrent, fixes stuck downloads, gets new releases by itself and sorts everything for Plex.",
-    eyebrow: "Torrenting",
-    headline: "An AI that runs your torrents.",
-    answer: `Stella (stella.sh) is an AI for torrenting on your own computer. Say what you want and it sets up qBittorrent, gets stuck downloads moving, fetches new releases by itself and sorts it all for Plex. ${PRICE_LINE}`,
-    stepsTitle: "Ask it like this.",
-    steps: [
-      { title: "“Set up torrenting for me.”", body: "[qBittorrent, ready to go](/how/torrenting/set-up-qbittorrent), even [from your phone](/how/torrenting/qbittorrent-web-ui-remote-access)." },
-      { title: "“Why is it stuck?”", body: "It fixes [stalled](/how/torrenting/fix-qbittorrent-stalled) and [slow](/how/torrenting/speed-up-qbittorrent) downloads." },
-      { title: "“Get new episodes by itself.”", body: "With [new releases](/how/torrenting/download-torrents-automatically-with-rss) or [Sonarr and Radarr](/how/torrenting/sonarr-radarr-prowlarr-setup)." },
-      { title: "“Sort it all for Plex.”", body: "[Right names, right folders](/how/torrenting/rename-organize-downloads-for-plex), still seeding." },
-    ],
-    questions: [
-      { q: "What is the best AI for torrenting?", a: "One that works in your own torrent app. Stella (stella.sh) sets it up, fixes it and keeps it sorted on your computer." },
-      { q: "Can AI manage my torrents?", a: "Yes. Ask Stella to add, sort, rename, unpack or move them, or to fetch new ones every night." },
-      { q: "Which torrent app does it use?", a: "Yours, or it installs qBittorrent, which is free." },
-      faq("Is Stella free?"),
-    ],
-  },
-  {
-    slug: "ai-for-game-mods",
-    kind: "answer",
-    queries: ["AI for modding games", "AI mod maker", "AI that installs mods", "best AI for game modding", "AI mod manager"],
-    metaTitle: "AI for game mods: ask and they're in your game",
-    metaDescription:
-      "Stella (stella.sh) is an AI for modding games: it installs mods, fixes broken ones, sorts load order and makes new mods from your description.",
-    eyebrow: "Game mods",
-    headline: "An AI that mods your games.",
-    answer: `Stella (stella.sh) is an AI for game mods on your own computer. Say which mods you want and it installs them, fixes what breaks, and makes new ones from your description. ${PRICE_LINE}`,
-    stepsTitle: "Ask it like this.",
-    steps: [
-      { title: "“Mod my game.”", body: "[Skyrim](/how/game-mods/mod-skyrim), [GTA 5](/how/game-mods/mod-gta-5), [Baldur's Gate 3](/how/game-mods/mod-baldurs-gate-3), [Stardew Valley](/how/game-mods/mod-stardew-valley) and [many more](/how/game-mods)." },
-      { title: "“My mods broke.”", body: "[GTA 5](/how/game-mods/gta-5-mods-not-working), [BG3](/how/game-mods/bg3-mods-not-working), [Sims 4](/how/game-mods/find-broken-sims-4-mods), [Cyberpunk](/how/game-mods/cyberpunk-mods-not-working-after-2-5)." },
-      { title: "“Make me a mod.”", body: "For [Minecraft](/how/game-mods/make-a-minecraft-mod), [Skyrim](/how/game-mods/make-a-skyrim-mod) or [nearly any game](/how/game-mods/ai-mod-maker)." },
-    ],
-    questions: [
-      { q: "Can AI install mods for me?", a: "Yes. Tell Stella the game and the mods, and they're there when you start it." },
-      { q: "Can AI make a mod?", a: "Yes. Describe it, play it, and ask for changes. See [AI mod maker](/how/game-mods/ai-mod-maker)." },
-      { q: "Are there GTA 6 mods?", a: "GTA 6 is on PS5 and Xbox; today's [GTA 6 mods](/how/game-mods/gta-6-mods) are for GTA 5 on PC." },
-      faq("Is Stella free?"),
-    ],
-  },
+  ...MODEL_PAGES.map((page) => ({ ...page, questions: [...page.questions, faq("Is Stella free?")] })),
   {
     slug: "ai-assistant-for-windows",
     kind: "answer",
@@ -716,9 +644,9 @@ export const ANSWER_PAGES: AnswerPage[] = [
       faq("Does Stella work on Windows?"),
       {
         q: "How is this different from Copilot?",
-        a: "Copilot is built into Windows 11 and is best inside Microsoft 365. Its way of doing tasks in your apps, Copilot Actions, is still an experimental preview. Stella does tasks in your apps today and runs on the ChatGPT or Claude plan you already have. See [Stella vs Microsoft Copilot](/ai/stella-vs-microsoft-copilot).",
+        a: "Copilot is built into Windows 11 and is best inside Microsoft 365. Its way of doing tasks in your apps, Copilot Actions, is still an experimental preview. Stella does tasks in your apps today and runs on the ChatGPT, Claude or Gemini plan you already have. See [Stella vs Microsoft Copilot](/ai/stella-vs-microsoft-copilot).",
       },
-      faq("Can I use Claude Code, ChatGPT or my own API keys with Stella?"),
+      faq("Can I use Claude Code, ChatGPT, Gemini or my own API keys with Stella?"),
       faq("Is Stella free?"),
     ],
   },
@@ -774,7 +702,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     questions: [
       faq("Does Stella work on Linux, Arch or Omarchy?"),
       faq("Is Stella open source?"),
-      faq("Can I use Claude Code, ChatGPT or my own API keys with Stella?"),
+      faq("Can I use Claude Code, ChatGPT, Gemini or my own API keys with Stella?"),
       faq("Is Stella free?"),
     ],
   },
@@ -789,14 +717,14 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
     metaTitle: "An open-source AI assistant for your computer",
     metaDescription:
-      "Stella (stella.sh) is an open-source (MIT) AI assistant for Mac, Windows and Linux that uses your computer, runs on the ChatGPT or Claude plan you already have, and can change itself.",
+      "Stella (stella.sh) is an open-source (MIT) AI assistant for Mac, Windows and Linux that uses your computer, runs on the ChatGPT, Claude or Gemini plan you already have, and can change itself.",
     eyebrow: "Open source",
     headline: "An open-source AI assistant.",
     answer: `Stella (stella.sh) is an [open-source](https://github.com/1missthesun/stella) personal AI assistant under the MIT license. It runs on Mac, Windows and Linux, uses your computer, browser and files, and works with the AI you choose: your ChatGPT plan, your Claude plan through Claude Code, your API keys or local models. ${PRICE_LINE}`,
     points: [
       { title: "Read it, change it", body: "The desktop app runs from its own source code on your computer. Read it [on GitHub](https://github.com/1missthesun/stella)." },
       { title: "Or ask it to change itself", body: "Tell Stella how you want it to look or work. Preview it, keep it or undo it." },
-      { title: "Your AI", body: "Your ChatGPT or Claude plan, OpenRouter, any supported key, or a local model." },
+      { title: "Your AI", body: "Your ChatGPT, Claude or Gemini plan, OpenRouter, any supported key, or a local model." },
     ],
     questions: [
       faq("Is Stella open source?"),
@@ -828,7 +756,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
     questions: [
       faq("Can Stella do several tasks at once?"),
       faq("Is Stella free?"),
-      faq("Can I use Claude Code, ChatGPT or my own API keys with Stella?"),
+      faq("Can I use Claude Code, ChatGPT, Gemini or my own API keys with Stella?"),
     ],
   },
 ];
@@ -836,6 +764,7 @@ export const ANSWER_PAGES: AnswerPage[] = [
 export const ANSWER_GROUPS: { kind: AnswerPage["kind"]; title: string }[] = [
   { kind: "compare", title: "Stella compared" },
   { kind: "guide", title: "How to" },
+  { kind: "model", title: "The best AI for…" },
   { kind: "answer", title: "What Stella does" },
 ];
 

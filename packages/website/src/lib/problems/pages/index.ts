@@ -3,11 +3,13 @@ import { AUDIO_PAGES } from "./audio";
 import { CHATS_DATA_EXPORTS_PAGES } from "./chats-data-exports";
 import { CONTACTS_CALENDAR_EMAIL_PAGES } from "./contacts-calendar-email";
 import { DOCUMENT_PAGES } from "./documents";
+import { EMULATION_PAGES } from "./emulation";
 import { FILES_FOLDERS_PAGES } from "./files-folders";
 import { GAME_MOD_PAGES } from "./game-mods";
 import { LOCAL_AI_PAGES } from "./local-ai";
 import { MONEY_HOUSEHOLD_PAGES } from "./money-household";
 import { PC_CLEANUP_PAGES } from "./pc-cleanup";
+import { PC_GAMING_PAGES } from "./pc-gaming";
 import { PDF_EXCEL_PAGES } from "./pdf-excel";
 import { READING_WRITING_PAGES } from "./reading-writing";
 import { HOBBIES_PAGES } from "./hobbies";
@@ -29,6 +31,8 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...DOCUMENT_PAGES,
   ...AUDIO_PAGES,
   ...LOCAL_AI_PAGES,
+  ...EMULATION_PAGES,
+  ...PC_GAMING_PAGES,
   ...FILES_FOLDERS_PAGES,
   ...CONTACTS_CALENDAR_EMAIL_PAGES,
   ...STUDY_PAGES,

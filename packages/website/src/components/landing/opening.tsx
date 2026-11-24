@@ -95,7 +95,7 @@ export function Opening() {
           <span className={o.titleLine}>personal</span>
           <span className={o.titleLine}>assistant.</span>
         </h1>
-        <p className={o.sub}>The easy way to use ChatGPT or Claude on your computer.</p>
+        <p className={o.sub}>The easy way to use ChatGPT, Claude or Gemini on your computer.</p>
         <div className={o.cta}>
           <DownloadButton />
           <span className={o.free}>Free with the plan you already have.</span>

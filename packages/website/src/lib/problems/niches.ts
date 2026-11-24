@@ -225,6 +225,35 @@ export const NICHES: Niche[] = [
       "Chord sheets, recipes and family records are small jobs that are easy to get slightly wrong by hand. Each guide gives the manual way, and shows Stella (stella.sh) doing it on real files, with what it changed and what it left alone.",
   },
   {
+    slug: "torrenting",
+    name: "Torrenting",
+    h1: "Torrents, set up, fixed and automated.",
+    title: "Torrenting how-tos: set up, fix and automate qBittorrent",
+    description:
+      "Set up qBittorrent, fix stalled or slow torrents, automate RSS, unpack RARs, name files for Plex, make torrents and move clients, by hand or with Stella (stella.sh).",
+    intro:
+      "Getting a torrent client right is a pile of small settings: ports, queues, folders, rules, scripts. Each guide gives the exact menus and commands, and Stella (stella.sh) doing the whole job on a real computer, checked afterwards.",
+  },
+  {
+    slug: "reverse-engineering",
+    name: "Reverse engineering",
+    h1: "Programs, games and files, taken apart.",
+    title: "Reverse engineering how-tos: decompile, patch, extract",
+    description:
+      "Decompile EXEs, DLLs, APKs, JARs and games, use AI with Ghidra, patch programs, edit saves and unpack firmware, with free tools or Stella (stella.sh) doing it for you.",
+    intro:
+      "Compiled, packed or scrambled files turned into something you can read, change and run again. Each guide gives the free tools and the manual steps, and a recorded run of Stella (stella.sh) doing the whole job, checked afterwards against an answer key.",
+    sections: [
+      {
+        title: "Windows programs.",
+        slugs: ["decompile-exe-to-source-code", "use-ai-with-ghidra", "decompile-dotnet-dll-to-csharp", "decompile-python-exe", "patch-exe-file", "is-this-exe-safe", "extract-files-from-exe-installer"],
+      },
+      { title: "Android, Java and scripts.", slugs: ["decompile-apk", "edit-apk", "decompile-jar-file", "deobfuscate-javascript", "extract-electron-asar", "decompile-lua"] },
+      { title: "Games.", slugs: ["edit-save-file", "extract-unity-game-assets", "decompile-unity-game", "decompile-godot-game", "extract-renpy-rpa", "extract-pak-files"] },
+      { title: "Formats, networks and devices.", slugs: ["reverse-engineer-a-file-format", "reverse-engineer-website-api", "inspect-app-traffic-with-mitmproxy", "extract-firmware"] },
+    ],
+  },
+  {
     slug: "local-ai",
     name: "AI on your computer",
     h1: "AI that runs on your own computer.",

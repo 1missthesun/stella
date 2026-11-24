@@ -287,7 +287,6 @@ const updateOf = (row: UpdateRow | null): AppSourceUpdate | null =>
 const readUpdateRow = (db: OwnerDbReader) =>
   db.one<UpdateRow>("SELECT * FROM app_source_update WHERE id = 1");
 
-/** The row for `version`: a different published version starts over. */
 const updateRowFor = (ctx: OwnerContext, version: string): UpdateRow => {
   const row = readUpdateRow(ctx.db);
   if (row?.version === version) return row;
@@ -309,13 +308,6 @@ const updateResult = (ctx: OwnerContext) => ({ update: updateOf(readUpdateRow(ct
 const limitUpdates = (ctx: OwnerContext, name: string) =>
   enforceOwnerRateLimit(ctx.db, ctx.now, name, { count: 60, windowMs: 60_000 }, "Too many update requests. Please wait a moment.");
 
-/**
- * One computer per account merges a version that needs a model. A claim is
- * granted when nobody holds it, the holder went quiet, or it is the holder
- * asking again (which keeps the claim fresh). A version already merged, or
- * one its preparer gave up on, is never claimed again: that would spend the
- * user's model use a second time.
- */
 const claimUpdate = (ctx: OwnerContext, args: AppSourceCalls["appSource.claimUpdate"]["args"]) => {
   limitUpdates(ctx, "appSource.claimUpdate");
   const row = updateRowFor(ctx, args.version);
@@ -337,7 +329,6 @@ const claimUpdate = (ctx: OwnerContext, args: AppSourceCalls["appSource.claimUpd
   return updateResult(ctx);
 };
 
-/** The first merged result stays: every computer that takes it gets the same version. */
 const updatePrepared = (ctx: OwnerContext, args: AppSourceCalls["appSource.updatePrepared"]["args"]) => {
   limitUpdates(ctx, "appSource.updatePrepared");
   const row = updateRowFor(ctx, args.version);

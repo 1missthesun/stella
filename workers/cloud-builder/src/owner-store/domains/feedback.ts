@@ -75,7 +75,6 @@ const countSince = async (env: Cloudflare.Env, where: string, bind: unknown[], s
 const limited = (message: string): RpcError =>
   new RpcError("RATE_LIMITED", message, { retryable: false });
 
-/** Null for a guest (anonymous) session, whose placeholder email reaches nobody. */
 const readAccount = async (env: Cloudflare.Env, ownerId: string): Promise<Sender | null> => {
   const row = await db(env)
     .prepare('SELECT "name", "email", "isAnonymous" FROM "user" WHERE "id" = ?')
@@ -233,7 +232,6 @@ const submitFeedback = async (ctx: PublicContext, args: FeedbackArgs): Promise<n
   return null;
 };
 
-/** Emails feedback whose first send failed; run from the hourly cron. */
 export const retryFeedbackEmails = async (env: Cloudflare.Env): Promise<void> => {
   if (!env.DB || !feedbackInbox(env)) return;
   const now = Date.now();
@@ -248,7 +246,6 @@ export const retryFeedbackEmails = async (env: Cloudflare.Env): Promise<void> =>
   for (const row of results) await notify(env, row);
 };
 
-/** Account deletion: keeps the message, drops who sent it. */
 export const forgetFeedbackSender = (database: D1Database, ownerId: string): D1PreparedStatement =>
   database
     .prepare("UPDATE feedback SET owner_id = NULL, account_email = NULL, contact = NULL WHERE owner_id = ?")

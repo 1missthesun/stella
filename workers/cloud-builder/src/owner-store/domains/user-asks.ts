@@ -774,8 +774,6 @@ const validateAnswer = (
       }
       continue;
     }
-    // A cloud task's masked field is sealed too, even if marked readable:
-    // what reaches the cloud in plain text is readable by the cloud.
     if (field.sensitive || (isCloudOrigin(ask.originDeviceId) && field.type === "secret")) {
       throw new RpcError(
         "BAD_REQUEST",
@@ -1297,7 +1295,6 @@ const turnRegisterParser = object({
   blocking: optional(boolean()),
   timeoutMs: optional(number({ int: true, min: 0, max: USER_ASK_BLOCKING_TTL_MS })),
   detail: json({ maxBytes: 32 * 1024 }),
-  /** The asking task's own key: a sensitive answer is sealed to it, and only that task's process can open it. */
   recipientKey: optional(recipientKeyParser),
 });
 

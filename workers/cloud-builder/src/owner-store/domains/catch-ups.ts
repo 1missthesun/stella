@@ -469,8 +469,6 @@ const summarizeWithStella = async (
       models: [spec],
     }),
   );
-  // The model now and then answers in prose instead of calling the tool:
-  // take a JSON object it wrote instead, or ask once more.
   for (let attempt = 0; ; attempt += 1) {
     const answer = await models.completeSimple(
       stellaModel(spec, relayBaseUrl),
@@ -495,7 +493,6 @@ const summarizeWithStella = async (
   }
 };
 
-/** A `{done, ongoing, waiting}` object written as text, fenced or not. */
 const jsonObjectIn = (text: string): Record<string, unknown> | null => {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");

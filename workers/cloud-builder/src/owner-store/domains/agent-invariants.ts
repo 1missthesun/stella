@@ -3,36 +3,6 @@ import { agentInputSender, sentByStarter } from "@stella/contracts/agent-rules";
 import type { AgentInvariantKind, AgentInvariantReport } from "@stella/contracts/backend/agent-threads";
 import type { OwnerDbReader } from "../registry.js";
 
-/**
- * Counts, from the owner's agent event log, each way the task rules were
- * broken in a window, so what is left of these bugs is a number rather than
- * an anecdote. Each check names one rule:
- *
- * - `report_to_stella_not_lead`: a helper's report went to Stella's chat
- *   although the cloud records the lead that started it (a note a task sends
- *   Stella on purpose is not one).
- * - `report_lost`: a report the cloud gave up delivering, one the audit
- *   found never sent, or a turn's end dropped because its computer gave it
- *   the number of a turn that had already ended.
- * - `stopped_task_took_input`: a stopped task started again from something
- *   no one sent on purpose (a report, a schedule's fire, a note), or its
- *   computer finished a turn of it after the stop.
- * - `waiting_on_nothing_seen`: a task has waited for hours with nothing that
- *   would wake it: none its computer saw as it waited (its wakers, recorded
- *   with the wait) and none the cloud can see (a helper at work, a schedule
- *   aimed at it, a message on its way). A wait from a computer too old to
- *   record its wakers may still have a background command, so for those this
- *   is an upper bound.
- * - `two_hosts_one_attempt`: two computers recorded work on the same attempt
- *   of one task.
- * - `report_carried_not_sent`: what a superseded or late turn said is still
- *   held for a task that settled an hour ago (it goes with the next report, or
- *   alone when the task settles without one).
- *
- * `hostedTurns` (not a violation) counts turns a placed task's computer ran by
- * itself that were recorded on its own thread, so routed to its lead.
- */
-
 const WAITING_TOO_LONG_MS = 6 * 60 * 60_000;
 const EXAMPLES_MAX = 5;
 const SCAN_MAX = 5_000;
@@ -98,8 +68,6 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     const detail = parse(row.detail);
     const trigger = String(detail.messageId ?? detail.reportId ?? "");
     const from = typeof detail.from === "string" ? detail.from : undefined;
-    // The same rule the cloud and the desktop apply: only the user or the
-    // task's starter resumes a stopped task.
     const task = db.one<{ parent_thread_id: string | null; conversation_id: string; origin_conversation_id: string | null }>(
       "SELECT parent_thread_id, conversation_id, origin_conversation_id FROM agent_threads WHERE thread_id = ?",
       row.thread_id,
@@ -111,8 +79,6 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
         from,
       );
     if (agentInputSender({ id: trigger, byStarter }) !== "other") continue;
-    // The task's state just before: its last start or end. A stop followed by a
-    // deliberate restart and a later wait is no longer stopped.
     const before = db.one<{ kind: string; thread_patch: string | null; detail: string | null }>(
       `SELECT kind, thread_patch, detail FROM agent_events
         WHERE thread_id = ? AND seq < ?
@@ -151,10 +117,6 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     add("waiting_on_nothing_seen", `${row.thread_id} since ${new Date(row.updated_at).toISOString()}: ${waitingFor}`);
   }
 
-  // Only what a computer writes while running the attempt: its start and its
-  // end. A computer also writes events for work it doesn't run (spawning a
-  // helper elsewhere, stopping a task, taking delivery of a report into the
-  // chat it holds), which named two computers on one attempt with no double run.
   for (const row of db.all<{ thread_id: string; attempt_generation: number; sources: string }>(
     `SELECT thread_id, attempt_generation, group_concat(DISTINCT source) AS sources FROM agent_events
       WHERE created_at >= ? AND thread_id IS NOT NULL AND attempt_generation IS NOT NULL

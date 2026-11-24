@@ -120,8 +120,6 @@ export const BILLING_MIGRATION = {
   ],
 };
 
-// Pricing v3: Go is now Plus. The per-attempt cost ledger records what Stella
-// paid for each paid attempt, separate from what the budget was charged.
 export const BILLING_COST_LEDGER_MIGRATION = {
   id: "billing.2-cost-ledger",
   statements: [
@@ -164,8 +162,6 @@ export const BILLING_COST_LEDGER_MIGRATION = {
   ],
 };
 
-// Admin credit grants share billing_credit_purchases (keyed `admin:<grantId>`);
-// the note is their audit trail.
 export const BILLING_CREDIT_NOTE_MIGRATION = {
   id: "billing.3-credit-note",
   statements: ["ALTER TABLE billing_credit_purchases ADD COLUMN note TEXT"],
@@ -380,7 +376,6 @@ export type BillingAccess = {
   retryAfterMs: number;
   message: string;
   remainingMicroCents: number | null;
-  // Remaining minus what running work has reserved; null when unlimited.
   availableMicroCents: number | null;
   reservedMicroCents: number;
   usageLimit?: StellaUsageLimit;
@@ -456,8 +451,6 @@ const capabilityBudget = (access: BillingAccess, reserved: number): number => {
   if (access.remainingMicroCents === null) return GATEWAY_BUDGET_UNLIMITED;
   const chunk = GATEWAY_SESSION_BUDGET_CHUNK_MICRO_CENTS[limitsAudienceFor(access.audience)];
   const available = Math.max(0, Math.floor(access.remainingMicroCents - reserved));
-  // One model session or turn holds at most a quarter of what's free, so a
-  // few concurrent turns still leave room for containers, media and search.
   const share = Math.max(Math.floor(available / 4), Math.min(available, MIN_MODEL_HOLD_MICRO_CENTS));
   return Math.min(available, share, chunk);
 };
@@ -560,10 +553,6 @@ const pruneGrants = (ctx: OwnerContext): void => {
   ctx.db.run("DELETE FROM billing_grants WHERE expires_at + ? < ?", GRANT_SETTLEMENT_GRACE_MS, ctx.now);
 };
 
-// Atomically hold `microCents` of the owner's budget for work about to run.
-// Every paid operation reserves first so concurrent jobs cannot spend the same
-// headroom twice: available = tightest window + credit - reserved.
-// With `minimumMicroCents`, a smaller hold (down to that floor) is accepted.
 export const reserveSpend = (
   ctx: OwnerContext,
   input: {
@@ -607,7 +596,6 @@ export const reserveSpend = (
   };
 };
 
-// What is still held for a reservation (0 once released or never made).
 export const reservationHeld = (ctx: { db: OwnerDbReader }, id: string): number => {
   const row = ctx.db.one<{ budget: number; settled: number }>(
     "SELECT budget, settled FROM billing_grants WHERE jti = ?",
@@ -681,8 +669,6 @@ const rollUp = (
   );
 };
 
-// Fixed always-on infrastructure, allocated once per active account-day as a
-// cost line. It is never charged to the customer's budget.
 const allocateFixedInfra = (ctx: OwnerContext, currentPlan: string, level: number): void => {
   const day = utcDay(ctx.now);
   const id = `infra:${day}`;
@@ -713,7 +699,6 @@ const allocateFixedInfra = (ctx: OwnerContext, currentPlan: string, level: numbe
   });
 };
 
-// Record one paid attempt in the cost ledger. Idempotent on entry.id.
 export const recordCost = (ctx: OwnerContext, entry: CostEntry, chargedMicroCents: number): boolean => {
   const row = ensureAccount(ctx.db, ctx.now);
   const currentPlan = plan(row);
@@ -762,9 +747,6 @@ export const recordCost = (ctx: OwnerContext, entry: CostEntry, chargedMicroCent
   return true;
 };
 
-// Charge the budget for finished (or partly finished) work and record what it
-// cost us, in one transaction. `reservationId` lowers that hold by the charge;
-// `release` drops whatever is left of it. Idempotent on `receiptId`.
 export const settleSpend = (
   ctx: OwnerContext,
   input: {
@@ -789,7 +771,6 @@ export const settleSpend = (
   return { charged: fresh };
 };
 
-// Old names, kept for callers not yet moved to reserveSpend/settleSpend.
 export const reserveUsage = (
   ctx: OwnerContext,
   input: { id: string; budgetMicroCents: number; expiresAt: number },
@@ -832,9 +813,6 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
       continue;
     }
     const charged = event.billable ? Math.max(0, Math.floor(event.chargedMicroCents)) : 0;
-    // Receipts carry the same scope as the gateway's replay key (capability +
-    // request); request ids alone can repeat across capabilities. A retry is
-    // a new physical attempt of the same request and is paid separately.
     const attempt = Math.max(1, Math.floor(event.attempt ?? 1));
     const scope = `${event.capabilityId}:${event.requestId}${attempt > 1 ? `:${attempt}` : ""}`;
     const legacyReceipt =
@@ -847,7 +825,6 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
     if (event.kind === "turn" && event.turnId) {
       ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", charged, `turn:${event.turnId}`);
     }
-    // Failed and aborted attempts are charged at what the provider billed us.
     if (charged > 0) charge(ctx, charged);
     const providerCost = event.providerCostMicroCents ?? event.usage.costMicroCents ?? event.chargedMicroCents;
     if (event.billable || providerCost > 0) {
@@ -903,8 +880,6 @@ export const setAdminPlan = (
     usageMode?: "default" | "unlimited";
     resetUsage?: boolean;
     spendAllowance?: boolean;
-    // A plan granted outside Stripe (e.g. the owner's own account): detach any Stripe
-    // subscription so its later events can't move the plan.
     complimentary?: boolean;
   },
 ): void => {
@@ -1280,10 +1255,6 @@ const subscriptionIdOf = (object: Record<string, unknown>): string | null => {
 
 const stripeEventChains = new Map<string, Promise<void>>();
 
-/**
- * One event at a time per owner: each sync reads the subscription from Stripe
- * after the previous one wrote, so a slower, older read can't land last.
- */
 export const applyStripeEvent = (ctx: OwnerContext, event: StripeEvent): Promise<void> => {
   const previous = stripeEventChains.get(ctx.ownerId) ?? Promise.resolve();
   const run = previous.catch(() => undefined).then(() => applyStripeEventInOrder(ctx, event));

@@ -1,8 +1,3 @@
-/**
- * Google accounts connected through Stella's own Google app: tokens live in
- * the owner's store, one row per Google account. One sign-in covers every
- * Google service whose scope the user granted.
- */
 import type { IntegrationAccount } from "@stella/contracts/backend/integrations";
 import { GOOGLE_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
 import {
@@ -77,11 +72,9 @@ const grants = (row: GoogleAccountRow, integrationId: string): boolean => {
 const rowsOf = (db: OwnerDbReader): GoogleAccountRow[] =>
   db.all<GoogleAccountRow>("SELECT * FROM google_accounts ORDER BY is_primary DESC, created_at ASC");
 
-/** Every Google account the user connected through Stella, whatever it granted. */
 export const hasStellaGoogleAccounts = (db: OwnerDbReader): boolean =>
   Boolean(db.one("SELECT 1 AS found FROM google_accounts LIMIT 1"));
 
-/** Accounts that granted this integration's scope, primary first. */
 export const stellaGoogleAccounts = (db: OwnerDbReader, integrationId: string): IntegrationAccount[] =>
   rowsOf(db)
     .filter((row) => grants(row, integrationId))
@@ -123,7 +116,6 @@ export const stellaGoogleAvailable = (env: Cloudflare.Env): boolean => {
   return available;
 };
 
-/** A Google sign-in link for this owner. */
 export const stellaGoogleConnectUrl = async (ctx: OwnerContext, options: { loginHint?: string } = {}): Promise<string> => {
   const { client, redirectUri } = requireClient(ctx.env);
   const nonce = crypto.randomUUID();
@@ -155,7 +147,6 @@ const parseComplete = object({
   error: optional(string({ max: 512 })),
 });
 
-/** Finishes a Google sign-in from the OAuth callback and stores the account. */
 export const completeStellaGoogleOAuth = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -187,9 +178,6 @@ export const completeStellaGoogleOAuth = async (
   if (!identity) throw new RpcError("BAD_REQUEST", "Couldn't read which Google account this is. Try again.");
   const granted = parseGoogleScope(token.body.scope);
   const scopes = granted.length > 0 ? granted : [...GOOGLE_OAUTH_SCOPES];
-  // Whoever approved at Google may not be the Stella user who started the
-  // link, so nothing attaches yet: the result waits under a one-time code
-  // that only the approver's own Stella app receives and redeems.
   const connectCode = issueOAuthClaim(ctx, "google", {
     email: identity.email,
     googleUserId: identity.googleUserId,
@@ -201,7 +189,6 @@ export const completeStellaGoogleOAuth = async (
   return { email: identity.email, connectCode };
 };
 
-/** Redeems a connect code in the caller's own store; a code issued to another Stella user isn't there. */
 export const finishStellaGoogleConnect = (ctx: OwnerContext, connectCode: string): { email: string } => {
   enforceOwnerRateLimit(
     ctx.db,
@@ -299,7 +286,6 @@ const accessTokenOf = async (ctx: OwnerContext, row: GoogleAccountRow, force = f
   return await run;
 };
 
-/** The account to use: the one named (by email), else the primary. */
 const resolveRow = (ctx: OwnerContext, integrationId: string, account?: string): GoogleAccountRow => {
   const rows = rowsOf(ctx.db).filter((row) => grants(row, integrationId));
   if (rows.length === 0) throw new RpcError("CONFLICT", NOT_CONNECTED, { reason: "not_connected" });
@@ -315,7 +301,6 @@ const resolveRow = (ctx: OwnerContext, integrationId: string, account?: string):
   return found;
 };
 
-/** Runs a Google action as one connected account, refreshing the token once if Google rejects it. */
 export const runStellaGoogleAction = async (
   ctx: OwnerContext,
   integrationId: string,
@@ -343,7 +328,6 @@ export const runStellaGoogleAction = async (
   }
 };
 
-/** A Google API failure as the RPC error the agent sees. */
 export const googleRpcError = (error: unknown): unknown =>
   error instanceof GoogleApiError
     ? new RpcError(
@@ -353,7 +337,6 @@ export const googleRpcError = (error: unknown): unknown =>
       )
     : error;
 
-/** Live access tokens for every connected account that granted Gmail, for the digest. */
 export const stellaGmailTokens = async (
   ctx: OwnerContext,
 ): Promise<{ email: string; primary: boolean; accessToken: () => Promise<string> }[]> =>
@@ -371,7 +354,6 @@ export const setPrimaryStellaGoogleAccount = (ctx: OwnerContext, integrationId: 
   return stellaGoogleAccounts(ctx.db, integrationId);
 };
 
-/** Disconnects a Google account from every Google service and revokes Stella's access. */
 export const removeStellaGoogleAccount = async (
   ctx: OwnerContext,
   integrationId: string,
@@ -388,16 +370,11 @@ export const removeStellaGoogleAccount = async (
   return stellaGoogleAccounts(ctx.db, integrationId);
 };
 
-/**
- * Forgets every Google account here without revoking it at Google. Test
- * accounts only: dev and production can share one Google app, so revoking a
- * test account's grant can end the same person's production grant.
- */
+/** Dev and production can share one Google app, so revoking a test account's grant can end the same person's production grant. */
 export const forgetStellaGoogleAccountsForTest = (db: OwnerDb): void => {
   db.run("DELETE FROM google_accounts");
 };
 
-/** Revokes and forgets every Google account (account deletion). */
 export const purgeStellaGoogleAccounts = async (ctx: OwnerContext): Promise<void> => {
   for (const row of rowsOf(ctx.db)) {
     await revokeGoogleToken(row.refresh_token ?? row.access_token);

@@ -119,7 +119,6 @@ export type OwnerHost = {
   }>;
   homeChanged(ownerGeneration: string, revision: number): Promise<void>;
   changeMemoryPolicy(change: MemoryPolicyChange): Promise<void>;
-  /** Writes a hidden note into a conversation's journal without running a turn; Stella reads it with her next one. */
   appendConversationNote(input: {
     conversationId: string;
     ownerGeneration: string;
@@ -131,7 +130,6 @@ export type OwnerHost = {
     conversationId: string;
     clientMsgId: string;
     prompt: string;
-    /** The model this turn and the conversation's later backend-started turns run on, when it changes here. */
     execution?: import("@stella/contracts/agent-engine").CloudExecutionSelection;
   }): Promise<void>;
   startScheduledTurn(input: ScheduledTurnStart): Promise<ScheduledTurnStarted>;
@@ -170,22 +168,13 @@ export type ScheduledTurnStart = {
   prompt: string;
   title: string;
   targetDeviceId?: string;
-  /**
-   * Run only on `targetDeviceId`, never in the cloud: the plan has no cloud
-   * runs. With `ownDevice`, the schedule was set up on that computer, so it is
-   * the computer's own work and needs no "work from other devices" consent.
-   */
   computerOnly?: { ownDevice: boolean };
   agent?: { description: string };
 };
 
-/** Where a scheduled run went, so its end can be followed. */
 export type ScheduledTurnStarted = {
-  /** The gate's dispatch, for a run sent to a computer (which may run it in the cloud instead). */
   dispatchId?: string;
-  /** The cloud turn, for a run started in the cloud. */
   cloudTurnId?: string;
-  /** The cloud agent a scheduled agent run starts. */
   agentThreadId?: string;
 };
 
@@ -249,14 +238,12 @@ export class DispatchError extends Error {
   }
 }
 
-/** A Stella Crew workspace a call runs for: its own drive space and home folder. */
 export type OwnerCrewScope = { space: string; home: string };
 
 export type OwnerContext = {
   ownerId: string;
   host: OwnerHost;
   caller: OwnerCaller | null;
-  /** Set only by the owner gate for a Stella Crew caller; pins drive calls to its space. */
   crew?: OwnerCrewScope;
   db: OwnerDb;
   jobs: OwnerJobs;
@@ -292,7 +279,6 @@ export type GlobalCallDef<K extends CallName> = {
   handler: (ctx: GlobalContext, args: CallArgs<K>) => CallResult<K> | Promise<CallResult<K>>;
 };
 
-/** Runs in the Worker for signed-in and signed-out callers alike; `caller` is null without a sign-in. */
 export type PublicContext = {
   caller: OwnerCaller | null;
   env: Cloudflare.Env;

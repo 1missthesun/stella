@@ -1,18 +1,3 @@
-/**
- * A fake Gmail for test accounts: how Email is tested, so no test ever reads
- * or writes a real person's inbox.
- *
- * It answers the Gmail REST calls the Email domain makes (profile, watch,
- * history, messages, threads, search, labels, drafts, send, import) from
- * messages kept in the owner's own database, with Gmail's answer shapes. It
- * never touches the network: a call it doesn't know fails. Sent mail stays in
- * its Sent folder.
- *
- * Fake inboxes exist only where test accounts are on (dev) and only for
- * `@test.stella.local` owners (the admin email probe makes them). An owner
- * with a fake inbox reads only fake inboxes, even when a real Gmail is
- * connected.
- */
 import { GoogleApiError, type Fetcher } from "../../integrations/google.js";
 import type { OwnerDb, OwnerDbReader } from "../registry.js";
 
@@ -38,7 +23,6 @@ export const FAKE_GMAIL_MIGRATION = {
   ],
 };
 
-/** Fake inbox addresses end with this, so one can never be mistaken for a real one. */
 export const FAKE_GMAIL_DOMAIN = "fake-gmail.test";
 
 const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -61,8 +45,6 @@ export const removeFakeGmailInbox = (db: OwnerDb, email: string): void => {
   db.run("DELETE FROM email_fake_messages WHERE inbox = ?", email);
   db.run("DELETE FROM email_fake_inboxes WHERE email = ?", email);
 };
-
-// MIME ------------------------------------------------------------------------------
 
 type Part = { headers: { name: string; value: string }[]; mimeType: string; text: string; parts: Part[] };
 
@@ -157,8 +139,6 @@ const payloadOf = (part: Part, withBody: boolean): Record<string, unknown> => ({
   ...(withBody && part.parts.length > 0 ? { parts: part.parts.map((child) => payloadOf(child, true)) } : {}),
 });
 
-// Store ------------------------------------------------------------------------------
-
 type Row = {
   id: string;
   inbox: string;
@@ -196,7 +176,6 @@ const messageJson = (row: Row, format: string): Record<string, unknown> => {
   };
 };
 
-/** Puts a raw RFC 822 message into a fake inbox; replies join their thread by In-Reply-To/References. */
 const insert = (db: OwnerDb, inbox: string, raw: string, labels: string[], now: number, threadId?: string, draftId?: string): Row => {
   const part = parsePart(raw);
   const date = Date.parse(headerValue(part, "Date"));
@@ -236,8 +215,6 @@ const modify = (db: OwnerDb, row: Row, add: string[], remove: string[]): void =>
   db.run("UPDATE email_fake_messages SET labels = ?, history_id = ? WHERE id = ?", JSON.stringify([...labels]), historyId, row.id);
 };
 
-// Search -----------------------------------------------------------------------------
-
 const searchable = (row: Row): { labels: string[]; from: string; to: string; subject: string; text: string } => {
   const part = parsePart(row.raw);
   const from = headerValue(part, "From").toLowerCase();
@@ -246,7 +223,6 @@ const searchable = (row: Row): { labels: string[]; from: string; to: string; sub
   return { labels: labelsOf(row), from, to, subject, text: `${from} ${to} ${subject} ${plainOf(part).toLowerCase()}` };
 };
 
-/** A useful subset of Gmail's search: in:, is:, label:, from:, to:, subject:, newer_than:, older_than:, -term, "phrases", OR. */
 const matches = (row: Row, query: string, now: number): boolean => {
   const tokens = query.match(/-?(?:\w+:)?(?:"[^"]*"|\([^)]*\)|\S+)/gu) ?? [];
   const fields = searchable(row);
@@ -306,8 +282,6 @@ const matches = (row: Row, query: string, now: number): boolean => {
   return ok;
 };
 
-// The fetcher ------------------------------------------------------------------------
-
 type Init = Parameters<Fetcher>[1];
 
 const notFound = (what: string): never => {
@@ -319,7 +293,6 @@ const bodyOf = (init: Init): Record<string, unknown> =>
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : []);
 
-/** A Gmail API for one fake inbox. */
 export const fakeGmailFetcher = (db: OwnerDb, inbox: string, clock: () => number = Date.now): Fetcher => {
   return async (url, init) => {
     if (!url.startsWith(GMAIL)) throw new GoogleApiError(400, `The fake Gmail only answers Gmail calls, not ${url.slice(0, 80)}.`);
@@ -429,7 +402,6 @@ export const fakeGmailFetcher = (db: OwnerDb, inbox: string, clock: () => number
   };
 };
 
-/** Every message in a fake inbox, newest first, for test checks. */
 export const fakeGmailList = (db: OwnerDbReader, inbox: string): { id: string; threadId: string; labels: string[]; from: string; to: string; subject: string; at: number }[] =>
   db.all<Row>("SELECT * FROM email_fake_messages WHERE inbox = ? ORDER BY internal_date DESC", inbox).map((row) => {
     const part = parsePart(row.raw);

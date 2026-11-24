@@ -81,10 +81,6 @@ export const CLAUDE_SESSIONS_CHUNK_ENCODING_MIGRATION = {
   statements: ["ALTER TABLE claude_session_chunks ADD COLUMN encoding TEXT"],
 };
 
-/**
- * Chunks are stored gzipped when that saves at least this share; the hashes,
- * chain and lengths always describe the raw bytes, so clients never see it.
- */
 const GZIP_MIN_SAVING = 0.1;
 
 const SESSION_TOUCH_MS = 60_000;
@@ -392,10 +388,6 @@ const assertAppendShape = (args: Omit<ClaudeSessionAppendArgs, "data">): void =>
   }
 };
 
-/**
- * Validates a chunk and stores it in R2, gzipped unless `raw` (an owner object
- * still on code from before chunk encodings refuses the `encoding` field).
- */
 export const stageClaudeSessionChunk = async (
   env: { CONVERSATION_ARCHIVE?: R2Bucket },
   ownerId: string,

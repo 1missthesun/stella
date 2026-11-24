@@ -37,12 +37,7 @@ const LEASE_TTL_MS = 10_000;
 const SESSION_MAX_MS = 5 * 60_000;
 const IDLE_REAP_MS = 2 * 60_000;
 const CLOSED_LEASE_RETENTION_MS = 24 * 60 * 60_000;
-/**
- * GPT-Live charges per second of session duration, not rounded up. Charged
- * for a session's open time until the provider session is actually closed,
- * never above one full session. Creating a WebRTC session bills 15 seconds
- * up front, credited once it runs.
- */
+/** GPT-Live bills per second of session time, and a new WebRTC session bills 15 seconds up front. */
 const ENVELOPE_MICRO_CENTS_PER_SECOND = Math.round(usdToMicroCents(REALTIME_VOICE_TARIFF.gptLiveUsdPerMinute) / 60);
 const SESSION_CHARGE_CAP = (SESSION_MAX_MS / 1_000) * ENVELOPE_MICRO_CENTS_PER_SECOND;
 const MIN_BILLED_SECONDS = REALTIME_VOICE_TARIFF.minimumBilledSeconds;
@@ -62,8 +57,6 @@ const MUSE_DICTATION_MODEL = "muse-voice-transcribe-1.0";
 const DICTATION_RATE = { count: 30, windowMs: 60_000 };
 const MUSE_STT_USD_PER_SECOND = DICTATION_TARIFF.museUsdPerHour / 3_600;
 const MUSE_MAX_SESSION_SECONDS = 60 * 60;
-// Streaming dictation holds budget a few minutes of audio at a time and
-// extends the hold as the session runs.
 const MUSE_HOLD_SECONDS = 3 * 60;
 const MUSE_RESERVATION_MS = (MUSE_MAX_SESSION_SECONDS + 15 * 60) * 1_000;
 const PCM_BYTES_PER_SECOND = 16_000 * 2;
@@ -139,12 +132,7 @@ const secret = (env: Cloudflare.Env, name: string): string | null => {
 const readLease = (ctx: OwnerContext, leaseId: string): LeaseRow | null =>
   ctx.db.one<LeaseRow>("SELECT * FROM voice_leases WHERE lease_id = ?", leaseId);
 
-/**
- * Startup history for the live session. GPT-Live takes one text part per
- * message, `input_text` for developer and user and `output_text` for the
- * assistant, and caps the list at 128 messages and 8,192 combined tokens.
- * The newest messages matter most, so the list is trimmed from the front.
- */
+/** GPT-Live takes one text part per message (`input_text`, `output_text` for the assistant) and caps the list at 128 messages and 8,192 tokens. */
 const buildSessionInput = (history: VoiceHistoryMessage[]): unknown[] => {
   const kept: VoiceHistoryMessage[] = [];
   let chars = 0;
@@ -187,7 +175,6 @@ const closeLiveSession = async (env: Cloudflare.Env, sessionId: string): Promise
       try {
         if ((JSON.parse(event.data) as { type?: unknown }).type === "session.closed") settle(true);
       } catch {
-        // Not a frame we care about.
       }
     });
     socket.addEventListener("close", () => settle(true));
@@ -205,7 +192,6 @@ const closeLiveSession = async (env: Cloudflare.Env, sessionId: string): Promise
     try {
       socket?.close();
     } catch {
-      // Already closed.
     }
   }
 };
@@ -220,8 +206,6 @@ const voiceEnvelope = (lease: LeaseRow, until: number): number => {
   return Math.min(SESSION_CHARGE_CAP, seconds * ENVELOPE_MICRO_CENTS_PER_SECOND);
 };
 
-// Charge a lease up to `until` (what OpenAI bills for its open time), write
-// its cost row, and drop the hold once nothing more can accrue.
 const chargeLease = (
   ctx: OwnerContext,
   lease: LeaseRow,
@@ -403,7 +387,6 @@ const createCall = async (ctx: OwnerContext, raw: unknown): Promise<{ sdp: strin
       signal: AbortSignal.timeout(20_000),
     });
   } catch {
-    // The session may exist without its id; charge the initialization and move on.
     await closeLease(ctx, lease.lease_id, "openai_session_unreachable", Date.now());
     throw new RpcError("UNAVAILABLE", "Failed to create the live voice session.");
   }
@@ -471,22 +454,16 @@ const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10)
 
 type TtsVendor = "openrouter" | "openai";
 
-// Rows and calls from before 2026-11-16 can still say "fal"; that route is gone
-// and Stella's read-aloud voice is billed at the OpenRouter rate.
 const ttsVendor = (vendor: string | undefined): TtsVendor => (vendor === "openai" ? "openai" : "openrouter");
 
 const TTS_RESERVATION_MS = 15 * 60_000;
 const ttsSpendId = (id: string) => `tts:${id}`;
 
-// Both read-aloud voices are priced per input character sent, so the hold
-// for the whole text is also the most a synthesis can cost.
 const ttsCostMicroCents = (vendor: TtsVendor, chars: number): number =>
   vendor === "openai"
     ? usdToMicroCents((chars / 1_000) * TTS_TARIFF.openAiMiniUsdPerThousandChars)
     : usdToMicroCents(estimateTtsUsage(chars, 0).estimatedUsd);
 
-// Read-aloud spends the pooled budget. The per-plan daily character cap stays
-// as a safety limit on top.
 const admitTts = (ctx: OwnerContext, input: { id: string; chars: number; vendor: TtsVendor }): void => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "tts", TTS_RATE, "Too many read-aloud requests. Try again in a minute.");
   const day = utcDay(ctx.now);
@@ -649,8 +626,6 @@ const museExpiry = (sessionId: string) => ({
   sku: MUSE_DICTATION_MODEL,
 });
 
-// Streaming dictation holds a few minutes of audio up front; the relay extends
-// the hold as it goes and ends the session when it can't.
 const holdMuse = (ctx: OwnerContext, sessionId: string, audioBytes: number) => {
   const maxBytes = MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND;
   const target = Math.min(maxBytes, audioBytes + MUSE_HOLD_SECONDS * PCM_BYTES_PER_SECOND);
@@ -748,8 +723,6 @@ const settleDictation = (ctx: OwnerContext, raw: unknown) => {
 
 const DICTATION_CLIP_MAX_BYTES = 15 * 60 * PCM_BYTES_PER_SECOND;
 const DICTATION_RESERVATION_MS = 10 * 60_000;
-// The clip route settles at OpenRouter's reported cost, else the fallback
-// rate; hold above that so a clip can never settle past its reservation.
 const CLIP_RESERVE_MARGIN = 1.25;
 const clipFallbackCost = (audioBytes: number): number =>
   usdToMicroCents((audioBytes / PCM_BYTES_PER_SECOND) * DICTATION_TARIFF.openRouterFallbackUsdPerSecond);
@@ -829,8 +802,6 @@ const settleDictationSegment = (ctx: OwnerContext, raw: unknown) => {
   return { costMicroCents: chargeClipSegment(ctx, sessionId, segment) };
 };
 
-// Ends a clip: charges any segment whose settlement did not get through
-// (idempotent per segment), then drops what is left of the hold.
 const finishDictationClip = (ctx: OwnerContext, raw: unknown) => {
   const { sessionId, unsettled } = object({
     sessionId: string({ pattern: DICTATION_SESSION_ID }),
@@ -875,7 +846,6 @@ const admitMaps = (ctx: OwnerContext, raw: unknown) => {
   return { reservedMicroCents: maxCost };
 };
 
-// Charges each Google SKU the resolver actually called, not what was asked for.
 const settleMaps = (ctx: OwnerContext, raw: unknown) => {
   const { requestId, placeCalls, routeCalls, outcome } = object({
     requestId: string({ min: 8, max: 64 }),
@@ -991,7 +961,6 @@ export const voiceDomain = {
         pcmBytes: number({ int: true, min: 0, max: 1_000_000_000 }),
         outcome: literal("succeeded", "failed", "aborted"),
       })(raw);
-      // Callers send the audio's length as 24 kHz 16-bit PCM bytes.
       return {
         chargedMicroCents: settleTts(ctx, { ...input, vendor: ttsVendor(vendor), audioSeconds: pcmBytes / 48_000 }),
       };

@@ -46,7 +46,6 @@ type LedgerRow = {
 
 const usd = (microCents: number) => Number((microCents / MICRO_CENTS_PER_USD).toFixed(6));
 
-/** Keeps one pending export job; called on every new cost row. */
 export const scheduleCostExport = (ctx: OwnerContext): void => {
   const memory = ctx.db.memory;
   const known = memory?.get(COST_EXPORT_MEMORY_KEY);
@@ -61,10 +60,6 @@ export const scheduleCostExport = (ctx: OwnerContext): void => {
   memory?.set(COST_EXPORT_MEMORY_KEY, runAt);
 };
 
-/**
- * Copies dirty daily rollups (updated since their last export) to D1's
- * owner_cost_daily. Rows are running totals, so the upsert is idempotent.
- */
 export const exportCostDaily = async (ctx: OwnerContext): Promise<{ exported: number; remaining: boolean }> => {
   const database = ctx.env.DB;
   if (!database) throw new Error("The DB binding is missing.");
@@ -170,7 +165,6 @@ const parseCursor = (cursor: string | undefined): { at: number; id: string } | n
   return split > 0 && Number.isFinite(at) ? { at, id: cursor.slice(split + 1) } : null;
 };
 
-/** One owner's raw ledger page (newest first), rollups for the day range, and revenue context. */
 export const ownerCostReport = (ctx: { db: OwnerDbReader; now: number }, query: OwnerCostQuery) => {
   const limit = Math.min(LEDGER_MAX_LIMIT, Math.max(1, Math.floor(query.limit ?? LEDGER_DEFAULT_LIMIT)));
   const fromAt = dayStart(query.from);

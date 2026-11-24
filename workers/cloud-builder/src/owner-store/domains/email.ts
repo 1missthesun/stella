@@ -65,26 +65,10 @@ import {
 import { ownerZone } from "./schedules.js";
 import { ownerModeEnabled } from "../../selfhost/owner-mode.js";
 
-/**
- * Email, read by Stella herself.
- *
- * New mail from every Gmail account connected through Stella is synced here
- * (Gmail push, else polling) and kept briefly. Stella reads it in batches, a
- * few times a day and whenever she is asked: a backend-started turn tells her
- * there is mail, and the `email` tool's `inbox` gives her a compact listing.
- * She keeps one living page (see email-page.ts) that every client shows, and
- * mentions it in the chat only when something needs the user.
- *
- * A cheap gate (email-sorter.ts) looks at each arriving email for one thing:
- * whether it should wake Stella before her next read. It never decides what
- * the user sees. Whatever reaches the user's phone, Stella marked urgent.
- */
-
 const SYNC_JOB = "email.sync";
 const TICK_JOB = "email.tick";
 const READ_JOB = "email.read";
 const WAKE_JOB = "email.wake";
-/** Jobs of the sorter Stella replaced; cancelled wherever they are still queued. */
 const RETIRED_JOBS = ["email.summary", "email.summary:now", "email.note", "email.lead", "email.later"];
 
 const MIN = 60_000;
@@ -100,9 +84,7 @@ const MAIL_RETENTION_MS = 14 * DAY;
 const SNIPPET_CHARS = 320;
 const WAKE_DEBOUNCE_MS = 20_000;
 
-/** Local hours Stella reads the mail on her own. */
 const READ_HOURS = { free: [9], paid: [8, 13, 18] } as const;
-/** Times a day the gate may wake her before a read. */
 const WAKES_PER_DAY = { free: 2, paid: 6 } as const;
 const QUIET_FROM_HOUR = 22;
 const QUIET_UNTIL_HOUR = 7;
@@ -115,17 +97,11 @@ const SEARCH_PER_ACCOUNT = 15;
 const SEARCH_SHOWN = 25;
 const RULES_MAX = 60;
 
-/**
- * The gate's allowance per owner on Stella's key. The gate only answers
- * "now or later", so a month of mail costs a fraction of a cent.
- */
 const CAPS = {
   free: { perDay: 40, usdPerMonth: 0.01 },
   paid: { perDay: 600, usdPerMonth: 2 },
 } as const;
-/** On the owner's own key, or a self-hosted server's, only this daily rate limit applies. */
 const OWN_KEY_PER_DAY = 600;
-/** After the owner's key is refused, Stella's allowance is used this long (or until they save a new key). */
 const OWN_KEY_RETRY_MS = HOUR;
 
 export const EMAIL_MIGRATION = {
@@ -215,12 +191,6 @@ export const EMAIL_MIGRATION = {
   ],
 };
 
-/**
- * One row per email row posted in the chat, so the opened Email view can show
- * it and every earlier one. Named `email_briefings` because owners who had the
- * October digest still have its `email_digests`, `email_digest_state` and
- * `email_digest_seen` tables, which are kept as they are.
- */
 export const EMAIL_DIGESTS_MIGRATION = {
   id: "email.2-digests",
   statements: [
@@ -244,17 +214,11 @@ export const EMAIL_DIGESTS_MIGRATION = {
   ],
 };
 
-/** The written briefing of each summary, kept with its digest. */
 export const EMAIL_BRIEF_MIGRATION = {
   id: "email.3-brief",
   statements: ["ALTER TABLE email_briefings ADD COLUMN brief TEXT"],
 };
 
-/**
- * Dev stores ran the first versions of the two migrations above, which named
- * the table `email_digests` (dropping the October one): give them the new
- * table, rebuilt from their items. A no-op where `email.2-digests` made it.
- */
 export const EMAIL_BRIEFINGS_MIGRATION = {
   id: "email.4-briefings",
   statements: [
@@ -277,12 +241,6 @@ export const EMAIL_BRIEFINGS_MIGRATION = {
   ],
 };
 
-/**
- * The Today view: items (matters) that stay until done, put off, or acted on;
- * a plain log of what Stella read and did; and what a left-out sender needs
- * to unsubscribe.
- */
-/** What the owner's own key spent this month, and when it was last refused. */
 export const EMAIL_OWN_KEY_MIGRATION = {
   id: "email.6-own-key",
   statements: [
@@ -349,10 +307,6 @@ export const EMAIL_TODAY_MIGRATION = {
   ],
 };
 
-/**
- * Stella reads the mail herself: what arrived (and what the user sent) is
- * kept here until she has read it, and her page is one document.
- */
 export const EMAIL_STELLA_MIGRATION = {
   id: "email.7-stella",
   statements: [
@@ -390,7 +344,6 @@ export const EMAIL_STELLA_MIGRATION = {
   ],
 };
 
-/** What Stella was last shown of the page and the rules, so a read repeats them only when they changed. */
 export const EMAIL_TOLD_MIGRATION = {
   id: "email.8-told-digest",
   statements: ["ALTER TABLE email_state ADD COLUMN told_digest TEXT"],
@@ -505,7 +458,6 @@ const localParts = (at: number, zone: string): { day: string; month: string; hou
   return { day: `${parts.year}-${parts.month}-${parts.day}`, month: `${parts.year}-${parts.month}`, hour: Number(parts.hour) };
 };
 
-/** A wall-clock time ("YYYY-MM-DD HH:MM") in a time zone, as an instant. */
 const zonedTime = (local: string, zone: string): number | null => {
   const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/u.exec(local.trim());
   if (!match) return null;
@@ -552,7 +504,6 @@ const log = (event: string, fields: Record<string, unknown> = {}): void => {
 };
 
 const liveAccounts = async (ctx: OwnerContext): Promise<LiveAccount[]> => {
-  // A test account with a fake inbox reads only fake inboxes, whatever else is connected.
   const fake = fakeGmailInboxes(ctx);
   if (fake.length > 0) return fake.map((email) => ({ email, get: async () => fakeGmailFetcher(ctx.db, email, () => ctx.now) }));
   if (!stellaGoogleAvailable(ctx.env)) return [];
@@ -569,8 +520,6 @@ const composioGmailOnly = (db: OwnerDbReader): boolean =>
 const planOf = (ctx: { db: OwnerDbReader }, snapshot?: OwnerSnapshot): "free" | "paid" =>
   (snapshot?.plan ?? stateOf(ctx.db)?.plan ?? "free") === "free" ? "free" : "paid";
 
-// The gate's allowance -------------------------------------------------------
-
 const ownKeyRow = (db: OwnerDbReader): { status: string; updated_at: number } | null => {
   try {
     return db.one<{ status: string; updated_at: number }>(
@@ -581,7 +530,6 @@ const ownKeyRow = (db: OwnerDbReader): { status: string; updated_at: number } | 
   }
 };
 
-/** Whose key pays for the gate right now: Stella's allowance, the owner's OpenRouter key, or a self-hosted server's. */
 const payerOf = (ctx: Reader): "stella" | "own_key" | "server" => {
   if (ownerModeEnabled(ctx.env)) return "server";
   const key = ownKeyRow(ctx.db);
@@ -656,8 +604,6 @@ const accessOf = (ctx: OwnerContext, snapshot: OwnerSnapshot): SorterAccess => (
     : {}),
 });
 
-// Rules ------------------------------------------------------------------------
-
 const rulesOf = (db: OwnerDbReader): RuleRow[] =>
   db.all<RuleRow>(
     "SELECT rule_id, text, match_text, action, created_at, fired_count, last_fired_at FROM email_rules ORDER BY created_at",
@@ -690,8 +636,6 @@ const rulesText = (db: OwnerDbReader): string => {
     .join("\n");
 };
 
-// People and the gate ---------------------------------------------------------------
-
 const wroteTo = (db: OwnerDbReader, address: string): number =>
   db.one<{ sent_count: number }>("SELECT sent_count FROM email_people WHERE address = ?", address)?.sent_count ?? 0;
 
@@ -706,7 +650,6 @@ const notePeople = (ctx: OwnerContext, mail: GmailMail): void => {
   }
 };
 
-/** The gate's answer for one arriving email: whether it can wait for Stella's next read. */
 const gateOne = async (
   ctx: OwnerContext,
   snapshot: OwnerSnapshot,
@@ -738,9 +681,6 @@ const gateOne = async (
   }
 };
 
-// Stella's turns --------------------------------------------------------------------
-
-/** Starts a turn of Stella's in her main conversation, wherever she runs now (a computer, or the cloud). */
 const startStellaTurn = async (
   ctx: OwnerContext,
   input: { clientMsgId: string; prompt: string; title: string },
@@ -752,7 +692,6 @@ const startStellaTurn = async (
     .agentReportTarget({ conversationId, ownerGeneration: snapshot.ownerGeneration })
     .catch(() => null);
   const deviceId = target?.kind === "device" ? resolveCurrentDeviceId(ctx.db, target.deviceId) : undefined;
-  // A computer on an app from before the Email page has the old email tool: the cloud reads instead.
   const targetDeviceId = snapshot.devices?.find((device) => device.deviceId === deviceId)?.capabilities?.includes("email-page")
     ? deviceId
     : undefined;
@@ -781,7 +720,6 @@ const unreadIncoming = (db: OwnerDbReader): number =>
 const accountsLine = (db: OwnerDbReader): string =>
   db.all<{ email: string }>("SELECT email FROM email_accounts ORDER BY created_at").map((row) => row.email).join(", ");
 
-/** The next local read time after `now`. */
 const nextReadAt = (now: number, zone: string, plan: "free" | "paid"): number => {
   const hours = READ_HOURS[plan];
   for (let offset = 0; offset <= 2; offset += 1) {
@@ -800,7 +738,6 @@ const scheduleRead = (ctx: OwnerContext, plan: "free" | "paid", zone: string): v
   ctx.jobs.schedule(READ_JOB, at, {}, { id: READ_JOB });
 };
 
-/** A scheduled read: wakes Stella when there is mail she hasn't read. */
 const runRead = async (ctx: OwnerContext): Promise<void> => {
   if (!enabled(ctx.db)) return;
   const snapshot = await ctx.host.snapshot();
@@ -832,7 +769,6 @@ const wakeAllowed = (ctx: OwnerContext, plan: "free" | "paid", zone: string, byR
   return true;
 };
 
-/** Mail the gate flagged (or a rule asked about) wakes Stella now, a few emails at once. */
 const runWake = async (ctx: OwnerContext): Promise<void> => {
   if (!enabled(ctx.db)) return;
   const rows = ctx.db.all<MailRow>("SELECT * FROM email_mail WHERE woke = 1 AND read_at IS NULL ORDER BY received_at ASC");
@@ -866,8 +802,6 @@ const runWake = async (ctx: OwnerContext): Promise<void> => {
   ctx.db.run(`UPDATE email_mail SET woke = ? WHERE woke = 1`, started ? 2 : 3);
   log("woke", { owner: ctx.ownerId.slice(0, 12), count: rows.length, started });
 };
-
-// Gmail sync -------------------------------------------------------------------------
 
 const isIncoming = (labels: string[]): boolean =>
   labels.includes("INBOX") && !labels.some((label) => label === "SENT" || label === "DRAFT" || label === "SPAM" || label === "TRASH");
@@ -1027,7 +961,6 @@ const watchAccount = async (ctx: OwnerContext, account: LiveAccount): Promise<vo
   await indexWatch(ctx, account.email, true);
 };
 
-/** The last day's inbox of a newly joined account, so Stella's first read has something to read. */
 const backfill = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string, account: string, get: Fetcher): Promise<void> => {
   const list = (await get(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?${new URLSearchParams({ q: "in:inbox newer_than:1d", maxResults: String(BACKFILL_MAX) }).toString()}`,
@@ -1040,7 +973,6 @@ const backfill = async (ctx: OwnerContext, snapshot: OwnerSnapshot, zone: string
   }
 };
 
-/** Joins accounts connected since, drops ones removed, and renews watches. */
 const reconcileAccounts = async (ctx: OwnerContext, options: { backfill: boolean }): Promise<LiveAccount[]> => {
   const live = await liveAccounts(ctx);
   const known = ctx.db.all<AccountRow>("SELECT * FROM email_accounts");
@@ -1092,11 +1024,6 @@ const scheduleTick = (ctx: OwnerContext, delay?: number): void => {
   ctx.jobs.schedule(TICK_JOB, ctx.now + (delay ?? (live ? TICK_LIVE_MS : TICK_POLL_MS)), {}, { id: TICK_JOB });
 };
 
-/**
- * The page has never been written: the first time Email runs for an owner
- * (or the first time after Stella took over from the sorter), she reads the
- * last day's mail right away.
- */
 const pageNeverWritten = (db: OwnerDbReader): boolean => !db.one("SELECT 1 AS present FROM email_page WHERE id = 1");
 
 const runTick = async (ctx: OwnerContext): Promise<void> => {
@@ -1120,8 +1047,6 @@ const runTick = async (ctx: OwnerContext): Promise<void> => {
     scheduleTick(ctx);
   }
 };
-
-// The page ---------------------------------------------------------------------------
 
 const readPage = (db: OwnerDbReader, now: number): EmailPage =>
   readEmailPage(db.one<{ json: string }>("SELECT json FROM email_page WHERE id = 1")?.json, now);
@@ -1178,8 +1103,6 @@ const pageState = (ctx: Reader): EmailPageState => {
   };
 };
 
-// The email tool --------------------------------------------------------------------
-
 type ToolArgs = Record<string, unknown>;
 
 const text = (args: ToolArgs, key: string, max: number): string =>
@@ -1223,11 +1146,6 @@ const toYou = (row: MailRow): string => {
   return "not addressed to you";
 };
 
-/**
- * What arrived since Stella last read, for her to read: grouped by thread,
- * a mailing list with several emails folded to one line, each with the ids
- * the other actions take. Reading it marks it read.
- */
 const inbox = (ctx: OwnerContext, zone: string, full = false): string => {
   const rows = unreadRows(ctx.db);
   const incoming = rows.filter((row) => row.direction === "in");
@@ -1391,7 +1309,6 @@ const header = (headers: unknown, name: string): string => {
   return typeof found?.value === "string" ? found.value : "";
 };
 
-/** A reply in an email's thread, sent or saved as a Gmail draft. */
 const reply = async (ctx: OwnerContext, args: ToolArgs, mode: "send" | "draft"): Promise<string> => {
   const messageId = text(args, "message", 128);
   const body = typeof args.body === "string" ? args.body.trim().slice(0, 20_000) : "";
@@ -1484,7 +1401,6 @@ const updatePage = async (ctx: OwnerContext, args: ToolArgs): Promise<string> =>
     if (newest > 0) item.mailAt = newest;
   }
   writePage(ctx, page);
-  // A draft of Stella's that the page no longer points at (rewritten, sent, or its item gone) leaves the user's Drafts.
   const stale = before.items.flatMap((old) =>
     old.draftId && page.items.find((item) => item.id === old.id)?.draftId !== old.draftId
       ? [{ draftId: old.draftId, accounts: (old.threads ?? []).map((thread) => thread.account) }]
@@ -1501,7 +1417,6 @@ const updatePage = async (ctx: OwnerContext, args: ToolArgs): Promise<string> =>
   for (const item of newlyUrgent) {
     await pushUrgent(ctx, item).catch((error: unknown) => log("push_failed", { message: errorText(error) }));
   }
-  // She wrote it, so she has it: the next read repeats the page only for changes not hers.
   tellDigest(ctx, pageAndRules(ctx.db, page).digest);
   const needs = page.items.filter((item) => item.section === "needs_you").length;
   return [
@@ -1564,7 +1479,6 @@ const emailTool = async (ctx: OwnerContext, raw: unknown): Promise<{ text: strin
     );
   }
   if (action === "inbox") {
-    // Mail Gmail hasn't pushed yet would otherwise wait for the next read.
     await runSync(ctx, {}).catch((error: unknown) => log("sync_failed", { owner: ctx.ownerId.slice(0, 12), message: errorText(error) }));
     return { text: inbox(ctx, zone, args.full === true) };
   }
@@ -1575,8 +1489,6 @@ const emailTool = async (ctx: OwnerContext, raw: unknown): Promise<{ text: strin
   }
   throw new RpcError("BAD_REQUEST", "action must be inbox, read, search, draft, send, archive, page, rules or off.");
 };
-
-// Turning Email on and off --------------------------------------------------------------
 
 const setEnabled = async (ctx: OwnerContext, args: { enabled: boolean }): Promise<EmailPageState> => {
   ensureState(ctx);
@@ -1632,7 +1544,6 @@ const runningEmailDomain = {
       parse: object({ enabled: boolean() }),
       handler: setEnabled,
     },
-    /** The `email` tool, from Stella running on a computer. */
     "email.tool": {
       scope: "owner",
       parse: (value: unknown, path?: string) => {
@@ -1656,13 +1567,7 @@ const runningEmailDomain = {
   internal: {
     "email.changed": changed,
     "email.tool": emailTool,
-    /** Whether Stella's email instructions apply to this owner: Email on, with the inboxes she reads. */
     "email.connected": (ctx: OwnerContext) => ({ accounts: connectedAccounts(ctx.db) }),
-    /**
-     * Test accounts only (admin email probe): puts a raw RFC 822 email into a
-     * fake inbox, as if it had just arrived (Gmail's push included). Never a
-     * real inbox: a test must not reach a real person's mail.
-     */
     "email.testImport": async (ctx: OwnerContext, raw: unknown) => {
       const args = (raw && typeof raw === "object" ? raw : {}) as ToolArgs;
       const message = typeof args.raw === "string" ? args.raw : "";
@@ -1683,13 +1588,6 @@ const runningEmailDomain = {
       if (enabled(ctx.db)) ctx.jobs.schedule(SYNC_JOB, ctx.now, { account: wanted }, { id: `${SYNC_JOB}:${wanted}` });
       return { id: result.id ?? null, threadId: result.threadId ?? null, account: wanted };
     },
-    /**
-     * Test accounts only (admin email probe): adds (or with `remove`, deletes)
-     * a fake inbox `<name>@fake-gmail.test`. `forgetGoogle` drops this test
-     * account's real Google connections without revoking them at Google: dev
-     * and production can share one Google app, and revoking ends that
-     * person's grant everywhere, production included.
-     */
     "email.testFakeInbox": (ctx: OwnerContext, raw: unknown) => {
       if (!fakeGmailEnabled(ctx.env)) throw new RpcError("FORBIDDEN", "Fake inboxes exist only where test accounts are on.");
       const args = (raw && typeof raw === "object" ? raw : {}) as ToolArgs;
@@ -1703,7 +1601,6 @@ const runningEmailDomain = {
       if (enabled(ctx.db)) scheduleTick(ctx, 0);
       return { inboxes: fakeGmailInboxes(ctx), googleAccounts: stellaGoogleAccounts(ctx.db, "gmail").length };
     },
-    /** Test accounts only: what a fake inbox holds (to check what Stella sent, drafted or archived). */
     "email.testFakeList": (ctx: OwnerContext, raw: unknown) => {
       const args = (raw && typeof raw === "object" ? raw : {}) as ToolArgs;
       const email = text(args, "email", 120).toLowerCase();
@@ -1752,11 +1649,6 @@ const unavailable = (): never => {
   throw new RpcError("NOT_FOUND", "Email isn't available.");
 };
 
-/**
- * Email runs only where it is turned on (`email-feature.ts`). Elsewhere every
- * call and view refuses, jobs and Gmail's change pings end without work, and
- * the tool says it isn't available; `email.available` says which.
- */
 type LooseCall = { handler: (ctx: OwnerContext, args: unknown) => unknown };
 type LooseView = { parse: unknown; read: (ctx: OwnerViewContext, args: unknown) => unknown };
 

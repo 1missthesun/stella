@@ -518,7 +518,6 @@ const devicesList = (db: OwnerDbReader): DevicesResponse => {
   const presence = new Map(
     db
       .all<PresenceRow>(
-        // Every column: the gate adds a new one only when it next wakes for a computer.
         `SELECT * FROM device_presence`,
       )
       .map((row) => [row.device_id, presenceState(row)] as const),
@@ -819,12 +818,6 @@ const flushDigest = async (ctx: OwnerContext): Promise<void> => {
   await sendPush(ctx, digestCopy(digest), "agent_activity:digest");
 };
 
-/**
- * A computer's work has waited a while for a sign-in only the user can give.
- * One push per hold: a desktop restarting mid-hold asks again, so the alert
- * stays sent until that computer says the hold is over (or the longest hold
- * has passed).
- */
 const SIGN_IN_ALERT_HOLD_MS = 12 * 60 * 60_000;
 const SIGN_IN_PROVIDER_NAMES = { claude: "Claude", chatgpt: "ChatGPT" } as const;
 

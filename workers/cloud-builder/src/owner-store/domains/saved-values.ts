@@ -27,17 +27,6 @@ import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
-/**
- * Saved private values synced across the owner's devices. The cloud keeps the
- * devices' list (each entry signed by a device on it; see
- * saved-values-trust.ts), each device's check-in, devices asking to join, and
- * every record sealed to each listed device; it holds no key that opens one or
- * that signs an entry. The checks here keep bad data out; devices don't rely
- * on them and check everything again. A cloud task gets a value only from a
- * computer that releases it (`savedValues.release`), sealed to that task's own
- * key.
- */
-
 export const SAVED_VALUES_MIGRATION = {
   id: "saved-values.1-init",
   statements: [
@@ -71,7 +60,6 @@ export const SAVED_VALUES_MIGRATION = {
 
 const ID = string({ min: 1, max: 128 });
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
-/** A seal is the payload's size, base64url-encoded, plus the GCM tag and its fields. */
 const MAX_SEAL_CHARS = Math.ceil((SAVED_VALUE_MAX_PAYLOAD_BYTES + 64) * 4 / 3) + 256;
 const RELEASE_TIMEOUT_NOTE = "No computer answered in time.";
 
@@ -130,7 +118,6 @@ const readRoster = (db: OwnerDbReader): SavedValuesRosterEntry[] =>
       }
     });
 
-/** A decided ask stays visible a little while, so the asking device learns the answer. */
 const DECIDED_JOIN_VISIBLE_MS = 5 * 60_000;
 const MAX_OPEN_JOINS = 8;
 
@@ -193,12 +180,6 @@ const parseSealed = (value: unknown): Record<string, SavedValueSeal> => {
   return value as Record<string, SavedValueSeal>;
 };
 
-/**
- * A device that comes back with a new key (a phone restored from a backup, a
- * reinstall) can't open what was sealed to its old one. Its seals are dropped,
- * so every record now lacks it as a recipient and the next device that holds
- * the record seals it again, at the same version, to the new key.
- */
 const dropSealsFor = (ctx: OwnerContext, deviceId: string) => {
   const rows = ctx.db.all<RecordRow>(
     "SELECT * FROM saved_value_records WHERE deleted = 0 AND recipients LIKE ?",
@@ -238,7 +219,6 @@ const putDevice = (
   if (known && known.public_key !== args.publicKey) dropSealsFor(ctx, args.deviceId);
   const existing = ctx.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM saved_value_devices WHERE device_id != ?", args.deviceId);
   if ((existing?.n ?? 0) >= SAVED_VALUES_MAX_DEVICES) {
-    // The device seen longest ago makes room; it gets values again when it comes back.
     ctx.db.run(
       "DELETE FROM saved_value_devices WHERE device_id = (SELECT device_id FROM saved_value_devices ORDER BY updated_at LIMIT 1)",
     );
@@ -277,7 +257,6 @@ const putRecord = (
   if (current) {
     const held = headOf(current);
     const newer = args.updatedAt > current.updated_at;
-    // The same version sealed to more devices (one that joined) replaces it too.
     const widened =
       args.updatedAt === current.updated_at &&
       !current.deleted &&
@@ -331,7 +310,6 @@ const writeEntry = (ctx: OwnerContext, entry: SavedValuesRosterEntry) => {
   ctx.db.run("INSERT INTO saved_value_roster (seq, entry) VALUES (?, ?)", entry.seq, JSON.stringify(entry));
 };
 
-/** What follows from an entry: a device taken off, or added with new keys, loses its seals and its check-in. */
 const afterEntry = (ctx: OwnerContext, entry: SavedValuesRosterEntry) => {
   if (entry.op === "remove") {
     dropSealsFor(ctx, entry.target);
@@ -419,7 +397,6 @@ const joinStart = (
   ) {
     throw new RpcError("BAD_REQUEST", "A request to join needs the device's keys and a commitment.");
   }
-  // One open ask per device: a new one replaces it.
   for (const join of readJoins(ctx.db, ctx.now)) {
     if (join.device.deviceId === device.deviceId) {
       ctx.db.run("DELETE FROM saved_value_joins WHERE join_id = ?", join.joinId);
@@ -501,11 +478,6 @@ const releaseParser = object({
   taskName: optional(string({ max: 240 })),
 });
 
-/**
- * A cloud task's request for a saved value: ask the owner's online computers
- * that hold saved values, the main one first, until one answers. The answer
- * is sealed to the task's key; nothing here can open it.
- */
 const release = async (ctx: OwnerContext, raw: unknown): Promise<SavedValueReleaseResult> => {
   const request = releaseParser(raw, "args") as unknown as SavedValueReleaseRequest;
   const holders = new Set(

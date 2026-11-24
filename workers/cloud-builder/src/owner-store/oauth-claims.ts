@@ -1,16 +1,5 @@
 import type { OwnerContext } from "./registry.js";
 
-/**
- * An OAuth callback is finished by whoever approves at the provider, in any
- * browser, so it never attaches the result to the owner named in the state.
- * It parks the result here under a fresh one-time code that only that browser
- * receives, and the owner's own signed-in session redeems it. Someone who sends
- * their connect link to another person never sees the code.
- *
- * Claims live in the integrations domain's `oauth_nonces` table, so its purge
- * removes them.
- */
-
 export type OAuthClaimKind = "x" | "slack_install" | "google";
 
 export const OAUTH_CLAIM_TTL_MS = 10 * 60_000;

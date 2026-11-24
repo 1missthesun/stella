@@ -1,31 +1,10 @@
-/**
- * When a computer running tasks goes away, Stella learns it within a couple
- * of minutes instead of the tasks hanging silently.
- *
- * Losing a computer (its presence socket closed, or a task's dispatch lease
- * lapsed) schedules one check per absence. If the computer is still offline
- * then, every conversation with tasks running there gets one hidden note in
- * its journal: which computer, since when, which tasks wait for it, and what
- * she can do (they resume by themselves when it is back, however long that
- * takes; or she carries one on elsewhere with send_message's destination, or
- * stops it). The note runs no turn; she reads it with her next one. A lead
- * whose helpers run there (from another computer or the cloud) gets its own
- * note, like a helper's report. Nothing moves or fails by itself.
- */
-
 import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { object, optional, string } from "../args.js";
 import { endedWaiting, queueAgentNote } from "./agent-reports.js";
 import type { OwnerContext, OwnerDomain } from "../registry.js";
 
 export const DEVICE_OFFLINE_JOB = "device-offline.check";
-/**
- * How long a computer may be away before Stella hears of it: just past what a
- * restart or update takes to reconnect (seconds, and up to about a minute and
- * a half), so an ordinary restart only brings the "[Computer restarted]" note.
- */
 export const DEVICE_OFFLINE_NOTE_AFTER_MS = 2 * 60_000;
-/** After its note, an absence's check stays as a marker so its later signals don't note it again. */
 const NOTED_MARKER_MS = 30 * 24 * 60 * 60_000;
 
 const jobId = (deviceId: string) => `device-offline:${deviceId}`;
@@ -39,7 +18,6 @@ type WaitingThread = {
 
 type CheckPayload = { deviceId: string; lostAt: number; connectionId?: string; noted?: true };
 
-/** Signals this close together with no connection to tell them apart are one absence. */
 const SAME_ABSENCE_MS = 3 * 60_000;
 
 const deviceLost = (
@@ -48,8 +26,6 @@ const deviceLost = (
 ): { scheduled: boolean } => {
   const pending = ctx.db.one<{ payload: string }>("SELECT payload FROM owner_jobs WHERE id = ?", jobId(args.deviceId));
   const prior = pending ? (JSON.parse(pending.payload) as Partial<CheckPayload>) : undefined;
-  // The same absence: its last connection is the same (it hasn't been back),
-  // or, without one, the signals came within minutes of each other.
   const same = prior
     ? args.connectionId || prior.connectionId
       ? prior.connectionId === args.connectionId
@@ -75,7 +51,6 @@ export const deviceOfflineNoteText = (args: {
   since: number | undefined;
   now: number;
   tasks: ReadonlyArray<{ threadId: string; description: string }>;
-  /** The note goes to a lead about the helpers it started there, not to Stella about her tasks. */
   helpers?: true;
 }): string => {
   const minutes = args.since ? Math.max(1, Math.round((args.now - args.since) / 60_000)) : undefined;
@@ -106,12 +81,6 @@ type Lead = {
   result_json: string | null;
 };
 
-/**
- * Helpers on the computer that went away are their lead's to look after, and
- * the lead (on another computer or in the cloud) would otherwise hear nothing
- * until it is back: each lead gets one note listing its helpers there. A lead
- * on that same computer is away with them, and Stella's note covers it.
- */
 const noteLeads = async (
   ctx: OwnerContext,
   args: { deviceId: string; name: string; absence: Partial<CheckPayload> },
@@ -142,7 +111,6 @@ const noteLeads = async (
     const leadHere =
       lead.executor_device_id === args.deviceId ||
       (lead.executor_device_id === null && lead.placement === "computer" && lead.origin_device_id === args.deviceId);
-    // A lead that finished or was stopped isn't waiting on them.
     if (leadHere || !(lead.status === "running" || lead.status === "waiting_for_user" || endedWaiting(lead))) continue;
     const ownerGeneration = lead.owner_generation ?? waiting.find((helper) => helper.owner_generation)?.owner_generation;
     if (!ownerGeneration) continue;
@@ -189,8 +157,6 @@ const check = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     byConversation.set(thread.conversation, [...(byConversation.get(thread.conversation) ?? []), thread]);
   }
   const name = device.label?.trim() || deviceId;
-  // Queued once per absence (its id names it), so a retry of this check after
-  // a busy conversation refused Stella's note doesn't repeat it.
   await noteLeads(ctx, { deviceId, name, absence });
   for (const [conversationId, waiting] of byConversation) {
     const ownerGeneration = waiting.find((thread) => thread.owner_generation)?.owner_generation;
@@ -198,7 +164,6 @@ const check = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     await ctx.host.appendConversationNote({
       conversationId,
       ownerGeneration,
-      // One note per absence: its last connection names it.
       noteId: `offline-${deviceId.slice(0, 48)}-${absence.connectionId?.slice(0, 64) ?? lostAt ?? 0}`,
       text: deviceOfflineNoteText({
         name,
@@ -224,7 +189,6 @@ export const deviceOfflineDomain: OwnerDomain = {
       ),
   },
   jobs: {
-    // A busy conversation refuses the append for a moment; retries cover a long reply.
     [DEVICE_OFFLINE_JOB]: { run: check, maxAttempts: 12 },
   },
 };

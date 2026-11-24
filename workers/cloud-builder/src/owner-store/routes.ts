@@ -51,8 +51,6 @@ const appendClaudeSessionChunk = async (
   };
   const first = await commit(false);
   let response = first.response;
-  // An owner object still on code from before chunk encodings refuses the
-  // field for a few minutes after a deploy; store that chunk raw instead.
   if (
     !response.ok &&
     first.staged.encoding &&
@@ -230,7 +228,6 @@ const refuseLive = (offered: boolean, code: number, reason: string): Response =>
   try {
     server.close(code, reason);
   } catch {
-    // The peer is already gone.
   }
   return new Response(null, {
     status: 101,

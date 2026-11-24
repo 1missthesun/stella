@@ -615,16 +615,6 @@ const fileRefusal = async <T>(work: () => Promise<T>): Promise<T> => {
   }
 };
 
-// ── Legacy memory ────────────────────────────────────────────────────────
-//
-// Before memory moved into the world it was `memory_docs` rows (with
-// `memory_doc_versions` and `memory_write_intents`) over R2 copies in
-// `AGENT_HOME`. An owner whose home was created then still has those tables.
-// `importLegacyMemory` copies each document the world layout keeps into the
-// world, never over a file already there, and records that it ran in
-// `memory_legacy_import`, so it happens once. It changes nothing in the
-// legacy rows or their R2 copies; only a wipe or an owner purge erases them.
-
 const LEGACY_MEMORY_TABLES = ["memory_docs", "memory_doc_versions", "memory_write_intents"] as const;
 const LEGACY_DISPLAY_PREFIX = "~/.stella/";
 
@@ -682,7 +672,6 @@ const legacyWorldPath = (displayPath: string): string | null => {
   return isSyncedMemoryPath(path) ? path : null;
 };
 
-/** Copy legacy memory into the world, once; the files written. Never deletes legacy data. */
 const importLegacyMemory = async (ctx: OwnerContext): Promise<number> => {
   if (!hasLegacyMemory(ctx.db) || legacyImportDone(ctx.db)) return 0;
   const state = readState(ctx.db);
@@ -1241,7 +1230,6 @@ const internal: Record<string, InternalDef> = {
     assertMemoryOpen(ctx.db);
     return readMemoryPolicy(ctx.db, args.ownerGeneration);
   },
-  /** Copy memory from before the move into the world, once (`importLegacyMemory`). */
   "memory.legacyImport": async (ctx, raw) => {
     generationOnly(raw);
     return { imported: await importLegacyMemory(ctx) };
@@ -1357,8 +1345,6 @@ export const homeDomain = {
       parse: object({
         path: syncPathArg,
         expectedMemoryEpoch: syncEpochArg,
-        // UTF-16 units; at most one per UTF-8 byte, so this admits every file
-        // `prepareMemorySync` does.
         content: string({ max: MEMORY_SYNC_MAX_BYTES }),
         expectSha: nullable(syncShaArg),
         importing: boolean(),

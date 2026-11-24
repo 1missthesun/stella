@@ -55,11 +55,7 @@ const BROWSER_MIGRATION = {
   ],
 };
 
-/**
- * An agent's run is one turn and can hand the browser to the user more than
- * once, so a turn no longer names one interaction: the table is rebuilt
- * without `turn_id`'s uniqueness (SQLite cannot drop a column constraint).
- */
+/** SQLite cannot drop a column constraint, so the table is rebuilt. */
 const BROWSER_RUN_HANDOFFS_MIGRATION = {
   id: "browser.2-run-handoffs",
   statements: [

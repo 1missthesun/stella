@@ -57,13 +57,7 @@ const CLEANUP_LEASE_MS = 5 * 60_000;
 /** R2 deletes at most 1,000 keys per call. */
 const CLEANUP_BATCH = 1_000;
 const CLEANUP_MAX_BATCHES_PER_RUN = 20;
-/**
- * The least time between cleanup runs. Objects retired by a burst of writes
- * come due one by one a grace period later; without this floor each one woke
- * the owner alarm on its own, a second apart.
- */
 const CLEANUP_CONTINUE_MS = 60_000;
-/** Keep retired bytes alive for signed GETs already handed to a client. */
 const REPLACEMENT_GRACE_MS = DOWNLOAD_URL_EXPIRES_SECONDS * 1_000;
 const WRITE_DEBT_GRACE_MS = 15 * 60_000;
 
@@ -82,7 +76,7 @@ const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60_000;
 const TOMBSTONE_PRUNE_EVERY_MS = 24 * 60 * 60_000;
 
 const ATTACHMENT_MAX_COUNT = 4;
-/** Larger chat images are fitted to the model's limits when prepared (the Images binding's input bound). */
+/** The Images binding's input bound. */
 const ATTACHMENT_MAX_BYTES = 20 * MB;
 const ATTACHMENT_URL_EXPIRES_SECONDS = 120;
 const REFERENCE_MAX_COUNT = 4;
@@ -148,13 +142,6 @@ export const DRIVE_DEVICE_FILES_MIGRATION = {
   ],
 };
 
-/**
- * Drive spaces: '' is the owner's personal Drive; `crew:<teamId>` is a Stella
- * Crew workspace's own storage. Every row belongs to one space and every query
- * names its space, so no caller sees another space's files. The owner's own
- * clients, devices and agents always use ''. Crew callers are pinned to their
- * space by the owner gate (`crew` on `ownerInternal`), never by arguments.
- */
 export const DRIVE_SPACES_MIGRATION = {
   id: "drive.3-spaces",
   statements: [
@@ -205,7 +192,6 @@ export const DRIVE_SPACES_MIGRATION = {
 
 export const PERSONAL_DRIVE_SPACE = "";
 
-/** The space a call works in: a Crew workspace's, else the owner's personal Drive. */
 const spaceOf = (ctx: Pick<OwnerContext, "crew">): string => ctx.crew?.space ?? PERSONAL_DRIVE_SPACE;
 
 const MAX_DEVICE_FILE_SOURCE_CHARS = 4_000;
@@ -427,8 +413,7 @@ const queueCleanup = (
 };
 
 const retirePendingUpload = (ctx: OwnerContext, row: UploadRow, now: number): void => {
-  // The presigned PUT cannot be revoked, so the staging key is reclaimed no
-  // sooner than the original abandonment horizon.
+  // A presigned PUT cannot be revoked.
   const expiresAt = Math.max(row.expires_at, now);
   ctx.db.run(
     `UPDATE drive_uploads SET status = 'cleanup', expires_at = ?, lease_id = NULL, lease_expires_at = NULL
@@ -688,17 +673,13 @@ const finalizeUpload = async (
     );
   }
   ctx.db.run("DELETE FROM drive_uploads WHERE upload_id = ?", debtId);
-  // The staging key stays cleanup work until its unrevocable PUT has aged out.
   retirePendingUpload(ctx, current, now);
   if (contentType.toLowerCase().startsWith("image/") && CHAT_UPLOAD_SOURCES.has(args.source ?? "")) {
-    // Started here rather than as a job so the images of one message are
-    // prepared side by side, not one alarm after another.
     void prepareChatImage(ctx, { r2Key: finalKey, contentType, sizeBytes: stagedBytes });
   }
   return { path, name, sizeBytes: stagedBytes, contentType, updatedAt: now };
 };
 
-/** Every write stores its bytes under a fresh R2 key, so the key names the content. */
 const fileVersion = (r2Key: string): string =>
   createHash("sha256").update(r2Key).digest("base64url").slice(0, 22);
 
@@ -1155,8 +1136,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
           });
           continue;
         }
-        // The staging key stays writable by its presigned PUT, so the row
-        // only ever names a server-made copy of it.
         await copyR2Object(signerOf(ctx), {
           from: staged.get(entry.uploadId!)!.r2_key,
           to: entry.r2Key,
@@ -1234,7 +1213,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
       armJob(ctx, DRIVE_CLEANUP_JOB, now);
     }
   }
-  // A staged key is reclaimed once its PUT has aged out, landed or not.
   for (const pending of staged.values()) retirePendingUpload(ctx, pending, now);
   const landed = new Set(written.map((entry) => entry.path));
   return {
@@ -1498,7 +1476,6 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
     try {
       wanted.add(normalizeDrivePath(candidate));
     } catch {
-      // A prompt is prose: most of what looks like a path is not one.
     }
   }
   const byPath = new Map<string, FileRow>();
@@ -1598,12 +1575,6 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
   };
 };
 
-/**
- * Moves a Crew workspace's folder out of the owner's personal Drive into the
- * workspace's own space, once per (space, home folder). Files keep their
- * paths; the personal Drive records them as deleted, so the owner's devices
- * and agents drop them. A path already in the space keeps the space's copy.
- */
 export const adoptCrewSpace = (
   ctx: OwnerContext,
   crew: { space: string; home: string },
@@ -1626,7 +1597,6 @@ export const adoptCrewSpace = (
   let moved = 0;
   for (const row of rows) {
     if (getFile(ctx.db, crew.space, row.path)) {
-      // The space already has this path: the personal copy goes, its bytes with it.
       ctx.db.run("DELETE FROM drive_files WHERE space = ? AND path = ?", PERSONAL_DRIVE_SPACE, row.path);
       queueCleanup(ctx, { path: row.path, r2Key: row.r2_key, notBefore: now + REPLACEMENT_GRACE_MS });
     } else {
@@ -1706,11 +1676,6 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
   return { urls };
 };
 
-/**
- * The background half of a chat image upload: its model-ready copy, made while
- * the user is still typing so sending only copies it into the conversation.
- * Best effort and never awaited: a send that finds no copy prepares one itself.
- */
 const prepareChatImage = async (
   ctx: Pick<OwnerContext, "env" | "ownerId">,
   input: { r2Key: string; contentType: string; sizeBytes: number },
@@ -1741,10 +1706,6 @@ const prepareChatImage = async (
   }
 };
 
-/**
- * Deletes every retired object that is due, one R2 batch delete per
- * `CLEANUP_BATCH` keys, in this one run.
- */
 const runCleanup = async (ctx: OwnerContext): Promise<void> => {
   const now = ctx.now;
   for (let batch = 0; batch < CLEANUP_MAX_BATCHES_PER_RUN; batch += 1) {
@@ -1769,12 +1730,10 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
     const doomed = due.filter((row) => !isKeyReferenced(ctx.db, row.r2_key));
     if (doomed.length > 0) {
       const keys = [...new Set(doomed.map((row) => row.r2_key))];
-      // A retired file's prepared chat-image copy goes with it.
       const prepared = await Promise.all(keys.map((key) => attachmentImageKey(ctx.ownerId, key)));
       try {
         await bucketOf(ctx).delete([...keys, ...prepared]);
       } catch {
-        // The lease holds these rows back until it lapses, then they retry.
         break;
       }
     }

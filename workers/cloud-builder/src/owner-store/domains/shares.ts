@@ -127,7 +127,6 @@ const viewSecretOf = (env: Cloudflare.Env): string | null => {
 
 const keyForSlug = (slug: string): string => `shares/${slug}.html`;
 
-/** A published document's assets live at `shares/<slug>/<path beside the document>`. */
 const assetPrefixForSlug = (slug: string): string => `shares/${slug}/`;
 
 const deleteAssets = async (
@@ -300,7 +299,6 @@ const forgetFailedPut = async (
     await bucketOf(ctx.env).delete(key);
     dropRow(ctx, slug);
   } catch {
-    // Kept for the expiry job.
   }
 };
 
@@ -581,8 +579,6 @@ const assetContentType = (path: string, stored: string): string =>
   ASSET_CONTENT_TYPES[/\.([a-z0-9]+)$/iu.exec(path)?.[1]?.toLowerCase() ?? ""] ??
   (stored || "application/octet-stream");
 
-// Quoted or url() strings that name a file beside the document, so assets a
-// page's script or stylesheet points at are published along with its tags'.
 const ASSET_LITERAL_RE =
   /["'(]([^"'()\s<>]{1,512}?\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp|mp4|m4v|webm|mov|mp3|wav|ogg|m4a|flac|css|m?js|woff2?|ttf|otf))(?=["')?#])/giu;
 
@@ -598,11 +594,6 @@ const documentAssetPaths = (html: string, documentPath: string): string[] => {
     .slice(0, MAX_DOCUMENT_ASSETS);
 };
 
-/**
- * Publishes an HTML file from the owner's Drive as a canvas, read here rather
- * than uploaded, with the files beside it that it references copied under the
- * share so its relative images, styles, scripts and videos resolve.
- */
 const saveDriveDocument = async (
   ctx: OwnerContext,
   args: { canvas: string; path: string; title?: string; visibility?: ShareVisibility },

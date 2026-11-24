@@ -42,7 +42,6 @@ const EXPIRE_MS = 30 * 60_000;
 const RATE_LIMIT = { count: 20, windowMs: 5 * 60_000 };
 // Static tariffs can undershoot what fal bills; hold a margin above the estimate.
 const RESERVE_MARGIN = 1.25;
-// Models priced from their output (transcription) reserve this up front.
 const UNPRICED_RESERVE_USD = 0.5;
 // After a cancel or timeout the job may still finish on fal and be billed:
 // keep checking for this long before settling at the estimate.
@@ -420,8 +419,6 @@ const lateOutcome = (row: JobRow): CostOutcome =>
       ? "expired"
       : "failed";
 
-// Charge what fal billed for this job (best estimate from the tariff), write
-// its cost ledger row and drop the hold. Runs once per job.
 const settleJob = (
   ctx: OwnerContext,
   jobId: string,
@@ -468,8 +465,6 @@ const settleJob = (
   log("media_job_settled", { jobId, model: row.model, outcome: input.outcome, chargedMicroCents: charge });
 };
 
-// A canceled, timed-out or lost job may still run to completion on fal; find
-// out what happened before settling.
 const settleLater = (ctx: OwnerContext, jobId: string, delayMs = 30_000): void => {
   ctx.jobs.schedule(MEDIA_SETTLE_JOB, Date.now() + delayMs, { jobId, check: 0 }, { id: settleJobId(jobId) });
 };

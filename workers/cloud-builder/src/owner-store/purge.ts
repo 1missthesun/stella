@@ -5,7 +5,6 @@ import { AGENT_REPORT_JOB, deleteConversationAgentReports } from "./domains/agen
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
 
 const PURGE_BATCH = 25;
-/** A deleted conversation's storage is purged however long it takes; never dropped. */
 const PURGE_JOB_MAX_ATTEMPTS = Number.POSITIVE_INFINITY;
 
 export const CONVERSATION_PURGE_JOB = "conversations.purge";
@@ -87,11 +86,6 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
   db.run("DELETE FROM agent_threads WHERE conversation_id = ?", conversationId);
 };
 
-/**
- * A conversation's catch-ups (`domains/catch-ups.ts`), and any still being
- * written. Kept here rather than imported: that domain imports conversations,
- * which imports this file.
- */
 const deleteConversationCatchUps = (db: OwnerDb, jobs: OwnerJobs, conversationId: string): void => {
   for (const { catch_up_id } of db.all<{ catch_up_id: string }>(
     "SELECT catch_up_id FROM catch_ups WHERE conversation_id = ? AND state = 'pending'",

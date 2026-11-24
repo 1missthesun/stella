@@ -67,7 +67,6 @@ type ThreadRow = {
   executor_device_id: string | null;
   placement: string;
   execution_json: string | null;
-  /** What earlier turns said that a later turn superseded before it reached anyone (see `carryReport`). */
   carried_report: string | null;
 };
 
@@ -160,7 +159,6 @@ const queuedInput = (db: OwnerDbReader, thread: ThreadRow): boolean =>
     ),
   );
 
-/** The outcome of an input held because its task was stopped: it waits for a resume, so it is not work under way. */
 export const HELD_WHILE_STOPPED = "held_while_stopped";
 
 export const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
@@ -273,20 +271,12 @@ const scheduleAudit = (
   );
 };
 
-/**
- * A schedule aimed at a task was removed or paused: a task whose turn ended
- * waiting hears it at once, since that schedule's fire may have been what it
- * waited for. A task at work hears nothing (it removed it itself, or will see).
- */
 export const tellWaitingScheduleGone = (
   ctx: Pick<OwnerContext, "db" | "now">,
   args: { threadId: string; name: string; change: "removed" | "paused"; key: string },
 ): void => {
   const thread = readThread(ctx.db, args.threadId);
   if (!thread || !thread.owner_generation) return;
-  // A task on the cloud's Stella engine keeps its attempt open while it
-  // waits (its own helpers and checks wake it there), so it still reads as
-  // running here: the engine drops the notice unless the task is waiting.
   const onCloudEngine =
     thread.status === "running" &&
     !thread.executor_device_id &&
@@ -303,7 +293,6 @@ export const tellWaitingScheduleGone = (
   });
 };
 
-/** Whether a task's execution runs on the conversation's cloud engine (not in a container of its own). */
 const runsOnCloudEngine = (executionJson: string | null): boolean => {
   if (!executionJson) return false;
   try {
@@ -314,11 +303,9 @@ const runsOnCloudEngine = (executionJson: string | null): boolean => {
   }
 };
 
-/** An attempt that ended its turn waiting (end_turn_waiting): it keeps its task and is never reported. */
 export const endedWaiting = (thread: Pick<ThreadRow, "status" | "result_json">): boolean =>
   agentStanding(recordedAgentFacts({ status: thread.status, resultJson: thread.result_json })).state === "waiting";
 
-/** A finished agent whose report waits for its own agents still at work. */
 export const reportHeldForHelpers = (
   db: OwnerDbReader,
   thread: Pick<ThreadRow, "thread_id" | "attempt_generation" | "status" | "result_json" | "origin_delivery_ack_at">,
@@ -329,7 +316,6 @@ export const reportHeldForHelpers = (
   !readOutbox(db, agentReportId(thread.thread_id, thread.attempt_generation)) &&
   liveDescendants(db, thread.thread_id).length > 0;
 
-/** The ancestors of these agents whose reports wait for helpers still at work. */
 export const heldAncestorIds = (
   db: OwnerDbReader,
   threads: readonly Pick<ThreadRow, "thread_id" | "parent_thread_id">[],
@@ -349,11 +335,6 @@ export const heldAncestorIds = (
   return held;
 };
 
-/**
- * A turn's report that a later turn superseded (input was already queued for
- * the task) is kept on the task, never dropped: it goes out with the task's
- * next report, or on its own once the task settles without one.
- */
 export const carryReport = (db: OwnerDb, threadId: string, text: string): void => {
   const trimmed = text.trim();
   if (!trimmed) return;
@@ -370,11 +351,6 @@ export const carryReport = (db: OwnerDb, threadId: string, text: string): void =
   );
 };
 
-/**
- * Whether `text` is already among what was carried: the same turn's words
- * reach the cloud more than once (its end retried, the attempt derived again
- * after its queued input settled), and a report says each of them once.
- */
 const saidAlready = (carried: string, text: string): boolean => {
   const said = carried.trim();
   const next = text.trim();
@@ -387,7 +363,6 @@ const withCarried = (thread: ThreadRow, text: string): string => {
   return saidAlready(carried, text) ? carried : `${carried}\n\n${text}`;
 };
 
-/** How long a turn's report waits for the end of the turn before it, still on its way from its computer. */
 const EARLIER_TURN_WAIT_MS = 45_000;
 
 const EARLIER_TURN_ENDS = [
@@ -402,12 +377,6 @@ const EARLIER_TURN_ENDS = [
   "terminal_ignored",
 ];
 
-/**
- * The turn before this one started and its end hasn't arrived: a computer can
- * send the next turn's start before the last turn's end (a wake that came in
- * as the turn finished). Filed now, this turn's report ("all done, the report
- * above stands") would reach Stella ahead of the report it points to.
- */
 const earlierTurnOnItsWay = (db: OwnerDbReader, thread: ThreadRow): boolean => {
   const earlier = thread.attempt_generation - 1;
   if (earlier < 1) return false;
@@ -444,11 +413,7 @@ export const deriveAgentReport = (
   const waiting = endedWaiting(thread);
   const stopped = thread.status === "canceled" && isAgentStopReason(thread.error_message);
   if (waiting || stopped) {
-    // It settles without a report of its own; what it said in turns a later
-    // one superseded still reaches whoever started it.
     if (!thread.carried_report?.trim()) return;
-    // A turn that only handed its words on (to the report it carried) isn't
-    // waiting on anything the starter needs to hear about.
     const handedOn = waiting && resultWaitingFor(thread.result_json) === HANDED_ON_WAITING_FOR;
     const tail = handedOn
       ? ""
@@ -460,9 +425,6 @@ export const deriveAgentReport = (
   }
   scheduleAudit(db, thread, now + REPORT_AUDIT_FIRST_MS, 0, false);
   const outcome = thread.status as AgentReportOutcome;
-  // A finished report it sent itself (explicit messaging) goes now: input
-  // queued for it starts a turn of its own, and its computer already refused
-  // the report while its helpers worked.
   const done = outcome === "completed" && resultDone(thread.result_json);
   const queued = !done && queuedInput(db, thread);
   const helpers =
@@ -481,8 +443,6 @@ export const deriveAgentReport = (
       detail: queued ? { queuedInput: true, carried: true } : { helpers },
       createdAt: now,
     });
-    // Queued input starts another turn, which supersedes this one: keep what
-    // this one said. (Held for helpers, the same turn reports later itself.)
     if (deferred && queued) carryReport(db, thread.thread_id, reportText(thread, outcome));
     return;
   }
@@ -509,12 +469,6 @@ export const deriveAgentReport = (
   fileReport(db, thread, reportId, outcome, boundReportText(withCarried(thread, reportText(thread, outcome)), thread.thread_id), now);
 };
 
-/**
- * A turn's end that arrives after a later turn of the task began (its
- * computer reported it late, or the next input started a turn first): what it
- * said is kept with the task's next report, or, when the task has already
- * settled and reported, delivered by itself now.
- */
 export const fileLateTurn = (
   db: OwnerDb,
   threadId: string,
@@ -527,9 +481,6 @@ export const fileLateTurn = (
   const thread = readThread(db, threadId);
   if (!thread || attemptGeneration >= thread.attempt_generation) return false;
   if (waiting || !text.trim()) {
-    // A turn that ended waiting is no report (its words are its waiting line;
-    // what it meant for its starter went as a message). Its end is noted, so a
-    // later turn's report no longer waits for it.
     const noted = appendAgentEvent(db, {
       key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
       kind: "report_deferred",
@@ -548,9 +499,6 @@ export const fileLateTurn = (
   const known = (key: string) => db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", key) !== null;
   if (known(lateId) || known(`report_deferred:${thread.thread_id}:${attemptGeneration}`)) return false;
   if (done) {
-    // The finished report it sent itself is that turn's own report: it goes
-    // out now, and says nothing about the later turn. It ends the earlier turn
-    // a later one's report may be waiting for.
     fileReport(
       db,
       { ...thread, attempt_generation: attemptGeneration, status: "completed" },
@@ -702,8 +650,6 @@ const settle = (
     createdAt: ctx.now,
   });
   ctx.jobs.cancel(deliveryJobId(row.report_id));
-  // A build that still reads `agentThreads.forDevice` must not take a report
-  // the outbox already delivered.
   if (state === "delivered" && row.kind === "report") {
     ctx.db.run(
       `UPDATE agent_threads SET origin_delivery_ack_at = ?
@@ -857,7 +803,6 @@ const route = async (ctx: OwnerContext, row: OutboxRow): Promise<void> => {
       reportId: row.report_id,
       parentThreadId: parent.thread_id,
       ownerGeneration: row.owner_generation ?? parent.owner_generation ?? "",
-      // A note (a helper's reply) is already framed as a message from it.
       text:
         row.kind === "note"
           ? row.text
@@ -946,9 +891,6 @@ const missingReportNote = (
   });
 };
 
-// Every finished attempt gets one look a few minutes later: a report that was
-// never derived is derived now, one that was dropped is told to Stella, and a
-// report still waiting (helpers at work, an offline computer) is looked at again.
 const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const args = payload as { threadId?: unknown; attemptGeneration?: unknown; checks?: unknown } | null;
   if (typeof args?.threadId !== "string" || typeof args.attemptGeneration !== "number") return;
@@ -1013,7 +955,6 @@ const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> =
       const detail = JSON.parse(dropped?.detail ?? "{}") as { reason?: unknown };
       if (typeof detail.reason === "string" && detail.reason.trim()) reason = detail.reason.trim().slice(0, 300);
     } catch {
-      // The default reason stands.
     }
     if (reason !== "conversation_gone") missingReportNote(ctx, thread, reason);
     return;
@@ -1052,11 +993,6 @@ export const queueStellaNote = (
   scheduleDelivery(ctx.db, args.noteId, ctx.now);
 };
 
-/**
- * A message from a helper to the agent that started it (its lead), delivered
- * like the helper's report would be: a note in the same outbox with the lead
- * as requester.
- */
 export const queueAgentNote = (
   ctx: Pick<OwnerContext, "db" | "now">,
   args: {
@@ -1155,7 +1091,6 @@ const noteParser = object({
   conversationId: id(),
   fromThreadId: id(),
   text: string({ min: 1, max: 40_000 }),
-  /** A lead of this conversation to give the note to instead of Stella (a computer's note about the helpers it runs). */
   toThreadId: optional(id()),
 });
 

@@ -202,13 +202,6 @@ export const SCHEDULES_TARGET_THREAD_MIGRATION = {
   statements: [`ALTER TABLE schedules ADD COLUMN target_thread_id TEXT`],
 };
 
-/**
- * A schedule's run lives on after the schedule hands it over: each handed-over
- * run is recorded until it settles, so a run that fails where it runs is
- * retried or reported instead of being taken for done. `retry_of` carries a
- * retry's chain to its next run; `failure_told_at` keeps a failing repeating
- * schedule from telling Stella on every run.
- */
 export const SCHEDULES_RUNS_MIGRATION = {
   id: "schedules.11-runs",
   statements: [
@@ -235,13 +228,6 @@ export const SCHEDULES_RUNS_MIGRATION = {
   ],
 };
 
-/**
- * A run in the cloud is followed like one on a computer: `dispatch_id` is the
- * gate's dispatch of a run sent to a computer (which may go to the cloud
- * instead), `cloud_turn_id` the cloud turn that runs it, `cloud_thread_id`
- * the cloud agent a scheduled agent run starts. `done_at` marks a run whose
- * end was acted on, so it is acted on once.
- */
 export const SCHEDULES_CLOUD_RUNS_MIGRATION = {
   id: "schedules.12-cloud-runs",
   statements: [
@@ -291,12 +277,6 @@ type Row = {
   updated_at: number;
 };
 
-/**
- * Where a schedule's current run is. `armed` waits for `next_run_at`; with a
- * fire id it is a retry of that run. `firing` holds the run while it starts;
- * its job stays armed for the lease end, so a run cut off by an eviction or a
- * throw is resumed or recorded failed, never dropped.
- */
 type RunState =
   | { kind: "armed"; retryFireId: string | null }
   | { kind: "firing"; fireId: string; startedAt: number };
@@ -313,7 +293,6 @@ const sameRun = (a: RunState, b: RunState): boolean =>
     ? b.kind === "firing" && a.fireId === b.fireId && a.startedAt === b.startedAt
     : b.kind === "armed" && a.retryFireId === b.retryFireId;
 
-/** The one way a run moves. False when the row has moved on: that caller lost. */
 const transitionRun = (
   ctx: OwnerContext,
   scheduleId: string,
@@ -428,7 +407,6 @@ const noticeCardOf = (row: Row, action: ScheduleNoticeAction, zone?: string): Sc
   };
 };
 
-/** Show the change in the schedule's conversation, posted after this write commits. */
 const queueNotice = (ctx: OwnerContext, row: Row, action: ScheduleNoticeAction): void => {
   const conversationId = row.conversation_id;
   if (!conversationId || conversationId.startsWith("local_")) return;
@@ -471,12 +449,6 @@ const postNotice = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
   if (!posted) throw new Error("The schedule notice could not be posted yet.");
 };
 
-/**
- * Plans without cloud containers (Free) run scheduled work only on the
- * user's computer: a scheduled run never starts in the cloud, where it would
- * need a container (Claude Code) or spend the small one-time budget.
- * Reminders carry no AI and are still delivered from the cloud.
- */
 const computerOnly = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now: number }): boolean =>
   !cloudSandboxAccess(ctx).enabled;
 
@@ -758,11 +730,9 @@ type CreateInput = {
   targetThreadId?: string;
   script?: string;
   once?: boolean;
-  /** The agent that set it up, told too when a run fails. */
   createdByThreadId?: string;
 };
 
-/** A schedule may target only an agent the ledger knows; its canonical thread id. */
 const targetThreadOf = (ctx: OwnerContext, kind: ScheduleKind, threadId: string | undefined): string | null => {
   const wanted = threadId?.trim();
   if (!wanted) return null;
@@ -1373,18 +1343,11 @@ type FireOutcome = {
   error?: string;
   retry?: { sameFire: boolean };
   pause?: boolean;
-  /** The schedule's last run (a watch that stops once it finds something). */
   last?: boolean;
-  /** A failure Stella already heard about another way (a watch's own repair note). */
   quiet?: boolean;
-  /**
-   * The run went to a computer and is still running there: it is done only
-   * when it settles (`schedules.runSettled`), so a failing streak isn't over.
-   */
   tracked?: boolean;
 };
 
-/** Settles a run: back to armed for the next occurrence or a retry, or done. */
 const finishFire = (ctx: OwnerContext, scheduleId: string, fireId: string, outcome: FireOutcome): void => {
   const row = readRow(ctx.db, scheduleId);
   if (!row) return;
@@ -1436,16 +1399,9 @@ const finishFire = (ctx: OwnerContext, scheduleId: string, fireId: string, outco
   }
 };
 
-/** Waits between tries of a run that never started anywhere (a computer's run that failed before starting). */
 const RUN_RETRY_DELAYS_MS = [60_000, 5 * 60_000, 15 * 60_000] as const;
 const RUN_RECORD_TTL_MS = 7 * DAY_MS;
-/** An unsettled run is kept this long at most (a cloud agent can run for days). */
 const RUN_RECORD_MAX_MS = 30 * DAY_MS;
-/**
- * How long a cloud run may go without word of how it ended before it is
- * checked: a cloud turn always reports its end (its watchdog ends one that
- * stalls), so silence this long means the report was lost.
- */
 const CLOUD_RUN_CHECK_MS = 12 * 60 * 60_000;
 export const SCHEDULE_FAILED_JOB = "schedules.tellFailed";
 const SCHEDULE_SETTLE_JOB = "schedules.settleRun";
@@ -1474,7 +1430,6 @@ type RunRecord = {
 const readRun = (db: OwnerDbReader, fireId: string): RunRecord | null =>
   db.one<RunRecord>("SELECT * FROM schedule_runs WHERE fire_id = ?", fireId);
 
-/** Notes a run about to be started, before it is: its end can arrive at once. */
 const recordRun = (ctx: OwnerContext, row: Row, fireId: string): void => {
   ctx.db.run(
     "DELETE FROM schedule_runs WHERE (done_at IS NOT NULL AND created_at < ?) OR created_at < ?",
@@ -1493,11 +1448,6 @@ const recordRun = (ctx: OwnerContext, row: Row, fireId: string): void => {
   );
 };
 
-/**
- * The run is started (on a computer or in the cloud): from here its end
- * decides what happens next. A run started in the cloud is checked on if no
- * word of its end comes.
- */
 const runHandedOver = (ctx: OwnerContext, fireId: string, started: ScheduledTurnStarted): void => {
   ctx.db.run(
     `UPDATE schedule_runs SET handed = 1,
@@ -1533,11 +1483,6 @@ const runSettledArgs = object({
   errorMessage: optional(string({ max: 4_000 })),
 });
 
-/**
- * How a run handed to a computer ended, from the owner gate. A computer's run
- * can fail long after the schedule handed it over (aborted where it ran, the
- * computer gone before it started): that run is not done.
- */
 const runSettled = (ctx: OwnerContext, raw: unknown): { known: boolean } => {
   const args = runSettledArgs(raw);
   const fireId = args.clientMsgId.startsWith("schedule:") ? args.clientMsgId.slice("schedule:".length) : "";
@@ -1581,7 +1526,6 @@ const queueSettle = (db: OwnerDb, fireId: string, now: number): void => {
   );
 };
 
-/** Records how a run ended, once; the settle job acts on it. */
 const noteRunOutcome = (
   db: OwnerDb,
   fireId: string,
@@ -1603,14 +1547,6 @@ const noteRunOutcome = (
   queueSettle(db, fireId, now);
 };
 
-/**
- * Follows a run in the cloud through the owner events of its cloud turn: the
- * turn's start names the run (its client message id is the run's, or the
- * dispatch's that sent it to the cloud), and the turn's end settles it. A
- * scheduled agent's turn only starts the agent, so its end waits for the
- * agent's (`agentChangeHooks` below); a turn that ended before the agent
- * existed never started it.
- */
 export const followScheduledRuns = (
   ctx: Pick<OwnerContext, "db" | "now">,
   events: readonly OwnerEvent[],
@@ -1655,10 +1591,7 @@ export const followScheduledRuns = (
       run.fire_id,
       {
         outcome: status === "waiting_for_user" ? "completed" : status,
-        // A turn that ended before running did nothing; unknown counts as started.
         started: event.began !== false,
-        // A cloud turn's cancel can come from the system as well as from
-        // someone's Stop, and the event doesn't say which: it is told.
         error: event.errorMessage ?? null,
       },
       ctx.now,
@@ -1668,7 +1601,6 @@ export const followScheduledRuns = (
 
 const AGENT_ENDED = new Set(["completed", "failed", "canceled"]);
 
-/** A scheduled cloud agent's run ends with the agent. */
 agentChangeHooks.push((db, threadId, now) => {
   const run = db.one<{ fire_id: string }>(
     "SELECT fire_id FROM schedule_runs WHERE cloud_thread_id = ? AND outcome IS NULL",
@@ -1700,12 +1632,6 @@ const settleQueued = (ctx: OwnerContext, payload: unknown): void => {
   if (run?.handed) settleRun(ctx, run);
 };
 
-/**
- * A cloud run with no word of its end after `CLOUD_RUN_CHECK_MS`. A scheduled
- * agent still at work (or paused, or waiting for the user) is checked again
- * later; anything else lost its report, and is told as a run whose end is
- * not known.
- */
 const checkRun = (ctx: OwnerContext, payload: unknown): void => {
   const { fireId } = fireIdPayload(payload);
   const run = readRun(ctx.db, fireId);
@@ -1729,7 +1655,6 @@ const checkRun = (ctx: OwnerContext, payload: unknown): void => {
   );
 };
 
-/** Acts on a run's end, once: a run's end can be heard twice (the gate and the cloud turn's own report). */
 const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
   if (run.done_at !== null || run.outcome === null) return;
   ctx.db.run("UPDATE schedule_runs SET done_at = ? WHERE fire_id = ? AND done_at IS NULL", ctx.now, run.fire_id);
@@ -1741,7 +1666,6 @@ const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
     }
     return;
   }
-  // Someone stopped it (Stop in the chat, a cancel): they know.
   if (run.outcome === "canceled" && run.on_purpose) return;
   const error = run.error ?? `It ended ${run.outcome ?? "without finishing"}.`;
   log("error", "schedule_run_failed", {
@@ -1760,7 +1684,6 @@ const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
     ctx.now,
     row.schedule_id,
   );
-  // A cloud turn canceled before it ran may have been someone's Stop: told, not run again.
   const stoppedInCloud = run.outcome === "canceled" && run.cloud_turn_id !== null;
   if (!run.started && !stoppedInCloud && retryRun(ctx, row, run)) return;
   let after: "ended" | "continues" | "paused" = "ended";
@@ -1780,12 +1703,6 @@ const settleRun = (ctx: OwnerContext, run: RunRecord): void => {
   });
 };
 
-/**
- * A run that never started anywhere did nothing, so it runs again shortly, a
- * few times, while the schedule is still meant to run it then: not paused,
- * removed or already on to another run. Each try is a new run (its own fire
- * id) chained to the first by `retry_of`.
- */
 const retryRun = (ctx: OwnerContext, row: Row, run: RunRecord): boolean => {
   const delay = RUN_RETRY_DELAYS_MS[run.attempt - 1];
   if (delay === undefined) return false;
@@ -1798,8 +1715,6 @@ const retryRun = (ctx: OwnerContext, row: Row, run: RunRecord): boolean => {
     return false;
   }
   const retryAt = ctx.now + delay;
-  // A one-time schedule ran its only run (done); active again means it was
-  // given a new time meanwhile. A repeating one retries only before its next run.
   if (oneTime ? row.status !== "done" : row.status !== "active" || retryAt >= row.next_run_at) return false;
   ctx.db.run(
     `UPDATE schedules SET status = 'active', next_run_at = ?, retry_of = ?, retry_attempt = ?, updated_at = ?
@@ -1823,23 +1738,14 @@ const retryRun = (ctx: OwnerContext, row: Row, run: RunRecord): boolean => {
 type FailedRun = {
   fireId: string;
   error: string;
-  /** Whether it got as far as running; unknown when the cloud couldn't tell. */
   started?: boolean;
   attempts: number;
-  /** What the schedule does now. */
   after: "ended" | "continues" | "paused";
   dueAt?: number;
   deviceId?: string;
   inCloud?: boolean;
 };
 
-/**
- * A run that won't happen is told, never just recorded: Stella hears it in
- * the schedule's conversation, and so does the agent that set it up, as a
- * message (the same outbox as an agent's report: it reaches wherever each
- * runs, retried until taken). A repeating schedule tells once per failing
- * streak.
- */
 const tellRunFailed = (ctx: OwnerContext, scheduleId: string, failed: FailedRun): void => {
   const row = readRow(ctx.db, scheduleId);
   if (!row) return;
@@ -1934,8 +1840,6 @@ const tellFailed = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
   }
   if (reachable) {
     queueAgentNote(ctx, {
-      // "schedule:" marks it automatic: a task stopped on purpose holds it
-      // until it is resumed instead of being started by it.
       noteId: agentReportReceipt(`schedule:failed:${failed.fireId}:by`),
       parentThreadId: reachable.thread_id,
       conversationId: reachable.conversation_id,
@@ -1954,11 +1858,6 @@ const tellFailed = async (ctx: OwnerContext, payload: unknown): Promise<void> =>
 
 const INTERRUPTED_RUN = "This run was cut off before it finished starting.";
 
-/**
- * Picks the run this job fire owns: a due armed schedule starts a new run
- * (or its pending retry), a firing one past its lease was cut off and is
- * resumed under the same fire id. Null when there is nothing to run now.
- */
 const claimRun = (
   ctx: OwnerContext,
   row: Row,
@@ -2087,24 +1986,17 @@ const runFire = async (
   finishFire(ctx, scheduleId, fireId, started.ok ? { tracked: started.tracked } : started.outcome);
 };
 
-/** A retry's run says so: its first try never started, so nothing of it was done. */
 const retryNote = (row: Row): string =>
   row.retry_of && row.retry_attempt
     ? `\n\n(Try ${row.retry_attempt}: the earlier try never started${row.last_error ? ` (${row.last_error})` : ""}, so nothing of it was done.)`
     : "";
 
-/** Where a scheduled run goes: anywhere (today's routing), or only to a computer. */
 type Placement =
   | { computerOnly: false; away: false; device?: undefined }
   | { computerOnly: true; away: boolean; device?: DeviceDestination; ownDevice: boolean };
 
 const WAIT_RECHECK_MS = 30 * 60_000;
 
-/**
- * A computer-only run goes to the computer that set the schedule up, else
- * the user's main computer (or the one seen last). `away` when none is
- * online: the run then waits instead of starting anywhere.
- */
 const placementOf = async (ctx: OwnerContext, row: Row): Promise<Placement> => {
   if (!computerOnly(ctx)) return { computerOnly: false, away: false };
   const computers = await ctx.host.deviceDestinations();
@@ -2122,12 +2014,6 @@ const placementOf = async (ctx: OwnerContext, row: Row): Promise<Placement> => {
   return { computerOnly: true, away: !device?.online, ownDevice: Boolean(own), ...(device ? { device } : {}) };
 };
 
-/**
- * The run came due while its computer was away. Nothing runs in the cloud:
- * the schedule keeps the run waiting, says so once in its conversation and on
- * the phone, and runs it when the computer is back (`schedules.computerBack`),
- * with a slow recheck in case that signal is missed.
- */
 const waitForComputer = async (
   ctx: OwnerContext,
   row: Row,
@@ -2146,7 +2032,6 @@ const waitForComputer = async (
       nextRunAt = Math.min(nextRunAt, computeNextRunAt(schedule, ctx.now + 1_000, ownerZone(ctx.db)));
     }
   } catch {
-    // An unreadable schedule is paused by its next fire.
   }
   const waited = transitionRun(ctx, row.schedule_id, run, { kind: "armed", retryFireId: null }, {
     waiting_since: dueAt,
@@ -2180,7 +2065,6 @@ const waitForComputer = async (
 
 const SCHEDULE_WAITING_PUSH_KIND = "schedule-waiting";
 
-/** A computer came back: runs waiting for it go now. */
 const computerBack = (ctx: OwnerContext, raw: unknown): { woke: number } => {
   const { deviceId } = object({ deviceId: string({ max: 256 }) })(raw);
   const rows = ctx.db.all<Row>(
@@ -2214,8 +2098,6 @@ const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string): boolea
     return true;
   } catch (error) {
     if (!(error instanceof RpcError) || error.code !== "RATE_LIMITED") throw error;
-    // Not told: with many schedules it would wake Stella for every skipped
-    // run; the schedule shows it as its last error.
     finishFire(ctx, scheduleId, fireId, {
       error: `This run was skipped: today's ${budget.count} scheduled runs on the ${planLabel(budget.plan)} plan are used up.`,
       quiet: true,
@@ -2245,7 +2127,6 @@ const startRun = async (
   const targetDeviceId = run.agent
     ? ownDeviceId
     : await whereStellaRuns(ctx, { conversationId, ownerGeneration, fallback: ownDeviceId ?? undefined, placement });
-  // Every run is followed to its end, wherever it runs.
   const tracked = true;
   recordRun(ctx, row, fireId);
   const start = async (id: string): Promise<ScheduledTurnStarted> =>
@@ -2298,14 +2179,6 @@ const startRun = async (
   return { ok: true, tracked };
 };
 
-/**
- * Where a run for Stella goes: to the computer her conversation runs on, or
- * the cloud when it runs there. A computer that doesn't hold the
- * conversation can't run a turn of it (its turn is refused and stopped at
- * once), so the schedule's own computer is only the fallback for a
- * conversation that runs nowhere yet. A computer-only plan never starts one
- * in the cloud.
- */
 const whereStellaRuns = async (
   ctx: OwnerContext,
   args: { conversationId: string; ownerGeneration: string; fallback: string | undefined; placement: Placement },
@@ -2329,11 +2202,6 @@ type ThreadSend =
   | { kind: "retry"; error: string }
   | { kind: "fallback"; note: string };
 
-/**
- * Hands a fire to the schedule's target thread. A thread that is gone, or
- * whose computer refuses it, falls back to Stella with a note; a thread
- * that is only between runs is retried.
- */
 const sendToThread = async (
   ctx: OwnerContext,
   row: Row,
@@ -2539,11 +2407,6 @@ const tellStellaArgs = object({
   text: string({ max: 16_000 }),
 });
 
-/**
- * A computer's own schedule (a watch whose check needs that computer) speaks
- * to Stella through here when she isn't running on that computer: queued like
- * an agent's message, it reaches the computer or cloud that runs her.
- */
 const tellStella = async (
   ctx: OwnerContext,
   args: ScheduleCalls["schedules.tellStella"]["args"],

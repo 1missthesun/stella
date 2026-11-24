@@ -1298,7 +1298,9 @@ export const runCloudClaude = async (options: {
             typeof event.result === "string" ? event.result.trim() : "";
           if (resultText) {
             answers.push(resultText);
-            finalText = answers.join("\n\n");
+            // Stella's turn posts every answer it gave; a task's plain text
+            // only stands for its last words (its messages went by send_message).
+            finalText = profile.role === "orchestrator" ? answers.join("\n\n") : resultText;
           }
           addResultUsage(event);
           if (typeof event.num_turns === "number") {

@@ -256,6 +256,7 @@ function AuthenticatedLayout({ screensReady }: { screensReady: boolean }) {
 
   useEffect(() => {
     if (
+      !screensReady ||
       !navigatorReady ||
       session.isPending ||
       !guestReady ||
@@ -323,6 +324,7 @@ function AuthenticatedLayout({ screensReady }: { screensReady: boolean }) {
       router.replace(selfHostServersAvailable ? "/welcome" : "/login");
     }
   }, [
+    screensReady,
     navigatorReady,
     mainChatRequested,
     pathname,
@@ -356,6 +358,7 @@ function AuthenticatedLayout({ screensReady }: { screensReady: boolean }) {
       return;
     }
     if (
+      !screensReady ||
       !navigatorReady ||
       session.isPending ||
       !guestReady ||
@@ -373,6 +376,7 @@ function AuthenticatedLayout({ screensReady }: { screensReady: boolean }) {
       });
     });
   }, [
+    screensReady,
     navigatorReady,
     session.isPending,
     guestReady,

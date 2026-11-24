@@ -160,6 +160,39 @@ export type AttachedToolControlRequest =
       linkedPaths: readonly string[];
     }>;
 
+/** World pulls and pushes a container agent's turn made, and their cost. */
+export type WorldSyncTiming = {
+  pulls: number;
+  pullMs: number;
+  pullMaxMs: number;
+  pushes: number;
+  pushMs: number;
+  pushMaxMs: number;
+};
+
+const WORLD_SYNC_TIMING_KEYS = [
+  "pulls",
+  "pullMs",
+  "pullMaxMs",
+  "pushes",
+  "pushMs",
+  "pushMaxMs",
+] as const;
+
+const worldSyncTimingOf = (value: unknown): WorldSyncTiming => {
+  const row = record(value, "worldSync");
+  exactKeys(row, WORLD_SYNC_TIMING_KEYS, "worldSync");
+  const timing = {} as WorldSyncTiming;
+  for (const key of WORLD_SYNC_TIMING_KEYS) {
+    const entry = row[key];
+    if (!Number.isSafeInteger(entry) || (entry as number) < 0) {
+      throw new AttachedToolProtocolError("worldSync");
+    }
+    timing[key] = entry as number;
+  }
+  return timing;
+};
+
 export type AttachedToolControlResponse =
   | Readonly<{
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
@@ -170,6 +203,7 @@ export type AttachedToolControlResponse =
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
       status: "quiesced";
       deliveredFiles: readonly string[];
+      worldSync?: WorldSyncTiming;
     }>
   | Readonly<{
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
@@ -460,7 +494,11 @@ export const parseAttachedToolControlResponse = (
     return { version, status: "boot_report", notices: row.notices };
   }
   if (row.status === "quiesced") {
-    exactKeys(row, ["version", "status", "deliveredFiles"], "control");
+    exactKeys(
+      row,
+      ["version", "status", "deliveredFiles", "worldSync"],
+      "control",
+    );
     return {
       version,
       status: "quiesced",
@@ -469,6 +507,9 @@ export const parseAttachedToolControlResponse = (
         "deliveredFiles",
         ATTACHED_TOOL_MAX_DELIVERED_FILES,
       ),
+      ...(row.worldSync === undefined
+        ? {}
+        : { worldSync: worldSyncTimingOf(row.worldSync) }),
     };
   }
   if (row.status === "failed") {

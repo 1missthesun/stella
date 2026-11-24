@@ -408,6 +408,7 @@ export const runAgentTurn = (
       const workspaceStateDir = toolStateDir(workspaceRoot);
       const driveWorkspace = worldDriveWorkspace(workspaceRoot);
       const toolHome = CLOUD_TOOL_HOME;
+      markTurnStep("worldPullStarted");
       yield* Effect.tryPromise({
         try: () =>
           pullWorldProjection({ root: workspaceRoot, access: input.world }),
@@ -786,6 +787,7 @@ export const runAgentTurn = (
         nativeStateCheckpoint = native.nativeStateCheckpoint;
       }
       yield* Effect.promise(() => inbox.close().catch(() => []));
+      markTurnStep("worldPushStarted");
       const executorBoundaryPushFailure = yield* Effect.promise(async () => {
         try {
           await pushWorldProjection({
@@ -795,6 +797,8 @@ export const runAgentTurn = (
           return undefined;
         } catch (error) {
           return asError(error);
+        } finally {
+          markTurnStep("worldPushed");
         }
       });
       if (executorBoundaryPushFailure && !execution.errorMessage) {

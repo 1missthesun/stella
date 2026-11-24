@@ -57,6 +57,7 @@ import {
 import {
   pullWorldProjection,
   pushWorldProjection,
+  takeWorldSyncTiming,
   worldBaseEstablished,
 } from "./world-sync.js";
 
@@ -369,6 +370,7 @@ export const createAttachedToolDispatcher = (args: {
       version: ATTACHED_TOOL_PROTOCOL_VERSION,
       status: "quiesced",
       deliveredFiles: report.deliveredFiles,
+      worldSync: takeWorldSyncTiming(),
     };
   };
 

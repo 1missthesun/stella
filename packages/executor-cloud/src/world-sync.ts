@@ -128,11 +128,55 @@ const indexedNodeModulesDirectories = (index: WorldIndex): Set<string> => {
   return directories;
 };
 
-const fileSha256 = async (filePath: string): Promise<string> => {
+/** The bytes of a file the listing recorded at `size`, or fewer if it shrank since. */
+async function* listedBytes(
+  filePath: string,
+  size: number,
+): AsyncGenerator<Buffer> {
+  if (size === 0) return;
+  for await (const chunk of createReadStream(filePath, {
+    start: 0,
+    end: size - 1,
+  })) {
+    yield chunk as Buffer;
+  }
+}
+
+export class WorldFileShrankError extends Error {
+  constructor(filePath: string) {
+    super(`World file shrank while it was read: ${filePath}`);
+    this.name = "WorldFileShrankError";
+  }
+}
+
+/**
+ * The sha256 of the first `size` bytes, the size the listing recorded. A file
+ * still being appended to (a dev server's log) hashes as it was when listed,
+ * and its upload sends that same prefix, so the push goes through.
+ */
+const fileSha256 = async (filePath: string, size: number): Promise<string> => {
   const hash = createHash("sha256");
-  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  let read = 0;
+  for await (const chunk of listedBytes(filePath, size)) {
+    hash.update(chunk);
+    read += chunk.byteLength;
+  }
+  if (read !== size) throw new WorldFileShrankError(filePath);
   return hash.digest("hex");
 };
+
+/** Exactly the listed prefix of a file, failing if it shrank since. */
+async function* uploadBytes(
+  filePath: string,
+  size: number,
+): AsyncGenerator<Buffer> {
+  let sent = 0;
+  for await (const chunk of listedBytes(filePath, size)) {
+    sent += chunk.byteLength;
+    yield chunk;
+  }
+  if (sent !== size) throw new WorldFileShrankError(filePath);
+}
 
 const readIndex = async (
   indexPath: string,
@@ -311,7 +355,7 @@ export const withWorldSyncLock = async <T>(
 export const listWorldProjection = async (
   root: string,
   previous: WorldIndex = {},
-  hashFile: (filePath: string) => Promise<string> = fileSha256,
+  hashFile: (filePath: string, size: number) => Promise<string> = fileSha256,
 ): Promise<{ entries: WorldListingEntry[]; index: WorldIndex }> => {
   const entries: WorldListingEntry[] = [];
   const index: WorldIndex = {};
@@ -330,7 +374,7 @@ export const listWorldProjection = async (
         throw new Error(`World path exceeds 1024 UTF-8 bytes: ${child}`);
       }
       const childPath = absoluteWorldPath(root, child);
-      const stat = await lstat(childPath);
+      let stat = await lstat(childPath);
       const kind = stat.isSymbolicLink()
         ? "symlink"
         : stat.isDirectory()
@@ -355,6 +399,39 @@ export const listWorldProjection = async (
       ) {
         continue;
       }
+      let sha256: string | undefined;
+      if (kind === "file") {
+        if (stat.size > WORLD_FILE_LIMIT_BYTES) {
+          throw new Error(`World file exceeds 256 MiB: ${child}`);
+        }
+        const prior = previous[child];
+        if (
+          prior?.kind === "file" &&
+          prior.sha256 &&
+          prior.size === stat.size &&
+          prior.mtime === Math.trunc(stat.mtimeMs)
+        ) {
+          sha256 = prior.sha256;
+        } else {
+          // A file truncated and rewritten while it was hashed is listed
+          // again at its new size; one that keeps shrinking fails the sync.
+          for (let attempt = 1; sha256 === undefined; attempt += 1) {
+            try {
+              sha256 = await hashFile(childPath, stat.size);
+            } catch (error) {
+              if (!(error instanceof WorldFileShrankError) || attempt >= 3) {
+                throw error;
+              }
+              const again = await lstat(childPath);
+              if (!again.isFile() || again.isSymbolicLink()) throw error;
+              if (again.size > WORLD_FILE_LIMIT_BYTES) {
+                throw new Error(`World file exceeds 256 MiB: ${child}`);
+              }
+              stat = again;
+            }
+          }
+        }
+      }
       const common = {
         path: child,
         mode: stat.mode & 0o7777,
@@ -375,18 +452,7 @@ export const listWorldProjection = async (
         entries.push({ ...common, kind });
         index[child] = { kind, mode: common.mode, size: 0, mtime: common.mtime };
         await walk(child, durableNodeModulesEntry);
-      } else {
-        if (stat.size > WORLD_FILE_LIMIT_BYTES) {
-          throw new Error(`World file exceeds 256 MiB: ${child}`);
-        }
-        const prior = previous[child];
-        const sha256 =
-          prior?.kind === "file" &&
-          prior.sha256 &&
-          prior.size === common.size &&
-          prior.mtime === common.mtime
-            ? prior.sha256
-            : await hashFile(childPath);
+      } else if (sha256 !== undefined) {
         entries.push({ ...common, kind, sha256 });
         index[child] = {
           kind,
@@ -823,6 +889,49 @@ const establishedBase = async (root: string): Promise<WorldIndex> => {
   );
 };
 
+/** How long this process's world pulls and pushes took, for turn timing. */
+export type { WorldSyncTiming } from "./attached-tool-protocol.js";
+import type { WorldSyncTiming } from "./attached-tool-protocol.js";
+
+const syncTiming: WorldSyncTiming = {
+  pulls: 0,
+  pullMs: 0,
+  pullMaxMs: 0,
+  pushes: 0,
+  pushMs: 0,
+  pushMaxMs: 0,
+};
+
+/** The pulls and pushes since the last call, then starts counting afresh. */
+export const takeWorldSyncTiming = (): WorldSyncTiming => {
+  const taken = { ...syncTiming };
+  for (const key of Object.keys(syncTiming) as (keyof WorldSyncTiming)[]) {
+    syncTiming[key] = 0;
+  }
+  return taken;
+};
+
+const timed = async <T>(
+  kind: "pull" | "push",
+  run: () => Promise<T>,
+): Promise<T> => {
+  const started = performance.now();
+  try {
+    return await run();
+  } finally {
+    const ms = Math.round(performance.now() - started);
+    if (kind === "pull") {
+      syncTiming.pulls += 1;
+      syncTiming.pullMs += ms;
+      syncTiming.pullMaxMs = Math.max(syncTiming.pullMaxMs, ms);
+    } else {
+      syncTiming.pushes += 1;
+      syncTiming.pushMs += ms;
+      syncTiming.pushMaxMs = Math.max(syncTiming.pushMaxMs, ms);
+    }
+  }
+};
+
 export const worldBaseEstablished = async (root: string): Promise<boolean> =>
   (await readIndex(statePaths(root).index))?.complete === true;
 
@@ -830,7 +939,7 @@ export const pullWorldProjection = async (args: {
   root: string;
   access: WorldSyncAccess;
 }): Promise<WorldMarker> =>
-  await withWorldSyncLock(args.root, async () => {
+  await timed("pull", () => withWorldSyncLock(args.root, async () => {
     let marker = await readWorldMarker(args.root);
     const base = await establishedBase(args.root);
     for (;;) {
@@ -850,7 +959,7 @@ export const pullWorldProjection = async (args: {
       await writeIndex(args.root, base);
       await writeWorldMarker(args.root, marker);
     }
-  });
+  }));
 
 const postChanges = async (
   access: WorldSyncAccess,
@@ -955,7 +1064,7 @@ const batchBody = (blobs: readonly WorldBlobUpload[]): Readable =>
     (async function* () {
       for (const blob of blobs) {
         yield blobFrameHeader(blob);
-        for await (const chunk of createReadStream(blob.filePath)) yield chunk;
+        yield* uploadBytes(blob.filePath, blob.size);
       }
     })(),
   );
@@ -1013,7 +1122,7 @@ const uploadBlobBatch = async (
     requestHeaders.set("content-type", "application/octet-stream");
     requestHeaders.set("x-stella-world-blob-sha256", batch.blob.sha256);
     requestHeaders.set("content-length", String(batch.blob.size));
-    body = createReadStream(batch.blob.filePath);
+    body = Readable.from(uploadBytes(batch.blob.filePath, batch.blob.size));
   }
   const init: RequestInit & { duplex: "half" } = {
     method: "POST",
@@ -1068,9 +1177,9 @@ const uploadBatches = async (
 export const pushWorldProjection = async (args: {
   root: string;
   access: WorldSyncAccess;
-  hashFile?: (filePath: string) => Promise<string>;
+  hashFile?: (filePath: string, size: number) => Promise<string>;
 }): Promise<WorldMarker> =>
-  await withWorldSyncLock(args.root, async () => {
+  await timed("push", () => withWorldSyncLock(args.root, async () => {
     const marker = await readWorldMarker(args.root);
     const stored = await readIndex(statePaths(args.root).index);
     if (!stored?.complete) {
@@ -1129,4 +1238,4 @@ export const pushWorldProjection = async (args: {
     await writeIndex(args.root, projection.index);
     await writeWorldMarker(args.root, nextMarker);
     return nextMarker;
-  });
+  }));

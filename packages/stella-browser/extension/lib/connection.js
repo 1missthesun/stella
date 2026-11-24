@@ -1,6 +1,5 @@
 import { STELLA_NATIVE_HOST_NAME } from "./native-host-name.js";
 
-/** Must match the daemon's bridge port (STELLA_BROWSER_BRIDGE_PORT / DEFAULT_EXT_PORT). */
 const BRIDGE_HEALTH_URL = "http://127.0.0.1:39040/healthz";
 const PROBE_INTERVAL = 4000;
 const MAX_PROBE_INTERVAL = 30000;
@@ -16,18 +15,10 @@ let shouldConnect = false;
 let connectionGeneration = 0;
 let failedAttaches = 0;
 
-/**
- * Set the handler for incoming commands from the daemon.
- * @param {(command: object) => Promise<object>} handler
- */
 export function onCommand(handler) {
   commandHandler = handler;
 }
 
-/**
- * Set the callback for connection status changes.
- * @param {(connected: boolean) => void} callback
- */
 export function onStatus(callback) {
   statusCallback = callback;
 }
@@ -55,38 +46,27 @@ export function disconnect() {
     try {
       port.disconnect();
     } catch {
-      // ignore
     }
   }
   setStatus(false);
 }
 
-/**
- * @returns {boolean}
- */
 export function isConnected() {
   return nativePort !== null;
 }
 
-/**
- * @param {object} message
- */
 export function send(message) {
   if (nativePort) {
     try {
       nativePort.postMessage(message);
     } catch {
-      // ignore
     }
   }
 }
 
 /**
- * Check whether the Stella daemon is listening on the bridge port. A 204 means
- * up and a refused connection means down. Chrome's Local Network Access check
- * can hold a service worker's loopback fetch with no prompt to answer, so a
- * probe that times out is unknown, not down: the native host then finds out.
- * @returns {Promise<"up" | "down" | "unknown">}
+ * Chrome's Local Network Access check can hold a service worker's loopback
+ * fetch with no prompt to answer, so a probe that times out is unknown, not down.
  */
 async function probeDaemon() {
   const controller = new AbortController();
@@ -160,7 +140,6 @@ function doConnect(generation) {
     try {
       port.disconnect();
     } catch {
-      // ignore
     }
     return;
   }
@@ -225,8 +204,6 @@ function doConnect(generation) {
     nativePort = null;
     setStatus(false);
     if (welcomed) {
-      // A working link dropped (daemon restart, host crash): reattach at
-      // once; the host itself waits briefly for the daemon to come back.
       doConnect(generation);
       return;
     }

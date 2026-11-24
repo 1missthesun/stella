@@ -5,7 +5,6 @@ export async function attachDebugger(tabId) {
   try {
     await chrome.debugger.attach({ tabId }, "1.3");
   } catch (error) {
-    // A service worker restart forgets attachments Chrome still holds.
     if (!/already attached/i.test(String(error?.message || error))) throw error;
     await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
       expression: "1",

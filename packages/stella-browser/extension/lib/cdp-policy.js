@@ -38,8 +38,6 @@ export function assertAllowedMethod(method, params) {
   if (BLOCKED_METHODS.has(method)) {
     throw new Error(`${method} is not allowed through the Stella Browser extension`);
   }
-  // Without flat sessions, or held at start, an attached frame can't be
-  // addressed by the tab checks here or would never run.
   if (
     method === "Target.setAutoAttach" &&
     params?.autoAttach === true &&

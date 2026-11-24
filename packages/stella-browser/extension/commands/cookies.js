@@ -1,13 +1,5 @@
 import { getActiveTab } from './tabs.js';
 
-/**
- * Resolve the URL a cookie command applies to. Cookie commands frequently
- * arrive from owners that have no tabs (e.g. the desktop app's privileged
- * fetch bridge sends `cookies_get` with an explicit `url`); falling back to
- * `getActiveTab()` in that case would create a blank owner tab purely as a
- * side effect of a read-only cookie query. Only touch the active tab when
- * the command did not specify a URL itself.
- */
 async function resolveCookieUrl(command) {
   if (command.url) return command.url;
   const tab = await getActiveTab(command);
@@ -49,14 +41,6 @@ export async function handleCookiesGet(command) {
   };
 }
 
-/**
- * Export every cookie from the user's regular Chromium cookie stores.
- *
- * Querying each store explicitly keeps incognito cookies out of the export and
- * preserves the complete Cookie objects returned by Chrome, including fields
- * such as hostOnly, session, storeId, and partitionKey that cookies_get's
- * compatibility shape intentionally omits.
- */
 async function isIncognitoStore(store) {
   if (store.incognito === true) return true;
   const tabs = await Promise.all(
@@ -65,7 +49,6 @@ async function isIncognitoStore(store) {
   return tabs.some(tab => tab?.incognito === true);
 }
 
-/** Ids of the profile's non-incognito cookie stores; private-window cookies never leave the browser. */
 export async function regularCookieStoreIds() {
   const stores = await chrome.cookies.getAllCookieStores();
   const incognito = await Promise.all(stores.map(isIncognitoStore));

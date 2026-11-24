@@ -43,7 +43,6 @@ function promoteStagedBinary(binaryPath) {
       try {
         renameSync(previousPath, binaryPath);
       } catch {
-        // Keep the original error; startup cannot proceed without a binary.
       }
     }
     console.error(

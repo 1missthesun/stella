@@ -93,7 +93,7 @@ const RESUME_GRACE_MS = 1_500;
 const MAX_NO_PROGRESS_BACKFILLS = 3;
 const PROBE_TIMEOUT_MS = 5_000;
 const OPEN_TIMEOUT_MS = 20_000;
-const KEEPALIVE_INTERVAL_MS = 30_000;
+const KEEPALIVE_INTERVAL_MS = SOCKET_STALE_MS / 3;
 
 const performanceNow = (): number =>
   typeof performance === "undefined" ? 0 : performance.now();

@@ -145,6 +145,12 @@ export const IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER =
 export const IPC_DICTATION_CANCEL_OPENROUTER =
   "dictation:cancelOpenRouter" as const;
 export const IPC_DICTATION_ACTIVE_CHANGED = "dictation:activeChanged" as const;
+export const IPC_DICTATION_CAPTURE_READY = "dictation:captureReady" as const;
+export const IPC_DICTATION_CAPTURE_ARM = "dictation:captureArm" as const;
+export const IPC_DICTATION_CAPTURE_OPEN = "dictation:captureOpen" as const;
+export const IPC_DICTATION_CAPTURE_CLOSE = "dictation:captureClose" as const;
+export const IPC_DICTATION_CAPTURE_AUDIO = "dictation:captureAudio" as const;
+export const IPC_DICTATION_CAPTURE_EVENT = "dictation:captureEvent" as const;
 export const IPC_DICTATION_PLAY_SOUND = "dictation:playSound" as const;
 export const IPC_DICTATION_ON_DEVICE_STATUS =
   "dictation:onDeviceStatus" as const;

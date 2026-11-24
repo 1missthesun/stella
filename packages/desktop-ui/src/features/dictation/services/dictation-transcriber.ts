@@ -10,6 +10,8 @@ import {
   transcribeOnDevice,
 } from "./on-device-dictation";
 
+import { reportDictationReady } from "./native-microphone";
+
 export type DictationRoute =
   | "streaming"
   | "managed"
@@ -80,7 +82,10 @@ export const resolveDictationRoute = async (): Promise<DictationRoute> => {
           : (await onDeviceDictationAvailable())
             ? "on-device"
             : "needs-key";
-  if (generation === routeGeneration) lastRoute = route;
+  if (generation === routeGeneration) {
+    lastRoute = route;
+    void reportDictationReady(route !== "needs-key");
+  }
   return route;
 };
 
@@ -146,7 +151,7 @@ const transcribeWithOwnKey = async (wav: ArrayBuffer, signal?: AbortSignal): Pro
  * On a Mac, Apple's on-device recognizer stands in whenever the route the
  * user has fails (signed out, usage limit, no service, offline, a bad key).
  */
-export const transcribeWithFallback = async (
+const transcribeWithFallback = async (
   wav: ArrayBuffer,
   error: unknown,
   signal?: AbortSignal,
@@ -156,12 +161,16 @@ export const transcribeWithFallback = async (
   return (await transcribeOnDevice(wav)).text;
 };
 
+/** A recognizer that hears no words can describe the sound: "[music]". */
+const spokenWords = (text: string): string =>
+  /^\s*(?:[[(][^\])]*[\])][\s.]*)+$/.test(text) ? "" : text;
+
 export const transcribeDictation = async (
   wav: ArrayBuffer,
   signal?: AbortSignal,
 ): Promise<string> => {
   try {
-    return await transcribeWithRoute(wav, signal);
+    return spokenWords(await transcribeWithRoute(wav, signal));
   } catch (error) {
     if (lastRoute === "on-device") throw error;
     return await transcribeWithFallback(wav, error, signal);

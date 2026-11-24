@@ -249,6 +249,12 @@ import {
   IPC_DIAGNOSTICS_REPORT_TIMING,
   IPC_DICTATION_ACTIVE_CHANGED,
   IPC_DICTATION_CANCEL_OPENROUTER,
+  IPC_DICTATION_CAPTURE_ARM,
+  IPC_DICTATION_CAPTURE_AUDIO,
+  IPC_DICTATION_CAPTURE_CLOSE,
+  IPC_DICTATION_CAPTURE_EVENT,
+  IPC_DICTATION_CAPTURE_OPEN,
+  IPC_DICTATION_CAPTURE_READY,
   IPC_DICTATION_GET_SHORTCUT,
   IPC_DICTATION_GET_SOUND_EFFECTS_ENABLED,
   IPC_DICTATION_HAS_OPENROUTER_KEY,
@@ -641,7 +647,14 @@ export type TranscriptWord = { w: string; s: number; e: number };
 
 export type OnDeviceTranscript = { text: string; words: TranscriptWord[] };
 
+export type DictationCaptureEvent = {
+  captureId: string;
+  event: "live" | "ended" | "failed";
+  message?: string;
+};
+
 export type DictationToggle = {
+  /** Names this start, and the capture main opened for it. */
   startId?: string;
   action?: "toggle" | "start" | "stop" | "cancel";
   source?: "companion";
@@ -1024,6 +1037,18 @@ export type IpcInvokeContract = {
   [IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER]: Invoke<
     [payload: { requestId: string; wav: ArrayBuffer }],
     { text: string }
+  >;
+  /**
+   * Says whether a start here would dictate (a transcriber is available), and
+   * answers whether the native microphone can be used for it.
+   */
+  [IPC_DICTATION_CAPTURE_READY]: Invoke<
+    [payload: { ready: boolean }],
+    { native: boolean }
+  >;
+  [IPC_DICTATION_CAPTURE_OPEN]: Invoke<
+    [payload: { captureId: string }],
+    { ok: boolean }
   >;
   [IPC_DICTATION_ON_DEVICE_STATUS]: Invoke<
     [payload: { locales: string[] }],
@@ -1645,6 +1670,10 @@ export type IpcSendContract = {
     payload: { sessionId: string; pcm: ArrayBuffer },
   ];
   [IPC_DICTATION_ON_DEVICE_CANCEL]: [payload: { sessionId: string }];
+  [IPC_DICTATION_CAPTURE_ARM]: [payload: { captureId: string }];
+  [IPC_DICTATION_CAPTURE_CLOSE]: [
+    payload: { captureId: string; discard?: boolean },
+  ];
   [IPC_SHOW_STELLA_FRAME]: [
     payload: { captureId: string; t: number; jpeg: ArrayBuffer },
   ];
@@ -1730,6 +1759,8 @@ export type IpcEventContract = {
   [IPC_VOICE_SESSION_ERROR_STATE]: string;
   [IPC_VOICE_PREFERENCES_CHANGED]: RealtimeVoicePreferences;
   [IPC_DICTATION_TOGGLE]: DictationToggle;
+  [IPC_DICTATION_CAPTURE_AUDIO]: { captureId: string; pcm: ArrayBuffer };
+  [IPC_DICTATION_CAPTURE_EVENT]: DictationCaptureEvent;
   [IPC_COMPANION_LAYOUT]: CompanionLayout;
   [IPC_COMPANION_ACTIVITY]: CompanionActivity;
   [IPC_COMPANION_SET_EXPANDED]: { expanded: boolean };

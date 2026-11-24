@@ -358,6 +358,7 @@ export function CompanionPanelRoot() {
                 : "companion.arc.dictate",
             )}
             onClick={dictation.toggle}
+            onPointerDown={dictation.arm}
             onPointerEnter={dictation.prewarm}
             onFocus={dictation.prewarm}
           >

@@ -1,6 +1,10 @@
 const SAMPLE_RATE = 16_000;
 const HEADER_BYTES = 44;
 const INITIAL_SECONDS = 30;
+const WINDOW_SAMPLES = SAMPLE_RATE / 50;
+const SPEECH_MIN_LEVEL = 200;
+const SPEECH_OVER_FLOOR = 3;
+const SPEECH_MIN_WINDOWS = 5;
 
 const transferBuffer = (buffer: ArrayBuffer, length: number): ArrayBuffer =>
   (buffer as ArrayBuffer & { transfer(length: number): ArrayBuffer }).transfer(length);
@@ -38,6 +42,21 @@ export class PcmRecording {
       take === pcm.length ? pcm : pcm.subarray(0, take),
     );
     this.samples += take;
+  }
+
+  /** Whether anything clearly louder than the room was recorded. */
+  hasSpeech(): boolean {
+    const pcm = new Int16Array(this.buffer, HEADER_BYTES, this.samples);
+    const levels: number[] = [];
+    for (let start = 0; start + WINDOW_SAMPLES <= pcm.length; start += WINDOW_SAMPLES) {
+      let sum = 0;
+      for (let i = start; i < start + WINDOW_SAMPLES; i += 1) sum += pcm[i]! * pcm[i]!;
+      levels.push(Math.sqrt(sum / WINDOW_SAMPLES));
+    }
+    const heard = levels.filter((level) => level > 0).sort((a, b) => a - b);
+    const floor = heard[Math.floor(heard.length * 0.15)] ?? 0;
+    const threshold = Math.max(SPEECH_MIN_LEVEL, floor * SPEECH_OVER_FLOOR);
+    return levels.filter((level) => level > threshold).length >= SPEECH_MIN_WINDOWS;
   }
 
   toWav(): ArrayBuffer {

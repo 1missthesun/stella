@@ -14,6 +14,7 @@ import {
 } from "./claude-code-tool-mcp-host.js";
 import type { ToolResult } from "../tools/types.js";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
+import { watchNetwork } from "../shared/network-watch.js";
 import { antigravityCliExecutable, antigravityCliKeeper } from "./antigravity-cli-install.js";
 import type { CliLaunch } from "./cli-keeper.js";
 import {
@@ -44,6 +45,10 @@ const OTHER_NATIVE_TOOL = `${NATIVE_PREFIX}tool`;
 /** Arguments Antigravity adds to every call for its own display; Stella's tools never take them. */
 const DISPLAY_ARGS = new Set(["toolSummary"]);
 const TOOL_GROUP_SETTLE_MS = 250;
+const NETWORK_LOSS_SILENCE_MS = 20_000;
+/** Output the CLI had already received can still arrive this long after its connection died. */
+const NETWORK_LOSS_DRAIN_MS = 3_000;
+const NETWORK_LOST = "The network changed and the model request timed out.";
 const TAKE_IN_LIMIT_MS = 2_000;
 const IDLE_CLOSE_MS = 20 * 60_000;
 const SIGN_OUT_CHECK_MS = 1_000;
@@ -137,6 +142,7 @@ type TurnState = {
   closeTimer: (() => void) | undefined;
   finalText: string;
   calls: Map<string, ToolCallState>;
+  executing: number;
   claimWaiters: Set<() => void>;
   given: Set<AntigravityMessage>;
   taking?: Promise<void>;
@@ -159,6 +165,7 @@ type Proc = {
   binary: CliLaunch;
   turn?: TurnState;
   idle?: () => void;
+  networkLost?: { at: number; quietSince: number; cancelCheck: () => void };
   exited: boolean;
   stderr: string;
 };
@@ -227,8 +234,40 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
   const procs = new Map<string, Proc>();
   const profile = createAntigravityProfile(config.home);
 
+  let stopNetworkWatch: (() => void) | undefined;
+
+  const networkKept = (proc: Proc) => {
+    proc.networkLost?.cancelCheck();
+    proc.networkLost = undefined;
+  };
+
+  const networkLost = (proc: Proc, at: number) => {
+    networkKept(proc);
+    const check = () => {
+      if (proc.exited || proc.networkLost !== lost) return;
+      const turn = proc.turn;
+      if (!turn) return;
+      const working = turn.executing > 0 || [...turn.calls.values()].some((call) => !call.stella && !call.ended);
+      if (working) lost.quietSince = Date.now();
+      const remaining = lost.quietSince + NETWORK_LOSS_SILENCE_MS - Date.now();
+      if (remaining > 0) {
+        lost.cancelCheck = forkTimeoutFiber(remaining, check);
+        return;
+      }
+      console.warn("[antigravity-cli] silent since the network changed; starting a new process", { sessionKey: proc.key });
+      kill(proc, NETWORK_LOST);
+    };
+    const lost = { at, quietSince: at, cancelCheck: forkTimeoutFiber(NETWORK_LOSS_SILENCE_MS, check) };
+    proc.networkLost = lost;
+  };
+
   const kill = (proc: Proc, reason: string) => {
     if (procs.get(proc.key) === proc) procs.delete(proc.key);
+    if (procs.size === 0) {
+      stopNetworkWatch?.();
+      stopNetworkWatch = undefined;
+    }
+    networkKept(proc);
     proc.idle?.();
     proc.mcp.server.close();
     void rm(proc.mcp.socketPath, { force: true }).catch(() => undefined);
@@ -394,9 +433,15 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           nativeToolCallIds: true,
           claimNativeToolUseId: (name: string, args: Record<string, unknown>, signal: AbortSignal) => claim(proc, name, args, signal),
           executeTool: async (toolCallId: string, name: string, args: Record<string, unknown>, signal?: AbortSignal) => {
-            const result = await turn.request.executeTool(toolCallId, name, args, signal);
-            await turn.taking;
-            return result;
+            turn.executing += 1;
+            try {
+              const result = await turn.request.executeTool(toolCallId, name, args, signal);
+              await turn.taking;
+              return result;
+            } finally {
+              turn.executing -= 1;
+              if (proc.networkLost) proc.networkLost.quietSince = Date.now();
+            }
           },
         };
       },
@@ -556,6 +601,9 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       return { models: [] };
     })();
     procs.set(key, proc);
+    stopNetworkWatch ??= watchNetwork(({ at, lost }) => {
+      if (lost) for (const live of procs.values()) networkLost(live, at);
+    });
     watchFile(signInRecord, { interval: SIGN_OUT_CHECK_MS, persistent: false }, closeOnSignOut);
     return proc;
   };
@@ -583,6 +631,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const onUpdate = (proc: Proc, update: Record<string, any>) => {
     const turn = proc.turn;
+    if (proc.networkLost && Date.now() - proc.networkLost.at > NETWORK_LOSS_DRAIN_MS) networkKept(proc);
     switch (update.sessionUpdate) {
       case "agent_message_chunk":
         if (!turn) return endStray(proc);
@@ -664,6 +713,10 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       kill(proc, "Replaced.");
       proc = undefined;
     }
+    if (proc?.networkLost) {
+      kill(proc, NETWORK_LOST);
+      proc = undefined;
+    }
     if (proc && proc.allowedTools !== allowedToolsOf(request)) {
       kill(proc, "Stella's tools changed.");
       proc = undefined;
@@ -710,6 +763,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       closeTimer: undefined,
       finalText: "",
       calls: new Map(),
+      executing: 0,
       claimWaiters: new Set(),
       given: new Set(),
     };

@@ -65,6 +65,7 @@ import {
   CHAT_TURN_PHASE_KEY,
   CHAT_TURN_MODEL_CAPABILITY_KEY,
   LOCAL_TURN_LEASE_KEY,
+  LOCAL_TURN_LEASE_MS,
   TERMINAL_NOTICE,
   CLOUD_CONTEXT_NOTICE,
 } from "./constants.js";
@@ -293,14 +294,19 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     const localLease =
       await this.getTurnState<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (localLease) {
-      const retirementAt = localTurnRetirementDeadline(localLease);
-      if (retirementAt <= Date.now()) {
+      let retirementAt = localTurnRetirementDeadline(localLease);
+      let waiting = retirementAt > Date.now();
+      if (!waiting) {
         if (localLease.phase.s === "cancel_pending") {
           await this.cancelLocalTurn(localLease, true);
-        } else {
-          await this.expireLocalLease(localLease, false);
+        } else if (
+          (await this.expireLocalLease(localLease, false)) === "renewed"
+        ) {
+          waiting = true;
+          retirementAt = Date.now() + LOCAL_TURN_LEASE_MS;
         }
-      } else {
+      }
+      if (waiting) {
         await this.armLocalLeaseAlarm(retirementAt);
         log("info", "chat_turn_waiting_for_local_turn", {
           turnId: turn.turnId,

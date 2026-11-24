@@ -95,7 +95,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
         }
         await this.cancelLocalTurn(localLease, true);
       } else if (localLease.expiresAt <= Date.now()) {
-        await this.expireLocalLease(localLease, true);
+        await this.retireLapsedLocalLease(localLease);
       } else {
         await this.armLocalLeaseAlarm(localLease.expiresAt);
       }

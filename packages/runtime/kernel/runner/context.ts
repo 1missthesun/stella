@@ -2,6 +2,8 @@ import { readAgentMessageDelivery, readAgentStopResult } from "@stella/contracts
 import { loadDeviceExecutionContext, loadEmailAccess, loadMediaAccess } from "./execution-context.js";
 import { resolveRuntimeSourceAsset } from "../shared/runtime-paths.js";
 import { createCloudTranscriptWriter } from "./cloud-transcript-write.js";
+import { createRuntimeLogger } from "../debug.js";
+import { watchNetwork } from "../shared/network-watch.js";
 import { createBrainLeaseView } from "./brain-lease.js";
 import { createToolHost } from "../tools/host.js";
 import { HookEmitter } from "../extensions/hook-emitter.js";
@@ -127,6 +129,7 @@ export const createRunnerContext = ({
   });
 
   const brainLeases = createBrainLeaseView(deviceId);
+  const cloudTranscriptLogger = createRuntimeLogger("cloud-transcript");
   const cloudTranscript = createCloudTranscriptWriter({
     deviceId,
     store: runtimeStore,
@@ -141,6 +144,9 @@ export const createRunnerContext = ({
     getBaseUrl: cloudRealtimeBaseUrl,
     getOwnerGeneration: getCloudOwnerGeneration,
     isResumableTurn: (localTurnId: string) => localTurnId.startsWith("pi:"),
+    onLog: (level, event, fields) => {
+      cloudTranscriptLogger[level](event, fields);
+    },
     ...(appendLocalChatEvent
       ? {
           onDurableDeliveryFailure: ({
@@ -169,6 +175,7 @@ export const createRunnerContext = ({
         }
       : {}),
   });
+  const stopNetworkWatch = watchNetwork(() => cloudTranscript.networkChanged());
 
   const codexRoute = (model: string, reasoningEffort: SpawnReasoningEffort | undefined) => {
     try {
@@ -442,7 +449,13 @@ export const createRunnerContext = ({
     scheduleApi,
     runtimeStore,
         appendLocalChatEvent,
-        cloudTranscript,
+        cloudTranscript: {
+          ...cloudTranscript,
+          stop: () => {
+            stopNetworkWatch();
+            cloudTranscript.stop();
+          },
+        },
     brainLeases,
     piCloudAgentThreads,
     cloudOwnerGeneration: getCloudOwnerGeneration,

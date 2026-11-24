@@ -14,15 +14,8 @@ import {
   noteAntigravitySignIn,
 } from "./antigravity-cli-status.js";
 
-/**
- * Signing in to Google Antigravity with Google's own login command
- * (`agy acp --login`): it prints Google's page, the person signs in there, and
- * the CLI reads the code that page shows. The CLI stores the sign-in; Stella
- * never reads it.
- */
 const URL_TIMEOUT_MS = 45_000;
 const FINISH_TIMEOUT_MS = 60_000;
-/** Longer than a running turn takes to notice a sign-out and close. */
 const TURNS_CLOSE_MS = 2_500;
 
 const canceled = () => new Error("Google sign-in was canceled.");
@@ -34,11 +27,9 @@ const lastLine = (output: string): string =>
     .filter((line) => line && !line.startsWith("http"))
     .at(-1) ?? "";
 
-/** A current `agy` that starts, installed, updated or repaired first as needed. */
 const readyCli = async (signal: AbortSignal): Promise<string> => {
   const found = await antigravityCliKeeper.inspect();
   if (signal.aborted) throw canceled();
-  // Someone is waiting on this, so a repair that just failed is tried again.
   if (found && !found.check.ok) await antigravityCliKeeper.repair(found.install, { force: true });
   if (signal.aborted) throw canceled();
   return (await antigravityCliKeeper.select({ repair: "wait", signal })).executable;
@@ -56,7 +47,6 @@ const loginUrl = (output: string): string | undefined => {
   return undefined;
 };
 
-/** What `agy acp --login` reads: the code Google's page shows, or that page's address. */
 const loginAnswer = (pasted: string): string => {
   const value = pasted.trim();
   if (/^[\w./~-]{1,2048}$/u.test(value)) return value;
@@ -97,7 +87,6 @@ export const signInAntigravity = async (args: {
   const { loginId, home, signal } = args;
   const binary = await readyCli(signal);
   await mkdir(home, { recursive: true, mode: 0o700 });
-  // Already signed in, such as in a terminal: nothing to ask the person for.
   const already = await askAntigravityCli(binary, home);
   if (signal.aborted) throw canceled();
   if (already.ok && already.signedIn) return noteAntigravitySignIn(home, true);
@@ -149,10 +138,8 @@ export const signInAntigravity = async (args: {
   }
 };
 
-/** Signs out through the CLI, wherever it keeps the sign-in. */
 export const signOutAntigravity = async (home: string): Promise<void> => {
   noteAntigravitySignedOut(home);
-  // A running turn still holds the sign-in, and could store it again.
   await new Promise<void>((resolve) => void forkTimeoutFiber(TURNS_CLOSE_MS, resolve));
   const { executable } = await antigravityCliKeeper.select({ repair: "wait" });
   const { replies, problem } = await callAntigravityAcp(executable, home, [
@@ -169,5 +156,4 @@ export const signOutAntigravity = async (home: string): Promise<void> => {
 
 export const antigravityInstalled = (): boolean => findAntigravityCli() !== undefined;
 
-/** For screens that show it. */
 export const antigravitySignedIn = (home: string): Promise<boolean> => currentAntigravitySignIn(home, antigravityCliExecutable);

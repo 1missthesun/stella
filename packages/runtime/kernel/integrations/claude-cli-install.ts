@@ -11,15 +11,10 @@ import { forkCancelableInterval } from "./effect-runtime.js";
 export type { ClaudeCliInstallProgress, ClaudeCliInstallResult };
 
 /**
- * Installs Claude Code for someone who has a Claude plan but has never opened
- * a terminal, with Anthropic's own native installer (install.sh on macOS and
- * Linux, install.ps1 on Windows; https://code.claude.com/docs/en/setup). It
- * installs into the user's home, needs no admin rights, and keeps itself
- * updated; Stella's background updater covers it from then on.
- *
- * The installer prints nothing while it downloads, so progress comes from
- * the binary it is writing into ~/.claude/downloads against the size the
- * release manifest gives for this platform.
+ * Anthropic's installer (https://code.claude.com/docs/en/setup) prints nothing
+ * while it downloads, so progress comes from the binary it is writing into
+ * ~/.claude/downloads against the size the release manifest gives for this
+ * platform.
  */
 
 const RELEASES = "https://downloads.claude.ai/claude-code-releases";
@@ -47,7 +42,6 @@ const describe = (error: unknown): string => {
 const isMusl = (): boolean =>
   fs.existsSync("/lib/libc.musl-x86_64.so.1") || fs.existsSync("/lib/libc.musl-aarch64.so.1");
 
-/** The release manifest's name for this computer, as the installer works it out. */
 export const claudeCliPlatform = (): string | null => {
   const arch = process.arch === "x64" ? "x64" : process.arch === "arm64" ? "arm64" : null;
   if (!arch) return null;
@@ -74,9 +68,7 @@ const sizeOnDisk = (dir: string, prefix: string): number => {
       if (!name.startsWith(prefix)) continue;
       try {
         total = Math.max(total, fs.statSync(path.join(dir, name)).size);
-      } catch {
-        // Renamed or removed between the listing and the stat.
-      }
+      } catch {}
     }
     return total;
   } catch {
@@ -224,8 +216,6 @@ export const installClaudeCli = async (
   }
 
   if (options.signal?.aborted) return { status: "failed", detail: "Canceled." };
-  // Installed means it starts: an install that left a binary that doesn't
-  // run is a failed one, with what that binary printed.
   const { inspectClaudeCli } = await import("./claude-cli-launch.js");
   const installed = await inspectClaudeCli(env);
   if (result.exitCode === 0 && installed?.check.ok && installed.install.executable) {

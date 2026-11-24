@@ -11,19 +11,9 @@ import { antigravityHomeFor, askAntigravityCli } from "./antigravity-cli-status.
 import { CLI_REPAIR_TIMEOUT_MS, cliRealPath, createCliKeeper, type CliInstall, type CliRepairOutcome } from "./cli-keeper.js";
 import { updateCli, type CliUpdateOutcome } from "./cli-update.js";
 
-/**
- * Finding, installing, repairing and updating Google's Antigravity CLI
- * (`agy`), as Stella does Claude Code's (`cli-keeper.ts`): Google's own
- * installer puts it where Google puts it, a broken or half-installed one is
- * reinstalled while the last working copy stands in, and Google's own `update`
- * keeps it current. Google's installer also puts its folder on the person's
- * PATH; Stella finds the CLI without that, so it installs without it.
- */
-
 const INSTALLER_SH = "https://antigravity.google/cli/install.sh";
 const INSTALLER_PS1 = "https://antigravity.google/cli/install.ps1";
 const DOWNLOAD_TIMEOUT_MS = 30_000;
-/** The first release whose custom agents can carry Stella's prompt and tools as tested. */
 const MINIMUM_VERSION = "1.5.14";
 
 const STAGING_PREFIX = ".stella-agy-";
@@ -33,7 +23,6 @@ type Install = CliInstall<AntigravityCliInstallMethod>;
 
 const PROGRAM = process.platform === "win32" ? "agy.exe" : "agy";
 
-/** Where Google's installer puts `agy`. */
 const installDirectory = (env: NodeJS.ProcessEnv): string =>
   process.platform === "win32"
     ? path.join(env.LOCALAPPDATA?.trim() || path.join(os.homedir(), "AppData", "Local"), "agy", "bin")
@@ -41,7 +30,6 @@ const installDirectory = (env: NodeJS.ProcessEnv): string =>
 
 const installedAt = (env: NodeJS.ProcessEnv): string => path.join(installDirectory(env), PROGRAM);
 
-/** `agy`, as a turn would run it: on PATH, or where Google's installer puts it. */
 export const findAntigravityCli = (env: NodeJS.ProcessEnv = process.env): string | undefined =>
   findExternalCliPath("agy", { env }) ?? undefined;
 
@@ -57,7 +45,6 @@ const olderThan = (version: string, minimum: string): boolean => {
 const methodOf = (launcher: string, env: NodeJS.ProcessEnv): AntigravityCliInstallMethod =>
   cliRealPath(launcher) === cliRealPath(installedAt(env)) ? "google" : "other";
 
-/** What there is, or the install Google's installer would make where there is none. */
 const currentInstall = async (env: NodeJS.ProcessEnv): Promise<Install> => {
   const launcher = findAntigravityCli(env);
   if (launcher) return { launcher, method: methodOf(launcher, env), executable: launcher };
@@ -70,12 +57,6 @@ const currentInstall = async (env: NodeJS.ProcessEnv): Promise<Install> => {
 
 const commandEnv = (executable: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => claudeCliCommandEnv(executable, env);
 
-/**
- * Runs Google's installer into `directory`, kept off the person's PATH and
- * shell files: on Windows with the flags its `install` step takes; elsewhere,
- * where the script can't pass them on, with a throwaway home folder for that
- * step to write to.
- */
 const runInstaller = async (
   directory: string,
   env: NodeJS.ProcessEnv,
@@ -131,7 +112,6 @@ const removeReplacedVersions = async (env: NodeJS.ProcessEnv): Promise<void> => 
   }
 };
 
-/** Too old but running: Google's own update. Otherwise a fresh install. */
 const runRepair = async (install: Install, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<CliRepairOutcome> => {
   let output = "";
   if (install.executable && (await versionOf(install.executable, env))) {
@@ -146,8 +126,6 @@ const runRepair = async (install: Install, env: NodeJS.ProcessEnv, signal?: Abor
   }
   if (install.method !== "google") return { status: "manual", how: manualRepair(install) };
   const target = installedAt(env);
-  // Installed beside its place and moved in only once it starts, so an
-  // install that fails or is cut off leaves what was there.
   let staged: string | undefined;
   try {
     await fs.mkdir(path.dirname(target), { recursive: true });
@@ -195,18 +173,10 @@ const unusable = (detail: { install: Install | null; problem: string; repair?: C
   );
 };
 
-/**
- * Google ships new versions often and Stella hasn't run most of them, so the
- * first run of each compares it with the kept one on this computer: one that
- * lost something the kept one has (it doesn't answer Stella, dropped what
- * turns need, or no longer sees the sign-in) isn't used. Relative, so a
- * problem both share (offline, signed out) never blocks anyone.
- */
 const selfCheck = async (executable: string, kept: string, env: NodeJS.ProcessEnv): Promise<string | undefined> => {
   const dataDir = env.STELLA_DATA_DIR?.trim() || process.env.STELLA_DATA_DIR?.trim();
   if (!dataDir) return undefined;
   const home = antigravityHomeFor(path.resolve(dataDir));
-  // Never used here: nothing to compare.
   if (!existsSync(home)) return undefined;
   const now = await askAntigravityCli(executable, home, commandEnv(executable, env));
   if (now.ok && now.usable && now.signedIn) return undefined;
@@ -218,7 +188,6 @@ const selfCheck = async (executable: string, kept: string, env: NodeJS.ProcessEn
   return undefined;
 };
 
-/** The `agy` to ask something of now, repairing nothing. */
 export const antigravityCliExecutable = async (): Promise<string | undefined> =>
   await antigravityCliKeeper.select({ repair: "none" }).then(
     (launch) => launch.executable,
@@ -244,10 +213,6 @@ export const antigravityCliKeeper = createCliKeeper<AntigravityCliInstallMethod>
 const isOn = (value: string | undefined): boolean =>
   value !== undefined && !["", "0", "false", "no", "off"].includes(value.trim().toLowerCase());
 
-/**
- * One scheduled check: keeps `agy` current and working. Where Stella isn't
- * signed in to Google and `agy` isn't installed, there's nothing to keep.
- */
 export const updateAntigravityCli = async (
   options: { signedIn: boolean; env?: NodeJS.ProcessEnv },
 ): Promise<CliUpdateOutcome<AntigravityCliInstallMethod>> => {

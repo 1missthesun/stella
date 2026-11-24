@@ -29,18 +29,10 @@ export function getStellaAppDir(): string {
     dir = parent;
   }
 
-  // Last resort: assume the canonical source layout
-  // (<root>/packages/runtime/kernel/shared -> <root>).
   cachedRoot = path.resolve(moduleDir, "..", "..", "..", "..");
   return cachedRoot;
 }
 
-/**
- * Resolve a data asset that ships in the repo's source tree under `packages/runtime/`
- * (e.g. the OAuth catalog JSON, bundled agent markdown). The STELLA_APP_DIR path
- * is canonical; the packaging build's copy under `packages/desktop/dist-electron/` is a fallback
- * for callers that only see the bundled tree.
- */
 export function resolveRuntimeSourceAsset(...segments: string[]): string {
   const root = getStellaAppDir();
   const resourcesPath = process.env.STELLA_APP_RESOURCES_PATH?.trim();
@@ -55,14 +47,8 @@ export function resolveRuntimeSourceAsset(...segments: string[]): string {
 }
 
 /**
- * Resolve a runtime file the app spawns by path (the worker entry, sidecar
- * CLIs). A source tree runs it as TypeScript under Bun, so the `.ts` source
- * comes first; a packaged app has no runtime source and uses its bundled copy
- * under `STELLA_APP_RESOURCES_PATH`, and `dist-electron/runtime/` (the
- * packaging build) is the last resort. Anchored on STELLA_APP_DIR rather than
- * this module's `import.meta`, which moves when esbuild inlines it.
- *
- * @param relativeToRuntimeRoot e.g. "worker/entry.js" or "kernel/cli/foo.js"
+ * Anchored on STELLA_APP_DIR rather than this module's `import.meta`, which
+ * moves when esbuild inlines it.
  */
 export function resolveBundledRuntimeFile(relativeToRuntimeRoot: string): string {
   const root = getStellaAppDir();

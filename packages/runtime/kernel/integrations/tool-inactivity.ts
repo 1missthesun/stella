@@ -1,11 +1,6 @@
 import type { ToolResult } from "../tools/types.js";
 import { forkCancelableTimeout } from "./effect-runtime.js";
 
-/**
- * Bound for Stella tools bridged into external engines: a tool that reports
- * no progress for this long is cancelled and the engine gets an error result.
- * `STELLA_TOOL_INACTIVITY_TIMEOUT_MS` overrides it; <= 0 disables it.
- */
 export const DEFAULT_TOOL_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
 const CANCELLATION_GRACE_MS = 5_000;
@@ -35,13 +30,6 @@ const abortedPromise = (signal: AbortSignal): Promise<void> =>
         signal.addEventListener("abort", () => resolve(), { once: true }),
       );
 
-/**
- * Run one bridged tool call under the inactivity bound. `run` gets the
- * composed cancellation signal and an `onActivity` callback to call on every
- * progress update. After an inactivity timeout the tool gets a short grace to
- * honour cancellation; if it still has not settled, the error result says its
- * outcome is unknown rather than claiming it stopped.
- */
 export const executeToolWithInactivityBound = async (args: {
   toolName: string;
   signal?: AbortSignal;

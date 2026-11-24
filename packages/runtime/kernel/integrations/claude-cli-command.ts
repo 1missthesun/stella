@@ -6,18 +6,12 @@ const OUTPUT_TAIL_CHARS = 2_000;
 export type CliCommandResult = {
   exitCode: number | null;
   timedOut: boolean;
-  /** The program couldn't be started at all (EACCES, ENOENT, ENOEXEC…). */
   spawnError: string | null;
   stdout: string;
   stderr: string;
-  /** stdout and stderr as they arrived, last 2,000 characters. */
   output: string;
 };
 
-/**
- * Runs a program to completion, keeping the tail of what it printed. Never
- * throws: a program that can't start comes back with `spawnError`.
- */
 export const runCliCommand = (
   executable: string,
   args: readonly string[],
@@ -26,7 +20,6 @@ export const runCliCommand = (
     timeoutMs: number;
     signal?: AbortSignal;
     cwd?: string;
-    /** Windows: run through cmd.exe, for `.cmd` programs such as npm. */
     shell?: boolean;
   },
 ): Promise<CliCommandResult> =>
@@ -84,8 +77,6 @@ export const runCliCommand = (
       });
     };
     child.on("error", (error) => {
-      // An error after the program started (a kill, an abort) still ends in
-      // "close"; one before means it never ran.
       if (child.pid === undefined) {
         spawnError = error.message;
         finish(null);
@@ -96,11 +87,6 @@ export const runCliCommand = (
     child.on("close", (code) => finish(code));
   });
 
-/**
- * The environment Stella runs the CLI's own commands in (`--version`,
- * `update`, `install`): never a credential, so nothing it does can use or
- * change a login other than the user's own.
- */
 export const claudeCliCommandEnv = (
   executable: string,
   env: NodeJS.ProcessEnv,

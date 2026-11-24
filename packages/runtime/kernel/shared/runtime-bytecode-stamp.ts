@@ -23,11 +23,6 @@ const STAMP_SUFFIXES = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".json"]);
 
 const toPosix = (p: string): string => p.split(path.sep).join("/");
 
-/**
- * Fast stat-based fingerprint of all TypeScript/JavaScript/JSON sources that
- * feed into the Bun runtime worker bytecode snapshot. Used both by the builder
- * and at launch time so a stale snapshot falls back to source automatically.
- */
 export const computeRuntimeBytecodeSourceStamp = (repoRoot: string): string => {
   const hash = createHash("sha256");
   hash.update(`platform:${process.platform}\0arch:${process.arch}\0`);
@@ -111,9 +106,7 @@ export const readRuntimeBytecodeFingerprint = (
     ) {
       return parsed as RuntimeBytecodeFingerprint;
     }
-  } catch {
-    // Missing or unreadable fingerprint.
-  }
+  } catch {}
   return null;
 };
 
@@ -134,9 +127,6 @@ export const isRuntimeBytecodeSnapshotFresh = (
   if (bunVersion && fp.bunVersion !== bunVersion) {
     return false;
   }
-  // When checked from Node/Electron main (`process.versions.bun` is undefined),
-  // validate the Bun binary itself so a Bun runtime upgrade invalidates stale
-  // `.jsc` snapshots without spawning a subprocess.
   const configuredBun = process.env.STELLA_BUN_PATH?.trim();
   if (fp.bunBinPath) {
     const activeBun = configuredBun || fp.bunBinPath;

@@ -6,12 +6,7 @@ import { writePrivateFile } from "@stella/node-shared/shared/private-fs.js";
 
 const RESOLVED_MODELS_FILE = "claude-code-resolved-models.json";
 
-/**
- * Model aliases the `claude` CLI accepts via `--model`
- * (https://code.claude.com/docs/en/model-config). Canonical list — the
- * session runtime derives its picker options from it, and stored keys
- * outside this set (full model ids) are bounded by a small LRU below.
- */
+/** Model aliases the `claude` CLI accepts via `--model` (https://code.claude.com/docs/en/model-config). */
 export const CLAUDE_CODE_MODEL_ALIASES = [
   "default",
   "best",
@@ -106,16 +101,10 @@ export const recordClaudeCodeResolvedModel = (
         filePath,
         JSON.stringify(Object.fromEntries(bounded), null, 2),
       );
-    } catch {
-      // Resolved-model capture is best-effort; never fail a turn over it.
-    }
+    } catch {}
   });
 };
 
-/**
- * An alias resolves inside the CLI, so what one version resolved it to says
- * nothing about the next version.
- */
 export const forgetClaudeCodeResolvedAliases = (
   stellaAppDir: string,
 ): Promise<void> => {
@@ -129,9 +118,7 @@ export const forgetClaudeCodeResolvedAliases = (
         filePath,
         JSON.stringify(Object.fromEntries(kept), null, 2),
       );
-    } catch {
-      // Best-effort: the next turn on each alias records its resolution again.
-    }
+    } catch {}
   });
 };
 
@@ -191,9 +178,7 @@ export const recordClaudeCodeContextWindows = (
           2,
         ),
       );
-    } catch {
-      // Context-window capture is best-effort; never fail a turn over it.
-    }
+    } catch {}
   });
 };
 

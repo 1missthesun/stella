@@ -1,27 +1,3 @@
-/**
- * Provider-agnostic validation/repair for inline (base64) vision image
- * payloads before they are attached to a model request.
- *
- * Motivation: tool-produced images (screenshots, browser captures,
- * image-file reads) can reach the request in shapes the provider
- * rejects — most importantly a *truncated / corrupt* image whose bytes were
- * captured mid-write. The base64 is clean and the header (e.g. PNG IHDR)
- * parses, so nothing upstream notices, but the pixel stream is incomplete.
- * Anthropic decodes the image server-side and answers the whole request with
- * a fatal `400 "Could not process image"`. Because the bad block is persisted
- * in thread history, every subsequent resume re-sends it and re-fails.
- *
- * User-attached images never hit this: they come from complete files the user
- * selected. This is why the bug is specific to the tool-produced path.
- *
- * This module is intentionally self-contained: pure byte inspection, no
- * Photon/WASM.
- * It cannot re-encode a truly undecodable image (nothing can — the pixels are
- * gone), so an unprocessable block is dropped and the caller substitutes a
- * short text note instead of poisoning the request. Valid images pass through
- * untouched, so the working user-attached path does not regress.
- */
-
 import { isImageRef } from "./image-ref.js";
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import { ANTHROPIC_DIRECT_MAX_IMAGE_BASE64_BYTES } from "./image-caps.js";
@@ -119,13 +95,6 @@ const tailContainsMarker = (
   return false;
 };
 
-/**
- * Structural completeness check per format. This is what catches the
- * truncated-screenshot bug: the header is intact but the stream is cut off
- * before its terminator, so the provider can't decode it. The terminator is
- * scanned for within a bounded trailing window (not required to be the exact
- * final bytes) so valid images with trailing data still pass.
- */
 export const isCompleteImage = (
   bytes: Uint8Array,
   mediaType: SupportedImageMediaType,
@@ -187,16 +156,6 @@ export interface SanitizedImagePayload {
   data: string;
 }
 
-/**
- * Validate/repair an inline image for a base64 vision source.
- *
- * Returns the canonicalized payload (media type corrected from the actual
- * bytes, data: URI prefix stripped) when the image is a complete, supported,
- * in-limit image. Returns `null` when the image is empty, malformed,
- * truncated/corrupt, an unsupported format, or exceeds the size ceiling — in
- * which case the caller should drop it rather than send an unprocessable
- * block that fails the entire request.
- */
 export const sanitizeInlineImagePayload = (
   data: string,
   declaredMimeType: string | undefined,
@@ -231,7 +190,6 @@ const processable = (
   block: TextContent | ImageContent,
 ): TextContent | ImageContent => {
   if (block.type !== "image") return block;
-  // A stored image was checked when it was stored; its bytes are not here.
   if (isImageRef(block.data)) return block;
   const sanitized = sanitizeInlineImagePayload(block.data, block.mimeType);
   if (!sanitized) return { type: "text", text: UNPROCESSABLE_IMAGE_NOTE };
@@ -241,15 +199,9 @@ const processable = (
 };
 
 /**
- * A request's messages with every inline image a provider can decode, the
- * send boundary: an image history already holds (stored before the attach
- * gate, attached by the user, produced on another device) is checked again
- * right before it is sent. A provider decodes images server-side and answers
- * the whole request with an error for one it can't (Anthropic: `400 "Could
- * not process image"`), and since the block stays in history every later
- * request would fail the same way. Such an image is replaced by a short note
- * for this request only; valid images pass untouched, and the same array
- * comes back when nothing changed.
+ * A provider decodes images server-side and fails the whole request for one
+ * it can't (Anthropic: `400 "Could not process image"`), and the block stays
+ * in history, so every image is checked again right before it is sent.
  */
 export const withProcessableImages = <M extends Message>(
   messages: readonly M[],

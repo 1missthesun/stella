@@ -1074,8 +1074,6 @@ const policyForMacTarget = (app: ListedAppPayload): ComputerUseAppPolicy => {
 
 type NativeFeature = "running_apps" | "quick_glide";
 
-// Features a published helper may predate, remembered per daemon process so a
-// helper update (a new daemon) is tried again.
 const unsupportedNativeFeatures = new Map<number, Set<NativeFeature>>();
 
 const nativeFeatureUnsupported = (
@@ -1213,10 +1211,6 @@ const resolveMacTypedTarget = async (
   };
 };
 
-// The sky client authorizes every call with a resolve_target request and then
-// sends the call itself. The call takes over that resolution instead of
-// listing the running apps a second time, so the app it acts on is the one
-// that was authorized.
 const RESOLUTION_HANDOFF_MS = 5_000;
 const resolutionHandoffs = new Map<
   string,
@@ -1483,9 +1477,6 @@ const withQuickGlide = (
       }
     : operation;
 
-// After the first action of a batch the software cursor glides quickly. The
-// helper validates the whole batch before running any of it, so an older
-// helper's refusal of the option is retried without it.
 const runMacBatch = async (
   sessionPaths: SessionPaths,
   operations: TypedAutomationOperation[],
@@ -1921,11 +1912,6 @@ export const createMacComputerUseSession = (options: {
   sessionId: string;
   commandTimeoutMs?: number;
   getSignal?: () => AbortSignal | undefined;
-  /**
-   * Worker CLI-bridge socket. When present, the automation daemon is spawned
-   * by the Electron host through this bridge so it stays under the single
-   * "Stella" macOS TCC identity (see ensureAutomationDaemon).
-   */
   cliBridgeSocketPath?: string;
 }): ComputerUseSession => ({
   request: async (request, requestOptions) => {
@@ -1985,8 +1971,6 @@ export const releaseMacStellaComputerSession = async (
   return stopped;
 };
 
-// A session's saved states and screenshots belong to the run that made them;
-// a later run of the same agent observes again before acting.
 const removeEndedSessionDirectory = (sessionPaths: SessionPaths) => {
   if (pidIsRunning(readPidFile(automationPidPath(sessionPaths)))) return;
   fs.rmSync(sessionPaths.sessionDir, { recursive: true, force: true });

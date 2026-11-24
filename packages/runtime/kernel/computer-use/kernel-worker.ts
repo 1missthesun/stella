@@ -14,11 +14,6 @@ import type {
   WorkerToNodeReplParentMessage,
 } from "./protocol.js";
 
-/**
- * Kept self-contained because the function body is stringified and started as
- * an eval worker. That makes the same entry work from source, compiled
- * Electron output, and bundled runtime chunks without a separate worker asset.
- */
 const nodeReplWorkerMain = async (
   installBrowserApi: typeof installBrowserWorkerApi,
   installConnectApi: typeof installConnectWorkerApi,
@@ -482,12 +477,6 @@ const nodeReplWorkerMain = async (
       },
     });
   };
-  // Live tool surface. The kernel sends the current allowed tool names with
-  // every evaluate message, so tools added or removed mid-session appear
-  // without restarting the worker. `$search` and `$describe` are always
-  // installed: they run host-side over the live catalog before the allowlist
-  // gate. The literal intrinsic names stay inline because this function is
-  // serialized with `toString()` into the worker source.
   const toolFunctions = new Map<
     string,
     (args?: Record<string, unknown>) => Promise<unknown>
@@ -918,14 +907,8 @@ const nodeReplWorkerMain = async (
           Math.min(workerData.maxEvalOutputBytes, 65_536),
         );
         if (/(?:^|\n)Uncaught\b/.test(outputBuffer)) {
-          // The REPL reports a cell's thrown or rejected error through its
-          // domain, prints it as `Uncaught ...`, and never calls server.eval's
-          // callback, so this is how every failing cell ends. Only a throw
-          // that abandons a cell still waiting on host calls leaves work
-          // running in this worker; that alone makes it unsafe to reuse.
-          // Effect-ratchet pin: this function is serialized with
-          // `toString()` into the eval-worker source, which has no Effect
-          // runtime — the raw timer is the only scheduling primitive there.
+          // Node's REPL reports a cell's thrown or rejected error through its domain,
+          // prints it as `Uncaught ...`, and never calls server.eval's callback.
           outputErrorTimer ??= setTimeout(() => {
             const reject = outputErrorReject;
             outputErrorTimer = undefined;
@@ -946,8 +929,6 @@ const nodeReplWorkerMain = async (
                 renderedError,
               )
             ) {
-              // The literal must stay inline: this function is serialized
-              // with `toString()` into the worker source.
               uncaught.name = "NodeReplUncaughtError";
             }
             reject(uncaught);
@@ -978,8 +959,6 @@ const nodeReplWorkerMain = async (
       writable: false,
       configurable: false,
     },
-    // Compatibility for JavaScript authored against the pre-`code` helper.
-    // It is intentionally non-enumerable and absent from current prompts.
     nodeRepl: {
       value: codeRuntime,
       enumerable: false,
@@ -1085,14 +1064,6 @@ const nodeReplWorkerMain = async (
 
   const drainPendingToolCalls = async () => {
     let firstFailure: Error | undefined;
-    // Bounded settlement deadline. A nested call the cell started without
-    // awaiting can be wedged on a transport that never responds; waiting
-    // unboundedly would hold the whole code tool call open until the
-    // parent's eval timeout kills the kernel (losing REPL state) — or
-    // forever if that rejection is itself blocked. Fail the evaluation with
-    // a diagnosis instead; the kernel stays alive and reusable. The literal
-    // fallback must stay inline: this function is serialized with
-    // `toString()` into the worker source.
     const drainWaitMs =
       Number.isFinite(workerData.maxToolDrainWaitMs) &&
       workerData.maxToolDrainWaitMs > 0
@@ -1108,8 +1079,6 @@ const nodeReplWorkerMain = async (
           ? await Promise.race([
               Promise.all(batch),
               new Promise<null>((resolve) => {
-                // Effect-ratchet pin: serialized worker source (see above) —
-                // no Effect runtime exists inside the eval worker.
                 deadlineTimer = setTimeout(() => resolve(null), remainingMs);
                 deadlineTimer.unref?.();
               }),

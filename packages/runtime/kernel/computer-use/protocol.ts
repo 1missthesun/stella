@@ -7,29 +7,11 @@ export const MAX_NODE_REPL_PENDING_SKY_CALLS = 64;
 export const MAX_NODE_REPL_PENDING_BROWSER_CALLS = 64;
 export const MAX_NODE_REPL_PENDING_TOOL_CALLS = 64;
 export const MAX_NODE_REPL_PENDING_CONNECT_CALLS = 16;
-/**
- * How long an evaluation waits, after the cell's own code finishes, for
- * nested `tools.*` calls the cell started without awaiting. A nested call
- * that never settles (wedged bridge, dead transport) must fail the
- * evaluation with a diagnosis instead of holding the tool call open until
- * the whole-kernel eval timeout kills the REPL (or forever).
- */
 export const DEFAULT_NODE_REPL_TOOL_DRAIN_TIMEOUT_MS = 60_000;
 
-/**
- * Reserved in-REPL tool name for the host-side catalog search. Always
- * installed on the worker's `tools` object and intercepted by the kernel
- * before the allowlist gate; `$`-prefixed names are rejected at tool
- * registration so no real tool can shadow it. The worker source keeps the
- * literal `"$search"` inline (it is serialized via `toString()`), so this
- * constant must never drift from that literal.
- */
 export const NODE_REPL_TOOL_SEARCH_NAME = "$search";
-/** Reserved exact-tool schema lookup intrinsic; see the `$search` note above. */
 export const NODE_REPL_TOOL_DESCRIBE_NAME = "$describe";
-/** Reserved `history.sql` / `history.read` intrinsic; see the `$search` note above. */
 export const NODE_REPL_TOOL_HISTORY_NAME = "$history";
-/** Reserved `memory.read` / `memory.write` / `memory.list` intrinsic; see the `$search` note above. */
 export const NODE_REPL_TOOL_MEMORY_NAME = "$memory";
 
 export type SkyMethod = keyof SkyClient;
@@ -95,7 +77,6 @@ export type NodeReplWorkerData = {
   toolNames: string[];
   memory: boolean;
   deviceControl: boolean;
-  /** Methods of the cloud browser `browser` global; absent when it has none. */
   cloudBrowserMethods?: string[];
 };
 

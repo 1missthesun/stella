@@ -60,23 +60,13 @@ import {
 import { HyprlandDesktop } from "./linux/hyprland.js";
 import { forkCancelableTimeout, sleepMs } from "./effect-runtime.js";
 
-/**
- * Computer use on Linux. Background by default, like macOS and Windows:
- * apps are read and driven through AT-SPI (GTK, Qt, accessibility-enabled
- * Chromium/Electron), single windows are captured even when covered or on
- * another workspace, and the user's pointer and focused window are never
- * touched. Raw pointer/keyboard input exists only for delivery:
- * "foreground", which gives the user's window and pointer back afterwards.
- *
- * Built on Cua's Linux approach (MIT, trycua/cua; see linux/LICENSE-cua).
- */
+// Built on Cua's Linux approach (MIT, trycua/cua; see linux/LICENSE-cua).
 
 export const linuxComputerUseResourceArbiter = new ComputerUseResourceArbiter();
 
 type LinuxSnapshot = {
   window: LinuxWindow;
   appName: string;
-  /** Accessibility tree lines (empty when the app exposes none). */
   treeLines: string[];
   elements: LinuxElement[];
   focused: LinuxElement | null;
@@ -135,7 +125,6 @@ const COORDINATE_STALE_HINT =
   'Take a fresh get_app_state with screenshot_policy: "always" and pick the point again from that screenshot. If this window never stops animating, pass stale_check: "window" on the click or drag.';
 
 const SETTLE_CHANGE_MS = 700;
-/** How long a document scroll may take to show in element positions. */
 const SCROLL_SETTLE_MS = 400;
 const SETTLE_STABLE_MAX_MS = 400;
 const SETTLE_POLL_MS = 60;
@@ -169,7 +158,6 @@ const errorResponse = (
 const jsonObject = (value: unknown): JsonObject =>
   JSON.parse(JSON.stringify(value)) as JsonObject;
 
-/** Fast PNG for screenshots: Sub filter, light compression. */
 const encodeScreenshotPng = (
   rgba: Uint8Array,
   width: number,
@@ -382,7 +370,6 @@ const KEY_ALIASES: Record<string, string> = {
 
 export const parseKeyChord = (input: string): LinuxKeyChord => {
   const parts = input.split("+").map((part) => part.trim());
-  // "ctrl++" means ctrl and the plus key.
   if (input.endsWith("++")) parts.splice(parts.length - 2, 2, "plus");
   const mods: string[] = [];
   let key = "";
@@ -451,7 +438,6 @@ const readProcessName = (pid: number) => {
 };
 
 const STELLA_APP_IDS = /^(stella|stella-v2|stella-dev|stella-verify.*)$/i;
-/** Apps that hold passwords or system security settings. */
 const SECURITY_APP_IDS =
   /(keepass|1password|bitwarden|enpass|seahorse|gcr-prompter|polkit|pinentry|org\.gnome\.seahorse|kwalletmanager|proton.?pass)/i;
 
@@ -465,9 +451,7 @@ const protectedKind = (window: LinuxWindow): "stella" | "security" | null => {
     ) {
       return "stella";
     }
-  } catch {
-    // unknown process
-  }
+  } catch {}
   if (
     SECURITY_APP_IDS.test(window.appId) ||
     SECURITY_APP_IDS.test(readProcessName(window.pid))
@@ -485,10 +469,8 @@ export type LinuxComputerUseSessionOptions = Readonly<{
 type SessionState = {
   snapshots: Map<string, LinuxSnapshot>;
   committed: Set<string>;
-  /** The element Stella last focused or edited in each window. */
   focusTargets: Map<string, AtspiRef>;
   windows: Set<string>;
-  /** Per window: when Stella last acted and the state it acted on. */
   recentActions: Map<string, { at: number; stateId: string }>;
   tail: Promise<void>;
 };
@@ -538,7 +520,6 @@ const screenshotPath = (sessionId: string, alias: string) =>
     "last-screenshot.png",
   );
 
-/** Called when an agent run ends: drops its states and screenshots. */
 export const releaseLinuxComputerSession = async (sessionId: string) => {
   const state = sessions.get(sessionId);
   sessions.delete(sessionId);
@@ -555,9 +536,7 @@ export const releaseLinuxComputerSession = async (sessionId: string) => {
   }
   try {
     rmSync(linuxSessionDir(sessionId), { recursive: true, force: true });
-  } catch {
-    // best effort
-  }
+  } catch {}
 };
 
 const windowIdOf = (target: Extract<ComputerUseTarget, { type: "window" }>) =>
@@ -628,7 +607,6 @@ export const createLinuxComputerUseSession = (
     return best;
   };
 
-  /** The accessibility root of one window: its app's frame with that title or size. */
   const findFrame = async (
     atspi: AtspiClient,
     window: LinuxWindow,
@@ -750,7 +728,6 @@ export const createLinuxComputerUseSession = (
       await Promise.all([treeTask, capture()]);
     } else {
       await treeTask;
-      // "auto": a picture only when the tree cannot describe the window.
       if (screenshotPolicy === "auto" && read.accessibility !== "ok")
         await capture();
     }
@@ -801,9 +778,7 @@ export const createLinuxComputerUseSession = (
               .slice(selection.start, selection.end)
               .join("") || null;
         }
-      } catch {
-        // no selection info
-      }
+      } catch {}
     }
     timings.total_ms = Math.round(performance.now() - started);
     return {
@@ -939,13 +914,10 @@ export const createLinuxComputerUseSession = (
     };
   };
 
-  // ---------------------------------------------------------------- actions
-
   type Route = {
     route: string;
     delivery: "background" | "foreground";
     detail?: Record<string, unknown>;
-    /** The action changes nothing the tree shows (focus, caret, selection). */
     quiet?: boolean;
   };
 
@@ -1072,7 +1044,6 @@ export const createLinuxComputerUseSession = (
       }
       return { route: `atspi.action:${action.name}`, delivery: "background" };
     }
-    // List items and table cells: select them through their container.
     if (element.states.has("selectable")) {
       const container = ancestors(snapshot, element).find((candidate) =>
         candidate.interfaces.has("Selection"),
@@ -1089,7 +1060,6 @@ export const createLinuxComputerUseSession = (
     return null;
   };
 
-  /** The element keyboard input should go to: focused, or the one Stella last used. */
   const keyboardTarget = async (sessionId: string, snapshot: LinuxSnapshot) => {
     if (snapshot.focused) return snapshot.focused;
     const remembered = sessionState(sessionId).focusTargets.get(
@@ -1239,8 +1209,6 @@ export const createLinuxComputerUseSession = (
     const atspi = await atspiClient();
     const vertical = direction === "up" || direction === "down";
     const sign = direction === "down" || direction === "right" ? 1 : -1;
-    // The scroll bar for this element: in its subtree, or next to it under
-    // the nearest ancestor that holds one.
     const scopes = [element, ...ancestors(snapshot, element)];
     for (const scope of scopes) {
       const bars = snapshot.elements.filter((candidate) => {
@@ -1283,9 +1251,6 @@ export const createLinuxComputerUseSession = (
         };
       }
     }
-    // No settable scroll bar (web documents): bring the nearest child past
-    // the edge into view. Off-screen children are not in the observation,
-    // so read them live.
     const viewport = element.bounds;
     if (viewport && viewport.height > 0) {
       const children = (
@@ -1309,8 +1274,6 @@ export const createLinuxComputerUseSession = (
             child.bounds && (child.bounds.width > 0 || child.bounds.height > 0),
           ),
       );
-      // Exact pages first: move a child by the viewport's size (ScrollToPoint
-      // scrolls its ancestors and stops at the document's edges).
       const live =
         (await atspi.extents(element.ref).catch(() => null)) ?? viewport;
       // Live extents can be in device pixels (Chromium web content), the
@@ -1359,7 +1322,6 @@ export const createLinuxComputerUseSession = (
               detail: { pixels: Math.round(moved / rawScale) },
             };
           }
-          // Nothing moved and nothing lies past that edge: already there.
           const past = placed.some(({ bounds }) =>
             direction === "down"
               ? bounds.y + bounds.height > live.y + live.height + 2
@@ -1409,8 +1371,6 @@ export const createLinuxComputerUseSession = (
               )[0];
         if (!next) break;
         const ok = await atspi
-          // Down: the next child's top goes to the top (about one page);
-          // up: the previous child's bottom goes to the bottom.
           .scrollTo(
             next.ref,
             sign > 0
@@ -1508,7 +1468,6 @@ export const createLinuxComputerUseSession = (
       await desktop.foreground.focus(window);
       result = await run(desktop);
     } finally {
-      // Give the app a moment to take the input before focus moves away.
       await sleepMs(60);
       await desktop.foreground.restore(before).catch(() => undefined);
     }
@@ -1829,8 +1788,6 @@ export const createLinuxComputerUseSession = (
     }
   };
 
-  // --------------------------------------------------------------- requests
-
   const withSessionLock = async <T>(
     sessionId: string,
     run: () => Promise<T>,
@@ -1980,12 +1937,6 @@ export const createLinuxComputerUseSession = (
     }),
   });
 
-  /**
-   * Safety net for background actions: if the target window took the user's
-   * focus anyway (an app activating itself), give it straight back. Only a
-   * move to the target window counts, so the user's own clicks are never
-   * undone.
-   */
   const guardUserFocus = async (
     desktop: LinuxDesktop,
     before: LinuxFocusSnapshot,
@@ -2037,11 +1988,8 @@ export const createLinuxComputerUseSession = (
   };
 
   /**
-   * Apps apply an action's effect to their accessibility tree a little later
-   * (a GTK button reports its click when its 250 ms press animation ends).
-   * Right after an action, an observation waits
-   * until the tree moves off the acted-on state and holds still, so agents
-   * see the result without sleeping.
+   * Apps apply an action's effect to their accessibility tree a little later:
+   * a GTK button reports its click when its 250 ms press animation ends.
    */
   const settle = async (
     sessionId: string,
@@ -2270,9 +2218,6 @@ export const createLinuxComputerUseSession = (
       };
     }
 
-    // batch: every command is checked against the live app before any runs.
-    // Elements are AT-SPI objects, so later commands still address what
-    // the shared observation showed even after earlier ones changed the UI.
     const lives: LinuxSnapshot[] = [];
     for (const command of request.commands)
       lives.push(await validateLive(sessionId, command));
@@ -2334,7 +2279,6 @@ export const createLinuxComputerUseSession = (
       async () =>
         await withSessionLock(typedRequest.sessionId, async () => {
           try {
-            // A hung app or compositor must never hang the agent.
             const limitMs =
               typedRequest.type === "wait_for_change"
                 ? typedRequest.timeoutMs + 15_000

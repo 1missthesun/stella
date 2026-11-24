@@ -49,7 +49,6 @@ const GRACE_MS = 1_500;
 const KILL_CONFIRM_MS = 1_000;
 const POLL_MS = 50;
 const LIST_TIMEOUT_MS = 4_000;
-/** A stopped task resumes with the environment it had, so its empty ledger stays a while. */
 const EMPTY_LEDGER_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
 const ownerName = (owner: string) => owner.replace(/[^A-Za-z0-9_.-]/g, "_");
@@ -58,7 +57,7 @@ export const taskProcessLedgerDir = (stellaDataDir: string, owner: string) =>
   path.join(path.resolve(stellaDataDir), LEDGER_DIRECTORY, ownerName(owner));
 
 // Redirections apply left to right, so `2>/dev/null` comes first to keep a
-// failed write quiet. The folder is made again when a prune removed it.
+// failed write quiet.
 const RECORD_GROUP = `if [ -n "$${TASK_PROCESS_LEDGER_ENV}" ]; then
   [ -d "$${TASK_PROCESS_LEDGER_ENV}" ] || mkdir -p "$${TASK_PROCESS_LEDGER_ENV}" 2>/dev/null
   if true 2>/dev/null >|"$${TASK_PROCESS_LEDGER_ENV}/$$"; then
@@ -92,12 +91,6 @@ const writeHook = (stellaDataDir: string, name: string, contents: string) => {
   return file;
 };
 
-/**
- * The environment a task's shells and Claude Code run with: the owner
- * marker, its ledger, and the hooks bash (`BASH_ENV`) and Claude Code's Bash
- * tool (`CLAUDE_ENV_FILE`) run first in each shell. The user's own hooks of
- * those names still run, from the same shell.
- */
 export const taskProcessEnvironment = (
   stellaDataDir: string,
   owner: string,
@@ -118,13 +111,10 @@ export const taskProcessEnvironment = (
     if (userBashEnv && userBashEnv !== bashHook) env[USER_BASH_ENV] = userBashEnv;
     const userClaudeEnv = inherited[USER_CLAUDE_ENV_FILE] ?? inherited.CLAUDE_ENV_FILE;
     if (userClaudeEnv && userClaudeEnv !== claudeHook) env[USER_CLAUDE_ENV_FILE] = userClaudeEnv;
-  } catch {
-    // Without a ledger the owner marker alone still applies.
-  }
+  } catch {}
   return env;
 };
 
-/** For Stella's own long-lived helpers started from a task's shell: they are not the task's. */
 export const withoutTaskProcessOwnership = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
   if (env[TASK_PROCESS_OWNER_ENV] === undefined && env[TASK_PROCESS_LEDGER_ENV] === undefined) return env;
   const next: NodeJS.ProcessEnv = { ...env };
@@ -139,11 +129,6 @@ export const withoutTaskProcessOwnership = (env: NodeJS.ProcessEnv): NodeJS.Proc
   return next;
 };
 
-/**
- * Record a process Stella spawned for a task (the leader of its own group
- * outside Windows) in the task's ledger. Call the returned function when it
- * exits.
- */
 export const recordTaskProcess = (
   env: NodeJS.ProcessEnv,
   pid: number | undefined,
@@ -156,9 +141,7 @@ export const recordTaskProcess = (
   const touch = (name: string) => {
     try {
       writeFileSync(path.join(ledger, name), "");
-    } catch {
-      // A missing entry only narrows what a stop can find.
-    }
+    } catch {}
   };
   try {
     mkdirSync(ledger, { recursive: true });
@@ -242,7 +225,6 @@ const listWindows = async (): Promise<ProcessRow[] | null> => {
 
 const markerToken = (owner: string) => `${TASK_PROCESS_OWNER_ENV}=${ownerName(owner)}`;
 
-/** Pids whose environment names this owner. */
 const markedPids = async (owner: string, rows: readonly ProcessRow[]): Promise<Set<number>> => {
   const token = markerToken(owner);
   const marked = new Set<number>();
@@ -254,9 +236,7 @@ const markedPids = async (owner: string, rows: readonly ProcessRow[]): Promise<S
         if (environ.subarray(0, needle.length - 1).equals(needle.subarray(1)) || environ.includes(needle)) {
           marked.add(row.pid);
         }
-      } catch {
-        // Gone, or not readable by this user.
-      }
+      } catch {}
     }
     return marked;
   }
@@ -299,13 +279,9 @@ const readLedger = (ledger: string): GroupEntry[] => {
       let endedMs = startedMs;
       try {
         endedMs = Math.max(startedMs, statSync(path.join(ledger, `${name}${END_SUFFIX}`)).mtimeMs);
-      } catch {
-        // Never recorded an end: only its start bounds it.
-      }
+      } catch {}
       entries.push({ pgid: Number(name), startedMs, endedMs });
-    } catch {
-      // Removed meanwhile.
-    }
+    } catch {}
   }
   return entries;
 };
@@ -315,7 +291,6 @@ const forgetEntry = (ledger: string, pgid: number) => {
   rmSync(path.join(ledger, `${pgid}${END_SUFFIX}`), { force: true });
 };
 
-/** Whether the group now under this id is the one the entry recorded. */
 const entryHolds = (entry: GroupEntry, rows: readonly ProcessRow[], groupKeyed: boolean): ProcessRow[] => {
   const leader = rows.find((row) => row.pid === entry.pgid);
   if (leader && Number.isFinite(leader.startedMs)) {
@@ -366,12 +341,6 @@ const descendantsOf = (rows: readonly ProcessRow[], roots: Iterable<number>) => 
   return found;
 };
 
-/**
- * What a stop will signal, each with the start time it had when found: a
- * signal goes only to that same process, never to a pid handed on since.
- * A group is signalled as a group only while its leader is that same
- * leader; otherwise its members are signalled one by one.
- */
 type Targets = { pids: Map<number, string | null>; groups: Map<number, string | null> };
 
 const collectPosix = async (owner: string, ledger: string | undefined): Promise<Targets | null> => {
@@ -513,10 +482,6 @@ const endWindows = async (ledger: string | undefined): Promise<number> => {
   return targets.size;
 };
 
-/**
- * End every process the task `owner` started that is still running, never
- * this process or its ancestors. Resolves with how many were signalled.
- */
 export const endTaskProcesses = async (args: { owner: string; stellaDataDir?: string }): Promise<number> => {
   const ledger = args.stellaDataDir ? taskProcessLedgerDir(args.stellaDataDir, args.owner) : undefined;
   try {
@@ -526,7 +491,6 @@ export const endTaskProcesses = async (args: { owner: string; stellaDataDir?: st
   }
 };
 
-/** Drop ledger entries of groups that have ended, and ledgers left empty. */
 export const pruneTaskProcessLedgers = async (stellaDataDir: string): Promise<void> => {
   const root = path.join(path.resolve(stellaDataDir), LEDGER_DIRECTORY);
   let owners: string[];
@@ -552,8 +516,6 @@ export const pruneTaskProcessLedgers = async (stellaDataDir: string): Promise<vo
       if (readdirSync(ledger).length === 0 && Date.now() - statSync(ledger).mtimeMs > EMPTY_LEDGER_KEEP_MS) {
         rmSync(ledger, { recursive: true, force: true });
       }
-    } catch {
-      // Not a ledger directory.
-    }
+    } catch {}
   }
 };

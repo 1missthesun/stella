@@ -1,11 +1,5 @@
 import type { AtspiNode, AtspiRef, Rect } from "./atspi.js";
 
-/**
- * Turns an AT-SPI tree into the numbered element lines agents read, in the
- * same shape as the macOS and Windows states: one line per element,
- * tab-indented, `<index> <role> <label>, Value: …, Secondary Actions: …`.
- */
-
 export type LinuxElement = Readonly<{
   index: number;
   ref: AtspiRef;
@@ -19,7 +13,6 @@ export type LinuxElement = Readonly<{
   textLength?: number;
   caretOffset?: number;
   value?: AtspiNode["value"];
-  /** Index of the nearest listed ancestor, if any. */
   parentIndex: number | null;
   depth: number;
 }>;
@@ -30,7 +23,6 @@ export type FormattedTree = {
   focused: LinuxElement | null;
 };
 
-/** Containers that say nothing on their own; their children move up. */
 const TRANSPARENT_ROLES = new Set([
   "panel",
   "filler",
@@ -170,7 +162,6 @@ export const formatTree = (
       node.states.has("focused") ||
       node.states.has("selected") ||
       !TRANSPARENT_ROLES.has(node.role);
-    // A label repeating its parent's name (GTK buttons) adds nothing.
     const redundantLabel =
       (node.role === "label" || node.role === "static") &&
       label !== "" &&
@@ -254,7 +245,6 @@ export const formatTree = (
   return { lines, elements, focused };
 };
 
-/** The deepest listed element whose bounds contain the point (window px). */
 export const elementAtPoint = (
   elements: readonly LinuxElement[],
   x: number,
@@ -272,7 +262,6 @@ export const elementAtPoint = (
     ) {
       continue;
     }
-    // Later elements are deeper or drawn above earlier siblings.
     if (!best || element.depth >= best.depth) best = element;
   }
   return best;

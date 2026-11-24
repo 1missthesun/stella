@@ -121,21 +121,9 @@ import type { ReplConnectClient } from "../connectors/connect-service.js";
 import { resolveToolFallbackCwd } from "../tools/cwd.js";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 
-// Browser protocol waits can deliberately run for ten minutes. Keep the
-// enclosing REPL cell alive slightly longer so a requested wait is not killed
-// by the historical five-minute outer evaluation ceiling.
 const DEFAULT_EVAL_TIMEOUT_MS = 11 * 60_000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 4 * 60 * 60_000;
-/**
- * Upper bound on kernel/session teardown awaited inside the evaluate error
- * path. Disposal can touch the browser client transport and the computer-use
- * session daemon; if either is wedged, an unbounded await here
- * holds the evaluation's own timeout rejection hostage and the node_repl
- * tool call never returns (observed 2026-07-12: a hung Brave extension
- * bridge turned a 5-minute eval timeout into an indefinite tool hang).
- * Teardown keeps running in the background past this bound.
- */
 const DEFAULT_KERNEL_DISPOSE_TIMEOUT_MS = 10_000;
 const DEFAULT_COMPLETED_CELL_RETENTION_MS = 5 * 60_000;
 const DEFAULT_MAX_RETAINED_CELLS = 128;
@@ -259,11 +247,6 @@ class KernelTerminatedError extends Error {
   }
 }
 
-/**
- * Error name the worker assigns to uncaught async throws surfaced through the
- * REPL's output stream (see the inline literal in `kernel-worker.ts`, which is
- * serialized into the worker source and cannot share this constant).
- */
 const NODE_REPL_UNCAUGHT_ERROR_NAME = "NodeReplUncaughtError";
 
 const BLOCKED_NODE_MODULE_RE =
@@ -578,13 +561,6 @@ export const nodeReplChildUsesElectronRuntime = (
   return /^electron(\.exe)?$/i.test(path.basename(executable));
 };
 
-/**
- * The tool account a sandboxed host's REPL runs as, and the workspace it
- * starts in. A context that carries a `toolProcessIdentity` (the cloud
- * container) gets the same privilege drop as `Bash`: never the host's own
- * user and environment, where `node:fs` could read the host's private state
- * and `/proc/self/environ` would hand over its secrets.
- */
 export type NodeReplProcessIsolation = Readonly<{
   identity: ToolProcessIdentity;
   cwd: string;
@@ -597,11 +573,6 @@ type ExternalNodeReplTransportOptions = Readonly<{
   isolation?: NodeReplProcessIsolation;
 }>;
 
-/**
- * The whole environment an isolated REPL child gets: the tool account's own
- * home and state directories and a fixed PATH, as a `Bash` command's identity
- * overrides set them, and nothing inherited from the host.
- */
 const isolatedNodeReplEnvironment = (
   isolation: NodeReplProcessIsolation,
 ): NodeJS.ProcessEnv => ({
@@ -614,11 +585,10 @@ const isolatedNodeReplEnvironment = (
 });
 
 /**
- * Bun cannot host the hardened REPL in-process, so production starts the
- * bundled Node runtime and streams the worker source over stdin. ChildProcess
- * `error` events do not cover errors emitted by the separate stdin Socket:
- * when a Windows child closes during bootstrap, an unobserved stdin EPIPE is
- * otherwise fatal to the detached runtime worker.
+ * Bun cannot host the hardened REPL in-process. ChildProcess `error` events do
+ * not cover errors emitted by the separate stdin Socket: when a Windows child
+ * closes during bootstrap, an unobserved stdin EPIPE is fatal to the runtime
+ * worker.
  */
 export const createExternalNodeReplTransport = (
   source: string,
@@ -661,9 +631,6 @@ export const createExternalNodeReplTransport = (
     for (const listener of errorListeners) listener(error);
   };
 
-  // Install both guards before writing any source. `child.on("error")` handles
-  // spawn/IPC failures; stdin is its own EventEmitter and needs a distinct
-  // listener for asynchronous EPIPE/ECONNRESET failures.
   child.on("error", forwardError);
   child.stdin?.on("error", forwardError);
   try {
@@ -718,8 +685,6 @@ const createNodeReplTransport = (
   name: string,
   isolation?: NodeReplProcessIsolation,
 ): NodeReplTransport => {
-  // A worker thread shares the host's user and environment, so an isolated
-  // REPL is always a child process, whatever runtime hosts the kernel.
   if (!isolation && !isBunNodeReplRuntime()) {
     return new Worker(source, { eval: true, workerData, name });
   }
@@ -932,9 +897,7 @@ class NodeReplKernel {
     if (turnId) {
       try {
         this.browser.beginTurn?.(turnId);
-      } catch {
-        // Another turn holds the session; the command below reports it.
-      }
+      } catch {}
     }
     const backend = target.backend ?? this.browserBackend;
     const bound: BrowserCommandParams = { [WORKER_BOUND_BACKEND_PARAM]: backend };
@@ -1014,13 +977,9 @@ class NodeReplKernel {
         value: target.value,
       });
     } catch (error) {
-      // A fill that failed part-way may have left the value somewhere
-      // visible; take it back out before reporting the failure.
       await inspect("all");
       throw error;
     }
-    // A value that landed in a visible field other than the one the selector
-    // names is cleared from there straight away and reported.
     const report = await inspect("visible-not-target");
     return {
       tabId,
@@ -1306,9 +1265,7 @@ class NodeReplKernel {
       active.nextContentCursor += 1;
       try {
         active.onContent?.(typed.item, typed.cursor);
-      } catch {
-        // Streaming observers are diagnostic only and cannot change execution.
-      }
+      } catch {}
       return;
     }
     if (typed.type === "evaluation-result") {
@@ -1367,10 +1324,6 @@ class NodeReplKernel {
         return;
       }
       if (error.name === NODE_REPL_UNCAUGHT_ERROR_NAME) {
-        // The worker's REPL caught an uncaught async throw via its domain and
-        // abandoned the in-flight evaluation; the REPL cannot be safely
-        // reused. Terminate so the registry disposes this kernel's session
-        // and the next evaluate starts a fresh kernel.
         void this.completeEvaluation(
           active,
           active.content,
@@ -1812,7 +1765,6 @@ class NodeReplKernel {
     }
   }
 
-  /** Registers password and secret hidden-field values of the page; returns its site. */
   private async rememberPageSecrets(
     tabId: number | undefined,
     backend: BrowserBackend,
@@ -1836,8 +1788,6 @@ class NodeReplKernel {
     }
   }
 
-  // Credentials in browser output reach the agent's code only as placeholders
-  // (secret-masking.ts); the real values stay in this process.
   private async maskBrowserResult(
     message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
     value: unknown,
@@ -1914,7 +1864,6 @@ class NodeReplKernel {
     return masked;
   }
 
-  /** HAR on disk is masked too: an agent reads it with Bash. */
   private async maskHarFile(
     run: BrowserSecretMaskRun,
     data: unknown,
@@ -1976,7 +1925,6 @@ class NodeReplKernel {
     return masked;
   }
 
-  /** Desktop main records this session's in-app browser downloads here. */
   private async readInAppBrowserDownloads(active: ActiveEvaluation) {
     const stellaDataDir = active.context.stellaDataDir?.trim()
       ? path.resolve(active.context.stellaDataDir)
@@ -2140,9 +2088,6 @@ class NodeReplKernel {
     );
   }
 
-  // `path` is saved here, after the capture, so it works the same on every
-  // backend (the extension and the cloud browser can't write local files).
-  // A relative path resolves where the agent's Bash runs.
   private splitScreenshotParams(
     active: ActiveEvaluation,
     value: unknown,
@@ -2161,7 +2106,6 @@ class NodeReplKernel {
     return { params, savePath };
   }
 
-  /** The browser service resolves a relative path against its own directory. */
   private withAbsoluteHarPaths(
     active: ActiveEvaluation,
     message: Extract<WorkerToNodeReplParentMessage, { type: "browser-call" }>,
@@ -2752,9 +2696,7 @@ class NodeReplKernel {
     active.responseMeta = meta;
     try {
       active.onResponseMeta?.(meta);
-    } catch {
-      // UI metadata must never change the tool's success/error outcome.
-    }
+    } catch {}
   }
 
   private async captureBrowserResponseMeta(
@@ -2821,9 +2763,7 @@ class NodeReplKernel {
             ...(pageUrl ? { pageUrl } : {}),
           };
         }
-      } catch {
-        // ChatGPT treats this capture as best-effort response metadata.
-      }
+      } catch {}
     }
     const visibleUrl = screenshotTab?.url
       ? sanitizedBrowserUrl(screenshotTab.url)
@@ -3071,9 +3011,6 @@ const waitForCellChange = async (
         const changed = Effect.raceFirst(
           Deferred.await(terminal),
           Deferred.await(contentReady).pipe(
-            // A return value is immediately followed by its terminal message
-            // on the worker channel. Give that next message one event-loop
-            // turn so a completed cell is not spuriously reported as running.
             Effect.flatMap(() => Effect.sleep(0)),
           ),
         );
@@ -3147,7 +3084,6 @@ export class NodeReplKernelRegistry {
     }
   }
 
-  /** Sweeps once after `delayMs`, then every interval until dispose. */
   private scheduleTaskTabSweep(delayMs: number): void {
     if (this.taskTabSweepStopped) return;
     this.cancelTaskTabSweep = forkCancelableTimeout(delayMs, () => {
@@ -3162,7 +3098,6 @@ export class NodeReplKernelRegistry {
     this.options.taskTabs?.started(agentBrowserOwnerId(agentId));
   }
 
-  /** A task's run ended; its tabs close after a grace period unless it is still waiting on work or on the user. */
   browserTaskEnded(agentId: string, keepTabs: boolean, report?: string): void {
     this.options.taskTabs?.ended(agentBrowserOwnerId(agentId), keepTabs, report);
   }
@@ -3652,13 +3587,6 @@ export class NodeReplKernelRegistry {
     return await kernel.fillSecureField(context, target);
   }
 
-  /**
-   * Stops the session's native computer-use helper once its agent run has
-   * ended, keeping the kernel (and its REPL bindings) for a later resume.
-   * The helper is respawned on the next computer-use request. Waits for a
-   * cell still running in the background, and skips the release when the
-   * agent started using code again in the meantime.
-   */
   async releaseAgentNativeSessions(agentId: string): Promise<number> {
     const ids = [...(this.sessionIdsByAgent.get(agentId) ?? [])];
     this.sessionIdsByAgent.delete(agentId);
@@ -3693,9 +3621,7 @@ export class NodeReplKernelRegistry {
           () => undefined,
           () => undefined,
         );
-      } catch {
-        // Session cleanup must not mask the evaluation or shutdown outcome.
-      }
+      } catch {}
     }
     if (this.kernels.get(id) === kernel) {
       this.kernels.delete(id);
@@ -3704,15 +3630,6 @@ export class NodeReplKernelRegistry {
     const teardown = Promise.allSettled([kernelClose, sessionCleanup]).then(
       () => undefined,
     );
-    // Never let a wedged teardown (hung browser bridge dispose, stuck
-    // session daemon) block the caller: `evaluate` awaits this before
-    // rethrowing a KernelTerminatedError, so an unbounded wait here would
-    // swallow the eval timeout and hang the node_repl tool call forever.
-    // The registry entry is already deleted, so a follow-up evaluate gets a
-    // fresh kernel while teardown finishes in the background. The bound is
-    // an Effect race: when teardown settles first the sleep fiber is
-    // interrupted (the clearTimeout analogue); when the deadline fires
-    // first, teardown keeps running in the background exactly as before.
     return runComputerUseEffect(
       Effect.raceFirst(
         Effect.promise(() => teardown),

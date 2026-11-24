@@ -191,11 +191,8 @@ const actionPoints = (
   return [];
 };
 
-/** A pixel counts as changed when any channel moved by more than this. */
 const PIXEL_CHANGE_THRESHOLD = 48;
-/** Share of changed pixels around a point that means "something else is there now". */
 const POINT_AREA_CHANGE_LIMIT = 0.4;
-/** Share of changed pixels in the whole window that means "a different screen". */
 const WINDOW_CHANGE_LIMIT = 0.75;
 
 const changedPixelShare = (
@@ -228,12 +225,6 @@ const changedPixelShare = (
   return total === 0 ? 0 : changed / total;
 };
 
-/**
- * Whether a screenshot-coordinate action may still go ahead: the pixels
- * around each of its points and most of the window must look the same as in
- * the observation. Small animations (a spinner, a pulsing button, a ticking
- * timer) pass; a dialog over the point or a different screen does not.
- */
 const coordinatePixelChange = (
   observed: DecodedPng,
   current: DecodedPng,
@@ -295,7 +286,6 @@ const decodeSnapshotScreenshot = (snapshot: WinSnapshot) => {
   }
 };
 
-/** Helper error codes that mean input was refused or not delivered. */
 const WINDOWS_INPUT_ERROR_CODES = new Set([
   "background_unavailable",
   "foreground_refused",
@@ -324,8 +314,6 @@ class WindowsInputError extends Error {
 const BACKGROUND_UNAVAILABLE_OPTIONS =
   'Nothing was sent and Stella did not take over the screen. What you can do: act on an element instead (click, scroll, set_value or perform_secondary_action with an element_index go through UI Automation, which works in the background), use set_value to fill a text field, or tell the user what you could not do. Only if the user asked Stella to take over the screen for this task, retry with delivery: "foreground": the window comes to the front for the action, then the user gets their window and pointer back.';
 
-// Helpers without coded errors send the code as a "code: message" prefix.
-// What the agent may do next is the runtime's to say, not the helper's.
 const codedHelperError = (response: WinHelperResponse, fallback: string) => {
   let code = response.code;
   let message = response.error?.trim() || fallback;
@@ -374,8 +362,6 @@ const actionOperation = (
 ): WinHelperRequest => {
   const { details, snapshot } = requireSnapshot(sessionId, command.target);
   if (isCoordinateAction(command)) {
-    // Coordinates are read against the screenshot of the latest observation,
-    // so the action must come from that observation, not an earlier one.
     const latestVisualStateId = windowsVisualStateId(snapshot);
     if (
       command.observedVisualStateId &&
@@ -402,8 +388,6 @@ const actionOperation = (
   const shared = {
     app: details.app,
     windowId: details.windowId ?? snapshot.windowId,
-    // Window-relative coordinates follow the window if it moved since the
-    // observation; the live check already refused a resized window.
     windowBounds:
       options.liveSnapshot?.windowBounds ?? snapshot.windowBounds ?? null,
     dispatch: options.dispatch,
@@ -692,8 +676,6 @@ export const createWindowsComputerUseSession = (
   const committedStateKeys = new Set<string>();
   const committedStateKey = (sessionId: string, alias: string) =>
     `${sessionId}\u0000${alias}`;
-  // The state right before a background-delivered action, compared with the
-  // next observation to tell whether the action had any effect.
   const backgroundProbes = new Map<
     string,
     { stateId: string; visualStateId: string; action: string }
@@ -1099,10 +1081,6 @@ export const createWindowsComputerUseSession = (
                   return live;
                 }
 
-                // Screenshot coordinates: the pixels are the evidence, not the
-                // accessibility tree. The window must have the same size, and
-                // unless the caller accepts any change, the same pixels around
-                // the points.
                 const observedBounds = observed?.windowBounds;
                 const liveBounds = live.windowBounds;
                 if (
@@ -1131,7 +1109,6 @@ export const createWindowsComputerUseSession = (
                   : null;
                 const liveImage = decodeSnapshotScreenshot(live);
                 if (!observedImage || !liveImage) {
-                  // Unreadable pixels: fall back to the exact comparison.
                   if (
                     command.observedVisualStateId &&
                     windowsVisualStateId(live) !== command.observedVisualStateId

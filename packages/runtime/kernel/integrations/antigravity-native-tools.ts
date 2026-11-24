@@ -11,7 +11,6 @@ const ORCHESTRATOR_TOOLS = ["read_file", "search_web"] as const;
 const WORKER_TOOLS = ["read_file", "write_file", "edit_file", "search_web"] as const;
 export const ANTIGRAVITY_NATIVE_TOOLS = WORKER_TOOLS;
 
-/** Antigravity tools that stay declared or could appear, and that a Stella agent may only use when it is in its set. */
 export const ANTIGRAVITY_GATED_TOOLS = [
   ...ANTIGRAVITY_NATIVE_TOOLS,
   "run_command",
@@ -49,7 +48,6 @@ const STELLA_TOOLS_REPLACED: Readonly<Record<string, readonly string[]>> = {
   search_web: ["web"],
 };
 
-/** Stella's own file and shell tools, which its orchestrator delegates instead of using. */
 const ORCHESTRATOR_WITHHELD = ["Write", "Edit", "apply_patch", "Bash", "exec_command", "write_stdin", "Grep", "Glob"];
 
 export const resolveAntigravityToolSet = <T extends { name: string }>(args: {

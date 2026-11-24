@@ -1,18 +1,10 @@
 export interface ImageCaps {
   maxWidth: number;
   maxHeight: number;
-  /** The hard base64 ceiling; never exceeded. */
   maxBytes: number;
   jpegQuality: number;
-  /**
-   * The base64 size an image is fitted to when it can be without losing
-   * detail: at good JPEG quality and at least `minEdge` on its long side.
-   * When it can't, the image keeps that resolution and quality and only has
-   * to fit `maxBytes`.
-   */
   targetBytes?: number;
   minEdge?: number;
-  /** A tighter long edge for photos; screenshots and graphics keep `maxWidth`/`maxHeight` for their text. */
   photoEdge?: number;
 }
 
@@ -24,12 +16,7 @@ export interface ImageCapTarget {
   detailOriginal?: boolean;
 }
 
-/**
- * Anthropic's documented per-image base64 ceiling on the direct API (and
- * claude.ai). This is the true hard cap the wire rejects above; it replaces
- * the previously-divergent 4.5MB/5MB/10MB constants scattered across the
- * resize, send-boundary, and spill modules.
- */
+/** Anthropic's documented per-image base64 ceiling on the direct API; the wire rejects anything above it. */
 export const ANTHROPIC_DIRECT_MAX_IMAGE_BASE64_BYTES = 10 * 1024 * 1024;
 
 export const ANTHROPIC_HIGH_RES_MAX_EDGE = 2576;
@@ -41,48 +28,25 @@ export const OPENAI_ORIGINAL_MAX_EDGE = 6000;
 
 export const GOOGLE_MAX_EDGE = 3072;
 
-// --- Many-image request rule (Anthropic: >20 blocks => each <=2000px) ---
+// Anthropic: a request with more than 20 image blocks caps each at 2000px.
 
 export const MANY_IMAGE_THRESHOLD = 20;
 export const MANY_IMAGE_MAX_EDGE = 2000;
 
 export const SAFE_FALLBACK_MAX_EDGE = 2048;
 
-/**
- * What an image is fitted to when it enters a conversation. Every image is
- * resent with each later request, so it is fitted once, to what models use
- * and to ~1 MB, which keeps a long chat's images within the providers'
- * request limits. Screenshots and graphics keep the high-resolution Anthropic
- * edge (2576px): small text in a retina screenshot stops being readable at
- * 2000px even as lossless PNG, and as JPEG at quality 90 it still fits ~1 MB.
- * Photos gain nothing past 2000px (OpenAI fits images into 2048px, Anthropic's
- * standard models into 1568px).
- */
 export const CONTEXT_IMAGE_MAX_EDGE = 2576;
 export const CONTEXT_PHOTO_MAX_EDGE = 2000;
 export const CONTEXT_IMAGE_MIN_EDGE = 1568;
-/**
- * Screenshots and graphics may go a little past ~1 MB to stay lossless PNG:
- * dense small text that JPEG at quality 90-95 misreads (a "YJ" read as "JY")
- * reads correctly from the same pixels as PNG. (Lossless WebP doesn't help:
- * the same pixels as WebP were misread the same way, so the route re-encodes
- * WebP before the model sees it.)
- */
 export const CONTEXT_LOSSLESS_TARGET_BYTES = base64EncodedLengthOf(1.5 * 1024 * 1024);
 export const CONTEXT_IMAGE_TARGET_BYTES = base64EncodedLengthOf(1024 * 1024);
 export const SAFE_FALLBACK_MAX_BYTES = Math.floor(4.5 * 1024 * 1024);
 
-/**
- * Byte budget to aim for below the direct-API hard cap: staying a margin under
- * 10MB avoids an image passing the resizer only to trip the send-boundary
- * guard at exactly the wire limit.
- */
 const ANTHROPIC_DIRECT_RESIZE_MAX_BYTES = Math.floor(9.5 * 1024 * 1024);
 const GENEROUS_RESIZE_MAX_BYTES = Math.floor(9.5 * 1024 * 1024);
 
 export const DEFAULT_JPEG_QUALITY = 90;
 
-/** Lowest JPEG quality an image is encoded at to meet `targetBytes`. */
 export const CONTEXT_IMAGE_MIN_JPEG_QUALITY = 80;
 
 const normalize = (value: string | undefined): string =>
@@ -181,12 +145,8 @@ export const maxInlineImageBase64Bytes = (
 export const READ_IMAGE_MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 
 /**
- * What `Read` fits an image to, the same on the desktop runtime, a cloud
- * agent's container, and the cloud orchestrator's Worker. `Read` does not know
- * which model will see the image (a Worker turn may route anywhere), so the
- * target is the conversation fit above, with the safe byte ceiling under the
- * tightest mainstream per-image cap (Bedrock/Vertex's 5MB) for images that
- * can't reach ~1 MB without losing detail.
+ * `Read` does not know which model will see the image, so its byte ceiling
+ * sits under the tightest mainstream per-image cap (Bedrock/Vertex's 5MB).
  */
 export const READ_IMAGE_CAPS: ImageCaps = {
   ...contextFit(CONTEXT_IMAGE_MAX_EDGE),
@@ -194,24 +154,16 @@ export const READ_IMAGE_CAPS: ImageCaps = {
   jpegQuality: DEFAULT_JPEG_QUALITY,
 };
 
-/**
- * The same target where the result is stored as one Durable Object SQLite
- * row: the cloud orchestrator's Read runs in a Worker, and its result is a
- * single pi entry (and journal row), which the platform caps at 2MB. The edge,
- * ladder and note are unchanged; only the byte ceiling leaves room for the row.
- */
+/** Durable Object storage caps a row at 2MB, and a cloud Read result is one row. */
 export const DURABLE_OBJECT_READ_IMAGE_CAPS: ImageCaps = {
   ...READ_IMAGE_CAPS,
   maxBytes: Math.floor(1.5 * 1024 * 1024),
 };
 
 /**
- * Context tokens one image block costs, for budgeting a history window. An
- * image is billed by its pixels (~width*height/750 on Anthropic), never by
- * its base64 length; counting the base64 as text made one photo read as
- * ~375k tokens and pushed the whole conversation out of the window. Image
- * blocks carry no dimensions, so this is the bound for the largest image
- * Read sends (a square at the Read long edge).
+ * An image is billed by its pixels (~width*height/750 on Anthropic), never by
+ * its base64 length, and image blocks carry no dimensions, so this is the
+ * bound for the largest image Read sends.
  */
 export const IMAGE_CONTEXT_TOKEN_ESTIMATE = Math.ceil(
   (READ_IMAGE_CAPS.maxWidth * READ_IMAGE_CAPS.maxHeight) / 750,
@@ -229,7 +181,6 @@ function base64EncodedLengthOf(byteLength: number): number {
   return Math.ceil(byteLength / 3) * 4;
 }
 
-/** The caps for an image of `sourceMimeType`: photos take `photoEdge`. */
 export const capsForSource = (caps: ImageCaps, sourceMimeType: string): ImageCaps =>
   caps.photoEdge === undefined || triesLosslessFirst(sourceMimeType)
     ? caps
@@ -240,7 +191,6 @@ export const capsForSource = (caps: ImageCaps, sourceMimeType: string): ImageCap
         minEdge: Math.min(caps.minEdge ?? caps.photoEdge, caps.photoEdge),
       };
 
-/** Whether an image goes as it is: within the edge and the size it would be fitted to. */
 export const imageFitsCaps = (
   caps: ImageCaps,
   width: number,
@@ -298,17 +248,6 @@ const scaled = (size: { width: number; height: number }, factor: number) => ({
 
 const jpeg = (quality: number): ImageEncoding => ({ format: "image/jpeg", quality });
 
-/**
- * How an image that doesn't go as it is gets fitted, in order: each pass
- * resizes to its dimensions and takes the first encoding under its byte
- * limit. With a `targetBytes`, the first passes aim for it at good quality,
- * never below `minEdge`: screenshots and graphics first as PNG (within
- * `CONTEXT_LOSSLESS_TARGET_BYTES`), then as JPEG at 90-80; photos as JPEG at
- * 85-80. Past those, the image keeps its full fitted size and only has to fit
- * `maxBytes`, lowering quality and then size only as far as that needs. The
- * runtime's Photon resize and the Worker's Images binding both follow this
- * plan.
- */
 export const imageFitPasses = (
   sourceCaps: ImageCaps,
   width: number,

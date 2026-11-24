@@ -100,15 +100,6 @@ export const readClaudeCliVersion = async (
 
 export type ClaudeCliUpdateOutcome = CliUpdateOutcome<ClaudeCliInstallMethod>;
 
-/**
- * Keeps Claude Code current and working with its own updater
- * (`cli-update.ts`), which follows however it was installed: a native install
- * downloads the next version beside the running one, an npm install
- * reinstalls through npm, a version manager's wrapper (mise) updates its tool
- * before running it, and a Homebrew, WinGet or Linux package install is left
- * to its package manager. The release channel and `minimumVersion` in the
- * user's Claude settings apply as they would in a terminal.
- */
 export const updateClaudeCli = async (
   options: { env?: NodeJS.ProcessEnv } = {},
 ): Promise<ClaudeCliUpdateOutcome> =>

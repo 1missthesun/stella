@@ -38,10 +38,8 @@ export const createReadinessLatch = (): ReadinessLatch => {
       }
       return new Promise((resolve) => {
         let settled = false;
-        // Effect-ratchet pin (1 setTimeout): the wait bound for plain-TS
-        // callers is a deliberately unref'd raw timer — a latch that never
-        // opens must not keep the process alive for timeoutMs, which an
-        // Effect sleep fiber (a ref'd timer under the hood) would.
+        // An Effect sleep fiber holds a ref'd timer; a latch that never opens must
+        // not keep the process alive, so this is a raw unref'd timer.
         const timer = setTimeout(() => {
           if (settled) return;
           settled = true;

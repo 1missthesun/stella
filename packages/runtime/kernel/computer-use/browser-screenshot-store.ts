@@ -10,10 +10,6 @@ import {
   writeFile,
 } from "node:fs/promises";
 
-// Browser screenshots outlive the code cell that took them: agents read,
-// copy and upload the returned path in later tool calls. Kept per agent (or
-// conversation) under <stella data>/media/screenshots and swept by age and
-// total size, never at cell or runtime end.
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000;

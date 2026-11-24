@@ -21,41 +21,11 @@ const logError = (...args: unknown[]) =>
   console.error("[stella:extensions]", ...args);
 
 /**
- * Build a cache-busting query suffix for ESM `import()` so the runtime
- * picks up edits to existing extension files on F1 reload.
- *
- * The Node ESM loader caches modules by their full specifier string. A
- * stable `file:///abs/path.ts` URL hits the cache on every reload —
- * even if the file was edited on disk — and `import()` returns the
- * old module record. Appending a query that changes between calls
- * (file mtime + a per-load token) makes each reload's specifier
- * unique while keeping intra-load deduplication intact (two
- * `importModules` invocations during the same `loadExtensions` call
- * share the same loadToken so they don't re-import the same file).
- *
- * Using mtime alone wouldn't help if the user saved twice within the
- * same millisecond; `loadToken` provides a tiebreaker. Querystrings
- * are valid in `file://` URLs and the loader treats different
- * query-stringed specifiers as distinct cache keys.
- *
- * Note: this DOES leak the previous version's module record from the
- * loader cache on every reload — Node ESM exposes no public API to
- * evict a module by URL. Per-session leak ≈ N × (file count under
- * `extensions/**`) where N is the number of reloads. For typical
- * extension authoring (occasional edits, a handful of files) the
- * working set is small. For pathological churn (auto-reload on every
- * keystroke through a watcher, or thousands of files), expect the
- * worker process to grow until restart.
- *
- * Mitigation: {@link loadExtensions} logs a heads-up when the per-
- * worker reload count crosses a threshold so the user has a signal
- * to restart Stella before memory becomes a problem. Bumping the
- * threshold here is fine — the trade-off is "surface a warning the
- * user might care about" vs. "let the leak grow silently."
- *
- * Bun (the runtime worker) keys its module registry by path and ignores
- * the query, so there the file's registry entry is evicted instead;
- * without it an edited extension reloads as its old code.
+ * Node's ESM loader caches modules by their full specifier and exposes no API
+ * to evict one, so a query that changes per load (mtime plus a per-load token)
+ * makes an edited file import fresh, leaking the old module record. Bun keys
+ * its module registry by path and ignores the query, so there the file's
+ * registry entry is evicted instead.
  */
 const cacheBusterEffect = (
   filePath: string,
@@ -250,12 +220,6 @@ const loadPrompts = (dir: string): Effect.Effect<PromptTemplate[]> =>
     return results;
   });
 
-// Per-process counter of how many times `loadExtensions` has run.
-// First call (startup) is 1; each F1 reload increments it. Used only
-// to surface a warning when the count crosses
-// `LOADER_RELOAD_WARN_THRESHOLD` so the user has a signal that the
-// ESM-loader cache is accumulating stale module records (see
-// `cacheBuster` for why eviction isn't possible).
 let loadExtensionsCallCount = 0;
 const LOADER_RELOAD_WARN_THRESHOLD = 50;
 
@@ -267,9 +231,6 @@ export function loadExtensions(
     Effect.gen(function* () {
       loadExtensionsCallCount += 1;
       if (loadExtensionsCallCount === LOADER_RELOAD_WARN_THRESHOLD) {
-        // One-shot warning at the threshold. Silent past that — repeated
-        // warnings would drown out other logs and the user already has
-        // the signal.
         log(
           `Extensions have been (re)loaded ${loadExtensionsCallCount} times this session. ` +
             "Each reload leaks the previous version's module records into the Node ESM loader cache. " +
@@ -278,10 +239,6 @@ export function loadExtensions(
       }
       log(`Loading extensions from ${baseDir}`);
 
-      // Per-load token shared across all importModules calls below so a
-      // single `loadExtensions` invocation reuses cached imports for the
-      // same file, but a subsequent reload (next call to `loadExtensions`)
-      // sees a fresh token and re-imports edited files. See `cacheBuster`.
       const loadToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       const [tools, hooks, providers, prompts, registered] = yield* Effect.all(

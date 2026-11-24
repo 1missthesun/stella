@@ -76,11 +76,6 @@ type ProgressNotification = {
   };
 };
 
-/**
- * Progress for one tool call: tool updates as they come, and a heartbeat when
- * nothing else was sent for half the interval. Without a progress token the
- * client asked for no progress, so nothing is sent.
- */
 const startCallProgress = (
   progressToken: string | number | undefined,
   send: (notification: ProgressNotification) => Promise<void>,
@@ -152,39 +147,24 @@ export type ClaudeCodeToolMcpActiveTurn = {
  * `CLAUDE_AGENT_SDK_MCP_NO_PREFIX=1` the model sees their plain names.
  */
 export type ClaudeCodeToolControlChannel = {
-  /**
-   * The control request to write first on the process's stdin: it registers
-   * Stella's server and maps old prefixed tool names onto the plain ones.
-   */
   initializeLine: string;
-  /** Takes one stdout event; true when it was this channel's (answer written). */
   handle: (event: Record<string, unknown>) => boolean;
-  /** Whether the process on this channel has listed Stella's tools. */
   listed: () => boolean;
   close: () => void;
 };
 
 export type ClaudeCodeToolMcpHost = {
   toolCatalogHash: string;
-  /** The names Stella's tools carry in Claude Code, in catalog order. */
   claudeToolNames: readonly string[];
   postToolUseHook: { url: string; headers: { Authorization: string } };
   /**
-   * Serve this host's tools over a Claude Code process's stdin/stdout.
-   * `listed`: the process already listed this exact catalog on an earlier
-   * channel (a kept process picked up again). Claude Code lists an SDK
-   * server's tools once per process, so it will not list them again, and the
-   * host counts its catalog as loaded from the start.
+   * Claude Code lists an SDK server's tools once per process: `listed` says a
+   * kept process already listed this exact catalog on an earlier channel.
    */
   openControlChannel: (
     write: (line: string) => void,
     options?: { listed?: boolean },
   ) => ClaudeCodeToolControlChannel;
-  /**
-   * Serve this host's tools over a plain MCP JSON-RPC message stream, for an
-   * agent CLI that runs MCP servers itself (Antigravity's `agy acp`) and
-   * reaches this one through a small bridge process.
-   */
   openJsonRpcChannel: (write: (message: JSONRPCMessage) => void) => {
     handle: (message: JSONRPCMessage) => void;
     close: () => void;
@@ -202,7 +182,6 @@ export type CreateClaudeCodeToolMcpHostOptions = {
   tools: readonly ToolMetadata[];
   identityScope?: string;
   allowLegacyImagePathReopen?: boolean;
-  /** Defaults to `CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS`; <= 0 sends none. */
   progressHeartbeatMs?: number;
   getActiveTurn: () =>
     | ClaudeCodeToolMcpActiveTurn
@@ -395,14 +374,11 @@ export const createClaudeCodeToolMcpHost = async (
     options.progressHeartbeatMs ?? CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS;
   const stellaNames = options.tools.map((tool) => tool.name);
   const tools = options.tools.map((tool) => ({
-    // The name the model sees: Stella's own, with no prefix.
     name: tool.name,
     description: tool.description,
-    // Claude rejects root combinators. The host still dispatches through
-    // Stella's original catalog and execution-side validators.
+    // Claude rejects root combinators.
     inputSchema: normalizeProviderToolInputSchema(tool.parameters),
   }));
-  /** Claude Code's name for each tool → Stella's own. */
   const stellaNameOf = new Map<string, string>();
   for (const [index, tool] of tools.entries()) {
     const stellaName = options.tools[index]!.name;
@@ -420,7 +396,6 @@ export const createClaudeCodeToolMcpHost = async (
       );
     }
   }
-  /** Stella's name for a call: the plain name, or an old prefixed one. */
   const resolveStellaName = (claudeName: string): string | undefined =>
     stellaNameOf.get(claudeName) ??
     (claudeName.startsWith(LEGACY_CLAUDE_CODE_STELLA_TOOL_PREFIX)
@@ -488,8 +463,6 @@ export const createClaudeCodeToolMcpHost = async (
     extra: CallToolExtra,
     reportProgress: (message: string) => void,
   ): Promise<CallToolResult> => {
-    // `claudeName` is what the model called (and what the native tool_use
-    // correlator saw); `toolName` is Stella's own name for the tool.
     const claudeName = request.params.name;
     const toolName = resolveStellaName(claudeName);
     if (!toolName) {
@@ -682,7 +655,6 @@ export const createClaudeCodeToolMcpHost = async (
     return result;
   };
 
-  /** One stdin/stdout channel per Claude Code process. */
   type ControlChannelState = { server: Server; close: () => void };
   const channels = new Set<ControlChannelState>();
   const aliases = legacyClaudeCodeToolAliases(stellaNames);
@@ -707,7 +679,6 @@ export const createClaudeCodeToolMcpHost = async (
       { capabilities: { tools: {} } },
     );
     configureMcpServer(server);
-    /** The CLI's control request waiting on each JSON-RPC request id. */
     const awaiting = new Map<
       string | number,
       {
@@ -756,8 +727,6 @@ export const createClaudeCodeToolMcpHost = async (
             return;
           }
         }
-        // Progress notifications (and anything else the server starts) go
-        // to the CLI as its own control requests.
         write(
           JSON.stringify({
             type: "control_request",
@@ -826,7 +795,6 @@ export const createClaudeCodeToolMcpHost = async (
         responseDelivery.run(delivery, () => transport.onmessage?.(message));
         return true;
       }
-      // A notification (initialized, cancelled) or a reply: nothing to wait for.
       transport.onmessage?.(message);
       answer(requestId, { jsonrpc: "2.0", result: {}, id: 0 });
       return true;
@@ -912,7 +880,6 @@ export const createClaudeCodeToolMcpHost = async (
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(answer));
   };
-  // The loopback HTTP server only answers Claude Code's PostToolUse hook.
   const httpServer = http.createServer((request, response) => {
     if (request.url !== hookPath || request.method !== "POST") {
       response.writeHead(404).end();

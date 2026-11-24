@@ -566,8 +566,5 @@ export const endLockedUseLease = async (sessionPaths: SessionPaths) => {
     sessionPaths,
     ["locked-use-end"],
     5_000,
-  ).catch(() => {
-    // Best-effort cleanup; command result handling should not be masked by a
-    // failed lease close.
-  });
+  ).catch(() => {});
 };

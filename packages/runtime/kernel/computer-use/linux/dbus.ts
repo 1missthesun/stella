@@ -2,13 +2,6 @@ import net from "node:net";
 import os from "node:os";
 import { forkCancelableTimeout } from "../effect-runtime.js";
 
-/**
- * A small D-Bus client for the session and accessibility buses: EXTERNAL
- * auth, method calls with pipelined replies, and the marshalling AT-SPI
- * needs. Stella owns it so Linux computer use has no native dependency for
- * reading and acting on app UI.
- */
-
 type DBusType =
   | { kind: "basic"; code: string }
   | { kind: "variant" }
@@ -16,7 +9,6 @@ type DBusType =
   | { kind: "struct"; fields: DBusType[] }
   | { kind: "dict"; key: DBusType; value: DBusType };
 
-/** A value marshalled as a variant with the given signature. */
 export type DBusVariant = {
   readonly signature: string;
   readonly value: unknown;
@@ -519,7 +511,6 @@ export class DBusConnection {
     this.socket.destroy();
   }
 
-  /** Lets the process exit while this connection is idle. */
   unref() {
     this.socket.unref();
   }
@@ -601,7 +592,7 @@ export class DBusConnection {
 
   private handleMessage(message: Buffer, bodyStart: number) {
     const type = message[1];
-    if (type !== 2 && type !== 3) return; // only replies and errors matter
+    if (type !== 2 && type !== 3) return;
     const reader = new Reader(message, 12);
     const fields = reader.read(HEADER_FIELDS_TYPE) as [number, unknown][];
     let replySerial = 0;

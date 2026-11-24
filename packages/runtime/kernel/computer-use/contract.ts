@@ -73,24 +73,8 @@ export type ComputerUseAction =
   | Readonly<{ type: "set_value"; elementId: string; value: string }>
   | Readonly<{ type: "type_text"; text: string }>;
 
-/**
- * How input reaches the window. "background" (default) never moves the
- * user's pointer or focus; a window that would ignore background input
- * refuses the action with background_unavailable instead of being taken
- * over. "foreground" brings the window to the front, sends real OS input and
- * then gives the user back their window and pointer; it is only for tasks
- * where the user asked for the screen to be taken over. Honoured on Windows;
- * other platforms deliver input their own way.
- */
 export type ComputerUseInputDelivery = "background" | "foreground";
 
-/**
- * What must be unchanged since the observation for the action to go ahead.
- * "auto" (default): element and keyboard actions need the same UI tree,
- * screenshot-coordinate actions need the same window size and the same
- * pixels around their points. "window": only the same window and size, for
- * windows that never stop changing (games, video). Honoured on Windows.
- */
 export type ComputerUseStaleCheck = "auto" | "window";
 
 export type ComputerUseActionCommand = Readonly<{
@@ -189,7 +173,6 @@ export type ComputerUseAppState = Readonly<{
   app: string;
   text: string;
   screenshot: ComputerUseImage | null;
-  /** Compatibility alias for semanticStateId. */
   stateId?: string;
   semanticStateId?: string;
   visualStateId?: string;

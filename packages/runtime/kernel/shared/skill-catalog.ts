@@ -92,11 +92,6 @@ const filterSkillLocations = (
   return locations.filter((location) => !omitted.has(location.id));
 };
 
-// Per-SKILL.md cache so an unchanged skill is never re-read or re-parsed on a
-// later turn. The directory listing still runs each turn (cheap, and needed to
-// detect added/removed skills); only the file read + frontmatter parse is gated
-// behind an mtime+size signature that also folds in `scripts/program.ts`
-// presence (a program add/remove changes the rendered entry).
 const skillEntryCache = new Map<
   string,
   { sig: string; entry: SkillCatalogEntry }

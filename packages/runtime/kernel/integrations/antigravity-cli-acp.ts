@@ -38,13 +38,6 @@ import {
   createAntigravityProfile,
 } from "./antigravity-profile.js";
 
-/**
- * Google's own Antigravity CLI driven over the Agent Client Protocol
- * (`agy acp`), the way editors such as Zed and T3 Code drive it: Google's
- * binary holds the sign-in and makes every request; Stella only speaks ACP to
- * it and serves its own tools as an MCP server the CLI starts.
- */
-
 const MCP_TOOL_PREFIX = `mcp_${ANTIGRAVITY_MCP_SERVER_NAME}_`;
 const NATIVE_PREFIX = "agy_";
 const OTHER_NATIVE_TOOL = `${NATIVE_PREFIX}tool`;
@@ -87,7 +80,6 @@ export type AntigravityTurnRequest = {
   onNativeToolEnd(end: { toolCallId: string; result: string; isError: boolean }): void;
   onSessionId(sessionId: string): void;
   onControl(control: { inject(message: AntigravityMessage): boolean }): void;
-  /** The picked model is gone from the account, and another runs. */
   onModelFallback(text: string): void;
 };
 
@@ -99,9 +91,7 @@ export type AntigravityMessage = {
 };
 
 export type AntigravityCliConfig = {
-  /** The `agy` to run now, put right first when it's missing, broken or too old. */
   launch(signal: AbortSignal): Promise<CliLaunch>;
-  /** Antigravity's own folder for this computer's Stella sign-in (its `--gemini-dir`). */
   home(): string;
 };
 
@@ -128,7 +118,6 @@ const hash = (value: string) => crypto.createHash("sha256").update(value).digest
 
 const allowedToolsOf = (request: { nativeTools: readonly string[] }): string => request.nativeTools.join(",");
 
-/** Why a turn can't run on this computer's Antigravity sign-in, if it can't. */
 export const antigravityCliProblem = async (config: Pick<AntigravityCliConfig, "home">): Promise<string | undefined> =>
   (await currentAntigravitySignIn(config.home(), antigravityCliExecutable)) ? undefined : ANTIGRAVITY_SIGN_IN_NEEDED;
 
@@ -149,9 +138,7 @@ type TurnState = {
   finalText: string;
   calls: Map<string, ToolCallState>;
   claimWaiters: Set<() => void>;
-  /** Messages the CLI was given and has not gone on from yet. */
   given: Set<AntigravityMessage>;
-  /** Until the CLI took in the last of them: a call that returned before would go to its model without it. */
   taking?: Promise<void>;
 };
 
@@ -191,10 +178,6 @@ const thinkingTier = (level: ModelThinkingLevel): string => {
   }
 };
 
-/**
- * The model to run for a pick, and whether the pick itself is gone. Never the
- * CLI's own current choice, which may be another company's model.
- */
 const resolveModel = (available: readonly string[], model: string, level: ModelThinkingLevel): { wire?: string; replaced?: string } => {
   if (!model || model === "default") {
     const first = antigravityModelsOf(available)[0];
@@ -207,7 +190,6 @@ const resolveModel = (available: readonly string[], model: string, level: ModelT
   return listed ? { wire: antigravityWireModel(available, listed, level), replaced: listed } : {};
 };
 
-/** `gemini-4-neon` at `high` → `gemini-4-neon-high`, falling back to the nearest tier the account offers. */
 export const antigravityWireModel = (available: readonly string[], model: string, level: ModelThinkingLevel): string | undefined => {
   if (!model || model === "default") return undefined;
   if (available.includes(model)) return model;
@@ -355,7 +337,6 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     turn.request.onNativeToolEnd({ toolCallId: call.id, result: resultText(update), isError: update.status === "failed" });
   };
 
-  /** Stella's MCP server got a call: find the ACP tool call it belongs to, waiting for its notification if it is late. */
   const claim = (proc: Proc, name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<string> =>
     new Promise((resolve, reject) => {
       const key = stableJson(withoutDisplayArgs(args));
@@ -551,7 +532,6 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       proc.stderr = `${proc.stderr}${data}`.slice(-4_000);
     });
     const signInRecord = antigravitySignInRecordFile(home);
-    // A process that outlived its sign-in would still hold it, and could store it again.
     const closeOnSignOut = () => {
       if (antigravitySignedOutSince(home, startedAt)) kill(proc, "This computer signed out of Google Antigravity.");
     };
@@ -585,7 +565,6 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       proc.child.stdin?.writable && proc.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: message.id, result })}\n`);
     if (message.method === "session/request_permission") {
       const options: { optionId: string; kind?: string }[] = message.params?.options ?? [];
-      // Stella's orchestrator delegates work: like Claude Code's, it reads and looks things up but runs no commands and changes no files.
       const kind = String(message.params?.toolCall?.kind ?? "");
       const allow = proc.role === "worker" || !["execute", "edit", "delete", "move"].includes(kind);
       const choice = allow
@@ -598,7 +577,6 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       proc.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Not supported by Stella." } })}\n`);
   };
 
-  /** A model run Stella started no turn for: nothing would record it or answer its tool calls, so it stops. */
   const endStray = (proc: Proc) => {
     if (proc.sessionId) proc.rpc.notify("session/cancel", { sessionId: proc.sessionId });
   };
@@ -647,7 +625,6 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     if (typeof result?.models?.currentModelId === "string") proc.currentModel = result.models.currentModelId;
   };
 
-  /** Opens (or reopens, when the prompt or tools changed) this process's ACP session. Returns whether its history carried over. */
   const ensureSession = async (proc: Proc, request: AntigravityTurnRequest): Promise<boolean> => {
     const shape = hash(`${proc.mcp.catalogKey}\0${request.systemPrompt}`);
     const wanted = proc.sessionId ?? request.resumeSessionId;
@@ -701,7 +678,6 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     const opening = proc;
     const resumed = await ensureSession(opening, request).catch(async (error: unknown) => {
       if (!isAntigravityAuthRequired(error)) throw error;
-      // This process started signed out; the next turn starts another.
       kill(opening, "Signed out.");
       await refreshAntigravitySignIn(config.home(), antigravityCliExecutable);
       throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);

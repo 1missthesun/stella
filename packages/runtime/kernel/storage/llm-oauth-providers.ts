@@ -66,7 +66,6 @@ export const getLlmOAuthApiKey = async (
   return { credentials, apiKey: auth.apiKey };
 };
 
-/** getLlmOAuthApiKey by provider id, in the shape the credential store takes. */
 export const resolveLlmOAuthApiKey = async (
   providerId: string,
   credentials: OAuthCredentials,
@@ -88,7 +87,6 @@ export const loginLlmOAuth = async (
   callbacks: LlmOAuthLoginCallbacks,
 ): Promise<OAuthCredentials> => asStored(await provider.oauth.login(callbacks));
 
-/** The account a fresh sign-in belongs to, for Settings to show. */
 export const describeLlmOAuthCredential = (
   _providerId: string,
   credentials: OAuthCredentials,

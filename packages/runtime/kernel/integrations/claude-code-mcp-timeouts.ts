@@ -8,18 +8,8 @@
  */
 export const CLAUDE_CODE_MCP_PROGRESS_HEARTBEAT_MS = 30_000;
 
-/**
- * Silence budget Stella gives Claude Code for its MCP tools, on desktop and in
- * the cloud. Heartbeats keep healthy calls well inside it; it only ends a call
- * whose host stopped answering altogether.
- */
 export const CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS = 30 * 60_000;
 
-/**
- * Heartbeats keep a call alive for as long as it runs, so one of Stella's
- * tools that never answers is ended here instead. Calls that wait for the
- * user have no ceiling.
- */
 export const CLAUDE_CODE_STELLA_TOOL_CEILING_MS = 30 * 60_000;
 
 export const stellaToolCeilingText = (toolName: string): string =>

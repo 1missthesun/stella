@@ -43,7 +43,6 @@ export type SnapshotNode = {
   title?: string | null;
   description?: string | null;
   value?: string | null;
-  /** Identity of the full value when `value` was cut at the helper's limit. */
   valueDigest?: string | null;
   valueType?: string | null;
   settable?: boolean | null;
@@ -460,9 +459,7 @@ export const formatNodeLines = (node: SnapshotNode, depth = 0): string[] => {
 
   if (node.url) {
     const renderedUrl = truncate(formatUrlLike(node.url), 100);
-    if (node.role === "AXLink" && primaryLabel !== rawPrimaryLabel) {
-      // The markdown link already carries the destination.
-    } else if (node.role === "AXLink" && !renderedValue) {
+    if (node.role === "AXLink" && primaryLabel !== rawPrimaryLabel) {} else if (node.role === "AXLink" && !renderedValue) {
       extras.push(`Value: ${renderedUrl}`);
     } else {
       extras.push(`URL: ${renderedUrl}`);
@@ -648,11 +645,6 @@ const appendNodeValueIdentity = (node: SnapshotNode, out: string[]) => {
   for (const child of node.children) appendNodeValueIdentity(child, out);
 };
 
-/**
- * The rendered lines cut long text, so the full values (and the helper's
- * digest of values past its own limit) are part of the identity: an edit
- * past the displayed cutoff is still a state change.
- */
 export const snapshotStateId = (snapshot: SnapshotDocument): string => {
   const values: string[] = [];
   for (const node of snapshot.nodes) appendNodeValueIdentity(node, values);
@@ -672,10 +664,7 @@ export const snapshotVisualStateId = (
   if (imagePath && path.isAbsolute(imagePath)) {
     try {
       bytes = fs.readFileSync(imagePath);
-    } catch {
-      // A missing image is represented as no visual identity, not a semantic
-      // state change.
-    }
+    } catch {}
   }
   if (!bytes && snapshot.screenshot?.data) bytes = snapshot.screenshot.data;
   return bytes

@@ -2,14 +2,6 @@ import net from "node:net";
 import path from "node:path";
 import { forkCancelableTimeout } from "../effect-runtime.js";
 
-/**
- * A minimal Wayland client for zwlr_virtual_pointer_v1: real pointer input
- * (move, buttons, wheel) on wlroots-family compositors (Hyprland, Sway,
- * river, labwc). Used only for delivery: "foreground", which moves the
- * user's real cursor; the caller puts it back afterwards. Stella speaks the
- * wire protocol itself, so it ships no native helper for this.
- */
-
 const BUTTON_CODES = { left: 0x110, right: 0x111, middle: 0x112 } as const;
 const AXIS_VERTICAL = 0;
 const AXIS_HORIZONTAL = 1;
@@ -105,7 +97,6 @@ export class WaylandVirtualPointer {
     return this.nextId++;
   }
 
-  /** wl_display.sync: resolves once the compositor processed everything sent. */
   roundtrip(): Promise<void> {
     const id = this.allocate();
     return new Promise<void>((resolve, reject) => {
@@ -203,7 +194,6 @@ export class WaylandVirtualPointer {
     this.send(new WireWriter().message(this.pointerId, 4));
   }
 
-  /** Absolute position within an extent (the output layout, in logical px). */
   moveTo(x: number, y: number, extentWidth: number, extentHeight: number) {
     this.send(
       new WireWriter()
@@ -228,7 +218,6 @@ export class WaylandVirtualPointer {
     this.frame();
   }
 
-  /** Wheel scroll in pixels (positive = down/right). */
   scroll(dx: number, dy: number) {
     if (dy)
       this.send(
@@ -253,9 +242,7 @@ export class WaylandVirtualPointer {
     try {
       this.send(new WireWriter().message(this.pointerId, 8));
       await this.roundtrip();
-    } catch {
-      // closing anyway
-    }
+    } catch {}
     this.socket.destroy();
   }
 }

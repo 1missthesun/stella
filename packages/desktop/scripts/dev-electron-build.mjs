@@ -209,6 +209,81 @@ const browserScriptPlugin = {
   },
 };
 
+// An installed Stella checks an update by building its main and preload on a
+// scratch copy linked to the packages it has now, before the update's own
+// `bun install`. A package the update newly depends on is not there yet, so
+// that check leaves it external when the tree declares it; the build after the
+// install bundles it like any other.
+const UPDATE_CHECK_RUNNER = "stella-update-gate.mjs";
+const checkingUpdate = path.basename(process.argv[1] ?? "") === UPDATE_CHECK_RUNNER;
+
+const packageNameOf = (specifier) => {
+  const parts = specifier.split("/");
+  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+};
+
+const declaringManifests = new Map();
+const declaredDependencies = (dir) => {
+  if (declaringManifests.has(dir)) return declaringManifests.get(dir);
+  let names = null;
+  try {
+    const manifest = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8"));
+    names = new Set(
+      ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"].flatMap(
+        (field) => Object.keys(manifest[field] ?? {}),
+      ),
+    );
+  } catch {}
+  declaringManifests.set(dir, names);
+  return names;
+};
+
+const isDeclaredByImporter = (importer, name) => {
+  let dir = path.dirname(importer);
+  while (dir.startsWith(repoRootDir)) {
+    if (dir.split(path.sep).includes("node_modules")) return false;
+    const names = declaredDependencies(dir);
+    if (names) return names.has(name);
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return false;
+};
+
+const notYetInstalledExternals = [];
+
+const notYetInstalledPackagesPlugin = {
+  name: "not-yet-installed-packages",
+  setup(build) {
+    build.onResolve({ filter: /^[^./]/ }, async (args) => {
+      if (args.pluginData?.notYetInstalledProbe || args.path.startsWith("node:")) return undefined;
+      const resolved = await build.resolve(args.path, {
+        kind: args.kind,
+        importer: args.importer,
+        resolveDir: args.resolveDir,
+        pluginData: { notYetInstalledProbe: true },
+      });
+      if (resolved.errors.length === 0) {
+        return {
+          path: resolved.path,
+          external: resolved.external,
+          namespace: resolved.namespace,
+          sideEffects: resolved.sideEffects,
+          suffix: resolved.suffix,
+          pluginData: resolved.pluginData,
+        };
+      }
+      const name = packageNameOf(args.path);
+      if (!args.importer || !isDeclaredByImporter(args.importer, name)) return undefined;
+      notYetInstalledExternals.push(args.path);
+      return { path: args.path, external: true };
+    });
+  },
+};
+
+const updateCheckPlugins = checkingUpdate ? [notYetInstalledPackagesPlugin] : [];
+
 const fallbackNodePaths = [
   path.join(repoRootDir, "packages", "runtime", "node_modules"),
   path.join(repoRootDir, "node_modules"),
@@ -245,7 +320,7 @@ const nodeBundleOptions = {
   format: "esm",
   metafile: true,
   logLevel: "warning",
-  plugins: [pruneDependencyPackageMetadataPlugin, browserScriptPlugin],
+  plugins: [...updateCheckPlugins, pruneDependencyPackageMetadataPlugin, browserScriptPlugin],
   outdir: path.join("packages", "desktop", outdir),
   platform: "node",
   target: nodeTarget,
@@ -272,7 +347,7 @@ const buildOptions = [
     entryPoints: preloadEntryPoints,
     format: "cjs",
     logLevel: "warning",
-    plugins: [pruneDependencyPackageMetadataPlugin],
+    plugins: [...updateCheckPlugins, pruneDependencyPackageMetadataPlugin],
     outdir: path.join("packages", "desktop", outdir),
     platform: "node",
     target: nodeTarget,
@@ -659,6 +734,11 @@ export const ensureElectronBundlesFresh = async ({ log } = {}) => {
     lastBuildOutputs,
   );
   log?.(`built main and preload in ${Date.now() - startedAt}ms`);
+  if (notYetInstalledExternals.length > 0) {
+    log?.(
+      `left ${[...new Set(notYetInstalledExternals)].sort().join(", ")} external until the update installs it`,
+    );
+  }
   return { built: true };
 };
 

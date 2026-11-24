@@ -1,8 +1,3 @@
-//! What a session's pages send over the network: live request tracking, HAR
-//! recording, and request routing. Works from CDP events as they arrive, so a
-//! paused request is answered and a body read while the browser still has it,
-//! whether or not a command is running.
-
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex as SyncMutex, Weak};
 use std::time::Duration;
@@ -20,7 +15,6 @@ use super::network::DomainFilter;
 pub const MAX_TRACKED_REQUESTS: usize = 256;
 pub const MAX_TRACKED_BODY_BYTES: usize = 128 * 1024;
 pub const MAX_TRACKED_TOTAL_BODY_BYTES: usize = 2 * 1024 * 1024;
-/// Bodies worth reading before anyone asks for them.
 const EAGER_BODY_BYTES: i64 = 1024 * 1024;
 const CAPTURE_WAIT: Duration = Duration::from_secs(2);
 const LEFT_BODY_WAIT: Duration = Duration::from_secs(5);
@@ -68,7 +62,6 @@ pub struct RequestRules {
 }
 
 impl RequestRules {
-    /// The `Fetch.enable` patterns for a session; none when it needs no pausing.
     pub fn patterns(&self, session_id: &str) -> Vec<Value> {
         let mut patterns: Vec<Value> = self
             .routes
@@ -95,7 +88,6 @@ pub struct TrackedRequest {
     pub request_id: String,
     #[serde(skip)]
     pub session_id: String,
-    /// The session that made the request: the page's, or a frame's or worker's in it.
     #[serde(skip)]
     pub source_session: String,
     #[serde(skip)]
@@ -146,7 +138,6 @@ struct HarEntry {
     url: String,
     request_headers: Vec<(String, String)>,
     post_data: Option<String>,
-    /// Too large for the request event; read separately.
     post_data_elsewhere: bool,
     request_body_size: i64,
     resource_type: String,
@@ -181,17 +172,11 @@ pub struct HarCapture {
 
 #[derive(Default)]
 struct LogState {
-    /// Page sessions whose requests are kept.
     pages: HashSet<String>,
-    /// Whether a task asked to see requests, so the tab must stay attached and
-    /// every body is read before the page can drop it.
     tracking: bool,
     tracked: Vec<TrackedRequest>,
-    /// By page session.
     har: HashMap<String, Har>,
-    /// Bodies being read; HAR waits for them.
     reading: usize,
-    /// Frame and worker sessions, by the page session they belong to.
     roots: HashMap<String, String>,
     rules: RequestRules,
 }
@@ -218,7 +203,6 @@ impl LogState {
             .sum()
     }
 
-    /// Drops a page's oldest bodies until `room` bytes fit.
     fn make_room(&mut self, page: &str, room: usize) {
         let mut held = self.body_bytes(page);
         for entry in self.tracked.iter_mut() {
@@ -302,7 +286,6 @@ struct Shared {
 pub struct NetworkLog {
     client: Arc<CdpClient>,
     shared: Arc<Shared>,
-    /// Whether Chrome attaches a page's frames and workers when asked to.
     auto_attach: bool,
 }
 
@@ -332,7 +315,6 @@ impl NetworkLog {
         state.wants_every_body() || !state.rules.routes.is_empty() || !state.rules.rewrites.is_empty()
     }
 
-    /// Keeps what a page sends from now on, without holding its tab attached.
     pub async fn capture(&self, session_id: &str) {
         if !self.shared.state.lock().unwrap().pages.insert(session_id.to_string()) {
             return;
@@ -343,7 +325,6 @@ impl NetworkLog {
         }
     }
 
-    /// The pages' tabs are no longer attached. What they sent is kept.
     pub fn forget_pages(&self) {
         let mut state = self.shared.state.lock().unwrap();
         state.pages.clear();
@@ -378,8 +359,6 @@ impl NetworkLog {
         state.tracked.retain(|entry| entry.session_id != session_id);
     }
 
-    /// Reads the bodies that were left in the browser. Pictures, fonts and
-    /// media are read only when one is asked for by URL.
     pub async fn read_left_bodies(
         &self,
         session_id: &str,
@@ -452,8 +431,6 @@ impl NetworkLog {
         requests
     }
 
-    /// The newest response whose URL contains `pattern`, waiting for it to
-    /// arrive and finish.
     pub async fn wait_for_response(
         &self,
         session_id: &str,
@@ -931,7 +908,6 @@ fn push_frame(state: &mut LogState, source: &str, request_id: &str, frame: Value
     entry.frames.push(frame);
 }
 
-/// Whether a body may push out older ones.
 #[derive(Clone, Copy)]
 enum Keep {
     Newest,

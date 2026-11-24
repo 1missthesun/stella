@@ -91,10 +91,6 @@ struct PendingCommand {
     generation: u64,
 }
 
-/// Which browser profile a connection is. Only `Identified` connections carry
-/// a profile-directory key; `Identifying` ones take no commands, and
-/// `Unidentifiable` ones keep retrying while routable under their
-/// `browser:<Name>` key when no turned-off profile could be theirs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Identity {
     Identifying,
@@ -212,9 +208,6 @@ impl BridgeInner {
             .map(|(generation, _)| *generation)
     }
 
-    /// The connection an owner's commands go to: the very connection it was
-    /// routed to while that is up, else the newest connection of the same
-    /// profile (a reconnect).
     fn owner_generation(&self, owner: &str) -> Option<u64> {
         let route = self.owner_routes.get(owner)?;
         match self.connections.get(&route.generation) {
@@ -331,8 +324,6 @@ impl ExtensionBridge {
         self.inner.lock().await.connections.keys().copied().collect()
     }
 
-    /// Queues a command on a connection; commands reach the extension in the
-    /// order they are queued.
     pub(super) async fn queue(
         &self,
         generation: u64,
@@ -960,10 +951,6 @@ impl ExtensionBridge {
         .await
         {
             Ok(response) => response,
-            // The connection closed between choosing it and sending, so the
-            // command never reached the browser: send it once on whichever
-            // connection serves this browser now instead of failing on the
-            // dead one.
             Err(SendFailure::NotSent(first)) => {
                 if let (Some(owner), None) = (owner, target) {
                     self.wait_for_owner_browser(owner).await?;
@@ -1123,9 +1110,6 @@ fn not_connected_error(guard: &BridgeInner) -> String {
     })
 }
 
-/// Why a command did not get an answer: `NotSent` means it never reached the
-/// extension (its connection was already gone), so sending it again elsewhere
-/// is safe; `Unknown` means it may have run.
 enum SendFailure {
     NotSent(String),
     Unknown(String),
@@ -1422,9 +1406,6 @@ async fn identify_connection(
     }
 }
 
-/// The one place a connection's `Identity` changes. Returns `None` when the
-/// connection is gone, else the older connections of the same profile that
-/// this one replaces.
 async fn apply_identity(
     inner: &Arc<Mutex<BridgeInner>>,
     generation: u64,
@@ -1485,7 +1466,6 @@ async fn probe_profile(
         .connections
         .get(&generation)
         .is_some_and(|connection| connection.debugger_pipe);
-    // Extensions without the debugger pipe keep the marker as a site mod.
     let pattern = format!("{}.invalid", marker);
     let (mut mark, mut unmark) = if debugger_pipe {
         (
@@ -1998,9 +1978,6 @@ fn listening_pids(port: u16) -> Vec<u32> {
         .unwrap_or_default()
 }
 
-/// Stop a leftover daemon of this same session still listening on `port`.
-/// Anything else holding the port is left running and the bind reports the
-/// conflict.
 pub fn kill_stale_stella_browser_on_port(port: u16) {
     let (Some(stem), Some(session)) = (current_exe_stem(), session_arg(std::env::args())) else {
         return;

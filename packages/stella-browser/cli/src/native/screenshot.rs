@@ -58,7 +58,6 @@ pub struct ScreenshotOptions {
     pub quality: Option<i32>,
     pub annotate: bool,
     pub output_dir: Option<String>,
-    /// Also save the image to a file.
     pub keep: bool,
 }
 
@@ -306,8 +305,6 @@ async fn collect_annotations(
     Ok(annotations)
 }
 
-/// The element's rectangle on the page after scrolling it into view, and
-/// whether the viewport shows all of it.
 async fn element_clip(
     client: &CdpClient,
     session_id: &str,

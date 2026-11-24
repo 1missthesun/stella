@@ -136,10 +136,8 @@ pub enum WaitUntil {
     NetworkIdle,
 }
 
-/// A page too busy to answer doesn't hold up the result of loading it.
 const PAGE_ANSWER_TIMEOUT: Duration = Duration::from_secs(2);
 
-/// How far a navigation got within its time.
 #[derive(PartialEq)]
 enum Progress {
     Reached,
@@ -452,7 +450,6 @@ impl BrowserManager {
         Ok(manager)
     }
 
-    /// Drives tabs the Stella Browser extension attaches, through `client`.
     pub fn over_pipe(client: Arc<CdpClient>) -> Self {
         let dialogs = Dialogs::answer_during_commands(&client);
         Self {
@@ -469,8 +466,6 @@ impl BrowserManager {
         }
     }
 
-    /// Makes a tab of the user's browser the active page, without bringing it
-    /// to the front. `known` is false when it was just attached.
     pub async fn show_pipe_tab(&mut self, tab: PipeTab, known: bool) -> Result<(), String> {
         let session_id = tab_session(tab.tab_id);
         if !known {
@@ -960,8 +955,6 @@ impl BrowserManager {
         self.evaluate_in(script, false).await
     }
 
-    /// Evaluates in Stella's isolated world, or the page's own when
-    /// `main_world` (see `world::agent_script_in_main_world`).
     pub async fn evaluate_in(&self, script: &str, main_world: bool) -> Result<Value, String> {
         let session_id = self.active_session_id()?.to_string();
         let result = self
@@ -1221,7 +1214,6 @@ impl BrowserManager {
         Ok(())
     }
 
-    /// Brings the pages' URLs and titles up to date with the browser.
     pub async fn refresh_pages(&mut self) {
         let Ok(targets) = self
             .client

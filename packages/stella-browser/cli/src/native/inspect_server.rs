@@ -167,7 +167,6 @@ async fn handle_ws_proxy(
         .await
         .map_err(|e| format!("WebSocket handshake failed: {}", e))?;
 
-    // Create a dedicated CDP session for this DevTools connection.
     // Each connection gets its own session so domain enablements (DOM.enable, etc.)
     // always trigger fresh initial state dumps from Chrome.
     let attach_id = ATTACH_ID.fetch_sub(1, Ordering::SeqCst);

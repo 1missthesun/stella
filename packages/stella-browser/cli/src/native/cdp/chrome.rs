@@ -451,7 +451,6 @@ pub async fn auto_connect_cdp() -> Result<String, String> {
                 let ws_url = format!("ws://127.0.0.1:{}{}", port, ws_path);
                 return Ok(ws_url);
             }
-            // Port is dead — remove the stale file so future runs skip it.
             let stale = dir.join("DevToolsActivePort");
             let _ = std::fs::remove_file(&stale);
         }
@@ -523,12 +522,7 @@ fn get_chrome_user_data_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-/// Returns true if Chrome's sandbox should be disabled because the environment
-/// doesn't support it (containers, VMs, CI runners, running as root).
-/// Chrome refuses to start sandboxed as root, so that is the only case the
-/// sandbox is dropped without the caller passing `--no-sandbox` (via `--args`
-/// or STELLA_BROWSER_ARGS). Anywhere else a host without a usable sandbox fails
-/// the launch with a hint instead of silently browsing unsandboxed.
+/// Chrome refuses to start sandboxed as root.
 fn should_disable_sandbox(existing_args: &[String]) -> bool {
     if existing_args.iter().any(|a| a == "--no-sandbox") {
         return false;

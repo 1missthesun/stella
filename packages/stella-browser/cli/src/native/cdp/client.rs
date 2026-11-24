@@ -13,11 +13,7 @@ use super::types::{CdpCommand, CdpEvent, CdpMessage};
 type PendingMap = Arc<Mutex<HashMap<u64, oneshot::Sender<CdpMessage>>>>;
 type WorldMap = Arc<Mutex<HashMap<String, i64>>>;
 
-/// Stella's own JavaScript world in each page (shared with the extension):
-/// it sees the page's DOM but none of its scripts, so the page cannot observe
-/// what Stella reads, calls or leaves behind there.
 pub const ISOLATED_WORLD: &str = "stella-observation";
-/// Set on params to run a command in the page's own world instead.
 pub const MAIN_WORLD_PARAM: &str = "stellaMainWorld";
 const CDP_COMMAND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -32,8 +28,6 @@ type WsSink = futures_util::stream::SplitSink<
     Message,
 >;
 
-/// Where commands go: a browser's DevTools WebSocket, or an in-process peer
-/// that speaks the same JSON (the extension pipe).
 enum CdpSink {
     WebSocket(Mutex<WsSink>),
     Channel(mpsc::UnboundedSender<String>),
@@ -67,8 +61,6 @@ pub struct CdpClient {
     worlds: WorldMap,
 }
 
-/// The context parameter that places `method` in a world, when the caller
-/// left it to the default (the page's own world).
 fn world_param(method: &str, params: &Value) -> Option<&'static str> {
     let has = |key: &str| params.get(key).is_some();
     match method {
@@ -130,8 +122,6 @@ impl CdpClient {
         ))
     }
 
-    /// A client whose peer is in this process: `outgoing` receives each command
-    /// and `incoming` carries responses and events, all as CDP JSON.
     pub fn over_channel(
         outgoing: mpsc::UnboundedSender<String>,
         incoming: mpsc::UnboundedReceiver<String>,
@@ -237,10 +227,6 @@ impl CdpClient {
         }
     }
 
-    /// Sends a command. Page reads and calls (Runtime.evaluate,
-    /// Runtime.callFunctionOn without an object, DOM.resolveNode) run in
-    /// Stella's isolated world unless they name a context or set
-    /// `MAIN_WORLD_PARAM`; targets without one (workers) use their own.
     pub async fn send_command(
         &self,
         method: &str,
@@ -396,7 +382,6 @@ impl CdpClient {
         self.event_tx.subscribe()
     }
 
-    /// Everything but network traffic, for a reader that may fall behind it.
     pub fn subscribe_to_pages(&self) -> broadcast::Receiver<CdpEvent> {
         self.page_event_tx.subscribe()
     }

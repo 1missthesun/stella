@@ -15,7 +15,7 @@ Edit the file here, run `bun run prompts:sync-defaults` (CI's
 `prompts:check-defaults` fails if the cloud-builder copy drifts), and deploy
 cloud-builder. The cloud worker imports the generated module
 (`workers/cloud-builder/src/prompts/defaults.generated.ts`), and the desktop
-runtime reads cloud-builder's `/api/stella/prompts` with a conditional GET on
+runtime reads cloud-builder's `/api/stella/prompts/v2` with a conditional GET on
 every orchestrator turn (`kernel/prompts/remote-prompts.ts`), so the change
 reaches every client on the next message. The bundled files are the
 offline/BYOK fallback and the source the publication is generated from;

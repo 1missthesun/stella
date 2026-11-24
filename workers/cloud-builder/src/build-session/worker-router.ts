@@ -74,8 +74,8 @@ import {
   parseDispatchSubmitRequest,
 } from "../dispatch-policy.js";
 import { handleMuseTranscribeSocket } from "../muse-transcribe-socket.js";
-import { STELLA_PROMPTS_PATH } from "@stella/contracts/stella-api";
-import { stellaPromptsResponse } from "../prompts/route.js";
+import { STELLA_PROMPTS_LEGACY_PATH, STELLA_PROMPTS_PATH } from "@stella/contracts/stella-api";
+import { stellaLegacyPromptsResponse, stellaPromptsResponse } from "../prompts/route.js";
 import {
   HEADER_PRESENCE_DEVICE_ID,
   OwnerGate,
@@ -935,6 +935,7 @@ app.get("/readyz", (c) => {
   );
 });
 app.get(STELLA_PROMPTS_PATH, (c) => stellaPromptsResponse(c.req.raw));
+app.get(STELLA_PROMPTS_LEGACY_PATH, (c) => stellaLegacyPromptsResponse(c.req.raw));
 app.get("/.well-known/stella", async (c) => {
   const { discoveryRoute } = await import("../selfhost/discovery.js");
   return await discoveryRoute(c.env as unknown as Cloudflare.Env);

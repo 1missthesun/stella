@@ -943,6 +943,9 @@
       "description": "Affiche les commandes de voix et d'appel. La dictée fonctionne dans tous les cas.",
       "title": "Conversations vocales"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Ajouté le {added}"
     }

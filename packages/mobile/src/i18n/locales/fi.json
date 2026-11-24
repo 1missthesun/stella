@@ -942,6 +942,9 @@
       "description": "Näytä puhe- ja puhelusäätimet. Sanelu toimii joka tapauksessa.",
       "title": "Puhekeskustelut"
     },
+    "groups": {
+      "app": "Sovellus"
+    },
     "secureValues": {
       "added": "Lisätty {added}"
     }

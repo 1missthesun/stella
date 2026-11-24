@@ -943,6 +943,9 @@
       "description": "Mostra controles de voz e chamada. O ditado funciona de qualquer forma.",
       "title": "Conversas por voz"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Adicionado em {added}"
     }

@@ -942,6 +942,9 @@
       "description": "Ses ve arama kontrollerini göster. Dikte her durumda çalışır.",
       "title": "Sesli görüşmeler"
     },
+    "groups": {
+      "app": "Uygulama"
+    },
     "secureValues": {
       "added": "Eklendi: {added}"
     }

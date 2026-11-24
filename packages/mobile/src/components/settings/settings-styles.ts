@@ -1,55 +1,68 @@
 import { StyleSheet } from "react-native";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
-import { fadeHex } from "../../theme/oklch";
+
+export function settingsSurfaceFills(isDark: boolean) {
+  return {
+    subtleFill: isDark ? "rgba(255, 255, 255, 0.048)" : "rgba(0, 0, 0, 0.028)",
+    tonalFill: isDark ? "rgba(255, 255, 255, 0.085)" : "rgba(0, 0, 0, 0.055)",
+    strongFill: isDark ? "rgba(255, 255, 255, 0.13)" : "rgba(0, 0, 0, 0.085)",
+  };
+}
 
 export const makeSettingsStyles = (colors: Colors) =>
   StyleSheet.create({
     section: {
-      marginTop: 28,
+      marginTop: 26,
+    },
+    sectionFirst: {
+      marginTop: 18,
     },
     sectionLabel: {
-      color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 20,
-      letterSpacing: -0.4,
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 12.5,
+      letterSpacing: 0.05,
       marginBottom: 8,
     },
     group: {
-      borderBottomColor: colors.border,
+      borderBottomColor: colors.borderWeak,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.border,
+      borderTopColor: colors.borderWeak,
       borderTopWidth: StyleSheet.hairlineWidth,
     },
     groupGap: {
-      marginTop: 12,
+      marginTop: 14,
     },
     row: {
       alignItems: "center",
       flexDirection: "row",
       gap: 12,
-      minHeight: 52,
-      paddingVertical: 12,
+      minHeight: 48,
+      paddingVertical: 11,
     },
     rowDivider: {
-      borderTopColor: fadeHex(colors.border, 0.8),
+      borderTopColor: colors.borderWeak,
       borderTopWidth: StyleSheet.hairlineWidth,
     },
     rowPressed: {
-      opacity: 0.6,
+      opacity: 0.58,
     },
     rowDisabled: {
-      opacity: 0.55,
+      opacity: 0.48,
     },
     rowIcon: {
-      width: 22,
+      alignItems: "center",
+      justifyContent: "center",
+      width: 20,
     },
     rowCopy: {
       flex: 1,
       gap: 2,
+      minWidth: 0,
     },
     rowLabel: {
-      color: colors.text,
+      color: colors.textStrong,
       fontFamily: fonts.sans.medium,
       fontSize: 15,
       letterSpacing: -0.2,
@@ -57,34 +70,47 @@ export const makeSettingsStyles = (colors: Colors) =>
     rowSub: {
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 12.5,
+      lineHeight: 17.5,
+    },
+    rowTrailingWrap: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexShrink: 1,
+      gap: 6,
+      maxWidth: "46%",
     },
     rowTrailing: {
       color: colors.textMuted,
+      flexShrink: 1,
       fontFamily: fonts.sans.regular,
-      fontSize: 13,
+      fontSize: 13.5,
       letterSpacing: -0.1,
-      maxWidth: 150,
     },
     rowAction: {
       color: colors.accent,
       fontFamily: fonts.sans.medium,
-      fontSize: 14,
+      fontSize: 13.5,
       letterSpacing: -0.1,
     },
     rowDanger: {
       color: colors.danger,
       fontFamily: fonts.sans.medium,
-      fontSize: 14,
+      fontSize: 13.5,
       letterSpacing: -0.1,
     },
     hint: {
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
-      fontSize: 14,
-      lineHeight: 20,
-      paddingVertical: 14,
+      fontSize: 13.5,
+      lineHeight: 19,
+      paddingVertical: 12,
+    },
+    attentionDot: {
+      backgroundColor: colors.accent,
+      borderRadius: 3,
+      height: 6,
+      width: 6,
     },
   });
 

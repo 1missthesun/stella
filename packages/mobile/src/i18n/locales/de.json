@@ -942,6 +942,9 @@
       "description": "Zeigt Sprach- und Anrufsteuerung. Diktieren funktioniert so oder so.",
       "title": "Sprachunterhaltungen"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Hinzugefügt {added}"
     }

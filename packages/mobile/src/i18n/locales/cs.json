@@ -944,6 +944,9 @@
       "description": "Zobrazí ovládání hlasu a hovorů. Diktování funguje tak jako tak.",
       "title": "Hlasové konverzace"
     },
+    "groups": {
+      "app": "Aplikace"
+    },
     "secureValues": {
       "added": "Přidáno {added}"
     }

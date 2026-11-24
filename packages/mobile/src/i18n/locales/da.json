@@ -942,6 +942,9 @@
       "description": "Vis stemme- og opkaldsknapper. Diktering virker uanset hvad.",
       "title": "Stemmesamtaler"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Tilføjet {added}"
     }

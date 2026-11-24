@@ -943,6 +943,9 @@
       "description": "Mostra i controlli di voce e chiamata. La dettatura funziona comunque.",
       "title": "Conversazioni vocali"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Aggiunto il {added}"
     }

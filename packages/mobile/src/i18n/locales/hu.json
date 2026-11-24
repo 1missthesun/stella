@@ -942,6 +942,9 @@
       "description": "Hang- és hívásvezérlők megjelenítése. A diktálás mindenképp működik.",
       "title": "Beszélgetés hanggal"
     },
+    "groups": {
+      "app": "Alkalmazás"
+    },
     "secureValues": {
       "added": "Hozzáadva: {added}"
     }

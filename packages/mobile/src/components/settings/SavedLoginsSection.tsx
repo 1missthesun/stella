@@ -15,7 +15,13 @@ import {
 } from "../SavedLoginsCards";
 import type { SettingsStyles } from "./settings-styles";
 
-export function SavedLoginsSection({ styles }: { styles: SettingsStyles }) {
+export function SavedLoginsSection({
+  styles,
+  embedded = false,
+}: {
+  styles: SettingsStyles;
+  embedded?: boolean;
+}) {
   const t = useT();
   const trust = useSavedValuesTrust();
   const { busy, run } = useSavedLoginsAction();
@@ -38,14 +44,16 @@ export function SavedLoginsSection({ styles }: { styles: SettingsStyles }) {
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{t("mobile.savedLogins.section")}</Text>
+    <View style={embedded ? styles.sectionFirst : styles.section}>
+      {embedded ? null : (
+        <Text style={styles.sectionLabel}>
+          {t("mobile.savedLogins.section")}
+        </Text>
+      )}
       {trust.standing === "waiting" ? (
         <SavedLoginsWaitingCard waiting={trust} />
       ) : null}
-      {trust.standing === "problem" ? (
-        <SavedLoginsProblemCard />
-      ) : null}
+      {trust.standing === "problem" ? <SavedLoginsProblemCard /> : null}
       {trust.standing === "member" ? (
         <>
           {trust.requests.map((request) => (
@@ -118,7 +126,7 @@ function DeviceRow({
     <View style={[styles.row, divided && styles.rowDivider]}>
       <Icon
         name={device.kind === "phone" ? "smartphone" : "monitor"}
-        size={18}
+        size={17}
         color={colors.textMuted}
         style={styles.rowIcon}
       />
@@ -139,7 +147,9 @@ function DeviceRow({
           onPress={onRemove}
           style={({ pressed }) => (pressed || busy) && styles.rowPressed}
         >
-          <Text style={styles.rowDanger}>{t("mobile.savedLogins.remove")}</Text>
+          <Text style={styles.rowDanger}>
+            {t("mobile.savedLogins.remove")}
+          </Text>
         </Pressable>
       )}
     </View>

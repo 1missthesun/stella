@@ -1,26 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
+  BackHandler,
   Linking,
   Pressable,
+  type ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import { Text } from "./Text";
 import { useRouter } from "expo-router";
+import { resolveThemeColors } from "@stella/theme";
+import { USER_ASK_URGENCY_NAMES } from "@stella/contracts/user-ask";
 import { GlassToggle } from "./glass";
 import { Icon, type IconName } from "./Icon";
-import { SubscriptionSection } from "./SubscriptionSection";
+import {
+  SubscriptionSection,
+  SubscriptionSummaryCard,
+} from "./SubscriptionSection";
 import { FeedbackSheet } from "./FeedbackSheet";
+import { AppearanceSubView } from "./settings/AppearanceSubView";
 import { SettingsScroll } from "./settings/SettingsScroll";
 import { SIDEBAR_BRAND_ROW } from "./sidebar/SidebarPanel";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
 import { SavedLoginsSection } from "./settings/SavedLoginsSection";
 import { ServerSection } from "./settings/ServerSection";
-import { useServerFeatures } from "../lib/server-features";
-import { isSelfHostedLaunch, launchServer } from "../lib/server-registry";
 import {
   makeSettingsStyles,
+  settingsSurfaceFills,
   type SettingsStyles,
 } from "./settings/settings-styles";
 import { env } from "../config/env";
@@ -34,83 +41,70 @@ import { clearCachedToken } from "../lib/auth-token";
 import { clearAccountChatData } from "../lib/chat-account-cleanup";
 import { useCloudBrowserActions } from "../lib/cloud-browser";
 import { tapLight } from "../lib/haptics";
+import { publishBackOverride } from "../lib/main-shell-store";
+import { selfHostServersAvailable } from "../lib/native-capabilities";
 import { tearDownPushNotifications } from "../lib/notifications";
-import { withdrawSavedValuesDevice } from "../lib/saved-values";
 import {
   getNotificationsMuted,
   setNotificationsMuted,
   subscribeNotificationsMuted,
 } from "../lib/notifications-prefs";
 import {
-  getVoiceEnabled,
-  setVoiceEnabled,
-  subscribeVoiceEnabled,
-} from "../lib/voice-visibility";
-import {
   clearStoredPhoneAccess,
   listStoredPairedPhoneAccess,
   type StoredPhoneAccess,
 } from "../lib/phone-access";
+import { withdrawSavedValuesDevice } from "../lib/saved-values";
+import { useSavedValuesTrust } from "../lib/saved-values-trust";
+import { useServerFeatures } from "../lib/server-features";
+import { isSelfHostedLaunch, launchServer } from "../lib/server-registry";
+import { useUserAskEscalationPolicy } from "../lib/user-ask-policy";
 import { userFacingError } from "../lib/user-facing-error";
-import { type Colors } from "../theme/colors";
 import {
-  useColors,
-  useTheme,
-  type GradientColor,
-  type GradientMode,
-  type ThemePreference,
-} from "../theme/theme-context";
-import { resolveThemeColors } from "@stella/theme";
+  getVoiceEnabled,
+  setVoiceEnabled,
+  subscribeVoiceEnabled,
+} from "../lib/voice-visibility";
+import { type Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
+import { useColors, useTheme } from "../theme/theme-context";
 import { useT } from "../i18n";
-import { SegmentedControl } from "./SegmentedControl";
 
-const APPEARANCE_OPTIONS: { value: ThemePreference; labelKey: string }[] = [
-  { value: "system", labelKey: "mobile.settings.appearance.system" },
-  { value: "light", labelKey: "mobile.settings.appearance.light" },
-  { value: "dark", labelKey: "mobile.settings.appearance.dark" },
-];
+type AccountSubpage =
+  | "subscription"
+  | "appearance"
+  | "notifications"
+  | "saved-logins"
+  | "server";
 
-const GRADIENT_OPTIONS: { value: GradientMode; labelKey: string }[] = [
-  { value: "soft", labelKey: "mobile.settings.background.soft" },
-  { value: "flat", labelKey: "mobile.settings.background.flat" },
-];
+export type SettingsContentProps = {
+  active?: boolean;
+  inDrawer?: boolean;
+  onOpenCloudHome?: () => void;
+};
 
-const GRADIENT_COLOR_OPTIONS: { value: GradientColor; labelKey: string }[] = [
-  { value: "relative", labelKey: "mobile.settings.backgroundColor.relative" },
-  { value: "strong", labelKey: "mobile.settings.backgroundColor.strong" },
-];
+function initialFor(name: string, email: string): string {
+  const source = (name || email).trim();
+  const match = source.match(/[A-Za-z0-9]/u);
+  return match ? match[0].toUpperCase() : "S";
+}
 
 export function SettingsContent({
-  active,
-  inDrawer,
+  active = true,
+  inDrawer = false,
   onOpenCloudHome,
-}: {
-  active: boolean;
-  inDrawer: boolean;
-  onOpenCloudHome: () => void;
-}) {
+}: SettingsContentProps = {}) {
   const colors = useColors();
   const t = useT();
-  const {
-    preference,
-    setPreference,
-    selectedThemeId,
-    setThemeId,
-    themes,
-    isDark,
-    flat,
-    gradientPreference,
-    setGradientPreference,
-    gradientColor,
-    setGradientColor,
-  } = useTheme();
-  const gradientLocked = flat;
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { preference, selectedThemeId, themes, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const settingsStyles = useMemo(() => makeSettingsStyles(colors), [colors]);
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
   const session = authClient.useSession();
   const features = useServerFeatures();
+  const savedLoginsTrust = useSavedValuesTrust();
+  const [subpage, setSubpage] = useState<AccountSubpage | null>(null);
   const [isResettingCloudBrowser, setIsResettingCloudBrowser] = useState(false);
   const { resetProfile: resetCloudBrowserProfile } = useCloudBrowserActions();
   const [notificationsMuted, setMutedLocal] = useState(() =>
@@ -136,6 +130,40 @@ export function SettingsContent({
   const isSignedIn = Boolean(user);
   const showFeedback = isSignedIn && !isSelfHostedLaunch;
   const showLoadingHeader = session.isPending && !user;
+  const escalation = useUserAskEscalationPolicy(isSignedIn, active);
+
+  useEffect(() => {
+    if (!active) setSubpage(null);
+  }, [active]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [subpage]);
+
+  useEffect(() => {
+    if (inDrawer || subpage === null) return;
+    publishBackOverride({
+      label: t("mobile.nav.account"),
+      onPress: () => setSubpage(null),
+    });
+    return () => {
+      publishBackOverride(null);
+    };
+  }, [inDrawer, subpage, t]);
+
+  useEffect(() => {
+    if (subpage === null) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setSubpage(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [subpage]);
+
+  const openSubpage = (next: AccountSubpage) => {
+    tapLight();
+    setSubpage(next);
+  };
 
   const runResetCloudBrowser = async () => {
     if (isResettingCloudBrowser) return;
@@ -259,8 +287,134 @@ export function SettingsContent({
     );
   };
 
+  const activeTheme =
+    themes.find((item) => item.id === selectedThemeId) ?? themes[0];
+  const activeThemePreview = activeTheme
+    ? resolveThemeColors(activeTheme, isDark).colors
+    : null;
+
+  const appearanceValue = t(`mobile.settings.appearance.${preference}`);
+  const notificationsValue =
+    isSignedIn && escalation.available
+      ? t(
+          `mobile.settings.userAsk.level.${USER_ASK_URGENCY_NAMES[escalation.policy.ceiling - 1]}`,
+        )
+      : undefined;
+
+  const showSavedLogins = isSignedIn && savedLoginsTrust.standing !== "off";
+  const savedLoginsAttention =
+    savedLoginsTrust.standing === "waiting" ||
+    savedLoginsTrust.standing === "problem" ||
+    (savedLoginsTrust.standing === "member" &&
+      savedLoginsTrust.requests.length > 0);
+  const savedLoginsValue =
+    savedLoginsTrust.standing === "member"
+      ? String(savedLoginsTrust.devices.length)
+      : undefined;
+
+  const activeServerName =
+    launchServer.kind === "hosted"
+      ? t("mobile.selfHost.hostedName")
+      : launchServer.name;
+
+  const showNotificationsRow = features.push || isSignedIn;
+  const showCloudSection = isSignedIn || selfHostServersAvailable;
+
+  if (subpage !== null) {
+    const subpageTitle =
+      subpage === "subscription"
+        ? t("billing.mobile.sectionTitle")
+        : subpage === "appearance"
+          ? t("mobile.settings.appearanceSection")
+          : subpage === "notifications"
+            ? t("mobile.settings.notificationsSection")
+            : subpage === "saved-logins"
+              ? t("mobile.savedLogins.section")
+              : t("mobile.selfHost.serverSection");
+
+    return (
+      <SettingsScroll ref={scrollRef} inDrawer={inDrawer}>
+        <View style={styles.subHeader}>
+          {inDrawer ? (
+            <Pressable
+              testID="account-subpage-back"
+              onPress={() => {
+                tapLight();
+                setSubpage(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.nav.account")}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.subBackBtn,
+                pressed && settingsStyles.rowPressed,
+              ]}
+            >
+              <Icon name="chevron-left" size={16} color={colors.textMuted} />
+              <Text style={styles.subBackText}>{t("mobile.nav.account")}</Text>
+            </Pressable>
+          ) : null}
+          <Text
+            style={styles.title}
+            accessibilityRole="header"
+            testID={`account-subpage-${subpage}`}
+          >
+            {subpageTitle}
+          </Text>
+        </View>
+
+        {subpage === "subscription" ? <SubscriptionSection embedded /> : null}
+
+        {subpage === "appearance" ? (
+          <AppearanceSubView styles={settingsStyles} />
+        ) : null}
+
+        {subpage === "notifications" ? (
+          <>
+            {features.push ? (
+              <View style={settingsStyles.sectionFirst}>
+                <View style={settingsStyles.group}>
+                  <View style={settingsStyles.row}>
+                    <View style={settingsStyles.rowCopy}>
+                      <Text style={settingsStyles.rowLabel}>
+                        {t("mobile.settings.pushToggleLabel")}
+                      </Text>
+                      <Text style={settingsStyles.rowSub}>
+                        {t("mobile.settings.pushToggleSub")}
+                      </Text>
+                    </View>
+                    <GlassToggle
+                      value={!notificationsMuted}
+                      onValueChange={toggleNotifications}
+                      accessibilityLabel={t("mobile.settings.pushToggleA11y")}
+                    />
+                  </View>
+                </View>
+              </View>
+            ) : null}
+            <UserAskEscalationSection
+              enabled={isSignedIn}
+              active={active}
+              styles={settingsStyles}
+              embedded
+              view={escalation}
+            />
+          </>
+        ) : null}
+
+        {subpage === "saved-logins" ? (
+          <SavedLoginsSection styles={settingsStyles} embedded />
+        ) : null}
+
+        {subpage === "server" ? (
+          <ServerSection styles={settingsStyles} colors={colors} embedded />
+        ) : null}
+      </SettingsScroll>
+    );
+  }
+
   return (
-    <SettingsScroll inDrawer={inDrawer}>
+    <SettingsScroll ref={scrollRef} inDrawer={inDrawer}>
       <View style={inDrawer ? styles.drawerTitleRow : styles.titleRow}>
         <Text
           style={styles.title}
@@ -271,291 +425,240 @@ export function SettingsContent({
         </Text>
       </View>
 
-      <View style={settingsStyles.section}>
-        <View style={settingsStyles.group}>
-          {isSignedIn ? (
-            <View style={settingsStyles.row}>
-              <Icon
-                name="user"
-                size={26}
-                color={colors.textMuted}
-                style={styles.avatar}
-              />
-              <View style={settingsStyles.rowCopy}>
-                {userName ? (
-                  <Text style={styles.identityName} numberOfLines={1}>
-                    {userName}
-                  </Text>
-                ) : null}
-                {email ? (
-                  <Text
-                    style={userName ? settingsStyles.rowSub : styles.identityName}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                    selectable
-                  >
-                    {email}
-                  </Text>
-                ) : null}
-              </View>
+      <View style={styles.identitySection}>
+        {isSignedIn ? (
+          <View style={styles.identityRow}>
+            <View style={styles.monogram}>
+              <Text style={styles.monogramText}>
+                {initialFor(userName, email)}
+              </Text>
             </View>
-          ) : showLoadingHeader ? (
-            <Text style={settingsStyles.hint}>
-              {t("mobile.settings.loadingSession")}
-            </Text>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.settings.signInTitle")}
-              onPress={() => {
-                tapLight();
-                router.replace("/login");
-              }}
-              style={({ pressed }) => [
-                settingsStyles.row,
-                pressed && settingsStyles.rowPressed,
+            <View style={settingsStyles.rowCopy}>
+              {userName ? (
+                <Text style={styles.identityPrimary} numberOfLines={1}>
+                  {userName}
+                </Text>
+              ) : null}
+              {email ? (
+                <Text
+                  style={
+                    userName ? styles.identitySecondary : styles.identityPrimary
+                  }
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                  selectable
+                >
+                  {email}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        ) : showLoadingHeader ? (
+          <Text style={settingsStyles.hint}>
+            {t("mobile.settings.loadingSession")}
+          </Text>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.settings.signInTitle")}
+            onPress={() => {
+              tapLight();
+              router.replace("/login");
+            }}
+            style={({ pressed }) => [
+              styles.signInCard,
+              pressed && settingsStyles.rowPressed,
+            ]}
+          >
+            <View style={styles.monogram}>
+              <Icon name="user" size={17} color={colors.accent} />
+            </View>
+            <Text
+              style={[
+                settingsStyles.rowLabel,
+                styles.flex,
+                { color: colors.accent },
               ]}
             >
-              <Icon
-                name="user"
-                size={18}
-                color={colors.accent}
-                style={settingsStyles.rowIcon}
-              />
-              <Text
-                style={[
-                  settingsStyles.rowLabel,
-                  styles.flex,
-                  { color: colors.accent },
-                ]}
-              >
-                {t("mobile.settings.signIn")}
-              </Text>
-              <Icon name="chevron-right" size={16} color={colors.textMuted} />
-            </Pressable>
-          )}
-        </View>
+              {t("mobile.settings.signIn")}
+            </Text>
+            <Icon name="chevron-right" size={14} color={colors.textWeaker} />
+          </Pressable>
+        )}
+
+        {isSignedIn && features.billing ? (
+          <SubscriptionSummaryCard onPress={() => openSubpage("subscription")} />
+        ) : null}
       </View>
 
-      {isSignedIn && features.billing ? (
-        <View style={settingsStyles.section}>
-          <SubscriptionSection />
-        </View>
-      ) : null}
+      <View style={settingsStyles.section}>
+        <Text style={settingsStyles.sectionLabel}>
+          {t("settings.groups.app")}
+        </Text>
+        <View style={settingsStyles.group}>
+          <NavRow
+            testID="account-appearance-row"
+            leading={
+              activeThemePreview ? (
+                <View style={settingsStyles.rowIcon}>
+                  <View
+                    style={[
+                      styles.miniSwatch,
+                      {
+                        backgroundColor: activeThemePreview.background,
+                        borderColor: activeThemePreview.border,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.miniSwatchCore,
+                        { backgroundColor: activeThemePreview.primary },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ) : undefined
+            }
+            label={t("mobile.settings.appearanceSection")}
+            trailing={appearanceValue}
+            accessibilityLabel={`${t("mobile.settings.appearanceSection")}, ${appearanceValue}`}
+            styles={settingsStyles}
+            colors={colors}
+            onPress={() => openSubpage("appearance")}
+          />
 
-      <ServerSection styles={settingsStyles} colors={colors} />
-
-      {isSignedIn ? (
-        <View style={settingsStyles.section}>
-          <Text style={settingsStyles.sectionLabel}>
-            {t("mobile.cloudHome.settingsSection")}
-          </Text>
-          <View style={settingsStyles.group}>
-            <LinkRow
-              icon="file-text"
-              label={t("settings.memory.title")}
-              sub={t("mobile.cloudHome.title")}
-              accessibilityLabel={t("mobile.cloudHome.openSettingsLabel")}
+          {showNotificationsRow ? (
+            <NavRow
+              testID="account-notifications-row"
+              icon="bell"
+              label={t("mobile.settings.notificationsSection")}
+              trailing={notificationsValue}
+              accessibilityLabel={
+                notificationsValue
+                  ? `${t("mobile.settings.notificationsSection")}, ${notificationsValue}`
+                  : t("mobile.settings.notificationsSection")
+              }
+              divided
               styles={settingsStyles}
               colors={colors}
-              onPress={onOpenCloudHome}
+              onPress={() => openSubpage("notifications")}
             />
+          ) : null}
+
+          {features.realtimeVoice ? (
             <View style={[settingsStyles.row, settingsStyles.rowDivider]}>
               <Icon
-                name="globe"
-                size={18}
+                name="waveform"
+                size={16}
                 color={colors.textMuted}
                 style={settingsStyles.rowIcon}
               />
               <View style={settingsStyles.rowCopy}>
                 <Text style={settingsStyles.rowLabel}>
-                  {t("cloudBrowser.settings.defaultProfile")}
+                  {t("settings.voiceAgent.title")}
                 </Text>
-                <Text style={settingsStyles.rowSub}>
-                  {t("cloudBrowser.settings.description")}
+                <Text style={settingsStyles.rowSub} numberOfLines={2}>
+                  {t("settings.voiceAgent.description")}
                 </Text>
               </View>
-              <Pressable
-                onPress={confirmResetCloudBrowser}
-                disabled={isResettingCloudBrowser}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={t("cloudBrowser.settings.reset")}
-                style={({ pressed }) => [
-                  (pressed || isResettingCloudBrowser) && styles.dimmed,
-                ]}
-              >
-                <Text style={settingsStyles.rowDanger}>
-                  {isResettingCloudBrowser
-                    ? t("cloudBrowser.settings.resetting")
-                    : t("cloudBrowser.settings.reset")}
-                </Text>
-              </Pressable>
+              <GlassToggle
+                value={voiceEnabled}
+                onValueChange={(next) => void setVoiceEnabled(next)}
+                accessibilityLabel={t("settings.voiceAgent.title")}
+              />
             </View>
-          </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
 
-      {isSignedIn ? <SavedLoginsSection styles={settingsStyles} /> : null}
-
-      <View style={settingsStyles.section}>
-        <View
-          style={inDrawer ? styles.appearanceStack : styles.appearanceHeader}
-        >
-          <Text
-            style={[
-              settingsStyles.sectionLabel,
-              !inDrawer && styles.appearanceLabel,
-            ]}
-          >
-            {t("mobile.settings.appearanceSection")}
+      {showCloudSection ? (
+        <View style={settingsStyles.section}>
+          <Text style={settingsStyles.sectionLabel}>
+            {t("mobile.cloudHome.settingsSection")}
           </Text>
-          <View style={!inDrawer && styles.modeControl}>
-            <SegmentedControl<ThemePreference>
-              accessibilityLabel="Mode"
-              value={preference}
-              onChange={(next) => {
-                tapLight();
-                setPreference(next);
-              }}
-              options={APPEARANCE_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: t(opt.labelKey),
-              }))}
-            />
-          </View>
-        </View>
-
-        <View style={styles.themeDots}>
-          {themes.map((th) => {
-            const preview = resolveThemeColors(th, isDark).colors;
-            const isActive = th.id === selectedThemeId;
-            return (
-              <Pressable
-                key={th.id}
+          <View style={settingsStyles.group}>
+            {isSignedIn ? (
+              <NavRow
+                testID="account-memory-row"
+                icon="file-text"
+                label={t("settings.memory.title")}
+                accessibilityLabel={t("mobile.cloudHome.openSettingsLabel")}
+                styles={settingsStyles}
+                colors={colors}
                 onPress={() => {
                   tapLight();
-                  setThemeId(th.id);
+                  if (onOpenCloudHome) onOpenCloudHome();
+                  else router.push("/cloud-home");
                 }}
-                accessibilityLabel={t("mobile.settings.useThemeLabel", {
-                  name: th.name,
-                })}
-                accessibilityState={{ selected: isActive }}
-                style={[
-                  styles.themeDotOuter,
-                  isActive && { borderColor: colors.accent },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.themeDotSwatch,
-                    {
-                      backgroundColor: preview.background,
-                      borderColor: preview.border,
-                    },
+              />
+            ) : null}
+
+            {isSignedIn ? (
+              <View style={[settingsStyles.row, settingsStyles.rowDivider]}>
+                <Icon
+                  name="globe"
+                  size={16}
+                  color={colors.textMuted}
+                  style={settingsStyles.rowIcon}
+                />
+                <View style={settingsStyles.rowCopy}>
+                  <Text style={settingsStyles.rowLabel} numberOfLines={1}>
+                    {t("cloudBrowser.settings.defaultProfile")}
+                  </Text>
+                  <Text style={settingsStyles.rowSub} numberOfLines={2}>
+                    {t("cloudBrowser.settings.description")}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={confirmResetCloudBrowser}
+                  disabled={isResettingCloudBrowser}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("cloudBrowser.settings.reset")}
+                  style={({ pressed }) => [
+                    (pressed || isResettingCloudBrowser) && styles.dimmed,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.themeDotAccent,
-                      { backgroundColor: preview.primary },
-                    ]}
-                  />
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text style={settingsStyles.rowDanger}>
+                    {isResettingCloudBrowser
+                      ? t("cloudBrowser.settings.resetting")
+                      : t("cloudBrowser.settings.reset")}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
 
-        <View style={styles.surfaceControls}>
-          <View style={styles.surfaceControl}>
-            <SegmentedControl<GradientMode>
-              accessibilityLabel="Background"
-              disabled={gradientLocked}
-              value={gradientLocked ? "flat" : gradientPreference}
-              onChange={(next) => {
-                tapLight();
-                setGradientPreference(next);
-              }}
-              options={GRADIENT_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: t(opt.labelKey),
-              }))}
-            />
-          </View>
-          <View style={styles.surfaceControl}>
-            <SegmentedControl<GradientColor>
-              accessibilityLabel="Background color"
-              disabled={gradientLocked}
-              value={gradientColor}
-              onChange={(next) => {
-                tapLight();
-                setGradientColor(next);
-              }}
-              options={GRADIENT_COLOR_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: t(opt.labelKey),
-              }))}
-            />
+            {showSavedLogins ? (
+              <NavRow
+                testID="account-saved-logins-row"
+                icon="key"
+                label={t("mobile.savedLogins.section")}
+                trailing={savedLoginsValue}
+                attention={savedLoginsAttention}
+                accessibilityLabel={t("mobile.savedLogins.section")}
+                divided
+                styles={settingsStyles}
+                colors={colors}
+                onPress={() => openSubpage("saved-logins")}
+              />
+            ) : null}
+
+            {selfHostServersAvailable ? (
+              <NavRow
+                testID="account-server-row"
+                icon="cloud"
+                label={t("mobile.selfHost.serverSection")}
+                trailing={activeServerName}
+                accessibilityLabel={`${t("mobile.selfHost.serverSection")}, ${activeServerName}`}
+                divided={isSignedIn}
+                styles={settingsStyles}
+                colors={colors}
+                onPress={() => openSubpage("server")}
+              />
+            ) : null}
           </View>
         </View>
-      </View>
-
-      {features.push ? (
-      <View style={settingsStyles.section}>
-        <Text style={settingsStyles.sectionLabel}>
-          {t("mobile.settings.notificationsSection")}
-        </Text>
-        <View style={settingsStyles.group}>
-          <View style={settingsStyles.row}>
-            <View style={settingsStyles.rowCopy}>
-              <Text style={settingsStyles.rowLabel}>
-                {t("mobile.settings.pushToggleLabel")}
-              </Text>
-              <Text style={settingsStyles.rowSub}>
-                {t("mobile.settings.pushToggleSub")}
-              </Text>
-            </View>
-            <GlassToggle
-              value={!notificationsMuted}
-              onValueChange={toggleNotifications}
-              accessibilityLabel={t("mobile.settings.pushToggleA11y")}
-            />
-          </View>
-        </View>
-      </View>
-      ) : null}
-
-      <UserAskEscalationSection
-        enabled={isSignedIn}
-        active={active}
-        styles={settingsStyles}
-      />
-
-      {features.realtimeVoice ? (
-      <View style={settingsStyles.section}>
-        <Text style={settingsStyles.sectionLabel}>
-          {t("mobile.settings.voiceSection")}
-        </Text>
-        <View style={settingsStyles.group}>
-          <View style={settingsStyles.row}>
-            <View style={settingsStyles.rowCopy}>
-              <Text style={settingsStyles.rowLabel}>
-                {t("settings.voiceAgent.title")}
-              </Text>
-              <Text style={settingsStyles.rowSub}>
-                {t("settings.voiceAgent.description")}
-              </Text>
-            </View>
-            <GlassToggle
-              value={voiceEnabled}
-              onValueChange={(next) => void setVoiceEnabled(next)}
-              accessibilityLabel={t("settings.voiceAgent.title")}
-            />
-          </View>
-        </View>
-      </View>
       ) : null}
 
       <View style={settingsStyles.section}>
@@ -564,26 +667,32 @@ export function SettingsContent({
         </Text>
         <View style={settingsStyles.group}>
           {showFeedback ? (
-            <LinkRow
+            <NavRow
+              testID="account-feedback-row"
               label={t("sidebar.feedback")}
               accessibilityLabel={t("sidebar.feedback")}
               styles={settingsStyles}
               colors={colors}
-              onPress={() => setFeedbackOpen(true)}
+              onPress={() => {
+                tapLight();
+                setFeedbackOpen(true);
+              }}
             />
           ) : null}
-          <LinkRow
+          <NavRow
             label={t("mobile.settings.termsOfService")}
             accessibilityLabel={t("mobile.settings.openTermsLabel")}
             divided={showFeedback}
+            external
             styles={settingsStyles}
             colors={colors}
             onPress={() => void Linking.openURL(`${env.siteUrl}/terms`)}
           />
-          <LinkRow
+          <NavRow
             label={t("mobile.settings.privacyPolicy")}
             accessibilityLabel={t("mobile.settings.openPrivacyLabel")}
             divided
+            external
             styles={settingsStyles}
             colors={colors}
             onPress={() => void Linking.openURL(`${env.siteUrl}/privacy`)}
@@ -592,48 +701,46 @@ export function SettingsContent({
       </View>
 
       {isSignedIn ? (
-        <View style={settingsStyles.section}>
-          <View style={settingsStyles.group}>
-            <Pressable
-              onPress={() => void signOut()}
-              disabled={isSigningOut || isDeletingAccount}
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.settings.signOutLabel")}
-              style={({ pressed }) => [
-                settingsStyles.row,
-                pressed && settingsStyles.rowPressed,
-                (isSigningOut || isDeletingAccount) &&
-                  settingsStyles.rowDisabled,
-              ]}
-            >
-              <Text style={[settingsStyles.rowLabel, styles.centered]}>
-                {isSigningOut
-                  ? t("mobile.settings.signingOut")
-                  : t("mobile.settings.signOut")}
-              </Text>
-            </Pressable>
-          </View>
-
-          {isSelfHostedLaunch ? null : (
+        <View style={styles.footerActions}>
           <Pressable
-            onPress={confirmDeleteAccount}
-            disabled={isDeletingAccount || isSigningOut}
+            onPress={() => void signOut()}
+            disabled={isSigningOut || isDeletingAccount}
             accessibilityRole="button"
-            accessibilityLabel={t("mobile.settings.deleteAccountLabel")}
+            accessibilityLabel={t("mobile.settings.signOutLabel")}
             style={({ pressed }) => [
-              styles.deleteAccountLink,
-              pressed && styles.dimmed,
+              styles.signOutButton,
+              pressed && settingsStyles.rowPressed,
+              (isSigningOut || isDeletingAccount) && settingsStyles.rowDisabled,
             ]}
           >
-            <Text style={styles.deleteAccountLinkText}>
-              {isDeletingAccount
-                ? t("mobile.settings.deletingAccount")
-                : t("mobile.settings.deleteAccount")}
+            <Text style={styles.signOutText}>
+              {isSigningOut
+                ? t("mobile.settings.signingOut")
+                : t("mobile.settings.signOut")}
             </Text>
           </Pressable>
+
+          {isSelfHostedLaunch ? null : (
+            <Pressable
+              onPress={confirmDeleteAccount}
+              disabled={isDeletingAccount || isSigningOut}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.settings.deleteAccountLabel")}
+              style={({ pressed }) => [
+                styles.deleteAccountLink,
+                pressed && styles.dimmed,
+              ]}
+            >
+              <Text style={styles.deleteAccountLinkText}>
+                {isDeletingAccount
+                  ? t("mobile.settings.deletingAccount")
+                  : t("mobile.settings.deleteAccount")}
+              </Text>
+            </Pressable>
           )}
         </View>
       ) : null}
+
       <FeedbackSheet
         visible={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
@@ -642,19 +749,29 @@ export function SettingsContent({
   );
 }
 
-function LinkRow({
+function NavRow({
+  testID,
   icon,
+  leading,
   label,
   sub,
+  trailing,
+  attention = false,
+  external = false,
   accessibilityLabel,
   divided = false,
   styles,
   colors,
   onPress,
 }: {
+  testID?: string;
   icon?: IconName;
+  leading?: ReactNode;
   label: string;
   sub?: string;
+  trailing?: string;
+  attention?: boolean;
+  external?: boolean;
   accessibilityLabel: string;
   divided?: boolean;
   styles: SettingsStyles;
@@ -663,6 +780,7 @@ function LinkRow({
 }) {
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -672,95 +790,167 @@ function LinkRow({
         pressed && styles.rowPressed,
       ]}
     >
-      {icon ? (
+      {leading ? (
+        leading
+      ) : icon ? (
         <Icon
           name={icon}
-          size={18}
+          size={16}
           color={colors.textMuted}
           style={styles.rowIcon}
         />
       ) : null}
       <View style={styles.rowCopy}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {sub ? <Text style={styles.rowSub}>{sub}</Text> : null}
+        <Text style={styles.rowLabel} numberOfLines={1}>
+          {label}
+        </Text>
+        {sub ? (
+          <Text style={styles.rowSub} numberOfLines={2}>
+            {sub}
+          </Text>
+        ) : null}
       </View>
-      <Icon name="chevron-right" size={15} color={colors.textMuted} />
+      {trailing || attention ? (
+        <View style={styles.rowTrailingWrap}>
+          {attention ? <View style={styles.attentionDot} /> : null}
+          {trailing ? (
+            <Text style={styles.rowTrailing} numberOfLines={1}>
+              {trailing}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+      <Icon
+        name={external ? "arrow-up-right" : "chevron-right"}
+        size={external ? 13.5 : 14}
+        color={colors.textWeaker}
+      />
     </Pressable>
   );
 }
 
-const makeStyles = (colors: Colors) =>
-  StyleSheet.create({
-    titleRow: { marginTop: 4 },
+const makeStyles = (colors: Colors, isDark: boolean) => {
+  const { subtleFill, tonalFill } = settingsSurfaceFills(isDark);
+  return StyleSheet.create({
+    titleRow: { marginTop: 6 },
     drawerTitleRow: {
       height: SIDEBAR_BRAND_ROW,
       justifyContent: "center",
     },
     title: {
-      color: colors.text,
+      color: colors.textStrong,
       fontFamily: fonts.display.semiBold,
-      fontSize: 27,
-      letterSpacing: -1.2,
+      fontSize: 26,
+      letterSpacing: -0.9,
     },
-    avatar: {
-      width: 30,
+    subHeader: {
+      gap: 4,
+      marginBottom: 4,
     },
-    identityName: {
-      color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 16,
-      letterSpacing: -0.3,
+    subBackBtn: {
+      alignItems: "center",
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      gap: 4,
+      height: SIDEBAR_BRAND_ROW,
+      marginLeft: -4,
     },
-
-    dimmed: {
-      opacity: 0.6,
+    subBackText: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13.5,
     },
-    centered: {
-      flex: 1,
-      textAlign: "center",
+    identitySection: {
+      marginTop: 14,
     },
-    appearanceHeader: {
+    identityRow: {
       alignItems: "center",
       flexDirection: "row",
       gap: 12,
-      marginBottom: 14,
+      minHeight: 44,
+      paddingVertical: 4,
     },
-    appearanceStack: { marginBottom: 18 },
-    appearanceLabel: { flex: 1, marginBottom: 0 },
-    modeControl: { width: 220 },
-    surfaceControls: { flexDirection: "row", gap: 10, marginTop: 26 },
-    surfaceControl: { flex: 1 },
-    flex: { flex: 1 },
-    themeDots: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 12,
-    },
-    themeDotOuter: {
+    signInCard: {
       alignItems: "center",
-      borderColor: "transparent",
-      borderRadius: 20,
-      borderWidth: 2,
-      justifyContent: "center",
-      padding: 2,
-    },
-    themeDotSwatch: {
-      alignItems: "center",
-      borderRadius: 14,
+      backgroundColor: subtleFill,
+      borderColor: colors.borderWeak,
+      borderRadius: 13,
       borderWidth: StyleSheet.hairlineWidth,
-      height: 28,
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 56,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    monogram: {
+      alignItems: "center",
+      backgroundColor: tonalFill,
+      borderColor: colors.borderWeak,
+      borderRadius: 18,
+      borderWidth: StyleSheet.hairlineWidth,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    monogramText: {
+      color: colors.textStrong,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15,
+    },
+    identityPrimary: {
+      color: colors.textStrong,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15,
+      letterSpacing: -0.25,
+    },
+    identitySecondary: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 12.5,
+    },
+    miniSwatch: {
+      alignItems: "center",
+      borderRadius: 9,
+      borderWidth: StyleSheet.hairlineWidth,
+      height: 18,
       justifyContent: "center",
       overflow: "hidden",
-      width: 28,
+      width: 18,
     },
-    themeDotAccent: {
-      borderRadius: 7,
-      height: 14,
-      width: 14,
+    miniSwatchCore: {
+      borderRadius: 4,
+      height: 8,
+      width: 8,
+    },
+    dimmed: {
+      opacity: 0.55,
+    },
+    flex: {
+      flex: 1,
+    },
+    footerActions: {
+      marginTop: 28,
+    },
+    signOutButton: {
+      alignItems: "center",
+      backgroundColor: subtleFill,
+      borderColor: colors.borderWeak,
+      borderRadius: 11,
+      borderWidth: StyleSheet.hairlineWidth,
+      justifyContent: "center",
+      minHeight: 44,
+      paddingHorizontal: 16,
+    },
+    signOutText: {
+      color: colors.textStrong,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14.5,
+      letterSpacing: -0.15,
     },
     deleteAccountLink: {
       alignSelf: "center",
-      marginTop: 16,
+      marginTop: 14,
+      paddingHorizontal: 12,
       paddingVertical: 8,
     },
     deleteAccountLinkText: {
@@ -769,4 +959,5 @@ const makeStyles = (colors: Colors) =>
       fontSize: 13,
       letterSpacing: -0.1,
     },
-  } as const);
+  });
+};

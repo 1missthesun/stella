@@ -944,6 +944,9 @@
       "description": "Pokaż sterowanie głosem i połączeniami. Dyktowanie działa zawsze.",
       "title": "Rozmowy głosowe"
     },
+    "groups": {
+      "app": "Aplikacja"
+    },
     "secureValues": {
       "added": "Dodano {added}"
     }

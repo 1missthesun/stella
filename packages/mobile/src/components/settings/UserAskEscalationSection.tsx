@@ -8,15 +8,18 @@ import {
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
 import { tapLight } from "../../lib/haptics";
-import { useUserAskEscalationPolicy } from "../../lib/user-ask-policy";
+import {
+  useUserAskEscalationPolicy,
+  type UserAskPolicyView,
+} from "../../lib/user-ask-policy";
 import { useLocale, useT } from "../../i18n";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
-import { useColors } from "../../theme/theme-context";
+import { useColors, useTheme } from "../../theme/theme-context";
 import { GlassToggle } from "../glass";
 import { Icon } from "../Icon";
 import { SegmentedControl } from "../SegmentedControl";
-import type { SettingsStyles } from "./settings-styles";
+import { settingsSurfaceFills, type SettingsStyles } from "./settings-styles";
 
 const QUIET_HOURS_STEP_MINUTES = 30;
 
@@ -39,23 +42,30 @@ export function UserAskEscalationSection({
   enabled,
   active,
   styles,
+  embedded = false,
+  view,
 }: {
   enabled: boolean;
   active: boolean;
   styles: SettingsStyles;
+  embedded?: boolean;
+  view?: UserAskPolicyView;
 }) {
   const colors = useColors();
+  const { isDark } = useTheme();
   const locale = useLocale();
   const t = useT();
-  const local = useMemo(() => makeStyles(colors), [colors]);
-  const { policy, loaded, available, failed, update } =
-    useUserAskEscalationPolicy(enabled, active);
+  const local = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const owned = useUserAskEscalationPolicy(enabled && !view, active);
+  const { policy, loaded, available, failed, update } = view ?? owned;
 
   const levelOptions = useMemo(
     () =>
       USER_ASK_URGENCY_LEVELS.map((level) => ({
         value: String(level),
-        label: t(`mobile.settings.userAsk.level.${USER_ASK_URGENCY_NAMES[level - 1]}`),
+        label: t(
+          `mobile.settings.userAsk.level.${USER_ASK_URGENCY_NAMES[level - 1]}`,
+        ),
       })),
     [t],
   );
@@ -63,7 +73,7 @@ export function UserAskEscalationSection({
   if (!enabled) return null;
 
   return (
-    <View style={styles.section}>
+    <View style={embedded ? styles.section : styles.section}>
       <Text style={styles.sectionLabel}>
         {t("mobile.settings.userAsk.section")}
       </Text>
@@ -273,7 +283,7 @@ function StepperRow({
           }}
           style={({ pressed }) => [local.stepButton, pressed && local.pressed]}
         >
-          <Icon color={colors.text} name="chevron-left" size={15} />
+          <Icon color={colors.textMuted} name="chevron-left" size={14} />
         </Pressable>
         <Text style={local.stepperValue}>{value}</Text>
         <Pressable
@@ -285,42 +295,45 @@ function StepperRow({
           }}
           style={({ pressed }) => [local.stepButton, pressed && local.pressed]}
         >
-          <Icon color={colors.text} name="chevron-right" size={15} />
+          <Icon color={colors.textMuted} name="chevron-right" size={14} />
         </Pressable>
       </View>
     </View>
   );
 }
 
-const makeStyles = (colors: Colors) =>
-  StyleSheet.create({
+const makeStyles = (colors: Colors, isDark: boolean) => {
+  const { tonalFill } = settingsSurfaceFills(isDark);
+  return StyleSheet.create({
     pressed: {
-      opacity: 0.6,
+      opacity: 0.55,
     },
     stackedRow: {
       alignItems: "stretch",
       flexDirection: "column",
       gap: 10,
+      paddingVertical: 13,
     },
     stepButton: {
       alignItems: "center",
-      height: 30,
+      height: 32,
       justifyContent: "center",
-      width: 30,
+      width: 28,
     },
     stepper: {
       alignItems: "center",
-      borderColor: colors.border,
-      borderRadius: 15,
-      borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: tonalFill,
+      borderRadius: 9,
       flexDirection: "row",
-      gap: 2,
+      paddingHorizontal: 2,
     },
     stepperValue: {
-      color: colors.text,
+      color: colors.textStrong,
       fontFamily: fonts.sans.medium,
       fontSize: 13,
-      minWidth: 62,
+      fontVariant: ["tabular-nums"],
+      minWidth: 58,
       textAlign: "center",
     },
   });
+};

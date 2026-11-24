@@ -941,6 +941,9 @@
       "description": "顯示語音和通話控制項。聽寫不受影響。",
       "title": "語音對話"
     },
+    "groups": {
+      "app": "應用程式"
+    },
     "secureValues": {
       "added": "新增於 {added}"
     }

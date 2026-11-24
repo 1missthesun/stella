@@ -21,9 +21,11 @@ const hostOf = (entry: ServerEntry) =>
 export function ServerSection({
   styles,
   colors,
+  embedded = false,
 }: {
   styles: SettingsStyles;
   colors: Colors;
+  embedded?: boolean;
 }) {
   const t = useT();
   const router = useRouter();
@@ -82,8 +84,12 @@ export function ServerSection({
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{t("mobile.selfHost.serverSection")}</Text>
+    <View style={embedded ? styles.sectionFirst : styles.section}>
+      {embedded ? null : (
+        <Text style={styles.sectionLabel}>
+          {t("mobile.selfHost.serverSection")}
+        </Text>
+      )}
       <View style={styles.group}>
         {servers.map((entry, index) => {
           const active = entry.id === launchServer.id;
@@ -100,29 +106,37 @@ export function ServerSection({
                 disabled={busy || active}
                 onPress={() => confirmSwitch(entry)}
                 style={({ pressed }) => [
-                  { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
-                  pressed && { opacity: 0.6 },
+                  {
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    minWidth: 0,
+                  },
+                  pressed && styles.rowPressed,
                 ]}
               >
-              <Icon
-                name={entry.kind === "hosted" ? "cloud" : "monitor"}
-                size={18}
-                color={colors.textMuted}
-                style={styles.rowIcon}
-              />
-              <View style={styles.rowCopy}>
-                <Text style={styles.rowLabel} numberOfLines={1}>
-                  {nameOf(entry)}
-                </Text>
-                <Text style={styles.rowSub} numberOfLines={1}>
-                  {entry.kind === "hosted"
-                    ? t("mobile.selfHost.hostedSub")
-                    : t("mobile.selfHost.selfHostedSub", { host: hostOf(entry) })}
-                </Text>
-              </View>
-              {active ? (
-                <Icon name="check" size={16} color={colors.accent} />
-              ) : null}
+                <Icon
+                  name={entry.kind === "hosted" ? "cloud" : "monitor"}
+                  size={17}
+                  color={colors.textMuted}
+                  style={styles.rowIcon}
+                />
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowLabel} numberOfLines={1}>
+                    {nameOf(entry)}
+                  </Text>
+                  <Text style={styles.rowSub} numberOfLines={1}>
+                    {entry.kind === "hosted"
+                      ? t("mobile.selfHost.hostedSub")
+                      : t("mobile.selfHost.selfHostedSub", {
+                          host: hostOf(entry),
+                        })}
+                  </Text>
+                </View>
+                {active ? (
+                  <Icon name="check" size={15} color={colors.accent} />
+                ) : null}
               </Pressable>
               {entry.kind === "self-hosted" ? (
                 <Pressable
@@ -133,9 +147,12 @@ export function ServerSection({
                   hitSlop={8}
                   disabled={busy}
                   onPress={() => confirmRemove(entry)}
-                  style={{ marginLeft: 12 }}
+                  style={({ pressed }) => [
+                    { marginLeft: 10 },
+                    pressed && styles.rowPressed,
+                  ]}
                 >
-                  <Icon name="trash" size={16} color={colors.textMuted} />
+                  <Icon name="trash" size={15} color={colors.textMuted} />
                 </Pressable>
               ) : null}
             </View>
@@ -156,7 +173,12 @@ export function ServerSection({
             pressed && styles.rowPressed,
           ]}
         >
-          <Icon name="plus" size={18} color={colors.accent} style={styles.rowIcon} />
+          <Icon
+            name="plus"
+            size={17}
+            color={colors.accent}
+            style={styles.rowIcon}
+          />
           <Text style={[styles.rowLabel, { flex: 1, color: colors.accent }]}>
             {t("mobile.selfHost.addServer")}
           </Text>

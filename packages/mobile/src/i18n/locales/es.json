@@ -943,6 +943,9 @@
       "description": "Muestra los controles de voz y llamada. El dictado funciona igual.",
       "title": "Conversaciones por voz"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Añadido el {added}"
     }

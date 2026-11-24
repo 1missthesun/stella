@@ -941,6 +941,9 @@
       "description": "Hiện nút điều khiển giọng nói và cuộc gọi. Đọc chính tả vẫn hoạt động.",
       "title": "Trò chuyện bằng giọng nói"
     },
+    "groups": {
+      "app": "Ứng dụng"
+    },
     "secureValues": {
       "added": "Đã thêm {added}"
     }

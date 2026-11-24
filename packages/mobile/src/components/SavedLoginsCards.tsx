@@ -17,7 +17,8 @@ import { userFacingError } from "../lib/user-facing-error";
 import { useT } from "../i18n";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
-import { useColors } from "../theme/theme-context";
+import { useColors, useTheme } from "../theme/theme-context";
+import { settingsSurfaceFills } from "./settings/settings-styles";
 
 type Waiting = Extract<SavedValuesTrustView, { standing: "waiting" }>;
 
@@ -326,11 +327,13 @@ function Action({
 
 const useStyles = () => {
   const colors = useColors();
-  return useMemo(() => makeStyles(colors), [colors]);
+  const { isDark } = useTheme();
+  return useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 };
 
-const makeStyles = (colors: Colors) =>
-  StyleSheet.create({
+const makeStyles = (colors: Colors, isDark: boolean) => {
+  const { subtleFill, tonalFill } = settingsSurfaceFills(isDark);
+  return StyleSheet.create({
     actions: {
       alignItems: "center",
       flexDirection: "row",
@@ -341,82 +344,84 @@ const makeStyles = (colors: Colors) =>
     body: {
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
-      fontSize: 15,
-      lineHeight: 21,
+      fontSize: 13.5,
+      lineHeight: 19.5,
     },
     card: {
       alignSelf: "stretch",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: 20,
+      backgroundColor: subtleFill,
+      borderColor: colors.borderWeak,
+      borderRadius: 13,
       borderWidth: StyleSheet.hairlineWidth,
       gap: 12,
-      padding: 16,
+      padding: 15,
     },
     code: {
-      color: colors.text,
+      color: colors.textStrong,
       fontFamily: fonts.sans.semiBold,
-      fontSize: 26,
+      fontSize: 22,
       fontVariant: ["tabular-nums"],
       letterSpacing: 1,
     },
     codeLine: {
-      color: colors.text,
+      color: colors.textStrong,
       fontFamily: fonts.sans.regular,
-      fontSize: 16,
-      lineHeight: 34,
+      fontSize: 15,
+      lineHeight: 30,
     },
     copy: {
       gap: 4,
     },
     disabled: {
-      opacity: 0.5,
+      opacity: 0.48,
     },
     link: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 14,
-      lineHeight: 20,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13.5,
+      lineHeight: 19,
     },
     pressed: {
-      opacity: 0.7,
+      opacity: 0.65,
     },
     primary: {
       alignItems: "center",
       backgroundColor: colors.accent,
-      borderRadius: 19,
+      borderRadius: 9,
       justifyContent: "center",
-      minHeight: 38,
-      paddingHorizontal: 18,
+      minHeight: 34,
+      paddingHorizontal: 14,
     },
     primaryText: {
       color: colors.accentForeground,
       fontFamily: fonts.sans.semiBold,
-      fontSize: 15,
+      fontSize: 13.5,
     },
     secondary: {
       alignItems: "center",
-      borderRadius: 19,
+      backgroundColor: tonalFill,
+      borderRadius: 9,
       justifyContent: "center",
-      minHeight: 38,
-      paddingHorizontal: 14,
+      minHeight: 34,
+      paddingHorizontal: 13,
     },
     secondaryText: {
-      color: colors.textMuted,
+      color: colors.textStrong,
       fontFamily: fonts.sans.medium,
-      fontSize: 15,
+      fontSize: 13.5,
     },
     linkAction: {
       flexGrow: 1,
       flexShrink: 1,
       justifyContent: "center",
-      minHeight: 38,
+      minHeight: 34,
     },
     title: {
-      color: colors.text,
+      color: colors.textStrong,
       fontFamily: fonts.sans.semiBold,
-      fontSize: 17,
+      fontSize: 15.5,
       letterSpacing: -0.2,
-      lineHeight: 23,
+      lineHeight: 21,
     },
   });
+};

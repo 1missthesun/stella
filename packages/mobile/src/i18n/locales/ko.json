@@ -941,6 +941,9 @@
       "description": "음성 및 통화 컨트롤을 표시합니다. 받아쓰기는 어느 쪽이든 작동합니다.",
       "title": "음성 대화"
     },
+    "groups": {
+      "app": "앱"
+    },
     "secureValues": {
       "added": "{added}에 추가됨"
     }

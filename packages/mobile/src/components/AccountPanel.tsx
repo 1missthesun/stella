@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { BackHandler, StyleSheet, View } from "react-native";
 import Animated, {
   FadeInLeft,
   FadeInRight,
@@ -47,6 +47,16 @@ function AccountPages({ showing }: { showing: boolean }) {
     setMoved(false);
     setPage("account");
   }, [showing]);
+
+  useEffect(() => {
+    if (page === "account") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setMoved(true);
+      setPage("account");
+      return true;
+    });
+    return () => sub.remove();
+  }, [page]);
 
   const go = (next: typeof page) => {
     setMoved(true);

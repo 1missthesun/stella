@@ -13,7 +13,9 @@ import { READING_WRITING_PAGES } from "./reading-writing";
 import { HOBBIES_PAGES } from "./hobbies";
 import { PHOTOS_FILES_PAGES } from "./photos-files";
 import { PRINTING_LABELS_PAGES } from "./printing-labels";
+import { REVERSE_ENGINEERING_PAGES } from "./reverse-engineering";
 import { STUDY_PAGES } from "./study";
+import { TORRENTING_PAGES } from "./torrenting";
 import { VIDEO_PAGES } from "./video";
 import { WEDDINGS_EVENTS_PAGES } from "./weddings-events";
 
@@ -36,4 +38,6 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...CHATS_DATA_EXPORTS_PAGES,
   ...READING_WRITING_PAGES,
   ...HOBBIES_PAGES,
+  ...TORRENTING_PAGES,
+  ...REVERSE_ENGINEERING_PAGES,
 ];

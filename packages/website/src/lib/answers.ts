@@ -602,6 +602,129 @@ export const ANSWER_PAGES: AnswerPage[] = [
     ],
   },
   {
+    slug: "ai-for-reverse-engineering",
+    kind: "answer",
+    queries: [
+      "best AI for reverse engineering",
+      "AI reverse engineering",
+      "AI decompiler",
+      "best AI agent for reverse engineering",
+      "AI that can decompile an exe or APK",
+      "Ghidra AI",
+    ],
+    metaTitle: "AI for reverse engineering: decompile, patch and analyse",
+    metaDescription:
+      "Stella (stella.sh) is an AI that does reverse engineering on your computer: it decompiles EXEs, DLLs, APKs and games, works in Ghidra, patches binaries and decodes file formats, then tests the result.",
+    eyebrow: "Reverse engineering",
+    headline: "An AI that does the reverse engineering.",
+    answer: `Stella (stella.sh) is an AI that does reverse engineering end to end on your own computer. Give it an EXE, DLL, APK, JAR, game, firmware image, save file or unknown format and say what you want: it installs the tools (Ghidra, ILSpy, jadx, apktool and the rest), reads the code, writes the source, patch or converter, and tests it against the original. Every job below was recorded and checked against an answer key. ${PRICE_LINE}`,
+    stepsTitle: "Ask it like this.",
+    steps: [
+      {
+        title: "“I lost the source code for this program. Turn it back into C I can build.”",
+        body: "On a 64-bit Windows EXE with no symbols, Stella wrote 441 lines of commented C in about 14 minutes, and the rebuilt program matched the original on all 3,000 command lines checked afterwards. See [decompile an EXE](/how/reverse-engineering/decompile-exe-to-source-code), a [.NET DLL to C#](/how/reverse-engineering/decompile-dotnet-dll-to-csharp), a [Python EXE](/how/reverse-engineering/decompile-python-exe) or a [JAR](/how/reverse-engineering/decompile-jar-file).",
+      },
+      {
+        title: "“Open this in Ghidra and name every function.”",
+        body: "Stella installed Ghidra, named and commented all 23 functions of a stripped binary in under six minutes, and saved a project that opens in Ghidra. See [use AI with Ghidra](/how/reverse-engineering/use-ai-with-ghidra).",
+      },
+      {
+        title: "“Fix the bug in this old program.”",
+        body: "With no source, Stella found the two-digit-year cutoff in a 1998 program and fixed it by changing one byte. See [patch an EXE file](/how/reverse-engineering/patch-exe-file).",
+      },
+      {
+        title: "“What does this app connect to?”",
+        body: "From the APK alone, Stella listed an Android app's permissions and all six servers it fetches from in about two minutes. See [decompile an APK](/how/reverse-engineering/decompile-apk), [edit an APK](/how/reverse-engineering/edit-apk) and [check an EXE without running it](/how/reverse-engineering/is-this-exe-safe).",
+      },
+      {
+        title: "“Work out this file format.”",
+        body: "Stella decoded a discontinued program's data file into a CSV of 219 transactions and wrote a converter that worked on a second file it had never seen. See [reverse engineer a file format](/how/reverse-engineering/reverse-engineer-a-file-format) and [edit a save file](/how/reverse-engineering/edit-save-file).",
+      },
+    ],
+    points: [
+      { title: "It runs the tools for you", body: "Stella downloads what a job needs without admin rights where it can, drives it from the command line, and leaves you the finished files." },
+      { title: "It proves the result", body: "It rebuilds what it recovers and runs it beside the original on many inputs, then tells you what matched and what it had to reconstruct." },
+      { title: "Games and formats too", body: "[Unity](/how/reverse-engineering/decompile-unity-game) and [Godot](/how/reverse-engineering/decompile-godot-game) games, [Ren'Py archives](/how/reverse-engineering/extract-renpy-rpa), [Unreal paks](/how/reverse-engineering/extract-pak-files), [router firmware](/how/reverse-engineering/extract-firmware), [obfuscated JavaScript](/how/reverse-engineering/deobfuscate-javascript) and more: [all the reverse engineering guides](/how/reverse-engineering)." },
+    ],
+    questions: [
+      {
+        q: "What is the best AI for reverse engineering?",
+        a: "Pick one that can run the tools and test its own answer, not only explain code you paste in. Stella (stella.sh) works on your computer with the actual file: it installs and drives Ghidra, ILSpy, jadx or apktool, writes the recovered source or patch, and compares it with the original. It runs on your Claude or ChatGPT plan.",
+      },
+      {
+        q: "Can AI decompile an EXE?",
+        a: "Yes. Native C and C++ programs come back as equivalent C with reconstructed names, .NET programs as C# projects that build, and PyInstaller programs as .py files. Stella does all three and checks that the rebuilt program gives the same output.",
+      },
+      {
+        q: "Do I need a Ghidra MCP server?",
+        a: "Only to have an AI work inside a Ghidra window you already have open. Stella scripts Ghidra directly: it analyses the file, names and comments the functions, and saves a project you can open afterwards.",
+      },
+      faq("Is Stella free?"),
+      faq("Can I use Claude Code, ChatGPT or my own API keys with Stella?"),
+    ],
+  },
+  {
+    slug: "ai-for-torrenting",
+    kind: "answer",
+    queries: [
+      "AI for torrenting",
+      "AI torrent manager",
+      "AI that sets up qBittorrent",
+      "automate torrent downloads with AI",
+      "AI to organize torrents for Plex",
+    ],
+    metaTitle: "AI for torrenting: set up, fix and automate qBittorrent",
+    metaDescription:
+      "Stella (stella.sh) is an AI that runs your torrent setup: it installs and tunes qBittorrent, fixes stalled or slow downloads, automates RSS, unpacks RARs and names files for Plex.",
+    eyebrow: "Torrenting",
+    headline: "An AI that runs your torrent setup.",
+    answer: `Stella (stella.sh) is an AI that sets up and runs torrenting on your own computer. Ask in plain words and it installs and configures qBittorrent, finds out why downloads are stalled or slow, writes RSS rules, unpacks RARs when they finish, names movies and shows for Plex while they keep seeding, makes torrents and reads magnet links. Every job below was recorded and checked. ${PRICE_LINE}`,
+    stepsTitle: "Ask it like this.",
+    steps: [
+      {
+        title: "“Install qBittorrent with sensible settings.”",
+        body: "Stella installed qBittorrent, set folders, queue and seeding limits, downloaded Debian through it and verified the file against Debian's signed checksums. See [how to torrent with qBittorrent](/how/torrenting/set-up-qbittorrent).",
+      },
+      {
+        title: "“Everything says stalled. Find out why and fix it.”",
+        body: "Stella found all four causes in 2 minutes 24 seconds and the downloads finished. See [fix qBittorrent stalled](/how/torrenting/fix-qbittorrent-stalled) and [speed up qBittorrent](/how/torrenting/speed-up-qbittorrent), where a download went from about 50 KiB/s to 9.5 MiB/s.",
+      },
+      {
+        title: "“Sort my finished downloads into Plex and keep them seeding.”",
+        body: "Six movies and five episodes from nine messy downloads, hard-linked with Plex's names and subtitles in under 3 minutes. See [rename files for Plex](/how/torrenting/rename-organize-downloads-for-plex).",
+      },
+      {
+        title: "“Unpack and sort downloads when they finish.”",
+        body: "Stella wrote the script qBittorrent runs on completion, and new RAR downloads landed in the right category folder within seconds. See [unrar downloads automatically](/how/torrenting/extract-rar-after-torrent-downloads) and [RSS rules](/how/torrenting/download-torrents-automatically-with-rss).",
+      },
+      {
+        title: "“I moved to a new PC and every torrent says Missing Files.”",
+        body: "All seven torrents pointed at their new folders in under 6 minutes, with nothing downloaded again. See [move qBittorrent](/how/torrenting/move-qbittorrent-to-new-drive-or-computer).",
+      },
+    ],
+    points: [
+      { title: "It works in your own client", body: "Stella reads and changes your qBittorrent settings, resume data and rules on your computer, and tests that downloads really start." },
+      { title: "Plain words in, working setup out", body: "Say what you want in a sentence. Stella picks the tool, writes the script or rule, and tells you what it changed." },
+      { title: "Every step is written down", body: "Each guide has the manual way too, with the exact menus and commands: [all the torrenting guides](/how/torrenting)." },
+    ],
+    questions: [
+      {
+        q: "Is there an AI that can manage torrents?",
+        a: "Yes. Stella (stella.sh) works on your computer, so it can install qBittorrent, change its settings, add torrents and magnet links, write RSS rules, and sort, rename and unpack what you download. You ask in plain words.",
+      },
+      {
+        q: "Can AI fix a stalled torrent?",
+        a: "Yes. Stella reads the client's settings, log and trackers, tests each suspect (blocklists, bans, encryption, dead trackers, limits) and confirms the download runs. In the recorded run it cleared four separate causes in 2 minutes 24 seconds.",
+      },
+      {
+        q: "Which torrent client does Stella use?",
+        a: "The one you have. The guides use qBittorrent, which is free and open source on Windows, Mac and Linux, and Stella can install it for you.",
+      },
+      faq("Is Stella free?"),
+      faq("Can I use Claude Code, ChatGPT or my own API keys with Stella?"),
+    ],
+  },
+  {
     slug: "ai-assistant-for-windows",
     kind: "answer",
     queries: [

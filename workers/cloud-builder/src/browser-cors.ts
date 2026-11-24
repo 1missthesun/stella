@@ -90,7 +90,7 @@ export async function withBrowserCors(
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Methods": "GET, POST",
         "Access-Control-Allow-Headers": [...ALLOWED_HEADERS].join(", "),
-        "Access-Control-Max-Age": "600",
+        "Access-Control-Max-Age": "7200",
         Vary: "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
       },
     });

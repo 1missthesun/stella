@@ -131,8 +131,46 @@ const importUserKeys = async (jwks: unknown): Promise<UserKeys> => {
   return { keys, fetchedAtMs: Date.now() };
 };
 
+const JWKS_GRACE_PERIOD_MS = 3600 * 24 * 30 * 1000;
+
+const loadPublicJwksDirect = async (env: Cloudflare.Env): Promise<{ keys: unknown[] } | null> => {
+  if (!env.DB) return null;
+  const rows = await env.DB.prepare(
+    'SELECT "id", "publicKey", "alg", "crv", "expiresAt" FROM "jwks"',
+  ).all<{
+    id: string;
+    publicKey: string;
+    alg: string | null;
+    crv: string | null;
+    expiresAt: string | number | null;
+  }>();
+  if (!rows.results?.length) return null;
+  const now = Date.now();
+  const keys: unknown[] = [];
+  for (const row of rows.results) {
+    if (row.expiresAt != null) {
+      const expMs = typeof row.expiresAt === "number" ? row.expiresAt : Date.parse(String(row.expiresAt));
+      if (Number.isFinite(expMs) && expMs + JWKS_GRACE_PERIOD_MS <= now) continue;
+    }
+    try {
+      const pub = JSON.parse(row.publicKey) as Record<string, unknown>;
+      keys.push({
+        alg: row.alg ?? "RS256",
+        ...(row.crv ? { crv: row.crv } : {}),
+        ...pub,
+        kid: row.id,
+      });
+    } catch {
+      continue;
+    }
+  }
+  return keys.length > 0 ? { keys } : null;
+};
+
 const loadUserKeys = async (env: Cloudflare.Env): Promise<UserKeys> => {
   const load = (async () => {
+    const direct = await loadPublicJwksDirect(env).catch(() => null);
+    if (direct) return importUserKeys(direct);
     const { createAuth } = await import("./auth/auth.js");
     return importUserKeys(await createAuth(env).api.getJwks());
   })();
@@ -163,7 +201,7 @@ export const verifyUserToken = async (
   return verified.ok ? await admitSession(verified.token, revocations) : verified;
 };
 
-const verifySignedUserToken = async (token: string, env: Cloudflare.Env): Promise<VerifyResult> => {
+export const verifySignedUserToken = async (token: string, env: Cloudflare.Env): Promise<VerifyResult> => {
   const issuer = (env.CLOUD_BUILDER_PUBLIC_URL ?? "").trim().replace(/\/+$/, "");
   if (!issuer) return fail("no_issuer_configured", true);
   const parts = token.split(".");

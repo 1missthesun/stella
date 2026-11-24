@@ -33,9 +33,7 @@ export const openAgentInbox = async (
       try {
         const text = (JSON.parse(raw) as { text?: unknown }).text;
         if (typeof text === "string" && text.trim()) texts.push(text);
-      } catch {
-        // BuildSession writes whole JSON files; anything else is not a message.
-      }
+      } catch {}
     }
     return texts;
   };

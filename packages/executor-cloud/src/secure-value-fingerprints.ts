@@ -7,24 +7,11 @@ import {
 } from "@stella/contracts/secret-redaction";
 import { CLOUD_HOST_STATE } from "./cloud-process-isolation.js";
 
-/**
- * The fingerprints of the secure values a cloud task was given, so Claude
- * Code's own tools (whose output Stella's host never sees) get them redacted
- * too: its PostToolUse hook runs inside the sandbox and reads them from here.
- *
- * Fingerprints are salted rolling hashes, never values. The file is root's,
- * read-only, in a root folder the sandbox sees only through a read-only bind
- * (claude-sandbox.ts), so the tool user can neither change nor remove it. It
- * outlives the values: one that turned up in a file stays redacted on a
- * later turn, as the desktop keeps fingerprints of values that expired.
- */
 const FINGERPRINTS_ROOT = path.join(CLOUD_HOST_STATE, "secure-value-redaction");
 const FINGERPRINTS_FILE = "fingerprints.json";
 
-/** Where the sandbox sees this thread's folder. Never created on the host: the sandbox's own tmpfs holds it. */
 export const SANDBOX_FINGERPRINTS_VIEW = path.join(CLOUD_HOST_STATE, "secure-value-view");
 export const SANDBOX_FINGERPRINTS_FILE = path.join(SANDBOX_FINGERPRINTS_VIEW, FINGERPRINTS_FILE);
-/** Tells the hook where the file is; set, it withholds output it can't check. */
 export const SANDBOX_FINGERPRINTS_ENV = "STELLA_SANDBOX_FINGERPRINTS";
 
 export const fingerprintsDirectory = (threadKey: string): string =>
@@ -64,10 +51,6 @@ const writeAtomically = async (directory: string, value: SecretFingerprints) => 
   await rename(staging, target);
 };
 
-/**
- * The thread's folder and file, made if missing (root, 0755 and 0444), and
- * what it holds. A file that can't be read is started again.
- */
 export const ensureFingerprints = async (
   threadKey: string,
 ): Promise<{ directory: string; fingerprints: SecretFingerprints }> => {

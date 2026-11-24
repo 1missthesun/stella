@@ -351,11 +351,6 @@ const resolveTarget = (
   return absolute;
 };
 
-/**
- * The workspace copy's sha when it provably holds this row's bytes: the row's
- * own hash, or the ledger's for this exact version. Anything else is
- * compared against downloaded bytes.
- */
 const alreadyCurrent = async (
   snapshot: WorkspaceSnapshot | null,
   entry: DriveSyncEntry,
@@ -507,14 +502,6 @@ const readTombstones = (value: unknown): DriveSyncTombstone[] => {
   return tombstones;
 };
 
-/**
- * Both live outcomes carry a ledger entry, because both leave this workspace
- * holding the row's bytes. Recording only the downloads is what let a file
- * that was already on disk — every piece of agent output, which hydration
- * takes at its size the turn after it was written — sit in the drive tree with
- * nothing accounting for it, so the tombstone gate could never remove it when
- * the user deleted the row.
- */
 type Hydration =
   | { kind: "current"; path: string; updatedAt: number; ledger: LedgerEntry }
   | {

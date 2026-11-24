@@ -19,20 +19,6 @@ import {
   ensureFingerprints,
 } from "./secure-value-fingerprints.js";
 
-/**
- * Claude Code in the cloud runs its own Read/Edit/Write/Bash/Grep/Glob inside
- * its process, so the process itself is the sandbox: it runs as the tool user
- * (`stella-tools`, no capabilities, no_new_privs), in a mount namespace that
- * shows it only this thread's session folder, its Claude account folder and a
- * private /tmp, and in a PID namespace that shows it only its own processes.
- * The executor stays root outside it and keeps the backend capability.
- *
- * Host state, other threads' sessions, other accounts, the turn attempt
- * folders (the executor's capability) and the executor's processes are out of
- * sight. Before every turn `probeClaudeSandbox` runs a real process through
- * the same launch and fails the turn unless every escape attempt fails.
- */
-
 const run = promisify(execFile);
 
 const UNSHARE_PATH = "/usr/bin/unshare";
@@ -45,7 +31,6 @@ export type ClaudeSandbox = {
   tmpDir: string;
   cwd: string;
   home: string;
-  /** The thread's secure-value fingerprints folder (root, read-only inside). */
   fingerprintsDir: string;
 };
 
@@ -61,23 +46,12 @@ const ownedByToolUser = async (target: string): Promise<void> => {
   );
 };
 
-/**
- * Give this thread's session folder back to root after the CLI has run in the
- * sandbox, so the executor's native-state machinery (the archive, the parity
- * check, and the sealed attestation) sees the root-owned tree it expects. The
- * tool user owns the folder only while its own CLI process is using it.
- */
 export const restoreNativeStateOwner = async (
   stateRoot: string,
 ): Promise<void> => {
   await chownTree(stateRoot, "0:0").catch(() => undefined);
 };
 
-/**
- * Hand this thread's session folder and its Claude account folder to the tool
- * user (the backend restores sessions and writes logins as root) and make its
- * private /tmp. `fresh` empties /tmp: nothing of a previous process remains.
- */
 const PROTECTED_HARDLINKS = "/proc/sys/fs/protected_hardlinks";
 
 /**
@@ -114,7 +88,6 @@ export const prepareClaudeSandbox = async (args: {
   await chmod(tmpDir, 0o700);
   await protectHardlinks();
   if ((await readFile(PROTECTED_HARDLINKS, "utf8").catch(() => "")).trim() !== "1") {
-    // Never hand the folders over without the protection.
     throw new Error("protected_hardlinks is off and could not be turned on");
   }
   await ownedByToolUser(args.stateRoot);
@@ -130,14 +103,6 @@ export const prepareClaudeSandbox = async (args: {
   };
 };
 
-/**
- * Runs as root inside the new mount and PID namespaces, then becomes the tool
- * user. The three folders are bound to a stage first, the anchors are covered
- * with empty tmpfs (0711: passable, not listable), and the folders are bound
- * back at their own paths, so every path Claude Code keeps stays the same.
- * The thread's secure-value fingerprints folder is bound read-only at its
- * view inside the covered host state, where the redaction hook reads it.
- */
 const ENTER_SCRIPT = `set -eu
 state=$1 account=$2 tmp=$3 cwd=$4 fingerprints=$5
 shift 6
@@ -167,7 +132,6 @@ cd "$cwd"
 exec "$@"
 `;
 
-/** The argv that runs `command` inside the sandbox. */
 export const sandboxedClaudeLaunch = (
   sandbox: ClaudeSandbox,
   command: string,
@@ -204,10 +168,6 @@ export const sandboxedClaudeLaunch = (
   };
 };
 
-/**
- * Every escape a built-in Bash or Read could try, run for real as the
- * sandboxed tool user. Prints SANDBOX_OK only when all of them fail.
- */
 const PROBE_SCRIPT = `ok=1
 fail() { echo "FAIL $1"; ok=0; }
 field() { sed -n "s/^$1:[[:space:]]*//p" /proc/self/status | tr -s ' \\t' '  ' | sed 's/ *$//'; }
@@ -252,10 +212,7 @@ const childrenOf = async (directory: string): Promise<string[]> =>
     path.join(directory, name),
   );
 
-/** What the sandbox must not reach, listed as root outside it. */
 const hiddenPaths = async (sandbox: ClaudeSandbox): Promise<string[]> => {
-  // The sandbox sees two host-state paths: the accounts folder holding its
-  // own account, and the orchestrator's (empty) working folder.
   const hostState = (await childrenOf(CLOUD_HOST_STATE)).filter(
     (entry) =>
       entry !== CLOUD_CLAUDE_ACCOUNTS_ROOT &&
@@ -281,10 +238,6 @@ const hiddenPaths = async (sandbox: ClaudeSandbox): Promise<string[]> => {
   ];
 };
 
-/**
- * Run the probe through the same sandbox Claude Code is about to run in.
- * Resolves to undefined when every escape failed, else to what got through.
- */
 export const probeClaudeSandbox = async (
   sandbox: ClaudeSandbox,
   hook: { hookScript: string; runtime: string },

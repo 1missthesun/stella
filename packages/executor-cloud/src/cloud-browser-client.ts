@@ -16,11 +16,6 @@ export type BrokerCloudBrowser = CloudBrowserBridge & {
   checkpoint(): Promise<void>;
 };
 
-/**
- * The container agent's cloud browser: every command goes through the turn
- * broker to the Browser Gateway, and a sign-in handed to the user is waited
- * out here, one bounded broker request at a time.
- */
 export const createBrokerCloudBrowser = (args: {
   post: BrokerPost;
   turnId: string;

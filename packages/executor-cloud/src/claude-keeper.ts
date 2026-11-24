@@ -33,11 +33,6 @@ type Child = {
 
 let child: Child | undefined;
 
-/**
- * Claude Code runs under its sandbox launcher (claude-sandbox.ts), in a
- * process group of its own: parking, continuing and killing reach the CLI and
- * the launcher together.
- */
 const signal = (current: Child, name: NodeJS.Signals): void => {
   const pid = current.process.pid;
   try {
@@ -45,9 +40,7 @@ const signal = (current: Child, name: NodeJS.Signals): void => {
       process.kill(-pid, name);
       return;
     }
-  } catch {
-    // The group is gone; signal the launcher itself.
-  }
+  } catch {}
   current.process.kill(name);
 };
 let attached: net.Socket | undefined;
@@ -77,8 +70,6 @@ const killChild = async (): Promise<Child | undefined> => {
 const startChild = async (
   spec: Extract<ClaudeKeeperRequest, { t: "attach" }>,
 ): Promise<void> => {
-  // Stella's tools travel on the process's own stdin/stdout, so whichever
-  // turn is attached answers them; a picked-up process needs nothing redone.
   const processHandle = spawn(spec.spawn.command, spec.spawn.args, {
     cwd: spec.spawn.cwd,
     env: spec.spawn.env,
@@ -214,11 +205,6 @@ const fingerprint = async (root: string): Promise<string> => {
   return parts.sort().join("\n");
 };
 
-/**
- * Stop the process once its session files have settled: what the turn
- * seals next is then exactly what the process holds, and nothing changes it
- * until the next turn continues it.
- */
 const park = async (socket: net.Socket, stateRoot: string): Promise<void> => {
   const current = child;
   if (!current || current.exited) {

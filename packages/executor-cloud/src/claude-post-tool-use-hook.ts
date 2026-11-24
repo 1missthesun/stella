@@ -1,16 +1,3 @@
-/**
- * Claude Code's PostToolUse command hook in the cloud: it reads the hook
- * event on stdin and answers on stdout with the tool output redacted, as the
- * desktop's HTTP hook does. Claude Code runs it inside its sandbox for its own
- * built-ins only (the settings' matcher leaves Stella's tools out; Stella's
- * host redacts those). A command, not an HTTP endpoint, so a parked process
- * picked up by a later turn still reaches it.
- *
- * The secure values this task was given are redacted by their fingerprints,
- * which the executor keeps in a read-only file inside the sandbox
- * (secure-value-fingerprints.ts). When the file is named but can't be read,
- * the output is withheld rather than shown unchecked.
- */
 import { readFile } from "node:fs/promises";
 import { claudeCodePostToolUseHookResponse } from "@stella/runtime/kernel/integrations/claude-code-output-redaction.js";
 import { setSecureValueFingerprintSource } from "@stella/runtime/kernel/shared/secure-value-redaction.js";

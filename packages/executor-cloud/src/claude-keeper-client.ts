@@ -80,9 +80,7 @@ const startKeeper = (socketPath: string): void => {
   const logPath = `${socketPath}.log`;
   try {
     if (statSync(logPath).size > KEEPER_LOG_MAX_BYTES) truncateSync(logPath, 0);
-  } catch {
-    // No log yet.
-  }
+  } catch {}
   closeSync(openSync(logPath, "a", 0o600));
   const launcher = spawn(
     "/bin/sh",

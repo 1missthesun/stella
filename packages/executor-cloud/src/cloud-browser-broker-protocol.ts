@@ -2,7 +2,6 @@ import type { CloudBrowserHandoffResult } from "@stella/contracts/cloud-browser"
 
 export const CLOUD_BROWSER_BROKER_PATH = "/api/cloud/browser";
 
-/** How long one handoff wait request is held open before answering `waiting`. */
 export const CLOUD_BROWSER_HANDOFF_POLL_MS = 20_000;
 
 export type CloudBrowserBrokerRequest =

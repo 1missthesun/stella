@@ -140,7 +140,6 @@ export type AgentTurnTerminalResult = {
   ok: boolean;
   finalText: string;
   error?: string;
-  /** The turn ended without its finished report: the task is idle, and no report is filed. */
   waitingFor?: string;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   usage: { inputTokens: number; outputTokens: number; llmCalls: number };
@@ -440,9 +439,6 @@ export const runAgentTurn = (
         body: unknown,
       ): Promise<Response> => await broker.postJson(route, body);
 
-      // The secure values this task is given live only in this process; their
-      // fingerprints go where Claude Code's redaction hook reads them (the
-      // same thread key as its sandbox).
       const fingerprintsKey = cloudClaudeRoleProfile({
         role: "agent",
         threadId: input.threadId,
@@ -596,10 +592,6 @@ export const runAgentTurn = (
       );
 
       markTurnStep("toolHostCreated");
-      // The same split as a Claude Code task on a computer: Claude Code's own
-      // Read/Edit/Write/Bash/Grep/Glob (plus TaskStop/Monitor and its web
-      // tools) run inside the CLI, which runs sandboxed as the tool user
-      // (claude-sandbox.ts); Stella serves the rest.
       const byName = new Map(
         toolHost
           .getToolCatalog("general", { agentEngine: "claude_code_local" })
@@ -619,7 +611,6 @@ export const runAgentTurn = (
         toolHome,
         allowedToolNames: claudeToolSet.tools.map((tool) => tool.name),
       });
-      // What the turn took in: its prompt and the messages that reached it mid-turn.
       const turnInputs: string[] = [input.prompt];
       const messenger = createCloudAgentMessenger(postJson, input.turnId);
       let nudged = false;
@@ -761,9 +752,6 @@ export const runAgentTurn = (
                 },
                 reopen: () => inbox.reopen(),
               },
-              // Its plain text reaches no one: a quiet end gets one nudge
-              // when it took in a message from whoever started it, or when
-              // nothing can wake it any more.
               quietEnd: {
                 done: () => messenger.report() !== undefined,
                 nudge: (live) => {
@@ -1074,12 +1062,6 @@ export const runAgentTurn = (
     }),
   );
 
-/**
- * How a turn that didn't fail ends. Its finished report (send_message with
- * done) is the attempt's result. Without one it is idle and nothing is filed,
- * unless it stayed quiet after its nudge: nothing is left in the cloud that
- * could wake it, so its task ends with the silent-end report.
- */
 export const explicitEnding = (turn: {
   report: string | undefined;
   nudged: boolean;

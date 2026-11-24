@@ -19,11 +19,6 @@ import {
   type UserAskSealedValue,
 } from "@stella/contracts/user-ask";
 
-/**
- * The cloud task's side of the user-ask seal (as the desktop's
- * user-ask-seal.js): a fresh X25519 key per request whose private half lives
- * only in this process, and the opener for values sealed to it.
- */
 const SPKI_X25519_PREFIX = Buffer.from("302a300506032b656e032100", "hex");
 
 const sha256Hex = (bytes: Uint8Array): string =>
@@ -60,7 +55,6 @@ export const createTaskRecipientKey = (): TaskRecipientKey => {
   };
 };
 
-/** Opens one field; `askId` is the ask's id, or the release id for a released value. */
 export const openSealedValue = (args: {
   sealed: UserAskSealedValue;
   key: TaskRecipientKey;

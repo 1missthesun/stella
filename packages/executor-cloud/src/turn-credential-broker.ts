@@ -564,8 +564,6 @@ export class TurnCredentialBrokerClient {
               method,
               headers,
               signal: this.#requestSignal,
-              // A Builder redirect must never receive the bearer capability on
-              // another origin. The authenticated broker endpoint is exact.
               redirect: "manual",
             });
             if (response.status >= 300 && response.status < 400) {
@@ -677,17 +675,6 @@ export class TurnCredentialBrokerClient {
         consumeResponse: (response) =>
           readBoundedCheckpointReceipt(response, request),
       },
-    );
-  }
-
-  /** @deprecated The atomic state operation requires an explicit cursor. */
-  async commitNativeStateCheckpoint(
-    checkpoint: TurnBrokerNativeStateCheckpoint,
-    signal?: AbortSignal,
-  ): Promise<TurnBrokerTurnStateCheckpointReceipt> {
-    return await this.commitTurnStateCheckpoint(
-      { historyCursor: checkpoint.cursor, nativeCheckpoint: checkpoint },
-      signal,
     );
   }
 }

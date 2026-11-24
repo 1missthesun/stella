@@ -2169,9 +2169,9 @@
       "antigravityHint": "Google のプランで使う Gemini（このコンピュータのタスク用）",
       "antigravityOpened": "Google のログインページをブラウザで開きました。そこでログインし、表示されたコードを貼り付けてください。",
       "antigravityCode": "Google に表示されたコードを貼り付け",
-      "antigravityPreparing": "Google の Antigravity CLI を準備しています…",
-      "antigravityAgain": "Stella は Gemini を Google 公式の Antigravity CLI の中で動かすようになりました。引き続き使うには、もう一度ログインしてください。",
-      "antigravityRisk": "Stella は Google 公式の Antigravity CLI を動かし、Google のログイン情報はその CLI が保持します。無人の作業に使われたアカウントは Google に制限されることがあります。"
+      "antigravityPreparing": "Google Antigravity を準備しています…",
+      "antigravityAgain": "Gemini を引き続き使うには、もう一度ログインしてください。",
+      "antigravityRisk": "無人の作業に使われたアカウントは Google に制限されることがあります。"
     },
     "engineModels": {
       "ariaLabel": "{engine} のモデル",

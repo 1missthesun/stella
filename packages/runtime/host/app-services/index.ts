@@ -16,6 +16,7 @@ import {
 import {
   answerAntigravitySignInForApp,
   antigravityStatusForApp,
+  checkAntigravityCliUpdate,
   cancelAntigravitySignInForApp,
   signInAntigravityForApp,
   signOutAntigravityForApp,
@@ -89,6 +90,7 @@ export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
   waitForChatGptCallback: (_context, request) => waitForChatGptCallback(request),
   closeChatGptCallbackListener: (_context, request) => closeChatGptCallbackListener(request),
   cancelLlmOAuthSignIn: (_context, request) => cancelLlmOAuthSignIn(request),
+  checkAntigravityCliUpdate: (context) => checkAntigravityCliUpdate(dataDir(context)),
   antigravityStatus: (context) => antigravityStatusForApp(dataDir(context)),
   signInAntigravity: (context, request) =>
     signInAntigravityForApp(dataDir(context), request, (url) => {

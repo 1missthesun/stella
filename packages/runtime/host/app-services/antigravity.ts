@@ -17,6 +17,19 @@ export const antigravityStatusForApp = async (dataDir: string): Promise<{ instal
   return { installed: antigravityInstalled(), signedIn: antigravityCliSignedIn(antigravityHomeFor(dataDir)) };
 };
 
+/** One scheduled check: install, update or repair `agy` where Stella uses it. */
+export const checkAntigravityCliUpdate = async (dataDir: string) => {
+  const [{ updateAntigravityCli }, { antigravityCliSignedIn, antigravityHomeFor }] = await Promise.all([
+    import("../../kernel/integrations/antigravity-cli-install.js"),
+    loadCli(),
+  ]);
+  try {
+    return await updateAntigravityCli({ signedIn: antigravityCliSignedIn(antigravityHomeFor(dataDir)) });
+  } catch (error) {
+    return { status: "failed" as const, version: null, output: error instanceof Error ? error.message : String(error) };
+  }
+};
+
 export const signInAntigravityForApp = async (
   dataDir: string,
   request: { loginId?: unknown } | null | undefined,

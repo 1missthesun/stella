@@ -2179,9 +2179,9 @@
       "antigravityHint": "Gemini on your Google plan, for tasks on this computer",
       "antigravityOpened": "Google's sign-in page opened in your browser. Sign in there, then paste the code it shows you.",
       "antigravityCode": "Paste the code Google shows",
-      "antigravityPreparing": "Getting Google's Antigravity CLI ready…",
-      "antigravityAgain": "Stella now runs Gemini inside Google's own Antigravity CLI. Sign in once more to keep using it.",
-      "antigravityRisk": "Stella runs Google's own Antigravity CLI, which keeps your Google sign-in. Google may limit accounts used for unattended work."
+      "antigravityPreparing": "Getting Google Antigravity ready…",
+      "antigravityAgain": "Sign in once more to keep using Gemini.",
+      "antigravityRisk": "Google may limit accounts used for unattended work."
     },
     "engineModels": {
       "ariaLabel": "{engine} models",

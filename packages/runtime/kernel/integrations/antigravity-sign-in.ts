@@ -1,16 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
 import {
   ANTIGRAVITY_APP_DATA_DIR,
   antigravityCliEnv,
   antigravityCliSignedIn,
   antigravityTokenFile,
-  findAntigravityCli,
 } from "./antigravity-cli-acp.js";
+import { antigravityCliKeeper, findAntigravityCli } from "./antigravity-cli-install.js";
 
 /**
  * Signing in to Google Antigravity with Google's own login command
@@ -18,42 +15,11 @@ import {
  * the CLI reads the code that page shows. The CLI stores the sign-in; Stella
  * never reads it.
  */
-const INSTALLER_SH = "https://antigravity.google/cli/install.sh";
-const INSTALLER_PS1 = "https://antigravity.google/cli/install.ps1";
-/** The first release whose custom agents can carry Stella's prompt and tools as tested. */
-const MINIMUM_VERSION = "1.5.14";
-const INSTALL_TIMEOUT_MS = 15 * 60_000;
-const UPDATE_TIMEOUT_MS = 5 * 60_000;
-const VERSION_TIMEOUT_MS = 20_000;
 const URL_TIMEOUT_MS = 45_000;
 const FINISH_TIMEOUT_MS = 60_000;
 const LOGOUT_TIMEOUT_MS = 20_000;
 
 const canceled = () => new Error("Google sign-in was canceled.");
-
-const run = (
-  command: string,
-  args: readonly string[],
-  options: { timeoutMs: number; env?: NodeJS.ProcessEnv; signal?: AbortSignal },
-): Promise<{ code: number | null; output: string }> =>
-  new Promise((resolve) => {
-    let output = "";
-    const child = spawn(command, [...args], {
-      env: options.env ?? process.env,
-      cwd: os.tmpdir(),
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-      timeout: options.timeoutMs,
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-    const collect = (chunk: Buffer) => {
-      output = `${output}${chunk.toString("utf8")}`.slice(-4_000);
-    };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", collect);
-    child.on("error", (error) => resolve({ code: null, output: `${output}\n${error.message}`.trim() }));
-    child.on("close", (code) => resolve({ code, output: output.trim() }));
-  });
 
 const lastLine = (output: string): string =>
   output
@@ -62,46 +28,14 @@ const lastLine = (output: string): string =>
     .filter((line) => line && !line.startsWith("http"))
     .at(-1) ?? "";
 
-const olderThan = (version: string, minimum: string): boolean => {
-  const left = version.split(".").map(Number);
-  const right = minimum.split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    if ((left[index] ?? 0) !== (right[index] ?? 0)) return (left[index] ?? 0) < (right[index] ?? 0);
-  }
-  return false;
-};
-
-const versionOf = async (binary: string, signal: AbortSignal): Promise<string | undefined> => {
-  const { code, output } = await run(binary, ["--version"], { timeoutMs: VERSION_TIMEOUT_MS, signal });
-  return code === 0 ? /\d+\.\d+\.\d+/u.exec(output)?.[0] : undefined;
-};
-
-/** Google's own install command, as its download page gives it. */
-const install = async (signal: AbortSignal): Promise<void> => {
-  const { code, output } =
-    process.platform === "win32"
-      ? await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `irm ${INSTALLER_PS1} | iex`], { timeoutMs: INSTALL_TIMEOUT_MS, signal })
-      : await run("bash", ["-c", `set -o pipefail; curl -fsSL ${INSTALLER_SH} | bash`], { timeoutMs: INSTALL_TIMEOUT_MS, signal });
-  if (code !== 0 && !signal.aborted) throw new Error(lastLine(output) || "Google's Antigravity CLI didn't install.");
-};
-
-/** Finds a current `agy`, installing it with Google's installer, or updating one too old for Stella. */
+/** A current `agy` that starts, installed, updated or repaired first as needed. */
 const readyCli = async (signal: AbortSignal): Promise<string> => {
-  if (!findAntigravityCli()) await install(signal);
+  const found = await antigravityCliKeeper.inspect();
   if (signal.aborted) throw canceled();
-  const binary = findAntigravityCli();
-  if (!binary) throw new Error("Google's Antigravity CLI didn't install.");
-  let version = await versionOf(binary, signal);
-  if (version && olderThan(version, MINIMUM_VERSION)) {
-    await run(binary, ["update"], { timeoutMs: UPDATE_TIMEOUT_MS, signal });
-    version = await versionOf(binary, signal);
-  }
+  // Someone is waiting on this, so a repair that just failed is tried again.
+  if (found && !found.check.ok) await antigravityCliKeeper.repair(found.install, { force: true });
   if (signal.aborted) throw canceled();
-  if (!version) throw new Error(`Google's Antigravity CLI at ${binary} doesn't start.`);
-  if (olderThan(version, MINIMUM_VERSION)) {
-    throw new Error(`Google's Antigravity CLI at ${binary} is version ${version}. Update it to ${MINIMUM_VERSION} or newer, then sign in again.`);
-  }
-  return binary;
+  return (await antigravityCliKeeper.select({ repair: "wait", signal })).executable;
 };
 
 const loginUrl = (output: string): string | undefined => {
@@ -244,7 +178,4 @@ export const signOutAntigravity = async (home: string): Promise<void> => {
   await rm(antigravityTokenFile(home), { force: true });
 };
 
-export const antigravityInstalled = (): boolean => {
-  const binary = findAntigravityCli();
-  return binary !== undefined && existsSync(binary);
-};
+export const antigravityInstalled = (): boolean => findAntigravityCli() !== undefined;

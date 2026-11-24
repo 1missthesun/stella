@@ -1,0 +1,23 @@
+.antigravity-picker-sign-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 10px;
+}
+
+.antigravity-picker-sign-in__hint {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  color: var(--text-weak);
+}
+
+.antigravity-picker-sign-in .pill-btn {
+  flex: none;
+}
+
+.antigravity-picker-prompt {
+  padding: 0 10px 4px;
+}

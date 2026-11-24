@@ -2219,9 +2219,9 @@
       "antigravityHint": "Gemini ضمن خطة Google الخاصة بك، للمهام على هذا الكمبيوتر",
       "antigravityOpened": "فُتحت صفحة تسجيل الدخول من Google في متصفحك. سجّل الدخول هناك، ثم الصق الرمز الذي يظهر لك.",
       "antigravityCode": "الصق الرمز الذي تعرضه Google",
-      "antigravityPreparing": "جارٍ تجهيز Antigravity CLI من Google…",
-      "antigravityAgain": "تشغّل Stella الآن Gemini داخل Antigravity CLI من Google نفسها. سجّل الدخول مرة أخرى لمواصلة استخدامه.",
-      "antigravityRisk": "تشغّل Stella ‏Antigravity CLI من Google نفسها، وهو الذي يحتفظ بتسجيل دخولك إلى Google. قد تقيّد Google الحسابات المستخدمة في عمل بلا إشراف."
+      "antigravityPreparing": "جارٍ تجهيز Google Antigravity…",
+      "antigravityAgain": "سجّل الدخول مرة أخرى لمواصلة استخدام Gemini.",
+      "antigravityRisk": "قد تقيّد Google الحسابات المستخدمة في عمل بلا إشراف."
     },
     "engineModels": {
       "ariaLabel": "نماذج {engine}",

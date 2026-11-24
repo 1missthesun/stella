@@ -55,6 +55,7 @@ export function AntigravitySignInPrompt({
           )}
         </p>
       )}
+      {signIn.state === "running" ? <p className="engine-connect-prompt__hint">{t(`${K}.antigravityRisk`)}</p> : null}
       {page ? (
         <input
           className="engine-connect-prompt__input"

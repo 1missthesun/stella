@@ -8,6 +8,7 @@ export const RUNTIME_APP_SERVICE_CALLS = [
   "signInLlmOAuth",
   "cancelLlmOAuthSignIn",
   "antigravityStatus",
+  "checkAntigravityCliUpdate",
   "signInAntigravity",
   "answerAntigravitySignIn",
   "cancelAntigravitySignIn",

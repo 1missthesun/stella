@@ -2169,9 +2169,9 @@
       "antigravityHint": "使用你的 Google 方案运行 Gemini，用于这台电脑上的任务",
       "antigravityOpened": "Google 登录页面已在浏览器中打开。请在那里登录，然后粘贴显示的代码。",
       "antigravityCode": "粘贴 Google 显示的代码",
-      "antigravityPreparing": "正在准备 Google 的 Antigravity CLI…",
-      "antigravityAgain": "Stella 现在通过 Google 自己的 Antigravity CLI 运行 Gemini。请再登录一次以继续使用。",
-      "antigravityRisk": "Stella 运行 Google 自己的 Antigravity CLI，由它保存您的 Google 登录。Google 可能会限制用于无人值守工作的账号。"
+      "antigravityPreparing": "正在准备 Google Antigravity…",
+      "antigravityAgain": "请再登录一次以继续使用 Gemini。",
+      "antigravityRisk": "Google 可能会限制用于无人值守工作的账号。"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

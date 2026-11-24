@@ -2179,9 +2179,9 @@
       "antigravityHint": "Gemini på dit Google-abonnement, til opgaver på denne computer",
       "antigravityOpened": "Googles loginside er åbnet i din browser. Log ind dér, og indsæt derefter den kode, den viser.",
       "antigravityCode": "Indsæt koden, som Google viser",
-      "antigravityPreparing": "Gør Googles Antigravity CLI klar…",
-      "antigravityAgain": "Stella kører nu Gemini i Googles eget Antigravity CLI. Log ind én gang til for at blive ved med at bruge det.",
-      "antigravityRisk": "Stella kører Googles eget Antigravity CLI, som opbevarer dit Google-login. Google kan begrænse konti, der bruges til arbejde uden opsyn."
+      "antigravityPreparing": "Gør Google Antigravity klar…",
+      "antigravityAgain": "Log ind én gang til for at blive ved med at bruge Gemini.",
+      "antigravityRisk": "Google kan begrænse konti, der bruges til arbejde uden opsyn."
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

@@ -1359,13 +1359,13 @@ export class StellaRuntimeHost {
     return await this.oauthSignedIn("chatgpt");
   }
 
-  /** Whether Google's own Antigravity CLI is installed and signed in for Stella here. */
+  /** Whether Stella is signed in to Google Antigravity here. */
   private async antigravitySignedIn(): Promise<boolean> {
-    const { antigravityCliProblem, antigravityHomeFor, findAntigravityCli } = await import(
+    const { antigravityCliProblem, antigravityHomeFor } = await import(
       "../kernel/integrations/antigravity-cli-acp.js"
     );
     const dataDir = this.options.initializeParams.stellaDataDirPath;
-    return antigravityCliProblem({ binary: findAntigravityCli, home: () => antigravityHomeFor(dataDir) }) === undefined;
+    return antigravityCliProblem({ home: () => antigravityHomeFor(dataDir) }) === undefined;
   }
 
   /** Which plan sign-ins this computer holds, read at most once a minute. */

@@ -2189,9 +2189,9 @@
       "antigravityHint": "Gemini din abonamentul tău Google, pentru sarcinile de pe acest computer",
       "antigravityOpened": "Pagina de conectare Google s-a deschis în browser. Conectează-te acolo, apoi lipește codul afișat.",
       "antigravityCode": "Lipește codul afișat de Google",
-      "antigravityPreparing": "Se pregătește Antigravity CLI de la Google…",
-      "antigravityAgain": "Stella rulează acum Gemini în Antigravity CLI de la Google. Conectează-te încă o dată pentru a-l folosi în continuare.",
-      "antigravityRisk": "Stella rulează Antigravity CLI de la Google, care păstrează conectarea ta Google. Google poate limita conturile folosite pentru lucru nesupravegheat."
+      "antigravityPreparing": "Se pregătește Google Antigravity…",
+      "antigravityAgain": "Conectează-te încă o dată pentru a folosi Gemini în continuare.",
+      "antigravityRisk": "Google poate limita conturile folosite pentru lucru nesupravegheat."
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

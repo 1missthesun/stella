@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export type ExternalCli = "claude";
+export type ExternalCli = "claude" | "agy";
 
 type ExternalCliConfig = {
   displayName: string;
@@ -16,6 +16,11 @@ const CLI_CONFIG: Record<ExternalCli, ExternalCliConfig> = {
     displayName: "Claude Code CLI",
     overrideEnvNames: ["STELLA_CLAUDE_CLI_PATH", "CLAUDE_CLI_PATH"],
     toolDirectories: [".claude/local", ".claude/bin"],
+  },
+  agy: {
+    displayName: "Google Antigravity CLI",
+    overrideEnvNames: ["STELLA_ANTIGRAVITY_CLI_BIN", "ANTIGRAVITY_CLI_PATH"],
+    toolDirectories: [],
   },
 };
 
@@ -169,6 +174,7 @@ const defaultWellKnownDirectories = (
   }
 
   if (process.platform === "win32") {
+    if (cli === "agy" && env.LOCALAPPDATA) add(path.join(env.LOCALAPPDATA, "agy", "bin"));
     add(env.APPDATA ? path.join(env.APPDATA, "npm") : undefined);
     add(
       env.LOCALAPPDATA

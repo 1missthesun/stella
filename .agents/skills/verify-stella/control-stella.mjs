@@ -956,9 +956,10 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
         ? { VITE_STELLA_BACKEND_URL: resolveSiteUrl() }
         : {}),
       STELLA_SKIP_BROWSER_HYDRATE: "1",
-      // A run shares the host's `claude` but not its home, so the background
-      // updater would install a second copy into the run's home.
+      // A run shares the host's `claude` and `agy` but not its home, so the
+      // background updaters would install second copies into the run's home.
       STELLA_CLAUDE_CLI_UPDATES: process.env.STELLA_CLAUDE_CLI_UPDATES?.trim() || "off",
+      STELLA_ANTIGRAVITY_CLI_UPDATES: process.env.STELLA_ANTIGRAVITY_CLI_UPDATES?.trim() || "off",
       // Saved secure values go to the run's protected file, never the user's
       // login keychain or Secret Service.
       STELLA_SAVED_VALUES_STORE: "protected_file",

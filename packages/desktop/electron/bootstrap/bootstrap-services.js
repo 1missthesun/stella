@@ -14,7 +14,7 @@ import { ConnectorConnectService } from "../services/connector-connect-service.j
 import { EngineAccountAccess } from "../services/engine-account-access.js";
 import { MemorySyncService } from "../services/memory-sync/memory-sync-service.js";
 import { ClaudeLocalAccounts } from "../services/claude-local-accounts.js";
-import { ClaudeCliUpdater } from "../services/claude-cli-updater.js";
+import { ANTIGRAVITY_CLI_UPDATER, CLAUDE_CLI_UPDATER, CliUpdater } from "../services/cli-updater.js";
 import { ExternalLinkService } from "../services/external-link-service.js";
 import { readConfiguredCanvasShareBaseUrl } from "../services/canvas-share-service.js";
 import { isCanvasShareUrl } from "@stella/contracts/canvas-share";
@@ -153,7 +153,8 @@ export const createBootstrapServices = (options) => {
         getBackendUrl: () => authService.getBackendUrl(),
         getAuthToken: () => authService.getAuthToken(),
     });
-    const claudeCliUpdater = new ClaudeCliUpdater(config.stellaDataDirPath);
+    const claudeCliUpdater = new CliUpdater(config.stellaDataDirPath, CLAUDE_CLI_UPDATER);
+    const antigravityCliUpdater = new CliUpdater(config.stellaDataDirPath, ANTIGRAVITY_CLI_UPDATER);
     const claudeLocalAccounts = new ClaudeLocalAccounts({
         stellaDataDir: config.stellaDataDirPath,
         engineAccounts: engineAccountAccess,
@@ -168,6 +169,7 @@ export const createBootstrapServices = (options) => {
         onCliFound: () => claudeCliUpdater.noteCliFound(),
     });
     claudeCliUpdater.start();
+    antigravityCliUpdater.start();
     const memorySync = new MemorySyncService({
         stellaDataDir: config.stellaDataDirPath,
         getBackendUrl: () => authService.getBackendUrl(),
@@ -246,6 +248,7 @@ export const createBootstrapServices = (options) => {
         engineAccountAccess,
         claudeLocalAccounts,
         claudeCliUpdater,
+        antigravityCliUpdater,
         memorySync,
         externalLinkService,
         localChatHistoryService,

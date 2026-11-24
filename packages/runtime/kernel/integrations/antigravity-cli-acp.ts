@@ -13,6 +13,8 @@ import {
 } from "./claude-code-tool-mcp-host.js";
 import type { ToolResult } from "../tools/types.js";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
+import { antigravityCliKeeper } from "./antigravity-cli-install.js";
+import type { CliLaunch } from "./cli-keeper.js";
 import { ANTIGRAVITY_NATIVE_TOOLS } from "./antigravity-native-tools.js";
 import {
   ANTIGRAVITY_ALLOWED_TOOLS_ENV,
@@ -42,8 +44,7 @@ const START_TIMEOUT_MS = 60_000;
 
 export const ANTIGRAVITY_LOGIN_REQUIRED = "ANTIGRAVITY_CLI_LOGIN_REQUIRED";
 export const ANTIGRAVITY_SIGN_IN_NEEDED =
-  "This computer isn't signed in to Google Antigravity. Sign in with Google under Google Antigravity in Settings › Claude and ChatGPT. If you used Google Antigravity in Stella before, sign in once more: Stella now runs it through Google's own Antigravity app.";
-export const ANTIGRAVITY_NOT_INSTALLED = "ANTIGRAVITY_CLI_NOT_INSTALLED";
+  "This computer isn't signed in to Google Antigravity. Sign in with Google in Settings › Claude and ChatGPT.";
 
 export type AntigravityToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
 export type AntigravityToolOutcome = ToolResult;
@@ -74,8 +75,8 @@ export type AntigravityTurnRequest = {
 };
 
 export type AntigravityCliConfig = {
-  /** The `agy` executable. */
-  binary(): string | undefined;
+  /** The `agy` to run now, put right first when it's missing, broken or too old. */
+  launch(signal: AbortSignal): Promise<CliLaunch>;
   /** Antigravity's own folder for this computer's Stella sign-in (its `--gemini-dir`). */
   home(): string;
 };
@@ -101,27 +102,6 @@ const withoutDisplayArgs = (args: unknown): Record<string, unknown> => {
 
 const hash = (value: string) => crypto.createHash("sha256").update(value).digest("hex").slice(0, 24);
 
-/** `agy` on PATH, or where Google's installer puts it. */
-export const findAntigravityCli = (): string | undefined => {
-  const explicit = process.env.STELLA_ANTIGRAVITY_CLI_BIN?.trim();
-  if (explicit) return existsSync(explicit) ? explicit : undefined;
-  const names = process.platform === "win32" ? ["agy.exe", "agy.cmd", "agy"] : ["agy"];
-  const dirs = [
-    ...(process.env.PATH ?? "").split(path.delimiter),
-    process.platform === "win32"
-      ? path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local"), "agy", "bin")
-      : path.join(os.homedir(), ".local", "bin"),
-  ];
-  for (const dir of dirs) {
-    if (!dir) continue;
-    for (const name of names) {
-      const candidate = path.join(dir, name);
-      if (existsSync(candidate)) return candidate;
-    }
-  }
-  return undefined;
-};
-
 /** The environment every `agy` Stella starts gets: its own profile, file-stored sign-in, no self-update, no browser. */
 export const antigravityCliEnv = (home: string): Record<string, string> => ({
   GEMINI_HOME: home,
@@ -138,8 +118,7 @@ export const antigravityTokenFile = (home: string): string => path.join(home, AN
 
 export const antigravityCliSignedIn = (home: string): boolean => existsSync(antigravityTokenFile(home));
 
-export const antigravityCliProblem = (config: AntigravityCliConfig): string | undefined => {
-  if (!config.binary()) return "Google Antigravity isn't set up on this computer yet. Sign in with Google under Google Antigravity in Settings › Claude and ChatGPT.";
+export const antigravityCliProblem = (config: Pick<AntigravityCliConfig, "home">): string | undefined => {
   if (!antigravityCliSignedIn(config.home())) return ANTIGRAVITY_SIGN_IN_NEEDED;
   return undefined;
 };
@@ -177,6 +156,7 @@ type Proc = {
   agent: string;
   allowedTools: string;
   mcp: { host: ClaudeCodeToolMcpHost; catalogKey: string; socketPath: string; token: string; server: net.Server };
+  binary: CliLaunch;
   turn?: TurnState;
   idle?: () => void;
   exited: boolean;
@@ -443,9 +423,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     return { host, catalogKey: hash(stableJson(tools.map((tool) => [tool.name, tool.description, tool.parameters]))), socketPath, token, server };
   };
 
-  const spawnProc = async (request: AntigravityTurnRequest): Promise<Proc> => {
-    const binary = config.binary();
-    if (!binary) throw errorWith(ANTIGRAVITY_NOT_INSTALLED, "Google Antigravity CLI (agy) isn't installed on this computer.");
+  const spawnProc = async (request: AntigravityTurnRequest, launch: CliLaunch): Promise<Proc> => {
     const home = config.home();
     if (!antigravityCliSignedIn(home)) {
       throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
@@ -456,7 +434,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     const mcp = await startMcp(key, request.tools, () => current);
     const allowedTools = allowedToolsOf(request);
     const child = spawn(
-      binary,
+      launch.executable,
       ["acp", "--gemini-dir", home, "--app-data-dir", ANTIGRAVITY_APP_DATA_DIR, "--agent", agent, "--disable-telemetry", ...(request.ref.role === "worker" ? ["--dangerously-skip-permissions"] : [])],
       {
         cwd: request.cwd,
@@ -497,13 +475,16 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       agent,
       allowedTools,
       mcp,
+      binary: launch,
       exited: false,
       stderr: "",
     };
     current = proc;
     let buffer = "";
+    let started = false;
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (data: string) => {
+      started = true;
       buffer += data;
       for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
         const line = buffer.slice(0, newline);
@@ -540,6 +521,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     const exited = (detail: string) => {
       if (proc.exited) return;
       proc.exited = true;
+      if (!started) antigravityCliKeeper.noteLaunchFailed(launch.executable);
       unwatchFile(tokenFile, closeOnSignOut);
       for (const waiting of pending.values()) waiting.reject(new Error(`Antigravity CLI exited (${detail}).`));
       pending.clear();
@@ -652,8 +634,14 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const runTurn = async (request: AntigravityTurnRequest): Promise<{ text: string; sessionId: string }> => {
     if (request.signal.aborted) throw new Error("Stopped.");
+    if (!antigravityCliSignedIn(config.home())) throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
+    const launch = await config.launch(request.signal);
     const key = request.ref.sessionKey;
     let proc = procs.get(key);
+    if (proc && proc.binary.identity !== launch.identity) {
+      kill(proc, "Google Antigravity was updated.");
+      proc = undefined;
+    }
     if (proc && !antigravityCliSignedIn(config.home())) {
       kill(proc, "Signed out.");
       proc = undefined;
@@ -670,7 +658,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       kill(proc, "Stella's tools changed.");
       proc = undefined;
     }
-    proc ??= await spawnProc(request);
+    proc ??= await spawnProc(request, launch);
     proc.idle?.();
     await proc.ready;
     const resumed = await ensureSession(proc, request);

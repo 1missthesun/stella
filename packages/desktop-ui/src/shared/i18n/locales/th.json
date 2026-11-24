@@ -2169,9 +2169,9 @@
       "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ สำหรับงานบนคอมพิวเตอร์เครื่องนี้",
       "antigravityOpened": "หน้าเข้าสู่ระบบของ Google เปิดในเบราว์เซอร์แล้ว เข้าสู่ระบบที่นั่น แล้ววางรหัสที่แสดง",
       "antigravityCode": "วางรหัสที่ Google แสดง",
-      "antigravityPreparing": "กำลังเตรียม Antigravity CLI ของ Google…",
-      "antigravityAgain": "ตอนนี้ Stella เรียกใช้ Gemini ใน Antigravity CLI ของ Google เอง เข้าสู่ระบบอีกครั้งเพื่อใช้งานต่อ",
-      "antigravityRisk": "Stella เรียกใช้ Antigravity CLI ของ Google เอง ซึ่งเก็บการเข้าสู่ระบบ Google ของคุณไว้ Google อาจจำกัดบัญชีที่ใช้ทำงานโดยไม่มีคนดูแล"
+      "antigravityPreparing": "กำลังเตรียม Google Antigravity…",
+      "antigravityAgain": "เข้าสู่ระบบอีกครั้งเพื่อใช้งาน Gemini ต่อ",
+      "antigravityRisk": "Google อาจจำกัดบัญชีที่ใช้ทำงานโดยไม่มีคนดูแล"
     },
     "engineModels": {
       "ariaLabel": "โมเดล {engine}",

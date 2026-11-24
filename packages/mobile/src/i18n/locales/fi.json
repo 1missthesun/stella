@@ -2179,9 +2179,9 @@
       "antigravityHint": "Gemini Google-tilauksellasi tämän tietokoneen tehtäviin",
       "antigravityOpened": "Googlen kirjautumissivu avautui selaimeesi. Kirjaudu siellä sisään ja liitä sitten sen näyttämä koodi.",
       "antigravityCode": "Liitä Googlen näyttämä koodi",
-      "antigravityPreparing": "Valmistellaan Googlen Antigravity CLI:tä…",
-      "antigravityAgain": "Stella käyttää Geminiä nyt Googlen omassa Antigravity CLI:ssä. Kirjaudu vielä kerran, niin voit jatkaa sen käyttöä.",
-      "antigravityRisk": "Stella käyttää Googlen omaa Antigravity CLI:tä, joka säilyttää Google-kirjautumisesi. Google voi rajoittaa tilejä, joita käytetään valvomattomaan työhön."
+      "antigravityPreparing": "Valmistellaan Google Antigravitya…",
+      "antigravityAgain": "Kirjaudu vielä kerran, niin voit jatkaa Geminin käyttöä.",
+      "antigravityRisk": "Google voi rajoittaa tilejä, joita käytetään valvomattomaan työhön."
     },
     "engineModels": {
       "ariaLabel": "Mallit: {engine}",

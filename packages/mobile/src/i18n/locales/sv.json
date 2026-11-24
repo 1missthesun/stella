@@ -2179,9 +2179,9 @@
       "antigravityHint": "Gemini på ditt Google-abonnemang, för uppgifter på den här datorn",
       "antigravityOpened": "Googles inloggningssida öppnades i webbläsaren. Logga in där och klistra sedan in koden som visas.",
       "antigravityCode": "Klistra in koden som Google visar",
-      "antigravityPreparing": "Gör Googles Antigravity CLI redo…",
-      "antigravityAgain": "Stella kör nu Gemini i Googles eget Antigravity CLI. Logga in en gång till för att fortsätta använda det.",
-      "antigravityRisk": "Stella kör Googles eget Antigravity CLI, som sparar din Google-inloggning. Google kan begränsa konton som används för obevakat arbete."
+      "antigravityPreparing": "Gör Google Antigravity redo…",
+      "antigravityAgain": "Logga in en gång till för att fortsätta använda Gemini.",
+      "antigravityRisk": "Google kan begränsa konton som används för obevakat arbete."
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

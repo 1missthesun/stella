@@ -4,7 +4,6 @@ import { powerMonitor } from "electron";
 import { callRuntimeAppService } from "./runtime-app-services.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger";
 
-const STATE_FILE = "claude-cli-updates.json";
 const CHECK_INTERVAL_MS = 12 * 60 * 60_000;
 const RETRY_INTERVAL_MS = 60 * 60_000;
 const NOT_INSTALLED_INTERVAL_MS = 15 * 60_000;
@@ -14,8 +13,8 @@ const AFTER_START_MS = 90_000;
 const RESTART_QUIET_MS = 10 * 60_000;
 const DUE_POLL_MS = 15 * 60_000;
 
-/** What one check found (the runtime's claude-cli-update.ts ClaudeCliUpdateOutcome). */
-type ClaudeCliUpdateOutcome = {
+/** What one check found (the runtime's cli-update.ts CliUpdateOutcome). */
+type CliUpdateOutcome = {
   status:
     | "not_installed"
     | "turned_off"
@@ -34,12 +33,12 @@ type ClaudeCliUpdateOutcome = {
 
 type UpdaterState = {
   checkedAt?: number;
-  status?: ClaudeCliUpdateOutcome["status"];
+  status?: CliUpdateOutcome["status"];
   version?: string | null;
 };
 
-// Until Claude Code is installed a check only looks for it, so it looks
-// often: onboarding installs it minutes after the first check.
+// Until the CLI is installed a check only looks for it, so it looks often:
+// onboarding installs it minutes after the first check.
 const intervalAfter = (status: UpdaterState["status"]): number =>
   status === "failed"
     ? RETRY_INTERVAL_MS
@@ -49,16 +48,41 @@ const intervalAfter = (status: UpdaterState["status"]): number =>
         ? NOT_INSTALLED_INTERVAL_MS
         : CHECK_INTERVAL_MS;
 
+export type CliUpdaterOptions = {
+  /** The schedule's file in Stella's data folder. */
+  stateFile: string;
+  /** The environment switch that turns it off (`off`). */
+  offSwitch: string;
+  /** What its log lines start with. */
+  log: string;
+  service: "checkClaudeCliUpdate" | "checkAntigravityCliUpdate";
+};
+
+export const CLAUDE_CLI_UPDATER: CliUpdaterOptions = {
+  stateFile: "claude-cli-updates.json",
+  offSwitch: "STELLA_CLAUDE_CLI_UPDATES",
+  log: "claude-cli",
+  service: "checkClaudeCliUpdate",
+};
+
+export const ANTIGRAVITY_CLI_UPDATER: CliUpdaterOptions = {
+  stateFile: "antigravity-cli-updates.json",
+  offSwitch: "STELLA_ANTIGRAVITY_CLI_UPDATES",
+  log: "antigravity-cli",
+  service: "checkAntigravityCliUpdate",
+};
+
 /**
- * Keeps the Claude Code CLI current and working for someone who never opens
- * it in a terminal, where it would update itself: Stella only ever runs it
- * non-interactively. Checks shortly after Stella starts and then twice a day,
- * silently. An install that can't start is repaired rather than updated, and
- * a new version is checked to start before any turn runs it; until it does,
- * turns run the last one that did (`claude-cli-launch.ts`). A session moves
- * to a new version at the start of its next turn (`ensureStreamingProcess`).
+ * Keeps a CLI Stella runs (Claude Code, Google Antigravity) current and
+ * working for someone who never opens it in a terminal, where it would update
+ * itself: Stella only ever runs it non-interactively. Checks shortly after
+ * Stella starts and then twice a day, silently. An install that can't start is
+ * repaired rather than updated, and a new version is checked to start before
+ * any turn runs it; until it does, turns run the last one that did
+ * (`cli-keeper.ts`). A session moves to a new version at the start of its next
+ * turn.
  */
-export class ClaudeCliUpdater {
+export class CliUpdater {
   private readonly statePath: string;
   private readonly abort = new AbortController();
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -68,12 +92,15 @@ export class ClaudeCliUpdater {
   private dueAt = Date.now() + AFTER_START_MS;
   private readonly onResume = () => this.arm();
 
-  constructor(private readonly stellaDataDir: string) {
-    this.statePath = path.join(stellaDataDir, STATE_FILE);
+  constructor(
+    stellaDataDir: string,
+    private readonly options: CliUpdaterOptions,
+  ) {
+    this.statePath = path.join(stellaDataDir, options.stateFile);
   }
 
   start(): void {
-    if (process.env.STELLA_CLAUDE_CLI_UPDATES?.trim().toLowerCase() === "off") {
+    if (process.env[this.options.offSwitch]?.trim().toLowerCase() === "off") {
       return;
     }
     const stored = this.readState();
@@ -88,7 +115,7 @@ export class ClaudeCliUpdater {
   }
 
   /**
-   * Claude Code was found where the last check found none: check now, so
+   * The CLI was found where the last check found none: check now, so
    * it's on the schedule (and its version recorded) from the start.
    */
   noteCliFound(): void {
@@ -122,10 +149,10 @@ export class ClaudeCliUpdater {
     if (this.running) return;
     this.running = true;
     const previous = this.readState();
-    let outcome: ClaudeCliUpdateOutcome;
+    let outcome: CliUpdateOutcome;
     try {
       // How to update or repair the CLI is the runtime's; main keeps the schedule.
-      outcome = await callRuntimeAppService<ClaudeCliUpdateOutcome>("checkClaudeCliUpdate", {
+      outcome = await callRuntimeAppService<CliUpdateOutcome>(this.options.service, {
         previousVersion: previous.version ?? null,
       });
     } catch (error) {
@@ -146,9 +173,9 @@ export class ClaudeCliUpdater {
     });
     const logger = getFileLogger();
     if (outcome.status === "failed") {
-      logger?.warn("claude-cli.update-failed", { ...outcome });
+      logger?.warn(`${this.options.log}.update-failed`, { ...outcome });
     } else if (outcome.status === "unusable") {
-      logger?.warn("claude-cli.unusable", {
+      logger?.warn(`${this.options.log}.unusable`, {
         problem: outcome.problem,
         method: outcome.method,
         repair: outcome.repair?.status,
@@ -157,9 +184,9 @@ export class ClaudeCliUpdater {
         fallback: outcome.fallback,
       });
     } else if (outcome.status === "repaired") {
-      logger?.warn("claude-cli.repaired", { ...outcome });
+      logger?.warn(`${this.options.log}.repaired`, { ...outcome });
     } else if (outcome.status !== previous.status || outcome.status === "updated") {
-      logger?.process(`claude-cli.update-${outcome.status}`, { ...outcome });
+      logger?.process(`${this.options.log}.update-${outcome.status}`, { ...outcome });
     }
     this.dueAt = Date.now() + intervalAfter(outcome.status);
     this.arm();

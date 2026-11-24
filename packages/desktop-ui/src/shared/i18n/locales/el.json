@@ -2179,9 +2179,9 @@
       "antigravityHint": "Gemini με το πρόγραμμα Google σας, για εργασίες σε αυτόν τον υπολογιστή",
       "antigravityOpened": "Η σελίδα σύνδεσης της Google άνοιξε στο πρόγραμμα περιήγησής σας. Συνδεθείτε εκεί και μετά επικολλήστε τον κωδικό που εμφανίζεται.",
       "antigravityCode": "Επικολλήστε τον κωδικό που δείχνει η Google",
-      "antigravityPreparing": "Προετοιμασία του Antigravity CLI της Google…",
-      "antigravityAgain": "Η Stella εκτελεί πλέον το Gemini μέσα στο Antigravity CLI της ίδιας της Google. Συνδεθείτε άλλη μία φορά για να συνεχίσετε να το χρησιμοποιείτε.",
-      "antigravityRisk": "Η Stella εκτελεί το Antigravity CLI της ίδιας της Google, το οποίο κρατά τη σύνδεσή σας στη Google. Η Google μπορεί να περιορίσει λογαριασμούς που χρησιμοποιούνται για εργασία χωρίς επίβλεψη."
+      "antigravityPreparing": "Προετοιμασία του Google Antigravity…",
+      "antigravityAgain": "Συνδεθείτε άλλη μία φορά για να συνεχίσετε να χρησιμοποιείτε το Gemini.",
+      "antigravityRisk": "Η Google μπορεί να περιορίσει λογαριασμούς που χρησιμοποιούνται για εργασία χωρίς επίβλεψη."
     },
     "engineModels": {
       "ariaLabel": "Μοντέλα {engine}",

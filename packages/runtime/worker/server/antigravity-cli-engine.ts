@@ -15,9 +15,9 @@ import {
   antigravityCliProblem,
   antigravityHomeFor,
   createAntigravityCliRuntime,
-  findAntigravityCli,
   type AntigravityCliConfig,
 } from "../../kernel/integrations/antigravity-cli-acp.js";
+import { antigravityCliKeeper } from "../../kernel/integrations/antigravity-cli-install.js";
 import { stellaAgentShellEnvironment } from "../../kernel/tools/stella-agent-env.js";
 import { TOOL_RESULT_AUTHORIZED_IMAGES, type AuthorizedToolImage, type ToolResult } from "../../kernel/tools/types.js";
 import type { OpenSession } from "./sessions.js";
@@ -92,7 +92,7 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
 };
 
 export const antigravityCliConfigFor = (session: OpenSession): AntigravityCliConfig => ({
-  binary: findAntigravityCli,
+  launch: (signal) => antigravityCliKeeper.select({ repair: "wait", signal }),
   home: () => antigravityHomeFor(session.config.get().stellaDataDirPath),
 });
 

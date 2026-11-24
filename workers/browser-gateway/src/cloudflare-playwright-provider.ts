@@ -120,13 +120,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
   private cdp: CDPSession | undefined;
   private currentSessionId: string | undefined;
   private currentPolicyDigest: string | undefined;
-  // Stella owns the human handoff end to end. Cloudflare's structured
-  // `Cloudflare.handoff` command is deliberately not used: its Live View
-  // renders a hardcoded "Human Intervention Required" panel with its own
-  // Done/Failed buttons on top of the page, duplicating Stella's controls.
-  // The navigation fence, verification, expiry, and Done/Cancel decisions all
-  // live in the gateway, so the remote browser only needs an interactive
-  // Live View of the fenced page.
+  // Cloudflare's `Cloudflare.handoff` command renders its own "Human Intervention Required" panel over Live View.
   private activeHandoffId: string | undefined;
   private network: Array<{
     entry: NetworkEntry;
@@ -302,7 +296,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
       return {
         url: sanitizePageUrl(page.url()),
         title: safeTitle(title),
-        // innerText deliberately excludes form control values.
+        // innerText excludes form control values.
         text: redactVisibleText(text),
         elements: rawElements.map(safeElement),
       };
@@ -731,8 +725,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
       if (this.handoffOriginViolation) {
         throw new GatewayError("verification_failed", 409);
       }
-      // Live View draws the tab 1:1 and crops what doesn't fit, so the tab
-      // takes the viewer's size before the link is minted.
+      // Cloudflare's Live View draws the tab 1:1 and crops what doesn't fit.
       if (viewport) await this.requiredPage().setViewportSize(viewport);
       const liveView = await (
         await this.handoffCdp()

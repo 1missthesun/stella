@@ -158,8 +158,7 @@ const flattenEvent = (
     principal_kind: principalKind,
     event_type: item.event.type,
   };
-  // Every variant emits the same nullable column set so the Pipeline's inferred
-  // schema remains stable as new event kinds arrive in a batch.
+  // Cloudflare Pipelines infers its schema from the batch, so every variant emits the same nullable columns.
   const empty = {
     component: null,
     phase: null,
@@ -334,9 +333,7 @@ const ingestValidated = async (
   const output = events.map((event) =>
     flattenEvent(event, ownerIdSha256, principal.kind, ingestedAtMs),
   );
-  // The generated binding types model nullable schema columns as optional.
-  // Pipelines expects the full fixed-width record with explicit nulls, so the
-  // cast lives only at this closed, validated serialization boundary.
+  // Wrangler types nullable Pipelines columns as optional, but the stream expects explicit nulls.
   await env.EVENTS_PIPELINE.send(
     output as unknown as TelemetryPipelineRecord[],
   );

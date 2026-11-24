@@ -23,18 +23,11 @@ export const isUsageEvent = (value: unknown): value is GatewayUsageEvent => {
   );
 };
 
-// Matches max_retries of the dead-letter consumers in wrangler.jsonc.
 const DEAD_LETTER_MAX_ATTEMPTS = 10;
 const PERMANENT_REJECTIONS = new Set(["owner_mismatch"]);
 
 const isDeadLetterQueue = (queue: string): boolean => /-dlq(-|$)/u.test(queue);
 
-/**
- * Usage events the gateway could not hold in its ledger outbox, and the
- * dead letters of this queue. A message is acknowledged only once billing
- * accepted it or already had it; the dead-letter consumer re-ingests, and
- * logs `billing_usage_unreconciled` for anything that still cannot land.
- */
 export const handleUsageBatch = async (
   batch: MessageBatch<unknown>,
   env: Pick<Env, "BILLING">,

@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import d from "./change-card-demo.module.css";
 
-// A recreation of Stella's in-chat change card: the request, the card
-// with Update, then the applied change (new sidebar button) with Undo.
 export function ChangeCardDemo() {
   const ref = useRef<HTMLDivElement>(null);
   const [done, setDone] = useState(false);

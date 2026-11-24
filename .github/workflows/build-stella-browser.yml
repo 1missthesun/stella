@@ -1,8 +1,5 @@
 name: Build Stella Browser
 
-# A push publishes to the dev channel only (stella-browser/dev/current.json).
-# Installs read stella-browser/current.json, which only promote-stella-browser.yml moves.
-
 on:
   push:
     branches: [master]
@@ -37,8 +34,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             builtFile: stella-browser.exe
             installedFile: stella-browser.exe
-          # Oldest supported LTS runner keeps the glibc floor low (2.35) so the
-          # binary runs on the same distros the AppImage targets.
+          # The oldest supported LTS runner keeps the glibc floor at 2.35.
           - os: ubuntu-22.04
             platform: linux-x64
             target: x86_64-unknown-linux-gnu

@@ -6,15 +6,7 @@ import {
   type AssembleOutcome,
 } from "./types.js";
 
-/**
- * OpenAI Responses stream -> `Response`.
- *
- * The Responses API is self-assembling: the terminal event
- * (`response.completed` | `response.failed` | `response.incomplete`) carries
- * the complete `response` object, so nothing is folded from deltas. A stream
- * that ends without a terminal event, or that carries an `error` event, is a
- * failure — the partial output items are never returned as a result.
- */
+// OpenAI's terminal event carries the complete `response`, so deltas are never folded.
 const TERMINAL_EVENTS = new Set([
   "response.completed",
   "response.failed",

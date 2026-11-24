@@ -1,7 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-// Retain the deployed class identity without the retired proxy/capability pipeline.
-// This avoids deleting persisted objects as a side effect of a code rollout.
+// Cloudflare deletes a Durable Object class's stored objects when a migration removes the class.
 export class AppFetchGate extends DurableObject {
   fetch() {
     return Promise.resolve(new Response("Gone", { status: 410 }));

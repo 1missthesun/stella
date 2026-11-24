@@ -1,43 +1,3 @@
-/**
- * canvas-share serving Worker.
- *
- * Serves published canvas HTML documents from the `stella-canvas-shares` R2
- * bucket at `GET /c/:slug`.
- *
- * Security model: every share is served with a `Content-Security-Policy:
- * sandbox` header. `allow-scripts` is REQUIRED (canvases run JS — Chart.js,
- * D3, etc.), but `allow-same-origin` is deliberately OMITTED. Without
- * `allow-same-origin` the document gets an opaque origin, so shares cannot
- * read cookies/localStorage or reach across to each other. Never add
- * `allow-same-origin` alongside `allow-scripts` — that pairing is the classic
- * sandbox escape.
- *
- * Private canvases: an object whose metadata says `visibility: private` is
- * served only to its owner. The owner arrives with a `?grant=` minted by the
- * backend's `shares.viewLink`; a valid grant for this slug and this object's
- * owner is traded for an HttpOnly view cookie, and the browser is redirected
- * to the clean link (so the grant never sits where the canvas's scripts could
- * read it). After that the cookie opens the owner's private canvases until it
- * expires. Anyone else gets the "private" page, which links the owner to the
- * website's sign-in page for the link (`owner-site` metadata, else
- * `OWNER_SITE_URL`); signed in there as the owner, the site fetches a grant
- * and sends the browser back here with it. Without
- * `CANVAS_SHARE_VIEW_SECRET` no private canvas opens here at all. Objects
- * written before visibility existed carry none and stay public.
- *
- * Page assets: a page published from Drive with files beside it (videos,
- * images, styles, scripts) is served at `/c/:slug/` (the bare `/c/:slug`
- * redirects there, so relative URLs resolve) and its files at
- * `/c/:slug/<path>` from `shares/<slug>/<path>`, under the page's own expiry
- * and visibility, with range requests for video.
- *
- * Shared drive files: `GET /f/:slug/:name` serves `files/<slug>` with the
- * content type the backend stored on it, under a scriptless sandbox. Only
- * images (never SVG), video, audio and PDFs open inline; everything else is
- * always a download, whatever the stored metadata says. Range requests are honoured so videos play and seek. File links
- * are always public; the trailing name is cosmetic.
- */
-
 import {
   CANVAS_VIEW_COOKIE,
   CANVAS_VIEW_COOKIE_TTL_MS,
@@ -48,9 +8,7 @@ import {
 import { buildCanvasOwnerOpenUrl } from "../../../packages/contracts/canvas-share.js";
 
 const KEY_PREFIX = "shares";
-// A sandboxed page has an opaque origin, so its own subresource requests are
-// cross-site and never carry the Lax view cookie. Its owner gets this one,
-// scoped to the page's folder and accepted only for the page's assets.
+// A sandboxed page has an opaque origin, so its subresource requests never carry the Lax view cookie.
 const CANVAS_ASSET_COOKIE = "stella_canvas_asset";
 const SLUG_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -197,11 +155,7 @@ const parseCanvasPath = (pathname: string): CanvasPath | null => {
 };
 
 const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
-// WebKit lays out its built-in player (the page Safari shows for a bare video
-// URL, and every <video controls>) with its own scripts, which a `sandbox`
-// without allow-scripts blocks: the video collapses to a sliver and the
-// controls never show a duration. A video/audio body served with nosniff can
-// never run as a document, so media goes without the sandbox.
+// WebKit's built-in media player runs its own scripts, which `sandbox` without allow-scripts blocks.
 const MEDIA_FILE_CSP = "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
 const MEDIA_TYPE = /^(?:video|audio)\/[a-z0-9.+-]+$/;
 
@@ -328,10 +282,6 @@ const formatBytes = (bytes: number): string => {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`;
 };
 
-// A person opening a shared video or audio link gets a small player page
-// rather than the browser's bare media page; the player loads the bytes from
-// the same link with `?raw=1`. Everything else (the <video> element itself,
-// curl, download managers, `?raw=1`, `?download=1`) gets the file.
 const wantsPlayerPage = (request: Request, url: URL): boolean => {
   if (url.searchParams.has("raw") || url.searchParams.has("download")) return false;
   if (request.headers.has("range")) return false;

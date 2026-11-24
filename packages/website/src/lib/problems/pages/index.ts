@@ -36,7 +36,6 @@ import { TORRENTING_PAGES } from "./torrenting";
 import { VIDEO_PAGES } from "./video";
 import { WEDDINGS_EVENTS_PAGES } from "./weddings-events";
 
-/** Every problem page, drafts included, one file per niche. A new niche's file goes here. */
 export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...GAME_MOD_PAGES,
   ...VIDEO_PAGES,

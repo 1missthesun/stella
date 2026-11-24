@@ -54,7 +54,7 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-// bun skips patchedDependencies under `--omit peer`; apply what it skipped.
+// bun skips patchedDependencies under `--omit peer`.
 const problems = ensurePatchedDeps({ fix: true });
 if (problems.length > 0) {
   for (const problem of problems) console.error(`[deps] ${problem}`);

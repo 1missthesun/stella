@@ -10,7 +10,6 @@ import { ANSWER_PAGES, answerTitle, type AnswerPage } from "@/lib/answers";
 import { demoFrom } from "@/lib/demo";
 import { getNiche, getProblemById, nichePath, type ProblemPage } from "@/lib/problems";
 
-/** "Use Claude for X" / "Best AI for X": headline, model line, download and a Stella chat first. */
 export function ModelAnswerPage({ page }: { page: AnswerPage }) {
   const demo = page.demo;
   const guides = (page.guides ?? []).map(getProblemById).filter((g): g is ProblemPage => Boolean(g));

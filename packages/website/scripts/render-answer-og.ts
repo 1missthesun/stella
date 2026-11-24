@@ -1,7 +1,3 @@
-// Renders the 1200x630 share images for /ai and every /ai/<slug> page into
-// public/og/ai/, in the answer pages' own type (Mona Sans + Martian Mono).
-// Run after changing an answer page's eyebrow or headline:
-//   bun scripts/render-answer-og.ts            (uses `chromium`; set CHROME to override)
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

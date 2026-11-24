@@ -1,18 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  // Stella sites: the public origin of sites agents publish (Slack previews
-  // today). Every request goes to cloud-builder's SitesHost entrypoint, which
-  // checks the link, its expiry and the workspace's access setting, and serves
-  // the files from R2. Nothing else is reachable here.
-  //
-  // The stellasites.app zone has one proxied wildcard record
-  // (`*.stellasites.app`, AAAA 100::), covered by the free Universal SSL
-  // certificate. dev serves `https://<id>-dev.stellasites.app/`, production
-  // `https://<id>.stellasites.app/`; cloud-builder's SITES_HOST must match the
-  // route. Dev ids end in `-dev`, which no production id can, so the more
-  // specific dev route never shadows a production site. Production also
-  // serves the bare domain (SITES_APEX, a proxied apex record): a page saying
-  // what the domain is and where to report abuse.
+  // Cloudflare's free Universal SSL covers the stellasites.app apex and one wildcard level only.
   "name": "stella-v2-sites-dev",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-22",

@@ -66,8 +66,7 @@ export function CatViewer({ active, className }: { active: boolean; className?: 
     let disposed = false;
     let raf = 0;
     let inView = false;
-    // Without WebGL (blocklisted GPU, disabled in settings) ogl's constructor throws; an uncaught
-    // throw here takes the whole page down, so keep the poster instead.
+    // ogl's Renderer constructor throws when WebGL is unavailable.
     let renderer: Renderer;
     try {
       renderer = new Renderer({

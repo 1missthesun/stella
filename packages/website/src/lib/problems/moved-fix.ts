@@ -1,22 +1,14 @@
-/**
- * Old /fix/<slug> pages whose problem now has a full /how page. next.config.ts
- * redirects them permanently; the /fix index links straight to the new page and
- * the sitemap drops the old URL. No imports: next.config loads this file.
- */
 export const MOVED_FIX_PAGES: Record<string, string> = {
   "organize-downloads-folder": "/how/pc-cleanup/organize-downloads-folder",
   "bank-statement-to-excel": "/how/pdf-excel/bank-statement-pdf-to-excel",
   "minecraft-modpack-crash": "/how/game-mods/minecraft-modpack-exit-code-1",
   "merge-excel-files": "/how/pdf-excel/combine-excel-files-into-one-sheet",
   "convert-mkv-to-mp4": "/how/video/convert-mkv-to-mp4",
-  // Cannibalization audit 2026-11-24: newer /how guides target the same searches.
   "comfyui-broken-after-update": "/how/local-ai/comfyui-missing-custom-nodes",
   "c-drive-full": "/how/pc-cleanup/free-up-space-on-c-drive",
   "sims-4-mods-broken": "/how/game-mods/find-broken-sims-4-mods",
   "vcruntime140-dll-missing": "/how/pc-gaming/vcruntime140-dll-missing",
   "obs-black-screen": "/how/streaming/obs-black-screen",
-  // Retired (audit 2026-11-10): developer topics are the wrong audience, and the
-  // DLSS 5 page promised a "leaked build". They redirect to the how-to index.
   "setup-dlss-5-one-click": "/how",
   "docker-wont-start": "/how",
   "git-disaster-recovery": "/how",

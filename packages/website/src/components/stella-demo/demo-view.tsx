@@ -46,7 +46,6 @@ function Inline({ parts }: { parts: DemoInline[] }) {
   });
 }
 
-/** Stella's markdown, the subset a demo uses: paragraphs, bullets, bold, links, code. */
 export function Rich({ text }: { text: string }) {
   return (
     <div className="markdown">
@@ -69,7 +68,6 @@ export function Rich({ text }: { text: string }) {
   );
 }
 
-/** The gap above a row, as the app's timeline spaces them (ROW_GAP, ASSISTANT_RUN_GAP, USER_RUN_GAP). */
 export function rowGap(prev: ChatItem | undefined, item: ChatItem): number {
   if (!prev) return 0;
   if (item.kind === "user") return prev.kind === "user" ? APP_TIMING.userRunGap : APP_TIMING.rowGap;
@@ -171,7 +169,6 @@ export const columnStyle: CSSProperties = {
   paddingBottom: APP_COLUMN.paddingBottom,
 };
 
-/** Stella's composer: the add button, the field, the mic, and send. */
 export function ComposerView({
   fieldRef,
   formRef,
@@ -218,10 +215,6 @@ export function ComposerView({
   );
 }
 
-/**
- * A still of the finished chat for guide cards: the request and Stella's last
- * reply in the app's own rows and styles, with no window chrome and no script.
- */
 export function DemoStill({ steps, theme = "light" }: { steps: DemoStep[]; theme?: "light" | "dark" }) {
   const items = chatItems(steps);
   const user = items.find((item) => item.kind === "user");

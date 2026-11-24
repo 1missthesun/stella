@@ -1,11 +1,5 @@
 name: Windows install repro
 
-# Installs Stella on a fresh Windows runner the way a user does (Stella.exe
-# from launcher/stable, or a launcher built from this ref), presses Start,
-# watches for a while and uploads screenshots, the launcher, Electron and
-# runtime logs and crash dumps. Not a gate: run it by hand to see what a
-# Windows user sees.
-
 on:
   workflow_dispatch:
     inputs:

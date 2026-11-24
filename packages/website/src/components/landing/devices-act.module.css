@@ -99,8 +99,6 @@
   color: var(--w-fg);
 }
 
-/* Devices */
-
 .laptop,
 .pc,
 .phone {
@@ -174,8 +172,6 @@
   box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.9);
 }
 
-/* Wide layout */
-
 .stage[data-layout="wide"] .laptop {
   left: 10px;
   top: 92px;
@@ -236,8 +232,6 @@
   height: 418px;
   border-radius: 42px;
 }
-
-/* Narrow layout */
 
 .stage[data-layout="narrow"] .laptop {
   left: 4px;
@@ -306,8 +300,6 @@
   margin-top: 10px;
   font-size: 12px;
 }
-
-/* Desktop app inside the laptop and monitor, drawn at 476x292 and scaled to fit */
 
 .laptop {
   --k: 1;
@@ -464,8 +456,6 @@
   background: var(--w-send);
 }
 
-/* Cued items */
-
 .stage [data-cue] {
   max-height: 0;
   margin-top: 0 !important;
@@ -511,8 +501,6 @@
   transform: none;
 }
 
-/* Laptop goes away after the handoff */
-
 .away {
   display: grid;
   place-items: center;
@@ -557,8 +545,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* Home PC */
 
 .sleep {
   display: flex;
@@ -724,8 +710,6 @@
   font-size: 11.5px;
   color: var(--w-sub);
 }
-
-/* Phone */
 
 .phoneScreen {
   inset: 8px;
@@ -926,8 +910,6 @@
   transform: translateX(-50%);
 }
 
-/* Portals and the hop */
-
 .portal {
   position: absolute;
   left: 50%;
@@ -1102,8 +1084,6 @@
   width: 22px;
   height: 22px;
 }
-
-/* Loop reset: fade the screens, clear the cues underneath, fade back */
 
 .screen > :not(.backdrop),
 .phoneScreen > :not(.backdrop) {

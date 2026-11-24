@@ -248,9 +248,7 @@ export class BrowserProfileSession extends DurableObject<BrowserGatewayEnv> {
     try {
       await this.exclusive(() => this.core.expireActive());
     } catch (error) {
-      // Native alarm retries stop after six attempts. Re-arm before the final
-      // attempt is exhausted so a transient Browser Run outage cannot leave a
-      // durable HUMAN_CONTROL cleanup debt permanently stranded.
+      // Cloudflare stops retrying a failing alarm after six attempts.
       if ((alarmInfo?.retryCount ?? 0) >= 5) {
         console.error(
           JSON.stringify({

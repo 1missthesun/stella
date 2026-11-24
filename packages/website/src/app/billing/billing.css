@@ -1,8 +1,3 @@
-/* stella.sh/billing: a settings surface in the /crew style. A slim title row,
- * a sticky section list, hairline-separated sections, label-left rows.
- * Headings use two classes so they beat landing.module.css's
- * `.root :where(h1, …) { font-weight: inherit }`. */
-
 .billing-page {
   --b-ink: #0a0a0d;
   --b-text: #2a2a31;

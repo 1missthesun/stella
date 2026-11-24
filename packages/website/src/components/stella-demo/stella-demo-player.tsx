@@ -11,12 +11,6 @@ import s from "./stella-demo.module.css";
 
 type Status = "idle" | "playing" | "paused" | "done";
 
-/**
- * Stella's desktop chat, drawn with the app's own styles, playing a guide's
- * exchange: typing, send, the working indicator and its hand-off, the task in
- * the top bar, the reply. The finished exchange is in the page's HTML, so it
- * reads without script, for search, and with reduced motion.
- */
 export function StellaDemoPlayer({ steps, theme = "dark", label }: { steps: DemoStep[]; theme?: "dark" | "light"; label: string }) {
   const items = chatItems(steps);
   const task = steps.find((step): step is Extract<DemoStep, { task: string }> => "task" in step);

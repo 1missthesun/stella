@@ -81,7 +81,6 @@ export type TrustedVerification = Readonly<{
 
 export type TrustedVerificationState = "authenticated" | "logged_out";
 
-/** `pending`: the remote session may still be running and must be closed later. */
 export type RemoteCloseOutcome = "closed" | "pending";
 
 export type BrowserStorageCookie = {

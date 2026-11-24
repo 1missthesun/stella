@@ -6,7 +6,6 @@ import { DemoStill } from "@/components/stella-demo/demo-view";
 import { FREE_LINE, GUIDE_LABEL, pageDemo, problemPath, type ProblemPage } from "@/lib/problems";
 import h from "./how.module.css";
 
-/** A title in the home page's style: the part after a question mark goes wide. */
 export function HowTitle({ text, id }: { text: string; id?: string }) {
   const cut = text.indexOf("? ");
   const long = text.length > 46 ? "" : undefined;
@@ -24,7 +23,6 @@ export function HowTitle({ text, id }: { text: string; id?: string }) {
   );
 }
 
-/** The download button and price line exactly as the home hero shows them. */
 export function HeroCta() {
   return (
     <div className={`${o.cta} ${h.heroCta}`}>
@@ -45,7 +43,6 @@ export function BackLink({ href, children }: { href: string; children: React.Rea
   );
 }
 
-/** The exact prompt, shown like Stella's own composer, with a copy button. */
 export function PromptCard({ text }: { text: string }) {
   return (
     <div className={h.prompt}>

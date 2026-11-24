@@ -6,7 +6,6 @@ import { FREE_LINE } from "./index";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
-/** The app's dark chat colours (app.generated.css, dark theme). */
 const CHAT = { bg: "#1c1c1e", user: "#2871c9", userText: "#f2fbff", reply: "#3a3a3c", replyText: "#f5f5f7", edge: "rgba(0,0,0,0.09)" };
 
 type OgChat = { you: string; stella?: string };
@@ -19,7 +18,6 @@ const clip = (text: string, max: number) => {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 12)).replace(/[\s,.;:]+$/, "")}…`;
 };
 
-/** The request and the first lines of Stella's last reply, as plain text for the share image. */
 export function ogChat(steps: DemoStep[]): OgChat | undefined {
   const items = chatItems(steps);
   const you = items.find((item) => item.kind === "user");
@@ -62,7 +60,6 @@ function ChatStill({ chat }: { chat: OgChat }) {
 
 const font = (file: string) => readFile(path.join(process.cwd(), "assets/og-fonts", file));
 
-/** The share image for /how pages, built once at build time, in the site's own type. */
 export async function problemOgImage({
   eyebrow,
   headline,
@@ -72,7 +69,6 @@ export async function problemOgImage({
   eyebrow: string;
   headline: string;
   note?: string;
-  /** A still of the guide's example chat, shown beside the headline. */
   chat?: OgChat;
 }) {
   const [medium, heavy, logo] = await Promise.all([

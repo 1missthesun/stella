@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Dependency-free structural validation for telemetry IaC and schema."""
-
 from __future__ import annotations
 
 import json
@@ -136,8 +134,7 @@ def validate_iac_shape() -> None:
 
     required_guards = (
         "enabled        = false",
-        # Cloudflare canonicalizes authentication to false for a disabled HTTP
-        # endpoint. The security boundary is the disabled endpoint itself.
+        # Cloudflare canonicalizes authentication to false for a disabled HTTP endpoint.
         "authentication = false",
         "enabled = true",
         'type       = "r2_data_catalog"',

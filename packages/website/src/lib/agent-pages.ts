@@ -326,12 +326,10 @@ function renderAnswerPage(page: AnswerPage): string {
   return [`## ${answerTitle(page)}`, "", `Source: ${abs(`/ai/${page.slug}`)}`, "", answerBody(page, "##")].join("\n");
 }
 
-/** The .md twin of /ai/<slug>. */
 export function renderAnswerMarkdown(page: AnswerPage): string {
   return `${header(page.metaTitle, `/ai/${page.slug}`, plainText(page.metaDescription))}\n${answerBody(page, "#").trimEnd()}\n\nGet Stella: ${abs("/download")}. ${PRICE_LINE}\n`;
 }
 
-/** The .md twin of /ai. */
 export function renderAnswersIndexMarkdown(): string {
   const lines = [
     header(

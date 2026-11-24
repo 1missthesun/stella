@@ -1,14 +1,5 @@
 name: Build Launchers
 
-# Builds the native launchers (launcher/{macos,windows,linux}), runs each one's
-# --self-test against this commit's source (install → sign → verify → prepare
-# → launch Electron → wait for ready → quit, exit 0), and on a manual publish
-# uploads the binaries to R2 launcher/stable/.
-#
-# The self-tests install into a throwaway STELLA_LAUNCHER_ROOT with a throwaway
-# STELLA_LAUNCHER_KEY_FILE and clone from the checkout (--source), so they
-# never touch a real install or the upstream bootstrap.
-
 on:
   push:
     branches: [master]
@@ -31,13 +22,7 @@ on:
 permissions:
   contents: read
 
-# The deployment these launchers belong to (read by each build.sh). A fork
-# sets repository variables instead of editing this file; unset ones keep
-# Stella's values. See SELF_HOSTING.md.
 env:
-  # The self-tests start Stella for real. Send its anonymous usage counts to
-  # the dev worker, which drops a production batch, so CI runners aren't
-  # counted as installs.
   STELLA_ANONYMOUS_COUNTS_ENDPOINT: https://stella-v2-telemetry-dev.fromyou.workers.dev/v1/counts
   STELLA_BACKEND_URL: ${{ vars.STELLA_BACKEND_URL }}
   STELLA_RELEASES_URL: ${{ vars.STELLA_RELEASES_URL }}
@@ -107,8 +92,6 @@ jobs:
           xcrun stapler staple "$app"
           xcrun stapler validate "$app"
           spctl --assess --verbose --type exec "$app"
-          # The download: the drag-to-Applications disk image (make-dmg.sh),
-          # itself signed, notarized and stapled.
           launcher/macos/make-dmg.sh "$app" "$RUNNER_TEMP/Stella-macos.dmg"
           codesign --force --timestamp --keychain "$keychain_path" --sign "$identity" "$RUNNER_TEMP/Stella-macos.dmg"
           xcrun notarytool submit "$RUNNER_TEMP/Stella-macos.dmg" \
@@ -189,7 +172,7 @@ jobs:
           $check = Start-Process pwsh -NoNewWindow -PassThru -ArgumentList @('-NoProfile', '-File',
             "`"$env:GITHUB_WORKSPACE\.github\scripts\launcher-window-check.ps1`"", '-Out', "`"$env:RUNNER_TEMP\capture`"")
           $null = $check.Handle
-          # Stella.exe is a GUI-subsystem program: wait on it explicitly.
+          # Stella.exe is a GUI-subsystem program, so Windows doesn't wait for it unless told to.
           $p = Start-Process -FilePath "$env:GITHUB_WORKSPACE\launcher\windows\build\Stella.exe" -Wait -PassThru -ArgumentList @(
             '--self-test', '--source', "`"$env:GITHUB_WORKSPACE`"", '--capture-dir', "`"$env:RUNNER_TEMP\capture`"")
           Get-Content "$env:STELLA_LAUNCHER_ROOT\logs\launcher.log"
@@ -198,19 +181,12 @@ jobs:
           if ($check.ExitCode -ne 0) { exit 1 }
           exit $p.ExitCode
 
-      # Taking a change on the install the self-test left: the update check's
-      # build and the background merge on scratch copies with the app's
-      # packages linked in (junctions), a draft prepared and removed, and the
-      # change applied, as a user without admin rights where the runner allows
-      # it. After every step the app's packages must all still be there.
       - name: Update links check
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\.github\scripts\update-links-check.ps1" -Root "$env:RUNNER_TEMP\stella-root" -Out "$env:RUNNER_TEMP\capture\update-links"
 
-      # Authenticode through DigiCert KeyLocker, the same certificate pinning
-      # as the old desktop release: certsync can return more than one, so the
-      # approved one is selected by thumbprint, serial and publisher.
+      # DigiCert's certsync can return more than one certificate.
       - name: Reconstruct DigiCert client authentication certificate
         if: github.event_name == 'workflow_dispatch' && inputs.publish
         env:
@@ -361,12 +337,8 @@ jobs:
         run: |
           rm -rf launchers/*evidence* 2>/dev/null || true
           cd launchers && ls -la && sha256sum Stella-macos.dmg Stella-macos.zip Stella.exe stella-launcher-linux-* | tee SHA256SUMS
-          # The build number every launcher in this run carries; installed
-          # launchers update themselves when it's higher than theirs.
           echo "${{ github.run_number }}" > VERSION
 
-      # Linux launchers accept an update only with SHA256SUMS.sig verifying
-      # against the Ed25519 key built into them (launcher/linux, UPDATE_PUBLIC_KEY).
       - name: Sign the Linux update metadata
         env:
           LINUX_LAUNCHER_SIGNING_KEY: ${{ secrets.LINUX_LAUNCHER_SIGNING_KEY }}
@@ -402,14 +374,11 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
           export AWS_DEFAULT_REGION="auto"
           files="Stella-macos.dmg Stella-macos.zip Stella.exe stella-launcher-linux-x64 stella-launcher-linux-arm64 SHA256SUMS SHA256SUMS.sig VERSION"
-          # An unchanging copy per version first: package managers (AUR
-          # stella-desktop-bin, winget FROMYOU.Stella) pin these URLs and their
-          # checksums, which the next publish to stable/ would break.
+          # AUR stella-desktop-bin and winget FROMYOU.Stella pin these URLs and checksums.
           for file in $files; do
             aws s3 cp "launchers/$file" "s3://${R2_BUCKET}/launcher/releases/${{ github.run_number }}/$file" \
               --cache-control "public, max-age=31536000, immutable" --endpoint-url "$R2_ENDPOINT"
           done
-          # VERSION last: a launcher that sees it finds the binaries and sums already there.
           for file in $files; do
             aws s3 cp "launchers/$file" "s3://${R2_BUCKET}/launcher/stable/$file" \
               --cache-control "no-cache" --endpoint-url "$R2_ENDPOINT"

@@ -1,12 +1,6 @@
 name: Build Electron Identity
 
-# The macOS launcher runs Electron as Stella.app. Signed with the Developer ID
-# (identifier com.stella.app, team 7UVYHQ763X), its Keychain item and privacy
-# grants keep trusting it across Electron updates and launcher reinstalls; an
-# ad-hoc copy built on the user's Mac has a new identity for every version, so
-# macOS asks for the login password and resets permissions. This builds the
-# signed Stella.app for the Electron version the source pins and uploads it to
-# R2 electron-identity/<version>/, where the launcher downloads it.
+# macOS ties the Keychain item and privacy grants to the Developer ID signature; an ad-hoc copy gets a new identity per version.
 
 on:
   push:
@@ -34,8 +28,6 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     env:
-      # A fork sets the STELLA_RELEASES_URL and STELLA_APPLE_TEAM_ID repository
-      # variables (SELF_HOSTING.md).
       PUBLIC_BASE: ${{ vars.STELLA_RELEASES_URL || 'https://pub-a319aaada8144dc9be5a83625033769c.r2.dev' }}/electron-identity
       APPLE_TEAM: ${{ vars.STELLA_APPLE_TEAM_ID || '7UVYHQ763X' }}
     steps:
@@ -89,8 +81,6 @@ jobs:
             ditto -x -k "$work/electron.zip" "$work/dist"
             app="$work/Stella.app"
             mv "$work/dist/Electron.app" "$app"
-            # Same identity patch as the launcher's local fallback
-            # (launcher/macos/Sources/StellaLauncher/Prepare.swift).
             plist="$app/Contents/Info.plist"
             plutil -replace CFBundleName -string Stella "$plist"
             plutil -replace CFBundleDisplayName -string Stella "$plist"
@@ -117,7 +107,6 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
           set -euo pipefail
-          # Zips first, so a published checksum always has its zip.
           for file in Stella-darwin-arm64.zip Stella-darwin-x64.zip Stella-darwin-arm64.zip.sha256 Stella-darwin-x64.zip.sha256; do
             aws s3 cp "out/$file" "s3://${R2_BUCKET}/electron-identity/$VERSION/$file" \
               --cache-control "public, max-age=31536000, immutable" --endpoint-url "$R2_ENDPOINT"

@@ -260,8 +260,6 @@ export const handleNativeRelay = async (args: {
       { retryable: true },
     );
   }
-  // Stored conversation images arrive as signed URLs; the ChatGPT backend's
-  // handling of image URLs is unverified, so they go to it inline.
   const images = mayCarryStoredImages(JSON.stringify(requestJson))
     ? await inlineStoredImages(requestJson, { fetch: deps.fetch, backendOrigin: env.STELLA_BACKEND_URL })
     : undefined;

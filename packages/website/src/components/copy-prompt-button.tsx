@@ -10,7 +10,6 @@ async function copyText(text: string) {
       return;
     }
   } catch {
-    // Insecure contexts and some browsers reject clipboard.writeText.
   }
 
   const textarea = document.createElement("textarea");

@@ -71,10 +71,6 @@ export const APP_STORE_URL = "https://apps.apple.com/us/app/stella-your-ai/id676
 export const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.fromyou.stella";
 const DOWNLOAD_PAGE_PATH = "/download";
 
-/**
- * "unknown" is the server render and anything we can't place: it links to
- * /download, which lists every build, so nothing is downloaded on a guess.
- */
 export type Platform = "unknown" | "mac" | "windows" | "linux" | "ios" | "android";
 
 const ariaLabels: Record<"mac" | "windows" | "linux", string> = {
@@ -93,8 +89,7 @@ function detectPlatform(): Platform {
   if (/iphone|ipad|ipod/.test(ua)) return "ios";
   if (ua.includes("android")) return "android";
   if (ua.includes("mac")) {
-    // iPadOS Safari asks for the desktop site with a Mac user agent; only the
-    // touch screen tells it apart from a Mac.
+    // iPadOS Safari sends a Mac user agent; only the touch screen tells it apart.
     return navigator.maxTouchPoints > 0 ? "ios" : "mac";
   }
   if (ua.includes("windows")) return "windows";
@@ -114,7 +109,6 @@ export function isPhonePlatform(platform: Platform): platform is "ios" | "androi
   return platform === "ios" || platform === "android";
 }
 
-/** On a phone: get the desktop link onto the computer without downloading anything here. */
 export function SendToComputer({ className }: { className?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
@@ -166,8 +160,6 @@ export function LinuxInstallOptions({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard denied (insecure context, permissions). The command is
-      // visible and selectable in the DOM either way.
     }
   }
 

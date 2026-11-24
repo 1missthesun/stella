@@ -44,8 +44,7 @@ export function useSceneLoop(
       ([entry]) => setRunning(entry.isIntersecting),
       { threshold },
     );
-    // Embedded browsers can defer the observer's initial record until the
-    // page scrolls. Seed the same visibility decision for an on-screen scene.
+    // Embedded browsers can defer an IntersectionObserver's initial record until the page scrolls.
     const seedTimer = window.setTimeout(() => {
       const rect = el.getBoundingClientRect();
       const visibleHeight = Math.max(

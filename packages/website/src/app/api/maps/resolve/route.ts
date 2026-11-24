@@ -7,9 +7,6 @@ export const runtime = "nodejs";
 const MAX_BODY_BYTES = 16 * 1024;
 const BACKEND_TIMEOUT_MS = 60_000;
 
-// Released desktops still call this route. Map lookups cost Google money, so
-// it only forwards signed-in callers to the backend's resolver, which charges
-// the owner's budget; it never calls Google itself.
 export async function POST(request: Request) {
   const authorization = request.headers.get("authorization")?.trim() ?? "";
   if (!/^Bearer\s+\S+/i.test(authorization)) {

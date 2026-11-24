@@ -1,22 +1,6 @@
 export const CHAT_FRAME_ID = "stella-chat-frame";
 export const CHAT_APP_PATH = "/chat-app/index.html";
 
-/**
- * Points the chat iframe at the renderer. OAuth returns a short-lived
- * one-time token in the URL fragment. Fragments never reach Next, so transfer
- * that credential once into the same-origin renderer iframe and immediately
- * erase it from the public address bar.
- *
- * Self-contained (globals and arguments only) because it runs as an inline
- * script straight after the iframe in the static /chat shell (route.ts), so
- * the renderer download starts during HTML parse. A no-op once the frame has
- * a source.
- *
- * An owner who changed Stella's UI has their own renderer under
- * `/chat-app/u/<fork>/<tree>/`; the renderer stores that path in
- * `stella:web-renderer` (see `web-renderer-switch.ts` in desktop-ui), and the
- * frame starts there instead of the shared build.
- */
 export function adoptChatFrameSource(frameId: string, appPath: string): void {
   const frame = document.getElementById(frameId);
   if (!frame || frame.getAttribute("src")) return;
@@ -27,7 +11,6 @@ export function adoptChatFrameSource(frameId: string, appPath: string): void {
       source = `${own}index.html`;
     }
   } catch {
-    // Storage blocked: the shared build.
   }
   const rawFragment = window.location.hash.replace(/^#\??/, "");
   const containsHandoff =

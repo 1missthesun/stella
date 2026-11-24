@@ -2,12 +2,6 @@ export type WebGLTier = "hardware" | "software" | "none";
 
 type WebGLProbe = {
   tier: WebGLTier;
-  /**
-   * Whether the fragment stage genuinely supports full-precision `highp`
-   * float. The aurora's FBM noise hash (`fract(p * 123.34)` style math)
-   * needs true 32-bit precision; weaker iGPUs (notably older Intel on
-   * Windows) report reduced highp and render the shader garbled/banded.
-   */
   reliableHighp: boolean;
 };
 
@@ -36,8 +30,7 @@ function probeWebGL(): WebGLProbe {
       ).toLowerCase();
     }
 
-    // True IEEE-ish highp reports 23 bits of mantissa precision and a range
-    // exponent of 127. Anything less means the noise hash will band/garble.
+    // Full highp reports 23 mantissa bits and a range exponent of 127; older Intel iGPUs report less.
     const fmt = gl.getShaderPrecisionFormat?.(
       gl.FRAGMENT_SHADER,
       gl.HIGH_FLOAT,
@@ -69,23 +62,10 @@ export function getWebGLTier(): WebGLTier {
   return probeWebGL().tier;
 }
 
-/**
- * Whether the fragment stage can run the aurora's precision-sensitive noise
- * shader without garbling. False on iGPUs with marginal `highp` support.
- */
 export function hasReliableHighpFragment(): boolean {
   return probeWebGL().reliableHighp;
 }
 
-/**
- * Whether the animated WebGL aurora should run. Gated on a real (non-software)
- * GPU with genuine highp fragment precision — else the noise shader garbles,
- * common on older Intel iGPUs. Core/RAM count is deliberately NOT a factor:
- * `deviceMemory`/`hardwareConcurrency` report low values on plenty of capable
- * machines (Chrome caps `deviceMemory` at 8 and commonly reports 4), and
- * forcing those onto the CSS fallback looks worse than the real shader.
- * Reduced-motion is honored separately by the aurora (it renders a still frame).
- */
 export function shouldRunAuroraShader(): boolean {
   return getWebGLTier() === "hardware" && hasReliableHighpFragment();
 }

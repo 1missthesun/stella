@@ -5,11 +5,6 @@ import o from "@/components/landing/opening.module.css";
 import { StellaCharacter, useWanderingGaze, type StellaMarkHandle } from "@/components/landing/stella-character";
 import h from "./how.module.css";
 
-/**
- * The home hero's mascot, filling the empty right side of the first screen on
- * wide desktops. Calm on purpose: it only looks around, it doesn't hop. Hidden
- * below 1100px so it never pushes the download button down on phones.
- */
 export function HeroMascot() {
   const ref = useRef<HTMLDivElement>(null);
   const handle = useRef<StellaMarkHandle | null>(null);

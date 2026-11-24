@@ -14,7 +14,6 @@
   },
   "images": { "binding": "IMAGES" },
   "observability": { "enabled": true, "redact_query_string": true },
-  // stella.sh/r/<source> hits (short-links.mjs).
   "analytics_engine_datasets": [
     { "binding": "SHORT_LINKS", "dataset": "stella_short_links_dev" }
   ],

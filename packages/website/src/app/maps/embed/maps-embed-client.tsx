@@ -7,6 +7,7 @@ import {
   type MapRouteArtifact,
 } from "@stella/contracts/map-artifact";
 
+// Google restricts this public key by HTTP referrer, to the Maps JavaScript API.
 const BROWSER_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY?.trim();
 
 type LatLngLiteral = { lat: number; lng: number };
@@ -252,7 +253,6 @@ const renderArtifact = (
         }),
       );
     } catch {
-      // A bad polyline still leaves a useful pins-only map.
     }
   }
 

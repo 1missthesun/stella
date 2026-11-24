@@ -1,30 +1,3 @@
-/**
- * Inline script that runs before first paint to:
- *   1. Detect when the page is loaded inside Stella's desktop
- *      `WebContentsView` (`?embedded=1` on first load, persisted to
- *      `sessionStorage` for in-session navigations).
- *   2. Apply the theme tokens passed via URL params or restored from
- *      `sessionStorage` as `--embedded-*` CSS custom properties on
- *      `<html>`.
- *   3. Toggle `data-embedded="true"` so the embedded CSS rules
- *      activate.
- *
- * Lives as a string injected via `dangerouslySetInnerHTML` (rather than
- * a normal client component) so it runs synchronously in the document
- * head — eliminating the flash of the website's default light gradient
- * before React mounts.
- *
- * The sessionStorage step is what lets the Store's `<a href="/store?tab=…">`
- * links keep the embedded look across tab navigations: after the first
- * load tags the session as embedded, every subsequent same-origin
- * navigation in the desktop's WebContentsView restores the same state.
- *
- * Live theme updates (when the user changes themes inside Stella) are
- * handled separately by `embedded-theme-bridge.tsx`, which subscribes
- * to the `stellaDesktopStore.onThemeChanged` preload event and also
- * writes the latest tokens back into `sessionStorage` so this script
- * can restore them on the very next navigation.
- */
 const EMBEDDED_INIT_SCRIPT = /* javascript */ `
 (() => {
   try {

@@ -125,7 +125,6 @@ const move = (t: number, from: Pt, to: Pt, a: number, b: number): Pt => {
   return [lerp(from[0], to[0], k), lerp(from[1], to[1], k)];
 };
 
-/** Stella pinned above other apps: it stays on top when another window is clicked, and fades while the pointer is away. */
 export function PinSkin({ t: clock, w, h }: SkinProps) {
   const t = clock - T0;
   const tall = h > w;
@@ -246,7 +245,6 @@ function Pet({ x, y, size, t }: { x: number; y: number; size: number; t: number 
   );
 }
 
-/** A little Stella that lives on the desktop: it naps, wakes, hops, and says a task is done. */
 export function PetSkin({ t: clock, w, h }: SkinProps) {
   const t = clock - T0;
   const tall = h > w;
@@ -367,7 +365,6 @@ function PenTip({ at, s }: { at: Pt; s: number }) {
   );
 }
 
-/** The pen Stella gave itself: a toolbar over the window, and a Today box sketched right on it. */
 export function PenSkin({ t: clock, w, h }: SkinProps) {
   const t = clock - T0;
   const { tall, box, rect, lines, checks } = penBox(w, h);
@@ -437,7 +434,6 @@ const TODAY = [
   { what: "Taxes: bike receipt", when: "Done", hot: false },
 ];
 
-/** The sketched box, made real: a Today panel where it was drawn. */
 export function PenRealSkin({ t: clock, w, h }: SkinProps) {
   const t = clock - T0;
   const { box } = penBox(w, h);

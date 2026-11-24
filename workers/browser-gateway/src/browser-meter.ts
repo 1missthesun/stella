@@ -3,8 +3,6 @@ import { GatewayError } from "./errors.js";
 
 type HoldResult = { ok: true } | { ok: false; message: string };
 
-// cloud-builder's ComputeBilling entrypoint, which prices browser time at
-// Stella's tariff and charges the owner's budget.
 export type BrowserBilling = {
   browserHold(input: { ownerId: string; run: string }): Promise<HoldResult>;
   browserSettle(input: {
@@ -35,13 +33,6 @@ type MeterRow = {
 const SETTLE_EVERY_MS = 5 * 60_000;
 const EXPIRY_GRACE_MS = 30_000;
 
-/**
- * Browser Run time of the owner's agent browser sessions, acquire to close
- * (or keep_alive expiry), kept in the profile object's storage. A session is
- * held against the owner's budget before it is acquired; while it lives each
- * 5-minute interval is charged and the hold extended, and a session whose
- * hold cannot be extended is closed.
- */
 export class BrowserSessionMeter {
   private pending: { run: string; ownerId: string } | null = null;
   private owner: string | undefined;
@@ -56,7 +47,6 @@ export class BrowserSessionMeter {
     this.table();
   }
 
-  // The profile's purge drops every table; the next session recreates it.
   private table(): void {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS browser_meter (
       run TEXT PRIMARY KEY,

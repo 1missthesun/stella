@@ -29,12 +29,6 @@ export type RelayReservation =
   | ({ kind: "refused" } & OwnerAdmissionRefusal)
   | { kind: "reserved"; held: HeldReservation };
 
-/**
- * The single budget and replay authority for one capability: owner-scoped
- * capabilities reserve together with owner admission on the owner's gate,
- * legacy ones on their own CapabilityLedger. Only a reserved outcome can
- * settle, and only for the attempt it reserved.
- */
 export type RelayAccounting = {
   authority: "owner" | "capability";
   reserve: (args: LedgerReserveArgs) => Promise<RelayReservation>;

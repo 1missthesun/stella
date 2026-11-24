@@ -9,12 +9,6 @@ import {
   type LedgerSettleResult,
 } from "./ledger-store.js";
 
-/**
- * One SQLite-backed Durable Object per legacy capability `jti`: the budget,
- * request-count and replay authority for capabilities without an owner
- * ledger scope. At `expires_at + GATEWAY_RESULT_CACHE_TTL_MS` it deletes
- * everything, once every usage event it holds has reached billing.
- */
 export class CapabilityLedger extends DurableObject<Env> {
   private store!: LedgerStore;
 

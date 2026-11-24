@@ -53,7 +53,6 @@ export type DemoPlayer = {
 
 type Status = "idle" | "playing" | "paused" | "done";
 
-/** What the replica's still frame shows before it plays (also set by an inline script before hydration). */
 export const greetingFor = (date: Date) => {
   const hour = date.getHours();
   if (hour < 5) return "Good night";
@@ -68,7 +67,6 @@ const SWAP_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const POP_EASE = "cubic-bezier(0.33, 1, 0.68, 1)";
 const WORK_STATUS = "Working on it";
 
-/** Pacing of the replayed exchange: how long people take, not how long the app takes. */
 const PACE = {
   lead: 700,
   typingTotalMs: 2300,
@@ -90,7 +88,6 @@ const PACE = {
   end: 400,
 };
 
-/** A spring as a CSS linear() easing: critically shaped by damping ratio over `duration`. */
 function springEasing(dampingRatio: number, settleRadians = 7) {
   const points: string[] = [];
   const zeta = Math.min(dampingRatio, 0.999);
@@ -104,7 +101,6 @@ function springEasing(dampingRatio: number, settleRadians = 7) {
   return `linear(${points.join(", ")})`;
 }
 
-/** Keyframes of a mass-1 spring from `from` to `to` (motion's damping/stiffness spring). */
 function springFrames(from: number, to: number, { damping, stiffness }: { damping: number; stiffness: number }) {
   const frames: number[] = [];
   let x = from;
@@ -151,7 +147,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     el.style.animation = "";
   };
 
-  /* Text shimmer, as TextShimmer: one sweep, a rest, again; one per exclusive group, highest priority wins. */
   const refreshShimmers = () => {
     let top: HTMLElement | null = null;
     for (const [el, s] of shimmers) if (!top || s.priority > shimmers.get(top)!.priority) top = el;
@@ -223,7 +218,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     refreshShimmers();
   };
 
-  /* Timers on the demo's own clock, so pausing holds everything. */
   const timers = new Map<number, Action>();
   let timerId = 0;
   const schedule = (delay: number, run: () => void) => {
@@ -233,9 +227,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
   };
   const cancel = (id: number) => void timers.delete(id);
 
-  /* ── State setters, each mirroring what the app renders ── */
-
-  /** The app rounds the box 20px once the message wraps, and to a pill otherwise. */
   const roundComposer = (form: HTMLElement) => {
     const shell = form.closest<HTMLElement>(".composer-shell");
     if (shell) shell.style.borderRadius = form.classList.contains("expanded") ? `${APP_TIMING.composerExpandedRadiusPx}px` : "";
@@ -314,7 +305,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     indicatorState = state;
   };
 
-  /* SwapText: the new line rises in as the old one rises out; the first line after the dots is static. */
   const setStatus = (text: string) => {
     if (text === indicatorText) return;
     const el = p.status;
@@ -440,8 +430,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     animate(line, [{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: old ? 120 : 0, easing: SWAP_EASE, fill: "backwards" });
   };
 
-  /* ── Reset to the app's empty home screen ── */
-
   const reset = () => {
     p.root.closest("figure")?.removeAttribute("data-armed");
     for (const row of p.rows.values()) {
@@ -468,8 +456,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     p.scroller.scrollTop = 0;
     p.topMark.current?.setState("idle");
   };
-
-  /* ── The plan ── */
 
   const readTime = (text: string) =>
     Math.max(PACE.readMin, Math.min(PACE.readMax, text.split(/\s+/).length * PACE.readPerWord));
@@ -579,8 +565,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
   t += PACE.end;
   const endAt = t;
   actions.sort((a, b) => a.at - b.at);
-
-  /* ── Clock ── */
 
   let next = 0;
   let status: Status = "playing";

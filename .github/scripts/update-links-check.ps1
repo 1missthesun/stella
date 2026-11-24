@@ -1,12 +1,4 @@
-# Runs packages/desktop/scripts/check-update-links.mjs against a Stella the
-# Windows launcher installed (STELLA_LAUNCHER_ROOT), with the app's own
-# Electron (as Node), git and bun, the way Stella takes a change.
-#
-# The runner's account is an elevated administrator, which may create plain
-# directory symlinks; a normal user can't (that is the bug this guards). So it
-# runs under a Basic User token (runas /trustlevel) when the runner allows it,
-# and says which it was: the check's first line reports whether this process
-# could make a plain directory symlink ("plainDirectorySymlink").
+# GitHub's Windows runner account is an elevated administrator, which may create plain directory symlinks; a normal user can't.
 param(
   [Parameter(Mandatory = $true)][string]$Root,
   [Parameter(Mandatory = $true)][string]$Out
@@ -50,11 +42,7 @@ $lines += "> `"$done`" echo %ERRORLEVEL%"
 New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\links-temp" | Out-Null
 Set-Content -Path $cmd -Value $lines -Encoding ascii
 
-# Let a Basic User token write where the check works. The grant is
-# inheritable, so setting it on each top folder is enough: Windows passes it
-# down to everything inside. `/T` would walk the tree itself and follow bun's
-# package junctions round in circles (packages\agent\node_modules\@stella\runtime
-# -> ...\@stella\agent -> ...) until paths get too long, which took ~10 min.
+# icacls /T follows junctions in circles; an inheritable grant on the top folder reaches everything inside.
 foreach ($dir in @($Root, $Out, "$env:RUNNER_TEMP\links-temp")) {
   icacls $dir /grant "*S-1-5-32-545:(OI)(CI)M" /Q | Out-Null
 }

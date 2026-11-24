@@ -12,8 +12,7 @@ export const browserGuardrailDomains = (
     } catch {
       throw new GatewayError("navigation_denied", 403);
     }
-    // Include the PSL private section so one tenant cannot gain egress to
-    // sibling tenants on github.io, vercel.app, blogspot.com, and peers.
+    // The PSL private section covers github.io, vercel.app and other multi-tenant suffixes.
     const registrable = getDomain(hostname, { allowPrivateDomains: true });
     if (!registrable) {
       throw new GatewayError("navigation_denied", 403);

@@ -49,8 +49,6 @@ export const createSseParser = (): SseParser => {
         break;
       case "retry":
       default:
-        // `retry` is a reconnect hint we never act on; unknown fields are
-        // ignored per spec.
         break;
     }
   };
@@ -68,7 +66,7 @@ export const createSseParser = (): SseParser => {
       let skip: number;
       if (cr === -1 && lf === -1) break;
       if (cr !== -1 && (lf === -1 || cr < lf)) {
-        // A trailing CR may be the first half of CRLF split across chunks.
+        // SSE: a trailing CR may be the first half of a CRLF split across chunks.
         if (cr === buffer.length - 1 && !flush) break;
         end = cr;
         skip = buffer[cr + 1] === "\n" ? 2 : 1;

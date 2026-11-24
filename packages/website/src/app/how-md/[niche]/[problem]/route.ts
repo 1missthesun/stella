@@ -2,7 +2,6 @@ import { getProblemPage, problemPath, publishedProblemPages } from "@/lib/proble
 import { renderProblemMarkdown } from "@/lib/problems/markdown";
 import { getSiteUrl } from "@/lib/site-url";
 
-// Served at /how/<niche>/<slug>.md through a rewrite in next.config.ts.
 export const dynamic = "force-static";
 export const dynamicParams = false;
 

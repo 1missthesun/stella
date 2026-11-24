@@ -54,10 +54,7 @@ export const trustedVerifyPageResult = async (
       }
       return false;
     };
-    // Locator.isVisible() is an immediate snapshot; its timeout option is
-    // explicitly ignored by Playwright. Authentication UIs commonly update
-    // after DOMContentLoaded, so poll the compound trusted state instead of
-    // accepting or rejecting the first transient frame.
+    // Playwright's Locator.isVisible() is an immediate snapshot and ignores its timeout option.
     const deadline = now() + timeoutMs;
     let authenticatedVisible = false;
     let loggedOutVisible = false;

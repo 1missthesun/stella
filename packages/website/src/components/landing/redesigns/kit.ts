@@ -22,7 +22,6 @@ const FACES = {
 
 export type FontSet = keyof typeof FACES | "serif" | "manrope";
 
-/** A font already registered by next/font on the page, loaded on demand without a duplicate asset. */
 function loadPageVarFont(cssVar: string, italic = false) {
   const root = document.querySelector<HTMLElement>("[data-landing-root]") ?? document.body;
   const family = getComputedStyle(root).getPropertyValue(cssVar).trim();
@@ -34,7 +33,6 @@ function loadPageVarFont(cssVar: string, italic = false) {
 
 const requested = new Map<FontSet, Promise<unknown>>();
 
-/** Registers and fetches a skin's faces; resolves once they can render (or failed). */
 export function loadFonts(sets: readonly FontSet[]): Promise<unknown> {
   if (typeof document === "undefined") return Promise.resolve();
   return Promise.all(
@@ -79,7 +77,6 @@ export const F = {
   mono: "var(--l-mono), ui-monospace, monospace",
 };
 
-/** Deterministic hash -> [0,1). */
 export function hash(n: number, seed = 0): number {
   let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(seed + 0x27d4eb2f, 0xc2b2ae35);
   x ^= x >>> 15;
@@ -93,7 +90,6 @@ export function hash(n: number, seed = 0): number {
 export const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 export const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
-/** The mascot's star silhouette as an SVG path in a 0..2C box, its centre C, and the face metrics. */
 export const STAR = {
   C: STAR_C,
   path: SHAPES.star.path,
@@ -101,13 +97,11 @@ export const STAR = {
   face: SHAPES.star.face,
 };
 
-/** Eye outline as a path centred at cx,cy with half-sizes ew, eh. */
 export function eyePath(cx: number, cy: number, ew: number, eh: number, pose: keyof typeof EYE_POSES = "neutral") {
   const pts = EYE_POSES[pose];
   return "M" + pts.map(([x, y]) => `${(cx + x * ew).toFixed(2)} ${(cy + y * eh).toFixed(2)}`).join("L") + "Z";
 }
 
-/** Eye centres of the star mascot in the 0..2C box. */
 export function starEyes() {
   const f = STAR.face;
   const sx = STAR.C + f.dx;
@@ -116,10 +110,6 @@ export function starEyes() {
   return { l: [sx - half, sy] as [number, number], r: [sx + half, sy] as [number, number], ew: f.rx * 0.78, eh: f.ry * 0.62 };
 }
 
-/**
- * Breaks text into `n` lines whose widths follow an oval (short / long / short),
- * the way a letterer fills a speech balloon. Widths approximated by char count.
- */
 export function ovalLines(text: string, n: number): string[] {
   const words = text.split(/\s+/);
   if (n <= 1 || words.length < n) return [text];

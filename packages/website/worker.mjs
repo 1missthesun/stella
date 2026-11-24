@@ -210,8 +210,6 @@ const handle = {
   },
 };
 
-// Preview Workers (wrangler.problem-preview.jsonc sets NOINDEX) keep every
-// response out of search, redirects and images included.
 const worker = {
   async fetch(request, env, ctx) {
     const response = await handle.fetch(request, env, ctx);

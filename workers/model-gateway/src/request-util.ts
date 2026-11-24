@@ -190,10 +190,6 @@ export const createUpstreamController = (args: {
   };
 };
 
-/**
- * Streams `body` to the client and disposes `controller` exactly once, when
- * the body ends, fails, or the client cancels it.
- */
 export const ownedResponseBody = (
   body: ReadableStream<Uint8Array>,
   controller: { dispose(): void },

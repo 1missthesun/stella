@@ -55,7 +55,6 @@ function CopyCommand() {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           } catch {
-            // The command stays visible and selectable.
           }
         }}
       >
@@ -139,7 +138,6 @@ export function DownloadOptions() {
     },
   ];
 
-  // A phone sees its own store first; a computer sees the computers first.
   const ordered = phone ? [...rows.filter((r) => !r.desktop), ...rows.filter((r) => r.desktop)] : rows;
 
   return (

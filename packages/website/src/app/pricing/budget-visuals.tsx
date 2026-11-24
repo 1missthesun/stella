@@ -8,8 +8,7 @@ import pr from "./pricing.module.css";
 const percent = (used: number, limit: number) => `${Math.round(Math.min(1, used / limit) * 100)}%`;
 
 const SPEND_COLORS = ["#703cff", "#00a3ff", "#ff4ac0", "#ff9d2e", "#13b37a", "#8b8b95"];
-// What a month of Pro might look like, in the order of BUDGET_COVERS.
-const SAMPLE_SPEND = [7.4, 4.85, 3.2, 1.15, 0.9, 0.55];
+const SAMPLE_SPEND: readonly number[] & Pick<typeof BUDGET_COVERS, "length"> = [7.4, 4.85, 3.2, 1.15, 0.9, 0.55];
 
 export function BudgetVisual() {
   const ref = useRef<HTMLDivElement>(null);

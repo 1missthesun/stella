@@ -14,7 +14,6 @@ export const HOW_INDEX_PATH = "/how";
 
 let checked: ProblemPage[] | null = null;
 
-/** Published pages, after the quality gate. Throws (failing the build) if any page fails. */
 export function publishedProblemPages(): ProblemPage[] {
   if (!checked) {
     assertProblemPages(ALL_PAGES, NICHES);
@@ -23,7 +22,6 @@ export function publishedProblemPages(): ProblemPage[] {
   return checked;
 }
 
-/** Niches with at least one published page, in hub order. */
 export function publishedNiches(): Niche[] {
   const pages = publishedProblemPages();
   return NICHES.filter((niche) => pages.some((page) => page.niche === niche.slug));
@@ -33,7 +31,6 @@ export function nichePages(niche: string): ProblemPage[] {
   return publishedProblemPages().filter((page) => page.niche === niche);
 }
 
-/** A hub's pages in its headed groups (one untitled group when the hub has none). */
 export function nicheSections(niche: Niche): { title?: string; pages: ProblemPage[] }[] {
   const pages = nichePages(niche.slug);
   if (!niche.sections?.length) return [{ pages }];
@@ -53,7 +50,6 @@ export function nicheSections(niche: Niche): { title?: string; pages: ProblemPag
   return groups.filter((group) => group.pages.length);
 }
 
-/** The exchange a guide plays in its Stella replica. */
 export function pageDemo(page: ProblemPage): DemoStep[] {
   return demoFrom({ prompt: page.prompt, ...page.demo });
 }
@@ -72,7 +68,6 @@ export function getProblemById(id: string) {
   return getProblemPage(niche, slug);
 }
 
-/** Related pages first, then the rest of the niche, so neighbours always link to each other. */
 export function neighbours(page: ProblemPage, limit = 6): ProblemPage[] {
   const out: ProblemPage[] = [];
   const add = (other: ProblemPage | undefined) => {
@@ -83,10 +78,8 @@ export function neighbours(page: ProblemPage, limit = 6): ProblemPage[] {
   return out.slice(0, limit);
 }
 
-/** What a visitor gets on a guide, in their words (cards on the index and hubs). */
 export const GUIDE_LABEL = "Just ask Stella";
 
-/** The price line exactly as the home page shows it under the download button. */
 export const FREE_LINE = "Free with the plan you already have.";
 
 export const PLATFORM_NAMES: Record<Platform, string> = {
@@ -95,7 +88,6 @@ export const PLATFORM_NAMES: Record<Platform, string> = {
   linux: "Linux",
 };
 
-/** Asked on every problem page; not counted as the page's own content. */
 export function sharedFaq(page: ProblemPage): Faq[] {
   return [{ q: "Is Stella free?", a: page.costNote ?? `Yes. ${PRICE_LINE}` }];
 }
@@ -103,7 +95,6 @@ export function sharedFaq(page: ProblemPage): Faq[] {
 export const formatDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-/** BreadcrumbList, FAQPage and SoftwareApplication. */
 export function problemJsonLd(page: ProblemPage, site: URL) {
   const niche = getNiche(page.niche)!;
   const url = new URL(problemPath(page), site).href;

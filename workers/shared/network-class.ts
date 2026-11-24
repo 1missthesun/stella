@@ -117,7 +117,6 @@ export const classifyNetwork = async (
       );
       if (override) return override;
     } catch {
-      // The built-in policy remains available when the optional override is not.
     }
   }
 

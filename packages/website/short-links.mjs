@@ -1,7 +1,3 @@
-// stella.sh/r/<source>: a 302 to the home page that counts the hit per source
-// in Workers Analytics Engine (dataset bound as SHORT_LINKS). Nothing about the
-// visitor is stored beyond the source, their country and the referring host.
-
 const SOURCES = new Set([
   "tiktok",
   "youtube",
@@ -40,7 +36,6 @@ const ALIASES = { twitter: "x", yt: "youtube", ig: "instagram", tt: "tiktok", fb
 
 const SHORT_LINK = /^\/r\/([^/]{1,64})\/?$/;
 
-/** The counted source for a /r/ path, "other" for unknown ones, null when not a short link. */
 export const shortLinkSource = (pathname) => {
   const match = SHORT_LINK.exec(pathname);
   if (!match) return null;
@@ -71,7 +66,6 @@ export const shortLinkResponse = (request, env, source) => {
       doubles: [1],
     });
   } catch {
-    // Counting must never block the redirect.
   }
   return new Response(null, {
     status: 302,

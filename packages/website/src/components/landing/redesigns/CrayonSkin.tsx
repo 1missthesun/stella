@@ -2,14 +2,6 @@ import React from "react";
 import { CHAT, type SkinProps } from "./content";
 import { F, STAR, hash, ovalLines } from "./kit";
 
-/**
- * A parent made Stella look like their six-year-old drew it: wax crayon on blue
- * construction paper, taped up. Wobbly boxes that don't quite close, bubbles coloured in
- * with scribbles that run over the lines, Stella as a purple star with rosy cheeks,
- * you as a waving stick figure, a sun in the corner. The lines "boil" at 8 fps,
- * the way hand-drawn animation does.
- */
-
 const PAPER = "#86bde6";
 const WAX = {
   dark: "#2a1f3d",
@@ -39,7 +31,6 @@ function smoothPath(pts: P[]) {
   return d + `L${l[0].toFixed(1)} ${l[1].toFixed(1)}`;
 }
 
-/** A rounded box drawn in one go: it wobbles, overshoots where it should close. */
 function wobblyBox(x: number, y: number, w: number, h: number, r: number, seed: number) {
   const pts: P[] = [];
   const per = 2 * (w + h);
@@ -47,7 +38,6 @@ function wobblyBox(x: number, y: number, w: number, h: number, r: number, seed: 
   const at = (u: number): P => {
     let s = (u % 1) * per;
     const corner = (cx: number, cy: number, a0: number, k: number): P => [cx + Math.cos(a0 + k * (Math.PI / 2)) * r, cy + Math.sin(a0 + k * (Math.PI / 2)) * r];
-    // walk the straight parts and round the corners loosely
     if (s < w) return s < r ? corner(x + r, y + r, Math.PI, 0.5 + (s / r) * 0.5) : s > w - r ? corner(x + w - r, y + r, -Math.PI / 2, ((s - (w - r)) / r) * 0.5) : [x + s, y];
     s -= w;
     if (s < h) return s < r ? corner(x + w - r, y + r, -Math.PI / 2, 0.5 + (s / r) * 0.5) : s > h - r ? corner(x + w - r, y + h - r, 0, ((s - (h - r)) / r) * 0.5) : [x + w, y + s];
@@ -60,13 +50,12 @@ function wobblyBox(x: number, y: number, w: number, h: number, r: number, seed: 
   for (let i = 0; i <= n + 2; i++) {
     const u = start + i / n;
     const [px, py] = at(u);
-    const drift = i > n - 1 ? (i - n + 1) * 5 : 0; // the overshoot drifts off the line
+    const drift = i > n - 1 ? (i - n + 1) * 5 : 0;
     pts.push([px + jit(i, seed, 3.2), py + jit(i, seed + 7, 3.2) + drift]);
   }
   return smoothPath(pts);
 }
 
-/** Back-and-forth colouring-in, a bit past the edges. */
 function scribble(x: number, y: number, w: number, h: number, seed: number, step = 11) {
   const pts: P[] = [];
   const n = Math.ceil((w + h * 0.5) / step);
@@ -92,7 +81,6 @@ function wobblyCircle(cx: number, cy: number, r: number, seed: number, over = 0.
 
 const Wax: React.FC<{ d: string; c: string; w?: number; o?: number }> = ({ d, c, w = 5, o = 1 }) => <path d={d} stroke={c} strokeWidth={w} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={o} />;
 
-/** Kid-drawn Stella: a lumpy six-point star, coloured in, two eyes, rosy cheeks, shine lines. */
 const KidStar: React.FC<{ cx: number; cy: number; s: number; seed: number; t: number }> = ({ cx, cy, s, seed, t }) => {
   const C = STAR.C;
   const ring = STAR.ring;
@@ -113,7 +101,6 @@ const KidStar: React.FC<{ cx: number; cy: number; s: number; seed: number; t: nu
         <Wax d={scribble(cx - s * 0.5, cy - s * 0.5, s, s, seed + 12, s / 22)} c="#9a72ea" w={Math.max(3, s / 40)} o={0.7} />
       </g>
       <Wax d={outline} c={WAX.purpleDk} w={7} />
-      {/* eyes: two tall dots, pressed hard */}
       {[-1, 1].map((sd) => (
         <ellipse key={sd} cx={cx + sd * s * 0.11 + jit(sd + 2, seed, 1)} cy={cy - s * 0.02} rx={s * 0.035} ry={s * 0.065} fill={WAX.dark} />
       ))}
@@ -121,7 +108,6 @@ const KidStar: React.FC<{ cx: number; cy: number; s: number; seed: number; t: nu
         <Wax key={`c${sd}`} d={wobblyCircle(cx + sd * s * 0.2, cy + s * 0.1, s * 0.04, seed + sd + 30, 0.6)} c={WAX.pink} w={7} />
       ))}
       <Wax d={smoothPath([[cx - s * 0.07, cy + s * 0.1], [cx, cy + s * 0.15 + jit(1, seed, 1)], [cx + s * 0.07, cy + s * 0.1]])} c={WAX.dark} w={4} />
-      {/* shine lines */}
       {[
         [-0.62, -0.42, -0.74, -0.52],
         [-0.66, -0.2, -0.82, -0.2],
@@ -150,7 +136,6 @@ const StickFigure: React.FC<{ x: number; y: number; s: number; seed: number; t: 
         <circle key={sd} cx={hx + sd * r * 0.38} cy={hy - r * 0.05} r={3.2} fill={WAX.dark} />
       ))}
       <Wax d={smoothPath([[hx - r * 0.45, hy + r * 0.32], [hx, hy + r * 0.62], [hx + r * 0.45, hy + r * 0.32]])} c={WAX.red} w={4} />
-      {/* triangle dress / shirt scribbled in */}
       <Wax d={scribble(hx - s * 0.13, hy + r + 6, s * 0.26, s * 0.3, seed + 9, 9)} c={WAX.green} w={8} o={0.9} />
       <Wax d={smoothPath([neck, [neck[0] + jit(2, seed, 2), neck[1] + s * 0.2], hip])} c={WAX.dark} w={5} />
       <Wax d={smoothPath([[neck[0], neck[1] + s * 0.1], [neck[0] + Math.cos(ang) * s * 0.18, neck[1] + s * 0.1 + Math.sin(ang) * s * 0.18], [neck[0] + Math.cos(ang - 0.3) * s * 0.34, neck[1] + s * 0.1 + Math.sin(ang - 0.3) * s * 0.34]])} c={WAX.dark} w={5} />
@@ -174,7 +159,7 @@ const Sun: React.FC<{ cx: number; cy: number; r: number; seed: number }> = ({ cx
 export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
   const tall = h > w;
   const boil = Math.floor(t * 8) % 3;
-  const sd = (n: number) => n + boil * 101; // hand-redrawn every 1/8 s
+  const sd = (n: number) => n + boil * 101;
   const fs = tall ? 36 : 31;
   const lh = fs * 1.12;
   const colX = tall ? 45 : 350;
@@ -182,7 +167,6 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
   const barH = 92;
   const comp = { x: colX, y: h - (tall ? 140 : 120), w: colW, h: 82 };
 
-  // bubbles bottom-up
   const msgs: [boolean, string, number][] = [
     [true, CHAT.me1, 2],
     [false, CHAT.her1, 2],
@@ -220,7 +204,6 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
             <feTurbulence type="fractalNoise" baseFrequency="0.7 0.12" numOctaves={2} seed={12} />
             <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -1.05" />
           </filter>
-          {/* wax: wobble the line (re-seeded on 8s), then let the paper's tooth show through */}
           <filter id="cr-wax" x="-5%" y="-5%" width="110%" height="110%">
             <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves={2} seed={boil + 1} result="wob" />
             <feDisplacementMap in="SourceGraphic" in2="wob" scale={4} xChannelSelector="R" yChannelSelector="G" result="d" />
@@ -238,7 +221,6 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         <rect width={w} height={h} filter="url(#cr-fiber)" opacity={0.18} />
 
         <g filter="url(#cr-wax)">
-          {/* top bar: three dots, the name, account */}
           {[WAX.red, WAX.yellow, WAX.green].map((c, i) => (
             <g key={i}>
               <Wax d={scribble(30 + i * 40, 30, 22, 22, sd(60 + i), 6)} c={c} w={7} />
@@ -249,17 +231,14 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
 
           {!tall ? <Sun cx={w - 200} cy={170} r={34} seed={sd(90)} /> : <Sun cx={w / 2} cy={190} r={36} seed={sd(90)} />}
 
-          {/* the two of you */}
           <KidStar cx={star.cx} cy={star.cy} s={star.s} seed={sd(100)} t={t} />
           <StickFigure x={person.x} y={person.y} s={person.s} seed={sd(120)} t={t} />
-          {/* grass */}
           {Array.from({ length: Math.floor(w / 14) }, (_, i) => {
             const gx = i * 14 + jit(i, 5, 3);
             const gh = 14 + hash(i, 6) * 16;
             return <Wax key={i} d={`M${gx} ${h + 4}L${gx + 5 + jit(i, sd(7), 3)} ${h - gh}`} c={WAX.green} w={5} />;
           })}
 
-          {/* bubbles */}
           {bubbles.map((b, i) => (
             <g key={i}>
               <clipPath id={`cr-bc${i}`}>
@@ -269,7 +248,6 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
                 <Wax d={scribble(b.x, b.y, b.bw, b.bh, sd(200 + i), 11)} c={b.me ? WAX.yellow : WAX.white} w={12} o={0.85} />
               </g>
               <Wax d={wobblyBox(b.x, b.y, b.bw, b.bh, 26, sd(210 + i))} c={b.me ? WAX.orange : WAX.purpleDk} w={5} />
-              {/* a pointy tail toward the speaker */}
               <Wax
                 d={b.me ? `M${b.x + b.bw - 50} ${b.y + b.bh - 2}L${b.x + b.bw - 8 + jit(i, sd(220), 3)} ${b.y + b.bh + 24}L${b.x + b.bw - 26} ${b.y + b.bh - 4}` : `M${b.x + 50} ${b.y + b.bh - 2}L${b.x + 6 + jit(i, sd(221), 3)} ${b.y + b.bh + 24}L${b.x + 26} ${b.y + b.bh - 4}`}
                 c={b.me ? WAX.orange : WAX.purpleDk}
@@ -278,7 +256,6 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
             </g>
           ))}
 
-          {/* composer */}
           <clipPath id="cr-cc">
             <rect x={comp.x - 3} y={comp.y - 3} width={comp.w + 6} height={comp.h + 6} rx={40} />
           </clipPath>
@@ -288,17 +265,13 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
           <Wax d={wobblyBox(comp.x, comp.y, comp.w, comp.h, 36, sd(301))} c={WAX.dark} w={5} />
           <Wax d={wobblyCircle(comp.x + 42, comp.y + comp.h / 2, 20, sd(302))} c={WAX.dark} w={4} />
           <Wax d={`M${comp.x + 32} ${comp.y + comp.h / 2}H${comp.x + 52}M${comp.x + 42} ${comp.y + comp.h / 2 - 10}V${comp.y + comp.h / 2 + 10}`} c={WAX.dark} w={4} />
-          {/* mic doodle */}
           <Wax d={wobblyBox(comp.x + comp.w - 112, comp.y + 20, 16, 28, 8, sd(303))} c={WAX.dark} w={4} />
           <Wax d={`M${comp.x + comp.w - 120} ${comp.y + 40}Q${comp.x + comp.w - 104} ${comp.y + 66} ${comp.x + comp.w - 88} ${comp.y + 40}M${comp.x + comp.w - 104} ${comp.y + 56}V${comp.y + 66}`} c={WAX.dark} w={4} />
-          {/* send: a red arrow in a red circle, coloured in */}
           <Wax d={scribble(comp.x + comp.w - 64, comp.y + 18, 46, 46, sd(304), 7)} c={WAX.red} w={8} />
           <Wax d={wobblyCircle(comp.x + comp.w - 41, comp.y + comp.h / 2, 25, sd(305))} c={WAX.red} w={4} />
           <Wax d={`M${comp.x + comp.w - 41} ${comp.y + comp.h / 2 + 14}V${comp.y + comp.h / 2 - 14}M${comp.x + comp.w - 52} ${comp.y + comp.h / 2 - 3}L${comp.x + comp.w - 41} ${comp.y + comp.h / 2 - 15}L${comp.x + comp.w - 30} ${comp.y + comp.h / 2 - 3}`} c={WAX.white} w={5} />
-          {/* tape */}
         </g>
 
-        {/* lettering in crayon */}
         <g filter="url(#cr-waxText)" style={{ fontFamily: F.kid, paintOrder: "stroke" }} strokeWidth={1.6} strokeLinejoin="round">
           <text x={w / 2 + 26} y={60} textAnchor="middle" fontSize={44} fill={WAX.white} stroke={WAX.white} style={{ letterSpacing: 2 }}>
             Stella
@@ -320,12 +293,10 @@ export const CrayonSkin: React.FC<SkinProps> = ({ t, w, h }) => {
             {CHAT.placeholder}...{caret ? "|" : ""}
           </text>
         </g>
-        {/* tiny star next to the name */}
         <g filter="url(#cr-wax)">
           <KidStar cx={w / 2 - 74} cy={44} s={46} seed={sd(400)} t={0} />
         </g>
       </svg>
-      {/* tape holding the drawing up */}
       {[
         [w * 0.18, -10, -8],
         [w * 0.8, -12, 7],

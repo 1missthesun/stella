@@ -4,7 +4,6 @@ import type { BrowserGatewayEnv } from "./profile-session-core.js";
 
 type Browser = Awaited<ReturnType<typeof launch>>;
 
-// Lifetime of the capture browser, launch to close, for the caller to bill.
 export const BROWSER_MS_HEADER = "x-stella-browser-ms";
 
 export const withTimedBrowser = async (

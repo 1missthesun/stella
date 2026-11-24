@@ -10,7 +10,6 @@ const RETRY_DELAYS_MS = [5_000, 15_000, 60_000, 180_000, 600_000, 1_800_000, 3_6
 const UNRECONCILED_AFTER_TRIES = RETRY_DELAYS_MS.length;
 const GIVE_UP_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
-// The owner refuses these for good; retrying cannot land them.
 const PERMANENT_REJECTIONS = new Set(["owner_mismatch"]);
 
 const retryDelay = (tries: number): number =>
@@ -39,12 +38,6 @@ export const logUnreconciled = (
   );
 };
 
-/**
- * Delivers due usage events to the owner's billing. An event leaves the
- * outbox only once billing has accepted it or already had it; everything
- * else is retried with backoff, and logged as unreconciled when it keeps
- * failing.
- */
 export const flushUsageOutbox = async (
   store: LedgerStore,
   billing: BillingControlRpc,

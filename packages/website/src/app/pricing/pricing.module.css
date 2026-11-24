@@ -11,8 +11,6 @@
   padding: 0 var(--l-margin) clamp(100px, 15svh, 170px);
 }
 
-/* One table, columns split by hairlines; the featured plan carries the
-   colour instead of a separate card. */
 .table {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -169,7 +167,6 @@
   color: var(--l-accent, #5243ff);
 }
 
-/* Product visuals: a recreation of Stella's Plan & usage panel. */
 .act {
   padding-top: clamp(70px, 11svh, 130px);
   padding-bottom: clamp(70px, 11svh, 130px);

@@ -166,7 +166,6 @@ export const upstreamErrorBody = (
       return scrubUpstreamJson(parsed, secrets);
     }
   } catch {
-    // Not JSON; fall through.
   }
   const body: GatewayErrorBody = {
     error: {

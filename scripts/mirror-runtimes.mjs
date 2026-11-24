@@ -1,15 +1,4 @@
 #!/usr/bin/env node
-// Copies the third-party runtimes installs download from GitHub releases (Bun,
-// PortableGit, Electron) into Stella's releases bucket, under
-// `runtimes/github/<the same path as on github.com>`. Launchers and
-// ensure-electron-binary try that mirror first and fall back to GitHub, whose
-// release downloads time out or answer 502/504 for minutes at a time.
-//
-// Run it after changing a pinned Bun/PortableGit URL in launcher/ or
-// packages/desktop/launcher.json, or the Electron version in package.json. Every file is checked against the sha256
-// pinned in this repo before upload, and files already mirrored are skipped.
-//
-//   env -u CLOUDFLARE_API_TOKEN node scripts/mirror-runtimes.mjs [--dry-run]
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -25,7 +14,6 @@ const dryRun = process.argv.includes("--dry-run");
 
 const read = (file) => readFileSync(path.join(root, file), "utf8");
 
-/** GitHub URLs pinned in the launchers, each followed by its sha256. */
 const launcherAssets = () => {
   const assets = new Map();
   const files = [
@@ -56,8 +44,6 @@ const electronAssets = () => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// npmmirror republishes these exact release files; with the sha256 check it is
-// a safe second source for seeding the mirror while GitHub is failing.
 const NPMMIRROR_PATHS = [
   ["oven-sh/bun/releases/download/", "bun/"],
   ["electron/electron/releases/download/", "electron/"],

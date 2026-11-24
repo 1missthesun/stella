@@ -871,4 +871,297 @@ export const PC_GAMING_PAGES: ProblemPage[] = [
     platforms: ["windows"],
     lastChecked: "2026-11-24",
   }),
+  shortGuide({
+    slug: "vcruntime140-dll-missing",
+    niche: "pc-gaming",
+    searchPhrases: [
+      "vcruntime140.dll was not found",
+      "vcruntime140.dll missing",
+      "msvcp140.dll was not found",
+      "vcruntime140_1.dll not found",
+      "the code execution cannot proceed because vcruntime140.dll was not found",
+      "vcruntime140 dll was not found windows 11",
+    ],
+    title: "VCRUNTIME140.dll was not found? Get the game to open",
+    description:
+      "Game or app says VCRUNTIME140.dll or MSVCP140.dll was not found? Stella (stella.sh) installs Microsoft's Visual C++ package in both versions and opens it again.",
+    h1: "VCRUNTIME140.dll was not found",
+    short: "VCRUNTIME140.dll / MSVCP140.dll missing",
+    lede: "The game opening normally instead of stopping at a missing file.",
+    answer:
+      "VCRUNTIME140.dll and MSVCP140.dll belong to Microsoft's Visual C++ package, which many games and apps quietly rely on. Stella (stella.sh) installs the current package from Microsoft in both the 64-bit and 32-bit versions, then starts the game again.",
+    gets: [
+      "Microsoft's own Visual C++ package, both versions",
+      "VCRUNTIME140_1.dll and MSVCP140.dll errors gone too",
+      "A broken earlier install repaired, not stacked on top",
+    ],
+    prompt:
+      "Hades 2 won't open, it says the code execution cannot proceed because VCRUNTIME140.dll was not found. Please fix it.",
+    demo: {
+      ack: "On it. That file ships with Microsoft's Visual C++ package.",
+      task: "Fixing the VCRUNTIME140.dll error",
+      rows: ["Visual C++ package is damaged", "Getting both versions from Microsoft", "Repairing the existing install", "Opening Hades 2"],
+      reply:
+        "Fixed. The Visual C++ package on this PC was half removed. Both the 64-bit and 32-bit versions are now installed fresh from Microsoft, and Hades 2 opens to its title screen.",
+    },
+    faq: [
+      ["Is MSVCP140.dll was not found the same fix?", "Yes. MSVCP140.dll comes in the same Microsoft package as VCRUNTIME140.dll, so installing it fixes both, plus VCRUNTIME140_1.dll."],
+      ["Why install the 32-bit version on a 64-bit PC?", "Plenty of games and launchers are still 32-bit programs, and they look for the 32-bit copy. Having both covers every program."],
+    ],
+    byHand: [
+      "Download both vc_redist.x64.exe and vc_redist.x86.exe from Microsoft's [latest Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) page.",
+      "If they say already installed, choose Repair. Restart, then try the game.",
+      "Skip DLL download websites; their copies are often the wrong version.",
+    ],
+    related: [
+      "pc-gaming/d3dx9-43-dll-not-found",
+      "pc-gaming/application-unable-to-start-correctly-0xc000007b",
+      "pc-gaming/games-crashing-to-desktop",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "application-unable-to-start-correctly-0xc000007b",
+    niche: "pc-gaming",
+    searchPhrases: [
+      "the application was unable to start correctly 0xc000007b",
+      "0xc000007b error",
+      "0xc000007b windows 11",
+      "0xc000007b error fix",
+      "0xc000007b elden ring",
+    ],
+    title: "The application was unable to start correctly (0xc000007b)",
+    description:
+      "Seeing 0xc000007b when a game starts? Stella (stella.sh) finds the mixed-up 32-bit and 64-bit files behind it, puts the right ones back and opens the game.",
+    h1: "The application was unable to start correctly (0xc000007b)",
+    short: "0xc000007b: unable to start correctly",
+    lede: "A game that launches instead of a box with a strange code.",
+    answer:
+      "0xc000007b means a game found a 32-bit file where it needed a 64-bit one, or the other way round. Stella (stella.sh) finds the mismatched file, reinstalls the Microsoft packages it came from and starts the game again.",
+    gets: [
+      "The wrong-sized file found and named",
+      "Visual C++, DirectX and .NET put back properly",
+      "Stray copies inside the game folder cleaned out",
+    ],
+    prompt:
+      "Elden Ring gives me 'The application was unable to start correctly (0xc000007b)'. It worked last week. Fix it.",
+    demo: {
+      ack: "On it. Looking for a file of the wrong kind.",
+      task: "Fixing 0xc000007b for Elden Ring",
+      rows: ["Found a 32-bit copy in System32", "Reinstalling Visual C++ in both versions", "Adding the older DirectX files", "Checking Elden Ring's game files"],
+      reply:
+        "Fixed. A 32-bit copy of a Microsoft file had been dropped where Windows keeps the 64-bit one, probably by an old installer. The proper files are back and Elden Ring starts.",
+    },
+    faq: [
+      ["What does 0xc000007b actually mean?", "Windows tried to load a piece of a program built for the other kind of Windows, 32-bit versus 64-bit, and gave up."],
+      ["Do I need to reinstall Windows for 0xc000007b?", "Almost never. Putting back the shared Microsoft packages and repairing the game's own files clears it in nearly every case."],
+    ],
+    byHand: [
+      "Reinstall the x64 and x86 Visual C++ Redistributable, the DirectX End-User Runtime and .NET Framework from Microsoft.",
+      "Run sfc /scannow in an admin Command Prompt, then restart.",
+      "Verify the game's files in Steam or its launcher.",
+    ],
+    related: [
+      "pc-gaming/vcruntime140-dll-missing",
+      "pc-gaming/d3dx9-43-dll-not-found",
+      "pc-gaming/games-crashing-to-desktop",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "directx-encountered-an-unrecoverable-error",
+    niche: "pc-gaming",
+    searchPhrases: [
+      "directx encountered an unrecoverable error",
+      "directx encountered an unrecoverable error call of duty",
+      "directx encountered an unrecoverable error warzone",
+      "how to fix directx encountered an unrecoverable error",
+      "call of duty directx error",
+    ],
+    title: "DirectX encountered an unrecoverable error? Stop the crash",
+    description:
+      "Call of Duty or Warzone closing with DirectX encountered an unrecoverable error? Stella (stella.sh) clears the cause, from old shaders to a shaky overclock.",
+    h1: "DirectX encountered an unrecoverable error",
+    short: "DirectX encountered an unrecoverable error",
+    lede: "Full matches of Call of Duty without the crash box.",
+    answer:
+      "This Call of Duty crash means the graphics card stopped answering the game, usually from a stale driver, a corrupted shader cache or an unstable overclock. Stella (stella.sh) works through those causes and leaves your settings steady.",
+    gets: [
+      "The game's shader cache cleared so it rebuilds clean",
+      "A fresh graphics driver for your exact card",
+      "Any factory or manual overclock eased back",
+    ],
+    prompt:
+      "Warzone keeps crashing mid-match with DirectX encountered an unrecoverable error. RTX 4070. Make it stop.",
+    demo: {
+      ack: "On it. Reading the crash reports Warzone left.",
+      task: "Fixing the Warzone DirectX error",
+      rows: ["Crash came from the graphics driver", "Clearing Warzone's shader cache", "Installing the newest NVIDIA driver", "Lowering the memory overclock"],
+      reply:
+        "Done. The driver reset during play each time. Warzone's shader cache is cleared, the NVIDIA driver is fresh, and the overclock from your tuning tool is off. The first match will rebuild shaders, then it plays normally.",
+    },
+    faq: [
+      ["Is my graphics card dying?", "Rarely. Most of the time it's software or a clock speed the card can't hold for long. Stella checks those before anything points at the hardware."],
+      ["Does running the game as administrator help?", "It helps when the game can't write its shader files. Stella fixes the folder access instead, so you don't need it every launch."],
+    ],
+    byHand: [
+      "Delete the shader cache folders in the game's install folder (players or shadercache); the game rebuilds them.",
+      "Clean install the driver with DDU, then remove any overclock in MSI Afterburner.",
+      "Use Scan and Repair in Battle.net or Verify in Steam.",
+    ],
+    related: [
+      "pc-gaming/dxgi-error-device-removed",
+      "pc-gaming/clean-install-graphics-drivers",
+      "pc-gaming/games-crashing-to-desktop",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "dxgi-error-device-removed",
+    niche: "pc-gaming",
+    searchPhrases: [
+      "dxgi_error_device_removed",
+      "dxgi_error_device_hung",
+      "dxgi_error_device_removed 0x887a0006",
+      "dxgi_error_device_hung apex legends",
+      "dxgi_error_device_removed with reason dxgi_error_device_hung",
+    ],
+    title: "DXGI_ERROR_DEVICE_REMOVED or DEVICE_HUNG? Fix the crash",
+    description:
+      "Game crashing with DXGI_ERROR_DEVICE_REMOVED or DXGI_ERROR_DEVICE_HUNG? Stella (stella.sh) finds why your graphics card drops out and steadies it.",
+    h1: "DXGI_ERROR_DEVICE_REMOVED and DXGI_ERROR_DEVICE_HUNG",
+    short: "DXGI_ERROR_DEVICE_REMOVED / DEVICE_HUNG",
+    lede: "Long sessions that don't end with the screen freezing.",
+    answer:
+      "Both errors mean Windows lost contact with your graphics card for a moment and reset it, so the game died. Stella (stella.sh) checks the driver, clock speeds, temperatures and power settings, then fixes whichever one is slipping.",
+    gets: [
+      "Windows' own reset log read to find the cause",
+      "Clock speeds set to what your card holds",
+      "Windows given longer to wait on a busy card",
+    ],
+    prompt:
+      "Apex Legends crashes every few games with DXGI_ERROR_DEVICE_HUNG. RX 7800 XT. Find what's wrong and fix it.",
+    demo: {
+      ack: "On it. Reading Windows' log of graphics card resets.",
+      task: "Fixing DXGI_ERROR_DEVICE_HUNG in Apex",
+      rows: ["Card reset four times this week", "Each time near 88°C hot spot", "Easing the clock and fan curve", "Giving Windows longer to wait"],
+      reply:
+        "Fixed. The card was running hot and briefly stalled, so Windows reset it. Clocks are a little lower, fans ramp earlier, and Windows waits longer before resetting. Apex should hold through long sessions now.",
+    },
+    faq: [
+      ["What's the difference between DEVICE_REMOVED and DEVICE_HUNG?", "DEVICE_HUNG means the card stopped responding. DEVICE_REMOVED is what the game sees afterwards, once Windows has reset the card."],
+      ["Can a power supply cause DXGI_ERROR_DEVICE_REMOVED?", "Yes. A weak or split cable can make the card drop out under load. Stella spots that pattern in the logs and tells you."],
+    ],
+    byHand: [
+      "Clean install the driver with DDU.",
+      "Lower the core clock by 50 to 100 MHz in MSI Afterburner or AMD Adrenalin and test.",
+      "Raise TdrDelay to 8 in the registry under HKLM\\System\\CurrentControlSet\\Control\\GraphicsDrivers.",
+    ],
+    related: [
+      "pc-gaming/directx-encountered-an-unrecoverable-error",
+      "pc-gaming/undervolt-gpu",
+      "pc-gaming/pc-overheating-when-gaming",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "out-of-video-memory-trying-to-allocate",
+    niche: "pc-gaming",
+    searchPhrases: [
+      "out of video memory trying to allocate a rendering resource",
+      "out of video memory trying to allocate a texture",
+      "out of video memory trying to allocate a rendering resource fix",
+      "out of video memory trying to allocate a rendering resource marvel rivals",
+      "out of video memory trying to allocate a rendering resource fortnite",
+    ],
+    title: "Out of video memory trying to allocate a rendering resource",
+    description:
+      "Marvel Rivals, Fortnite or another game says out of video memory? Stella (stella.sh) checks whether it's settings or your processor, and fixes the real cause.",
+    h1: "Out of video memory trying to allocate a rendering resource",
+    short: "Out of video memory error",
+    lede: "Games that load in instead of crashing at the menu.",
+    answer:
+      "Despite the wording, this crash often isn't the graphics card at all. On Intel 13th and 14th gen processors it's usually a known instability fixed by a motherboard update. Stella (stella.sh) works out which case you're in and fixes it.",
+    gets: [
+      "Your processor checked against Intel's known issue",
+      "The motherboard update that fixes it, ready to apply",
+      "Texture and shader settings matched to your card",
+    ],
+    prompt:
+      "Marvel Rivals crashes with 'out of video memory trying to allocate a rendering resource'. i9-13900K, RTX 4080. Fix it.",
+    demo: {
+      ack: "On it. Your processor is one Intel flagged.",
+      task: "Fixing the out of video memory crash",
+      rows: ["Your card has plenty of memory", "Motherboard firmware is from 2023", "Downloading the fixed firmware update", "Setting texture quality to high"],
+      reply:
+        "Your 13900K is on old motherboard firmware without Intel's fix, which is what triggers this crash. The new update is in Downloads with steps to apply it from the setup screen. Texture quality is high, not ultra.",
+    },
+    faq: [
+      ["Do I need a graphics card with more memory?", "Usually not. With 8 GB or more, the processor or a driver is the likelier cause."],
+      ["I have an AMD processor. Can I still get this error?", "Yes, though less often. Then it's typically texture settings above what the card holds, or an old driver, and Stella fixes those."],
+    ],
+    byHand: [
+      "Intel 13th/14th gen: update the motherboard BIOS to one with Intel's latest microcode.",
+      "Otherwise lower texture quality a step and update the graphics driver.",
+    ],
+    related: [
+      "pc-gaming/games-crashing-to-desktop",
+      "pc-gaming/dxgi-error-device-removed",
+      "pc-gaming/update-graphics-drivers",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "game-security-violation-detected",
+    niche: "pc-gaming",
+    searchPhrases: [
+      "game security violation detected",
+      "game security violation detected easy anti cheat",
+      "easy anti cheat untrusted system file",
+      "game security violation detected fortnite",
+      "game security violation detected elden ring",
+    ],
+    title: "Game Security Violation Detected? Get back into the game",
+    description:
+      "Easy Anti-Cheat stopping your game with Game Security Violation Detected? Stella (stella.sh) finds the harmless program it objects to and clears the way.",
+    h1: "Game Security Violation Detected (Easy Anti-Cheat)",
+    short: "Game Security Violation Detected",
+    lede: "Back in the match without the anti-cheat box stopping you.",
+    answer:
+      "Easy Anti-Cheat shows this when something harmless running on your PC looks suspicious to it, often a lighting, fan or macro app. Stella (stella.sh) finds which program it named, closes it for game time and repairs Easy Anti-Cheat.",
+    gets: [
+      "The program Easy Anti-Cheat named, found and explained",
+      "That program kept closed while you play",
+      "Easy Anti-Cheat repaired from the game's own folder",
+    ],
+    prompt:
+      "Fortnite keeps saying Game Security Violation Detected with code 00000001. I don't cheat. Fix it so I can play.",
+    demo: {
+      ack: "On it. Finding which program it doesn't like.",
+      task: "Clearing Game Security Violation Detected",
+      rows: ["The flagged program is your RGB app", "Closing it whenever Fortnite starts", "Repairing Easy Anti-Cheat"],
+      reply:
+        "Easy Anti-Cheat objected to your keyboard lighting app reading game memory. It now closes when Fortnite opens and comes back after, and Easy Anti-Cheat is repaired. You're clear to play.",
+    },
+    faq: [
+      ["How do I fix untrusted system file in Easy Anti-Cheat?", "The message names a file, often from a driver. Stella repairs Windows' own files and reinstalls the driver it belongs to, such as AMD's hotkey file."],
+      ["Does Game Security Violation Detected mean I'm banned?", "No, it stops the game from launching while the flagged program runs. Once that program is closed, the game starts as normal."],
+    ],
+    byHand: [
+      "Note the file or program named in the error and close it, or uninstall it if you don't need it.",
+      "Run EasyAntiCheat_Setup.exe in the game's EasyAntiCheat folder and choose Repair.",
+    ],
+    related: [
+      "pc-gaming/games-crashing-to-desktop",
+      "pc-gaming/application-unable-to-start-correctly-0xc000007b",
+      "pc-gaming/high-cpu-usage-while-gaming",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
 ];

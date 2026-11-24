@@ -6,6 +6,13 @@ import { WATCHES_PAGES } from "./watches";
 import { APPS_PAGES } from "./apps";
 import { DESIGN_PAGES } from "./design";
 import { WEBSITES_PAGES } from "./websites";
+import { GAME_SERVERS_PAGES } from "./game-servers";
+import { STREAMING_PAGES } from "./streaming";
+import { MAKE_GAMES_PAGES } from "./make-games";
+import { SIDELOADING_PAGES } from "./sideloading";
+import { DOWNLOADS_PAGES } from "./downloads";
+import { PUBLISHING_PAGES } from "./publishing";
+import { PRINTING_3D_PAGES } from "./3d-printing";
 import { DOCUMENT_PAGES } from "./documents";
 import { EMULATION_PAGES } from "./emulation";
 import { FILES_FOLDERS_PAGES } from "./files-folders";
@@ -41,6 +48,13 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...LOCAL_AI_PAGES,
   ...EMULATION_PAGES,
   ...PC_GAMING_PAGES,
+  ...GAME_SERVERS_PAGES,
+  ...STREAMING_PAGES,
+  ...MAKE_GAMES_PAGES,
+  ...SIDELOADING_PAGES,
+  ...DOWNLOADS_PAGES,
+  ...PUBLISHING_PAGES,
+  ...PRINTING_3D_PAGES,
   ...FILES_FOLDERS_PAGES,
   ...CONTACTS_CALENDAR_EMAIL_PAGES,
   ...STUDY_PAGES,

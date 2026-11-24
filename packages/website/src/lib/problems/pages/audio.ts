@@ -690,4 +690,598 @@ export const AUDIO_PAGES: ProblemPage[] = [
     platforms: ["windows", "mac", "linux"],
     lastChecked: "2026-11-24",
   }),
+  shortGuide({
+    slug: "edit-podcast-episode",
+    niche: "audio",
+    searchPhrases: [
+      "how to edit a podcast",
+      "edit podcast audio",
+      "edit podcast with ai",
+      "how to edit a podcast for free",
+    ],
+    title: "How to edit a podcast episode: cut mistakes, add intro and outro",
+    description:
+      "Raw podcast recording full of flubs and long pauses? Ask Stella (stella.sh) to cut them, tighten the gaps and add your intro and outro music.",
+    h1: "Edit my podcast episode, start to finish",
+    short: "Edit a podcast episode",
+    lede: "A finished episode: mistakes out, pauses tightened, intro and outro on.",
+    answer:
+      "To edit a podcast, cut the mistakes and long pauses, then add your intro and outro music. Stella (stella.sh) does the whole edit from your raw recording and hands back an episode ready to upload.",
+    gets: [
+      "False starts, retakes and long pauses cut out",
+      "Your intro and outro music added with soft fades",
+      "An MP3 ready for Spotify and Apple Podcasts",
+    ],
+    prompt:
+      "Edit episode 12 of my podcast in Podcast/Raw. Cut the flubs and the long pauses, and add intro.mp3 and outro.mp3.",
+    demo: {
+      ack: "Sure. Editing episode 12 now.",
+      task: "Editing podcast episode 12",
+      rows: [
+        "Writing out what was said",
+        "Finding retakes, flubs and dead air",
+        "Cutting and tightening the gaps",
+        "Adding the intro and outro music",
+      ],
+      reply:
+        "Done. **Episode 12 (edited).mp3** is in Podcast/Edited: 52 minutes, down from 61, with 14 retakes cut. Every cut is listed in cuts.txt.",
+      files: ["Episode 12 (edited).mp3", "cuts.txt"],
+    },
+    faq: [
+      ["Will it cut things I wanted to keep?", "Only clear retakes, false starts and dead air go, each listed with its time. Ask for any of them back."],
+      ["Does this work for video podcasts?", "Yes. The same cuts are made to the video, so picture and sound stay in sync."],
+    ],
+    byHand: [
+      "Open the recording in the free [Audacity](https://www.audacityteam.org), or GarageBand on a Mac.",
+      "Listen through, select each mistake or long pause and delete it.",
+      "Drag your intro and outro music onto a second track and fade it under the first and last words.",
+    ],
+    related: ["audio/master-podcast-loudness", "audio/mix-two-person-podcast", "video/remove-filler-words-from-video"],
+    costNote: "Yes. A free speech tool on your computer writes out the episode, and the editing runs on your own plan.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "mix-two-person-podcast",
+    niche: "audio",
+    searchPhrases: [
+      "how to mix podcast audio",
+      "how to mix a podcast",
+      "how to mix podcast vocals",
+      "how to mix and master a podcast",
+    ],
+    title: "How to mix podcast audio so both voices sound even",
+    description:
+      "One host loud, the other quiet, and both mics picking up each other? Ask Stella (stella.sh) to mix your podcast tracks into one even episode.",
+    h1: "Mix my podcast audio so both voices match",
+    short: "Mix a two-person podcast",
+    lede: "Two voices at the same level, each one clean, in one finished mix.",
+    answer:
+      "To mix podcast audio, clean each voice on its own track, match their levels, and stop one mic picking up the other. Stella (stella.sh) mixes your two tracks into one even episode.",
+    gets: [
+      "Both voices at the same level all the way through",
+      "Your voice turned down in your co-host's mic, and theirs in yours",
+      "Your separate tracks kept as they were",
+    ],
+    prompt:
+      "Mix my podcast. Dana's mic and mine are separate files in Podcast/Ep 8. She's way quieter than me and you can hear me in her mic.",
+    demo: {
+      ack: "On it. Mixing the two mics together.",
+      task: "Mixing episode 8",
+      rows: [
+        "Lining up both mic tracks",
+        "Bringing Dana up to your level",
+        "Quieting each mic while the other talks",
+        "Blending both into one mix",
+      ],
+      reply:
+        "Done. **Ep 8 mix.wav** is in Podcast/Ep 8. Dana now sits at the same level as you, and your voice no longer echoes through her mic. Both original tracks are unchanged.",
+      files: ["Ep 8 mix.wav"],
+    },
+    faq: [
+      ["What if we recorded everything into one file?", "It still works. Each speaker's parts are found and evened out, quiet up and loud down."],
+      ["What's the difference between mixing and mastering a podcast?", "Mixing balances the voices. Mastering sets the finished episode's loudness for podcast apps. Ask for both at once."],
+    ],
+    byHand: [
+      "In Audacity, import both tracks and run Loudness Normalization on each, to the same target.",
+      "Add the Compressor effect to each voice so loud and soft moments sit closer together.",
+      "Lower each track where only the other person talks, then export a single mixed file.",
+    ],
+    related: ["audio/master-podcast-loudness", "audio/edit-podcast-episode", "audio/zoom-recording-to-podcast"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "master-podcast-loudness",
+    niche: "audio",
+    searchPhrases: [
+      "podcast loudness lufs",
+      "podcast loudness standards",
+      "apple podcast loudness standard",
+      "spotify podcast loudness",
+      "podcast target lufs",
+    ],
+    title: "Podcast loudness in LUFS: master for Spotify and Apple",
+    description:
+      "Podcast quieter than every other show? Ask Stella (stella.sh) to master your episode to -16 LUFS with safe peaks, the level Apple asks for.",
+    h1: "Get my podcast to the right loudness (LUFS) for Spotify and Apple",
+    short: "Master a podcast to the right loudness",
+    lede: "An episode as loud as the shows around it, with no distortion.",
+    answer:
+      "Podcasts sound right at about -16 LUFS with peaks under -1 dB, the level Apple asks for, which plays well on Spotify too. Stella (stella.sh) masters your episode to that and reports the final numbers.",
+    gets: [
+      "Your episode at -16 LUFS, peaks held under -1 dB",
+      "Loud and soft moments evened out first, not just turned up",
+      "The original file kept",
+    ],
+    prompt:
+      "My podcast is way quieter than other shows on Spotify. Master episode 30 in Podcast/Final to the right loudness for Spotify and Apple.",
+    demo: {
+      ack: "Sure. Mastering episode 30 for podcast apps.",
+      task: "Mastering episode 30",
+      rows: [
+        "Measuring the episode: -24 LUFS now",
+        "Evening out loud and soft moments",
+        "Raising it to -16 LUFS",
+        "Holding peaks under -1 dB",
+      ],
+      reply:
+        "Done. **Episode 30 (mastered).mp3** is in Podcast/Final at -16 LUFS with peaks at -1 dB, so it matches other shows on Spotify and Apple Podcasts. Your original is untouched.",
+      files: ["Episode 30 (mastered).mp3"],
+    },
+    faq: [
+      ["Is podcast loudness -14 or -16 LUFS?", "Apple asks for -16 LUFS. Spotify's own -14 target is for music, and -16 plays well there too. Ask for -14 if you prefer it louder."],
+      ["Why is my podcast so quiet after uploading?", "It was exported well under -16 LUFS. A limiter, not the volume slider, brings it up without crackle."],
+    ],
+    byHand: [
+      "In Audacity, choose Effect, Volume and Compression, Loudness Normalization and set -16 LUFS.",
+      "Then add the Limiter effect with the ceiling at -1 dB so peaks don't crackle.",
+      "Or upload to [Auphonic](https://auphonic.com), which does both online with a few free hours each month.",
+    ],
+    related: ["audio/mix-two-person-podcast", "audio/normalize-audio-volume", "audio/edit-podcast-episode"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "remove-background-noise-from-audio",
+    niche: "audio",
+    searchPhrases: [
+      "remove background noise from audio",
+      "remove background noise from audio free",
+      "remove background noise from video",
+      "remove background noise from audio ai",
+      "podcast audio noise removal",
+    ],
+    title: "Remove background noise from audio or video, free",
+    description:
+      "Hum, fan or traffic behind your voice? Ask Stella (stella.sh) to remove the background noise from your recording or video and keep your voice natural.",
+    h1: "Remove background noise from my audio",
+    short: "Remove background noise",
+    lede: "Your voice clear, with the hum, fan and traffic gone.",
+    answer:
+      "To remove background noise from audio, run it through an AI noise remover that keeps the voice and drops the rest. Stella (stella.sh) cleans your recording on your computer, videos included, without that underwater sound.",
+    gets: [
+      "Fan, hum, hiss and traffic taken out",
+      "Your voice kept natural, not robotic",
+      "Videos cleaned too, with the picture untouched",
+    ],
+    prompt:
+      "There's a loud air conditioner hum behind my voice in interview.m4a in Downloads. Get rid of it but keep my voice sounding normal.",
+    demo: {
+      ack: "On it. Cleaning up the recording.",
+      task: "Removing background noise",
+      rows: [
+        "Listening for the hum and room noise",
+        "Separating your voice from the noise",
+        "Blending back a touch of room tone",
+      ],
+      reply:
+        "Done. **interview (clean).m4a** is next to the original in Downloads. The air conditioner hum is gone and your voice keeps its natural tone. Play the two side by side to compare.",
+      files: ["interview (clean).m4a"],
+    },
+    faq: [
+      ["Can I remove background noise from a video?", "Yes. The sound is cleaned and put back on the same video, so the picture and timing stay exactly as they were."],
+      ["Why does noise removal make my voice sound robotic?", "Older tools subtract a noise pattern and take part of the voice with it. AI noise removers separate the voice instead, so it stays natural."],
+    ],
+    byHand: [
+      "Free online: upload to [Adobe Podcast Enhance](https://podcast.adobe.com/enhance) and download the cleaned file.",
+      "In Audacity, select a few seconds of pure noise, then Effect, Noise Removal and Repair, Noise Reduction, Get Noise Profile.",
+      "Select the whole file, run Noise Reduction again around 12 dB, and stop before the voice starts to warble.",
+    ],
+    related: ["audio/remove-echo-from-audio", "audio/make-voice-over-sound-better", "audio/trim-silence-from-recordings"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "remove-echo-from-audio",
+    niche: "audio",
+    searchPhrases: [
+      "remove echo from audio",
+      "remove reverb from audio",
+      "remove echo from voice recording",
+      "remove echo from video recording",
+      "remove reverb from video",
+    ],
+    title: "Remove echo and room sound from audio or video",
+    description:
+      "Recorded in an empty, echoey room? Ask Stella (stella.sh) to remove the echo from your audio or video so your voice sounds close and clear.",
+    h1: "Remove the echo from my audio",
+    short: "Remove echo from audio",
+    lede: "A voice that sounds close to the mic, not lost in an empty room.",
+    answer:
+      "To remove echo from audio, use an AI tool that pulls the voice apart from the room's reflections. Stella (stella.sh) does that on your computer and puts the dry voice back on your recording or video.",
+    gets: [
+      "The hollow, roomy sound taken off your voice",
+      "Background noise cleaned in the same pass",
+      "Videos kept in sync with the cleaned sound",
+    ],
+    prompt:
+      "I recorded my lesson video in an empty room and my voice echoes. Fix lesson-3.mp4 in Videos so it sounds like I used a proper mic.",
+    demo: {
+      ack: "Sure. Taking the echo out.",
+      task: "Removing room echo from lesson 3",
+      rows: [
+        "Pulling your voice from the room sound",
+        "Trimming the leftover echo tails",
+        "Putting the clean voice back on the video",
+      ],
+      reply:
+        "Done. **lesson-3 (no echo).mp4** is next to the original in Videos. The empty-room sound is gone and your voice sounds close to the mic. Picture and timing are unchanged.",
+      files: ["lesson-3 (no echo).mp4"],
+    },
+    faq: [
+      ["Can echo really be removed after recording?", "Yes. AI tools trained on echoey voices take most of the room sound out and leave the voice itself intact."],
+      ["How do I avoid echo next time?", "Sit closer to the mic in a room with soft things in it: a couch, curtains, a rug. Even recording beside a wardrobe of clothes helps."],
+    ],
+    byHand: [
+      "Free online: [Adobe Podcast Enhance](https://podcast.adobe.com/enhance) removes echo and noise together.",
+      "Free on your computer: Ultimate Vocal Remover with the DeEcho-DeReverb model, keeping the voice output.",
+      "Paid: iZotope RX De-reverb, or the Dialogue Separator in DaVinci Resolve Studio.",
+    ],
+    related: ["audio/remove-background-noise-from-audio", "audio/make-voice-over-sound-better", "video/make-video-louder"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "remove-background-music-from-video",
+    niche: "audio",
+    searchPhrases: [
+      "remove background music from video",
+      "remove background music from video but keep voice",
+      "isolate voice from video",
+      "remove music from video keep sound effects",
+      "isolate voice from audio",
+    ],
+    title: "Remove background music from a video and keep the voice",
+    description:
+      "Want the talking without the song behind it? Ask Stella (stella.sh) to remove the background music from your video and keep every word clear.",
+    h1: "Remove the background music from a video, keep the voice",
+    short: "Remove background music, keep the voice",
+    lede: "The same video with the song gone and every word still there.",
+    answer:
+      "To remove background music from a video, split the sound into voice and music with an AI separator, then keep only the voice. Stella (stella.sh) does that and puts the clean voice back on your video.",
+    gets: [
+      "Just the voice, with the music gone",
+      "A voice-only audio file as well",
+      "The picture untouched and in sync",
+    ],
+    prompt:
+      "Take the background music out of vlog-paris.mp4 in Videos. I want to keep my voice and put a different song on later.",
+    demo: {
+      ack: "On it. Pulling your voice away from the music.",
+      task: "Removing music from vlog-paris",
+      rows: [
+        "Splitting voice from music",
+        "Cleaning traces of music between words",
+        "Putting the voice back on the video",
+      ],
+      reply:
+        "Done. **vlog-paris (voice only).mp4** is next to the original, with the music gone and your voice clear. A voice-only WAV is there too, ready to lay a new song under.",
+      files: ["vlog-paris (voice only).mp4", "vlog-paris voice.wav"],
+    },
+    faq: [
+      ["Can I remove the music but keep sound effects?", "Yes. Ask to keep the effects and the sound is split into voice, music and everything else. Only the music goes."],
+      ["Can I isolate a voice from an audio file?", "Yes. Give it an MP3 or WAV instead of a video and you get the voice on its own."],
+    ],
+    byHand: [
+      "Save the video's sound as a WAV, open it in the free Ultimate Vocal Remover, pick an MDX-Net model and tick Vocals Only.",
+      "Online, LALAL.AI and Moises split voice from music, with a few free minutes.",
+      "Mute the original sound in CapCut or DaVinci Resolve and lay the voice file back under the picture.",
+    ],
+    related: ["audio/make-karaoke-version-of-song", "video/add-music-to-video", "audio/extract-audio-from-video"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "fix-distorted-audio",
+    niche: "audio",
+    searchPhrases: [
+      "fix distorted audio",
+      "fix clipped audio",
+      "fix distorted audio online free",
+      "fix clipped audio ai",
+      "fix distorted audio in video",
+    ],
+    title: "Fix distorted or clipped audio in a recording or video",
+    description:
+      "Recording crackles and buzzes where someone got loud? Ask Stella (stella.sh) to repair the distorted, clipped parts of your audio or video.",
+    h1: "Fix distorted, clipped audio",
+    short: "Fix distorted audio",
+    lede: "The crackly, overloaded parts smoothed back into a clean voice.",
+    answer:
+      "To fix distorted audio, rebuild the flattened tops of each overloaded sound wave and lower the level so nothing crackles. Stella (stella.sh) repairs your recording or video that way and keeps the rest as it was.",
+    gets: [
+      "Crackle and buzz on loud words smoothed out",
+      "Videos repaired with the picture untouched",
+      "Your original file kept",
+    ],
+    prompt:
+      "My mic was set way too loud and wedding-toast.mp4 crackles every time my brother laughs or shouts. Can you fix the sound?",
+    demo: {
+      ack: "Sure. Repairing the overloaded parts.",
+      task: "Fixing distortion in wedding-toast",
+      rows: [
+        "Finding 37 overloaded moments",
+        "Rebuilding the cut-off peaks",
+        "Lowering the overall level slightly",
+        "Putting the sound back on the video",
+      ],
+      reply:
+        "Done. **wedding-toast (fixed).mp4** is next to the original. The crackle on the laughs and shouts is gone and the speech sounds clean again. The video itself is unchanged.",
+      files: ["wedding-toast (fixed).mp4"],
+    },
+    faq: [
+      ["What is clipped audio?", "The sound got louder than the mic or recorder could take, so the top of each sound wave was cut flat. That flat edge is what you hear as crackle."],
+      ["How do I stop it happening next time?", "Turn the mic's input level down so the loudest moments stay out of the red, then raise the volume afterwards."],
+    ],
+    byHand: [
+      "In Audacity, select the damaged part and choose Effect, Noise Removal and Repair, Clip Fix.",
+      "Free online, [Adobe Podcast Enhance](https://podcast.adobe.com/enhance) often smooths over light distortion in speech.",
+      "Paid: iZotope RX De-clip handles heavy distortion best.",
+    ],
+    related: ["audio/remove-background-noise-from-audio", "video/make-video-louder", "audio/normalize-audio-volume"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-mashup-of-two-songs",
+    niche: "audio",
+    searchPhrases: [
+      "how to make a mashup of two songs",
+      "mashup maker",
+      "two songs mashup",
+      "how to make a mashup of songs for free",
+    ],
+    title: "How to make a mashup of two songs that actually fits",
+    description:
+      "Want one song's vocals over another song's beat? Ask Stella (stella.sh) to make the mashup from your two files, matched in speed and key.",
+    h1: "Make a mashup of two songs",
+    short: "Make a mashup of two songs",
+    lede: "One song's vocals over the other's beat, in time and in tune.",
+    answer:
+      "To make a mashup of two songs, take the vocals from one and the music from the other, then match their speed and key. Stella (stella.sh) does all of it from your two song files.",
+    gets: [
+      "Vocals from one song over the other's beat",
+      "Both matched in speed and key",
+      "A clean start and finish, ready to share",
+    ],
+    prompt:
+      "Make a mashup of Velvet Static and Midnight Arcade in my Music folder: the vocals from the first over the beat of the second.",
+    demo: {
+      ack: "Sure. Building the mashup.",
+      task: "Mashing up two songs",
+      rows: [
+        "Splitting vocals and music in both songs",
+        "Matching the vocal's speed to the beat",
+        "Shifting the vocal into the same key",
+        "Landing the chorus on the drop",
+      ],
+      reply:
+        "Done. **Velvet Static x Midnight Arcade.mp3** is in your Music folder. The vocal was sped up slightly and moved up one key to fit the beat, and the chorus lands on the drop.",
+      files: ["Velvet Static x Midnight Arcade.mp3"],
+    },
+    faq: [
+      ["Do I need DJ software to make a mashup?", "No. If you DJ, you also get the vocal and the beat as separate files for Rekordbox or Serato."],
+      ["What if the two songs don't fit together?", "You're told how far apart their speed and key are. For a big gap, a closer pairing from your library is suggested."],
+    ],
+    byHand: [
+      "Split both songs with Ultimate Vocal Remover: keep the vocals of one and the instrumental of the other.",
+      "Look up each song's tempo and key on a free site like Tunebat.",
+      "In Audacity, use Change Tempo and Change Pitch on the vocal to match, line it up on the beat and export.",
+    ],
+    related: ["downloads/separate-song-into-stems", "audio/change-key-of-song", "audio/make-extended-mix"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-extended-mix",
+    niche: "audio",
+    searchPhrases: [
+      "how to make an extended mix of a song",
+      "extend a song",
+      "how to make a song longer",
+      "extend song length online free",
+    ],
+    title: "How to make an extended mix of a song for DJing",
+    description:
+      "Need a longer version with a clean intro and outro to mix with? Ask Stella (stella.sh) to make an extended mix from your song, on the beat throughout.",
+    h1: "Make an extended mix of a song",
+    short: "Make an extended mix",
+    lede: "A longer version with a clean intro and outro to mix in and out of.",
+    answer:
+      "To make an extended mix, loop the song's own beat into a longer intro and outro and repeat its best section, cutting only on the bar. Stella (stella.sh) builds it from your song file, in time all the way through.",
+    gets: [
+      "A beat-only intro and outro of 16 or 32 bars",
+      "The chorus or drop repeated where you want it",
+      "Every join on the beat, with no skips",
+    ],
+    prompt:
+      "Make an extended mix of Sunline in my DJ folder: 32 bars of just drums at the start and end, and play the drop twice.",
+    demo: {
+      ack: "On it. Building the extended mix.",
+      task: "Making an extended mix of Sunline",
+      rows: [
+        "Finding the beat and bar lines",
+        "Building a drums-only intro and outro",
+        "Repeating the drop on the bar",
+        "Smoothing every join",
+      ],
+      reply:
+        "Done. **Sunline (Extended Mix).mp3** is in your DJ folder: 6:15, up from 3:40, with 32 bars of drums at each end and the drop twice.",
+      files: ["Sunline (Extended Mix).mp3"],
+    },
+    faq: [
+      ["Can I just make a song longer for a video?", "Yes. Say the length, like 2 minutes, and it's looped on its own beat to fit."],
+      ["Is an extended mix the same as a remix?", "An extended mix loops the song's own parts. A remix adds new drums or bass on top of its stems."],
+    ],
+    byHand: [
+      "Load the song in Audacity or GarageBand and set the grid to the song's tempo.",
+      "Copy a drums-only stretch of 8 or 16 bars and paste it before the start and after the end.",
+      "Duplicate the drop, cut each join exactly on a bar line, and add short crossfades.",
+    ],
+    related: ["downloads/separate-song-into-stems", "audio/make-mashup-of-two-songs", "audio/slow-down-song-without-changing-pitch"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "background-music-for-voice-over",
+    niche: "audio",
+    searchPhrases: [
+      "background music for voice over",
+      "add background music to podcast",
+      "royalty free background music for podcast",
+      "background music for voice over no copyright",
+      "add background music to audio",
+    ],
+    title: "Add background music under a voice-over or podcast",
+    description:
+      "Want soft music under your narration or podcast? Ask Stella (stella.sh) to find a free track, keep it under your voice and fade it in and out.",
+    h1: "Add background music under my voice-over",
+    short: "Add background music under a voice-over",
+    lede: "Soft music under your voice that dips whenever you talk.",
+    answer:
+      "To add background music under a voice-over, pick a calm track from a free music library and keep it low under your voice. Stella (stella.sh) finds the music, sets the levels and fades it in and out.",
+    gets: [
+      "A calm track from a free library, with its source noted",
+      "Music that dips under your voice and rises in the gaps",
+    ],
+    prompt:
+      "Put some calm piano music under my narration in Projects/Tour/voiceover.wav. Keep it quiet and fade it out at the end.",
+    demo: {
+      ack: "Sure. Finding calm piano music for it.",
+      task: "Adding music under your narration",
+      rows: [
+        "Finding calm piano tracks in free libraries",
+        "Trimming it to your narration",
+        "Lowering it whenever you speak",
+        "Fading in and out",
+      ],
+      reply:
+        "Done. **voiceover with music.wav** is in Projects/Tour, with soft piano from Pixabay Music that dips while you talk and fades after your last line. The track's link is in music-source.txt.",
+      files: ["voiceover with music.wav", "music-source.txt"],
+    },
+    faq: [
+      ["How loud should background music be under a voice?", "About 20 dB under the voice while you talk, rising a little in the pauses."],
+      ["Can I use a song I already have?", "Yes. Point to the file and it's handled the same way."],
+    ],
+    byHand: [
+      "Download a calm track from [Pixabay Music](https://pixabay.com/music/) or the YouTube Audio Library.",
+      "In Audacity, put the voice and the music on separate tracks.",
+      "Lower the music about 20 dB, run Auto Duck so it dips when you speak, and add fades.",
+    ],
+    related: ["video/add-music-to-video", "audio/make-voice-over-sound-better", "audio/edit-podcast-episode"],
+    costNote:
+      "Yes with free-library music or your own songs. Music made just for you comes with Stella plans from $20 a month.",
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "make-voice-over-sound-better",
+    niche: "audio",
+    searchPhrases: [
+      "how to make voice over sound better",
+      "how to make your voice over sound professional",
+      "clean up audio voice over",
+      "make my voice sound better with ai",
+      "enhance voice recording",
+    ],
+    title: "How to make your voice-over sound better for YouTube",
+    description:
+      "Voice-over sounds thin, hissy or uneven? Ask Stella (stella.sh) to clean it up, warm it up and set it to the right loudness for YouTube.",
+    h1: "Make my voice-over sound better for YouTube",
+    short: "Make a voice-over sound better",
+    lede: "A voice that sounds clear, full and steady, like a proper studio mic.",
+    answer:
+      "To make a voice-over sound better, clean the noise, soften harsh S sounds and mouth clicks, even out the level and set it loud enough for YouTube. Stella (stella.sh) does all of that to your recording.",
+    gets: [
+      "Hiss, hum and mouth clicks cleaned up",
+      "Sharp S sounds and popping P's softened",
+      "A warmer, fuller tone at a steady volume",
+    ],
+    prompt:
+      "My voice-over for my YouTube video sounds thin and hissy, recorded on my laptop mic. Make voiceover-ep4.wav in Videos sound more professional.",
+    demo: {
+      ack: "Sure. Polishing your voice-over.",
+      task: "Polishing the episode 4 voice-over",
+      rows: [
+        "Removing hiss and mouth clicks",
+        "Adding warmth, softening sharp S sounds",
+        "Evening out loud and quiet words",
+        "Setting it to YouTube loudness",
+      ],
+      reply:
+        "Done. **voiceover-ep4 (polished).wav** is next to the original in Videos. The hiss is gone, your voice sounds fuller, and the level holds steady from start to finish. It's ready to drop into your edit.",
+      files: ["voiceover-ep4 (polished).wav"],
+    },
+    faq: [
+      ["Can a cheap mic sound like a studio mic?", "Much closer, yes. AI voice cleaners rebuild a clear, full voice from a laptop or phone recording."],
+      ["How loud should a YouTube voice-over be?", "Around -14 LUFS, voice well above any music. YouTube turns louder videos down."],
+    ],
+    byHand: [
+      "Free online: [Adobe Podcast Enhance](https://podcast.adobe.com/enhance) cleans and fills out a voice in one step.",
+      "In Audacity, run Noise Reduction, a Filter Curve EQ cutting below 80 Hz, then Compressor.",
+      "Finish with Loudness Normalization at -14 LUFS and export a WAV for your editor.",
+    ],
+    related: ["audio/remove-background-noise-from-audio", "audio/background-music-for-voice-over", "video/edit-raw-footage-into-youtube-video"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "zoom-recording-to-podcast",
+    niche: "audio",
+    searchPhrases: [
+      "how to turn a zoom recording into a podcast",
+      "zoom recording podcast",
+      "can i use zoom to record a podcast",
+      "zoom record separate audio tracks",
+    ],
+    title: "Turn a Zoom or Teams recording into a podcast episode",
+    description:
+      "Recorded an interview on Zoom or Teams? Ask Stella (stella.sh) to turn the call into a clean podcast episode with your intro, ready for Spotify.",
+    h1: "Turn my Zoom recording into a podcast episode",
+    short: "Turn a Zoom recording into a podcast",
+    lede: "Your video call, cleaned and edited into an episode people want to hear.",
+    answer:
+      "To turn a Zoom recording into a podcast, take the audio, clean each voice, cut the call chatter and level it for podcast apps. Stella (stella.sh) does it from your Zoom or Teams file and adds your intro.",
+    gets: [
+      "\"Can you hear me?\" and the goodbyes cut",
+      "Each voice cleaned and evened out",
+      "Your intro added and loudness set for podcast apps",
+    ],
+    prompt:
+      "Turn yesterday's Zoom interview with Priya in Documents/Zoom into a podcast episode. Cut the small talk at the start and add my intro.",
+    demo: {
+      ack: "On it. Turning the call into an episode.",
+      task: "Making an episode from the Zoom call",
+      rows: [
+        "Using each speaker's own Zoom audio file",
+        "Cutting the setup chatter and goodbyes",
+        "Cleaning and leveling both voices",
+        "Adding your intro, setting podcast loudness",
+      ],
+      reply:
+        "Done. **Priya interview - episode.mp3** is in Documents/Zoom: 41 minutes, starting at your intro, with both voices clean and even. Chapter times are in show-notes.txt.",
+      files: ["Priya interview - episode.mp3", "show-notes.txt"],
+    },
+    faq: [
+      ["Can I use Zoom to record a podcast?", "Yes. Before the call, turn on a separate audio file for each participant in Zoom's recording settings."],
+      ["Does it work with Teams or Google Meet recordings?", "Yes. Those give one mixed file, so each speaker's parts are found and evened out from that."],
+    ],
+    byHand: [
+      "In Zoom's settings, under Recording, tick the option to record a separate audio file for each participant.",
+      "Open the files in Audacity, cut the opening and closing chatter, and clean each voice with Noise Reduction.",
+      "Even out the two voices, add your intro, normalize to -16 LUFS and export an MP3.",
+    ],
+    related: ["audio/edit-podcast-episode", "audio/mix-two-person-podcast", "audio/master-podcast-loudness"],
+    lastChecked: "2026-11-24",
+  }),
 ];

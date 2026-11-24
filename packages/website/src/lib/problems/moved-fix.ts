@@ -13,6 +13,8 @@ export const MOVED_FIX_PAGES: Record<string, string> = {
   "comfyui-broken-after-update": "/how/local-ai/comfyui-missing-custom-nodes",
   "c-drive-full": "/how/pc-cleanup/free-up-space-on-c-drive",
   "sims-4-mods-broken": "/how/game-mods/find-broken-sims-4-mods",
+  "vcruntime140-dll-missing": "/how/pc-gaming/vcruntime140-dll-missing",
+  "obs-black-screen": "/how/streaming/obs-black-screen",
   // Retired (audit 2026-11-10): developer topics are the wrong audience, and the
   // DLSS 5 page promised a "leaked build". They redirect to the how-to index.
   "setup-dlss-5-one-click": "/how",

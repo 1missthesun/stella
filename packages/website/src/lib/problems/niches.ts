@@ -21,6 +21,7 @@ export const NICHES: Niche[] = [
       { title: "Cosy, building and survival.", slugs: ["mod-stardew-valley",  "stardew-valley-mods-not-working",  "install-stardew-valley-expanded",  "stardew-valley-recolor-mods",  "cozy-minecraft-texture-packs",  "disney-dreamlight-valley-mods",  "coral-island-mods",  "mod-valheim",  "mod-terraria",  "mod-rimworld",  "mod-palworld",  "mod-subnautica",  "mod-project-zomboid",  "mod-cities-skylines-2",  "mod-lethal-company",  "mod-balatro",  "mod-silksong"] },
       { title: "Driving.", slugs: ["assetto-corsa-mods", "beamng-mods", "euro-truck-simulator-2-mods"] },
       { title: "Mod managers and making your own.", slugs: ["ai-mod-maker", "make-a-skyrim-mod", "install-nexus-mods", "vortex-mod-manager", "mod-organizer-2", "vortex-to-mod-organizer-2", "r2modman-thunderstore", "install-bepinex", "steam-deck-mods"] },
+      { title: "Error messages.", slugs: ["skyrim-newer-version-than-skse",  "skse-dll-plugin-failed-to-load",  "fallout-4-newer-version-than-f4se",  "script-hook-v-critical-error"] },
     ],
   },
   {
@@ -143,6 +144,7 @@ export const NICHES: Niche[] = [
       { title: "Fixing ComfyUI errors.", slugs: ["comfyui-missing-custom-nodes",  "fix-comfyui-workflow-errors",  "torch-not-compiled-with-cuda-enabled",  "comfyui-python-version"] },
       { title: "Small graphics cards.", slugs: ["comfyui-out-of-memory",  "make-comfyui-faster-low-vram"] },
       { title: "Chat AI on your computer.", slugs: ["run-ai-offline-on-your-computer",  "best-ollama-model-for-your-pc",  "ollama-open-webui-setup"] },
+      { title: "Error messages.", slugs: ["torch-cuda-out-of-memory",  "cuda-driver-version-is-insufficient"] },
     ],
   },
   {
@@ -161,6 +163,130 @@ export const NICHES: Niche[] = [
       { title: "Monitors and HDR.", slugs: ["second-monitor-not-detected",  "monitor-stuck-at-60hz",  "hdr-washed-out-windows-11"] },
       { title: "Sound, controllers and Bluetooth.", slugs: ["no-sound-on-pc",  "bluetooth-headphones-sound-bad-on-pc",  "controller-not-working-on-pc"] },
       { title: "Startup and game storage.", slugs: ["windows-11-slow-startup",  "move-steam-game-to-another-drive"] },
+      { title: "Error messages.", slugs: ["vcruntime140-dll-missing",  "application-unable-to-start-correctly-0xc000007b",  "directx-encountered-an-unrecoverable-error",  "dxgi-error-device-removed",  "out-of-video-memory-trying-to-allocate",  "game-security-violation-detected"] },
+    ],
+  },
+  {
+    slug: "game-servers",
+    recommended: "claude",
+    name: "Game servers and Discord",
+    h1: "A server for you and your friends.",
+    title: "Game servers made easy: Minecraft, Palworld, Valheim, Discord",
+    description:
+      "Set up a modded Minecraft, Palworld, Terraria or Valheim server your friends can join, fix crashes, and set up Discord bots and roles. Just ask Stella (stella.sh).",
+    intro:
+      "Say which game and who's playing. Stella (stella.sh) sets up the server and gets your friends in.",
+    sections: [
+      { title: "Minecraft.", slugs: ["make-a-minecraft-server-for-friends",  "make-a-modded-minecraft-server",  "minecraft-java-and-bedrock-server",  "minecraft-server-without-port-forwarding",  "minecraft-server-crashing"] },
+      { title: "Palworld, Valheim, Terraria and Zomboid.", slugs: ["palworld-dedicated-server",  "valheim-dedicated-server-with-mods",  "modded-terraria-server",  "project-zomboid-server-for-friends"] },
+      { title: "Players and backups.", slugs: ["whitelist-and-admins-minecraft-server",  "automatic-game-server-backup"] },
+      { title: "Discord.", slugs: ["make-a-discord-server",  "make-a-discord-bot",  "game-server-status-discord-bot"] },
+    ],
+  },
+  {
+    slug: "streaming",
+    recommended: "claude",
+    name: "Streaming and OBS",
+    h1: "Go live looking and sounding right.",
+    title: "Streaming made easy: OBS setup, audio, scenes and dropped frames",
+    description:
+      "Set up OBS scenes, split game and Discord audio, make your mic sound good and fix dropped frames or lag on Twitch, YouTube and Kick. Just ask Stella (stella.sh).",
+    intro:
+      "Say what you stream and what's wrong. Stella (stella.sh) sets up OBS and fixes it.",
+    sections: [
+      { title: "Go live.", slugs: ["set-up-obs-for-streaming",  "best-obs-settings-for-streaming",  "stream-to-twitch-and-youtube",  "capture-card-obs-setup"] },
+      { title: "Lag and black screens.", slugs: ["obs-black-screen",  "obs-dropped-frames-encoding-overloaded"] },
+      { title: "Voice and sound.", slugs: ["make-mic-sound-better-in-obs",  "separate-game-and-discord-audio-in-obs"] },
+      { title: "Scenes, chat and camera.", slugs: ["set-up-obs-scenes",  "add-chat-and-alerts-to-obs",  "obs-virtual-camera"] },
+      { title: "Recording and clips.", slugs: ["best-obs-settings-for-recording",  "obs-replay-buffer"] },
+    ],
+  },
+  {
+    slug: "make-games",
+    recommended: "claude",
+    name: "Make your own game",
+    h1: "Your own game, from your idea.",
+    title: "Make your own game without coding: Roblox, Ren'Py, browser games",
+    description:
+      "Make a Roblox game, a visual novel, a small browser game or a Minecraft datapack from your idea, and change it by asking. Just ask Stella (stella.sh).",
+    intro:
+      "Describe the game you want to play. Stella (stella.sh) makes it and changes it when you ask.",
+    sections: [
+      { title: "Start with an idea.", slugs: ["make-a-game-without-coding",  "make-a-2d-platformer-game",  "make-a-video-game-as-a-gift"] },
+      { title: "Roblox.", slugs: ["make-a-roblox-game",  "make-an-obby-in-roblox",  "roblox-studio-scripts"] },
+      { title: "Fortnite and Minecraft.", slugs: ["make-a-fortnite-map",  "make-a-minecraft-datapack"] },
+      { title: "Stories and RPGs.", slugs: ["make-a-visual-novel-with-renpy",  "make-an-rpg-with-rpg-maker"] },
+      { title: "Party games.", slugs: ["make-a-trivia-game",  "make-a-jackbox-style-party-game"] },
+    ],
+  },
+  {
+    slug: "sideloading",
+    recommended: "gemini",
+    name: "Phone, VR and console mods",
+    h1: "Apps and mods on your phone, headset and console.",
+    title: "Sideloading made easy: iPhone, Android, Quest and handhelds",
+    description:
+      "Sideload apps on iPhone with AltStore or SideStore, patch Android apps, add Quest mods with SideQuest and set up handhelds. Just ask Stella (stella.sh).",
+    intro:
+      "Say what you want on your device. Stella (stella.sh) sets it up from your computer.",
+    sections: [
+      { title: "iPhone and iPad.", slugs: ["install-altstore-on-iphone",  "sidestore-setup",  "install-ipa-on-iphone",  "altstore-apps-expire"] },
+      { title: "Android.", slugs: ["install-apk-from-pc-to-android",  "youtube-revanced",  "remove-bloatware-android-with-pc"] },
+      { title: "Meta Quest and VR.", slugs: ["sideload-quest-3-with-sidequest",  "beat-saber-custom-songs-quest",  "gorilla-tag-mods"] },
+      { title: "Consoles and handhelds.", slugs: ["switch-custom-firmware",  "how-to-mod-3ds",  "ps-vita-homebrew",  "install-decky-loader-steam-deck"] },
+    ],
+  },
+  {
+    slug: "downloads",
+    recommended: "gemini",
+    name: "Download and convert media",
+    h1: "Save the video, the playlist, the song.",
+    title: "Download videos and music made easy: YouTube, TikTok, Twitch",
+    description:
+      "Save YouTube videos and playlists, TikToks, Twitch VODs and podcasts, rip CDs and DVDs, and fix files that won't play. Just ask Stella (stella.sh).",
+    intro:
+      "Paste the link or say what you want to keep. Stella (stella.sh) saves it in a format that plays.",
+    sections: [
+      { title: "YouTube.", slugs: ["download-youtube-videos",  "download-youtube-playlist",  "youtube-to-mp3"] },
+      { title: "TikTok, Instagram, Twitch and other sites.", slugs: ["download-tiktok-without-watermark",  "download-instagram-reels",  "download-twitch-vods",  "download-video-from-website"] },
+      { title: "Music and podcasts.", slugs: ["spotify-playlist-to-mp3",  "download-all-podcast-episodes",  "separate-song-into-stems"] },
+      { title: "CDs, DVDs and Blu-rays.", slugs: ["rip-cd-to-flac-or-mp3",  "rip-dvd-to-mp4"] },
+      { title: "Files that won't play right.", slugs: ["hevc-video-wont-play",  "fix-audio-out-of-sync-with-video"] },
+    ],
+  },
+  {
+    slug: "publishing",
+    recommended: "claude",
+    name: "Books, comics and printables",
+    h1: "Your book, ready to print or publish.",
+    title: "Make a book made easy: children's books, cookbooks, comics, KDP",
+    description:
+      "Make a children's book, family cookbook, photo book or comic, and get it ready for Amazon KDP, print or EPUB. Just ask Stella (stella.sh).",
+    intro:
+      "Bring the words, recipes or photos. Stella (stella.sh) lays out the book and gets it ready to print.",
+    sections: [
+      { title: "Books from your photos and keepsakes.", slugs: ["make-a-photo-book",  "make-a-memory-book",  "turn-kids-artwork-into-a-book"] },
+      { title: "Picture books and comics.", slugs: ["make-a-childrens-book",  "turn-a-story-into-a-comic",  "make-a-coloring-book"] },
+      { title: "Self-publishing on Amazon and Apple Books.", slugs: ["format-a-book-for-kdp",  "make-a-kdp-book-cover",  "make-an-ebook",  "self-publish-a-poetry-book"] },
+      { title: "Printables.", slugs: ["make-a-printable-planner",  "make-recipe-cards",  "make-a-zine"] },
+    ],
+  },
+  {
+    slug: "3d-printing",
+    recommended: "claude",
+    name: "3D printing and making",
+    h1: "From an idea to a finished print.",
+    title: "3D printing made easy: custom STLs, fixes and slicer setup",
+    description:
+      "Get a custom STL made, fix broken models, set up Bambu Lab or Prusa slicing, and make cosplay parts or laser-cut files. Just ask Stella (stella.sh).",
+    intro:
+      "Say what you want to print or make. Stella (stella.sh) makes the file and gets it print-ready.",
+    sections: [
+      { title: "Make something to print.", slugs: ["make-a-custom-stl-file",  "3d-print-a-replacement-part",  "make-a-name-keychain-stl",  "make-a-lithophane-from-a-photo"] },
+      { title: "Cosplay and sizing.", slugs: ["3d-print-a-cosplay-helmet",  "resize-a-3d-model-to-measurements",  "split-a-model-for-3d-printing"] },
+      { title: "Fix files and prints.", slugs: ["fix-a-broken-stl-file",  "fix-3d-print-stringing"] },
+      { title: "Slicer settings.", slugs: ["bambu-studio-best-settings",  "prusaslicer-best-settings"] },
+      { title: "Laser cutting.", slugs: ["make-svg-files-for-laser-cutting"] },
     ],
   },
   {
@@ -287,13 +413,21 @@ export const NICHES: Niche[] = [
   },
   {
     slug: "audio",
-    name: "Audio and music",
-    h1: "Music and recordings, sorted and ready to play.",
-    title: "Audio and music how-tos: convert, join, split, practise",
+    recommended: "claude",
+    name: "Podcasts, audio and music",
+    h1: "Podcasts and recordings that sound finished.",
+    title: "Audio made easy: podcast editing, clean-up, stems and music files",
     description:
-      "Convert WMA or FLAC to MP3, fix tags, trim silence, even out volume, make ringtones and audiobooks, or practice tracks. Just ask Stella (stella.sh).",
+      "Edit and mix a podcast, clean up noisy recordings, split vocals and stems, convert and tag music, and make ringtones or audiobooks. Just ask Stella (stella.sh).",
     intro:
-      "Convert, trim, tidy and practise with your music and recordings. Just ask Stella (stella.sh).",
+      "Bring the recording and say what it needs. Stella (stella.sh) edits it, cleans it up and hands it back.",
+    sections: [
+      { title: "Podcasts and voice-overs.", slugs: ["edit-podcast-episode",  "mix-two-person-podcast",  "master-podcast-loudness",  "zoom-recording-to-podcast",  "make-voice-over-sound-better",  "background-music-for-voice-over"] },
+      { title: "Clean up a recording.", slugs: ["remove-background-noise-from-audio",  "remove-echo-from-audio",  "fix-distorted-audio",  "remove-background-music-from-video",  "trim-silence-from-recordings",  "normalize-audio-volume"] },
+      { title: "Remixes, mashups and karaoke.", slugs: ["make-karaoke-version-of-song",  "make-mashup-of-two-songs",  "make-extended-mix",  "change-key-of-song",  "slow-down-song-without-changing-pitch"] },
+      { title: "Convert and tag music files.", slugs: ["convert-flac-to-mp3",  "convert-m4a-to-mp3",  "convert-wma-to-mp3",  "convert-midi-to-mp3",  "extract-audio-from-video",  "edit-mp3-tags-in-bulk"] },
+      { title: "Split, join, ringtones and audiobooks.", slugs: ["merge-mp3-files",  "split-audio-into-tracks",  "make-audiobook-with-chapters",  "make-ringtone",  "transcribe-voice-memos-to-text"] },
+    ],
   },
   {
     slug: "contacts-calendar-email",

@@ -3444,4 +3444,198 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     platforms: ["windows", "mac", "linux"],
     lastChecked: "2026-11-24",
   }),
+  shortGuide({
+    slug: "skyrim-newer-version-than-skse",
+    niche: "game-mods",
+    searchPhrases: [
+      "you are using a newer version of skyrim than this version of skse64 supports",
+      "you are using a newer version of skyrim skse64",
+      "skse version mismatch",
+      "skyrim updated skse not working",
+      "skse64 runtime version mismatch",
+    ],
+    title: "Newer version of Skyrim than this version of SKSE64 supports",
+    description:
+      "Skyrim updated and SKSE64 says it doesn't support this version? Stella (stella.sh) brings SKSE and your mods up to date, or steps Skyrim back to match.",
+    h1: "You are using a newer version of Skyrim than this version of SKSE64 supports",
+    short: "Skyrim newer than SKSE64 supports",
+    lede: "Your modded Skyrim starting again after Steam updated it.",
+    answer:
+      "Steam updated Skyrim and your SKSE64 is built for the old version. Stella (stella.sh) gets the SKSE64 made for your new Skyrim, or, if your big mods aren't ready yet, steps Skyrim back to the version they all fit.",
+    gets: [
+      "Your Skyrim and SKSE64 versions compared",
+      "The SKSE64 that matches, or Skyrim stepped back",
+      "Steam set to update Skyrim only when you launch it",
+    ],
+    prompt:
+      "Skyrim says I'm using a newer version than this version of SKSE64 supports. I have 300 mods in MO2. Get it working.",
+    demo: {
+      ack: "On it. Comparing your Skyrim and SKSE64 versions.",
+      task: "Matching SKSE64 to your Skyrim",
+      rows: ["Steam updated Skyrim last night", "Six of your mods aren't updated yet", "Stepping Skyrim back one version", "Saves copied before anything changed"],
+      reply:
+        "Steam's update got ahead of six mods you rely on, so Skyrim is back on the version they all support, with matching SKSE64. Your saves are copied in Documents/Skyrim backup. Launch through MO2 as usual.",
+    },
+    faq: [
+      ["Should I update SKSE64 or downgrade Skyrim?", "Update once your bigger mods have caught up. Until then, stepping Skyrim back keeps the whole list working."],
+      ["How do I stop Steam updating Skyrim?", "Steam has no off switch. Set Skyrim to update only when launched from Steam, then always start it through SKSE64. Stella sets that up for you."],
+    ],
+    byHand: [
+      "Check SkyrimSE.exe's version (Properties, Details) and get the SKSE64 build for it from [skse.silverlock.org](https://skse.silverlock.org).",
+      "Or roll back with the Skyrim downgrade patcher on Nexus Mods.",
+      "Update Address Library for SKSE Plugins too.",
+    ],
+    related: [
+      "game-mods/install-skse",
+      "game-mods/skse-dll-plugin-failed-to-load",
+      "game-mods/skyrim-crash-log",
+    ],
+    platforms: ["windows", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "skse-dll-plugin-failed-to-load",
+    niche: "game-mods",
+    searchPhrases: [
+      "a dll plugin has failed to load correctly",
+      "a dll plugin has failed to load correctly skyrim skse",
+      "racemenu incompatible with current version of the game",
+      "a dll plugin has failed to load correctly racemenu",
+      "address library for skse plugins not working",
+    ],
+    title: "A DLL plugin has failed to load correctly (Skyrim SKSE)",
+    description:
+      "Skyrim pops up 'A DLL plugin has failed to load correctly' at launch? Stella (stella.sh) updates each named mod and Address Library so nothing gets switched off.",
+    h1: "A DLL plugin has failed to load correctly in Skyrim",
+    short: "A DLL plugin has failed to load correctly",
+    lede: "Every Skyrim mod on its list switched on again.",
+    answer:
+      "SKSE turns off any mod with its own DLL plugin that doesn't fit your Skyrim version, then shows this box. Stella (stella.sh) reads which ones were switched off, gets their matching versions and updates Address Library so they load.",
+    gets: [
+      "Each disabled plugin named, with why",
+      "Matching versions of RaceMenu and the rest",
+      "Address Library brought up to date",
+    ],
+    prompt:
+      "Skyrim says a DLL plugin has failed to load correctly and lists RaceMenu and Engine Fixes. Fix them so they load.",
+    demo: {
+      ack: "On it. Reading the list SKSE switched off.",
+      task: "Fixing failed DLL plugins in Skyrim",
+      rows: ["RaceMenu: needs the newer build", "Engine Fixes: Address Library is old", "Updating both through Vortex"],
+      reply:
+        "Both load now. RaceMenu had an older build for your Skyrim version, and Engine Fixes was waiting on a newer Address Library. The popup is gone and character sliders are back.",
+    },
+    faq: [
+      ["What does 'disabled, address library needs to be updated' mean?", "That mod looks up the game through Address Library, whose copy is older than your Skyrim. Updating Address Library alone often fixes several plugins at once."],
+      ["What if a plugin has no update yet?", "Stella turns that one mod off cleanly so the rest keep working, or steps Skyrim back if it's one you can't play without."],
+    ],
+    byHand: [
+      "Note each .dll listed in the popup and the reason beside it.",
+      "Update those mods on Nexus Mods, picking the file for your Skyrim version.",
+      "Install the All in one (all game versions) Address Library for SKSE Plugins.",
+    ],
+    related: [
+      "game-mods/skyrim-newer-version-than-skse",
+      "game-mods/install-skse",
+      "game-mods/skyrim-load-order",
+    ],
+    platforms: ["windows", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "fallout-4-newer-version-than-f4se",
+    niche: "game-mods",
+    searchPhrases: [
+      "you are using a newer version of fallout 4 than this version of f4se supports",
+      "you are using a newer version of fallout 4",
+      "looksmenu incompatible with current version of the game",
+      "f4ee dll disabled incompatible with current version of the game",
+      "f4se version mismatch",
+    ],
+    title: "Newer version of Fallout 4 than this version of F4SE supports",
+    description:
+      "Fallout 4 updated and F4SE or LooksMenu stopped loading? Stella (stella.sh) matches F4SE and your mods to the game, or sets the game back to fit them.",
+    h1: "You are using a newer version of Fallout 4 than this version of F4SE supports",
+    short: "Fallout 4 newer than F4SE supports",
+    lede: "Modded Fallout 4 starting again after an update broke it.",
+    answer:
+      "Fallout 4 updated and F4SE, plus mods built on it like LooksMenu, no longer fit. Stella (stella.sh) installs the F4SE for your version and updated mods, or sets Fallout 4 back to the version your list was built for.",
+    gets: [
+      "F4SE matched to the Fallout 4 you have",
+      "LooksMenu and other switched-off mods loading again",
+      "Your saves copied before anything changes",
+    ],
+    prompt:
+      "Fallout 4 says I'm using a newer version than F4SE supports, and LooksMenu is disabled. Get my modded game running.",
+    demo: {
+      ack: "On it. Checking which Fallout 4 you have now.",
+      task: "Matching F4SE to Fallout 4",
+      rows: ["Fallout 4 updated to the newest version", "Getting the F4SE built for it", "Updating LooksMenu and two others", "Copying your saves first"],
+      reply:
+        "F4SE now matches your Fallout 4, and LooksMenu, Buffout 4 and MCM have their updated versions. All three load. Your saves are copied to Documents/Fallout4 backup.",
+    },
+    faq: [
+      ["Is it better to downgrade Fallout 4 for mods?", "If many of your mods haven't updated, yes. Stella checks your list first and picks whichever keeps the most of it working."],
+    ],
+    byHand: [
+      "Check Fallout4.exe's version under Properties, Details.",
+      "Get the matching F4SE from [f4se.silverlock.org](https://f4se.silverlock.org) or Nexus Mods.",
+      "Update each mod the popup lists, or downgrade with the Fallout 4 downgrader.",
+    ],
+    related: [
+      "game-mods/install-f4se",
+      "game-mods/downgrade-fallout-4",
+      "game-mods/mod-fallout-4",
+    ],
+    platforms: ["windows", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "script-hook-v-critical-error",
+    niche: "game-mods",
+    searchPhrases: [
+      "script hook v critical error unknown game version",
+      "script hook v critical error",
+      "script hook v critical error gta 5 enhanced",
+      "script hook v fatal error unknown game version",
+      "script hook v critical error fix",
+    ],
+    title: "Script Hook V critical error: unknown game version? Fixed",
+    description:
+      "GTA 5 stopping with Script Hook V Critical Error: Unknown game version? Stella (stella.sh) matches Script Hook V to your update, so mods load again.",
+    h1: "Script Hook V critical error: unknown game version",
+    short: "Script Hook V critical error",
+    lede: "GTA 5 with your mods running again after Rockstar's update.",
+    answer:
+      "Rockstar updated GTA 5 and your Script Hook V is older than the game, so it stops at launch. Stella (stella.sh) installs the newest Script Hook V for your version, Legacy or Enhanced, and checks your mods still fit.",
+    gets: [
+      "The newest Script Hook V for your game version",
+      "Your mods checked against the new game version",
+      "A clean switch to play online without mods",
+    ],
+    prompt:
+      "GTA 5 says Script Hook V critical error, unknown game version, after the update. Get my mods working again.",
+    demo: {
+      ack: "On it. Checking your GTA 5 version.",
+      task: "Fixing the Script Hook V error",
+      rows: ["You're on GTA 5 Legacy, just updated", "Script Hook V update is out", "Replacing the two Script Hook files"],
+      reply:
+        "Script Hook V now matches the update, and your trainer and car mods load again. If a future update lands before Script Hook V catches up, ask me and I'll set the game to start without mods.",
+    },
+    faq: [
+      ["Does Script Hook V work on GTA 5 Enhanced?", "Yes, current Script Hook V covers both. Mods written for its .NET add-on also need the Enhanced edition of that add-on, which Stella installs alongside."],
+    ],
+    byHand: [
+      "Download the newest Script Hook V from [dev-c.com](http://www.dev-c.com/gtav/scripthookv/).",
+      "Copy ScriptHookV.dll and dinput8.dll into the GTA 5 folder, replacing the old ones.",
+      "No update yet? Move those two files out to play without mods.",
+    ],
+    related: [
+      "game-mods/install-script-hook-v",
+      "game-mods/gta-5-mods-not-working",
+      "game-mods/mod-gta-5",
+    ],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
 ];

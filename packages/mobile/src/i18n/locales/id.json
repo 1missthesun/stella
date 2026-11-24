@@ -2617,7 +2617,8 @@
       "askAgain": "Minta lagi",
       "waitingFor": "Menunggu {name}…",
       "cloudUses": "Dipakai tugas cloud",
-      "refused": "Tidak diberikan"
+      "refused": "Tidak diberikan",
+      "added": "Ditambahkan {added}"
     },
     "googleComposio": {
       "title": "Gunakan Composio untuk Google",

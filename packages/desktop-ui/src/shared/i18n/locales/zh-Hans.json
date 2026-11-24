@@ -2617,7 +2617,8 @@
       "askAgain": "再次请求",
       "waitingFor": "正在等待 {name}…",
       "cloudUses": "云端任务的使用",
-      "refused": "未提供"
+      "refused": "未提供",
+      "added": "添加于 {added}"
     },
     "googleComposio": {
       "title": "Google 使用 Composio",

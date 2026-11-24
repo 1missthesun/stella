@@ -816,6 +816,10 @@ export class UserAskService {
             deviceId: this.options.getDeviceId() ?? "",
         };
     }
+    /** Marks a saved-value note when this computer's saved values sync to the user's other devices. */
+    syncedFlag() {
+        return this.sync.getStatus().standing === "member" ? { synced: true } : {};
+    }
     releaseLogPath() {
         const dir = this.options.getStellaAppDir();
         return dir ? path.join(dir, RELEASE_LOG_FILE) : null;
@@ -960,6 +964,7 @@ export class UserAskService {
                     remembered: true,
                     savedAt: entry.updatedAt,
                     ...asked,
+                    ...this.syncedFlag(),
                 },
                 answeredAt: Date.now(),
             },
@@ -1312,7 +1317,7 @@ export class UserAskService {
             ...(Object.keys(answerHandles).length > 0 ? { handles: answerHandles } : {}),
             ...(answerAsHandles.length > 0 ? { asHandles: answerAsHandles } : {}),
             ...(freshUntil ? { freshUntil } : {}),
-            ...(savedNote ? { saved: savedNote } : {}),
+            ...(savedNote ? { saved: { ...savedNote, ...(savedNote.remembered ? this.syncedFlag() : {}) } } : {}),
             ...(userNote ? { userNote } : {}),
             answeredAt,
             ...(late ? { late: true } : {}),

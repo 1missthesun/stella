@@ -2617,7 +2617,8 @@
       "askAgain": "Hỏi lại",
       "waitingFor": "Đang chờ {name}…",
       "cloudUses": "Tác vụ đám mây đã dùng",
-      "refused": "Không cấp"
+      "refused": "Không cấp",
+      "added": "Đã thêm {added}"
     },
     "googleComposio": {
       "title": "Dùng Composio cho Google",

@@ -2647,7 +2647,8 @@
       "askAgain": "Zapytaj ponownie",
       "waitingFor": "Czekam na {name}…",
       "cloudUses": "Użyte przez zadania w chmurze",
-      "refused": "Nie wydano"
+      "refused": "Nie wydano",
+      "added": "Dodano {added}"
     },
     "googleComposio": {
       "title": "Używaj Composio dla Google",

@@ -2627,7 +2627,8 @@
       "askAgain": "Fråga igen",
       "waitingFor": "Väntar på {name}…",
       "cloudUses": "Använda av molnuppgifter",
-      "refused": "Inte utlämnad"
+      "refused": "Inte utlämnad",
+      "added": "Tillagd {added}"
     },
     "googleComposio": {
       "title": "Använd Composio för Google",

@@ -2637,7 +2637,8 @@
       "askAgain": "Volver a pedir",
       "waitingFor": "Esperando a {name}…",
       "cloudUses": "Usados por tareas en la nube",
-      "refused": "No entregado"
+      "refused": "No entregado",
+      "added": "Añadido el {added}"
     },
     "googleComposio": {
       "title": "Usar Composio para Google",

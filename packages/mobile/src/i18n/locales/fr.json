@@ -2637,7 +2637,8 @@
       "askAgain": "Redemander",
       "waitingFor": "En attente de {name}…",
       "cloudUses": "Utilisés par des tâches cloud",
-      "refused": "Non fourni"
+      "refused": "Non fourni",
+      "added": "Ajouté le {added}"
     },
     "googleComposio": {
       "title": "Utiliser Composio pour Google",

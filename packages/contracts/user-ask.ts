@@ -460,6 +460,8 @@ export type UserAskSavedValueNote = Readonly<{
   askedService?: string;
   /** Fields that came from the saved value while the user gave the rest. */
   fromSaved?: readonly string[];
+  /** Saved values sync to the user's other devices from this computer. */
+  synced?: boolean;
 }>;
 
 export type UserAskResolution =

@@ -21,14 +21,6 @@ import {
   safeJsonValue,
 } from "./validation.js";
 
-// Chain-step vocabulary offered to agents: a deliberate subset of the
-// session's BROWSER_CHAIN_ACTIONS, which the `satisfies` below enforces at
-// compile time. Keep it in step with
-// packages/stella-browser/protocol/actions.json: every action here must be a
-// manifest action with "chain": true, and every key must be a manifest param
-// (or the global tabId). finalize_tabs is deliberately
-// absent: it is top-level-only on the daemon and exposed as
-// browser.tabs.finalize() instead.
 export const SAFE_ACTION_KEYS: Readonly<Record<string, readonly string[]>> =
   Object.freeze({
     navigate: ["tabId", "url", "waitUntil", "timeout"],
@@ -179,8 +171,6 @@ export const sanitizeChainOptions = (
     "chain options",
   );
   const result: Record<string, unknown> = {};
-  // Numeric rules match BrowserSession's validateChainOptions, which
-  // re-checks these after the kernel maps them to timeoutMs/waitTimeoutMs.
   if (value.timeout !== undefined) {
     result.timeout = boundedPositiveInteger(
       value.timeout,

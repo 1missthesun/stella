@@ -6,9 +6,6 @@ export const DEFAULT_BROWSER_CHAIN_DELAY_MAX_MS = 1_200;
 
 export const WORKER_BOUND_BACKEND_PARAM = "__stellaBrowserBackend";
 
-// Mirrors packages/stella-browser/protocol/actions.json ("chain": true):
-// adding, removing, or renaming an entry needs the manifest and the Rust
-// daemon (is_chain_allowed_action) to agree.
 export const BROWSER_CHAIN_ACTIONS = [
   "healthcheck",
   "navigate",

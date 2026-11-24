@@ -160,7 +160,7 @@ const PROVIDER_MATCHERS = [
 
 const CHOOSE_MODEL_ACTION = {
   label: "Choose model",
-  onPress: () => openDrawer(),
+  onPress: () => openDrawer("end"),
 };
 
 const ROUTE_FAILURE_NOTICES: Record<LlmRouteFailureKind, NoticeCopy> = {

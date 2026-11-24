@@ -28,6 +28,7 @@ import { GlassIconButton } from "../../src/components/GlassIconButton";
 import { StellaStatusHeader } from "../../src/components/StellaStatusHeader";
 import { StellaActivityMenu } from "../../src/components/StellaActivityMenu";
 import { OverlayHost } from "../../src/components/OverlayHost";
+import { AccountPanel } from "../../src/components/AccountPanel";
 import { ChatSettingsPanel } from "../../src/components/ChatSettingsPanel";
 import {
   AppBackdrop,
@@ -62,6 +63,7 @@ import {
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
+  useDrawerSide,
 } from "../../src/lib/drawer";
 import { type Colors } from "../../src/theme/colors";
 import { useColors, useTheme } from "../../src/theme/theme-context";
@@ -90,6 +92,8 @@ export const unstable_settings = { anchor: "chat" };
 const SIDEBAR_WIDTH = 320;
 const TOP_BAR_BUTTON = DRAWER_CHEVRON_SIZE;
 const TOP_BAR_INSET = 10;
+const ACCOUNT_ICON_SIZE = 18;
+const SETTINGS_ICON_SIZE = 19;
 const TITLE_MAX_FONT_SCALE = 1.3;
 
 const EMPTY_RUNNING_AGENTS: readonly ActivityIndicatorEntry[] = [];
@@ -108,6 +112,7 @@ export default function MainLayout() {
   const pathname = usePathname();
   const router = useRouter();
   const drawerLive = useDrawerLive();
+  const drawerSide = useDrawerSide();
   const { travel } = useDrawerMetrics();
   const [activityMenuRunning, setActivityMenuRunning] = useState<
     readonly ActivityIndicatorEntry[] | null
@@ -173,8 +178,10 @@ export default function MainLayout() {
   useEffect(() => {
     if (!onChatSurface) return;
     const pending = takePendingMainTab();
-    if (pending) router.push(MAIN_TAB_HREFS[pending]);
-  }, [onChatSurface, router]);
+    if (!pending) return;
+    if (pending === "settings" && !wide) openDrawer("start");
+    else router.push(MAIN_TAB_HREFS[pending]);
+  }, [onChatSurface, router, wide]);
 
   const onPlace = onChatSurface || (onTabRoot && !backOverride);
   const barTab = !wide && isBottomBarTab(activeTab) ? activeTab : null;
@@ -201,12 +208,11 @@ export default function MainLayout() {
   };
 
   const onPressTopLeft = () => {
-    tapLight();
     if (!backVisible) {
-      Keyboard.dismiss();
-      router.push(MAIN_TAB_HREFS.settings);
+      openDrawer("start");
       return;
     }
+    tapLight();
     if (backOverride) {
       backOverride.onPress();
       return;
@@ -220,10 +226,23 @@ export default function MainLayout() {
   }, [wide]);
 
   useEffect(() => {
-    if (!onChatSurface && isDrawerOpen()) closeDrawer();
+    if (!onChatSurface && isDrawerOpen("end")) closeDrawer();
   }, [onChatSurface]);
 
-  const settingsHandedOff = onChatSurface && drawerLive;
+  useEffect(() => {
+    if (!barVisible && isDrawerOpen("start")) closeDrawer();
+  }, [barVisible]);
+
+  useEffect(
+    () => () => {
+      if (isDrawerOpen()) closeDrawer();
+    },
+    [],
+  );
+
+  const accountHandedOff = barVisible && drawerLive && drawerSide === "start";
+  const settingsHandedOff =
+    onChatSurface && drawerLive && drawerSide === "end";
 
   const topBarFade = useAnimatedStyle(() => ({
     opacity:
@@ -291,15 +310,33 @@ export default function MainLayout() {
         </>
       ) : (
         <DrawerStage
-          enabled={onChatSurface}
-          panel={<ChatSettingsPanel width={travel} />}
-          chevron={{
-            left: width - TOP_BAR_INSET - TOP_BAR_BUTTON,
-            top: topBarHeight - TOP_BAR_BUTTON,
-            openCenterY: insets.top + SIDEBAR_BRAND_CENTER,
-            openLabel: t("mobile.nav.chatSettingsLabel"),
-            closeLabel: t("mobile.nav.backToChat"),
-            restIcon: "settings",
+          start={{
+            enabled: barVisible,
+            panel: <AccountPanel width={travel} />,
+            chevron: {
+              left: TOP_BAR_INSET,
+              top: topBarHeight - TOP_BAR_BUTTON,
+              openCenterY: insets.top + SIDEBAR_BRAND_CENTER,
+              openLabel: t("mobile.nav.account"),
+              closeLabel: t("mobile.common.back"),
+              icon: "chevron-left",
+              restIcon: "user",
+              restIconSize: ACCOUNT_ICON_SIZE,
+            },
+          }}
+          end={{
+            enabled: onChatSurface,
+            panel: <ChatSettingsPanel width={travel} />,
+            chevron: {
+              left: width - TOP_BAR_INSET - TOP_BAR_BUTTON,
+              top: topBarHeight - TOP_BAR_BUTTON,
+              openCenterY: insets.top + SIDEBAR_BRAND_CENTER,
+              openLabel: t("mobile.nav.chatSettingsLabel"),
+              closeLabel: t("mobile.nav.backToChat"),
+              icon: "chevron-right",
+              restIcon: "settings",
+              restIconSize: SETTINGS_ICON_SIZE,
+            },
           }}
         >
           <AppBackdrop />
@@ -375,11 +412,18 @@ export default function MainLayout() {
               </View>
             ) : null}
             {search.isOpen ? null : (
-              <View style={styles.topBarSide}>
+              <View
+                style={[
+                  styles.topBarSide,
+                  accountHandedOff && styles.handedOff,
+                ]}
+                pointerEvents={accountHandedOff ? "none" : "auto"}
+                accessibilityElementsHidden={accountHandedOff}
+              >
                 <GlassIconButton
                   icon={backVisible ? "chevron-left" : "user"}
                   size={TOP_BAR_BUTTON}
-                  iconSize={backVisible ? 20 : 18}
+                  iconSize={backVisible ? 20 : ACCOUNT_ICON_SIZE}
                   accessibilityLabel={
                     backVisible
                       ? (backOverride?.label ?? t("mobile.common.back"))
@@ -407,9 +451,9 @@ export default function MainLayout() {
                 <GlassIconButton
                   icon="settings"
                   size={TOP_BAR_BUTTON}
-                  iconSize={19}
+                  iconSize={SETTINGS_ICON_SIZE}
                   accessibilityLabel={t("mobile.nav.chatSettingsLabel")}
-                  onPress={openDrawer}
+                  onPress={() => openDrawer("end")}
                 />
               </View>
             ) : null}
@@ -449,7 +493,7 @@ function MainStack({ wide }: { wide: boolean }) {
           <Stack.Screen name="email" options={sidePageOptions} />
           <Stack.Screen name="apps" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="files" options={TAB_SCREEN_OPTIONS} />
-          <Stack.Screen name="settings" options={sidePageOptions} />
+          <Stack.Screen name="settings" options={TAB_SCREEN_OPTIONS} />
         </Stack>
         <PersistentAppsHost visible={pathname === "/apps"} />
       </View>

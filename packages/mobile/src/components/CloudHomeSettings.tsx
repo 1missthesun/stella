@@ -2,14 +2,14 @@ import { useMemo } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import { Text } from "./Text";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassToggle } from "./glass";
 import { PrimaryButton } from "./PrimaryButton";
+import { SettingsScroll } from "./settings/SettingsScroll";
+import { PanelPageHeader } from "./sidebar/PanelPageHeader";
 import type { CloudConversationIdentity } from "../lib/cloud-conversation-auth";
 import { useCloudMemoryPreference } from "../lib/use-cloud-memory-preference";
 import { useTelemetryPreference } from "../lib/use-telemetry-preference";
@@ -21,20 +21,28 @@ import { useT } from "../i18n";
 type CloudHomeSettingsProps = {
   identity: CloudConversationIdentity | null;
   onSignIn: () => void;
+  onBack?: () => void;
 };
 
 export function CloudHomeSettings({
   identity,
   onSignIn,
+  onBack,
 }: CloudHomeSettingsProps) {
   const colors = useColors();
   const t = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
+  const inDrawer = onBack !== undefined;
   const memoryPreference = useCloudMemoryPreference(identity);
   const telemetry = useTelemetryPreference(identity);
 
-  const header = (
+  const header = onBack ? (
+    <PanelPageHeader
+      back={t("mobile.nav.account")}
+      onBack={onBack}
+      title={t("mobile.cloudHome.title")}
+    />
+  ) : (
     <View style={styles.header}>
       <View style={styles.headerCopy}>
         <Text style={styles.title} numberOfLines={1}>
@@ -46,13 +54,7 @@ export function CloudHomeSettings({
 
   if (!identity) {
     return (
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: 32 + insets.bottom },
-        ]}
-      >
+      <SettingsScroll inDrawer={inDrawer}>
         {header}
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>
@@ -67,18 +69,12 @@ export function CloudHomeSettings({
             style={styles.stateButton}
           />
         </View>
-      </ScrollView>
+      </SettingsScroll>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: 32 + insets.bottom },
-      ]}
-    >
+    <SettingsScroll inDrawer={inDrawer}>
       {header}
       <View style={styles.memoryPreferenceCard}>
         <View style={styles.memoryPreferenceCopy}>
@@ -146,19 +142,18 @@ export function CloudHomeSettings({
           </Pressable>
         </View>
       ) : null}
-    </ScrollView>
+    </SettingsScroll>
   );
 }
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    screen: { flex: 1 },
-    content: { paddingBottom: 32, paddingTop: 8 },
     header: {
       alignItems: "center",
       flexDirection: "row",
       gap: 8,
       marginBottom: 20,
+      paddingTop: 8,
     },
     headerCopy: { flex: 1 },
     title: {

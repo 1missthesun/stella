@@ -37,9 +37,11 @@ const formatMinute = (locale: string, minuteOfDay: number): string => {
 
 export function UserAskEscalationSection({
   enabled,
+  active,
   styles,
 }: {
   enabled: boolean;
+  active: boolean;
   styles: SettingsStyles;
 }) {
   const colors = useColors();
@@ -47,7 +49,7 @@ export function UserAskEscalationSection({
   const t = useT();
   const local = useMemo(() => makeStyles(colors), [colors]);
   const { policy, loaded, available, failed, update } =
-    useUserAskEscalationPolicy(enabled);
+    useUserAskEscalationPolicy(enabled, active);
 
   const levelOptions = useMemo(
     () =>

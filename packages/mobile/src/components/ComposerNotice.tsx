@@ -10,6 +10,7 @@ import {
 import { useT } from "../i18n";
 import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
 import { startConnectPlan } from "../lib/connect-plan";
+import { useOpenAccount } from "../lib/use-open-account";
 import { useServerFeatures } from "../lib/server-features";
 import { isSelfHostedLaunch } from "../lib/server-registry";
 import { useColors } from "../theme/theme-context";
@@ -35,6 +36,7 @@ export function ComposerNotice({
   const t = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
+  const openAccount = useOpenAccount();
   const notice = useComposerNotice(conversationId);
   const features = useServerFeatures();
 
@@ -71,7 +73,7 @@ export function ComposerNotice({
             label: "Upgrade",
             onPress: () => {
               dismiss();
-              router.push("/settings");
+              openAccount();
             },
           }
         : notice.action
@@ -90,7 +92,7 @@ export function ComposerNotice({
           label: CONNECT_PLAN_COPY.plans,
           onPress: () => {
             dismiss();
-            router.push("/settings");
+            openAccount();
           },
         }
       : null;

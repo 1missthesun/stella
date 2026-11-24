@@ -1,0 +1,1174 @@
+{
+  "app": {
+    "chat": {
+      "activityPill": {
+        "tasksInProgress": {
+          "one": "{count} görev sürüyor",
+          "other": "{count} görev sürüyor"
+        }
+      },
+      "composer": {
+        "stop": "Durdur"
+      },
+      "contextChips": {
+        "removePastedText": "Yapıştırılan metni kaldır"
+      },
+      "miniModelPicker": {
+        "reasoningEffortLabel": "Akıl yürütme düzeyi",
+        "triggerLabel": "Model: {model}",
+        "updateFailedTitle": "Model ayarları güncellenemedi"
+      },
+      "catchUp": {
+        "pill": "Özet",
+        "pillLabel": "{count} yeni mesajı özetle",
+        "title": "Özet",
+        "done": "Tamamlandı",
+        "ongoing": "Sürüyor",
+        "waiting": "Seni bekliyor",
+        "loading": "Özetleniyor…",
+        "failed": "Bu özet yazılamadı.",
+        "retry": "Tekrar dene",
+        "empty": "Kayda değer yeni bir şey yok.",
+        "close": "Kapat",
+        "notLoaded": "Bu mesaj artık sohbette değil."
+      }
+    }
+  },
+  "billing": {
+    "mobile": {
+      "accessEnds": "Erişim {date} tarihinde sona erer",
+      "alreadySubscribedTitle": "Zaten bir aboneliğin var",
+      "currentPlanLabel": "Mevcut plan",
+      "errorRetry": "Tekrar dene",
+      "footnote": "Stella tarafından Stripe aracılığıyla faturalandırılır. İptal edilene kadar aylık yenilenir; istediğin zaman iptal et.",
+      "manage": "Aboneliği yönet",
+      "manageWebNote": "Bu aboneliği web'deki Stella'da stella.sh adresinden yönetin veya iptal edin.",
+      "pendingBody": "Ödemeyi tarayıcıda tamamla. Ödeme onaylanır onaylanmaz planın burada otomatik olarak güncellenir — yeniden başlatmana gerek yok.",
+      "pendingDismiss": "Şimdi değil",
+      "pendingTitle": "Satın alman tamamlanıyor",
+      "planValue": "Stella {plan}",
+      "renews": "{date} tarihinde yenilenir",
+      "sectionTitle": "Abonelik",
+      "startingCheckout": "Başlatılıyor…",
+      "successBody": "Aboneliğin etkin. Daha yüksek limitlerin keyfini çıkar.",
+      "successTitle": "Stella {plan} kullanıyorsun"
+    },
+    "v3": {
+      "usage": {
+        "oneTimeNote": "Tek seferlik, sıfırlanmaz",
+        "resets": "Sıfırlanma: {date}",
+        "credit": "Ek kredi",
+        "outTitle": "Şimdilik kullanımın bitti",
+        "outBody": "Bütçen sıfırlanma tarihi: {date}. Hemen devam etmek için kredi ekle veya yükselt.",
+        "outBodyNoDate": "Hemen devam etmek için kredi ekle veya yükselt.",
+        "freeOutTitle": "Ücretsiz kullanımını bitirdin",
+        "freeOutBody": "Devam etmek için bir plan seç veya kredi ekle.",
+        "creditTitle": "Ek krediyle çalışıyor",
+        "creditBody": "Planının sınırı {date} tarihine kadar doldu. O zamana kadar Stella'nın yaptıklarını kredi karşılar.",
+        "upgradeTo": "{plan} planına yükselt",
+        "percentUsed": "{percent} kullanıldı"
+      },
+      "plan": {
+        "lede": "Her planda aynı Stella. Büyük planlar daha fazla kullanım sunar.",
+        "heading": "Planınızı seçin",
+        "recommended": "Önerilen",
+        "currentPlan": "Mevcut plan",
+        "get": "{plan} al",
+        "switchTo": "{plan} planına geç",
+        "month": "aylık",
+        "noCard": "Kart gerekmez"
+      },
+      "includes": {
+        "media": "Görsel, video, müzik ve 3D",
+        "voice": "Dikte ve sesli okuma",
+        "byok": "Kendi modellerinizi ve anahtarlarınızı kullanın"
+      },
+      "mobile": {
+        "usageRow": "Bu ay",
+        "usageOneTime": "Ücretsiz kullanım"
+      },
+      "tagline": {
+        "free": "Stella'yı deneyin",
+        "plus": "Daha fazla kullanım",
+        "pro": "Daha yüksek kullanım",
+        "max": "En yüksek kullanım"
+      }
+    }
+  },
+  "chat": {
+    "attachments": {
+      "camera": "Kamera",
+      "cameraDeniedBody": "Fotoğraf çekebilmek için Ayarlar'dan Stella'nın kamerayı kullanmasına izin ver.",
+      "cameraDeniedTitle": "Kamera",
+      "files": "Dosyalar",
+      "photos": "Fotoğraflar",
+      "photosDeniedBody": "Görsel ekleyebilmek için Ayarlar'dan Stella'nın fotoğraf kitaplığına erişmesine izin ver.",
+      "photosDeniedTitle": "Fotoğraflar",
+      "readAloud": "Yanıtları sesli oku",
+      "remove": "Eki kaldır",
+      "retryUpload": "Yüklemeyi yeniden dene",
+      "sheetTitle": "Sohbete ekle",
+      "tooManyBody": "Bir kerede en fazla {count} dosya ekleyebilirsin.",
+      "tooManyTitle": "Çok fazla dosya"
+    }
+  },
+  "cloudBrowser": {
+    "actions": {
+      "canceling": "Canceling…",
+      "done": "Done",
+      "finishing": "Finishing…",
+      "useCloudBrowser": "Use Stella's browser"
+    },
+    "deviceCode": {
+      "body": "Enter this code on the site, then come back here.",
+      "copied": "Copied",
+      "copy": "Copy code",
+      "open": "Open site",
+      "title": "Sign in to {origin}"
+    },
+    "errors": {
+      "decision": "That didn't go through. Try again.",
+      "liveView": "Couldn't load the sign-in page. Try again.",
+      "liveViewBoundary": "Couldn't load the sign-in page.",
+      "verificationUrl": "Couldn't open that page."
+    },
+    "settings": {
+      "confirmBody": "Stella will ask you to sign in again next time.",
+      "confirmTitle": "Sign out of all sites?",
+      "defaultProfile": "Saved sign-ins",
+      "description": "Sites Stella has signed in to for you. Reset to sign out of all of them.",
+      "reset": "Reset",
+      "resetComplete": "Signed out of all sites.",
+      "resetFailed": "Couldn't sign out. Try again.",
+      "resetting": "Resetting…",
+      "title": "Browser sign-ins"
+    },
+    "takeover": {
+      "body": "Sign in to keep going. Stella can't see what you type.",
+      "checking": "Finishing sign-in to {origin}",
+      "localNotice": "Stella can't see what you type",
+      "localOriginFallback": "Switched to Stella's browser to finish signing in.",
+      "localTransferFallback": "Couldn't confirm that sign-in. Try again in Stella's browser.",
+      "preparing": "Loading sign-in…",
+      "privateNotice": "Stella can't see what you type",
+      "resumingBody": "Stella will pick up where it left off.",
+      "title": "Sign in to {origin}"
+    }
+  },
+  "cloudConnector": {
+    "connect": "Bağlan",
+    "connecting": "Tarayıcınızda {name} oturum açma işlemini tamamlayın. Onaylandığında Stella devam edecek.",
+    "errors": {
+      "decision": "{name} bağlanamadı. Tekrar deneyin.",
+      "open": "Oturum açma sayfası açılamadı."
+    },
+    "notNow": "Şimdi değil",
+    "openAgain": "Yeniden aç",
+    "titleOffer": "{name} bağlansın mı?",
+    "titleWaiting": "{name} bekleniyor",
+    "googleClaim": {
+      "connected": "Google bağlandı",
+      "connectedBody": "{email}, Stella'ya bağlandı.",
+      "failed": "Google bağlanamadı",
+      "failedBody": "Google'ı Stella'dan yeniden bağlamaya başlayın."
+    }
+  },
+  "common": {
+    "cancel": "İptal",
+    "close": "Kapat",
+    "continue": "Devam et",
+    "gotIt": "Anladım",
+    "loading": "Yükleniyor…",
+    "next": "İleri",
+    "previous": "Önceki",
+    "tryAgain": "Tekrar dene"
+  },
+  "errors": {
+    "generic": "Bir şeyler ters gitti"
+  },
+  "mobile": {
+    "account": {
+      "title": "Hesap"
+    },
+    "activityHub": {
+      "conversation": {
+        "subtitle": "Ana iş parçacığının oluşturduğu dosyalar",
+        "title": "Bu konuşma"
+      },
+      "files": {
+        "empty": "Stella’nın oluşturduğu veya paylaştığı dosyalar burada görünecek.",
+        "emptyFiltered": "Eşleşen dosya yok.",
+        "filterAll": "Tüm dosyalar",
+        "filterLabel": "Dosyaları filtrele ve sırala",
+        "searchPlaceholder": "Dosyalarda ara",
+        "sortName": "Ad",
+        "sortNewest": "Önce en yeni",
+        "sortOldest": "Önce en eski",
+        "sourceCloud": "Bulut",
+        "sourceUpload": "Senin gönderdiklerin",
+        "types": {
+          "all": "Tümü",
+          "images": "Görseller",
+          "videos": "Videolar",
+          "audio": "Ses",
+          "documents": "Belgeler",
+          "code": "Kod",
+          "pages": "Sayfalar",
+          "other": "Diğer"
+        }
+      },
+      "schedule": {
+        "actionFailed": "Bu işlem gerçekleşemedi.",
+        "alertTitle": "Zamanlama",
+        "customCadence": "Özel zamanlama",
+        "deleteConfirm": "“{title}” artık çalışmayacak.",
+        "deleteSchedule": "Zamanlamayı sil",
+        "empty": "Henüz planlanmış bir şey yok.",
+        "emptyAction": "Bir şey planla",
+        "emptyActionPrompt": "Bana şunu hatırlat: ",
+        "lastRunFailed": "Son çalışma başarısız oldu: {error}",
+        "loadFailed": "Zamanlamalar yüklenemedi.",
+        "next": "Sonraki çalışma {when}",
+        "pauseSchedule": "Zamanlamayı duraklat",
+        "paused": "Duraklatıldı",
+        "resumeSchedule": "Zamanlamayı sürdür",
+        "editPrompt": "“{title}” zamanlamamı değiştir: "
+      },
+      "search": {
+        "clear": "Aramayı temizle",
+        "close": "Aramayı kapat",
+        "placeholder": "Etkinlik ve dosyalarda ara"
+      },
+      "tabs": {
+        "activity": "Etkinlik",
+        "files": "Dosyalar",
+        "schedule": "Zamanlama",
+        "search": "Ara"
+      },
+      "task": {
+        "failed": "Tamamlanamadı",
+        "finished": "Tamamlandı",
+        "stopped": "Durduruldu",
+        "working": "Arka planda çalışıyor"
+      },
+      "time": {
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "tomorrow": "Yarın",
+        "earlierThisMonth": "Bu ayın başlarında"
+      }
+    },
+    "apps": {
+      "empty": "Stella’nın senin için oluşturduğu uygulamalar burada olacak.",
+      "emptyAction": "Uygulama oluştur",
+      "emptyActionPrompt": "Bana şunu yapan bir uygulama oluştur: "
+    },
+    "authCallback": {
+      "backToSignIn": "Girişe dön",
+      "failedTitle": "Giriş yapılamadı",
+      "genericFailure": "Şu anda giriş yapamadık. Lütfen tekrar deneyin.",
+      "invalidLink": "Geçersiz giriş bağlantısı.",
+      "linkExpired": "Bu giriş bağlantısının süresi doldu. Lütfen yenisini isteyin.",
+      "signingInBody": "Bir saniye...",
+      "signingInTitle": "Giriş yapılıyor"
+    },
+    "boot": {
+      "checkingSessionBody": "Stella uyanırken biraz bekleyin.",
+      "checkingSessionTitle": "Oturumunuz denetleniyor",
+      "crashTitle": "Başlatılırken bir sorun oluştu",
+      "missingConfigBody": "Uygulamayı başlatmadan önce EXPO_PUBLIC_STELLA_BACKEND_URL değerini ayarlayın.",
+      "missingConfigTitle": "Mobil ortam değişkenlerini ekleyin"
+    },
+    "chat": {
+      "composerPlaceholder": "Stella'ya mesaj yazın",
+      "createFailed": "Sohbet oluşturulamadı. Lütfen tekrar deneyin.",
+      "emptyPrompt": "Stella'ya istediğinizi sorun",
+      "loadMore": "Daha fazla yükle",
+      "mainChat": "Ana sohbet"
+    },
+    "cloudHome": {
+      "backToSettingsLabel": "Ayarlar'a dön",
+      "openSettingsLabel": "Cloud Home belleğini aç",
+      "settingsSection": "Cloud Home",
+      "signIn": "Oturum aç",
+      "signInBody": "Belleğiniz Stella hesabınıza özeldir.",
+      "signInTitle": "Cloud Home'u kullanmak için oturum açın",
+      "title": "Cloud Home belleği"
+    },
+    "common": {
+      "back": "Geri",
+      "backChevron": "‹ Geri",
+      "cancel": "İptal",
+      "continue": "Devam et",
+      "delete": "Sil",
+      "done": "Bitti",
+      "goBack": "Geri dön",
+      "tryAgain": "Tekrar dene"
+    },
+    "computer": {
+      "connectedLabel": "Bilgisayar bağlandı",
+      "connectingLabel": "Bilgisayarınıza bağlanılıyor",
+      "defaultDeviceLabel": "Bilgisayarınız",
+      "disconnectedLabel": "Bilgisayar bağlantısı kesildi",
+      "guestHeroBody": "Stella'dan bilgisayarınızda işler yapmasını isteyin — web'de gezinsin, dosyaları yönetsin, görevleri çalıştırsın ve daha fazlası.",
+      "guestHeroTitle": "Bilgisayarınız parmaklarınızın ucunda",
+      "statusAsleep": "Uykuda",
+      "statusChecking": "Denetleniyor…",
+      "statusConnected": "Bağlandı"
+    },
+    "desktop": {
+      "connecting": "Masaüstüne bağlanılıyor",
+      "deviceUnreachable": "Şu cihaza ulaşılamıyor: {platform}",
+      "guestSignInPrompt": "Başlamak için giriş yapın.",
+      "limitedCapabilities": "Bazı şeyler bilgisayarınızı gerektirir",
+      "linkInterrupted": "Bilgisayarınızla olan bağlantı kesildi.",
+      "reconnecting": "Yeniden bağlanılıyor...",
+      "retryLabel": "Yeniden bağlanmayı dene",
+      "unreachable": "Masaüstüne ulaşılamıyor"
+    },
+    "engineAccounts": {
+      "active": "Kullanımda",
+      "backLabel": "Ayarlar'a dön",
+      "chatgptBrowserWaiting": "Tarayıcında ChatGPT oturum açma işlemini tamamla.",
+      "chatgptSection": "ChatGPT",
+      "claudeNote": "Buradan hesap eklemek, Stella'nın bulutunun Anthropic'in kendi sayfasında Claude Code'a oturum açmasını sağlar. Her bilgisayar kendi Claude Code oturumunu kullanır.",
+      "claudeSection": "Claude",
+      "claudeSyncNote": "Araç çıktıları dahil tüm Claude Code oturumları Stella'nın bulutuna senkronize edilir.",
+      "claudeSyncNoteSelfHosted": "Araç çıktıları dahil tüm Claude Code oturumları kendi Stella sunucunuza senkronize edilir.",
+      "connectChatgpt": "ChatGPT hesabını bağla",
+      "connectClaude": "Claude hesabı ekle",
+      "connecting": "Bağlanıyor…",
+      "continueAsChatgpt": "{name} olarak ChatGPT ile devam et",
+      "continueWithChatgpt": "ChatGPT hesabınızla devam edin",
+      "enablePlanUsage": "ChatGPT planı kullanımını etkinleştir",
+      "errorBody": "Bir sorun oluştu. Tekrar dene.",
+      "errorTitle": "Hesaplar güncellenemedi",
+      "finish": "Bağlan",
+      "manageUsage": "Kullanımı yönet",
+      "moreLabel": "{name} seçenekleri",
+      "notSignedIn": "Hiçbir yerde oturum açık değil",
+      "openChatgptAgain": "ChatGPT'yi yeniden aç",
+      "openClaudeAgain": "Oturum açma sayfasını yeniden aç",
+      "pasteFromClipboard": "Yapıştır",
+      "pasteHintChatgpt": "Onayladıktan sonra ChatGPT seni yüklenmeyen bir sayfaya yönlendirir. O sayfanın tam adresini kopyalayıp buraya yapıştır.",
+      "pasteHintClaude": "Onayladıktan sonra Anthropic bir kod gösterir. Kopyalayıp buraya yapıştırın.",
+      "pastePlaceholder": "Anthropic'in gösterdiği kodu yapıştırın",
+      "pastePlaceholderUrl": "Adresi buraya yapıştır",
+      "placeCloud": "Bulut",
+      "placeComputer": "Bilgisayar",
+      "planUsageOffBody": "Sen izin verene kadar Stella ChatGPT planını kullanamaz. Hesapta “ChatGPT planı kullanımını etkinleştir” seçeneğini seç.",
+      "planWelcomeBody": "Stella bulutundaki ChatGPT istekleri ChatGPT planından düşülür. Kullanımı incele ve Stella'nın limitini ChatGPT Ayarları'ndan belirle.",
+      "planWelcomeTitle": "ChatGPT planını kullanıyorsun",
+      "remove": "Kaldır",
+      "removeBody": "Stella bu ChatGPT hesabını unutur. Daha sonra yeniden oturum açabilirsin.",
+      "removeClaudeBody": "Stella bu Claude hesabını unutur ve bulutun bu hesaptaki oturumunu kapatır. Bilgisayarlarınız kendi Claude Code oturumlarını korur.",
+      "removeTitle": "{name} kaldırılsın mı?",
+      "revokeUnconfirmed": "ChatGPT oturumun kapatıldığını onaylamadı. Stella'nın bağlantısını ChatGPT Ayarları'ndan kesebilirsin.",
+      "signInAgain": "Yeniden oturum aç",
+      "signInCloud": "Bulutta oturum aç",
+      "signOut": "Oturumu kapat",
+      "signOutBody": "Stella bu hesabı kullanmayı bırakacak. İstediğin zaman yeniden ekleyebilirsin.",
+      "signOutCloud": "Buluttan oturumu kapat",
+      "signOutCloudBody": "Stella'nın bulutu, orada yeniden oturum açana kadar bu hesabı kullanmaz. Bilgisayarlarınız kendi Claude Code oturumlarını korur.",
+      "signOutCloudTitle": "{name} buluttan çıkarılsın mı?",
+      "signOutTitle": "{name} oturumu kapatılsın mı?",
+      "signedInOn": "Oturum açık: {places}",
+      "startAgain": "Baştan başla",
+      "statusPlanUsageOff": "ChatGPT planı kullanımı etkin değil",
+      "statusReauth": "Kullanmaya devam etmek için yeniden oturum aç",
+      "statusSignedOut": "Oturum kapatıldı",
+      "subtitle": "Zaten ödediğin Claude veya ChatGPT planını kullan",
+      "title": "Claude ve ChatGPT",
+      "useAccount": "Bu hesabı kullan"
+    },
+    "login": {
+      "appleCompleteFailed": "Apple ile giriş tamamlanamadı.",
+      "appleNoToken": "Apple bir kimlik belirteci döndürmedi.",
+      "appleStartFailed": "Apple ile giriş başlatılamadı.",
+      "checkInbox": "Gelen kutunuzu kontrol edip bağlantıya dokunun — otomatik olarak giriş yapacaksınız.",
+      "continueAsGuest": "Giriş yapmadan devam et",
+      "continueWithApple": "Apple ile devam et",
+      "continueWithGoogle": "Google ile devam et",
+      "emailPlaceholder": "E-posta",
+      "enterEmail": "E-posta adresinizi girin.",
+      "finishFailed": "Giriş tamamlanamadı. Lütfen tekrar deneyin.",
+      "googleStartFailed": "Google ile giriş başlatılamadı.",
+      "heroBody": "Apple, Google ya da bilgisayarınızda kullandığınız e-postayı kullanın.",
+      "heroTitle": "Asistanınız,\ncebinizde.",
+      "incomplete": "Giriş tamamlanmadı. Lütfen tekrar deneyin.",
+      "legalConjunction": " ve ",
+      "legalPrefix": "Devam ederek ",
+      "legalPrivacy": "Gizlilik Politikasını",
+      "legalSuffix": " kabul edersiniz.",
+      "legalTerms": "Hizmet Koşullarını",
+      "linkExpired": "Bağlantının süresi doldu. Lütfen tekrar deneyin.",
+      "openingApple": "Apple açılıyor...",
+      "openingGoogle": "Google açılıyor...",
+      "orUseEmail": "veya e-posta kullanın",
+      "resend": "Yeniden gönder",
+      "resendLabel": "Giriş e-postasını yeniden gönder",
+      "sendFailed": "Giriş e-postası gönderilemedi.",
+      "sending": "Gönderiliyor...",
+      "signingIn": "Giriş yapılıyor...",
+      "useDifferentEmail": "Farklı bir e-posta kullan"
+    },
+    "nav": {
+      "account": "Hesap",
+      "apps": "Uygulamalar",
+      "backToApps": "Uygulamalara dön",
+      "backToChat": "Sohbete dön",
+      "chat": "Sohbet",
+      "chatSettingsLabel": "Sohbet ayarları",
+      "closeLabel": "Gezinmeyi kapat",
+      "openLabel": "Gezinmeyi aç",
+      "settings": "Ayarlar",
+      "signIn": "Giriş yap"
+    },
+    "onboarding": {
+      "account": {
+        "chatgptDesc": "Stella bulutu için ChatGPT planın",
+        "claudeDesc": "Claude Code üzerinden Pro veya Max",
+        "connect": "Bağla",
+        "connectLabel": "{name} bağla",
+        "connectedAs": "Bağlandı · {name}",
+        "guestSettled": "İstediğiniz zaman Ayarlar'dan giriş yapın",
+        "settledGuest": "Stella misafir olarak kullanılıyor",
+        "settledSignedIn": "Giriş yapıldı",
+        "signIn": "Giriş yap",
+        "signInBody": "Konuşmanızı, ayarlarınızı ve bağlı bilgisayarınızı her cihazda yanınızda tutun.",
+        "signInTitle": "Stella'ya giriş yapın",
+        "skip": "Şimdilik geç",
+        "subscriptionsBody": "Mevcut Claude veya ChatGPT aboneliğini kullanmak ister misin?",
+        "subscriptionsLabel": "İsteğe bağlı"
+      },
+      "composerPlaceholder": "Ya da bana bir şey sorun",
+      "computer": {
+        "body": "Bilgisayarında oturum aç, otomatik olarak bağlanır.",
+        "connectedTo": "{name} ile bağlandı",
+        "getDesktop": "Masaüstü için Stella’yı indir",
+        "later": "Sonra",
+        "settledSkippedTitle": "Henüz bilgisayar yok",
+        "title": "Bilgisayarında Stella"
+      },
+      "gmail": {
+        "body": "E-postaları bul, yazışmalara yetiş ve yanıt taslakları hazırla, sadece iste.",
+        "connect": "Gmail'i bağla",
+        "connected": "Bağlandı",
+        "error": "Gmail bağlanamadı. Tekrar dene veya şimdilik atla.",
+        "settledSkippedTitle": "Şimdilik Gmail yok",
+        "settledTitle": "Gmail bağlandı",
+        "skip": "Şimdi değil",
+        "title": "Gmail'i bağla",
+        "waiting": "Google bekleniyor…"
+      },
+      "hello": {
+        "cta": "Göster",
+        "pillars": {
+          "asks": {
+            "body": "Para harcayan her şey onayınızı bekler.",
+            "title": "Önemli olmadan sorar"
+          },
+          "background": {
+            "body": "Bir işi devredin ve devam edin. Bitince size haber veririm.",
+            "title": "Arka planda çalışır"
+          },
+          "done": {
+            "body": "Rezervasyonlar, siparişler, dosyalar ve araştırmalar, sizin için tamamlanır.",
+            "title": "İşleri halleder"
+          }
+        },
+        "settledTitle": "Stella ile tanışın"
+      },
+      "messages": {
+        "account": "Bunların hepsini saklamak ister misiniz? Bir Stella hesabı sizinle her cihaza gelir.",
+        "accountSignedIn": "Giriş yaptınız, yani her şey cihazlar arasında sizinle birlikte. İsteğe bağlı bir ekstra daha:",
+        "computer": "Bir Mac'iniz ya da PC'niz varsa onda da çalışabilirim.",
+        "gmail": "Hayatın büyük kısmı e-postadan geçiyor. Gmail'i bağla, sana yardım edeyim.",
+        "hello": "Merhaba, ben Stella.\n\nSohbet botu değilim. Neye ihtiyacınız olduğunu söyleyin, siz gününüze devam ederken ben arka planda hallederim.",
+        "ready": "Hepsi bu. Zamanla sizi tanıyacağım.\n\nİlk olarak ne yapalım?",
+        "showcase": "İşte nasıl göründüğü.",
+        "theme": "Şimdi, nasıl görünmemi istersiniz?"
+      },
+      "progressLabel": "Adım {current} / {total}",
+      "ready": {
+        "start": "Sohbete başla",
+        "starters": {
+          "explain": {
+            "prompt": "Bileşik faizin nasıl işlediğini basitçe anlat.",
+            "title": "Bir şeyi açıkla"
+          },
+          "gift": {
+            "prompt": "Bir arkadaşım için $50'ın altında, düşünceli bir doğum günü hediyesi bul.",
+            "title": "Hediye bul"
+          },
+          "plan": {
+            "prompt": "Önümdeki işlere göre haftamı planlamama yardım et.",
+            "title": "Haftamı planla"
+          },
+          "remind": {
+            "prompt": "Pazar günü saat 6'da annemi aramamı hatırlat.",
+            "title": "Hatırlatıcı kur"
+          }
+        },
+        "startersLabel": "Şunlardan birini deneyin"
+      },
+      "replies": {
+        "accountDone": "Tamam.",
+        "accountSkipped": "Şimdilik geç.",
+        "computerDone": "Bağlandı!",
+        "computerSkipped": "Belki sonra.",
+        "gmailDone": "Tamam.",
+        "gmailSkipped": "Şimdi değil.",
+        "helloDone": "Göster.",
+        "showcaseDone": "Anladım.",
+        "themeDone": "Bu olsun.",
+        "themeSkipped": "Varsayılan kalsın."
+      },
+      "send": "Gönder",
+      "showcase": {
+        "chapters": {
+          "errands": {
+            "caption": "Siteyi açar, bilgileri doldurur ve işi sizin gibi sonuna kadar götürürüm.",
+            "prompt": "Cuma akşamı 20:00 için iki kişilik masa ayırt",
+            "receipt1": "Osteria Lucia · Cum 20:00 · 2 kişi",
+            "receipt2": "Takviminize eklendi",
+            "reply": "Osteria Lucia'da cuma 20:00 için masa ayırttım. Takviminizde.",
+            "scene": {
+              "date": "Tarih",
+              "dateValue": "Cuma",
+              "party": "Kişi",
+              "partyValue": "2 kişi",
+              "reserve": "Ayırt",
+              "reserved": "Ayrıldı",
+              "site": "osterialucia.com",
+              "time": "Saat",
+              "timeValue": "20:00"
+            },
+            "title": "Bir kez söyleyin. Halloldu sayın.",
+            "word": "İşler",
+            "working": "Masa ayırtılıyor"
+          },
+          "research": {
+            "caption": "Seçenekleri karşılaştırır, yorumları okur ve bir yanıtla dönerim.",
+            "prompt": "$2.000'ın altındaki en iyi e-bisikleti bul",
+            "receipt1": "24 yorum okundu",
+            "receipt2": "Karşılaştırma Dosyalar'a kaydedildi",
+            "reply": "Cityline 3: en hafif gövde, en iyi frenler, $1.799.",
+            "scene": {
+              "rank1": "Cityline 3",
+              "rank2": "Metro S",
+              "rank3": "Urban X",
+              "source1": "Uzman incelemeleri",
+              "source2": "Kullanıcı forumları",
+              "source3": "Teknik özellikler",
+              "title": "E-bisikletler karşılaştırılıyor"
+            },
+            "title": "Okumayı ben yaparım.",
+            "word": "Araştırma",
+            "working": "Yorumlar okunuyor"
+          },
+          "routines": {
+            "caption": "Kendi programıyla çalışan hatırlatıcılar, yoklamalar ve günlük özetler.",
+            "prompt": "Her sabah 8'de günümü özetle",
+            "receipt1": "Her gün 08:00",
+            "reply": "Tamam. İlk özetiniz yarın sabah 8'de geliyor.",
+            "scene": {
+              "body": "3 toplantı, 17:00'den sonra yağmur ve bugün Sam'in doğum günü.",
+              "day": "Yarın",
+              "now": "şimdi",
+              "time": "8:00",
+              "title": "Sabah özetiniz",
+              "when": "Yarın, 08:00"
+            },
+            "title": "Bir kez kurun. Ben sürdürürüm.",
+            "word": "Rutinler",
+            "working": "Ayarlanıyor"
+          },
+          "shopping": {
+            "amount": "$129,99",
+            "caption": "Ürünü bulur, ödeme adımına getiririm. Toplamı siz onaylarsınız, siparişi ben veririm.",
+            "confirm": "Onayla",
+            "confirmDetail": "Trail Runner 2 · 10 numara",
+            "confirmTitle": "Satın alma onaylansın mı?",
+            "confirmed": "Onaylandı",
+            "prompt": "Koşu ayakkabılarımı tekrar sipariş et, 10 numara",
+            "receipt1": "Order #48213 · perşembe günü gelir",
+            "reply": "Sipariş verildi. Perşembe günü elinizde.",
+            "scene": {
+              "addToCart": "Sepete ekle",
+              "inCart": "Sepette",
+              "product": "Trail Runner 2",
+              "site": "trailco.com"
+            },
+            "title": "Satın alabilirim, onayınızla.",
+            "word": "Alışveriş",
+            "working": "Ayakkabılarınız bulunuyor"
+          },
+          "work": {
+            "caption": "Belgeler, tablolar ve sunumlar: işi ben yaparım, dosyayı açabileceğiniz yere kaydederim.",
+            "prompt": "Q3 notlarımı pazartesi için bir sunuma dönüştür",
+            "receipt1": "Q3 notları · okundu",
+            "receipt2": "Q3 değerlendirme sunumu · 12 slayt",
+            "reply": "Sunumunuz hazır: 12 slayt, Dosyalar'a kaydedildi.",
+            "scene": {
+              "file": "Q3 değerlendirme.pptx",
+              "slideTitle": "Q3 Değerlendirme"
+            },
+            "title": "Gerçek dosyalar, tamamlanmış.",
+            "word": "İş",
+            "working": "Notlarınız okunuyor"
+          }
+        },
+        "placeholder": "Stella'ya sor",
+        "play": "Bu demoyu oynat",
+        "replay": "Demoyu yeniden oynat",
+        "settledTitle": "Hızlı tur",
+        "tablist": "Stella neler yapabilir"
+      },
+      "skip": "Atla",
+      "skipLabel": "Tanıtımı atla",
+      "theme": {
+        "appearance": "Görünüm",
+        "confirm": "Bitti",
+        "reset": "Varsayılan kalsın",
+        "themes": "Tema"
+      }
+    },
+    "search": {
+      "cancelLabel": "Aramayı iptal et",
+      "clearLabel": "Aramayı temizle",
+      "openLabel": "Mesajlarda ara",
+      "placeholder": "Mesajlarda ara"
+    },
+    "selfHost": {
+      "addServer": "Sunucu bağla",
+      "appTooOldBody": "{host}, Stella'nın daha yeni bir sürümünü gerektiriyor. Uygulamayı güncelleyip yeniden aç.",
+      "appTooOldTitle": "Uygulamayı güncelle",
+      "back": "Geri",
+      "behindBody": "Bazı özellikler sunucunun daha yeni bir sürümünü gerektiriyor.",
+      "behindTitle": "Sunucunun güncellenmesi gerekiyor",
+      "cameraDenied": "Stella kamerayı kullanamıyor. Ayarlar'dan izin ver veya bağlantıyı yapıştır.",
+      "cameraHint": "Kamerayı eşleştirme koduna doğrult.",
+      "checkAgain": "Tekrar kontrol et",
+      "checking": "Kontrol ediliyor…",
+      "confirmAppTooOld": "Bu sunucu uygulamanın daha yeni bir sürümünü gerektiriyor. Stella'yı güncelleyip tekrar dene.",
+      "confirmBody": "Stella tarafından değil, sahibi tarafından işletilen {host} sunucusuna bağlanıyorsun. Sohbetlerin ve dosyaların o sunucuda saklanacak.",
+      "confirmServerTooOld": "Bu sunucu bu uygulama için çok eski. Sunucuyu güncelle, ardından yeni bir kod tara.",
+      "confirmTitle": "{name} sunucusuna bağlanılsın mı?",
+      "connectBody": "Sunucunun gösterdiği eşleştirme kodunu (kurulum çıktısında veya bilgisayarındaki Stella'da) tara ya da bağlantısını yapıştır.",
+      "connectButton": "Bağlan",
+      "connectOwn": "Kendi sunucunu bağla",
+      "connectOwnHint": "Stella'yı kendi Cloudflare hesabında mı çalıştırıyorsun? Bu telefonu onunla eşleştir.",
+      "connecting": "Bağlanıyor…",
+      "errorAttempts": "Bu kodla çok fazla deneme yapıldı. Sunucunda yeni bir kod oluştur.",
+      "errorExpired": "Bu eşleştirme kodunun süresi doldu veya zaten kullanıldı. Sunucunda yeni bir kod oluştur.",
+      "errorInvalid": "Bu eşleştirme kodu geçersiz. Sunucunda yeni bir kod oluştur.",
+      "errorRateLimited": "Çok fazla deneme. Bir dakika bekleyip tekrar dene.",
+      "errorServer": "Sunucu bu telefonu bağlayamadı. Tekrar dene.",
+      "hostedName": "Stella",
+      "hostedSub": "stella.sh, Stella tarafından işletilir",
+      "howToSelfHost": "Kendi sunucunu nasıl çalıştırırsın",
+      "invalidLink": "Bu bir Stella eşleştirme bağlantısı değil.",
+      "noCodeInPhoto": "Bu fotoğrafta eşleştirme kodu bulunamadı.",
+      "notStella": "{host} bir Stella sunucusu değil.",
+      "openStore": "Mağazayı aç",
+      "ownerOf": "{name} sahibi",
+      "paste": "Yapıştır",
+      "pasteLabel": "Eşleştirme bağlantısı",
+      "removeBody": "Bu telefon sunucuyu ve oturumunu unutur. Daha sonra yeniden eşleştirebilirsin.",
+      "removeButton": "Kaldır",
+      "removeButtonA11y": "{name} öğesini kaldır",
+      "removeTitle": "{name} kaldırılsın mı?",
+      "scanPhoto": "Kodun fotoğrafını seç",
+      "scanQr": "Eşleştirme kodunu tara",
+      "selfHostedSub": "{host}, sahibi tarafından işletilir",
+      "serverAddress": "Adres",
+      "serverName": "Ad",
+      "serverSection": "Sunucu",
+      "serverTooOldBody": "{host}, bu uygulamanın desteklediğinden daha eski bir Stella sürümü çalıştırıyor.",
+      "serverTooOldHow": "Kurulumu yapan kodlama ajanından Stella sunucunu güncellemesini iste veya şunu çalıştır: node scripts/selfhost.mjs update",
+      "serverTooOldTitle": "Sunucunu güncelle",
+      "serverVersion": "Sürüm",
+      "serverVersionLine": "Sunucu sürümü: {version}",
+      "sessionEnded": "Bu telefonun {host} oturumu kapandı. Yeniden bağlanmak için yeni bir eşleştirme kodu tara.",
+      "switchBody": "Stella o sunucuda yeniden başlar.",
+      "switchButton": "Geç",
+      "switchTitle": "{name} sunucusuna geçilsin mi?",
+      "unknownVersion": "Bilinmiyor",
+      "unreachable": "{host} adresine ulaşılamadı. Bağlantını kontrol edip tekrar dene.",
+      "useStella": "Stella'yı kullan",
+      "useStellaInstead": "Bunun yerine Stella'yı kullan",
+      "welcomeBody": "Telefonunda ve bilgisayarlarında asistanın.",
+      "welcomeTitle": "Merhaba, ben Stella"
+    },
+    "settings": {
+      "aboutSection": "Hakkında",
+      "appearance": {
+        "dark": "Koyu",
+        "light": "Açık",
+        "system": "Sistem"
+      },
+      "appearanceSection": "Görünüm",
+      "background": {
+        "flat": "Düz",
+        "soft": "Yumuşak"
+      },
+      "backgroundColor": {
+        "relative": "Göreli",
+        "strong": "Güçlü"
+      },
+      "chatStorage": {
+        "description": "Sohbetlerinize tüm cihazlarınızdan erişin. Yalnızca bu cihazda ayrı bir sohbet geçmişi tutmak için kapatın. Geri açtığınızda bu sohbetler yüklenmez. Yapay zekâ sağlayıcıları mesajlarınızı yine de işler."
+      },
+      "computer": {
+        "cloud": "Bulut",
+        "connectFailedTitle": "O bilgisayara bağlanılamadı",
+        "connecting": "Bağlanıyor…",
+        "enable": "Etkinleştir",
+        "enableFailedTitle": "O bilgisayar etkinleştirilemedi",
+        "enableLabel": "{name} bilgisayarını etkinleştir",
+        "enabling": "Etkinleştiriliyor…",
+        "sectionLabel": "Stella nerede çalışıyor",
+        "statusAwaitingConsent": "O bilgisayarda izin bekleniyor",
+        "statusDeclined": "O bilgisayarda reddedildi",
+        "statusNotEnabled": "Henüz etkinleştirilmedi",
+        "statusNotReady": "Hazır değil",
+        "statusOffline": "Çevrimdışı",
+        "statusOnline": "Çevrimiçi"
+      },
+      "computerSection": "Bilgisayar",
+      "deleteAccount": "Hesabı sil",
+      "deleteAccountLabel": "Stella hesabınızı silin",
+      "deleteConfirmBody": "Tüm cihazlarda oturumunuz kapatılacak ve hesabınız hemen devre dışı bırakılacak. 7 gün sonra hesabınız ve buluttaki verileri kalıcı olarak silinir. İptal etmek için bundan önce yeniden oturum açın.",
+      "deleteConfirmTitle": "Hesabı sil",
+      "deleteFailedBody": "Hesabınız silinmedi ve oturumunuz hâlâ açık.",
+      "deleteFailedTitle": "Hesap silinemedi",
+      "deleteRetry": "Tekrar dene",
+      "deletingAccount": "Hesap siliniyor…",
+      "deletionScheduledTitle": "Hesap silme planlandı",
+      "loadingSession": "Oturum yükleniyor…",
+      "notificationsSection": "Bildirimler",
+      "openPrivacyLabel": "Gizlilik Politikasını aç",
+      "openTermsLabel": "Hizmet Koşullarını aç",
+      "paired": {
+        "unnamedComputer": "Bilgisayar · {id}"
+      },
+      "privacyPolicy": "Gizlilik Politikası",
+      "pushToggleA11y": "Anlık bildirimleri aç/kapat",
+      "pushToggleLabel": "Anlık bildirimlere izin ver",
+      "pushToggleSub": "Bilgisayarınız bir isteği tamamladığında bildirim alın.",
+      "signIn": "Giriş yap",
+      "signInTitle": "Stella'ya giriş yapın",
+      "signOut": "Çıkış yap",
+      "signOutLabel": "Stella'dan çıkış yap",
+      "signingOut": "Çıkış yapılıyor…",
+      "termsOfService": "Hizmet Koşulları",
+      "title": "Ayarlar",
+      "useAppearanceLabel": "Şu görünümü kullan: {name}",
+      "useBackgroundColorLabel": "Şu arka plan rengini kullan: {name}",
+      "useBackgroundLabel": "Şu arka planı kullan: {name}",
+      "useThemeLabel": "Şu temayı kullan: {name}",
+      "userAsk": {
+        "ceiling": "Ne kadar ileri gidebilir",
+        "ceilingSub": "Bir sorunun çıkabileceği en yüksek seviye.",
+        "level": {
+          "alert": "Uyarı",
+          "breakthrough": "Araya gir",
+          "chat": "Sohbet",
+          "notify": "Bildir"
+        },
+        "quietCeiling": "Sessiz saatlerde sınır",
+        "quietEnd": "Bitiş",
+        "quietHours": "Sessiz saatler",
+        "quietHoursSub": "{start} - {end}",
+        "quietStart": "Başlangıç",
+        "rateLimit": "Kesintiler",
+        "rateLimitSub": "Saatte en fazla bu kadar soru.",
+        "rateLimitValue": "{count}/sa",
+        "saveFailed": "Kaydedilemedi. Tekrar dene.",
+        "section": "Stella sana ihtiyaç duyduğunda",
+        "sound": "Ses",
+        "soundSub": "Bir soru geldiğinde ses çal.",
+        "stepDown": "{label} azalt",
+        "stepUp": "{label} artır",
+        "unavailable": "Bu ayarlar henüz kullanılamıyor."
+      },
+      "voiceSection": "Ses"
+    },
+    "sidebar": {
+      "searchPlaceholder": "Etkinlik ve dosyalarda ara",
+      "signedOutHint": "Stella’nın arka planda ne üzerinde çalıştığını görmek için giriş yapın."
+    },
+    "userAsk": {
+      "answerFailed": "Yanıt gönderilemedi. Tekrar dene.",
+      "answerOnComputer": "Bunu {device} üzerinde yanıtla",
+      "answerOnComputerUnknown": "Bunu soran bilgisayarda yanıtla",
+      "answerOnComputerWhy": "Bunun için özel bir bilgi gerekiyor ve bu telefonda o bilgisayara şifrelemek için anahtar yok. Stella bunu şifrelemeden göndermez.",
+      "askedBy": "{label} tarafından",
+      "cancelFailed": "Soru kapatılamadı. Tekrar dene.",
+      "cantRightNow": "Şimdi olmaz",
+      "deadline": "{time} kaldı",
+      "deadlinePassed": "Süre doldu",
+      "hideSecret": "{label} alanını gizle",
+      "missingFields": "Zorunlu alanların tümünü doldur.",
+      "notification": {
+        "alreadyAnsweredBody": "Yanıtın ulaşmadan önce bu soru yanıtlandı veya kapatıldı.",
+        "alreadyAnsweredTitle": "Zaten yanıtlandı",
+        "answer": "Yanıtla",
+        "body": "Yanıtlamak için dokun.",
+        "dismiss": "Kapat",
+        "sendFailedBody": "Yanıtlamak için Stella'yı aç.",
+        "sendFailedTitle": "Yanıtın gönderilemedi",
+        "title": "Stella seni bekliyor",
+        "titleFrom": "{label} sana ihtiyaç duyuyor"
+      },
+      "optional": "İsteğe bağlı",
+      "revealSecret": "{label} alanını göster",
+      "sealFailed": "Bu cihazda şifrelenemedi.",
+      "sendSecurely": "Güvenle gönder",
+      "sending": "Gönderiliyor…",
+      "sensitive": "Uçtan uca şifreli",
+      "sensitiveUnavailable": "Bu cihaz bunu henüz şifreleyemiyor",
+      "unnamedComputer": "Bilgisayar · {id}",
+      "waitingBadge": "Seni bekliyor",
+      "remember": "Bir dahaki sefer için hatırla",
+      "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır.",
+      "rememberOff": "Yalnızca bu görev için kullanılır, sonra unutulur.",
+      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
+      "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli.",
+      "savedHeading": "Cihazlarınıza kaydedildi",
+      "savedBody": "Bunu daha önce kaydettiniz. Stella olduğu gibi kullanır, bir şey yazmanız gerekmez.",
+      "useSaved": "Kayıtlı girişi kullan",
+      "typeInstead": "Başka bir tane yaz",
+      "useSavedInstead": "Bunun yerine kayıtlı olanı kullan",
+      "needsFromYou": "Bunun için henüz kayıtlı bir şey yok, bu yüzden Stella'nın sizden alması gerekiyor."
+    },
+    "savedLogins": {
+      "allowTitle": "{name} için izin verilsin mi?",
+      "allowCheck": "{code} gösterdiğini kontrol et",
+      "notNow": "Şimdi değil",
+      "allow": "İzin ver",
+      "waitingTitle": "Girişlerini buraya al",
+      "waitingBody": "Stella’yı başka bir cihazda aç",
+      "startOver": "Baştan başla",
+      "compare": "{name} cihazının {code} gösterdiğini kontrol et",
+      "matches": "Eşleşiyor",
+      "useAnother": "Başka cihaz kullan",
+      "confirmed": "{name} bekleniyor…",
+      "declined": "İzin verilmedi",
+      "removed": "Cihazlarından kaldırıldı",
+      "askAgain": "Tekrar iste",
+      "section": "Kayıtlı girişler",
+      "thisPhone": "Bu telefon",
+      "quiet": "Son zamanlarda görülmedi",
+      "remove": "Kaldır",
+      "removeTitle": "{name} kaldırılsın mı?",
+      "removeBody": "Kayıtlı girişlerini artık almaz.",
+      "problem": "Cihazların kontrol edilemiyor",
+      "startOverTitle": "Baştan başlansın mı?",
+      "startOverBody": "Yalnızca bu telefonun olduğu yeni bir liste başlar. Diğer cihazlarının her birine yeniden izin verilmesi gerekir."
+    }
+  },
+  "settings": {
+    "account": {
+      "toasts": {
+        "accountDeleted": "Stella hesabınız silindi.",
+        "deletionScheduled": "Hesabınız silinmek üzere planlandı. Tamamlandığında size e-posta göndereceğiz."
+      }
+    },
+    "telemetry": {
+      "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
+      "title": "Share anonymous usage metrics"
+    },
+    "compactModelList": {
+      "loadFailed": "Stella modelleri yüklenemedi."
+    },
+    "engineAccounts": {
+      "addInCloud": "Bulutta",
+      "claude": {
+        "addOn": "{place} üzerinde",
+        "automatic": "Varsayılan",
+        "automaticToast": "Artık her bilgisayar kendi Claude Code oturumunu kullanıyor.",
+        "chosen": "Seçildi",
+        "chosenToast": "{email} artık tüm bilgisayarlarında ve bulutta kullanılıyor.",
+        "cliMissing": "Claude Code yüklü değil",
+        "cloud": "Bulut",
+        "notSignedIn": "Oturum açık değil",
+        "offline": "Çevrimdışı",
+        "otherComputer": "Başka bir bilgisayar",
+        "signedInOn": "{place} Claude'da oturum açtı.",
+        "signedInOnAs": "{place} Claude'da {email} olarak oturum açtı.",
+        "thisComputer": "{name} (bu bilgisayar)",
+        "thisComputerUnnamed": "Bu bilgisayar",
+        "unknown": "Henüz bir Claude Code oturumu bildirmedi",
+        "ownLogin": "Her bilgisayarın kendi girişi",
+        "ownLoginHint": "Claude Code'un her bilgisayarda giriş yaptığı hesap",
+        "ownLoginHere": "Bu bilgisayarın Claude Code girişi",
+        "everywhere": "Tüm bilgisayarlarınızda ve bulutta",
+        "usedOn": "{places} üzerinde",
+        "noteEnded": "{place}: oturum sona erdi.",
+        "noteEnding": "{place}: oturum {date} tarihinde sona erecek.",
+        "noteMissingChosen": "{place}, {email} hesabına giriş yapmamış.",
+        "noteSignedOut": "{place} oturum açmamış.",
+        "cloudStart": "Bulut",
+        "cloudInline": "bulut",
+        "thisComputerInline": "bu bilgisayar",
+        "rowNotChosen": "{chosen} değil, {email} kullanılıyor",
+        "rowEnded": "Oturum sona erdi",
+        "rowEnding": "Oturum {date} tarihinde sona erecek"
+      },
+      "claudeLogin": {
+        "whereCloud": "Bulutunda Claude Code'da oturum açılıyor.",
+        "whereDevice": "{place} üzerinde Claude Code'da oturum açılıyor."
+      },
+      "claudeTitle": "Claude (Pro/Max)",
+      "signIn": "Oturum aç"
+    },
+    "errors": {
+      "loadMemory": "Bellek ayarı yüklenemedi.",
+      "saveMemory": "Bellek ayarı güncellenemedi."
+    },
+    "memory": {
+      "description": "Kayıtlı anıları yanıtlarda kullan. Kapatmak onları silmez.",
+      "title": "Bellek"
+    },
+    "reasoningEffort": {
+      "high": "Yüksek",
+      "low": "Düşük",
+      "max": "En yüksek",
+      "medium": "Orta",
+      "xhigh": "Ekstra"
+    },
+    "voiceAgent": {
+      "description": "Ses ve arama kontrollerini göster. Dikte her durumda çalışır.",
+      "title": "Sesli görüşmeler"
+    },
+    "secureValues": {
+      "added": "Eklendi: {added}"
+    }
+  },
+  "shell": {
+    "display": {
+      "canvasShare": {
+        "toasts": {
+          "openFailed": "Bağlantı açılamadı"
+        }
+      },
+      "folder": {
+        "emptyTitle": "Bu klasör boş",
+        "truncated": "Yalnızca ilk {count} öğe gösteriliyor."
+      }
+    },
+    "sidebar": {
+      "feedback": {
+        "contactLabel": "E-posta adresin (isteğe bağlı)",
+        "description": "Yanıt verebilmemiz için hesabının e-posta adresiyle birlikte Stella ekibine iletilir.",
+        "descriptionSignedOut": "Stella ekibine iletilir. Yanıt istersen e-posta adresini ekle.",
+        "fieldLabel": "Geri bildirim",
+        "placeholder": "Neyin işe yaradığını, neyin yaramadığını veya ne görmek istediğinizi anlatın…",
+        "send": "Gönder",
+        "sending": "Gönderiliyor…",
+        "sentWith": "Birlikte gönderilenler: {details}",
+        "title": "Geri bildirim gönder",
+        "toasts": {
+          "failedTitle": "Geri bildirim gönderilemedi",
+          "sentDescription": "Teşekkürler — her not Stella'yı şekillendirmemize yardımcı oluyor.",
+          "sentTitle": "Geri bildirim gönderildi"
+        }
+      }
+    }
+  },
+  "sidebar": {
+    "feedback": "Geri bildirim gönder"
+  },
+  "reminders": {
+    "title": "Hatırlatıcı",
+    "done": "Tamam",
+    "doneState": "Tamamlandı",
+    "snooze": "Ertele",
+    "snoozeFor": "10 dakika ertele",
+    "snooze10": "10 dakika",
+    "snooze60": "1 saat",
+    "snoozeTomorrow": "Yarın sabah",
+    "snoozedUntil": "{time} saatine ertelendi",
+    "snoozed": "Ertelendi",
+    "failed": "Hatırlatıcı güncellenemedi. Tekrar deneyin."
+  },
+  "userAsk": {
+    "deadline": {
+      "remaining": "{time} kaldı"
+    },
+    "question": {
+      "confirm": "Bu yanıtı kullan",
+      "default": "Varsayılan",
+      "next": "Sonraki soru",
+      "previous": "Önceki soru",
+      "progress": "{current}/{total}",
+      "sending": "Gönderiliyor…",
+      "skip": "Atla",
+      "skipped": "Atlandı",
+      "somethingElse": "Başka bir şey",
+      "submit": "Gönder"
+    },
+    "secureInput": {
+      "choosePlaceholder": "Choose",
+      "optional": "optional",
+      "privateBadge": "Private — Stella never sees it",
+      "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",
+      "relayedPrivateNote": "Private values are encrypted on this device so only the computer that asked can read them. Stella uses them without ever reading them.",
+      "required": "Fill in {label} first.",
+      "sharedBadge": "Shared with Stella",
+      "sharedNote": "Shared values are sent to Stella as plain text.",
+      "submit": "Send securely",
+      "submitting": "Sending…",
+      "decline": "Decline",
+      "remember": "Bir dahaki sefer için hatırla",
+      "rememberRelayed": "Bir dahaki sefer için hatırla",
+      "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır; istediğiniz zaman {place} bölümünden silebilirsiniz.",
+      "rememberOff": "Yalnızca bu görev için kullanılır, sonra unutulur.",
+      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
+      "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli.",
+      "note": "Not ekle (isteğe bağlı)",
+      "provided": "Verildi",
+      "declined": "Reddedildi"
+    }
+  },
+  "schedule": {
+    "waiting": "Bilgisayarın bekleniyor",
+    "edit": {
+      "title": "Düzenle"
+    },
+    "notice": {
+      "open": "Takvimde aç",
+      "whenBack": "Geri geldiğinde çalışır",
+      "title": {
+        "created": {
+          "reminder": "Hatırlatıcı kuruldu",
+          "task": "Görev planlandı",
+          "watch": "Takip kuruldu"
+        },
+        "updated": {
+          "reminder": "Hatırlatıcı değiştirildi",
+          "task": "Görev değiştirildi",
+          "watch": "Takip değiştirildi"
+        },
+        "paused": {
+          "reminder": "Hatırlatıcı duraklatıldı",
+          "task": "Görev duraklatıldı",
+          "watch": "Takip duraklatıldı"
+        },
+        "resumed": {
+          "reminder": "Hatırlatıcı sürdürüldü",
+          "task": "Görev sürdürüldü",
+          "watch": "Takip sürdürüldü"
+        },
+        "removed": {
+          "reminder": "Hatırlatıcı kaldırıldı",
+          "task": "Görev kaldırıldı",
+          "watch": "Takip kaldırıldı"
+        },
+        "waiting": {
+          "reminder": "Bilgisayarın bekleniyor",
+          "task": "Bilgisayarın bekleniyor",
+          "watch": "Bilgisayarın bekleniyor"
+        }
+      },
+      "when": {
+        "today": "Bugün {time}",
+        "tomorrow": "Yarın {time}",
+        "onDay": "{day} {time}",
+        "onDate": "{date} {time}",
+        "daily": "Her gün {time}",
+        "weekdays": "Her hafta içi {time}",
+        "weekends": "Hafta sonları {time}",
+        "weekly": "Her {day} {time}",
+        "onDays": "{days} {time}",
+        "everyMinutes": {
+          "one": "Her dakika",
+          "other": "{count} dakikada bir"
+        },
+        "everyHours": {
+          "one": "Her saat",
+          "other": "{count} saatte bir"
+        },
+        "everyDays": {
+          "one": "Her gün",
+          "other": "{count} günde bir"
+        }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} görev planlandı",
+              "other": "{count} görev planlandı"
+            },
+            "reminder": {
+              "one": "{count} anımsatıcı kuruldu",
+              "other": "{count} anımsatıcı kuruldu"
+            },
+            "watch": {
+              "one": "{count} izleme kuruldu",
+              "other": "{count} izleme kuruldu"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} görev değişti",
+              "other": "{count} görev değişti"
+            },
+            "reminder": {
+              "one": "{count} anımsatıcı değişti",
+              "other": "{count} anımsatıcı değişti"
+            },
+            "watch": {
+              "one": "{count} izleme değişti",
+              "other": "{count} izleme değişti"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} görev kaldırıldı",
+              "other": "{count} görev kaldırıldı"
+            },
+            "reminder": {
+              "one": "{count} anımsatıcı kaldırıldı",
+              "other": "{count} anımsatıcı kaldırıldı"
+            },
+            "watch": {
+              "one": "{count} izleme kaldırıldı",
+              "other": "{count} izleme kaldırıldı"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} çalıştırma",
+          "other": "{count} çalıştırma"
+        },
+        "undone": "Planlandı, sonra kaldırıldı",
+        "fromAgents": {
+          "one": "Bir arka plan görevi için",
+          "other": "{count} arka plan görevi için"
+        },
+        "showAll": "Tümünü göster",
+        "showLess": "Daha az göster"
+      }
+    }
+  },
+  "email": {
+    "title": "E-posta",
+    "failed": "Güncellenemedi. Tekrar deneyin.",
+    "section": {
+      "connectBody": "Gmail'i bağlayın; Stella yeni postaları geldikçe ayırsın. Acil olanlar size hemen ulaşır, gerisi Bugün bölümünde bekler; yanıt gerekiyorsa taslağı hazırdır.",
+      "connect": "Gmail'i bağla",
+      "connecting": "Google bekleniyor…",
+      "connectError": "Gmail bağlanmadı. Tekrar deneyin.",
+      "reconnectBody": "Stella'nın postalarınızı ayırabilmesi için Gmail'in Stella üzerinden yeniden bağlanması gerekiyor.",
+      "reconnect": "Gmail'i yeniden bağla",
+      "loadErrorBody": "Stella şu anda sunucularına ulaşamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
+      "offBody": "Stella yeni postaları geldikçe ayırır. Acil olanlar size hemen ulaşır, gerisi Bugün bölümünde bekler; yanıt gerekiyorsa taslağı hazırdır. Gereksizler dışarıda kalır.",
+      "turnOn": "Aç",
+      "turningOn": "Son postalarınız ayrılıyor…"
+    }
+  }
+}

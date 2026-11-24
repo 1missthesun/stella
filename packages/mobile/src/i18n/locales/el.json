@@ -1,0 +1,1174 @@
+{
+  "app": {
+    "chat": {
+      "activityPill": {
+        "tasksInProgress": {
+          "one": "{count} εργασία σε εξέλιξη",
+          "other": "{count} εργασίες σε εξέλιξη"
+        }
+      },
+      "composer": {
+        "stop": "Διακοπή"
+      },
+      "contextChips": {
+        "removePastedText": "Κατάργηση επικολλημένου κειμένου"
+      },
+      "miniModelPicker": {
+        "reasoningEffortLabel": "Προσπάθεια συλλογισμού",
+        "triggerLabel": "Μοντέλο: {model}",
+        "updateFailedTitle": "Δεν ήταν δυνατή η ενημέρωση των ρυθμίσεων μοντέλου"
+      },
+      "catchUp": {
+        "pill": "Σύνοψη",
+        "pillLabel": "Σύνοψη {count} νέων μηνυμάτων",
+        "title": "Σύνοψη",
+        "done": "Ολοκληρώθηκε",
+        "ongoing": "Σε εξέλιξη",
+        "waiting": "Περιμένει εσένα",
+        "loading": "Γίνεται σύνοψη…",
+        "failed": "Δεν ήταν δυνατή η σύνοψη.",
+        "retry": "Δοκίμασε ξανά",
+        "empty": "Τίποτα νέο αξιοσημείωτο.",
+        "close": "Κλείσιμο",
+        "notLoaded": "Αυτό το μήνυμα δεν υπάρχει πια στη συνομιλία."
+      }
+    }
+  },
+  "billing": {
+    "mobile": {
+      "accessEnds": "Η πρόσβαση λήγει στις {date}",
+      "alreadySubscribedTitle": "Έχετε ήδη συνδρομή",
+      "currentPlanLabel": "Τρέχον πρόγραμμα",
+      "errorRetry": "Δοκιμάστε ξανά",
+      "footnote": "Χρέωση από τη Stella μέσω Stripe. Ανανεώνεται μηνιαίως έως την ακύρωση· ακυρώστε οποτεδήποτε.",
+      "manage": "Διαχείριση συνδρομής",
+      "manageWebNote": "Διαχειριστείτε ή ακυρώστε αυτή τη συνδρομή από το Stella στο web, στο stella.sh.",
+      "pendingBody": "Ολοκληρώστε την πληρωμή στο πρόγραμμα περιήγησης. Το πρόγραμμά σας ενημερώνεται εδώ αυτόματα μόλις επιβεβαιωθεί η πληρωμή — δεν χρειάζεται επανεκκίνηση.",
+      "pendingDismiss": "Όχι τώρα",
+      "pendingTitle": "Ολοκλήρωση της αγοράς σας",
+      "planValue": "Stella {plan}",
+      "renews": "Ανανεώνεται στις {date}",
+      "sectionTitle": "Συνδρομή",
+      "startingCheckout": "Έναρξη…",
+      "successBody": "Η συνδρομή σας είναι ενεργή. Απολαύστε τα υψηλότερα όρια.",
+      "successTitle": "Έχετε το Stella {plan}"
+    },
+    "v3": {
+      "usage": {
+        "oneTimeNote": "Εφάπαξ, δεν ανανεώνεται",
+        "resets": "Ανανεώνεται {date}",
+        "credit": "Επιπλέον πίστωση",
+        "outTitle": "Η χρήση σου εξαντλήθηκε προς το παρόν",
+        "outBody": "Ο προϋπολογισμός σου ανανεώνεται {date}. Πρόσθεσε πίστωση ή αναβάθμισε για να συνεχίσεις τώρα.",
+        "outBodyNoDate": "Πρόσθεσε πίστωση ή αναβάθμισε για να συνεχίσεις τώρα.",
+        "freeOutTitle": "Χρησιμοποίησες τη δωρεάν χρήση σου",
+        "freeOutBody": "Διάλεξε πρόγραμμα ή πρόσθεσε πίστωση για να συνεχίσεις.",
+        "creditTitle": "Λειτουργεί με επιπλέον πίστωση",
+        "creditBody": "Το όριο του προγράμματός σου έχει εξαντληθεί έως {date}. Η πίστωση καλύπτει ό,τι κάνει η Stella μέχρι τότε.",
+        "upgradeTo": "Αναβάθμιση σε {plan}",
+        "percentUsed": "{percent} σε χρήση"
+      },
+      "plan": {
+        "lede": "Η ίδια Stella σε κάθε πρόγραμμα. Τα μεγαλύτερα προγράμματα δίνουν περισσότερη χρήση.",
+        "heading": "Επιλέξτε πρόγραμμα",
+        "recommended": "Προτείνεται",
+        "currentPlan": "Τρέχον πρόγραμμα",
+        "get": "Αποκτήστε το {plan}",
+        "switchTo": "Αλλαγή σε {plan}",
+        "month": "ανά μήνα",
+        "noCard": "Χωρίς κάρτα"
+      },
+      "includes": {
+        "media": "Εικόνα, βίντεο, μουσική και 3D",
+        "voice": "Υπαγόρευση και ανάγνωση",
+        "byok": "Φέρτε τα δικά σας μοντέλα και κλειδιά"
+      },
+      "mobile": {
+        "usageRow": "Αυτόν τον μήνα",
+        "usageOneTime": "Δωρεάν χρήση"
+      },
+      "tagline": {
+        "free": "Δοκιμάστε τη Stella",
+        "plus": "Περισσότερη χρήση",
+        "pro": "Υψηλότερη χρήση",
+        "max": "Μέγιστη χρήση"
+      }
+    }
+  },
+  "chat": {
+    "attachments": {
+      "camera": "Κάμερα",
+      "cameraDeniedBody": "Επιτρέψτε στη Stella να χρησιμοποιεί την κάμερα από τις Ρυθμίσεις για να βγάλετε φωτογραφία.",
+      "cameraDeniedTitle": "Κάμερα",
+      "files": "Αρχεία",
+      "photos": "Φωτογραφίες",
+      "photosDeniedBody": "Επιτρέψτε στη Stella πρόσβαση στη βιβλιοθήκη φωτογραφιών από τις Ρυθμίσεις για να επισυνάπτετε εικόνες.",
+      "photosDeniedTitle": "Φωτογραφίες",
+      "readAloud": "Ανάγνωση απαντήσεων φωναχτά",
+      "remove": "Αφαίρεση επισύναψης",
+      "retryUpload": "Επανάληψη μεταφόρτωσης",
+      "sheetTitle": "Προσθήκη στη συνομιλία",
+      "tooManyBody": "Μπορείτε να επισυνάψετε έως {count} αρχεία κάθε φορά.",
+      "tooManyTitle": "Πάρα πολλά αρχεία"
+    }
+  },
+  "cloudBrowser": {
+    "actions": {
+      "canceling": "Canceling…",
+      "done": "Done",
+      "finishing": "Finishing…",
+      "useCloudBrowser": "Use Stella's browser"
+    },
+    "deviceCode": {
+      "body": "Enter this code on the site, then come back here.",
+      "copied": "Copied",
+      "copy": "Copy code",
+      "open": "Open site",
+      "title": "Sign in to {origin}"
+    },
+    "errors": {
+      "decision": "That didn't go through. Try again.",
+      "liveView": "Couldn't load the sign-in page. Try again.",
+      "liveViewBoundary": "Couldn't load the sign-in page.",
+      "verificationUrl": "Couldn't open that page."
+    },
+    "settings": {
+      "confirmBody": "Stella will ask you to sign in again next time.",
+      "confirmTitle": "Sign out of all sites?",
+      "defaultProfile": "Saved sign-ins",
+      "description": "Sites Stella has signed in to for you. Reset to sign out of all of them.",
+      "reset": "Reset",
+      "resetComplete": "Signed out of all sites.",
+      "resetFailed": "Couldn't sign out. Try again.",
+      "resetting": "Resetting…",
+      "title": "Browser sign-ins"
+    },
+    "takeover": {
+      "body": "Sign in to keep going. Stella can't see what you type.",
+      "checking": "Finishing sign-in to {origin}",
+      "localNotice": "Stella can't see what you type",
+      "localOriginFallback": "Switched to Stella's browser to finish signing in.",
+      "localTransferFallback": "Couldn't confirm that sign-in. Try again in Stella's browser.",
+      "preparing": "Loading sign-in…",
+      "privateNotice": "Stella can't see what you type",
+      "resumingBody": "Stella will pick up where it left off.",
+      "title": "Sign in to {origin}"
+    }
+  },
+  "cloudConnector": {
+    "connect": "Σύνδεση",
+    "connecting": "Ολοκληρώστε τη σύνδεση στο {name} στο πρόγραμμα περιήγησής σας. Η Stella θα συνεχίσει μόλις εγκριθεί.",
+    "errors": {
+      "decision": "Δεν ήταν δυνατή η σύνδεση του {name}. Δοκιμάστε ξανά.",
+      "open": "Δεν ήταν δυνατό το άνοιγμα της σελίδας σύνδεσης."
+    },
+    "notNow": "Όχι τώρα",
+    "openAgain": "Άνοιγμα ξανά",
+    "titleOffer": "Σύνδεση του {name};",
+    "titleWaiting": "Αναμονή για {name}",
+    "googleClaim": {
+      "connected": "Το Google συνδέθηκε",
+      "connectedBody": "Το {email} συνδέθηκε με τη Stella.",
+      "failed": "Το Google δεν συνδέθηκε",
+      "failedBody": "Ξεκινήστε ξανά τη σύνδεση Google από τη Stella."
+    }
+  },
+  "common": {
+    "cancel": "Άκυρο",
+    "close": "Κλείσιμο",
+    "continue": "Συνέχεια",
+    "gotIt": "Εντάξει",
+    "loading": "Φόρτωση…",
+    "next": "Επόμενο",
+    "previous": "Προηγούμενο",
+    "tryAgain": "Δοκιμάστε ξανά"
+  },
+  "errors": {
+    "generic": "Κάτι πήγε στραβά"
+  },
+  "mobile": {
+    "account": {
+      "title": "Λογαριασμός"
+    },
+    "activityHub": {
+      "conversation": {
+        "subtitle": "Αρχεία που δημιούργησε το κύριο νήμα",
+        "title": "Αυτή η συνομιλία"
+      },
+      "files": {
+        "empty": "Τα αρχεία που δημιουργεί ή μοιράζεται η Stella θα εμφανίζονται εδώ.",
+        "emptyFiltered": "Κανένα αρχείο δεν ταιριάζει.",
+        "filterAll": "Όλα τα αρχεία",
+        "filterLabel": "Φιλτράρισμα και ταξινόμηση αρχείων",
+        "searchPlaceholder": "Αναζήτηση αρχείων",
+        "sortName": "Όνομα",
+        "sortNewest": "Νεότερα πρώτα",
+        "sortOldest": "Παλαιότερα πρώτα",
+        "sourceCloud": "Cloud",
+        "sourceUpload": "Από εσάς",
+        "types": {
+          "all": "Όλα",
+          "images": "Εικόνες",
+          "videos": "Βίντεο",
+          "audio": "Ήχος",
+          "documents": "Έγγραφα",
+          "code": "Κώδικας",
+          "pages": "Σελίδες",
+          "other": "Άλλα"
+        }
+      },
+      "schedule": {
+        "actionFailed": "Δεν ολοκληρώθηκε.",
+        "alertTitle": "Πρόγραμμα",
+        "customCadence": "Προσαρμοσμένο πρόγραμμα",
+        "deleteConfirm": "Το «{title}» θα σταματήσει να εκτελείται.",
+        "deleteSchedule": "Διαγραφή προγράμματος",
+        "empty": "Δεν υπάρχει τίποτα προγραμματισμένο ακόμα.",
+        "emptyAction": "Προγραμματίστε κάτι",
+        "emptyActionPrompt": "Θύμισέ μου να ",
+        "lastRunFailed": "Η τελευταία εκτέλεση απέτυχε: {error}",
+        "loadFailed": "Δεν ήταν δυνατή η φόρτωση των προγραμμάτων.",
+        "next": "Επόμενη εκτέλεση {when}",
+        "pauseSchedule": "Παύση προγράμματος",
+        "paused": "Σε παύση",
+        "resumeSchedule": "Συνέχιση προγράμματος",
+        "editPrompt": "Άλλαξε το πρόγραμμα «{title}»: "
+      },
+      "search": {
+        "clear": "Καθαρισμός αναζήτησης",
+        "close": "Κλείσιμο αναζήτησης",
+        "placeholder": "Αναζήτηση σε δραστηριότητα και αρχεία"
+      },
+      "tabs": {
+        "activity": "Δραστηριότητα",
+        "files": "Αρχεία",
+        "schedule": "Πρόγραμμα",
+        "search": "Αναζήτηση"
+      },
+      "task": {
+        "failed": "Δεν ολοκληρώθηκε",
+        "finished": "Ολοκληρώθηκε",
+        "stopped": "Διακόπηκε",
+        "working": "Εργάζεται στο παρασκήνιο"
+      },
+      "time": {
+        "today": "Σήμερα",
+        "yesterday": "Χθες",
+        "tomorrow": "Αύριο",
+        "earlierThisMonth": "Νωρίτερα αυτόν τον μήνα"
+      }
+    },
+    "apps": {
+      "empty": "Οι εφαρμογές που φτιάχνει η Stella για εσάς θα εμφανίζονται εδώ.",
+      "emptyAction": "Δημιουργία εφαρμογής",
+      "emptyActionPrompt": "Φτιάξε μου μια εφαρμογή που "
+    },
+    "authCallback": {
+      "backToSignIn": "Πίσω στη σύνδεση",
+      "failedTitle": "Δεν ήταν δυνατή η σύνδεση",
+      "genericFailure": "Δεν μπορέσαμε να σας συνδέσουμε αυτή τη στιγμή. Δοκιμάστε ξανά.",
+      "invalidLink": "Μη έγκυρος σύνδεσμος σύνδεσης.",
+      "linkExpired": "Αυτός ο σύνδεσμος σύνδεσης έληξε. Ζητήστε έναν νέο.",
+      "signingInBody": "Μια στιγμή...",
+      "signingInTitle": "Γίνεται σύνδεση"
+    },
+    "boot": {
+      "checkingSessionBody": "Μια στιγμή, η Stella ξυπνάει.",
+      "checkingSessionTitle": "Έλεγχος της συνεδρίας σας",
+      "crashTitle": "Κάτι χάλασε κατά την εκκίνηση",
+      "missingConfigBody": "Ορίστε το EXPO_PUBLIC_STELLA_BACKEND_URL πριν ξεκινήσετε την εφαρμογή.",
+      "missingConfigTitle": "Προσθέστε τις μεταβλητές περιβάλλοντος για κινητά"
+    },
+    "chat": {
+      "composerPlaceholder": "Γράψτε στη Stella",
+      "createFailed": "Δεν ήταν δυνατή η δημιουργία συνομιλίας. Δοκιμάστε ξανά.",
+      "emptyPrompt": "Ρωτήστε τη Stella οτιδήποτε",
+      "loadMore": "Φόρτωση περισσότερων",
+      "mainChat": "Κύρια συνομιλία"
+    },
+    "cloudHome": {
+      "backToSettingsLabel": "Επιστροφή στις Ρυθμίσεις",
+      "openSettingsLabel": "Άνοιγμα της μνήμης Cloud Home",
+      "settingsSection": "Cloud Home",
+      "signIn": "Σύνδεση",
+      "signInBody": "Η μνήμη σας είναι ιδιωτική στον λογαριασμό σας Stella.",
+      "signInTitle": "Συνδεθείτε για να χρησιμοποιήσετε το Cloud Home",
+      "title": "Μνήμη Cloud Home"
+    },
+    "common": {
+      "back": "Πίσω",
+      "backChevron": "‹ Πίσω",
+      "cancel": "Άκυρο",
+      "continue": "Συνέχεια",
+      "delete": "Διαγραφή",
+      "done": "Τέλος",
+      "goBack": "Επιστροφή",
+      "tryAgain": "Δοκιμάστε ξανά"
+    },
+    "computer": {
+      "connectedLabel": "Ο υπολογιστής συνδέθηκε",
+      "connectingLabel": "Σύνδεση με τον υπολογιστή σας",
+      "defaultDeviceLabel": "Ο υπολογιστής σας",
+      "disconnectedLabel": "Ο υπολογιστής αποσυνδέθηκε",
+      "guestHeroBody": "Ζητήστε από τη Stella να κάνει πράγματα στον υπολογιστή σας — να περιηγηθεί στο web, να διαχειριστεί αρχεία, να εκτελέσει εργασίες και άλλα.",
+      "guestHeroTitle": "Ο υπολογιστής σας στα χέρια σας",
+      "statusAsleep": "Σε αναστολή",
+      "statusChecking": "Έλεγχος…",
+      "statusConnected": "Συνδεδεμένος"
+    },
+    "desktop": {
+      "connecting": "Σύνδεση με τον υπολογιστή",
+      "deviceUnreachable": "Η συσκευή {platform} δεν είναι προσβάσιμη",
+      "guestSignInPrompt": "Συνδεθείτε για να ξεκινήσετε.",
+      "limitedCapabilities": "Ορισμένα πράγματα χρειάζονται τον υπολογιστή σας",
+      "linkInterrupted": "Η σύνδεση με τον υπολογιστή σας διακόπηκε.",
+      "reconnecting": "Επανασύνδεση...",
+      "retryLabel": "Δοκιμάστε ξανά τη σύνδεση",
+      "unreachable": "Δεν είναι δυνατή η σύνδεση με τον υπολογιστή"
+    },
+    "engineAccounts": {
+      "active": "Σε χρήση",
+      "backLabel": "Πίσω στις Ρυθμίσεις",
+      "chatgptBrowserWaiting": "Ολοκληρώστε τη σύνδεση στο ChatGPT στο πρόγραμμα περιήγησης.",
+      "chatgptSection": "ChatGPT",
+      "claudeNote": "Η προσθήκη λογαριασμού εδώ συνδέει το cloud της Stella στο Claude Code μέσω της σελίδας της ίδιας της Anthropic. Κάθε υπολογιστής χρησιμοποιεί τη δική του σύνδεση στο Claude Code.",
+      "claudeSection": "Claude",
+      "claudeSyncNote": "Οι πλήρεις συνεδρίες του Claude Code, μαζί με τα αποτελέσματα των εργαλείων, συγχρονίζονται στο cloud της Stella.",
+      "claudeSyncNoteSelfHosted": "Οι πλήρεις συνεδρίες του Claude Code, μαζί με τα αποτελέσματα των εργαλείων, συγχρονίζονται στον διακομιστή Stella σας.",
+      "connectChatgpt": "Σύνδεση λογαριασμού ChatGPT",
+      "connectClaude": "Προσθήκη λογαριασμού Claude",
+      "connecting": "Σύνδεση…",
+      "continueAsChatgpt": "Συνέχεια με ChatGPT ως {name}",
+      "continueWithChatgpt": "Συνέχεια με τον λογαριασμό σου ChatGPT",
+      "enablePlanUsage": "Ενεργοποίηση χρήσης προγράμματος ChatGPT",
+      "errorBody": "Κάτι πήγε στραβά. Δοκιμάστε ξανά.",
+      "errorTitle": "Δεν ήταν δυνατή η ενημέρωση των λογαριασμών",
+      "finish": "Σύνδεση",
+      "manageUsage": "Διαχείριση χρήσης",
+      "moreLabel": "Επιλογές για {name}",
+      "notSignedIn": "Δεν είναι συνδεδεμένος πουθενά",
+      "openChatgptAgain": "Άνοιγμα του ChatGPT ξανά",
+      "openClaudeAgain": "Άνοιγμα της σελίδας σύνδεσης ξανά",
+      "pasteFromClipboard": "Επικόλληση",
+      "pasteHintChatgpt": "Μετά την έγκριση, το ChatGPT σας μεταφέρει σε μια σελίδα που δεν φορτώνει. Αντιγράψτε την πλήρη διεύθυνση αυτής της σελίδας και επικολλήστε την εδώ.",
+      "pasteHintClaude": "Μόλις εγκρίνεις, η Anthropic εμφανίζει έναν κωδικό. Αντίγραψέ τον και επικόλλησέ τον εδώ.",
+      "pastePlaceholder": "Επικόλλησε τον κωδικό που εμφανίζει η Anthropic",
+      "pastePlaceholderUrl": "Επικολλήστε τη διεύθυνση εδώ",
+      "placeCloud": "Cloud",
+      "placeComputer": "Υπολογιστής",
+      "planUsageOffBody": "Η Stella δεν μπορεί να χρησιμοποιήσει το πρόγραμμα ChatGPT σας μέχρι να το επιτρέψετε. Επιλέξτε «Ενεργοποίηση χρήσης προγράμματος ChatGPT» στον λογαριασμό.",
+      "planWelcomeBody": "Τα αιτήματα ChatGPT στο cloud της Stella χρεώνονται στο πρόγραμμα ChatGPT σας. Ελέγξτε τη χρήση και ορίστε το όριο της Stella στις Ρυθμίσεις του ChatGPT.",
+      "planWelcomeTitle": "Χρησιμοποιείτε το πρόγραμμα ChatGPT σας",
+      "remove": "Αφαίρεση",
+      "removeBody": "Η Stella ξεχνά αυτόν τον λογαριασμό ChatGPT. Μπορείτε να συνδεθείτε ξανά σε αυτόν αργότερα.",
+      "removeClaudeBody": "Η Stella ξεχνά αυτόν τον λογαριασμό Claude και αποσυνδέει το cloud από αυτόν. Οι υπολογιστές σου κρατούν τις δικές τους συνδέσεις στο Claude Code.",
+      "removeTitle": "Αφαίρεση του {name};",
+      "revokeUnconfirmed": "Το ChatGPT δεν επιβεβαίωσε την αποσύνδεση. Μπορείτε να αποσυνδέσετε τη Stella από τις Ρυθμίσεις του ChatGPT.",
+      "signInAgain": "Σύνδεση ξανά",
+      "signInCloud": "Σύνδεση στο cloud",
+      "signOut": "Αποσύνδεση",
+      "signOutBody": "Η Stella θα σταματήσει να χρησιμοποιεί αυτόν τον λογαριασμό. Μπορείτε να τον προσθέσετε ξανά οποιαδήποτε στιγμή.",
+      "signOutCloud": "Αποσύνδεση από το cloud",
+      "signOutCloudBody": "Το cloud της Stella σταματά να χρησιμοποιεί αυτόν τον λογαριασμό μέχρι να συνδεθείς ξανά εκεί. Οι υπολογιστές σου κρατούν τις δικές τους συνδέσεις στο Claude Code.",
+      "signOutCloudTitle": "Αποσύνδεση του {name} από το cloud;",
+      "signOutTitle": "Αποσύνδεση από {name};",
+      "signedInOn": "Συνδεδεμένος: {places}",
+      "startAgain": "Έναρξη από την αρχή",
+      "statusPlanUsageOff": "Η χρήση του προγράμματος ChatGPT δεν είναι ενεργή",
+      "statusReauth": "Συνδεθείτε ξανά για να συνεχίσετε να τον χρησιμοποιείτε",
+      "statusSignedOut": "Αποσυνδέθηκε",
+      "subtitle": "Χρησιμοποιήστε το πρόγραμμα Claude ή ChatGPT που ήδη πληρώνετε",
+      "title": "Claude και ChatGPT",
+      "useAccount": "Χρήση αυτού του λογαριασμού"
+    },
+    "login": {
+      "appleCompleteFailed": "Δεν ήταν δυνατή η ολοκλήρωση της σύνδεσης με Apple.",
+      "appleNoToken": "Η Apple δεν επέστρεψε διακριτικό ταυτότητας.",
+      "appleStartFailed": "Δεν ήταν δυνατή η έναρξη της σύνδεσης με Apple.",
+      "checkInbox": "Ελέγξτε τα εισερχόμενά σας και πατήστε τον σύνδεσμο — θα συνδεθείτε αυτόματα.",
+      "continueAsGuest": "Συνέχεια χωρίς σύνδεση",
+      "continueWithApple": "Συνέχεια με Apple",
+      "continueWithGoogle": "Συνέχεια με Google",
+      "emailPlaceholder": "Email",
+      "enterEmail": "Εισαγάγετε το email σας.",
+      "finishFailed": "Δεν ήταν δυνατή η ολοκλήρωση της σύνδεσης. Δοκιμάστε ξανά.",
+      "googleStartFailed": "Δεν ήταν δυνατή η έναρξη της σύνδεσης με Google.",
+      "heroBody": "Χρησιμοποιήστε Apple, Google ή το email που έχετε στον υπολογιστή σας.",
+      "heroTitle": "Ο βοηθός σας,\nσε μέγεθος τσέπης.",
+      "incomplete": "Η σύνδεση δεν ολοκληρώθηκε. Δοκιμάστε ξανά.",
+      "legalConjunction": " και την ",
+      "legalPrefix": "Συνεχίζοντας, αποδέχεστε τους ",
+      "legalPrivacy": "Πολιτική απορρήτου",
+      "legalSuffix": ".",
+      "legalTerms": "Όρους χρήσης",
+      "linkExpired": "Ο σύνδεσμος έληξε. Δοκιμάστε ξανά.",
+      "openingApple": "Άνοιγμα Apple...",
+      "openingGoogle": "Άνοιγμα Google...",
+      "orUseEmail": "ή χρησιμοποιήστε email",
+      "resend": "Επαναποστολή",
+      "resendLabel": "Επαναποστολή email σύνδεσης",
+      "sendFailed": "Η αποστολή του email σύνδεσης απέτυχε.",
+      "sending": "Αποστολή...",
+      "signingIn": "Σύνδεση...",
+      "useDifferentEmail": "Χρήση άλλου email"
+    },
+    "nav": {
+      "account": "Λογαριασμός",
+      "apps": "Εφαρμογές",
+      "backToApps": "Πίσω στις εφαρμογές",
+      "backToChat": "Επιστροφή στη συνομιλία",
+      "chat": "Συνομιλία",
+      "chatSettingsLabel": "Ρυθμίσεις συνομιλίας",
+      "closeLabel": "Κλείσιμο πλοήγησης",
+      "openLabel": "Άνοιγμα πλοήγησης",
+      "settings": "Ρυθμίσεις",
+      "signIn": "Σύνδεση"
+    },
+    "onboarding": {
+      "account": {
+        "chatgptDesc": "Το πρόγραμμα ChatGPT σας, για το cloud της Stella",
+        "claudeDesc": "Pro ή Max, μέσω Claude Code",
+        "connect": "Συνδέστε",
+        "connectLabel": "Συνδέστε το {name}",
+        "connectedAs": "Συνδέθηκε · {name}",
+        "guestSettled": "Συνδεθείτε οποιαδήποτε στιγμή από τις Ρυθμίσεις",
+        "settledGuest": "Χρήση της Stella ως επισκέπτης",
+        "settledSignedIn": "Έχετε συνδεθεί",
+        "signIn": "Σύνδεση",
+        "signInBody": "Κρατήστε τη συνομιλία, τις ρυθμίσεις και τον συνδεδεμένο υπολογιστή σας σε κάθε συσκευή.",
+        "signInTitle": "Σύνδεση στη Stella",
+        "skip": "Παράλειψη προς το παρόν",
+        "subscriptionsBody": "Θέλετε να χρησιμοποιήσετε την υπάρχουσα συνδρομή σας στο Claude ή στο ChatGPT;",
+        "subscriptionsLabel": "Προαιρετικό"
+      },
+      "composerPlaceholder": "Ή απλώς ρωτήστε με κάτι",
+      "computer": {
+        "body": "Συνδεθείτε στον υπολογιστή σας και θα συνδεθεί αυτόματα.",
+        "connectedTo": "Συνδέθηκε με {name}",
+        "getDesktop": "Αποκτήστε τη Stella για υπολογιστή",
+        "later": "Αργότερα",
+        "settledSkippedTitle": "Κανένας υπολογιστής ακόμη",
+        "title": "Η Stella στον υπολογιστή σας"
+      },
+      "gmail": {
+        "body": "Βρες email, ενημερώσου για συζητήσεις και γράψε πρόχειρες απαντήσεις, απλώς ζητώντας το.",
+        "connect": "Σύνδεση Gmail",
+        "connected": "Συνδέθηκε",
+        "error": "Δεν ήταν δυνατή η σύνδεση του Gmail. Δοκίμασε ξανά ή παράλειψέ το προς το παρόν.",
+        "settledSkippedTitle": "Χωρίς Gmail προς το παρόν",
+        "settledTitle": "Το Gmail συνδέθηκε",
+        "skip": "Όχι τώρα",
+        "title": "Σύνδεση Gmail",
+        "waiting": "Αναμονή για Google…"
+      },
+      "hello": {
+        "cta": "Δείξε μου",
+        "pillars": {
+          "asks": {
+            "body": "Ό,τι κοστίζει χρήματα περιμένει το ΟΚ σας.",
+            "title": "Ρωτάει πριν έχει σημασία"
+          },
+          "background": {
+            "body": "Αναθέστε κάτι και συνεχίστε. Θα σας πω όταν τελειώσει.",
+            "title": "Δουλεύει στο παρασκήνιο"
+          },
+          "done": {
+            "body": "Κρατήσεις, παραγγελίες, αρχεία και έρευνα, ολοκληρωμένα για εσάς.",
+            "title": "Τα κάνει πράξη"
+          }
+        },
+        "settledTitle": "Γνωρίστε τη Stella"
+      },
+      "messages": {
+        "account": "Θέλετε να τα κρατήσετε όλα αυτά; Ένας λογαριασμός Stella σας ακολουθεί σε κάθε συσκευή.",
+        "accountSignedIn": "Έχετε συνδεθεί, οπότε όλα σας ακολουθούν από συσκευή σε συσκευή. Ένα προαιρετικό έξτρα:",
+        "computer": "Αν έχετε Mac ή PC, μπορώ να δουλεύω και εκεί.",
+        "gmail": "Μεγάλο μέρος της ζωής περνά από το email. Σύνδεσε το Gmail και θα σε βοηθήσω με το δικό σου.",
+        "hello": "Γεια σας, είμαι η Stella.\n\nΔεν είμαι chatbot. Πείτε μου τι χρειάζεστε και θα το φροντίσω, στο παρασκήνιο, ενώ εσείς συνεχίζετε τη μέρα σας.",
+        "ready": "Αυτό ήταν. Θα σας γνωρίσω σιγά σιγά.\n\nΤι να κάνουμε πρώτα;",
+        "showcase": "Να πώς φαίνεται αυτό.",
+        "theme": "Τώρα, πώς θέλετε να φαίνομαι;"
+      },
+      "progressLabel": "Βήμα {current} από {total}",
+      "ready": {
+        "start": "Έναρξη συνομιλίας",
+        "starters": {
+          "explain": {
+            "prompt": "Εξήγησέ μου απλά πώς λειτουργεί ο ανατοκισμός.",
+            "title": "Εξήγησέ μου κάτι"
+          },
+          "gift": {
+            "prompt": "Βρες ένα προσεγμένο δώρο γενεθλίων για έναν φίλο, κάτω από 50 $.",
+            "title": "Βρες ένα δώρο"
+          },
+          "plan": {
+            "prompt": "Βοήθησέ με να οργανώσω την εβδομάδα μου με βάση όσα έχω μπροστά μου.",
+            "title": "Σχεδίασε την εβδομάδα μου"
+          },
+          "remind": {
+            "prompt": "Υπενθύμισέ μου να πάρω τηλέφωνο τη μαμά την Κυριακή στις 18:00.",
+            "title": "Όρισε υπενθύμιση"
+          }
+        },
+        "startersLabel": "Δοκιμάστε ένα από αυτά"
+      },
+      "replies": {
+        "accountDone": "Όλα έτοιμα.",
+        "accountSkipped": "Παράλειψη προς το παρόν.",
+        "computerDone": "Συνδέθηκε!",
+        "computerSkipped": "Ίσως αργότερα.",
+        "gmailDone": "Έγινε.",
+        "gmailSkipped": "Όχι τώρα.",
+        "helloDone": "Δείξε μου.",
+        "showcaseDone": "Κατάλαβα.",
+        "themeDone": "Αυτό.",
+        "themeSkipped": "Κράτα την προεπιλογή."
+      },
+      "send": "Αποστολή",
+      "showcase": {
+        "chapters": {
+          "errands": {
+            "caption": "Ανοίγω τον ιστότοπο, συμπληρώνω τα στοιχεία και ολοκληρώνω τη δουλειά, όπως θα κάνατε εσείς.",
+            "prompt": "Κλείσε τραπέζι για δύο την Παρασκευή στις 20:00",
+            "receipt1": "Osteria Lucia · Παρ 20:00 · 2 άτομα",
+            "receipt2": "Προστέθηκε στο ημερολόγιό σας",
+            "reply": "Έκλεισα τραπέζι στο Osteria Lucia για την Παρασκευή στις 20:00. Υπάρχει στο ημερολόγιό σας.",
+            "scene": {
+              "date": "Ημ/νία",
+              "dateValue": "Παρασκευή",
+              "party": "Άτομα",
+              "partyValue": "2 άτομα",
+              "reserve": "Κράτηση",
+              "reserved": "Κρατήθηκε",
+              "site": "osterialucia.com",
+              "time": "Ώρα",
+              "timeValue": "20:00"
+            },
+            "title": "Ζητήστε το μία φορά. Θεωρήστε το τελειωμένο.",
+            "word": "Δουλειές",
+            "working": "Κλείνω τραπέζι"
+          },
+          "research": {
+            "caption": "Συγκρίνω τις επιλογές, διαβάζω τις κριτικές και επιστρέφω με μια απάντηση.",
+            "prompt": "Βρες το καλύτερο ηλεκτρικό ποδήλατο κάτω από 2.000 $",
+            "receipt1": "Διαβάστηκαν 24 κριτικές",
+            "receipt2": "Η σύγκριση αποθηκεύτηκε στα Αρχεία",
+            "reply": "Το Cityline 3: ο πιο ελαφρύς σκελετός, τα καλύτερα φρένα, 1.799 $.",
+            "scene": {
+              "rank1": "Cityline 3",
+              "rank2": "Metro S",
+              "rank3": "Urban X",
+              "source1": "Κριτικές ειδικών",
+              "source2": "Φόρουμ ιδιοκτητών",
+              "source3": "Τεχνικά φυλλάδια",
+              "title": "Σύγκριση ηλεκτρικών ποδηλάτων"
+            },
+            "title": "Το διάβασμα είναι δική μου δουλειά.",
+            "word": "Έρευνα",
+            "working": "Διαβάζω κριτικές"
+          },
+          "routines": {
+            "caption": "Υπενθυμίσεις, check-in και καθημερινές ενημερώσεις που τρέχουν με δικό τους πρόγραμμα.",
+            "prompt": "Κάθε πρωί στις 8 ενημέρωσέ με για τη μέρα μου",
+            "receipt1": "Κάθε μέρα στις 8:00",
+            "reply": "Έγινε. Η πρώτη σας ενημέρωση φτάνει αύριο στις 8.",
+            "scene": {
+              "body": "3 συναντήσεις, βροχή μετά τις 17:00 και τα γενέθλια του Sam.",
+              "day": "Αύριο",
+              "now": "τώρα",
+              "time": "8:00",
+              "title": "Η πρωινή σας ενημέρωση",
+              "when": "Αύριο, 8:00"
+            },
+            "title": "Ορίστε το μία φορά. Θα το συνεχίσω εγώ.",
+            "word": "Ρουτίνες",
+            "working": "Το ρυθμίζω"
+          },
+          "shopping": {
+            "amount": "129,99 $",
+            "caption": "Το βρίσκω και πάω στο ταμείο. Εσείς εγκρίνετε το σύνολο και εγώ κάνω την παραγγελία.",
+            "confirm": "Επιβεβαίωση",
+            "confirmDetail": "Trail Runner 2 · νούμερο 10",
+            "confirmTitle": "Επιβεβαίωση αγοράς;",
+            "confirmed": "Επιβεβαιώθηκε",
+            "prompt": "Ξαναπαράγγειλε τα running παπούτσια μου, νούμερο 10",
+            "receipt1": "Παραγγελία #48213 · φτάνει την Πέμπτη",
+            "reply": "Η παραγγελία έγινε. Φτάνουν την Πέμπτη.",
+            "scene": {
+              "addToCart": "Προσθήκη",
+              "inCart": "Στο καλάθι",
+              "product": "Trail Runner 2",
+              "site": "trailco.com"
+            },
+            "title": "Μπορώ να αγοράζω, με το ΟΚ σας.",
+            "word": "Αγορές",
+            "working": "Αναζητώ τα παπούτσια σας"
+          },
+          "work": {
+            "caption": "Έγγραφα, φύλλα και παρουσιάσεις: κάνω τη δουλειά και αποθηκεύω το αρχείο εκεί που μπορείτε να το ανοίξετε.",
+            "prompt": "Μετάτρεψε τις σημειώσεις μου για το Q3 σε παρουσίαση για τη Δευτέρα",
+            "receipt1": "Σημειώσεις Q3 · διαβάστηκαν",
+            "receipt2": "Παρουσίαση Q3 · 12 διαφάνειες",
+            "reply": "Η παρουσίασή σας είναι έτοιμη: 12 διαφάνειες, αποθηκευμένη στα Αρχεία.",
+            "scene": {
+              "file": "Ανασκόπηση Q3.pptx",
+              "slideTitle": "Ανασκόπηση Q3"
+            },
+            "title": "Πραγματικά αρχεία, έτοιμα.",
+            "word": "Εργασία",
+            "working": "Διαβάζω τις σημειώσεις σας"
+          }
+        },
+        "placeholder": "Ρωτήστε τη Stella",
+        "play": "Αναπαραγωγή αυτής της επίδειξης",
+        "replay": "Επανάληψη της επίδειξης",
+        "settledTitle": "Η γρήγορη ξενάγηση",
+        "tablist": "Τι μπορεί να κάνει η Stella"
+      },
+      "skip": "Παράλειψη",
+      "skipLabel": "Παράλειψη εισαγωγής",
+      "theme": {
+        "appearance": "Εμφάνιση",
+        "confirm": "Τέλος",
+        "reset": "Διατήρηση προεπιλογής",
+        "themes": "Θέμα"
+      }
+    },
+    "search": {
+      "cancelLabel": "Ακύρωση αναζήτησης",
+      "clearLabel": "Εκκαθάριση αναζήτησης",
+      "openLabel": "Αναζήτηση στα μηνύματα",
+      "placeholder": "Αναζήτηση στα μηνύματα"
+    },
+    "selfHost": {
+      "addServer": "Σύνδεση διακομιστή",
+      "appTooOldBody": "Ο {host} χρειάζεται νεότερη έκδοση της Stella. Ενημέρωσε την εφαρμογή και άνοιξέ την ξανά.",
+      "appTooOldTitle": "Ενημέρωσε την εφαρμογή",
+      "back": "Πίσω",
+      "behindBody": "Ορισμένες λειτουργίες χρειάζονται νεότερη έκδοση του διακομιστή σου.",
+      "behindTitle": "Ο διακομιστής σου χρειάζεται ενημέρωση",
+      "cameraDenied": "Η Stella δεν μπορεί να χρησιμοποιήσει την κάμερα. Επίτρεψέ το στις Ρυθμίσεις ή επικόλλησε τον σύνδεσμο.",
+      "cameraHint": "Στρέψε την κάμερα στον κωδικό σύζευξης.",
+      "checkAgain": "Έλεγχος ξανά",
+      "checking": "Έλεγχος…",
+      "confirmAppTooOld": "Αυτός ο διακομιστής χρειάζεται νεότερη έκδοση της εφαρμογής. Ενημέρωσε τη Stella και δοκίμασε ξανά.",
+      "confirmBody": "Συνδέεσαι με {host}, που τον διαχειρίζεται ο ιδιοκτήτης του, όχι η Stella. Οι συνομιλίες και τα αρχεία σου θα αποθηκεύονται σε αυτόν τον διακομιστή.",
+      "confirmServerTooOld": "Αυτός ο διακομιστής είναι πολύ παλιός για την εφαρμογή. Ενημέρωσε τον διακομιστή και σάρωσε νέο κωδικό.",
+      "confirmTitle": "Σύνδεση με {name};",
+      "connectBody": "Σάρωσε τον κωδικό σύζευξης που δείχνει ο διακομιστής σου (στην έξοδο της εγκατάστασης ή στη Stella του υπολογιστή σου) ή επικόλλησε τον σύνδεσμό του.",
+      "connectButton": "Σύνδεση",
+      "connectOwn": "Σύνδεση του δικού σου διακομιστή",
+      "connectOwnHint": "Τρέχεις τη Stella στον δικό σου λογαριασμό Cloudflare; Σύζευξε αυτό το τηλέφωνο μαζί του.",
+      "connecting": "Σύνδεση…",
+      "errorAttempts": "Πάρα πολλές προσπάθειες με αυτόν τον κωδικό. Δημιούργησε νέο στον διακομιστή σου.",
+      "errorExpired": "Ο κωδικός σύζευξης έληξε ή έχει ήδη χρησιμοποιηθεί. Δημιούργησε νέο στον διακομιστή σου.",
+      "errorInvalid": "Ο κωδικός σύζευξης δεν είναι έγκυρος. Δημιούργησε νέο στον διακομιστή σου.",
+      "errorRateLimited": "Πάρα πολλές προσπάθειες. Περίμενε ένα λεπτό και δοκίμασε ξανά.",
+      "errorServer": "Ο διακομιστής δεν μπόρεσε να συνδέσει αυτό το τηλέφωνο. Δοκίμασε ξανά.",
+      "hostedName": "Stella",
+      "hostedSub": "stella.sh, από τη Stella",
+      "howToSelfHost": "Πώς τρέχεις τον δικό σου διακομιστή",
+      "invalidLink": "Αυτός δεν είναι σύνδεσμος σύζευξης της Stella.",
+      "noCodeInPhoto": "Δεν βρέθηκε κωδικός σύζευξης σε αυτή τη φωτογραφία.",
+      "notStella": "Ο {host} δεν είναι διακομιστής Stella.",
+      "openStore": "Άνοιγμα καταστήματος",
+      "ownerOf": "Κάτοχος του {name}",
+      "paste": "Επικόλληση",
+      "pasteLabel": "Σύνδεσμος σύζευξης",
+      "removeBody": "Το τηλέφωνο ξεχνά τον διακομιστή και τη σύνδεσή του. Μπορείς να κάνεις ξανά σύζευξη αργότερα.",
+      "removeButton": "Αφαίρεση",
+      "removeButtonA11y": "Αφαίρεση {name}",
+      "removeTitle": "Αφαίρεση {name};",
+      "scanPhoto": "Επιλογή φωτογραφίας του κωδικού",
+      "scanQr": "Σάρωση κωδικού σύζευξης",
+      "selfHostedSub": "{host}, από τον ιδιοκτήτη του",
+      "serverAddress": "Διεύθυνση",
+      "serverName": "Όνομα",
+      "serverSection": "Διακομιστής",
+      "serverTooOldBody": "Ο {host} τρέχει παλαιότερη έκδοση της Stella από αυτήν που υποστηρίζει η εφαρμογή.",
+      "serverTooOldHow": "Ζήτησε από τον πράκτορα κώδικα που τον εγκατέστησε να ενημερώσει τον διακομιστή Stella ή εκτέλεσε: node scripts/selfhost.mjs update",
+      "serverTooOldTitle": "Ενημέρωσε τον διακομιστή σου",
+      "serverVersion": "Έκδοση",
+      "serverVersionLine": "Έκδοση διακομιστή: {version}",
+      "sessionEnded": "Αυτό το τηλέφωνο αποσυνδέθηκε από {host}. Σάρωσε νέο κωδικό σύζευξης για να συνδεθείς ξανά.",
+      "switchBody": "Η Stella επανεκκινείται σε εκείνον τον διακομιστή.",
+      "switchButton": "Μετάβαση",
+      "switchTitle": "Μετάβαση σε {name};",
+      "unknownVersion": "Άγνωστη",
+      "unreachable": "Δεν ήταν δυνατή η σύνδεση με {host}. Έλεγξε τη σύνδεσή σου και δοκίμασε ξανά.",
+      "useStella": "Χρήση της Stella",
+      "useStellaInstead": "Χρήση της Stella",
+      "welcomeBody": "Η βοηθός σου στο τηλέφωνο και στους υπολογιστές σου.",
+      "welcomeTitle": "Γεια, είμαι η Stella"
+    },
+    "settings": {
+      "aboutSection": "Σχετικά",
+      "appearance": {
+        "dark": "Σκούρο",
+        "light": "Ανοιχτό",
+        "system": "Σύστημα"
+      },
+      "appearanceSection": "Εμφάνιση",
+      "background": {
+        "flat": "Επίπεδο",
+        "soft": "Απαλό"
+      },
+      "backgroundColor": {
+        "relative": "Σχετικό",
+        "strong": "Έντονο"
+      },
+      "chatStorage": {
+        "description": "Αποκτήστε πρόσβαση στις συνομιλίες σας από όλες τις συσκευές. Απενεργοποιήστε το για να διατηρήσετε ξεχωριστό ιστορικό μόνο σε αυτή τη συσκευή. Αν το ενεργοποιήσετε ξανά, αυτές οι συνομιλίες δεν θα μεταφορτωθούν. Οι πάροχοι AI εξακολουθούν να επεξεργάζονται τα μηνύματά σας."
+      },
+      "computer": {
+        "cloud": "Cloud",
+        "connectFailedTitle": "Δεν ήταν δυνατή η σύνδεση με τον υπολογιστή",
+        "connecting": "Σύνδεση…",
+        "enable": "Ενεργοποίηση",
+        "enableFailedTitle": "Δεν ήταν δυνατή η ενεργοποίηση του υπολογιστή",
+        "enableLabel": "Ενεργοποίηση του {name}",
+        "enabling": "Ενεργοποίηση…",
+        "sectionLabel": "Πού δουλεύει η Stella",
+        "statusAwaitingConsent": "Αναμονή για άδεια σε εκείνον τον υπολογιστή",
+        "statusDeclined": "Απορρίφθηκε σε εκείνον τον υπολογιστή",
+        "statusNotEnabled": "Δεν έχει ενεργοποιηθεί ακόμη",
+        "statusNotReady": "Δεν είναι έτοιμος",
+        "statusOffline": "Εκτός σύνδεσης",
+        "statusOnline": "Σε σύνδεση"
+      },
+      "computerSection": "Υπολογιστής",
+      "deleteAccount": "Διαγραφή λογαριασμού",
+      "deleteAccountLabel": "Διαγραφή του λογαριασμού σας Stella",
+      "deleteConfirmBody": "Θα αποσυνδεθείτε από όλες τις συσκευές και ο λογαριασμός σας θα απενεργοποιηθεί αμέσως. Μετά από 7 ημέρες, ο λογαριασμός και τα δεδομένα του στο cloud διαγράφονται οριστικά. Συνδεθείτε ξανά πριν από τότε για ακύρωση.",
+      "deleteConfirmTitle": "Διαγραφή λογαριασμού",
+      "deleteFailedBody": "Ο λογαριασμός σας δεν διαγράφηκε και παραμένετε συνδεδεμένοι.",
+      "deleteFailedTitle": "Δεν ήταν δυνατή η διαγραφή του λογαριασμού",
+      "deleteRetry": "Δοκιμάστε ξανά",
+      "deletingAccount": "Διαγραφή λογαριασμού…",
+      "deletionScheduledTitle": "Η διαγραφή λογαριασμού προγραμματίστηκε",
+      "loadingSession": "Φόρτωση συνεδρίας…",
+      "notificationsSection": "Ειδοποιήσεις",
+      "openPrivacyLabel": "Άνοιγμα Πολιτικής απορρήτου",
+      "openTermsLabel": "Άνοιγμα Όρων χρήσης",
+      "paired": {
+        "unnamedComputer": "Υπολογιστής · {id}"
+      },
+      "privacyPolicy": "Πολιτική απορρήτου",
+      "pushToggleA11y": "Εναλλαγή ειδοποιήσεων push",
+      "pushToggleLabel": "Να επιτρέπονται οι ειδοποιήσεις push",
+      "pushToggleSub": "Λάβετε ειδοποίηση όταν ο υπολογιστής σας ολοκληρώσει ένα αίτημα.",
+      "signIn": "Σύνδεση",
+      "signInTitle": "Συνδεθείτε στη Stella",
+      "signOut": "Αποσύνδεση",
+      "signOutLabel": "Αποσύνδεση από τη Stella",
+      "signingOut": "Αποσύνδεση…",
+      "termsOfService": "Όροι χρήσης",
+      "title": "Ρυθμίσεις",
+      "useAppearanceLabel": "Χρήση εμφάνισης {name}",
+      "useBackgroundColorLabel": "Χρήση χρώματος φόντου {name}",
+      "useBackgroundLabel": "Χρήση φόντου {name}",
+      "useThemeLabel": "Χρήση θέματος {name}",
+      "userAsk": {
+        "ceiling": "Πόσο μακριά μπορεί να φτάσει",
+        "ceilingSub": "Το ανώτατο επίπεδο που επιτρέπεται σε μια ερώτηση.",
+        "level": {
+          "alert": "Συναγερμός",
+          "breakthrough": "Διακοπή",
+          "chat": "Συνομιλία",
+          "notify": "Ειδοποίηση"
+        },
+        "quietCeiling": "Όριο στην ησυχία",
+        "quietEnd": "Λήξη",
+        "quietHours": "Ώρες ησυχίας",
+        "quietHoursSub": "{start} έως {end}",
+        "quietStart": "Έναρξη",
+        "rateLimit": "Διακοπές",
+        "rateLimitSub": "Το πολύ τόσες ερωτήσεις την ώρα.",
+        "rateLimitValue": "{count}/ώρα",
+        "saveFailed": "Δεν αποθηκεύτηκε. Δοκίμασε ξανά.",
+        "section": "Όταν σε χρειάζεται η Stella",
+        "sound": "Ήχος",
+        "soundSub": "Αναπαραγωγή ήχου όταν φτάνει ερώτηση.",
+        "stepDown": "Μείωση {label}",
+        "stepUp": "Αύξηση {label}",
+        "unavailable": "Αυτές οι ρυθμίσεις δεν είναι διαθέσιμες ακόμη."
+      },
+      "voiceSection": "Φωνή"
+    },
+    "sidebar": {
+      "searchPlaceholder": "Αναζήτηση σε δραστηριότητα και αρχεία",
+      "signedOutHint": "Συνδεθείτε για να δείτε τι επεξεργάζεται η Stella στο παρασκήνιο."
+    },
+    "userAsk": {
+      "answerFailed": "Η απάντηση δεν στάλθηκε. Δοκίμασε ξανά.",
+      "answerOnComputer": "Απάντησε σε αυτό στο {device}",
+      "answerOnComputerUnknown": "Απάντησε σε αυτό στον υπολογιστή που ρωτά",
+      "answerOnComputerWhy": "Χρειάζεται κάτι προσωπικό, και αυτό το τηλέφωνο δεν έχει κλειδί για να το κρυπτογραφήσει προς εκείνον τον υπολογιστή. Η Stella δεν θα το στείλει χωρίς κρυπτογράφηση.",
+      "askedBy": "Από {label}",
+      "cancelFailed": "Η ερώτηση δεν έκλεισε. Δοκίμασε ξανά.",
+      "cantRightNow": "Όχι τώρα",
+      "deadline": "Απομένουν {time}",
+      "deadlinePassed": "Ο χρόνος τελείωσε",
+      "hideSecret": "Απόκρυψη {label}",
+      "missingFields": "Συμπλήρωσε όλα τα υποχρεωτικά πεδία.",
+      "notification": {
+        "alreadyAnsweredBody": "Η ερώτηση απαντήθηκε ή έκλεισε πριν φτάσει η απάντησή σου.",
+        "alreadyAnsweredTitle": "Έχει ήδη απαντηθεί",
+        "answer": "Απάντηση",
+        "body": "Πάτα για απάντηση.",
+        "dismiss": "Απόρριψη",
+        "sendFailedBody": "Άνοιξε τη Stella για να απαντήσεις εκεί.",
+        "sendFailedTitle": "Η απάντησή σου δεν στάλθηκε",
+        "title": "Η Stella σε χρειάζεται",
+        "titleFrom": "Το {label} σε χρειάζεται"
+      },
+      "optional": "Προαιρετικό",
+      "revealSecret": "Εμφάνιση {label}",
+      "sealFailed": "Δεν ήταν δυνατή η κρυπτογράφηση σε αυτή τη συσκευή.",
+      "sendSecurely": "Ασφαλής αποστολή",
+      "sending": "Αποστολή…",
+      "sensitive": "Κρυπτογραφημένο από άκρο σε άκρο",
+      "sensitiveUnavailable": "Αυτή η συσκευή δεν μπορεί ακόμη να το κρυπτογραφήσει",
+      "unnamedComputer": "Υπολογιστής · {id}",
+      "waitingBadge": "Περιμένει εσένα",
+      "remember": "Απομνημόνευση για την επόμενη φορά",
+      "rememberOn": "Αποθηκεύτηκε ως «{label}». Η Stella το ξαναχρησιμοποιεί χωρίς να σας ρωτήσει ξανά.",
+      "rememberOff": "Χρησιμοποιείται μόνο για αυτή την εργασία και μετά ξεχνιέται.",
+      "replacing": "Η αποθηκευμένη τιμή για «{label}» δεν λειτούργησε. Εισαγάγετε τη σωστή· θα αντικαταστήσει την αποθηκευμένη.",
+      "usingSaved": "Τα υπόλοιπα προέρχονται από το αποθηκευμένο «{label}». Χρειάζονται μόνο τα παρακάτω.",
+      "savedHeading": "Αποθηκευμένο στις συσκευές σου",
+      "savedBody": "Το έχεις αποθηκεύσει ήδη. Η Stella το χρησιμοποιεί όπως είναι, χωρίς να πληκτρολογήσεις τίποτα.",
+      "useSaved": "Χρήση αποθηκευμένης σύνδεσης",
+      "typeInstead": "Πληκτρολόγησε κάτι άλλο",
+      "useSavedInstead": "Χρήση της αποθηκευμένης",
+      "needsFromYou": "Δεν υπάρχει ακόμη τίποτα αποθηκευμένο γι' αυτό, οπότε η Stella το χρειάζεται από σένα."
+    },
+    "savedLogins": {
+      "allowTitle": "Να επιτραπεί το {name};",
+      "allowCheck": "Έλεγξε ότι δείχνει {code}",
+      "notNow": "Όχι τώρα",
+      "allow": "Να επιτραπεί",
+      "waitingTitle": "Πάρε εδώ τις συνδέσεις σου",
+      "waitingBody": "Άνοιξε το Stella σε άλλη συσκευή",
+      "startOver": "Ξεκίνα από την αρχή",
+      "compare": "Έλεγξε ότι το {name} δείχνει {code}",
+      "matches": "Ταιριάζει",
+      "useAnother": "Άλλη συσκευή",
+      "confirmed": "Αναμονή για {name}…",
+      "declined": "Δεν επιτράπηκε",
+      "removed": "Αφαιρέθηκε από τις συσκευές σου",
+      "askAgain": "Ζήτησέ το ξανά",
+      "section": "Αποθηκευμένες συνδέσεις",
+      "thisPhone": "Αυτό το τηλέφωνο",
+      "quiet": "Δεν εμφανίστηκε πρόσφατα",
+      "remove": "Αφαίρεση",
+      "removeTitle": "Αφαίρεση του {name};",
+      "removeBody": "Δεν θα λαμβάνει πια τις αποθηκευμένες συνδέσεις σου.",
+      "problem": "Δεν γίνεται έλεγχος των συσκευών σου",
+      "startOverTitle": "Ξεκίνημα από την αρχή;",
+      "startOverBody": "Ξεκινά μια νέα λίστα μόνο με αυτό το τηλέφωνο. Κάθε άλλη συσκευή σου θα πρέπει να επιτραπεί ξανά."
+    }
+  },
+  "settings": {
+    "account": {
+      "toasts": {
+        "accountDeleted": "Ο λογαριασμός σας Stella διαγράφηκε.",
+        "deletionScheduled": "Ο λογαριασμός σας έχει προγραμματιστεί για διαγραφή. Θα σας στείλουμε email όταν ολοκληρωθεί."
+      }
+    },
+    "telemetry": {
+      "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
+      "title": "Share anonymous usage metrics"
+    },
+    "compactModelList": {
+      "loadFailed": "Δεν ήταν δυνατή η φόρτωση των μοντέλων Stella."
+    },
+    "engineAccounts": {
+      "addInCloud": "Στο cloud",
+      "claude": {
+        "addOn": "Σε: {place}",
+        "automatic": "Προεπιλογή",
+        "automaticToast": "Κάθε υπολογιστής χρησιμοποιεί πλέον τη δική του σύνδεση στο Claude Code.",
+        "chosen": "Επιλεγμένος",
+        "chosenToast": "Ο λογαριασμός {email} χρησιμοποιείται πλέον σε όλους τους υπολογιστές σας και στο cloud.",
+        "cliMissing": "Το Claude Code δεν είναι εγκατεστημένο",
+        "cloud": "Cloud",
+        "notSignedIn": "Μη συνδεδεμένο",
+        "offline": "Εκτός σύνδεσης",
+        "otherComputer": "Άλλος υπολογιστής",
+        "signedInOn": "{place}: συνδεδεμένο στο Claude.",
+        "signedInOnAs": "{place}: συνδεδεμένο στο Claude ως {email}.",
+        "thisComputer": "{name} (αυτός ο υπολογιστής)",
+        "thisComputerUnnamed": "Αυτός ο υπολογιστής",
+        "unknown": "Δεν έχει αναφέρει ακόμη σύνδεση στο Claude Code",
+        "ownLogin": "Η δική του σύνδεση σε κάθε υπολογιστή",
+        "ownLoginHint": "Όποιος λογαριασμός είναι συνδεδεμένος στο Claude Code σε κάθε υπολογιστή",
+        "ownLoginHere": "Η σύνδεση του Claude Code σε αυτόν τον υπολογιστή",
+        "everywhere": "Σε όλους τους υπολογιστές σας και στο cloud",
+        "usedOn": "Σε: {places}",
+        "noteEnded": "{place}: η σύνδεση έληξε.",
+        "noteEnding": "{place}: η σύνδεση λήγει {date}.",
+        "noteMissingChosen": "{place}: δεν έχει γίνει σύνδεση στο {email}.",
+        "noteSignedOut": "{place}: δεν έχει γίνει σύνδεση.",
+        "cloudStart": "Το cloud",
+        "cloudInline": "το cloud",
+        "thisComputerInline": "αυτός ο υπολογιστής",
+        "rowNotChosen": "Χρησιμοποιεί {email}, όχι {chosen}",
+        "rowEnded": "Η σύνδεση έληξε",
+        "rowEnding": "Η σύνδεση λήγει {date}"
+      },
+      "claudeLogin": {
+        "whereCloud": "Σύνδεση στο Claude Code στο cloud σας.",
+        "whereDevice": "Σύνδεση στο Claude Code σε: {place}."
+      },
+      "claudeTitle": "Claude (Pro/Max)",
+      "signIn": "Σύνδεση"
+    },
+    "errors": {
+      "loadMemory": "Αποτυχία φόρτωσης της ρύθμισης μνήμης.",
+      "saveMemory": "Αποτυχία ενημέρωσης της ρύθμισης μνήμης."
+    },
+    "memory": {
+      "description": "Χρήση αποθηκευμένων αναμνήσεων στις απαντήσεις. Η απενεργοποίηση δεν τις διαγράφει.",
+      "title": "Μνήμη"
+    },
+    "reasoningEffort": {
+      "high": "Υψηλή",
+      "low": "Χαμηλή",
+      "max": "Μέγιστη",
+      "medium": "Μεσαία",
+      "xhigh": "Επιπλέον"
+    },
+    "voiceAgent": {
+      "description": "Εμφάνιση στοιχείων φωνής και κλήσεων. Η υπαγόρευση λειτουργεί έτσι κι αλλιώς.",
+      "title": "Φωνητικές συνομιλίες"
+    },
+    "secureValues": {
+      "added": "Προστέθηκε {added}"
+    }
+  },
+  "shell": {
+    "display": {
+      "canvasShare": {
+        "toasts": {
+          "openFailed": "Δεν ήταν δυνατό το άνοιγμα του συνδέσμου"
+        }
+      },
+      "folder": {
+        "emptyTitle": "Αυτός ο φάκελος είναι κενός",
+        "truncated": "Εμφανίζονται μόνο τα πρώτα {count}."
+      }
+    },
+    "sidebar": {
+      "feedback": {
+        "contactLabel": "Το email σου (προαιρετικό)",
+        "description": "Πηγαίνει στην ομάδα του Stella μαζί με το email του λογαριασμού σου, ώστε να μπορούμε να απαντήσουμε.",
+        "descriptionSignedOut": "Πηγαίνει στην ομάδα του Stella. Πρόσθεσε το email σου αν θέλεις απάντηση.",
+        "fieldLabel": "Σχόλια",
+        "placeholder": "Πείτε μας τι λειτουργεί, τι όχι, ή τι θα θέλατε να δείτε…",
+        "send": "Αποστολή",
+        "sending": "Αποστολή…",
+        "sentWith": "Αποστέλλεται μαζί με: {details}",
+        "title": "Αποστολή σχολίων",
+        "toasts": {
+          "failedTitle": "Δεν ήταν δυνατή η αποστολή σχολίων",
+          "sentDescription": "Ευχαριστούμε — κάθε σημείωμα μας βοηθά να διαμορφώσουμε τη Stella.",
+          "sentTitle": "Τα σχόλια στάλθηκαν"
+        }
+      }
+    }
+  },
+  "sidebar": {
+    "feedback": "Αποστολή σχολίων"
+  },
+  "reminders": {
+    "title": "Υπενθύμιση",
+    "done": "Έγινε",
+    "doneState": "Ολοκληρώθηκε",
+    "snooze": "Αναβολή",
+    "snoozeFor": "Αναβολή 10 λεπτά",
+    "snooze10": "10 λεπτά",
+    "snooze60": "1 ώρα",
+    "snoozeTomorrow": "Αύριο το πρωί",
+    "snoozedUntil": "Σε αναβολή έως {time}",
+    "snoozed": "Σε αναβολή",
+    "failed": "Δεν ήταν δυνατή η ενημέρωση της υπενθύμισης. Δοκιμάστε ξανά."
+  },
+  "userAsk": {
+    "deadline": {
+      "remaining": "Απομένουν {time}"
+    },
+    "question": {
+      "confirm": "Χρήση αυτής της απάντησης",
+      "default": "Προεπιλογή",
+      "next": "Επόμενη ερώτηση",
+      "previous": "Προηγούμενη ερώτηση",
+      "progress": "{current} από {total}",
+      "sending": "Αποστολή…",
+      "skip": "Παράλειψη",
+      "skipped": "Παραλείφθηκε",
+      "somethingElse": "Κάτι άλλο",
+      "submit": "Υποβολή"
+    },
+    "secureInput": {
+      "choosePlaceholder": "Choose",
+      "optional": "optional",
+      "privateBadge": "Private — Stella never sees it",
+      "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",
+      "relayedPrivateNote": "Private values are encrypted on this device so only the computer that asked can read them. Stella uses them without ever reading them.",
+      "required": "Fill in {label} first.",
+      "sharedBadge": "Shared with Stella",
+      "sharedNote": "Shared values are sent to Stella as plain text.",
+      "submit": "Send securely",
+      "submitting": "Sending…",
+      "decline": "Decline",
+      "remember": "Απομνημόνευση για την επόμενη φορά",
+      "rememberRelayed": "Απομνημόνευση για την επόμενη φορά",
+      "rememberOn": "Αποθηκεύτηκε ως «{label}». Η Stella το ξαναχρησιμοποιεί χωρίς να σας ρωτήσει ξανά· μπορείτε να το διαγράψετε όποτε θέλετε από {place}.",
+      "rememberOff": "Χρησιμοποιείται μόνο για αυτή την εργασία και μετά ξεχνιέται.",
+      "replacing": "Η αποθηκευμένη τιμή για «{label}» δεν λειτούργησε. Εισαγάγετε τη σωστή· θα αντικαταστήσει την αποθηκευμένη.",
+      "usingSaved": "Τα υπόλοιπα προέρχονται από το αποθηκευμένο «{label}». Χρειάζονται μόνο τα παρακάτω.",
+      "note": "Προσθέστε σημείωση (προαιρετικό)",
+      "provided": "Δόθηκε",
+      "declined": "Απορρίφθηκε"
+    }
+  },
+  "schedule": {
+    "waiting": "Αναμονή για τον υπολογιστή σας",
+    "edit": {
+      "title": "Επεξεργασία"
+    },
+    "notice": {
+      "open": "Άνοιγμα στο Πρόγραμμα",
+      "whenBack": "Θα εκτελεστεί όταν επιστρέψει",
+      "title": {
+        "created": {
+          "reminder": "Η υπενθύμιση ορίστηκε",
+          "task": "Η εργασία προγραμματίστηκε",
+          "watch": "Η παρακολούθηση ρυθμίστηκε"
+        },
+        "updated": {
+          "reminder": "Η υπενθύμιση άλλαξε",
+          "task": "Η εργασία άλλαξε",
+          "watch": "Η παρακολούθηση άλλαξε"
+        },
+        "paused": {
+          "reminder": "Η υπενθύμιση σε παύση",
+          "task": "Η εργασία σε παύση",
+          "watch": "Η παρακολούθηση σε παύση"
+        },
+        "resumed": {
+          "reminder": "Η υπενθύμιση συνεχίζεται",
+          "task": "Η εργασία συνεχίζεται",
+          "watch": "Η παρακολούθηση συνεχίζεται"
+        },
+        "removed": {
+          "reminder": "Η υπενθύμιση αφαιρέθηκε",
+          "task": "Η εργασία αφαιρέθηκε",
+          "watch": "Η παρακολούθηση αφαιρέθηκε"
+        },
+        "waiting": {
+          "reminder": "Αναμονή για τον υπολογιστή σας",
+          "task": "Αναμονή για τον υπολογιστή σας",
+          "watch": "Αναμονή για τον υπολογιστή σας"
+        }
+      },
+      "when": {
+        "today": "Σήμερα στις {time}",
+        "tomorrow": "Αύριο στις {time}",
+        "onDay": "{day} στις {time}",
+        "onDate": "{date} στις {time}",
+        "daily": "Κάθε μέρα στις {time}",
+        "weekdays": "Κάθε εργάσιμη στις {time}",
+        "weekends": "Τα Σαββατοκύριακα στις {time}",
+        "weekly": "Κάθε {day} στις {time}",
+        "onDays": "{days} στις {time}",
+        "everyMinutes": {
+          "one": "Κάθε λεπτό",
+          "other": "Κάθε {count} λεπτά"
+        },
+        "everyHours": {
+          "one": "Κάθε ώρα",
+          "other": "Κάθε {count} ώρες"
+        },
+        "everyDays": {
+          "one": "Κάθε μέρα",
+          "other": "Κάθε {count} μέρες"
+        }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} εργασία προγραμματίστηκε",
+              "other": "{count} εργασίες προγραμματίστηκαν"
+            },
+            "reminder": {
+              "one": "{count} υπενθύμιση ορίστηκε",
+              "other": "{count} υπενθυμίσεις ορίστηκαν"
+            },
+            "watch": {
+              "one": "{count} παρακολούθηση ορίστηκε",
+              "other": "{count} παρακολουθήσεις ορίστηκαν"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} εργασία άλλαξε",
+              "other": "{count} εργασίες άλλαξαν"
+            },
+            "reminder": {
+              "one": "{count} υπενθύμιση άλλαξε",
+              "other": "{count} υπενθυμίσεις άλλαξαν"
+            },
+            "watch": {
+              "one": "{count} παρακολούθηση άλλαξε",
+              "other": "{count} παρακολουθήσεις άλλαξαν"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} εργασία αφαιρέθηκε",
+              "other": "{count} εργασίες αφαιρέθηκαν"
+            },
+            "reminder": {
+              "one": "{count} υπενθύμιση αφαιρέθηκε",
+              "other": "{count} υπενθυμίσεις αφαιρέθηκαν"
+            },
+            "watch": {
+              "one": "{count} παρακολούθηση αφαιρέθηκε",
+              "other": "{count} παρακολουθήσεις αφαιρέθηκαν"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} εκτέλεση",
+          "other": "{count} εκτελέσεις"
+        },
+        "undone": "Προγραμματίστηκε και μετά αφαιρέθηκε",
+        "fromAgents": {
+          "one": "Για μια εργασία στο παρασκήνιο",
+          "other": "Για {count} εργασίες στο παρασκήνιο"
+        },
+        "showAll": "Εμφάνιση όλων",
+        "showLess": "Λιγότερα"
+      }
+    }
+  },
+  "email": {
+    "title": "Email",
+    "failed": "Δεν ήταν δυνατή η ενημέρωση. Δοκιμάστε ξανά.",
+    "section": {
+      "connectBody": "Συνδέστε το Gmail και η Stella ταξινομεί τα νέα μηνύματα μόλις φτάνουν. Τα επείγοντα σας φτάνουν αμέσως· τα υπόλοιπα περιμένουν στο Σήμερα, με έτοιμη απάντηση όπου χρειάζεται.",
+      "connect": "Σύνδεση Gmail",
+      "connecting": "Αναμονή για Google…",
+      "connectError": "Το Gmail δεν συνδέθηκε. Δοκιμάστε ξανά.",
+      "reconnectBody": "Το Gmail πρέπει να επανασυνδεθεί μέσω της Stella για να ταξινομεί η Stella τα μηνύματά σας.",
+      "reconnect": "Επανασύνδεση Gmail",
+      "loadErrorBody": "Η Stella δεν μπορεί να φτάσει τους διακομιστές της αυτή τη στιγμή. Ελέγξτε τη σύνδεση και δοκιμάστε ξανά.",
+      "offBody": "Η Stella ταξινομεί τα νέα μηνύματα μόλις φτάνουν. Τα επείγοντα σας φτάνουν αμέσως· τα υπόλοιπα περιμένουν στο Σήμερα, με έτοιμη απάντηση όπου χρειάζεται. Ο θόρυβος μένει έξω.",
+      "turnOn": "Ενεργοποίηση",
+      "turningOn": "Ταξινόμηση πρόσφατων μηνυμάτων…"
+    }
+  }
+}

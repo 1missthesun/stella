@@ -1,0 +1,1204 @@
+{
+  "app": {
+    "chat": {
+      "activityPill": {
+        "tasksInProgress": {
+          "few": "{count} задачи выполняются",
+          "many": "{count} задач выполняются",
+          "one": "{count} задача выполняется",
+          "other": "{count} задачи выполняются"
+        }
+      },
+      "composer": {
+        "stop": "Стоп"
+      },
+      "contextChips": {
+        "removePastedText": "Убрать вставленный текст"
+      },
+      "miniModelPicker": {
+        "reasoningEffortLabel": "Глубина рассуждений",
+        "triggerLabel": "Модель: {model}",
+        "updateFailedTitle": "Не удалось обновить настройки моделей"
+      },
+      "catchUp": {
+        "pill": "Сводка",
+        "pillLabel": "Сводка по {count} новым сообщениям",
+        "title": "Сводка",
+        "done": "Сделано",
+        "ongoing": "В работе",
+        "waiting": "Ждёт вас",
+        "loading": "Готовлю сводку…",
+        "failed": "Не удалось составить сводку.",
+        "retry": "Повторить",
+        "empty": "Ничего нового.",
+        "close": "Закрыть",
+        "notLoaded": "Этого сообщения больше нет в чате."
+      }
+    }
+  },
+  "billing": {
+    "mobile": {
+      "accessEnds": "Доступ закончится {date}",
+      "alreadySubscribedTitle": "У вас уже есть подписка",
+      "currentPlanLabel": "Текущий план",
+      "errorRetry": "Повторить",
+      "footnote": "Оплата через Stella с помощью Stripe. Продлевается ежемесячно до отмены; отменить можно в любой момент.",
+      "manage": "Управление подпиской",
+      "manageWebNote": "Управляйте подпиской или отмените её в Stella в вебе на stella.sh.",
+      "pendingBody": "Завершите оплату в браузере. Ваш план обновится здесь автоматически, как только оплата подтвердится, — перезапуск не нужен.",
+      "pendingDismiss": "Не сейчас",
+      "pendingTitle": "Завершаем покупку",
+      "planValue": "Stella {plan}",
+      "renews": "Продлится {date}",
+      "sectionTitle": "Подписка",
+      "startingCheckout": "Запуск…",
+      "successBody": "Подписка активна. Пользуйтесь увеличенными лимитами.",
+      "successTitle": "Вы перешли на Stella {plan}"
+    },
+    "v3": {
+      "usage": {
+        "oneTimeNote": "Разово, не обновляется",
+        "resets": "Обновится {date}",
+        "credit": "Дополнительный баланс",
+        "outTitle": "Лимит пока исчерпан",
+        "outBody": "Бюджет обновится {date}. Пополните баланс или перейдите на тариф выше, чтобы продолжить сейчас.",
+        "outBodyNoDate": "Пополните баланс или перейдите на тариф выше, чтобы продолжить сейчас.",
+        "freeOutTitle": "Бесплатный лимит израсходован",
+        "freeOutBody": "Выберите тариф или пополните баланс, чтобы продолжить.",
+        "creditTitle": "Работает на дополнительном балансе",
+        "creditBody": "Лимит тарифа исчерпан до {date}. До этого времени работу Stella оплачивает баланс.",
+        "upgradeTo": "Перейти на {plan}",
+        "percentUsed": "Использовано {percent}"
+      },
+      "plan": {
+        "lede": "Одна и та же Stella в каждом плане. Старшие планы дают больше использования.",
+        "heading": "Выберите план",
+        "recommended": "Рекомендуем",
+        "currentPlan": "Текущий план",
+        "get": "Перейти на {plan}",
+        "switchTo": "Сменить на {plan}",
+        "month": "в месяц",
+        "noCard": "Карта не нужна"
+      },
+      "includes": {
+        "media": "Изображения, видео, музыка и 3D",
+        "voice": "Диктовка и чтение вслух",
+        "byok": "Свои модели и ключи"
+      },
+      "mobile": {
+        "usageRow": "Этот месяц",
+        "usageOneTime": "Бесплатный лимит"
+      },
+      "tagline": {
+        "free": "Попробуйте Stella",
+        "plus": "Больше использования",
+        "pro": "Ещё больше использования",
+        "max": "Максимум использования"
+      }
+    }
+  },
+  "chat": {
+    "attachments": {
+      "camera": "Камера",
+      "cameraDeniedBody": "Разрешите Stella использовать камеру в настройках, чтобы сделать фото.",
+      "cameraDeniedTitle": "Камера",
+      "files": "Файлы",
+      "photos": "Фото",
+      "photosDeniedBody": "Разрешите Stella доступ к медиатеке в настройках, чтобы прикреплять изображения.",
+      "photosDeniedTitle": "Фото",
+      "readAloud": "Читать ответы вслух",
+      "remove": "Убрать вложение",
+      "retryUpload": "Повторить загрузку",
+      "sheetTitle": "Добавить в чат",
+      "tooManyBody": "За один раз можно прикрепить не более {count} файлов.",
+      "tooManyTitle": "Слишком много файлов"
+    }
+  },
+  "cloudBrowser": {
+    "actions": {
+      "canceling": "Canceling…",
+      "done": "Done",
+      "finishing": "Finishing…",
+      "useCloudBrowser": "Use Stella's browser"
+    },
+    "deviceCode": {
+      "body": "Enter this code on the site, then come back here.",
+      "copied": "Copied",
+      "copy": "Copy code",
+      "open": "Open site",
+      "title": "Sign in to {origin}"
+    },
+    "errors": {
+      "decision": "That didn't go through. Try again.",
+      "liveView": "Couldn't load the sign-in page. Try again.",
+      "liveViewBoundary": "Couldn't load the sign-in page.",
+      "verificationUrl": "Couldn't open that page."
+    },
+    "settings": {
+      "confirmBody": "Stella will ask you to sign in again next time.",
+      "confirmTitle": "Sign out of all sites?",
+      "defaultProfile": "Saved sign-ins",
+      "description": "Sites Stella has signed in to for you. Reset to sign out of all of them.",
+      "reset": "Reset",
+      "resetComplete": "Signed out of all sites.",
+      "resetFailed": "Couldn't sign out. Try again.",
+      "resetting": "Resetting…",
+      "title": "Browser sign-ins"
+    },
+    "takeover": {
+      "body": "Sign in to keep going. Stella can't see what you type.",
+      "checking": "Finishing sign-in to {origin}",
+      "localNotice": "Stella can't see what you type",
+      "localOriginFallback": "Switched to Stella's browser to finish signing in.",
+      "localTransferFallback": "Couldn't confirm that sign-in. Try again in Stella's browser.",
+      "preparing": "Loading sign-in…",
+      "privateNotice": "Stella can't see what you type",
+      "resumingBody": "Stella will pick up where it left off.",
+      "title": "Sign in to {origin}"
+    }
+  },
+  "cloudConnector": {
+    "connect": "Подключить",
+    "connecting": "Завершите вход в {name} в браузере. Stella продолжит, как только доступ будет подтверждён.",
+    "errors": {
+      "decision": "Не удалось подключить {name}. Попробуйте ещё раз.",
+      "open": "Не удалось открыть страницу входа."
+    },
+    "notNow": "Не сейчас",
+    "openAgain": "Открыть снова",
+    "titleOffer": "Подключить {name}?",
+    "titleWaiting": "Ожидание {name}",
+    "googleClaim": {
+      "connected": "Google подключён",
+      "connectedBody": "{email} подключён к Stella.",
+      "failed": "Google не подключился",
+      "failedBody": "Начните подключение Google заново в Stella."
+    }
+  },
+  "common": {
+    "cancel": "Отмена",
+    "close": "Закрыть",
+    "continue": "Продолжить",
+    "gotIt": "Понятно",
+    "loading": "Загрузка…",
+    "next": "Далее",
+    "previous": "Назад",
+    "tryAgain": "Попробовать ещё раз"
+  },
+  "errors": {
+    "generic": "Что-то пошло не так"
+  },
+  "mobile": {
+    "account": {
+      "title": "Аккаунт"
+    },
+    "activityHub": {
+      "conversation": {
+        "subtitle": "Файлы, созданные основным потоком",
+        "title": "Этот разговор"
+      },
+      "files": {
+        "empty": "Здесь появятся файлы, которые Stella создаёт или отправляет.",
+        "emptyFiltered": "Нет подходящих файлов.",
+        "filterAll": "Все файлы",
+        "filterLabel": "Фильтр и сортировка файлов",
+        "searchPlaceholder": "Поиск файлов",
+        "sortName": "Имя",
+        "sortNewest": "Сначала новые",
+        "sortOldest": "Сначала старые",
+        "sourceCloud": "Облако",
+        "sourceUpload": "Отправлено вами",
+        "types": {
+          "all": "Все",
+          "images": "Изображения",
+          "videos": "Видео",
+          "audio": "Аудио",
+          "documents": "Документы",
+          "code": "Код",
+          "pages": "Страницы",
+          "other": "Другое"
+        }
+      },
+      "schedule": {
+        "actionFailed": "Не получилось.",
+        "alertTitle": "Расписание",
+        "customCadence": "Особое расписание",
+        "deleteConfirm": "«{title}» больше не будет запускаться.",
+        "deleteSchedule": "Удалить расписание",
+        "empty": "Пока ничего не запланировано.",
+        "emptyAction": "Запланировать",
+        "emptyActionPrompt": "Напомни мне ",
+        "lastRunFailed": "Последний запуск не удался: {error}",
+        "loadFailed": "Не удалось загрузить расписания.",
+        "next": "Следующий запуск {when}",
+        "pauseSchedule": "Приостановить расписание",
+        "paused": "На паузе",
+        "resumeSchedule": "Возобновить расписание",
+        "editPrompt": "Измени моё расписание «{title}»: "
+      },
+      "search": {
+        "clear": "Очистить поиск",
+        "close": "Закрыть поиск",
+        "placeholder": "Искать в активности и файлах"
+      },
+      "tabs": {
+        "activity": "Активность",
+        "files": "Файлы",
+        "schedule": "Расписание",
+        "search": "Поиск"
+      },
+      "task": {
+        "failed": "Не удалось завершить",
+        "finished": "Готово",
+        "stopped": "Остановлено",
+        "working": "Работает в фоне"
+      },
+      "time": {
+        "today": "Сегодня",
+        "yesterday": "Вчера",
+        "tomorrow": "Завтра",
+        "earlierThisMonth": "Ранее в этом месяце"
+      }
+    },
+    "apps": {
+      "empty": "Здесь будут приложения, которые Stella создаст для вас.",
+      "emptyAction": "Создать приложение",
+      "emptyActionPrompt": "Сделай мне приложение, которое "
+    },
+    "authCallback": {
+      "backToSignIn": "Назад ко входу",
+      "failedTitle": "Не удалось выполнить вход",
+      "genericFailure": "Сейчас не удалось выполнить вход. Попробуйте ещё раз.",
+      "invalidLink": "Недействительная ссылка для входа.",
+      "linkExpired": "Срок действия этой ссылки для входа истёк. Запросите новую.",
+      "signingInBody": "Один момент...",
+      "signingInTitle": "Выполняем вход"
+    },
+    "boot": {
+      "checkingSessionBody": "Подождите немного, Stella просыпается.",
+      "checkingSessionTitle": "Проверяем вашу сессию",
+      "crashTitle": "Что-то сломалось при запуске",
+      "missingConfigBody": "Задайте EXPO_PUBLIC_STELLA_BACKEND_URL перед запуском приложения.",
+      "missingConfigTitle": "Добавьте переменные окружения для мобильного приложения"
+    },
+    "chat": {
+      "composerPlaceholder": "Написать Stella",
+      "createFailed": "Не удалось создать чат. Попробуйте ещё раз.",
+      "emptyPrompt": "Спросите у Stella что угодно",
+      "loadMore": "Загрузить ещё",
+      "mainChat": "Основной чат"
+    },
+    "cloudHome": {
+      "backToSettingsLabel": "Назад к настройкам",
+      "openSettingsLabel": "Открыть память Cloud Home",
+      "settingsSection": "Cloud Home",
+      "signIn": "Войти",
+      "signInBody": "Ваша память доступна только вашему аккаунту Stella.",
+      "signInTitle": "Войдите, чтобы использовать Cloud Home",
+      "title": "Память Cloud Home"
+    },
+    "common": {
+      "back": "Назад",
+      "backChevron": "‹ Назад",
+      "cancel": "Отмена",
+      "continue": "Продолжить",
+      "delete": "Удалить",
+      "done": "Готово",
+      "goBack": "Вернуться назад",
+      "tryAgain": "Попробовать ещё раз"
+    },
+    "computer": {
+      "connectedLabel": "Компьютер подключён",
+      "connectingLabel": "Подключение к вашему компьютеру",
+      "defaultDeviceLabel": "Ваш компьютер",
+      "disconnectedLabel": "Компьютер отключён",
+      "guestHeroBody": "Попросите Stella сделать что-нибудь на вашем компьютере — открыть сайт, разобрать файлы, запустить задачи и не только.",
+      "guestHeroTitle": "Ваш компьютер под рукой",
+      "statusAsleep": "Спит",
+      "statusChecking": "Проверяем…",
+      "statusConnected": "Подключено"
+    },
+    "desktop": {
+      "connecting": "Подключение к компьютеру",
+      "deviceUnreachable": "Устройство {platform} недоступно",
+      "guestSignInPrompt": "Войдите, чтобы начать.",
+      "limitedCapabilities": "Для некоторых задач нужен ваш компьютер",
+      "linkInterrupted": "Связь с вашим компьютером прервалась.",
+      "reconnecting": "Переподключение...",
+      "retryLabel": "Попробовать подключиться снова",
+      "unreachable": "Не удаётся связаться с компьютером"
+    },
+    "engineAccounts": {
+      "active": "Используется",
+      "backLabel": "Назад к настройкам",
+      "chatgptBrowserWaiting": "Завершите вход в ChatGPT в браузере.",
+      "chatgptSection": "ChatGPT",
+      "claudeNote": "При добавлении аккаунта здесь облако Stella входит в Claude Code на собственной странице Anthropic. Каждый компьютер использует свой вход в Claude Code.",
+      "claudeSection": "Claude",
+      "claudeSyncNote": "Полные сессии Claude Code, включая вывод инструментов, синхронизируются с облаком Stella.",
+      "claudeSyncNoteSelfHosted": "Полные сессии Claude Code, включая вывод инструментов, синхронизируются с вашим сервером Stella.",
+      "connectChatgpt": "Подключить аккаунт ChatGPT",
+      "connectClaude": "Добавить аккаунт Claude",
+      "connecting": "Подключение…",
+      "continueAsChatgpt": "Продолжить с ChatGPT как {name}",
+      "continueWithChatgpt": "Продолжить с вашим аккаунтом ChatGPT",
+      "enablePlanUsage": "Включить использование плана ChatGPT",
+      "errorBody": "Что-то пошло не так. Попробуйте ещё раз.",
+      "errorTitle": "Не удалось обновить аккаунты",
+      "finish": "Подключить",
+      "manageUsage": "Управлять использованием",
+      "moreLabel": "Параметры для {name}",
+      "notSignedIn": "Вход нигде не выполнен",
+      "openChatgptAgain": "Снова открыть ChatGPT",
+      "openClaudeAgain": "Снова открыть страницу входа",
+      "pasteFromClipboard": "Вставить",
+      "pasteHintChatgpt": "После подтверждения ChatGPT перенаправит вас на страницу, которая не загрузится. Скопируйте полный адрес этой страницы и вставьте его сюда.",
+      "pasteHintClaude": "После подтверждения Anthropic покажет код. Скопируйте его и вставьте сюда.",
+      "pastePlaceholder": "Вставьте код, который показывает Anthropic",
+      "pastePlaceholderUrl": "Вставьте адрес сюда",
+      "placeCloud": "Облако",
+      "placeComputer": "Компьютер",
+      "planUsageOffBody": "Stella не может использовать ваш план ChatGPT, пока вы это не разрешите. Выберите «Включить использование плана ChatGPT» у аккаунта.",
+      "planWelcomeBody": "Запросы ChatGPT в облаке Stella расходуют ваш план ChatGPT. Проверьте использование и задайте лимит для Stella в настройках ChatGPT.",
+      "planWelcomeTitle": "Вы используете свой план ChatGPT",
+      "remove": "Удалить",
+      "removeBody": "Stella забудет этот аккаунт ChatGPT. Позже вы сможете снова войти в него.",
+      "removeClaudeBody": "Stella забудет этот аккаунт Claude и выполнит выход из него в облаке. Ваши компьютеры сохраняют собственные входы в Claude Code.",
+      "removeTitle": "Удалить {name}?",
+      "revokeUnconfirmed": "ChatGPT не подтвердил выход. Вы можете отключить Stella в настройках ChatGPT.",
+      "signInAgain": "Войти снова",
+      "signInCloud": "Войти в облаке",
+      "signOut": "Выйти",
+      "signOutBody": "Stella перестанет использовать этот аккаунт. Вы сможете добавить его снова в любое время.",
+      "signOutCloud": "Выйти из облака",
+      "signOutCloudBody": "Облако Stella перестанет использовать этот аккаунт, пока вы снова не войдёте в нём. Ваши компьютеры сохраняют собственные входы в Claude Code.",
+      "signOutCloudTitle": "Выйти из {name} в облаке?",
+      "signOutTitle": "Выйти из {name}?",
+      "signedInOn": "Вход выполнен: {places}",
+      "startAgain": "Начать заново",
+      "statusPlanUsageOff": "Использование плана ChatGPT не включено",
+      "statusReauth": "Войдите снова, чтобы продолжить использование",
+      "statusSignedOut": "Выполнен выход",
+      "subtitle": "Используйте план Claude или ChatGPT, за который вы уже платите",
+      "title": "Claude и ChatGPT",
+      "useAccount": "Использовать этот аккаунт"
+    },
+    "login": {
+      "appleCompleteFailed": "Не удалось завершить вход через Apple.",
+      "appleNoToken": "Apple не вернул токен идентификации.",
+      "appleStartFailed": "Не удалось начать вход через Apple.",
+      "checkInbox": "Проверьте почту и нажмите на ссылку — вход выполнится автоматически.",
+      "continueAsGuest": "Продолжить без входа",
+      "continueWithApple": "Продолжить с Apple",
+      "continueWithGoogle": "Продолжить с Google",
+      "emailPlaceholder": "Эл. почта",
+      "enterEmail": "Введите адрес эл. почты.",
+      "finishFailed": "Не удалось завершить вход. Попробуйте ещё раз.",
+      "googleStartFailed": "Не удалось начать вход через Google.",
+      "heroBody": "Используйте Apple, Google или ту же почту, что и на компьютере.",
+      "heroTitle": "Ваш ассистент,\nразмером с карман.",
+      "incomplete": "Вход не завершён. Попробуйте ещё раз.",
+      "legalConjunction": " и ",
+      "legalPrefix": "Продолжая, вы принимаете наши ",
+      "legalPrivacy": "Политику конфиденциальности",
+      "legalSuffix": ".",
+      "legalTerms": "Условия использования",
+      "linkExpired": "Срок действия ссылки истёк. Попробуйте ещё раз.",
+      "openingApple": "Открываем Apple...",
+      "openingGoogle": "Открываем Google...",
+      "orUseEmail": "или по электронной почте",
+      "resend": "Отправить снова",
+      "resendLabel": "Отправить письмо для входа ещё раз",
+      "sendFailed": "Не удалось отправить письмо для входа.",
+      "sending": "Отправляем...",
+      "signingIn": "Выполняем вход...",
+      "useDifferentEmail": "Использовать другой адрес"
+    },
+    "nav": {
+      "account": "Аккаунт",
+      "apps": "Приложения",
+      "backToApps": "Назад к приложениям",
+      "backToChat": "Вернуться в чат",
+      "chat": "Чат",
+      "chatSettingsLabel": "Настройки чата",
+      "closeLabel": "Закрыть навигацию",
+      "openLabel": "Открыть навигацию",
+      "settings": "Настройки",
+      "signIn": "Войти"
+    },
+    "onboarding": {
+      "account": {
+        "chatgptDesc": "Ваш план ChatGPT для облака Stella",
+        "claudeDesc": "Pro или Max, через Claude Code",
+        "connect": "Подключить",
+        "connectLabel": "Подключить {name}",
+        "connectedAs": "Подключено · {name}",
+        "guestSettled": "Войти можно в любой момент в Настройках",
+        "settledGuest": "Вы используете Stella без аккаунта",
+        "settledSignedIn": "Вход выполнен",
+        "signIn": "Войти",
+        "signInBody": "Сохраните разговор, настройки и подключённый компьютер на всех своих устройствах.",
+        "signInTitle": "Вход в Stella",
+        "skip": "Пока пропустить",
+        "subscriptionsBody": "Использовать вашу текущую подписку Claude или ChatGPT?",
+        "subscriptionsLabel": "По желанию"
+      },
+      "composerPlaceholder": "Или просто спросите меня о чём-нибудь",
+      "computer": {
+        "body": "Войдите на компьютере, и он подключится автоматически.",
+        "connectedTo": "Подключено к {name}",
+        "getDesktop": "Скачать Stella для компьютера",
+        "later": "Позже",
+        "settledSkippedTitle": "Компьютера пока нет",
+        "title": "Stella на вашем компьютере"
+      },
+      "gmail": {
+        "body": "Находите письма, догоняйте переписки и готовьте черновики ответов, просто попросив.",
+        "connect": "Подключить Gmail",
+        "connected": "Подключено",
+        "error": "Не удалось подключить Gmail. Попробуйте ещё раз или пропустите пока.",
+        "settledSkippedTitle": "Пока без Gmail",
+        "settledTitle": "Gmail подключён",
+        "skip": "Не сейчас",
+        "title": "Подключить Gmail",
+        "waiting": "Ждём Google…"
+      },
+      "hello": {
+        "cta": "Показать",
+        "pillars": {
+          "asks": {
+            "body": "Всё, что связано с тратами, ждёт вашего согласия.",
+            "title": "Спрашивает, когда это важно"
+          },
+          "background": {
+            "body": "Передайте задачу и занимайтесь своим. Я скажу, когда будет готово.",
+            "title": "Работает в фоне"
+          },
+          "done": {
+            "body": "Бронирование, заказы, файлы и исследования, всё сделано за вас.",
+            "title": "Доводит дела до конца"
+          }
+        },
+        "settledTitle": "Знакомьтесь, Stella"
+      },
+      "messages": {
+        "account": "Хотите сохранить всё это? Аккаунт Stella следует за вами на любое устройство.",
+        "accountSignedIn": "Вы вошли, так что всё следует за вами между устройствами. Ещё один необязательный штрих:",
+        "computer": "Если у вас есть Mac или PC, я могу работать и на нём.",
+        "gmail": "Большая часть жизни проходит через почту. Подключите Gmail, и я помогу с вашей.",
+        "hello": "Привет, я Stella.\n\nЯ не чат-бот. Скажите, что вам нужно, и я всё сделаю в фоновом режиме, пока вы занимаетесь своими делами.",
+        "ready": "Вот и всё. Я буду узнавать вас по ходу дела.\n\nС чего начнём?",
+        "showcase": "Вот как это выглядит.",
+        "theme": "А теперь: как мне выглядеть?"
+      },
+      "progressLabel": "Шаг {current} из {total}",
+      "ready": {
+        "start": "Начать чат",
+        "starters": {
+          "explain": {
+            "prompt": "Объясни простыми словами, как работают сложные проценты.",
+            "title": "Объяснить что-нибудь"
+          },
+          "gift": {
+            "prompt": "Найди продуманный подарок на день рождения для друга, до $50.",
+            "title": "Найти подарок"
+          },
+          "plan": {
+            "prompt": "Помоги спланировать неделю с учётом того, что мне предстоит.",
+            "title": "Спланировать неделю"
+          },
+          "remind": {
+            "prompt": "Напомни позвонить маме в воскресенье в 18:00.",
+            "title": "Поставить напоминание"
+          }
+        },
+        "startersLabel": "Попробуйте что-нибудь из этого"
+      },
+      "replies": {
+        "accountDone": "Готово.",
+        "accountSkipped": "Пока пропустить.",
+        "computerDone": "Подключено!",
+        "computerSkipped": "Может, позже.",
+        "gmailDone": "Готово.",
+        "gmailSkipped": "Не сейчас.",
+        "helloDone": "Покажи.",
+        "showcaseDone": "Понятно.",
+        "themeDone": "Вот эта.",
+        "themeSkipped": "Оставить по умолчанию."
+      },
+      "send": "Отправить",
+      "showcase": {
+        "chapters": {
+          "errands": {
+            "caption": "Я открою сайт, заполню данные и доведу дело до конца, как сделали бы вы сами.",
+            "prompt": "Забронируй столик на двоих на пятницу на 20:00",
+            "receipt1": "Osteria Lucia · пт 20:00 · 2 человека",
+            "receipt2": "Добавлено в ваш календарь",
+            "reply": "Забронировала Osteria Lucia на пятницу, 20:00. Уже в вашем календаре.",
+            "scene": {
+              "date": "Дата",
+              "dateValue": "Пятница",
+              "party": "Гости",
+              "partyValue": "2 человека",
+              "reserve": "Забронировать",
+              "reserved": "Забронировано",
+              "site": "osterialucia.com",
+              "time": "Время",
+              "timeValue": "20:00"
+            },
+            "title": "Попросите один раз. Считайте, что готово.",
+            "word": "Дела",
+            "working": "Бронирую столик"
+          },
+          "research": {
+            "caption": "Сравниваю варианты, читаю отзывы и возвращаюсь с готовым ответом.",
+            "prompt": "Найди лучший электровелосипед до $2000",
+            "receipt1": "Прочитано 24 отзыва",
+            "receipt2": "Сравнение сохранено в Файлах",
+            "reply": "Cityline 3: самая лёгкая рама, лучшие тормоза, $1799.",
+            "scene": {
+              "rank1": "Cityline 3",
+              "rank2": "Metro S",
+              "rank3": "Urban X",
+              "source1": "Обзоры экспертов",
+              "source2": "Форумы владельцев",
+              "source3": "Характеристики",
+              "title": "Сравниваю электровелосипеды"
+            },
+            "title": "Читаю за вас.",
+            "word": "Поиск",
+            "working": "Читаю отзывы"
+          },
+          "routines": {
+            "caption": "Напоминания, проверки и ежедневные сводки, которые приходят строго по расписанию.",
+            "prompt": "Каждое утро в 8:00 рассказывай мне, что у меня сегодня",
+            "receipt1": "Каждый день в 8:00",
+            "reply": "Готово. Первая сводка придёт завтра в 8:00.",
+            "scene": {
+              "body": "3 встречи, дождь после 17:00 и день рождения у Sam.",
+              "day": "Завтра",
+              "now": "сейчас",
+              "time": "8:00",
+              "title": "Ваша утренняя сводка",
+              "when": "Завтра, 8:00"
+            },
+            "title": "Настройте раз. Дальше я сама.",
+            "word": "Рутина",
+            "working": "Настраиваю"
+          },
+          "shopping": {
+            "amount": "$129,99",
+            "caption": "Нахожу товар и довожу до оформления. Вы подтверждаете сумму, а я делаю заказ.",
+            "confirm": "Подтвердить",
+            "confirmDetail": "Trail Runner 2 · размер 10",
+            "confirmTitle": "Подтвердить покупку?",
+            "confirmed": "Подтверждено",
+            "prompt": "Закажи ещё раз мои беговые кроссовки, размер 10",
+            "receipt1": "Заказ #48213 · доставка в четверг",
+            "reply": "Заказала. Привезут в четверг.",
+            "scene": {
+              "addToCart": "В корзину",
+              "inCart": "В корзине",
+              "product": "Trail Runner 2",
+              "site": "trailco.com"
+            },
+            "title": "Я могу покупать, с вашего согласия.",
+            "word": "Покупки",
+            "working": "Ищу ваши кроссовки"
+          },
+          "work": {
+            "caption": "Документы, таблицы и презентации: я делаю работу и сохраняю файл там, где вы сможете его открыть.",
+            "prompt": "Сделай из моих заметок по Q3 презентацию к понедельнику",
+            "receipt1": "Заметки по Q3 · прочитаны",
+            "receipt2": "Презентация итогов Q3 · 12 слайдов",
+            "reply": "Презентация готова: 12 слайдов, сохранена в Файлах.",
+            "scene": {
+              "file": "Итоги Q3.pptx",
+              "slideTitle": "Итоги Q3"
+            },
+            "title": "Настоящие файлы, готовые.",
+            "word": "Работа",
+            "working": "Читаю ваши заметки"
+          }
+        },
+        "placeholder": "Спросите Stella",
+        "play": "Воспроизвести демонстрацию",
+        "replay": "Показать демо ещё раз",
+        "settledTitle": "Быстрый тур",
+        "tablist": "Что умеет Stella"
+      },
+      "skip": "Пропустить",
+      "skipLabel": "Пропустить знакомство",
+      "theme": {
+        "appearance": "Оформление",
+        "confirm": "Готово",
+        "reset": "Оставить по умолчанию",
+        "themes": "Тема"
+      }
+    },
+    "search": {
+      "cancelLabel": "Отменить поиск",
+      "clearLabel": "Очистить поиск",
+      "openLabel": "Поиск по сообщениям",
+      "placeholder": "Поиск по сообщениям"
+    },
+    "selfHost": {
+      "addServer": "Подключить сервер",
+      "appTooOldBody": "{host} требуется более новая версия Stella. Обновите приложение и откройте его снова.",
+      "appTooOldTitle": "Обновите приложение",
+      "back": "Назад",
+      "behindBody": "Некоторым функциям нужна более новая версия вашего сервера.",
+      "behindTitle": "Серверу нужно обновление",
+      "cameraDenied": "Stella не может использовать камеру. Разрешите доступ в Настройках или вставьте ссылку.",
+      "cameraHint": "Наведите камеру на код связывания.",
+      "checkAgain": "Проверить снова",
+      "checking": "Проверка…",
+      "confirmAppTooOld": "Этому серверу нужна более новая версия приложения. Обновите Stella и повторите попытку.",
+      "confirmBody": "Вы подключаетесь к {host}, которым управляет его владелец, а не Stella. Ваши чаты и файлы будут храниться на этом сервере.",
+      "confirmServerTooOld": "Этот сервер слишком старый для приложения. Обновите сервер и отсканируйте новый код.",
+      "confirmTitle": "Подключиться к {name}?",
+      "connectBody": "Отсканируйте код связывания, который показывает ваш сервер (в выводе установки или в Stella на компьютере), или вставьте его ссылку.",
+      "connectButton": "Подключить",
+      "connectOwn": "Подключить свой сервер",
+      "connectOwnHint": "Запускаете Stella в своём аккаунте Cloudflare? Свяжите с ним этот телефон.",
+      "connecting": "Подключение…",
+      "errorAttempts": "Слишком много попыток с этим кодом. Создайте новый на сервере.",
+      "errorExpired": "Срок действия кода истёк или он уже использован. Создайте новый на сервере.",
+      "errorInvalid": "Этот код связывания недействителен. Создайте новый на сервере.",
+      "errorRateLimited": "Слишком много попыток. Подождите минуту и повторите.",
+      "errorServer": "Серверу не удалось подключить этот телефон. Повторите попытку.",
+      "hostedName": "Stella",
+      "hostedSub": "stella.sh, управляет Stella",
+      "howToSelfHost": "Как запустить свой сервер",
+      "invalidLink": "Это не ссылка для связывания Stella.",
+      "noCodeInPhoto": "На этом фото нет кода связывания.",
+      "notStella": "{host} — не сервер Stella.",
+      "openStore": "Открыть магазин",
+      "ownerOf": "Владелец {name}",
+      "paste": "Вставить",
+      "pasteLabel": "Ссылка для связывания",
+      "removeBody": "Телефон забудет сервер и вход на нём. Позже его можно связать снова.",
+      "removeButton": "Удалить",
+      "removeButtonA11y": "Удалить {name}",
+      "removeTitle": "Удалить {name}?",
+      "scanPhoto": "Выбрать фото кода",
+      "scanQr": "Сканировать код связывания",
+      "selfHostedSub": "{host}, управляет владелец",
+      "serverAddress": "Адрес",
+      "serverName": "Название",
+      "serverSection": "Сервер",
+      "serverTooOldBody": "На {host} работает более старая версия Stella, чем поддерживает это приложение.",
+      "serverTooOldHow": "Попросите агента-программиста, который его настроил, обновить ваш сервер Stella, или выполните: node scripts/selfhost.mjs update",
+      "serverTooOldTitle": "Обновите сервер",
+      "serverVersion": "Версия",
+      "serverVersionLine": "Версия сервера: {version}",
+      "sessionEnded": "Этот телефон вышел из {host}. Отсканируйте новый код связывания, чтобы подключиться снова.",
+      "switchBody": "Stella перезапустится на этом сервере.",
+      "switchButton": "Переключить",
+      "switchTitle": "Переключиться на {name}?",
+      "unknownVersion": "Неизвестна",
+      "unreachable": "Не удалось связаться с {host}. Проверьте подключение и повторите попытку.",
+      "useStella": "Использовать Stella",
+      "useStellaInstead": "Использовать Stella",
+      "welcomeBody": "Ваш ассистент на телефоне и компьютерах.",
+      "welcomeTitle": "Привет, я Stella"
+    },
+    "settings": {
+      "aboutSection": "О приложении",
+      "appearance": {
+        "dark": "Тёмная",
+        "light": "Светлая",
+        "system": "Системная"
+      },
+      "appearanceSection": "Оформление",
+      "background": {
+        "flat": "Плоский",
+        "soft": "Мягкий"
+      },
+      "backgroundColor": {
+        "relative": "Относительный",
+        "strong": "Насыщенный"
+      },
+      "chatStorage": {
+        "description": "Доступ к чатам на всех устройствах. Отключите, чтобы хранить отдельную историю чатов только на этом устройстве. При повторном включении эти чаты не будут загружены. Поставщики ИИ по-прежнему обрабатывают ваши сообщения."
+      },
+      "computer": {
+        "cloud": "Облако",
+        "connectFailedTitle": "Не удалось подключиться к этому компьютеру",
+        "connecting": "Подключение…",
+        "enable": "Включить",
+        "enableFailedTitle": "Не удалось включить этот компьютер",
+        "enableLabel": "Включить {name}",
+        "enabling": "Включение…",
+        "sectionLabel": "Где работает Stella",
+        "statusAwaitingConsent": "Ожидание разрешения на том компьютере",
+        "statusDeclined": "Отклонено на том компьютере",
+        "statusNotEnabled": "Пока не включено",
+        "statusNotReady": "Не готов",
+        "statusOffline": "Не в сети",
+        "statusOnline": "В сети"
+      },
+      "computerSection": "Компьютер",
+      "deleteAccount": "Удалить аккаунт",
+      "deleteAccountLabel": "Удалить ваш аккаунт Stella",
+      "deleteConfirmBody": "Вы выйдете из аккаунта на всех устройствах, а аккаунт сразу будет отключён. Через 7 дней аккаунт и его данные в облаке будут удалены навсегда. Чтобы отменить, войдите снова до этого срока.",
+      "deleteConfirmTitle": "Удалить аккаунт",
+      "deleteFailedBody": "Ваш аккаунт не удалён, и вы по-прежнему в системе.",
+      "deleteFailedTitle": "Не удалось удалить аккаунт",
+      "deleteRetry": "Повторить",
+      "deletingAccount": "Удаляем аккаунт…",
+      "deletionScheduledTitle": "Удаление аккаунта запланировано",
+      "loadingSession": "Загрузка сессии…",
+      "notificationsSection": "Уведомления",
+      "openPrivacyLabel": "Открыть Политику конфиденциальности",
+      "openTermsLabel": "Открыть Условия использования",
+      "paired": {
+        "unnamedComputer": "Компьютер · {id}"
+      },
+      "privacyPolicy": "Политика конфиденциальности",
+      "pushToggleA11y": "Переключить push-уведомления",
+      "pushToggleLabel": "Разрешить push-уведомления",
+      "pushToggleSub": "Получайте уведомление, когда компьютер завершит запрос.",
+      "signIn": "Войти",
+      "signInTitle": "Вход в Stella",
+      "signOut": "Выйти",
+      "signOutLabel": "Выйти из Stella",
+      "signingOut": "Выходим…",
+      "termsOfService": "Условия использования",
+      "title": "Настройки",
+      "useAppearanceLabel": "Использовать оформление {name}",
+      "useBackgroundColorLabel": "Использовать цвет фона {name}",
+      "useBackgroundLabel": "Использовать фон {name}",
+      "useThemeLabel": "Использовать тему {name}",
+      "userAsk": {
+        "ceiling": "Насколько громко можно",
+        "ceilingSub": "Самый высокий уровень, до которого может дойти вопрос.",
+        "level": {
+          "alert": "Оповещение",
+          "breakthrough": "Прорваться",
+          "chat": "Чат",
+          "notify": "Уведомить"
+        },
+        "quietCeiling": "Предел в тихие часы",
+        "quietEnd": "Окончание",
+        "quietHours": "Тихие часы",
+        "quietHoursSub": "С {start} до {end}",
+        "quietStart": "Начало",
+        "rateLimit": "Прерывания",
+        "rateLimitSub": "Не больше такого числа вопросов в час.",
+        "rateLimitValue": "{count}/ч",
+        "saveFailed": "Не удалось сохранить. Попробуйте снова.",
+        "section": "Когда Stella ждёт вас",
+        "sound": "Звук",
+        "soundSub": "Воспроизводить звук при появлении вопроса.",
+        "stepDown": "Уменьшить {label}",
+        "stepUp": "Увеличить {label}",
+        "unavailable": "Эти настройки пока недоступны."
+      },
+      "voiceSection": "Голос"
+    },
+    "sidebar": {
+      "searchPlaceholder": "Искать в активности и файлах",
+      "signedOutHint": "Войдите, чтобы увидеть, над чем Stella работает в фоновом режиме."
+    },
+    "userAsk": {
+      "answerFailed": "Не удалось отправить ответ. Попробуйте снова.",
+      "answerOnComputer": "Ответьте на это на {device}",
+      "answerOnComputerUnknown": "Ответьте на это на компьютере, который спрашивает",
+      "answerOnComputerWhy": "Нужны личные данные, а у этого телефона нет ключа, чтобы зашифровать их для того компьютера. Stella не отправит их открытым текстом.",
+      "askedBy": "От {label}",
+      "cancelFailed": "Не удалось закрыть вопрос. Попробуйте снова.",
+      "cantRightNow": "Сейчас не могу",
+      "deadline": "Осталось {time}",
+      "deadlinePassed": "Время истекло",
+      "hideSecret": "Скрыть {label}",
+      "missingFields": "Заполните все обязательные поля.",
+      "notification": {
+        "alreadyAnsweredBody": "На вопрос ответили или его закрыли до того, как пришёл ваш ответ.",
+        "alreadyAnsweredTitle": "Уже отвечено",
+        "answer": "Ответить",
+        "body": "Нажмите, чтобы ответить.",
+        "dismiss": "Закрыть",
+        "sendFailedBody": "Откройте Stella, чтобы ответить там.",
+        "sendFailedTitle": "Не удалось отправить ответ",
+        "title": "Stella ждёт вас",
+        "titleFrom": "{label} нужна ваша помощь"
+      },
+      "optional": "Необязательно",
+      "revealSecret": "Показать {label}",
+      "sealFailed": "Не удалось зашифровать это на устройстве.",
+      "sendSecurely": "Отправить безопасно",
+      "sending": "Отправка…",
+      "sensitive": "Сквозное шифрование",
+      "sensitiveUnavailable": "Это устройство пока не может это зашифровать",
+      "unnamedComputer": "Компьютер · {id}",
+      "waitingBadge": "Ждёт вас",
+      "remember": "Запомнить на будущее",
+      "rememberOn": "Сохранено как «{label}». Stella будет использовать это снова, не спрашивая вас.",
+      "rememberOff": "Используется только для этой задачи, затем забывается.",
+      "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое.",
+      "usingSaved": "Остальное берётся из сохранённого «{label}». Нужно только то, что ниже.",
+      "savedHeading": "Сохранено на ваших устройствах",
+      "savedBody": "Вы уже сохраняли это. Stella использует как есть, вводить ничего не нужно.",
+      "useSaved": "Использовать сохранённый вход",
+      "typeInstead": "Ввести другое",
+      "useSavedInstead": "Использовать сохранённое",
+      "needsFromYou": "Для этого пока ничего не сохранено, поэтому Stella нужно получить это от вас."
+    },
+    "savedLogins": {
+      "allowTitle": "Разрешить {name}?",
+      "allowCheck": "Проверьте, что там {code}",
+      "notNow": "Не сейчас",
+      "allow": "Разрешить",
+      "waitingTitle": "Ваши логины — и здесь",
+      "waitingBody": "Откройте Stella на другом устройстве",
+      "startOver": "Начать заново",
+      "compare": "Проверьте, что {name} показывает {code}",
+      "matches": "Совпадает",
+      "useAnother": "Другое устройство",
+      "confirmed": "Ожидание {name}…",
+      "declined": "Не разрешено",
+      "removed": "Удалено из ваших устройств",
+      "askAgain": "Спросить снова",
+      "section": "Сохранённые логины",
+      "thisPhone": "Этот телефон",
+      "quiet": "Давно не появлялось",
+      "remove": "Удалить",
+      "removeTitle": "Удалить {name}?",
+      "removeBody": "Оно больше не будет получать ваши сохранённые логины.",
+      "problem": "Не удаётся проверить устройства",
+      "startOverTitle": "Начать заново?",
+      "startOverBody": "Появится новый список только с этим телефоном. Каждое другое устройство нужно будет разрешить снова."
+    }
+  },
+  "settings": {
+    "account": {
+      "toasts": {
+        "accountDeleted": "Ваш аккаунт Stella удалён.",
+        "deletionScheduled": "Удаление вашего аккаунта запланировано. Мы сообщим по электронной почте, когда всё будет готово."
+      }
+    },
+    "telemetry": {
+      "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
+      "title": "Share anonymous usage metrics"
+    },
+    "compactModelList": {
+      "loadFailed": "Не удалось загрузить модели Stella."
+    },
+    "engineAccounts": {
+      "addInCloud": "В облаке",
+      "claude": {
+        "addOn": "На: {place}",
+        "automatic": "По умолчанию",
+        "automaticToast": "Теперь каждый компьютер использует собственный вход в Claude Code.",
+        "chosen": "Выбран",
+        "chosenToast": "Теперь {email} используется на всех ваших компьютерах и в облаке.",
+        "cliMissing": "Claude Code не установлен",
+        "cloud": "Облако",
+        "notSignedIn": "Вход не выполнен",
+        "offline": "Не в сети",
+        "otherComputer": "Другой компьютер",
+        "signedInOn": "{place}: выполнен вход в Claude.",
+        "signedInOnAs": "{place}: выполнен вход в Claude как {email}.",
+        "thisComputer": "{name} (этот компьютер)",
+        "thisComputerUnnamed": "Этот компьютер",
+        "unknown": "Ещё не сообщил о входе в Claude Code",
+        "ownLogin": "Собственный вход каждого компьютера",
+        "ownLoginHint": "Аккаунт, в который выполнен вход в Claude Code на каждом компьютере",
+        "ownLoginHere": "Вход Claude Code на этом компьютере",
+        "everywhere": "На всех ваших компьютерах и в облаке",
+        "usedOn": "На: {places}",
+        "noteEnded": "{place}: срок входа истёк.",
+        "noteEnding": "{place}: срок входа истекает {date}.",
+        "noteMissingChosen": "{place}: вход в {email} не выполнен.",
+        "noteSignedOut": "{place}: вход не выполнен.",
+        "cloudStart": "Облако",
+        "cloudInline": "облако",
+        "thisComputerInline": "этот компьютер",
+        "rowNotChosen": "Использует {email}, а не {chosen}",
+        "rowEnded": "Срок входа истёк",
+        "rowEnding": "Срок входа истекает {date}"
+      },
+      "claudeLogin": {
+        "whereCloud": "Вход в Claude Code в вашем облаке.",
+        "whereDevice": "Вход в Claude Code на устройстве {place}."
+      },
+      "claudeTitle": "Claude (Pro/Max)",
+      "signIn": "Войти"
+    },
+    "errors": {
+      "loadMemory": "Не удалось загрузить настройку памяти.",
+      "saveMemory": "Не удалось обновить настройку памяти."
+    },
+    "memory": {
+      "description": "Использовать сохранённые воспоминания в ответах. Выключение их не удаляет.",
+      "title": "Память"
+    },
+    "reasoningEffort": {
+      "high": "Высокая",
+      "low": "Низкая",
+      "max": "Максимум",
+      "medium": "Средняя",
+      "xhigh": "Экстра"
+    },
+    "voiceAgent": {
+      "description": "Показывать кнопки голоса и звонков. Диктовка работает в любом случае.",
+      "title": "Голосовые разговоры"
+    },
+    "secureValues": {
+      "added": "Добавлено {added}"
+    }
+  },
+  "shell": {
+    "display": {
+      "canvasShare": {
+        "toasts": {
+          "openFailed": "Не удалось открыть ссылку"
+        }
+      },
+      "folder": {
+        "emptyTitle": "Эта папка пуста",
+        "truncated": "Показаны только первые {count}."
+      }
+    },
+    "sidebar": {
+      "feedback": {
+        "contactLabel": "Ваша почта (необязательно)",
+        "description": "Сообщение получит команда Stella вместе с электронной почтой вашего аккаунта, чтобы мы могли ответить.",
+        "descriptionSignedOut": "Сообщение получит команда Stella. Укажите почту, если хотите получить ответ.",
+        "fieldLabel": "Отзыв",
+        "placeholder": "Расскажите, что работает, что нет и что вы хотели бы увидеть…",
+        "send": "Отправить",
+        "sending": "Отправка…",
+        "sentWith": "Вместе с сообщением: {details}",
+        "title": "Отправить отзыв",
+        "toasts": {
+          "failedTitle": "Не удалось отправить отзыв",
+          "sentDescription": "Спасибо — каждое сообщение помогает нам делать Stella лучше.",
+          "sentTitle": "Отзыв отправлен"
+        }
+      }
+    }
+  },
+  "sidebar": {
+    "feedback": "Отправить отзыв"
+  },
+  "reminders": {
+    "title": "Напоминание",
+    "done": "Готово",
+    "doneState": "Выполнено",
+    "snooze": "Отложить",
+    "snoozeFor": "Отложить на 10 минут",
+    "snooze10": "10 минут",
+    "snooze60": "1 час",
+    "snoozeTomorrow": "Завтра утром",
+    "snoozedUntil": "Отложено до {time}",
+    "snoozed": "Отложено",
+    "failed": "Не удалось обновить напоминание. Попробуйте ещё раз."
+  },
+  "userAsk": {
+    "deadline": {
+      "remaining": "Осталось {time}"
+    },
+    "question": {
+      "confirm": "Использовать этот ответ",
+      "default": "По умолчанию",
+      "next": "Следующий вопрос",
+      "previous": "Предыдущий вопрос",
+      "progress": "{current} из {total}",
+      "sending": "Отправка…",
+      "skip": "Пропустить",
+      "skipped": "Пропущено",
+      "somethingElse": "Другое",
+      "submit": "Отправить"
+    },
+    "secureInput": {
+      "choosePlaceholder": "Choose",
+      "optional": "optional",
+      "privateBadge": "Private — Stella never sees it",
+      "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",
+      "relayedPrivateNote": "Private values are encrypted on this device so only the computer that asked can read them. Stella uses them without ever reading them.",
+      "required": "Fill in {label} first.",
+      "sharedBadge": "Shared with Stella",
+      "sharedNote": "Shared values are sent to Stella as plain text.",
+      "submit": "Send securely",
+      "submitting": "Sending…",
+      "decline": "Decline",
+      "remember": "Запомнить на будущее",
+      "rememberRelayed": "Запомнить на будущее",
+      "rememberOn": "Сохранено как «{label}». Stella будет использовать это снова, не спрашивая вас; удалить можно в любой момент в разделе {place}.",
+      "rememberOff": "Используется только для этой задачи, затем забывается.",
+      "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое.",
+      "usingSaved": "Остальное берётся из сохранённого «{label}». Нужно только то, что ниже.",
+      "note": "Добавить заметку (необязательно)",
+      "provided": "Предоставлено",
+      "declined": "Отклонено"
+    }
+  },
+  "schedule": {
+    "waiting": "Ждёт ваш компьютер",
+    "edit": {
+      "title": "Изменить"
+    },
+    "notice": {
+      "open": "Открыть в расписании",
+      "whenBack": "Выполнится, когда он вернётся",
+      "title": {
+        "created": {
+          "reminder": "Напоминание создано",
+          "task": "Задача запланирована",
+          "watch": "Наблюдение настроено"
+        },
+        "updated": {
+          "reminder": "Напоминание изменено",
+          "task": "Задача изменена",
+          "watch": "Наблюдение изменено"
+        },
+        "paused": {
+          "reminder": "Напоминание приостановлено",
+          "task": "Задача приостановлена",
+          "watch": "Наблюдение приостановлено"
+        },
+        "resumed": {
+          "reminder": "Напоминание возобновлено",
+          "task": "Задача возобновлена",
+          "watch": "Наблюдение возобновлено"
+        },
+        "removed": {
+          "reminder": "Напоминание удалено",
+          "task": "Задача удалена",
+          "watch": "Наблюдение удалено"
+        },
+        "waiting": {
+          "reminder": "Ждёт ваш компьютер",
+          "task": "Ждёт ваш компьютер",
+          "watch": "Ждёт ваш компьютер"
+        }
+      },
+      "when": {
+        "today": "Сегодня в {time}",
+        "tomorrow": "Завтра в {time}",
+        "onDay": "{day} в {time}",
+        "onDate": "{date} в {time}",
+        "daily": "Каждый день в {time}",
+        "weekdays": "По будням в {time}",
+        "weekends": "По выходным в {time}",
+        "weekly": "Каждую неделю: {day}, {time}",
+        "onDays": "{days} в {time}",
+        "everyMinutes": {
+          "one": "Каждую {count} минуту",
+          "few": "Каждые {count} минуты",
+          "many": "Каждые {count} минут",
+          "other": "Каждые {count} минуты"
+        },
+        "everyHours": {
+          "one": "Каждый {count} час",
+          "few": "Каждые {count} часа",
+          "many": "Каждые {count} часов",
+          "other": "Каждые {count} часа"
+        },
+        "everyDays": {
+          "one": "Каждый {count} день",
+          "few": "Каждые {count} дня",
+          "many": "Каждые {count} дней",
+          "other": "Каждые {count} дня"
+        }
+      },
+      "group": {
+        "count": {
+          "created": {
+            "task": {
+              "one": "{count} задача запланирована",
+              "few": "{count} задачи запланированы",
+              "many": "{count} задач запланировано",
+              "other": "{count} задачи запланировано"
+            },
+            "reminder": {
+              "one": "{count} напоминание создано",
+              "few": "{count} напоминания создано",
+              "many": "{count} напоминаний создано",
+              "other": "{count} напоминания создано"
+            },
+            "watch": {
+              "one": "{count} отслеживание настроено",
+              "few": "{count} отслеживания настроено",
+              "many": "{count} отслеживаний настроено",
+              "other": "{count} отслеживания настроено"
+            }
+          },
+          "updated": {
+            "task": {
+              "one": "{count} задача изменена",
+              "few": "{count} задачи изменены",
+              "many": "{count} задач изменено",
+              "other": "{count} задачи изменено"
+            },
+            "reminder": {
+              "one": "{count} напоминание изменено",
+              "few": "{count} напоминания изменено",
+              "many": "{count} напоминаний изменено",
+              "other": "{count} напоминания изменено"
+            },
+            "watch": {
+              "one": "{count} отслеживание изменено",
+              "few": "{count} отслеживания изменено",
+              "many": "{count} отслеживаний изменено",
+              "other": "{count} отслеживания изменено"
+            }
+          },
+          "removed": {
+            "task": {
+              "one": "{count} задача удалена",
+              "few": "{count} задачи удалены",
+              "many": "{count} задач удалено",
+              "other": "{count} задачи удалено"
+            },
+            "reminder": {
+              "one": "{count} напоминание удалено",
+              "few": "{count} напоминания удалено",
+              "many": "{count} напоминаний удалено",
+              "other": "{count} напоминания удалено"
+            },
+            "watch": {
+              "one": "{count} отслеживание удалено",
+              "few": "{count} отслеживания удалено",
+              "many": "{count} отслеживаний удалено",
+              "other": "{count} отслеживания удалено"
+            }
+          }
+        },
+        "runs": {
+          "one": "{count} запуск",
+          "few": "{count} запуска",
+          "many": "{count} запусков",
+          "other": "{count} запуска"
+        },
+        "undone": "Запланирована, затем удалена",
+        "fromAgents": {
+          "one": "Для фоновой задачи",
+          "few": "Для {count} фоновых задач",
+          "many": "Для {count} фоновых задач",
+          "other": "Для {count} фоновых задач"
+        },
+        "showAll": "Показать все",
+        "showLess": "Свернуть"
+      }
+    }
+  },
+  "email": {
+    "title": "Почта",
+    "failed": "Не удалось обновить. Попробуйте ещё раз.",
+    "section": {
+      "connectBody": "Подключите Gmail, и Stella будет сортировать новые письма по мере поступления. Срочные дойдут до вас сразу, остальные ждут в разделе «Сегодня», с черновиком ответа, когда нужно ответить.",
+      "connect": "Подключить Gmail",
+      "connecting": "Ждём Google…",
+      "connectError": "Gmail не подключился. Попробуйте ещё раз.",
+      "reconnectBody": "Gmail нужно заново подключить через Stella, чтобы она могла сортировать вашу почту.",
+      "reconnect": "Переподключить Gmail",
+      "loadErrorBody": "Stella сейчас не может связаться со своими серверами. Проверьте подключение и попробуйте ещё раз.",
+      "offBody": "Stella сортирует новые письма по мере поступления. Срочные дойдут до вас сразу, остальные ждут в разделе «Сегодня», с черновиком ответа, когда нужно ответить. Шум останется за бортом.",
+      "turnOn": "Включить",
+      "turningOn": "Сортирую недавние письма…"
+    }
+  }
+}

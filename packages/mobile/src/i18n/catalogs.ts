@@ -1,11 +1,5 @@
-import { Asset } from "expo-asset";
-import { Directory, File, Paths } from "expo-file-system";
-import {
-  LOCALE_PACK_ASSETS,
-  loadEnglishCatalog,
-} from "./catalog-registry.generated";
+import { CATALOG_LOADERS } from "./catalog-registry.generated";
 import type { Catalog } from "./catalog-types";
-import { extractSingleZipUtf8 } from "./inflate";
 import { DEFAULT_LOCALE, type Locale } from "@stella/contracts/locales";
 
 export type { Catalog };
@@ -19,174 +13,32 @@ const unwrap = (mod: unknown): Catalog => {
 };
 
 const catalogCache = new Map<Locale, Catalog>();
-const inflightLoads = new Map<Locale, Promise<Catalog>>();
-let englishLeafOrderCache: string[] | null = null;
 
-const isLeafCatalogValue = (value: unknown): boolean =>
-  typeof value === "string" ||
-  Array.isArray(value) ||
-  isPluralForms(value) ||
-  value === null ||
-  typeof value !== "object";
-
-const collectOrderedLeafPaths = (
-  node: unknown,
-  prefix = "",
-  out: string[] = [],
-): string[] => {
-  if (isLeafCatalogValue(node)) {
-    if (prefix) out.push(prefix);
-    return out;
-  }
-  for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-    collectOrderedLeafPaths(child, prefix ? `${prefix}.${key}` : key, out);
-  }
-  return out;
-};
-
-const getEnglishLeafOrder = (): string[] => {
-  if (!englishLeafOrderCache) {
-    englishLeafOrderCache = collectOrderedLeafPaths(getEnglishCatalog());
-  }
-  return englishLeafOrderCache;
-};
-
-const hydrateCatalogFromValues = (values: unknown[]): Catalog => {
-  const keys = getEnglishLeafOrder();
-  const root: Catalog = {};
-  const count = Math.min(keys.length, values.length);
-  for (let i = 0; i < count; i += 1) {
-    const value = values[i];
-    if (value === null || value === undefined) continue;
-    const segments = keys[i]!.split(".");
-    let cursor = root;
-    for (let s = 0; s < segments.length - 1; s += 1) {
-      const seg = segments[s]!;
-      let next = cursor[seg];
-      if (!next || typeof next !== "object" || Array.isArray(next)) {
-        next = {};
-        cursor[seg] = next;
-      }
-      cursor = next as Catalog;
-    }
-    cursor[segments[segments.length - 1]!] = value;
-  }
-  return root;
-};
-
-const localeCacheDir = (): Directory | null => {
+const readCatalog = (locale: Locale): Catalog => {
+  const cached = catalogCache.get(locale);
+  if (cached) return cached;
+  const loader = CATALOG_LOADERS[locale];
+  if (!loader) return getEnglishCatalog();
+  let catalog: Catalog;
   try {
-    return new Directory(Paths.cache, "stella-i18n");
+    catalog = unwrap(loader());
   } catch {
-    return null;
+    catalog = getEnglishCatalog();
   }
-};
-
-const localeCacheFile = (locale: Locale, hash: string): File | null => {
-  const dir = localeCacheDir();
-  if (!dir) return null;
-  return new File(dir, `${locale}-${hash}.json`);
-};
-
-const readDiskCachedCatalogSync = (locale: Locale): Catalog | null => {
-  const pack = LOCALE_PACK_ASSETS[locale];
-  if (!pack) return null;
-  try {
-    const file = localeCacheFile(locale, pack.hash);
-    if (!file || !file.exists) return null;
-    const parsed: unknown = JSON.parse(file.textSync());
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    return parsed as Catalog;
-  } catch {
-    return null;
-  }
-};
-
-const writeDiskCachedCatalog = (locale: Locale, hash: string, catalog: Catalog): void => {
-  try {
-    const dir = localeCacheDir();
-    if (!dir) return;
-    if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-    const prefix = `${locale}-`;
-    const targetName = `${locale}-${hash}.json`;
-    for (const item of dir.list()) {
-      if (item instanceof File && item.name.startsWith(prefix) && item.name !== targetName) {
-        try {
-          item.delete();
-        } catch {}
-      }
-    }
-    const file = new File(dir, targetName);
-    file.write(JSON.stringify(catalog));
-  } catch {}
+  catalogCache.set(locale, catalog);
+  return catalog;
 };
 
 export const getEnglishCatalog = (): Catalog => {
   const cached = catalogCache.get(DEFAULT_LOCALE);
   if (cached) return cached;
-  const catalog = unwrap(loadEnglishCatalog());
+  const loader = CATALOG_LOADERS[DEFAULT_LOCALE];
+  const catalog = loader ? unwrap(loader()) : {};
   catalogCache.set(DEFAULT_LOCALE, catalog);
   return catalog;
 };
 
-export const getCachedCatalogSync = (locale: Locale): Catalog | null => {
-  if (locale === DEFAULT_LOCALE) return getEnglishCatalog();
-  const inMemory = catalogCache.get(locale);
-  if (inMemory) return inMemory;
-  const fromDisk = readDiskCachedCatalogSync(locale);
-  if (fromDisk) {
-    catalogCache.set(locale, fromDisk);
-    return fromDisk;
-  }
-  return null;
-};
-
-export const loadCatalogAsync = async (locale: Locale): Promise<Catalog> => {
-  const cached = getCachedCatalogSync(locale);
-  if (cached) return cached;
-
-  const pack = LOCALE_PACK_ASSETS[locale];
-  if (!pack) return getEnglishCatalog();
-
-  const existing = inflightLoads.get(locale);
-  if (existing) return existing;
-
-  const work = (async (): Promise<Catalog> => {
-    try {
-      const asset = Asset.fromModule(pack.asset());
-      if (!asset.localUri) {
-        await asset.downloadAsync();
-      }
-      const uri = asset.localUri ?? asset.uri;
-      if (!uri) return getEnglishCatalog();
-      let zipBytes: Uint8Array;
-      if (uri.startsWith("http://") || uri.startsWith("https://")) {
-        const res = await fetch(uri);
-        if (!res.ok) return getEnglishCatalog();
-        zipBytes = new Uint8Array(await res.arrayBuffer());
-      } else {
-        zipBytes = await new File(uri).bytes();
-      }
-      const rawJson = extractSingleZipUtf8(zipBytes);
-      const values: unknown = JSON.parse(rawJson);
-      if (!Array.isArray(values)) return getEnglishCatalog();
-      const catalog = hydrateCatalogFromValues(values);
-      catalogCache.set(locale, catalog);
-      writeDiskCachedCatalog(locale, pack.hash, catalog);
-      return catalog;
-    } catch {
-      return getEnglishCatalog();
-    }
-  })().finally(() => {
-    if (inflightLoads.get(locale) === work) inflightLoads.delete(locale);
-  });
-
-  inflightLoads.set(locale, work);
-  return work;
-};
-
-export const getCatalog = (locale: Locale): Catalog =>
-  getCachedCatalogSync(locale) ?? getEnglishCatalog();
+export const getCatalog = (locale: Locale): Catalog => readCatalog(locale);
 
 const lookupPath = (catalog: Catalog | undefined, key: string): unknown => {
   if (!catalog) return undefined;
@@ -199,6 +51,9 @@ const lookupPath = (catalog: Catalog | undefined, key: string): unknown => {
   return cursor;
 };
 
+// The bundled catalogs are pruned to the keys the phone's sources name
+// (`scripts/sync-i18n-catalogs.mjs`), so a key built from a runtime value the
+// pruning could not see would show raw. Say so loudly in development.
 const reportedMissingKeys = new Set<string>();
 const reportMissingKey = (key: string): void => {
   if (typeof __DEV__ === "undefined" || !__DEV__) return;

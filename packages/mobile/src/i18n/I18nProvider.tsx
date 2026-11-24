@@ -10,9 +10,8 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   type Catalog,
-  getCachedCatalogSync,
+  getCatalog,
   getEnglishCatalog,
-  loadCatalogAsync,
   translate,
   translateArray,
   translatePlural,
@@ -51,9 +50,7 @@ export interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
-  const [catalog, setCatalog] = useState<Catalog>(
-    () => getCachedCatalogSync(locale) ?? getEnglishCatalog(),
-  );
+  const [catalog, setCatalog] = useState<Catalog>(() => getCatalog(locale));
 
   useEffect(() => {
     let cancelled = false;
@@ -69,18 +66,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
   }, []);
 
   useEffect(() => {
-    const sync = getCachedCatalogSync(locale);
-    if (sync) {
-      setCatalog(sync);
-      return;
-    }
-    let cancelled = false;
-    void loadCatalogAsync(locale).then((loaded) => {
-      if (!cancelled) setCatalog(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
+    setCatalog(getCatalog(locale));
   }, [locale]);
 
   useEffect(() => {

@@ -1,6 +1,4 @@
-# Grabs the launcher window from the screen, not through WebView2: a webview
-# that renders but never presents (CapturePreview still works) shows blank.
-# Exits 1 when the window never appears or its client area is one flat color.
+# WebView2's CapturePreview still works when a webview renders but never presents.
 param([string]$Out, [int]$TimeoutSeconds = 180)
 Add-Type -AssemblyName System.Drawing
 Add-Type @"

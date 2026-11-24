@@ -118,17 +118,12 @@ jobs:
       - name: Typecheck agent harness
         run: bun run agent:typecheck
 
-      # Runtime worker perf lab (packages/runtime/scripts/perf/README.md).
-      # Source entry only, 1k history template; the worker runs with a
-      # scratch HOME/data dir, the scripted fake model provider and the
-      # network guard, so the step needs no secrets and no network. Count and
-      # byte metrics gate; wall-clock and memory only warn (--counts-only).
       - name: Check runtime perf counts
         env:
           STELLA_PERF_LAB_DIR: ${{ runner.temp }}/stella-perf-lab
         run: bun run runtime:perf:check --out "$RUNNER_TEMP/stella-perf-report.json"
 
-      # Diagnostic only: an exhausted account artifact quota must not fail CI.
+      # GitHub: an exhausted account artifact quota fails the upload.
       - name: Upload runtime perf report
         if: always()
         continue-on-error: true

@@ -289,6 +289,9 @@ export const agentRunOutcome = (
         ? { outcome: "completed", text: end.answer }
         : undefined;
 
+/** What a turn whose words the next report carries (an input on its way, a helper still working) waits on. */
+const HELD_WAITING_FOR = "a message already on its way to it, or a helper still working";
+
 /** How many earlier answers of one run a report carries (the newest ones). */
 const ANSWERS_IN_REPORT_MAX = 8;
 
@@ -1179,7 +1182,13 @@ export function stellaAgents(host: StellaAgentsHost) {
               return next(failedReport({ threadId, description, error: unansweredText(settled) }), "failed");
             }
             if (settled.type !== "input" || !agent) return next();
-            if (superseded) return next();
+            if (superseded) {
+              // The input after it reports this turn's words with its own. Its
+              // end still reaches the cloud, recorded waiting (no report), so
+              // that report isn't held for an end that would never come.
+              end = { waitingFor: HELD_WAITING_FOR, wakers: [HELD_WAITING_FOR] };
+              return next();
+            }
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
             const failed = answer?.stopReason === "error";
             if (answer && isSafeguardBlock(answer)) {
@@ -1280,7 +1289,9 @@ export function stellaAgents(host: StellaAgentsHost) {
             if (agent.reported.includes(settled.answer)) return next();
             agent.reported.push(settled.answer);
             if (busy && !failed) {
-              end = { ...end, waiting: true };
+              // Its turn ended; the cloud records it waiting (no report of its
+              // own), so the next turn's report isn't held for this one's end.
+              end = { ...end, waiting: true, waitingFor: HELD_WAITING_FOR, wakers: [HELD_WAITING_FOR] };
               agent.heldForHelpers = true;
               // Not reported yet: the turn that answers what it waits for
               // reports these words with its own.

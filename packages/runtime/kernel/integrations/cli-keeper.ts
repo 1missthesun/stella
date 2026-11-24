@@ -113,6 +113,20 @@ const writeJson = (file: string, value: unknown) => {
   fs.renameSync(temp, file);
 };
 
+/**
+ * Whether the kept copy is whole and its own file. An older Stella kept a hard
+ * link, which is damaged with the install it's meant to stand in for.
+ */
+const isSeparateCopy = (saved: string, source: string): boolean => {
+  try {
+    const copy = fs.statSync(saved, { bigint: true });
+    const original = fs.statSync(source, { bigint: true });
+    return copy.size === original.size && (copy.ino !== original.ino || copy.dev !== original.dev);
+  } catch {
+    return false;
+  }
+};
+
 /** A program file that runs on its own: not a script that needs its package beside it. */
 const isStandaloneProgram = (file: string): boolean => {
   try {
@@ -133,7 +147,7 @@ type LastGood = {
   version: string;
   /** Where it was installed. */
   binary: string;
-  /** Stella's own link or copy of it, which no installer removes. */
+  /** Stella's own copy of it, which no installer removes. */
   saved: string | null;
   verifiedAt: number;
 };
@@ -221,20 +235,11 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     await fs.promises.mkdir(savedDir, { recursive: true });
     const name = `${spec.program}-${version}${process.platform === "win32" ? ".exe" : ""}`;
     const target = path.join(savedDir, name);
-    const sourceSize = (await fs.promises.stat(real)).size;
-    const saved = await fs.promises
-      .stat(target)
-      .then((stat) => stat.size === sourceSize)
-      .catch(() => false);
-    if (!saved) {
+    if (!isSeparateCopy(target, real)) {
       const temp = path.join(savedDir, `.${name}.${process.pid}.tmp`);
       await fs.promises.rm(temp, { force: true });
-      try {
-        await fs.promises.link(real, temp);
-      } catch {
-        // Another volume: a copy (a clone where the file system can).
-        await fs.promises.copyFile(real, temp, fs.constants.COPYFILE_FICLONE);
-      }
+      // A clone where the file system can, a copy elsewhere.
+      await fs.promises.copyFile(real, temp, fs.constants.COPYFILE_FICLONE);
       if (process.platform !== "win32") await fs.promises.chmod(temp, 0o755);
       await fs.promises.rename(temp, target);
     }
@@ -257,7 +262,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     if (
       known?.version === version &&
       known.binary === real &&
-      (known.saved === null || fs.existsSync(known.saved))
+      (known.saved === null || isSeparateCopy(known.saved, real))
     ) {
       return;
     }

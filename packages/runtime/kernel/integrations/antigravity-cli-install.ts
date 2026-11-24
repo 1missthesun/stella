@@ -116,6 +116,20 @@ const versionOf = async (binary: string, env: NodeJS.ProcessEnv): Promise<string
   return result.exitCode === 0 ? (/\d+\.\d+\.\d+/u.exec(result.stdout)?.[0] ?? null) : null;
 };
 
+/**
+ * On Windows Google's update sets the version it replaces aside as
+ * `agy.exe.<number>.old` and never removes it. One still running can't be
+ * removed and goes the next time.
+ */
+const removeReplacedVersions = async (env: NodeJS.ProcessEnv): Promise<void> => {
+  if (process.platform !== "win32") return;
+  const directory = installDirectory(env);
+  const names = await fs.readdir(directory).catch(() => []);
+  for (const name of names) {
+    if (/^agy\.exe\.\d+\.old$/u.test(name)) await fs.rm(path.join(directory, name), { force: true }).catch(() => undefined);
+  }
+};
+
 /** Too old but running: Google's own update. Otherwise a fresh install. */
 const runRepair = async (install: Install, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<CliRepairOutcome> => {
   let output = "";
@@ -207,9 +221,11 @@ export const updateAntigravityCli = async (
 ): Promise<CliUpdateOutcome<AntigravityCliInstallMethod>> => {
   const env = options.env ?? process.env;
   if (!options.signedIn && (await currentInstall(env)).executable === null) return { status: "not_installed" };
-  return await updateCli(antigravityCliKeeper, {
+  const outcome = await updateCli(antigravityCliKeeper, {
     env,
     commandEnv,
     turnedOffBy: (values) => (isOn(values.AGY_CLI_DISABLE_AUTO_UPDATE) ? "AGY_CLI_DISABLE_AUTO_UPDATE (environment)" : null),
   });
+  await removeReplacedVersions(env);
+  return outcome;
 };

@@ -399,6 +399,7 @@ const listedDevices = (
         name: member.name,
         kind: member.kind,
         thisDevice,
+        addedAt: member.addedAt,
         lastSeenAt,
         quiet: !thisDevice && now - lastSeenAt >= SAVED_VALUES_QUIET_MS,
       };

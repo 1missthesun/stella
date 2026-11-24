@@ -4,7 +4,7 @@ import type { SavedValuesListedDevice } from "@stella/contracts/saved-values";
 import { removeSavedValuesDevice } from "../../lib/saved-values";
 import { useSavedValuesTrust } from "../../lib/saved-values-trust";
 import { tapLight } from "../../lib/haptics";
-import { useT } from "../../i18n";
+import { useLocale, useT } from "../../i18n";
 import { useColors } from "../../theme/theme-context";
 import { Icon } from "../Icon";
 import {
@@ -63,6 +63,9 @@ export function SavedLoginsSection({ styles }: { styles: SettingsStyles }) {
                 key={device.deviceId}
                 device={device}
                 divided={index > 0}
+                sameName={trust.devices.some(
+                  (other) => other !== device && other.name === device.name,
+                )}
                 busy={busy}
                 onRemove={() => confirmRemove(device)}
                 styles={styles}
@@ -78,23 +81,41 @@ export function SavedLoginsSection({ styles }: { styles: SettingsStyles }) {
 function DeviceRow({
   device,
   divided,
+  sameName,
   busy,
   onRemove,
   styles,
 }: {
   device: SavedValuesListedDevice;
   divided: boolean;
+  /** Another device has this name, so the row says when it was added. */
+  sameName: boolean;
   busy: boolean;
   onRemove: () => void;
   styles: SettingsStyles;
 }) {
   const t = useT();
+  const locale = useLocale();
   const colors = useColors();
-  const detail = device.thisDevice
-    ? t("mobile.savedLogins.thisPhone")
-    : device.quiet
-      ? t("mobile.savedLogins.quiet")
-      : null;
+  const detail = [
+    device.thisDevice
+      ? t("mobile.savedLogins.thisPhone")
+      : device.quiet
+        ? t("mobile.savedLogins.quiet")
+        : null,
+    sameName
+      ? t("settings.secureValues.added", {
+          added: new Date(device.addedAt).toLocaleString(locale, {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+        })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <View style={[styles.row, divided && styles.rowDivider]}>
       <Icon

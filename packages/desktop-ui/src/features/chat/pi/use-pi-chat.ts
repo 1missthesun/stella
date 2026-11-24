@@ -25,8 +25,8 @@ export const usePiChat = (conversationId: string | null) => {
   const state = useSyncExternalStore(enabled ? subscribe : NO_SUBSCRIPTION, () => piChatSnapshot(conversationId));
 
   const projection = useMemo(
-    () => projectPiChat({ entries: state.entries, requestIds: state.requestIds }),
-    [state.entries, state.requestIds],
+    () => projectPiChat({ entries: state.entries, requestIds: state.requestIds, running: state.running }),
+    [state.entries, state.requestIds, state.running],
   );
   const runningTool = useMemo(() => {
     const running = Object.entries(state.tools).filter(

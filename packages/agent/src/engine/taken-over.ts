@@ -26,5 +26,3 @@ export const noteCutCall = (callId: string): void => {
 };
 
 export const isCutCall = (callId: string): boolean => cut.has(callId);
-
-export const takeCutCall = (callId: string): boolean => cut.delete(callId);

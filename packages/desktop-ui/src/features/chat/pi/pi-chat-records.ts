@@ -40,7 +40,7 @@ const writtenIn = (entry: PiEntry): boolean => {
   return typeof data?.journalSeq === "number" || typeof data?.localLog === "string";
 };
 
-export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds">): PiChatProjection => {
+export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" | "running">): PiChatProjection => {
   const records: JournalRecord[] = [];
   let turnId = "pi:0";
   let turn: Turn = { assistantMessages: 0 };
@@ -107,7 +107,8 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds">
       records.push({ ...base, role: "toolResult", hidden: false, payload: message as unknown as Record<string, unknown> });
     }
   }
-  if (ending) records.push(ending);
+  // A failed attempt is not the turn's end while the run goes on: it is tried again.
+  if (ending && !state.running) records.push(ending);
   return {
     records,
     messages: journalRecordsToMessageRecords(records),

@@ -152,15 +152,13 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
         args.cursor >= 0
           ? args.cursor
           : undefined;
-      const handBack = new AbortController();
-      const stopListening = onToolCallYield(context.requestId, () => handBack.abort());
       try {
         const observation = hasCode
           ? await registry.startCell(args.code as string, context, {
               ...(timeoutMs !== undefined ? { timeoutMs } : {}),
               ...(yieldTimeMs !== undefined ? { yieldTimeMs } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
-              yieldSignal: handBack.signal,
+              onYield: (handBack) => onToolCallYield(context.requestId, handBack),
               ...(extras?.onUpdate ? { onToolUpdate: extras.onUpdate } : {}),
             })
           : await registry.waitCell((args.cell_id as string).trim(), context, {
@@ -168,7 +166,7 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
               ...(cursor !== undefined ? { afterCursor: cursor } : {}),
               ...(args.terminate === true ? { terminate: true } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
-              yieldSignal: handBack.signal,
+              onYield: (handBack) => onToolCallYield(context.requestId, handBack),
             });
         return resultForObservation(
           observation,
@@ -178,8 +176,6 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
         return {
           error: error instanceof Error ? error.message : String(error),
         };
-      } finally {
-        stopListening();
       }
     },
   };

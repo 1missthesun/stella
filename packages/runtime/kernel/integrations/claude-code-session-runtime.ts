@@ -245,7 +245,7 @@ type PendingStep = {
   /** Stella interrupted this quiet step at Claude Code's nudge: whatever result follows ends it silent. */
   quietInterrupted?: boolean;
   /** The user's next message took this step over: its interrupted result ends it as aborted, and the CLI goes on. */
-  takenOver?: ReturnType<typeof setTimeout>;
+  takenOver?: () => void;
   /** The uuid this step's prompt was written with; Claude Code replays it when it takes the prompt. */
   promptUuid?: string;
   promptReplayed?: boolean;
@@ -3802,7 +3802,7 @@ class ClaudeCodeSessionRuntime {
             return;
           }
           processState.child.stdin.write(`${buildClaudeCodeInterruptRequest()}\n`, () => {});
-          pending.takenOver = setTimeout(abort, TAKEOVER_SETTLE_MS);
+          pending.takenOver = forkCancelableTimeout(TAKEOVER_SETTLE_MS, abort);
         };
         if (request.abortSignal.aborted) {
           pending.abortListener();
@@ -4004,7 +4004,7 @@ class ClaudeCodeSessionRuntime {
       clearTimeout(pending.idleTimer);
       pending.idleTimer = undefined;
     }
-    clearTimeout(pending.takenOver);
+    pending.takenOver?.();
     if (pending.abortListener && pending.request.abortSignal) {
       pending.request.abortSignal.removeEventListener(
         "abort",

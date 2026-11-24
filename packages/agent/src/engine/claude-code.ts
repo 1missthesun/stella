@@ -281,6 +281,7 @@ type Turn = {
   queue: QueueItem[];
   wake?: () => void;
   callIds: Set<string>;
+  nativeIds: Set<string>;
   prompted?: Message[];
   context?: string;
   unsent: Message[];
@@ -1080,6 +1081,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       settle,
       queue: [],
       callIds: new Set(),
+      nativeIds: new Set(),
       prompted: conversation,
       ...(!steering && !backgroundWake && baseline !== undefined ? { context: baseline } : {}),
       unsent: [],
@@ -1418,6 +1420,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               const record: CallRecord = { turn, name, native };
               calls.set(block.id, record);
               turn.callIds.add(block.id);
+              if (native) turn.nativeIds.add(block.id);
               messageTools += 1;
               out.push({ type: "toolcall_start", contentIndex: index, partial: output });
             }
@@ -1523,11 +1526,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const current = turn;
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
       const stopped = turn.abort.signal.aborted;
-      const restarts =
-        flavor.restartsForMessages &&
-        !turn.done &&
-        trailingUsers(tail).users.some((message) => !session.wakes?.has(textOf(message.content).trim()));
-      const replaced = !ours || stopped || restarts || (turn.done && turn.queue.length === 0);
+      const messaged = !turn.done && trailingUsers(tail).users.some((message) => !session.wakes?.has(textOf(message.content).trim()));
+      // The CLI goes on from the calls it runs itself without waiting for pi, so a message handed in now is read a step late.
+      const ahead =
+        messaged &&
+        session.binding.session.role === "orchestrator" &&
+        results.some((message) => message.role === "toolResult" && current.nativeIds.has(message.toolCallId));
+      const restarts = messaged && flavor.restartsForMessages === true;
+      const replaced = !ours || stopped || restarts || ahead || (turn.done && turn.queue.length === 0);
       const moved = !replaced && !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
       if (moved) {
         turn.nextToolSet = toolSet;
@@ -1539,7 +1545,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       if (replaced || stranded) {
         holdUndelivered(session, turn.unsent);
         turn.unsent = [];
-        abortTurn(turn, "Superseded.");
+        if (ahead) noteSeen(session, results.filter((message) => message.role === "toolResult" && current.nativeIds.has(message.toolCallId)));
+        abortTurn(turn, ahead ? new TakenOver() : "Superseded.");
         superseded = turn;
         turn = undefined;
       } else {

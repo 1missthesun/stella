@@ -38,7 +38,8 @@ import {
 import { isStopMessage } from "@stella/contracts/stop-message";
 import { yieldToolCall } from "@stella/runtime/kernel/tools/tool-call-yield";
 import { LOCAL_PROVIDER_ID } from "../provider/byok.ts";
-import { noteCutCall, takeCutCall, TakenOver } from "../engine/taken-over.ts";
+import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
+import { isCutCall, noteCutCall, TakenOver } from "../engine/taken-over.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 export const TAKEOVER_EXTENSION = "stella-takeover";
@@ -56,8 +57,9 @@ const TAKEOVER_LIMIT_MS = 60_000;
 
 /** A model request that has not begun to answer by then is given up and tried again. */
 const MODEL_START_LIMIT_MS = 90_000;
-/** The same for a response that goes silent midway; hidden reasoning can be quiet for a while. */
-const MODEL_SILENCE_LIMIT_MS = 3 * 60_000;
+/** The same for a response that goes silent midway. Hidden reasoning can be quiet for a while; Claude Code counts its tokens aloud, and text flows. */
+const MODEL_SILENCE_LIMIT_MS = 2 * 60_000;
+const AUDIBLE_SILENCE_LIMIT_MS = 60_000;
 /** After the computer slept or the process stood still, a connection that stays silent this long is dead. */
 const AFTER_SLEEP_LIMIT_MS = 30_000;
 const SLEEP_GAP_MS = 20_000;
@@ -268,9 +270,14 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
           lastEventAt = at;
           return;
         }
-        const signAt = Math.max(lastEventAt, ...engines.map((engine) => engine.lastSignAt(sessionId) ?? 0));
+        const signs = engines.flatMap((engine) => engine.lastSignAt(sessionId) ?? []);
+        const signAt = Math.max(lastEventAt, ...signs);
         const silent = at - signAt;
-        const limit = begun ? MODEL_SILENCE_LIMIT_MS : MODEL_START_LIMIT_MS;
+        const limit = !begun
+          ? MODEL_START_LIMIT_MS
+          : model.provider === CLAUDE_CODE_PROVIDER_ID || phase === "text"
+            ? AUDIBLE_SILENCE_LIMIT_MS
+            : MODEL_SILENCE_LIMIT_MS;
         if (silent > limit || (sleptAt !== undefined && signAt < sleptAt && at - sleptAt > AFTER_SLEEP_LIMIT_MS)) stalled();
       },
     };
@@ -327,13 +334,9 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
     }
   };
 
-  const endedText = (call: { id: string; name: string }): string | undefined => {
-    const lateText = late.get(call.id);
-    late.delete(call.id);
-    if (lateText !== undefined) return lateText;
-    if (yielded.delete(call.id)) return takeCutCall(call.id) ? CUT_CALL_TEXT : YIELDED_CALL_TEXT;
-    return takeCutCall(call.id) ? CUT_CALL_TEXT : undefined;
-  };
+  // Asked twice for a call that returned as it was aborted: pi settles that result, then the abort.
+  const endedText = (callId: string): string | undefined =>
+    late.get(callId) ?? (isCutCall(callId) ? CUT_CALL_TEXT : yielded.has(callId) ? YIELDED_CALL_TEXT : undefined);
 
   const extension = defineExtension({
     name: TAKEOVER_EXTENSION,
@@ -394,7 +397,7 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
         afterTool: (call, result) => {
           clearTimeout(limits.get(call.id));
           limits.delete(call.id);
-          const text = endedText(call);
+          const text = endedText(call.id);
           return text === undefined
             ? undefined
             : {

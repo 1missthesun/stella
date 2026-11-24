@@ -28,9 +28,7 @@ export const readRecentModels = (): string[] => {
 const writeRecentModels = (next: string[]): void => {
   try {
     uiState.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Recents are a convenience; ignore storage failures.
-  }
+  } catch {}
 };
 
 export const recordRecentModel = (modelId: string): string[] => {

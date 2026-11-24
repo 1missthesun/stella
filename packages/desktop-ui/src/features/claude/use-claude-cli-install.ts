@@ -10,7 +10,6 @@ export type ClaudeCliInstallState =
   | { status: "installed" }
   | { status: "error"; kind: "offline" | "unavailable" | "failed"; detail: string };
 
-/** Installs Claude Code on this computer with Anthropic's installer, with progress. */
 export function useClaudeCliInstall() {
   const available =
     typeof window !== "undefined" &&
@@ -57,16 +56,11 @@ export function useClaudeCliInstall() {
   return { available, state, install, reset };
 }
 
-/** Whole-number percent for a download with a known size, else null. */
 export const claudeInstallPercent = (progress: ClaudeCliInstallProgress): number | null =>
   progress.phase === "downloading" && progress.total
     ? Math.min(99, Math.floor((progress.received / progress.total) * 100))
     : null;
 
-/**
- * Installs Claude Code, then goes straight on to signing in to the person's
- * Claude plan, the same way from onboarding, Settings and the chat.
- */
 export function useClaudeInstallThenSignIn({
   reload,
   signIn,

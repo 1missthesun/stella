@@ -186,9 +186,6 @@ export function useModelCatalog() {
   const authAudienceKey = useMemo(() => {
     if (session.isPending) return null;
     if (!hasConnectedAccount) return `${sessionCacheScope}:audience:anonymous`;
-    // The backend derives the real audience from the auth token, so keep the
-    // key stable from initial pending -> first resolved billing plan and only
-    // bust the cache when a resolved plan changes (e.g. after upgrading).
     return stableAudienceKey(sessionCacheScope, billingAudienceKey);
   }, [
     billingAudienceKey,

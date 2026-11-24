@@ -138,9 +138,7 @@ export function I18nProviderBase({
       if (!isSupportedLocale(next)) return;
       setLocaleState(next);
       writePersistedLocale(next);
-      void Promise.resolve(persistRemoteLocale?.(next)).catch(() => {
-        /* signed-out / network — preference still lives locally */
-      });
+      void Promise.resolve(persistRemoteLocale?.(next)).catch(() => {});
     },
     [persistRemoteLocale],
   );
@@ -206,9 +204,7 @@ export function useLocale(): Locale {
 const FALLBACK: I18nContextValue = {
   locale: DEFAULT_LOCALE,
   isRTL: false,
-  setLocale: () => {
-    /* no-op — provider missing */
-  },
+  setLocale: () => {},
   t: (key, params) => translate(getEagerCatalog(DEFAULT_LOCALE), key, params),
   tArray: (key, params) =>
     translateArray(getEagerCatalog(DEFAULT_LOCALE), key, params),

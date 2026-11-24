@@ -73,9 +73,7 @@ function requestPreview(
     if (!pending.delete(id)) return;
     try {
       target.postMessage({ id, cancel: true });
-    } catch {
-      // A terminated worker needs no cancellation.
-    }
+    } catch {}
     scheduleIdleTermination();
   };
 }

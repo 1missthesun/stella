@@ -42,15 +42,6 @@ const signInRequiredMatchers = [
 
 const signInRequiredCodePattern = /(?<!engine_)sign_in_required/
 
-/**
- * The Free plan's allowance is a lifetime budget, not a window — once it
- * is exhausted it cannot be used again. It has to be classified separately
- * from the ordinary `billing` limit or the user gets told to "wait until
- * usage resets" about a quota that has no reset.
- *
- * Checked before `billingMatchers` because the backend's exhaustion
- * error may also carry the generic "usage limit reached" prose.
- */
 const freeAllowanceMatchers = [
   'free_allowance_exhausted',
   'lifetime_limit_reached',
@@ -59,13 +50,6 @@ const freeAllowanceMatchers = [
   'lifetime usage limit',
 ] as const
 
-/**
- * Structured capability denial. The authoritative signals are the
- * contract's `CAPABILITY_REQUIRED` code and the `[capability/<id>]`
- * marker it appends to the prose (see `buildCapabilityDenial`); the
- * remaining matchers cover the older paid-media rejection wording
- * (`PAID_PLAN_REQUIRED`) that predates the matrix.
- */
 const capabilityRequiredMatchers = [
   CAPABILITY_DENIED_CODE.toLowerCase(),
   'capability_not_available',
@@ -255,9 +239,7 @@ const extractJsonErrorMessage = (message: string): string | null => {
     try {
       const extracted = nestedErrorMessage(JSON.parse(candidate))
       if (extracted) return extracted
-    } catch {
-      // The error is ordinary text, not a JSON envelope.
-    }
+    } catch {}
   }
   return null
 }
@@ -321,12 +303,9 @@ export const classifyStellaProviderError = (
   if (normalized.includes(claudeCodeNotInstalledMatcher)) {
     return { kind: 'claude-code-not-installed', message }
   }
-  // Installed but can't start: what it printed and what to do, as written.
   if (normalized.includes(claudeCodeUnusableMatcher)) {
     return { kind: 'claude-code-unusable', message }
   }
-  // Stella's own usage limit, worded by the backend or the gateway: never
-  // "try again", always the upgrade notice.
   const usageLimit = stellaUsageLimitOf(normalized)
   if (usageLimit === 'free_allowance') {
     return { kind: 'free-allowance-exhausted', message }

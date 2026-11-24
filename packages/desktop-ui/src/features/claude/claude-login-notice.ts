@@ -3,11 +3,6 @@ import { translateNow } from "@/shared/i18n/active-translator";
 
 const heldNoticeId = (conversationId: string) => `claude-login-held:${conversationId}`;
 
-/**
- * A reply (or a task) waits for a Claude sign-in: one notice above the
- * composer with Sign in. The message is kept and goes out once the person
- * signs in, so the notice says nothing about sending again.
- */
 export const presentClaudeLoginHeld = (conversationId: string, email: string | undefined): void => {
   presentComposerNotice(
     {

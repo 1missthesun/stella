@@ -5,7 +5,6 @@ import type {
 
 const languageOf = (tag: string): string => tag.split(/[-_]/)[0]?.toLowerCase() ?? "";
 
-/** Stella's language first, in the system's regional variant when it has one. */
 export const dictationLocales = (): string[] => {
   const stella = document.documentElement.dataset.stellaLocale ?? "";
   const system = typeof navigator === "undefined" ? [] : [...(navigator.languages ?? [])];

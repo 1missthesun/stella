@@ -16,7 +16,7 @@
   max-width: 100%;
 }
 
-/* ── Prevent iOS auto-zoom on focused inputs (requires >= 16px) ── */
+/* iOS zooms into a focused input whose text is under 16px. */
 
 [data-platform="mobile"] .chat-composer-field,
 [data-platform="mobile"] .composer-input,

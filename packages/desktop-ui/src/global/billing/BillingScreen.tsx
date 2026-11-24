@@ -53,7 +53,6 @@ type Formatters = ReturnType<typeof useFormatters>;
 const pct = (used: number, limit: number) =>
   !Number.isFinite(limit) || limit <= 0 ? 0 : Math.min(100, Math.max(0, (used / limit) * 100));
 
-// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
 export const usedShare = (used: number, limit: number): number => {
   if (!Number.isFinite(limit) || limit <= 0 || !(used > 0)) return 0;
   if (used >= limit) return 100;
@@ -68,9 +67,7 @@ const getBillingReturnUrl = async (): Promise<string> => {
   try {
     const resolved = await window.electronAPI?.website?.getBaseUrl?.();
     if (resolved) baseUrl = resolved;
-  } catch {
-    // Fall through to the production default.
-  }
+  } catch {}
   return new URL("/billing", baseUrl).toString();
 };
 
@@ -283,7 +280,6 @@ function UsageSection({
   const mainUsed = Math.min(mainLimit, oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd);
   const credit = status.credits.balanceUsd;
   const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
-  // Backends before pricing v3 send no reservation or availability.
   const available: number | null | undefined = usage.availableUsd;
   const blocked = typeof available === "number" && available <= 0.0001;
   const exceeded = oneTime

@@ -602,8 +602,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
   useDictationToggleBridge();
 
-  // The Chat tab shows in the viewer only while you're away from the chat;
-  // coming back to it puts that copy away.
   useEffect(() => {
     if (isOnChatRoute && fileViewer.getSnapshot().fileId === CHAT_DISPLAY_TAB_ID) {
       fileViewer.close();

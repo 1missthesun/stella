@@ -69,7 +69,6 @@ const readShareableHtml = async (
   return html;
 };
 
-/** The reason to show when it is something the user can act on (a size limit, a missing file). */
 const publishFailureReason = (error: unknown): string | null => {
   if (error instanceof CanvasTooLargeError) return error.message;
   const code =

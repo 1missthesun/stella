@@ -7,13 +7,11 @@ import {
 
 type ComposerContextState = {
   hasScreenshotContext: boolean;
-  /** A screen recording is attached (ready or still being prepared). */
   hasRecordingContext: boolean;
   hasFileContext: boolean;
   hasPastedTextContext: boolean;
   hasAppSelectionContext: boolean;
   hasViewerContext: boolean;
-  /** The Email tab's briefing, point, email or thread rides along. */
   hasEmailContext: boolean;
   hasActivityContext: boolean;
   hasWindowContext: boolean;
@@ -53,11 +51,6 @@ export const truncateChipLabel = (
 
 type ComposerAppSelection = NonNullable<ChatContext["appSelection"]>;
 
-/**
- * All selected-area contexts, newest last. Reads the `appSelections`
- * list; falls back to the legacy single `appSelection` slot for contexts
- * produced before selections became appendable.
- */
 export const getComposerAppSelections = (
   chatContext: ChatContext | null,
 ): ComposerAppSelection[] => {
@@ -100,15 +93,12 @@ export const resolveComposerContextState = (
   const hasRecordingContext = Boolean(chatContext?.showCaptures?.length);
   const hasFileContext = Boolean(chatContext?.files?.length);
   const hasPastedTextContext = Boolean(chatContext?.pastedTexts?.length);
-  // The viewer's "what's open" chip rides along with a message but isn't
-  // something to send on its own.
   const hasAppSelectionContext = getComposerAppSelections(chatContext).some(
     (selection) =>
       Boolean(selection.snapshot) &&
       selection.surface !== VIEWER_SELECTION_SURFACE &&
       selection.surface !== EMAIL_SELECTION_SURFACE,
   );
-  // Like the viewer's chip, email context rides along but isn't a message on its own.
   const hasEmailContext = getComposerAppSelections(chatContext).some(
     (selection) => selection.surface === EMAIL_SELECTION_SURFACE,
   );
@@ -155,7 +145,6 @@ export const resolveComposerContextState = (
 
 const PLACEHOLDER = "app.chat.composer.placeholder";
 
-/** The catalog key of the composer's placeholder for what's attached. */
 const resolveComposerPlaceholderKey = ({
   contextState,
 }: ComposerPlaceholderOptions): string => {

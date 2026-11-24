@@ -94,10 +94,7 @@ const createBrowserStorageAdapter = (): WriteAdapter | null => {
             managedKeys.add(key);
           }
         }
-      } catch {
-        // Restricted/private browsing can revoke storage after the adapter
-        // was created.
-      }
+      } catch {}
     },
     clear: () => {
       try {
@@ -105,10 +102,7 @@ const createBrowserStorageAdapter = (): WriteAdapter | null => {
           if (!key.startsWith("better-auth")) storage.removeItem(key);
         }
         managedKeys.clear();
-      } catch {
-        // Storage access can throw (restricted/private browsing); clearing is
-        // best-effort.
-      }
+      } catch {}
     },
   };
 };
@@ -151,12 +145,6 @@ if (hasWindow) {
   window.addEventListener("pagehide", flushPending);
 }
 
-// ── One-time legacy migration ───────────────────────────────────────────────
-
-// First boot after the localStorage → shared-store cut: the file is empty but
-// this origin still holds the user's state. Import it once; the flush
-// persists it to ~/.stella/ui-state.json for every host. Legacy Better Auth
-// blobs stay out — session state belongs to the main process, never here.
 if (hasWindow && memory.size === 0) {
   try {
     const legacy = window.localStorage;
@@ -168,9 +156,7 @@ if (hasWindow && memory.size === 0) {
       memory.set(key, value);
       queueChange(key, value);
     }
-  } catch {
-    // localStorage can throw in restricted contexts; fresh state is fine.
-  }
+  } catch {}
 }
 
 export const uiState = {

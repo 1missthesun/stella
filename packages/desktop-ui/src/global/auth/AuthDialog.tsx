@@ -140,7 +140,6 @@ const pollDesktopSocialAuth = async (
 export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
-  // An expired session keeps its account on screen; only a live sign-in closes this.
   const bootstrapStatus = useAuthBootstrapState().status;
   const signedIn = hasConnectedAccount && bootstrapStatus === "ready";
   useEffect(() => {

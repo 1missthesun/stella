@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { OVERDUE_TURN_MS } from "@stella/contracts/working-status";
 
-/** Stop, once Stella has been at one message for too long; undefined until then. */
 export function useOverdueStop({
   working,
   messageId,

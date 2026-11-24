@@ -58,11 +58,6 @@ const lifecycleAgentIdsOnTurn = (
   return ids;
 };
 
-/**
- * Agents whose start card renders on some turn. A computer's agent has its
- * card on the agent's own thread turn, not on the turn that spawned it; that
- * card renders only when the turn has a message to carry it.
- */
 const startCardedAgentIds = (
   turns: ReadonlyMap<string, readonly JournalRecord[]>,
 ): Set<string> => {
@@ -91,15 +86,6 @@ const spawnResultThreadId = (
     ? agentToolResultThreadId(record.payload)
     : null;
 
-/**
- * Lifecycle events for a turn the desktop executed and mirrored into the
- * journal. Such a turn carries no `agent-lifecycle` card: the spawn is only
- * a `spawn_agent` result naming its thread, and the completion is only the
- * hidden `[Agent completed]` wake prompt. Synthesize the events the worker
- * would have written so both placements project the same rows (spawn row on
- * the spawning reply, completion with its linked files on the relaying
- * reply). A task that does have a card on the turn keeps the card.
- */
 const mirroredLifecycleEvents = (
   turnId: string,
   turnRecords: readonly JournalRecord[],
@@ -315,7 +301,6 @@ export const journalRecordsToMessageRecords = (
     const events: EventRecord[] = [];
     let userMessageId: string | undefined;
     let turnUserRecord: JournalMessageRecord | undefined;
-    // A task asking Stella before it asks the user: her side of it stays out of the chat.
     let quiet = false;
     const mirrored = mirroredLifecycleEvents(turnId, turnRecords, startCarded);
     const promptAhead = turnRecords.some(
@@ -353,7 +338,6 @@ export const journalRecordsToMessageRecords = (
         });
         continue;
       }
-      // Email isn't shown in the chat (it lives in the Email tab and the bell); older email rows stay hidden.
       if (record.kind === "card" && parseEmailCard(record.card)) continue;
       const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
       const safeguardLabel = safeguard ? safeguardCardLabel(safeguard) : null;
@@ -375,10 +359,6 @@ export const journalRecordsToMessageRecords = (
         const message = journalUserMessage(record.payload);
         const userText = message.text;
         const attachments = userAttachments(message);
-        // A prompt with nothing to show (older desktop turns mirrored their
-        // lifecycle wake as an empty, unflagged user record) renders like a
-        // hidden one: no bubble, no slot. So does one an agent sent (a note
-        // stored before it was flagged), whose reply still shows.
         const blank = message.blank;
         const unshown = blank || isPiAgentText(userText);
         quiet = isPiAskFirstText(userText);
@@ -493,12 +473,6 @@ const assistantOwner = (message: MessageRecord): string | null => {
   return typeof value === "string" && value ? value : null;
 };
 
-/**
- * Keeps unacknowledged local cache rows visible, then atomically yields each
- * logical slot to its canonical journal twin. Matching is by the prompt's
- * stable client message id and assistant ordinal within that prompt — never
- * by text or timestamp.
- */
 export const mergeCanonicalMessagesWithLocalCache = (
   canonical: readonly MessageRecord[],
   local: readonly MessageRecord[],
@@ -534,11 +508,5 @@ export const mergeCanonicalMessagesWithLocalCache = (
     return ordinal > (canonicalAssistantCounts.get(owner) ?? 0);
   });
 
-  // The journal sequence, reflected by `canonical` array order, is the
-  // authority. AgentMessage timestamps may come from different devices and
-  // can be skewed, so sorting canonical rows by those clocks would subtly
-  // reorder the same conversation across clients. Any cache-only rows are
-  // necessarily newer than the fetched canonical tail and remain a temporary
-  // suffix until their journal twins arrive.
   return [...canonical, ...unacknowledged];
 };

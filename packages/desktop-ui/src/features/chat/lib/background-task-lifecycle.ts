@@ -159,15 +159,6 @@ const completionFor = (
   };
 };
 
-/**
- * Fold lifecycle events into spawn-anchored card state.
- *
- * Raw events are deduplicated by id before the fold because the live/SQLite
- * handoff can briefly project one event onto two messages. Terminal events
- * resolve to the latest `agent-started` in their `(agentId, rootRunId)`
- * stream. The start event remains the card's identity and insertion anchor;
- * completion time never becomes a second timeline anchor.
- */
 export const buildBackgroundTaskLifecycleIndex = (
   events: ReadonlyArray<EventRecord>,
 ): BackgroundTaskLifecycleIndex => {

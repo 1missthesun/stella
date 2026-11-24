@@ -23,11 +23,6 @@ import { importLocalPiChat } from "@/features/chat/pi/pi-chat-store";
 import { useMemorySyncStatus } from "@/features/cloud/use-memory-sync-status";
 import "./local-mode.css";
 
-/**
- * After signing in, chats and memory made without an account stay on this
- * computer until the user says otherwise: keep them here, or copy them into
- * the account. Nothing is uploaded before that choice.
- */
 export function SignedOutLocalChoice({
   signedIn,
   isPrivate,
@@ -46,7 +41,6 @@ export function SignedOutLocalChoice({
   const [busy, setBusy] = useState(false);
   const memorySync = useMemorySyncStatus();
   const hasMemorySync = Boolean(window.electronAPI?.memorySync);
-  // Memory files the account doesn't have yet; unknown until the sync service has looked.
   const waitingMemory = !hasMemorySync
     ? 0
     : memorySync?.phase === "held" && memorySync.heldReason === "local_choice"
@@ -104,7 +98,6 @@ export function SignedOutLocalChoice({
       if (!from || importing.current === target) return;
       importing.current = target;
       void importLocalPiChat(target, from)
-        // The copied chat belongs to the account now; signing out must not show it.
         .then(createPrivateConversation)
         .then(() => {
           clearLocalChatSync();

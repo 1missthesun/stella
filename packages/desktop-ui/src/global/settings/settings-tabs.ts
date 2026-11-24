@@ -58,7 +58,6 @@ export const SETTINGS_TAB_GROUPS: {
 export const availableSettingsTabs = (website: boolean) =>
   website
     ? SETTINGS_TABS.filter(
-        // Saved values live in this computer's secure store.
         (tab) => tab.key !== "shortcuts" && tab.key !== "savedValues",
       )
     : SETTINGS_TABS;

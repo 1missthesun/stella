@@ -489,8 +489,6 @@
   min-width: 0;
 }
 
-/* The label keeps its full width; the privacy badge wraps under it when a
-   narrow column can't fit both, instead of cutting the label to "Card nu…". */
 .user-ask__field-label {
   flex: 0 0 auto;
   max-width: 100%;
@@ -589,7 +587,6 @@
   font-size: var(--font-size-md);
 }
 
-/* Secondary action: Send's shape and size with a quiet fill instead of a border. */
 .user-ask__actions .pill-btn.user-ask__decline-btn {
   border-color: transparent;
   background: color-mix(in srgb, var(--foreground) 7%, transparent);
@@ -646,8 +643,6 @@
   }
 }
 
-/* Optional note under the secure fields, styled like the question card's
-   "Something else" row: quiet until hovered or focused. */
 .user-ask__note {
   display: flex;
   min-height: 36px;

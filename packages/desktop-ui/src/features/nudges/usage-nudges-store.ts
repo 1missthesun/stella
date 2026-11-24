@@ -2,7 +2,6 @@ import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 
 const STORAGE_KEY = "stella:usage-nudges";
-/** Set by the "How did you find Stella?" step of the earlier, longer setup. */
 export const FOUND_VIA_CHOICE_KEY = "stella-onboarding-found-via";
 
 export const FOUND_VIA_NOTICE_ID = "found-via-nudge";
@@ -11,16 +10,12 @@ export type NudgeId = "foundVia" | "phoneApp";
 type NudgeStatus = "pending" | "done";
 
 export type UsageNudgesState = {
-  /** Finished replies seen on this computer. */
   replies: number;
-  /** The first two local days Stella was opened on. */
   days: string[];
   nudges: Record<NudgeId, NudgeStatus>;
 };
 
-/** "How did you find Stella?" asks after this many replies. */
 export const FOUND_VIA_AFTER_REPLIES = 3;
-/** The phone app is suggested on a second day with at least one reply, or after this many replies. */
 export const PHONE_APP_AFTER_REPLIES = 6;
 
 const CHANGE_EVENT = "stella:usage-nudges-changed";
@@ -71,10 +66,6 @@ const update = (change: (state: UsageNudgesState) => UsageNudgesState | null) =>
   if (next) write(next);
 };
 
-/**
- * Starts the nudges once per install. Someone who finished the earlier, longer
- * setup already saw both questions there, so theirs start done.
- */
 export const startUsageNudges = (onboardingAlreadyDone: boolean): void => {
   if (readUsageNudges()) return;
   const status: NudgeStatus = onboardingAlreadyDone ? "done" : "pending";

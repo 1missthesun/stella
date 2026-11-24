@@ -671,7 +671,6 @@ const SourceDiffBatchFooter = ({
 const diffFileName = (filePath: string): string =>
   filePath.split(/[\\/]/).pop() ?? filePath;
 
-/** The batch's files, with a changed-files list to jump between them. */
 const SourceDiffBatchFiles = ({
   payloads,
 }: {

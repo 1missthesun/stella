@@ -10,10 +10,6 @@ import {
   wipeAccountsFromThisComputer,
 } from "@/features/cloud/paused-account";
 
-/**
- * When a different account signs in on this computer, the previous account's
- * chat copy and unsent messages are deleted before anything else uses them.
- */
 export function AccountSwitchGuard() {
   const t = useT();
   const { accountScope, isCloudConversationReady } = useCloudConversationSession();

@@ -33,9 +33,6 @@ type PendingPick = { execution: CloudExecutionSelection; pickedAt: number };
 
 const createSelectionController = (accountId: string) => {
   const pendingKey = `stella:model-pick-pending:${accountId}`;
-  // When the newest pick is one the account can't hold (a model that runs
-  // only on this computer, like Google Antigravity or a local model), the
-  // time it was made, so an older account pick doesn't replace it.
   const localOnlyKey = `stella:model-pick-local-only:${accountId}`;
   let reconciled: CloudExecutionSelection | null = null;
   let accountProviders: ReadonlySet<string> = new Set();
@@ -99,8 +96,6 @@ const createSelectionController = (accountId: string) => {
     try {
       await cloudEnginesApi.setExecution(derived);
     } catch (error) {
-      // A server from before computer-only plans refuses the pick for good:
-      // keep it on this computer instead of retrying.
       if (error instanceof BackendRequestError && error.code === "BAD_REQUEST") {
         uiState.removeItem(pendingKey);
         uiState.setItem(localOnlyKey, String(Date.now()));
@@ -120,8 +115,6 @@ const createSelectionController = (accountId: string) => {
     const local = await readLocal();
     if (!local || disposed) return;
     const localOnlyAt = Number(uiState.getItem(localOnlyKey));
-    // The marker lives only while the newest local pick is one the account
-    // can't hold: any pick the account takes clears it (pushLocal).
     if (localOnlyAt > 0 && (typeof selectedAt !== "number" || selectedAt <= localOnlyAt)) {
       return;
     }

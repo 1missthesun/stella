@@ -22,14 +22,10 @@ const stopWebAudio = () => {
   try {
     currentSource.onended = null;
     currentSource.stop();
-  } catch {
-    /* already stopped */
-  }
+  } catch {}
   try {
     currentSource.disconnect();
-  } catch {
-    /* already disconnected */
-  }
+  } catch {}
   currentSource = null;
   publishPlaying();
 };
@@ -41,9 +37,7 @@ const stopStream = () => {
   if (stream) {
     try {
       stream.teardown();
-    } catch {
-      /* already torn down */
-    }
+    } catch {}
   }
 };
 
@@ -65,9 +59,7 @@ export async function playReadAloud(
     await ctx.resume().catch(() => undefined);
   }
 
-  // decodeAudioData detaches the buffer in newer browsers, so clone
-  // once defensively to keep the input usable for callers that retain
-  // a reference.
+  // decodeAudioData detaches its input buffer, so it decodes a copy.
   const decoded = await ctx.decodeAudioData(encoded.slice(0));
 
   stopCurrent();
@@ -138,32 +130,22 @@ export async function playReadAloudStream(
     torn = true;
     try {
       void reader.cancel().catch(() => undefined);
-    } catch {
-      /* already released */
-    }
+    } catch {}
     try {
       audio.pause();
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     try {
       if (sourceBuffer && mediaSource.readyState === "open") {
         sourceBuffer.abort();
       }
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     try {
       audio.removeAttribute("src");
       audio.load();
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     try {
       URL.revokeObjectURL(objectUrl);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   };
 
   const playback: StreamPlayback = { teardown };
@@ -236,9 +218,7 @@ export async function playReadAloudStream(
         endOfStreamSignaled = true;
         try {
           if (mediaSource.readyState === "open") mediaSource.endOfStream();
-        } catch {
-          /* ignore */
-        }
+        } catch {}
       }
     };
 

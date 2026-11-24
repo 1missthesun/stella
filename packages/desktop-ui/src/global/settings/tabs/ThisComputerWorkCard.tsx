@@ -2,7 +2,6 @@ import { useExecutionDevicesController } from "@/global/settings/hooks/use-execu
 import { useT } from "@/shared/i18n";
 import { SettingsToggleCard } from "./settings-toggle-card";
 
-/** Whether Stella on the user's other devices may start tasks on this computer. */
 export function ThisComputerWorkCard() {
   const t = useT();
   const { devices, currentDeviceId, error, pendingDeviceId, setRemoteExecution } =

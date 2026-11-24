@@ -27,7 +27,6 @@ const MAX_DICTATION_DURATION_MS = 15 * 60 * 1000;
 const PRE_ROLL_MS = 300;
 const WARM_CONTEXT_IDLE_MS = 60_000;
 const ARMED_PRE_ROLL_MS = 1_500;
-// How far behind the voice the browser's microphone pipeline runs.
 const BROWSER_DRAIN_MS = 120;
 const LIVE_TIMEOUT_MS = 10_000;
 // The browser pads a microphone that is still starting with zeros, but a quiet
@@ -47,7 +46,6 @@ export type DictationSessionState =
   | "error";
 
 type CaptureHandle = {
-  /** Resolves once everything said before this call has been delivered. */
   drain: () => Promise<void>;
   release: () => void;
 };
@@ -61,15 +59,12 @@ const rmsOf = (pcm: Int16Array): number => {
   return pcm.length === 0 ? 0 : Math.sqrt(sum / pcm.length) / 0x8000;
 };
 
-// The native capture has no noise suppression, so the room would move the
-// waveform. Fixed rather than adaptive: steady noise must never read as a voice.
 const NATIVE_ROOM_RMS = 0.02;
 
 const aboveRoomNoise = (rms: number): number =>
   Math.sqrt(Math.max(0, rms * rms - NATIVE_ROOM_RMS * NATIVE_ROOM_RMS));
 
 type DictationCallbacks = {
-  /** Nothing here can transcribe: the user has to add a key or sign in. */
   onNeedsKey?: () => void;
   onFinalTranscript?: (text: string) => void;
   onStateChange?: (state: DictationSessionState, error?: string) => void;
@@ -126,7 +121,6 @@ class DictationWarmCapture {
     this.scheduleIdleClose();
   }
 
-  /** Opens the microphone for a press in progress; see `disarm`. */
   arm(): void {
     if (this.listener || this.pinned || this.armedTimer) return;
     this.clearIdle();
@@ -292,17 +286,13 @@ class DictationWarmCapture {
         this.workletNode.port.onmessage = null;
         this.workletNode.port.close();
         this.workletNode.disconnect();
-      } catch {
-        // The node may already be gone with its context.
-      }
+      } catch {}
       this.workletNode = null;
     }
     if (this.sourceNode) {
       try {
         this.sourceNode.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.sourceNode = null;
     }
   }
@@ -567,7 +557,6 @@ export class DictationSession {
     };
   }
 
-  /** Before it was live the browser gets a try; after, what was said is kept. */
   private async onNativeFailed(message: string): Promise<void> {
     console.warn("[dictation] native microphone failed:", message);
     if (this.heard) {
@@ -729,10 +718,6 @@ export class DictationSession {
     }
   }
 
-  /**
-   * The relay can end without its last words, or hear nothing in a word it
-   * only caught part of. The recording still has them.
-   */
   private async finishStreamed(
     recording: PcmRecording,
     signal: AbortSignal,

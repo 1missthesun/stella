@@ -115,8 +115,6 @@ const isImageAttachment = (attachment: Attachment, safeUrl: string): boolean => 
   if (safeUrl.startsWith("data:")) {
     return /^data:image\//i.test(safeUrl);
   }
-  // Legacy remote payloads often lack a mimeType; keep the historical
-  // image treatment unless the filename clearly says otherwise.
   if (attachment.name && /\.[a-z0-9]+$/i.test(attachment.name)) {
     return IMAGE_FILE_EXT_RE.test(attachment.name);
   }
@@ -478,7 +476,6 @@ export const UserMessageRow = memo(
         ),
       });
     }
-    // Email chips are stored by label only; their "Email · …" prefix gives them the mail icon.
     const emailPrefix = t("email.brief.chip", { title: "" });
     appSelectionLabels.forEach((label, index) => {
       chips.push({
@@ -626,7 +623,6 @@ export const UserMessageRow = memo(
 type AssistantRowProps = {
   row: AssistantRowViewModel;
   conversationId?: string | null;
-  /** This is the newest reply with media, so its previews start expanded. */
   latestMedia?: boolean;
 };
 

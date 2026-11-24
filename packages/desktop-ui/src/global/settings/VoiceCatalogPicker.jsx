@@ -5,10 +5,6 @@ import { DEFAULT_STELLA_TTS_VOICE, STELLA_TTS_VOICES, getDefaultRealtimeVoice, g
 import { resolveReadAloudProvider, resolveRealtimeUnderlyingProvider, } from "@stella/contracts/local-preferences";
 import { useT } from "@/shared/i18n";
 import "./VoiceCatalogPicker.css";
-/**
- * Chevron stepper + dropdown over one voice catalog. `activeVoiceId` is
- * display-only when it is a fallback: the server applies the real default.
- */
 function VoiceStepper({ catalog, activeVoiceId, sourceLabel, onPick, disabled }) {
     const t = useT();
     const activeIndex = useMemo(() => {
@@ -71,11 +67,6 @@ export function VoiceCatalogPicker({ voiceProvider, selectedVoices, onSelectVoic
         provider: voiceProvider,
     });
     const catalog = getRealtimeVoiceCatalog(underlyingProvider);
-    // DISPLAY-ONLY: which voice to highlight when the user hasn't picked one.
-    // The real default is server-authoritative (the client omits the voice and
-    // the backend applies it), so this bundled constant only affects which chip
-    // is pre-highlighted in the picker — never what actually gets synthesized.
-    // If it drifts from the server default, only the badge is wrong, not audio.
     const fallback = getDefaultRealtimeVoice(underlyingProvider);
     const activeVoiceId = selectedVoices?.[underlyingProvider]?.trim() || fallback;
     const activeReadAloud = resolveReadAloudProvider({ readAloudProvider });

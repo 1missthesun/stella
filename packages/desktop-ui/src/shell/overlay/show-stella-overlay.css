@@ -35,7 +35,6 @@
   animation: show-stella-bar-in 160ms ease-out both;
 }
 
-/* macOS: a native panel takes the bar's clicks so Stella never comes forward. */
 .show-stella-bar--passive {
   pointer-events: none;
 }
@@ -107,7 +106,6 @@
   }
 }
 
-/* While ⇧ is held the overlay takes the mouse, so pins and ⇧-drags stay off the app below. */
 .show-stella-catch {
   position: absolute;
   z-index: 3;

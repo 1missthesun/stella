@@ -92,9 +92,7 @@ export function ConnectorsPopover({
       setConnectors((current) =>
         current.map((entry) => (entry.id === updated.id ? updated : entry)),
       );
-    } catch {
-      // The row keeps its previous state; reopening refreshes the list.
-    } finally {
+    } catch {} finally {
       setBusyIds((current) => {
         const next = new Set(current);
         next.delete(connector.id);

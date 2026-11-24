@@ -19,7 +19,6 @@ type ComposerAddMenuProps = {
   setChatContext: Dispatch<SetStateAction<ChatContext | null>>;
   className?: string;
   title?: string;
-  /** Screenshots and recordings land in the main window's composer, so surfaces with their own attachments turn them off. */
   allowCapture?: boolean;
 };
 

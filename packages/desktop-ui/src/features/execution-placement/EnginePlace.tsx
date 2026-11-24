@@ -14,7 +14,6 @@ const openAccounts = () =>
     settingsDialog.openAt("ai"),
   );
 
-/** "On <computer>" beside an engine's name while the chat runs on another computer that can run it. */
 export function enginePlaceBadge(
   t: ReturnType<typeof useT>,
   destination: ModelDestination,
@@ -25,7 +24,6 @@ export function enginePlaceBadge(
     : undefined;
 }
 
-/** An engine's models when the place the chat runs on can run them, or what to do there when it can't. */
 export function EnginePlace({
   destination,
   plan,

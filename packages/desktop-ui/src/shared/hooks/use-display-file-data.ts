@@ -38,12 +38,9 @@ type CacheEntry = {
   blob: Blob | null;
   url: string | null;
   refCount: number;
-  /** When the entry was last let go; idle entries are evicted oldest first. */
   idleSince: number;
-  /** Size and time of the file as read, for local files (no `source`). */
   stamp: Promise<FileStamp | null> | null;
   checkedAt: number;
-  /** Hooks showing this entry, told when the file changed under it. */
   stale: Set<() => void>;
 };
 const isDisplayFileApiAvailable = () =>
@@ -80,20 +77,13 @@ const readDisplayFileRaw = async (
 // @reloadable a cache of file reads; a newer copy starts empty
 const cache = new Map<string, CacheEntry>();
 
-/** One read outside the cache (a thumbnail that only needs the bytes once). */
 export const readDisplayFileOnce = (
   filePath: string,
   conversationId: string | null,
 ): Promise<DisplayFileRead> =>
   readDisplayFileRaw(filePath, undefined, conversationId, undefined);
-/**
- * What closed viewers keep, so reopening a file shows the same blob URL
- * (Chromium then reuses its decoded image too) instead of reading and
- * decoding it again. Oldest idle entries go first past either limit.
- */
 const IDLE_CACHE_MAX_BYTES = 192 * 1024 * 1024;
 const IDLE_CACHE_MAX_ENTRIES = 96;
-/** A file shown again is checked against its size and time at most this often. */
 const RECHECK_MS = 1500;
 const displayFileCacheKey = (
   filePath: string,
@@ -175,11 +165,6 @@ const statFile = (
 const sameStamp = (a: FileStamp | null, b: FileStamp | null): boolean =>
   !a || !b || (a.sizeBytes === b.sizeBytes && a.modifiedAt === b.modifiedAt);
 
-/**
- * A cached local file shown again is drawn at once, then checked: if it was
- * replaced on disk since it was read, the entry is dropped and whoever shows
- * it reads it afresh.
- */
 const recheck = (
   cacheKey: string,
   entry: CacheEntry,
@@ -268,7 +253,6 @@ const release = (cacheKey: string, entry: CacheEntry) => {
   trimIdle();
 };
 
-/** Read a file into the cache ahead of time (the viewer's neighbours). */
 export const prefetchDisplayFile = (
   filePath: string,
   conversationId: string | null,
@@ -394,10 +378,6 @@ const blobOf = (entry: CacheEntry): DisplayFileBlob | null => {
   };
 };
 
-/**
- * What the cache already holds for `filePaths`, so a file seen before is in
- * the first frame rather than one render later.
- */
 const cachedState = (
   key: string,
   filePaths: string[],
@@ -418,7 +398,6 @@ const cachedState = (
         missingMessages: empty,
       };
     }
-    // Newest idle entry, so nothing evicts it before the effect takes it.
     if (entry.refCount === 0) entry.idleSince = performance.now();
     files.push(blob);
   }

@@ -11,11 +11,6 @@ const day = (at: number) => {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 };
 
-/**
- * A quiet line in the bell (no pop-up) the first time each day a cloud task
- * gets a saved login from this computer, so a use the user didn't expect is
- * there to see.
- */
 export function SavedValuesNotifications() {
   const t = useT();
   const { status } = useSavedValuesSync();

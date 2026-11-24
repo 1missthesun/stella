@@ -1,24 +1,3 @@
-/**
- * Mic capture pipeline for the WebSocket transport.
- *
- * Pulls samples from a MediaStream, downsamples to the target rate (24 kHz by
- * default — what the xAI Voice Agent API expects), converts to 16-bit
- * little-endian PCM, base64-encodes, and hands chunks to a callback.
- *
- * Also exposes:
- *   - An AnalyserNode tap for level visualisation.
- *   - A GainNode for soft-mute (echo guard ramps gain instead of hard-cutting,
- *     matching the WebRTC transport's behaviour).
- *
- * Why ScriptProcessorNode instead of AudioWorklet: AudioWorklet would be
- * lower-jitter but requires bundling a separate worklet module file (Vite
- * `?worker&url`-style), which complicates the build for what is already a
- * stream where ~100 ms chunks are fine. ScriptProcessor is deprecated but
- * still works in every Chromium version Electron ships, and the latency it
- * adds (~10 ms) is comfortably inside the budget for a turn-taking voice
- * agent.
- */
-
 import {
   floatToPcm16Le,
   resampleLinear,
@@ -122,9 +101,7 @@ export class MicCapture {
     if (this.audioContext) {
       try {
         await this.audioContext.close();
-      } catch {
-        // Already closed.
-      }
+      } catch {}
       this.audioContext = null;
     }
   }
@@ -134,25 +111,19 @@ export class MicCapture {
       this.processor.onaudioprocess = null;
       try {
         this.processor.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.processor = null;
     }
     if (this.source) {
       try {
         this.source.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.source = null;
     }
     if (this.gateGain) {
       try {
         this.gateGain.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+      } catch {}
       this.gateGain = null;
     }
     this.analyser = null;

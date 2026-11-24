@@ -1,6 +1,3 @@
-/* Top-right under the window header, clear of the composer and the cards
-   docked above it (usage limit, notices), and below a notification's toast
-   under the bell. */
 [data-component="toast-region"] {
   position: fixed;
   top: calc(48px + var(--notification-toast-space, 0px));
@@ -116,7 +113,6 @@
   min-width: 0;
 }
 
-/* Without a title the actions share the first row with the close button: keep clear of it. */
 [data-component="toast"]:not(:has([data-slot="toast-title"])):has([data-slot="toast-actions"]) [data-slot="toast-content"] {
   padding-right: 28px;
 }
@@ -129,8 +125,6 @@
   margin-left: auto;
 }
 
-/* Actions sit on the last text row at the description's size: a secondary as
-   muted text just left of the primary pill. */
 [data-component="toast"] [data-slot="toast-action-button"] {
   padding: 0;
   border: 0;
@@ -144,8 +138,6 @@
   cursor: default;
 }
 
-/* The primary: an accent pill on the description's baseline (16px line +
-   4px padding), overhanging its 20px row by 2px each side. */
 [data-component="toast"] [data-slot="toast-action-button"]:not([data-variant]) {
   margin-block: -2px;
   padding: 4px 10px;
@@ -179,9 +171,6 @@
   align-items: baseline;
 }
 
-/* The ✕ is pinned top-right on the first text row so the actions row can run
-   the full width: the primary's right edge sits under the visible ✕ icon
-   (16px icon centred in the 22px button; content inset 16px). */
 [data-component="toast"] [data-slot="toast-title"],
 [data-component="toast"] [data-slot="toast-row"]:first-child [data-slot="toast-description"] {
   padding-right: 22px;
@@ -226,7 +215,6 @@
   }
 }
 
-/* Technical detail, folded under the plain sentence. */
 [data-component="toast"] [data-slot="toast-detail"] {
   margin-top: 4px;
   color: var(--text-weak, var(--muted-foreground));

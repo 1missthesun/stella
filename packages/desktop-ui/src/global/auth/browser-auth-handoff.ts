@@ -6,13 +6,6 @@ type BrowserHandoffLocation = Pick<Location, "hash" | "pathname" | "search">;
 
 type BrowserHandoffHistory = Pick<History, "replaceState" | "state">;
 
-/**
- * Consume a browser auth credential from the URL fragment.
- *
- * Fragments are not included in the request to the renderer host. Erase the
- * entire fragment before returning the token so it cannot survive in copied
- * URLs, screenshots, subsequent navigation, or client-side diagnostics.
- */
 export const consumeBrowserAuthHandoffToken = (
   location: BrowserHandoffLocation,
   history: BrowserHandoffHistory,

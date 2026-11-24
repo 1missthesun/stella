@@ -146,11 +146,6 @@ export const conversationTabs = {
   getSnapshot(): ConversationTabsSnapshot {
     return snapshot;
   },
-  /**
-   * Switches the whole tab store as one account-scoped unit. No legacy,
-   * unscoped payload is migrated: its ids have no provable owner and must
-   * never flash while a new identity is bootstrapping.
-   */
   setAccountScope(accountScopeInput: string | null): void {
     const accountScope = accountScopeInput?.trim() || null;
     if (accountScope === currentAccountScope) return;

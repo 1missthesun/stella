@@ -14,9 +14,7 @@ export function useClaudeLocalAccounts() {
     try {
       const next = await list();
       if (mounted.current) setState(next);
-    } catch {
-      // Keep the last state; the next change reloads it.
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {

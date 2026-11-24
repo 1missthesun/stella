@@ -32,9 +32,7 @@ export const voiceBackendFetch = async (
     try {
       const parsed = JSON.parse(detail) as { error?: { message?: unknown } };
       if (typeof parsed.error?.message === "string") message = parsed.error.message;
-    } catch {
-      // Not JSON; keep the text.
-    }
+    } catch {}
     throw new Error(`Voice request failed (${response.status})${message ? `: ${message}` : ""}`);
   }
   return response;

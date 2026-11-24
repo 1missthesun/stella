@@ -14,11 +14,6 @@ const MAX_RETAINED_TABS = 20;
 const texts = viewAtom<Record<string, TabComposerText>>("composer.tabs", {});
 const contexts = new Map<string, ChatContext | null>();
 
-/**
- * What each open conversation's composer held when the user left it. The
- * text survives reloads and restarts; attachments of a conversation that is
- * not on screen are large and stay in this page's memory only.
- */
 export const composerTabMemory = {
   get(conversationId: string): TabComposerMemory | undefined {
     const text = texts.get()[conversationId];
@@ -42,7 +37,6 @@ export const composerTabMemory = {
       if (!(id in kept)) contexts.delete(id);
     }
   },
-  /** The memory of a conversation the user is returning to; what they do there replaces it. */
   take(conversationId: string): TabComposerMemory | undefined {
     const memory = composerTabMemory.get(conversationId);
     if (!memory) return undefined;

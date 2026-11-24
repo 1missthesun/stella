@@ -96,9 +96,6 @@ export const ChatColumn = memo(function ChatColumn({
   showHomeContent: homeSurface,
 }: ChatColumnProps) {
   const t = useT();
-  // A tab on the stage takes the whole body, so Home steps aside for it:
-  // the chat shows its docked composer, which the stage ends above, as it
-  // does over a conversation with messages. Home comes back with Chat.
   const tabStageVisible = useTabStageVisible();
   const showHomeContent = Boolean(homeSurface) && !tabStageVisible;
   const focus = useConversationFocus(conversationId);

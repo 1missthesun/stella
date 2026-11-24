@@ -12,13 +12,11 @@ import "./show-stella-overlay.css";
 
 const INK_COLOR = "#ff3b30";
 const INK_WIDTH = 4.5;
-/** Finished ink stays this long, then fades over INK_FADE_MS. */
 const INK_HOLD_MS = 1_400;
 const INK_FADE_MS = 600;
 const PIN_PULSE_MS = 350;
 const PIN_LABEL_MS = 1_200;
 const HINT_MS = 4_000;
-/** After this many captures the drawing hint is shown only briefly. */
 const HINT_FULL_TIMES = 3;
 
 type DrawnStroke = { points: Array<[number, number]>; doneAt: number | null };
@@ -237,8 +235,6 @@ export function ShowStellaOverlay() {
   const nativeControls = state.phase === "recording" && state.nativeControls;
   const doneRef = useRef<HTMLButtonElement | null>(null);
 
-  // macOS: the bar only draws; a native panel takes the Done click (and shows
-  // the finish card) so clicking never brings Stella forward.
   useEffect(() => {
     if (!captureId) return;
     const report = () => {
@@ -265,7 +261,6 @@ export function ShowStellaOverlay() {
       });
     };
     const frame = requestAnimationFrame(report);
-    // Again once the hint has finished sliding in or out.
     const settled = setTimeout(report, 450);
     return () => {
       cancelAnimationFrame(frame);
@@ -281,7 +276,6 @@ export function ShowStellaOverlay() {
     return () => clearTimeout(timer);
   }, [captureId]);
 
-  /** The overlay takes the mouse over the bar, the finish card, or everywhere while ⇧ is held. */
   const syncInteractive = useCallback(() => {
     const next = hoveringBar.current || hoveringCard.current || catchingRef.current;
     if (interactive.current === next) return;

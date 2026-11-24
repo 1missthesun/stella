@@ -236,7 +236,6 @@ class ConversationStore {
     }
   }
 
-  /** No live connection while the account's session has ended; the cached copy stays. */
   setPaused(paused: boolean): void {
     if (this.paused === paused) return;
     this.paused = paused;
@@ -666,8 +665,6 @@ export const retireCloudConversationClientAuthority = (
   for (const scope of activeOwnerGenerationByAccount.keys()) {
     if (scope !== accountScope) activeOwnerGenerationByAccount.delete(scope);
   }
-  // Signed out keeps the last account's copy hidden for its return; another
-  // account signing in, or "remove from this computer", is what deletes it.
   if (accountScope === "signed-out") return;
   pendingPrompts.retainAccountScope(accountScope);
   void cloudConversationCacheClient.retainAccount(accountScope);

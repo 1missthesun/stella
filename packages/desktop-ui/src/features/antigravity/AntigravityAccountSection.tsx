@@ -9,7 +9,6 @@ import { useAntigravity } from "./use-antigravity";
 
 const K = "settings.engineAccounts";
 
-/** Google Antigravity on this computer, and which of the others are signed in to it: Gemini on the user's own Google plan, run inside Google's own CLI. */
 export function AntigravityAccountSection({ engineInUse = false }: { engineInUse?: boolean }) {
   const t = useT();
   const antigravity = useAntigravity();

@@ -75,9 +75,6 @@ export const useMediaMaterializer = ({
   const t = useT()
   const { hasConnectedAccount } = useAuthSessionState()
 
-  // Stable boot timestamp so we don't re-materialize the entire history on
-  // every reload. We reach back ~10 minutes to forgive crashes/restarts that
-  // happened during a long-running job.
   const bootSince = useMemo(() => Date.now() - 10 * 60 * 1000, [])
 
   const onPayloadRef = useRef(onMaterialized)
@@ -143,10 +140,7 @@ export const useMediaMaterializer = ({
           }
 
           onPayloadRef.current(payload)
-        } catch {
-          // Swallow per-job errors; we'll retry on the next subscription
-          // tick (entry stays out of the materialized set).
-        } finally {
+        } catch {} finally {
           inFlightRef.current.delete(job.jobId)
         }
       })()

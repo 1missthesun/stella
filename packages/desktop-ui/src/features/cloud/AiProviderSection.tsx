@@ -11,7 +11,6 @@ import {
 import { Button } from "@/ui/button";
 import "./ai-accounts.css";
 
-/** One provider on the Claude and ChatGPT tab: who is signed in, what needs you, and the rest folded away. */
 export function AiProviderSection({
   id,
   titleKey,
@@ -60,7 +59,6 @@ export function AiProviderSection({
   );
 }
 
-/** The account a provider runs on, in one line, with where it works and how much is used beneath it. */
 export function AiPrimaryAccount({
   name,
   meta,
@@ -93,7 +91,6 @@ export function AiInUse({ label }: { label: string }) {
   );
 }
 
-/** Something that needs the person, with the one action that settles it. */
 export function AiNote({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="ai-note" role="note">
@@ -133,7 +130,6 @@ export function AiDetailsGroup({ label, children }: { label: string; children: R
 
 export type AiMenuItem = { key: string; label: string; onSelect: () => void };
 
-/** A row in the folded list: an account or a computer, its state, and its few controls. */
 export function AiRow({
   name,
   meta,

@@ -104,7 +104,6 @@ const HistoryItem = ({
   now: number;
   pending: boolean;
   blocked: boolean;
-  /** Null where Stella can't undo (a developer's own checkout). */
   onUndo: (() => void) | null;
 }) => {
   const t = useT();

@@ -8,7 +8,6 @@ export const settingsDialog = {
   open() {
     open.set(true);
   },
-  /** Opens Settings on `tab`, scrolled to the card titled by `cardKey` when given. */
   openAt(tab: SettingsTab, cardKey?: string) {
     writeViewState("settings.tab", tab);
     if (cardKey) requestSettingsCard(cardKey);

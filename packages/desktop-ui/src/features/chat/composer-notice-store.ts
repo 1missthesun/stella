@@ -17,11 +17,8 @@ export type ComposerNotice = {
   description?: string;
   action?: ComposerNoticeAction;
   secondaryAction?: ComposerNoticeAction;
-  /** `continues`: a reply waits for this sign-in and goes out by itself after it. */
   claudeSignIn?: { email?: string; place?: "cloud"; continues?: boolean; dismissKey?: string };
-  /** Renders the connect-your-plan card (features/chat/connect-plan). */
   connectPlan?: ConnectPlanNoticeState;
-  /** Renders the one-time "How did you find Stella?" question (features/nudges). */
   foundVia?: true;
 };
 

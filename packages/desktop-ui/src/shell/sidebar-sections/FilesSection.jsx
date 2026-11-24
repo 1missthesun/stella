@@ -320,8 +320,6 @@ export function WorkList({
     return () => window.cancelAnimationFrame(frame);
   }, [focusRequest, searchOpen, showSearch]);
   useEffect(() => {
-    // Only a list that shows the search field owns it; hosted outside the
-    // stage (the + menu), the host closes it.
     if (embedded || !showSearch) return;
     if (searchOpen && (!panelOpen || activeSection !== "home")) {
       displaySearchStore.close();

@@ -1,9 +1,3 @@
-/**
- * Loaded before everything else in the full window. Dynamic imports in the
- * served modules go through `load`, so a module swapped in after a change is
- * the one a later `import()` gets, and the source server can tell which
- * modules already hold one they imported.
- */
 export type SwapPayload = {
   version: number;
   root: string | null;
@@ -18,9 +12,7 @@ type SwapRuntime = {
   ran: () => [string, string][];
   versions: Map<string, number>;
   apply: (payload: SwapPayload) => Promise<SwapOutcome>;
-  /** Roots swapped in since this page loaded; each leaves its old modules in memory. */
   swaps: number;
-  /** Milliseconds since the user last typed, clicked or scrolled; 0 while a key or button is held. */
   quietFor: () => number;
 };
 

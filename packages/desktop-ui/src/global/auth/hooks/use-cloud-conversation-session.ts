@@ -65,8 +65,6 @@ export function useCloudConversationSession() {
       rememberOwnerGeneration(session.cacheScope, confirmedOwnerGeneration);
     }
   }, [confirmedOwnerGeneration, session.cacheScope]);
-  // The account's session ended without the user signing out: its chat stays
-  // readable from this computer's copy until the same account signs back in.
   const pausedOwnerGeneration =
     authBootstrap.status === "reauth_required" &&
     session.hasSession &&

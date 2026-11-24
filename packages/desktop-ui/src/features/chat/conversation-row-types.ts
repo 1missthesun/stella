@@ -28,14 +28,11 @@ export type UserRowViewModel = {
   activityLabel?: string;
   pastedTexts?: PastedTextDescriptor[];
   quotedText?: string;
-  /** A tap on a canvas control: the canvas it came from and its chip. */
   canvasAction?: { canvas: string; chip: string };
   reaction?: string;
   reactionAt?: number;
   attachments: Attachment[];
-  /** Why a message from this device didn't send; the row offers retry. */
   sendFailed?: string;
-  /** Sent here but not in the shared chat yet: waiting for the runtime, or for the cloud. */
   sendPending?: "sending" | "unsynced";
   channelEnvelope?: ChannelEnvelope;
   hidden?: boolean;
@@ -79,7 +76,6 @@ export type AssistantRowViewModel = {
   voiceSession?: VoiceSessionSummaryMetadata;
   reminder?: ReminderMark;
   scheduleNotice?: ScheduleNoticeCard;
-  /** Consecutive schedule notices shown as one card; starts with `scheduleNotice`. */
   scheduleNoticeRun?: ScheduleNoticeCard[];
   toolActivity?: ToolActivityGroup;
   backgroundWork?: {

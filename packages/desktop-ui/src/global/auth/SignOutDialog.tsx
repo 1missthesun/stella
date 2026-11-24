@@ -30,10 +30,6 @@ const subscribe = (listener: () => void) => {
 
 export const openSignOutDialog = () => setOpen(true);
 
-/**
- * Signs this computer out; the chat stays in the account and is hidden here, or
- * removed. Stella carries on in a chat on this computer and offers to sign in.
- */
 export const signOutOfThisComputer = async (removeFromComputer: boolean) => {
   await secureSignOut("current_device", { forgetAccount: removeFromComputer });
   if (removeFromComputer) await wipeAccountsFromThisComputer(null);

@@ -1,30 +1,3 @@
-/**
- * Modal — the accessible shell for hand-rolled modal surfaces.
- *
- * Most dialogs in the app ride on `ui/dialog.tsx` (Radix), which already
- * ships the dialog role, the focus trap, Esc-to-close and focus restore.
- * A few surfaces cannot use it: they must render *inside* a specific
- * layout box rather than a body portal (the chat-column focus overlay),
- * or they predate the primitive entirely (the screenshot preview). This
- * is the tiny in-house equivalent for those — no new dependency, and
- * deliberately unopinionated about looks: every visual decision stays in
- * the caller's own class names.
- *
- * What it guarantees:
- *  - `role="dialog"` + `aria-modal="true"` on the panel
- *  - an accessible name via `aria-labelledby` or `aria-label`, and an
- *    optional `aria-describedby`
- *  - focus moved into the panel on open (explicit target, else the first
- *    tabbable, else the panel itself)
- *  - Tab / Shift+Tab cycling inside the panel
- *  - Escape closes the topmost open modal only
- *  - focus restored to whatever opened it on close
- *  - the rest of the page marked `inert` + `aria-hidden` while open
- *
- * Motion is left to CSS: the app's global `html[data-reduce-motion="reduce"]`
- * rule in `index.css` already neutralizes animations, so callers keep the
- * animations they had and inherit the same reduced-motion behavior.
- */
 import {
   useCallback,
   useEffect,

@@ -107,7 +107,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
     finish,
   } = useOnboardingChat({
     onFinished: (handoff) => {
-      // Skipping setup never answers "Choose your AI"; count what is set now. Main keeps only the first.
       recordAnonymousCount({ type: "engine_chosen" });
       onComplete(handoff);
     },

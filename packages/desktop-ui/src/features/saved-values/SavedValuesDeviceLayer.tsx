@@ -22,16 +22,8 @@ import { useSavedValuesSync } from "./use-saved-values-sync";
 import "@/global/execution/remote-execution-consent.css";
 import "./saved-values-device.css";
 
-/**
- * The two cards that add a device to the ones holding saved logins, each
- * shown by itself when it's needed: on a device on the list, "Allow «name»?"
- * with the code; on the new device, "Check «name» shows …" with It matches.
- * Allowing here also lets the user's devices start work on this computer if
- * that was never answered, so adding a device is one card, not two.
- */
 const FREE_POLL_MS = 1_000;
 
-/** True once no other card is open, so these never stack on another dialog. */
 const useScreenFree = (wanted: boolean): boolean => {
   const [free, setFree] = useState(false);
   useEffect(() => {

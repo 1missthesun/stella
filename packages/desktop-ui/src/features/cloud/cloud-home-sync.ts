@@ -622,9 +622,7 @@ export const runCloudHomeSync = async (
         },
         signal: options.signal,
       });
-    } catch {
-      // Re-query below: an exact version may have committed before response loss.
-    }
+    } catch {}
     try {
       cloudSkills = parseSkillHeads(
         await awaitBounded({
@@ -685,17 +683,6 @@ export const runCloudHomeSync = async (
     publishStatus();
   }
 
-  // The prune runs only after the upload pass above has finished, on the heads
-  // that pass last observed. Two properties make it safe. Every slug the
-  // conflict branch touched is by definition present in the scanned device
-  // root, so it is never a candidate here; and the delete carries the revision
-  // this pass observed, so a head another device advanced in the meantime is
-  // refused rather than erased. Multi-device convergence is deliberate rather
-  // than exact: if this Mac drops a skill another Mac still holds, that Mac
-  // re-uploads it on its next pass and the skill comes back. The live device
-  // roots, not a tombstone, are the authority. What keeps that from being a
-  // footgun on a fresh Mac is the one-time import-ownership confirmation
-  // above, which is where the user says this root speaks for the account.
   const deviceSlugs = new Set(scan.skills.map((local) => local.slug));
   if (
     !scan.warnings.some((warning) =>

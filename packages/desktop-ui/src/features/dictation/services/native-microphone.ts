@@ -26,13 +26,11 @@ const subscribe = (): boolean => {
   return true;
 };
 
-/** A shortcut can have opened it for this window before the window is ready. */
 export const nativeMicrophoneSupported = (): boolean =>
   window.electronAPI?.platform === "darwin";
 
 let nativeReady = false;
 
-/** Whether dictation here opens the microphone natively. */
 export const nativeMicrophoneReady = (): boolean => nativeReady;
 
 export const reportDictationReady = async (ready: boolean): Promise<void> => {
@@ -42,10 +40,6 @@ export const reportDictationReady = async (ready: boolean): Promise<void> => {
   nativeReady = answer?.native === true && subscribe();
 };
 
-/**
- * Opens the microphone for a press that has not finished yet; a start with the
- * same id takes it over, and one that never comes lets it go.
- */
 export const armNativeMicrophone = (captureId: string): void =>
   api()?.captureArm?.({ captureId });
 
@@ -63,7 +57,6 @@ export class NativeCapture {
     private readonly handlers: NativeCaptureHandlers,
   ) {}
 
-  /** Null when the microphone has to be opened by the browser instead. */
   static async open(
     captureId: string,
     handlers: NativeCaptureHandlers,
@@ -93,7 +86,6 @@ export class NativeCapture {
     if (!expected) this.handlers.onFailed(event.message ?? "The microphone stopped.");
   }
 
-  /** Resolves once everything said before this call has arrived. */
   async drain(): Promise<void> {
     if (this.over) return;
     await new Promise<void>((resolve) => {

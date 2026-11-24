@@ -28,10 +28,6 @@ const dwellFor = (text: string) =>
 
 type Turn = { key: string; ids: Set<string>; text: string; at: number };
 
-// A turn's ids change under it (optimistic → accepted → stored user message,
-// streaming overlay → stored assistant message). Bubbles are keyed by turn, not
-// by message id, so those swaps update a bubble in place instead of remounting
-// it and replaying its pop-in.
 const SAME_USER_MESSAGE_MS = 2 * 60_000;
 
 const belongsToTurn = (

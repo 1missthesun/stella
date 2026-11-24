@@ -27,15 +27,7 @@ const AgentModelPicker = lazy(() =>
   })),
 );
 
-/**
- * @param {{ visible?: boolean, placement?: "footer" | "topbar" }} props
- *   `placement="topbar"` renders the Models button in the top bar, where it
- *   moved when the right sidebar went away. `visible` follows the shell's
- *   authoritative right-side Activity-workspace visibility. When the right
- *   region isn't displaying, the control renders nothing so it never leaves an
- *   empty right gutter behind. State/overlay/lifecycle stay globally owned
- *   (engine-overlay store) — this only gates whether the button is on screen.
- */
+/** @param {{ visible?: boolean, placement?: "footer" | "topbar" }} props */
 export function GlobalModelsControl({ visible = true, placement = "footer" }) {
   const inTopbar = placement === "topbar";
   const open = useEngineOverlayOpen();

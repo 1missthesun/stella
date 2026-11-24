@@ -1,53 +1,3 @@
-/**
- * Chronological, append-only anchoring for agent lifecycle events
- * (`agent-started` / `agent-progress` / `agent-completed` /
- * `agent-failed` / `agent-canceled`) across a turn's rows.
- *
- * Why this exists: the SQLite grouping (`assembleMessageWindow` /
- * `groupEventsIntoMessages`) attaches a turn's pre-assistant events to
- * the FIRST assistant message once one lands. That rule is fine for
- * tool_request/tool_result (inline artifacts only render on finalized
- * assistant rows, so nothing painted ever moves), but `agent-started`
- * renders a live background-work card. Later lifecycle packets are still
- * routed/deduplicated here, then the task selector folds them back onto that
- * start-anchored card.
- * Under the first-assistant rule a card that painted ABOVE the reply
- * (anchored to the user message because no assistant row was persisted
- * yet) gets re-anchored BELOW it the moment the segment persists —
- * already-painted rows visibly reorder mid-turn.
- *
- * The rule here is arrival order, applied on the merged display list
- * (persisted messages + in-memory overlays):
- *
- *   - Every assistant anchor has a *first text* time: the overlay's own
- *     creation timestamp while it is the live row, and the persisted
- *     row's `metadata.runtime.streamStartedAtMs` afterwards. The runtime
- *     stamps that moment onto the `assistant-message` event as
- *     `firstTextAtMs`; the worker persists it under the older name.
- *   - A lifecycle event anchors to the LATEST anchor in its turn whose
- *     first text is <= the event's timestamp — i.e. exactly where the
- *     bottom of the transcript was when the event occurred. An event
- *     that predates every assistant's first text anchors to the turn's
- *     user message (renders above the reply, where it first painted); an
- *     event that fires after one anchors to that segment (renders below
- *     it, never injected above).
- *   - Once routed, the decision is STICKY for the session (`sticky`
- *     map, `eventId -> anchorKey`). The overlay and its eventual
- *     persisted twin share the same anchor key, so the overlay ->
- *     persisted handoff cannot move a card even when the renderer- and
- *     worker-observed stream starts differ by a few ms, or when the
- *     overlay is cleared a frame before the twin loads. A pin whose
- *     anchor is absent from the current window is KEPT (the anchor may
- *     come back) while the event renders at a per-frame fallback — which
- *     is also the stream-end release for aborted segments that never
- *     persist a twin: their slot key never returns, so the event settles
- *     on the surviving anchors. A pin hit by a LATER overlay reusing the
- *     slot of an aborted segment is detected (its stream start postdates
- *     the event) and dropped as stale.
- *   - Assistants with no `streamStartedAtMs` (transcripts persisted
- *     before this metadata existed) are left alone: events already
- *     attached to them stay put, preserving old renderings.
- */
 import type {
   EventRecord,
   MessageRecord,
@@ -68,7 +18,6 @@ const isLifecycleEvent = (event: EventRecord): boolean =>
 const STREAMING_OVERLAY_ID_PREFIX = "stream-overlay:";
 
 export type LifecycleRoutingState = {
-  /** Sticky `eventId -> anchorKey` decisions for the session. */
   sticky: Map<string, string>;
   routedByBase: WeakMap<MessageRecord, MessageRecord>;
 };
@@ -153,15 +102,6 @@ export const routeLifecycleEvents = (
     const entries = turn;
     turn = [];
 
-    // One routing decision per EVENT ID. The SQLite/tail-refresh handoff
-    // can briefly leave the same lifecycle event on two rows (the stale
-    // pre-assistant copy on the user anchor plus the fresh copy the
-    // grouping forward-attached to the assistant); resolving per id
-    // collapses those duplicates onto a single target so the card can
-    // never render twice (or produce a doubled toolEvents list). The
-    // LAST source in walk order is the canonical one — for a duplicate
-    // it is the anchor the grouping most recently attached the event to,
-    // while the earlier copy is the stale leftover.
     const sourcesByEventId = new Map<
       string,
       { event: EventRecord; lastSource: TurnEntry }
@@ -172,7 +112,6 @@ export const routeLifecycleEvents = (
         if (!isLifecycleEvent(event)) continue;
         const existing = sourcesByEventId.get(event._id);
         if (existing) {
-          // Duplicate copy: at most one of the involved rows keeps it.
           changed.add(existing.lastSource);
           changed.add(entry);
           existing.lastSource = entry;
@@ -201,12 +140,6 @@ export const routeLifecycleEvents = (
       if (stickyKey !== undefined) {
         const pinned = anchorsByKey.get(stickyKey);
         if (pinned) {
-          // A pin is only ever recorded while its anchor's stream start
-          // was <= the event's timestamp, and a persisted twin keeps
-          // (roughly) its overlay's start. So an OVERLAY occupying the
-          // pinned slot with a LATER start is a different, newer stream
-          // reusing the slot of an aborted segment — the pin is stale and
-          // must not capture the new run's row.
           const pinnedStart = pinned.anchor.startTs;
           const stale =
             isOverlayEntry(pinned) &&
@@ -216,16 +149,7 @@ export const routeLifecycleEvents = (
           state.sticky.delete(event._id);
           stickyKey = undefined;
         }
-        // The pinned anchor is not in this window (trimmed / the one-frame
-        // overlay -> twin handoff gap / an aborted segment whose twin never
-        // lands). Fall back to a per-frame computation but KEEP the pin —
-        // the anchor may come back, and stomping it here is what let a
-        // transient frame permanently re-home a painted card. If it never
-        // comes back (abort), the per-frame fallback IS the release.
       }
-      // Legacy assistants (no stream-start metadata) keep their events:
-      // there is no way to place them chronologically, and moving them
-      // would churn transcripts persisted before this rule existed.
       if (source.anchor.startTs === undefined) {
         if (stickyKey === undefined) {
           state.sticky.set(event._id, source.anchor.key);
@@ -245,12 +169,6 @@ export const routeLifecycleEvents = (
         resolved = firstReply;
       }
       const target = resolved ?? source;
-      // Pin overlay routings too: the overlay and its persisted twin share
-      // one slot key, so the pin survives the handoff even when the twin's
-      // worker-stamped stream start lands a few ms AFTER the event (clock
-      // skew would otherwise exclude it from `targets` and yank the card
-      // above the text), or when the overlay is cleared a frame before the
-      // twin loads.
       if (stickyKey === undefined) {
         state.sticky.set(event._id, target.anchor.key);
       }
@@ -330,10 +248,6 @@ export const routeLifecycleEvents = (
       const indexInTurn =
         (assistantCountByUserMessageId.get(userMessageId) ?? 0) + 1;
       assistantCountByUserMessageId.set(userMessageId, indexInTurn);
-      // Slot key shared by a streaming overlay and its persisted twin
-      // (both occupy the same `(userMessageId, indexInTurn)` slot, only
-      // one of which is present at a time) so sticky decisions survive
-      // the overlay -> persisted handoff.
       key = `slot:${userMessageId}:${indexInTurn}`;
     } else {
       key = `id:${message._id}`;

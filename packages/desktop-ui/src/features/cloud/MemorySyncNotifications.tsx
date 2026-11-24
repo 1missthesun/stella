@@ -6,10 +6,6 @@ import {
 import { useT } from "@/shared/i18n";
 import { useMemorySyncStatus } from "./use-memory-sync-status";
 
-/**
- * Memory files the cloud won't take stay on this computer only. Settings lists
- * them; the bell says so once per set of files, so it isn't only a log line.
- */
 export function MemorySyncNotifications() {
   const t = useT();
   const status = useMemorySyncStatus();

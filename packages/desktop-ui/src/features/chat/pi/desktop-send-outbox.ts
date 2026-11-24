@@ -1,20 +1,11 @@
 import type { PiChatSend } from "@stella/contracts/pi-chat";
 
-/**
- * Messages typed on this computer that its runtime hasn't taken yet: kept in
- * localStorage from the moment they are sent until the runtime has them
- * (after which they live in its durable transcript), so one sent while the
- * runtime restarts, or in the second before an Update relaunch, goes out once
- * it is back instead of vanishing. The runtime dedupes by request id, so a
- * replay of one it already took is harmless.
- */
 export type QueuedSend = {
   conversationId: string;
   requestId: string;
   text: string;
   send?: PiChatSend;
   createdAtMs: number;
-  /** Set when the runtime refused it; the row offers Retry and Remove. */
   failed?: string;
 };
 
@@ -28,7 +19,6 @@ const RETRY_MS = [1_000, 2_000, 4_000, 8_000];
 const RUNTIME_GONE =
   /Stella runtime not available|runtime client is not connected|Stella's runtime is (?:not available|restarting)|Stella runtime is restarting|The Stella runtime is not running|Runtime worker is not running|RPC peer is closed/i;
 
-/** The runtime isn't there to take a message right now (starting, restarting, relaunching). */
 export const runtimeUnavailable = (error: unknown): boolean =>
   RUNTIME_GONE.test(error instanceof Error ? error.message : String(error));
 
@@ -101,9 +91,7 @@ const write = (entry: QueuedSend): boolean => {
 const erase = (requestId: string) => {
   try {
     storage()?.removeItem(PREFIX + requestId);
-  } catch {
-    // A row that can't be erased is replayed later and deduped by the runtime.
-  }
+  } catch {}
   emit(entries.filter((entry) => entry.requestId !== requestId));
 };
 
@@ -130,27 +118,22 @@ export const desktopSendOutbox = {
     load();
     return entries;
   },
-  /** Where queued messages go: the runtime's submit for one conversation. */
   setDeliver(next: Deliver): void {
     deliver = next;
   },
-  /** The runtime takes messages only for the chat on screen, so only its queue is sent. */
   setActive(conversationId: string | null): void {
     active = conversationId;
     if (conversationId) void this.flush(conversationId);
   },
-  /** A live send is handing this one over; a flush leaves it alone. */
   claim(requestId: string): void {
     delivering.add(requestId);
   },
   release(requestId: string): void {
     delivering.delete(requestId);
   },
-  /** The user removed it: its bubble goes too. */
   wasRemoved(requestId: string): boolean {
     return removed.has(requestId);
   },
-  /** Saves a message before it is handed to the runtime; false when it can't be saved (too large, no storage). */
   keep(entry: QueuedSend): boolean {
     load();
     if (entries.some((queued) => queued.requestId === entry.requestId)) return true;
@@ -158,11 +141,9 @@ export const desktopSendOutbox = {
     emit([...entries, entry]);
     return true;
   },
-  /** The runtime took it (or it never needs sending again). */
   taken(requestId: string): void {
     if (entries.some((entry) => entry.requestId === requestId)) erase(requestId);
   },
-  /** Messages sent earlier in this conversation still wait, so this one goes after them. */
   behind(conversationId: string, requestId: string): boolean {
     load();
     const queue = waiting(conversationId);
@@ -185,7 +166,6 @@ export const desktopSendOutbox = {
     attempt = 0;
     void this.flush(entry.conversationId);
   },
-  /** Sends what waits for `conversationId`, oldest first, stopping while the runtime is away. */
   async flush(conversationId: string): Promise<void> {
     load();
     const send = deliver;
@@ -213,7 +193,6 @@ export const desktopSendOutbox = {
       }
     }
   },
-  /** Retries queued messages soon (the runtime just went away mid-send). */
   later(): void {
     scheduleRetry();
   },

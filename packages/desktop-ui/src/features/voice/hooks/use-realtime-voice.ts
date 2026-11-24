@@ -154,11 +154,6 @@ export class VoiceSessionManager {
     this.deps.onActiveVoiceEnded(reason);
   }
 
-  /**
-   * Stella's managed voice bills every connected second and the backend ends
-   * a session after five minutes. An active conversation that has gone quiet
-   * ends here so it neither runs to that cap nor keeps the wake word paused.
-   */
   private endActiveVoiceIfQuiet(): void {
     if (!this.deps.inputActiveRef.current) return;
     const session = this.sessionRef.current;

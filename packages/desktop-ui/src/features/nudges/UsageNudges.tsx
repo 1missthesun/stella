@@ -34,7 +34,6 @@ const openPhoneDialog = () => {
   });
 };
 
-/** Null until known, so the found-via question keeps its turn ahead of the phone app. */
 const useCountsOn = (): boolean | null => {
   const [on, setOn] = useState<boolean | null>(ANONYMOUS_COUNTS_ENABLED ? null : false);
   useEffect(() => {
@@ -59,11 +58,6 @@ const useCountsOn = (): boolean | null => {
   return on;
 };
 
-/**
- * Two one-time nudges once someone has used Stella a little: "How did you
- * find Stella?" above the composer after a few replies, and the phone app in
- * the bell on a second day (or after a few more replies). One per app run.
- */
 export function UsageNudges() {
   const t = useT();
   const { completed, hydrated } = useOnboardingState();

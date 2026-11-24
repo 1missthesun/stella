@@ -12,10 +12,6 @@ import "./antigravity.css";
 
 const K = "settings.engineAccounts";
 
-/**
- * Antigravity's models in the model picker when the computer the chat runs on
- * can run them; its sign-in when the chat runs here and this computer has none.
- */
 export function AntigravityModelSection({
   destination,
   computers,
@@ -25,7 +21,6 @@ export function AntigravityModelSection({
   destination: ModelDestination;
   computers: readonly OtherComputer[];
   selected: boolean;
-  /** Draws the models, given the ones its account reports, if it has. */
   children: (models: readonly string[] | undefined) => ReactNode;
 }) {
   if (destination.kind !== "here") {

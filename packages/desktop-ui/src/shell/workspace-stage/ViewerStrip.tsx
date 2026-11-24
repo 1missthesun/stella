@@ -19,7 +19,6 @@ import {
   type StripSet,
 } from "./viewer-siblings";
 
-/** Load a thumbnail once it's near the visible part of the strip. */
 const useNearView = (ref: React.RefObject<HTMLElement | null>): boolean => {
   const [near, setNear] = useState(false);
   useEffect(() => {
@@ -56,12 +55,9 @@ const videoPathOf = (entry: FileEntry): string | null => {
 const pdfPathOf = (entry: FileEntry): string | null =>
   entry.payload.kind === "pdf" ? entry.payload.filePath : null;
 
-/** What the item's thumbnail is made from, if it has one. */
 type ThumbSource = {
   kind: StripThumbKind;
-  /** A file here, or (for a Drive file) its stand-in path. */
   filePath: string;
-  /** Set for a Drive file: what the thumbnail is read from. */
   drivePath: string | null;
 };
 
@@ -92,7 +88,6 @@ function DriveThumb({ source, drivePath }: { source: ThumbSource; drivePath: str
   return <ThumbImage url={useDriveStripThumbnail(source.kind, drivePath, true)} />;
 }
 
-/** A document's first page, over its icon once it's made. */
 function PageThumb({ source }: { source: ThumbSource }) {
   const local = useStripThumbnail(source.kind, source.filePath, !source.drivePath);
   const drive = useDriveStripThumbnail(source.kind, source.drivePath ?? "", Boolean(source.drivePath));
@@ -107,7 +102,6 @@ function PageThumb({ source }: { source: ThumbSource }) {
   ) : null;
 }
 
-/** A small still: a picture, a clip's frame half a second in, a PDF's first page. */
 function Thumb({ source }: { source: ThumbSource }) {
   return source.drivePath ? (
     <DriveThumb source={source} drivePath={source.drivePath} />
@@ -155,15 +149,12 @@ function StripItem({
       title={tooltip}
       onClick={(event) => {
         if (current) return;
-        // A click (not Enter or ⇧←/→, which arrive with no detail) picks
-        // something already on screen, so the strip stays where it is.
         if (event.detail > 0) onPointerPick(entry.id);
         showSibling(fromId, entry);
       }}
       onContextMenu={contextMenu(
         async () => {
           const open = () => showSibling(fromId, entry);
-          // A Drive file's payload path is a stand-in, not a file here.
           const path = drivePath ? null : (source?.filePath ?? entry.filePath);
           if (!path) return [[{ label: translateNow("contextMenu.open"), run: open }]];
           return await fileMenu(path, { open, image: source?.kind === "image" })();
@@ -197,7 +188,6 @@ function StripItem({
   );
 }
 
-/** Where `el` sits along the strip, measured from the list itself. */
 const offsetIn = (list: HTMLElement, el: HTMLElement, vertical: boolean) => {
   let offset = 0;
   let node: HTMLElement | null = el;
@@ -210,10 +200,8 @@ const offsetIn = (list: HTMLElement, el: HTMLElement, vertical: boolean) => {
   return offset;
 };
 
-/** The strip's direction, scroll and visible length, and where a node sits in it. */
 const placeOf = (list: HTMLElement) => {
   const vertical = getComputedStyle(list).flexDirection === "column";
-  // Offsets, not client rects: the viewer's open animation scales it.
   const scroll = vertical ? list.scrollTop : list.scrollLeft;
   const view = vertical ? list.clientHeight : list.clientWidth;
   const fit = (node: HTMLElement) => ({
@@ -223,10 +211,6 @@ const placeOf = (list: HTMLElement) => {
   return { vertical, scroll, view, fit };
 };
 
-/**
- * Centre `el` (with the whole set it belongs to, when that fits): only when
- * the viewer opens or the strip turns between rail and row.
- */
 const centerOn = (list: HTMLElement, el: HTMLElement) => {
   const { vertical, scroll, view, fit } = placeOf(list);
   const group = el.closest<HTMLElement>(".viewer-strip__set");
@@ -238,18 +222,12 @@ const centerOn = (list: HTMLElement, el: HTMLElement) => {
   list.scrollTo({ [vertical ? "top" : "left"]: target, behavior: "auto" });
 };
 
-/** Whether all of `el` is inside the strip's visible part. */
 const isInView = (list: HTMLElement, el: HTMLElement) => {
   const { view, fit } = placeOf(list);
   const item = fit(el);
   return item.start >= 0 && item.start + item.size <= view;
 };
 
-/**
- * Bring `el` into view when part of it is off the strip (stepping with the
- * arrow keys past an edge), with a little of the next item showing. An
- * item already in view never moves the strip.
- */
 const reveal = (list: HTMLElement, el: HTMLElement) => {
   const { vertical, scroll, view, fit } = placeOf(list);
   const item = fit(el);
@@ -262,7 +240,6 @@ const reveal = (list: HTMLElement, el: HTMLElement) => {
   list.scrollTo({ [vertical ? "top" : "left"]: target, behavior: "smooth" });
 };
 
-/** "2:14 PM" today, "Yesterday", "Mon" this week, "Nov 7" before. */
 const shortWhen = (ms: number, locale: string): string => {
   const date = new Date(ms);
   const today = new Date();
@@ -288,18 +265,6 @@ const shortWhen = (ms: number, locale: string): string => {
   });
 };
 
-/**
- * One strip for everything the conversation made or opened (photos, videos,
- * audio, documents), oldest first. A rail on the left when the viewer is
- * wide, a row along the bottom when it's narrow. Like the filmstrips in
- * Photos and Lightroom it holds still while you step, and only scrolls when
- * the current item would otherwise be out of sight.
- *
- * What came with one message sits together as a set, in its own soft tray;
- * the tray you're in is a touch stronger, with when it arrived written
- * quietly under it. Every thumbnail has a faint edge, so dark and bright
- * pictures keep their shape.
- */
 export function ViewerStrip({ item }: { item: DisplayTab }) {
   const t = useT();
   const locale = useLocale();
@@ -310,14 +275,10 @@ export function ViewerStrip({ item }: { item: DisplayTab }) {
   const show = index !== -1 && items.length > 1;
   const grouped = sets.length > 1;
 
-  // The file just shown loads before any thumbnail does.
   useLayoutEffect(() => {
     deferStripThumbnails();
   }, [item.id]);
 
-  // Centred once when the strip appears. After that it holds still: a
-  // clicked item is already on screen, and anything else (arrow keys, the
-  // edge arrows, a set jump) only scrolls when the item would be hidden.
   useLayoutEffect(() => {
     const list = listRef.current;
     const current = list?.querySelector<HTMLElement>("[data-current='true']");
@@ -335,9 +296,6 @@ export function ViewerStrip({ item }: { item: DisplayTab }) {
     if (!clicked) reveal(list, current);
   }, [item.id, index, show]);
 
-  // Switching between rail and row re-centres the current item; a resize
-  // that hides it (the viewer's first open settles its height after the
-  // strip has already scrolled) brings it back.
   useEffect(() => {
     const list = listRef.current;
     if (!list || typeof ResizeObserver === "undefined") return;

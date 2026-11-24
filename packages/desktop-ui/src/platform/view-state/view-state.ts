@@ -2,11 +2,6 @@ import { useSyncExternalStore, type Dispatch, type SetStateAction } from "react"
 import { VIEW_STATE_KEY_PREFIX } from "@stella/contracts/ui-state";
 import { uiState } from "@/platform/ui-state";
 
-/**
- * Where the user is: what a reload, a remount, a restart or a crash must put
- * back. Values are JSON, live under `view.` keys in the durable UI state, and
- * are read synchronously on the first render.
- */
 const WRITE_DELAY_MS = 200;
 
 type Listener = () => void;
@@ -66,10 +61,6 @@ export type ViewAtom<T> = {
 
 const atoms = new Map<string, ViewAtom<unknown>>();
 
-/**
- * A value that survives reloads and restarts. `accepts` rejects a stored
- * value written by an older shape of the same key.
- */
 export const viewAtom = <T,>(
   key: string,
   initial: T,
@@ -110,7 +101,6 @@ export const viewAtom = <T,>(
   return atom;
 };
 
-/** `useState` whose value survives reloads and restarts. */
 export const useViewState = <T,>(
   key: string,
   initial: T,
@@ -126,10 +116,6 @@ export const writeViewState = (key: string, value: unknown) => {
   store(key, value);
 };
 
-/**
- * Forget where the user was: a view that cannot be shown, or that belongs to
- * another account, must not be restored again.
- */
 export const discardViewState = () => {
   unwritten.clear();
   parsed.clear();

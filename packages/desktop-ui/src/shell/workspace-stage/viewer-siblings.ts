@@ -15,10 +15,6 @@ import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import type { DisplayTabKind } from "@/features/workspace-display/types";
 
-/**
- * Kinds the strip holds: every file a conversation can produce, in one
- * list, so photos, clips, documents and canvases page through together.
- */
 const STRIP_KINDS: ReadonlySet<DisplayTabKind> = new Set([
   "image",
   "video",
@@ -37,10 +33,6 @@ const STRIP_KINDS: ReadonlySet<DisplayTabKind> = new Set([
 export const hasSiblingStrip = (kind: DisplayTabKind): boolean =>
   STRIP_KINDS.has(kind);
 
-/**
- * The display id the payload opens under (as `payloadToTabSpec` names it),
- * for the kinds the strip shows.
- */
 const stripIdFor = (payload: DisplayTabPayload): string | null => {
   switch (payload.kind) {
     case "media":
@@ -62,24 +54,20 @@ const stripIdFor = (payload: DisplayTabPayload): string | null => {
 
 const EMPTY_MESSAGES: ReadonlyArray<EventRecord> = [];
 
-/** A strip item, and the set (one message's files) it belongs to. */
 export type StripEntry = FileEntry & {
   setKey: string;
   setOrder: number;
   from?: "stella" | "user";
 };
 
-/** Consecutive strip items that came with the same message. */
 export type StripSet = {
   key: string;
   start: number;
-  /** Exclusive. */
   end: number;
   from?: "stella" | "user";
   at: number;
 };
 
-/** Photos, videos, clips and canvases linked anywhere in the conversation. */
 const useConversationStripEntries = (): StripEntry[] => {
   const messages = useContext(
     ChatMessagesContext,
@@ -88,8 +76,6 @@ const useConversationStripEntries = (): StripEntry[] => {
   return useMemo(() => {
     const entries: StripEntry[] = [];
     for (const file of deriveConversationFiles(events)) {
-      // A Drive file opens under its Drive path (as a chat link opens it),
-      // so its strip item is the same item the viewer shows once opened.
       const drive = file.cloudDriveFile;
       if (drive?.stored === false) continue;
       const payload: DisplayTabPayload = drive
@@ -117,7 +103,6 @@ const useConversationStripEntries = (): StripEntry[] => {
 
 const NO_SETS: StripSet[] = [];
 
-/** Runs of items from the same message, in strip order. */
 const setsOf = (items: readonly StripEntry[]): StripSet[] => {
   const sets: StripSet[] = [];
   items.forEach((entry, index) => {
@@ -137,12 +122,6 @@ const setsOf = (items: readonly StripEntry[]): StripSet[] => {
   return sets;
 };
 
-/**
- * Every file in this conversation, whatever its type, plus anything already
- * opened, oldest first, so the strip reads in the order the conversation
- * produced them and → moves forward in time. Files that came with the same
- * message stay together, in the order the message lists them.
- */
 export const useViewerSiblings = (
   itemId: string,
   kind: DisplayTabKind,
@@ -150,7 +129,6 @@ export const useViewerSiblings = (
   items: StripEntry[];
   index: number;
   sets: StripSet[];
-  /** The set holding the current item, or null. */
   set: StripSet | null;
 } => {
   const opened = useFileEntries();
@@ -186,7 +164,6 @@ export const useViewerSiblings = (
   }, [itemId, ordered]);
 };
 
-/** Show `entry` where `fromId` is showing: the viewer, or the active tab. */
 export const showSibling = (fromId: string, entry: FileEntry): void => {
   openDisplayPayloadTab(entry.payload, { activate: false });
   if (fileViewer.getSnapshot().fileId === fromId) {

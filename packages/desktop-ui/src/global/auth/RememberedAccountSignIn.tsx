@@ -71,7 +71,6 @@ function SwitchAccountDialog({
   );
 }
 
-/** Signed out of an account this computer still remembers: go back to it, use another, or carry on without one. */
 export function RememberedAccountSignIn({
   hint,
   account,

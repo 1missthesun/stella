@@ -14,7 +14,6 @@ export const readAccountHint = async (): Promise<AccountHint | null> => {
 export const accountHintChanged = () =>
   window.dispatchEvent(new Event(CHANGED_EVENT));
 
-/** The account last signed in on this computer, if Stella still remembers it; undefined until read. */
 export function useAccountHint(refreshKey?: unknown): AccountHint | null | undefined {
   const [hint, setHint] = useState<AccountHint | null>();
   useEffect(() => {

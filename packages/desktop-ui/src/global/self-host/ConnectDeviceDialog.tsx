@@ -44,7 +44,6 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
       setState({ kind: "failed", error: result.error });
       return;
     }
-    // The QR encoder loads with the dialog rather than with every window.
     const { default: QRCode } = await import("qrcode");
     const qr = await QRCode.toDataURL(result.link, {
       width: 400,

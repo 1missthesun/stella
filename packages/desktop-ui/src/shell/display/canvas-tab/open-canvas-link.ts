@@ -6,12 +6,6 @@ import { openLocalPathOrExplain } from "@/features/chat/lib/open-local-path";
 import { openWebLink } from "@/features/chat/lib/stella-web-links";
 import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
 
-/**
- * Opens a link from inside a canvas the way the same link opens from a chat
- * message: pages in Stella's browser (a new tab on the web), Drive files and
- * canvases in Stella's viewer, files on a computer in the viewer, apps in
- * Apps. A place in the canvas itself is the caller's to scroll to.
- */
 export const openCanvasLink = (link: CanvasLink): void => {
   switch (link.kind) {
     case "web":

@@ -15,10 +15,6 @@ const writeLocal = async (patch: {
   return result?.memoryEnabled === patch.memoryEnabled;
 };
 
-/**
- * Mirrors the account's Memory setting onto this computer. A settled account
- * value is also remembered as the user's choice for when they are signed out.
- */
 export const mirrorCloudMemoryPreferenceLocally = (
   memoryEnabled: boolean,
   options: { settled?: boolean } = {},
@@ -29,11 +25,6 @@ export const mirrorCloudMemoryPreferenceLocally = (
     ),
   );
 
-/**
- * Memory follows the user's last settled choice while the account value is
- * unknown (signed out, offline, or still loading). With no choice yet it is on
- * when signed out, and left as it is when signed in.
- */
 export const restoreLocalMemoryChoice = (
   options: { whenUnknown?: "on" | "keep" } = {},
 ): Promise<boolean> =>

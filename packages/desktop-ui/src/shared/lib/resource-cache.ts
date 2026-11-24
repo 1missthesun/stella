@@ -196,9 +196,7 @@ export function useResourceStore<K extends string, T>(
 
   useEffect(() => {
     if (key === null) return;
-    void store.ensure(key).catch(() => {
-      /* error captured on entry */
-    });
+    void store.ensure(key).catch(() => {});
   }, [key, store]);
 
   const refresh = useCallback(async () => {

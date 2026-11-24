@@ -63,10 +63,6 @@ function PlaceTiles({ onPick }: { onPick: () => void }) {
   );
 }
 
-/**
- * The top bar's + menu: search everything, or open a place as its own tab.
- * Picking a search result or a place closes the menu.
- */
 export function NewTabMenu({ onPick }: { onPick: () => void }) {
   return (
     <div

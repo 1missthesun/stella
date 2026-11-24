@@ -601,11 +601,6 @@ export function useChatScrollManagement({
         sendMotion = null;
       };
 
-      // One motion for a send: the scroll holds still through the sent
-      // bubble's first frames (the list may still show an estimated height for
-      // the new row), then starts on the frame the bubble starts to move and
-      // glides with the follow lerp, aiming at the live end each frame so late
-      // layout lands inside the same motion.
       const stepSend = () => {
         followRaf = 0;
         const motion = sendMotion;
@@ -674,9 +669,6 @@ export function useChatScrollManagement({
 
       followApi.current = { followToEnd, followSend, cancel: stopLoop };
 
-      // Judge "was at the bottom" against the end before this growth: a long
-      // reply can land in one layout, so the distance after it says nothing
-      // about where the reader was.
       let lastSeenEnd = Math.max(0, node.scrollHeight - node.clientHeight);
       const followContentGrowth = () => {
         if (!attached) return;

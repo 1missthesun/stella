@@ -17,7 +17,6 @@ const answer = (choice: FoundViaChoice, close: () => void) => {
   close();
 };
 
-/** "How did you find Stella?" above the composer: one tap answers, ✕ skips. Sent only as an anonymous count. */
 export function FoundViaNotice({
   compact,
   onClose,

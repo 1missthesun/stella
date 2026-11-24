@@ -11,13 +11,6 @@ import {
   useViewerDetailReporter,
 } from "@/shell/workspace-stage/viewer-item-context";
 
-/**
- * The page rail for Word and Slides: slides, or the document's headings.
- * Office previews are HTML, so this lists them by text rather than drawing a
- * thumbnail of each one (which would mean re-rendering the whole file per
- * entry).
- */
-
 type OutlineKind = "presentation" | "document";
 
 const SLIDE_SELECTOR = ".slide-container, [data-slide-index]";
@@ -44,7 +37,6 @@ const scrollContainerOf = (node: Element, doc: Document): Element => {
   return doc.scrollingElement ?? doc.documentElement;
 };
 
-/** Viewport top of a scroll container (0 for the document itself). */
 const viewportTopOf = (container: Element, doc: Document) =>
   container === (doc.scrollingElement ?? doc.documentElement)
     ? 0
@@ -60,7 +52,6 @@ export const parseOfficeOutline = (
     return Array.from(doc.querySelectorAll(SLIDE_SELECTOR))
       .slice(0, MAX_ENTRIES)
       .map((slide, index) => {
-        // Slide previews often lead with their own "Slide N" label.
         const clean = (text: string) =>
           text.replace(/^slide\s+\d+\s*[:.\-–]?\s*/i, "");
         const heading = clean(
@@ -100,7 +91,6 @@ export function OfficeOutlineRail({
 }) {
   const entries = useMemo(() => parseOfficeOutline(html, kind), [html, kind]);
   const [current, setCurrent] = useState(0);
-  // While a jump animates, the scroll position lags behind the target.
   const jumpUntilRef = useRef(0);
   const reportDetail = useViewerDetailReporter();
 
@@ -116,7 +106,6 @@ export function OfficeOutlineRail({
     );
   }, [current, entries, kind, reportDetail]);
 
-  // Follow the frame's scroll so the rail and the composer chip track it.
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame || entries.length < 2) return;
@@ -139,7 +128,6 @@ export function OfficeOutlineRail({
         }
         setCurrent(index);
       };
-      // Previews may scroll an inner element, so listen in the capture phase.
       doc.addEventListener("scroll", onScroll, {
         capture: true,
         passive: true,

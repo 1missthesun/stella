@@ -110,7 +110,6 @@ const subscribe = (listener: () => void): (() => void) => {
 
 const getSnapshot = (): ManualReadAloudState => state;
 
-/** The read-aloud status of `key` right now, outside React. */
 export const manualReadAloudStatus = (key: string): ManualReadAloudStatus =>
   state.key === key ? state.status : "idle";
 

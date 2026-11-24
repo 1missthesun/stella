@@ -3,11 +3,6 @@ import type {
   EventRowViewModel,
 } from "@/features/chat/conversation-row-types";
 
-/**
- * Agent pills (the task cards quoted above a reply when Stella starts,
- * continues or relays an agent, with their connector line). Hidden for now;
- * flipping this back restores them. The rows still carry `agentLabelIds`.
- */
 export const SHOW_AGENT_CARDS = false;
 
 export const shownAgentLabelIds = (row: AssistantRowViewModel): string[] =>

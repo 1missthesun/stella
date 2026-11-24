@@ -50,9 +50,7 @@ const hotContext = (url: string) => {
     invalidate() {
       location.reload();
     },
-    on() {
-      // No server events: updates arrive through `update()`.
-    },
+    on() {},
     register(type: unknown, name: string) {
       RefreshRuntime.register(type, `${id} ${name}`);
     },

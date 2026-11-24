@@ -67,13 +67,6 @@ export interface CreateStellaMarkOptions {
   paused?: boolean;
 
   visibilityGate?: boolean;
-  /**
-   * Upper bound on redraws per second. The loop runs on requestAnimationFrame,
-   * which fires at the display's refresh rate (240Hz on some monitors); every
-   * redraw rewrites SVG geometry and repaints, so an uncapped mark in an
-   * always-visible place (the top bar while tasks run) keeps the renderer's
-   * main thread busy. Defaults to 30 for marks of 48px or less, 60 otherwise.
-   */
   maxFps?: number;
 }
 
@@ -130,28 +123,13 @@ const stepSpring = (s: Spring, w: number, z: number, dt: number) => {
 };
 const SUBSTEP = 1 / 120;
 
-// Frame pacing. A capped mark (30fps on a 60–240Hz display) used to request
-// the next animation frame straight after drawing, wake on the next vsync only
-// to find it too early, sleep on a timer and request again: two or three
-// BeginMainFrames, each a full Blink lifecycle, for every frame it drew. The
-// display's frame interval, learned from back-to-back animation frames and
-// shared by every mark, lets the timer land between the vsync before the
-// target and the target itself, so each drawn frame costs one.
 let vsyncMs = 0;
 const noteVsyncSample = (ms: number) => {
   if (ms >= 3 && ms <= 50) vsyncMs = ms;
 };
 
-// Ambient idle drift (bob, breathing and ring shimmer, with no activity and no
-// blink, pose, gaze, shape or particle in motion) moves the mark's outline at
-// most ~1.85e-5 CSS px per ms per CSS px of mark size. Small marks draw it only
-// as often as it moves AMBIENT_STEP_DEVICE_PX on screen: every frame drawn is
-// still the exact frame for its moment, and the steps between them stay far
-// below anything visible. Blinks, pose changes and any state change wake the
-// mark at full rate on time.
 const AMBIENT_EDGE_SPEED = 2e-5;
 const AMBIENT_STEP_DEVICE_PX = 0.05;
-// Under the loop's 100ms dt clamp, so the animation clock never lags real time.
 const AMBIENT_MAX_INTERVAL_MS = 80;
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -426,7 +404,6 @@ export function createStellaMark(
   const maxFps =
     o.maxFps && o.maxFps > 0 ? o.maxFps : o.size && o.size <= 48 ? 30 : 60;
   const frameIntervalMs = 1000 / maxFps;
-  // Small slack so a 60Hz display still draws every frame at a 60fps cap.
   const FRAME_SLACK_MS = 1.5;
   const id = `sm${++uid}`;
   const reduced =
@@ -441,8 +418,6 @@ export function createStellaMark(
 
   const frameEl = document.createElement("span");
   frameEl.setAttribute("aria-hidden", "true");
-  // Own compositing layer and layout containment: per-frame SVG changes then
-  // repaint only the mark instead of invalidating and repainting the page.
   frameEl.style.cssText =
     "display:block;position:relative;width:100%;contain:layout style;will-change:transform";
   if (o.size) {
@@ -951,18 +926,14 @@ export function createStellaMark(
     return workRing;
   }
 
-  // Ask for the frame at the first vsync at least `remainingMs` after `now`
-  // (an animation-frame timestamp unless `inFrame` is false).
   function requestNext(now: number, remainingMs: number, inFrame = true) {
     const p = vsyncMs;
     const vsyncs = p > 0 ? Math.ceil(remainingMs / p - 0.02) : 1;
     if (vsyncs <= 1) {
-      // Back-to-back frames also teach the shared vsync estimate.
       chainedAt = inFrame ? now : 0;
       raf = requestAnimationFrame(frame);
       return;
     }
-    // Wake mid-way between the vsync before the target and the target.
     const delay = (vsyncs - 0.5) * p - (performance.now() - now);
     raf = 0;
     chainedAt = 0;
@@ -975,7 +946,6 @@ export function createStellaMark(
   function ambientIntervalMs(): number {
     const dpr =
       (typeof window !== "undefined" && window.devicePixelRatio) || 1;
-    // The glow's slow pulse moves its (soft) edge about twice as fast.
     const speed = AMBIENT_EDGE_SPEED * (glowEl ? 2 : 1);
     return Math.min(
       AMBIENT_MAX_INTERVAL_MS,
@@ -1028,8 +998,6 @@ export function createStellaMark(
     } else {
       const sub = Math.max(1, Math.ceil(dt / SUBSTEP)),
         h = dt / sub;
-      // Ambient targets follow the clock per substep, so the motion is the
-      // same whatever rate the mark draws at.
       for (let i = 0; i < sub; i++) {
         if (!paused) setAmbientTargets(t - dt * 1000 + (i + 1) * h * 1000);
         stepSpring(env, ENV_W, ENV_Z, h);
@@ -1289,8 +1257,6 @@ export function createStellaMark(
       raf = 0;
       return;
     }
-    // Only the ambient drift is moving: draw it at the rate it visibly moves,
-    // and be back on time for the next blink or pose change.
     const ambient =
       settled &&
       !reduced &&
@@ -1389,8 +1355,6 @@ export function createStellaMark(
   function wake() {
     if (destroyed || (suspended() && painted)) return;
     if (running) {
-      // Sleeping through ambient drift: something changed, so draw it at the
-      // normal rate from the last frame on, as when the loop is awake.
       const normalGap = frameIntervalMs - FRAME_SLACK_MS;
       if (gapMs > normalGap) {
         gapMs = normalGap;

@@ -1,13 +1,3 @@
-/**
- * Client-side device capability checks for scaling back GPU/CPU-heavy decorative
- * effects (blur entrances, infinite marketing-style loops, backdrop-filter glass)
- * on low-end machines.
- *
- * The inline `stella-boot.js` script mirrors `isLowPowerDevice()` so
- * `html[data-low-power]` is present before first paint; this module is the
- * TypeScript source of truth for components that need the same signal later.
- */
-
 let cachedLowPower: boolean | undefined;
 
 const hasForcedLowPowerFlag = (): boolean => {

@@ -23,7 +23,6 @@
     opacity 0.15s ease;
 }
 
-/* Re-assert against the shared <Button> primitive's data-component styles. */
 .pill-btn[data-component="button"] {
   padding: 5px 12px;
   border: 1px solid var(--border);

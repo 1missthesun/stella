@@ -118,7 +118,6 @@ export const ComposerNotice = ({
       <div className="composer-notice__body">
         <p className="composer-notice__title">{notice.title}</p>
         {inline ? (
-          // Usage-limit card: reset text on the left, Resume on the same row.
           <div className="composer-notice__row">
             <p className="composer-notice__sub">{notice.description ?? ""}</p>
             {actions}

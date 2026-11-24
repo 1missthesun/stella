@@ -200,7 +200,6 @@
   color: var(--text-strong);
 }
 
-/* Just under the bell, clear of the chat and the composer. */
 .notification-toast {
   position: fixed;
   top: calc(var(--shell-topbar-height, 38px) + 4px);

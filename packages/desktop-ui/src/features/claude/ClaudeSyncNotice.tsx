@@ -27,9 +27,7 @@ const readSeen = (userId: string): boolean => {
 const writeSeen = (userId: string) => {
   try {
     window.localStorage.setItem(seenKey(userId), "1");
-  } catch {
-    // Storage unavailable: it may show once more.
-  }
+  } catch {}
 };
 
 export function useClaudeSyncNotice() {

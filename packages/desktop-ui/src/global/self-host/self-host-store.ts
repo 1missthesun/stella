@@ -45,9 +45,7 @@ const loadServerState = () => {
     try {
       serverState = await api.getState();
       emit();
-    } catch {
-      // Older main process: no server switching.
-    }
+    } catch {}
   })();
 };
 

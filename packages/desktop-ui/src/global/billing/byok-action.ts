@@ -1,6 +1,5 @@
 export const OPEN_MODEL_PICKER_EVENT = 'stella:open-model-picker'
 
-/** Opens Models; with `provider` (a provider key) that provider's group opens expanded. */
 export const openModelPickerAt = (provider?: string): void => {
   if (typeof window === 'undefined') return
   window.dispatchEvent(

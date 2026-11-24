@@ -58,7 +58,6 @@ const boundsKey = (layout: BrowserViewLayout) =>
   `${layout.pageBounds.x},${layout.pageBounds.y},${layout.pageBounds.width},${layout.pageBounds.height}|` +
   `${layout.surfaceBounds.x},${layout.surfaceBounds.y},${layout.surfaceBounds.width},${layout.surfaceBounds.height}`;
 
-/* The browser fills a stage tab; nothing HTML sits over its page. */
 const browserPageBounds = (rect: DOMRect): BrowserViewBounds => toBounds(rect);
 
 const normalizeAddress = (raw: string): string | null => {
@@ -329,7 +328,6 @@ export function BrowserSection() {
   const chat = useChatRuntime();
   const activeSection = useActiveSidebarSection();
   const panelOpen = useDisplayPanelOpen();
-  // An expanded file sits over the stage; the native view would draw on top.
   const fileStageOpen = useFileViewerStageOpen();
   const visible = panelOpen && activeSection === "browser" && !fileStageOpen;
   const [state, setState] = useState<BrowserViewState>(EMPTY_STATE);

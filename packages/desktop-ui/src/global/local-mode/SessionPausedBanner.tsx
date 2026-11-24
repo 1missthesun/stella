@@ -6,7 +6,6 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 import { accountLabel } from "@/global/auth/hooks/use-account-hint";
 import "./local-mode.css";
 
-/** The account's session ended on its own: its chat stays, and signing back in continues it. */
 export function SessionPausedBanner() {
   const t = useT();
   const { storageMode } = useChatStore();

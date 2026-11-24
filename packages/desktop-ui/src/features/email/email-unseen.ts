@@ -3,8 +3,6 @@ import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { useEmailFeature } from "./email-feature";
 
-// When the Email page was last looked at on this computer. What Stella put
-// under "Needs you" after it is unseen and badges the Email entry.
 const KEY = "stella.email.seenAt";
 const listeners = new Set<() => void>();
 
@@ -29,17 +27,14 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** The Email page while Email runs here and the user is signed in. */
 export function useEmailPageView() {
   const { hasConnectedAccount } = useAuthSessionState();
   const on = useEmailFeature();
   return useBackendView("email.page", hasConnectedAccount && on ? {} : "skip");
 }
 
-/** When the Email page was last looked at on this computer. */
 export const useEmailSeenAt = (): number => useSyncExternalStore(subscribe, () => seenAt);
 
-/** Items that need the user and changed since the Email page was last open. */
 export function useEmailUnseenCount(): number {
   const items = useEmailPageView().value?.page.items;
   const seen = useEmailSeenAt();

@@ -72,11 +72,6 @@ export const openUrlInStellaBrowser = async (
   return true;
 };
 
-/**
- * Opens a web page the way a link in a chat message does: a shared canvas in
- * Stella's viewer, any other page in Stella's browser on the desktop (the
- * system browser when that fails), a new tab on the web.
- */
 export const openWebLink = (value: string): void => {
   const url = normalizedHttpUrl(value);
   if (!url || maybeHandleCanvasShareUrl(url)) return;

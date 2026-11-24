@@ -46,15 +46,11 @@ async function clearLocalAccountState() {
 
   try {
     localStorage.clear();
-  } catch {
-    /* best-effort local cleanup */
-  }
+  } catch {}
 
   try {
     sessionStorage.clear();
-  } catch {
-    /* best-effort local cleanup */
-  }
+  } catch {}
 
   if (
     typeof indexedDB !== "undefined" &&
@@ -68,9 +64,7 @@ async function clearLocalAccountState() {
           (name): name is string => typeof name === "string" && name.length > 0,
         );
       await Promise.all(names.map(deleteIndexedDatabase));
-    } catch {
-      /* best-effort local cleanup */
-    }
+    } catch {}
   }
 
   if (typeof caches !== "undefined") {
@@ -79,9 +73,7 @@ async function clearLocalAccountState() {
       await Promise.all(
         cacheNames.map((cacheName) => caches.delete(cacheName)),
       );
-    } catch {
-      /* best-effort local cleanup */
-    }
+    } catch {}
   }
 
   await window.electronAPI?.ui.hardReset?.();

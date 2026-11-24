@@ -392,7 +392,6 @@ function ScheduleItem({
         ],
         [
           {
-            // Arms the row's own confirm, as clicking its bin does.
             label: t("schedule.delete"),
             enabled: !busy,
             run: () => setConfirmDelete(true),
@@ -470,7 +469,6 @@ function ScheduleItem({
 export function ScheduleSection({ active }: { active: boolean }) {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
-  // Signed out, the desktop still has this computer's own schedules.
   const desktop = Boolean(window.electronAPI?.schedule);
   const { jobs, api } = useAllSchedules(hasConnectedAccount || desktop);
   const [editing, setEditing] = useState<string | null>(null);
@@ -483,8 +481,6 @@ export function ScheduleSection({ active }: { active: boolean }) {
     return () => window.clearInterval(timer);
   }, [active, jobs]);
   const { running, paused } = useMemo(() => {
-    // This computer's scheduler keeps a one-time schedule after it ran (turned
-    // off); like a finished cloud one, it is done, not paused.
     const list = (jobs ?? []).filter(
       (job) =>
         !(

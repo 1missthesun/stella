@@ -46,9 +46,7 @@ const storeTarget = (target: DesktopExecutionTarget): void => {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(target));
-  } catch {
-    // localStorage can throw in restricted contexts.
-  }
+  } catch {}
 };
 
 const shareSelectedDevice = (target: DesktopExecutionTarget): void => {

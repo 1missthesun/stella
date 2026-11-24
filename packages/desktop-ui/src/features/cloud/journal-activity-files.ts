@@ -69,9 +69,6 @@ const withoutSandboxFileFields = (
   details: Record<string, unknown> | null,
 ): Record<string, unknown> | null => {
   if (!details) return null;
-  // `fileChanges` / `producedFiles` are legacy fields written by pre-v2
-  // attached-tool daemons; the live protocol no longer carries them, but
-  // historical journal rows still do, so keep stripping them from display.
   const {
     filePath: _filePath,
     fileChanges: _fileChanges,
@@ -164,12 +161,6 @@ export const journalRecordsToCloudFileEvents = (
 const logicalEventKey = (event: EventRecord): string | null =>
   event.requestId ? `${event.type}\u001f${event.requestId}` : null;
 
-/**
- * SQLite is only a delivery/recovery overlay for cloud conversations. Ten
- * minutes is deliberately much longer than the normal journal append path,
- * while still ensuring a pre-cloud desktop cache cannot become permanent
- * Activity or Files history that browser/mobile never see.
- */
 export const LOCAL_CLOUD_EVENT_OVERLAY_TTL_MS = 10 * 60_000;
 const LOCAL_CLOUD_EVENT_MAX_FUTURE_SKEW_MS = 60_000;
 
@@ -201,12 +192,6 @@ export const nextLocalCloudEventOverlayExpiry = (
   return next;
 };
 
-/**
- * Canonical rows replace their matching device-cache event. Local-only rows
- * remain only as a short-lived operational overlay until the journal
- * acknowledgement arrives. Unmatched rows from pre-cloud desktop builds age
- * out instead of becoming a second durable history authority.
- */
 export const mergeCanonicalCloudEventsWithLocalOverlay = (
   canonical: readonly EventRecord[],
   local: readonly EventRecord[],

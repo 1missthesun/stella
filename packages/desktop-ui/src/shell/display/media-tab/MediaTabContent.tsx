@@ -46,10 +46,6 @@ const wheelGesture: {
   idleTimer: ReturnType<typeof setTimeout> | null;
 } = { travel: 0, fired: false, idleTimer: null };
 
-/**
- * In the file viewer the header carries the item's actions (Download, Share,
- * and Copy / Delete in its menu); this hands it the media-specific ones.
- */
 const useViewerMediaActions = (item: MediaTabItem, onDelete: () => void) => {
   const imagePath =
     item.asset.kind === "image" ? (item.asset.filePaths[0] ?? null) : null;
@@ -92,10 +88,6 @@ const localImageOf = (entry: FileEntry | null): string | null => {
   return payload.asset.kind === "image" ? (payload.asset.filePaths[0] ?? null) : null;
 };
 
-/**
- * Once the picture on screen has had its moment, read the pictures either
- * side of it and decode them, so stepping to them is immediate.
- */
 const usePrefetchNeighbours = (
   previous: FileEntry | null,
   next: FileEntry | null,
@@ -194,7 +186,6 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
   usePrefetchNeighbours(neighbours.previous, neighbours.next, inViewer);
 
   if (inViewer) {
-    // The viewer's header holds the actions, so the media gets the space.
     return (
       <div className="media-tab media-tab--viewer">
         <div

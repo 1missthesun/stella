@@ -13,12 +13,6 @@ const ipcErrorMessage = (caught: unknown): string =>
   );
 
 export type OpenLocalPathOptions = {
-  /**
-   * The link came from a document rather than from Stella (a link inside a
-   * canvas). A file Stella can't show is then revealed in its folder instead
-   * of being opened with its default app, so a document can never launch a
-   * program or script with one click.
-   */
   fromDocument?: boolean;
 };
 

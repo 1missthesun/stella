@@ -17,9 +17,7 @@ const readHandedOver = (): Record<string, unknown> | null => {
       const age = Date.now() - handoff.at;
       if (age >= 0 && age < HANDOFF_TTL_MS) handedOver = handoff.values;
     }
-  } catch {
-    // Nothing handed over.
-  }
+  } catch {}
   return handedOver;
 };
 
@@ -27,9 +25,7 @@ export const recallHandoff = <T>(key: string): T | undefined => {
   try {
     const raw = window.sessionStorage.getItem(`${SESSION_PREFIX}${key}`);
     if (raw) return JSON.parse(raw) as T;
-  } catch {
-    // Fall through to the handoff.
-  }
+  } catch {}
   return readHandedOver()?.[key] as T | undefined;
 };
 
@@ -37,9 +33,7 @@ export const rememberForHandoff = (key: string, value: unknown): void => {
   remembered.set(key, value);
   try {
     window.sessionStorage.setItem(`${SESSION_PREFIX}${key}`, JSON.stringify(value));
-  } catch {
-    // Without it a reload just waits for the answer.
-  }
+  } catch {}
 };
 
 const handOver = () => {
@@ -49,9 +43,7 @@ const handOver = () => {
       HANDOFF_KEY,
       JSON.stringify({ at: Date.now(), values: Object.fromEntries(remembered) }),
     );
-  } catch {
-    // The next window just waits for the answers.
-  }
+  } catch {}
 };
 
 if (typeof window !== "undefined") {

@@ -52,7 +52,6 @@
   opacity: 1;
 }
 
-/* Without a hovering pointer (touch), the actions are always shown. */
 @media (hover: none) {
   .schedule-section__actions {
     opacity: 1;
@@ -93,8 +92,6 @@
   color: var(--destructive, var(--text-strong));
 }
 
-/* "Delete?" grows to the left over Pause and Edit, which step aside while
-   the bin waits for its second click; the bin itself never moves. */
 .schedule-section__confirm-label {
   position: absolute;
   top: 0;

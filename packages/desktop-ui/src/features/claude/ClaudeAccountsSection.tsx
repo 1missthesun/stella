@@ -66,7 +66,6 @@ type PlaceView = {
   ownLoginEmail?: string;
   missingChosen: boolean;
   reported: boolean;
-  /** The login in use there ends soon, or has ended. */
   loginEnd?: { state: "ending" | "ended"; endsAt?: number; email?: string };
 };
 
@@ -157,7 +156,6 @@ export function ClaudeAccountsSection({
 
   const startLogin = (target: ClaudeLoginTarget) => void login.start(target);
   const canSignInHere = local.available && local.cliInstalled;
-  // Claude Code isn't on this computer: install it here, then sign in.
   const install = useClaudeInstallThenSignIn({
     reload: reloadLocal,
     signIn: () => void login.start({ place: "local", configId: "default" }),

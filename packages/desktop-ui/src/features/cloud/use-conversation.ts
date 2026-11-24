@@ -263,9 +263,7 @@ const reportRenderedAcceptanceAuthority = (
     .then(([authorityHash, ownerGenerationSha256]) => {
       hook({ authoritySha256: authorityHash, ownerGenerationSha256 });
     })
-    .catch(() => {
-      // Acceptance instrumentation must never change product behavior.
-    });
+    .catch(() => {});
 };
 
 const imagePathsOf = (attachments: readonly CloudAttachment[]): string[] =>
@@ -280,10 +278,6 @@ const imagePathsOf = (attachments: readonly CloudAttachment[]): string[] =>
 
 const admissionTails = new Map<string, Promise<void>>();
 
-/**
- * Turns are admitted in the order they were sent, so a message waiting on its
- * uploads holds back the ones sent after it instead of being overtaken.
- */
 const admissionOrder = (authorityKey: string) => {
   const previous = admissionTails.get(authorityKey) ?? Promise.resolve();
   let release!: () => void;
@@ -513,9 +507,7 @@ export const useConversation = (
               );
           try {
             renderedAcceptanceOutcome(Object.freeze(receipt));
-          } catch {
-            // Acceptance instrumentation must never change product behavior.
-          }
+          } catch {}
         }
         if (!mutationOutcome.accepted) throw mutationOutcome.error;
         const result = mutationOutcome.result;
@@ -767,7 +759,6 @@ export const useConversation = (
           return false;
         }
       }
-      // Compatibility for a turn created before browser placement shipped.
       return store?.cancelTurn(turnId) ?? false;
     },
     [config.httpOrigin, state.records, store],

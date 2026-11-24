@@ -12,14 +12,8 @@ import type { ConnectPlanNoticeState, ConnectPlanReason } from "./connect-plan-t
 
 export type { ConnectPlanNoticeState, ConnectPlanReason } from "./connect-plan-types";
 
-/** Off until the owner gives an explicit go-ahead; see `@stella/contracts/connect-plan-offer`. */
 export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_ENABLED;
 
-/**
- * The web chat runs in the cloud, where a Free account can only run on a
- * ChatGPT plan: cloud Claude needs a paid plan (and stops with the free
- * usage), and API keys live on a computer.
- */
 export const connectPlanChatGptOnly = (): boolean => isWebsiteHost();
 
 export const connectPlanCopy = (
@@ -46,7 +40,6 @@ export const connectPlanCopy = (
 
 export const openPlans = (): void => planUsageDialog.openPlans();
 
-/** Where connecting lives when the card can't show: the Models picker, or Settings → Claude and ChatGPT on the web. */
 export const openEngineConnectFallback = (): void => {
   if (typeof window === "undefined") return;
   if (connectPlanChatGptOnly()) {
@@ -58,16 +51,10 @@ export const openEngineConnectFallback = (): void => {
 
 export type OpenConnectPlanInput = ConnectPlanNoticeState & {
   conversationId: string | null;
-  /** Override the reason's own wording (e.g. the no-engine card's). */
   title?: string;
   description?: string;
 };
 
-/**
- * Show the connect-your-plan card above the composer (it works in an empty
- * chat too). Connecting there switches Stella to that plan and then runs
- * `resend`. Where no chat is on screen it falls back to a toast.
- */
 export const openConnectPlan = (input: OpenConnectPlanInput): void => {
   const copy = connectPlanCopy(input.reason);
   const title = input.title ?? copy.title;
@@ -99,11 +86,6 @@ export const openConnectPlan = (input: OpenConnectPlanInput): void => {
   );
 };
 
-/**
- * The free usage ran out: show the connect-your-plan card instead of the
- * plain plan notice. False (and nothing shown) while the switch is off or
- * the error is about something else.
- */
 export const presentAllowanceConnectPlan = (
   reason: string | null | undefined,
   conversationId: string | null,

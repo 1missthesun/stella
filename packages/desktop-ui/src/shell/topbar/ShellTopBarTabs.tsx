@@ -35,11 +35,6 @@ import {
 import { useEmailUnseenCount } from "@/features/email/email-unseen";
 import "./shell-topbar-tabs.css";
 
-/**
- * Chrome-style tabs in the top bar: Chat first, then everything that lasts
- * (browser, apps, canvases, Home and its places, sign-in). The active tab
- * fills the stage over the chat; Chat puts the stage away.
- */
 export function ShellTopBarTabs() {
   const tabs = useSidebarOpenTabs();
   const activeTabId = useSidebarActiveTabId();
@@ -73,15 +68,9 @@ export function ShellTopBarTabs() {
     strip
       .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    // The browser does not know the pinned Chat tab covers the strip's
-    // start, so a tab scrolled under it still counts as in view.
     revealOpenTab(strip);
   }, [activeTabId, panelOpen]);
 
-  // Fade a tab's title only when it is actually cut off, and note how far
-  // the tabs have been narrowed (the close button moves; see the CSS).
-  // Chat gives up its name first: it goes to its icon alone whenever the
-  // other tabs would otherwise be narrowed past their titles.
   useEffect(() => {
     const strip = stripRef.current;
     if (!strip) return;
@@ -108,8 +97,6 @@ export function ShellTopBarTabs() {
     };
     const observer = new ResizeObserver(mark);
     observer.observe(strip);
-    // The strip sizes to its tabs while they fit, so watch the bar's side
-    // that gives it room too.
     const side = strip.closest<HTMLElement>(".shell-topbar-full__left");
     if (side) observer.observe(side);
     for (const tab of strip.children) observer.observe(tab);
@@ -122,7 +109,6 @@ export function ShellTopBarTabs() {
     if (!onChatRoute) void navigate({ to: "/chat" });
   };
 
-  // ⌘T opens the + menu, ⌘1 Chat, ⌘2–9 the tabs after it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
@@ -280,7 +266,6 @@ export function ShellTopBarTabs() {
           sideOffset={8}
           collisionPadding={12}
           onOpenAutoFocus={(event) => {
-            // The search field focuses itself once search opens.
             event.preventDefault();
             displaySearchStore.open();
           }}
@@ -292,14 +277,11 @@ export function ShellTopBarTabs() {
   );
 }
 
-/** Pinned Chat with its name, and the room around the strip (see the CSS). */
 const CHAT_FULL_GAP = 6;
 const TAB_GAP = 2;
 const TAB_MAX = 152;
 const TAB_TIGHT = 104;
-/** Icon, its gap and the leading padding of a tab with a title. */
 const TAB_LEAD = 10 + 18 + 6;
-/** Room kept after the title: for the close button, or less once tight. */
 const TAB_TRAIL = 26;
 const TAB_TRAIL_TIGHT = 10;
 
@@ -316,12 +298,6 @@ function labelRoom(width: number): number {
   return width - TAB_LEAD - (width < TAB_TIGHT ? TAB_TRAIL_TIGHT : TAB_TRAIL);
 }
 
-/**
- * Whether the tabs would be narrowed past their titles (or scroll) with
- * Chat showing its name. Worked out from the room the bar gives the strip,
- * not from the tabs as they stand, so Chat does not flip back and forth as
- * its own width changes.
- */
 function chatNeedsRoom(strip: HTMLElement): boolean {
   const chat = strip.querySelector<HTMLElement>(".topbar-tabs__tab--chat");
   const tabs = [
@@ -347,7 +323,6 @@ function chatNeedsRoom(strip: HTMLElement): boolean {
     if (child === strip) continue;
     room -= (child as HTMLElement).offsetWidth + holderGap;
   }
-  // The strip's trailing padding, less what its negative margin gives back.
   const stripStyle = getComputedStyle(strip);
   room -=
     parseFloat(stripStyle.paddingRight) + parseFloat(stripStyle.marginRight);
@@ -367,7 +342,6 @@ function chatNeedsRoom(strip: HTMLElement): boolean {
     const title = tab.querySelector<HTMLElement>(".topbar-tabs__label")
       ?.textContent;
     if (!title) return false;
-    // A title too long even for a full-width tab only asks for that width.
     const wanted = Math.min(textWidth(title, font), labelRoom(TAB_MAX));
     return wanted > fits + 0.5;
   });

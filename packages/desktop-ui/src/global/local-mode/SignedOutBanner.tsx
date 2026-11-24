@@ -16,7 +16,6 @@ const subscribe = (listener: () => void) => {
 };
 const isDismissed = () => uiState.getItem(DISMISSED_KEY) === "1";
 
-/** Signed out, chats stay on this computer; this says what an account would add. */
 export function SignedOutBanner() {
   const t = useT();
   const localMode = useChatStorageMode() === "local";

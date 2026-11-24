@@ -1,10 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { SafeguardAction, SafeguardNotice } from "@stella/contracts/safeguard-block";
 
-/** What the chat's safety-block card shows; it sits in the message list where the stopped reply would be. */
 export type SafeguardCardState = {
   notice: SafeguardNotice;
-  /** The choice being applied. */
   pending?: SafeguardAction;
   problem?: string;
   choose(action: SafeguardAction): void;
@@ -33,11 +31,6 @@ export const useSafeguardCard = (conversationId: string | null | undefined): Saf
   return conversationId ? (snapshot.get(conversationId) ?? null) : null;
 };
 
-/**
- * Shows the chat's unresolved safety block, or clears the card when there is
- * none. `resolve` applies a choice; the card stays until the chat reports the
- * block gone.
- */
 export const presentSafeguardBlock = (
   conversationId: string,
   notice: SafeguardNotice | null,

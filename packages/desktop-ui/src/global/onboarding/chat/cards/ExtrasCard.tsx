@@ -111,12 +111,10 @@ function useGmailConnect(enabled: boolean) {
 type ExtrasCardProps = {
   active: boolean;
   answered: OnboardingChatAnswer | undefined;
-  /** Gmail is offered only with a Stella account, where its connector lives. */
   canConnectGmail: boolean;
   onAnswer: (answer: OnboardingChatAnswer) => void;
 };
 
-/** The last setup step: optional Gmail, browser extension and (on macOS) permissions, then into the chat. */
 export function ExtrasCard({ active, answered, canConnectGmail, onAnswer }: ExtrasCardProps) {
   const t = useT();
   const isMac = getPlatform() === "darwin";

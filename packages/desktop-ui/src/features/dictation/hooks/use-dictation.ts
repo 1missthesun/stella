@@ -33,7 +33,6 @@ import { useT } from "@/shared/i18n";
 
 export const DICTATION_TOGGLE_EVENT = "stella:dictation-toggle";
 
-/** Every composer that can dictate; a shortcut is for exactly one of them. */
 type DictationSurface = {
   isActive: () => boolean;
   canStart: () => boolean;
@@ -77,13 +76,11 @@ interface UseDictationOptions {
   onTranscriptCommitted?: () => void;
   onCommit?: () => void;
   commitOnShortcutStop?: boolean;
-  /** The composer, to tell which one a shortcut is for. */
   surfaceRef?: RefObject<HTMLElement | null>;
 }
 
 interface UseDictationResult {
   prewarm: () => void;
-  /** The microphone button is going down: its click will start dictation. */
   arm: (event: { button: number }) => void;
   isRecording: boolean;
   isRecordingVisible: boolean;
@@ -221,8 +218,6 @@ export const useDictation = ({
       const cached = cachedDictationRoute();
       let route: Promise<DictationRoute>;
       if (cached === "needs-key") {
-        // Nothing could transcribe last time, so the microphone stays off
-        // until something can.
         const pending = { stopRequested: false };
         pendingStartRef.current = pending;
         setState("starting");
@@ -367,7 +362,6 @@ export const useDictation = ({
     const settle = () => {
       window.removeEventListener("pointerup", settle, true);
       window.removeEventListener("pointercancel", settle, true);
-      // The click that follows a release on the button comes first.
       setTimeout(() => {
         if (armedRef.current !== captureId) return;
         armedRef.current = null;

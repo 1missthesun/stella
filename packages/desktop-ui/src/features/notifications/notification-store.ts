@@ -14,23 +14,19 @@ export type NotificationAction = {
   label: string;
   primary?: boolean;
   disabled?: boolean;
-  /** The notification stays after this action (its source withdraws it when done). */
   keep?: boolean;
   run: () => void | Promise<unknown>;
 };
 
 export type NotificationInput = {
-  /** Stable: the same id updates in place and never toasts twice. */
   id: string;
   kind: NotificationKind;
   title: string;
   detail?: string;
   createdAt?: number;
-  /** An action of this notification is under way (e.g. "Adding…"). */
   busy?: boolean;
   busyLabel?: string;
   actions?: NotificationAction[];
-  /** Default true: a new notification first shows as a toast under the bell. */
   toast?: boolean;
   onDismiss?: () => void;
 };
@@ -140,13 +136,11 @@ const remove = (id: string): AppNotification | undefined => {
   return item;
 };
 
-/** Show a notification now (an event). A dismissed id shows again when notified again. */
 export const notify = (input: NotificationInput): void => {
   forget("dismissed", input.id);
   upsert(input, null);
 };
 
-/** Take a notification away without the person dismissing it (it was dealt with elsewhere). */
 export const withdrawNotification = (id: string): void => {
   remove(id);
 };
@@ -209,7 +203,6 @@ export const useNotificationToast = (): AppNotification | null =>
 export const useNotificationPanelOpen = (): boolean =>
   useSyncExternalStore(subscribe, () => state.panelOpen);
 
-/** How many notifications the person hasn't seen in the panel yet. */
 export const useUnseenNotificationCount = (): number =>
   useSyncExternalStore(subscribe, () => {
     if (state.items.length === 0) return 0;
@@ -220,11 +213,6 @@ export const useUnseenNotificationCount = (): number =>
 const sourceIds = (source: string) =>
   state.items.filter((item) => item.source === source).map((item) => item.id);
 
-/**
- * Keep the notifications of one source equal to `items`, a list derived from
- * live state: new ones appear (once; a dismissed id stays dismissed), changed
- * ones update, and ones no longer listed are withdrawn.
- */
 export const syncNotificationSource = (source: string, items: readonly NotificationInput[]): void => {
   const wanted = new Set<string>();
   for (const item of items) {

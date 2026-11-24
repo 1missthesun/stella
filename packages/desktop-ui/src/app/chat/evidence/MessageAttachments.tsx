@@ -39,7 +39,6 @@ const useOnscreenTiles = (
           return changed ? next : previous;
         });
       },
-      // A wrapped grid scrolls with the chat, so it watches the viewport instead of the row.
       { root: wrapped ? null : row, rootMargin: "200px" },
     );
     for (const tile of row.querySelectorAll<HTMLElement>("[data-evidence-tile]")) {
@@ -99,7 +98,6 @@ const useRowWidth = (
   return width;
 };
 
-// Expanded grids stay bounded; past this many tiles a "Show all" step reveals the rest.
 const EXPANDED_TILE_CAP = 48;
 
 const REMEMBERED_EXPANSIONS = 200;
@@ -158,9 +156,7 @@ export const MessageAttachments = ({
   filePaths: string[];
   part: "media" | "documents";
   driveCards?: readonly EvidenceCard[];
-  /** Identifies the message, so a manual expand/collapse sticks to it. */
   expansionKey?: string;
-  /** The latest message with media opens expanded; older ones start as one row. */
   expandedByDefault?: boolean;
 }) => {
   const t = useT();

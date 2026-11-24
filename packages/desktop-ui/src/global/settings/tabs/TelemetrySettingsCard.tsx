@@ -26,9 +26,7 @@ export function TelemetrySettingsCard() {
         const local =
           await window.electronAPI?.system?.getTelemetryEnabled?.();
         if (!cancelled && local) setEnabled(local.enabled);
-      } catch {
-        // The account value below still applies when signed in.
-      } finally {
+      } catch {} finally {
         if (!cancelled) setLoaded(true);
       }
     })();

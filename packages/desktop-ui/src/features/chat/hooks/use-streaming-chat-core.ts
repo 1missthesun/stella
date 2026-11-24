@@ -46,7 +46,6 @@ export const buildContextMessageMetadata = (
   const appSelectionLabels = getComposerAppSelections(chatContext)
     .map((selection) => selection.label?.trim() ?? "")
     .filter((label) => label.length > 0);
-  // Joined singular kept for legacy single-slot consumers.
   const appSelectionLabel =
     appSelectionLabels.length > 0 ? appSelectionLabels.join(", ") : undefined;
   const activityLabel = chatContext?.activity?.label?.trim();
@@ -81,9 +80,6 @@ export const buildContextMessageMetadata = (
   };
 };
 
-// Mirrors the runtime's persisted user_message text (the trimmed prompt only;
-// quoted text travels in metadata), so the pending bubble matches the
-// confirmed one, including image-only sends with no text.
 const visibleUserMessageText = (userPrompt: string): string => userPrompt.trim();
 
 const buildOptimisticUserEvent = (args: {
@@ -224,8 +220,6 @@ export function useStreamingChatCore({
     async () => false,
   );
 
-  // A first message that waited for a sign-in or an engine goes out as soon
-  // as one arrives.
   const { hasConnectedAccount } = useAuthSessionState();
   const signedInRef = useRef(hasConnectedAccount);
   useEffect(() => {
@@ -336,8 +330,6 @@ export function useStreamingChatCore({
             conversationId: resolvedConversationId,
             retry: () => sendMessageRef.current(sent),
           });
-          // Signed in here, but the runtime hasn't taken the sign-in yet
-          // (Stella just started): nothing else will send it again.
           if (signedInRef.current) void retryHeldSend({ attempts: 8, spacingMs: 1500 });
         } else {
           clearHeldSend();

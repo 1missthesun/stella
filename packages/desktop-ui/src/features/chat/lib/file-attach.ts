@@ -30,11 +30,6 @@ const ATTACHMENT_IMAGE_MIME_TYPES: ReadonlySet<string> = new Set([
   "image/svg+xml",
 ]);
 
-/**
- * Files with a path on this computer attach by reference at any size. Only
- * files without one (pasted or dragged from another app) are read into memory,
- * and the runtime accepts at most this much inline.
- */
 const IN_MEMORY_ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
 
 type SetChatContext = Dispatch<SetStateAction<ChatContext | null>>;

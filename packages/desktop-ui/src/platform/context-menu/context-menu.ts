@@ -4,18 +4,6 @@ import type {
   ContextMenuWireItem,
 } from "@stella/contracts/desktop/context-menu";
 
-/**
- * Right-click menus. Anything can add to the menu of a right-click on it:
- *
- *   <div onContextMenu={contextMenu(() => [[{ label, run }]])}>
- *
- * Handlers add their groups as the event bubbles (innermost first) and never
- * stop it, so a file inside a message offers the file's actions, then the
- * message's. `registerContextMenu` adds a group wherever its builder finds
- * something to act on (links, code blocks, selected text). Electron main
- * draws the native menu and adds spelling and cut/copy/paste itself.
- */
-
 export type MenuAction = {
   label: string;
   run: () => void | Promise<unknown>;
@@ -31,11 +19,9 @@ export type MenuItem =
 export type MenuSection = MenuItem[];
 
 export type MenuContext = {
-  /** The element right-clicked (or focused, from the keyboard). */
   target: Element;
   selectionText: string;
   isEditable: boolean;
-  /** Kinds an inner handler already covered: `link`, `image`, `code`… */
   claimed: ReadonlySet<string>;
 };
 
@@ -60,21 +46,13 @@ type GlobalBuilder = {
   slot: "selection" | "sections";
 };
 
-/**
- * Everything the menus keep between a right-click and the pick, held once
- * per page. A warm swap can load a second copy of this module into the same
- * page; both copies share this, so menus never answer or act twice.
- */
 type MenuState = {
   capture: Capture | null;
-  /** What was selected just before the latest right mouse press. */
   selectedBeforePress: string | null;
-  /** Keyed, so registering again (a newer copy of the code) replaces. */
   globals: Map<string, GlobalBuilder>;
   handlers: Map<string, MenuAction["run"]>;
   activeRequestId: number;
   installed: boolean;
-  /** The newest copy's collect; the page's listeners always call this. */
   collect: (request: ContextMenuCollectRequest) => Promise<void>;
 };
 
@@ -82,7 +60,6 @@ declare global {
   var __stellaContextMenus: MenuState | undefined;
 }
 
-/** Builders get this long; main stops waiting a little after. */
 const BUILD_TIMEOUT_MS = 260;
 const CAPTURE_FRESH_MS = 1500;
 
@@ -111,7 +88,6 @@ const elementOf = (target: EventTarget | null): Element | null =>
       ? target.parentElement
       : null;
 
-/** Add to the menu of the right-click being handled. */
 export const addContextMenu = (
   event: Event | ReactMouseEvent,
   build: MenuBuilder,
@@ -123,17 +99,11 @@ export const addContextMenu = (
   capture.contributions.push({ build, claims: options?.claims ?? [] });
 };
 
-/** An `onContextMenu` handler that adds `build`'s groups to the menu. */
 export const contextMenu =
   (build: MenuBuilder, options?: { claims?: readonly string[] }) =>
   (event: ReactMouseEvent): void =>
     addContextMenu(event, build, options);
 
-/**
- * Add groups to every right-click whose target `build` recognises. `key`
- * names the group: registering the same key again replaces it. Returns the
- * unregister function.
- */
 export const registerContextMenu = (
   key: string,
   build: MenuBuilder,
@@ -220,8 +190,6 @@ const collect = async (request: ContextMenuCollectRequest) => {
   const contributions = fresh?.contributions ?? [];
   const before = state.selectedBeforePress;
   state.selectedBeforePress = null;
-  // Nothing was selected before the press, so the selection is the word the
-  // press itself picked on a button, pill or image: drop it.
   const ignoreSelection =
     !request.isEditable &&
     request.selectionText.trim().length > 0 &&
@@ -255,7 +223,6 @@ const collect = async (request: ContextMenuCollectRequest) => {
     next.set(id, run);
     return id;
   };
-  // Generic groups (a link, a code block) come before the thing they sit in.
   const sections = [...shared.flat(), ...own.flat()].map((section) =>
     toWire(section, register),
   );
@@ -274,7 +241,6 @@ const collect = async (request: ContextMenuCollectRequest) => {
 
 state.collect = collect;
 
-/** Listen for right-clicks and main's questions about them, once per page. */
 // The native menu holds focus until it closes; clipboard writes from an
 // unfocused page are refused, so give the window a moment to take it back.
 const waitForFocus = (): Promise<void> =>

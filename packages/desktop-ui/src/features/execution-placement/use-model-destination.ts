@@ -25,30 +25,23 @@ const C = "settings.engineAccounts.claude";
 const computerName = (label: string | undefined): string =>
   label?.trim().replace(/\.local$/iu, "") ?? "";
 
-/** Another of the user's computers that is on, and the plans it says it's signed in to. */
 export type OtherComputer = {
   deviceId: string;
   label: string;
   signedIn: DeviceEngine[];
 };
 
-/** Where the open chat runs, as the model controls need it. */
 export type ModelDestination =
   | { kind: "here" }
   | {
       kind: "cloud" | "device";
-      /** Its name at the start of a sentence, and inside one. */
       placeStart: string;
       place: string;
-      /** The plans it can run; undefined until known (an older Stella doesn't say). */
       signedIn: readonly DeviceEngine[] | undefined;
-      /** The Gemini models its Google Antigravity account has; undefined until it says. */
       antigravityModels?: readonly string[];
-      /** Providers whose key or sign-in the account holds, so every place can use them; undefined until known. */
       accountProviders: ReadonlySet<string> | undefined;
     };
 
-/** The computers on the account other than this one. */
 export function useOtherComputers(): {
   computers: OtherComputer[];
   labelOf: (deviceId: string) => string;
@@ -151,7 +144,6 @@ export function useModelDestination(): {
   return { destination, computers };
 }
 
-/** The plan a model reference runs on, when it runs on a plan signed in per place. */
 export const planOfModel = (modelId: string): DeviceEngine | undefined =>
   modelId.startsWith("claude-code/")
     ? "claude-code"
@@ -161,14 +153,12 @@ export const planOfModel = (modelId: string): DeviceEngine | undefined =>
         ? "antigravity"
         : undefined;
 
-/** Whether the place can run a plan; undefined when it runs here or hasn't said. */
 export const planSignedInAt = (
   destination: ModelDestination,
   plan: DeviceEngine,
 ): boolean | undefined =>
   destination.kind === "here" ? undefined : destination.signedIn?.includes(plan);
 
-/** A provider set up only on this computer (its key, sign-in or model server), so no other place can use it. */
 export const providerOnlyHere = (
   destination: ModelDestination,
   provider: string,
@@ -181,7 +171,6 @@ export const providerOnlyHere = (
 
 export type ModelBlock = "signed-out" | "only-here";
 
-/** Why the place the chat runs on can't run this model, if it can't. */
 export const modelBlockedAt = (
   destination: ModelDestination,
   modelId: string,

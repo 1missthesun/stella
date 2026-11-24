@@ -8,7 +8,6 @@ import "@/features/cloud/EngineConnectPrompt.css";
 const K = "settings.engineAccounts";
 const LOGIN = `${K}.claudeLogin`;
 
-/** A Google sign-in under way: Google's page is open and the code it shows goes here. */
 export function AntigravitySignInPrompt({
   antigravity,
   onStart,

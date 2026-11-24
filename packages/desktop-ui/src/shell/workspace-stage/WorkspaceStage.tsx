@@ -100,15 +100,9 @@ import "./workspace-stage.css";
 
 export interface WorkspaceStageHandle {
   open(payload: DisplayTabPayload): void;
-  /** Agent output. `tab: false` only registers it (e.g. generated media). */
   update(payload: DisplayTabPayload, opts?: { tab?: boolean }): void;
   close(): void;
 }
-
-/* ------------------------------------------------------------------ */
-/* Geometry: the stage ends above the composer; the floater never     */
-/* covers it.                                                          */
-/* ------------------------------------------------------------------ */
 
 const STAGE_GAP_ABOVE_COMPOSER = 12;
 const STAGE_BOTTOM_WITHOUT_COMPOSER = 14;
@@ -121,7 +115,6 @@ type Geometry = {
   topbar: number;
   viewportWidth: number;
   viewportHeight: number;
-  /** Viewport y the stage and floater must stay above. */
   floor: number;
   composer: { left: number; width: number } | null;
 };
@@ -147,9 +140,6 @@ const findComposerShell = (): HTMLElement | null => {
   return best?.el ?? null;
 };
 
-/** Cards pinned above the composer (a connect offer or question the agent's
- *  turn is waiting on, a plan notice) sit between the conversation and the
- *  composer; the stage ends above them too, or they wait unseen behind it. */
 const topOfComposerArea = (shell: HTMLElement, top: number): number => {
   let el = shell.closest(".composer-wrap")?.previousElementSibling ?? null;
   while (el && !el.classList.contains("chat-viewport-region")) {
@@ -208,7 +198,6 @@ const getGeometry = (): Geometry => {
   return geometry!;
 };
 
-/** Keep the composer measurement fresh while anything is on screen. */
 const useGeometryTracking = (active: boolean) => {
   useLayoutEffect(() => {
     if (!active) return;
@@ -239,8 +228,6 @@ const defaultFloatRect = (geo: Geometry): FileViewerRect => {
   const centre = geo.composer
     ? geo.composer.left + geo.composer.width / 2
     : geo.viewportWidth / 2;
-  // Top of the chat area, so the latest messages above the composer stay
-  // in sight.
   return {
     x: Math.round(centre - width / 2),
     y: Math.round(geo.topbar + FLOAT_TOP_GAP),
@@ -249,7 +236,6 @@ const defaultFloatRect = (geo: Geometry): FileViewerRect => {
   };
 };
 
-/** Fit a rect inside the window, below the top bar and above the composer. */
 const clampFloatRect = (
   rect: FileViewerRect,
   geo: Geometry,
@@ -276,10 +262,6 @@ const clampFloatRect = (
   };
 };
 
-/* ------------------------------------------------------------------ */
-/* Tabs on the stage                                                   */
-/* ------------------------------------------------------------------ */
-
 function TabStage({ visible }: { visible: boolean }) {
   return (
     <section
@@ -293,10 +275,6 @@ function TabStage({ visible }: { visible: boolean }) {
     </section>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* The file viewer: floating, or expanded onto the stage               */
-/* ------------------------------------------------------------------ */
 
 const MinimizeIcon = ({ size = 15 }: { size?: number }) => (
   <svg
@@ -320,7 +298,6 @@ const RESIZE_EDGES: ResizeEdge[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
 const fileNameOf = (path: string): string =>
   path.split(/[\\/]/).pop() || path;
 
-/** A local file behind the item (not a web address), for Download / Share. */
 const localFilePath = (payload: DisplayTabPayload | undefined): string | null =>
   payload?.kind === "url" ? null : payloadPath(payload);
 
@@ -342,7 +319,6 @@ const readFileBlob = async (path: string): Promise<Blob | null> => {
 const errorText = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
-/** A quiet icon button for the viewer's top bar. */
 function HeaderButton({
   label,
   shortcut,
@@ -392,11 +368,8 @@ function ViewerHeader({
   stage: boolean;
   actions: ViewerItemActions | null;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-  /** Set to the right-click menu for what's open. */
   menuRef: { current: MenuBuilder | null };
 }) {
-  // A Drive file's payload carries a stand-in path ("/folder/name"); what
-  // names it is its Drive path.
   const drivePath = item.payload?.cloudDrivePath ?? null;
   const path = drivePath ?? payloadPath(item.payload);
   const filePath = drivePath ? null : localFilePath(item.payload);
@@ -431,7 +404,6 @@ function ViewerHeader({
   }, [filePath]);
 
   const canShare = Boolean(drivePath || filePath);
-  // Not async: the copy has to start inside the click (see clipboard.ts).
   const share = useCallback(() => {
     if (sharing) return;
     const link = drivePath
@@ -482,7 +454,6 @@ function ViewerHeader({
   const hasMenu = Boolean(actions?.copy || path || remove);
 
   menuRef.current = async ({ target }) => {
-    // A thumbnail in the strip has its own menu.
     if (target.closest(".viewer-strip")) return null;
     const sections: MenuSection[] = [];
     if (actions?.copy) {
@@ -681,7 +652,6 @@ function ViewerHeader({
   );
 }
 
-/** Arrows that appear at the media's left and right edges on hover. */
 function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
   const t = useT();
   if (!nav || (!nav.canPrevious && !nav.canNext)) return null;
@@ -719,7 +689,6 @@ function EdgeArrows({ nav }: { nav: ViewerNav | null }) {
   );
 }
 
-/** Item-to-item navigation across everything the conversation made or opened. */
 const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
   const { items, index, sets } = useViewerSiblings(
     item?.id ?? "",
@@ -742,7 +711,6 @@ const useSiblingNav = (item: DisplayTab | null): ViewerNav | null => {
   }, [grouped, index, item, items]);
 };
 
-/** Viewers light enough to mount in the frame that opens them. */
 const IMMEDIATE_KINDS: ReadonlySet<DisplayTab["kind"]> = new Set([
   "image",
   "video",
@@ -769,8 +737,6 @@ function FileViewerFrame({
   );
   const menuRef = useRef<MenuBuilder | null>(null);
 
-  // Body actions clear themselves when the body unmounts (a parent effect
-  // here would run after the new body registered its own).
   useEffect(() => setBodyNav(null), [fileId]);
 
   useEffect(() => {
@@ -927,10 +893,6 @@ function FileViewerFrame({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Composer chip for the item on screen                                */
-/* ------------------------------------------------------------------ */
-
 const payloadPath = (payload: DisplayTabPayload | undefined): string | null => {
   if (!payload) return null;
   const record = payload as Record<string, unknown>;
@@ -967,10 +929,6 @@ const withViewerSelection = (
   };
 };
 
-/**
- * "Add to chat": attach what's open to the next message as a chip. Nothing
- * is attached until the user asks, and the chip is theirs to remove.
- */
 function useViewerChatAttachment(
   item: DisplayTab,
 ): { added: boolean; toggle: () => void } | null {
@@ -1009,10 +967,6 @@ function useViewerChatAttachment(
   return { added, toggle };
 }
 
-/* ------------------------------------------------------------------ */
-/* Host                                                                */
-/* ------------------------------------------------------------------ */
-
 const isEditableTarget = (target: EventTarget | null): boolean => {
   const el = target as HTMLElement | null;
   if (!el) return false;
@@ -1031,10 +985,6 @@ const editableIsEmpty = (target: EventTarget | null): boolean => {
   return (el.textContent ?? "").length === 0;
 };
 
-/**
- * ⇧← / ⇧→ in the viewer: the first item of the previous or next set, or
- * back to the start of this set when you're partway through it.
- */
 const setJumpTarget = (
   frame: Element | null,
   backwards: boolean,
@@ -1092,12 +1042,10 @@ export const WorkspaceStage = memo(
         [],
       );
 
-      // A stage with nothing to show falls back to the chat.
       useEffect(() => {
         if (panelOpen && !activeTab) displayTabs.setPanelOpen(false);
       }, [activeTab, panelOpen]);
 
-      // Looking at a tab clears its dot.
       useEffect(() => {
         if (tabStageVisible && activeTab?.unread) {
           sidebarSections.activateTab(activeTab.id);

@@ -17,9 +17,7 @@ export function useChatGptProfiles() {
     try {
       const next = await list();
       if (mounted.current) setState(next);
-    } catch {
-      // Keep the last list; the next change reloads it.
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {

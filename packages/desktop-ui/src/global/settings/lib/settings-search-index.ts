@@ -6,23 +6,6 @@ export type SettingsSearchHost = "native" | "website";
 export type SettingsSearchAvailability = "all" | "native";
 export type SettingsSearchPlatform = "darwin" | "linux" | "win32";
 
-/**
- * Definition of a searchable Settings entry. One entry per
- * `.settings-card` (or logical row) so users find a card by its heading,
- * description, or any row label / sublabel inside it.
- *
- * This catalog drives the global "Search settings" results view: every
- * tab can be searched at once because the catalog covers them all, even
- * the tabs that haven't been lazy-loaded yet.
- *
- * Two layers of synonym handling:
- *   - Per-entry `keywords` — the strongest signal. Use this for
- *     setting-specific aliases ("byok", "anthropic oauth", "rtl").
- *     Keywords stay English; localized search still matches via the
- *     translated title/description.
- *   - Global `SEARCH_SYNONYMS` map below — for words that should match
- *     across many settings ("mute" → sound/audio/volume/notification).
- */
 export interface SettingsSearchEntryDef {
   tab: SettingsTab;
   availability?: SettingsSearchAvailability;

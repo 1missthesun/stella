@@ -30,7 +30,6 @@ const webInfo = (): FeedbackClientInfo => {
   };
 };
 
-/** What the feedback dialog sends (and shows it sends) about this copy of Stella. */
 export const readFeedbackClientInfo = async (): Promise<FeedbackClientInfo> => {
   const api = window.electronAPI;
   if (isWebsiteHost() || !api) return webInfo();

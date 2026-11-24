@@ -135,7 +135,6 @@ const exactBuffer = (pcm: Int16Array): ArrayBuffer =>
     pcm.byteOffset + pcm.byteLength,
   ) as ArrayBuffer;
 
-/** The relay answered that it will not transcribe (usage, availability). */
 export class DictationRefusedError extends Error {}
 
 export class DictationStream {
@@ -215,7 +214,6 @@ export class DictationStream {
     this.socket.send(pcm instanceof ArrayBuffer ? pcm : exactBuffer(pcm));
   }
 
-  /** What has been recognized so far. */
   get partial(): string {
     return (this.finalTranscript || this.transcript).trim();
   }

@@ -26,10 +26,6 @@ type Drag = {
   settle: number;
 };
 
-/**
- * Drag a top-bar tab sideways to reorder it. The Chat tab carries no
- * `data-tab-id`, so it never moves and nothing can be dropped before it.
- */
 export function useTabReorder(
   stripRef: RefObject<HTMLDivElement | null>,
   tabIds: string,
@@ -125,9 +121,7 @@ export function useTabReorder(
         drag.el.dataset.dragging = "true";
         try {
           drag.el.setPointerCapture(drag.pointerId);
-        } catch {
-          // The pointer is already gone; the window listeners still end it.
-        }
+        } catch {}
         return true;
       };
 
@@ -252,7 +246,6 @@ export function useTabReorder(
     [stripRef],
   );
 
-  // A tab opening or closing mid-drag makes the measured slots stale.
   useEffect(
     () => () => {
       const drag = dragRef.current;

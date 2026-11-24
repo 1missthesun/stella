@@ -31,10 +31,6 @@ const openInSystemBrowser = (url: string): void => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
-/**
- * In a browser the tab has to open inside the click, before the backend
- * answers, or it is blocked as a popup; it is pointed at the view URL after.
- */
 const openPendingBrowserTab = (): ((url: string) => void) => {
   const pending = window.open("about:blank", "_blank");
   if (!pending) return (url) => openInSystemBrowser(url);

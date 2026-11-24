@@ -64,7 +64,6 @@ export type LocalAgentStartArgs = {
   userMessageTimestamp?: number;
   onUserMessageAccepted?: (userMessageId: string) => void;
   onStartFailed?: () => void;
-  /** Nothing can answer yet: the message waits for a sign-in or an engine. */
   onNeedsEngine?: () => void;
 };
 
@@ -165,10 +164,7 @@ export function useLocalAgentStream({
           args.onNeedsEngine?.();
         } else if (isStellaLimitOrAuthReason(reason)) {
           showToast(resolveStellaProviderErrorToast(reason));
-        } else if (isRetryingHeldSend()) {
-          // A waiting message tried while the chat is still switching over
-          // (just signed in); it tries again by itself in a moment.
-        } else {
+        } else if (!isRetryingHeldSend()) {
           const toast = resolveAgentNotReadyToast(reason);
           showToast({
             title: toast.title,

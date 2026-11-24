@@ -13,15 +13,8 @@ import { connectPlanChatGptOnly, connectPlanCopy, openConnectPlan } from "./conn
 
 const SHOWN_KEY = "stella.connectPlan.nearShown";
 
-// One heads-up per app run even while several chat surfaces are mounted.
 let shownThisRun = false;
 
-/**
- * Once, when a Free account has used about 80% of its free usage: a quiet
- * heads-up in the bell that the ChatGPT or Claude plan it already has keeps
- * Stella free after that. It stays there until the person connects or
- * dismisses it (remembered per account on this device), then never repeats.
- */
 export function useConnectPlanHeadsUp(conversationId: string | null): void {
   const session = useDesktopAuthSession();
   const user = (session.data as { user?: { id?: string | null; isAnonymous?: boolean | null } | null } | null)

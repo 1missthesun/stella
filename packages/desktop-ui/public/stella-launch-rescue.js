@@ -1,7 +1,3 @@
-// Drives the launch splash's "taking longer than usual" rescue affordance.
-// Loaded as an external script from `desktop/index.html` because the page's
-// CSP forbids inline <script>. After RESCUE_DELAY_MS without React removing
-// the splash, surfaces a Restart app button.
 (function () {
   var RESCUE_DELAY_MS = 8000;
   var launch = document.getElementById("stella-launch");
@@ -32,9 +28,7 @@
       try {
         api.ui.relaunch();
         return;
-      } catch (_) {
-        // Fall through to reload.
-      }
+      } catch (_) {}
     }
     window.location.reload();
   };

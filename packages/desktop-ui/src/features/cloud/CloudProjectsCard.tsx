@@ -44,13 +44,6 @@ function CloudProjectsCardImpl() {
     }
   }, []);
 
-  /**
-   * The bind. This is a deliberate, authenticated user action and nothing
-   * else may stand in for it: reading the code out of a URL or the clipboard
-   * and submitting it on load would hand the decision back to whoever
-   * supplied the link, which is precisely the account-linking CSRF the
-   * two-half handshake exists to close.
-   */
   const handleFinishConnect = useCallback(async () => {
     const code = connectCode.trim();
     if (!code) return;

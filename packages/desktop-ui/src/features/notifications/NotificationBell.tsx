@@ -140,11 +140,6 @@ const useWindowFocused = () => {
   return focused;
 };
 
-/**
- * A new notification shows here, just under the bell, and then goes into it.
- * Its time only runs while the window is in front and the pointer or focus
- * isn't on it, so it isn't missed.
- */
 const NotificationToast = ({ anchor }: { anchor: RefObject<HTMLButtonElement | null> }) => {
   const item = useNotificationToast();
   const now = useMinuteNow();

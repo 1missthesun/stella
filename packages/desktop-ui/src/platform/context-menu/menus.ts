@@ -20,15 +20,10 @@ import {
   type MenuSection,
 } from "./context-menu";
 
-/* ------------------------------------------------------------------ */
-/* Platform words                                                      */
-/* ------------------------------------------------------------------ */
-
 const platform = (): string =>
   window.electronAPI?.platform ??
   (/Mac/i.test(navigator.platform) ? "darwin" : "linux");
 
-/** "Show in Finder", "Show in File Explorer", "Open containing folder". */
 export const revealLabel = (): string => {
   const os = platform();
   if (os === "darwin") return t("contextMenu.showInFinder");
@@ -43,10 +38,6 @@ const quoted = (text: string): string => {
   return flat.length > 28 ? `${flat.slice(0, 27)}…` : flat;
 };
 
-/* ------------------------------------------------------------------ */
-/* Composer: what "Add to chat" reaches                                */
-/* ------------------------------------------------------------------ */
-
 type ComposerBridge = {
   setChatContext: (update: (prev: ChatContext | null) => ChatContext | null) => void;
   quote: (text: string) => void;
@@ -55,14 +46,12 @@ type ComposerBridge = {
 
 let composer: ComposerBridge | null = null;
 
-/** The chat registers its composer so menus can add things to it. */
 export const setContextMenuComposer = (next: ComposerBridge | null): void => {
   composer = next;
 };
 
 export const canAddToChat = (): boolean => composer !== null;
 
-/** Attach a file on this computer to the next message, by reference. */
 export const attachPathToChat = async (path: string): Promise<void> => {
   if (!composer) return;
   const stat = await window.electronAPI?.display
@@ -91,17 +80,12 @@ export const attachPathToChat = async (path: string): Promise<void> => {
   composer.focus();
 };
 
-/** Quote text in the composer, as Reply and "Ask Stella" do. */
 export const quoteInChat = (text: string): void => {
   const value = text.trim();
   if (!value || !composer) return;
   composer.quote(value);
   composer.focus();
 };
-
-/* ------------------------------------------------------------------ */
-/* Actions                                                             */
-/* ------------------------------------------------------------------ */
 
 const failed = (error?: string) =>
   showToast({
@@ -126,7 +110,6 @@ const readBlob = async (path: string): Promise<Blob | null> => {
   return new Blob([part], { type: read.mimeType || "image/png" });
 };
 
-/** Copy the image at `path` (a file) or `src` (any URL the page can load). */
 export const copyImage = async (source: {
   path?: string;
   src?: string;
@@ -169,16 +152,9 @@ export const openInStellaBrowser = async (url: string): Promise<void> => {
   if (!opened) window.electronAPI?.system?.openExternal?.(url);
 };
 
-/* ------------------------------------------------------------------ */
-/* Groups                                                              */
-/* ------------------------------------------------------------------ */
-
 export type FileMenuOptions = {
-  /** What a plain click does; the menu's first item. */
   open?: () => void;
-  /** Offer Copy image. */
   image?: boolean;
-  /** Overrides plain "Add to chat" (the viewer toggles its own chip). */
   addToChat?: MenuAction | null;
 };
 
@@ -194,18 +170,12 @@ const presenceOf = async (path: string): Promise<Presence> => {
     (stat): Presence => (stat.deviceId || stat.deviceName ? "elsewhere" : "here"),
     (): Presence => "missing",
   );
-  // A file on this computer answers at once; a slow answer means Stella is
-  // asking other computers, and the menu can't wait for them.
   const slow = new Promise<Presence>((resolve) =>
     window.setTimeout(() => resolve("elsewhere"), PRESENCE_TIMEOUT_MS),
   );
   return await Promise.race([check, slow]);
 };
 
-/**
- * A file's actions: open it, copy it, find it on disk, keep a copy, put it in
- * the chat. Checks the file is still there, and says so when it isn't.
- */
 export const fileMenu =
   (path: string, options: FileMenuOptions = {}) =>
   async (): Promise<MenuSection[]> => {
@@ -255,7 +225,6 @@ export const fileMenu =
     return sections;
   };
 
-/** A web address: Stella's browser by default, or the system's. */
 export const linkMenu = (url: string): MenuSection => [
   { label: t("contextMenu.open"), run: () => openInStellaBrowser(url) },
   {
@@ -264,10 +233,6 @@ export const linkMenu = (url: string): MenuSection => [
   },
   { label: t("contextMenu.copyLink"), run: () => copyText(url) },
 ];
-
-/* ------------------------------------------------------------------ */
-/* Everywhere                                                          */
-/* ------------------------------------------------------------------ */
 
 const selectionGroup = ({ selectionText, isEditable }: MenuContext) => {
   const text = selectionText.trim();
@@ -303,7 +268,6 @@ const codeGroup = ({ target, claimed }: MenuContext) => {
   );
   if (!block) return null;
   const pre = block.querySelector<HTMLElement>("pre") ?? block;
-  // innerText keeps line breaks between highlighted lines.
   const text = (pre.querySelector<HTMLElement>("code") ?? pre).innerText ?? "";
   if (!text.trim()) return null;
   return [{ label: t("contextMenu.copyCode"), run: () => copyText(text) }];
@@ -339,10 +303,6 @@ const tabGroup = ({ target }: MenuContext) => {
   ];
 };
 
-/**
- * Menus that apply wherever their target turns up. Calling it again (a
- * newer copy of this code after a warm swap) replaces them.
- */
 export const registerSharedMenus = (): void => {
   registerContextMenu("selection", selectionGroup, { slot: "selection" });
   registerContextMenu("tab", tabGroup);

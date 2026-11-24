@@ -30,10 +30,8 @@ export type BrowserAttachmentUpload = {
   progress: number;
   status: "pending" | "uploading" | "finalizing" | "ready" | "error";
   error: string | null;
-  /** The pending message this upload was sent with; null while it is in the composer. */
   sentWith: string | null;
   retryable: boolean;
-  /** The preview is a video's first frame. */
   poster?: true;
 };
 
@@ -102,10 +100,6 @@ export class AttachmentUploadFailedError extends Error {
   }
 }
 
-/**
- * The finished Drive files for these uploads, in order, once every one has
- * landed. Rejects as soon as one has failed past its automatic retries.
- */
 export const waitForAttachmentUploads = async (
   ids: readonly string[],
 ): Promise<CloudAttachment[]> => {
@@ -232,15 +226,6 @@ const imageFile = (blob: Blob, source: File): File => {
   });
 };
 
-/**
- * An attached image fitted to what the model takes (the long edge and byte
- * budget in `chat-image-limits`) as soon as it is attached, so the upload is
- * small and the cloud sends it as it is. One already within the limits, in a
- * type every provider takes, uploads untouched (a screenshot stays lossless,
- * a GIF animated). An image the browser can't decode (HEIC outside Safari),
- * or one too large to decode safely here,
- * uploads as it is and the cloud fits it instead.
- */
 export const fitBrowserChatImage = async (file: File): Promise<File> => {
   const type = attachmentContentType({ declared: file.type, name: file.name });
   if (
@@ -265,7 +250,6 @@ export const fitBrowserChatImage = async (file: File): Promise<File> => {
     ) {
       return file;
     }
-    // A photo stays JPEG; anything that may carry transparency goes to WebP.
     let output = type === "image/jpeg" ? "image/jpeg" : "image/webp";
     let scale = Math.min(1, CHAT_IMAGE_MAX_EDGE / longEdge);
     let quality = 0.86;
@@ -283,7 +267,6 @@ export const fitBrowserChatImage = async (file: File): Promise<File> => {
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       const blob = await canvasBlob(canvas, output, quality);
       if (blob.type !== output) {
-        // This browser can't encode WebP; JPEG on white instead.
         output = "image/jpeg";
         continue;
       }
@@ -445,7 +428,6 @@ export const browserAttachmentUploads = {
     replace(id, { status: "pending", error: null });
     void uploadOne(entry);
   },
-  /** The composer's uploads, handed to a message that was just sent; they keep uploading. */
   takeForMessage(clientMsgId: string): string[] {
     const taken = uploads.filter((entry) => entry.sentWith === null);
     if (taken.length === 0) return [];
@@ -469,7 +451,6 @@ export const browserAttachmentUploads = {
     uploads = uploads.filter((upload) => upload.id !== id);
     notify();
   },
-  /** Forget a sent message's uploads once the cloud has its own copy of the message. */
   release(ids: readonly string[]) {
     const released = new Set(ids);
     const gone = uploads.filter((entry) => released.has(entry.id));

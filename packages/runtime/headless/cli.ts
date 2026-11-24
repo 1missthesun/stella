@@ -155,7 +155,6 @@ const readDesktopUiBackendUrl = (stellaAppDir: string): string | null => {
       if (match) return match[1] ?? null;
     }
   } catch {
-    // No default available; Stella-managed models then require --backend-url.
   }
   return null;
 };
@@ -233,7 +232,6 @@ const main = async (): Promise<void> => {
     try {
       await host.stop();
     } catch {
-      // Best effort — the child worker dies with our stdin regardless.
     }
     process.exit(exitCode);
   };
@@ -272,7 +270,6 @@ const main = async (): Promise<void> => {
   log(`worker ready (pid=${health.workerPid})`);
 
   if (options.mode === "list-models") {
-    // Printed as one model object per entry, as before the wire went compact.
     const listed = (await host.listModels({})) as RuntimeModelCatalogSnapshot;
     const { modelsByProvider: _compact, ...snapshot } = listed;
     emit({

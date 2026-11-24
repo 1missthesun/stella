@@ -23,14 +23,9 @@ export type LifecycleServerOptions = {
   onShutdown: (reason: WorkerShutdownReason) => Promise<void> | void;
 };
 
-/** "quit": the app quit and asked the runtime to stop its work and exit once it detached. */
 export type WorkerShutdownReason = "idle" | "quit" | "signal" | "restart";
 
 const DEFAULT_IDLE_SHUTDOWN_MS = 10_000;
-/**
- * How long the runtime keeps its work going for an app that said it is relaunching (an Update that keeps the
- * runtime). A relaunch takes seconds; one that never comes back still stops the work, like any app that disappears.
- */
 const RELAUNCH_GRACE_MS = 2 * 60_000;
 const INTERRUPT_WORK_TIMEOUT_MS = 4_000;
 
@@ -130,10 +125,6 @@ export class WorkerLifecycleServer {
     this.scheduleIdleShutdown();
   }
 
-  /**
-   * The app is relaunching and attaches again in a moment: the work goes on, and the runtime waits for it longer
-   * than for an app that disappeared.
-   */
   noteRelaunching() {
     if (this.shuttingDown) return;
     this.quitRequested = false;

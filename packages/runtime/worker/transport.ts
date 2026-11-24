@@ -135,7 +135,6 @@ const probeSocketAlive = (socketPath: string): Promise<boolean> =>
       try {
         socket.destroy();
       } catch {
-        // Best effort.
       }
       resolve(alive);
     };
@@ -202,8 +201,6 @@ const startIpcSocketTransport = async (
       sockets.delete(socket);
     });
     socket.on("error", () => {
-      // Connection-level errors (e.g. host crashed) just close the socket;
-      // peer.dispose runs via the readline 'close' handler downstream.
     });
 
     let buffered = "";

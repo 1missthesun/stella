@@ -1,11 +1,3 @@
-/**
- * Connector sign-ins (device code, a provider's registered OAuth app, or
- * dynamic registration) run here. The app owns the approval UI and the
- * browser: it asks for a flow, opens the page each one names (appServiceProgress),
- * and hands back a callback that returned through a stella:// link
- * (waitForConnectorOAuthCallback). Tokens are saved through the app's
- * keychain-backed store (requestConnectorTokenStore).
- */
 import type { AppServiceContext } from "./index.js";
 import { createCancelableRegistry } from "./cancelable.js";
 
@@ -15,11 +7,6 @@ const loadOAuth = () => import("../../kernel/connectors/oauth.js");
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-/**
- * The worker installs a token store that goes through the app; when no worker
- * session has yet, install the same one so a sign-in never reaches for the OS
- * keychain, which this process can't use.
- */
 const ensureTokenStore = async (context: AppServiceContext) => {
   const oauth = await loadOAuth();
   if (oauth.hasConnectorTokenStoreBroker()) return;

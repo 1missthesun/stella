@@ -21,7 +21,6 @@ export const rotateLogIfOversizedEffect = (
       if (statSync(filePath).size < maxBytes) return;
       renameSync(filePath, `${filePath}.1`);
     } catch {
-      // File missing or not rotatable — nothing to do.
     }
   });
 

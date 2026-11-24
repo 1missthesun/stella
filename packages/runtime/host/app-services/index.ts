@@ -49,7 +49,6 @@ export type AppServiceContext = Pick<
   StellaRuntimeHostOptions,
   "hostHandlers" | "initializeParams"
 > & {
-  /** The host's own calls (e.g. googleWorkspaceDisconnect), for services that use them. */
   host?: { googleWorkspaceDisconnect?: () => Promise<unknown> };
 };
 
@@ -57,7 +56,6 @@ const dataDir = (context: AppServiceContext) => context.initializeParams.stellaD
 
 type AppServiceCall = (context: AppServiceContext, ...args: any[]) => unknown;
 
-/** Tell the app what a running sign-in needs it to do (open a page, record a profile). */
 const reportAppServiceProgress = async (
   context: AppServiceContext,
   request: { loginId?: unknown; provider?: unknown } | null | undefined,
@@ -70,14 +68,9 @@ const reportAppServiceProgress = async (
       notice,
     });
   } catch {
-    // The app is gone or restarting; the sign-in times out on its own.
   }
 };
 
-/**
- * The runtime's side of RUNTIME_APP_SERVICE_CALLS. StellaRuntimeHost exposes
- * each as a method of the same name, so the app reaches it with a host call.
- */
 export const appServiceCalls: Record<RuntimeAppServiceCall, AppServiceCall> = {
   listLlmOAuthProviders: () => listLlmOAuthProviders(),
   signInLlmOAuth: (context, request) =>

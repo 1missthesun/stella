@@ -46,7 +46,6 @@ export type RuntimeClientServerOptions = {
   clientWaitMs?: number;
   onShutdownRequested?: () => void;
   onQuitRequested?: () => Promise<void>;
-  /** The attached app is relaunching and will attach again; the runtime keeps its work going until it does. */
   onRelaunching?: () => void;
   identity?: RuntimeServerIdentity;
 };
@@ -253,7 +252,6 @@ export class RuntimeClientServer {
             attachmentId: this.attachments.get(client),
           } satisfies FencedRuntimeEventParams);
         } catch {
-          // A closing client drops its events; it reattaches and resyncs.
         }
       }
     });

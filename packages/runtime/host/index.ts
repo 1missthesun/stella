@@ -132,10 +132,6 @@ import type {
   WorkerConnection,
   WorkerHealthSnapshot,
 } from "./worker-lifecycle.js";
-/**
- * The app's side of the host (see RUNTIME_HOST_HANDLERS). Results cross a
- * process boundary untyped, so each call site reads what it needs.
- */
 type HostHandler = (...args: any[]) => any;
 export type StellaRuntimeHostHandlers = Partial<
   Record<RuntimeHostHandler, HostHandler>
@@ -159,7 +155,6 @@ export type StellaRuntimeHostOptions = {
     restartProcess: (reason: string) => void;
   };
 };
-/** Worker RPC params are untyped JSON; each handler reads what it needs. */
 type WorkerRequestHandler = (params: any) => unknown;
 type WorkerNotificationHandler = (params: any) => void;
 type WorkerPeerRegistrar = {
@@ -273,8 +268,6 @@ export class StellaRuntimeHost {
   hostDatabase: SqliteDatabase | null = null;
   constructor(options: StellaRuntimeHostOptions) {
     this.options = options;
-    // The app's Settings work (see RUNTIME_APP_SERVICE_CALLS) is served as
-    // host methods of the same names, which the client server dispatches to.
     for (const [name, call] of Object.entries(appServiceCalls)) {
       (this as unknown as Record<string, unknown>)[name] = (...args: unknown[]) =>
         call({ ...this.options, host: this as never }, ...args);
@@ -409,11 +402,6 @@ export class StellaRuntimeHost {
       );
     }
     this.startStaleWorkerQuiescencePoll();
-    // Nudge the unified gate soon: restart now if already quiescent, otherwise
-    // an unblock hook (pause release, morph settle, worker idle) or the poll
-    // retries. Forked as a 1s fiber so it stays off this call stack — a
-    // caller still inside the startup / apply sequence isn't restarted from
-    // under itself.
     forkDelayed(1_000, () => {
       void this.flushWorkerRestart();
     });
@@ -430,10 +418,6 @@ export class StellaRuntimeHost {
   }
   startStaleWorkerQuiescencePoll() {
     if (this.staleWorkerQuiescencePollFiber) return;
-    // Safety net for busy signals that don't end in a RUN_FINISHED event
-    // (e.g. voice-only activity) or a missed event during churn. Fixed-rate
-    // 30s ticks with a leading delay, matching the old setInterval cadence
-    // (see quiescencePollEffect).
     this.staleWorkerQuiescencePollFiber = hostRuntime.runFork(
       quiescencePollEffect(() => this.flushWorkerRestart()),
     );
@@ -490,8 +474,6 @@ export class StellaRuntimeHost {
       this.transitionWorker({ type: "check_finished" });
     }
     if (!idle) {
-      // pi work ends without a RUN_FINISHED notification, so keep a
-      // re-check armed for any deferred restart, not only stale ones.
       this.startStaleWorkerQuiescencePoll();
       return;
     }
@@ -614,7 +596,6 @@ export class StellaRuntimeHost {
       this.events.emit("schedule-updated", undefined);
     });
   }
-  /** Move the retired device id's pairings onto this identity; retried until the backend accepts. */
   async claimDeviceIdentitySuccession(): Promise<void> {
     const previousDeviceId = this.deviceIdentity?.supersededDeviceId;
     const deviceId = this.deviceIdentity?.deviceId;
@@ -800,8 +781,6 @@ export class StellaRuntimeHost {
           request.method === "savedValues.release" &&
           request.mobileDeviceId !== DEVICE_REQUEST_CLOUD_ASKER
         ) {
-          // Only a cloud task, through Stella's cloud, asks for a saved value:
-          // a phone or computer holds its own sealed copy and never needs this.
           return {
             ok: false,
             code: "forbidden",
@@ -1125,8 +1104,6 @@ export class StellaRuntimeHost {
     try {
       await bridge.start();
       this.hostExecutionPlacementRetryAttempt = 0;
-      // Tasks placed here are resumed or ended now; the worker's restart note
-      // for Stella waits for this to say how each one stands.
       void this.requestWorker(METHOD_NAMES.INTERNAL_WORKER_PLACEMENT_RECONCILED, undefined, {
         ensureWorker: true,
         recordActivity: false,
@@ -1184,8 +1161,6 @@ export class StellaRuntimeHost {
   async start() {
     if (this.started) return;
     this.started = true;
-    // The home folder is seeded here, before the worker reads it, rather than
-    // by the app: bundled skills and layout migrations are runtime concerns.
     try {
       await seedStellaDataDir(
         this.options.initializeParams.stellaAppDir,
@@ -1375,7 +1350,6 @@ export class StellaRuntimeHost {
     return await this.oauthSignedIn("chatgpt");
   }
 
-  /** Google Antigravity here, when Stella is signed in to it, and the account's models once known. */
   private async antigravityHere(): Promise<{ models: string[] } | null> {
     const { antigravityHomeFor, knownAntigravityModels, knownAntigravitySignIn } = await import(
       "../kernel/integrations/antigravity-cli-status.js"
@@ -1384,7 +1358,6 @@ export class StellaRuntimeHost {
     return knownAntigravitySignIn(home) ? { models: knownAntigravityModels(home) } : null;
   }
 
-  /** Which plan sign-ins this computer holds, read at most once a minute. */
   private async oauthSignedIn(provider: string): Promise<boolean> {
     const known = this.planLogins;
     if (Date.now() - known.at >= 60_000 && !known.pending) {
@@ -1634,7 +1607,6 @@ export class StellaRuntimeHost {
     const pending = { canceled: false };
     this.pendingDestinationHandoffs.set(conversationId, pending);
     void (async () => {
-      // A moment for the turn that moved it to finish its reply here first.
       await hostRuntime.runPromise(Effect.sleep(DESTINATION_HANDOFF_DELAY_MS));
       if (pending.canceled) return;
       if (this.pendingDestinationHandoffs.get(conversationId) === pending) {
@@ -1969,7 +1941,6 @@ export class StellaRuntimeHost {
       },
     );
   }
-  /** Hands a framed message to a task on this computer, resuming it when it had finished. */
   async messageAgent(payload: {
     threadId: string;
     messageId: string;
@@ -2087,11 +2058,6 @@ export class StellaRuntimeHost {
       .catch(() => []);
     return [...cloud, ...local];
   }
-  /**
-   * Every schedule, saying whether the list is whole: signed in, the cloud's
-   * may fail to load or not be reachable yet, and a missing one must not read
-   * as none (a task waiting on it would be told nothing can wake it).
-   */
   async listCronJobsForWake(): Promise<{ jobs: LocalCronJobRecord[]; complete: boolean }> {
     const local = this.schedulerService?.listCronJobs() ?? [];
     const signedIn = Boolean(this.configCache.hasConnectedAccount);
@@ -2109,9 +2075,6 @@ export class StellaRuntimeHost {
       if (signedIn && this.configCache.cloudSyncEnabled !== false) {
         return await this.getCloudSchedules().add(input);
       }
-      // Signed out, or chats kept only on this computer (cloud sync off, so
-      // the cloud never sees this computer as ready): reminders and tasks run
-      // from this computer's own scheduler. A watch's check must be a local script.
       if (input.payload.kind === "watch") {
         throw new Error(
           `${signedIn ? "Chats are kept only on this computer" : "Stella is signed out"}, so schedules live only on this computer: write the check with ScriptDraft and add the watch with runsOn "computer".`,
@@ -2150,14 +2113,12 @@ export class StellaRuntimeHost {
     }
     return updated;
   }
-  /** An enabled schedule on this computer that wakes a task's thread. */
   private localScheduleAimedAtTask(jobId: string): { jobId: string; name: string; threadId: string } | undefined {
     const job = this.schedulerService?.listCronJobs().find((entry) => entry.id === jobId);
     const payload = job?.payload;
     if (!job?.enabled || !payload || (payload.kind !== "task" && payload.kind !== "watch") || !payload.threadId) return undefined;
     return { jobId, name: job.name, threadId: payload.threadId };
   }
-  /** A task waiting with that schedule aimed at it hears it is gone; a task at work hears nothing. */
   private tellWaitingScheduleGone(aimed: { jobId: string; name: string; threadId: string }, change: "removed" | "paused") {
     void this.messageAgent({
       threadId: aimed.threadId,
@@ -2212,9 +2173,6 @@ export class StellaRuntimeHost {
     });
     this.hostDatabase = hostDatabase;
     if (this.options.disableLocalScheduler) {
-      // Ephemeral hosts (headless CLI, tests) must not run a second
-      // scheduler over the same data dir as a live desktop host — a
-      // duplicate scheduler could double-fire due cron jobs.
       this.hostReady = true;
       return;
     }

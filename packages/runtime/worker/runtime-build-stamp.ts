@@ -3,34 +3,6 @@ import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { readRuntimeBytecodeFingerprint } from "../kernel/shared/runtime-bytecode-stamp.js";
 
-/**
- * Runtime code-identity stamp used by the staleness handshake between the
- * Electron host and the detached runtime worker.
- *
- * The detached worker deliberately outlives the Electron host (grace window
- * so in-flight agent runs survive a desktop restart). The cost: a host that
- * reconnects after a desktop update can silently adopt a worker running old
- * runtime code. This stamp makes that detectable:
- *
- *   - The worker computes the stamp of the runtime tree it loaded at boot
- *     and writes it to Electron `userData/runtime/<rootHash>/build-stamp.txt`
- *     (see `WorkerLifecycleServer.start`).
- *   - The host, when it attaches to an existing worker, recomputes the stamp
- *     from the on-disk tree and compares. Mismatch (or a missing worker
- *     stamp, i.e. a pre-stamp worker) means "stale worker" — the host then
- *     restarts it immediately when idle, or defers until quiescence.
- *
- * The stamp is stat-based (relative path + size + mtimeMs) over the files
- * in the runtime tree. No file contents are read, so computing it is a cheap
- * directory walk. A
- * real code change virtually always changes size or mtime; mtime-preserving
- * copies with identical sizes are the only blind spot and don't occur in
- * the desktop-update path.
- *
- * A source tree (the runtime running as TypeScript) stamps `packages/runtime`
- * and `packages/contracts`, minus tests and scripts the runtime never loads.
- */
-
 export const RUNTIME_BUILD_STAMP_UNAVAILABLE = "unavailable";
 
 const STAMPED_FILE_SUFFIXES = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
@@ -87,7 +59,6 @@ const collectStampLines = (
       size = stats.size;
       mtimeMs = Math.round(stats.mtimeMs);
     } catch {
-      // File vanished mid-walk (concurrent rebuild); record presence only.
     }
     lines.push(`${relPath}\n${size}\n${mtimeMs}`);
   }

@@ -40,14 +40,6 @@ const resolveDesktopCliEntrypoint = (
 const resolveRuntimeCliPath = (fileName: string) =>
   resolveBundledRuntimeFile(`kernel/cli/${fileName}`);
 
-/**
- * Owns the session's runner lifecycle. The runner is built in the background
- * (dynamic import — its module subgraph is only needed once a turn runs and
- * code-splitting keeps it out of the eager worker bundle) and registered into
- * RunnerCell when ready. The session finalizer awaits any in-flight build and
- * then stops the runner, so a re-init can never strand a
- * started-but-unreferenced runner.
- */
 export interface Interface {
   readonly tryCurrent: () => RuntimeRunner | null;
   readonly current: () => RuntimeRunner;
@@ -243,8 +235,6 @@ export const make = (args: {
   const buildPromise: Promise<RuntimeRunner | null> = (async () => {
     const { createStellaHostRunner } = await runnerModule.load();
     const runner = createStellaHostRunner(runnerOptions);
-    // Apply the latest config (config patches that arrived during the
-    // import fanned out against an empty RunnerCell, so re-apply).
     const cfg = config.get();
     runner.setBackendUrl(cfg.backendUrl ?? null);
     runner.setAuthToken(cfg.authToken);

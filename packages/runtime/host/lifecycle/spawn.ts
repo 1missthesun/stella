@@ -11,7 +11,6 @@ import { getFileLogger } from "@stella/node-shared/observability/file-logger.js"
 import { killWorkerProcess } from "./kill.js";
 import { readProcessIdentity } from "@stella/node-shared/shared/process-identity.js";
 
-/** Start time of each worker this host spawned, read as soon as it started. */
 const spawnedIdentity = new WeakMap<ChildProcess, string | null>();
 import type { LifecycleStartOptions } from "./options.js";
 
@@ -93,10 +92,7 @@ const spawnDetachedWorkerProcess = (
   rotateLogIfOversized(paths.logFile);
   const logFd = openSync(paths.logFile, "a");
   // bun ignores NODE_COMPILE_CACHE, so every cold spawn re-parses the ~2.5MB
-  // kernel entry bundle from scratch. Point bun's runtime transpiler cache at a
-  // dedicated per-root dir so re-spawns (the common Electron-restart churn case)
-  // skip re-transpiling. Best-effort: if the dir can't be created we simply fall
-  // back to the uncached spawn, so behavior is otherwise unchanged.
+  // kernel entry bundle from scratch.
   let transpilerCachePath: string | undefined;
   try {
     transpilerCachePath = join(paths.rootDir, "bun-transpiler-cache");
@@ -134,8 +130,6 @@ const spawnDetachedWorkerProcess = (
     closeSync(logFd);
   }
   child.unref();
-  // A worker that dies without quitting (a signal, a native crash) leaves
-  // nothing in its own log; record how it ended while this app is its parent.
   const pid = child.pid;
   child.once("exit", (code, signal) => {
     getFileLogger()?.process("worker.exited", { pid, code, signal });
@@ -169,23 +163,6 @@ const waitForWorkerSpawn = ({
     child.once("error", onError);
   });
 
-/**
- * Spawn the detached worker as a scope-managed resource with adoption
- * semantics:
- *
- * - Success: the worker outlives the scope by design — it is detached and
- *   self-supervises (idle-shutdown timer, own lockfile). Release is a no-op.
- * - Failure (e.g. readiness timeout): the worker is ALSO left running, on
- *   purpose — this preserves the old observable behavior where a
- *   slow-booting worker survives the host's poll budget and the next start
- *   attaches to it instead of triggering a spawn-retry cascade.
- * - Interruption: nobody is coming back for this attach, so the release
- *   reaps the just-spawned child (SIGTERM→750ms→SIGKILL). This is the one
- *   new path — the old promise code could not be cancelled at all. The
- *   check is `Cause.hasInterrupts` (ANY interruption present), not
- *   `hasInterruptsOnly`: a cancel that races a concurrent failure must
- *   still reap — only pure non-interrupt failures adopt the worker.
- */
 export const spawnAdoptedWorker = (
   options: LifecycleStartOptions,
   paths: RuntimePaths,

@@ -45,7 +45,6 @@ export type WorkerHealthSnapshot = {
   voiceBusy?: boolean;
   pendingVoiceRequestCount?: number;
   piBusy?: boolean;
-  /** Stella is mid-reply in a chat here. */
   piReplying?: boolean;
 };
 
@@ -72,7 +71,6 @@ const waitForWorkerProcessExitEffect = (
           try {
             child.kill("SIGKILL");
           } catch {
-            // Best effort during process shutdown.
           }
         }),
       ),
@@ -91,7 +89,6 @@ const disconnectWorkerEffect = (
       try {
         child.stdin?.end();
       } catch {
-        // Best effort.
       }
       return Effect.void;
     }
@@ -102,7 +99,6 @@ const disconnectWorkerEffect = (
         try {
           child.stdin?.end();
         } catch {
-          // Best effort.
         }
         return Effect.sync(() => {
           child.off("exit", finish);
@@ -128,11 +124,6 @@ export type RuntimeWorkerLifecycleControllerOptions = {
   killWorker?: () => Promise<void>;
 };
 
-/**
- * The host-side worker lifecycle. Exit and close events act only when they
- * come from the current connection, so a stopped worker that exits late can't
- * reset or replace its successor.
- */
 export class RuntimeWorkerLifecycleController {
   private connection: WorkerConnection | null = null;
   private startupPromise: Promise<void> | null = null;
@@ -289,12 +280,6 @@ export class RuntimeWorkerLifecycleController {
     }
   }
 
-  /**
-   * Stops the current worker. `stillIdle` is asked after new requests are held
-   * (state `stopping`) and in-flight ones have drained, right before the kill;
-   * returning false keeps the worker running and resolves `false`. `retire`
-   * refuses every later start (the process itself is about to restart).
-   */
   async stop(
     reason: "idle" | "restart" | "stopped",
     options: { stillIdle?: () => Promise<boolean>; retire?: boolean } = {},

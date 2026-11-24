@@ -54,7 +54,6 @@ const addIntent = (phase: WorkerPhase, next: RestartIntent): WorkerPhase => {
 const withoutStale = (intent: RestartIntent | null): RestartIntent | null =>
   intent ? { ...intent, stale: null } : null;
 
-/** The single place the worker's restart intent changes. */
 export const transitionWorkerPhase = (
   phase: WorkerPhase,
   event: WorkerPhaseEvent,

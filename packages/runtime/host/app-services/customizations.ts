@@ -1,8 +1,3 @@
-/**
- * Settings' prompt presets, onboarding's prompts, resetting customizations
- * and reading a skill's frontmatter. They read the runtime's own prompt and
- * home files (and YAML), so they run here rather than in Electron main.
- */
 import {
   getPromptPresetSelection,
   setPromptPresetSelection,
@@ -91,7 +86,6 @@ export const readRuntimePromptForApp = async (
   return readRuntimePrompt(typeof request?.id === "string" ? request.id : "") ?? null;
 };
 
-/** Seed the home folder from the app: outputs README, bundled skills, layout migrations. */
 export const seedStellaDataDir = async (stellaAppDir: string, stellaDataDir: string) => {
   const { ensureStellaDataDirSeeded } = await import("../../kernel/home/stella-home.js");
   return await ensureStellaDataDirSeeded(stellaAppDir, stellaDataDir);

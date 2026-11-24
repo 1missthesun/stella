@@ -1,10 +1,3 @@
-/**
- * Settings → Integrations and connect offers in chat: the connector catalog,
- * which integrations are on, their accounts, and the sign-in each needs. This
- * runs in the runtime, which owns the connector state; the steps that need the
- * app's windows (approval cards, the browser) go back to it through the
- * requestConnectorSignIn host handler, keyed by the flow's id.
- */
 import {
   disableNativeConnector,
   enableNativeConnector,
@@ -717,10 +710,6 @@ const connectorIdentityFingerprint = (target: ResolvedNativeCredentialTarget) =>
   });
 };
 
-/**
- * What a connect offer's card shows, and the fingerprint the accepted
- * connection must still match (the catalog can change while the card is open).
- */
 export const describeConnectorOffer = async (
   options: NativeCredentialFlowOptions,
   stellaAppDir: string,
@@ -744,7 +733,6 @@ export const describeConnectorOffer = async (
   };
 };
 
-/** Connect an accepted offer: sign in if needed, then turn the integration on. */
 export const connectConnectorOffer = async (
   options: NativeCredentialFlowOptions,
   stellaAppDir: string,

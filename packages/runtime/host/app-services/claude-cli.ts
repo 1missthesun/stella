@@ -1,8 +1,3 @@
-/**
- * Finding, installing, updating and repairing the Claude Code CLI. The app
- * keeps its Claude account logins and the update schedule; how to find,
- * install, update or repair the CLI is the runtime's, which runs it for turns.
- */
 import { randomUUID } from "node:crypto";
 
 import { createCancelableRegistry } from "./cancelable.js";
@@ -47,7 +42,6 @@ export const cancelClaudeCliInstall = (request: { installId?: unknown } | null |
   return { canceled: installs.cancel(installId, new Error("Claude Code install cancelled.")) };
 };
 
-/** One scheduled check: update or repair the CLI, and forget aliases a new version resolves differently. */
 export const checkClaudeCliUpdate = async (
   stellaDataDir: string,
   request: { previousVersion?: unknown } | null | undefined,

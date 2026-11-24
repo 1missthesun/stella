@@ -69,16 +69,9 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MIN_TOKEN_REFRESH_DELAY_MS = 30_000;
 const HTTP_TIMEOUT_MS = 15_000;
 const CANCELLATION_RPC_TIMEOUT_MS = 60_000;
-/**
- * A task whose local run was lost (the runtime restarting for an Update,
- * crashing, or slow to come back) is run again, joining the same durable work,
- * with growing waits for up to this long. An Update restart can take well over
- * 20 seconds on a loaded computer.
- */
 const AGENT_RUN_RETRY_WINDOW_MS = 10 * 60_000;
 const AGENT_RUN_RETRY_MS = 3_000;
 const AGENT_RUN_RETRY_MAX_MS = 60_000;
-/** Ends a task whose runtime never came back: paused where it was, not failed. */
 export const AGENT_RUN_INTERRUPTED_ERROR_CODE = "LOCAL_RUN_INTERRUPTED";
 const DISPATCH_WATCH_POLL_MS = 750;
 const DEVICE_PRESENCE_SILENCE_MS = 3 * DEVICE_PRESENCE_PING_INTERVAL_MS + 2_000;
@@ -109,11 +102,6 @@ const remoteCancellation = (
     ? { errorCode: AGENT_STOPPED_ERROR_CODE, errorMessage: AGENT_STOPPED_REASON }
     : { errorMessage: "Canceled by the user." };
 
-/**
- * A run the server already ended while this computer was away. One ended by
- * a stop ends here as a stop (the task is marked stopped and what it left
- * running ends), not as a run that merely lost its place and may start again.
- */
 const remoteEnded = (
   remote: Pick<DispatchSummary, "state" | "cancelReason">,
   fallback: { errorCode: string; errorMessage: string },
@@ -125,7 +113,6 @@ const remoteEnded = (
 export type ExecutionPlacementRunResult = {
   status: "ok" | "error" | "canceled";
   stopped?: boolean;
-  /** Its runtime never came back to finish it: it keeps its context and a message carries it on. */
   interrupted?: boolean;
   finalText?: string;
   error?: string;
@@ -447,11 +434,6 @@ export class ExecutionPlacementBridge {
     return this.started && !this.stopped && epoch === this.lifecycleEpoch;
   }
 
-  /**
-   * A task's run is durable on this computer: a restart pauses it and the
-   * same dispatch resumes it (runExecution is idempotent per dispatch), so
-   * its row outlives the bridge instead of being canceled.
-   */
   private resumable(row: ExecutionPlacementInboxRow | null | undefined) {
     return (
       row?.kind === "agent" &&
@@ -504,7 +486,6 @@ export class ExecutionPlacementBridge {
         if (typeof error.retryable === "boolean") retryable = error.retryable;
       }
     } catch {
-      // A terse body keeps the status-derived defaults.
     }
     throw new PlacementRouteError({
       code,
@@ -839,13 +820,6 @@ export class ExecutionPlacementBridge {
     });
   }
 
-  /**
-   * Reopens the socket with a fresh sign-in shortly before its token expires.
-   * Only a different token is worth a reconnect: while the sign-in still hands
-   * out the one this socket opened with (it hasn't refreshed yet, or this
-   * computer's clock runs ahead of the token's), the socket stays up and the
-   * check repeats, instead of dropping presence every 30 s for nothing.
-   */
   private armTokenRefresh(
     socket: ExecutionPlacementSocket,
     token: string,
@@ -1063,7 +1037,6 @@ export class ExecutionPlacementBridge {
         this.log("warn", "An agent stop was not applied.", error);
       }
     }
-    // Gates from before `stop_agent` read a stop's ack as `paused`.
     this.send({ type: "agent-pause.ack", commandId, threadId, outcome: outcome === "stopped" ? "paused" : outcome });
   }
 
@@ -1145,8 +1118,6 @@ export class ExecutionPlacementBridge {
         dispatch.state === "canceled" &&
         isAgentStopReason(dispatch.cancelReason)
       ) {
-        // Stopped while this computer was away, and the server gave up
-        // waiting for it: the task still stops here, as a stop.
         await this.cancelAccepted(local, dispatch);
       }
       return;
@@ -1310,8 +1281,6 @@ export class ExecutionPlacementBridge {
 
     const now = this.now();
     for (const row of this.inbox.listAllUnfinished()) {
-      // A task keeps its dispatch across a restart: the runtime pauses it
-      // (its work is durable) and the next start resumes it from here.
       if (row.kind === "agent" && !row.cancelRpcPending) continue;
       if (["claimed", "accepted", "running"].includes(row.state)) {
         this.inbox.stageCancellation(row.dispatchId, {
@@ -1333,8 +1302,6 @@ export class ExecutionPlacementBridge {
     );
     const cancellationsAcknowledged = cancellationResults.every(Boolean);
     if (cancellationsAcknowledged) {
-      // Tasks run on until the runtime pauses them; waiting here would hold
-      // the quit for as long as the task works.
       await Promise.allSettled(
         [...this.executionTasks.entries()]
           .filter(([dispatchId]) => !this.resumable(this.inbox.get(dispatchId)))
@@ -1388,7 +1355,6 @@ export class ExecutionPlacementBridge {
           error,
         );
       }
-      // A task resumes (reconcileInbox), unless it was stopped meanwhile.
       if (row.kind === "agent" && !remoteCanceled) continue;
       this.inbox.stageCancellation(row.dispatchId, {
         outcome: remoteCanceled ? "canceled" : "failed",
@@ -1533,8 +1499,6 @@ export class ExecutionPlacementBridge {
         identityRefreshNeeded = true;
         const leaseLost = this.leases.noteRenewalFailure(row.dispatchId, now);
         this.log("warn", "Execution placement lease renewal failed.", error);
-        // A task outlives a lost connection: the server holds its dispatch
-        // for reconciliation, and the task reports once it reconnects.
         if (
           isOwnerLifecycleFenceError(error) ||
           (leaseLost && row.kind !== "agent")
@@ -1922,8 +1886,6 @@ export class ExecutionPlacementBridge {
         }
         continue;
       }
-      // A dispatch stopped (or moved elsewhere) while this computer was away
-      // keeps its cancel request in reconciliation; it ends here, unrun.
       if (remote.state === "cancel_pending" || remote.cancelRequestId) {
         await this.launchLocal(row, { ...remote, state: "cancel_pending" });
       } else if (row.state === "terminal_pending") {
@@ -2134,12 +2096,6 @@ export class ExecutionPlacementBridge {
     }
   }
 
-  /**
-   * Runs the dispatch here. A task's run is idempotent per dispatch, so when
-   * the runtime goes away mid-run (restart, crash) it runs again and joins
-   * the same durable work; null means the bridge stopped and the next start
-   * resumes it, so nothing is settled now.
-   */
   private async runLocally(
     row: ExecutionPlacementInboxRow,
     remote: DispatchSummary,

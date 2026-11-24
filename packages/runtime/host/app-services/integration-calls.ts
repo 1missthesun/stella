@@ -22,11 +22,6 @@ const flows = createCancelableRegistry();
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
-/**
- * The flow options the moved integration code expects: Stella's backend
- * auth comes with the request (main holds the session), and each sign-in step
- * that needs a window goes back to the app as requestConnectorSignIn.
- */
 const flowOptions = (
   context: AppServiceContext,
   request: IntegrationRequest,

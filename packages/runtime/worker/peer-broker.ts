@@ -110,7 +110,6 @@ export class WorkerPeerBroker {
       try {
         (listener as PeerEventListener<K>)(payload);
       } catch {
-        // Listener errors are isolated.
       }
     }
   }
@@ -142,19 +141,10 @@ export class WorkerPeerBroker {
       try {
         peer.notify(method, params);
       } catch {
-        // Notification failures on one peer don't block the rest.
       }
     }
   }
 
-  /**
-   * Outgoing request to "the host." We pick the most-recently attached
-   * peer as authoritative; if no peer is attached, wait briefly for one.
-   * Mid-call disconnect retries are opt-in because most host callbacks
-   * should fail quickly during bootstrap or tool work. Morph transitions
-   * opt in because they are specifically meant to bridge an Electron
-   * restart gap.
-   */
   async request<TResult = unknown>(
     method: string,
     params?: unknown,
@@ -230,7 +220,6 @@ export class WorkerPeerBroker {
       try {
         peer.dispose();
       } catch {
-        // Best effort.
       }
     }
   }

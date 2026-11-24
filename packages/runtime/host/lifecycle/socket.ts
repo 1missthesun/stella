@@ -73,7 +73,6 @@ const connectSocket = (
           try {
             socket.destroy();
           } catch {
-            // ignore
           }
           resume(Effect.fail(new WorkerNotReadyError({ socketPath })));
           return;
@@ -93,7 +92,6 @@ const connectSocket = (
           try {
             socket.destroy();
           } catch {
-            // ignore
           }
         }
       });
@@ -109,7 +107,6 @@ const destroyQuietly = (socket: Socket) => {
   try {
     socket.destroy();
   } catch {
-    // ignore
   }
 };
 

@@ -44,7 +44,6 @@ const displayOf = (
     (attachment, index): NonNullable<PiUserDisplay["attachments"]> => {
       const typeFromLocation =
         attachment.kind === "file" ? undefined : contentTypeFromName(attachment.path ?? attachment.url);
-      // Screenshots and dropped images can arrive as a bare path plus a data-URL preview, with no kind or type.
       const image =
         attachment.kind === "image" ||
         (attachment.mimeType ?? "").startsWith("image/") ||

@@ -237,15 +237,27 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     const target = path.join(savedDir, name);
     if (!isSeparateCopy(target, real)) {
       const temp = path.join(savedDir, `.${name}.${process.pid}.tmp`);
-      await fs.promises.rm(temp, { force: true });
-      // A clone where the file system can, a copy elsewhere.
-      await fs.promises.copyFile(real, temp, fs.constants.COPYFILE_FICLONE);
-      if (process.platform !== "win32") await fs.promises.chmod(temp, 0o755);
-      await fs.promises.rename(temp, target);
+      try {
+        await fs.promises.rm(temp, { force: true });
+        // A clone where the file system can, a copy elsewhere.
+        await fs.promises.copyFile(real, temp, fs.constants.COPYFILE_FICLONE);
+        if (process.platform !== "win32") await fs.promises.chmod(temp, 0o755);
+        // Windows won't replace a program that is running (an old hard link is
+        // the installed one), but lets it be renamed; the loop below removes it
+        // once it can.
+        if (process.platform === "win32") {
+          await fs.promises.rename(target, `${target}.${Date.now()}.old`).catch(() => undefined);
+        }
+        await fs.promises.rename(temp, target);
+      } catch (error) {
+        await fs.promises.rm(temp, { force: true }).catch(() => undefined);
+        throw error;
+      }
     }
     for (const entry of await fs.promises.readdir(savedDir)) {
       if (entry !== name && entry.startsWith(`${spec.program}-`)) {
-        await fs.promises.rm(path.join(savedDir, entry), { force: true });
+        // One still running stays until a later save.
+        await fs.promises.rm(path.join(savedDir, entry), { force: true }).catch(() => undefined);
       }
     }
     return target;

@@ -47,6 +47,13 @@ fi
 
 scripts/check-bun-pin.sh
 
+# The bundled translation catalogs are pruned to the keys this tree's sources
+# name; a stale copy would show raw keys for strings added since the last sync.
+if ! node scripts/sync-i18n-catalogs.mjs --check; then
+  echo "REFUSING to publish: src/i18n is stale. Run \`bun run i18n:sync\` and commit." >&2
+  exit 1
+fi
+
 SHA="$(git rev-parse --short HEAD)"
 SUBJECT="$(git log -1 --format=%s)"
 

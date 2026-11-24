@@ -50,7 +50,7 @@ export interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
-  const [catalog, setCatalog] = useState<Catalog>(() => getEnglishCatalog());
+  const [catalog, setCatalog] = useState<Catalog>(() => getCatalog(locale));
 
   useEffect(() => {
     let cancelled = false;

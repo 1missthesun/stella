@@ -942,6 +942,9 @@
       "description": "Toon spraak- en belknoppen. Dicteren werkt hoe dan ook.",
       "title": "Spraakgesprekken"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Toegevoegd op {added}"
     }

@@ -941,6 +941,9 @@
       "description": "显示语音和通话控件。听写不受影响。",
       "title": "语音对话"
     },
+    "groups": {
+      "app": "应用"
+    },
     "secureValues": {
       "added": "添加于 {added}"
     }

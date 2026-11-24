@@ -941,6 +941,9 @@
       "description": "音声と通話のコントロールを表示します。音声入力はどちらでも使えます。",
       "title": "音声での会話"
     },
+    "groups": {
+      "app": "アプリ"
+    },
     "secureValues": {
       "added": "{added} に追加"
     }

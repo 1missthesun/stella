@@ -942,6 +942,9 @@
       "description": "Show voice and call controls. Dictation works either way.",
       "title": "Voice conversations"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Added {added}"
     }

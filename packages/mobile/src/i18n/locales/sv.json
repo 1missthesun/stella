@@ -942,6 +942,9 @@
       "description": "Visa röst- och samtalskontroller. Diktering fungerar oavsett.",
       "title": "Röstsamtal"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Tillagd {added}"
     }

@@ -941,6 +941,9 @@
       "description": "Tampilkan kontrol suara dan panggilan. Dikte tetap berfungsi.",
       "title": "Percakapan suara"
     },
+    "groups": {
+      "app": "Aplikasi"
+    },
     "secureValues": {
       "added": "Ditambahkan {added}"
     }

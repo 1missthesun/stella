@@ -942,6 +942,9 @@
       "description": "Vis stemme- og samtalekontroller. Diktering fungerer uansett.",
       "title": "Talesamtaler"
     },
+    "groups": {
+      "app": "App"
+    },
     "secureValues": {
       "added": "Lagt til {added}"
     }

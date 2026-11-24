@@ -943,6 +943,9 @@
       "description": "Afișează comenzile de voce și apel. Dictarea funcționează oricum.",
       "title": "Conversații vocale"
     },
+    "groups": {
+      "app": "Aplicație"
+    },
     "secureValues": {
       "added": "Adăugat pe {added}"
     }

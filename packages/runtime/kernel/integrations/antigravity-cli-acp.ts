@@ -358,6 +358,16 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     (turn as TurnState & { reject?: (error: Error) => void }).reject?.(error);
   };
 
+  /** A canceled turn doesn't end while the CLI waits for a call, so one that has no answer yet is answered as it ends. */
+  const untilEnded = (turn: TurnState, call: Promise<ToolResult>): Promise<ToolResult> =>
+    new Promise((resolve, reject) => {
+      const signal = turn.request.signal;
+      const onAbort = () => resolve({ error: "The call was canceled." });
+      if (signal.aborted) return onAbort();
+      signal.addEventListener("abort", onAbort, { once: true });
+      call.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+    });
+
   const startMcp = async (key: string, tools: AntigravityToolSpec[], getProc: () => Proc | undefined) => {
     const host = await createClaudeCodeToolMcpHost({
       tools,
@@ -372,7 +382,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           nativeToolCallIds: true,
           claimNativeToolUseId: (name: string, args: Record<string, unknown>, signal: AbortSignal) => claim(proc, name, args, signal),
           executeTool: (toolCallId: string, name: string, args: Record<string, unknown>, signal?: AbortSignal) =>
-            turn.request.executeTool(toolCallId, name, args, signal),
+            untilEnded(turn, turn.request.executeTool(toolCallId, name, args, signal)),
         };
       },
     });

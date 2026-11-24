@@ -171,17 +171,15 @@ export const columnStyle: CSSProperties = {
   paddingBottom: APP_COLUMN.paddingBottom,
 };
 
-/** Stella's composer: the add button, the field, the mic, stop while working, and send. */
+/** Stella's composer: the add button, the field, the mic, and send. */
 export function ComposerView({
   fieldRef,
   formRef,
-  stopRef,
   submitRef,
   slot,
 }: {
   fieldRef?: (el: HTMLDivElement | null) => void;
   formRef?: (el: HTMLDivElement | null) => void;
-  stopRef?: (el: HTMLButtonElement | null) => void;
   submitRef?: (el: HTMLButtonElement | null) => void;
   slot?: ReactNode;
 }) {
@@ -207,9 +205,6 @@ export function ComposerView({
               <div className="composer-toolbar-right">
                 <button type="button" tabIndex={-1} className="chat-composer-icon-button chat-composer-icon-button--mic composer-mic">
                   <AppIcon name="Mic" size={16} strokeWidth={1.75} />
-                </button>
-                <button type="button" tabIndex={-1} ref={stopRef} className="chat-composer-icon-button chat-composer-icon-button--stop composer-stop" data-demo-stop="" hidden>
-                  <AppIcon name="Square" size={16} fill="currentColor" />
                 </button>
                 <button type="button" tabIndex={-1} ref={submitRef} className="chat-composer-icon-button chat-composer-icon-button--submit composer-submit" disabled>
                   <AppIcon name="ArrowUp" size={16} strokeWidth={1.75} />

@@ -2,7 +2,6 @@
 export const APP_ICONS = {
   Plus: "<path d=\"M12 5.5v13M5.5 12h13\"/>",
   Mic: "<rect x=\"9.25\" y=\"3\" width=\"5.5\" height=\"11\" rx=\"2.75\"/> <path d=\"M5.75 11.5a6.25 6.25 0 0 0 12.5 0M12 17.75V21\"/>",
-  Square: "<rect x=\"5.75\" y=\"5.75\" width=\"12.5\" height=\"12.5\" rx=\"2.5\"/>",
   ArrowUp: "<path d=\"M12 19.5v-15M5.5 11 12 4.5 18.5 11\"/>",
   CircleDot: "<circle cx=\"12\" cy=\"12\" r=\"8.25\"/> <circle cx=\"12\" cy=\"12\" r=\"2.6\" fill=\"currentColor\" stroke=\"none\"/>",
   CheckCircle2: "<circle cx=\"12\" cy=\"12\" r=\"8.25\"/> <path d=\"m8.4 12.3 2.5 2.5 4.7-5.3\"/>",

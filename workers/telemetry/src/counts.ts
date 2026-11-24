@@ -62,18 +62,6 @@ const readSmallBody = async (request: Request): Promise<string | null> => {
   return new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(bytes);
 };
 
-/**
- * `POST /v1/counts`: unauthenticated anonymous install counts.
- *
- * Stored in Workers Analytics Engine, one data point per event:
- * index1 = keyed hash of the install ID; blob1 event type; blob2 engine,
- * answer, new/existing, setup step, day-1 message number or error kind;
- * blob3 platform; blob4 app release; blob5 environment; blob6 event ID
- * (random, for de-duplication); blob7 engine of a day-1 message or failed
- * reply, else "";
- * double1 = when it happened on the computer (ms). The client IP is used only
- * as a hashed rate-limit key and is never written.
- */
 export const handleCounts = async (
   request: Request,
   env: CountsEnv,

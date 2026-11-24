@@ -13,11 +13,6 @@ import {
 import { containsBrowserSecretPlaceholder } from "@stella/node-shared/browser/secret-placeholder.js";
 import { GatewayError } from "./errors.js";
 
-/*
- * Agents get placeholders for the credentials in what the browser returns, as
- * they do from the browsers on a computer. The values stay in the gateway.
- */
-
 const MAX_VAULTS = 16;
 
 type Params = Record<string, unknown>;
@@ -27,7 +22,6 @@ export type SecretPage = Readonly<{
   evaluate(script: string): Promise<unknown>;
 }>;
 
-/** This gateway's actions by the name the masking rules know them. */
 const MASKED_ACTIONS: Readonly<Record<string, string>> = {
   "browser.evaluate": "evaluate",
   "browser.requests": "requests",
@@ -161,7 +155,6 @@ export class ThreadBrowserSecrets {
   }
 }
 
-/** One thread's secrets each, the least recently used dropped. */
 export class ThreadSecretCache {
   private readonly threads = new Map<string, ThreadBrowserSecrets>();
 

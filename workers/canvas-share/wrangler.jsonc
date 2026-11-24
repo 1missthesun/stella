@@ -1,13 +1,5 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Cloudflare Worker: canvas-share serving layer.
-  //
-  // Serves published canvas documents from the `stella-canvas-shares` R2
-  // bucket at `GET /c/:slug`. The backend writes/deletes the objects; this
-  // Worker is read-only apart from an optional lazy delete of expired objects.
-  //
-  // DO NOT deploy from here as part of the backend build. Deploy is a separate,
-  // deliberate step once the domain and backend origin are configured.
   "name": "canvas-share",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-30",
@@ -25,7 +17,6 @@
     "OWNER_SITE_URL": "https://stella.sh"
   },
 
-  // Public share domain; scripts/check-deploy-config.mjs holds it to the backend's CANVAS_SHARE_BASE_URL.
   "routes": [
     {
       "pattern": "stellashare.app",

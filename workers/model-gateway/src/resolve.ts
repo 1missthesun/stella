@@ -14,16 +14,6 @@ import {
 } from "@stella/model-catalog/request-shaping";
 import { GatewayError } from "./errors.js";
 
-/**
- * Alias -> route resolution for the managed lane, per capability audience.
- *
- * Audience rules live in `@stella/model-catalog`: a restricted audience's
- * override silently falls back to the agent default there. That is fine for
- * a session capability (the caller asked for something it may not have), but
- * a turn capability was admitted with one exact execution — if the resolved
- * `requestedModel` is not that execution's model the request is refused
- * rather than routed elsewhere.
- */
 export type ManagedRoute = {
   requestedModel: string;
   resolvedModel: string;

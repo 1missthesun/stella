@@ -1,15 +1,5 @@
-/**
- * Conversation images arrive as short-lived signed URLs to Stella's own R2
- * objects (`conversation-images/...`), so the conversation never carries the
- * bytes. Providers that fetch image URLs get them as they are; for an upstream
- * that only takes inline images, the gateway reads each one back and sends it
- * as base64 in the request's own shape.
- */
-
-/** Managed providers verified to fetch image URLs themselves. */
 const URL_IMAGE_PROVIDERS = new Set(["openai", "anthropic", "openrouter", "xai"]);
 
-/** Upstream hosts (BYOK) verified to fetch image URLs themselves. */
 const URL_IMAGE_HOSTS = new Set(["api.openai.com", "api.anthropic.com", "openrouter.ai", "api.x.ai"]);
 
 export const providerFetchesImageUrls = (provider: string): boolean => URL_IMAGE_PROVIDERS.has(provider);
@@ -21,14 +11,8 @@ const FETCH_TIMEOUT_MS = 20_000;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const BLANK_GIF = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
-/** Whether the request might carry a stored image at all; a cheap check before parsing. */
 export const mayCarryStoredImages = (text: string): boolean => text.includes("conversation-images");
 
-/**
- * Only Stella's own signed R2 URLs are read: a presigned S3 URL on R2, or the
- * backend's signed `/api/r2/` link. Anything else stays a URL, so the gateway
- * never fetches an address a request merely names.
- */
 const isStoredImageUrl = (value: string, backendOrigin: string | undefined): boolean => {
   if (!value.startsWith("https://")) return false;
   let url: URL;
@@ -57,13 +41,6 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-/**
- * `json` with every stored image URL replaced by its bytes, in the shape the
- * protocol takes inline: an OpenAI `image_url` (Chat Completions' object or
- * Responses' string) becomes a data URL, and an Anthropic URL source becomes a
- * base64 source. An image that can't be read becomes a 1x1 transparent GIF so
- * the request stays well-formed. Returns the same object when nothing changed.
- */
 export const inlineStoredImages = async <T>(
   json: T,
   options: { fetch: typeof fetch; backendOrigin?: string },

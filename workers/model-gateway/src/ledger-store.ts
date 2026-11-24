@@ -12,12 +12,9 @@ export type LedgerReserveArgs = {
   jti: string;
   budgetMicroCents: number;
   maxRequests?: number;
-  /** Capability expiry, ms since epoch. */
   expiresAt: number;
   requestId: string;
-  /** The most this attempt can cost; held in full when the budget allows. */
   estimatedMicroCents: number;
-  /** Hold less than the estimate, down to this floor, when that is all that is left. */
   minimumMicroCents?: number;
 };
 
@@ -25,7 +22,6 @@ export type LedgerReserveResult =
   | {
       kind: "reserved";
       attempt: string;
-      /** 1 for the first physical attempt of this request id, 2+ for retries. */
       attemptNumber: number;
       heldMicroCents: number;
       remainingMicroCents: number | null;
@@ -39,11 +35,8 @@ export type LedgerSettleArgs = {
   requestId: string;
   attempt: string;
   chargedMicroCents: number;
-  /** Refund the request count when no provider output byte was received. */
   refundRequest: boolean;
-  /** Present for a completed result that should be replayable. */
   result?: { status: number; body: string };
-  /** Kept in the outbox, in the same transaction, until billing acknowledges it. */
   usage?: GatewayUsageEvent;
 };
 
@@ -116,9 +109,6 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS usage_outbox_due ON usage_outbox(next_at)`,
 ];
 
-// Result rows: status > 0 holds a replayable result, 0 an attempt in flight,
-// and SETTLED_UNREPLAYABLE a finished attempt whose result was not kept, so
-// the next attempt for that request id is counted as a retry.
 const SETTLED_UNREPLAYABLE = -1;
 
 export type OutboxEntry = { id: string; event: GatewayUsageEvent; tries: number; createdAt: number };
@@ -129,13 +119,7 @@ export const usageOutboxId = (event: GatewayUsageEvent): string =>
 const clampMicroCents = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 
-/**
- * Capability budget, request-count and replay accounting, keyed by jti.
- * Every method is synchronous SQL, so the hosting object's input gate makes
- * each one atomic. A reservation is owned by the attempt token `reserve`
- * returns: only that attempt can settle it, and once its lease lapses the
- * next reserve for the same request id replaces it with a new attempt.
- */
+// A Durable Object's input gate makes each method atomic only while it stays synchronous SQL.
 export class LedgerStore {
   constructor(private readonly storage: DurableObjectStorage) {
     for (const statement of SCHEMA) this.storage.sql.exec(statement);
@@ -399,7 +383,6 @@ export class LedgerStore {
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }
 
-  /** Arms the alarm for the next ledger expiry or usage delivery, unless an earlier one is set. */
   async armAlarm(): Promise<void> {
     const next = this.nextAlarmAt();
     if (next === null) return;
@@ -408,7 +391,7 @@ export class LedgerStore {
     if (current === null || at < current) await this.storage.setAlarm(at);
   }
 
-  /** Inside alarm(): the fired alarm is gone, so set the next one unconditionally. */
+  // Cloudflare clears the fired alarm before alarm() runs.
   async rearmAfterAlarm(): Promise<void> {
     const next = this.nextAlarmAt();
     if (next !== null) await this.storage.setAlarm(Math.max(Date.now() + 250, next));

@@ -159,12 +159,6 @@ const stringAt = (value: unknown, ...path: string[]): string | undefined => {
   return typeof current === "string" && current.trim() ? current.trim() : undefined;
 };
 
-/**
- * A provider's refusal as one short line: its own message, plus the model
- * host's message when a router (OpenRouter) wraps one. Keys and bearer tokens
- * are cut out; the line is capped, so a provider echoing request text can't
- * put much of it in a log.
- */
 const rejectionReason = (bodyText: string, apiKey: string | undefined): string => {
   let parsed: unknown;
   try {
@@ -270,8 +264,6 @@ export const handleByokRelay = async (args: {
   const access = await accessFor(env, claims, provider, deps.now());
   const target = upstreamTarget(request.headers.get(GATEWAY_BYOK_UPSTREAM_HEADER), access);
   const headers = forwardHeaders(request, access);
-  // Stored conversation images arrive as signed URLs; an upstream that can't
-  // fetch them gets the bytes inline instead.
   let upstreamBody = bodyText;
   if (!hostFetchesImageUrls(target.host) && mayCarryStoredImages(bodyText)) {
     const images = await inlineStoredImages(JSON.parse(bodyText) as unknown, {
@@ -327,8 +319,6 @@ export const handleByokRelay = async (args: {
     accessCache.delete(`${claims.sub}|${claims.gen}|${provider}`);
   }
   if (upstream.status >= 400 && upstream.status < 500) {
-    // The provider refused the request itself. Its reason goes to the log
-    // and, cleaned, to the caller, so a refusal isn't a bare status code.
     const errorText = upstream.body ? await readCapped(upstream.body).catch(() => "") : "";
     controller.dispose();
     const reason = rejectionReason(errorText, access.apiKey);

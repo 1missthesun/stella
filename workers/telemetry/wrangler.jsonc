@@ -3,7 +3,7 @@
   "name": "stella-v2-telemetry-dev",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-30",
-  // The JWKS lives on cloud-builder in the same account (see model-gateway).
+  // A plain fetch to another worker in the same account fails (error 1042) without this flag.
   "compatibility_flags": ["global_fetch_strictly_public"],
   "workers_dev": true,
   "preview_urls": false,
@@ -41,18 +41,16 @@
   "ratelimits": [
     {
       "name": "TELEMETRY_RATE_LIMITER",
-      // Account-local integer namespace. Replace if already allocated.
+      // Rate-limit namespaces are shared by every worker in the Cloudflare account.
       "namespace_id": "41001",
       "simple": { "limit": 120, "period": 60 }
     },
     {
-      // Anonymous counts, keyed by the pseudonymized install ID.
       "name": "COUNTS_INSTALL_RATE_LIMITER",
       "namespace_id": "41003",
       "simple": { "limit": 10, "period": 60 }
     },
     {
-      // Anonymous counts, keyed by a keyed hash of the client IP (never stored).
       "name": "COUNTS_IP_RATE_LIMITER",
       "namespace_id": "41004",
       "simple": { "limit": 60, "period": 60 }
@@ -86,7 +84,6 @@
       "ratelimits": [
         {
           "name": "TELEMETRY_RATE_LIMITER",
-          // Must differ from development.
           "namespace_id": "41002",
           "simple": { "limit": 120, "period": 60 }
         },

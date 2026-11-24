@@ -49,8 +49,7 @@ export const createGoogleAssembler = (): Assembler => {
       isTextPart(part) &&
       isTextPart(previous) &&
       (previous.thought === true) === (part.thought === true) &&
-      // A signed fragment closes the run: the signature belongs to exactly
-      // the text accumulated so far.
+      // Gemini's thoughtSignature belongs to exactly the text accumulated so far.
       previous.thoughtSignature === undefined
     ) {
       previous.text = `${previous.text as string}${part.text as string}`;

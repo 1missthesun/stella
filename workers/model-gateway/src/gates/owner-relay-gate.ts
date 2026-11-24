@@ -50,11 +50,6 @@ export type OwnerAdmissionRefusal = {
   resetAt: number;
 };
 
-/**
- * Wire shape of `admitRelay`. `duplicate` marks a request id this owner
- * already holds in flight: it is admitted without a hold of its own, and
- * only the holder releases it.
- */
 export type GateAdmission =
   | { ok: true; duplicate?: boolean }
   | ({ ok: false } & OwnerAdmissionRefusal);
@@ -292,8 +287,6 @@ export class OwnerRelayGate extends DurableObject<Env> {
     }
     const current = this.enforcementRecord();
     const applied = this.applyOwnerEnforcementSync(record, current);
-    // A delayed authenticated push cannot attest to a newer legacy KV seed.
-    // Leave its v1 marker for the authoritative bootstrap in that case.
     if (!current || record.updatedAt >= current.updatedAt) {
       this.ctx.storage.sql.exec(
         "INSERT OR REPLACE INTO owner_enforcement_meta(singleton, initialized) VALUES (1, ?)",
@@ -314,8 +307,7 @@ export class OwnerRelayGate extends DurableObject<Env> {
       initialized.initialized >= OWNER_ENFORCEMENT_INITIALIZATION_VERSION
     )
       return;
-    // KV is an eventual mirror. Bootstrap from the owner's object on
-    // cloud-builder so a stale KV read can never seed this durable state.
+    // Workers KV is eventually consistent.
     let state: unknown;
     try {
       state = await billingControl(this.env).ownerEnforcement(ownerId);
@@ -521,10 +513,6 @@ export class OwnerRelayGate extends DurableObject<Env> {
     );
   }
 
-  /**
-   * Owner-wide admission and generation/JTI accounting commit together; the
-   * admission is held by the reservation's attempt until that attempt settles.
-   */
   async admitAndReserve(args: {
     audience: ManagedModelAudience;
     requestId: string;

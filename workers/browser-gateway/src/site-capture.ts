@@ -3,17 +3,6 @@ import type { BrowserGatewayEnv } from "./profile-session-core.js";
 import { GatewayError } from "./errors.js";
 import { withTimedBrowser } from "./timed-browser.js";
 
-/**
- * Screenshots (and an optional short recording) of one Stella site, for Crew
- * agents' visual proof. The caller (cloud-builder, over the service binding)
- * checks the site belongs to the asking workspace and, for members-only
- * sites, passes a short-lived sign-in URL that lands on the page. Each view
- * gets its own throwaway browser context with no profile.
- *
- * A recording is the page's own screencast frames, replayed onto a canvas in
- * a second page and encoded there with MediaRecorder: Browser Run has no
- * ffmpeg, so the browser encodes its own video.
- */
 const NAVIGATION_TIMEOUT_MS = 25_000;
 const SETTLE_MS = 1_200;
 const MAX_VIEWS = 4;
@@ -165,6 +154,7 @@ const runStep = async (page: Page, step: Step): Promise<void> => {
 
 type Frame = { data: string; at: number };
 
+// Browser Run has no ffmpeg.
 const ENCODE_SCRIPT = `async ({ width, height }) => {
   const holder = globalThis;
   const list = holder.__frames;

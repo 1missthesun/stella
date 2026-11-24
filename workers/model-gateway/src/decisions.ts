@@ -11,12 +11,6 @@ const UPSTREAM_TIMEOUT_MS = 20_000;
 
 type Block = { type?: unknown; text?: unknown; data?: unknown; mime_type?: unknown; resolution?: unknown };
 
-/**
- * Stella's decision request (an `input` list of text, image and document
- * blocks; `noul` criteria as `true_description`/`false_description`) in
- * OpenRouter's Decisions shape: the blocks become top-level `state` items
- * (`image_url` and `file` parts as data URLs) and `noul` criteria `true`/`false`.
- */
 export const openRouterDecisionBody = (body: Record<string, unknown>): Record<string, unknown> => {
   const blocks = Array.isArray(body.input) ? (body.input as Block[]) : [];
   const state: unknown[] = [];
@@ -49,20 +43,12 @@ export const openRouterDecisionBody = (body: Record<string, unknown>): Record<st
   }
   return {
     model: GATEWAY_DECISIONS_MODEL,
-    // Mail is private: only endpoints that don't store or train on it.
     provider: { data_collection: "deny" },
     state: state.length === 1 && typeof state[0] === "string" ? state[0] : state,
     questions,
   };
 };
 
-/**
- * Gemini Decision 1 (Google's closed-set decision model) for Stella's own
- * background work, such as sorting a user's new email, through OpenRouter on
- * the managed key. Billed by input tokens only; the caller keeps its own
- * per-owner cost guard. The answer keeps Stella's shape: `answers` as
- * OpenRouter returns them, and `usage.total_input_tokens`.
- */
 export const handleDecisions = async (
   request: Request,
   env: Env,
@@ -85,8 +71,6 @@ export const handleDecisions = async (
   } catch {
     throw new GatewayError(400, "bad_request", "The decision request must be a JSON object.");
   }
-  // An email capability admitted on the owner's own OpenRouter key spends theirs; otherwise Stella's
-  // (on a self-hosted server, that server's own key).
   const execution = claims.turn?.execution;
   const ownKey = execution?.engine === "provider" && execution.provider === "openrouter";
   if (ownKey && execution.model !== GATEWAY_DECISIONS_MODEL) {

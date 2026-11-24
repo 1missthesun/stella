@@ -62,7 +62,6 @@ export class AppCompiler
 
 export default {
   fetch(): Response {
-    // Private Service Binding RPC worker only; never publicly routable.
     return new Response("Not found.", { status: 404 });
   },
 } satisfies ExportedHandler<Cloudflare.Env>;

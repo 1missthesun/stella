@@ -107,11 +107,7 @@ export const GATEWAY_REPLAY_HEADER = "x-stella-gateway-replay" as const;
 
 const MAX_UPSTREAM_STREAM_BYTES = 64 * 1024 * 1024;
 
-// Output ceiling assumed for budgeting when neither the model nor the caller
-// names one.
 const ASSUMED_MAX_OUTPUT_TOKENS = 64_000;
-// The smallest answer worth sending when the budget can't cover the full
-// output ceiling; below this the request is refused as over budget.
 const MIN_AFFORDABLE_OUTPUT_TOKENS = 1_024;
 
 const assemblerFor = (protocol: GatewayProtocol): Assembler => {
@@ -127,11 +123,6 @@ const assemblerFor = (protocol: GatewayProtocol): Assembler => {
   }
 };
 
-/**
- * The URL `@stella/model-catalog` shapes against. Google's verb and `alt=sse`
- * are forced here because the model catalog preserves whatever verb the
- * caller used; everything else keeps the caller's path suffix.
- */
 const shapingUrlFor = (request: Request, protocol: GatewayProtocol): URL => {
   const url = new URL(request.url);
   if (protocol === "google-generative-ai") {
@@ -152,9 +143,7 @@ const streamingRequestJson = (
   // Google streams by verb, not by body flag, and rejects unknown fields.
   if (protocol === "google-generative-ai") delete body.stream;
   else body.stream = true;
-  // Every managed Responses request stands alone: clients carry reasoning
-  // inline and never chain on a stored response, and some upstreams refuse
-  // `store: true` outright ("not supported on this proxy").
+  // Some Responses upstreams refuse `store: true` ("not supported on this proxy").
   if (protocol === "openai-responses" && body.store === true) body.store = false;
   return body;
 };
@@ -182,7 +171,6 @@ export type ShapedUpstreamRequest = {
   url: string;
   headers: Headers;
   body: string;
-  /** The output ceiling the upstream is sent, reasoning included. */
   maxOutputTokens: number | null;
 };
 
@@ -369,19 +357,12 @@ export type AttemptCost = {
   basis: "actual" | "estimated";
 };
 
-/**
- * What one physical attempt cost Stella: the provider's reported cost when
- * it sent one, else the tokens it reported (or that were seen streaming
- * before a failure) at the tariff. `inputTokens` is the request estimate
- * the provider's own count replaces.
- */
 export const attemptCost = (args: {
   model: string;
   price: TokenPriceConfig;
   usage: RelayUsage | null;
   inputTokens: number;
   streamedOutputTokens: number;
-  /** The provider finished the response, so its reported counts are final. */
   complete: boolean;
 }): AttemptCost => {
   const seen = { inputTokens: args.inputTokens, outputTokens: Math.max(0, args.streamedOutputTokens) };
@@ -390,8 +371,7 @@ export const attemptCost = (args: {
     args.usage?.costMicroCents !== undefined && hasReportedTokens(args.usage)
       ? Math.max(0, Math.round(args.usage.costMicroCents))
       : null;
-  // A reported $0 for tokens we used is not a real price (free promos, BYOK
-  // fee-only reports); fall back to the tariff so usage is never free.
+  // Providers report $0 for free promos and BYOK fee-only usage.
   if (reported !== null && reported > 0) {
     return { chargedMicroCents: reported, tokens, basis: "actual" };
   }
@@ -782,7 +762,7 @@ export const handleManagedRelay = async (args: {
       tokens: billableTokens({ inputTokens: estimate.inputTokens, outputTokens: 0 }),
       price,
     });
-    // Priced as reasoning, which no provider bills below the output rate.
+    // No provider bills reasoning below the output rate.
     const outputMicroCentsPerToken =
       computeUsageCostMicroCents({
         model: route.resolvedModel,
@@ -898,7 +878,6 @@ export const handleManagedRelay = async (args: {
           break;
       }
     }
-    // A partial hold buys only the output it covers; the provider is told so.
     const affordableOutputTokens =
       heldMicroCents < maxCostMicroCents
         ? Math.max(
@@ -908,8 +887,6 @@ export const handleManagedRelay = async (args: {
             ),
           )
         : null;
-    // Stored conversation images arrive as signed URLs; a provider that
-    // can't fetch them gets the bytes inline instead.
     let upstreamRequestJson = cappedRequestJson;
     if (
       !providerFetchesImageUrls(route.provider) &&
@@ -1150,9 +1127,7 @@ export const handleManagedRelay = async (args: {
     let upstream: Response;
     try {
       timing.mark("providerDispatch");
-      // Outbound fetch already waits for these writes in a Durable Object.
-      // Await that same gate explicitly so it is counted as application
-      // overhead instead of being hidden inside provider time.
+      // A Durable Object's output gate holds outbound fetch until storage writes land.
       if (deps.beforeProviderDispatch) {
         await timing.measure(
           "providerOutputGateMs",
@@ -1173,7 +1148,6 @@ export const handleManagedRelay = async (args: {
       console.warn(
         `[model-gateway] trace=${traceId} provider=${route.provider} upstream fetch failed cause=${controller.cause() ?? (error instanceof Error ? error.message : "unknown")}`,
       );
-      // No response, so no token reached us and none was billed.
       await finish(
         failure.code === "canceled" ? "aborted" : "failed",
         nothingBilled,
@@ -1326,7 +1300,6 @@ export const handleManagedRelay = async (args: {
       console.warn(
         `[model-gateway] trace=${traceId} provider=${route.provider} stream read failed cause=${controller.cause() ?? (error instanceof Error ? error.message : "unknown")}`,
       );
-      // Whatever streamed before the failure was generated, and billed.
       await finish(
         failure.code === "canceled" ? "aborted" : "failed",
         firstUpstreamByte ? costOf(usage, false) : nothingBilled,

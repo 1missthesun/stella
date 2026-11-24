@@ -3,8 +3,7 @@
   "name": "stella-v2-model-gateway-dev",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-30",
-  // global_fetch_strictly_public: the JWKS lives on cloud-builder in the same
-  // account, which a plain worker-to-worker fetch can't reach (error 1042).
+  // A plain fetch to another worker in the same account fails (error 1042) without global_fetch_strictly_public.
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": true,
   "preview_urls": false,
@@ -27,19 +26,8 @@
   },
   "vars": {
     "STELLA_BACKEND_URL": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
-    // Dev only (production deploys refuse it, scripts/check-deploy-config.mjs):
-    // a desktop signed in to a cloud-builder Preview (`https://<name><suffix>`,
-    // DEPLOY.md "Previews") gets its session capability from that Preview,
-    // signed with `builder-preview-1`.
     "PREVIEW_BACKEND_HOST_SUFFIX": "-stella-v2-cloud-builder-preview.fromyou.workers.dev",
-    // Dev only (production deploys refuse it): a dev test account (`@test.stella.local`,
-    // the `tst` sign-in claim) gets GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR
-    // session exchanges, since test runs relaunch several computers on one.
     "STELLA_TEST_ACCOUNTS": "1",
-    // JSON `GatewayJwks` holding the PUBLIC ES256 keys of the capability
-    // issuer (cloud-builder's `CAPABILITY_SIGNING_KID`s); production deploys
-    // refuse an empty set or one missing the production key. `builder-preview-1`
-    // signs for the per-agent cloud-builder Previews (DEPLOY.md, "Previews").
     "CAPABILITY_JWKS": "{\"keys\":[{\"kid\":\"builder-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"_zTj5c7FMbjcMng9baQbQRXtkHak6jk4-1boqSnt59A\",\"y\":\"tR-kttYxzHOPR__VorAqBes7AkaI9uvAiyuM7h7DMEk\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-bn118-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"3B2uhLMZ0nFNovFPfyHOqiVeXac4vJO0YhR1F7U1xQc\",\"y\":\"_vW3crzH0DnvV5yjUqvxa9qH5_lygAfXR7FWiI7MLAA\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-preview-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"fNbXqGJFsWaRGpdQmkq-4KmWvbqUVpWzbiPzbVoWyAk\",\"y\":\"gITvf5FUWXr6wCD8-rKlCTsE_FnZt-DXkC-cr5wZeTI\",\"alg\":\"ES256\",\"use\":\"sig\"}}]}",
   },
   "durable_objects": {
@@ -87,7 +75,6 @@
       "id": "1cca6b348e5a4998baab44e3333a1f49",
     },
     {
-      // Keys are decimal ASN numbers and values are NetworkClass strings.
       "binding": "ASN_POLICY",
       "id": "a255c73f45c94af094c46f604aaa50e8",
     },

@@ -1,23 +1,3 @@
-/**
- * Verifying a user's Stella JWT (Better Auth on cloud-builder) inside workerd.
- *
- * This is the only user-authenticated door into this worker (the session
- * capability exchange), so the rules it enforces are written out rather than
- * implied:
- *
- * - RS256 only, taken from the public JWKS at `${issuer}/api/auth/jwks`.
- * - The issuer is PINNED by the caller (STELLA_BACKEND_URL) and compared
- *   against the token's `iss`.
- * - `aud` must be "stella". A token minted for some other audience is not a
- *   login here.
- * - The owner id is `sub`, the Better Auth user id.
- *
- * The cache has an escape hatch the in-repo connector helper lacks: an unknown
- * `kid` triggers at most one refetch per JWKS_MIN_REFETCH_MS, single-flighted.
- * Without it a key rotation produces a full cache lifetime of 401s for every
- * signed-in user at once.
- */
-
 export const JWKS_TTL_MS = 10 * 60_000;
 export const JWKS_MIN_REFETCH_MS = 60_000;
 export const CLOCK_SKEW_S = 60;
@@ -35,13 +15,7 @@ export type VerifyResult =
   | { ok: true; token: VerifiedToken }
   | {
       ok: false;
-      /** Log-only. Never a user-facing string and never echoed to a client. */
       reason: string;
-      /**
-       * True when the failure is ours (JWKS unreachable), not the caller's.
-       * A retryable failure must not be reported as "unauthenticated" — that
-       * would make every client give up permanently during a backend blip.
-       */
       retryable: boolean;
     };
 
@@ -99,11 +73,6 @@ const fetchJwks = async (
   return pending;
 };
 
-/**
- * Cached keys, refreshed when stale or when `wantedKid` is absent — the second
- * condition is the rotation escape hatch, rate-limited so an unknown kid from
- * a forged token cannot be used to hammer the JWKS endpoint.
- */
 const resolveJwks = async (
   url: string,
   wantedKid: string,
@@ -119,8 +88,6 @@ const resolveJwks = async (
     try {
       return await fetchJwks(url, fetchImpl);
     } catch (error) {
-      // A refresh failure must not invalidate keys that still work: an expired
-      // cache with a matching kid beats a hard 401 for every user.
       if (!missing) return cached;
       throw error;
     }
@@ -184,9 +151,6 @@ const fail = (reason: string, retryable = false): VerifyResult => ({
   retryable,
 });
 
-/**
- * @param issuer the PINNED backend origin. Never the token's own `iss`.
- */
 export const verifyUserToken = async (
   token: string,
   issuer: string,
@@ -236,12 +200,6 @@ export const verifyUserToken = async (
       true,
     );
   }
-  // Retryable, deliberately. An unknown kid is far more often "our cache is
-  // one refetch behind a rotation" than "forged token", and JWKS_MIN_REFETCH_MS
-  // means that state can persist for a minute per isolate. Reporting it as
-  // unauthenticated would be terminal for the client, so a routine key roll
-  // would lock every signed-in user out until they reloaded. A forged kid pays
-  // only a backoff loop, and never triggers a JWKS fetch while throttled.
   if (!key) return fail("unknown_kid", true);
 
   const signature = base64UrlToBytes(parts[2]!);

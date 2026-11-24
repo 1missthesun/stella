@@ -83,7 +83,6 @@ const parseJwks = (raw: string): GatewayJwks => {
       return parsed as GatewayJwks;
     }
   } catch {
-    // Fall through to the empty set below.
   }
   console.error(
     "[model-gateway] CAPABILITY_JWKS is not a GatewayJwks document; refusing all capabilities",

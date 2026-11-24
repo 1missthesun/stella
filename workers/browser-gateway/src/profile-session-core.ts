@@ -1162,8 +1162,6 @@ export class BrowserProfileSessionCore {
         );
         const allowedOrigins = parseAllowedOrigins(value.allowedOrigins);
         const displayOrigin = parseOrigin(value.displayOrigin);
-        // Password entry is deliberately same-origin in v1. Cross-origin SSO
-        // needs a separate handoff that displays the actual IdP origin.
         if (
           allowedOrigins.length !== 1 ||
           allowedOrigins[0] !== displayOrigin

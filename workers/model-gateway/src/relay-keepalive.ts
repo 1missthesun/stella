@@ -15,13 +15,7 @@ const envelopeOf = async (response: Response): Promise<RelayKeepaliveEnvelope> =
   return { stellaRelayEnvelope: 1, status: response.status, headers, body: await response.text() };
 };
 
-/**
- * Non-streaming relay responses arrive only when the model finishes, so a
- * client timing the connection on silence would cut a long think. Opted-in
- * requests get headers now, a space every interval, then the real response
- * as an envelope. `no-transform` keeps Cloudflare from compressing (and so
- * buffering) the spaces.
- */
+// `no-transform` keeps Cloudflare from compressing, and so buffering, the keepalive spaces.
 export const withRelayKeepalive = (
   request: Request,
   ctx: Pick<ExecutionContext, "waitUntil">,

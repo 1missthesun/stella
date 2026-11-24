@@ -1,21 +1,3 @@
-/**
- * A deliberately narrow adapter around Cloudflare Code Mode.
- *
- * Generated code gets exactly one RPC-backed `codemode` namespace. The child
- * Worker gets no additional modules, no env bindings, and `globalOutbound` is
- * `null`.
- *
- * The official `@cloudflare/codemode` child currently pins Cloudflare's
- * `nodejs_compat` compatibility flag internally. That is an implementation
- * detail of the official child Worker, not a custom Node/QuickJS evaluator in
- * this Durable Object: model-generated code receives no modules or secrets
- * from Stella, and it can make no outbound requests of its own.
- *
- * Stella owns the WorkerLoader adapter rather than hiding it behind the
- * package executor. The Effect scope therefore owns both native handles and
- * does not report cancellation until their disposal has produced an outcome.
- */
-
 import type {
   ExecuteResult,
   JsonSchemaToolDescriptor,
@@ -152,10 +134,6 @@ export type CloudCodeExecutionResult =
       error: string;
       logs?: readonly string[];
       tool?: CloudCodeToolNameMapping;
-      /**
-       * Present when the wrapper returned before the package execution settled.
-       * Late settlement is ignored in both cases.
-       */
       cleanup?: CloudCodeCleanupStatus;
     }>;
 
@@ -195,13 +173,6 @@ type DispatchFailure = Readonly<{
   tool: CloudCodeToolNameMapping;
 }>;
 
-/**
- * The host-side code clock: the execution deadline counts only the time the
- * sandbox spends in its own code. It pauses while a nested host call is in
- * flight — a connect card waiting on the user, an image job, a connector
- * action — so those calls are bounded by their own timeouts, not by the
- * sandbox's. The child module keeps an identical clock for its own race.
- */
 type CodeClock = Readonly<{
   expired: Promise<void>;
   pause(): void;
@@ -816,7 +787,6 @@ const createProvider = (
           try {
             await onToolError?.(error, context);
           } catch {
-            // Diagnostics cannot change dispatch semantics.
           }
           return fail("tool_failed");
         }
@@ -918,9 +888,7 @@ export const executeCloudCodeWithExecutorFactory = async (
       const resource = yield* Effect.acquireRelease(
         Effect.sync(() => {
           try {
-            // The fixed literals are intentional. Do not spread caller
-            // options: an omitted globalOutbound inherits the parent's full
-            // network.
+            // An omitted globalOutbound inherits the parent's full network.
             const executor = executorFactory({
               loader: request.loader,
               timeout,

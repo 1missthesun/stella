@@ -1,17 +1,3 @@
-/**
- * Stella's GitHub App: the App JWT, short-lived installation tokens, and the
- * user-identity reads the connect handshake uses. Only an installation id is
- * ever stored; tokens are minted when needed and never persisted.
- *
- * Optional secrets (absent on dev until the App exists):
- *   GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY (PEM, PKCS#1 or PKCS#8),
- *   GITHUB_APP_SLUG, GITHUB_APP_CLIENT_ID, GITHUB_APP_CLIENT_SECRET,
- *   GITHUB_WEBHOOK_SECRET.
- *
- * Stella for Slack has its own read-only App (`app = "slack"`), configured by
- * the same names prefixed `SLACK_` (`SLACK_GITHUB_APP_ID`, …).
- */
-
 const GITHUB_API_BASE = "https://api.github.com";
 const GITHUB_WEB_BASE = "https://github.com";
 const USER_AGENT = "stella-cloud";
@@ -145,7 +131,6 @@ const appJwt = async (env: Cloudflare.Env, app: GithubAppKind = "projects"): Pro
       ["sign"],
     );
   } catch {
-    // Never echo key material into an error.
     throw new GithubError("The GitHub app private key on this deployment couldn't be loaded.");
   }
   const now = Math.floor(Date.now() / 1000);
@@ -266,7 +251,6 @@ export const fetchInstallationAccount = async (
   }
 };
 
-/** The installation's own state from the App's view, or null when GitHub didn't say. */
 export const fetchInstallationState = async (
   env: Cloudflare.Env,
   installationId: string,
@@ -388,11 +372,7 @@ const userPermission = (permissions?: Partial<Record<string, boolean>>): UserRep
       ? "read"
       : null;
 
-/**
- * The repositories of `installationId` the GitHub user behind `userToken` can
- * reach, with that user's own permission. Seeing an installation in
- * /user/installations only means the user can reach one of its repositories.
- */
+// Seeing an installation in /user/installations only means the user can reach one of its repositories.
 export const listUserInstallationRepos = async (
   userToken: string,
   installationId: string,
@@ -453,12 +433,9 @@ export const parseUserRepos = (raw: string | null): UserInstallationRepo[] | nul
 };
 
 /**
- * Whether the GitHub user behind `userToken` can reach `installationId`. The
- * installation id in the setup redirect is attacker-supplied, so this check
- * is what authorizes it. When the user's own listing is unavailable, the
- * App's view of the installation decides, which is conclusive only for a
- * User-account installation; an org installation that can't be listed is
- * refused.
+ * The installation id in GitHub's setup redirect is attacker-supplied. The
+ * App's view of an installation is conclusive only for a User-account
+ * installation.
  */
 export const verifyInstallationBelongsToUser = async (
   env: Cloudflare.Env,

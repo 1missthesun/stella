@@ -39,5 +39,4 @@ const promptsRoute = (publication: Publication) => {
 
 export const stellaPromptsResponse = promptsRoute(STELLA_PROMPT_DEFAULTS);
 
-/** For desktops from before explicit messaging (`src/prompts/legacy/`). */
 export const stellaLegacyPromptsResponse = promptsRoute(STELLA_PROMPT_LEGACY);

@@ -1,9 +1,3 @@
-/**
- * A minimal Slack Web API client: JSON (or form) POSTs with a bot token, one
- * retry on HTTP 429 using Slack's `Retry-After`, and `ok: false` surfaced as
- * a `SlackApiError` carrying Slack's error code.
- */
-
 const SLACK_API = "https://slack.com/api";
 const MAX_RETRY_WAIT_MS = 5_000;
 

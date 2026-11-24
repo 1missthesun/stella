@@ -1,23 +1,3 @@
-/**
- * The agent containers' caches and installed dependencies, kept across images.
- *
- * A container snapshot cannot cross images and nearly every deploy changes the
- * image, so a cold start usually begins from a clean disk: the world comes back
- * from the world store, but everything agents set up beside it does not. This
- * keeps the two things that are expensive to rebuild and never belong in the
- * world store: the tool home (caches, config and state under
- * `/workspace/.stella-tool-home`) and the `node_modules` directories under the
- * world. Both go into one size-capped archive per owner in `BACKUP_BUCKET`,
- * outside the world quota, shared by every agent container of the owner:
- * written when a turn releases its container and something in them changed
- * there, and restored by any of them that starts without a snapshot.
- *
- * Only the tool account's own files leave the container. Anything owned by
- * another user (root's in particular) is excluded file by file, the root-only
- * host state (`/home/stella-host-state`, where the Claude Code logins live) is
- * never inside the archived tree, and the credential stores the file tools
- * already refuse to touch (`command-safety.ts`) are left out of the tool home.
- */
 import {
   CLOUD_TOOL_HOME,
   WORLD_UNSYNCED_PATHS,
@@ -131,11 +111,6 @@ find "$restored" -type d -name node_modules -prune -printf '%P\\0' | while IFS= 
   if [ -d "\${target%/*}" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then mv -T -- "$restored/$rel" "$target" || true; fi
 done`;
 
-/**
- * Move the restored `node_modules` directories into a freshly extracted world.
- * Root hands the restored tree to the tool uid while no tool process can reach
- * it, and every operation inside the world runs as the tool uid.
- */
 export const dependencyAdoptionLines = (indexPath: string): string[] => [
   `restored=${DEPENDENCY_RESTORE_ROOT}/${WORLD}`,
   `adopt=${DEPENDENCY_BACKUP_DIR}/.stella-dependency-adopt`,

@@ -7,8 +7,6 @@ const validOwner = (ownerId: unknown): ownerId is string =>
 
 const validRun = (run: unknown): run is string => typeof run === "string" && /^[A-Za-z0-9-]{1,64}$/u.test(run);
 
-// Metered compute other Workers run for an owner (the browser gateway's
-// agent browser sessions), charged to that owner's budget.
 export class ComputeBilling extends WorkerEntrypoint<Env> {
   async browserHold(input: { ownerId: string; run: string }): Promise<BrowserHoldResult> {
     if (!validOwner(input?.ownerId) || !validRun(input.run)) throw new Error("Invalid browser hold.");

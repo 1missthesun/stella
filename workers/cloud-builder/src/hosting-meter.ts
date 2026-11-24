@@ -9,9 +9,6 @@ const FLUSH_AT_REQUESTS = 1_000;
 const PAUSE_RECHECK_MS = 60_000;
 const MAX_CPU_MS_PER_REQUEST = 30_000;
 
-// Requests and CPU each isolate served per owner and SKU since its last
-// flush. A flush is one owner-gate write per isolate at most every few
-// seconds, never one per request; what an evicted isolate held is lost.
 const batches = new Map<string, Batch>();
 const pausedUntil = new Map<string, { until: number; message: string }>();
 
@@ -30,9 +27,6 @@ const remember = async (ownerId: string, status: { serving: boolean; message: st
     .catch(() => undefined);
 };
 
-// Whether the owner's hosting is paused, and why. Each isolate learns it at
-// most once a minute: from its own last flush, else from the colo cache that
-// any isolate's flush or check filled, else from the owner gate.
 export const hostingPause = async (env: OwnerEnv, ownerId: string): Promise<string | null> => {
   const known = pausedUntil.get(ownerId);
   if (known && known.until > Date.now()) return known.message || null;

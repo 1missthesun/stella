@@ -95,11 +95,6 @@ const escapeHtml = (value: string): string =>
 export const xResultPage = (success: boolean, message: string, status: number): Response =>
   xPage(success ? "X connected" : "X connection failed", message, status, success ? "ok" : "error");
 
-/**
- * The callback page for a connection waiting on its one-time code. The code
- * goes back to the Stella that started the connection, the same way a CLI
- * sign-in shows a code to paste into the terminal.
- */
 export const xConnectCodePage = (username: string, code: string): Response =>
   xPage(
     "Almost done",

@@ -91,7 +91,6 @@ const POLICY_CACHE_MS = 5_000;
 
 const DEFAULT_NAME = "Default";
 
-/** Environments are on where `SLACK_ENVIRONMENTS` is "1" (dev until they ship). */
 export const slackEnvironmentsEnabled = (env: Partial<Cloudflare.Env>): boolean =>
   (env as { SLACK_ENVIRONMENTS?: string }).SLACK_ENVIRONMENTS === "1";
 
@@ -698,9 +697,6 @@ export const prepareSlackEnvironment = async (
   if (!script) return { env: agentEnv };
 
   const key = (await sha256Hex(`${repoId}\0${script}\0${environment.envVars}\0${environment.network}`)).slice(0, 16);
-  // One run per container start. Agents that start together (one thread
-  // starting two at once) wait on the lock for the first one's run and take
-  // its result, so the script runs, is recorded and is reported once.
   const ran = `${SETUP_DIR}/ran-${key}`;
   const savedEnv = `${SETUP_DIR}/env-${key}`;
 

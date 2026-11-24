@@ -37,7 +37,6 @@ export type MapsAdmission = (lookups: { places: number; route: boolean }) => Pro
   { ok: true; settle: (usage: MapsUsage) => Promise<void> } | { ok: false; status: 403 | 429; error: string }
 >;
 
-// Google calls that Google bills for, counted as they happen.
 type Meter = { placeCalls: number; routeCalls: number };
 
 // Directions answers HTTP 200 for everything; these statuses are not billed.

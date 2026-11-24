@@ -83,7 +83,6 @@ export const verifyFalSignature = async (headers: Headers, rawBody: string, now:
     try {
       if (await crypto.subtle.verify("Ed25519", key, signatureBytes, message)) return true;
     } catch {
-      // Try the next key.
     }
   }
   return false;
@@ -183,7 +182,7 @@ export const pollFal = async (apiKey: string, endpointId: string, requestId: str
   return { state: "failed", message: errorMessage(payload, `fal request failed (${result.status}).`) };
 };
 
-/** Best effort: a finished or unknown request answers 404/409, which is fine. */
+// fal answers 404/409 for a finished or unknown request.
 export const cancelFal = async (apiKey: string, endpointId: string, requestId: string): Promise<void> => {
   const response = await fetch(`${requestBase(endpointId, requestId)}/cancel`, {
     method: "PUT",

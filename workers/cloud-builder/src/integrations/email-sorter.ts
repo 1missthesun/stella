@@ -4,18 +4,8 @@ import type { ManagedModelAudience } from "@stella/contracts/gateway/capability"
 import { STELLA_DEFAULT_MODEL } from "@stella/model-catalog/aliases";
 import { mintTurnCapability } from "../capability-signer.js";
 
-/**
- * Email's wake gate: one cheap call per arriving email (Gemini Decision 1
- * through Stella's model gateway) with one job, deciding whether Stella should
- * read it now rather than at her next scheduled read. It never decides what
- * the user sees; Stella does, when she reads.
- */
-
-/** Gemini Decision 1, USD per million input tokens (output is free). */
 export const DECISION_INPUT_USD_PER_M = 0.1;
-/** At or above this the "can't wait" probability wakes Stella. */
 export const WAKE_THRESHOLD = 0.8;
-/** At or above this a standing instruction counts as matched. */
 export const RULE_THRESHOLD = 0.6;
 const DECISION_TIMEOUT_MS = 25_000;
 const RUN_BUDGET_MICRO_CENTS = 5_000_000;
@@ -28,15 +18,12 @@ export type SorterAccess = {
   execution: CloudExecutionSelection;
   audience: ManagedModelAudience;
   budgetMicroCents: number;
-  /** The owner's own key saved to their account, which pays for the gate instead of Stella's allowance. */
   ownKey?: OwnKeyProvider;
-  /** Their key was refused (invalid, out of credit): the gate goes back to Stella's allowance for a while. */
   onOwnKeyRefused?: (message: string) => void;
 };
 
 export type OwnKeyProvider = "openrouter";
 
-/** The owner's key was refused, so this call fails and the next ones use Stella's allowance. */
 export class OwnKeyRefused extends Error {}
 
 export class DecisionRefused extends Error {}
@@ -51,14 +38,11 @@ export type WakeInput = {
   receivedAt: number;
   text: string;
   bulk: boolean;
-  /** How many times this inbox wrote to the sender in the last six months. */
   wroteToSender: number;
-  /** Standing instructions that ask to hear about, or act on, some mail at once. */
   rules: { ruleId: string; when: string }[];
 };
 
 export type WakeVerdict = {
-  /** Probability it can't wait until Stella's next read. */
   urgentP: number;
   ruleId?: string;
   inputTokens: number;
@@ -157,7 +141,6 @@ export const wakeVerdictFrom = (payload: unknown, input: WakeInput): WakeVerdict
   };
 };
 
-/** Asks the gate about one email. */
 export const checkWake = async (access: SorterAccess, input: WakeInput): Promise<WakeVerdict> => {
   const gateway = access.env.MODEL_GATEWAY;
   const origin = access.env.MODEL_GATEWAY_URL?.trim() ?? "";

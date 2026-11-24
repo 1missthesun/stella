@@ -186,7 +186,6 @@ const openAudio = async (env: VoiceEnv, text: string, voice: string, transport: 
   }
 };
 
-// `tts.settle` takes the audio's length as 24 kHz 16-bit PCM bytes.
 const pcmBytesOf = (audioSeconds: number): number => Math.round(audioSeconds * 48_000);
 
 const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => {

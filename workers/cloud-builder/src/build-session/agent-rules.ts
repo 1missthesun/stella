@@ -4,7 +4,6 @@ import { ownerGateStub } from "../rpc-release.js";
 import { ownerMemoryWorld, readWorldStellaText } from "../world-memory.js";
 import type { TurnRequest } from "./shared/types.js";
 
-/** The owner's standing rules for a cloud Claude Code agent's prompt; none while memory is off. */
 export const agentRulesSection = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES" | "WORLDS">,
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "ownerPurgeGeneration">,

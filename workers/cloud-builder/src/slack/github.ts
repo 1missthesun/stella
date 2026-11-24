@@ -168,8 +168,7 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
   try {
     if (!code) {
       if (!installationId) return back(row, SLACK_GITHUB_ERROR_PARAM, "GitHub didn't finish installing Stella Crew.");
-      // Back from installing or reconfiguring the App: the installation id in
-      // the query proves nothing, so confirm through the user again.
+      // The installation id in GitHub's setup redirect proves nothing.
       return Response.redirect(githubAuthorizeUrl(env, stateToken, callbackUrl(env, request), "slack"), 302);
     }
     const userToken = await exchangeUserCode(env, code, callbackUrl(env, request), "slack");
@@ -198,8 +197,6 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
     if (choices.length === 0) {
       return back(row, SLACK_GITHUB_ERROR_PARAM, "GitHub wouldn't list the repositories you can reach. Try again.");
     }
-    // Whoever started the connection can read the state's nonce, so only the
-    // browser that finished it gets the code that lets the owner finish.
     const claim = randomNonce();
     await d1(env)
       .prepare("UPDATE slack_github_connects SET nonce = ?, installations = ? WHERE nonce = ?")
@@ -293,11 +290,6 @@ const minted = async (
   }
 };
 
-/**
- * A refused mint can be about the request (one repository, a rate limit), but
- * the status is shared by every workspace on the installation, so only the
- * installation's own state changes it.
- */
 const settleInstallation = async (
   env: Cloudflare.Env,
   connection: SlackGithubConnection,
@@ -382,11 +374,6 @@ export const listRepoBranches = async (
   return { branches, defaultBranch, truncated, viaGithub: Boolean(token) };
 };
 
-/**
- * The token an agent clones with: minted for this one repository with
- * `contents: read` when the workspace's GitHub connection grants it, else a
- * token pasted before connections existed, else none (public).
- */
 export const cloneToken = async (env: Cloudflare.Env, repo: SlackRepoSettings): Promise<string | null> => {
   const connection = repo.github;
   if (connection && connection.status !== "revoked" && repoPermission(connection, repo.fullName)) {

@@ -86,10 +86,6 @@ export const decideDispatchPlacement = (args: {
   };
 };
 
-/**
- * A schedule's run on the computer that set the schedule up is that
- * computer's own work, not work sent from another device.
- */
 export const isOwnScheduledWork = (
   row: { ingress: string; requesting_device_id: string | null },
   deviceId: string | null | undefined,
@@ -132,7 +128,6 @@ export const isEligibleDevice = (args: {
   requiredCapabilities: readonly ExecutionCapability[];
   now: number;
   staleAfterMs: number;
-  /** The computer's own work (a schedule it set up), which needs no remote-work consent. */
   ownWork?: boolean;
 }): boolean => {
   const { presence, device } = args;
@@ -161,7 +156,6 @@ export const isTerminalDispatchState = (state: DispatchState): boolean =>
 
 const ENDED: readonly DispatchState[] = ["completed", "failed", "canceled"];
 
-/** Every legal state change of a dispatch row; a write that keeps the state is always legal. */
 export const DISPATCH_TRANSITIONS: Readonly<
   Record<DispatchState, readonly DispatchState[]>
 > = {

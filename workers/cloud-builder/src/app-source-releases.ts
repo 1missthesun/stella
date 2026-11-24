@@ -56,7 +56,6 @@ export class AppReleaseChannel extends DurableObject<Env> {
     return this.ctx.storage.kv.get<PublishedRecord>(RECORD_KEY) ?? null;
   }
 
-  /** `notBefore`: the answer must come from a read of upstream that started no earlier. */
   private check(notBefore?: number): Promise<PublishedRecord> {
     const running = this.checking;
     if (running) {
@@ -90,7 +89,6 @@ export class AppReleaseChannel extends DurableObject<Env> {
             socket.send(frame(version));
             sent += 1;
           } catch {
-            // Closing; the desktop catches up when it reconnects.
           }
         }
         log("info", "app_source_release_published", {
@@ -131,7 +129,6 @@ export class AppReleaseChannel extends DurableObject<Env> {
     try {
       socket.close(code === 1005 || code === 1006 ? 1000 : code, "closed");
     } catch {
-      // Already closed.
     }
   }
 
@@ -139,7 +136,6 @@ export class AppReleaseChannel extends DurableObject<Env> {
     try {
       socket.close(1011, "error");
     } catch {
-      // Already closed.
     }
   }
 }

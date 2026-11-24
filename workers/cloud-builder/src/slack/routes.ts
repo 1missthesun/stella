@@ -1,19 +1,4 @@
-/**
- * Slack routes (all self-authenticating, mounted above the service gate):
- *
- *   GET  /api/slack/install          start the OAuth v2 install (any workspace)
- *   GET  /api/slack/oauth/callback   store the workspace's bot token
- *   POST /api/slack/events           Events API (signed)
- *   POST /api/slack/interactivity    buttons (signed)
- *   POST /api/slack/commands         /stella (signed)
- *   GET  /api/slack/link             connect a Slack user to a Stella account
- *   POST /api/slack/link/start       sign in to Stella (Google or email link)
- *   GET  /api/slack/link/finish      signed in: confirm the link
- *   POST /api/slack/link/confirm     write the link
- *
- * Slack expects an answer within three seconds, so events are acknowledged
- * at once and handled in `waitUntil`.
- */
+// Slack expects an answer within three seconds.
 
 import { readOttCookie, withClearedOttCookie } from "../auth/ott-cookie.js";
 import { slackCall, slackTry, type SlackResponse } from "./api.js";

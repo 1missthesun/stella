@@ -344,7 +344,6 @@ const runScript = async (
     const parsed = JSON.parse(line) as ScriptResult;
     if (parsed && typeof parsed === "object" && typeof parsed.ok === "boolean") return parsed;
   } catch {
-    // Fall through to the generic failure.
   }
   console.error(
     JSON.stringify({
@@ -375,7 +374,6 @@ const loginBackupUrl = async (
   });
 };
 
-/** When one stored cloud login ends, keyed by its account directory. */
 export type ClaudeCloudLoginHealth = { key: string; endsAt: number | null; ended: boolean };
 
 const loginHealthOf = (value: unknown): ClaudeCloudLoginHealth[] =>
@@ -390,15 +388,6 @@ const loginHealthOf = (value: unknown): ClaudeCloudLoginHealth[] =>
       })
     : [];
 
-/**
- * Store the owner's Claude Code logins from one container (the sign-in
- * container after a sign-in or a sign-out, an agent's after every Claude
- * turn, since the CLI may have rotated its refresh token there). An agent's
- * container passes `merge`: it never adds or removes a login, and another
- * container may have refreshed one since, so each login keeps whichever copy
- * is fresher. Returns when each stored login ends, or null when nothing was
- * stored.
- */
 export const backupClaudeCloudLogins = async (
   env: Cloudflare.Env,
   ownerId: string,

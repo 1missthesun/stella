@@ -176,7 +176,6 @@ export type ContainerTurnHost = Pick<
   | "unregisterTurn"
 >;
 
-/** The owner's world, or the Slack workspace's own world for a Stella Crew turn. */
 const turnWorldName = async (
   env: { DB?: D1Database },
   turn: Pick<TurnRequest, "ownerId" | "conversationId" | "originConversationId">,
@@ -409,8 +408,7 @@ export const steerContainerAgent = async (
   );
   const staged = `${CLOUD_TURN_ATTEMPT_ANCHOR}/.inbox-${crypto.randomUUID()}`;
   const sandbox = host.sandbox(marker.sandboxId, marker.size, "world");
-  // Any call into a stopped container starts it again; a lost one is the
-  // alarm's to recover.
+  // Any call into a stopped container starts it again.
   if (!(await host.sandboxContainerRunning(sandbox))) {
     return json({ accepted: false, reason: "busy" });
   }
@@ -652,9 +650,6 @@ export const runContainerAgentTurn = async (
       });
       execution.assertActive();
       await host.assertAgentExecutionActive(turn, execution);
-      // The watchdog budget was spent on the attempt that died; without a
-      // fresh one the retry is guaranteed to be cut off mid-run and the
-      // escalation buys nothing.
       const watchdogDeadlineAt =
         Date.now() + Math.max(1_000, turn.watchdogMs ?? 15 * 60_000);
       await host.ctx.storage.put(
@@ -1498,8 +1493,6 @@ export const runAgentAttempt = async (
       role: "agent",
       systemPrompt: [
         renderCloudAgentPrompt("agents/general.md", {
-          // Container agents run on Claude Code: its own Bash (with TaskStop
-          // and Monitor) replaces Stella's shell sessions and write_stdin.
           names: [
             ...cloudGeneralToolNames().filter((name) => name !== "write_stdin"),
             CLOUD_AGENT_MOVE_TOOL,
@@ -1509,8 +1502,6 @@ export const runAgentAttempt = async (
         }),
         ...(rulesSection ? [rulesSection] : []),
         ...(devicesSection ? [devicesSection] : []),
-        // Who it is and who started it: where its messages and its finished
-        // report go (a helper's lead, not Stella).
         ...(turn.threadId
           ? [
               agentIdentityText({
@@ -1624,10 +1615,6 @@ export const runAgentAttempt = async (
               );
               return "session_quiesced" as const;
             } catch {
-              // A kill ambiguity must not reach Builder fallback. Fence a
-              // generic terminal result before rotating the sandbox lifetime;
-              // alarm replay will only retry teardown/delivery, never archive
-              // a newly recreated empty container.
             }
           }
           const teardownPending: PendingTerminal = {
@@ -1898,7 +1885,6 @@ export const runAgentAttempt = async (
   };
 };
 
-/** Records when each cloud Claude login ends, for the sign-in notice. */
 const noteClaudeCloudLogins = async (
   env: Env,
   turn: TurnRequest,

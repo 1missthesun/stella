@@ -7,14 +7,6 @@ const shellQuote = (value: string): string => {
   return `'${value.replace(/'/gu, `'"'"'`)}'`;
 };
 
-/**
- * The sync code before 2026-11 kept its marker inside the world, at
- * `.stella/world-manifest`, root-owned. A container saved by that code (or a
- * turn it still ran after this deploy) carries it over instead of downloading
- * the world again: only a root-owned, singly linked regular file is taken, the
- * one read is the one checked (same inode through the open descriptor), and
- * its text must be exactly a marker.
- */
 const legacyMarkerLines = [
   'legacy="$root/.stella/world-manifest"',
   'if [ -d "$root/.stella" ] && [ ! -L "$root/.stella" ] && [ -f "$legacy" ] && [ ! -L "$legacy" ] && { [ ! -f "$marker" ] || [ "$legacy" -nt "$marker" ]; }; then',

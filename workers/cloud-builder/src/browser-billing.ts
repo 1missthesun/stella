@@ -35,13 +35,9 @@ const hold = async (env: OwnerEnv, ownerId: string, run: string): Promise<Browse
     : { ok: false, message: reservation.usageLimit?.message || reservation.message || BROWSER_BUDGET_MESSAGE };
 };
 
-// A browser session is held for 15 minutes of Browser Run time before it is
-// acquired, and the hold is extended at every settlement while it runs.
 export const holdBrowser = (env: OwnerEnv, input: { ownerId: string; run: string }): Promise<BrowserHoldResult> =>
   hold(env, input.ownerId, input.run);
 
-// Charge one interval of a browser session. The first interval of a session
-// carries Browser Run's per-session minimum; later ones are linear.
 export const settleBrowser = async (
   env: OwnerEnv,
   input: {
@@ -86,11 +82,6 @@ export const releaseBrowser = async (env: OwnerEnv, input: { ownerId: string; ru
   await ownerGateStub(env.OWNER_GATES, input.ownerId).releaseSpend(reservationId(input.run));
 };
 
-// One short-lived capture browser (app preview, site screenshot): hold before
-// the gateway launches it, charge its lifetime after. The gateway reports the
-// browser's launch-to-close time in `x-stella-browser-ms`; a successful
-// answer without it is charged the call's wall time as an estimate, and a
-// failed one without it launched nothing to charge.
 export const meteredCapture = async (
   env: OwnerEnv,
   ownerId: string,

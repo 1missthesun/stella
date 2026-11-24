@@ -1,9 +1,3 @@
-/**
- * Stella's own Google connection for the cloud: a Web OAuth client in
- * Stella's Google project, tokens kept in the owner's store, and plain
- * Google REST calls instead of Composio. One Google sign-in covers Gmail,
- * Calendar, Drive, Docs, Sheets and Tasks.
- */
 import type { IntegrationAction, IntegrationCatalogEntry } from "@stella/contracts/backend/integrations";
 
 export const GOOGLE_STATE_KIND = "google";
@@ -13,7 +7,6 @@ const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const REQUEST_TIMEOUT_MS = 30_000;
 
-/** Only the scopes approved for Stella's Google app. */
 export const GOOGLE_OAUTH_SCOPES = [
   "openid",
   "email",
@@ -39,7 +32,6 @@ export type GoogleTokenResponse = {
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-/** `GOOGLE_CLOUD_OAUTH_CLIENT_JSON` = {"clientId":"…","clientSecret":"…"} (a worker secret). */
 export const googleClient = (env: Cloudflare.Env): GoogleClient | null => {
   const raw = (env as unknown as Record<string, unknown>).GOOGLE_CLOUD_OAUTH_CLIENT_JSON;
   if (typeof raw !== "string" || !raw.trim()) return null;
@@ -115,16 +107,12 @@ export const readGoogleIdentity = async (
 export const parseGoogleScope = (scope: unknown): string[] =>
   typeof scope === "string" ? scope.split(/\s+/u).filter(Boolean) : [];
 
-// ---------------------------------------------------------------------------
-// Catalog: the Google integrations Stella connects itself.
-
 type GoogleService = {
   id: string;
   name: string;
   category: string;
   description: string;
   iconUrl: string;
-  /** Scope the user must have granted for this integration's tools. */
   scope: string;
 };
 
@@ -206,9 +194,6 @@ export const stellaGoogleCatalogEntry = (id: string): IntegrationCatalogEntry | 
   };
 };
 
-// ---------------------------------------------------------------------------
-// Actions.
-
 type JsonObject = Record<string, unknown>;
 
 const isRecord = (value: unknown): value is JsonObject =>
@@ -222,7 +207,6 @@ export class GoogleApiError extends Error {
   }
 }
 
-/** A Google API call. `text` returns the response body as a string (file contents). */
 export type Fetcher = (
   url: string,
   init?: { method?: string; body?: unknown; raw?: string; contentType?: string; text?: boolean },
@@ -272,11 +256,6 @@ const base64Utf8 = (value: string): string => {
   return btoa(binary);
 };
 
-/**
- * Google API calls made through a Composio-connected account (Composio's
- * proxy signs them with that account's own grant), so an account connected
- * before Stella's own Google sign-in runs the same actions.
- */
 export const proxyFetcher = (
   toolkit: string,
   execute: (request: Record<string, unknown>) => Promise<Record<string, unknown>>,
@@ -334,8 +313,6 @@ const qs = (params: Record<string, string | number | boolean | undefined>): stri
   const text = search.toString();
   return text ? `?${text}` : "";
 };
-
-// Gmail helpers ------------------------------------------------------------
 
 const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -457,8 +434,6 @@ const replyHeaders = async (get: Fetcher, input: JsonObject): Promise<{ headers:
   };
 };
 
-// Drive helpers ------------------------------------------------------------
-
 const DRIVE = "https://www.googleapis.com/drive/v3";
 const DRIVE_FILE_FIELDS = "id,name,mimeType,modifiedTime,size,webViewLink,owners(emailAddress),parents";
 const MAX_FILE_CHARS = 60_000;
@@ -497,8 +472,6 @@ const readDriveFile = async (get: Fetcher, fileId: string): Promise<JsonObject> 
   };
 };
 
-// Docs helpers -------------------------------------------------------------
-
 const DOCS = "https://docs.googleapis.com/v1/documents";
 
 const docText = (doc: JsonObject): string => {
@@ -531,8 +504,6 @@ const docEndIndex = (doc: JsonObject): number => {
   const end = isRecord(last) ? Number(last.endIndex) : 1;
   return Math.max(1, (Number.isFinite(end) ? end : 1) - 1);
 };
-
-// Calendar helpers ---------------------------------------------------------
 
 const CALENDAR = "https://www.googleapis.com/calendar/v3";
 
@@ -584,13 +555,9 @@ const summarizeEvent = (event: unknown): JsonObject | null => {
   };
 };
 
-// Sheets / Tasks -----------------------------------------------------------
-
 const SHEETS = "https://sheets.googleapis.com/v4/spreadsheets";
 const TASKS = "https://tasks.googleapis.com/tasks/v1";
 
-// Generic request: the full REST API of one service, for anything the named
-// actions don't cover.
 const SERVICE_HOSTS: Record<string, { base: string; prefixes: string[] }> = {
   gmail: { base: "https://gmail.googleapis.com", prefixes: ["/gmail/v1/users/me/"] },
   googlecalendar: { base: "https://www.googleapis.com", prefixes: ["/calendar/v3/"] },
@@ -1374,7 +1341,6 @@ export const googleAction = (id: string, name: string): IntegrationAction | null
   return spec ? toAction(spec) : null;
 };
 
-/** Runs one action with a live access token. Throws GoogleApiError (401 = token rejected). */
 export const runGoogleAction = async (
   access: string | Fetcher,
   id: string,
@@ -1386,15 +1352,10 @@ export const runGoogleAction = async (
   return await spec.run({ get: typeof access === "string" ? fetcherFor(access) : access, input });
 };
 
-// Email sorting -----------------------------------------------------------
-
-/** Gmail calls for Stella's email sorting, made with one account's access token. */
 export const gmailFetcher = (accessToken: string): Fetcher => fetcherFor(accessToken);
 export const GMAIL_API = GMAIL;
 export const gmailHeader = headerOf;
 export const gmailMessageText = (payload: unknown): { text: string; attachments: JsonObject[] } => messageBody(payload);
-
-// Callback page ------------------------------------------------------------
 
 const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/gu, (char) => `&#${char.charCodeAt(0)};`);
@@ -1422,8 +1383,6 @@ export const googleResultPage = (success: boolean, title: string, message: strin
     },
   );
 
-// Agent connector source ---------------------------------------------------
-
 type ConnectorSourceLike = {
   catalog(): Promise<readonly IntegrationCatalogEntry[]>;
   actions(args: { id: string; action?: string; query?: string; cursor?: string; limit?: number }): Promise<
@@ -1431,11 +1390,6 @@ type ConnectorSourceLike = {
   >;
 };
 
-/**
- * Wraps the agent's integration source so Google services that run on
- * Stella's own Google connection show Stella's entries and actions instead
- * of Composio's. `routes` says which do, per owner.
- */
 export const withStellaGoogle = <Source extends ConnectorSourceLike>(
   base: Source,
   routes: () => Promise<Record<string, "stella" | "composio">>,
@@ -1482,12 +1436,6 @@ export const withStellaGoogle = <Source extends ConnectorSourceLike>(
   };
 };
 
-/**
- * The callback page for a Google sign-in waiting on its one-time code. It
- * opens the Stella app on this device, which redeems the code as its own
- * signed-in user. Without the app, Copy gives a whole sentence for a Stella chat,
- * so the chat knows to redeem it (a bare code reads as nothing to answer).
- */
 export const googleConnectCodePage = (email: string, code: string, appLink: string): Response =>
   new Response(
     `<!DOCTYPE html>

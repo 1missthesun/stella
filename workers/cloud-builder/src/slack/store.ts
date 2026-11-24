@@ -80,7 +80,6 @@ export const saveInstallation = async (
   await db.batch([...(ownerChanges ? workspaceRepoDeletes(db, install.teamId) : []), upsert]);
 };
 
-/** Whether the workspace still has Stella installed and a Stella account running her. */
 export const installationActive = async (env: Cloudflare.Env, teamId: string): Promise<boolean> =>
   Boolean(
     await d1(env)
@@ -115,7 +114,6 @@ export const loadInstallation = async (
   let homeFolder = row.home_folder;
   if (!homeFolder) {
     homeFolder = workspaceHomeFolder(row.team_name, row.team_id);
-    // Two workspaces with the same name never share a folder.
     const taken = await d1(env)
       .prepare("SELECT 1 FROM slack_installations WHERE home_folder = ? AND team_id <> ? LIMIT 1")
       .bind(homeFolder, row.team_id)

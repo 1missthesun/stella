@@ -89,8 +89,6 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-// Thrown when the provider had the audio and may have billed for it (a
-// timeout or unreadable answer), as opposed to refusing the request.
 class BilledSegmentError extends Error {}
 
 const transcribeSegment = async (

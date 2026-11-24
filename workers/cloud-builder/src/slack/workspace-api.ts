@@ -93,7 +93,6 @@ const ok = (body: unknown): Response =>
 
 type CrewInstall = { teamId: string; homeFolder: string };
 
-/** A drive call in the Slack workspace's own space, never the owner's personal Drive. */
 const ownerInternal = async (
   env: Cloudflare.Env,
   ownerId: string,

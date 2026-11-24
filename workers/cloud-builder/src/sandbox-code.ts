@@ -1,28 +1,3 @@
-/**
- * Stella's own code in a sandbox container.
- *
- * The sandbox image holds only the OS, tools and third-party packages, so it
- * changes only with the Dockerfile or `sandbox-image.bun.lock`, and a deploy of
- * Stella source keeps every owner's container snapshot (a snapshot restores
- * only onto the image it was taken from). The executor's sources ship as a
- * content-addressed bundle instead: `scripts/sandbox-code.mjs` packs it at
- * build time into this Worker version's static assets and compiles its
- * SHA-256 in here.
- *
- * When an agent container starts, fresh or from a snapshot, the Sandbox object
- * runs the image's `stella-code-install` with that hash and an intercepted
- * plain-HTTP URL served from this version's assets (`SandboxCode`). The
- * container refuses bytes that hash to anything else, extracts them root-owned
- * under `/run/stella-code/<sha256>`, and points `current` at them. Every
- * executor process then starts through `stella-executor`, which runs
- * `current`.
- *
- * Version rule: a container runs the bundle it installed when it started. A
- * deploy reaches a running container at its next start (agent containers stop
- * when their turn releases them), so a turn in progress finishes on the code it
- * began with.
- */
-
 declare const __STELLA_SANDBOX_CODE__:
   | Readonly<{ sha256: string; bytes: number }>
   | undefined;
@@ -37,11 +12,6 @@ export const sandboxCodeAssetPath = (sha256: string): string =>
 export const SANDBOX_CODE_INSTALL = "/opt/stella/bin/stella-code-install";
 export const SANDBOX_EXECUTOR = "/opt/stella/bin/stella-executor";
 
-/**
- * Runs detached at container start: loads the executor's modules and the
- * Claude Code binary into the page cache, then lets Claude Code check for a
- * newer release (`packages/executor-cloud/src/claude-cli.ts`).
- */
 export const SANDBOX_PAGE_CACHE_WARM_COMMAND = `setsid ${SANDBOX_EXECUTOR} --warm </dev/null >/dev/null 2>&1 &`;
 
 const SHA256 = /^[0-9a-f]{64}$/u;

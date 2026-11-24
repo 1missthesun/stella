@@ -1,10 +1,4 @@
-/**
- * `web` in the cloud: the desktop tool's exact surface (`defs/web-def.ts`)
- * and fetch pipeline (`web-fetch-core`, with per-redirect-hop SSRF
- * re-validation). workerd has no resolver hook, so the guard runs
- * literal-only here; Cloudflare's own egress policy backstops DNS-rebinding
- * names. Search is the owner's `search.web`.
- */
+// workerd has no resolver hook, so the SSRF guard checks literal addresses only.
 
 import type { TSchema } from "@sinclair/typebox";
 import type { WebSearchResult } from "@stella/contracts/backend/search";

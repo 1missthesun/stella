@@ -1,34 +1,4 @@
 import { PLAN_CATALOG, normalizeBillingPlan } from "@stella/contracts/billing-plans";
-/**
- * Stella previews for Slack: static sites a workspace's agents build and
- * Stella hosts, for when the repository publishes no preview of its own.
- *
- * Every Slack agent container gets a publish capability (`sp1`, 12 hours,
- * one workspace and conversation) and `stella-publish`, which builds the
- * project and uploads its output as a gzipped tar to `POST /api/slack/previews`.
- * The files go to APP_BUILDS under `slack-previews/<id>/`; a D1 row
- * (`slack_previews`) is the link. Ids are 128-bit random, so links can't be
- * guessed, and each upload gets a new one.
- *
- * Sites are served on their own origin, never stella.sh or an app origin:
- * the `sites-host` Worker forwards every request to `SitesHost` below over a
- * service binding. `SITES_HOST` is the host pattern (`*.stellasites.app` in
- * production, `*-dev.stellasites.app` on dev), so each site is its own origin,
- * and stellasites.app is on the Public Suffix List, so each is its own site
- * too. Without it (a self-hosted server on workers.dev), every site shares
- * `SITES_SHARED_ORIGIN` under its own path, `<origin>/<id>/`; no response
- * carries Service-Worker-Allowed, so a site's service worker can't reach
- * past its own `/<id>/`.
- *
- * Access is the workspace owner's choice, per repository (`slack_repos`,
- * for previews built from one) or for the workspace (`slack_preview_settings`):
- * anyone with the link, or members only. A members-only preview sends the
- * visitor to Sign in with Slack (OpenID) restricted to the workspace; the
- * callback hands the preview origin a short grant, which it trades for an
- * HttpOnly `__Host-` cookie. Links expire `ttl_days` after they were made
- * (the current setting, so shortening it expires older links too); the daily
- * cron deletes their files.
- */
 
 import { WorkerEntrypoint } from "cloudflare:workers";
 import {
@@ -934,11 +904,6 @@ const signinCallback = async (request: Request, env: Cloudflare.Env): Promise<Re
   return await grantRedirect(env, preview, state.r, { "set-cookie": await memberCookie(env, team, user) });
 };
 
-/**
- * The fallback for people Sign in with Slack refuses (an unconfirmed email,
- * say): the workspace's bot DMs a one-time link to the member with that
- * email. The page never says whether the email belongs to a member.
- */
 const appMessagesLink = (install: { appId: string; teamId: string }): string => {
   const link = new URL("https://slack.com/app_redirect");
   link.searchParams.set("app", install.appId);

@@ -17,10 +17,6 @@ const CONTAINER_SNAPSHOT_KEY = "containerSnapshot";
 const DEPENDENCY_BACKUP_KEY = "dependencyBackup";
 const DISK_CLASSES: readonly DiskClass[] = ["standard", "large"];
 
-/**
- * Each disk class keeps its own latest snapshot and archive. The standard
- * class keeps the keys every container used before there were classes.
- */
 const slotKey = (key: string, slot: DiskClass): string =>
   slot === "standard" ? key : `${key}:${slot}`;
 

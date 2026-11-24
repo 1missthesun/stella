@@ -11,8 +11,6 @@ const MUSE_SOCKET_URL = "https://api.meta.ai/v1/asr/realtime";
 const PCM_BYTES_PER_SECOND = 16_000 * 2;
 const MAX_AUDIO_BYTES = 60 * 60 * PCM_BYTES_PER_SECOND;
 const MAX_FRAME_BYTES = PCM_BYTES_PER_SECOND;
-// Ask the owner for more budget this far before the current hold runs out;
-// audio that arrives at the limit while it answers waits, up to a few seconds.
 const EXTEND_LEAD_BYTES = 60 * PCM_BYTES_PER_SECOND;
 const MAX_WAITING_BYTES = 10 * PCM_BYTES_PER_SECOND;
 
@@ -28,7 +26,6 @@ export class DictationUsageError extends Error {}
 
 export type MuseControl = {
   prepare(sessionId: string): Promise<PreparedSession>;
-  /** Grows the session's budget hold; resolves to the new audio byte limit. */
   extend(usage: { sessionId: string; audioBytes: number }): Promise<number>;
   settle(usage: {
     sessionId: string;
@@ -79,7 +76,6 @@ const closeSocket = (socket: WebSocket, code: number, reason: string): void => {
         : 1011;
     socket.close(validCode, reason.slice(0, 120));
   } catch {
-    // Closing is best effort once the peer has already gone away.
   }
 };
 
@@ -238,7 +234,6 @@ const startProvider = async (
         });
         return;
       } catch {
-        // The owner charges the session's remaining hold when it expires.
       }
     }
   };
@@ -426,7 +421,6 @@ const bridge = (
           sawFinalTranscript = true;
         }
       } catch {
-        // Forward provider frames unchanged; clients ignore unknown payloads.
       }
     }
     if (!trySend(gateway, data)) closeBoth(1001, "Client went away");
@@ -459,8 +453,7 @@ const bridge = (
 const acceptClientSocket = () => {
   const pair = new WebSocketPair();
   const gateway = pair[1];
-  // Current Workers compatibility dates deliver binary frames as Blob by
-  // default. Keep PCM frames synchronous and ordered for the relay.
+  // Current Workers compatibility dates deliver binary frames as Blob by default.
   gateway.binaryType = "arraybuffer";
   gateway.accept();
   return {

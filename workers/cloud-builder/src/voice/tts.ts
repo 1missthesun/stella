@@ -7,9 +7,6 @@ import { concat, createMp3Framer } from "./mp3.js";
 
 export const TTS_MODEL = STELLA_MEDIA_MODELS.speech;
 const OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech";
-// Simba streams each request's audio as it is made (first bytes in ~0.5 s
-// whatever the length), so text is split only for the per-request limit
-// (about six minutes of MP3) and to start the next part while one plays.
 const CHUNK_CHARS = 1_000;
 const CHUNKS_IN_FLIGHT = 2;
 
@@ -20,13 +17,11 @@ const read = (env: object, name: string): string | null => {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 };
 
-/** Stella's read-aloud voice runs on OpenRouter only; fal does not carry Simba. */
 export const ttsProvider = (env: object): { provider: TtsProvider; apiKey: string } | null => {
   const apiKey = read(env, "OPENROUTER_API_KEY");
   return apiKey ? { provider: "openrouter", apiKey } : null;
 };
 
-/** A voice from Stella's read-aloud catalog, else the default (Beth). */
 export const resolveTtsVoice = (voice: unknown): string =>
   typeof voice === "string" && isStellaTtsVoice(voice.trim()) ? voice.trim() : DEFAULT_STELLA_TTS_VOICE;
 
@@ -80,11 +75,6 @@ const LATIN = /[A-Za-z\u00c0-\u024f\u1e00-\u1eff]/gu;
 const KANA = /[\u3040-\u30ff\u31f0-\u31ff]/u;
 const VIETNAMESE = /[\u01a0\u01a1\u01af\u01b0\u1ea0-\u1ef9]/gu;
 
-/**
- * The Simba language code for `chunk` when it is mostly in a non-Latin
- * script or is Vietnamese, else null. `whole` is the full text: Chinese characters in a
- * text that also has kana are Japanese.
- */
 export const ttsLanguage = (chunk: string, whole = chunk): string | null => {
   let best: { language: string; count: number; refine?: (text: string) => string } | null = null;
   for (const script of SCRIPTS) {
@@ -167,7 +157,6 @@ export const splitTtsText = (text: string): string[] => {
   return chunks.filter((chunk) => chunk.length > 0);
 };
 
-/** One chunk's audio as it arrives, read ahead of the listener. */
 type ChunkAudio = {
   parts: Uint8Array[];
   done: boolean;
@@ -249,12 +238,6 @@ const chunkedAudio = (
   });
 };
 
-/**
- * MP3 for `text` as whole frames, streamed as Simba makes it, a chunk of
- * text per request with the next one read ahead; each request's file is
- * passed on without its ID3 tag so they play as one stream. Throws when
- * read-aloud is not set up or the provider refuses the first chunk.
- */
 export const openTtsAudio = async (
   env: object,
   args: { text: string; voice: string; signal: AbortSignal },
@@ -268,8 +251,7 @@ export const openTtsAudio = async (
   if (!picked) throw new Error("Read-aloud is not configured.");
   args.signal.throwIfAborted();
   const attribution = !ownerModeEnabled(env);
-  // A chunk that fails before any audio arrives is tried once more: OpenRouter
-  // does not bill failed generations, and a dropped part would cut the reply.
+  // OpenRouter does not bill failed generations.
   const synthesize = (text: string, audio: ChunkAudio) =>
     Effect.tryPromise({
       try: async (interrupted) => {

@@ -20,9 +20,6 @@ const CORS_HEADERS = {
   "access-control-max-age": "7200",
 };
 
-// Rendered catalog per loaded price list, then per audience and gateway: the
-// body is a pure function of those and this build's catalog, and holds nothing
-// about the caller. A reload of prices (every few minutes) starts a new entry.
 const renderedCatalogs = new WeakMap<object, Map<string, { body: string; etag: string }>>();
 
 const reply = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>

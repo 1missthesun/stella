@@ -242,8 +242,7 @@ const tarHeader = (
   const archivePath =
     options.archivePath ??
     (entry.kind === "dir" ? `${entry.path}/` : entry.path);
-  // A PAX record carries the real value when it cannot fit in the legacy
-  // ustar fields. The fallback is intentionally harmless and bounded.
+  // A PAX record carries the real value when it cannot fit in the legacy ustar fields.
   const pathParts = splitUstarPath(archivePath) ?? {
     name: "PaxFiles/stella",
     prefix: "",
@@ -1570,10 +1569,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     return { missingBlobs: [], revision: mutation.revision };
   }
 
-  /**
-   * What the live world holds against its quota, and anything it still
-   * lists under the drive's subtree, which it never counts or exports.
-   */
   async usage(): Promise<{
     revision: number;
     files: number;
@@ -1725,8 +1720,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     const entries: WorldEntry[] = [];
     const deleted: string[] = [];
     for (const row of rows) {
-      // Only a world that stored the drive before it moved out can name it
-      // here, and a sandbox's working copy is not the world's to change.
       if (isWorldDrivePath(row.path)) continue;
       const entry = this.entryRow(row.path, this.liveManifest(forkId));
       if (entry) entries.push(rowEntry(entry));
@@ -1831,8 +1824,6 @@ export class WorldSqlStore implements WorldToolFileApi {
         for (const row of rows) {
           assertLiveUnchanged();
           const entry = rowEntry(row);
-          // A world that stored the drive before it moved out still lists
-          // it; it is never exported or counted.
           if (isWorldDrivePath(entry.path)) continue;
           const pax = paxPayload(entry);
           if (pax) {

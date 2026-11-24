@@ -13,11 +13,6 @@ export type SlackGithubConnection = {
   account: string;
   accountType: string;
   status: SlackGithubStatus;
-  /**
-   * The repositories the GitHub user who connected it can reach, with their
-   * permission: all a workspace may use. Null on connections made before it
-   * was recorded, which grant nothing until reconnected.
-   */
   repos: UserInstallationRepo[] | null;
 };
 
@@ -37,7 +32,6 @@ export type SlackRepoSettings = {
   id: string;
   fullName: string;
   branch: string;
-  /** A token pasted before GitHub connections existed. */
   legacyToken: string | null;
   github: SlackGithubConnection | null;
 };
@@ -138,7 +132,6 @@ export const repoOwnedBy = (github: SlackGithubConnection | null, fullName: stri
   Boolean(github?.account) &&
   fullName.split("/")[0]!.toLowerCase() === github!.account.toLowerCase();
 
-/** What the workspace may do in `fullName` through this connection: its connecting user's permission. */
 export const repoPermission = (
   github: SlackGithubConnection | null,
   fullName: string,

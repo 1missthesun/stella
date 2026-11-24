@@ -1,19 +1,3 @@
-/**
- * Stella for Slack's repositories: before an agent of a Slack workspace starts
- * in its container, the repository its conversation works in (`repos.ts`) is
- * cloned (or brought up to date) under `/workspace/repos/<name>` on that
- * repository's branch, outside the owner's world so it never syncs into
- * their files.
- *
- * Through the workspace's GitHub connection the agent can push: the clone's
- * git asks `stella-git-credential` for a token on every operation, which
- * trades the container's repo capability (`repo-capability.ts`) for a fresh
- * installation token scoped to this one repository. `stella-preview` waits
- * for the repository's own preview of a pushed commit and prints its URL.
- * Nothing long-lived is written to the clone. A public repository, or one
- * with a token pasted before connections existed, is cloned without these.
- */
-
 import type { ExecutionSession } from "../sandbox-client.js";
 import { cloneToken } from "./github.js";
 import { issueSlackRepoCapability } from "./repo-capability.js";
@@ -119,9 +103,7 @@ export const prepareSlackRepo = async (
         writeFile(PREVIEW_HELPER, PREVIEW_SCRIPT, "0755", "root:root"),
       ]
     : [`rm -rf ${HELPER_DIR}`];
-  // A pasted token must never reach a tool-uid process, so root fetches with it
-  // into a root-owned mirror the tool uid can only read; the token travels in
-  // the exec environment, not in argv.
+  // argv is readable by every process in the container; the environment is not.
   const mirrorGit = `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $${GITHUB_BASIC_ENV}" git -c core.fsmonitor= -c core.hooksPath=/dev/null`;
   const mirrored = token
     ? [

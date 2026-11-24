@@ -122,12 +122,8 @@ const linkFromPayload = (payload: Record<string, unknown>): string | null => {
   );
 };
 
-/**
- * Whether a `GET /session/{id}/toolkits` payload shows `toolkit` with an
- * active connected account. Tolerant of the response shapes the router has
- * returned (items/data/toolkits arrays, nested toolkit slugs, item-level or
- * connection-level accounts, bare booleans).
- */
+// Composio's router has returned items/data/toolkits arrays, nested toolkit
+// slugs, item-level or connection-level accounts, and bare booleans.
 export const toolkitConnectedFromPayload = (
   payload: Record<string, unknown>,
   toolkit: string,
@@ -174,11 +170,7 @@ export const toolkitConnectedFromPayload = (
 
 const sessionPath = (sessionId: string): string => `/session/${encodeURIComponent(sessionId)}`;
 
-/**
- * Create a session for one toolkit. Composio has no idempotency key for this.
- * `multiAccount` lets its connect links add further accounts instead of
- * replacing one; `connectedAccountId` pins every execution to that account.
- */
+// Composio has no idempotency key for session creation.
 export const createComposioSession = async (
   config: ComposioConfig,
   userId: string,
@@ -313,7 +305,6 @@ const accountIdentity = (item: Record<string, unknown>): string | undefined => {
   return undefined;
 };
 
-/** Every connected account (any status) the user has for one toolkit, oldest first. */
 export const listComposioAccounts = async (
   config: ComposioConfig,
   toolkit: string,

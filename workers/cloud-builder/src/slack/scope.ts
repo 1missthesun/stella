@@ -1,15 +1,3 @@
-/**
- * Where a Stella Crew conversation lives on the account it runs on.
- *
- * Crew runs on the Slack workspace owner's account, but everyone in the
- * workspace talks to it, so it never shares the owner's own storage:
- * - its Drive is the workspace's own drive space (`crew:<teamId>`), pinned by
- *   the owner gate (`crew` on `ownerInternal`); the owner's personal Drive is
- *   a different space it can't name;
- * - its world (the `/workspace/world` agents get) is one per Slack workspace,
- *   never the owner's world with their memory, skills, projects and apps.
- */
-
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { sha256Hex } from "../hash.js";
 import { crewSpaceForTeam } from "../owner-store/crew-scope.js";
@@ -24,16 +12,11 @@ export type CrewPlace = Readonly<{ teamId: string; crew: OwnerCrewScope }>;
 const SCOPE_CACHE_MS = 60_000;
 const placeCache = new Map<string, { place: CrewPlace; at: number }>();
 
-/** The drive scope of a Slack installation. */
 export const crewScopeForInstall = (install: { teamId: string; homeFolder: string }): OwnerCrewScope => ({
   space: crewSpaceForTeam(install.teamId),
   home: install.homeFolder,
 });
 
-/**
- * The Slack workspace a Crew conversation belongs to. One that can't be
- * placed gets a space of its own that holds nothing.
- */
 export const crewPlaceForConversation = async (
   env: { DB?: D1Database },
   conversationId: string,
@@ -62,11 +45,9 @@ export const crewPlaceForConversation = async (
   return place;
 };
 
-/** The world a Crew workspace's agents share; never the owner's own world. */
 export const crewWorldName = async (ownerId: string, teamId: string): Promise<string> =>
   `${await sha256Hex(ownerId)}:${await sha256Hex(`crew:${teamId}:${await checkpointKey(ownerId)}`)}`;
 
-/** The owner's world, or the Crew workspace's world for a Crew conversation. */
 export const conversationWorldName = async (
   env: { DB?: D1Database },
   ownerId: string,
@@ -77,7 +58,6 @@ export const conversationWorldName = async (
   return await crewWorldName(ownerId, (await crewPlaceForConversation(env, conversationId)).teamId);
 };
 
-/** The `crew` scope to send with owner calls made for this conversation, if it is a Crew one. */
 export const crewScopeForConversation = async (
   env: { DB?: D1Database },
   conversationId: string | undefined,
@@ -86,7 +66,6 @@ export const crewScopeForConversation = async (
     ? (await crewPlaceForConversation(env, conversationId)).crew
     : undefined;
 
-/** An owner call, pinned to a Crew workspace's scope when there is one. */
 export const ownerCallFor =
   (
     env: Pick<Cloudflare.Env, "OWNER_GATES">,

@@ -5,11 +5,6 @@ export type NameResolver = (userId: string) => Promise<string>;
 const unescapeSlack = (text: string): string =>
   text.replace(/&lt;/gu, "<").replace(/&gt;/gu, ">").replace(/&amp;/gu, "&");
 
-/**
- * Slack's markup to plain text: `<@U1>` to `@name`, `<#C1|general>` to
- * `#general`, `<https://x|label>` to `label (https://x)`, entities decoded.
- * The bot's own mention is dropped.
- */
 export const slackToPlain = async (
   text: string,
   botUserId: string,

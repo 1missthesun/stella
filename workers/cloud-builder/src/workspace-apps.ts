@@ -266,7 +266,6 @@ export class WorkspaceApps {
     slug: string,
     release: Release,
   ): Promise<Record<string, string>> {
-    // Migration from the first development build; new releases use bounded chunks.
     if ("files" in release)
       return (release as Release & { files: Record<string, string> }).files;
     const chunks: Uint8Array[] = [];

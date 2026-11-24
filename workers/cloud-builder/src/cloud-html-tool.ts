@@ -22,7 +22,6 @@ const MAX_HTML_BYTES = 6 * 1024 * 1024;
 export type CloudHtmlToolContext = Readonly<{
   turnId: string;
   ownerInternal: OwnerInternalCall;
-  /** Drive folder the canvas goes under (a Crew workspace's home); the drive root when absent. */
   driveRoot?: string;
   publishFiles: (
     writerKey: string,

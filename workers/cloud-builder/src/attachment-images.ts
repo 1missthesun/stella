@@ -1,22 +1,3 @@
-/**
- * The model-ready copy of an image a chat attached from the Drive.
- *
- * A chat attachment is uploaded to the Drive as soon as it is attached, and
- * the owner prepares its model-ready copy in the background as the upload
- * finalizes (`prepareChatImage` in the Drive domain), so sending the turn only copies
- * a ready object into the conversation. The copy lives at
- * `conversation-images/<owner hash>/attachments/<hash of the Drive key>`:
- *
- * - an image already within the model's limits (clients resize on attach) is
- *   copied server-side by R2, with no bytes through the isolate;
- * - anything else (an older client, a raw phone photo) is fitted with the
- *   Images binding, the safety net.
- *
- * A send that finds no prepared copy (sent before the background job ran)
- * prepares it the same way on the spot. The copy goes when its Drive object
- * is retired, and with the owner.
- */
-
 import { DURABLE_OBJECT_READ_IMAGE_CAPS, imageFitsCaps, READ_IMAGE_MAX_SOURCE_BYTES } from "@stella/runtime/kernel/shared/image-caps.js";
 import { fitImageWithImagesBinding } from "./cloud-image-fit.js";
 import { ownerConversationImagesPrefix } from "./conversation-images.js";
@@ -31,7 +12,6 @@ export type AttachmentImagesEnv = Pick<
 export type PreparedAttachmentImage = {
   key: string;
   mimeType: string;
-  /** How it was made: already there, copied as it was, or fitted. */
   via: "ready" | "copied" | "fitted";
 };
 
@@ -49,7 +29,6 @@ const u24le = (b: Uint8Array, i: number) => b[i]! | (b[i + 1]! << 8) | (b[i + 2]
 const u32be = (b: Uint8Array, i: number) => ((b[i]! << 24) >>> 0) + ((b[i + 1]! << 16) | (b[i + 2]! << 8) | b[i + 3]!);
 const ascii = (b: Uint8Array, i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n));
 
-/** The type and pixel size an image's header declares, or null when it can't be read from these bytes. */
 export const imageHeaderInfo = (b: Uint8Array): { mimeType: string; width: number; height: number } | null => {
   if (b.length >= 24 && b[0] === 0x89 && ascii(b, 1, 3) === "PNG" && ascii(b, 12, 4) === "IHDR") {
     return { mimeType: "image/png", width: u32be(b, 16), height: u32be(b, 20) };
@@ -91,10 +70,6 @@ export const imageHeaderInfo = (b: Uint8Array): { mimeType: string; width: numbe
   return null;
 };
 
-/**
- * Fitting holds the whole source (up to 20MB) and its output in the isolate,
- * so at most two run at once per isolate, beside a Durable Object's own memory.
- */
 const FIT_SLOTS = 2;
 let fitting = 0;
 const fitWaiters: Array<() => void> = [];
@@ -111,11 +86,6 @@ const withFitSlot = async <T>(work: () => Promise<T>): Promise<T> => {
 
 const bytesOf = async (object: R2ObjectBody): Promise<Uint8Array> => new Uint8Array(await object.arrayBuffer());
 
-/**
- * The prepared copy of the Drive object `driveKey` under `ownerId`: the one
- * already made, or made now. Null when the source is gone or isn't an image
- * the model can take even after fitting.
- */
 export const prepareAttachmentImage = async (
   env: AttachmentImagesEnv,
   args: { ownerId: string; driveKey: string; contentType: string; sizeBytes: number },
@@ -136,7 +106,6 @@ export const prepareAttachmentImage = async (
     const signer = r2Signer(env, env.R2_DRIVE_BUCKET);
     if (signer) {
       await copyR2Object(signer, { from: args.driveKey, to: key });
-      // The copy keeps the source's metadata; the type the model sees is the one its bytes declare.
       const copied = await bucket.head(key);
       if (copied?.httpMetadata?.contentType === info.mimeType) return { key, mimeType: info.mimeType, via: "copied" };
     }
@@ -145,7 +114,6 @@ export const prepareAttachmentImage = async (
     await bucket.put(key, await bytesOf(whole), { httpMetadata: { contentType: info.mimeType } });
     return { key, mimeType: info.mimeType, via: "copied" };
   }
-  // The safety net: too large, too many pixels, or a type the model can't take.
   const images = env.IMAGES;
   if (!images || args.sizeBytes > READ_IMAGE_MAX_SOURCE_BYTES) return null;
   return await withFitSlot(async () => {

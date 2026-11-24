@@ -1,10 +1,3 @@
-/**
- * Google Ads mutations run through Composio's proxy endpoint instead of its
- * generated tools: each `GOOGLEADS_MUTATE_*` action's published schema is
- * replaced by one operations schema, and its input becomes a raw
- * `customers/<id>/<service>:mutate` request.
- */
-
 const GOOGLE_ADS_API_VERSION = "v23";
 
 const GOOGLE_ADS_MUTATION_SERVICES = {

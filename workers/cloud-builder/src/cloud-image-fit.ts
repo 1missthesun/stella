@@ -1,18 +1,4 @@
-/**
- * Fit an image to the model's limits inside the Worker, the counterpart of the
- * runtime's Photon `resizeImage` (packages/runtime/kernel/shared/image-resize).
- *
- * workerd cannot host Photon here: its Node build compiles WASM from bytes
- * read off disk, and a full-size photo decoded into the isolate (a 12MP JPEG
- * is ~48MB of RGBA, a 24MP one ~96MB) would not fit beside a Durable Object
- * in 128MB anyway. The Images binding decodes and resizes outside the isolate.
- * Everything that decides the outcome — the caps, when an image passes
- * untouched, the sizes and encodings it tries in turn, and the note the model
- * reads — comes from the shared `image-caps` module, so a Read behaves the
- * same here as on a computer or in an agent's container. (The binding's PNG is
- * less compact than the runtime's, so a dense screenshot that stays PNG there
- * may go as JPEG at quality 90 here.)
- */
+// workerd cannot host Photon: its Node build compiles WASM from bytes read off disk.
 
 import {
   base64EncodedLength,

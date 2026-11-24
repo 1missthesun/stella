@@ -188,10 +188,6 @@ export const resolveAgentTurnState = async (
                 ? "signature"
                 : undefined;
       if (unverifiable) {
-        // A saved Claude session this deployment cannot verify (signed with a
-        // retired service key, or left half-written) is never restored. The
-        // thread's own history is canonical, so the turn rebuilds the session
-        // from it instead of failing every message until someone intervenes.
         log("info", "native_state_checkpoint_discarded", {
           turnId: turn.turnId,
           threadId: turn.threadId,
@@ -643,7 +639,6 @@ export const serveTurnDriveRequest = async (
               }
             : null;
   if (!call) return brokerFailure(403);
-  // A Stella Crew turn's drive is its Slack workspace's own space.
   const crew = await crewScopeForConversation(env, turn.conversationId ?? turn.originConversationId);
   const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
     ...call,
@@ -726,8 +721,6 @@ export const serveTurnUserAskRequest = async (
     return brokerFailure(403);
   }
   if (operation === "release") {
-    // A saved value from one of the owner's computers, sealed to the task's
-    // own key. The conversation and thread come from the turn, never the body.
     const released = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
       name: "savedValues.release",
       args: {
@@ -778,7 +771,6 @@ export const serveTurnUserAskRequest = async (
             ? {}
             : { timeoutMs: body.timeoutMs }),
           detail: body.detail,
-          // The task's own key: a sensitive answer is sealed to it.
           ...(body.recipientKey === undefined || body.recipientKey === null
             ? {}
             : { recipientKey: body.recipientKey }),

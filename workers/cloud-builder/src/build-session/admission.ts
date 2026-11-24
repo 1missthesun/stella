@@ -120,9 +120,7 @@ export const startAgentTurn = (
       host.builderFallbackRecoveries.has(turn.turnId)
         ? host.quiesceCurrentAgentSession(turn)
         : host.terminateCurrentAgentSession(turn),
-    // createSession() may ignore AbortSignal and resolve after the immediate
-    // destroy. Sweep again after the underlying turn promise has unwound so
-    // Stop can never ACK while that late session/container remains live.
+    // createSession() may ignore AbortSignal and resolve after the immediate destroy.
     afterInterrupt: () =>
       host.builderFallbackRecoveries.has(turn.turnId)
         ? host.quiesceCurrentAgentSession(turn)

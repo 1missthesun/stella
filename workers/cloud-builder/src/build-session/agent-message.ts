@@ -7,12 +7,6 @@ import type { TurnRequest } from "./shared/types.js";
 
 const reply = (body: CloudAgentMessageResponse) => Response.json(body, { headers: { "cache-control": "no-store" } });
 
-/**
- * A cloud task's `send_message`. The sender is the turn's own thread, never
- * what the model says; the owner routes it (Stella and the task's lead
- * durably) or, with `done`, only checks that it is for whoever started the
- * task, since the executor files a finished report as the turn ends.
- */
 export const serveAgentMessageRequest = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "turnId" | "attemptGeneration" | "threadId" | "agentRole">,

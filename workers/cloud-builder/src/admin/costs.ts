@@ -17,7 +17,6 @@ const usd = (microCents: number) => Number((microCents / MICRO_CENTS_PER_USD).to
 
 const isoDay = (at: number) => new Date(at).toISOString().slice(0, 10);
 
-/** Parses an inclusive UTC day range (`YYYY-MM-DD`), defaulting to the last 30 days. */
 export const dayRange = (url: URL): { from: string; to: string; days: number } | Response => {
   const to = url.searchParams.get("to")?.trim() || isoDay(Date.now());
   const from = url.searchParams.get("from")?.trim() || isoDay(Date.parse(`${to}T00:00:00Z`) - (DEFAULT_RANGE_DAYS - 1) * DAY_MS);
@@ -99,11 +98,6 @@ const distribution = (values: number[]) => {
 
 type OwnerPlan = { totals: Totals };
 
-/**
- * Cross-owner cost report over D1's owner_cost_daily. Revenue is an estimate:
- * each owner seen in the range pays their plan's monthly price prorated to the
- * range, split across plans by the share of active days on each.
- */
 export const costsReport = async (url: URL, database: D1Database): Promise<Response> => {
   const range = dayRange(url);
   if (range instanceof Response) return range;

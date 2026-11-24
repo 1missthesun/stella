@@ -1,22 +1,3 @@
-/**
- * The conversation object's Slack side. A conversation started from Slack is
- * bound to its thread (`bind`, called by `events.ts` before each turn), and
- * from then on everything it commits is mirrored there:
- *
- * - Stella's replies, as they are journaled, including the ones that answer
- *   an agent's completion hours later;
- * - one progress message per turn, edited in place: the tools it runs and the
- *   background agents it starts, each ticking to done, with a Stop button
- *   while the turn runs;
- * - files the turn's agents produce, uploaded into the thread;
- * - the 👀 reaction on the request, removed when the turn ends, and a notice
- *   when a turn fails or is stopped.
- *
- * Delivery is best effort and ordered: one promise chain per object, every
- * Slack call caught. A conversation that was never bound answers `observe`
- * after one storage read and then never again.
- */
-
 import type { JournalRecord } from "../conversation-types.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import {
@@ -40,12 +21,10 @@ import { crewScopeForInstall } from "./scope.js";
 export type SlackRelayBinding = {
   teamId: string;
   channelId: string;
-  /** The thread's root; null for a DM, whose replies are top level. */
   threadTs: string | null;
   ownerId: string;
   requesterUserId: string;
   shared: boolean;
-  /** Who and where the latest request came from, for the Slack prompt. */
   workspace?: SlackWorkspaceContext;
 };
 
@@ -62,14 +41,10 @@ type TurnState = {
   progressTs?: string;
   lines: Line[];
   phase: "running" | "completed" | "failed" | "canceled";
-  /** A turn no Slack message asked for (an agent's report, a schedule) reports into this one. */
   hostTurnId?: string;
   startedAt?: number;
-  /** Stella has said something in the thread for this request. */
   acked?: boolean;
-  /** Someone pressed Stop; the request ends here whatever still reports. */
   stopped?: boolean;
-  /** Woken by an agent's progress note rather than its report: brief replies are not posted. */
   noteWake?: boolean;
   updatedAt: number;
 };
@@ -86,10 +61,8 @@ const TOKEN_CACHE_MS = 5 * 60_000;
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const STALE_TURN_MS = 20 * 60_000;
 const SETTLE_DELAY_MS = 6_000;
-/** Give Stella's first words a head start over the checklist. */
 const PROGRESS_GRACE_MS = 25_000;
 const STALE_AGENT_MS = 3 * 60 * 60_000;
-/** A reply to an agent's progress note this short is chatter, not a result. */
 const NOTE_REPLY_MIN_CHARS = 500;
 const AGENT_TOOLS = new Set([
   "spawn_agent",
@@ -142,16 +115,9 @@ const assistantText = (payload: unknown): string | null => {
     : forSlack(stripMessageRefTag(withoutRefs(splitReplyRefs(text).text)));
 };
 
-/** A trailing `refs` fence the model glued to its last line, closed or not. */
 const withoutRefs = (text: string): string =>
   text.replace(/\s*`{3}[ \t]*refs\b[^`]*(?:`{3})?\s*$/u, "");
 
-/**
- * Links Slack can't open (drive and workspace paths, which Stella's own apps
- * turn into file chips) are dropped when they stand on a line of their own,
- * since the file itself is uploaded into the thread, and become their label
- * inside a sentence.
- */
 const NON_WEB_LINK = /\[([^\]\n]+)\]\((?!https?:|mailto:)([^)\s]+)\)/iu;
 const forSlack = (text: string): string =>
   text
@@ -184,7 +150,6 @@ export class SlackRelay {
     private readonly waitUntil: (work: Promise<unknown>) => void,
   ) {}
 
-  /** Where this conversation's replies go, and which Slack message asked. */
   async bind(
     input: SlackRelayBinding & { clientMsgId: string; triggerTs: string },
   ): Promise<void> {
@@ -212,7 +177,6 @@ export class SlackRelay {
     this.binding = binding;
   }
 
-  /** The workspace context of the latest Slack request; null outside Slack. */
   async workspace(): Promise<SlackWorkspaceContext | null> {
     if (this.binding === undefined) {
       this.binding =
@@ -256,7 +220,6 @@ export class SlackRelay {
     });
   }
 
-  /** Agents a Slack request started that are still working. */
   async runningAgentIds(): Promise<string[]> {
     const turns = await this.loadTurns();
     const ids = new Set<string>();
@@ -269,7 +232,6 @@ export class SlackRelay {
     return [...ids];
   }
 
-  /** Stop pressed: the request reads Stopped, once, naming who stopped it. */
   stopped(hostTurnId: string, slackUserId: string): void {
     this.enqueue(async () => {
       const state = await this.turn(hostTurnId);
@@ -338,7 +300,6 @@ export class SlackRelay {
     return created;
   }
 
-  /** The Slack request a turn reports into: its own, or the latest one. */
   private async hostOf(turnId: string): Promise<string | null> {
     const turns = await this.loadTurns();
     const own = turns[turnId];
@@ -353,7 +314,6 @@ export class SlackRelay {
     await this.storage.put(TURNS_KEY, this.turns);
   }
 
-  /** Any turn still running, or any agent a Slack request started still working. */
   private async busy(): Promise<{
     runningTurnId: string | null;
     agentsRunning: boolean;
@@ -569,7 +529,6 @@ export class SlackRelay {
     this.settleSoon();
   }
 
-  /** An agent's report starts its wake turn a moment after the agent ends; wait for it. */
   private settleSoon(): void {
     this.waitUntil(
       scheduler
@@ -578,7 +537,6 @@ export class SlackRelay {
     );
   }
 
-  /** Nothing left running: the 👀 come off every request it answered. */
   private async settleIfIdle(): Promise<void> {
     const { runningTurnId, agentsRunning } = await this.busy();
     if (runningTurnId || agentsRunning) return;

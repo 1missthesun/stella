@@ -86,9 +86,6 @@ export type CapturedSessionExecOptions = Readonly<{
 
 const CAPTURE_START_TIMEOUT_MS = 10_000;
 const CAPTURE_STARTED_TIMEOUT_MS = 10_000;
-// Production teardown may spend up to 35s on an exact kill and 30s on a
-// sandbox lifetime rotation. Keep explicit room for the durable terminal fence
-// and marker transaction rather than racing those writes at the same boundary.
 const CAPTURE_ABANDON_TIMEOUT_MS = 90_000;
 const CAPTURE_RESULT_TIMEOUT_MS = 60_000;
 const CAPTURE_STATUS_RPC_TIMEOUT_MS = 10_000;
@@ -111,10 +108,6 @@ const positiveDuration = (
     ? value
     : fallback;
 
-/**
- * Keep both settlement handlers attached after the timer wins. A late platform
- * rejection is observed rather than becoming an unhandled rejection.
- */
 const withLocalDeadline = <T>(
   operation: () => Promise<T>,
   timeoutMs: number,
@@ -162,19 +155,6 @@ const trustedProcessCommand = (argv: readonly string[]): string => {
   return argv.map(quoteShellArg).join(" ");
 };
 
-/**
- * Run the trusted Stella executor as a named, sessionless process and collect
- * its terminal result from the sandbox's process directory. The executor must
- * remain root so it can validate the root-owned host/native anchors and apply
- * the per-tool setpriv boundary itself. Untrusted app/build commands use
- * `strictSessionExec`.
- *
- * The caller owns the destructive uncertainty boundary. A start whose ACK is
- * lost must destroy the exact sandbox. An acknowledged process that does not
- * yield a terminal event must be killed and its dedicated session deleted,
- * falling back to sandbox destruction. Production callers that may recover a
- * workspace must therefore supply `onAbandon`.
- */
 export const capturedSessionExec = async (
   session: CapturedSession,
   argv: readonly string[],
@@ -286,11 +266,7 @@ export const capturedSessionExec = async (
                 "Captured session process exceeded its local command deadline.",
               );
             }
-            // Cloudflare's process-info RPC can stay pending for the lifetime
-            // of a running process. One locally bounded observer is enough to
-            // close the subscribe-after-exit race; if it hangs, stop polling
-            // rather than accumulating detached RPCs and let the already-open
-            // exit stream remain authoritative.
+            // Cloudflare's process-info RPC can stay pending for the lifetime of a running process.
             const observed = await withLocalDeadline(
               () => session.getProcess!(processId),
               Math.min(CAPTURE_STATUS_RPC_TIMEOUT_MS, remainingMs),

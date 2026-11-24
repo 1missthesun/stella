@@ -245,7 +245,6 @@ const searchOpenRouter = async (
       billing: { provider: "openrouter", sku: model, basis: reported !== null ? "actual" : "estimated", outcome: "succeeded" },
     };
   } catch (error) {
-    // A request the provider accepted (or one we gave up on mid-flight) is billed.
     const billed = answered || signal.aborted
       ? { costMicroCents: estimate, provider: "openrouter", sku: model, outcome: (signal.aborted ? "aborted" : "failed") as CostOutcome }
       : undefined;
@@ -254,7 +253,6 @@ const searchOpenRouter = async (
   }
 };
 
-// The most one search can cost, held before it runs.
 export const webSearchMaxCostMicroCents = (env: Cloudflare.Env): number =>
   webSearchBackend(env) === "openrouter"
     ? usdToMicroCents(SEARCH_TARIFF.openRouterMaxUsd)

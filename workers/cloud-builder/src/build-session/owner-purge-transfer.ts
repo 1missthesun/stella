@@ -77,12 +77,7 @@ export const cloudHomeLeaseRunner =
 export const APP_SLUG_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 export const LEGACY_BUILD_PREFIX_PATTERN = /^builds\/[A-Za-z0-9_-]{1,64}$/;
 
-/**
- * Backfill for checkpoints written before cleanup debt existed. The sandbox
- * SDK stores `{name}` in `backups/<uuid>/meta.json`; our name is derived from
- * the owner/workspace checkpoint key, so a full metadata scan can attribute
- * old random backup ids without guessing or deleting another owner's data.
- */
+// The sandbox SDK stores `{name}` in `backups/<uuid>/meta.json`.
 const sweepBackupsByName = async (
   bucket: R2Bucket,
   name: string,
@@ -179,8 +174,6 @@ export const purgeNativeStateForWorkspace = async (
       if (!swept.done)
         throw new Error("Native checkpoint purge was truncated.");
     }
-    // Also catches createBackup -> descriptor-persist crash or a malformed KV
-    // record. The name is a one-way derivative of this exact native key.
     const historical = await sweepBackupsByName(
       env.BACKUP_BUCKET,
       await nativeStateBackupName(key),

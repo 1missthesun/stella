@@ -26,14 +26,12 @@ export type GmailMail = {
   labelIds: string[];
   text: string;
   bulk: boolean;
-  /** How to stop a mailing list, from its List-Unsubscribe headers. */
   unsubscribe?: GmailUnsubscribe;
   attachments: GmailAttachmentRef[];
 };
 
 export type GmailUnsubscribe = { url?: string; mailto?: string; oneClick: boolean };
 
-/** Reads List-Unsubscribe (and RFC 8058's List-Unsubscribe-Post) into what Stella can use. */
 export const parseUnsubscribe = (header: string | undefined, post: string | undefined): GmailUnsubscribe | undefined => {
   if (!header) return undefined;
   const entries = [...header.matchAll(/<([^>]+)>/gu)].map((match) => match[1]!.trim());
@@ -82,10 +80,8 @@ export const gmailStopWatch = async (get: Fetcher): Promise<void> => {
 };
 
 export type GmailHistory = {
-  /** Messages added (or moved into the inbox) since the cursor, oldest first, with the labels they had then. */
   added: { id: string; labelIds: string[] }[];
   historyId: string;
-  /** The cursor was too old for Gmail to answer from; start again from now. */
   expired: boolean;
 };
 
@@ -175,7 +171,6 @@ export const gmailReadMail = async (get: Fetcher, id: string): Promise<GmailMail
   };
 };
 
-/** One attachment's bytes as standard base64. */
 export const gmailAttachmentBase64 = async (get: Fetcher, messageId: string, attachmentId: string): Promise<string> => {
   const answer = (await get(
     `${GMAIL_API}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
@@ -184,7 +179,6 @@ export const gmailAttachmentBase64 = async (get: Fetcher, messageId: string, att
   return data.replace(/-/gu, "+").replace(/_/gu, "/");
 };
 
-/** Takes a message out of the inbox (archive) or puts it back. */
 export const gmailSetInbox = async (get: Fetcher, id: string, inInbox: boolean): Promise<void> => {
   await get(`${GMAIL_API}/messages/${encodeURIComponent(id)}/modify`, {
     method: "POST",
@@ -192,13 +186,11 @@ export const gmailSetInbox = async (get: Fetcher, id: string, inInbox: boolean):
   });
 };
 
-/** Marks messages read. */
 export const gmailMarkRead = async (get: Fetcher, ids: string[]): Promise<void> => {
   if (ids.length === 0) return;
   await get(`${GMAIL_API}/messages/batchModify`, { method: "POST", body: { ids, removeLabelIds: ["UNREAD"] } });
 };
 
-/** Takes many messages out of the inbox at once. */
 export const gmailArchiveMany = async (get: Fetcher, ids: string[]): Promise<void> => {
   for (let start = 0; start < ids.length; start += 500) {
     await get(`${GMAIL_API}/messages/batchModify`, {
@@ -208,7 +200,6 @@ export const gmailArchiveMany = async (get: Fetcher, ids: string[]): Promise<voi
   }
 };
 
-/** A few of the inbox owner's own recent emails (their words only), so replies Stella writes sound like them. */
 export const gmailWritingSamples = async (get: Fetcher, max = 4): Promise<string[]> => {
   const list = (await get(
     `${GMAIL_API}/messages?${new URLSearchParams({ q: "in:sent newer_than:120d -in:chats", maxResults: "12" }).toString()}`,
@@ -219,14 +210,12 @@ export const gmailWritingSamples = async (get: Fetcher, max = 4): Promise<string
     if (samples.length >= max) break;
     const mail = await gmailReadMail(get, id).catch(() => null);
     const text = mail?.text.replace(/\n{3,}/gu, "\n\n").trim() ?? "";
-    // Their own words: drop forwarded and quoted history, and one-word notes.
     const own = text.split(/\n(?:On .+wrote:|-{2,} ?Forwarded message|From: )/u)[0]!.trim();
     if (own.length >= 40) samples.push(own.slice(0, 450));
   }
   return samples;
 };
 
-/** Labels a message has now (to see whether the user already read or archived it). */
 export const gmailLabelsOf = async (get: Fetcher, id: string): Promise<string[] | null> => {
   try {
     const message = (await get(`${GMAIL_API}/messages/${encodeURIComponent(id)}?format=minimal`)) as JsonObject;
@@ -237,7 +226,6 @@ export const gmailLabelsOf = async (get: Fetcher, id: string): Promise<string[] 
   }
 };
 
-/** Everyone this inbox wrote to recently, with how often: the people who matter, read from headers only. */
 export const gmailSentPeople = async (get: Fetcher): Promise<Map<string, { count: number; lastAt: number }>> => {
   const list = (await get(
     `${GMAIL_API}/messages?${new URLSearchParams({ q: "in:sent newer_than:180d", maxResults: String(SENT_SCAN) }).toString()}`,
@@ -286,7 +274,6 @@ const decodeEntities = (text: string): string =>
     .replace(/&gt;/gu, ">")
     .replace(/&amp;/gu, "&");
 
-/** Messages matching a Gmail search, newest first, read from headers and Gmail's snippet only. */
 export const gmailSearch = async (get: Fetcher, q: string, max: number): Promise<GmailFoundMail[]> => {
   const list = (await get(`${GMAIL_API}/messages?q=${encodeURIComponent(q)}&maxResults=${max}`)) as JsonObject;
   const ids = (Array.isArray(list.messages) ? list.messages : []).flatMap((entry) =>
@@ -339,7 +326,6 @@ export type GmailThreadMessage = {
   draft: boolean;
 };
 
-/** A whole thread for reading in place: each message's plain text without the quoted history. */
 export const gmailReadThread = async (get: Fetcher, threadId: string): Promise<GmailThreadMessage[] | null> => {
   let thread: JsonObject;
   try {
@@ -375,7 +361,6 @@ export const gmailReadThread = async (get: Fetcher, threadId: string): Promise<G
   });
 };
 
-/** Takes a whole thread out of the inbox (archive) or puts it back. */
 export const gmailSetThreadInbox = async (get: Fetcher, threadId: string, inInbox: boolean): Promise<void> => {
   await get(`${GMAIL_API}/threads/${encodeURIComponent(threadId)}/modify`, {
     method: "POST",
@@ -383,7 +368,6 @@ export const gmailSetThreadInbox = async (get: Fetcher, threadId: string, inInbo
   });
 };
 
-/** Deletes a saved draft (after its reply was sent as written). */
 export const gmailDeleteDraft = async (get: Fetcher, draftId: string): Promise<void> => {
   await get(`${GMAIL_API}/drafts/${encodeURIComponent(draftId)}`, { method: "DELETE", text: true });
 };

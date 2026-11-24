@@ -44,7 +44,6 @@ export type CloudConnectorConnectionRequester = (
 export type CloudConnectorStatusToolOptions = Readonly<{
   directory: CloudConnectorDirectory;
   requestConnection?: CloudConnectorConnectionRequester;
-  /** Redeems a pasted Google connect code for this user. */
   finishConnect?: (connectCode: string) => Promise<{ email: string }>;
 }>;
 

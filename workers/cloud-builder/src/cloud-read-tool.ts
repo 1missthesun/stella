@@ -47,11 +47,6 @@ export type CloudReadToolOptions = Readonly<{
       name: "Read";
       arguments: Record<string, unknown>;
     }): Promise<{ ok: boolean; output: string }>;
-    /**
-     * Bytes for an image path. Absent on a world binding that predates this,
-     * in which case an image falls through to the text Read and reports the
-     * world's own refusal rather than crashing.
-     */
     stat?(path: string): Promise<{ kind: string; size: number } | null>;
     readFile?(
       path: string,

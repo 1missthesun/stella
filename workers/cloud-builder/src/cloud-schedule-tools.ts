@@ -23,7 +23,6 @@ export type CloudScheduleToolContext = Readonly<{
   ownerGeneration: string;
   conversationId: string;
   ownerInternal: OwnerInternalCall;
-  /** Set for an agent: its own thread, which its schedules target by default. */
   threadId?: string;
 }>;
 
@@ -143,7 +142,6 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
   };
 };
 
-/** Free has no cloud runs: say where the work happens instead of letting it fail later. */
 export const computerOnlyNote = (row: { kind?: string; computerOnly?: boolean } | undefined): string =>
   row?.computerOnly && row.kind !== "reminder"
     ? " The user's plan runs scheduled work only on their computer, never in the cloud: it runs there, and if that computer is off or asleep when it's due, the user is told and it runs once the computer is back. Say so if they expected it to run with the computer off."

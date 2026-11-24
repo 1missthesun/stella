@@ -55,7 +55,6 @@ export const ownerKeks = (env: unknown): OwnerKeks | null => {
 export const plaintextStorageAllowed = (env: unknown): boolean =>
   trimmed(env, "STELLA_PLAINTEXT_STORAGE") === "1";
 
-/** Keys for conversation storage: required unless the deployment declares STELLA_PLAINTEXT_STORAGE=1. */
 export const storageKeks = (env: unknown): OwnerKeks | null => {
   const keks = ownerKeks(env);
   if (keks || plaintextStorageAllowed(env)) return keks;

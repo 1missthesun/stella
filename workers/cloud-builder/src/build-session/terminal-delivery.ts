@@ -172,7 +172,7 @@ export const deliverTerminal = async (
         pending.kind === "completed"
           ? waitingFor
             ? waitingResultJson(finalText, waitingFor)
-            : // A task's completed end is its finished report (explicit messaging).
+            :
               doneResultJson(finalText)
           : undefined;
       const errorMessage =
@@ -219,10 +219,6 @@ export const deliverTerminal = async (
       message: errorMessage(error),
     });
     if (!owns) return false;
-    // No exponential ladder any more: delivery is an owner event plus a
-    // Durable Object call, both of which fail fast and locally. The one
-    // fixed retry exists so an unreachable owner or a parent object that is
-    // briefly unavailable does not strand a decided terminal.
     let attempts = 0;
     const retained = await host.ctx.storage.transaction(async (txn) => {
       if (!exactTurnIdentityMatches(await txn.get<TurnRequest>("turn"), turn)) {
@@ -708,9 +704,6 @@ export const cancelExactAgentTurn = async (
 
   const agentExecution = host.agentTurnExecutions.get(turn.turnId);
   try {
-    // Interrupt first: this closes the exact turn's local admission latch
-    // before sandbox teardown starts, so setup cannot recreate a session
-    // after Stop destroyed the pre-existing/current container.
     if (agentExecution) {
       await agentExecution.interrupt(
         new Error(
@@ -887,11 +880,7 @@ export const cancelForOwnerPurge = async (
     host.agentTurnExecutions.get(turnId);
   if (turnExecution) {
     try {
-      // Close the local admission latch before teardown. Destroying only the
-      // currently visible container is insufficient when createSession() is
-      // still pending: that promise could resolve after destroy and recreate
-      // executable work. interrupt() also boundedly joins that underlying
-      // promise-native setup before purge can acknowledge the lease.
+      // A pending createSession() can resolve after destroy and recreate executable work.
       await turnExecution.interrupt(
         new Error("Owner cloud activity is being purged."),
       );

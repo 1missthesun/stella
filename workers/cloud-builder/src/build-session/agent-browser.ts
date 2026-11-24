@@ -43,7 +43,6 @@ const answer = (body: CloudBrowserBrokerResponse): Response =>
 const failed = (error: unknown): Response =>
   answer({ ok: false, error: error instanceof Error ? error.message : String(error) });
 
-/** The handoff card shows in the chat the agent was started from. */
 const authorityOf = (turn: AgentBrowserTurn): CloudBrowserAuthority => ({
   ownerId: turn.ownerId,
   ownerGeneration: turn.ownerGeneration,
@@ -85,13 +84,6 @@ const HANDOFF_RESULTS: ReadonlySet<string> = new Set<CloudBrowserHandoffResult>(
   "failed",
 ]);
 
-/**
- * A container agent's cloud browser, behind its turn broker: commands go to
- * the Browser Gateway as the pi agents' do, and a login handoff is opened in
- * the owner store (card + push on the user's devices) and waited on through
- * bounded `wait` requests. The agent's watchdog is held past the handoff's
- * expiry while the user signs in.
- */
 export const serveAgentBrowserRequest = async (
   env: AgentBrowserEnv,
   storage: DurableObjectStorage,

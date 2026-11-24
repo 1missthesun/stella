@@ -20,6 +20,8 @@
  *     a production EAS build work: EAS uploads the git-tracked tree, so the
  *     catalogs are present before `npm install` or any build hook runs.
  *
+ * The copies are pruned to the keys the phone uses (see PRUNING below).
+ *
  * Run: `node scripts/sync-i18n-catalogs.mjs` (wired into the mobile
  * `start` / `ios` / `android` / `typecheck` scripts).
  */
@@ -49,9 +51,21 @@ const banner = (source) =>
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
 
-// Subtrees always kept in full: all mobile-owned keys and shared contract helpers
-// (`@stella/contracts/schedule-notice*`).
-const ALWAYS_INCLUDED_PREFIXES = ["mobile", "schedule.notice"];
+// PRUNING
+// -------
+// The desktop catalogs hold ~2,700 keys, most of them desktop-only, and all
+// 28 copies ship in every mobile bundle and OTA. The copies keep only the keys
+// the phone can reach: any key or key subtree named by a string literal (or by
+// the static prefix of a template literal, `prefix.${…}`) anywhere in the
+// mobile package or in the workspace packages it depends on (`@stella/contracts`
+// and `@stella/theme` today, found from package.json, so a new shared helper
+// that calls `t(...)` is covered without touching this script). Everything under
+// `mobile.*` is always kept. A key the phone builds from a value that is not a
+// literal anywhere in those sources must be listed in
+// `ALWAYS_INCLUDED_PREFIXES`; in development the app warns when a key resolves
+// to nothing (`src/i18n/catalogs.ts`). CI (`check:generated`) and
+// `publish-ota.sh` refuse catalogs that are stale against the sources.
+const ALWAYS_INCLUDED_PREFIXES = ["mobile"];
 
 const isPluralNode = (value) => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -86,25 +100,55 @@ const collectCatalogPaths = (node, prefix = "", leaves = new Set(), branches = n
   return { leaves, branches };
 };
 
+const SKIPPED_DIRS = new Set([
+  "node_modules",
+  "locales",
+  ".expo",
+  "dist",
+  "ios",
+  "android",
+  "build",
+]);
+
 const walkSourceFiles = (dir, out = []) => {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (
-        entry.name === "node_modules" ||
-        entry.name === "locales" ||
-        entry.name === ".expo" ||
-        entry.name === "dist"
-      ) {
-        continue;
-      }
+      if (SKIPPED_DIRS.has(entry.name) || entry.name.startsWith(".")) continue;
       walkSourceFiles(full, out);
-    } else if (/\.(ts|tsx|js|jsx|mjs)$/.test(entry.name)) {
+    } else if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name)) {
       out.push(full);
     }
   }
   return out;
+};
+
+// The mobile package plus every workspace package it depends on, transitively.
+const mobileSourceRoots = (mobileSourceRoot) => {
+  const packagesDir = dirname(mobileSourceRoot);
+  const byName = new Map();
+  for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const manifest = join(packagesDir, entry.name, "package.json");
+    if (!existsSync(manifest)) continue;
+    const { name } = JSON.parse(readFileSync(manifest, "utf8"));
+    if (name) byName.set(name, join(packagesDir, entry.name));
+  }
+  const roots = [];
+  const pending = [mobileSourceRoot];
+  while (pending.length > 0) {
+    const root = pending.pop();
+    if (roots.includes(root)) continue;
+    roots.push(root);
+    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    for (const [name, version] of Object.entries(manifest.dependencies ?? {})) {
+      if (String(version).startsWith("workspace:") && byName.has(name)) {
+        pending.push(byName.get(name));
+      }
+    }
+  }
+  return roots;
 };
 
 const collectUsedMobileKeys = ({ mobileSourceRoot, englishCatalog }) => {
@@ -120,16 +164,18 @@ const collectUsedMobileKeys = ({ mobileSourceRoot, englishCatalog }) => {
   const topAlt = topSections
     .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("|");
+  // A whole literal that is a key or a key subtree: "chat.send", 'settings.x'.
   const literalKeyRe = new RegExp(`["'\`]((?:${topAlt})\\.[a-zA-Z0-9_.-]+)["'\`]`, "g");
-  const templatePrefixRe = new RegExp(
-    `\`((?:${topAlt})(?:\\.[a-zA-Z0-9_-]+)*)\\.\\$\\{`,
+  // The static prefix of a key built at runtime: `chat.status.${kind}` or
+  // "chat.status." + kind.
+  const builtPrefixRe = new RegExp(
+    `(?:\`((?:${topAlt})(?:\\.[a-zA-Z0-9_-]+)*)\\.\\$\\{|["']((?:${topAlt})(?:\\.[a-zA-Z0-9_-]+)*)\\.["']\\s*\\+)`,
     "g",
   );
 
-  const sourceFiles = [
-    ...walkSourceFiles(join(mobileSourceRoot, "src")),
-    ...walkSourceFiles(join(mobileSourceRoot, "app")),
-  ];
+  const sourceFiles = mobileSourceRoots(mobileSourceRoot).flatMap((root) =>
+    walkSourceFiles(root),
+  );
 
   for (const file of sourceFiles) {
     const text = readFileSync(file, "utf8");
@@ -141,8 +187,8 @@ const collectUsedMobileKeys = ({ mobileSourceRoot, englishCatalog }) => {
         branchPrefixes.add(candidate);
       }
     }
-    for (const match of text.matchAll(templatePrefixRe)) {
-      const prefix = match[1];
+    for (const match of text.matchAll(builtPrefixRe)) {
+      const prefix = match[1] ?? match[2];
       if (branches.has(prefix) || leaves.has(prefix)) {
         branchPrefixes.add(prefix);
       }

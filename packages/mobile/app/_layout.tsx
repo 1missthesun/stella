@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Stack,
   usePathname,
+  useRootNavigationState,
   useRouter,
   type ErrorBoundaryProps,
 } from "expo-router";
@@ -190,6 +191,9 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
   useBackendFollowsAccount(session);
   const router = useRouter();
   const pathname = usePathname();
+  // The stack mounts only once the fonts are in (see the return below), so
+  // routing waits for the navigator to exist.
+  const navigatorReady = Boolean(useRootNavigationState()?.key);
   const mainChatRequested = useMainChatRequested();
   const [guestReady, setGuestReady] = useState(false);
   const [initialMainHref, setInitialMainHref] = useState<string | null>(null);
@@ -257,7 +261,12 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (session.isPending || !guestReady || !initialMainHref) {
+    if (
+      !navigatorReady ||
+      session.isPending ||
+      !guestReady ||
+      !initialMainHref
+    ) {
       return;
     }
 
@@ -320,6 +329,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
       router.replace(selfHostServersAvailable ? "/welcome" : "/login");
     }
   }, [
+    navigatorReady,
     mainChatRequested,
     pathname,
     router,
@@ -361,7 +371,12 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     if (splashHiddenRef.current) {
       return;
     }
-    if (!fontsReady || session.isPending || !guestReady || !initialMainHref) {
+    if (
+      !navigatorReady ||
+      session.isPending ||
+      !guestReady ||
+      !initialMainHref
+    ) {
       return;
     }
     if (!authoritySettled && !authorityWaitExpired) {
@@ -374,13 +389,20 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
       });
     });
   }, [
-    fontsReady,
+    navigatorReady,
     session.isPending,
     guestReady,
     initialMainHref,
     authoritySettled,
     authorityWaitExpired,
   ]);
+
+  // Local state, the session and the conversation authority load above while
+  // the fonts register; nothing visible mounts before them. Text laid out
+  // with the system fallback keeps those glyphs and metrics after the font
+  // arrives, so a screen mounted early would come out from under the splash in
+  // the wrong font, or clipped.
+  if (!fontsReady) return null;
 
   return (
     <ServerStatusGate>
@@ -397,7 +419,7 @@ function AppLayout({ fontsReady }: { fontsReady: boolean }) {
     return (
       <>
         <HideSplashWhenThemed fontsReady={fontsReady} />
-        <RootStack />
+        {fontsReady ? <RootStack /> : null}
       </>
     );
   }
@@ -415,6 +437,8 @@ function HideSplashWhenThemed({ fontsReady }: { fontsReady: boolean }) {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(criticalStellaFontAssets);
+  // A font that fails to load must not hold the splash forever: the app then
+  // draws in the system font instead.
   const fontsReady = fontsLoaded || Boolean(fontError);
 
   useEffect(() => {

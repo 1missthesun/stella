@@ -67,6 +67,19 @@ const lookupPath = (catalog: Catalog | undefined, key: string): unknown => {
   return cursor;
 };
 
+// The bundled catalogs are pruned to the keys the phone's sources name
+// (`scripts/sync-i18n-catalogs.mjs`), so a key built from a runtime value the
+// pruning could not see would show raw. Say so loudly in development.
+const reportedMissingKeys = new Set<string>();
+const reportMissingKey = (key: string): void => {
+  if (typeof __DEV__ === "undefined" || !__DEV__) return;
+  if (reportedMissingKeys.has(key)) return;
+  reportedMissingKeys.add(key);
+  console.warn(
+    `[i18n] missing translation key "${key}": add it to the desktop catalogs, or name it (or its prefix) as a literal so sync-i18n-catalogs keeps it.`,
+  );
+};
+
 export type TranslateParams = Record<string, string | number>;
 
 const interpolate = (template: string, params: TranslateParams): string =>
@@ -91,6 +104,7 @@ export const translate = (
       return params ? interpolate(fallback, params) : fallback;
     }
   }
+  reportMissingKey(key);
   return key;
 };
 
@@ -182,6 +196,7 @@ export const translatePlural = (
     }
     if (typeof fallback === "string") return interpolate(fallback, withCount);
   }
+  reportMissingKey(key);
   return key;
 };
 
@@ -205,5 +220,6 @@ export const translateArray = (
         .map((item) => (params ? interpolate(item, params) : item));
     }
   }
+  reportMissingKey(key);
   return [];
 };

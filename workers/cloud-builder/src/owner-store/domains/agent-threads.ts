@@ -1748,10 +1748,19 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
     thread.thread_id,
     thread.attempt_generation,
   );
+  // A turn still waiting to start on that computer (a schedule's fire or a
+  // message that arrived while it was off) never reached it: its input goes
+  // with the move instead of being canceled with the turn.
+  const unstarted = running
+    ? ctx.db.one<{ prompt: string; attachments: string | null }>(
+        "SELECT prompt, attachments FROM agent_dispatch_prompts WHERE turn_id = ?",
+        running.turn_id,
+      )
+    : null;
   const facts: MoveFacts = {
     from: { name, why, ...(presence?.lastSeenAt !== undefined ? { lastSeenAt: presence.lastSeenAt } : {}) },
     history: { entries: synced?.entries ?? 0, ...(synced?.synced_at ? { syncedAt: synced.synced_at } : {}) },
-    stoppedThere: running !== null,
+    stoppedThere: running !== null && unstarted === null,
     ...(cwd ? { cwd } : {}),
   };
   const toCloud = args.targetDeviceId.trim().toLowerCase() === CLOUD_DESTINATION;
@@ -1779,6 +1788,7 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
       entries: facts.history.entries,
       ...(facts.cwd ? { cwd: facts.cwd } : {}),
       message: args.prompt,
+      ...(unstarted ? { unstarted: unstarted.prompt, unstartedAttachments: unstarted.attachments !== null } : {}),
     }),
     ...(execution ? { execution } : {}),
     from: { kind: "device", deviceId: executor.deviceId },

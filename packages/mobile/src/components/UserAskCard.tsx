@@ -928,7 +928,13 @@ function SecureAskSurface({
         revision: ask.revision,
         kind: "fields",
         fields: payload,
-        ...(asksToRemember ? { remember: rememberHere } : {}),
+        ...(asksToRemember
+          ? {
+              // A cloud task is told whether it's saved; what came from the saved logins is.
+              remember:
+                rememberHere || (savedLogin !== null && rememberedByPhone(ask)),
+            }
+          : {}),
         ...(trimmedNote ? { note: trimmedNote } : {}),
       });
       recordUserAskAnswer(

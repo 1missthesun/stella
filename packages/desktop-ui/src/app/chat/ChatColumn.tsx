@@ -27,6 +27,7 @@ import { buildInlineWorkingIndicatorProps } from "@/features/chat/working-indica
 import { useFileDrop } from "@/features/chat/hooks/use-file-drop";
 import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-aloud";
 import type { ChatColumnProps } from "@/features/chat/chat-column-types";
+import { useOverdueStop } from "@/features/chat/hooks/use-overdue-stop";
 import { useAssistantReplyPeek } from "@/features/chat/hooks/use-assistant-reply-peek";
 import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat-messages";
 import {
@@ -190,6 +191,11 @@ export const ChatColumn = memo(function ChatColumn({
 
   useReadAloud(messages);
 
+  const overdueStop = useOverdueStop({
+    working: Boolean(conversation.streaming.isStreaming),
+    messageId: conversation.streaming.pendingUserMessageId,
+    stop: composer.onStop,
+  });
   const indicatorProps = useMemo(
     () =>
       buildInlineWorkingIndicatorProps({
@@ -200,6 +206,7 @@ export const ChatColumn = memo(function ChatColumn({
         activeToolCallId: conversation.streaming.activeToolCallId,
         runtimeStatusText: conversation.streaming.runtimeStatusText,
         isCompacting: Boolean(conversation.streaming.isCompacting),
+        onStop: overdueStop,
       }),
     [
       conversation.streaming.isStreaming,
@@ -209,6 +216,7 @@ export const ChatColumn = memo(function ChatColumn({
       conversation.streaming.activeToolCallId,
       conversation.streaming.runtimeStatusText,
       conversation.streaming.isCompacting,
+      overdueStop,
     ],
   );
   const { isDragOver, dropHandlers } = useFileDrop({

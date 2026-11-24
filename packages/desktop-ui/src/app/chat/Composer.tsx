@@ -8,7 +8,6 @@ import { ComposerAddMenu } from "./ComposerAddMenu";
 import {
   ComposerMicButton,
   ComposerRealtimeVoiceButton,
-  ComposerStopButton,
   ComposerSubmitButton,
 } from "@/features/chat/ComposerPrimitives";
 import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store";
@@ -104,7 +103,7 @@ function ComposerImpl({
   const [composerExpanded, setComposerExpanded] = useState(false);
   const [modelMentionTrigger, setModelMentionTrigger] =
     useState<ComposerModelMentionTrigger | null>(null);
-  const { showStop, requestStop } = useOptimisticStop(isStreaming, onStop);
+  const { canStop, requestStop } = useOptimisticStop(isStreaming, onStop);
   const {
     screenshot: previewScreenshot,
     previewIndex: previewScreenshotIndex,
@@ -148,7 +147,7 @@ function ComposerImpl({
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = canSubmit || dictationInFlight;
   useEscapeToStop({
-    active: showStop && !modelMentionTrigger && !dictationInFlight,
+    active: canStop && !modelMentionTrigger && !dictationInFlight,
     stop: requestStop,
     inputRef: textareaRef,
     whenUnfocused: true,
@@ -381,14 +380,6 @@ function ComposerImpl({
                           />
                         )}
                       </div>
-                      {showStop && (
-                        <ComposerStopButton
-                          className="composer-stop"
-                          onClick={requestStop}
-                          title={t("app.chat.composer.stop")}
-                          aria-label={t("app.chat.composer.stop")}
-                        />
-                      )}
                       {showRealtimeVoice ? null : (
                         <MemoComposerSubmitButton
                           className="composer-submit"

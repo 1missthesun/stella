@@ -2744,8 +2744,7 @@
     },
     "chatSidebar": {
       "add": "Dodaj",
-      "dictationError": "Dyktowanie: {error}",
-      "stop": "Zatrzymaj"
+      "dictationError": "Dyktowanie: {error}"
     },
     "connectors": {
       "desktopRequired": "Łączniki są dostępne w aplikacji Stella na komputer.",

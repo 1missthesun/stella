@@ -2711,8 +2711,7 @@
     },
     "chatSidebar": {
       "add": "追加",
-      "dictationError": "音声入力: {error}",
-      "stop": "停止"
+      "dictationError": "音声入力: {error}"
     },
     "connectors": {
       "desktopRequired": "コネクタは Stella デスクトップアプリで利用できます。",

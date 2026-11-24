@@ -2711,8 +2711,7 @@
     },
     "chatSidebar": {
       "add": "添加",
-      "dictationError": "听写：{error}",
-      "stop": "停止"
+      "dictationError": "听写：{error}"
     },
     "connectors": {
       "desktopRequired": "连接器可在 Stella 桌面应用中使用。",

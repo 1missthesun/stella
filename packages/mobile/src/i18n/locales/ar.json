@@ -2766,8 +2766,7 @@
     },
     "chatSidebar": {
       "add": "إضافة",
-      "dictationError": "الإملاء: {error}",
-      "stop": "إيقاف"
+      "dictationError": "الإملاء: {error}"
     },
     "connectors": {
       "desktopRequired": "الموصلات متاحة في تطبيق Stella لسطح المكتب.",

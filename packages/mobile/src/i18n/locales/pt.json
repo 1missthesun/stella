@@ -2733,8 +2733,7 @@
     },
     "chatSidebar": {
       "add": "Adicionar",
-      "dictationError": "Ditado: {error}",
-      "stop": "Parar"
+      "dictationError": "Ditado: {error}"
     },
     "connectors": {
       "desktopRequired": "Os conectores estão disponíveis no app da Stella para computador.",

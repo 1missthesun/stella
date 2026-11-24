@@ -6,6 +6,7 @@ import {
   type InlineWorkingIndicatorMountProps,
   type InlineWorkingIndicatorProps,
 } from "@/features/chat/working-indicator-state";
+import { useT } from "@/shared/i18n";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { useReplyHandoffController } from "./reply-handoff";
 import "./indicators.css";
@@ -33,7 +34,9 @@ export function InlineWorkingIndicator({
   status,
   compacting,
   minimumVisibleMs,
+  onStop,
 }: InlineWorkingIndicatorMountProps) {
+  const t = useT();
   const liveProps = useMemo<InlineWorkingIndicatorProps>(
     () => ({
       runningTool,
@@ -243,6 +246,15 @@ export function InlineWorkingIndicator({
           animationActive={active && !leaving}
         />
       )}
+      {showInner && onStop && !leaving ? (
+        <button
+          type="button"
+          className="inline-working-indicator__stop"
+          onClick={onStop}
+        >
+          {t("app.chat.composer.stop")}
+        </button>
+      ) : null}
     </div>
   );
 }

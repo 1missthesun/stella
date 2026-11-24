@@ -2711,8 +2711,7 @@
     },
     "chatSidebar": {
       "add": "Thêm",
-      "dictationError": "Đọc chính tả: {error}",
-      "stop": "Dừng"
+      "dictationError": "Đọc chính tả: {error}"
     },
     "connectors": {
       "desktopRequired": "Trình kết nối có sẵn trong ứng dụng Stella trên máy tính.",

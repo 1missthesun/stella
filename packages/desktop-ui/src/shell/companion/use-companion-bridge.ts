@@ -107,7 +107,6 @@ export function useCompanionBridge(conversationId: string | null): void {
     isStreaming,
     sendContextlessMessage,
     sendMessageWithContext,
-    cancelCurrentStream,
   } = conversation;
   const activeToolName = conversation.streaming.activeToolName ?? null;
 
@@ -211,13 +210,6 @@ export function useCompanionBridge(conversationId: string | null): void {
       sendContextlessMessage(trimmed, metadata);
     });
   }, [api, sendContextlessMessage, sendMessageWithContext]);
-
-  useEffect(() => {
-    if (!api) return;
-    return api.onStopRequested(() => {
-      cancelCurrentStream();
-    });
-  }, [api, cancelCurrentStream]);
 }
 
 export function CompanionBridge({

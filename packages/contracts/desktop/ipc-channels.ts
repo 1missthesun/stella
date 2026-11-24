@@ -467,9 +467,7 @@ export const IPC_COMPANION_OPEN_MAIN = "companion:openMain" as const;
 export const IPC_COMPANION_SHOW_CONTEXT_MENU =
   "companion:showContextMenu" as const;
 export const IPC_COMPANION_SEND = "companion:send" as const;
-export const IPC_COMPANION_STOP = "companion:stop" as const;
 export const IPC_COMPANION_SEND_REQUESTED = "companion:sendRequested" as const;
-export const IPC_COMPANION_STOP_REQUESTED = "companion:stopRequested" as const;
 export const IPC_COMPANION_PUBLISH_STATE = "companion:publishState" as const;
 export const IPC_COMPANION_GET_STATE = "companion:getState" as const;
 export const IPC_COMPANION_STATE = "companion:state" as const;

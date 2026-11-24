@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "जोड़ें",
-      "dictationError": "श्रुतलेखन: {error}",
-      "stop": "रोकें"
+      "dictationError": "श्रुतलेखन: {error}"
     },
     "connectors": {
       "desktopRequired": "कनेक्टर Stella डेस्कटॉप ऐप में उपलब्ध हैं।",

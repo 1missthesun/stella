@@ -301,7 +301,6 @@ export function CompanionPanelRoot() {
             isStreaming={state.isStreaming}
             focusRequestId={focusRequestId}
             onSend={sendCurrent}
-            onStop={() => api?.stop()}
             onEscape={collapse}
             onHoldOpen={holdOpen}
           />

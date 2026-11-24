@@ -2711,8 +2711,7 @@
     },
     "chatSidebar": {
       "add": "เพิ่ม",
-      "dictationError": "การบอกตามคำพูด: {error}",
-      "stop": "หยุด"
+      "dictationError": "การบอกตามคำพูด: {error}"
     },
     "connectors": {
       "desktopRequired": "ตัวเชื่อมต่อใช้ได้ในแอป Stella บนเดสก์ท็อป",

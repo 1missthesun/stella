@@ -1,13 +1,10 @@
 import { forwardRef, } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/shared/lib/utils";
-import { ArrowUp, AudioLines, Mic, Plus, Square } from "@/ui/icons";
+import { ArrowUp, AudioLines, Mic, Plus } from "@/ui/icons";
 import "./composer-primitives.css";
 function AddIcon() {
     return <Plus size={16} strokeWidth={1.75}/>;
-}
-function StopIcon() {
-    return <Square size={16} fill="currentColor" stroke="none"/>;
 }
 function MicIcon() {
     return <Mic size={16} strokeWidth={1.75}/>;
@@ -28,11 +25,6 @@ export const ComposerAddButton = forwardRef(function ComposerAddButton({ classNa
     const isDisabled = disabled ?? !onClick;
     return (<button ref={ref} type="button" className={cn("chat-composer-icon-button chat-composer-icon-button--add", className)} onClick={onClick} disabled={isDisabled} {...props}>
         {children ?? <AddIcon />}
-      </button>);
-});
-export const ComposerStopButton = forwardRef(function ComposerStopButton({ className, children, ...props }, ref) {
-    return (<button ref={ref} type="button" className={cn("chat-composer-icon-button chat-composer-icon-button--stop", className)} {...props}>
-        {children ?? <StopIcon />}
       </button>);
 });
 export const ComposerMicButton = forwardRef(function ComposerMicButton({ className, isTranscribing, children, title, ...props }, ref) {

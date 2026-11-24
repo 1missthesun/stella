@@ -1,3 +1,4 @@
+import { doneResultJson } from "@stella/contracts/agent-messaging";
 import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { Effect } from "effect";
 import { AGENT_STOP_WIRE_REASON, AGENT_STOPPED_REASON } from "@stella/contracts/agent-status";
@@ -785,7 +786,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ...(outcome === "completed" && event.ended.waitingFor
           ? { resultJson: waitingResultJson((text ?? "").slice(0, 30_000), event.ended.waitingFor) }
           : outcome === "completed" && text
-            ? { resultJson: JSON.stringify({ finalText: text.slice(0, 30_000) }) }
+            ? // Every completed end of a cloud pi task is a finished report (explicit messaging).
+              { resultJson: doneResultJson(text.slice(0, 30_000)) }
             : {}),
         ...(outcome === "failed"
           ? { errorMessage: (text || "The agent failed.").slice(0, 2_000) }

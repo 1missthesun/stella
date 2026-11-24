@@ -56,6 +56,24 @@ export const silentEndReport = (lastMessage: string | undefined): string => {
   ].join("\n\n");
 };
 
+/**
+ * A task's result that is its finished report. The cloud files it at once:
+ * a message already queued for the task starts a turn of its own afterwards
+ * rather than holding this report back (older desktops, which end turns with
+ * plain text, still have their report wait for that next turn).
+ */
+export const doneResultJson = (finalText: string): string => JSON.stringify({ finalText, done: true });
+
+export const resultDone = (resultJson: string | null | undefined): boolean => {
+  if (!resultJson) return false;
+  try {
+    const parsed = JSON.parse(resultJson) as { done?: unknown } | null;
+    return Boolean(parsed && typeof parsed === "object" && parsed.done === true);
+  } catch {
+    return false;
+  }
+};
+
 /** Why a `done` report is refused while the agent's own helpers still work. */
 export const doneWhileHelpersWorkText = (helpers: readonly string[]): string =>
   `Not sent: ${helpers.join("; ")} ${helpers.length === 1 ? "is" : "are"} still at work, so your work isn't finished. Wait for ${

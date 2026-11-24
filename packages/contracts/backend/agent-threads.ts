@@ -337,6 +337,11 @@ export type AgentThreadCalls = {
        * in words. Empty: nothing could. Absent: the computer could not tell.
        */
       wakers?: string[];
+      /**
+       * Its finished report (explicit messaging): filed at once, even with a
+       * message queued for it. Older desktops leave it off.
+       */
+      done?: true;
     };
     result: { updated: boolean; status: string };
   };

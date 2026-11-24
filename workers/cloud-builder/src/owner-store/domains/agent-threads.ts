@@ -63,7 +63,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
   type AgentTaskMessageResult,
 } from "@stella/contracts/backend/agent-threads";
-import { DONE_ACCEPTED_TEXT, DONE_NOT_TO_STARTER, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
+import { DONE_ACCEPTED_TEXT, DONE_NOT_TO_STARTER, doneResultJson, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
 import { selectCloudModel } from "./engines.js";
@@ -4051,7 +4051,7 @@ const endHostedAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   deviceId: string,
-  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string; wakers?: string[] },
+  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string; wakers?: string[]; done?: true },
 ): Promise<{ updated: boolean; status: string }> => {
   recordAgentChange(
     ctx.db,
@@ -4070,9 +4070,11 @@ const endHostedAttempt = async (
         ended.status,
         ended.waitingFor
           ? waitingResultJson(ended.result ?? "", ended.waitingFor, undefined, ended.wakers)
-          : ended.result !== undefined
-            ? JSON.stringify({ finalText: ended.result })
-            : null,
+          : ended.done && ended.status === "completed"
+            ? doneResultJson(ended.result ?? "")
+            : ended.result !== undefined
+              ? JSON.stringify({ finalText: ended.result })
+              : null,
         ended.error,
         ctx.now,
         thread.thread_id,
@@ -4160,7 +4162,7 @@ const completeHostedTurn = async (
     status,
     ...(result !== undefined ? { result } : {}),
     error,
-    ...(waitingFor ? { waitingFor, ...(args.wakers ? { wakers: args.wakers } : {}) } : {}),
+    ...(waitingFor ? { waitingFor, ...(args.wakers ? { wakers: args.wakers } : {}) } : args.done ? { done: true as const } : {}),
   };
   const mapped = readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration);
   if (mapped?.attempt_generation === thread.attempt_generation && ACTIVE_STATUSES.has(thread.status)) {
@@ -4529,9 +4531,11 @@ const completeComputerThread = async (
         status,
         waitingFor
           ? waitingResultJson(result ?? "", waitingFor, undefined, args.wakers)
-          : result !== undefined
-            ? JSON.stringify({ finalText: result })
-            : null,
+          : args.done && status === "completed"
+            ? doneResultJson(result ?? "")
+            : result !== undefined
+              ? JSON.stringify({ finalText: result })
+              : null,
         error,
         ctx.now,
         row.thread_id,
@@ -5865,6 +5869,7 @@ export const agentThreadsDomain = {
         error: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
         waitingFor: optional(string({ max: 1_000 })),
         wakers: optional(array(string({ max: 300 }), { max: WAKERS_MAX })),
+        done: optional(literal(true)),
       }),
       handler: completeComputerThread,
     },

@@ -121,7 +121,7 @@ const buildWakeText = async (
     "",
     await describeExits(exits, writeExitLog),
     "",
-    "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
+    "You were resumed for this. Continue the work that was waiting on it, or send what you found with send_message.",
   ].join("\n");
 /** What a working agent is told, once, of its background commands that ended meanwhile. */
 export const takeEndedCommands = async (

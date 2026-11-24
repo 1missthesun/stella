@@ -1,3 +1,4 @@
+import { doneResultJson } from "@stella/contracts/agent-messaging";
 import { waitingResultJson } from "@stella/contracts/agent-waiting";
 import { isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentAttemptOutcomeOf } from "@stella/contracts/agent-status";
@@ -171,7 +172,8 @@ export const deliverTerminal = async (
         pending.kind === "completed"
           ? waitingFor
             ? waitingResultJson(finalText, waitingFor)
-            : JSON.stringify({ finalText })
+            : // A task's completed end is its finished report (explicit messaging).
+              doneResultJson(finalText)
           : undefined;
       const errorMessage =
         pending.kind === "completed"

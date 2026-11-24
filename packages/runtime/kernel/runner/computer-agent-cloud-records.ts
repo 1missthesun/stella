@@ -26,6 +26,8 @@ type ComputerAgentTerminalPayload = {
   error?: string;
   waitingFor?: string;
   wakers?: string[];
+  /** Its finished report (explicit messaging): the cloud files it at once. */
+  done?: true;
   fallback?: UnrecordedReport;
 };
 
@@ -80,6 +82,7 @@ export type ComputerAgentCloudRecords = {
     error?: string;
     waitingFor?: string;
     wakers?: string[];
+    done?: true;
     ownerGeneration: string;
     fallback?: UnrecordedReport;
   }) => Promise<void>;
@@ -401,6 +404,7 @@ export const createComputerAgentCloudRecords = (
           ...(payload.error ? { error: payload.error } : {}),
           ...(payload.waitingFor ? { waitingFor: payload.waitingFor } : {}),
           ...(payload.waitingFor && payload.wakers ? { wakers: payload.wakers.slice(0, 20) } : {}),
+          ...(payload.done && !payload.waitingFor ? { done: true } : {}),
         }),
       );
       return;
@@ -749,6 +753,7 @@ export const createComputerAgentCloudRecords = (
           ...(args.error ? { error: args.error } : {}),
           ...(args.waitingFor ? { waitingFor: args.waitingFor } : {}),
           ...(args.waitingFor && args.wakers ? { wakers: args.wakers } : {}),
+          ...(args.done && !args.waitingFor ? { done: true as const } : {}),
           ...(args.fallback ? { fallback: args.fallback } : {}),
         } satisfies ComputerAgentTerminalPayload,
       });

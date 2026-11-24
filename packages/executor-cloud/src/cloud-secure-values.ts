@@ -235,6 +235,19 @@ const runSecureCommand = async (args: {
 const isReport = (value: unknown): value is SecureFillPageReport =>
   !!value && typeof value === "object" && Array.isArray((value as { landed?: unknown }).landed);
 
+/** The tab the browser is on, by the id browser.tabs() gives it, for the receipt. */
+const activeTabId = async (browser: CloudBrowserBridge, signal: AbortSignal): Promise<string> => {
+  try {
+    const listed = (await browser.call("tabs", [], signal)) as { tabs?: unknown } | null;
+    const tabs = Array.isArray(listed?.tabs) ? (listed.tabs as { tabId?: unknown; active?: unknown }[]) : [];
+    const active = tabs.find((tab) => tab.active === true) ?? (tabs.length === 1 ? tabs[0] : undefined);
+    if (typeof active?.tabId === "string" && active.tabId) return active.tabId;
+  } catch {
+    // The receipt still names where the value went, by field.
+  }
+  return "current";
+};
+
 /**
  * Fill the cloud browser's field the way a computer fills its own: the
  * value goes in once through `fill`, and the page scripts find where it is by
@@ -250,7 +263,7 @@ const fillCloudBrowserField = async (args: {
   if (args.target.tabId) {
     await args.browser.call("focusTab", [args.target.tabId], signal);
   }
-  const tabId = args.target.tabId ?? "current";
+  const tabId = args.target.tabId ?? (await activeTabId(args.browser, signal));
   const mode: SecureFillMode = args.target.mode ?? "fill";
   const seed = randomInt(0, 2 ** 31);
   const hash = secureFillHash(args.value, seed);

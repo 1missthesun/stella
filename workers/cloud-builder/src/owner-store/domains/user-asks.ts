@@ -774,7 +774,9 @@ const validateAnswer = (
       }
       continue;
     }
-    if (field.sensitive) {
+    // A cloud task's masked field is sealed too, even if marked readable:
+    // what reaches the cloud in plain text is readable by the cloud.
+    if (field.sensitive || (isCloudOrigin(ask.originDeviceId) && field.type === "secret")) {
       throw new RpcError(
         "BAD_REQUEST",
         "A sensitive value must be sealed for the asking device.",
@@ -1295,18 +1297,20 @@ const turnRegisterParser = object({
   blocking: optional(boolean()),
   timeoutMs: optional(number({ int: true, min: 0, max: USER_ASK_BLOCKING_TTL_MS })),
   detail: json({ maxBytes: 32 * 1024 }),
+  /** The asking task's own key: a sensitive answer is sealed to it, and only that task's process can open it. */
+  recipientKey: optional(recipientKeyParser),
 });
 
 const turnAskParser = object({ askId: string({ min: 1, max: 128 }) });
 
 const registerTurnAsk = (ctx: OwnerContext, args: unknown) => {
   const parsed = turnRegisterParser(args, "args");
-  if (parsed.kind === "secure_input") {
+  if (parsed.kind === "secure_input" && !parsed.recipientKey) {
     const detail = secureInputDetailParser(parsed.detail, "detail");
     if (detail.fields.some((field) => field.sensitive || field.type === "secret")) {
       throw new RpcError(
         "BAD_REQUEST",
-        "A sensitive value can only be collected on one of the user's computers, not by a cloud agent.",
+        "A sensitive field needs the asking task's recipientKey.",
       );
     }
   }

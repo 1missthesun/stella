@@ -1,22 +1,3 @@
-// mic_capture - Low-latency microphone capture for dictation (macOS).
-//
-// Runs for as long as Stella does with no audio device open, so the microphone
-// indicator stays off, and opens the default input when told to. Opening it
-// here takes about 35 ms; getUserMedia takes 80-200 ms, which is long enough to
-// lose the first word.
-//
-// stdin, one command per line:
-//   start <generation>
-//   stop <generation>     ends at the command's own time: audio spoken before
-//                         it is still delivered
-// Exits when stdin closes.
-//
-// stdout, binary frames: u32 LE payload length, u8 type, u32 LE generation,
-// payload.
-//   type 1: 16 kHz mono signed 16-bit little-endian PCM
-//   type 2: JSON event: {"event":"live","ms":..}, {"event":"ended"},
-//           {"event":"failed","message":".."}
-
 import CoreAudio
 import Foundation
 
@@ -84,8 +65,6 @@ func nominalRate(_ device: AudioDeviceID) -> Double {
     return status == noErr && rate > 0 ? rate : 48_000
 }
 
-/// Band-limited resampling to 16 kHz with a short windowed sinc, so nothing
-/// above 8 kHz folds back into the speech band.
 final class Resampler {
     private let step: Double
     private let cutoff: Double
@@ -128,7 +107,6 @@ final class Resampler {
         return out
     }
 
-    /// The last few input samples, which need silence after them to come out.
     func flush() -> [Float] {
         process([Float](repeating: 0, count: reach + 1))
     }
@@ -241,8 +219,6 @@ final class Capture {
         }
     }
 
-    /// The input went away or changed (a headset connecting): carry on with
-    /// whatever is the default input now.
     private func deviceChanged() {
         if ended || stopAt != nil { return }
         guard let next = defaultInputDevice() else { return }
@@ -346,7 +322,6 @@ func handle(_ line: String, receivedAt: UInt64) {
 
 signal(SIGPIPE, SIG_IGN)
 
-// Loads the audio system now, so the first start only has to open the device.
 if let device = defaultInputDevice() { _ = nominalRate(device) }
 
 Thread.detachNewThread {

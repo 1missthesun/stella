@@ -1,37 +1,3 @@
-// home_capture - Capture a screenshot of an app's topmost window by pid.
-// Used by the Stella home suggestion chip strip when the user clicks an
-// app suggestion: the chip attaches eagerly with metadata, then this
-// helper captures the actual window screenshot in the background and the
-// renderer patches the chat context when the result lands.
-//
-// Usage:
-//   home_capture --pid=<pid> --screenshot=<output_path.png>
-//
-// Output (JSON to stdout):
-//   {"title":"…","process":"App","pid":123,"bounds":{"x":0,"y":0,"width":W,"height":H},"axTree":"…"}
-// or:
-//   {"error":"no window for pid"}
-//
-// The screenshot is written to `output_path.png` if requested AND a
-// matching window was found. The file is left untouched on error so the
-// caller can detect failure by stat'ing the file size.
-//
-// Window-selection strategy:
-//   Pass 1 (visible apps) — `optionOnScreenOnly + layer==0`, mirrors the
-//     long-standing `window_info` behavior so on-Space windows are picked
-//     correctly and we don't accidentally match tooltips, IME bars, or
-//     other transient chrome the app owns.
-//   Pass 2 (off-Space fallback) — only runs if Pass 1 found nothing.
-//     Drops `optionOnScreenOnly` so windows on other macOS Spaces are
-//     reachable, but still enforces `layer<=0` and a minimum size to
-//     filter out the chrome / floating UI elements that off-screen apps
-//     also report. SC capture uses `onScreenWindowsOnly: false` so
-//     off-Space windows are still capturable.
-//
-// Build: swiftc -O -o out/darwin/home_capture src/home_capture.swift \
-//   -framework AppKit -framework CoreGraphics -framework Foundation \
-//   -framework ApplicationServices -framework ScreenCaptureKit
-
 import AppKit
 import ApplicationServices
 import CoreGraphics
@@ -515,17 +481,12 @@ guard let pid = parsePid(args) else {
 
 let screenshotPath = parseScreenshotPath(args)
 
-// Pass 1: on-screen, strict (matches legacy window_info behavior). This
-// is the common case for any app whose window is on the user's current
-// macOS Space.
 var match = findWindow(
     forPid: pid,
     options: [.optionOnScreenOnly, .excludeDesktopElements],
     enforceMinimumSize: false
 )
 
-// Pass 2: drop on-screen filter so off-Space windows are reachable. Apply
-// the minimum-size guard to keep stray UI elements out of the result.
 if match == nil {
     match = findWindow(
         forPid: pid,

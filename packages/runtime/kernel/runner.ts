@@ -25,7 +25,6 @@ import {
 } from "./integrations/claude-code-session-sync-sink.js";
 import { getClaudeCodeConfig } from "./storage/local-llm-credential-access.js";
 import { resolveAgentWorkingDirectory } from "./agent-runtime/shared.js";
-import { loadGoogleWorkspaceTools } from "./google-workspace/load-google-workspace-tools.js";
 import {
   listConnectorAccounts,
   removeAllConnectorAccounts,
@@ -583,6 +582,9 @@ export const createStellaHostRunner = (
     },
 
     googleWorkspaceConnect: async () => {
+      const { loadGoogleWorkspaceTools } = await import(
+        "./google-workspace/load-google-workspace-tools.js"
+      );
       const { callTool, disconnect } = await loadGoogleWorkspaceTools({
         stellaAppDir: context.stellaDataDir,
       });

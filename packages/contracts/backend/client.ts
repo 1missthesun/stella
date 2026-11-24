@@ -17,6 +17,7 @@ import type {
 import {
   LIVE_CLOSE,
   LIVE_PATH,
+  LIVE_SESSION_REVOKED,
   LIVE_SUBPROTOCOL,
   rpcPath,
   SOCKET_KEEPALIVE_PING,
@@ -45,9 +46,9 @@ export type TokenProvider = (options?: {
   force?: boolean;
 }) => Promise<string | null>;
 
-export const backendTokenExpiryMs = (
+const readTokenPayload = (
   token: string | null | undefined,
-): number | null => {
+): { exp?: unknown; sub?: unknown } | null => {
   const segment = token?.split(".")[1];
   if (!segment) return null;
   const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
@@ -56,11 +57,24 @@ export const backendTokenExpiryMs = (
     "=",
   );
   try {
-    const json = JSON.parse(atob(padded)) as { exp?: unknown };
-    return typeof json.exp === "number" ? json.exp * 1000 : null;
+    return JSON.parse(atob(padded)) as { exp?: unknown; sub?: unknown };
   } catch {
     return null;
   }
+};
+
+export const backendTokenExpiryMs = (
+  token: string | null | undefined,
+): number | null => {
+  const exp = readTokenPayload(token)?.exp;
+  return typeof exp === "number" ? exp * 1000 : null;
+};
+
+export const backendTokenSubject = (
+  token: string | null | undefined,
+): string | null => {
+  const sub = readTokenPayload(token)?.sub;
+  return typeof sub === "string" ? sub : null;
 };
 
 type SocketLike = {
@@ -86,12 +100,31 @@ export type BackendCallOptions = {
   idempotent?: boolean;
 };
 
+/**
+ * Carries a client's views over another process's live socket. When it says it
+ * can't, the client opens a socket of its own.
+ */
+export type BackendLiveTransport = {
+  watch(
+    view: string,
+    args: unknown,
+    handlers: {
+      onValue: (value: unknown) => void;
+      onError: (error: BackendError) => void;
+      onUnavailable: () => void;
+    },
+  ): () => void;
+  reconnect(): void;
+  nudge(): void;
+};
+
 export type BackendClientOptions = {
   baseUrl: string;
   getToken: TokenProvider;
   fetch?: FetchLike;
   WebSocket?: SocketConstructor;
   maxReconnectDelayMs?: number;
+  liveTransport?: BackendLiveTransport;
 };
 
 type Listener = {
@@ -106,11 +139,13 @@ type Subscription = {
   listeners: Set<Listener>;
   hasValue: boolean;
   value: unknown;
+  stopTransport?: () => void;
 };
 
 const SOCKET_OPEN = 1;
 const PING_INTERVAL_MS = 30_000;
 const SILENCE_LIMIT_MS = 2 * PING_INTERVAL_MS + 5_000;
+const NUDGE_ANSWER_MS = 5_000;
 const IDLE_CLOSE_DELAY_MS = 5_000;
 
 const subscriptionKey = (view: string, args: unknown): string =>
@@ -151,20 +186,25 @@ export class BackendClient {
   private readonly fetchImpl: FetchLike;
   private readonly SocketImpl: SocketConstructor | undefined;
   private readonly maxReconnectDelayMs: number;
+  private liveTransport: BackendLiveTransport | undefined;
 
   private readonly subscriptions = new Map<string, Subscription>();
   private readonly subscriptionsById = new Map<string, Subscription>();
   private nextSubscriptionId = 1;
   private socket: SocketLike | null = null;
   private connecting = false;
+  private connectEpoch = 0;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private nudgeTimer: ReturnType<typeof setTimeout> | null = null;
   private socketHeardAt = 0;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private forceTokenOnConnect = false;
   private socketTokenExpiryMs: number | null = null;
+  private socketSubject: string | null | undefined;
+  private expectedSubject: string | null | undefined;
   private disposed = false;
 
   constructor(options: BackendClientOptions) {
@@ -177,6 +217,7 @@ export class BackendClient {
         ? undefined
         : (WebSocket as unknown as SocketConstructor));
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
+    this.liveTransport = options.liveTransport;
   }
 
   async call<K extends CallName>(
@@ -257,7 +298,8 @@ export class BackendClient {
       };
       this.subscriptions.set(key, subscription);
       this.subscriptionsById.set(subscription.id, subscription);
-      this.sendFrame({ t: "sub", id: subscription.id, view, args });
+      if (this.liveTransport) this.openOnTransport(subscription, this.liveTransport);
+      else this.sendFrame({ t: "sub", id: subscription.id, view, args });
     }
     const listener: Listener = {
       onValue: onValue as (value: unknown) => void,
@@ -273,9 +315,46 @@ export class BackendClient {
       if (owned.listeners.size > 0) return;
       this.subscriptions.delete(key);
       this.subscriptionsById.delete(owned.id);
+      if (owned.stopTransport) {
+        owned.stopTransport();
+        return;
+      }
       this.sendFrame({ t: "unsub", id: owned.id });
       if (this.subscriptions.size === 0) this.scheduleIdleClose();
     };
+  }
+
+  private openOnTransport(
+    subscription: Subscription,
+    transport: BackendLiveTransport,
+  ): void {
+    const live = () =>
+      this.liveTransport === transport &&
+      this.subscriptionsById.get(subscription.id) === subscription;
+    subscription.stopTransport = transport.watch(
+      subscription.view,
+      subscription.args,
+      {
+        onValue: (value) => {
+          if (live()) this.deliverValue(subscription, value);
+        },
+        onError: (error) => {
+          if (live()) this.deliverError(subscription, error);
+        },
+        onUnavailable: () => {
+          if (this.liveTransport === transport) this.leaveTransport();
+        },
+      },
+    );
+  }
+
+  private leaveTransport(): void {
+    this.liveTransport = undefined;
+    for (const subscription of this.subscriptions.values()) {
+      subscription.stopTransport?.();
+      delete subscription.stopTransport;
+    }
+    this.ensureSocket();
   }
 
   /** The view's current value: the cached one, else the first delivered. */
@@ -330,6 +409,9 @@ export class BackendClient {
 
   dispose(): void {
     this.disposed = true;
+    for (const subscription of this.subscriptions.values()) {
+      subscription.stopTransport?.();
+    }
     this.subscriptions.clear();
     this.subscriptionsById.clear();
     this.clearTimers();
@@ -337,11 +419,18 @@ export class BackendClient {
   }
 
   reconnect(): void {
-    for (const subscription of this.subscriptions.values()) {
-      subscription.hasValue = false;
-      subscription.value = undefined;
-    }
     this.forceTokenOnConnect = true;
+    this.restart();
+  }
+
+  private restart(): void {
+    this.clearCachedValues();
+    if (this.liveTransport) {
+      this.liveTransport.reconnect();
+      return;
+    }
+    this.connectEpoch += 1;
+    this.connecting = false;
     this.closeSocket(1000, "client_reconnect");
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -349,6 +438,47 @@ export class BackendClient {
     }
     this.reconnectAttempt = 0;
     this.ensureSocket();
+  }
+
+  /** After a wake or a network change: reconnects now if waiting to, and drops a socket that stays silent. */
+  nudge(): void {
+    if (this.disposed) return;
+    if (this.liveTransport) {
+      this.liveTransport.nudge();
+      return;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      this.reconnectAttempt = 0;
+      this.ensureSocket();
+      return;
+    }
+    const socket = this.socket;
+    if (!socket || socket.readyState !== SOCKET_OPEN || this.nudgeTimer) return;
+    const askedAt = Date.now();
+    this.sendKeepalive();
+    this.nudgeTimer = setTimeout(() => {
+      this.nudgeTimer = null;
+      if (this.socket !== socket || this.socketHeardAt >= askedAt) return;
+      this.closeSocket(4001, "silent");
+      this.reconnectAttempt = 0;
+      if (this.subscriptions.size > 0) this.scheduleReconnect();
+    }, NUDGE_ANSWER_MS);
+  }
+
+  /** The signed-in account changed: a socket that isn't this account's goes, and so does what it delivered. */
+  noteSubject(subject: string | null): void {
+    this.expectedSubject = subject;
+    if (subject === null || !this.servesSubject(subject)) this.restart();
+  }
+
+  /** Whether the socket, open or opening, is this account's. */
+  servesSubject(subject: string): boolean {
+    if (this.connecting && this.socketSubject === undefined) return true;
+    return (
+      (this.connecting || this.socket !== null) && this.socketSubject === subject
+    );
   }
 
   private async postCall(
@@ -382,6 +512,7 @@ export class BackendClient {
   private ensureSocket(): void {
     if (
       this.disposed ||
+      this.liveTransport ||
       this.socket ||
       this.connecting ||
       this.reconnectTimer ||
@@ -391,12 +522,21 @@ export class BackendClient {
       return;
     }
     this.connecting = true;
+    this.socketSubject = undefined;
+    const epoch = this.connectEpoch;
     const force = this.forceTokenOnConnect;
     this.forceTokenOnConnect = false;
     void withDeadline(
       { label: "Connecting to Stella's cloud", timeoutMs: REQUEST_BUDGET_MS.connect },
       async () => {
         const token = await this.getToken(force ? { force: true } : undefined);
+        if (epoch === this.connectEpoch) {
+          const subject = backendTokenSubject(token);
+          if (subject && this.expectedSubject && subject !== this.expectedSubject) {
+            throw new Error("The account changed while connecting.");
+          }
+          this.socketSubject = subject;
+        }
         if (!token || this.disposed || this.subscriptions.size === 0) {
           return { token, credential: null };
         }
@@ -410,6 +550,7 @@ export class BackendClient {
       },
     )
       .then(({ token, credential }) => {
+        if (epoch !== this.connectEpoch) return;
         this.connecting = false;
         if (this.disposed || this.subscriptions.size === 0) return;
         if (!token) {
@@ -426,6 +567,7 @@ export class BackendClient {
         if (credential) this.openSocket(token, credential);
       })
       .catch(() => {
+        if (epoch !== this.connectEpoch) return;
         this.connecting = false;
         if (force) this.forceTokenOnConnect = true;
         this.scheduleReconnect();
@@ -476,10 +618,22 @@ export class BackendClient {
     socket.onclose = (event) => {
       if (this.socket !== socket) return;
       this.socket = null;
+      this.socketSubject = undefined;
       this.stopPing();
-      if (this.disposed || this.subscriptions.size === 0) return;
       if (event.code === LIVE_CLOSE.unauthenticated) {
+        this.clearCachedValues();
         this.forceTokenOnConnect = true;
+      }
+      if (this.disposed || this.subscriptions.size === 0) return;
+      if (
+        event.code === LIVE_CLOSE.unauthenticated &&
+        event.reason === LIVE_SESSION_REVOKED
+      ) {
+        this.failAll({
+          code: "UNAUTHENTICATED",
+          message: "This session was signed out.",
+          retryable: false,
+        });
       }
       if (event.code === LIVE_CLOSE.protocol) {
         this.failAll({
@@ -508,20 +662,13 @@ export class BackendClient {
     if (frame.t === "value") {
       const subscription = this.subscriptionsById.get(frame.id);
       if (!subscription) return;
-      subscription.hasValue = true;
-      subscription.value = frame.value;
-      for (const listener of [...subscription.listeners]) {
-        listener.onValue(frame.value);
-      }
+      this.deliverValue(subscription, frame.value);
       return;
     }
     if (frame.t === "error") {
       const subscription = this.subscriptionsById.get(frame.id);
       if (!subscription) return;
-      const error = new BackendRequestError(frame.error);
-      for (const listener of [...subscription.listeners]) {
-        listener.onError?.(error);
-      }
+      this.deliverError(subscription, frame.error);
       return;
     }
     if (frame.t === "reauth") {
@@ -540,12 +687,47 @@ export class BackendClient {
     }
   }
 
-  private failAll(error: BackendError): void {
+  private deliverValue(subscription: Subscription, value: unknown): void {
+    subscription.hasValue = true;
+    subscription.value = value;
+    this.eachListener(subscription, (listener) => listener.onValue(value));
+  }
+
+  private deliverError(subscription: Subscription, error: BackendError): void {
+    if (error.code === "UNAUTHENTICATED") {
+      subscription.hasValue = false;
+      subscription.value = undefined;
+    }
     const failure = new BackendRequestError(error);
-    for (const subscription of this.subscriptions.values()) {
-      for (const listener of [...subscription.listeners]) {
-        listener.onError?.(failure);
+    this.eachListener(subscription, (listener) => listener.onError?.(failure));
+  }
+
+  /** A listener that throws is reported like any uncaught error, and the rest still hear. */
+  private eachListener(
+    subscription: Subscription,
+    notify: (listener: Listener) => void,
+  ): void {
+    for (const listener of [...subscription.listeners]) {
+      try {
+        notify(listener);
+      } catch (error) {
+        queueMicrotask(() => {
+          throw error;
+        });
       }
+    }
+  }
+
+  private clearCachedValues(): void {
+    for (const subscription of this.subscriptions.values()) {
+      subscription.hasValue = false;
+      subscription.value = undefined;
+    }
+  }
+
+  private failAll(error: BackendError): void {
+    for (const subscription of [...this.subscriptions.values()]) {
+      this.deliverError(subscription, error);
     }
   }
 
@@ -614,6 +796,10 @@ export class BackendClient {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
     }
+    if (this.nudgeTimer) {
+      clearTimeout(this.nudgeTimer);
+      this.nudgeTimer = null;
+    }
   }
 
   private clearConnectTimer(): void {
@@ -636,6 +822,7 @@ export class BackendClient {
   private closeSocket(code: number, reason: string): void {
     const socket = this.socket;
     this.socket = null;
+    this.socketSubject = undefined;
     this.clearConnectTimer();
     this.stopPing();
     if (socket) {

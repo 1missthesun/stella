@@ -78,5 +78,8 @@ export const LIVE_CLOSE = {
   internal: 4500,
 } as const;
 
+/** The unauthenticated close's reason when the session itself was signed out. */
+export const LIVE_SESSION_REVOKED = "session_revoked";
+
 export const LIVE_MAX_FRAME_BYTES = 64 * 1024;
 export const LIVE_MAX_SUBSCRIPTIONS = 128;

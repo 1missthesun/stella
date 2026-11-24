@@ -6,6 +6,7 @@ import { app } from "electron";
 import {
   BackendClient,
   BackendRequestError,
+  type TokenProvider,
 } from "@stella/contracts/backend/client";
 import {
   leaseBackendClient,
@@ -123,7 +124,7 @@ type AppSourceServiceOptions = {
   relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
-  getAuthToken: () => Promise<string | null>;
+  getAuthToken: TokenProvider;
   log: (event: string, data: Record<string, unknown>) => void;
   onPushed?: (cwd: string) => void | Promise<void>;
   afterApply?: (cwd: string) => void | Promise<void>;
@@ -3071,7 +3072,7 @@ export class AppSourceService {
         baseUrl,
         lease: leaseBackendClient({
           baseUrl,
-          getToken: () => this.options.getAuthToken(),
+          getToken: (request) => this.options.getAuthToken(request),
         }),
       };
     }

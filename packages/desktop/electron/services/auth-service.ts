@@ -1519,6 +1519,12 @@ export class AuthService {
     return cached;
   }
 
+  /** A token for calls to the backend; `force` mints one newer than the backend refused. */
+  async getBackendToken(request?: { force?: boolean }): Promise<string | null> {
+    if (!request?.force) return await this.getAuthToken();
+    return (await this.refreshRuntimeAuth()).token;
+  }
+
   async whenRuntimeAuthenticated(): Promise<boolean> {
     await this.awaitPendingResync();
     return Boolean(await this.getAuthToken());

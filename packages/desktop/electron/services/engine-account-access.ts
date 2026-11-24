@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { BackendClient } from "@stella/contracts/backend/client";
+import type { BackendClient, TokenProvider } from "@stella/contracts/backend/client";
 import {
   leaseBackendClient,
   type BackendClientLease,
@@ -12,7 +12,7 @@ import { callRuntimeAppService } from "./runtime-app-services.js";
 
 export type EngineAccountAccessOptions = {
   getBackendUrl: () => string | null;
-  getAuthToken: () => Promise<string | null>;
+  getAuthToken: TokenProvider;
 };
 
 export const tokenSubject = (token: string | null): string | null => {
@@ -188,7 +188,7 @@ export class EngineAccountAccess {
       baseUrl,
       lease: leaseBackendClient({
         baseUrl,
-        getToken: async () => await this.options.getAuthToken(),
+        getToken: this.options.getAuthToken,
       }),
     };
     return this.client.lease.client;

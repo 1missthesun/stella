@@ -477,3 +477,9 @@ export const IPC_COMPANION_GET_VISIBLE = "companion:getVisible" as const;
 export const IPC_COMPANION_SET_VISIBLE = "companion:setVisible" as const;
 export const IPC_COMPANION_VISIBLE_CHANGED =
   "companion:visibleChanged" as const;
+
+export const IPC_BACKEND_LIVE_WATCH = "backendLive:watch" as const;
+export const IPC_BACKEND_LIVE_UNWATCH = "backendLive:unwatch" as const;
+export const IPC_BACKEND_LIVE_ACCOUNT = "backendLive:account" as const;
+export const IPC_BACKEND_LIVE_NUDGE = "backendLive:nudge" as const;
+export const IPC_BACKEND_LIVE_EVENT = "backendLive:event" as const;

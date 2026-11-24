@@ -36,8 +36,9 @@ export function useCloudConversationSession() {
       ? `${ownerSubject}\u0000${session.identityRevision}`
       : null;
   useEffect(() => {
-    if (!session.isLoading) setBackendAccount(accountKey);
-  }, [accountKey, session.isLoading]);
+    if (session.isLoading) return;
+    setBackendAccount(accountKey, accountKey ? ownerSubject : null);
+  }, [accountKey, ownerSubject, session.isLoading]);
   const { identity } = useOwnerIdentity(
     accountKey,
     accountKey ? readActiveCloudConversationIdCache(session.cacheScope) : null,

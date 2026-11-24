@@ -51,6 +51,7 @@ import { loadStellaDeviceId, loadStellaDeviceSigner } from "./host-runner.js";
 import path from "path";
 import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-messaging-host.js";
 import { registerAppSourceHandlers } from "../ipc/app-source-handlers.js";
+import { registerBackendLiveHandlers } from "../ipc/backend-live-handlers.js";
 import { registerSelfHostHandlers } from "../ipc/self-host-handlers.js";
 import { AppSourceService } from "../services/app-source/app-source-service.js";
 import { UpdateTransition } from "../services/app-source/update-transition.js";
@@ -260,6 +261,11 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         getStellaDataDir: lifecycle.getStellaDataDir,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
+    state.processRuntime.registerCleanup("before-quit", "backend-live", registerBackendLiveHandlers({
+        getBackendUrl: () => services.authService.getBackendUrl(),
+        getToken: (request) => services.authService.getBackendToken(request),
+        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
+    }));
     registerMemorySyncHandlers({
         service: services.memorySync,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
@@ -525,7 +531,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             },
             hasConnectedAccount: () => services.authService.getHostHasConnectedAccount(),
             getBackendUrl: () => services.authService.getBackendUrl(),
-            getAuthToken: () => services.authService.getAuthToken(),
+            getAuthToken: (request) => services.authService.getBackendToken(request),
             log: (event, data) => getMainLogger()?.process(event, data),
             beforeAction: assertHeadSigned,
             afterApply: signHead,

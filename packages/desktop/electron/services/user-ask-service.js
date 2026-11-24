@@ -1607,7 +1607,7 @@ export class UserAskService {
             baseUrl,
             lease: leaseBackendClient({
                 baseUrl,
-                getToken: async () => (await this.options.getAuthToken?.()) ?? null,
+                getToken: async (request) => (await this.options.getAuthToken?.(request)) ?? null,
             }),
         };
         return this.backend.lease.client;

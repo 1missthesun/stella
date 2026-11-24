@@ -65,7 +65,6 @@ export type ModuleGraphOptions = {
   uiRoot: string;
   repoRoot: string;
   cacheDir: string;
-  fallbackCacheDir?: string;
   development: boolean;
   defines: Record<string, string>;
 };
@@ -96,9 +95,6 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   });
   const definesDigest = createHash("sha256").update(JSON.stringify(options.defines)).digest("hex");
   const moduleCacheDir = path.join(options.cacheDir, "modules");
-  const fallbackModuleCacheDir = options.fallbackCacheDir
-    ? path.join(options.fallbackCacheDir, "modules")
-    : null;
   fs.mkdirSync(moduleCacheDir, { recursive: true });
   const memory = new Map<string, { mtimeMs: number; size: number; key: string | null; module: TransformedModule }>();
   const known = new Map<string, { mtimeMs: number; size: number; key: string }>();
@@ -276,30 +272,17 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     const stat = await fs.promises.stat(file);
     const hit = memory.get(file);
     if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) return hit.module;
-    const readCachedModule = async (key: string): Promise<TransformedModule | null> => {
-      const primary = path.join(moduleCacheDir, `${key}.json`);
-      try {
-        const module = JSON.parse(await fs.promises.readFile(primary, "utf8")) as TransformedModule;
-        touchCacheEntry(primary);
-        return module;
-      } catch {}
-      if (!fallbackModuleCacheDir) return null;
-      try {
-        return JSON.parse(
-          await fs.promises.readFile(path.join(fallbackModuleCacheDir, `${key}.json`), "utf8"),
-        ) as TransformedModule;
-      } catch {
-        return null;
-      }
-    };
     const remembered = known.get(file);
     if (remembered && remembered.mtimeMs === stat.mtimeMs && remembered.size === stat.size) {
-      const module = await readCachedModule(remembered.key);
-      if (module) {
+      try {
+        const cached = path.join(moduleCacheDir, `${remembered.key}.json`);
+        const module = JSON.parse(await fs.promises.readFile(cached, "utf8")) as TransformedModule;
+        touchCacheEntry(cached);
         memory.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, key: remembered.key, module });
         return module;
+      } catch {
+        known.delete(file);
       }
-      known.delete(file);
     }
     const source = await fs.promises.readFile(file, "utf8");
     const cacheable = !source.includes("import.meta.glob");
@@ -307,7 +290,15 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
       .update(`${TRANSFORM_VERSION}\0${definesDigest}\0${repoPath(file)}\0${source}`)
       .digest("hex");
     const diskPath = path.join(moduleCacheDir, `${key}.json`);
-    let module: TransformedModule | null = cacheable ? await readCachedModule(key) : null;
+    let module: TransformedModule | null = null;
+    if (cacheable) {
+      try {
+        module = JSON.parse(await fs.promises.readFile(diskPath, "utf8")) as TransformedModule;
+        touchCacheEntry(diskPath);
+      } catch {
+        module = null;
+      }
+    }
     if (!module) {
       module = await transformFile(file, source);
       if (cacheable) {

@@ -45,12 +45,6 @@ const steps = [
     "--best-effort",
   ],
   [
-    "prebuilt renderer",
-    process.execPath,
-    "packages/desktop/scripts/prebuild-renderer.mjs",
-    "--best-effort",
-  ],
-  [
     "runtime worker bytecode",
     bunBinary,
     "packages/runtime/scripts/build-worker-bytecode.mjs",

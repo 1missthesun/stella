@@ -13,6 +13,7 @@ import { forkTimeoutFiber } from "../cli/effect-runtime.js";
 
 export const ANTIGRAVITY_APP_DATA_DIR = "antigravity-acp";
 const ASK_TIMEOUT_MS = 20_000;
+const CLOSE_TIMEOUT_MS = 3_000;
 /** How long an answer stands before a screen that shows it asks again. */
 const SIGNED_IN_FRESH_MS = 5 * 60_000;
 const SIGNED_OUT_FRESH_MS = 20_000;
@@ -74,9 +75,19 @@ export const callAntigravityAcp = async (
       if (settled) return;
       settled = true;
       stopTimer();
-      child.kill("SIGTERM");
-      const detail = stderr.trim().split(/\r?\n/u).at(-1)?.slice(0, 300);
-      resolve({ replies, ...(problem ? { problem: detail ? `${problem} ${detail}` : problem } : {}) });
+      const done = () => {
+        stopClose();
+        const detail = stderr.trim().split(/\r?\n/u).at(-1)?.slice(0, 300);
+        resolve({ replies, ...(problem ? { problem: detail ? `${problem} ${detail}` : problem } : {}) });
+      };
+      // Closing its input lets it end by itself; killing it leaves a crash file on Windows.
+      const stopClose = forkTimeoutFiber(CLOSE_TIMEOUT_MS, () => {
+        child.kill("SIGTERM");
+        done();
+      });
+      if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return done();
+      child.once("exit", done);
+      child.stdin.end();
     };
     const stopTimer = forkTimeoutFiber(timeoutMs, () => finish("didn't answer Stella in time."));
     const send = (index: number) => {

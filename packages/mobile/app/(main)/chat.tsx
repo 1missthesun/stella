@@ -569,7 +569,7 @@ function ChatSurface(props: {
     () => (
       <>
         <CloudBoundary resetKey={thread.conversationId}>
-          <SavedLoginsChatCards />
+          <SavedLoginsChatCards conversationId={thread.conversationId} />
           <UserAskCard conversationId={thread.conversationId} />
           <CloudConnectorConnectCard conversationId={thread.conversationId} />
           <CloudBrowserInterventionCard

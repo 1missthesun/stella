@@ -21,7 +21,7 @@ import {
   type SavedValuesRosterCheck,
   type SavedValuesRosterPin,
 } from "@stella/contracts/saved-values-trust";
-import { getBackendClient, readBackendView } from "./backend";
+import { getBackendClient } from "./backend";
 import {
   loadDeviceKeys,
   loadTrust,
@@ -42,11 +42,12 @@ import {
  * arrived. What the cloud says about a request later never changes a code.
  */
 
-const NO_ARGS = {} as const;
 const NONCE_BYTES = 32;
 const RETRY_MS = 30_000;
 const JOIN_RETRY_MS = 60_000;
 const APPEND_ATTEMPTS = 4;
+const APPEND_RETRY_MS = 1_000;
+const BEHIND_GRACE_MS = 10_000;
 const WAKE_SLACK_MS = 1_000;
 /** How long after an ask ended the user may still say the codes matched. */
 const DECIDED_GRACE_MS = 5 * 60_000;
@@ -74,6 +75,8 @@ export type SavedValuesTrustView =
       /** The user said here that the codes match; the other device hasn't allowed it yet. */
       confirmed: boolean;
       stopped: SavedValuesStopped | null;
+      /** It stopped while Stella has been open, so the user hasn't been told yet. */
+      stoppedNow: boolean;
     }>
   | Readonly<{
       standing: "problem";
@@ -118,6 +121,8 @@ let view: SavedValuesTrustView = OFF;
 let myJoin: MyJoin | null = null;
 const myAnswers = new Map<string, MyAnswer>();
 let nextJoinAt = 0;
+let behindSince: number | null = null;
+let stoppedNow = false;
 let session = 0;
 
 const listeners = new Set<() => void>();
@@ -172,11 +177,18 @@ const samePin = (
 ) => left?.genesis === right?.genesis && left?.seq === right?.seq && left?.hash === right?.hash;
 
 const updateTrust = async (
-  change: Partial<Pick<SavedValuesTrust, "pin" | "stopped">>,
+  change: Partial<Pick<SavedValuesTrust, "pin" | "listed" | "stopped">>,
 ): Promise<void> => {
   if (!trust) return;
   const next = { ...trust, ...change };
-  if (samePin(next.pin, trust.pin) && next.stopped === trust.stopped) return;
+  if (next.stopped !== trust.stopped) stoppedNow = next.stopped !== null;
+  if (
+    samePin(next.pin, trust.pin) &&
+    next.listed === trust.listed &&
+    next.stopped === trust.stopped
+  ) {
+    return;
+  }
   trust = next;
   await saveTrust(next);
 };
@@ -230,10 +242,9 @@ const acceptState = (next: SavedValuesState) => {
   return settle();
 };
 
-const refresh = async (): Promise<void> => {
-  const mine = session;
-  const next = await readBackendView("savedValues.state", NO_ARGS);
-  if (mine === session) state = next;
+/** What this phone just wrote, without waiting for the cloud to push it back. */
+const noteEntries = (entries: SavedValuesState["roster"]) => {
+  if (state) state = { ...state, roster: entries };
 };
 
 /** Called with each state the cloud pushes for the signed-in account. */
@@ -258,6 +269,8 @@ export const resetSavedValuesTrust = () => {
   myJoin = null;
   myAnswers.clear();
   nextJoinAt = 0;
+  behindSince = null;
+  stoppedNow = false;
   lastCheck = null;
   if (wakeTimer) clearTimeout(wakeTimer);
   wakeTimer = null;
@@ -274,15 +287,22 @@ const step = async (): Promise<void> => {
   if (mine !== session) return;
 
   let checked = check(state.roster, trust.pin);
-  if (!checked.ok && checked.reason === "rollback") {
-    // A list this phone just added to can reach it late; look again before calling it a problem.
-    await refresh();
-    if (mine !== session || !state) return;
-    checked = check(state.roster, trust.pin);
+  const behind =
+    !checked.ok &&
+    (checked.reason === "rollback" ||
+      (checked.reason === "reset" && state.roster.length === 0));
+  if (!behind) behindSince = null;
+  else {
+    // A push from before this phone's own last entry can arrive after it; give the next one time.
+    behindSince ??= Date.now();
+    if (Date.now() - behindSince < BEHIND_GRACE_MS) {
+      wakeAt(behindSince + BEHIND_GRACE_MS);
+      return;
+    }
   }
   if (!checked.ok && checked.reason === "reset" && state.roster.length > 0) {
     // Another device started a new list, which this phone isn't on.
-    await updateTrust({ pin: null });
+    await updateTrust({ pin: null, listed: false });
     myAnswers.clear();
     checked = check(state.roster, null);
   }
@@ -303,7 +323,11 @@ const step = async (): Promise<void> => {
     return;
   }
   if (trust.pin && !checked.roster.members.has(me.deviceId)) {
-    await updateTrust({ pin: null, stopped: "removed" });
+    await updateTrust({
+      pin: checked.roster.head,
+      listed: false,
+      ...(trust.listed ? { stopped: "removed" as const } : {}),
+    });
   }
   roster = null;
   myAnswers.clear();
@@ -335,18 +359,23 @@ const startList = async (
   // Remembered first: if the answer is lost, this phone still knows its own list.
   await updateTrust({
     pin: { genesis: hash, seq: 0, hash },
+    listed: true,
     stopped: null,
   });
   try {
     await getBackendClient().call(`savedValues.${how}`, { entry });
   } catch (error) {
     if (isConflict(error)) {
-      await updateTrust({ pin: before?.pin ?? null, stopped: before?.stopped ?? null });
+      await updateTrust({
+        pin: before?.pin ?? null,
+        listed: before?.listed ?? false,
+        stopped: before?.stopped ?? null,
+      });
     }
     throw error;
   }
   myJoin = null;
-  await refresh();
+  noteEntries([entry]);
   again = true;
 };
 
@@ -465,7 +494,7 @@ const stayMember = async (
   list: SavedValuesRoster,
   keys: SavedValuesDeviceKeys,
 ): Promise<void> => {
-  await updateTrust({ pin: list.head, stopped: null });
+  await updateTrust({ pin: list.head, listed: true, stopped: null });
   myJoin = null;
   const grew = roster?.head.hash !== list.head.hash;
   roster = list;
@@ -502,20 +531,21 @@ const append = async (
   make: (list: SavedValuesRoster, keys: SavedValuesDeviceKeys) => ReturnType<typeof addToRoster> | null,
 ): Promise<void> => {
   for (let attempt = 1; ; attempt += 1) {
-    await refresh();
-    await settle();
     const membership = await savedValuesMembership();
     if (!membership) throw new Error("This phone isn’t on your devices’ list.");
     const entry = make(membership.roster, membership.keys);
     if (!entry) return;
     try {
       await getBackendClient().call("savedValues.rosterAppend", { entry });
-      await refresh();
-      await settle();
-      return;
     } catch (error) {
       if (!isConflict(error) || attempt >= APPEND_ATTEMPTS) throw error;
+      // Another device added to the list first; its entry is on the way here.
+      await new Promise((resolve) => setTimeout(resolve, APPEND_RETRY_MS));
+      continue;
     }
+    if (state?.roster.length === entry.seq) noteEntries([...state.roster, entry]);
+    await settle();
+    return;
   }
 };
 
@@ -552,7 +582,6 @@ const decide = async (
     state: decision,
   });
   myAnswers.delete(joinId);
-  await refresh().catch(() => undefined);
   await settle();
 };
 
@@ -618,7 +647,7 @@ const ask = async (
     // The list is the real one only if it continues from what the other device put in the code.
     const real = check(state.roster, myJoin.answer.pin);
     if (real.ok && isSelfListed(real.roster, me)) {
-      await updateTrust({ pin: real.roster.head, stopped: null });
+      await updateTrust({ pin: real.roster.head, listed: true, stopped: null });
       again = true;
       return;
     }
@@ -673,6 +702,7 @@ const ask = async (
     answeredBy: myJoin?.answer?.byName || null,
     confirmed: myJoin?.confirmed ?? false,
     stopped: trust?.stopped ?? null,
+    stoppedNow,
   });
 };
 

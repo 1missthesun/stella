@@ -89,7 +89,10 @@ export type SavedValuesStopped = "declined" | "removed";
 
 export type SavedValuesTrust = Readonly<{
   ownerId: string;
+  /** The newest list this phone checked; kept when it's taken off, so it can check it's the same list it's back on. */
   pin: SavedValuesRosterPin | null;
+  /** Whether it was on that list then. */
+  listed: boolean;
   stopped: SavedValuesStopped | null;
 }>;
 
@@ -105,7 +108,12 @@ const isPin = (value: unknown): value is SavedValuesRosterPin => {
 
 /** What this phone knows for this account; another account starts knowing nothing. */
 export const loadTrust = async (ownerId: string): Promise<SavedValuesTrust> => {
-  const nothing: SavedValuesTrust = { ownerId, pin: null, stopped: null };
+  const nothing: SavedValuesTrust = {
+    ownerId,
+    pin: null,
+    listed: false,
+    stopped: null,
+  };
   const stored = await SecureStore.getDeviceOnlyItemAsync(TRUST_ITEM);
   if (!stored) return nothing;
   try {
@@ -114,6 +122,7 @@ export const loadTrust = async (ownerId: string): Promise<SavedValuesTrust> => {
     return {
       ownerId,
       pin: isPin(value.pin) ? value.pin : null,
+      listed: value.listed === true,
       stopped:
         value.stopped === "declined" ||
         value.stopped === "removed"

@@ -12,6 +12,7 @@ import {
   type SavedValuesRequestView,
   type SavedValuesTrustView,
 } from "../lib/saved-values-trust";
+import { useConversationUserAsks } from "../lib/user-asks";
 import { userFacingError } from "../lib/user-facing-error";
 import { useT } from "../i18n";
 import type { Colors } from "../theme/colors";
@@ -38,11 +39,18 @@ let waitingDismissed = false;
 /**
  * Above the composer: a device to allow, or this phone asking for the user's
  * logins. The user can put the waiting card away until Stella next starts; it
- * comes back by itself once another device shows a code.
+ * comes back by itself once another device shows a code. A question or a
+ * secure card needs the same room, so it goes first.
  */
-export function SavedLoginsChatCards() {
+export function SavedLoginsChatCards({
+  conversationId,
+}: {
+  conversationId: string | null | undefined;
+}) {
   const trust = useSavedValuesTrust();
+  const { questions, secureInput } = useConversationUserAsks(conversationId);
   const [dismissed, setDismissed] = useState(waitingDismissed);
+  if (questions.length > 0 || secureInput) return null;
   if (trust.standing === "member") {
     const request = trust.requests[0];
     return request ? (
@@ -50,6 +58,7 @@ export function SavedLoginsChatCards() {
     ) : null;
   }
   if (trust.standing !== "waiting" || (dismissed && !trust.code)) return null;
+  if (trust.stopped && !trust.stoppedNow) return null;
   return (
     <SavedLoginsWaitingCard
       waiting={trust}
@@ -111,7 +120,6 @@ export function SavedLoginsWaitingCard({
   if (waiting.stopped) {
     return (
       <Card title={t(`mobile.savedLogins.${waiting.stopped}`)}>
-        <StartOver disabled={busy} run={run} />
         {putAway}
         <Action
           primary

@@ -1,9 +1,18 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import Reanimated, {
   Easing as ReanimatedEasing,
   cancelAnimation,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -45,6 +54,7 @@ const SHELL_ENTER = 0;
 const SHELL_EXIT = 1;
 const SHELL_HANDOFF = 2;
 const SWAP_DURATION_MS = 240;
+const SWAP_SHIFT = 4;
 const STATUS_MIN_VISIBLE_MS = 2000;
 const INDICATOR_PAD_TOP = 0;
 const INDICATOR_PAD_BOTTOM = 0;
@@ -76,80 +86,45 @@ function SwapText({
   colors: Colors;
   styles: ReturnType<typeof makeStyles>;
 }) {
-  const [current, setCurrent] = useState(text);
-  const [previous, setPrevious] = useState<string | null>(null);
-  const lastTextRef = useRef(text);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inValue = useRef(new Animated.Value(1)).current;
-  const outValue = useRef(new Animated.Value(0)).current;
+  const [labels, setLabels] = useState<{
+    current: string;
+    previous: string | null;
+  }>({ current: text, previous: null });
+  const swap = useSharedValue(1);
 
   useEffect(() => {
-    if (text === lastTextRef.current) return;
+    if (text === labels.current) return;
+    setLabels({ current: text, previous: labels.current });
+  }, [labels, text]);
 
-    const old = lastTextRef.current;
-    setPrevious(old);
-    setCurrent(text);
-    lastTextRef.current = text;
-    inValue.setValue(0);
-    outValue.setValue(1);
-
-    Animated.parallel([
-      Animated.timing(inValue, {
-        toValue: 1,
-        duration: SWAP_DURATION_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(outValue, {
-        toValue: 0,
-        duration: SWAP_DURATION_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      setPrevious(null);
-      timeoutRef.current = null;
-    }, SWAP_DURATION_MS);
-
-    return () => {
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [inValue, outValue, text]);
-
-  const inStyle = useMemo(
-    () => ({
-      opacity: inValue,
-      transform: [
-        {
-          translateY: inValue.interpolate({
-            inputRange: [0, 1],
-            outputRange: [4, 0],
-          }),
-        },
-      ],
-    }),
-    [inValue],
+  const dropPrevious = useCallback(
+    () => setLabels((shown) => ({ ...shown, previous: null })),
+    [],
   );
-  const outStyle = useMemo(
-    () => ({
-      opacity: outValue,
-      transform: [
-        {
-          translateY: outValue.interpolate({
-            inputRange: [0, 1],
-            outputRange: [-4, 0],
-          }),
-        },
-      ],
-    }),
-    [outValue],
-  );
+  useLayoutEffect(() => {
+    if (labels.previous === null) return;
+    swap.value = 0;
+    swap.value = withTiming(
+      1,
+      {
+        duration: SWAP_DURATION_MS,
+        easing: ReanimatedEasing.out(ReanimatedEasing.cubic),
+      },
+      (finished) => {
+        if (finished) runOnJS(dropPrevious)();
+      },
+    );
+  }, [dropPrevious, labels.current, labels.previous, swap]);
+
+  const inStyle = useAnimatedStyle(() => ({
+    opacity: swap.value,
+    transform: [{ translateY: SWAP_SHIFT * (1 - swap.value) }],
+  }));
+  const outStyle = useAnimatedStyle(() => ({
+    opacity: 1 - swap.value,
+    transform: [{ translateY: -SWAP_SHIFT * swap.value }],
+  }));
+  const { current, previous } = labels;
 
   return (
     <View style={styles.swapText}>
@@ -162,7 +137,7 @@ function SwapText({
         {current}
       </Text>
       {previous ? (
-        <Animated.View
+        <Reanimated.View
           style={[styles.swapLayer, outStyle]}
           pointerEvents="none"
         >
@@ -175,9 +150,9 @@ function SwapText({
               {previous}
             </Text>
           </View>
-        </Animated.View>
+        </Reanimated.View>
       ) : null}
-      <Animated.View style={[styles.swapLayer, inStyle]}>
+      <Reanimated.View style={[styles.swapLayer, inStyle]}>
         <View style={styles.shimmerWrap}>
           <TextShimmer
             text={current}
@@ -187,7 +162,7 @@ function SwapText({
             textStyle={styles.statusText}
           />
         </View>
-      </Animated.View>
+      </Reanimated.View>
     </View>
   );
 }

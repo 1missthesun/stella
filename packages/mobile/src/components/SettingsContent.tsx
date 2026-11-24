@@ -33,6 +33,7 @@ import { clearAccountChatData } from "../lib/chat-account-cleanup";
 import { useCloudBrowserActions } from "../lib/cloud-browser";
 import { tapLight } from "../lib/haptics";
 import { tearDownPushNotifications } from "../lib/notifications";
+import { withdrawSavedValuesDevice } from "../lib/saved-values";
 import {
   getNotificationsMuted,
   setNotificationsMuted,
@@ -183,6 +184,7 @@ export function SettingsContent() {
     setIsSigningOut(true);
     try {
       await tearDownPushNotifications();
+      await withdrawSavedValuesDevice();
       await authClient.signOut();
       clearCachedToken();
       await clearLocalAccountState();
@@ -218,6 +220,7 @@ export function SettingsContent() {
       return;
     }
     await tearDownPushNotifications().catch(() => {});
+    await withdrawSavedValuesDevice();
     clearCachedToken();
     await authClient.signOut().catch(() => {});
     await clearLocalAccountState().catch(() => {});

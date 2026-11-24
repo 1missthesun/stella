@@ -2186,12 +2186,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Iniciar sessão com o Google",
       "antigravitySignedIn": "Este computador tem sessão iniciada no Google Antigravity.",
-      "antigravityHint": "Gemini no seu plano Google, para tarefas neste computador",
+      "antigravityHint": "Gemini no seu plano Google",
       "antigravityOpened": "A página de login do Google abriu no seu navegador. Entre por lá e depois cole o código que aparecer.",
       "antigravityCode": "Cole o código mostrado pelo Google",
-      "antigravityPreparing": "Preparando o Antigravity CLI do Google…",
-      "antigravityAgain": "A Stella agora executa o Gemini dentro do Antigravity CLI do próprio Google. Entre mais uma vez para continuar usando.",
-      "antigravityRisk": "A Stella executa o Antigravity CLI do próprio Google, que guarda seu login do Google. O Google pode limitar contas usadas para trabalho sem supervisão."
+      "antigravityPreparing": "Preparando o Google Antigravity…",
+      "antigravityRisk": "O Google pode limitar contas usadas para trabalho sem supervisão."
     },
     "engineModels": {
       "ariaLabel": "Modelos da {engine}",

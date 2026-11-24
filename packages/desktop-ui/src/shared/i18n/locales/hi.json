@@ -2176,12 +2176,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Google से साइन इन करें",
       "antigravitySignedIn": "यह कंप्यूटर Google Antigravity में साइन इन है।",
-      "antigravityHint": "आपके Google प्लान पर Gemini, इस कंप्यूटर के कामों के लिए",
+      "antigravityHint": "आपके Google प्लान पर Gemini",
       "antigravityOpened": "Google का साइन-इन पेज आपके ब्राउज़र में खुल गया है। वहाँ साइन इन करें, फिर दिखाया गया कोड यहाँ पेस्ट करें।",
       "antigravityCode": "Google का दिखाया कोड पेस्ट करें",
-      "antigravityPreparing": "Google का Antigravity CLI तैयार हो रहा है…",
-      "antigravityAgain": "Stella अब Gemini को Google के अपने Antigravity CLI में चलाती है। इसे इस्तेमाल करते रहने के लिए एक बार फिर साइन इन करें।",
-      "antigravityRisk": "Stella Google का अपना Antigravity CLI चलाती है, जो आपका Google साइन-इन रखता है। बिना निगरानी के काम में इस्तेमाल होने वाले खातों को Google सीमित कर सकता है।"
+      "antigravityPreparing": "Google Antigravity तैयार हो रहा है…",
+      "antigravityRisk": "बिना निगरानी के काम में इस्तेमाल होने वाले खातों को Google सीमित कर सकता है।"
     },
     "engineModels": {
       "ariaLabel": "{engine} मॉडल",

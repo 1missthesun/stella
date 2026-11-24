@@ -2,8 +2,6 @@
 export type AntigravityStatus = {
   installed: boolean;
   signedIn: boolean;
-  /** Signed in through the retired sign-in, which Stella no longer uses; the CLI needs its own. */
-  signInAgain: boolean;
 };
 
 export type AntigravitySignInProgress =

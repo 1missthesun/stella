@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Button } from "@/ui/button";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
-import { AiNote, AiPrimaryAccount, AiProviderSection, AiRow } from "@/features/cloud/AiProviderSection";
+import { AiPrimaryAccount, AiProviderSection, AiRow } from "@/features/cloud/AiProviderSection";
 import { AntigravitySignInPrompt } from "./AntigravitySignInPrompt";
 import { useAntigravity } from "./use-antigravity";
 
@@ -43,11 +43,7 @@ export function AntigravityAccountSection() {
       id="antigravity"
       titleKey={`${K}.antigravityTitle`}
       notes={
-        <>
-          {status.signInAgain && signIn.state === "idle" ? <AiNote>{t(`${K}.antigravityAgain`)}</AiNote> : null}
-          <AntigravitySignInPrompt antigravity={antigravity} onStart={onStart} />
-          <p className="ai-provider__hint">{t(`${K}.antigravityRisk`)}</p>
-        </>
+        <AntigravitySignInPrompt antigravity={antigravity} onStart={onStart} />
       }
     >
       {status.signedIn ? (

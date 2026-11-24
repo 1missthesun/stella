@@ -16,7 +16,7 @@ import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effor
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
 import { hasRealtimeVoiceSessionRouteChanged, } from "@stella/contracts/local-preferences";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/node-shared/storage/llm-credentials";
-import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, hadRetiredLlmOAuthSignIn, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/node-shared/storage/llm-oauth-credentials";
+import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/node-shared/storage/llm-oauth-credentials";
 import { callRuntimeAppService, resolveLlmOAuthApiKeyInRuntime, watchAppServiceProgress, } from "../services/runtime-app-services.js";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/node-shared/storage/chatgpt-profiles";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
@@ -1159,14 +1159,7 @@ export const registerSystemHandlers = (options) => {
             throw new Error(`Blocked untrusted ${channel} request.`);
         }
     };
-    const antigravityStatus = async () => {
-        const stellaAppDir = options.getStellaAppDir();
-        const status = await callRuntimeAppService("antigravityStatus");
-        return {
-            ...status,
-            signInAgain: !status.signedIn && Boolean(stellaAppDir && hadRetiredLlmOAuthSignIn(stellaAppDir, "antigravity")),
-        };
-    };
+    const antigravityStatus = async () => await callRuntimeAppService("antigravityStatus");
     let antigravityLogin = null;
     const cancelAntigravityLogin = (loginId) => {
         void callRuntimeAppService("cancelAntigravitySignIn", { loginId }).catch(() => undefined);

@@ -2176,12 +2176,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Inloggen met Google",
       "antigravitySignedIn": "Deze computer is ingelogd bij Google Antigravity.",
-      "antigravityHint": "Gemini via je Google-abonnement, voor taken op deze computer",
+      "antigravityHint": "Gemini via je Google-abonnement",
       "antigravityOpened": "De inlogpagina van Google is geopend in je browser. Log daar in en plak daarna de code die je ziet.",
       "antigravityCode": "Plak de code die Google toont",
-      "antigravityPreparing": "Antigravity CLI van Google wordt klaargezet…",
-      "antigravityAgain": "Stella gebruikt Gemini nu in Google's eigen Antigravity CLI. Log nog één keer in om het te blijven gebruiken.",
-      "antigravityRisk": "Stella gebruikt Google's eigen Antigravity CLI, die je Google-aanmelding bewaart. Google kan accounts beperken die voor onbeheerd werk worden gebruikt."
+      "antigravityPreparing": "Google Antigravity wordt klaargezet…",
+      "antigravityRisk": "Google kan accounts beperken die voor onbeheerd werk worden gebruikt."
     },
     "engineModels": {
       "ariaLabel": "{engine}-modellen",

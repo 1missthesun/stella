@@ -2186,12 +2186,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "כניסה עם Google",
       "antigravitySignedIn": "המחשב הזה מחובר ל-Google Antigravity.",
-      "antigravityHint": "Gemini בתוכנית Google שלך, למשימות במחשב הזה",
+      "antigravityHint": "Gemini בתוכנית Google שלך",
       "antigravityOpened": "דף הכניסה של Google נפתח בדפדפן שלך. יש להיכנס שם ואז להדביק את הקוד שמוצג.",
       "antigravityCode": "הדבקת הקוד ש-Google מציגה",
-      "antigravityPreparing": "מכינים את Antigravity CLI של Google…",
-      "antigravityAgain": "Stella מריצה עכשיו את Gemini בתוך Antigravity CLI של Google עצמה. יש להיכנס פעם נוספת כדי להמשיך להשתמש בו.",
-      "antigravityRisk": "Stella מריצה את Antigravity CLI של Google עצמה, והוא שומר את הכניסה שלך ל-Google. ייתכן ש-Google תגביל חשבונות שמשמשים לעבודה ללא השגחה."
+      "antigravityPreparing": "מכינים את Google Antigravity…",
+      "antigravityRisk": "ייתכן ש-Google תגביל חשבונות שמשמשים לעבודה ללא השגחה."
     },
     "engineModels": {
       "ariaLabel": "מודלים של {engine}",

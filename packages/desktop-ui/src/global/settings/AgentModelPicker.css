@@ -193,6 +193,14 @@
   min-height: 0;
 }
 
+.agent-model-picker-connection {
+  margin: 0;
+  padding: 4px 2px 6px;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  color: var(--text-weak);
+}
+
 .agent-model-picker-load-error {
   display: flex;
   align-items: center;

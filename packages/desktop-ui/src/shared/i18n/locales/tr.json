@@ -2176,12 +2176,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Google ile oturum aç",
       "antigravitySignedIn": "Bu bilgisayar Google Antigravity'de oturum açtı.",
-      "antigravityHint": "Google planındaki Gemini, bu bilgisayardaki görevler için",
+      "antigravityHint": "Google planındaki Gemini",
       "antigravityOpened": "Google'ın oturum açma sayfası tarayıcınızda açıldı. Orada oturum açın, sonra gösterdiği kodu yapıştırın.",
       "antigravityCode": "Google'ın gösterdiği kodu yapıştırın",
-      "antigravityPreparing": "Google'ın Antigravity CLI'si hazırlanıyor…",
-      "antigravityAgain": "Stella artık Gemini'yi Google'ın kendi Antigravity CLI'sinde çalıştırıyor. Kullanmaya devam etmek için bir kez daha oturum açın.",
-      "antigravityRisk": "Stella, Google oturumunuzu saklayan, Google'ın kendi Antigravity CLI'sini çalıştırır. Google, gözetimsiz işlerde kullanılan hesapları sınırlayabilir."
+      "antigravityPreparing": "Google Antigravity hazırlanıyor…",
+      "antigravityRisk": "Google, gözetimsiz işlerde kullanılan hesapları sınırlayabilir."
     },
     "engineModels": {
       "ariaLabel": "{engine} modelleri",

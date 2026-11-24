@@ -2196,12 +2196,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Zaloguj się przez Google",
       "antigravitySignedIn": "Ten komputer jest zalogowany do Google Antigravity.",
-      "antigravityHint": "Gemini w ramach Twojego planu Google, do zadań na tym komputerze",
+      "antigravityHint": "Gemini w ramach Twojego planu Google",
       "antigravityOpened": "Strona logowania Google otworzyła się w przeglądarce. Zaloguj się tam, a potem wklej wyświetlony kod.",
       "antigravityCode": "Wklej kod wyświetlony przez Google",
-      "antigravityPreparing": "Przygotowywanie Antigravity CLI od Google…",
-      "antigravityAgain": "Stella uruchamia teraz Gemini w Antigravity CLI od Google. Zaloguj się jeszcze raz, aby dalej z niego korzystać.",
-      "antigravityRisk": "Stella uruchamia Antigravity CLI od Google, które przechowuje Twoje logowanie Google. Google może ograniczać konta używane do pracy bez nadzoru."
+      "antigravityPreparing": "Przygotowywanie Google Antigravity…",
+      "antigravityRisk": "Google może ograniczać konta używane do pracy bez nadzoru."
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

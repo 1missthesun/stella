@@ -42,7 +42,7 @@ const START_TIMEOUT_MS = 60_000;
 
 export const ANTIGRAVITY_LOGIN_REQUIRED = "ANTIGRAVITY_CLI_LOGIN_REQUIRED";
 export const ANTIGRAVITY_SIGN_IN_NEEDED =
-  "This computer isn't signed in to Google Antigravity. Sign in with Google under Google Antigravity in Settings › Claude and ChatGPT. If you used Google Antigravity in Stella before, sign in once more: Stella now runs it through Google's own Antigravity app.";
+  "This computer isn't signed in to Google Antigravity. Sign in with Google in Settings › Claude and ChatGPT.";
 export const ANTIGRAVITY_NOT_INSTALLED = "ANTIGRAVITY_CLI_NOT_INSTALLED";
 
 export type AntigravityToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
@@ -139,7 +139,7 @@ export const antigravityTokenFile = (home: string): string => path.join(home, AN
 export const antigravityCliSignedIn = (home: string): boolean => existsSync(antigravityTokenFile(home));
 
 export const antigravityCliProblem = (config: AntigravityCliConfig): string | undefined => {
-  if (!config.binary()) return "Google Antigravity isn't set up on this computer yet. Sign in with Google under Google Antigravity in Settings › Claude and ChatGPT.";
+  if (!config.binary()) return "Google Antigravity isn't set up on this computer yet. Sign in with Google in Settings › Claude and ChatGPT.";
   if (!antigravityCliSignedIn(config.home())) return ANTIGRAVITY_SIGN_IN_NEEDED;
   return undefined;
 };

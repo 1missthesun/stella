@@ -2166,12 +2166,11 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Masuk dengan Google",
       "antigravitySignedIn": "Komputer ini sudah masuk ke Google Antigravity.",
-      "antigravityHint": "Gemini dengan paket Google Anda, untuk tugas di komputer ini",
+      "antigravityHint": "Gemini dengan paket Google Anda",
       "antigravityOpened": "Halaman masuk Google terbuka di browser Anda. Masuk di sana, lalu tempelkan kode yang ditampilkan.",
       "antigravityCode": "Tempelkan kode yang ditampilkan Google",
-      "antigravityPreparing": "Menyiapkan Antigravity CLI dari Google…",
-      "antigravityAgain": "Stella kini menjalankan Gemini di dalam Antigravity CLI milik Google. Masuk sekali lagi untuk terus menggunakannya.",
-      "antigravityRisk": "Stella menjalankan Antigravity CLI milik Google, yang menyimpan login Google Anda. Google dapat membatasi akun yang dipakai untuk pekerjaan tanpa pengawasan."
+      "antigravityPreparing": "Menyiapkan Google Antigravity…",
+      "antigravityRisk": "Google dapat membatasi akun yang dipakai untuk pekerjaan tanpa pengawasan."
     },
     "engineModels": {
       "ariaLabel": "Model {engine}",

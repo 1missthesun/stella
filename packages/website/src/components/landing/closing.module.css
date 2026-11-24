@@ -7,7 +7,8 @@
   justify-content: center;
   overflow: hidden;
   content-visibility: auto;
-  contain-intrinsic-size: auto 1080px;
+  /* min-height (120svh) sets its height; the content fits inside. */
+  contain-intrinsic-size: auto 0px;
 }
 
 .wall {
@@ -137,7 +138,8 @@
   padding: 120px var(--l-margin) 80px;
   color: #fff;
   content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
+  /* min-height (100svh) sets its height; the content fits inside. */
+  contain-intrinsic-size: auto 0px;
 }
 
 .finaleAurora {

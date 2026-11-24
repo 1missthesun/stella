@@ -1,6 +1,7 @@
 import { Backdrop } from "./backdrop";
 import { Finale, LandingFooter, OpenSourceAct } from "./closing";
 import { ComputerAct } from "./computer-act";
+import { ContentVisibilitySettle } from "./content-visibility-settle";
 import { DevicesAct } from "./devices-act";
 import { FaqSection } from "./faq";
 import { landingFontVars } from "./fonts";
@@ -30,6 +31,7 @@ export function Landing() {
         <Finale />
       </main>
       <LandingFooter />
+      <ContentVisibilitySettle />
     </div>
   );
 }

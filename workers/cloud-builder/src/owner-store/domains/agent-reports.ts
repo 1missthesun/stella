@@ -522,6 +522,7 @@ export const fileLateTurn = (
   text: string,
   now: number,
   waiting = false,
+  done = false,
 ): boolean => {
   const thread = readThread(db, threadId);
   if (!thread || attemptGeneration >= thread.attempt_generation) return false;
@@ -546,6 +547,21 @@ export const fileLateTurn = (
   const lateId = agentReportId(thread.thread_id, attemptGeneration);
   const known = (key: string) => db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", key) !== null;
   if (known(lateId) || known(`report_deferred:${thread.thread_id}:${attemptGeneration}`)) return false;
+  if (done) {
+    // The finished report it sent itself is that turn's own report: it goes
+    // out now, and says nothing about the later turn. It ends the earlier turn
+    // a later one's report may be waiting for.
+    fileReport(
+      db,
+      { ...thread, attempt_generation: attemptGeneration, status: "completed" },
+      lateId,
+      "completed",
+      boundReportText(withCarried(thread, text.trim()), thread.thread_id),
+      now,
+    );
+    deriveAgentReport(db, thread.thread_id, now);
+    return true;
+  }
   const kept = appendAgentEvent(db, {
     key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
     kind: "report_deferred",

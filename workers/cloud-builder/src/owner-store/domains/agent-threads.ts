@@ -4473,7 +4473,7 @@ const completeComputerThread = async (
     // An earlier turn's end, after a later one began: what it said is kept.
     if (args.attemptGeneration < row.attempt_generation && args.status === "completed") {
       const said = result !== undefined && !isPlaceholderAgentResult(JSON.stringify({ finalText: result })) ? result : "";
-      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined);
+      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined, args.done === true);
       return { updated: false, status: row.status };
     }
     if (

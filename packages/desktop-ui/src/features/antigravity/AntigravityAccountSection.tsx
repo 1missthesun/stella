@@ -56,7 +56,7 @@ export function AntigravityAccountSection() {
       ) : (
         <AiPrimaryAccount
           name={<span data-empty>{t(`${K}.notConnected`)}</span>}
-          meta={t(status.signInAgain ? `${K}.antigravityAgain` : `${K}.antigravityHint`)}
+          meta={t(`${K}.antigravityHint`)}
           trailing={
             <Button
               type="button"

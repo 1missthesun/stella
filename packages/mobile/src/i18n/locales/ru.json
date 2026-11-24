@@ -2196,11 +2196,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Войти через Google",
       "antigravitySignedIn": "Этот компьютер вошёл в Google Antigravity.",
-      "antigravityHint": "Gemini по вашему тарифу Google — для задач на этом компьютере",
+      "antigravityHint": "Gemini по вашему тарифу Google",
       "antigravityOpened": "Страница входа Google открылась в браузере. Войдите там, затем вставьте показанный код.",
       "antigravityCode": "Вставьте код, показанный Google",
       "antigravityPreparing": "Подготовка Google Antigravity…",
-      "antigravityAgain": "Войдите ещё раз, чтобы продолжить пользоваться Gemini.",
       "antigravityRisk": "Google может ограничивать аккаунты, используемые для работы без присмотра."
     },
     "engineModels": {

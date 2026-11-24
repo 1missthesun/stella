@@ -2166,11 +2166,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Google でログイン",
       "antigravitySignedIn": "このコンピュータは Google Antigravity にログインしています。",
-      "antigravityHint": "Google のプランで使う Gemini（このコンピュータのタスク用）",
+      "antigravityHint": "Google のプランで使う Gemini",
       "antigravityOpened": "Google のログインページをブラウザで開きました。そこでログインし、表示されたコードを貼り付けてください。",
       "antigravityCode": "Google に表示されたコードを貼り付け",
       "antigravityPreparing": "Google Antigravity を準備しています…",
-      "antigravityAgain": "Gemini を引き続き使うには、もう一度ログインしてください。",
       "antigravityRisk": "無人の作業に使われたアカウントは Google に制限されることがあります。"
     },
     "engineModels": {

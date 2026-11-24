@@ -2176,11 +2176,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Bejelentkezés Google-fiókkal",
       "antigravitySignedIn": "Ez a számítógép be van jelentkezve a Google Antigravitybe.",
-      "antigravityHint": "Gemini a Google-előfizetéseddel, a gépen futó feladatokhoz",
+      "antigravityHint": "Gemini a Google-előfizetéseddel",
       "antigravityOpened": "Megnyílt a Google bejelentkezési oldala a böngésződben. Jelentkezz be ott, majd illeszd be a megjelenő kódot.",
       "antigravityCode": "Illeszd be a Google által mutatott kódot",
       "antigravityPreparing": "A Google Antigravity előkészítése…",
-      "antigravityAgain": "Jelentkezz be még egyszer, hogy tovább használhasd a Geminit.",
       "antigravityRisk": "A Google korlátozhatja a felügyelet nélküli munkára használt fiókokat."
     },
     "engineModels": {

@@ -2186,11 +2186,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Iniciar sesión con Google",
       "antigravitySignedIn": "Este ordenador ha iniciado sesión en Google Antigravity.",
-      "antigravityHint": "Gemini con tu plan de Google, para tareas en este ordenador",
+      "antigravityHint": "Gemini con tu plan de Google",
       "antigravityOpened": "La página de inicio de sesión de Google se abrió en tu navegador. Inicia sesión ahí y luego pega el código que te muestra.",
       "antigravityCode": "Pega el código que muestra Google",
       "antigravityPreparing": "Preparando Google Antigravity…",
-      "antigravityAgain": "Inicia sesión una vez más para seguir usando Gemini.",
       "antigravityRisk": "Google puede limitar las cuentas usadas para trabajo sin supervisión."
     },
     "engineModels": {

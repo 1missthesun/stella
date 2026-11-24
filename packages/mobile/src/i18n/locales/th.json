@@ -2166,11 +2166,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "ลงชื่อเข้าใช้ด้วย Google",
       "antigravitySignedIn": "คอมพิวเตอร์เครื่องนี้ลงชื่อเข้าใช้ Google Antigravity แล้ว",
-      "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ สำหรับงานบนคอมพิวเตอร์เครื่องนี้",
+      "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ",
       "antigravityOpened": "หน้าเข้าสู่ระบบของ Google เปิดในเบราว์เซอร์แล้ว เข้าสู่ระบบที่นั่น แล้ววางรหัสที่แสดง",
       "antigravityCode": "วางรหัสที่ Google แสดง",
       "antigravityPreparing": "กำลังเตรียม Google Antigravity…",
-      "antigravityAgain": "เข้าสู่ระบบอีกครั้งเพื่อใช้งาน Gemini ต่อ",
       "antigravityRisk": "Google อาจจำกัดบัญชีที่ใช้ทำงานโดยไม่มีคนดูแล"
     },
     "engineModels": {

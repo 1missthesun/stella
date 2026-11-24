@@ -2176,11 +2176,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Log ind med Google",
       "antigravitySignedIn": "Denne computer er logget ind på Google Antigravity.",
-      "antigravityHint": "Gemini på dit Google-abonnement, til opgaver på denne computer",
+      "antigravityHint": "Gemini på dit Google-abonnement",
       "antigravityOpened": "Googles loginside er åbnet i din browser. Log ind dér, og indsæt derefter den kode, den viser.",
       "antigravityCode": "Indsæt koden, som Google viser",
       "antigravityPreparing": "Gør Google Antigravity klar…",
-      "antigravityAgain": "Log ind én gang til for at blive ved med at bruge Gemini.",
       "antigravityRisk": "Google kan begrænse konti, der bruges til arbejde uden opsyn."
     },
     "engineModels": {

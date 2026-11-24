@@ -2176,11 +2176,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Mit Google anmelden",
       "antigravitySignedIn": "Dieser Computer ist bei Google Antigravity angemeldet.",
-      "antigravityHint": "Gemini über dein Google-Abo, für Aufgaben auf diesem Computer",
+      "antigravityHint": "Gemini über dein Google-Abo",
       "antigravityOpened": "Die Anmeldeseite von Google wurde in deinem Browser geöffnet. Melde dich dort an und füge dann den angezeigten Code ein.",
       "antigravityCode": "Den von Google angezeigten Code einfügen",
       "antigravityPreparing": "Google Antigravity wird vorbereitet…",
-      "antigravityAgain": "Melde dich noch einmal an, um Gemini weiter zu nutzen.",
       "antigravityRisk": "Google kann Konten einschränken, die für unbeaufsichtigte Arbeit genutzt werden."
     },
     "engineModels": {

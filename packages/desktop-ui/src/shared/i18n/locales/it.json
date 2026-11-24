@@ -2186,11 +2186,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Accedi con Google",
       "antigravitySignedIn": "Questo computer ha effettuato l'accesso a Google Antigravity.",
-      "antigravityHint": "Gemini con il tuo piano Google, per le attività su questo computer",
+      "antigravityHint": "Gemini con il tuo piano Google",
       "antigravityOpened": "La pagina di accesso di Google si è aperta nel browser. Accedi lì, poi incolla il codice che ti mostra.",
       "antigravityCode": "Incolla il codice mostrato da Google",
       "antigravityPreparing": "Preparazione di Google Antigravity…",
-      "antigravityAgain": "Accedi ancora una volta per continuare a usare Gemini.",
       "antigravityRisk": "Google può limitare gli account usati per lavoro non presidiato."
     },
     "engineModels": {

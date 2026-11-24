@@ -2176,11 +2176,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Σύνδεση με Google",
       "antigravitySignedIn": "Αυτός ο υπολογιστής έχει συνδεθεί στο Google Antigravity.",
-      "antigravityHint": "Gemini με το πρόγραμμα Google σας, για εργασίες σε αυτόν τον υπολογιστή",
+      "antigravityHint": "Gemini με το πρόγραμμα Google σας",
       "antigravityOpened": "Η σελίδα σύνδεσης της Google άνοιξε στο πρόγραμμα περιήγησής σας. Συνδεθείτε εκεί και μετά επικολλήστε τον κωδικό που εμφανίζεται.",
       "antigravityCode": "Επικολλήστε τον κωδικό που δείχνει η Google",
       "antigravityPreparing": "Προετοιμασία του Google Antigravity…",
-      "antigravityAgain": "Συνδεθείτε άλλη μία φορά για να συνεχίσετε να χρησιμοποιείτε το Gemini.",
       "antigravityRisk": "Η Google μπορεί να περιορίσει λογαριασμούς που χρησιμοποιούνται για εργασία χωρίς επίβλεψη."
     },
     "engineModels": {

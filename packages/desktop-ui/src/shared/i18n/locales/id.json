@@ -2166,11 +2166,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Masuk dengan Google",
       "antigravitySignedIn": "Komputer ini sudah masuk ke Google Antigravity.",
-      "antigravityHint": "Gemini dengan paket Google Anda, untuk tugas di komputer ini",
+      "antigravityHint": "Gemini dengan paket Google Anda",
       "antigravityOpened": "Halaman masuk Google terbuka di browser Anda. Masuk di sana, lalu tempelkan kode yang ditampilkan.",
       "antigravityCode": "Tempelkan kode yang ditampilkan Google",
       "antigravityPreparing": "Menyiapkan Google Antigravity…",
-      "antigravityAgain": "Masuk sekali lagi untuk terus menggunakan Gemini.",
       "antigravityRisk": "Google dapat membatasi akun yang dipakai untuk pekerjaan tanpa pengawasan."
     },
     "engineModels": {

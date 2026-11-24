@@ -23,7 +23,7 @@ export function AntigravityModelSection({ children }: { children: ReactNode }) {
   return (
     <div className="antigravity-picker-sign-in">
       <p className="antigravity-picker-sign-in__hint">
-        {t(status.signInAgain ? `${K}.antigravityAgain` : `${K}.antigravityHint`)}
+        {t(`${K}.antigravityHint`)}
       </p>
       <Button type="button" variant="ghost" className="pill-btn" onClick={() => void start()}>
         {t(`${K}.antigravitySignIn`)}

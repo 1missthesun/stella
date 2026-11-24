@@ -59,8 +59,6 @@ type StoredLlmOAuthCredentialRecord = {
 type StoredLlmOAuthCredentialFile = {
   version: 1;
   credentials: Record<string, StoredLlmOAuthCredentialRecord>;
-  /** Retired providers a sign-in was removed for, so Settings can ask for the new one. */
-  retired?: string[];
 };
 
 export type LocalLlmOAuthCredentialSummary = {
@@ -139,7 +137,6 @@ const pruneRetiredLlmOAuthCredentials = (
   const next: StoredLlmOAuthCredentialFile = {
     ...payload,
     credentials,
-    retired: [...new Set([...(payload.retired ?? []), ...removed.map(({ provider }) => provider)])],
   };
   try {
     writeCredentialFile(stellaAppDir, next);
@@ -205,10 +202,6 @@ export const cleanupRetiredLocalLlmOAuthCredentials = (
 ): void => {
   readCredentialFile(stellaAppDir);
 };
-
-/** Whether a sign-in for `provider` was removed here because Stella retired it. */
-export const hadRetiredLlmOAuthSignIn = (stellaAppDir: string, provider: string): boolean =>
-  readCredentialFile(stellaAppDir).retired?.includes(normalizeProvider(provider)) === true;
 
 export const hasLocalLlmOAuthCredential = (
   stellaAppDir: string,

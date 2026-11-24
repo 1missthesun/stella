@@ -2166,11 +2166,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "使用 Google 登入",
       "antigravitySignedIn": "這台電腦已登入 Google Antigravity。",
-      "antigravityHint": "使用你的 Google 方案執行 Gemini，用於這台電腦上的任務",
+      "antigravityHint": "使用你的 Google 方案執行 Gemini",
       "antigravityOpened": "Google 登入頁面已在瀏覽器中開啟。請在那裡登入，然後貼上顯示的代碼。",
       "antigravityCode": "貼上 Google 顯示的代碼",
       "antigravityPreparing": "正在準備 Google Antigravity…",
-      "antigravityAgain": "請再登入一次以繼續使用 Gemini。",
       "antigravityRisk": "Google 可能會限制用於無人值守工作的帳號。"
     },
     "engineModels": {

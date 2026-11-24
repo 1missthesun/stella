@@ -2186,11 +2186,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Conectează-te cu Google",
       "antigravitySignedIn": "Acest computer este conectat la Google Antigravity.",
-      "antigravityHint": "Gemini din abonamentul tău Google, pentru sarcinile de pe acest computer",
+      "antigravityHint": "Gemini din abonamentul tău Google",
       "antigravityOpened": "Pagina de conectare Google s-a deschis în browser. Conectează-te acolo, apoi lipește codul afișat.",
       "antigravityCode": "Lipește codul afișat de Google",
       "antigravityPreparing": "Se pregătește Google Antigravity…",
-      "antigravityAgain": "Conectează-te încă o dată pentru a folosi Gemini în continuare.",
       "antigravityRisk": "Google poate limita conturile folosite pentru lucru nesupravegheat."
     },
     "engineModels": {

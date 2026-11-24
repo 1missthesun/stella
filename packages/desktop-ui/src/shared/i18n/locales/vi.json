@@ -2166,11 +2166,10 @@
       "antigravityTitle": "Google Antigravity",
       "antigravitySignIn": "Đăng nhập bằng Google",
       "antigravitySignedIn": "Máy tính này đã đăng nhập Google Antigravity.",
-      "antigravityHint": "Gemini theo gói Google của bạn, cho các tác vụ trên máy tính này",
+      "antigravityHint": "Gemini theo gói Google của bạn",
       "antigravityOpened": "Trang đăng nhập của Google đã mở trong trình duyệt. Hãy đăng nhập ở đó rồi dán mã hiển thị.",
       "antigravityCode": "Dán mã Google hiển thị",
       "antigravityPreparing": "Đang chuẩn bị Google Antigravity…",
-      "antigravityAgain": "Hãy đăng nhập thêm một lần để tiếp tục dùng Gemini.",
       "antigravityRisk": "Google có thể giới hạn các tài khoản dùng cho công việc không có người giám sát."
     },
     "engineModels": {

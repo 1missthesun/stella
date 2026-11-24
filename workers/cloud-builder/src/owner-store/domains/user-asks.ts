@@ -20,7 +20,6 @@ import {
   effectiveEscalationCeiling,
   normalizeUserAskDeclineReason,
   normalizeUserAskNote,
-  USER_ASK_CLOUD_ORIGIN_DEVICE_ID,
   USER_ASK_MAX_NOTE,
   userAskTtlMs,
   nextEscalationLevel,

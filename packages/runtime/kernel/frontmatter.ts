@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 export type FrontmatterParseResult = {
   metadata: Record<string, unknown>;
   body: string;
@@ -30,115 +32,175 @@ const splitFrontmatter = (
   }
 
   return {
-    frontmatterText: lines.slice(1, endIndex).join("\n"),
+    // A CRLF file leaves the `\r` of the line before the closing `---` at
+    // the end of the block, where YAML would keep it in the last value.
+    frontmatterText: lines.slice(1, endIndex).join("\n").replace(/\r$/, ""),
     body: lines.slice(endIndex + 1).join("\n"),
   };
 };
 
-const parseSimpleScalar = (raw: string): unknown | undefined => {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  if (trimmed === "true") return true;
-  if (trimmed === "false") return false;
-  if (trimmed === "null" || trimmed === "~") return null;
-  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) {
-    const num = Number(trimmed);
-    if (Number.isFinite(num)) return num;
+/*
+ * Fast path for the flat frontmatter almost every skill, agent and prompt
+ * uses (`key: plain words`, `key: "quoted"`, `key: [a, b]`, `key:` followed
+ * by `  - item` lines), so loading them never pulls in the `yaml` package.
+ * It only accepts input whose meaning under YAML 1.2's core schema (what
+ * `yaml` parses with) is certain; anything else returns NOT_SIMPLE and the
+ * caller parses the whole block with `yaml`. The contract is "same result
+ * as `yaml`, or fall back", never "close enough".
+ */
+const NOT_SIMPLE = Symbol("not-simple");
+type Scalar = string | number | boolean | null;
+
+/** Plain scalars the core schema resolves to something other than a string. */
+const CORE_SCHEMA_NON_STRING =
+  /^(?:~|null|Null|NULL|true|True|TRUE|false|False|FALSE|[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
+const SIMPLE_NUMBER = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
+/** Characters a plain scalar may not start with, or that make its meaning depend on context. */
+const PLAIN_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
+const SIMPLE_KEY = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+/** Tabs, control and Unicode line/space characters YAML treats differently from JS `trim`. */
+const UNUSUAL_CHARACTER = /[\u0000-\u001f\u007f-\u00a0\u1680\u2000-\u200b\u2028\u2029\u202f\u205f\u3000\ufeff]/;
+const trimSpaces = (value: string): string => value.replace(/^ +| +$/g, "");
+
+const parseSimpleScalar = (raw: string, inFlow: boolean): Scalar | typeof NOT_SIMPLE => {
+  const value = trimSpaces(raw);
+  if (!value) return NOT_SIMPLE;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (value === "null" || value === "~") return null;
+  if (SIMPLE_NUMBER.test(value)) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : NOT_SIMPLE;
   }
-  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+  if (CORE_SCHEMA_NON_STRING.test(value)) return NOT_SIMPLE;
+  if (!inFlow && value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    // JSON string escapes are a subset of YAML double-quoted escapes with the
+    // same meaning; anything JSON rejects (YAML-only escapes, raw control
+    // characters, text after the closing quote) goes to `yaml`.
     try {
-      return JSON.parse(trimmed);
+      const parsed: unknown = JSON.parse(value);
+      return typeof parsed === "string" ? parsed : NOT_SIMPLE;
     } catch {
-      return undefined;
+      return NOT_SIMPLE;
     }
   }
-  if (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2) {
-    return trimmed.slice(1, -1).replace(/''/g, "'");
+  if (!inFlow && value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    const inner = value.slice(1, -1);
+    if (inner.replace(/''/g, "").includes("'")) return NOT_SIMPLE;
+    return inner.replace(/''/g, "'");
   }
-  if (
-    trimmed.startsWith("{") ||
-    trimmed.startsWith("[") ||
-    trimmed.startsWith("|") ||
-    trimmed.startsWith(">") ||
-    trimmed.startsWith("&") ||
-    trimmed.startsWith("*") ||
-    trimmed.startsWith("!")
-  ) {
-    return undefined;
+  if (PLAIN_INDICATOR_START.test(value)) return NOT_SIMPLE;
+  if (value.includes(": ") || value.endsWith(":") || value.includes(" #")) {
+    return NOT_SIMPLE;
   }
-  if (trimmed.includes(": ") || trimmed.includes(" #")) {
-    return undefined;
-  }
-  return trimmed;
+  if (inFlow && /[:#,[\]{}"']/.test(value)) return NOT_SIMPLE;
+  return value;
 };
 
 const parseSimpleFrontmatter = (
   frontmatterText: string,
-): Record<string, unknown> | null => {
+): Record<string, unknown> | typeof NOT_SIMPLE => {
   const result: Record<string, unknown> = {};
-  const lines = frontmatterText.split("\n");
-  let activeListKey: string | null = null;
-  let activeList: unknown[] | null = null;
+  let openList: { key: string; items: Scalar[]; indent: string | null } | null = null;
+  const closeList = () => {
+    if (openList) {
+      // `key:` with nothing under it is null in YAML, not an empty list.
+      result[openList.key] = openList.items.length > 0 ? openList.items : null;
+      openList = null;
+    }
+  };
 
-  for (const rawLine of lines) {
-    const line = rawLine.replace(/\r$/, "");
-    const trimmed = line.trim();
+  for (const rawLine of frontmatterText.split("\n")) {
+    const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+    if (UNUSUAL_CHARACTER.test(line)) return NOT_SIMPLE;
+    const trimmed = trimSpaces(line);
     if (!trimmed || trimmed.startsWith("#")) continue;
 
-    if (activeListKey && activeList && /^\s+-\s+/.test(line)) {
-      const itemVal = parseSimpleScalar(line.replace(/^\s+-\s+/, ""));
-      if (itemVal === undefined) return null;
-      activeList.push(itemVal);
+    const item = /^( +)- (.*)$/.exec(line);
+    if (openList && item) {
+      const list: { indent: string | null; items: Scalar[] } = openList;
+      // Every item at one indent: a deeper `- x` would continue the
+      // previous item's plain scalar in YAML, not start a new one.
+      if (list.indent !== null && list.indent !== item[1]) return NOT_SIMPLE;
+      list.indent = item[1]!;
+      const value = parseSimpleScalar(item[2]!, false);
+      if (value === NOT_SIMPLE) return NOT_SIMPLE;
+      list.items.push(value);
       continue;
     }
+    if (/^\s/.test(line)) return NOT_SIMPLE;
+    closeList();
 
-    if (/^\s/.test(line)) {
-      return null;
+    const match = /^([^:]+):(?: (.*))?$/.exec(line);
+    if (!match) return NOT_SIMPLE;
+    const key = trimSpaces(match[1]!);
+    if (
+      !SIMPLE_KEY.test(key) ||
+      CORE_SCHEMA_NON_STRING.test(key) ||
+      key === "__proto__" ||
+      Object.prototype.hasOwnProperty.call(result, key)
+    ) {
+      // Duplicate keys are an error to `yaml`; let it decide.
+      return NOT_SIMPLE;
     }
-
-    activeListKey = null;
-    activeList = null;
-
-    const colonIndex = line.indexOf(":");
-    if (colonIndex <= 0) return null;
-    const key = line.slice(0, colonIndex).trim();
-    if (!/^[A-Za-z0-9_.-]+$/.test(key)) return null;
-    const rest = line.slice(colonIndex + 1).trim();
+    const rest = trimSpaces(match[2] ?? "");
 
     if (!rest) {
-      activeListKey = key;
-      activeList = [];
-      result[key] = activeList;
+      openList = { key, items: [], indent: null };
+      result[key] = null;
       continue;
     }
 
     if (rest.startsWith("[") && rest.endsWith("]")) {
-      const inner = rest.slice(1, -1).trim();
+      const inner = trimSpaces(rest.slice(1, -1));
       if (!inner) {
         result[key] = [];
         continue;
       }
-      if (inner.includes('"') || inner.includes("'") || inner.includes("{") || inner.includes("[")) {
-        return null;
-      }
-      const items: unknown[] = [];
+      const items: Scalar[] = [];
       for (const part of inner.split(",")) {
-        const val = parseSimpleScalar(part);
-        if (val === undefined) return null;
-        items.push(val);
+        const value = parseSimpleScalar(part, true);
+        if (value === NOT_SIMPLE) return NOT_SIMPLE;
+        items.push(value);
       }
       result[key] = items;
       continue;
     }
 
-    const scalar = parseSimpleScalar(rest);
-    if (scalar === undefined) return null;
+    const scalar = parseSimpleScalar(rest, false);
+    if (scalar === NOT_SIMPLE) return NOT_SIMPLE;
     result[key] = scalar;
   }
 
+  closeList();
   return result;
 };
 
+type YamlParse = (source: string) => unknown;
+let parseYaml: YamlParse | undefined;
+/**
+ * `yaml` is loaded only when a file needs it. It is required synchronously
+ * because agent definitions (and `loadHomeAgents`, part of the extension API)
+ * load synchronously.
+ */
+const loadYaml = (): YamlParse =>
+  (parseYaml ??= (createRequire(import.meta.url)("yaml") as { parse: YamlParse }).parse);
+
+const parseFrontmatterText = (frontmatterText: string): Record<string, unknown> => {
+  const simple = parseSimpleFrontmatter(frontmatterText);
+  if (simple !== NOT_SIMPLE) return simple;
+  try {
+    const parsed = loadYaml()(frontmatterText);
+    if (parsed && typeof parsed === "object") {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Fall through to empty metadata on parse errors.
+  }
+  return {};
+};
+
+/** The body without its frontmatter, without parsing the frontmatter. */
 export const stripFrontmatter = (content: string): string =>
   splitFrontmatter(content).body;
 
@@ -147,29 +209,5 @@ export const extractFrontmatter = (content: string): FrontmatterParseResult => {
   if (frontmatterText === null) {
     return { metadata: {}, body };
   }
-  const simple = parseSimpleFrontmatter(frontmatterText);
-  return { metadata: simple ?? {}, body };
-};
-
-export const extractFrontmatterAsync = async (
-  content: string,
-): Promise<FrontmatterParseResult> => {
-  const { frontmatterText, body } = splitFrontmatter(content);
-  if (frontmatterText === null) {
-    return { metadata: {}, body };
-  }
-  const simple = parseSimpleFrontmatter(frontmatterText);
-  if (simple !== null) {
-    return { metadata: simple, body };
-  }
-  try {
-    const { parse: parseYaml } = await import("yaml");
-    const parsed = parseYaml(frontmatterText);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return { metadata: parsed as Record<string, unknown>, body };
-    }
-  } catch {
-    // Fall through to empty metadata on parse errors.
-  }
-  return { metadata: {}, body };
+  return { metadata: parseFrontmatterText(frontmatterText), body };
 };

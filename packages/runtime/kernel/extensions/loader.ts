@@ -12,7 +12,7 @@ import type {
   ExtensionRegistrationApi,
 } from "./types.js";
 import type { ExtensionServices } from "./services.js";
-import { extractFrontmatterAsync } from "../frontmatter.js";
+import { extractFrontmatter } from "../frontmatter.js";
 import { runExtensionEffect, tryExtensionOp } from "./effect-runtime.js";
 
 const log = (...args: unknown[]) =>
@@ -223,7 +223,7 @@ const loadPrompts = (dir: string): Effect.Effect<PromptTemplate[]> =>
       const filePath = path.join(dir, entry);
       yield* tryExtensionOp(async () => {
         const raw = await fs.readFile(filePath, "utf-8");
-        const { metadata, body } = await extractFrontmatterAsync(raw);
+        const { metadata, body } = extractFrontmatter(raw);
         const baseName = entry.replace(/\.prompt\.md$/, "");
         results.push({
           name: typeof metadata.name === "string" ? metadata.name : baseName,

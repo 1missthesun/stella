@@ -15,9 +15,7 @@ const remember = (base: string | null) => {
   try {
     if (base) window.localStorage.setItem(STORAGE_KEY, base);
     else window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Storage blocked: the website boots the shared build.
-  }
+  } catch {}
 };
 
 const check = async () => {

@@ -41,15 +41,6 @@ export const useConversationBootstrap = () => {
       try {
         while (!cancelled) {
           try {
-            // Seed the durable local active-conversation pointer (creating one
-            // on a fresh install) and settle the runtime host. This must NOT
-            // write `UiState.conversationId`: the root layout is the single
-            // selection authority and mirrors only the owner-checked cloud
-            // conversation into UiState (see STATE_OWNERSHIP.md). Writing the
-            // local id here made the root layout immediately reset it to null,
-            // which the shell read as "runtime ready, no conversation" and
-            // re-ran this bootstrap — a ~500 Hz render + IPC loop until the
-            // cloud conversation resolved.
             await Promise.all([
               getOrCreateLocalConversationId(),
               settleRuntime(),

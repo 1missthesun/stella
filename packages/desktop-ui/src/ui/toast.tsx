@@ -18,7 +18,6 @@ interface Toast {
   secondaryAction?: ToastAction;
 }
 
-/** Technical text kept behind a disclosure (its label, then the text). */
 type ToastDetail = {
   label: string;
   text: string;
@@ -32,7 +31,6 @@ type ToastAction = {
 export interface ToastOptions {
   title?: string;
   description?: string;
-  /** Shown folded; a toast with one stays until it is closed. */
   detail?: ToastDetail;
   variant?: "default" | "success" | "error" | "loading";
   duration?: number;
@@ -180,7 +178,6 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
       <div data-slot="toast-content">
         {toast.title && <div data-slot="toast-title">{toast.title}</div>}
         {(toast.description || toast.action || toast.secondaryAction) && (
-          // The actions sit at the right end of the last text row.
           <div data-slot="toast-row">
             {toast.description && <div data-slot="toast-description">{toast.description}</div>}
             {(toast.action || toast.secondaryAction) && (

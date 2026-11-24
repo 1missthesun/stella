@@ -1,10 +1,6 @@
 (function () {
   var root = document.documentElement;
 
-  // Shared UI state snapshot (~/.stella/ui-state.json), exposed before this
-  // script by the Electron preload or the dev server's injected inline
-  // script. localStorage remains only as a first-boot-after-migration
-  // fallback while the shared store is still empty.
   var uiState = window.__stellaUiState || {};
 
   var readStorage = function (key) {
@@ -26,9 +22,6 @@
     root.setAttribute("data-platform", "mobile");
   }
 
-  // Mirrors theme-context.tsx: a new desktop install follows the system; one
-  // set up before that, and the website, keep dark. Retired theme ids were
-  // pinned to one appearance and still win until React migrates them.
   var themeId = readStorage("stella-theme-id");
   var colorMode =
     readStorage("stella-color-mode") ||
@@ -74,8 +67,6 @@
     root.dataset.stellaBootRoute = route;
   }
 
-  // Low-power devices: drop blur entrances, decorative infinite loops, and
-  // backdrop-filter glass before React paints. Mirrors shared/lib/device-perf.ts.
   try {
     var n = navigator;
     var cores =

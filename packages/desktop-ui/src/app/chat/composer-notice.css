@@ -125,7 +125,6 @@
   right: 6px;
 }
 
-/* Usage-limit card: one row for the reset text and Resume, a shorter card. */
 .composer-notice--limit {
   align-items: flex-start;
   padding-top: 9px;
@@ -155,9 +154,6 @@
   width: auto;
 }
 
-/* Usage-limit card: the ✕ sits top-right on the title row and Resume on the
-   last row, its right edge under the visible ✕ icon (14px icon centred in the
-   24px button), with a clear gap between them. */
 .composer-notice--limit .composer-notice__title {
   line-height: 18px;
 }
@@ -192,8 +188,6 @@
   }
 }
 
-/* Both actions share one size, the other chat-card actions' 28px; the
-   primary differs only in its fill. */
 .composer-notice__primary.pill-btn,
 .composer-notice__secondary.pill-btn {
   height: 28px;

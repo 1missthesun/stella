@@ -15,8 +15,6 @@ export const MIN_COMPOSER_SHELL_HEIGHT_PX = 46;
 const getContentHeight = (content: HTMLElement) =>
   content.getBoundingClientRect().height;
 
-// The shell is border-box, so its height has to hold its own border as well as
-// the content; sized to the content alone it clips the content's bottom edge.
 const getShellBorderHeight = (shell: HTMLElement) => {
   const style = getComputedStyle(shell);
   return (

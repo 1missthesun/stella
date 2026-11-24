@@ -15,10 +15,6 @@ const shownRoute = viewAtom(
   (value) => typeof value === "string" && value.startsWith("/"),
 );
 
-/**
- * Created without the routes: the route modules load again when the
- * interface changes, and the router, with its history, has to outlive them.
- */
 export const router = createRouter({
   routeTree: createRootRoute() as unknown as AppRoutes,
   history: createMemoryHistory({ initialEntries: [shownRoute.get()] }),
@@ -35,7 +31,6 @@ router.subscribe("onResolved", ({ toLocation }) => {
 
 let routed = false;
 
-/** The router, showing `routes`. */
 export const routerFor = (routes: AppRoutes) => {
   if (router.routeTree === routes) return router;
   router.update({ ...router.options, routeTree: routes });

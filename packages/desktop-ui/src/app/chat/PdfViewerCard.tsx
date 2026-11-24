@@ -27,7 +27,6 @@ if (pdfjs.GlobalWorkerOptions.workerSrc !== PDF_WORKER_URL) {
 type PdfViewerCardProps = {
   filePath: string;
   title?: string;
-  /** Show a rail of page thumbnails beside the pages. */
   pageRail?: boolean;
   onPageChange?: (page: number, total: number) => void;
 };
@@ -85,7 +84,6 @@ function PdfViewerCardContent({
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const resizeTimerRef = useRef<number | null>(null);
   const lastWidthRef = useRef<number | null>(null);
-  // While a page jump animates, scroll position lags behind the target.
   const jumpUntilRef = useRef(0);
 
   const status: LoadStatus = fileError ? "error" : loadStatus;
@@ -123,7 +121,6 @@ function PdfViewerCardContent({
         resizeTimerRef.current = null;
       }
     };
-    // The page pane mounts inside <Document> once it loads; re-attach then.
   }, [numPages]);
 
   const handleLoadSuccess = useCallback(
@@ -144,9 +141,6 @@ function PdfViewerCardContent({
 
   const documentFile = useMemo(() => (bytes ? { data: bytes } : null), [bytes]);
 
-  // The current page is the last one whose top has passed the upper third
-  // of the pane. (Pages are usually taller than the pane, so visibility
-  // ratios can't tell which one you're reading.)
   useEffect(() => {
     const layout = layoutRef.current;
     if (!layout || numPages <= 0) return;
@@ -203,7 +197,6 @@ function PdfViewerCardContent({
 
   const showRail = pageRail && numPages > 1;
 
-  // In the viewer, ← → and the edge arrows turn pages.
   useRegisterViewerNav(
     pageRail && numPages > 1
       ? {

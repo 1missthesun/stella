@@ -32,14 +32,9 @@ const COPIED_MENU_CLOSE_MS = 700;
  * @property {string} text
  * @property {string} messageKey
  * @property {boolean} [showReadAloud]
- * @property {"start" | "end"} [align] Which side of the bubble the button sits
- *   on: `start` (assistant, button right of the bubble) or `end` (user, button
- *   left of the right-aligned bubble).
- * @property {number} [timestampMs] Message created time (epoch ms); shown as the
- *   menu's header in local "h:mm AM/PM" form.
+ * @property {"start" | "end"} [align]
+ * @property {number} [timestampMs]
  * @property {{ path?: string, url?: string, mimeType?: string, kind?: string, name?: string }} [copyAttachment]
- *   Attachment to copy when the message has no text (image → clipboard image,
- *   file → path as text). Text always takes priority when present.
  * @property {((text: string) => void)} [onReply]
  */
 

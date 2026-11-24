@@ -63,30 +63,14 @@ type MarkdownImageProps = ImgHTMLAttributes<HTMLImageElement> & {
  * Streamdown's `remarkPlugins` prop *replaces* its defaults (which
  * include `remark-gfm` for tables/strikethrough/task lists), so we
  * have to spread its defaults back in alongside our additions.
- * `defaultRemarkPlugins` is exported as a `Record<string, Pluggable>`
- * map; the prop wants an array, so unwrap with `Object.values`.
- *
- * `BASE_REMARK_PLUGINS` is the default Streamdown set plus the
- * stella-file link rewriter (always on — assistant messages may reference
- * local files anywhere). The emoji sprite plugin is added only when a
- * complete active pack is present; otherwise native Unicode emoji must
- * remain visible.
  */
 const DEFAULT_REMARK_PLUGINS = Object.values(defaultRemarkPlugins);
 
 /*
- * `stella://file/...` and `stella://app/...` references are rewritten by
- * `remarkStellaFileLinks` into custom `<stella-file>` / `<stella-app>`
- * elements (a plain `<a href="stella://…">` would be stripped by
- * rehype-sanitize's protocol allow-list), so the sanitize schema must let
- * those tags and attributes through.
- *
- * Streamdown only merges its `allowedTags` prop into the schema while the
- * `rehypePlugins` prop is its own default array, and its default harden step
- * marks every link it cannot keep (a relative path, `ftp:`, `file:`, or any
- * scheme sanitize dropped) as "label [blocked]". Chat builds the same
- * raw / sanitize / harden pipeline itself so such a link renders as its
- * plain label instead.
+ * rehype-sanitize's protocol allow-list strips `<a href="stella://…">`, and
+ * Streamdown merges its `allowedTags` prop into the schema only while
+ * `rehypePlugins` is its own default array; its default harden step also
+ * marks every link it cannot keep as "label [blocked]".
  */
 const ALLOWED_TAGS: Record<string, string[]> = {
   [STELLA_FILE_TAG]: [...STELLA_FILE_TAG_ATTRIBUTES],
@@ -124,39 +108,12 @@ const REHYPE_PLUGINS: PluggableList = [
   [hardenPlugin, { ...hardenOptions, linkBlockPolicy: "text-only" }],
 ];
 
-/*
- * Disable Streamdown's built-in "Open external link?" confirmation modal.
- *
- * We don't need it because the Electron main process already gates every
- * external open through `ExternalLinkService.setupExternalLinkHandlers`
- * (`setWindowOpenHandler` + `will-navigate` → `shell.openExternal`), so
- * a chat link click is already routed safely to the OS browser without
- * any in-renderer confirmation.
- *
- * Leaving it enabled caused three regressions in the chat surface:
- *   1. Streamdown rendered each link as a `<button>` and called
- *      `preventDefault()`, which made the surrounding message bubble pick
- *      up button focus / active styling on click ("the message gets
- *      highlighted").
- *   2. Streamdown's modal uses `position: fixed`, but our chat list is
- *      virtualized by `@legendapp/list` which applies `transform` to row
- *      containers — a transformed ancestor traps `position: fixed`, so
- *      the modal would render centered on the clicked *message* instead
- *      of the viewport.
- *   3. The modal carried Streamdown's own card chrome, not the
- *      Connect-dialog aesthetic the rest of the app uses.
- *
- * With `enabled: false`, links render as plain `<a target="_blank">` and
- * Electron's main-process handlers take over.
- */
 const LINK_SAFETY = { enabled: false } as const;
 
 const UNBOUNDED_STREAMDOWN_HEIGHT = Number.POSITIVE_INFINITY;
 
-// Streamdown always splits the text into blocks with a full `marked` lex, but
-// static mode renders the whole document in one pass and never reads those
-// blocks (they feed streaming-mode block memoization and `dir="auto"`, neither
-// of which chat uses). Skip the discarded lex on every row mount.
+// Streamdown always lexes the text into blocks with `marked`, but static mode
+// never reads them (they only feed streaming-mode memoization and `dir="auto"`).
 const NO_BLOCK_SPLIT = (): string[] => [];
 
 const areMarkdownPropsEqual = (
@@ -313,11 +270,6 @@ export const Markdown = memo(function Markdown({
     ) as CSSProperties;
   }, [activeEmojiPack, emojiSpritesEnabled]);
   const streamdownKey = `${effectiveCacheKey}:${emojiSpritesEnabled ? "emoji" : "plain"}:${hiddenFileKey}:${documentPath ?? ""}`;
-  // Streamdown parsing is intentionally a hard-bounded main-thread task.
-  // Parsing separate fragments changes document-level Markdown semantics
-  // (references, lists), while one pathological paragraph or fence defeats
-  // blank-line chunking. Preserve the complete authored text as plaintext
-  // once the bounded parser budget is exceeded.
   const useBoundedPlaintext = shouldUseBoundedMarkdownPlaintext(text.length);
   return (
     <div style={emojiVars}>

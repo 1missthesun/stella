@@ -15,15 +15,10 @@ type CopyAttachment = {
   name?: string;
 };
 
-/**
- * A message's own actions, the same ones its hover controls offer: copy it,
- * reply to it, read it aloud, and retry or remove one that didn't send.
- */
 export const messageMenu =
   (options: {
     text: string;
     messageKey: string;
-    /** The rendered text, when it reads differently from the source. */
     renderedText?: () => string | null;
     copyAttachment?: CopyAttachment | null;
     onReply?: ((text: string) => void) | null;

@@ -1,15 +1,5 @@
 import { flushViewState, readViewState, writeViewState } from "./view-state";
 
-/**
- * What the page itself holds and no component owns: how far each scrolling
- * element is scrolled, text typed into fields, and where the caret is. It is
- * recorded while the user scrolls and types and put back after the next mount,
- * so new UI keeps its place without doing anything.
- *
- * `data-view-state="off"` on an element leaves it and its descendants out.
- * `data-view-scope="<id>"` ties what is under it to that id: it is put back
- * only under the same id (a different conversation keeps its own place).
- */
 const DOM_KEY = "dom";
 const CAPTURE_DELAY_MS = 400;
 const RESTORE_DEADLINE_MS = 3_000;
@@ -93,10 +83,6 @@ const scopeOf = (element: Element) =>
 
 const KEYED = "key|";
 
-/**
- * `data-view-key` names a field whose place in the page or placeholder
- * changes with what is around it. Fields sharing a key show the same value.
- */
 const fieldMark = (field: TextField) =>
   field.dataset.viewKey
     ? `${KEYED}${field.dataset.viewKey}`
@@ -126,10 +112,6 @@ const recordable = (field: TextField) =>
 const shown = (element: Element) =>
   element.checkVisibility({ visibilityProperty: true }) && !element.closest("[inert]");
 
-/**
- * The element saved at `path`, or the only one on the page with the same
- * mark. Of several sharing a key, the one on show.
- */
 const find = <T extends Element>(
   entry: { path: string; mark: string; scope: string | null },
   markOf: (element: T) => string,
@@ -268,16 +250,9 @@ const select = (field: TextField, entry: Focus) => {
       Math.min(entry.end, length),
       entry.direction ?? "none",
     );
-  } catch {
-    // Some input types have no selection.
-  }
+  } catch {}
 };
 
-/**
- * A field that cannot take focus yet (inert, disabled) is asked again on each
- * pass, never waited for. Fields sharing a key all take the selection: which
- * of them is on show can change after this.
- */
 const placeFocus = (entry: Focus): Placement => {
   const element = find(entry, fieldMark, allFields);
   if (!element) return "missing";
@@ -307,11 +282,6 @@ const isDomState = (value: unknown): value is DomState =>
   Array.isArray((value as DomState).scroll) &&
   Array.isArray((value as DomState).fields);
 
-/**
- * Puts the saved page state back as the page fills in, and resolves once
- * everything is in place and stays there, the user starts doing something, or
- * the wait runs out.
- */
 export const restoreDomState = (state: unknown = readViewState(DOM_KEY)): Promise<void> => {
   settle?.();
   if (!isDomState(state) || (state.scroll.length === 0 && state.fields.length === 0 && !state.focus)) {
@@ -381,12 +351,10 @@ export const whenDomStateRestored = () => restored;
 
 declare global {
   interface Window {
-    /** Resolves once the page is back where the user left it; the update cover waits for it. */
     __stellaViewRestored?: () => Promise<void>;
   }
 }
 
-/** Records the page now, for a remount that follows at once. */
 export const captureDomStateNow = (): unknown => {
   const state = capture();
   if (!restoring) writeViewState(DOM_KEY, state);

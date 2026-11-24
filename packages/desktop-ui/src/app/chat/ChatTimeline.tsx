@@ -164,9 +164,6 @@ const useChatDrawDistance = (dataKey: string | null): number => {
     : CHAT_DRAW_DISTANCE_COLD_PX;
 };
 
-// Rows that only ever sit at the tail never anchor the list: a message
-// inserted above them would otherwise shift the scroll by its own height in
-// one frame, ahead of the send's scroll motion.
 const KEEP_VISIBLE_POSITION: MaintainVisibleContentPositionConfig<TimelineListItem> =
   {
     data: true,
@@ -260,7 +257,6 @@ export const ChatTimeline = memo(function ChatTimeline({
       return { ...item, gapAfter: ROW_GAP };
     });
   }, [askRecords, indicator, rows]);
-  // The newest reply with media opens its previews expanded; older ones show one row.
   const latestMediaRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];

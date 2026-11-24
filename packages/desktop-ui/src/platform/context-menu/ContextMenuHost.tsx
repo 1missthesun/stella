@@ -3,7 +3,6 @@ import { useChatRuntime } from "@/context/use-chat-runtime";
 import { installContextMenus } from "./context-menu";
 import { registerSharedMenus, setContextMenuComposer } from "./menus";
 
-/** Turns on right-click menus and lets them reach the composer. */
 export function ContextMenuHost() {
   const { composer } = useChatRuntime();
   const { setChatContext, setSelectedText, requestFocus } = composer;

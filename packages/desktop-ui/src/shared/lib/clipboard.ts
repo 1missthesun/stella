@@ -1,21 +1,9 @@
 /**
- * Copy text to the clipboard. Resolves to whether it was copied; it never
- * throws, and a `source` that rejects counts as not copied (the caller reads
- * that error from its own promise).
- *
- * The page's own `navigator.clipboard.writeText` is refused ("Write
- * permission denied") unless the click that asked for it is under ~5 seconds
- * old: after a link was fetched first, or from a native menu item, the page
- * has no click to show, Chromium asks for clipboard read access instead and
- * the app refuses that. `execCommand("copy")` fails the same way.
- *
- * - Desktop: the app writes the clipboard itself (main process), whenever
- *   the text is ready.
- * - Web: the write has to start inside the click. Text still on its way (a
- *   share link being made) goes on as a ClipboardItem holding the pending
- *   text, which browsers accept for a write begun in the click. So call this
- *   straight away in the click handler, with the promise, before awaiting
- *   anything.
+ * Chromium refuses the page's `navigator.clipboard.writeText` (and
+ * `execCommand("copy")`) unless the click that asked is under ~5 seconds
+ * old, so on the web the write has to start inside the click: pending text
+ * goes on as a ClipboardItem holding the promise, which browsers accept for
+ * a write begun in the click.
  */
 export type ClipboardText = string | Promise<string>;
 
@@ -55,9 +43,7 @@ const writeWithPage = async (text: string): Promise<boolean> => {
       await navigator.clipboard.writeText(text);
       return true;
     }
-  } catch {
-    // Refused: try the legacy path below.
-  }
+  } catch {}
   return writeWithExecCommand(text);
 };
 
@@ -69,7 +55,6 @@ const settled = async (source: ClipboardText): Promise<string | null> => {
   }
 };
 
-/** Starts a web write inside the click, for text that isn't ready yet. */
 const writePendingInBrowser = (
   pending: Promise<string>,
 ): Promise<boolean> | null => {
@@ -108,9 +93,7 @@ export function copyTextToClipboard(source: ClipboardText): Promise<boolean> {
     if (appWrite) {
       try {
         if ((await appWrite(text)).ok) return true;
-      } catch {
-        // An older app without the channel: the page's own paths below.
-      }
+      } catch {}
     }
     return await writeWithPage(text);
   })();

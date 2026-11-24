@@ -13,8 +13,6 @@ export const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitive.Root>,
   SwitchProps
 >(({ className, label, hideLabel, description, children, id, ...props }, ref) => {
-  // The label and description name and describe the control itself, so
-  // assistive tech and `getByRole("switch", { name })` find it by its words.
   const generatedId = React.useId();
   const controlId = id ?? `${generatedId}-control`;
   const descriptionId = description ? `${generatedId}-description` : undefined;

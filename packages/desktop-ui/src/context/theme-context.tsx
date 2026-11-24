@@ -66,9 +66,6 @@ const COLOR_MODE_STORAGE_KEY = "stella-color-mode";
 const GRADIENT_MODE_STORAGE_KEY = "stella-gradient-mode";
 const GRADIENT_COLOR_STORAGE_KEY = "stella-gradient-color";
 
-// A new desktop install follows the system's light or dark setting; installs
-// set up before that, and the website, keep dark. Mirrored in
-// public/stella-boot.js.
 function defaultColorMode(): ColorMode {
   if (!window.electronAPI) return "dark";
   return uiState.getItem("stella-onboarding-complete") === "true" ? "dark" : "system";
@@ -80,13 +77,7 @@ function getSystemColorMode(): "light" | "dark" {
     : "light";
 }
 
-// The old separate "light"/"dark" themes were `forcedMode`-pinned and are now a
-// single mode-driven "Default" theme. Migrate any stored selection onto Default
-// (the table lives with the catalog so mobile migrates identically).
 const migrateThemeId = migrateLegacyThemeId;
-// The pinned appearance a legacy "light"/"dark" selection was actually showing,
-// so migration can carry it onto the Appearance mode toggle instead of silently
-// flipping the look. Reads the raw stored ids (theme first, then Custom base).
 function readLegacyForcedAppearance(): "light" | "dark" | null {
   const stored = uiState.getItem(THEME_STORAGE_KEY);
   if (stored === "light" || stored === "dark") return stored;
@@ -187,10 +178,6 @@ function useThemePersistence(clearPreviews: () => void): PersistedThemeState {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // One-time migration of legacy "light"/"dark" theme selections. The init
-  // state above already reflects the migrated values; here we persist them so
-  // the migration is durable and does not re-fire, carrying the pinned
-  // appearance onto the Appearance mode toggle to preserve the current look.
   useEffect(() => {
     const legacy = readLegacyForcedAppearance();
     if (!legacy) return;
@@ -338,8 +325,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const customTheme = getThemeById("custom");
   const customPopulated = customTheme?.populated === true;
 
-  // The base Custom displays: the user's saved pick, else a legacy stored stock
-  // id, else Custom's declared default base.
   const customBaseId =
     persisted.customBase && getThemeById(persisted.customBase)
       ? persisted.customBase
@@ -368,8 +353,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const effectiveGradientColor =
     preview.previewGradientColor ?? persisted.gradientColor;
 
-  // Normalize legacy/stock selections onto Custom while it is unpopulated, so
-  // the instant a redesign populates Custom the user is already on it.
   const { themeId: rawThemeId, setCustomBase, setThemeId } = persisted;
   useEffect(() => {
     if (customPopulated) return;

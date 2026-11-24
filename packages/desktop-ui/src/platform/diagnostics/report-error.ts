@@ -27,9 +27,7 @@ export const reportRendererError = (payload: RendererErrorPayload): void => {
   reportCount += 1
   try {
     api.reportError(payload)
-  } catch {
-    // Reporting must never throw into app code.
-  }
+  } catch {}
 }
 
 let installed = false

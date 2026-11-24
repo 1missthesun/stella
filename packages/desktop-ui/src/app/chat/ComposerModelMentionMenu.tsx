@@ -264,10 +264,6 @@ export function filterComposerModelMentionOptions(
     });
 }
 
-/**
- * Where a mentioned engine's plan is signed in, when that isn't this computer:
- * the place the chat runs on, or another of the user's computers that has it.
- */
 function useEnginePlaceNotes(): (
   option: ComposerModelMentionOption,
 ) => string | undefined {

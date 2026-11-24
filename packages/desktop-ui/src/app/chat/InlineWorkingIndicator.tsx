@@ -224,8 +224,6 @@ export function InlineWorkingIndicator({
   );
 
   const showInner = renderShell;
-  // Hold the indicator's height through its show delay so the send's scroll
-  // already reaches it; it then fades into space that is already there.
   const reserving = active && !renderShell && !replyHeld;
 
   return (

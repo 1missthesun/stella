@@ -14,11 +14,6 @@ const frames = (count: number) =>
     step(count);
   });
 
-/**
- * Renders the app and takes changed code without a page load: the new root
- * replaces the old one, the page is put back where the user was, and a root
- * that fails to render is replaced by the one that was showing.
- */
 export const mountApp = (container: HTMLElement, initial: ComponentType) => {
   const runtime = globalThis.__stellaSwap;
   let shown = initial;

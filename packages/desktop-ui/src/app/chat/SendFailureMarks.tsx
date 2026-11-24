@@ -9,7 +9,6 @@ import "./send-failure-marks.css";
 export const isBrowserUploadId = (id: string | undefined): id is string =>
   Boolean(id?.startsWith("upload-"));
 
-/** The only upload state a tile shows: a small red mark that retries on click. */
 export function UploadFailedMark({ uploadId }: { uploadId: string }) {
   const uploads = useBrowserAttachmentUploads();
   const upload = uploads.find((entry) => entry.id === uploadId);
@@ -59,7 +58,6 @@ export function SendFailedMark({
   );
 }
 
-/** A just-sent message usually reaches the shared chat in well under this. */
 const PENDING_MARK_DELAY_MS = 3_000;
 
 const PENDING_COPY = {

@@ -1,25 +1,3 @@
-/**
- * Cross-mount cache for Streamdown's parsed markdown.
- *
- * Chat rows are virtualized, so a reply is unmounted when it scrolls out of
- * the draw window and fully re-parsed (remark → rehype → sanitize/harden,
- * ~10ms for a long reply) every time it scrolls back in. Replies are
- * immutable once shown, so the finished hast for a given text + plugin
- * configuration never changes.
- *
- * Streamdown owns the unified processor and renders it with
- * `processor.runSync(processor.parse(text), text)`. This remark "plugin"
- * installs nothing into the pipeline; its attacher (which unified calls with
- * the processor as `this` when the processor freezes) wraps that processor's
- * `parse` / `runSync` pair so a repeat of the same text returns the cached
- * hast instead of re-running the pipeline. Only the conversion to React
- * elements runs per mount, so handlers and context are resolved fresh.
- *
- * The cached tree is shared between mounts and must be treated as immutable;
- * Streamdown's hast → JSX step only reads it. Recheck the call shape this
- * relies on when upgrading Streamdown.
- */
-
 type UnifiedLike = {
   parse: (file?: unknown) => unknown;
   runSync: (tree: unknown, file?: unknown) => unknown;
@@ -33,7 +11,6 @@ type CacheEntry = { tree: object; chars: number };
 const entries = new Map<string, CacheEntry>();
 let cachedChars = 0;
 
-/** Placeholder trees handed from `parse` to `runSync` on a cache hit. */
 const pendingHits = new WeakMap<object, object>();
 
 const cacheKey = (scope: string, text: string) => `${scope}\u0001${text}`;
@@ -62,10 +39,6 @@ const writeEntry = (key: string, tree: object, chars: number) => {
   }
 };
 
-/**
- * Remark attacher. `scope` must identify everything besides the text that
- * changes the resulting tree (the rest of the plugin configuration).
- */
 export function remarkMarkdownRenderCache(this: unknown, scope = ""): void {
   const processor = this as UnifiedLike;
   const base = Object.getPrototypeOf(processor) as Partial<UnifiedLike>;

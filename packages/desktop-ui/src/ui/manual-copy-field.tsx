@@ -1,17 +1,12 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 
-/**
- * Text the app couldn't put on the clipboard, shown selected so the user can
- * copy it themselves.
- */
 export const ManualCopyField = ({
   value,
   label,
   className,
 }: {
   value: string;
-  /** Says why it's here; also the field's accessible name. */
   label: string;
   className?: string;
 }) => {

@@ -17,87 +17,80 @@ const JOURNEY: WindowThemeKey[] = [
   { id: "default", dark: false },
 ];
 
+// The window recolours over this part of its travel, from where it starts rising (p = 0)
+// to the middle of the screen (p = 1). The script path below uses the same 0.03 and 0.86.
 const JOURNEY_START = 0.03;
 const JOURNEY_END = 0.86;
+
+// Where the travel starts, as the distance the window's top has risen past the bottom of
+// the screen. Same rule as the script path: it starts at 90% of the screen height, or where
+// the window already sits when the page opens, whichever is higher.
+function journeyRiseStart(frame: HTMLElement) {
+  const vh = window.innerHeight;
+  const docTop = frame.getBoundingClientRect().top + window.scrollY;
+  return Math.round(vh - Math.min(vh * 0.9, docTop));
+}
+
+// `ease.inOut` (cubic) as a CSS easing, so the recolour follows the same curve in both paths.
+const EASE_IN_OUT = `linear(${Array.from({ length: 41 }, (_, i) => Number(ease.inOut(i / 40).toFixed(5))).join(", ")})`;
+
+// Browsers with scroll-driven animations recolour the window in CSS, off the scroll handler.
+// The registered properties are private (--jw-*): registering the shared --w-* names would give
+// every window and mock on the page a default-theme colour wherever it relies on a fallback.
+const SCROLL_TIMELINE_SUPPORTS =
+  "(animation-timeline: view()) and (animation-range: cover 0% cover 50%) and (animation-timing-function: linear(0, 1))";
 
 const JOURNEY_SCROLL_CSS = (() => {
   const stops = JOURNEY.map((theme) => resolveWindowTheme(theme).vars);
   const varNames = Object.keys(stops[0]);
+  const priv = (name: string) => name.replace(/^--w-/, "--jw-");
   const pct = (i: number) =>
-    `${((JOURNEY_START + (i / (JOURNEY.length - 1)) * (JOURNEY_END - JOURNEY_START)) * 100).toFixed(2)}%`;
+    `${((JOURNEY_START + (i / (JOURNEY.length - 1)) * (JOURNEY_END - JOURNEY_START)) * 100).toFixed(3)}%`;
+  const timeline = "animation-timeline: --stella-journey; animation-range: var(--journey-range);";
 
   const props = varNames
-    .map(
-      (name) =>
-        `@property ${name} { syntax: "<color>"; inherits: true; initial-value: ${stops[0][name]}; }`,
-    )
+    .map((name) => `@property ${priv(name)} { syntax: "<color>"; inherits: false; initial-value: ${stops[0][name]}; }`)
     .join("\n");
 
   const themeFrames = stops
     .map((vars, i) => {
-      const sel =
-        i === 0 ? `0%, ${pct(0)}` : i === stops.length - 1 ? `${pct(i)}, 100%` : pct(i);
-      const decls = varNames.map((n) => `${n}: ${vars[n]};`).join(" ");
-      return `  ${sel} { ${decls} animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }`;
+      const sel = i === 0 ? `0%, ${pct(0)}` : i === stops.length - 1 ? `${pct(i)}, 100%` : pct(i);
+      const decls = varNames.map((n) => `${priv(n)}: ${vars[n]};`).join(" ");
+      return `  ${sel} { ${decls} animation-timing-function: ${EASE_IN_OUT}; }`;
     })
     .join("\n");
 
-  const canvasFrames = JOURNEY.map((theme, j) => {
-    if (theme.id === "default") return "";
-    const prev = pct(j - 1);
-    const peak = pct(j);
-    const next = pct(j + 1);
-    return [
-      `@keyframes stella-journey-c${j} {`,
-      `  0%, ${prev} { opacity: 0; animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }`,
-      `  ${peak} { opacity: 1; animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }`,
-      `  ${next}, 100% { opacity: 0; }`,
-      `}`,
-    ].join("\n");
-  })
-    .filter(Boolean)
-    .join("\n");
-
-  const canvasBindings = JOURNEY.map((theme, j) =>
+  const canvasFrames = JOURNEY.map((theme, j) =>
     theme.id === "default"
       ? ""
-      : `  [data-journey-frame] canvas.journey-${j} { animation: stella-journey-c${j} linear both; animation-timeline: --stella-journey; animation-range: cover 14% cover 50%; }`,
+      : [
+          `@keyframes stella-journey-c${j} {`,
+          `  0%, ${pct(j - 1)} { opacity: 0; animation-timing-function: ${EASE_IN_OUT}; }`,
+          `  ${pct(j)} { opacity: 1; animation-timing-function: ${EASE_IN_OUT}; }`,
+          `  ${pct(j + 1)}, 100% { opacity: 0; }`,
+          `}`,
+          `@supports ${SCROLL_TIMELINE_SUPPORTS} { @media (prefers-reduced-motion: no-preference) {`,
+          `  [data-journey-window] canvas.journey-${j} { animation: stella-journey-c${j} linear both; ${timeline} }`,
+          `} }`,
+        ].join("\n"),
   )
     .filter(Boolean)
     .join("\n");
 
-  const mobileCanvasBindings = JOURNEY.map((theme, j) =>
-    theme.id === "default"
-      ? ""
-      : `    [data-journey-frame] canvas.journey-${j} { animation-range: cover 5% cover 50%; }`,
-  )
-    .filter(Boolean)
-    .join("\n");
+  const uses = varNames.map((n) => `${n}: var(${priv(n)}) !important;`).join(" ");
 
   return [
     props,
     `@keyframes stella-journey-theme {\n${themeFrames}\n}`,
     canvasFrames,
-    `@supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) {`,
-    `  @media (prefers-reduced-motion: no-preference) {`,
-    `    [data-journey-window] > * { animation: stella-journey-theme linear both; animation-timeline: --stella-journey; animation-range: cover 14% cover 50%; }`,
-    canvasBindings,
-    `    @media (max-width: 700px) {`,
-    `      [data-journey-window] > * { animation-range: cover 5% cover 50%; }`,
-    mobileCanvasBindings,
-    `    }`,
-    `  }`,
-    `}`,
+    `@supports ${SCROLL_TIMELINE_SUPPORTS} { @media (prefers-reduced-motion: no-preference) {`,
+    `  [data-journey-window] > * { ${uses} animation: stella-journey-theme linear both; ${timeline} }`,
+    `} }`,
   ].join("\n");
 })();
 
 function supportsCssScrollTimeline() {
-  return (
-    typeof CSS !== "undefined" &&
-    typeof CSS.supports === "function" &&
-    CSS.supports("animation-timeline", "view()") &&
-    CSS.supports("animation-range", "cover 0% cover 50%")
-  );
+  return typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports(SCROLL_TIMELINE_SUPPORTS);
 }
 
 function JourneyBackdrop() {
@@ -117,10 +110,21 @@ function JourneyView() {
   const tintRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (supportsCssScrollTimeline()) return;
     const frame = frameRef.current;
     const win = tintRef.current?.firstElementChild as HTMLElement | null;
     if (!frame || !win || prefersReducedMotion()) return;
+    if (supportsCssScrollTimeline()) {
+      // CSS runs the recolour; it only needs to know where the travel starts.
+      const place = () => frame.style.setProperty("--journey-range", `cover ${journeyRiseStart(frame)}px cover 50%`);
+      place();
+      const ro = new ResizeObserver(place);
+      ro.observe(document.body);
+      window.addEventListener("resize", place, { passive: true });
+      return () => {
+        ro.disconnect();
+        window.removeEventListener("resize", place);
+      };
+    }
     const canvases = Array.from(win.querySelectorAll<HTMLCanvasElement>("canvas[class^='journey-']"));
     let raf = 0;
     let key = "";

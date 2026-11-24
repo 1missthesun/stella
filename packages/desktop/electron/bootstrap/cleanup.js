@@ -59,8 +59,8 @@ export const registerBootstrapProcessCleanups = (context) => {
             phase: "stopping",
         });
         await context.services.telemetry.close({
-            timeoutMs: 3000,
-            send: !isRelaunching(),
+            timeoutMs: 1_000,
+            send: false,
         });
     });
     processRuntime.registerCleanup("before-quit", "runtime-worker", async () => {

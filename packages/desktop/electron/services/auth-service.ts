@@ -1498,9 +1498,22 @@ export class AuthService {
     await this.mintHostAuthToken();
   }
 
-  async getAuthToken(): Promise<string | null> {
+  getCachedAuthToken(): string | null {
     const cached = this.hostAuthToken?.trim() || null;
-    if (cached && this.isHostAuthTokenFresh(cached)) {
+    return cached && this.isHostAuthTokenFresh(cached) ? cached : null;
+  }
+
+  prefetchAuthToken(): void {
+    if (this.getCachedAuthToken() || !this.getBearerToken()) {
+      return;
+    }
+    void this.getAuthToken().catch(() => undefined);
+  }
+
+  async getAuthToken(options?: { forceRefresh?: boolean }): Promise<string | null> {
+    const forceRefresh = options?.forceRefresh === true;
+    const cached = this.hostAuthToken?.trim() || null;
+    if (!forceRefresh && cached && this.isHostAuthTokenFresh(cached)) {
       return cached;
     }
     if (!this.getBearerToken()) {

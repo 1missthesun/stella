@@ -53,6 +53,7 @@ const createDeferredStartupTasks = (context) => {
                 getMainLogger()?.process("startup.host-runner.kickoff", {
                     elapsedMs: Math.round(process.uptime() * 1000),
                 });
+                context.services.localChatHistoryService.warmCloudConversationCache();
                 state.startHostRunner?.();
             },
         },

@@ -641,6 +641,14 @@ type ReporterInput = {
   note?: true;
   /** Sent by no one on purpose (a schedule's fire): a stopped agent keeps it for when it is resumed. */
   wake?: true;
+  /**
+   * The one reminder after a quiet turn. `backstop`: that turn wasn't answering
+   * its starter (a brief, a wake, a helper's report), so if this one is quiet
+   * too with nothing live, the task ends with a silent-end report. After a
+   * starter's message ("thanks", "noted") staying quiet is a fine answer.
+   */
+  nudge?: true;
+  backstop?: true;
 };
 
 /** Who sent what a Reporter delivers, for the shared rules (`agentInputAction`). */
@@ -1116,18 +1124,26 @@ export function stellaAgents(host: StellaAgentsHost) {
             // Another input that settled on this same answer already ended it.
             if (agent.reported.includes(settled.answer)) return idle();
             agent.reported.push(settled.answer);
-            const nudged = isIdleStopNudge(message);
+            const nudged = reporter.input.nudge === true || isIdleStopNudge(message);
             const live = wakersAtEnd === undefined ? undefined : wakersAtEnd.length > 0;
             const said = turn as Awaited<ReturnType<typeof turnToStarter>> | undefined;
             if (said && !said.sent && !reporter.input.fromUser) {
               // One reminder that its plain text reached no one: for a turn that
               // took in its starter's message, or one with nothing left to wake it.
               if (!nudged && (said.tookStarter || live === false)) {
-                await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: IDLE_STOP_NUDGE, wake: true });
+                await nextTurn(tx, runtime.conversationId, {
+                  threadId,
+                  conversationId: reporter.input.conversationId,
+                  message: IDLE_STOP_NUDGE,
+                  wake: true,
+                  nudge: true,
+                  ...(said.tookStarter ? {} : { backstop: true as const }),
+                });
                 return idle(["a message on its way to you"]);
               }
-              // Still quiet after it, with nothing that could ever wake it.
-              if (nudged && live === false) {
+              // Still quiet after it, with nothing that could ever wake it, and
+              // not just leaving a starter's message unanswered.
+              if (nudged && reporter.input.backstop === true && live === false) {
                 const result = withNote(silentEndReport(said.lastWords));
                 end = { answer: result };
                 delete agent.waiting;
@@ -2805,6 +2821,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         return done;
       }, context);
     let nudged = false;
+    let backstop = false;
     let content = [...carried, args.prompt].join("\n\n");
     let requestId = `placed:${args.runKey}`;
     for (let retry = 1; ; retry += 1) {
@@ -2896,11 +2913,12 @@ export function stellaAgents(host: StellaAgentsHost) {
       const wakers = await wakersOf(harness, agent.id, context).catch(() => undefined);
       if (!turn.sent && !nudged && (turn.tookStarter || wakers?.length === 0)) {
         nudged = true;
+        backstop = !turn.tookStarter;
         content = IDLE_STOP_NUDGE;
         requestId = `placed:${args.runKey}:nudge`;
         continue;
       }
-      if (!turn.sent && nudged && wakers?.length === 0) return { threadId, status: "ok", finalText: silentEndReport(turn.lastWords) };
+      if (!turn.sent && nudged && backstop && wakers?.length === 0) return { threadId, status: "ok", finalText: silentEndReport(turn.lastWords) };
       return { threadId, status: "ok", finalText: "", waitingFor: idleWaitingFor(wakers) };
     }
   };

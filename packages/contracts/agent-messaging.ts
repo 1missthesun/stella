@@ -12,7 +12,9 @@
  *   message from its starter, or when nothing live is left that could wake
  *   it; never for a turn the user typed into the agent's own thread. A nudged
  *   turn that is still quiet with nothing live ends the task with
- *   `silentEndReport`.
+ *   `silentEndReport`, unless the quiet turn was answering its starter's
+ *   message ("thanks", "noted"): staying quiet is a fine answer there, and the
+ *   task just stays idle.
  */
 
 /** The `send_message` parameter that marks a finished report. */

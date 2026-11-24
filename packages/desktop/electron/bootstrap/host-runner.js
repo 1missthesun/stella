@@ -325,7 +325,18 @@ const connectHostRunner = async (context) => {
     }
     runner.setBackendUrl(services.authService.getBackendUrl());
     runner.setHasConnectedAccount(services.authService.getHostHasConnectedAccount());
-    runner.setAuthToken(await services.authService.getAuthToken());
+    const cachedAuthToken = services.authService.getCachedAuthToken();
+    if (cachedAuthToken) {
+        runner.setAuthToken(cachedAuthToken);
+    }
+    void services.authService
+        .getAuthToken()
+        .then((token) => {
+            if (token && lifecycle.getRunner() === runner) {
+                runner.setAuthToken(token);
+            }
+        })
+        .catch(() => undefined);
     state.localChatUpdateUnsubscribe = runner.onLocalChatUpdated((payload) => {
         broadcastLocalChatUpdated(context, payload);
     });

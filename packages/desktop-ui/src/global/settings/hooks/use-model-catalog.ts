@@ -139,6 +139,29 @@ function getSessionCacheKey(sessionData: AuthSessionData): string {
   return `${kind}:${identity}:${sessionId}`;
 }
 
+const resolvedAudienceByScope = new Map<string, string>();
+const audienceRevisionByScope = new Map<string, number>();
+
+function stableAudienceKey(
+  sessionCacheScope: string,
+  billingAudienceKey: string | null,
+): string {
+  if (billingAudienceKey) {
+    const previous = resolvedAudienceByScope.get(sessionCacheScope);
+    if (previous && previous !== billingAudienceKey) {
+      audienceRevisionByScope.set(
+        sessionCacheScope,
+        (audienceRevisionByScope.get(sessionCacheScope) ?? 0) + 1,
+      );
+    }
+    resolvedAudienceByScope.set(sessionCacheScope, billingAudienceKey);
+  }
+  const revision = audienceRevisionByScope.get(sessionCacheScope) ?? 0;
+  return revision > 0
+    ? `${sessionCacheScope}:audience:r${revision}`
+    : `${sessionCacheScope}:audience`;
+}
+
 export function useModelCatalog() {
   const session = useDesktopAuthSession();
   const sessionData = session.data as AuthSessionData;
@@ -163,15 +186,10 @@ export function useModelCatalog() {
   const authAudienceKey = useMemo(() => {
     if (session.isPending) return null;
     if (!hasConnectedAccount) return `${sessionCacheScope}:audience:anonymous`;
-    // Once billing resolves we key by the precise audience. Until then fetch
-    // under a provisional key rather than returning null — the backend derives
-    // the real audience (and `allowedForAudience`) from the auth token, not
-    // from this client cache key, so the fetched data is already correct; the
-    // audience only busts the cache so restricted styling re-evaluates on plan
-    // change. Returning null here previously left the picker stuck on
-    // "Loading Stella models…" forever whenever the billing query was slow or
-    // failed (it swallows errors and never resolves).
-    return `${sessionCacheScope}:audience:${billingAudienceKey ?? "pending"}`;
+    // The backend derives the real audience from the auth token, so keep the
+    // key stable from initial pending -> first resolved billing plan and only
+    // bust the cache when a resolved plan changes (e.g. after upgrading).
+    return stableAudienceKey(sessionCacheScope, billingAudienceKey);
   }, [
     billingAudienceKey,
     hasConnectedAccount,

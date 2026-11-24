@@ -286,6 +286,10 @@ export class AuthService {
   private hostAuthAuthenticated = false;
   private hostHasConnectedAccount = false;
   private hostAuthToken: string | null = null;
+  // The credential epoch and backend the cached JWT was minted for: a cached
+  // token is only handed out while both still match.
+  private hostAuthTokenEpoch = -1;
+  private hostAuthTokenBackendUrl: string | null = null;
   private authStorageCache: Record<string, string | null> | null = null;
   private hostAuthTokenMintPromise: Promise<string | null> | null = null;
   private hostAuthTokenRefreshTimer: ReturnType<typeof setTimeout> | null =
@@ -1429,6 +1433,12 @@ export class AuthService {
     });
   }
 
+  private isHostAuthTokenExpired(token: string): boolean {
+    const payload = decodeBase64UrlJson(token.split(".")[1] ?? "");
+    const exp = (payload as { exp?: unknown } | null)?.exp;
+    return typeof exp === "number" && Date.now() >= exp * 1000;
+  }
+
   private isHostAuthTokenFresh(token: string): boolean {
     const payload = decodeBase64UrlJson(token.split(".")[1] ?? "");
     const exp = (payload as { exp?: unknown } | null)?.exp;
@@ -1445,10 +1455,14 @@ export class AuthService {
       return await this.hostAuthTokenMintPromise;
     }
     const mintEpoch = this.credentialEpoch;
+    const mintBackendUrl = this.getBackendUrl();
     this.hostAuthTokenMintPromise = (async () => {
       try {
         const result = await this.getAuthTokenResult();
-        if (this.credentialEpoch !== mintEpoch) {
+        if (
+          this.credentialEpoch !== mintEpoch ||
+          this.getBackendUrl() !== mintBackendUrl
+        ) {
           return null;
         }
         if (result.ok) {
@@ -1456,6 +1470,8 @@ export class AuthService {
             this.hostAuthToken = result.token;
             this.options.runnerTarget.getRunner()?.setAuthToken(result.token);
           }
+          this.hostAuthTokenEpoch = mintEpoch;
+          this.hostAuthTokenBackendUrl = mintBackendUrl;
           this.hostAuthAuthenticated = true;
           this.refreshRetryAttempt = 0;
           this.scheduleHostAuthTokenRefresh(result.token);
@@ -1498,25 +1514,73 @@ export class AuthService {
     await this.mintHostAuthToken();
   }
 
-  async getAuthToken(): Promise<string | null> {
+  /** The cached JWT when it is fresh and was minted for the current credentials and backend. */
+  getCachedAuthToken(): string | null {
+    const cached = this.currentScopeAuthToken();
+    return cached && this.isHostAuthTokenFresh(cached) ? cached : null;
+  }
+
+  private currentScopeAuthToken(): string | null {
     const cached = this.hostAuthToken?.trim() || null;
-    if (cached && this.isHostAuthTokenFresh(cached)) {
+    if (
+      !cached ||
+      this.hostAuthTokenEpoch !== this.credentialEpoch ||
+      this.hostAuthTokenBackendUrl !== this.getBackendUrl()
+    ) {
+      return null;
+    }
+    return cached;
+  }
+
+  /** Mint the JWT ahead of first use (startup), so the renderer and the runtime find it cached. */
+  prefetchAuthToken(): void {
+    if (this.getCachedAuthToken() || !this.getBearerToken()) {
+      return;
+    }
+    void this.getAuthToken().catch(() => undefined);
+  }
+
+  /**
+   * The JWT for the current credentials: the cached one while fresh, otherwise
+   * a new mint (coalesced with one already in flight). `forceRefresh` always
+   * mints. When a mint fails, `allowStale` (the default, for the runtime and
+   * schedules) falls back to the last token for these same credentials;
+   * without it an expired token is never returned.
+   */
+  async getAuthToken(
+    options: { forceRefresh?: boolean; allowStale?: boolean } = {},
+  ): Promise<string | null> {
+    const forceRefresh = options.forceRefresh === true;
+    const allowStale = options.allowStale !== false;
+    const cached = this.getCachedAuthToken();
+    if (!forceRefresh && cached) {
       return cached;
     }
     if (!this.getBearerToken()) {
       return null;
     }
-    const fresh = await this.mintHostAuthToken();
-    if (fresh?.trim()) {
-      return fresh.trim();
+    const startEpoch = this.credentialEpoch;
+    let fresh = (await this.mintHostAuthToken())?.trim() || null;
+    // A mint already in flight when the credentials changed answers null for
+    // the old ones; mint once more for the current credentials.
+    if (!fresh && this.credentialEpoch !== startEpoch && this.getBearerToken()) {
+      fresh = (await this.mintHostAuthToken())?.trim() || null;
     }
-    // The mint failed. Fall back to the stale token only while the bearer is
-    // still stored: if the mint cleared it, this device is signed out and
-    // handing back the old JWT would paper over that.
+    if (fresh) {
+      return fresh;
+    }
+    // The mint failed. Fall back to the last token only while the bearer is
+    // still stored and it was minted for these same credentials: if the mint
+    // cleared the bearer, this device is signed out, and a token from before a
+    // credential change belongs to another session.
     if (!this.getBearerToken()) {
       return null;
     }
-    return cached;
+    const last = this.currentScopeAuthToken();
+    if (!last) {
+      return null;
+    }
+    return allowStale || !this.isHostAuthTokenExpired(last) ? last : null;
   }
 
   async whenRuntimeAuthenticated(): Promise<boolean> {

@@ -80,6 +80,14 @@ export class LocalChatHistoryService {
     return this.store;
   }
 
+  warmCloudConversationCache(): void {
+    try {
+      this.getCloudConversationCacheStore();
+    } catch {
+      // Best-effort startup warm-up.
+    }
+  }
+
   private getCloudConversationCacheStore(): CloudConversationCacheClient {
     if (this.resetInProgress)
       throw new Error("Local cloud conversation cache is resetting.");

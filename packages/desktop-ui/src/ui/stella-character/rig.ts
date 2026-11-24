@@ -130,6 +130,30 @@ const stepSpring = (s: Spring, w: number, z: number, dt: number) => {
 };
 const SUBSTEP = 1 / 120;
 
+// Frame pacing. A capped mark (30fps on a 60–240Hz display) used to request
+// the next animation frame straight after drawing, wake on the next vsync only
+// to find it too early, sleep on a timer and request again: two or three
+// BeginMainFrames, each a full Blink lifecycle, for every frame it drew. The
+// display's frame interval, learned from back-to-back animation frames and
+// shared by every mark, lets the timer land between the vsync before the
+// target and the target itself, so each drawn frame costs one.
+let vsyncMs = 0;
+const noteVsyncSample = (ms: number) => {
+  if (ms >= 3 && ms <= 50) vsyncMs = ms;
+};
+
+// Ambient idle drift (bob, breathing and ring shimmer, with no activity and no
+// blink, pose, gaze, shape or particle in motion) moves the mark's outline at
+// most ~1.85e-5 CSS px per ms per CSS px of mark size. Small marks draw it only
+// as often as it moves AMBIENT_STEP_DEVICE_PX on screen: every frame drawn is
+// still the exact frame for its moment, and the steps between them stay far
+// below anything visible. Blinks, pose changes and any state change wake the
+// mark at full rate on time.
+const AMBIENT_EDGE_SPEED = 2e-5;
+const AMBIENT_STEP_DEVICE_PX = 0.05;
+// Under the loop's 100ms dt clamp, so the animation clock never lags real time.
+const AMBIENT_MAX_INTERVAL_MS = 80;
+
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeOutBack = (t: number) =>
   1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
@@ -401,8 +425,9 @@ export function createStellaMark(
   };
   const maxFps =
     o.maxFps && o.maxFps > 0 ? o.maxFps : o.size && o.size <= 48 ? 30 : 60;
+  const frameIntervalMs = 1000 / maxFps;
   // Small slack so a 60Hz display still draws every frame at a 60fps cap.
-  const minFrameMs = 1000 / maxFps - 1.5;
+  const FRAME_SLACK_MS = 1.5;
   const id = `sm${++uid}`;
   const reduced =
     typeof matchMedia === "function" &&
@@ -674,7 +699,9 @@ export function createStellaMark(
     raf = 0,
     idleTimer = 0,
     last = 0,
-    clock = 0;
+    clock = 0,
+    chainedAt = 0;
+  let gapMs = frameIntervalMs - FRAME_SLACK_MS;
   let boxW = o.size ?? 28,
     measuredAt = -1e9;
   let lastPath = "",
@@ -924,26 +951,55 @@ export function createStellaMark(
     return workRing;
   }
 
+  // Ask for the frame at the first vsync at least `remainingMs` after `now`
+  // (an animation-frame timestamp unless `inFrame` is false).
+  function requestNext(now: number, remainingMs: number, inFrame = true) {
+    const p = vsyncMs;
+    const vsyncs = p > 0 ? Math.ceil(remainingMs / p - 0.02) : 1;
+    if (vsyncs <= 1) {
+      // Back-to-back frames also teach the shared vsync estimate.
+      chainedAt = inFrame ? now : 0;
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+    // Wake mid-way between the vsync before the target and the target.
+    const delay = (vsyncs - 0.5) * p - (performance.now() - now);
+    raf = 0;
+    chainedAt = 0;
+    idleTimer = window.setTimeout(() => {
+      idleTimer = 0;
+      if (!destroyed) raf = requestAnimationFrame(frame);
+    }, Math.max(0, delay));
+  }
+
+  function ambientIntervalMs(): number {
+    const dpr =
+      (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+    // The glow's slow pulse moves its (soft) edge about twice as fast.
+    const speed = AMBIENT_EDGE_SPEED * (glowEl ? 2 : 1);
+    return Math.min(
+      AMBIENT_MAX_INTERVAL_MS,
+      AMBIENT_STEP_DEVICE_PX / (speed * Math.max(boxW, 1) * dpr),
+    );
+  }
+
+  function setAmbientTargets(time: number) {
+    bobX.t = Math.sin(time * 0.00042) * 2.6 + Math.sin(time * 0.001) * 0.9;
+    bobY.t = Math.sin(time * 0.00058) * 2.0 + Math.sin(time * 0.0013) * 0.7;
+    breathe.t = 1 + 0.013 * Math.sin(time * 0.0016);
+  }
+
   function frame(now: number) {
     if (destroyed) return;
-    if (last && now - last < minFrameMs) {
+    raf = 0;
+    if (chainedAt) noteVsyncSample(now - chainedAt);
+    chainedAt = 0;
+    if (last && now - last < gapMs) {
       if (suspended() && painted) {
         running = false;
-        raf = 0;
         return;
       }
-      // Sleep until shortly before the next allowed redraw instead of waking
-      // on every display refresh in between.
-      const wait = minFrameMs - (now - last) - 4;
-      if (wait > 1) {
-        raf = 0;
-        idleTimer = window.setTimeout(() => {
-          idleTimer = 0;
-          if (!destroyed) raf = requestAnimationFrame(frame);
-        }, wait);
-      } else {
-        raf = requestAnimationFrame(frame);
-      }
+      requestNext(now, gapMs - (now - last));
       return;
     }
     const dtReal = Math.min((now - (last || now)) / 1000, 0.1);
@@ -972,7 +1028,10 @@ export function createStellaMark(
     } else {
       const sub = Math.max(1, Math.ceil(dt / SUBSTEP)),
         h = dt / sub;
+      // Ambient targets follow the clock per substep, so the motion is the
+      // same whatever rate the mark draws at.
       for (let i = 0; i < sub; i++) {
+        if (!paused) setAmbientTargets(t - dt * 1000 + (i + 1) * h * 1000);
         stepSpring(env, ENV_W, ENV_Z, h);
         stepSpring(fade, FADE_W, FADE_Z, h);
         stepSpring(shapeMix, 10, 1, h);
@@ -1005,9 +1064,7 @@ export function createStellaMark(
         nextBlinkAt = b ? t + rand(b[0], b[1]) : Infinity;
       }
 
-      bobX.t = Math.sin(t * 0.00042) * 2.6 + Math.sin(t * 0.001) * 0.9;
-      bobY.t = Math.sin(t * 0.00058) * 2.0 + Math.sin(t * 0.0013) * 0.7;
-      breathe.t = 1 + 0.013 * Math.sin(t * 0.0016);
+      setAmbientTargets(t);
     }
 
     if (pointer) {
@@ -1232,7 +1289,29 @@ export function createStellaMark(
       raf = 0;
       return;
     }
-    raf = requestAnimationFrame(frame);
+    // Only the ambient drift is moving: draw it at the rate it visibly moves,
+    // and be back on time for the next blink or pose change.
+    const ambient =
+      settled &&
+      !reduced &&
+      !paused &&
+      !activity &&
+      !prevActivity &&
+      !pointer &&
+      Math.abs(fade.x - fade.t) < 0.001 &&
+      Math.abs(eyeSize.x - eyeSize.t) < 0.001 &&
+      Math.abs(gazeX.x - gazeX.t) < 0.01 &&
+      Math.abs(gazeY.x - gazeY.t) < 0.01 &&
+      Math.abs(gazeX.v) < 0.05 &&
+      Math.abs(gazeY.v) < 0.05;
+    const interval = ambient
+      ? Math.max(
+          frameIntervalMs,
+          Math.min(ambientIntervalMs(), Math.min(nextPoseAt, nextBlinkAt) - t),
+        )
+      : frameIntervalMs;
+    gapMs = interval - FRAME_SLACK_MS;
+    requestNext(now, gapMs);
   }
 
   function drawDots(w: number) {
@@ -1308,9 +1387,26 @@ export function createStellaMark(
   }
 
   function wake() {
-    if (destroyed || running || (suspended() && painted)) return;
+    if (destroyed || (suspended() && painted)) return;
+    if (running) {
+      // Sleeping through ambient drift: something changed, so draw it at the
+      // normal rate from the last frame on, as when the loop is awake.
+      const normalGap = frameIntervalMs - FRAME_SLACK_MS;
+      if (gapMs > normalGap) {
+        gapMs = normalGap;
+        if (idleTimer) {
+          window.clearTimeout(idleTimer);
+          idleTimer = 0;
+          const now = performance.now();
+          requestNext(now, Math.max(0, last + gapMs - now), false);
+        }
+      }
+      return;
+    }
     running = true;
     last = 0;
+    gapMs = frameIntervalMs - FRAME_SLACK_MS;
+    chainedAt = 0;
     raf = requestAnimationFrame(frame);
   }
 

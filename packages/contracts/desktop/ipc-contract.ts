@@ -1096,7 +1096,7 @@ export type IpcInvokeContract = {
     [payload: { sessionToken: string }],
     OkResult
   >;
-  [IPC_AUTH_GET_TOKEN]: Invoke<[], string | null>;
+  [IPC_AUTH_GET_TOKEN]: Invoke<[options?: { forceRefresh?: boolean }], string | null>;
   [IPC_AUTH_REVOKE_SESSIONS]: Invoke<[], OkResult>;
   [IPC_AUTH_LIST_SESSIONS]: Invoke<[], AccountSessionSummary[]>;
   [IPC_AUTH_REVOKE_SESSION]: Invoke<

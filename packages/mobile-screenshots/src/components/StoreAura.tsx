@@ -16,7 +16,7 @@ export function StoreAura({ index, count, className }: StoreAuraProps) {
     const images = [...(host.current?.querySelectorAll("img") ?? [])];
     void Promise.all(images.map(image => image.decode())).then(() => {
       if (mounted) setReady(true);
-    }).catch(() => { /* Leave export blocked instead of silently dropping the aura. */ });
+    }).catch(() => {});
     return () => { mounted = false; };
   }, []);
   if (!Number.isInteger(count) || count < 1 || !Number.isInteger(index) || index < 0 || index >= count)

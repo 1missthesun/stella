@@ -1,6 +1,3 @@
-// The aurora shader the stella.sh hero used, kept here as the source for
-// public/brand/store-aura-panorama.png (see scripts/render-store-aura.ts).
-
 export const vertex = /* glsl */ `
   attribute vec2 uv;
   attribute vec2 position;

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import type { ExecutionSession } from "../../sandbox-client.js";
 import {
   TURN_OWNER_GENERATION_HEADER,
@@ -196,17 +198,17 @@ export const withInfrastructureDeadline = async <T>(
   timeoutMs: number,
   message: string,
 ): Promise<T> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      operation,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  return await runToolEffect(
+    Effect.raceFirst(
+      Effect.tryPromise({
+        try: () => operation,
+        catch: (error) => error,
       }),
-    ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
+      Effect.sleep(timeoutMs).pipe(
+        Effect.flatMap(() => Effect.fail(new Error(message))),
+      ),
+    ),
+  );
 };
 
 export const log = (

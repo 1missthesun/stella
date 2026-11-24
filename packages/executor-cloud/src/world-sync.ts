@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -9,9 +9,10 @@ import {
   worldSyncMarkerPath,
 } from "@stella/contracts/cloud-tool-home";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
+import type { WorldSyncTiming } from "./attached-tool-protocol.js";
 import { CLOUD_TOOL_PROCESS_IDENTITY } from "./cloud-process-isolation.js";
 import {
-  ExactReader,
+  encodeWorldTreeFrame,
   isSyncedPath,
   validateRelativePath,
   WORLD_ENTRY_LIMIT,
@@ -19,7 +20,11 @@ import {
   type WorldIndex,
   type WorldIndexEntry,
   type WorldListingEntry,
+  type WorldTreeFrameType,
+  WorldTreeFrames,
   type WorldTreeOperation,
+  type WorldTreeRequest,
+  WORLD_TREE_DATA_FRAME_BYTES,
 } from "./world-tree.js";
 
 export type {
@@ -69,22 +74,28 @@ const WORLD_TREE_SCRIPT = fileURLToPath(
   new URL("./world-tree.ts", import.meta.url),
 );
 
-type WorldTreeProcess = {
-  stdin: NodeJS.WritableStream;
-  stdout: AsyncIterable<Buffer>;
-  exited: Promise<void>;
-  kill: () => void;
+type WorldTreeHelper = {
+  readonly root: string;
+  readonly child: ChildProcessWithoutNullStreams;
+  readonly frames: WorldTreeFrames;
+  readonly exited: Promise<void>;
+  stderr: string;
+  dead: boolean;
 };
+
+const idleHelpers = new Map<string, WorldTreeHelper[]>();
 
 /**
  * Every filesystem operation on the world tree runs in `world-tree.ts` as the
  * tool uid that owns the tree. Root keeps only the network, the credential,
- * the index and the marker, all outside the tree.
+ * the index and the marker, all outside the tree. A helper serves one request
+ * at a time and stays for the rest of this process (a turn), so a sync costs
+ * no process start; parallel uploads get one each.
  */
-const startWorldTree = (operation: string, root: string): WorldTreeProcess => {
+const startWorldTree = (root: string): WorldTreeHelper => {
   const launch = isolateToolProcessLaunch({
     command: process.execPath,
-    commandArgs: [WORLD_TREE_SCRIPT, operation, root],
+    commandArgs: [WORLD_TREE_SCRIPT, "serve", root],
     ...(typeof process.getuid === "function" && process.getuid() === 0
       ? { identity: { ...CLOUD_TOOL_PROCESS_IDENTITY, home: CLOUD_TOOL_HOME } }
       : {}),
@@ -98,64 +109,153 @@ const startWorldTree = (operation: string, root: string): WorldTreeProcess => {
     },
     stdio: ["pipe", "pipe", "pipe"],
   });
+  syncTiming.helperStarts = (syncTiming.helperStarts ?? 0) + 1;
   child.stdin.on("error", () => undefined);
-  let stderr = "";
-  child.stderr.on("data", (chunk: Buffer) => {
-    stderr = `${stderr}${chunk.toString()}`.slice(-2_000);
-  });
-  const exited = new Promise<void>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", (code, signal) => {
-      if (code === 0) resolve();
-      else {
-        reject(
-          new Error(
-            `World ${operation} failed (${code ?? signal}): ${stderr.trim()}`,
-          ),
-        );
-      }
-    });
-  });
-  exited.catch(() => undefined);
-  return {
-    stdin: child.stdin,
-    stdout: child.stdout,
-    exited,
-    kill: () => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-    },
+  const helper: WorldTreeHelper = {
+    root,
+    child,
+    frames: new WorldTreeFrames(
+      (child.stdout as AsyncIterable<Buffer>)[Symbol.asyncIterator](),
+    ),
+    exited: new Promise<void>((resolve) => {
+      child.once("error", () => resolve());
+      child.once("close", () => resolve());
+    }),
+    stderr: "",
+    dead: false,
   };
+  child.stderr.on("data", (chunk: Buffer) => {
+    helper.stderr = `${helper.stderr}${chunk.toString()}`.slice(-2_000);
+  });
+  void helper.exited.then(() => {
+    helper.dead = true;
+  });
+  return helper;
 };
 
-const writeToWorldTree = async (
-  tree: WorldTreeProcess,
-  chunk: string | Uint8Array,
+type Referable = { ref?: () => unknown; unref?: () => unknown };
+
+/** An idle helper never keeps this process alive; a busy one does. */
+const holdProcessOpen = (helper: WorldTreeHelper, hold: boolean): void => {
+  for (const handle of [
+    helper.child,
+    helper.child.stdin,
+    helper.child.stdout,
+    helper.child.stderr,
+  ] as Referable[]) {
+    if (hold) handle.ref?.();
+    else handle.unref?.();
+  }
+};
+
+const acquireWorldTree = (root: string): WorldTreeHelper => {
+  const idle = idleHelpers.get(root) ?? [];
+  let helper = idle.pop();
+  while (helper?.dead) helper = idle.pop();
+  helper ??= startWorldTree(root);
+  holdProcessOpen(helper, true);
+  return helper;
+};
+
+const releaseWorldTree = (helper: WorldTreeHelper, finished: boolean) => {
+  if (finished && !helper.dead) {
+    holdProcessOpen(helper, false);
+    idleHelpers.set(helper.root, [...(idleHelpers.get(helper.root) ?? []), helper]);
+  } else if (helper.child.exitCode === null) {
+    // Abandoned midway: its stream state is unknown, so it never serves again.
+    helper.dead = true;
+    helper.child.kill("SIGKILL");
+  }
+};
+
+const withWorldTree = async <T>(
+  root: string,
+  run: (helper: WorldTreeHelper) => Promise<T>,
+): Promise<T> => {
+  const helper = acquireWorldTree(root);
+  let finished = false;
+  try {
+    const value = await run(helper);
+    finished = true;
+    return value;
+  } finally {
+    releaseWorldTree(helper, finished);
+  }
+};
+
+const sendToWorldTree = async (
+  helper: WorldTreeHelper,
+  type: WorldTreeFrameType,
+  payload?: Uint8Array,
 ): Promise<void> => {
-  if (tree.stdin.write(chunk)) return;
-  await Promise.race([
-    new Promise<void>((resolve) => tree.stdin.once("drain", resolve)),
-    tree.exited.then(() => {
-      throw new Error("The world tree process stopped reading.");
-    }),
-  ]);
+  for (const part of encodeWorldTreeFrame(type, payload)) {
+    if (helper.dead) {
+      throw new Error(`The world tree helper stopped. ${helper.stderr.trim()}`);
+    }
+    if (helper.child.stdin.write(part)) continue;
+    await Promise.race([
+      new Promise<void>((resolve) => helper.child.stdin.once("drain", resolve)),
+      helper.exited.then(() => {
+        throw new Error(`The world tree helper stopped reading. ${helper.stderr.trim()}`);
+      }),
+    ]);
+  }
+};
+
+/** Data to the helper in frames of at most WORLD_TREE_DATA_FRAME_BYTES. */
+const sendDataToWorldTree = async (
+  helper: WorldTreeHelper,
+  data: string | Uint8Array,
+): Promise<void> => {
+  const bytes = typeof data === "string" ? Buffer.from(data) : data;
+  for (let at = 0; at < bytes.byteLength; at += WORLD_TREE_DATA_FRAME_BYTES) {
+    await sendToWorldTree(
+      helper,
+      "D",
+      bytes.subarray(at, at + WORLD_TREE_DATA_FRAME_BYTES),
+    );
+  }
+};
+
+/** The helper's frames for the current request, ending after its result. */
+async function* worldTreeReplies(
+  helper: WorldTreeHelper,
+): AsyncGenerator<Buffer, unknown> {
+  for (;;) {
+    const frame = await helper.frames.next();
+    if (!frame) {
+      await helper.exited;
+      throw new Error(`The world tree helper stopped. ${helper.stderr.trim()}`);
+    }
+    if (frame.type === "D") {
+      yield frame.payload;
+    } else if (frame.type === "R") {
+      return JSON.parse(frame.payload.toString("utf8")) as unknown;
+    } else if (frame.type === "E") {
+      throw new Error(frame.payload.toString("utf8"));
+    } else {
+      throw new Error("The world tree helper answered out of turn.");
+    }
+  }
+}
+
+const worldTreeResult = async (helper: WorldTreeHelper): Promise<unknown> => {
+  const replies = worldTreeReplies(helper);
+  for (;;) {
+    const next = await replies.next();
+    if (next.done) return next.value;
+    throw new Error("The world tree helper sent data for a request without any.");
+  }
 };
 
 const worldTreeJson = async (
-  operation: string,
   root: string,
-  input = "",
-): Promise<unknown> => {
-  const tree = startWorldTree(operation, root);
-  try {
-    tree.stdin.end(input);
-    const chunks: Buffer[] = [];
-    for await (const chunk of tree.stdout) chunks.push(chunk);
-    await tree.exited;
-    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
-  } finally {
-    tree.kill();
-  }
-};
+  request: WorldTreeRequest,
+): Promise<unknown> =>
+  await withWorldTree(root, async (helper) => {
+    await sendToWorldTree(helper, "Q", Buffer.from(JSON.stringify(request)));
+    return await worldTreeResult(helper);
+  });
 
 const parseIndexEntry = (raw: unknown): WorldIndexEntry => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -405,7 +505,7 @@ export const listWorldProjection = async (
   root: string,
   previous: WorldIndex = {},
 ): Promise<{ entries: WorldListingEntry[]; index: WorldIndex }> => {
-  const value = await worldTreeJson("list", root, JSON.stringify(previous));
+  const value = await worldTreeJson(root, { op: "list", previous });
   const rows = (value as { entries?: unknown } | null)?.entries;
   if (!Array.isArray(rows) || rows.length > WORLD_ENTRY_LIMIT) {
     throw new Error("World listing is invalid.");
@@ -425,7 +525,7 @@ export const listWorldProjection = async (
 };
 
 const fetchBlobInto = async (
-  tree: WorldTreeProcess,
+  tree: WorldTreeHelper,
   access: WorldSyncAccess,
   entry: Extract<WorldTreeOperation, { op: "file" }>,
 ): Promise<void> => {
@@ -441,7 +541,7 @@ const fetchBlobInto = async (
     if (size > entry.size) {
       throw new Error(`World blob size mismatch for ${entry.path}.`);
     }
-    await writeToWorldTree(tree, chunk);
+    await sendDataToWorldTree(tree, chunk);
   }
   if (size !== entry.size) {
     throw new Error(`World blob size mismatch for ${entry.path}.`);
@@ -499,20 +599,17 @@ const applyChanges = async (
     operations.push({ op: "times", path: entry.path, mtime: entry.mtime });
   }
   if (operations.length > 0) {
-    const tree = startWorldTree("apply", root);
-    try {
+    await withWorldTree(root, async (tree) => {
+      await sendToWorldTree(tree, "Q", Buffer.from(JSON.stringify({ op: "apply" })));
       for (const operation of operations) {
-        await writeToWorldTree(tree, `${JSON.stringify(operation)}\n`);
+        await sendDataToWorldTree(tree, `${JSON.stringify(operation)}\n`);
         if (operation.op === "file") {
           await fetchBlobInto(tree, access, operation);
         }
       }
-      tree.stdin.end();
-      for await (const _ of tree.stdout);
-      await tree.exited;
-    } finally {
-      tree.kill();
-    }
+      await sendToWorldTree(tree, "Z");
+      await worldTreeResult(tree);
+    });
   }
   for (const { path: entryPath, ...entry } of entries) {
     next[entryPath] = entry;
@@ -536,22 +633,19 @@ const extractWorldExport = async (
     Number(response.headers.get("x-stella-world-revision")),
   );
   if (!manifestId) throw new Error("World export manifest is invalid.");
-  const tree = startWorldTree("extract", root);
-  try {
+  await withWorldTree(root, async (tree) => {
+    await sendToWorldTree(tree, "Q", Buffer.from(JSON.stringify({ op: "extract" })));
     for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-      await writeToWorldTree(tree, chunk);
+      await sendDataToWorldTree(tree, chunk);
     }
-    tree.stdin.end();
-    for await (const _ of tree.stdout);
-    await tree.exited;
-  } finally {
-    tree.kill();
-  }
+    await sendToWorldTree(tree, "Z");
+    await worldTreeResult(tree);
+  });
   return { manifestId, revision };
 };
 
 const restoredNodeModules = async (root: string): Promise<WorldIndex> =>
-  parseIndexEntries(await worldTreeJson("node-modules", root));
+  parseIndexEntries(await worldTreeJson(root, { op: "node-modules" }));
 
 const baseFromExport = async (
   root: string,
@@ -577,6 +671,48 @@ const establishedBase = async (root: string): Promise<WorldIndex> => {
   );
 };
 
+export type { WorldSyncTiming } from "./attached-tool-protocol.js";
+
+const syncTiming: WorldSyncTiming = {
+  pulls: 0,
+  pullMs: 0,
+  pullMaxMs: 0,
+  pushes: 0,
+  pushMs: 0,
+  pushMaxMs: 0,
+  helperStarts: 0,
+};
+
+/** The pulls and pushes since the last call, then starts counting afresh. */
+export const takeWorldSyncTiming = (): WorldSyncTiming => {
+  const taken = { ...syncTiming };
+  for (const key of Object.keys(syncTiming) as (keyof WorldSyncTiming)[]) {
+    syncTiming[key] = 0;
+  }
+  return taken;
+};
+
+const timed = async <T>(
+  kind: "pull" | "push",
+  run: () => Promise<T>,
+): Promise<T> => {
+  const started = performance.now();
+  try {
+    return await run();
+  } finally {
+    const ms = Math.round(performance.now() - started);
+    if (kind === "pull") {
+      syncTiming.pulls += 1;
+      syncTiming.pullMs += ms;
+      syncTiming.pullMaxMs = Math.max(syncTiming.pullMaxMs, ms);
+    } else {
+      syncTiming.pushes += 1;
+      syncTiming.pushMs += ms;
+      syncTiming.pushMaxMs = Math.max(syncTiming.pushMaxMs, ms);
+    }
+  }
+};
+
 export const worldBaseEstablished = async (root: string): Promise<boolean> =>
   (await readIndex(statePaths(root).index))?.complete === true;
 
@@ -584,7 +720,7 @@ export const pullWorldProjection = async (args: {
   root: string;
   access: WorldSyncAccess;
 }): Promise<WorldMarker> =>
-  await withWorldSyncLock(args.root, async () => {
+  await timed("pull", () => withWorldSyncLock(args.root, async () => {
     let marker = await readWorldMarker(args.root);
     const base = await establishedBase(args.root);
     for (;;) {
@@ -601,7 +737,7 @@ export const pullWorldProjection = async (args: {
       await writeIndex(args.root, base);
       await writeWorldMarker(args.root, marker);
     }
-  });
+  }));
 
 const postChanges = async (
   access: WorldSyncAccess,
@@ -747,24 +883,46 @@ const blobBody = (
 ): Readable =>
   Readable.from(
     (async function* () {
-      const tree = startWorldTree("read", root);
+      const tree = acquireWorldTree(root);
+      let finished = false;
       try {
-        tree.stdin.end(
-          JSON.stringify(blobs.map(({ path: entryPath, size }) => ({ path: entryPath, size }))),
+        await sendToWorldTree(
+          tree,
+          "Q",
+          Buffer.from(
+            JSON.stringify({
+              op: "read",
+              files: blobs.map(({ path: entryPath, size }) => ({ path: entryPath, size })),
+            } satisfies WorldTreeRequest),
+          ),
         );
-        const reader = new ExactReader(tree.stdout[Symbol.asyncIterator]());
-        try {
-          for (const blob of blobs) {
-            if (framed) yield blobFrameHeader(blob);
-            yield* reader.exactly(blob.size);
+        const replies = worldTreeReplies(tree);
+        let pending: Buffer = Buffer.alloc(0);
+        const take = async (bytes: number): Promise<Buffer> => {
+          while (pending.byteLength < bytes) {
+            const next = await replies.next();
+            if (next.done) throw new Error("World file changed while it was sent.");
+            pending = pending.byteLength ? Buffer.concat([pending, next.value]) : next.value;
           }
-        } catch (error) {
-          await tree.exited;
-          throw error;
+          const taken = pending.subarray(0, bytes);
+          pending = pending.subarray(bytes);
+          return taken;
+        };
+        for (const blob of blobs) {
+          if (framed) yield blobFrameHeader(blob);
+          let remaining = blob.size;
+          while (remaining > 0) {
+            const chunk = await take(Math.min(remaining, WORLD_TREE_DATA_FRAME_BYTES));
+            remaining -= chunk.byteLength;
+            yield chunk;
+          }
         }
-        await tree.exited;
+        if (pending.byteLength > 0 || !(await replies.next()).done) {
+          throw new Error("The world tree helper sent more than was asked for.");
+        }
+        finished = true;
       } finally {
-        tree.kill();
+        releaseWorldTree(tree, finished);
       }
     })(),
   );
@@ -843,7 +1001,7 @@ export const pushWorldProjection = async (args: {
   root: string;
   access: WorldSyncAccess;
 }): Promise<WorldMarker> =>
-  await withWorldSyncLock(args.root, async () => {
+  await timed("push", () => withWorldSyncLock(args.root, async () => {
     const marker = await readWorldMarker(args.root);
     const stored = await readIndex(statePaths(args.root).index);
     if (!stored?.complete) {
@@ -894,4 +1052,4 @@ export const pushWorldProjection = async (args: {
     await writeIndex(args.root, projection.index);
     await writeWorldMarker(args.root, nextMarker);
     return nextMarker;
-  });
+  }));

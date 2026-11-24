@@ -7,6 +7,26 @@ const shellQuote = (value: string): string => {
   return `'${value.replace(/'/gu, `'"'"'`)}'`;
 };
 
+/**
+ * The sync code before 2026-11 kept its marker inside the world, at
+ * `.stella/world-manifest`, root-owned. A container saved by that code (or a
+ * turn it still ran after this deploy) carries it over instead of downloading
+ * the world again: only a root-owned, singly linked regular file is taken, the
+ * one read is the one checked (same inode through the open descriptor), and
+ * its text must be exactly a marker.
+ */
+const legacyMarkerLines = [
+  'legacy="$root/.stella/world-manifest"',
+  'if [ -d "$root/.stella" ] && [ ! -L "$root/.stella" ] && [ -f "$legacy" ] && [ ! -L "$legacy" ] && { [ ! -f "$marker" ] || [ "$legacy" -nt "$marker" ]; }; then',
+  `checked="$(stat -c '%u %h %i' -- "$legacy")"`,
+  `legacy_marker="$(if [ "\${checked% *}" = "0 1" ] && exec 8<"$legacy" 2>/dev/null && [ "$(stat -L -c '%u %h %i' /proc/self/fd/8)" = "$checked" ]; then head -c 512 <&8; fi)"`,
+  `if printf '%s' "$legacy_marker" | grep -Eqx '\\{"manifestId":"[A-Za-z0-9:_-]+","revision":[0-9]+\\}'; then`,
+  `printf '%s\\n' "$legacy_marker" > "$marker.tmp"`,
+  'mv -f -- "$marker.tmp" "$marker"',
+  "fi",
+  "fi",
+];
+
 export const worldMaterializationCommand = (args: {
   worldRoot: string;
   exportUrl: string;
@@ -25,6 +45,7 @@ export const worldMaterializationCommand = (args: {
     "/usr/bin/flock --exclusive 9",
     `root=${shellQuote(args.worldRoot)}`,
     `marker=${shellQuote(marker)}`,
+    ...legacyMarkerLines,
     'if [ ! -f "$marker" ]; then',
     "headers=/workspace/.world-export-headers",
     "trap 'rm -f -- \"$headers\"' EXIT",

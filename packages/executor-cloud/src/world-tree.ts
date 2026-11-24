@@ -24,6 +24,7 @@ import {
   utimes,
 } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 import {
   isWorldUnsyncedPath,
   WORLD_UNSYNCED_PATHS,
@@ -96,7 +97,15 @@ const isDriveCopy = (relative: string): boolean => relative === "drive";
 const isSyncStaging = (relative: string): boolean =>
   relative === STAGING || relative.startsWith(`${STAGING}/`);
 
+/**
+ * Where the sync marker lived before it moved beside the world root. A
+ * container saved by the old code still has one (root-owned, unreadable to
+ * the tool uid); it is never synced.
+ */
+const LEGACY_MARKER = ".stella/world-manifest";
+
 export const isSyncedPath = (relative: string): boolean =>
+  relative !== LEGACY_MARKER &&
   !isSyncStaging(relative) &&
   !isWorldUnsyncedPath(relative) &&
   !isDriveCopy(relative) &&
@@ -115,9 +124,31 @@ const indexedNodeModulesDirectories = (index: WorldIndex): Set<string> => {
   return directories;
 };
 
-const fileSha256 = async (filePath: string): Promise<string> => {
+class WorldFileShrankError extends Error {
+  constructor(filePath: string) {
+    super(`World file shrank while it was read: ${filePath}`);
+    this.name = "WorldFileShrankError";
+  }
+}
+
+/**
+ * The sha256 of the first `size` bytes, the size the listing recorded. A file
+ * still being appended to (a dev server's log) hashes as it was when listed,
+ * and its upload (`readWorldFiles`) sends that same prefix.
+ */
+const fileSha256 = async (filePath: string, size: number): Promise<string> => {
   const hash = createHash("sha256");
-  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  let read = 0;
+  if (size > 0) {
+    for await (const chunk of createReadStream(filePath, {
+      start: 0,
+      end: size - 1,
+    })) {
+      hash.update(chunk as Buffer);
+      read += (chunk as Buffer).byteLength;
+    }
+  }
+  if (read !== size) throw new WorldFileShrankError(filePath);
   return hash.digest("hex");
 };
 
@@ -143,7 +174,7 @@ export const listWorldTree = async (
       }
       if (!isSyncedPath(child)) continue;
       const childPath = absoluteWorldPath(root, child);
-      const stat = await lstat(childPath);
+      let stat = await lstat(childPath);
       const kind = stat.isSymbolicLink()
         ? "symlink"
         : stat.isDirectory()
@@ -165,6 +196,36 @@ export const listWorldTree = async (
       ) {
         continue;
       }
+      let sha256: string | undefined;
+      if (kind === "file") {
+        const prior = previous[child];
+        // A file truncated and rewritten while it was hashed is listed again
+        // at its new size; one that keeps shrinking fails the sync.
+        for (let attempt = 1; sha256 === undefined; attempt += 1) {
+          if (stat.size > WORLD_FILE_LIMIT_BYTES) {
+            throw new Error(`World file exceeds 256 MiB: ${child}`);
+          }
+          if (
+            prior?.kind === "file" &&
+            prior.sha256 &&
+            prior.size === stat.size &&
+            prior.mtime === Math.trunc(stat.mtimeMs)
+          ) {
+            sha256 = prior.sha256;
+            break;
+          }
+          try {
+            sha256 = await fileSha256(childPath, stat.size);
+          } catch (error) {
+            if (!(error instanceof WorldFileShrankError) || attempt >= 3) {
+              throw error;
+            }
+            const again = await lstat(childPath);
+            if (!again.isFile()) throw error;
+            stat = again;
+          }
+        }
+      }
       const common = {
         mode: stat.mode & 0o7777,
         mtime: Math.trunc(stat.mtimeMs),
@@ -178,18 +239,7 @@ export const listWorldTree = async (
         entries.push({ path: child, ...common, kind });
         index[child] = { ...common, kind };
         await walk(child, durableNodeModulesEntry);
-      } else {
-        if (stat.size > WORLD_FILE_LIMIT_BYTES) {
-          throw new Error(`World file exceeds 256 MiB: ${child}`);
-        }
-        const prior = previous[child];
-        const sha256 =
-          prior?.kind === "file" &&
-          prior.sha256 &&
-          prior.size === common.size &&
-          prior.mtime === common.mtime
-            ? prior.sha256
-            : await fileSha256(childPath);
+      } else if (sha256 !== undefined) {
         entries.push({ path: child, ...common, kind, sha256 });
         index[child] = { ...common, kind, sha256 };
       }
@@ -336,6 +386,14 @@ export class ExactReader {
     }
   }
 
+  /** Exactly `bytes` bytes, or null when the stream ends before any of them. */
+  async bytes(bytes: number): Promise<Buffer | null> {
+    if (this.bufferedBytes === 0 && !(await this.fill())) return null;
+    const parts: Buffer[] = [];
+    for await (const part of this.exactly(bytes)) parts.push(part);
+    return Buffer.concat(parts);
+  }
+
   async *exactly(bytes: number): AsyncGenerator<Buffer> {
     let remaining = bytes;
     while (remaining > 0) {
@@ -346,6 +404,82 @@ export class ExactReader {
       remaining -= chunk.byteLength;
       yield chunk;
     }
+  }
+}
+
+/**
+ * The helper's wire format, both ways: a type byte, a 32-bit big-endian
+ * length, the payload. Root sends a request (Q), then for apply and extract
+ * its data as D frames closed by Z; the helper answers with D frames (read)
+ * and one R (result JSON) or E (error, after which it exits).
+ */
+export type WorldTreeFrameType = "Q" | "D" | "Z" | "R" | "E";
+
+export type WorldTreeFrame = Readonly<{
+  type: WorldTreeFrameType;
+  payload: Buffer;
+}>;
+
+export type WorldTreeRequest =
+  | Readonly<{ op: "list"; previous: WorldIndex }>
+  | Readonly<{ op: "node-modules" }>
+  | Readonly<{ op: "apply" }>
+  | Readonly<{ op: "extract" }>
+  | Readonly<{ op: "read"; files: readonly { path: string; size: number }[] }>;
+
+export const WORLD_TREE_DATA_FRAME_BYTES = 1024 * 1024;
+
+const FRAME_LIMITS: Record<WorldTreeFrameType, number> = {
+  Q: 512 * 1024 * 1024,
+  D: WORLD_TREE_DATA_FRAME_BYTES,
+  Z: 0,
+  R: 512 * 1024 * 1024,
+  E: 64 * 1024,
+};
+
+export const encodeWorldTreeFrame = (
+  type: WorldTreeFrameType,
+  payload: Uint8Array = new Uint8Array(0),
+): Buffer[] => {
+  if (payload.byteLength > FRAME_LIMITS[type]) {
+    throw new Error(`World tree ${type} frame is too large.`);
+  }
+  const header = Buffer.alloc(5);
+  header.write(type, 0, "latin1");
+  header.writeUInt32BE(payload.byteLength, 1);
+  return payload.byteLength ? [header, Buffer.from(payload)] : [header];
+};
+
+export class WorldTreeFrames {
+  private readonly reader: ExactReader;
+  constructor(source: AsyncIterator<Buffer>) {
+    this.reader = new ExactReader(source);
+  }
+
+  /** The next frame, or null when the stream ended between frames. */
+  async next(): Promise<WorldTreeFrame | null> {
+    const header = await this.reader.bytes(5);
+    if (!header) return null;
+    const type = header.toString("latin1", 0, 1) as WorldTreeFrameType;
+    const length = header.readUInt32BE(1);
+    if (!(type in FRAME_LIMITS) || length > FRAME_LIMITS[type]) {
+      throw new Error("World tree frame is invalid.");
+    }
+    const payload =
+      length === 0 ? Buffer.alloc(0) : await this.reader.bytes(length);
+    if (!payload) throw new Error("World tree stream ended mid-frame.");
+    return { type, payload };
+  }
+}
+
+/** The D payloads up to the closing Z. */
+async function* dataUntilEnd(frames: WorldTreeFrames): AsyncGenerator<Buffer> {
+  for (;;) {
+    const frame = await frames.next();
+    if (!frame) throw new Error("World tree stream ended mid-data.");
+    if (frame.type === "Z") return;
+    if (frame.type !== "D") throw new Error("World tree data frame expected.");
+    yield frame.payload;
   }
 }
 
@@ -498,17 +632,12 @@ export const extractWorldTree = async (
   if (exitCode !== 0) throw new Error(`World tar extraction exited ${exitCode}.`);
 };
 
-/** Write the first `size` bytes of each requested regular file to `output`. */
+/** Hand `write` the first `size` bytes of each requested regular file. */
 export const readWorldFiles = async (
   root: string,
   files: readonly { path: string; size: number }[],
-  output: NodeJS.WritableStream,
+  write: (chunk: Buffer) => Promise<void>,
 ): Promise<void> => {
-  const write = async (chunk: Buffer) => {
-    if (!output.write(chunk)) {
-      await new Promise<void>((resolve) => output.once("drain", resolve));
-    }
-  };
   for (const file of files) {
     const handle = await open(
       absoluteWorldPath(root, file.path),
@@ -540,44 +669,59 @@ export const readWorldFiles = async (
   }
 };
 
-const readAll = async (input: AsyncIterable<Buffer>): Promise<string> => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of input) chunks.push(chunk);
-  return Buffer.concat(chunks).toString("utf8");
+const send = async (type: WorldTreeFrameType, payload?: Uint8Array) => {
+  for (const part of encodeWorldTreeFrame(type, payload)) {
+    if (!process.stdout.write(part)) {
+      await new Promise<void>((resolve) => process.stdout.once("drain", resolve));
+    }
+  }
 };
 
-const writeJson = async (value: unknown): Promise<void> =>
-  await new Promise<void>((resolve, reject) =>
-    process.stdout.write(`${JSON.stringify(value)}\n`, (error) =>
-      error ? reject(error) : resolve(),
-    ),
+/**
+ * One helper serves a turn's world syncs, one request at a time, until root
+ * closes its stdin. A failed request answers E and ends the helper, so root
+ * never has to resynchronize a stream it abandoned midway.
+ */
+const serve = async (root: string): Promise<void> => {
+  const frames = new WorldTreeFrames(
+    (process.stdin as AsyncIterable<Buffer>)[Symbol.asyncIterator](),
   );
-
-const main = async (): Promise<void> => {
-  const [operation, root] = process.argv.slice(2);
-  if (!root || !path.isAbsolute(root)) throw new Error("World root is required.");
-  const stdin = process.stdin as AsyncIterable<Buffer>;
-  if (operation === "list") {
-    const previous = JSON.parse(await readAll(stdin)) as WorldIndex;
-    await writeJson(await listWorldTree(root, previous));
-  } else if (operation === "node-modules") {
-    await writeJson(await indexWorldNodeModules(root));
-  } else if (operation === "apply") {
-    await writeJson({ applied: await applyWorldOperations(root, stdin) });
-  } else if (operation === "extract") {
-    await extractWorldTree(root, process.stdin);
-    await writeJson({ extracted: true });
-  } else if (operation === "read") {
-    const files = JSON.parse(await readAll(stdin)) as { path: string; size: number }[];
-    await readWorldFiles(root, files, process.stdout);
-  } else {
-    throw new Error(`Unknown world tree operation: ${operation}`);
+  for (;;) {
+    const frame = await frames.next();
+    if (!frame) return;
+    if (frame.type !== "Q") throw new Error("World tree request expected.");
+    const request = JSON.parse(frame.payload.toString("utf8")) as WorldTreeRequest;
+    let result: unknown;
+    if (request.op === "list") {
+      result = await listWorldTree(root, request.previous);
+    } else if (request.op === "node-modules") {
+      result = await indexWorldNodeModules(root);
+    } else if (request.op === "apply") {
+      result = { applied: await applyWorldOperations(root, dataUntilEnd(frames)) };
+    } else if (request.op === "extract") {
+      await extractWorldTree(root, Readable.from(dataUntilEnd(frames)));
+      result = { extracted: true };
+    } else if (request.op === "read") {
+      await readWorldFiles(root, request.files, (chunk) => send("D", chunk));
+      result = { read: request.files.length };
+    } else {
+      throw new Error("Unknown world tree operation.");
+    }
+    await send("R", Buffer.from(JSON.stringify(result)));
   }
 };
 
 if (import.meta.main) {
-  await main().catch((error: unknown) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  const [operation, root] = process.argv.slice(2);
+  try {
+    if (operation !== "serve" || !root || !path.isAbsolute(root)) {
+      throw new Error("World tree usage: serve <absolute world root>");
+    }
+    await serve(root);
+    process.exit(0);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await send("E", Buffer.from(message.slice(0, 16_000))).catch(() => undefined);
     process.exit(1);
-  });
+  }
 }

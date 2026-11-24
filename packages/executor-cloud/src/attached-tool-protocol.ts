@@ -168,6 +168,8 @@ export type WorldSyncTiming = {
   pushes: number;
   pushMs: number;
   pushMaxMs: number;
+  /** World tree helper processes started (one per turn unless uploads ran in parallel). */
+  helperStarts?: number;
 };
 
 const WORLD_SYNC_TIMING_KEYS = [
@@ -179,16 +181,25 @@ const WORLD_SYNC_TIMING_KEYS = [
   "pushMaxMs",
 ] as const;
 
+const OPTIONAL_WORLD_SYNC_TIMING_KEYS = ["helperStarts"] as const;
+
 const worldSyncTimingOf = (value: unknown): WorldSyncTiming => {
   const row = record(value, "worldSync");
-  exactKeys(row, WORLD_SYNC_TIMING_KEYS, "worldSync");
-  const timing = {} as WorldSyncTiming;
-  for (const key of WORLD_SYNC_TIMING_KEYS) {
-    const entry = row[key];
+  exactKeys(
+    row,
+    [...WORLD_SYNC_TIMING_KEYS, ...OPTIONAL_WORLD_SYNC_TIMING_KEYS],
+    "worldSync",
+  );
+  const count = (entry: unknown): number => {
     if (!Number.isSafeInteger(entry) || (entry as number) < 0) {
       throw new AttachedToolProtocolError("worldSync");
     }
-    timing[key] = entry as number;
+    return entry as number;
+  };
+  const timing = {} as WorldSyncTiming;
+  for (const key of WORLD_SYNC_TIMING_KEYS) timing[key] = count(row[key]);
+  for (const key of OPTIONAL_WORLD_SYNC_TIMING_KEYS) {
+    if (row[key] !== undefined) timing[key] = count(row[key]);
   }
   return timing;
 };

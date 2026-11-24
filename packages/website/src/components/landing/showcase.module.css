@@ -94,19 +94,23 @@
   }
 }
 
-@supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) {
+/* Browsers with scroll-driven animations run the window's rise in CSS (showcase.tsx sets
+   --journey-range to the same start the script path uses; these are the pre-hydration guesses).
+   Keep this condition equal to SCROLL_TIMELINE_SUPPORTS in showcase.tsx. */
+@supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) and (animation-timing-function: linear(0, 1)) {
   @media (prefers-reduced-motion: no-preference) {
     .journeyFrame {
+      --journey-range: cover 14% cover 50%;
       view-timeline: --stella-journey block;
       animation: journeyScale linear both;
       animation-timeline: --stella-journey;
-      animation-range: cover 14% cover 50%;
+      animation-range: var(--journey-range);
     }
 
     .journeyGlow {
       animation: journeyGlowOpacity linear both;
       animation-timeline: --stella-journey;
-      animation-range: cover 14% cover 50%;
+      animation-range: var(--journey-range);
     }
   }
 }
@@ -121,13 +125,8 @@
     height: min(600px, 68svh);
   }
 
-  @supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) {
-    @media (prefers-reduced-motion: no-preference) {
-      .journeyFrame,
-      .journeyGlow {
-        animation-range: cover 5% cover 50%;
-      }
-    }
+  .journeyFrame {
+    --journey-range: cover 5% cover 50%;
   }
 }
 

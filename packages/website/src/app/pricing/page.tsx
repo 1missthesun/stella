@@ -84,13 +84,13 @@ export default function Pricing() {
                   <span className={pr.period}>{plan.interval ? "per month" : "No card needed"}</span>
                 </p>
                 {plan.interval ? (
-                  <Link className={featured ? pr.ctaPrimary : pr.cta} href={`/billing?plan=${id}`}>
+                  <Link className={featured ? pr.ctaPrimary : pr.cta} href={`/billing?plan=${id}`} prefetch={false}>
                     Choose {plan.label}
                   </Link>
                 ) : (
-                  <Link className={pr.cta} href="#get">
+                  <a className={pr.cta} href="#get">
                     Get Stella
-                  </Link>
+                  </a>
                 )}
                 <ul className={pr.features}>
                   {plan.includes.map((line) => (

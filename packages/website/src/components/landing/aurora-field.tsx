@@ -104,10 +104,14 @@ const fragment = /* glsl */ `
 export function AuroraField({
   className,
   dark = false,
+  followScene = false,
+  defer = false,
   liftRef,
 }: {
   className?: string;
   dark?: boolean;
+  followScene?: boolean;
+  defer?: boolean;
   liftRef?: { current: number };
 }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -116,50 +120,24 @@ export function AuroraField({
     const canvas = ref.current;
     if (!canvas || !shouldRunAuroraShader()) return;
 
-    let renderer: Renderer;
-    let program: Program;
-    let mesh: Mesh;
-    try {
-      renderer = new Renderer({
-        canvas,
-        alpha: true,
-        premultipliedAlpha: false,
-        dpr: Math.min(window.devicePixelRatio || 1, 1) * 0.6,
-      });
-      const gl = renderer.gl;
-      gl.clearColor(0, 0, 0, 0);
-      program = new Program(gl, {
-        vertex,
-        fragment,
-        transparent: true,
-        uniforms: {
-          uTime: { value: 0 },
-          uAspect: { value: 1 },
-          uPointer: { value: [0.5, 0.2] },
-          uLift: { value: 0 },
-          uDark: { value: dark ? 1 : 0 },
-        },
-      });
-      if (
-        !gl.getProgramParameter(program.program, gl.LINK_STATUS) ||
-        !program.uniformLocations
-      ) {
-        return;
-      }
-      mesh = new Mesh(gl, { geometry: new Triangle(gl), program });
-    } catch {
-      return;
-    }
-
-    canvas.dataset.webgl = "on";
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const pointer = { x: 0.5, y: 0.2, tx: 0.5, ty: 0.2 };
+    let renderer: Renderer | null = null;
+    let program: Program | null = null;
+    let mesh: Mesh | null = null;
+    let ro: ResizeObserver | null = null;
+    let mo: MutationObserver | null = null;
     let raf = 0;
     let last = -100;
-    let inView = true;
+    let inView = false;
     let disposed = false;
+    let darkValue = dark ? 1 : 0;
+    let darkTarget = darkValue;
+    let lastDarkTick = 0;
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const pointer = { x: 0.5, y: 0.2, tx: 0.5, ty: 0.2 };
 
     const resize = () => {
+      if (!renderer || !program) return;
       const rect = canvas.parentElement?.getBoundingClientRect();
       const w = rect?.width || window.innerWidth;
       const h = rect?.height || window.innerHeight;
@@ -170,8 +148,19 @@ export function AuroraField({
     };
 
     const draw = (now: number) => {
+      if (!renderer || !program || !mesh) return;
       pointer.x += (pointer.tx - pointer.x) * 0.05;
       pointer.y += (pointer.ty - pointer.y) * 0.05;
+      if (darkValue !== darkTarget) {
+        const dt = lastDarkTick ? Math.min(100, now - lastDarkTick) : 16;
+        const step = dt / 900;
+        darkValue =
+          darkTarget > darkValue
+            ? Math.min(darkTarget, darkValue + step)
+            : Math.max(darkTarget, darkValue - step);
+        program.uniforms.uDark.value = darkValue;
+      }
+      lastDarkTick = now;
       program.uniforms.uTime.value = reduce ? 6 : now * 0.001;
       program.uniforms.uPointer.value = [pointer.x, pointer.y];
       program.uniforms.uLift.value = liftRef?.current ?? 0;
@@ -180,31 +169,106 @@ export function AuroraField({
 
     const loop = (now: number) => {
       raf = 0;
-      if (disposed || !inView || document.hidden) return;
+      if (disposed || !inView || document.hidden || !renderer) return;
       if (now - last >= 1000 / 30) {
         last = now;
         draw(now);
       }
       raf = requestAnimationFrame(loop);
     };
+
     const play = () => {
-      if (!raf && !disposed && inView && !document.hidden && !reduce) {
+      if (!raf && !disposed && inView && !document.hidden && !reduce && renderer) {
         raf = requestAnimationFrame(loop);
       }
     };
 
-    resize();
-    draw(6000);
-    play();
+    const init = () => {
+      if (renderer || disposed) return;
+      try {
+        const nextRenderer = new Renderer({
+          canvas,
+          alpha: true,
+          premultipliedAlpha: false,
+          dpr: Math.min(window.devicePixelRatio || 1, 1) * 0.6,
+        });
+        const gl = nextRenderer.gl;
+        gl.clearColor(0, 0, 0, 0);
+        const nextProgram = new Program(gl, {
+          vertex,
+          fragment,
+          transparent: true,
+          uniforms: {
+            uTime: { value: 0 },
+            uAspect: { value: 1 },
+            uPointer: { value: [0.5, 0.2] },
+            uLift: { value: 0 },
+            uDark: { value: darkValue },
+          },
+        });
+        if (
+          !gl.getProgramParameter(nextProgram.program, gl.LINK_STATUS) ||
+          !nextProgram.uniformLocations
+        ) {
+          return;
+        }
+        renderer = nextRenderer;
+        program = nextProgram;
+        mesh = new Mesh(gl, { geometry: new Triangle(gl), program: nextProgram });
+      } catch {
+        return;
+      }
 
-    const ro = new ResizeObserver(() => {
+      canvas.dataset.webgl = "on";
       resize();
-      if (reduce) draw(6000);
-    });
-    if (canvas.parentElement) ro.observe(canvas.parentElement);
+      draw(6000);
+
+      ro = new ResizeObserver(() => {
+        resize();
+        if (reduce) draw(6000);
+      });
+      if (canvas.parentElement) ro.observe(canvas.parentElement);
+    };
+
+    if (followScene) {
+      const root = document.querySelector<HTMLElement>("[data-landing-root]");
+      const syncScene = () => {
+        darkTarget = root?.dataset.scene === "dark" ? 1 : 0;
+        if (reduce && program) {
+          darkValue = darkTarget;
+          program.uniforms.uDark.value = darkValue;
+          draw(6000);
+        }
+      };
+      syncScene();
+      darkValue = darkTarget;
+      if (root) {
+        mo = new MutationObserver(syncScene);
+        mo.observe(root, { attributes: true, attributeFilter: ["data-scene"] });
+      }
+    }
+
+    if (!defer) init();
+
+    const nearObserver = defer
+      ? new IntersectionObserver(
+          ([entry]) => {
+            if (!entry?.isIntersecting) return;
+            nearObserver?.disconnect();
+            init();
+            play();
+          },
+          { rootMargin: "300px 0px" },
+        )
+      : null;
+    nearObserver?.observe(canvas);
+
     const io = new IntersectionObserver((entries) => {
-      inView = entries[0]?.isIntersecting ?? true;
-      if (inView) play();
+      inView = entries[0]?.isIntersecting ?? false;
+      if (inView) {
+        if (!renderer) init();
+        play();
+      }
     });
     io.observe(canvas);
     const onVisibility = () => play();
@@ -213,16 +277,18 @@ export function AuroraField({
     return () => {
       disposed = true;
       if (raf) cancelAnimationFrame(raf);
-      ro.disconnect();
+      ro?.disconnect();
+      mo?.disconnect();
+      nearObserver?.disconnect();
       io.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       try {
-        mesh.geometry.remove();
-        program.remove();
+        mesh?.geometry.remove();
+        program?.remove();
       } catch {}
       delete canvas.dataset.webgl;
     };
-  }, [dark, liftRef]);
+  }, [dark, followScene, defer, liftRef]);
 
   return <canvas ref={ref} className={className} aria-hidden="true" />;
 }

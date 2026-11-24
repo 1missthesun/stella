@@ -22,7 +22,7 @@ function JourneyBackdrop() {
     <>
       {JOURNEY.map((theme, i) =>
         theme.id === "default" ? null : (
-          <ThemeGradient key={i} theme={theme} style={{ opacity: 0 }} className={`journey-${i}`} />
+          <ThemeGradient key={i} theme={theme} defer style={{ opacity: 0 }} className={`journey-${i}`} />
         ),
       )}
     </>
@@ -40,24 +40,35 @@ function JourneyView() {
     const canvases = Array.from(win.querySelectorAll<HTMLCanvasElement>("canvas[class^='journey-']"));
     let raf = 0;
     let key = "";
+    let lastP = "";
     let start = 0;
+    let frameDocTop = 0;
+    let frameHeight = 0;
+    let inView = false;
 
     const measure = () => {
       const rect = frame.getBoundingClientRect();
-      start = Math.min(window.innerHeight * 0.9, rect.top + window.scrollY);
+      frameDocTop = rect.top + window.scrollY;
+      frameHeight = rect.height;
+      start = Math.min(window.innerHeight * 0.9, frameDocTop);
     };
 
     const apply = () => {
       raf = 0;
       const vh = window.innerHeight;
-      const rect = frame.getBoundingClientRect();
-      const end = Math.max(0, (vh - rect.height) / 2);
-      const p = clamp((start - rect.top) / Math.max(1, start - end));
+      const rectTop = frameDocTop - window.scrollY;
+      const end = Math.max(0, (vh - frameHeight) / 2);
+      const p = clamp((start - rectTop) / Math.max(1, start - end));
+      const pStr = p.toFixed(3);
+      if (pStr !== lastP) {
+        lastP = pStr;
+        frame.style.setProperty("--journey", pStr);
+      }
       const span = (JOURNEY.length - 1) * seg(p, 0.03, 0.86);
       const i = Math.min(JOURNEY.length - 2, Math.floor(span));
-      const k = ease.inOut(span - i);
-      frame.style.setProperty("--journey", p.toFixed(4));
-      const next = `${i}:${k.toFixed(3)}`;
+      const kRaw = ease.inOut(span - i);
+      const k = Math.round(kRaw * 32) / 32;
+      const next = `${i}:${k}`;
       if (next === key) return;
       key = next;
       const vars = mixWindowVars(JOURNEY[i], JOURNEY[i + 1], k);
@@ -69,18 +80,32 @@ function JourneyView() {
     };
 
     const onScroll = () => {
+      if (!inView) return;
       if (!raf) raf = requestAnimationFrame(apply);
     };
     const onResize = () => {
       measure();
-      onScroll();
+      if (inView) onScroll();
     };
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        inView = entry?.isIntersecting ?? false;
+        if (inView) {
+          measure();
+          onScroll();
+        }
+      },
+      { rootMargin: "200px 0px" },
+    );
 
     measure();
     apply();
+    io.observe(frame);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", onResize, { passive: true });
     return () => {
+      io.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
       cancelAnimationFrame(raf);

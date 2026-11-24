@@ -184,7 +184,7 @@ export function DesignPlayer() {
         near.disconnect();
         void loadRedesigns().then(setMod);
       },
-      { rootMargin: "150% 0px 150% 0px" },
+      { rootMargin: "35% 0px 35% 0px" },
     );
     const seen = new IntersectionObserver(([entry]) => setVisible(entry?.isIntersecting ?? false), { threshold: 0.35 });
     near.observe(el);

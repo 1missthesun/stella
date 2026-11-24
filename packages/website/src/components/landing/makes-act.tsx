@@ -197,7 +197,7 @@ export function MakesAct() {
               ref={videoRef}
               className={k.clip}
               src={near ? "/landing/cabin.mp4" : undefined}
-              poster="/landing/cabin-poster.webp"
+              poster={near ? "/landing/cabin-poster.webp" : undefined}
               muted
               loop
               playsInline

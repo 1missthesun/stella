@@ -64,6 +64,7 @@
   flex-direction: column;
   justify-content: flex-end;
   overflow: hidden;
+  contain: layout style;
 }
 
 .list {
@@ -113,7 +114,6 @@
 @keyframes arrive {
   from {
     opacity: 0;
-    margin-bottom: -34px;
     transform: translateY(10px) scale(0.98);
   }
 }

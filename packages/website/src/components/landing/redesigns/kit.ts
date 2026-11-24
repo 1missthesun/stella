@@ -18,17 +18,18 @@ const FACES = {
     ["RK Barlow", "BarlowSC700", "700"],
     ["RK Barlow Italic", "BarlowSCItalic", "500"],
   ],
-  manrope: [["RK Manrope", "Manrope", "200 800"]],
 } as const;
 
-export type FontSet = keyof typeof FACES | "serif";
+export type FontSet = keyof typeof FACES | "serif" | "manrope";
 
-/** The page's own serif (next/font, not preloaded), fetched before a look that uses it. */
-function loadPageSerif() {
-  const root = document.querySelector<HTMLElement>("[data-landing-root]") ?? document.documentElement;
-  const family = getComputedStyle(root).getPropertyValue("--l-serif").trim();
+/** A font already registered by next/font on the page, loaded on demand without a duplicate asset. */
+function loadPageVarFont(cssVar: string, italic = false) {
+  const root = document.querySelector<HTMLElement>("[data-landing-root]") ?? document.body;
+  const family = getComputedStyle(root).getPropertyValue(cssVar).trim();
   if (!family) return Promise.resolve();
-  return Promise.all([document.fonts.load(`400 20px ${family}`), document.fonts.load(`italic 400 20px ${family}`)]).catch(() => undefined);
+  const loads = [document.fonts.load(`400 20px ${family}`)];
+  if (italic) loads.push(document.fonts.load(`italic 400 20px ${family}`));
+  return Promise.all(loads).catch(() => undefined);
 }
 
 const requested = new Map<FontSet, Promise<unknown>>();
@@ -41,9 +42,14 @@ export function loadFonts(sets: readonly FontSet[]): Promise<unknown> {
       const hit = requested.get(set);
       if (hit) return hit;
       if (set === "serif") {
-        const serif = loadPageSerif();
+        const serif = loadPageVarFont("--l-serif", true);
         requested.set(set, serif);
         return serif;
+      }
+      if (set === "manrope") {
+        const manrope = loadPageVarFont("--font-sans");
+        requested.set(set, manrope);
+        return manrope;
       }
       const loads = FACES[set].map(([family, file, weight]) => {
         const face = new FontFace(family, `url(${FONT_DIR}${file}.woff2) format("woff2")`, { weight, display: "block" });
@@ -66,7 +72,7 @@ export const F = {
   kid: '"RK Schoolbell", "Comic Sans MS", cursive',
   barlow: '"RK Barlow", "Arial Narrow", sans-serif',
   barlowI: '"RK Barlow Italic", "RK Barlow", sans-serif',
-  manrope: '"RK Manrope", system-ui, sans-serif',
+  manrope: 'var(--font-sans), "Manrope", system-ui, sans-serif',
   pixel: "var(--l-pixel), monospace",
   doto: "var(--l-doto), monospace",
   mona: "var(--l-sans), system-ui, sans-serif",

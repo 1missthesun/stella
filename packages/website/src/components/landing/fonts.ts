@@ -1,12 +1,4 @@
-import { Doto, Fraunces, Martian_Mono, Mona_Sans, Pixelify_Sans } from "next/font/google";
-
-export const mona = Mona_Sans({
-  variable: "--l-sans",
-  subsets: ["latin"],
-  axes: ["wdth"],
-  display: "swap",
-  preload: true,
-});
+import { Doto, Fraunces, Martian_Mono, Pixelify_Sans } from "next/font/google";
 
 export const martian = Martian_Mono({
   variable: "--l-mono",
@@ -39,7 +31,6 @@ export const fraunces = Fraunces({
 });
 
 export const landingFontVars = [
-  mona.variable,
   martian.variable,
   doto.variable,
   pixelify.variable,

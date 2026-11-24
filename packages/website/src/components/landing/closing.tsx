@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { APP_STORE_URL, DownloadButton, PLAY_STORE_URL } from "@/components/download-button";
 import { FooterLegalLinks } from "@/components/footer-legal-links";
 import { homeFooterGroups } from "@/components/site-footer-groups";
@@ -54,6 +54,21 @@ export function OpenSourceAct() {
 
   useInViewOnce(ref);
 
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        el.dataset.near = "1";
+        io.disconnect();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <section ref={ref} className={o.source} data-tone="light" data-bg="#ffffff" aria-labelledby="source-title">
       <div className={o.wall} aria-hidden="true">
@@ -100,7 +115,7 @@ export function Finale({
   return (
     <section id="get" className={`${o.finale} ${l.invert}`} data-tone="dark" data-bg="#060609" aria-labelledby="get-title">
       <div className={o.finaleAurora}>
-        <AuroraField className={o.finaleCanvas} dark />
+        <AuroraField className={o.finaleCanvas} dark defer />
       </div>
       {title ? (
         <h2 id="get-title" className={o.line}>
@@ -126,8 +141,8 @@ export function Finale({
         <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
           Android
         </a>
-        <Link href="/chat">Web</Link>
-        <Link href="/download">All downloads</Link>
+        <Link href="/chat" prefetch={false}>Web</Link>
+        <Link href="/download" prefetch={false}>All downloads</Link>
       </div>
     </section>
   );

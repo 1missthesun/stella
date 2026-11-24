@@ -11,32 +11,18 @@
   overflow: hidden;
 }
 
-.aurora,
-.darkAurora {
+.aurora {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.aurora {
   animation: fadeIn 1600ms ease both;
   -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 97%);
   mask-image: linear-gradient(to bottom, #000 50%, transparent 97%);
 }
 
-.darkAurora {
-  opacity: 0;
+:global([data-scene="dark"]) .aurora {
   -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
   mask-image: linear-gradient(to bottom, #000 55%, transparent);
-}
-
-:global([data-scene="dark"]) .aurora {
-  opacity: 0;
-}
-
-:global([data-scene="dark"]) .darkAurora {
-  opacity: 1;
 }
 
 .auroraCanvas {
@@ -112,7 +98,7 @@
 
 .titleLine {
   display: block;
-  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) both;
+  animation: titleRise 1100ms cubic-bezier(0.2, 1, 0.3, 1) both;
 }
 
 .titleLine + .titleLine {
@@ -161,6 +147,13 @@
 
 :global([data-scene="dark"]) .free {
   color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes titleRise {
+  from {
+    opacity: 0.02;
+    transform: translateY(32px);
+  }
 }
 
 @keyframes rise {
@@ -222,6 +215,8 @@
   .cta {
     flex-wrap: wrap;
     row-gap: 14px;
+    min-height: 142px;
+    align-content: flex-start;
   }
 }
 

@@ -1,4 +1,3 @@
-import { Context, Effect, Layer } from "effect";
 import { NOTIFICATION_NAMES } from "@stella/contracts/protocol";
 import { performance } from "node:perf_hooks";
 import { createDesktopDatabase } from "../../../kernel/storage/database.js";
@@ -15,8 +14,10 @@ import {
   recordBootField,
   recordBootStep,
 } from "../../../observability/boot-timing.js";
-import * as HostBus from "../host-bus.js";
-import * as SessionConfig from "./config.js";
+import type * as HostBus from "../host-bus.js";
+import type * as SessionConfig from "./config.js";
+
+export type SessionFinalizer = (succeeded: boolean) => Promise<void> | void;
 
 export interface Interface {
   readonly db: SqliteDatabase;
@@ -32,70 +33,64 @@ export interface Interface {
   ) => LocalChatEventRecord;
 }
 
-export class Service extends Context.Service<Service, Interface>()(
-  "@stella/runtime/worker/SessionStorage",
-) {}
+export const make = (args: {
+  hostBus: HostBus.Interface;
+  config: SessionConfig.Interface;
+  addFinalizer: (finalizer: SessionFinalizer) => void;
+}): Interface => {
+  const { hostBus, config, addFinalizer } = args;
+  const db = createDesktopDatabase(config.get().stellaDataDirPath, {
+    onTiming: (timing) => {
+      recordBootStep("dbOpen", timing.openMs);
+      recordBootStep("dbMigrate", timing.durationMs);
+      recordBootField("dbFromVersion", timing.fromVersion);
+      recordBootField("dbToVersion", timing.toVersion);
+      recordBootField("dbMigrated", timing.migrated);
+    },
+  });
+  const storesStartedAt = performance.now();
+  const chatStore = new ChatStore(db);
+  const runtimeStore = chatStore as RuntimeStore;
+  recordBootStep("chatStore", performance.now() - storesStartedAt);
+  const maintenance = new DatabaseMaintenance({
+    db,
+    databasePath: getDesktopDatabasePath(config.get().stellaDataDirPath),
+  });
 
-export const layer = Layer.effect(
-  Service,
-  Effect.gen(function* () {
-    const hostBus = yield* HostBus.Service;
-    const config = yield* SessionConfig.Service;
-    const db = createDesktopDatabase(config.get().stellaDataDirPath, {
-      onTiming: (timing) => {
-        recordBootStep("dbOpen", timing.openMs);
-        recordBootStep("dbMigrate", timing.durationMs);
-        recordBootField("dbFromVersion", timing.fromVersion);
-        recordBootField("dbToVersion", timing.toVersion);
-        recordBootField("dbMigrated", timing.migrated);
-      },
-    });
-    const storesStartedAt = performance.now();
-    const chatStore = new ChatStore(db);
-    const runtimeStore = chatStore as RuntimeStore;
-    recordBootStep("chatStore", performance.now() - storesStartedAt);
-    const maintenance = new DatabaseMaintenance({
-      db,
-      databasePath: getDesktopDatabasePath(config.get().stellaDataDirPath),
-    });
+  addFinalizer(() => {
+    maintenance.stop();
+    db.close();
+  });
 
-    yield* Effect.addFinalizer(() =>
-      Effect.sync(() => {
-        maintenance.stop();
-        db.close();
-      }),
+  const notifyLocalChatUpdated = (
+    conversationId?: string,
+    event?: LocalChatEventRecord,
+  ) => {
+    hostBus.notify(
+      NOTIFICATION_NAMES.LOCAL_CHAT_UPDATED,
+      event || conversationId
+        ? {
+            ...(conversationId ? { conversationId } : {}),
+            ...(event ? { event: projectLocalChatUpdateEvent(event) } : {}),
+          }
+        : null,
     );
+  };
 
-    const notifyLocalChatUpdated = (
-      conversationId?: string,
-      event?: LocalChatEventRecord,
-    ) => {
-      hostBus.notify(
-        NOTIFICATION_NAMES.LOCAL_CHAT_UPDATED,
-        event || conversationId
-          ? {
-              ...(conversationId ? { conversationId } : {}),
-              ...(event ? { event: projectLocalChatUpdateEvent(event) } : {}),
-            }
-          : null,
-      );
-    };
+  const appendChatEventAndNotify: Interface["appendChatEventAndNotify"] = (
+    eventArgs,
+  ) => {
+    const event = chatStore.chat.appendEvent(eventArgs);
+    notifyLocalChatUpdated(eventArgs.conversationId, event);
+    return event;
+  };
 
-    const appendChatEventAndNotify: Interface["appendChatEventAndNotify"] = (
-      args,
-    ) => {
-      const event = chatStore.chat.appendEvent(args);
-      notifyLocalChatUpdated(args.conversationId, event);
-      return event;
-    };
-
-    return {
-      db,
-      chatStore,
-      runtimeStore,
-      maintenance,
-      notifyLocalChatUpdated,
-      appendChatEventAndNotify,
-    };
-  }),
-);
+  return {
+    db,
+    chatStore,
+    runtimeStore,
+    maintenance,
+    notifyLocalChatUpdated,
+    appendChatEventAndNotify,
+  };
+};

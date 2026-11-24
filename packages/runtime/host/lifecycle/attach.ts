@@ -1,6 +1,7 @@
 import type { Socket } from "node:net";
 import { promises as fsPromises } from "node:fs";
-import { Effect, type Scope } from "effect";
+import * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
 import {
   ensureRuntimeIpcDir,
   resolveRuntimePaths,

@@ -7,14 +7,12 @@ const env = process.env;
 type CensusEntry = { path: string; bytes: number; at: number };
 const census: CensusEntry[] = [];
 if (env.STELLA_PERF_MODULE_CENSUS === "1") {
-  // Only ESM-safe files are intercepted: TypeScript sources and the esbuild
-  // ESM bundle chunks. Plugin-loaded `.js` loses Bun's CommonJS detection,
-  // so node_modules JS is left to the default loader and the bench expands
-  // each observed module to its static import closure from an esbuild
-  // metafile instead.
+  // Intercept TypeScript sources via Bun.plugin. Precompiled CJS bytecode
+  // bundles under dist-electron/runtime/ cannot be re-fed through onLoad
+  // (returning JS text disables CJS/bytecode detection), so they are observed
+  // from require.cache at snapshot time instead.
   const filter = new RegExp(
-    env.STELLA_PERF_MODULE_CENSUS_FILTER ??
-      "(\\.(m|c)?tsx?$)|(dist-electron/runtime/.*\\.js$)",
+    env.STELLA_PERF_MODULE_CENSUS_FILTER ?? "(\\.(m|c)?tsx?$)",
   );
   const loaderFor = (file: string): "ts" | "tsx" | "js" => {
     if (file.endsWith(".tsx")) return "tsx";
@@ -277,6 +275,21 @@ const snapshot = () => {
   Bun.gc(true);
   const heap = heapStats();
   const mem = process.memoryUsage();
+  const allCensus = [...census];
+  if (env.STELLA_PERF_MODULE_CENSUS === "1") {
+    const seen = new Set(allCensus.map((entry) => entry.path));
+    for (const file of Object.keys(require.cache)) {
+      if (seen.has(file) || !file.includes("dist-electron/runtime/")) continue;
+      seen.add(file);
+      let bytes = 0;
+      try {
+        bytes = readFileSync(file).byteLength;
+      } catch {
+        // ignore
+      }
+      allCensus.push({ path: file, bytes, at: performance.now() - bootAt });
+    }
+  }
   return {
     uptimeMs: performance.now() - bootAt,
     timeOriginEpochMs: performance.timeOrigin,
@@ -300,7 +313,7 @@ const snapshot = () => {
     stdout: outStats,
     fetch: fetchStats,
     fakeProvider: fakeStats,
-    census: census.length > 0 ? census : undefined,
+    census: allCensus.length > 0 ? allCensus : undefined,
   };
 };
 process.on("SIGUSR2", () => {

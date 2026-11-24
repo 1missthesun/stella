@@ -25,22 +25,35 @@ if (head && stampPath && !process.argv.includes("--force") && readStamp() === he
   process.exit(0);
 }
 
+const bunBinary =
+  process.versions?.bun
+    ? process.execPath
+    : process.env.STELLA_BUN_PATH?.trim() || "bun";
+
 const steps = [
-  ["native helpers", "packages/desktop/scripts/download-native-helpers.mjs"],
+  ["native helpers", process.execPath, "packages/desktop/scripts/download-native-helpers.mjs"],
   [
     "stella-browser",
+    process.execPath,
     "packages/desktop/scripts/ensure-stella-browser.mjs",
     "--best-effort",
   ],
   [
     "office previews",
+    process.execPath,
     "packages/stella-office/scripts/ensure-native.js",
     "--best-effort",
   ],
   [
     "prebuilt renderer",
+    process.execPath,
     "packages/desktop/scripts/prebuild-renderer.mjs",
     "--best-effort",
+  ],
+  [
+    "runtime worker bytecode",
+    bunBinary,
+    "packages/runtime/scripts/build-worker-bytecode.mjs",
   ],
 ];
 
@@ -48,10 +61,10 @@ const env = { ...process.env };
 delete env.STELLA_SKIP_BROWSER_HYDRATE;
 delete env.STELLA_SKIP_OFFICE_HYDRATE;
 
-const runStep = ([name, script, ...args]) =>
+const runStep = ([name, binary, script, ...args]) =>
   new Promise((resolve) => {
     const startedAt = Date.now();
-    const child = spawn(process.execPath, [script, ...args], {
+    const child = spawn(binary, [script, ...args], {
       cwd: repoRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],

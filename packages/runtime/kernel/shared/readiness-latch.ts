@@ -1,4 +1,7 @@
-import { Deferred, Effect, Layer, ManagedRuntime } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 
 const latchRuntime = ManagedRuntime.make(Layer.empty);
 

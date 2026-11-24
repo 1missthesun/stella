@@ -1,4 +1,8 @@
-import { Cause, Effect, Exit, Layer, ManagedRuntime } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 
 export const extensionsRuntime = ManagedRuntime.make(Layer.empty);
 

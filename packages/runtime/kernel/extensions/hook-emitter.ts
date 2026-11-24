@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type { HookEvent, HookDefinition, HookEventMap } from "./types.js";
 import { runExtensionEffect, tryExtensionOp } from "./effect-runtime.js";
 

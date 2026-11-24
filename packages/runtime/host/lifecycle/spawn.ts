@@ -1,7 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import { Cause, Effect, Exit, type Scope } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import type * as Scope from "effect/Scope";
 import { runtimeIpcListenUrl, type RuntimePaths } from "@stella/node-shared/worker/runtime-paths.js";
 import { rotateLogIfOversized } from "../../observability/rotate-file.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";

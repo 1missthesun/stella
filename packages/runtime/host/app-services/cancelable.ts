@@ -3,7 +3,10 @@
  * each runs as a fiber on the host runtime, and canceling interrupts it,
  * which aborts the signal the work was handed.
  */
-import { Cause, Effect, Exit, Fiber } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 
 import { hostRuntime } from "../effect-runtime.js";
 

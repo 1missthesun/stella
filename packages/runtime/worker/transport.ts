@@ -7,15 +7,14 @@ import {
 import { PassThrough } from "node:stream";
 import { existsSync, promises as fsPromises } from "node:fs";
 import path from "node:path";
-import { Effect } from "effect";
 import { attachJsonRpcPeerToStreams } from "@stella/contracts/protocol/jsonl";
 import {
   STELLA_RUNTIME_PROTOCOL_VERSION,
   STELLA_RUNTIME_READY_METHOD,
 } from "@stella/contracts/protocol";
 import type { JsonRpcPeer } from "@stella/contracts/protocol/rpc-peer";
-import { workerRuntime } from "./effect-runtime.js";
 import type { RuntimeServerIdentity } from "./server-identity.js";
+import { forkDelayed } from "./effect-runtime.js";
 import {
   ensurePrivateSocketDir,
   isWindowsNamedPipePath,
@@ -119,47 +118,36 @@ const startStdioTransport = (
   };
 };
 
-const probeSocketAlive = (socketPath: string): Effect.Effect<boolean> =>
-  Effect.callback<boolean>((resume) => {
+const probeSocketAlive = (socketPath: string): Promise<boolean> =>
+  new Promise<boolean>((resolve) => {
     let socket: Socket;
     try {
       socket = createConnection(socketPath);
     } catch {
-      resume(Effect.succeed(false));
+      resolve(false);
       return;
     }
     let settled = false;
     const finish = (alive: boolean) => {
       if (settled) return;
       settled = true;
-      socket.destroy();
-      resume(Effect.succeed(alive));
+      timer.cancel();
+      try {
+        socket.destroy();
+      } catch {
+        // Best effort.
+      }
+      resolve(alive);
     };
+    const timer = forkDelayed(250, () => finish(false));
     socket.once("connect", () => finish(true));
     socket.once("error", () => finish(false));
-    return Effect.sync(() => {
-      if (!settled) {
-        settled = true;
-        try {
-          socket.destroy();
-        } catch {
-          // Best effort.
-        }
-      }
-    });
-  }).pipe(
-    Effect.timeoutOrElse({
-      duration: 250,
-      orElse: () => Effect.succeed(false),
-    }),
-  );
+  });
 
 const removeIfStaleSocket = async (socketPath: string) => {
   const usesFilesystem = runtimeIpcPathUsesFilesystem(socketPath);
   if (usesFilesystem && !existsSync(socketPath)) return;
-  const liveSocket = await workerRuntime.runPromise(
-    probeSocketAlive(socketPath),
-  );
+  const liveSocket = await probeSocketAlive(socketPath);
   if (liveSocket) {
     throw new Error(`Runtime socket is already in use: ${socketPath}`);
   }
@@ -206,14 +194,11 @@ const startIpcSocketTransport = async (
   const server: Server = createServer((socket: Socket) => {
     sockets.add(socket);
     socket.setNoDelay(true);
-    const handshakeDeadline = Effect.runFork(
-      Effect.andThen(
-        Effect.sleep(HANDSHAKE_TIMEOUT_MS),
-        Effect.sync(() => socket.destroy()),
-      ),
-    );
+    const handshakeDeadline = forkDelayed(HANDSHAKE_TIMEOUT_MS, () => {
+      socket.destroy();
+    });
     socket.once("close", () => {
-      handshakeDeadline.interruptUnsafe();
+      handshakeDeadline.cancel();
       sockets.delete(socket);
     });
     socket.on("error", () => {
@@ -225,7 +210,7 @@ const startIpcSocketTransport = async (
     let nonces: RuntimeAuthNonces | null = null;
     const attachSocket = (initialInput: string) => {
       socket.off("data", onHandshakeData);
-      handshakeDeadline.interruptUnsafe();
+      handshakeDeadline.cancel();
       socket.pause();
       const input = new PassThrough();
       if (initialInput) {

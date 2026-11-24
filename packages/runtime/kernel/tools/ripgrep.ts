@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { ToolContext } from "./types.js";
 
-const __dirname = import.meta.dirname;
+const moduleDir = import.meta.dirname;
 
 let cachedRipgrepPath: string | null = null;
 let pendingResolve: Promise<string | null> | null = null;
@@ -54,7 +54,7 @@ const bundledCandidates = (context?: ToolContext): string[] => {
     process.env.STELLA_APP_RESOURCES_PATH,
     context?.stellaAppDir,
     process.env.STELLA_APP_DIR,
-    path.resolve(__dirname, "..", "..", ".."),
+    path.resolve(moduleDir, "..", "..", ".."),
   ].filter((entry): entry is string => Boolean(entry?.trim()));
   return roots.flatMap((root) => [
     path.join(root, "node_modules", ".bin", executableName()),

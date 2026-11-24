@@ -18,7 +18,6 @@
  */
 
 import { execFile } from "node:child_process";
-import { Effect } from "effect";
 import { logProcessSignal, readProcessCommand, readProcessIdentity } from "./process-identity.js";
 
 export type TerminateProcessTreeOptions = {
@@ -42,7 +41,10 @@ const LIST_TIMEOUT_MS = 2_000;
 const WINDOWS_LIST_TIMEOUT_MS = 4_000;
 const TASKKILL_TIMEOUT_MS = 3_000;
 
-const sleep = (ms: number) => Effect.runPromise(Effect.sleep(ms));
+const sleep = async (ms: number): Promise<void> => {
+  const { Effect } = await import("effect");
+  await Effect.runPromise(Effect.sleep(ms));
+};
 
 const signalTarget = (target: number, signal: NodeJS.Signals | 0) => {
   try {

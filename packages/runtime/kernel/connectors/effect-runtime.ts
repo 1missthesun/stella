@@ -1,4 +1,9 @@
-import { Cause, Deferred, Effect, Exit, Layer, ManagedRuntime } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
+export { forkTimeoutFiber, sleepMs } from "./timers.js";
 
 export const connectorsRuntime = ManagedRuntime.make(Layer.empty);
 
@@ -19,29 +24,6 @@ export const tryConnectorOp = <A>(
     try: op,
     catch: (error) => error,
   });
-
-export const sleepMs = (ms: number): Promise<void> =>
-  connectorsRuntime.runPromise(Effect.sleep(ms));
-
-export const forkTimeoutFiber = (
-  timeoutMs: number,
-  onTimeout: () => void,
-): (() => void) => {
-  const canceled = Deferred.makeUnsafe<void>();
-  void connectorsRuntime
-    .runPromise(
-      Effect.raceFirst(
-        Effect.sleep(timeoutMs).pipe(
-          Effect.flatMap(() => Effect.sync(onTimeout)),
-        ),
-        Deferred.await(canceled),
-      ),
-    )
-    .catch(() => undefined);
-  return () => {
-    Deferred.doneUnsafe(canceled, Effect.void);
-  };
-};
 
 export const guardWithAbortTimeout = <A>(args: {
   timeoutMs: number;

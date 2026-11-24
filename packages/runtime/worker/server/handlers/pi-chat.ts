@@ -1,20 +1,21 @@
-import { Effect } from "effect";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
 import type { PiChatRequest, PiChatUsageRequest } from "@stella/contracts/pi-chat";
 import { RunnerUnavailableError } from "../errors.js";
-import * as HostBus from "../host-bus.js";
 import { piChatRequest } from "../pi-chats.js";
-import * as WorkerSessions from "../sessions.js";
-import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
+import { requireSession } from "../sessions.js";
+import type { WorkerRpcHandlers } from "../rpc.js";
 
 export const piChatHandlers: WorkerRpcHandlers = {
-  [METHOD_NAMES.INTERNAL_WORKER_PI_CHAT]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(() => new RunnerUnavailableError());
-      const hostBus = yield* HostBus.Service;
-      yield* session.runner.initialized;
-      return yield* fromPromise(async () =>
-        piChatRequest(session, hostBus, params as PiChatRequest | PiChatUsageRequest),
-      );
-    }),
+  [METHOD_NAMES.INTERNAL_WORKER_PI_CHAT]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    await session.runner.ensureInitialized();
+    return await piChatRequest(
+      session,
+      ctx.hostBus,
+      params as PiChatRequest | PiChatUsageRequest,
+    );
+  },
 };

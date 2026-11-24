@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { readRuntimeBytecodeFingerprint } from "../kernel/shared/runtime-bytecode-stamp.js";
 
 /**
  * Runtime code-identity stamp used by the staleness handshake between the
@@ -96,6 +97,10 @@ export const computeRuntimeBuildStamp = (workerEntryPath: string): string => {
   const trimmedEntry = workerEntryPath?.trim();
   if (!trimmedEntry) return RUNTIME_BUILD_STAMP_UNAVAILABLE;
   try {
+    const bytecodeFp = readRuntimeBytecodeFingerprint(path.dirname(trimmedEntry));
+    if (bytecodeFp) {
+      return bytecodeFp.stamp.slice(0, 32);
+    }
     const lines: string[] = [];
     for (const rootDir of resolveRuntimeCodeRoots(trimmedEntry)) {
       collectStampLines(rootDir, rootDir, lines);

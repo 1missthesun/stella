@@ -4,7 +4,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { Worker } from "node:worker_threads";
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 
 import {
   forkCancelableTimeout,
@@ -65,6 +66,7 @@ import {
   type SkyClient,
 } from "./client.js";
 import { createNodeReplWorkerSource } from "./kernel-worker.js";
+import { ensureBrowserWorkerApiSource } from "../browser-use/worker-api-source.js";
 import {
   TASK_TABS_FIRST_SWEEP_DELAY_MS,
   TASK_TABS_SWEEP_INTERVAL_MS,
@@ -3221,7 +3223,7 @@ export class NodeReplKernelRegistry {
     context: ToolContext,
     options: EvaluateOptions = {},
   ): Promise<NodeReplEvaluationResult> {
-    const { id, kernel } = this.resolveKernel(context);
+    const { id, kernel } = await this.resolveKernel(context);
     return await this.runKernelEvaluation(id, kernel, code, context, options);
   }
 
@@ -3231,7 +3233,7 @@ export class NodeReplKernelRegistry {
     options: EvaluateOptions & { yieldTimeMs?: number } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
-    const { id, kernel } = this.resolveKernel(context);
+    const { id, kernel } = await this.resolveKernel(context);
     const existingCellId = this.runningCellByOwner.get(id);
     if (existingCellId) {
       throw new Error(
@@ -3336,10 +3338,10 @@ export class NodeReplKernelRegistry {
     );
   }
 
-  private resolveKernel(context: ToolContext): {
+  private async resolveKernel(context: ToolContext): Promise<{
     id: string;
     kernel: NodeReplKernel;
-  } {
+  }> {
     const id = getStellaComputerSessionId(context);
     const browserSessionId = getStellaBrowserSessionId(context);
     if (!id || !browserSessionId) {
@@ -3352,6 +3354,10 @@ export class NodeReplKernelRegistry {
       this.sessionIdsByAgent.set(context.agentId, ids);
     }
     let kernel = this.kernels.get(id);
+    if (!kernel) {
+      await ensureBrowserWorkerApiSource();
+      kernel = this.kernels.get(id);
+    }
     if (!kernel) {
       const sessionFactory = this.options.sessionFactory;
       if (!sessionFactory) {

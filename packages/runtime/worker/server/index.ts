@@ -1,5 +1,5 @@
-import { Effect, Layer, ManagedRuntime } from "effect";
 import type { WorkerPeerLike } from "../peer-broker.js";
+import { forkDelayed } from "../effect-runtime.js";
 import * as HostBus from "./host-bus.js";
 import * as ModelCatalog from "./model-catalog.js";
 import * as RunnerModule from "./runner-module.js";
@@ -22,14 +22,18 @@ export const createRuntimeWorkerServer = (
   prefetchRunner: () => void;
   shutdown: () => Promise<void>;
 } => {
-  const baseLayer: Layer.Layer<WorkerRpcContext> = WorkerSessions.layer.pipe(
-    Layer.provideMerge(ModelCatalog.layer),
-    Layer.provideMerge(RunnerModule.layer),
-    Layer.provideMerge(HostBus.layer(peer)),
-  );
-  const runtime = ManagedRuntime.make(baseLayer);
+  const hostBus = HostBus.make(peer);
+  const runnerModule = RunnerModule.make();
+  const modelCatalog = ModelCatalog.make(hostBus);
+  const sessions = WorkerSessions.make({ hostBus, modelCatalog, runnerModule });
+  const ctx: WorkerRpcContext = {
+    hostBus,
+    modelCatalog,
+    runnerModule,
+    sessions,
+  };
 
-  attachWorkerRpcHandlers(peer, runtime, {
+  attachWorkerRpcHandlers(peer, ctx, {
     ...lifecycleHandlers,
     ...chatHandlers,
     ...runsHandlers,
@@ -40,37 +44,19 @@ export const createRuntimeWorkerServer = (
     ...piChatHandlers,
   });
 
-  const ready = runtime.runPromise(Effect.void).catch(() => undefined);
+  const holdsWorkerAlive = (): boolean => sessions.holdsWorkerAlive();
 
-  const holdsWorkerAlive = (): boolean =>
-    runtime.runSync(
-      Effect.map(WorkerSessions.Service, (sessions) =>
-        sessions.holdsWorkerAlive(),
-      ),
-    );
-
-  const interruptWork = (): Promise<void> =>
-    runtime.runPromise(
-      Effect.flatMap(WorkerSessions.Service, (sessions) =>
-        sessions.interruptWork(),
-      ),
-    );
+  const interruptWork = (): Promise<void> => sessions.interruptWork();
 
   // Start the runner-module import ahead of initialize (see
-  // runner-module.ts). The import fiber lives in the base layer's scope.
-  // It waits one timer tick so requests already buffered on the transport
-  // (a stdio host writes before the worker attaches) are dispatched first;
-  // starting it synchronously delayed the first response by the whole
-  // import (+38 ms in the perf lab) for no gain in spawn→ready.
+  // runner-module.ts). It waits one timer tick so requests already buffered
+  // on the transport (a stdio host writes before the worker attaches) are
+  // dispatched first; starting it synchronously delayed the first response
+  // by the whole import (+38 ms in the perf lab) for no gain in spawn→ready.
   const prefetchRunner = (): void => {
-    void runtime
-      .runPromise(
-        Effect.andThen(
-          Effect.sleep(0),
-          Effect.flatMap(RunnerModule.Service, (m) => m.prefetch),
-        ),
-      )
-      .catch(() => undefined);
+    forkDelayed(0, () => {
+      runnerModule.prefetch();
+    });
   };
 
   let shuttingDown = false;
@@ -79,15 +65,8 @@ export const createRuntimeWorkerServer = (
       return;
     }
     shuttingDown = true;
-    await ready;
-    await runtime.runPromise(
-      Effect.gen(function* () {
-        const catalog = yield* ModelCatalog.Service;
-        const sessions = yield* WorkerSessions.Service;
-        catalog.dispose();
-        yield* sessions.shutdown();
-      }),
-    );
+    modelCatalog.dispose();
+    await sessions.shutdown();
   };
 
   return { interruptWork, holdsWorkerAlive, prefetchRunner, shutdown };

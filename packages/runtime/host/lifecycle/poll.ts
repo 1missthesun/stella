@@ -1,4 +1,5 @@
-import { Effect, Schedule } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schedule from "effect/Schedule";
 
 export const pollWithDeadline = <A, E, ED, R>(args: {
   timeoutMs: number;

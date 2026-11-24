@@ -1,4 +1,3 @@
-import { Cause, Effect, Exit, Scope } from "effect";
 import "@stella/node-shared/shared/http-proxy.js";
 import path from "node:path";
 import {
@@ -16,8 +15,7 @@ import {
 import { closeRuntimeTelemetry } from "../observability/runtime-telemetry.js";
 import type { JsonRpcPeer } from "@stella/contracts/protocol/rpc-peer";
 import { STELLA_RUNTIME_CLIENT_PROTOCOL_VERSION } from "@stella/contracts/protocol/runtime-client";
-import { RuntimeClientServer } from "../host/client-server.js";
-import { workerRuntime } from "./effect-runtime.js";
+import { sleepMs } from "./effect-runtime.js";
 import {
   WorkerLifecycleServer,
 } from "./lifecycle-server.js";
@@ -83,46 +81,33 @@ const main = async () => {
   }
   const transport = transportResult.transport;
 
-  const rootScope = Scope.makeUnsafe();
+  const finalizers: Array<() => Promise<void> | void> = [];
   let rootScopeClosed = false;
   const closeRootScope = async () => {
     if (rootScopeClosed) return;
     rootScopeClosed = true;
-    await workerRuntime
-      .runPromise(Scope.close(rootScope, Exit.void))
-      .catch(() => undefined);
+    for (let i = finalizers.length - 1; i >= 0; i -= 1) {
+      try {
+        await finalizers[i]?.();
+      } catch {
+        // Best effort during process shutdown.
+      }
+    }
     await closeRuntimeTelemetry();
   };
-  const acquire = async <A>(
-    effect: Effect.Effect<A, unknown, Scope.Scope>,
-  ): Promise<A> => {
-    const exit = await workerRuntime.runPromiseExit(
-      Scope.provide(effect, rootScope),
-    );
-    if (Exit.isSuccess(exit)) return exit.value;
-    throw Cause.squash(exit.cause);
-  };
 
-  const broker = await acquire(
-    Effect.acquireRelease(
-      Effect.sync(() => new WorkerPeerBroker()),
-      (acquired) =>
-        Effect.sync(() => {
-          try {
-            acquired.dispose();
-          } catch {
-            // Best effort during process shutdown.
-          }
-        }),
-    ),
-  );
-  const runtimeServer = await acquire(
-    Effect.acquireRelease(
-      Effect.sync(() => createRuntimeWorkerServer(broker)),
-      (acquired) =>
-        Effect.promise(() => acquired.shutdown().catch(() => undefined)),
-    ),
-  );
+  const broker = new WorkerPeerBroker();
+  finalizers.push(() => {
+    try {
+      broker.dispose();
+    } catch {
+      // Best effort during process shutdown.
+    }
+  });
+  const runtimeServer = createRuntimeWorkerServer(broker);
+  finalizers.push(async () => {
+    await runtimeServer.shutdown().catch(() => undefined);
+  });
   let shuttingDown = false;
 
   let lifecycle: WorkerLifecycleServer | null = null;
@@ -161,12 +146,10 @@ const main = async () => {
       shouldKeepAlive: () => runtimeServer.holdsWorkerAlive(),
       onShutdown: async (reason) => {
         const startedAt = Date.now();
-        const closed = await workerRuntime.runPromise(
-          Effect.raceFirst(
-            Effect.promise(() => closeRootScope()).pipe(Effect.as(true)),
-            Effect.sleep(SHUTDOWN_DEADLINE_MS).pipe(Effect.as(false)),
-          ),
-        );
+        const closed = await Promise.race([
+          closeRootScope().then(() => true),
+          sleepMs(SHUTDOWN_DEADLINE_MS).then(() => false),
+        ]);
         logger.process(closed ? "worker.shutdown-closed" : "worker.shutdown-deadline", {
           reason,
           elapsedMs: Date.now() - startedAt,
@@ -226,44 +209,40 @@ const main = async () => {
   let protocolVersion: string | undefined;
   if (lifecycle) {
     const runtimeLifecycle = lifecycle;
-    const { StellaRuntimeHost } = await import("../host/index.js");
-    const clientServer = await acquire(
-      Effect.acquireRelease(
-        Effect.sync(
-          () =>
-            new RuntimeClientServer({
-              ...(serverIdentity ? { identity: serverIdentity } : {}),
-              createHost: (params, hostHandlers) =>
-                new StellaRuntimeHost({
-                  initializeParams: params.initializeParams,
-                  hostHandlers,
-                  workerMode: "inproc",
-                  workerEntryPath: process.argv[1],
-                  ...(params.disableLocalScheduler
-                    ? { disableLocalScheduler: true }
-                    : {}),
-                  inprocWorker: {
-                    attach: (peer: JsonRpcPeer) => {
-                      broker.attach(peer);
-                      return () => broker.detach(peer);
-                    },
-                    restartProcess: () => {
-                      setImmediate(() => {
-                        void runtimeLifecycle.shutdown("restart");
-                      });
-                    },
-                  },
-                }),
-              onShutdownRequested: () => {
+    const [{ StellaRuntimeHost }, { RuntimeClientServer }] = await Promise.all([
+      import("../host/index.js"),
+      import("../host/client-server.js"),
+    ]);
+    const clientServer = new RuntimeClientServer({
+      ...(serverIdentity ? { identity: serverIdentity } : {}),
+      createHost: (params, hostHandlers) =>
+        new StellaRuntimeHost({
+          initializeParams: params.initializeParams,
+          hostHandlers,
+          workerMode: "inproc",
+          workerEntryPath: process.argv[1],
+          ...(params.disableLocalScheduler
+            ? { disableLocalScheduler: true }
+            : {}),
+          inprocWorker: {
+            attach: (peer: JsonRpcPeer) => {
+              broker.attach(peer);
+              return () => broker.detach(peer);
+            },
+            restartProcess: () => {
+              setImmediate(() => {
                 void runtimeLifecycle.shutdown("restart");
-              },
-              onQuitRequested: () => runtimeLifecycle.requestQuit(),
-              onRelaunching: () => runtimeLifecycle.noteRelaunching(),
-            }),
-        ),
-        (acquired) => Effect.promise(() => acquired.close()),
-      ),
-    );
+              });
+            },
+          },
+        }),
+      onShutdownRequested: () => {
+        void runtimeLifecycle.shutdown("restart");
+      },
+      onQuitRequested: () => runtimeLifecycle.requestQuit(),
+      onRelaunching: () => runtimeLifecycle.noteRelaunching(),
+    });
+    finalizers.push(() => clientServer.close());
     attachPeer = (peer) => {
       runtimeLifecycle.noteClientConnected();
       peer.on("closed", () => runtimeLifecycle.noteClientDisconnected());
@@ -272,26 +251,19 @@ const main = async () => {
     protocolVersion = STELLA_RUNTIME_CLIENT_PROTOCOL_VERSION;
   }
 
-  const server = await acquire(
-    Effect.acquireRelease(
-      Effect.tryPromise({
-        try: () =>
-          startWorkerTransport({
-            transport,
-            attach: attachPeer,
-            ...(protocolVersion ? { protocolVersion } : {}),
-            ...(serverIdentity ? { identity: serverIdentity } : {}),
-            ...(authKey ? { authKey } : {}),
-            onError: (error) => {
-              console.error("[runtime-worker] transport error:", error);
-            },
-          }),
-        catch: (error) => error,
-      }),
-      (acquired) =>
-        Effect.promise(() => acquired.close().catch(() => undefined)),
-    ),
-  );
+  const server = await startWorkerTransport({
+    transport,
+    attach: attachPeer,
+    ...(protocolVersion ? { protocolVersion } : {}),
+    ...(serverIdentity ? { identity: serverIdentity } : {}),
+    ...(authKey ? { authKey } : {}),
+    onError: (error) => {
+      console.error("[runtime-worker] transport error:", error);
+    },
+  });
+  finalizers.push(async () => {
+    await server.close().catch(() => undefined);
+  });
 
   runtimeServer.prefetchRunner();
 

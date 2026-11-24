@@ -4,11 +4,12 @@ import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generati
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { createProvider, type MutableModels, type Provider } from "@earendil-works/pi-ai/models";
-import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { ModelRef } from "@earendil-works/pi-durable";
 import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
-import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "./chatgpt.ts";
+import { loadUpstreamProvider } from "./lazy-upstream.ts";
 import { STELLA_PROVIDER_ID } from "./stella.ts";
+
+export const CHATGPT_PROVIDER_ID = "chatgpt";
 
 export type ModelPick =
   | { kind: "stella"; alias: string }
@@ -97,22 +98,28 @@ export const storeOnlyAuthContext: AuthContext = {
   fileExists: async () => false,
 };
 
+const RESERVED_UPSTREAM_IDS = new Set([STELLA_PROVIDER_ID, LOCAL_PROVIDER_ID, CHATGPT_PROVIDER_ID]);
+
 export function byokModels(models: MutableModels, resolveDirect?: DirectModelResolver) {
-  let upstream: Provider[] | undefined;
-  const upstreamProviders = () => (upstream ??= [...builtinProviders()]);
-  let registered = false;
-  const registerUpstream = () => {
-    if (registered) return;
-    registered = true;
-    for (const provider of upstreamProviders()) {
-      if ([STELLA_PROVIDER_ID, LOCAL_PROVIDER_ID, CHATGPT_PROVIDER_ID].includes(provider.id)) continue;
+  const registeredUpstream = new Set<string>();
+  const ensureUpstream = async (id: string): Promise<Provider | undefined> => {
+    if (RESERVED_UPSTREAM_IDS.has(id)) return undefined;
+    const provider = await loadUpstreamProvider(id);
+    if (!provider) return undefined;
+    if (!registeredUpstream.has(provider.id)) {
+      registeredUpstream.add(provider.id);
       models.setProvider(provider);
     }
+    return provider;
   };
 
+  let chatGptModule: Promise<typeof import("./chatgpt.ts")> | undefined;
+  const loadChatGpt = () => (chatGptModule ??= import("./chatgpt.ts"));
+
   const chatgpt = new Map<string, Model<"openai-responses">>();
-  const ensureChatGpt = (modelId: string): ModelRef | { error: string } => {
+  const ensureChatGpt = async (modelId: string): Promise<ModelRef | { error: string }> => {
     if (!chatgpt.has(modelId)) {
+      const { chatGptModel, chatGptProvider } = await loadChatGpt();
       const model = chatGptModel(modelId);
       if (!model) return { error: `chatgpt/${modelId} isn't a model Stella can run on your ChatGPT plan.` };
       chatgpt.set(modelId, model);
@@ -180,16 +187,16 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
   };
 
   const unlisted = new Map<string, Model<Api>[]>();
-  const ensureDirect = (pick: Extract<ModelPick, { kind: "direct" }>): ModelRef | { error: string } => {
-    registerUpstream();
+  const ensureDirect = async (pick: Extract<ModelPick, { kind: "direct" }>): Promise<ModelRef | { error: string }> => {
     const family = PROVIDER_FAMILIES[pick.provider] ?? [pick.provider];
+    const familyProviders = await Promise.all(family.map((id) => ensureUpstream(id)));
     // The picker writes some ids with dots where the provider uses dashes.
     for (const provider of family) {
       for (const candidate of [pick.modelId, pick.modelId.replace(/\./g, "-")]) {
         if (models.getModel(provider, candidate)) return { provider, modelId: candidate };
       }
     }
-    const provider = upstreamProviders().find((entry) => entry.id === family[0]);
+    const provider = familyProviders[0];
     const unlistedModel = provider ? modelForUnlistedId(provider.getModels(), pick.modelId) : undefined;
     if (!provider || !unlistedModel) {
       return { error: `${pick.provider}/${pick.modelId} isn't a model Stella can run with your key.` };
@@ -218,8 +225,7 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
         "google-generative-ai": googleGenerativeAIApi(),
       },
     }));
-  const routedProvider = (id: string): Provider => {
-    const base = upstreamProviders().find((entry) => entry.id === id);
+  const routedProvider = (id: string, base: Provider | undefined): Provider => {
     const own = () => routed.get(id) ?? new Map<string, DirectModelRoute>();
     const target = (model: Model<Api>): { provider: Provider; model: Model<Api> } => {
       const route = own().get(model.id);
@@ -271,7 +277,10 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
       },
     } as Provider;
   };
-  const ensureRouted = (resolve: DirectModelResolver, pick: { provider: string; modelId: string }): ModelRef | { error: string } => {
+  const ensureRouted = async (
+    resolve: DirectModelResolver,
+    pick: { provider: string; modelId: string },
+  ): Promise<ModelRef | { error: string }> => {
     const route = resolve(`${pick.provider}/${pick.modelId}`);
     if ("error" in route) return route;
     const { provider, id } = route.model;
@@ -279,30 +288,30 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
     if (!own) {
       own = new Map();
       routed.set(provider, own);
-      registerUpstream();
-      models.setProvider(routedProvider(provider));
+      const base = await loadUpstreamProvider(provider);
+      models.setProvider(routedProvider(provider, base));
     }
     own.set(id, route);
     return { provider, modelId: id };
   };
 
   return {
-    ensure(pick: Exclude<ModelPick, { kind: "stella" | "engine" }>): ModelRef | { error: string } {
+    async ensure(pick: Exclude<ModelPick, { kind: "stella" | "engine" }>): Promise<ModelRef | { error: string }> {
       if (pick.kind === "local") return ensureLocal(pick);
-      if (pick.provider === CHATGPT_PROVIDER_ID) return ensureChatGpt(pick.modelId);
-      return resolveDirect ? ensureRouted(resolveDirect, pick) : ensureDirect(pick);
+      if (pick.provider === CHATGPT_PROVIDER_ID) return await ensureChatGpt(pick.modelId);
+      return resolveDirect ? await ensureRouted(resolveDirect, pick) : await ensureDirect(pick);
     },
-    restore(ref: ModelRef): void {
+    async restore(ref: ModelRef): Promise<void> {
       if (ref.provider === LOCAL_PROVIDER_ID) {
         const pick = parseLocal(ref.modelId);
         if (pick?.kind === "local") ensureLocal(pick);
       } else if (ref.provider === CHATGPT_PROVIDER_ID) {
-        ensureChatGpt(ref.modelId);
+        await ensureChatGpt(ref.modelId);
       } else if (ref.provider !== STELLA_PROVIDER_ID && resolveDirect) {
-        ensureRouted(resolveDirect, ref);
+        await ensureRouted(resolveDirect, ref);
       } else if (ref.provider !== STELLA_PROVIDER_ID) {
-        registerUpstream();
-        if (!models.getModel(ref.provider, ref.modelId)) ensureDirect({ kind: "direct", ...ref });
+        await ensureUpstream(ref.provider);
+        if (!models.getModel(ref.provider, ref.modelId)) await ensureDirect({ kind: "direct", ...ref });
       }
     },
   };

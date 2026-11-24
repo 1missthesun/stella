@@ -1,50 +1,59 @@
-import * as Cause from "effect/Cause";
-import * as Data from "effect/Data";
 import { STELLA_RUNTIME_PROTOCOL_VERSION } from "@stella/contracts/protocol";
 
-export class WorkerNotInitializedError extends Data.TaggedError(
-  "@stella/runtime/worker/WorkerNotInitializedError",
-) {
-  override get message() {
-    return "Worker has not been initialized.";
+export class WorkerNotInitializedError extends Error {
+  readonly _tag = "@stella/runtime/worker/WorkerNotInitializedError";
+
+  constructor() {
+    super("Worker has not been initialized.");
+    this.name = "WorkerNotInitializedError";
   }
 }
 
-export class RunnerUnavailableError extends Data.TaggedError(
-  "@stella/runtime/worker/RunnerUnavailableError",
-) {
-  override get message() {
-    return "Runtime worker is not ready.";
+export class RunnerUnavailableError extends Error {
+  readonly _tag = "@stella/runtime/worker/RunnerUnavailableError";
+
+  constructor() {
+    super("Runtime worker is not ready.");
+    this.name = "RunnerUnavailableError";
   }
 }
 
-export class ChatStoreUnavailableError extends Data.TaggedError(
-  "@stella/runtime/worker/ChatStoreUnavailableError",
-) {
-  override get message() {
-    return "Chat store is not available.";
+export class ChatStoreUnavailableError extends Error {
+  readonly _tag = "@stella/runtime/worker/ChatStoreUnavailableError";
+
+  constructor() {
+    super("Chat store is not available.");
+    this.name = "ChatStoreUnavailableError";
   }
 }
 
-export class VoiceUnavailableError extends Data.TaggedError(
-  "@stella/runtime/worker/VoiceUnavailableError",
-) {
-  override get message() {
-    return "Voice runtime service is not available.";
+export class VoiceUnavailableError extends Error {
+  readonly _tag = "@stella/runtime/worker/VoiceUnavailableError";
+
+  constructor() {
+    super("Voice runtime service is not available.");
+    this.name = "VoiceUnavailableError";
   }
 }
 
-export class ProtocolMismatchError extends Data.TaggedError(
-  "@stella/runtime/worker/ProtocolMismatchError",
-)<{ readonly hostVersion: string }> {
-  override get message() {
-    return `Runtime protocol mismatch: host=${this.hostVersion} worker=${STELLA_RUNTIME_PROTOCOL_VERSION}.`;
+export class ProtocolMismatchError extends Error {
+  readonly _tag = "@stella/runtime/worker/ProtocolMismatchError";
+  readonly hostVersion: string;
+
+  constructor(args: { readonly hostVersion: string }) {
+    super(
+      `Runtime protocol mismatch: host=${args.hostVersion} worker=${STELLA_RUNTIME_PROTOCOL_VERSION}.`,
+    );
+    this.name = "ProtocolMismatchError";
+    this.hostVersion = args.hostVersion;
   }
 }
 
-export class WorkerRequestError extends Data.TaggedError(
-  "@stella/runtime/worker/WorkerRequestError",
-)<{ readonly message: string }> {}
+export class WorkerRequestError extends Error {
+  readonly _tag = "@stella/runtime/worker/WorkerRequestError";
 
-export const causeToThrowable = (cause: Cause.Cause<unknown>): unknown =>
-  Cause.squash(cause);
+  constructor(args: { readonly message: string }) {
+    super(args.message);
+    this.name = "WorkerRequestError";
+  }
+}

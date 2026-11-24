@@ -1,4 +1,5 @@
-import { Effect, Exit } from "effect";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import type { ToolContext, ToolResult, ToolUpdateCallback } from "../types.js";
 import { truncate } from "../utils.js";
 import { getTerminalRecoveryHint } from "../terminal-hints.js";

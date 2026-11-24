@@ -11,13 +11,8 @@ import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generati
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { createModels, createProvider } from "@earendil-works/pi-ai/models";
-import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-import {
-  CHATGPT_PROVIDER_ID,
-  chatGptModel,
-  chatGptProvider,
-} from "@stella/agent/provider/chatgpt";
-import { LOCAL_PROVIDER_ID } from "@stella/agent/provider/byok";
+import { CHATGPT_PROVIDER_ID, LOCAL_PROVIDER_ID } from "@stella/agent/provider/byok";
+import { loadUpstreamProvider } from "@stella/agent/provider/lazy-upstream";
 import { stellaModel, stellaProvider } from "@stella/agent/provider/stella";
 import type { ResolvedLlmRoute } from "./model-routing.js";
 import { withProcessableImages } from "./shared/image-payload.js";
@@ -31,10 +26,6 @@ export type RouteCompletionOptions = Pick<
 
 const LOCAL_PLACEHOLDER_KEY = "stella-local";
 const CREDENTIALLESS_PLACEHOLDER_KEY = "stella-credentialless";
-
-let upstream: readonly Provider[] | undefined;
-const upstreamProvider = (id: string): Provider | undefined =>
-  (upstream ??= builtinProviders()).find((provider) => provider.id === id);
 
 const keyedProvider = (id: string, model: Model<Api>, fallbackKey?: string): Provider =>
   createProvider({
@@ -57,12 +48,15 @@ const keyedProvider = (id: string, model: Model<Api>, fallbackKey?: string): Pro
     },
   });
 
-const directTarget = (route: ResolvedLlmRoute): { provider: Provider; model: Model<Api> } => {
+const directTarget = async (
+  route: ResolvedLlmRoute,
+): Promise<{ provider: Provider; model: Model<Api> }> => {
   const { model } = route;
   if (route.credentialless) {
     return { provider: keyedProvider(model.provider, model, CREDENTIALLESS_PLACEHOLDER_KEY), model };
   }
   if (model.provider === CHATGPT_PROVIDER_ID) {
+    const { chatGptModel, chatGptProvider } = await import("@stella/agent/provider/chatgpt");
     const plan = chatGptModel(model.id);
     if (!plan) throw new Error(`chatgpt/${model.id} isn't a model Stella can run on your ChatGPT plan.`);
     return { provider: chatGptProvider({ models: [plan] }), model: plan };
@@ -70,7 +64,7 @@ const directTarget = (route: ResolvedLlmRoute): { provider: Provider; model: Mod
   if (model.provider === LOCAL_PROVIDER_ID) {
     return { provider: keyedProvider(LOCAL_PROVIDER_ID, model, LOCAL_PLACEHOLDER_KEY), model };
   }
-  const provider = upstreamProvider(model.provider);
+  const provider = await loadUpstreamProvider(model.provider);
   if (!provider) return { provider: keyedProvider(model.provider, model), model };
   const known = provider.getModels().find((candidate) => candidate.id === model.id);
   if (known && (known.baseUrl !== model.baseUrl || known.api !== model.api)) {
@@ -95,8 +89,8 @@ export async function completeOnRoute(
     return await models.completeSimple(stellaModel(spec, access.relayBaseUrl), context, request);
   }
   const apiKey = givenKey ?? (await route.getApiKey())?.trim();
-  const send = (key: string | undefined) => {
-    const { provider, model } = directTarget(route);
+  const send = async (key: string | undefined) => {
+    const { provider, model } = await directTarget(route);
     models.setProvider(provider);
     return models.completeSimple(model, context, {
       ...request,
@@ -117,4 +111,3 @@ export const readAssistantText = (message: AssistantMessage): string =>
     .flatMap((part) => (part.type === "text" ? [part.text] : []))
     .join("")
     .trim();
-

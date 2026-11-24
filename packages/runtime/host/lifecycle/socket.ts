@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { createConnection, type Socket } from "node:net";
-import { Effect, Exit, type Scope } from "effect";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import type * as Scope from "effect/Scope";
 import {
   STELLA_RUNTIME_READY_METHOD,
   type RuntimeInitializeResult,

@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { Effect } from "effect";
 import {
   METHOD_NAMES,
   type RuntimeAttachmentRef,
@@ -15,7 +14,6 @@ import {
   RunnerUnavailableError,
   WorkerNotInitializedError,
 } from "../errors.js";
-import * as HostBus from "../host-bus.js";
 import { isFramedAgentMessage } from "@stella/contracts/agent-directory";
 import {
   cancelPiPlacedAgent,
@@ -27,8 +25,8 @@ import {
   piPlacementCanceled,
   piPlacedChat,
 } from "../pi-chats.js";
-import * as WorkerSessions from "../sessions.js";
-import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
+import { requireSession, type OpenSession } from "../sessions.js";
+import type { WorkerRpcHandlers } from "../rpc.js";
 import {
   isPlacementThreadId,
   placementRemoteThreadAgentId,
@@ -53,260 +51,287 @@ const withAttachedFiles = (
 };
 
 export const runsHandlers: WorkerRpcHandlers = {
-  [METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const automation = params as {
-        conversationId: string;
-        userPrompt: string;
-        rejectIfBusy?: boolean;
-        executionPlacementRunId?: string;
-        userMessageEventId?: string;
-        userAuthoredPrompt?: boolean;
-        scheduled?: boolean;
-        handoff?: boolean;
-        attachments?: RuntimeAttachmentRef[];
-        context?: unknown;
-      };
-      const hostBus = yield* HostBus.Service;
-      if (automation.executionPlacementRunId) {
-        const placementRunId = automation.executionPlacementRunId;
-        return yield* fromPromise(() =>
-          piPlacedChat(session, hostBus, {
-            conversationId: automation.conversationId,
-            userPrompt: automation.userPrompt,
-            placementRunId,
-            ...(automation.userMessageEventId ? { userMessageEventId: automation.userMessageEventId } : {}),
-            ...(automation.attachments?.length ? { attachments: automation.attachments } : {}),
-            ...(automation.context !== undefined ? { context: automation.context } : {}),
-            ...(automation.scheduled ? { scheduled: true } : {}),
-            ...(automation.handoff ? { handoff: true } : {}),
-          }),
-        );
-      }
-      return yield* fromPromise(async () =>
-        (await piChatsFor(session, hostBus)).automation(automation.conversationId, {
-          requestId: automation.userMessageEventId || `automation:${crypto.randomUUID()}`,
-          prompt: automation.userPrompt,
-          visible: automation.userAuthoredPrompt === true,
-          ...(automation.rejectIfBusy ? { rejectIfBusy: true } : {}),
-        }),
-      );
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_CANCEL_PLACEMENT_AUTOMATION]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as RuntimePlacementAutomationCancellationRequest;
-      const runId = typeof payload.runId === "string" ? payload.runId.trim() : "";
-      if (!runId) {
-        throw new Error(
-          "An execution-placement automation cancellation requires runId.",
-        );
-      }
-      const reason = typeof payload.reason === "string" ? payload.reason : undefined;
-      return { canceled: yield* fromPromise(() => cancelPiPlacement(session, runId, reason)) };
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_RUN_BLOCKING_AGENT]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as RuntimeLocalAgentRequest;
-      const attachments = yield* fromPromise(() =>
-        session.agentRuns.materializeAgentAttachments({
-          conversationId: payload.conversationId,
-          ...(payload.attachments ? { attachments: payload.attachments } : {}),
-        }),
-      );
-      const requestedModel = payload.requestedModel?.trim();
-      const pickedModel = requestedModel && requestedModel !== "default" ? requestedModel : undefined;
-      const hostBus = yield* HostBus.Service;
-      const agentKey = payload.remoteThreadId
-        ? piPlacedAgentKey(payload.remoteThreadId)
-        : payload.threadId || payload.executionId || crypto.randomUUID();
-      const runKey = payload.executionId || agentKey;
-      return yield* fromPromise(async () => {
-        const chats = await piChatsFor(session, hostBus);
-        const canceled = payload.threadId || payload.executionId ? piPlacementCanceled(session, "agent", runKey) : null;
-        if (canceled) return { status: "error" as const, finalText: "" as const, error: canceled, threadId: agentKey };
-        const result = await chats.runPlacedAgent(payload.conversationId, {
-          agentKey,
-          runKey,
-          ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
-          ...(payload.lineage ? { lineage: payload.lineage } : {}),
-          description: payload.description,
-          prompt: withAttachedFiles(payload.prompt, attachments),
-          ...(pickedModel ? { model: pickedModel } : {}),
-        });
-        if (result.status === "ok" && result.finalText) {
-          await session.runner
-            .ensureInitialized()
-            .then((runner) => runner.publishLinkedFiles(result.finalText))
-            .catch(() => undefined);
-        }
-        if (result.status === "moved") return { status: "ok" as const, finalText: "", threadId: result.threadId };
-        return result.status === "ok"
-          ? {
-              status: "ok" as const,
-              finalText: result.finalText,
-              threadId: result.threadId,
-              ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
-            }
-          : {
-              status: result.status,
-              finalText: "" as const,
-              error: result.error,
-              threadId: result.threadId,
-              ...("stopped" in result && result.stopped ? { stopped: true as const } : {}),
-            };
+  [METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const automation = params as {
+      conversationId: string;
+      userPrompt: string;
+      rejectIfBusy?: boolean;
+      executionPlacementRunId?: string;
+      userMessageEventId?: string;
+      userAuthoredPrompt?: boolean;
+      scheduled?: boolean;
+      handoff?: boolean;
+      attachments?: RuntimeAttachmentRef[];
+      context?: unknown;
+    };
+    if (automation.executionPlacementRunId) {
+      const placementRunId = automation.executionPlacementRunId;
+      return await piPlacedChat(session, ctx.hostBus, {
+        conversationId: automation.conversationId,
+        userPrompt: automation.userPrompt,
+        placementRunId,
+        ...(automation.userMessageEventId
+          ? { userMessageEventId: automation.userMessageEventId }
+          : {}),
+        ...(automation.attachments?.length
+          ? { attachments: automation.attachments }
+          : {}),
+        ...(automation.context !== undefined
+          ? { context: automation.context }
+          : {}),
+        ...(automation.scheduled ? { scheduled: true } : {}),
+        ...(automation.handoff ? { handoff: true } : {}),
       });
-    }),
+    }
+    return await (await piChatsFor(session, ctx.hostBus)).automation(
+      automation.conversationId,
+      {
+        requestId:
+          automation.userMessageEventId || `automation:${crypto.randomUUID()}`,
+        prompt: automation.userPrompt,
+        visible: automation.userAuthoredPrompt === true,
+        ...(automation.rejectIfBusy ? { rejectIfBusy: true } : {}),
+      },
+    );
+  },
 
-  [METHOD_NAMES.INTERNAL_WORKER_STEER_BLOCKING_AGENT]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
+  [METHOD_NAMES.INTERNAL_WORKER_CANCEL_PLACEMENT_AUTOMATION]: async (
+    params,
+    ctx,
+  ) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimePlacementAutomationCancellationRequest;
+    const runId =
+      typeof payload.runId === "string" ? payload.runId.trim() : "";
+    if (!runId) {
+      throw new Error(
+        "An execution-placement automation cancellation requires runId.",
       );
-      const payload = params as RuntimeLocalAgentSteerRequest;
-      const hostBus = yield* HostBus.Service;
-      const delivered = yield* fromPromise(async () =>
-        (await piChatsFor(session, hostBus)).steerPlacedAgent({
-          key: String(payload.messageId || crypto.randomUUID()),
-          agentKey: piPlacedAgentKey(String(payload.agentId ?? "")),
-          message: String(payload.text ?? ""),
-        }),
-      );
-      return { delivered };
-    }),
+    }
+    const reason =
+      typeof payload.reason === "string" ? payload.reason : undefined;
+    return { canceled: await cancelPiPlacement(session, runId, reason) };
+  },
 
-  [METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as RuntimeLocalAgentMessageRequest;
-      const hostBus = yield* HostBus.Service;
-      const message = {
-        threadId: String(payload.threadId ?? ""),
-        text: String(payload.text ?? ""),
-        messageId: String(payload.messageId ?? ""),
-      };
-      const sender = payload.sender === "user" || payload.sender === "starter" || payload.sender === "other" ? payload.sender : undefined;
-      const outcome = yield* fromPromise(() => piDeliverAgentMessage(session, hostBus, { ...message, ...(sender ? { sender } : {}) }));
-      // A schedule on this computer fired for a task that runs elsewhere (a
-      // helper on another computer or in the cloud): the cloud, which keeps the
-      // task's thread, takes it there. Only for this computer's own schedules
-      // (no owner generation): a message the cloud sent here never goes back.
-      if (outcome === "not_found" && !payload.ownerGeneration && message.messageId.startsWith("schedule:")) {
-        const routed = yield* fromPromise(() => scheduleFireThroughCloud(session, message));
-        if (routed) return { outcome: routed };
-      }
-      return { outcome };
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_STOP_LOCAL_AGENT]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as RuntimeLocalAgentStopRequest;
-      const threadId = String(payload.threadId ?? "");
-      const hostBus = yield* HostBus.Service;
-      // Runs of it queued to start before this stop arrived began without
-      // knowing of it: they are not announced (the stop ends them here).
-      session.runnerCell.get()?.computerAgents.dropQueuedStarts(threadId);
-      const stopped = yield* fromPromise(() =>
-        piStopAgent(session, hostBus, threadId),
-      );
-      return { outcome: stopped === "not_found" ? "not_found" : "stopped" };
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_PLACEMENT_RECONCILED]: () =>
-    Effect.sync(() => {
-      markPlacementReconciled();
-      return { ok: true };
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_CANCEL_BLOCKING_AGENT]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as RuntimeLocalAgentCancellationRequest;
-      const agentId =
-        typeof payload.agentId === "string" ? payload.agentId.trim() : "";
-      if (!agentId) {
-        throw new Error(
-          "A blocking local-agent cancellation requires agentId.",
-        );
-      }
-      const reason = typeof payload.reason === "string" ? payload.reason : undefined;
-      const executionId = typeof payload.executionId === "string" ? payload.executionId.trim() : "";
-      const runKey = executionId || agentId;
+  [METHOD_NAMES.INTERNAL_WORKER_RUN_BLOCKING_AGENT]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimeLocalAgentRequest;
+    const attachments = await session.agentRuns.materializeAgentAttachments({
+      conversationId: payload.conversationId,
+      ...(payload.attachments ? { attachments: payload.attachments } : {}),
+    });
+    const requestedModel = payload.requestedModel?.trim();
+    const pickedModel =
+      requestedModel && requestedModel !== "default"
+        ? requestedModel
+        : undefined;
+    const agentKey = payload.remoteThreadId
+      ? piPlacedAgentKey(payload.remoteThreadId)
+      : payload.threadId || payload.executionId || crypto.randomUUID();
+    const runKey = payload.executionId || agentKey;
+    const chats = await piChatsFor(session, ctx.hostBus);
+    const canceled =
+      payload.threadId || payload.executionId
+        ? piPlacementCanceled(session, "agent", runKey)
+        : null;
+    if (canceled) {
       return {
-        canceled: yield* fromPromise(() =>
-          cancelPiPlacedAgent(session, { agentKey: piPlacedAgentKey(agentId), runKey, ...(reason ? { reason } : {}) }),
-        ),
+        status: "error" as const,
+        finalText: "" as const,
+        error: canceled,
+        threadId: agentKey,
       };
-    }),
+    }
+    const result = await chats.runPlacedAgent(payload.conversationId, {
+      agentKey,
+      runKey,
+      ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
+      ...(payload.lineage ? { lineage: payload.lineage } : {}),
+      description: payload.description,
+      prompt: withAttachedFiles(payload.prompt, attachments),
+      ...(pickedModel ? { model: pickedModel } : {}),
+    });
+    if (result.status === "ok" && result.finalText) {
+      await session.runner
+        .ensureInitialized()
+        .then((runner) => runner.publishLinkedFiles(result.finalText))
+        .catch(() => undefined);
+    }
+    if (result.status === "moved") {
+      return { status: "ok" as const, finalText: "", threadId: result.threadId };
+    }
+    return result.status === "ok"
+      ? {
+          status: "ok" as const,
+          finalText: result.finalText,
+          threadId: result.threadId,
+          ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
+        }
+      : {
+          status: result.status,
+          finalText: "" as const,
+          error: result.error,
+          threadId: result.threadId,
+          ...("stopped" in result && result.stopped
+            ? { stopped: true as const }
+            : {}),
+        };
+  },
 
-  [METHOD_NAMES.INTERNAL_WORKER_CREATE_BACKGROUND_AGENT]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as RuntimeLocalAgentRequest;
-      const hostBus = yield* HostBus.Service;
-      return yield* fromPromise(async () =>
-        (await piChatsFor(session, hostBus)).startAgent(payload.conversationId, {
-          key: payload.threadId || crypto.randomUUID(),
-          description: payload.description,
-          prompt: payload.prompt,
-        }),
-      );
-    }),
+  [METHOD_NAMES.INTERNAL_WORKER_STEER_BLOCKING_AGENT]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimeLocalAgentSteerRequest;
+    const delivered = await (await piChatsFor(session, ctx.hostBus)).steerPlacedAgent({
+      key: String(payload.messageId || crypto.randomUUID()),
+      agentKey: piPlacedAgentKey(String(payload.agentId ?? "")),
+      message: String(payload.text ?? ""),
+    });
+    return { delivered };
+  },
 
-  [METHOD_NAMES.INTERNAL_WORKER_WEB_SEARCH]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const payload = params as {
-        query: string;
-        category?: string;
-      };
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
-      return yield* fromPromise(() =>
-        runner.webSearch(payload.query, {
-          category: payload.category,
-        }),
-      );
-    }),
+  [METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimeLocalAgentMessageRequest;
+    const message = {
+      threadId: String(payload.threadId ?? ""),
+      text: String(payload.text ?? ""),
+      messageId: String(payload.messageId ?? ""),
+    };
+    const sender =
+      payload.sender === "user" ||
+      payload.sender === "starter" ||
+      payload.sender === "other"
+        ? payload.sender
+        : undefined;
+    const outcome = await piDeliverAgentMessage(session, ctx.hostBus, {
+      ...message,
+      ...(sender ? { sender } : {}),
+    });
+    // A schedule on this computer fired for a task that runs elsewhere (a
+    // helper on another computer or in the cloud): the cloud, which keeps the
+    // task's thread, takes it there. Only for this computer's own schedules
+    // (no owner generation): a message the cloud sent here never goes back.
+    if (
+      outcome === "not_found" &&
+      !payload.ownerGeneration &&
+      message.messageId.startsWith("schedule:")
+    ) {
+      const routed = await scheduleFireThroughCloud(session, message);
+      if (routed) return { outcome: routed };
+    }
+    return { outcome };
+  },
 
-  [METHOD_NAMES.INTERNAL_WORKER_ONE_SHOT_COMPLETION]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new WorkerNotInitializedError(),
+  [METHOD_NAMES.INTERNAL_WORKER_STOP_LOCAL_AGENT]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimeLocalAgentStopRequest;
+    const threadId = String(payload.threadId ?? "");
+    // Runs of it queued to start before this stop arrived began without
+    // knowing of it: they are not announced (the stop ends them here).
+    session.runnerCell.get()?.computerAgents.dropQueuedStarts(threadId);
+    const stopped = await piStopAgent(session, ctx.hostBus, threadId);
+    return { outcome: stopped === "not_found" ? "not_found" : "stopped" };
+  },
+
+  [METHOD_NAMES.INTERNAL_WORKER_PLACEMENT_RECONCILED]: () => {
+    markPlacementReconciled();
+    return { ok: true };
+  },
+
+  [METHOD_NAMES.INTERNAL_WORKER_CANCEL_BLOCKING_AGENT]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimeLocalAgentCancellationRequest;
+    const agentId =
+      typeof payload.agentId === "string" ? payload.agentId.trim() : "";
+    if (!agentId) {
+      throw new Error(
+        "A blocking local-agent cancellation requires agentId.",
       );
-      return yield* fromPromise(() =>
-        session.agentRuns.oneShotCompletion(
-          params as RuntimeOneShotCompletionRequest,
-        ),
-      );
-    }),
+    }
+    const reason =
+      typeof payload.reason === "string" ? payload.reason : undefined;
+    const executionId =
+      typeof payload.executionId === "string" ? payload.executionId.trim() : "";
+    const runKey = executionId || agentId;
+    return {
+      canceled: await cancelPiPlacedAgent(session, {
+        agentKey: piPlacedAgentKey(agentId),
+        runKey,
+        ...(reason ? { reason } : {}),
+      }),
+    };
+  },
+
+  [METHOD_NAMES.INTERNAL_WORKER_CREATE_BACKGROUND_AGENT]: async (
+    params,
+    ctx,
+  ) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as RuntimeLocalAgentRequest;
+    return await (await piChatsFor(session, ctx.hostBus)).startAgent(
+      payload.conversationId,
+      {
+        key: payload.threadId || crypto.randomUUID(),
+        description: payload.description,
+        prompt: payload.prompt,
+      },
+    );
+  },
+
+  [METHOD_NAMES.INTERNAL_WORKER_WEB_SEARCH]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new RunnerUnavailableError(),
+    );
+    const payload = params as {
+      query: string;
+      category?: string;
+    };
+    const runner = await session.runner.ensureInitialized();
+    return await runner.webSearch(payload.query, {
+      category: payload.category,
+    });
+  },
+
+  [METHOD_NAMES.INTERNAL_WORKER_ONE_SHOT_COMPLETION]: async (params, ctx) => {
+    const session = requireSession(
+      ctx.sessions,
+      () => new WorkerNotInitializedError(),
+    );
+    return await session.agentRuns.oneShotCompletion(
+      params as RuntimeOneShotCompletionRequest,
+    );
+  },
 };
 
 /** The cloud's delivery of a local schedule's fire, as a device outcome; undefined when it couldn't take it. */
 const scheduleFireThroughCloud = async (
-  session: WorkerSessions.OpenSession,
+  session: OpenSession,
   message: { threadId: string; text: string; messageId: string },
 ): Promise<"steered" | "resumed" | "queued" | undefined> => {
   const runner = session.runnerCell.get();
@@ -317,12 +342,24 @@ const scheduleFireThroughCloud = async (
       messageId: message.messageId,
       to: message.threadId,
       text: message.text,
-      from: { threadId: scheduleId && scheduleId !== message.threadId ? scheduleId : "schedule", label: "a schedule on another computer" },
+      from: {
+        threadId:
+          scheduleId && scheduleId !== message.threadId
+            ? scheduleId
+            : "schedule",
+        label: "a schedule on another computer",
+      },
       ...(isFramedAgentMessage(message.text) ? { framed: true } : {}),
     });
-    return delivery.outcome === "steered" || delivery.outcome === "resumed" ? delivery.outcome : "queued";
+    return delivery.outcome === "steered" || delivery.outcome === "resumed"
+      ? delivery.outcome
+      : "queued";
   } catch (error) {
-    console.warn("[schedules] a schedule's fire for a task elsewhere did not reach it", message.threadId, error);
+    console.warn(
+      "[schedules] a schedule's fire for a task elsewhere did not reach it",
+      message.threadId,
+      error,
+    );
     return undefined;
   }
 };

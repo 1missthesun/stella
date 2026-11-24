@@ -1,6 +1,12 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { resolveRuntimeSourceAsset } from "../shared/runtime-paths.js";
 
-const ENTRYPOINT = path.join(import.meta.dirname, "worker-api.ts");
+const resolveEntrypoint = (): string => {
+  const local = path.join(import.meta.dirname, "worker-api.ts");
+  if (existsSync(local)) return local;
+  return resolveRuntimeSourceAsset("kernel", "browser-use", "worker-api.ts");
+};
 
 const selfContainedError = (packageImports: readonly string[]): Error =>
   new Error(
@@ -10,7 +16,7 @@ const selfContainedError = (packageImports: readonly string[]): Error =>
 const bundleWithBun = async (bun: typeof Bun): Promise<string> => {
   const packageImports: string[] = [];
   const result = await bun.build({
-    entrypoints: [ENTRYPOINT],
+    entrypoints: [resolveEntrypoint()],
     target: "browser",
     format: "cjs",
     throw: false,
@@ -52,7 +58,7 @@ const bundleWithEsbuild = async (): Promise<string> => {
   );
   const packageImports: string[] = [];
   const result = await esbuild.build({
-    entryPoints: [ENTRYPOINT],
+    entryPoints: [resolveEntrypoint()],
     bundle: true,
     write: false,
     platform: "browser",
@@ -88,13 +94,29 @@ const bundleBrowserWorkerApi = async (): Promise<string> => {
   return `(() => {\nconst module = { exports: {} };\nconst exports = module.exports;\n${code}\nreturn module.exports.installBrowserWorkerApi;\n})()`;
 };
 
-const bundled: Readonly<{ source: string } | { error: unknown }> =
-  await bundleBrowserWorkerApi().then(
-    (source) => ({ source }),
-    (error: unknown) => ({ error }),
+let cachedSource: string | null = null;
+let pendingBundle: Promise<string> | null = null;
+
+export const ensureBrowserWorkerApiSource = async (): Promise<string> => {
+  if (cachedSource !== null) return cachedSource;
+  pendingBundle ??= bundleBrowserWorkerApi().then(
+    (source) => {
+      cachedSource = source;
+      return source;
+    },
+    (error: unknown) => {
+      pendingBundle = null;
+      throw error;
+    },
   );
+  return await pendingBundle;
+};
 
 export const browserWorkerApiSource = (): string => {
-  if ("error" in bundled) throw bundled.error;
-  return bundled.source;
+  if (cachedSource === null) {
+    throw new Error(
+      "Browser worker API source has not been prepared; call ensureBrowserWorkerApiSource() before constructing NodeReplKernel.",
+    );
+  }
+  return cachedSource;
 };

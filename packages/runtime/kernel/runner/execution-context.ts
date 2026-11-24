@@ -1,5 +1,5 @@
 import { hostname } from "node:os";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type { BackendClient } from "@stella/contracts/backend/client";
 import type { ViewArgs, ViewName, ViewResult } from "@stella/contracts/backend/api";
 import {

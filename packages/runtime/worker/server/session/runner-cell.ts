@@ -1,4 +1,3 @@
-import { Context, Layer } from "effect";
 import type { RuntimeRunner } from "../types.js";
 
 /**
@@ -14,11 +13,7 @@ export interface Interface {
   readonly set: (runner: RuntimeRunner | null) => void;
 }
 
-export class Service extends Context.Service<Service, Interface>()(
-  "@stella/runtime/worker/RunnerCell",
-) {}
-
-export const layer = Layer.sync(Service, () => {
+export const make = (): Interface => {
   let runner: RuntimeRunner | null = null;
   return {
     get: () => runner,
@@ -26,4 +21,4 @@ export const layer = Layer.sync(Service, () => {
       runner = next;
     },
   };
-});
+};

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 
 import { acquireAbortLatch } from "../agent-core/abort-bridge.js";
 import {

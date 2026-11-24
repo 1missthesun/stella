@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type {
   ToolDefinition,
   HookDefinition,

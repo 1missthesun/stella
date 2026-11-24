@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 
 import { acquireAbortLatch } from "../agent-core/abort-bridge.js";
 import {

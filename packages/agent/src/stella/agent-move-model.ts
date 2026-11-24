@@ -1,6 +1,6 @@
 import type { ModelRef } from "@earendil-works/pi-durable";
 import { cliEnginePick, onCliEngine } from "../engine/selection.ts";
-import { accountProviderOfRegistryId } from "../provider/account-byok.ts";
+import { accountProviderOfRegistryId } from "../provider/account-byok-ids.ts";
 import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 
 const REASONING_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);

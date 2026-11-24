@@ -1,32 +1,31 @@
-import {
-  Deferred,
-  Effect,
-  Layer,
-  ManagedRuntime,
-  Schedule,
-} from "effect";
-
-export const storageRuntime = ManagedRuntime.make(Layer.empty);
+let effectModule: Promise<typeof import("../../worker/effect-lazy.js")> | null = null;
+const loadEffect = () => (effectModule ??= import("../../worker/effect-lazy.js"));
 
 export const forkFixedRateFiber = (
   intervalMs: number,
   tick: () => void,
 ): (() => void) => {
-  const canceled = Deferred.makeUnsafe<void>();
-  void storageRuntime
-    .runPromise(
-      Effect.raceFirst(
-        Effect.sleep(intervalMs).pipe(
-          Effect.andThen(
-            Effect.repeat(Effect.sync(tick), Schedule.fixed(intervalMs)),
-          ),
-          Effect.asVoid,
+  let canceled = false;
+  let cancelFiber: (() => void) | null = null;
+  void loadEffect().then(({ Effect, Fiber, Schedule }) => {
+    if (canceled) return;
+    const fiber = Effect.runFork(
+      Effect.sleep(intervalMs).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            if (!canceled) tick();
+          }),
         ),
-        Deferred.await(canceled),
+        Effect.repeat(Schedule.spaced(intervalMs)),
       ),
-    )
-    .catch(() => undefined);
+    );
+    cancelFiber = () => {
+      void Effect.runFork(Fiber.interrupt(fiber));
+    };
+  });
   return () => {
-    Deferred.doneUnsafe(canceled, Effect.void);
+    if (canceled) return;
+    canceled = true;
+    cancelFiber?.();
   };
 };

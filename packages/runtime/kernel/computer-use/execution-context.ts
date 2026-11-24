@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 import { acquireAbortLatch } from "../agent-core/abort-bridge.js";
 import { runComputerUseEffect } from "./effect-runtime.js";
 

@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import {
   createDirectoryEntryAdapter,

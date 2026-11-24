@@ -1,5 +1,5 @@
 import { renameSync, statSync } from "node:fs";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 const DEFAULT_RUNTIME_LOG_MAX_BYTES = 16 * 1024 * 1024;
 

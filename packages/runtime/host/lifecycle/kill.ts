@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { pollWithDeadline } from "./poll.js";
 import {
   readProcessIdentity,

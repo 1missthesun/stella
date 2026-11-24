@@ -218,6 +218,9 @@ export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = Date.
   relation: "another session",
 });
 
+/** Other sessions idle this long are left out of agent_status: they stay reachable by thread_id from history. */
+const DIRECTORY_SESSION_STALE_MS = 7 * 24 * 60 * 60_000;
+
 export const buildAgentDirectoryResult = (input: {
   caller: AgentDirectoryCaller;
   agents: AgentDirectoryAgentRow[];
@@ -248,19 +251,18 @@ export const buildAgentDirectoryResult = (input: {
       rosterLine(row, now, { startedYou: row.threadId === caller.parentThreadId }),
     );
   const sessions = input.sessions
-    .filter((row) => row.conversationId !== caller.conversationId)
+    .filter((row) => row.conversationId !== caller.conversationId && (row.active || now - row.updatedAt < DIRECTORY_SESSION_STALE_MS))
     .sort((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
     .slice(0, DIRECTORY_SESSION_LIMIT)
     .map((row) => sessionLine(row, now));
   const section = (title: string, lines: string[]) =>
     lines.length === 0 ? [] : [`${title}:`, ...lines];
-  const hidden = roster.hiddenActive + roster.hiddenInactive;
   const lines = [
     ...(caller.threadId ? [`stella: ${caller.conversationId}`] : []),
     ...section("subagents", subagents),
     ...section("teammates", teammates),
     ...section("sessions", sessions),
-    ...(hidden > 0 ? [`(${hidden} older agent${hidden === 1 ? "" : "s"} in history)`] : []),
+    ...(roster.hiddenActive > 0 ? [`(${roster.hiddenActive} more at work, not listed)`] : []),
     ...(input.unavailable ? [input.unavailable] : []),
   ];
   return subagents.length + teammates.length + sessions.length === 0

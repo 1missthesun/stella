@@ -356,6 +356,8 @@ export const heldAncestorIds = (
 export const carryReport = (db: OwnerDb, threadId: string, text: string): void => {
   const trimmed = text.trim();
   if (!trimmed) return;
+  const carried = db.one<{ carried_report: string | null }>("SELECT carried_report FROM agent_threads WHERE thread_id = ?", threadId)?.carried_report;
+  if (carried && saidAlready(carried, trimmed)) return;
   db.run(
     `UPDATE agent_threads SET carried_report = CASE
         WHEN carried_report IS NULL OR carried_report = '' THEN ?
@@ -367,8 +369,62 @@ export const carryReport = (db: OwnerDb, threadId: string, text: string): void =
   );
 };
 
-const withCarried = (thread: ThreadRow, text: string): string =>
-  thread.carried_report?.trim() ? `${thread.carried_report.trim()}\n\n${text}` : text;
+/**
+ * Whether `text` is already among what was carried: the same turn's words
+ * reach the cloud more than once (its end retried, the attempt derived again
+ * after its queued input settled), and a report says each of them once.
+ */
+const saidAlready = (carried: string, text: string): boolean => {
+  const said = carried.trim();
+  const next = text.trim();
+  return said === next || said.endsWith(`\n\n${next}`) || said.startsWith(`${next}\n\n`) || said.includes(`\n\n${next}\n\n`);
+};
+
+const withCarried = (thread: ThreadRow, text: string): string => {
+  const carried = thread.carried_report?.trim();
+  if (!carried) return text;
+  return saidAlready(carried, text) ? carried : `${carried}\n\n${text}`;
+};
+
+/** How long a turn's report waits for the end of the turn before it, still on its way from its computer. */
+const EARLIER_TURN_WAIT_MS = 45_000;
+
+const EARLIER_TURN_ENDS = [
+  "completed",
+  "failed",
+  "canceled",
+  "paused",
+  "attempt_ended",
+  "waiting_for_user",
+  "report",
+  "report_deferred",
+  "terminal_ignored",
+];
+
+/**
+ * The turn before this one started and its end hasn't arrived: a computer can
+ * send the next turn's start before the last turn's end (a wake that came in
+ * as the turn finished). Filed now, this turn's report ("all done, the report
+ * above stands") would reach Stella ahead of the report it points to.
+ */
+const earlierTurnOnItsWay = (db: OwnerDbReader, thread: ThreadRow): boolean => {
+  const earlier = thread.attempt_generation - 1;
+  if (earlier < 1) return false;
+  const started = db.one(
+    `SELECT 1 AS found FROM agent_events WHERE thread_id = ? AND attempt_generation = ?
+       AND kind IN ('spawned', 'attempt_started', 'resumed', 'attempt_dispatched') LIMIT 1`,
+    thread.thread_id,
+    earlier,
+  );
+  if (!started) return false;
+  return !db.one(
+    `SELECT 1 AS found FROM agent_events WHERE thread_id = ? AND attempt_generation = ?
+       AND kind IN (${EARLIER_TURN_ENDS.map(() => "?").join(", ")}) LIMIT 1`,
+    thread.thread_id,
+    earlier,
+    ...EARLIER_TURN_ENDS,
+  );
+};
 
 export const deriveAgentReport = (
   db: OwnerDb,
@@ -420,6 +476,26 @@ export const deriveAgentReport = (
     if (deferred && queued) carryReport(db, thread.thread_id, reportText(thread, outcome));
     return;
   }
+  if (earlierTurnOnItsWay(db, thread)) {
+    const held = appendAgentEvent(db, {
+      key: `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`,
+      kind: "report_deferred",
+      source: "ledger",
+      threadId: thread.thread_id,
+      conversationId: thread.conversation_id,
+      attemptGeneration: thread.attempt_generation,
+      status: thread.status,
+      detail: { earlierTurn: thread.attempt_generation - 1 },
+      createdAt: now,
+    });
+    const since = held
+      ? now
+      : (db.one<{ created_at: number }>("SELECT created_at FROM agent_events WHERE event_key = ?", `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`)?.created_at ?? now);
+    if (now - since < EARLIER_TURN_WAIT_MS) {
+      scheduleAudit(db, thread, since + EARLIER_TURN_WAIT_MS, 0, true);
+      return;
+    }
+  }
   fileReport(db, thread, reportId, outcome, boundReportText(withCarried(thread, reportText(thread, outcome)), thread.thread_id), now);
 };
 
@@ -435,9 +511,28 @@ export const fileLateTurn = (
   attemptGeneration: number,
   text: string,
   now: number,
+  waiting = false,
 ): boolean => {
   const thread = readThread(db, threadId);
-  if (!thread || attemptGeneration >= thread.attempt_generation || !text.trim()) return false;
+  if (!thread || attemptGeneration >= thread.attempt_generation) return false;
+  if (waiting || !text.trim()) {
+    // A turn that ended waiting is no report (its words are its waiting line;
+    // what it meant for its starter went as a message). Its end is noted, so a
+    // later turn's report no longer waits for it.
+    const noted = appendAgentEvent(db, {
+      key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
+      kind: "report_deferred",
+      source: "ledger",
+      threadId: thread.thread_id,
+      conversationId: thread.conversation_id,
+      attemptGeneration,
+      status: "completed",
+      detail: { late: true, ...(waiting ? { waiting: true } : { empty: true }) },
+      createdAt: now,
+    });
+    if (noted) deriveAgentReport(db, thread.thread_id, now);
+    return false;
+  }
   const lateId = agentReportId(thread.thread_id, attemptGeneration);
   const known = (key: string) => db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", key) !== null;
   if (known(lateId) || known(`report_deferred:${thread.thread_id}:${attemptGeneration}`)) return false;
@@ -849,8 +944,16 @@ const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> =
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
   let row = readOutbox(ctx.db, reportId);
   if (!row) {
+    const heldForEarlier = ctx.db.one(
+      "SELECT 1 AS found FROM agent_events WHERE event_key = ?",
+      `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`,
+    );
     deriveAgentReport(ctx.db, thread.thread_id, ctx.now);
     row = readOutbox(ctx.db, reportId);
+    if (row && heldForEarlier) {
+      again();
+      return;
+    }
     if (row) {
       appendAgentEvent(ctx.db, {
         key: `report_missing:${reportId}:derived`,

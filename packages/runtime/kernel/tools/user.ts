@@ -291,8 +291,32 @@ const mergePresetFields = (
  */
 export const SECURE_INPUT_SAVED_ONLY_ARG = "__savedOnly";
 
+const cloudNotSavedNote = (service: string, found: SecureInputNotSaved): string => {
+  const retry = "Call again without saved_only to ask the user on a secure card (they can answer on any device; a phone that holds the login fills it with one tap).";
+  if (found.reason === "no_computer") {
+    return `None of the user's computers that hold their saved values is online, so Stella could not look for "${service}". ${retry}`;
+  }
+  if (found.reason === "sync_off") {
+    return `The user's saved values don't sync to any computer Stella can ask, so nothing saved was found for "${service}". ${retry}`;
+  }
+  if (found.savedHere.length === 0) {
+    return `Nothing is saved for "${service}" or anything else. ${retry}`;
+  }
+  return `Nothing saved matches "${service}". savedHere lists what is saved (names only). If one of them is what you need, call again with its service (and account); otherwise ${retry.charAt(0).toLowerCase()}${retry.slice(1)}`;
+};
+
 const notSavedResult = (service: string, found: SecureInputNotSaved | null): ToolResult => {
   const savedHere = found?.savedHere ?? [];
+  if (found?.reason) {
+    const note = [found.message, cloudNotSavedNote(service, found)].filter(Boolean).join(" ");
+    const details = {
+      outcome: "not_saved" as const,
+      savedHere,
+      reason: found.reason,
+      ...(found.message ? { message: found.message } : {}),
+    };
+    return { result: { ...details, note }, details };
+  }
   const note = savedHere.length === 0
     ? `Nothing is saved on this computer for "${service}" or anything else. Call again without saved_only to ask the user on a secure card.`
     : `Nothing saved on this computer matches "${service}". savedHere lists what is saved (names only). If one of them is what you need, call again with its service (and account); otherwise call again without saved_only to ask the user.`;

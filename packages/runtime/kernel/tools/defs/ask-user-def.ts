@@ -163,13 +163,30 @@ const modelAnswers = (
     return { id: question.id, choice: response.choiceId };
   });
 
-const savedValueNote = (saved: UserAskSavedValueNote): string => {
+/** A cloud task's values come from the user's devices; nothing is saved where the task runs. */
+const cloudSavedValueNote = (saved: UserAskSavedValueNote, under: string, replace: string): string => {
+  if (saved.reused) {
+    return `Reused the value the user saved in Stella for "${saved.label}": one of their computers released it to this task, sealed to this task's own key, without asking the user.${under} ${replace}`;
+  }
+  if (saved.fromSaved?.length) {
+    return `${saved.fromSaved.join(", ")} came from the value the user saved in Stella for "${saved.label}"; the user gave only the rest.${under} ${replace}`;
+  }
+  if (saved.remembered) {
+    return saved.replaced
+      ? `The user gave a replacement; the device they answered on overwrites the saved value for "${saved.label}".`
+      : `The user chose to remember this as "${saved.label}"; it is saved on their devices, and later requests with the same service and account get it without asking while one of their computers is online.`;
+  }
+  return "The user chose not to remember this.";
+};
+
+const savedValueNote = (saved: UserAskSavedValueNote, cloud = false): string => {
   const under = saved.service
     ? ` It is saved under the service "${saved.service}", the closest match to "${saved.askedService ?? ""}".`
     : "";
   const replace = saved.service
     ? `If the login fails because this saved value is out of date, call request_secure_input again with service "${saved.service}" and replace_saved: true; if it is the wrong account or site altogether, call again with your own service and replace_saved: true, which saves the right one separately.`
     : "If it turns out to be wrong (the login fails), call request_secure_input again with the same service and account and replace_saved: true to ask once for the right one.";
+  if (cloud) return cloudSavedValueNote(saved, under, replace);
   if (saved.reused) {
     return `Reused the value saved on this computer for "${saved.label}" without asking the user.${under} ${replace}`;
   }
@@ -195,7 +212,13 @@ const clockTime = (at: number): string => {
 /** How the task may use the handles it got, so it never asks the user twice for a value it still holds. */
 const handlesNote = (resolution: Extract<UserAskResolution, { outcome: "answered" }>): string => {
   const parts: string[] = [];
-  if (resolution.freshUntil) {
+  if (resolution.freshUntil && resolution.heldBy === "cloud_task") {
+    const until = new Date(resolution.freshUntil);
+    const at = `${String(until.getUTCHours()).padStart(2, "0")}:${String(until.getUTCMinutes()).padStart(2, "0")} UTC`;
+    parts.push(
+      `These handles are held only by this task's own process in Stella's cloud: they stay usable by you for 30 minutes (until ${at}) or until this turn ends, whichever comes first. Use one as many times as you need, and if a fill lands in the wrong field, fill it again into the right one (into.mode "move" clears it from the wrong one). Never ask the user again for a value you still hold a handle for; once they stop working, request_secure_input finds a saved value again without asking.`,
+    );
+  } else if (resolution.freshUntil) {
     parts.push(
       `Handles not saved on this computer stay usable by you until ${clockTime(resolution.freshUntil)} (30 minutes): use one as many times as you need, and if a fill lands in the wrong field, fill it again into the right one (into.mode "move" clears it from the wrong one). Never ask the user again for a value you still hold a handle for.`,
     );
@@ -223,7 +246,10 @@ export const userAskResolutionResult = (
       ...(resolution.values ? { values: resolution.values } : {}),
       ...(resolution.handles ? { handles: resolution.handles } : {}),
       ...(resolution.saved
-        ? { saved: resolution.saved, note: savedValueNote(resolution.saved) }
+        ? {
+            saved: resolution.saved,
+            note: savedValueNote(resolution.saved, resolution.heldBy === "cloud_task"),
+          }
         : {}),
       ...(handlesNote(resolution) ? { handlesNote: handlesNote(resolution) } : {}),
       ...(resolution.userNote ? { userNote: resolution.userNote } : {}),

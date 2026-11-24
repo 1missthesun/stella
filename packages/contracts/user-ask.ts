@@ -130,6 +130,14 @@ export type SavedSecureValueSummary = Readonly<{
 export type SecureInputNotSaved = Readonly<{
   outcome: "not_saved";
   savedHere: readonly SavedSecureValueSummary[];
+  /**
+   * A cloud task's lookup: why nothing came back. "no_computer": none of the
+   * user's computers that hold saved values is online; "sync_off": none syncs
+   * saved values. Absent on a computer (it looked in its own).
+   */
+  reason?: "not_saved" | "no_computer" | "sync_off";
+  /** Set by the computer that looked, e.g. when several accounts fit and the task must pass account. */
+  message?: string;
 }>;
 
 export const normalizeSavedValuePart = (value: unknown, max = 200): string =>
@@ -463,6 +471,8 @@ export type UserAskResolution =
       asHandles?: readonly string[];
       /** When the handles not saved on this computer stop working. */
       freshUntil?: number;
+      /** The handles are held by the asking cloud task's own process, not by a computer. */
+      heldBy?: "cloud_task";
       saved?: UserAskSavedValueNote;
       userNote?: string;
       answeredAt: number;

@@ -3,6 +3,8 @@
   color: #fff;
   padding: clamp(100px, 14svh, 170px) 0 clamp(70px, 10svh, 130px);
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1000px;
 }
 
 .head {

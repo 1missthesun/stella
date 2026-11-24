@@ -73,6 +73,42 @@
   inset: 0;
   z-index: 1;
   container-type: size;
+  contain: layout style paint;
+}
+
+@keyframes journeyScale {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes journeyGlowOpacity {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.75;
+  }
+}
+
+@supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) {
+  @media (prefers-reduced-motion: no-preference) {
+    .journeyFrame {
+      view-timeline: --stella-journey block;
+      animation: journeyScale linear both;
+      animation-timeline: --stella-journey;
+      animation-range: cover 14% cover 50%;
+    }
+
+    .journeyGlow {
+      animation: journeyGlowOpacity linear both;
+      animation-timeline: --stella-journey;
+      animation-range: cover 14% cover 50%;
+    }
+  }
 }
 
 @media (max-width: 700px) {
@@ -83,6 +119,15 @@
   .journeyFrame {
     width: 92vw;
     height: min(600px, 68svh);
+  }
+
+  @supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) {
+    @media (prefers-reduced-motion: no-preference) {
+      .journeyFrame,
+      .journeyGlow {
+        animation-range: cover 5% cover 50%;
+      }
+    }
   }
 }
 

@@ -1,5 +1,7 @@
 .act {
   position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 960px;
 }
 
 .inner {

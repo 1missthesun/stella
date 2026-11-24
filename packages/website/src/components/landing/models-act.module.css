@@ -5,6 +5,8 @@
   align-items: center;
   padding: clamp(120px, 20svh, 220px) var(--l-margin) clamp(110px, 18svh, 210px);
   color: #fff;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1080px;
 }
 
 .title {

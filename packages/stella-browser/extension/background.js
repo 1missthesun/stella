@@ -163,14 +163,11 @@ onStatus((connected) => {
   );
   if (!connected) closePipe();
 });
-// Keep service worker alive via offscreen document port
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "keepalive") {
-    // Port keeps the service worker alive - nothing else needed
   }
 });
 
-// Create offscreen document to maintain keepalive port
 async function ensureOffscreen() {
   try {
     const contexts = await chrome.runtime.getContexts({

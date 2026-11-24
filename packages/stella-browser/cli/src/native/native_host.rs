@@ -173,8 +173,6 @@ fn send_line(tcp: &mut TcpStream, line: &[u8]) -> bool {
         .is_ok()
 }
 
-/// Proves the listener holds the bridge token before anything else crosses:
-/// no token, extension hello or command is exchanged with an unproven peer.
 fn authenticate_daemon(
     tcp: &mut TcpStream,
     reader: &mut io::BufReader<TcpStream>,

@@ -1,15 +1,3 @@
-//! Mutual authentication between the native-messaging host and the extension
-//! bridge. Both sides hold the bridge token from the 0600 token file; neither
-//! sends it. The daemon proves itself first, so a process squatting the
-//! loopback port learns nothing and receives nothing.
-//!
-//! host   -> daemon: {"type":"bridge_auth","clientNonce":cn}
-//! daemon -> host:   {"type":"bridge_auth_challenge","serverNonce":sn,"serverProof":HMAC(token, server|port|cn|sn)}
-//! host   -> daemon: hello with "proof": HMAC(token, client|port|cn|sn), no "token"
-//!
-//! The port is the daemon's bound port and the port the host dialed, so a
-//! squatter cannot relay a challenge from a daemon listening elsewhere.
-
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use hmac::{Hmac, Mac};
@@ -134,9 +122,6 @@ pub fn create_private_dir(dir: &Path) -> io::Result<()> {
     }
 }
 
-/// Publishes `contents` at `path` readable only by this user: the file is
-/// created 0600 under a fresh name and renamed into place, so it is never
-/// visible with wider permissions or half-written.
 pub fn write_private_file(path: &Path, contents: &str) -> io::Result<()> {
     let mut suffix = [0u8; 8];
     getrandom::getrandom(&mut suffix).map_err(io::Error::other)?;

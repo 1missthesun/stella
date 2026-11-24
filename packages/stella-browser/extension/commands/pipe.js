@@ -1,8 +1,3 @@
-/**
- * The raw debugger pipe. The service decides what to do to a page and sends
- * debugger commands; this relays them to Chrome and the debugger's events
- * back, for tabs the command's owner holds and methods the policy allows.
- */
 import { assertAllowedMethod } from "../lib/cdp-policy.js";
 import { send } from "../lib/connection.js";
 import { attachDebugger, detachDebugger } from "../lib/debugger.js";
@@ -133,7 +128,6 @@ async function sendToDebugger(tabId, { method, params, debuggerSession }) {
   }
 }
 
-/** Commands run in the order they arrive: nothing may be awaited before the debugger is called. */
 export const PIPE_HANDLERS = {
   pipe_tab: openTab,
   pipe_attach: attach,
@@ -153,12 +147,10 @@ onForgotten((ownerId, tabId) => {
   if (tabId != null) void detach(tabId);
 });
 
-/** The service is gone: nobody will release what it holds or use its tabs. */
 export function closePipe() {
   for (const tabId of [...pipedTabs.keys()]) void detach(tabId);
 }
 
-/** Debuggers a previous service worker left attached belong to nobody now. */
 export async function detachLeftoverDebuggers() {
   const targets = await chrome.debugger.getTargets();
   for (const { attached, tabId } of targets) {

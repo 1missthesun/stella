@@ -1,10 +1,3 @@
-//! Which JavaScript world an agent's own script runs in. Stella's reads run
-//! in its isolated world (see `cdp::client::ISOLATED_WORLD`), and so do agent
-//! scripts, unless the script reads the page's own state (framework internals
-//! on elements, or globals the page defined) or sets a global for the page
-//! (such as replacing `window.confirm`): those run in the page's world, where
-//! they work.
-
 use serde_json::{json, Value};
 
 use super::cdp::client::{CdpClient, MAIN_WORLD_PARAM};
@@ -22,8 +15,6 @@ fn is_ident_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '$'
 }
 
-/// Globals the script reads through `window.`/`globalThis.`/`self.` (or
-/// `["name"]`), and whether it assigns one.
 fn global_references(script: &str) -> (Vec<String>, bool) {
     let chars: Vec<char> = script.chars().collect();
     let mut names = Vec::new();
@@ -120,8 +111,6 @@ async fn evaluate_value(
         .cloned()
 }
 
-/// Whether an agent script runs in the page's own world. `requested` is the
-/// command's explicit `world` ("main" or "isolated"), if any.
 pub async fn agent_script_in_main_world(
     client: &CdpClient,
     session_id: &str,
@@ -165,7 +154,6 @@ pub async fn agent_script_in_main_world(
         == Some(Value::Bool(true))
 }
 
-/// Whether an isolated-world failure means the script needed the page's world.
 pub fn needs_page_world(error: &str) -> bool {
     error.contains("ReferenceError")
 }

@@ -1,11 +1,3 @@
-//! Input the way a person produces it, for tabs driven over CDP (Stella's
-//! in-app browser). Pointer paths follow a bowed cubic Bezier with a
-//! minimum-jerk velocity profile, ~60-110 Hz samples, slight tremor and an
-//! occasional overshoot; presses land a little off centre after a short
-//! settle and are held 45-110 ms; text is typed as a keystroke timeline with
-//! 55-120 ms holds that may overlap the next key; wheel scrolls glide in eased
-//! ~60 Hz frames.
-//!
 //! Adapted from OpenCode Browse (github.com/anomalyco/browse, MIT),
 //! rust/crates/browse-page/src/human.rs.
 
@@ -76,9 +68,6 @@ fn unit() -> f64 {
     (next_u64() >> 11) as f64 / (1u64 << 53) as f64
 }
 
-/// Timing of the input model, in ms: a quick, practised user (the extension's
-/// `PACE` in `extension/lib/human-input.js` uses the same values). Typing
-/// comes out around 150-160 wpm with natural variation.
 pub mod pace {
     pub const MOVE_BASE: f64 = 45.0;
     pub const MOVE_PER_DOUBLING: f64 = 65.0;
@@ -131,7 +120,6 @@ pub async fn sleep_ms(ms: f64) {
     }
 }
 
-/// Samples (with the delay before each, in ms) of one movement, excluding `to`.
 pub fn trajectory(from: Point, to: Point) -> Vec<(Point, f64)> {
     let dx = to.x - from.x;
     let dy = to.y - from.y;
@@ -208,7 +196,6 @@ pub fn trajectory(from: Point, to: Point) -> Vec<(Point, f64)> {
         .collect()
 }
 
-/// Per-frame wheel deltas for one scroll gesture: quick start, eased stop.
 pub fn glide(dx: f64, dy: f64) -> Vec<Point> {
     let distance = dx.hypot(dy);
     if distance < 40.0 {
@@ -255,8 +242,6 @@ async fn viewport(client: &CdpClient, session_id: &str) -> Option<(f64, f64)> {
     }
 }
 
-/// Forget the pointer when the document changed: a new page has no idea
-/// where the mouse was, and the next movement starts somewhere plausible.
 async fn sync_document(client: &CdpClient, session_id: &str) {
     let document = client
         .send_command("Page.getFrameTree", Some(json!({})), Some(session_id))
@@ -344,8 +329,6 @@ async fn pace(client: &CdpClient, session_id: &str, gap_ms: f64, method: &str, p
     sleep_ms(gap_ms - started.elapsed().as_secs_f64() * 1000.0).await;
 }
 
-/// Moves the pointer to `to` along a human path; `size` (the target's box)
-/// keeps the aim offset inside small targets; `exact` skips the offset.
 pub async fn move_to(
     client: &CdpClient,
     session_id: &str,
@@ -393,8 +376,6 @@ fn button_bit(button: &str) -> i64 {
     }
 }
 
-/// Presses and releases at the pointer: a short settle after arriving, the
-/// button held 45-110 ms, and 60-120 ms between the clicks of a double click.
 pub async fn press_release(
     client: &CdpClient,
     session_id: &str,
@@ -432,7 +413,6 @@ pub async fn press_release(
     Ok(())
 }
 
-/// A wheel gesture at `at`, gliding in ~60 Hz frames.
 pub async fn wheel(
     client: &CdpClient,
     session_id: &str,
@@ -455,7 +435,6 @@ pub async fn wheel(
     Ok(())
 }
 
-/// One key of a typed character: its key, code, key code and whether it needs Shift.
 pub struct TypedKey {
     pub key: String,
     pub code: String,
@@ -556,10 +535,6 @@ enum TimedEvent {
     Text(String),
 }
 
-/// Types text as a keystroke timeline: presses ~70-150 ms apart (faster for
-/// long text), each held 55-120 ms so fast pairs overlap, Shift held across
-/// a run of capitals. Past 160 characters the rest is inserted in word-sized
-/// chunks. `mean_interval_ms` overrides the pace.
 pub async fn type_text(
     client: &CdpClient,
     session_id: &str,
@@ -734,7 +709,6 @@ pub async fn type_text(
     Ok(())
 }
 
-/// Holds or releases the key that adds a click to a selection (Cmd on macOS, Ctrl elsewhere).
 pub async fn toggle_modifier(client: &CdpClient, session_id: &str, down: bool) -> Result<(), String> {
     let (key, code, key_code, bit) = if cfg!(target_os = "macos") {
         ("Meta", "MetaLeft", 91, 4)
@@ -760,7 +734,6 @@ pub async fn toggle_modifier(client: &CdpClient, session_id: &str, down: bool) -
     Ok(())
 }
 
-/// A key press paced like a person's after other keys or a click.
 pub async fn before_key(session_id: &str) {
     let (last_key, released) = with_state(session_id, |s| (s.last_key_at, s.released_at));
     let wait = [
@@ -777,7 +750,6 @@ pub async fn before_key(session_id: &str) {
     with_state(session_id, |s| s.last_key_at = Some(Instant::now()));
 }
 
-/// How long a pressed key stays down.
 pub async fn key_hold() {
     sleep_ms(random(55.0, 110.0)).await;
 }

@@ -1,11 +1,3 @@
-//! Runs page commands for tabs in the user's own browser inside this service.
-//!
-//! The extension keeps what only it can do (opening, grouping, owning and
-//! closing tabs, cookies, downloads). Everything done to a page is decided
-//! here and sent as raw debugger commands through the extension, which checks
-//! that the tab belongs to the command's owner. Extensions that don't announce
-//! `debuggerPipe` keep getting the high-level commands.
-
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
@@ -20,8 +12,6 @@ use super::browser::BrowserManager;
 use super::cdp::client::CdpClient;
 use super::extension_bridge::ExtensionBridge;
 
-/// Commands the service runs itself over the pipe. Anything else (tab
-/// lifecycle, cookies, downloads) goes to the extension as a whole command.
 const PIPED_ACTIONS: &[&str] = &[
     "navigate",
     "open",
@@ -91,7 +81,6 @@ pub(super) fn is_piped_action(action: &str) -> bool {
 
 pub(super) enum PipeOutcome {
     Done(Value),
-    /// The extension runs this command itself.
     UseExtension,
 }
 
@@ -106,12 +95,9 @@ pub(super) struct PipeOwners {
     owners: Arc<Mutex<HashMap<OwnerKey, Arc<Mutex<PipeOwner>>>>>,
 }
 
-/// An owner keeps one state per browser it drives.
 type OwnerKey = (String, u64);
 
 impl PipeOwners {
-    /// Boxed because a piped command can reach the bridge again (a
-    /// confirmation re-runs its command).
     pub(super) fn run<'a>(
         &'a self,
         bridge: &'a ExtensionBridge,
@@ -160,8 +146,6 @@ impl PipeOwners {
             return PipeOutcome::UseExtension;
         }
         if action == "tab_close" {
-            // While attached, a "Leave site?" dialog is answered here instead
-            // of holding the tab open.
             let owner = self.owners.lock().await.get(&key).cloned();
             if let (Some(owner), Some(tab_id)) =
                 (owner, command.get("tabId").and_then(Value::as_u64))
@@ -274,7 +258,6 @@ async fn detach_when_idle(owner: Weak<Mutex<PipeOwner>>) {
     }
 }
 
-/// Releases mouse buttons and keys a cancelled command left pressed.
 struct HeldInput {
     link: Arc<PipeLink>,
     armed: bool,
@@ -296,14 +279,12 @@ struct Lease {
     issued_at: Value,
 }
 
-/// One owner's CDP connection to their tabs, over one extension connection.
 pub(crate) struct PipeLink {
     bridge: ExtensionBridge,
     generation: u64,
     owner_id: String,
     lease: SyncMutex<Lease>,
     attached: SyncMutex<HashSet<u64>>,
-    /// Frame and worker sessions, by the tab they belong to.
     child_tabs: SyncMutex<HashMap<String, u64>>,
     frame_sessions: SyncMutex<HashMap<(u64, String), String>>,
     frame_attached: Notify,
@@ -411,7 +392,6 @@ impl PipeLink {
         response_data(response)
     }
 
-    /// Sends a whole command to the extension for a step of a piped one.
     pub(crate) async fn extension_command(&self, command: &Value) -> Result<Value, String> {
         let action = command.get("action").and_then(Value::as_str).unwrap_or("");
         let mut fields = command.clone();
@@ -427,8 +407,6 @@ impl PipeLink {
         response_data(self.bridge.reply(pending, COMMAND_TIMEOUT).await?)
     }
 
-    /// The owner's tab a command addresses (its active one without a tabId),
-    /// opened if the owner has none. The extension checks ownership.
     pub(crate) async fn resolve_tab(&self, tab_id: Option<u64>) -> Result<PipeTab, String> {
         let fields = match tab_id {
             Some(tab_id) => json!({ "tabId": tab_id }),
@@ -476,7 +454,6 @@ impl PipeLink {
         }
     }
 
-    /// Opens an empty page in a tab that can't be debugged as it is.
     pub(crate) async fn blank(&self, tab_id: u64) -> Result<(), String> {
         self.call("pipe_blank", json!({ "tabId": tab_id }))
             .await
@@ -515,7 +492,6 @@ impl PipeLink {
             .retain(|(tab, _), _| *tab != tab_id);
     }
 
-    /// Splits a CDP session id into the tab and, for a frame, its session.
     fn address(&self, session_id: &str) -> Option<(u64, Option<String>)> {
         if let Some(tab_id) = session_tab(session_id) {
             return Some((tab_id, None));
@@ -714,8 +690,6 @@ impl PipeLink {
         let _ = self.to_client.send(message.to_string());
     }
 
-    /// Shows the person where the agent points, with Chrome's own overlay:
-    /// nothing is added to the page.
     async fn draw_cursor(self: Arc<Self>, tab_id: u64, params: &Value) {
         let (Some(x), Some(y)) = (
             params.get("x").and_then(Value::as_f64),

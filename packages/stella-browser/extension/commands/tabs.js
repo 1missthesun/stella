@@ -1,9 +1,5 @@
 const forgetListeners = new Set();
 
-/**
- * `listener(ownerId, tabId)` runs when an owner stops holding a tab; without a
- * tab, all of the owner's; without an owner, everyone's.
- */
 export function onForgotten(listener) {
   forgetListeners.add(listener);
 }
@@ -356,10 +352,6 @@ export async function assertCurrentOwnerLease(command) {
   }
 }
 
-/**
- * The tab a pipe command names, when the command carries its owner's current
- * lease and the owner holds that tab. Synchronous so commands keep their order.
- */
 export function requireOwnedTab(command) {
   const ownerId = getCommandOwnerId(command);
   const lease = ownerLeaseState[ownerId];
@@ -1102,10 +1094,6 @@ function agentTouchedAt(ownerId, tabId) {
   );
 }
 
-/**
- * The person has taken a tab over when they looked at it after its task last
- * used it, or are looking at it now. Such tabs are released, never closed.
- */
 async function isTakenOver(ownerId, tab) {
   const viewedAt = Number(tabViewedAt[String(tab.id)] ?? 0);
   if (viewedAt > agentTouchedAt(ownerId, tab.id)) return true;
@@ -1144,10 +1132,6 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
     .catch(() => {});
 });
 
-/**
- * Tabs left in a Stella group that no task owns (Chrome restarted, or the
- * extension was reloaded) are closed; one showing in its window is released.
- */
 export async function closeStrayStellaTabs() {
   await loadState();
   await awaitPendingTabAdoptions();

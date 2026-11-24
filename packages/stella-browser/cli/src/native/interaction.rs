@@ -9,10 +9,8 @@ use super::human::{self, Point};
 pub struct ActionablePoint {
     pub object_id: String,
     pub session_id: String,
-    /// Where to point: a human-like spot on the element.
     pub x: f64,
     pub y: f64,
-    /// The centre of its visible part, to tell whether it moved.
     pub cx: f64,
     pub cy: f64,
 }
@@ -20,9 +18,6 @@ pub struct ActionablePoint {
 const ACTIONABILITY_TIMEOUT_MS: u64 = 2500;
 const ACTIONABILITY_POLL_MS: u64 = 150;
 
-/// semantics. Using `Input.insertText` after firing an empty input event can
-/// race controlled inputs: their framework restores the old value between
-/// the clear and insert, turning fill("1.0.27") into an append. This performs
 const FILL_REPLACE_JS: &str = r#"async function(nextValue) {
     const el = this;
     el.focus();
@@ -452,7 +447,6 @@ async fn frame_owner(
         .ok_or_else(|| "Frame owner is no longer available. Take a new snapshot.".to_string())
 }
 
-/// `in_view` refuses a point outside its frame's viewport.
 pub(super) async fn translate_frame_point(
     client: &CdpClient,
     scope: &[RefFrame],
@@ -659,9 +653,6 @@ async fn view_state(
         .cloned()
 }
 
-/// Brings a top-level element into view with the mouse wheel, the way a person
-/// scrolls to it. Anything it can't settle (frames, pages that ignore the
-/// wheel) is left to the actionability check, which scrolls it directly.
 async fn wheel_into_view(
     client: &CdpClient,
     session_id: &str,
@@ -905,9 +896,6 @@ async fn call_on(
         .unwrap_or(Value::Null))
 }
 
-/// Puts the keyboard focus in the element the way a person does, by clicking
-/// it; falls back to focusing it directly when the click didn't land there.
-/// Returns whether it was already focused.
 async fn focus_by_click(
     client: &CdpClient,
     session_id: &str,
@@ -1293,9 +1281,6 @@ async fn scroll_directly(
     Ok(())
 }
 
-/// Chooses options the way a person does with a closed dropdown: focus it and
-/// type the option's label. Lists, multiple choices and labels typing can't
-/// reach (duplicates) are set directly, with the events a change fires.
 pub async fn select_option(
     client: &CdpClient,
     session_id: &str,
@@ -1376,9 +1361,6 @@ pub async fn select_option(
     Ok(())
 }
 
-/// Clicks the wanted rows of a list box like a person: a plain click on the first, then
-/// Cmd/Ctrl-click on the rest. Returns false when a row is scrolled out of the box or the
-/// clicks did not produce the wanted selection.
 async fn click_list_options(
     client: &CdpClient,
     session_id: &str,
@@ -1793,8 +1775,6 @@ pub async fn tap_touch(
     Ok(())
 }
 
-/// Moves to the target and presses it, following it when the page shifts under
-/// the travelling pointer (a hover that changes the layout).
 async fn dispatch_click(
     client: &CdpClient,
     session_id: &str,

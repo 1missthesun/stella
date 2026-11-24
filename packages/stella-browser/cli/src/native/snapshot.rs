@@ -199,8 +199,6 @@ const FRAME_HIDDEN_JS: &str = r#"function() {
     return box.width < 2 || box.height < 2 || !this.checkVisibility({ opacityProperty: true, visibilityProperty: true });
 }"#;
 
-/// The frame elements of every document in a session, in document order. A
-/// search also reaches the ones in closed shadow roots.
 async fn frame_owners(client: &CdpClient, session_id: &str) -> Result<Vec<FrameOwner>, String> {
     client
         .send_command_no_params("DOM.enable", Some(session_id))
@@ -352,8 +350,6 @@ fn add_frame_tree(
     }
 }
 
-/// Every frame of the page, the main one first. Cross-origin frames live in
-/// sessions of their own and are found through their frame elements.
 async fn page_frames(
     client: &CdpClient,
     session_id: &str,
@@ -434,8 +430,6 @@ async fn attached_frame_tree(
     Ok((session, tree))
 }
 
-/// The readable frames in reading order, each with the chain of frames that
-/// leads to it. A hidden frame hides the frames inside it.
 fn frames_in_order(
     frames: &[PageFrame],
     domain_filter: Option<&super::network::DomainFilter>,
@@ -651,9 +645,6 @@ fn rename_walker_refs(tree: &str, renamed: &HashMap<String, String>) -> String {
     output
 }
 
-/// Snapshot from the page-side walker the extension backend also uses, so
-/// both backends return the same tree; `take_ax_snapshot` keeps Chrome's
-/// accessibility tree for callers that need it.
 pub async fn take_dom_snapshot(
     client: &CdpClient,
     session_id: &str,

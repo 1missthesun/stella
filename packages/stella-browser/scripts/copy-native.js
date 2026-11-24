@@ -30,9 +30,6 @@ if (!existsSync(binDir)) {
 const tempPath = join(binDir, `.${targetName}.${process.pid}.tmp`);
 
 try {
-  // Replace via a fresh temp file so repeated builds do not reuse the old inode.
-  // In this repo, Cursor's shell path could get stuck launching the previous inode
-  // even when the file contents had been overwritten in place.
   copyFileSync(sourcePath, tempPath);
 
   if (platform() !== 'win32') {

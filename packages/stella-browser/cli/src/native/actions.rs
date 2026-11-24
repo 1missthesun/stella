@@ -53,10 +53,6 @@ pub struct PendingConfirmation {
     confirmed: Vec<String>,
 }
 
-// The command vocabulary is contract-checked against
-// packages/stella-browser/protocol/actions.json (see contract_tests.rs).
-// Adding, removing, or renaming an action here without updating the manifest
-// (and the JS layers listed in it) fails the contract tests.
 fn is_known_action(action: &str) -> bool {
     matches!(
         action,
@@ -232,12 +228,6 @@ fn is_known_action(action: &str) -> bool {
 
 const MAX_CHAIN_STEPS: usize = 100;
 
-/// Actions the JS client (BROWSER_CHAIN_ACTIONS in
-/// packages/runtime/kernel/browser-use/client.ts) permits inside a chain,
-/// contract-checked against protocol/actions.json ("chain": true). Kept in
-/// sync as defense-in-depth: lifecycle, credential, and state-mutating
-/// maintenance actions must stay top-level so policy prompts and confirmation
-/// flows cannot be smuggled past inside a batch.
 fn is_chain_allowed_action(action: &str) -> bool {
     matches!(
         action,
@@ -750,9 +740,6 @@ fn validate_mark_tab(cmd: &Value) -> Result<(), String> {
 
 
 
-/// First AX ref number. DOM snapshots restart at `e1` on every capture, so AX
-/// refs, which keep counting across captures, start far above that range and
-/// the two ref families never share an id.
 const AX_REF_START: usize = 1_000_000;
 
 
@@ -769,10 +756,6 @@ struct ExtensionProxy {
     delegate_token: String,
 }
 
-/// Where an extension-targeted command goes once the daemon state lock is
-/// released. The extension answers on its own schedule (a slow page load can
-/// take tens of seconds), so the round trip must not hold the lock that every
-/// other owner's commands wait on.
 enum ExtensionRoute {
     Bridge(ExtensionBridge),
     Proxy(ExtensionProxy),
@@ -827,10 +810,7 @@ pub struct DaemonState {
     pub daemon_shutdown_tx: Option<mpsc::UnboundedSender<()>>,
     owner_leases: OwnerLeaseRegistry,
     deferred_extension_forward: Option<ExtensionForward>,
-    /// Set when this state drives tabs in the user's own browser.
     pipe: Option<Arc<PipeLink>>,
-    /// Refs of the tabs other than the active one, which is in `ref_map`.
-    /// Refs of the tabs that aren't active, and the tab `ref_map` belongs to.
     tab_refs: HashMap<u64, RefMap>,
     refs_tab: Option<u64>,
 }
@@ -904,8 +884,6 @@ impl DaemonState {
         self.subscribe_to_browser_events();
     }
 
-    /// Puts away the refs of the tab that was active and brings back those of
-    /// the one that is.
     fn follow_active_tab(&mut self) {
         let Some(browser) = self.browser.as_ref() else {
             return;
@@ -931,7 +909,6 @@ impl DaemonState {
         self.network.as_ref().is_some_and(NetworkLog::is_active)
     }
 
-    /// Network capture covers a tab from its first command.
     async fn capture_active_tab(&self) {
         let (Some(browser), Some(network)) = (&self.browser, &self.network) else {
             return;
@@ -1149,8 +1126,6 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
     }
 }
 
-/// Runs everything that needs the daemon state and returns the extension
-/// round trip, if any, for the caller to await after releasing the state lock.
 pub async fn prepare_command(cmd: &Value, state: &mut DaemonState) -> PreparedCommand {
     state.deferred_extension_forward = None;
     let response = execute_authorized(cmd, state, &[]).await;
@@ -1248,7 +1223,6 @@ impl Drop for AnsweringDialogs {
     }
 }
 
-/// Runs a command on the user's own browser over the extension pipe.
 pub(super) async fn execute_piped(
     cmd: &Value,
     state: &mut DaemonState,
@@ -1352,8 +1326,6 @@ fn opens_page(cmd: &Value) -> bool {
     }
 }
 
-/// `confirmed` lists the actions of this exact command the owner already
-/// confirmed; policy and confirm-actions stay in force for everything else.
 async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[String]) -> Value {
     let is_confirmed = |name: &str| confirmed.iter().any(|done| done == name);
     let action = cmd.get("action").and_then(|v| v.as_str()).unwrap_or("");
@@ -1561,9 +1533,6 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
                     }
                 }
 
-                // Commands without an explicit tab address operate on the
-                // owner's logical active tab, not whichever other owner most
-                // recently changed the process-global CDP page.
                 if cmd.get("tabId").is_none()
                     && !matches!(action, "tab_list" | "tab_new" | "tab_switch" | "tab_close")
                 {
@@ -1624,11 +1593,6 @@ async fn execute_authorized(cmd: &Value, state: &mut DaemonState, confirmed: &[S
         }
     }
 
-    // Callers built against the tab-addressed protocol (the browser worker
-    // API) pass the stable `tabId` from tab_list/tab_new on every per-tab
-    // action. The CDP handlers operate on the active page, so make the
-    // addressed tab active first. tab_switch/tab_close resolve their own
-    // target, and tab_list/tab_new take none.
     if !matches!(
         action,
         "tab_list" | "tab_new" | "tab_switch" | "tab_close" | "mark_tab"
@@ -1859,10 +1823,8 @@ async fn dispatch_action(
 
 const DEFAULT_CHAIN_COMMAND_TIMEOUT_MS: u64 = 30_000;
 const MIN_CHAIN_RUNTIME_MS: u64 = 3 * 60_000;
-/// Must stay aligned with MAX_BROWSER_CHAIN_TIMEOUT_MS in the runtime client.
 const MAX_CHAIN_RUNTIME_MS: u64 = 4 * 60_000;
 const CHAIN_STEP_BUDGET_MS: u64 = 1_000;
-/// Default implicit selector wait per step, mirroring the extension executor.
 const DEFAULT_CHAIN_WAIT_TIMEOUT_MS: u64 = 10_000;
 const CHAIN_SELECTOR_POLL_MS: u64 = 200;
 
@@ -2017,8 +1979,6 @@ async fn wait_for_chain_step_selector(
     }
 }
 
-/// Re-select the chain's addressed tab before a trailing snapshot/screenshot,
-/// since per-step tabIds may have moved the active page.
 async fn chain_select_tab(state: &mut DaemonState, tab_id: Option<u64>) {
     if let Some(link) = state.pipe.clone() {
         let cmd = match tab_id {
@@ -2135,7 +2095,6 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
         let mut step_cmd = step.clone();
         if let Some(step_object) = step_cmd.as_object_mut() {
             step_object.insert("id".to_string(), json!(format!("{}_s{}", id, index)));
-            // A response asked for after acting on the page is one the chain caused.
             if let (Some(acted_at), "responsebody", false) =
                 (acted_at, action, step_object.contains_key("after"))
             {
@@ -2207,9 +2166,6 @@ async fn handle_chain(cmd: &Value, state: &mut DaemonState, id: &str) -> Value {
             }
         }
 
-        // Route the step to its addressed tab. This mirrors execute_command's
-        // pre-dispatch tabId resolution: tab_* actions resolve their own
-        // targets, every other action runs against the active page.
         if state.pipe.is_none()
             && !matches!(action, "tab_list" | "tab_new" | "tab_switch" | "tab_close")
         {
@@ -4198,7 +4154,6 @@ async fn wait_for_selector(
     .await
 }
 
-/// `*` matches anything; a pattern without one matches any URL containing it.
 async fn wait_for_url(
     client: &super::cdp::client::CdpClient,
     session_id: &str,
@@ -4823,7 +4778,6 @@ pub(super) fn is_site_url(url: &str) -> bool {
     url::Url::parse(url).is_ok_and(|url| matches!(url.scheme(), "http" | "https"))
 }
 
-/// Starts loading a page in a new tab, without waiting for the site to answer.
 async fn load_in_active_tab(state: &DaemonState, url: &str) -> Result<(), String> {
     let browser = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = browser.active_session_id()?;
@@ -4838,7 +4792,6 @@ async fn load_in_active_tab(state: &DaemonState, url: &str) -> Result<(), String
     }
 }
 
-/// A tab of the user's browser, attached before its first page loads.
 async fn open_piped_tab(
     cmd: &Value,
     state: &mut DaemonState,
@@ -6517,7 +6470,6 @@ async fn handle_responsebody(cmd: &Value, state: &mut DaemonState) -> Result<Val
     }))
 }
 
-/// The active page's session and the log of what it sends.
 fn observed_page(state: &DaemonState) -> Result<(String, NetworkLog), String> {
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();

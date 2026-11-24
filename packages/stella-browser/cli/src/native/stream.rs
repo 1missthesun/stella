@@ -524,7 +524,6 @@ async fn handle_client_message(msg: &str, client: &CdpClient, session_id: Option
                 .await;
         }
         "status" => {
-            // Client requesting status -- handled via broadcast_status from the caller
         }
         _ => {}
     }

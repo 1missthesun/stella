@@ -1,10 +1,3 @@
-/**
- * Runs inside the page: the service embeds this file's source and evaluates
- * it there, so it can't use anything outside this function.
- *
- * @param {object} options
- * @returns {{ tree: string, refs: Record<string, object> }}
- */
 export function executeSnapshot(options) {
   const MAX_CHARS = 20_000;
   const MAX_ELEMENTS = 200;

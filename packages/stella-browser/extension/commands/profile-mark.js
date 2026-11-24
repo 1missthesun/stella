@@ -1,7 +1,3 @@
-/**
- * Lets the service learn which Chrome profile a connection belongs to: it has
- * the marker stored, then looks for it in the profiles' storage on disk.
- */
 const STORAGE_KEY = "stella_profile_mark";
 
 export async function handleProfileMark({ id, marker }) {

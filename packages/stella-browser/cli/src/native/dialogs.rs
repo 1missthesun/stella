@@ -8,11 +8,6 @@ use super::cdp::types::CdpEvent;
 
 const MAX_ANSWERED: usize = 20;
 
-/// Answers a page's dialogs the way a dismissing person would: alerts are
-/// acknowledged, confirms and prompts cancelled, "Leave site?" accepted.
-///
-/// In the user's own browser a dialog is answered only while a command runs;
-/// any other may be the user's, so it stays open until the next command.
 #[derive(Clone, Default)]
 pub struct Dialogs {
     state: Arc<Mutex<State>>,
@@ -117,7 +112,6 @@ impl Dialogs {
         );
     }
 
-    /// Answers dialogs from now on, starting with the open ones.
     pub async fn resume(&self) {
         let held = self.state.lock().unwrap().held.take();
         for event in held.unwrap_or_default() {
@@ -133,7 +127,6 @@ impl Dialogs {
             .get_or_insert_with(Vec::new);
     }
 
-    /// The dialogs answered since this was last called.
     pub fn take_answered(&self) -> Vec<Value> {
         std::mem::take(&mut self.state.lock().unwrap().answered)
     }

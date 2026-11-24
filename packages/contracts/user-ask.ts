@@ -361,6 +361,9 @@ export type UserAskSealedValue = Readonly<{
   ciphertext: string;
 }>;
 
+/** The `originDeviceId` of an ask a cloud task opened: no computer asked, so none stores what the user remembers. */
+export const USER_ASK_CLOUD_ORIGIN_DEVICE_ID = "stella-cloud";
+
 export type UserAsk = Readonly<{
   schemaVersion: typeof USER_ASK_SCHEMA_VERSION;
   askId: string;

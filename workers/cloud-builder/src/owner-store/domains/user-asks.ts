@@ -20,6 +20,7 @@ import {
   effectiveEscalationCeiling,
   normalizeUserAskDeclineReason,
   normalizeUserAskNote,
+  USER_ASK_CLOUD_ORIGIN_DEVICE_ID,
   USER_ASK_MAX_NOTE,
   userAskTtlMs,
   nextEscalationLevel,
@@ -104,7 +105,7 @@ const ANNOUNCE_MAX_LEVEL = 3;
 const COALESCE_WINDOW_MS = 60_000;
 const REPLY_SECRET_BYTES = 32;
 
-export const USER_ASK_CLOUD_ORIGIN_DEVICE_ID = "stella-cloud";
+export { USER_ASK_CLOUD_ORIGIN_DEVICE_ID };
 
 const isCloudOrigin = (originDeviceId: string): boolean =>
   originDeviceId === USER_ASK_CLOUD_ORIGIN_DEVICE_ID;

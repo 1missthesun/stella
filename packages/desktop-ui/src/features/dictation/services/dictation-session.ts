@@ -6,8 +6,13 @@ import {
   setSharedMicrophoneKeepWarm,
   type SharedMicrophoneLease,
 } from "@/features/voice/services/shared-microphone";
-import { DictationStream } from "./dictation-stream";
-import { transcribeDictation, transcribeWithFallback } from "./dictation-transcriber";
+import { DictationRefusedError, DictationStream } from "./dictation-stream";
+import { transcribeDictation, type DictationRoute } from "./dictation-transcriber";
+import {
+  NativeCapture,
+  nativeMicrophoneReady,
+  nativeMicrophoneSupported,
+} from "./native-microphone";
 import { onDeviceDictationAvailable, OnDeviceDictationStream } from "./on-device-dictation";
 import { PcmRecording } from "./pcm-recording";
 
@@ -21,6 +26,15 @@ const MAX_DICTATION_DURATION_MS = 15 * 60 * 1000;
 
 const PRE_ROLL_MS = 300;
 const WARM_CONTEXT_IDLE_MS = 60_000;
+const ARMED_PRE_ROLL_MS = 1_500;
+// How far behind the voice the browser's microphone pipeline runs.
+const BROWSER_DRAIN_MS = 120;
+const LIVE_TIMEOUT_MS = 10_000;
+// The browser pads a microphone that is still starting with zeros, but a quiet
+// headset that gates its noise delivers nothing else.
+const SILENT_LIVE_SAMPLES = 0.3 * TARGET_SAMPLE_RATE;
+// macOS hands a process it denies the microphone nothing but zeros.
+const NATIVE_SILENT_SAMPLES = 1.5 * TARGET_SAMPLE_RATE;
 
 export const resolveDictationPcmWorkletUrl = (rendererHref: string): string =>
   new URL(PCM_WORKLET_FILE, rendererHref).href;
@@ -32,7 +46,31 @@ export type DictationSessionState =
   | "transcribing"
   | "error";
 
+type CaptureHandle = {
+  /** Resolves once everything said before this call has been delivered. */
+  drain: () => Promise<void>;
+  release: () => void;
+};
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+const rmsOf = (pcm: Int16Array): number => {
+  let sum = 0;
+  for (let i = 0; i < pcm.length; i += 1) sum += pcm[i]! * pcm[i]!;
+  return pcm.length === 0 ? 0 : Math.sqrt(sum / pcm.length) / 0x8000;
+};
+
+// The native capture has no noise suppression, so the room would move the
+// waveform. Fixed rather than adaptive: steady noise must never read as a voice.
+const NATIVE_ROOM_RMS = 0.02;
+
+const aboveRoomNoise = (rms: number): number =>
+  Math.sqrt(Math.max(0, rms * rms - NATIVE_ROOM_RMS * NATIVE_ROOM_RMS));
+
 type DictationCallbacks = {
+  /** Nothing here can transcribe: the user has to add a key or sign in. */
+  onNeedsKey?: () => void;
   onFinalTranscript?: (text: string) => void;
   onStateChange?: (state: DictationSessionState, error?: string) => void;
 };
@@ -56,6 +94,7 @@ class DictationWarmCapture {
   private startPromise: Promise<void> | null = null;
   private listener: ((frame: WorkletFrame) => void) | null = null;
   private pinned = false;
+  private armedTimer: ReturnType<typeof setTimeout> | null = null;
   timings: Record<string, number> = {};
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -87,8 +126,25 @@ class DictationWarmCapture {
     this.scheduleIdleClose();
   }
 
+  /** Opens the microphone for a press in progress; see `disarm`. */
+  arm(): void {
+    if (this.listener || this.pinned || this.armedTimer) return;
+    this.clearIdle();
+    this.armedTimer = setTimeout(() => this.disarm(), ARMED_PRE_ROLL_MS);
+    void this.start().catch(() => undefined);
+  }
+
+  disarm(): void {
+    if (!this.armedTimer) return;
+    clearTimeout(this.armedTimer);
+    this.armedTimer = null;
+    void this.stop();
+  }
+
   async attach(listener: (frame: WorkletFrame) => void): Promise<Int16Array[]> {
     this.clearIdle();
+    if (this.armedTimer) clearTimeout(this.armedTimer);
+    this.armedTimer = null;
     this.listener = listener;
     const preRoll = this.chunks;
     this.chunks = [];
@@ -111,7 +167,7 @@ class DictationWarmCapture {
   async stop(): Promise<void> {
     const starting = this.startPromise;
     if (starting) await starting.catch(() => undefined);
-    if (this.listener || this.pinned || this.startPromise) return;
+    if (this.listener || this.pinned || this.armedTimer || this.startPromise) return;
     this.tearDownAudioPipeline();
     const lease = this.micLease;
     this.micLease = null;
@@ -214,7 +270,8 @@ class DictationWarmCapture {
   private append(chunk: Int16Array): void {
     this.chunks.push(chunk);
     this.totalSamples += chunk.length;
-    const maxSamples = Math.round((PRE_ROLL_MS / 1000) * TARGET_SAMPLE_RATE);
+    const keepMs = this.armedTimer ? ARMED_PRE_ROLL_MS : PRE_ROLL_MS;
+    const maxSamples = Math.round((keepMs / 1000) * TARGET_SAMPLE_RATE);
     while (this.totalSamples > maxSamples && this.chunks.length > 0) {
       const first = this.chunks[0]!;
       if (this.totalSamples - first.length >= maxSamples) {
@@ -267,12 +324,27 @@ export async function ensureDictationSuperFastWarm(): Promise<void> {
 }
 
 export function warmDictationAudio(): void {
-  warmCapture.warmForIntent();
+  if (!nativeMicrophoneReady()) warmCapture.warmForIntent();
+}
+
+export function armBrowserMicrophone(): void {
+  warmCapture.arm();
+}
+
+export function disarmBrowserMicrophone(): void {
+  warmCapture.disarm();
 }
 
 export class DictationSession {
   private state: DictationSessionState = "idle";
-  private attached: ((frame: WorkletFrame) => void) | null = null;
+  private capture: CaptureHandle | null = null;
+  private live: Promise<void> = Promise.resolve();
+  private markLive: () => void = () => undefined;
+  private heard = false;
+  private silentSamples = 0;
+  private routed: Promise<void> = Promise.resolve();
+  private unrouted: Int16Array[] | null = null;
+  private needsKey = false;
   private callbacks: DictationCallbacks = {};
   private recording = new PcmRecording();
   private transcription: AbortController | null = null;
@@ -280,7 +352,6 @@ export class DictationSession {
   private onDevice: OnDeviceDictationStream | null = null;
   private onDeviceOpened: Promise<void> = Promise.resolve();
   private onDeviceFallback: Promise<boolean> = Promise.resolve(false);
-  private streamedSamples = 0;
   private stream: DictationStream | null = null;
   private streamOpened: Promise<void> = Promise.resolve();
   private streamFailure: Error | null = null;
@@ -302,7 +373,7 @@ export class DictationSession {
 
   async start(
     callbacks: DictationCallbacks,
-    options: { streaming?: boolean; onDevice?: boolean } = {},
+    options: { route: Promise<DictationRoute>; captureId: string },
   ): Promise<void> {
     if (this.isActive()) return;
     this.pressedAt = performance.now();
@@ -310,28 +381,29 @@ export class DictationSession {
     this.callbacks = callbacks;
     this.cancelled = false;
     this.stopRequested = false;
-    this.setState("starting");
-    this.streaming = options.streaming === true;
+    this.needsKey = false;
+    this.heard = false;
+    this.silentSamples = 0;
+    this.streaming = false;
     this.recording = new PcmRecording();
+    this.unrouted = [];
     this.meter.reset();
     this.resetStream();
     this.resetOnDevice();
-    if (options.onDevice) {
-      this.openOnDevice();
-    } else if (this.streaming) {
-      this.openStream();
-      this.onDeviceFallback = onDeviceDictationAvailable().catch(() => false);
-    }
+    this.live = new Promise((resolve) => {
+      this.markLive = resolve;
+    });
+    this.setState("starting");
+    this.routed = options.route
+      .catch(() => "needs-key" as const)
+      .then((route) => this.applyRoute(route));
 
-    const listener = (frame: WorkletFrame) => this.onFrame(frame);
-    this.attached = listener;
-    let preRoll: Int16Array[];
     try {
-      preRoll = await warmCapture.attach(listener);
+      this.capture = await this.openCapture(options.captureId);
     } catch (err) {
       if (this.cancelled) {
         await this.cleanup();
-        this.setState("idle");
+        this.settleCancelled();
         return;
       }
       console.error("[dictation] failed to acquire microphone:", err);
@@ -341,15 +413,20 @@ export class DictationSession {
     }
 
     try {
-      if (this.cancelled) {
+      await Promise.race([this.live, wait(LIVE_TIMEOUT_MS)]);
+      if (this.cancelled || this.needsKey) {
         await this.cleanup();
-        this.setState("idle");
+        this.settleCancelled();
         return;
       }
-      for (const chunk of preRoll) this.capture(chunk);
+      if (!this.heard && !this.stopRequested) {
+        throw new Error("The microphone is not delivering any sound.");
+      }
       if (
         this.streamFailure &&
-        (this.onDevice || !(await this.onDeviceFallback))
+        (this.onDevice ||
+          (this.streamFailure instanceof DictationRefusedError &&
+            !(await this.onDeviceFallback)))
       ) {
         throw this.streamFailure;
       }
@@ -370,6 +447,7 @@ export class DictationSession {
   async stop(): Promise<void> {
     if (this.state === "starting") {
       this.stopRequested = true;
+      this.markLive();
       return;
     }
     if (this.state !== "listening") return;
@@ -378,43 +456,47 @@ export class DictationSession {
       clearTimeout(this.durationLimitTimer);
       this.durationLimitTimer = null;
     }
+    if (this.cancelled) {
+      await this.cleanup();
+      this.settleCancelled();
+      return;
+    }
+    const controller = new AbortController();
+    this.transcription = controller;
+    this.setState("transcribing");
+    const capture = this.capture;
+    this.capture = null;
+    await capture?.drain();
+    capture?.release();
     this.meter.reset();
-    this.releaseCapture();
+    await this.routed;
 
     const recording = this.recording;
     this.recording = new PcmRecording();
-    const samples = this.streaming
-      ? this.streamedSamples
-      : recording.sampleCount;
-    if (this.cancelled || samples === 0) {
+    if (this.cancelled || this.needsKey || recording.sampleCount === 0) {
       this.stream?.cancel();
       this.resetStream();
       this.onDevice?.cancel();
       this.resetOnDevice();
-      this.setState("idle");
+      this.settleCancelled();
       return;
     }
 
-    this.setState("transcribing");
-    const controller = new AbortController();
-    this.transcription = controller;
     try {
       const transcript = this.onDevice
         ? await this.finishOnDevice()
         : this.streaming
-          ? await this.finishStream().catch((error: unknown) =>
-              transcribeWithFallback(recording.toWav(), error, controller.signal),
-            )
+          ? await this.finishStreamed(recording, controller.signal)
           : await transcribeDictation(recording.toWav(), controller.signal);
       if (this.cancelled || !transcript) {
-        this.setState("idle");
+        this.settleCancelled();
         return;
       }
       this.callbacks.onFinalTranscript?.(transcript);
       this.setState("idle");
     } catch (err) {
       if (this.cancelled) {
-        this.setState("idle");
+        this.settleCancelled();
         return;
       }
       console.error("[dictation] transcription failed:", err);
@@ -430,11 +512,15 @@ export class DictationSession {
     this.onDevice?.cancel();
     if (this.state === "transcribing") {
       this.transcription?.abort();
+      this.releaseCapture();
       this.setState("idle");
       this.callbacks = {};
       return;
     }
-    if (this.state === "starting") return;
+    if (this.state === "starting") {
+      this.markLive();
+      return;
+    }
     if (this.state === "idle") {
       this.releaseCapture();
       return;
@@ -442,7 +528,85 @@ export class DictationSession {
     await this.stop();
   }
 
-  private onFrame(frame: WorkletFrame): void {
+  private settleCancelled(): void {
+    this.setState("idle");
+    if (this.needsKey && !this.cancelled) this.callbacks.onNeedsKey?.();
+  }
+
+  private async openCapture(captureId: string): Promise<CaptureHandle> {
+    if (nativeMicrophoneSupported()) {
+      let native: NativeCapture | null = null;
+      native = await NativeCapture.open(captureId, {
+        onAudio: (pcm) => {
+          this.onFrame({ pcm, rms: aboveRoomNoise(rmsOf(pcm)) }, true);
+          if (native && !this.heard && this.silentSamples >= NATIVE_SILENT_SAMPLES) {
+            native.discard();
+            void this.onNativeFailed("It delivered only silence.");
+          }
+        },
+        onFailed: (message) => void this.onNativeFailed(message),
+      });
+      if (native) {
+        const opened = native;
+        return {
+          drain: () => opened.drain(),
+          release: () => opened.discard(),
+        };
+      }
+    }
+    return await this.openBrowserCapture();
+  }
+
+  private async openBrowserCapture(): Promise<CaptureHandle> {
+    const listener = (frame: WorkletFrame) => this.onFrame(frame);
+    const preRoll = await warmCapture.attach(listener);
+    for (const pcm of preRoll) this.onFrame({ pcm, rms: rmsOf(pcm) });
+    return {
+      drain: () => wait(BROWSER_DRAIN_MS),
+      release: () => warmCapture.detach(listener),
+    };
+  }
+
+  /** Before it was live the browser gets a try; after, what was said is kept. */
+  private async onNativeFailed(message: string): Promise<void> {
+    console.warn("[dictation] native microphone failed:", message);
+    if (this.heard) {
+      void this.stop();
+      return;
+    }
+    if (this.state !== "starting" || this.cancelled) return;
+    this.silentSamples = 0;
+    try {
+      const browser = await this.openBrowserCapture();
+      if (this.state === "starting" || this.state === "listening") this.capture = browser;
+      else browser.release();
+    } catch (error) {
+      console.error("[dictation] failed to acquire microphone:", error);
+      this.markLive();
+    }
+  }
+
+  private applyRoute(route: DictationRoute): void {
+    const held = this.unrouted ?? [];
+    this.unrouted = null;
+    if (this.cancelled) return;
+    if (route === "needs-key") {
+      this.needsKey = true;
+      this.markLive();
+      if (this.state === "listening") void this.cleanup().then(() => this.settleCancelled());
+      return;
+    }
+    if (route === "on-device") {
+      this.openOnDevice();
+    } else if (route === "streaming") {
+      this.streaming = true;
+      this.openStream();
+      this.onDeviceFallback = onDeviceDictationAvailable().catch(() => false);
+    }
+    for (const pcm of held) this.forward(pcm);
+  }
+
+  private onFrame(frame: WorkletFrame, native = false): void {
     if (import.meta.env.DEV && this.marks.firstFrame === undefined) {
       this.marks.firstFrame = performance.now() - this.pressedAt;
       const marks = this.marks;
@@ -453,7 +617,14 @@ export class DictationSession {
       }, 1500);
     }
     this.meter.pushRms(frame.rms, (frame.pcm.length * 1000) / TARGET_SAMPLE_RATE);
-    this.capture(frame.pcm);
+    this.record(frame.pcm);
+    if (!this.heard) {
+      this.silentSamples += frame.pcm.length;
+      this.heard =
+        (!native && this.silentSamples >= SILENT_LIVE_SAMPLES) ||
+        frame.pcm.some((sample) => sample !== 0);
+      if (this.heard) this.markLive();
+    }
     if (this.recording.full && this.state === "listening") {
       console.warn("[dictation] hit max recording length, auto-stopping");
       void this.stop();
@@ -461,9 +632,8 @@ export class DictationSession {
   }
 
   private releaseCapture(): void {
-    if (!this.attached) return;
-    warmCapture.detach(this.attached);
-    this.attached = null;
+    this.capture?.release();
+    this.capture = null;
   }
 
   private resetStream(): void {
@@ -472,7 +642,6 @@ export class DictationSession {
     this.stream = null;
     this.streamOpened = Promise.resolve();
     this.streamFailure = null;
-    this.streamedSamples = 0;
   }
 
   private openStream(): void {
@@ -507,8 +676,11 @@ export class DictationSession {
   }
 
   private async failWhileListening(error: Error): Promise<void> {
-    if (this.streaming && !this.onDevice && (await this.onDeviceFallback)) {
-      console.warn("[dictation] relay failed; this Mac will transcribe instead:", error.message);
+    const recordingIsEnough =
+      !this.onDevice &&
+      (!(error instanceof DictationRefusedError) || (await this.onDeviceFallback));
+    if (recordingIsEnough) {
+      console.warn("[dictation] relay failed; the recording will be transcribed instead:", error.message);
       return;
     }
     console.error("[dictation] relay failed while recording:", error);
@@ -516,16 +688,15 @@ export class DictationSession {
     this.setState("error", error.message);
   }
 
-  private capture(pcm: Int16Array): void {
-    if (this.onDevice) {
-      this.streamedSamples += pcm.length;
-      this.onDevice.send(pcm);
-      return;
-    }
+  private record(pcm: Int16Array): void {
     this.recording.append(pcm);
-    if (!this.streaming) return;
-    this.streamedSamples += pcm.length;
-    this.ingress?.push(pcm);
+    if (this.unrouted) this.unrouted.push(pcm);
+    else this.forward(pcm);
+  }
+
+  private forward(pcm: Int16Array): void {
+    if (this.onDevice) this.onDevice.send(pcm);
+    else if (this.streaming) this.ingress?.push(pcm);
   }
 
   private resetOnDevice(): void {
@@ -558,6 +729,32 @@ export class DictationSession {
     }
   }
 
+  /**
+   * The relay can end without its last words, or hear nothing in a word it
+   * only caught part of. The recording still has them.
+   */
+  private async finishStreamed(
+    recording: PcmRecording,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const stream = this.stream;
+    let failure: unknown = null;
+    const text = await this.finishStream().catch((error: unknown) => {
+      failure = error;
+      return "";
+    });
+    if (text || signal.aborted) return text;
+    if (failure === null && !recording.hasSpeech()) return "";
+    try {
+      return await transcribeDictation(recording.toWav(), signal);
+    } catch (error) {
+      if (signal.aborted) return "";
+      const partial = stream?.partial ?? "";
+      if (partial || failure === null) return partial;
+      throw error;
+    }
+  }
+
   private async finishStream(): Promise<string> {
     const stream = this.stream;
     try {
@@ -584,6 +781,7 @@ export class DictationSession {
     }
     this.meter.reset();
     this.recording = new PcmRecording();
+    this.unrouted = null;
   }
 
   readLevel(): number {

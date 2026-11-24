@@ -135,6 +135,9 @@ const exactBuffer = (pcm: Int16Array): ArrayBuffer =>
     pcm.byteOffset + pcm.byteLength,
   ) as ArrayBuffer;
 
+/** The relay answered that it will not transcribe (usage, availability). */
+export class DictationRefusedError extends Error {}
+
 export class DictationStream {
   private socket: WebSocket | null = null;
   private transcript = "";
@@ -212,6 +215,11 @@ export class DictationStream {
     this.socket.send(pcm instanceof ArrayBuffer ? pcm : exactBuffer(pcm));
   }
 
+  /** What has been recognized so far. */
+  get partial(): string {
+    return (this.finalTranscript || this.transcript).trim();
+  }
+
   async replay(chunks: readonly Int16Array[]): Promise<void> {
     const deadline = Date.now() + REPLAY_TIMEOUT_MS;
     for (const chunk of chunks) {
@@ -281,7 +289,7 @@ export class DictationStream {
       return;
     }
     if (frame.type === "error") {
-      this.streamError = new Error(
+      this.streamError = new DictationRefusedError(
         typeof frame.message === "string"
           ? frame.message
           : "Dictation failed.",

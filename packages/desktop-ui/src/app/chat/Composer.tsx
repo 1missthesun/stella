@@ -124,6 +124,7 @@ function ComposerImpl({
     onCommit: () => {
       onSendRef.current();
     },
+    surfaceRef: shellRef,
   });
 
   const submitComposer = () => {
@@ -363,6 +364,7 @@ function ComposerImpl({
                           isTranscribing={dictation.isTranscribing}
                           disabled={dictation.isTranscribing}
                           onClick={dictation.toggle}
+                          onPointerDown={dictation.arm}
                           onPointerEnter={dictation.prewarm}
                           onFocus={dictation.prewarm}
                           title={

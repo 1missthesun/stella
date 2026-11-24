@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, shell, systemPreferences } from "electron";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -8,6 +8,7 @@ import { runNativeHelper } from "../native-helper.js";
 import { hasOpenRouterDictationKey, transcribeWithOpenRouter, } from "../services/dictation-openrouter.js";
 import { applyShortcutRegistration, } from "./shortcut-registration.js";
 import { OnDeviceDictation, SYSTEM_DICTATION_SETTINGS_URL, } from "../services/on-device-dictation.js";
+import { MicrophoneCapture } from "../services/microphone-capture.js";
 import {
   IPC_DICTATION_TOGGLE,
   IPC_DICTATION_SET_SHORTCUT,
@@ -19,6 +20,12 @@ import {
   IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED,
   IPC_DICTATION_ACTIVE_CHANGED,
   IPC_DICTATION_PLAY_SOUND,
+  IPC_DICTATION_CAPTURE_READY,
+  IPC_DICTATION_CAPTURE_ARM,
+  IPC_DICTATION_CAPTURE_OPEN,
+  IPC_DICTATION_CAPTURE_CLOSE,
+  IPC_DICTATION_CAPTURE_AUDIO,
+  IPC_DICTATION_CAPTURE_EVENT,
   IPC_DICTATION_ON_DEVICE_STATUS,
   IPC_DICTATION_ON_DEVICE_START,
   IPC_DICTATION_ON_DEVICE_AUDIO,
@@ -41,6 +48,14 @@ const DICTATION_SOUND_VOLUME_BY_SOUND = {
     cancel: "0.35",
 };
 const DICTATION_START_SOUND_MUTE_DELAY_MS = 220;
+// A microphone that never goes live still mutes, as a slow one eventually does.
+const DICTATION_LIVE_MUTE_FALLBACK_MS = 1_500;
+// The companion's window may have to load before it can claim its capture.
+const SHORTCUT_CAPTURE_UNCLAIMED_MS = 6_000;
+const ARMED_CAPTURE_UNCLAIMED_MS = 1_500;
+const MIC_ENABLED_KEY = "stella-mic-enabled";
+const PREFERRED_MIC_KEY = "stella-preferred-mic-id";
+const DICTATION_SUPER_FAST_KEY = "stella-dictation-super-fast";
 const DICTATION_BRIDGE_TIMEOUT_MS = 2_000;
 const OUTPUT_MUTE_FILE = "dictation-output-mute.json";
 const dictationBridgeIsSupported = () => process.platform === "darwin" || process.platform === "win32";
@@ -64,6 +79,20 @@ export const registerDictationHandlers = (options) => {
     let outputMuteActive = false;
     let outputMuteDelayTimer = null;
     const activeDictationSources = new Set();
+    const uiState = (key) => options.getUiState?.(key) ?? null;
+    const capture = new MicrophoneCapture(() => {
+        if (process.platform !== "darwin")
+            return false;
+        if (app.commandLine.hasSwitch("use-fake-device-for-media-stream"))
+            return false;
+        if (uiState(MIC_ENABLED_KEY) === "false" ||
+            uiState(PREFERRED_MIC_KEY) ||
+            uiState(DICTATION_SUPER_FAST_KEY) === "true") {
+            return false;
+        }
+        return systemPreferences.getMediaAccessStatus("microphone") === "granted";
+    });
+    let captureReady = false;
     let dictationActive = false;
     const outputMuteFile = () => {
         const stellaDataDir = options.getStellaDataDir();
@@ -177,7 +206,7 @@ export const registerDictationHandlers = (options) => {
             outputMutePromise = null;
         });
     };
-    const muteOutputForDictationAfterStartCue = () => {
+    const muteOutputForDictationAfter = (delayMs) => {
         if (!dictationBridgeIsSupported())
             return;
         outputMuteActive = true;
@@ -191,7 +220,7 @@ export const registerDictationHandlers = (options) => {
             if (!outputMuteActive)
                 return;
             muteOutputForDictation();
-        }, DICTATION_START_SOUND_MUTE_DELAY_MS);
+        }, delayMs);
     };
     const restoreOutputAfterDictation = () => {
         if (!dictationBridgeIsSupported())
@@ -227,7 +256,7 @@ export const registerDictationHandlers = (options) => {
         dictationActive = activeDictationSources.size > 0;
         if (dictationActive !== previous) {
             if (dictationActive) {
-                muteOutputForDictationAfterStartCue();
+                muteOutputForDictationAfter(DICTATION_LIVE_MUTE_FALLBACK_MS);
             }
             else {
                 restoreOutputAfterDictation();
@@ -249,26 +278,38 @@ export const registerDictationHandlers = (options) => {
     };
     const toggleDictation = () => {
         const target = pickFocusedStellaWindow();
+        const startId = randomUUID();
+        // The microphone opens here, on the key itself: the window that will
+        // dictate can be busy, or still have to load.
+        const openOrPlayStop = (window) => {
+            if (isRendererRecording(window))
+                playEnabledDictationSound("stopRecording");
+            else if (captureReady)
+                capture.open(startId, SHORTCUT_CAPTURE_UNCLAIMED_MS);
+        };
         if (target) {
-            playEnabledDictationSound(isRendererRecording(target) ? "stopRecording" : "startRecording");
-            target.webContents.send(IPC_DICTATION_TOGGLE, { startId: randomUUID() });
+            openOrPlayStop(target);
+            target.webContents.send(IPC_DICTATION_TOGGLE, { startId });
             return;
         }
         const companion = options.getCompanionController();
         if (!companion)
             return;
-        playEnabledDictationSound(isRendererRecording(companion.getPanelWindow()) ? "stopRecording" : "startRecording");
+        openOrPlayStop(companion.getPanelWindow());
         void companion
             .show({ focus: true })
             .then((shown) => {
-            if (!shown)
+            if (!shown) {
+                capture.discard(startId);
                 return;
+            }
             companion.sendToPanel(IPC_DICTATION_TOGGLE, {
-                startId: randomUUID(),
+                startId,
                 source: "companion",
             });
         })
             .catch((error) => {
+            capture.discard(startId);
             console.warn("[dictation] companion summon failed:", error);
         });
     };
@@ -415,6 +456,60 @@ export const registerDictationHandlers = (options) => {
     });
     app.on("browser-window-focus", () => onDevice.invalidate());
     app.once("will-quit", () => onDevice.dispose());
+    app.once("will-quit", () => capture.dispose());
+    let captureOwner = null;
+    const watchedCaptureSenders = new WeakSet();
+    const watchCaptureSender = (sender) => {
+        if (watchedCaptureSenders.has(sender))
+            return;
+        watchedCaptureSenders.add(sender);
+        const senderId = sender.id;
+        const discardOwned = () => {
+            if (captureOwner?.senderId === senderId)
+                capture.discard(captureOwner.captureId);
+        };
+        sender.once("destroyed", discardOwned);
+        sender.on("render-process-gone", discardOwned);
+        sender.on("did-start-navigation", (details) => {
+            if (details.isMainFrame && !details.isSameDocument)
+                discardOwned();
+        });
+    };
+    registerPrivilegedHandle(options, IPC_DICTATION_CAPTURE_READY, (_event, payload) => {
+        captureReady = payload?.ready === true;
+        return { native: captureReady && capture.prepare() };
+    });
+    onPrivilegedIpc(options, IPC_DICTATION_CAPTURE_ARM, (_event, payload) => {
+        if (typeof payload?.captureId === "string" && payload.captureId)
+            capture.open(payload.captureId, ARMED_CAPTURE_UNCLAIMED_MS);
+    });
+    registerPrivilegedHandle(options, IPC_DICTATION_CAPTURE_OPEN, (event, payload) => {
+        const captureId = typeof payload?.captureId === "string" ? payload.captureId : "";
+        if (!captureId || !capture.open(captureId, ARMED_CAPTURE_UNCLAIMED_MS))
+            return { ok: false };
+        const sender = event.sender;
+        const send = (channel, message) => {
+            if (!sender.isDestroyed())
+                sender.send(channel, { captureId, ...message });
+        };
+        const ok = capture.claim(captureId, {
+            audio: (pcm) => send(IPC_DICTATION_CAPTURE_AUDIO, { pcm }),
+            event: (message) => send(IPC_DICTATION_CAPTURE_EVENT, message),
+        });
+        if (ok) {
+            captureOwner = { senderId: sender.id, captureId };
+            watchCaptureSender(sender);
+        }
+        return { ok };
+    });
+    onPrivilegedIpc(options, IPC_DICTATION_CAPTURE_CLOSE, (_event, payload) => {
+        if (typeof payload?.captureId !== "string")
+            return;
+        if (payload.discard === true)
+            capture.discard(payload.captureId);
+        else
+            capture.close(payload.captureId);
+    });
     registerPrivilegedHandle(options, IPC_DICTATION_GET_SOUND_EFFECTS_ENABLED, () => areDictationSoundsEnabled());
     registerPrivilegedHandle(options, IPC_DICTATION_SET_SOUND_EFFECTS_ENABLED, (_event, enabled) => {
         const nextEnabled = enabled === true;
@@ -443,6 +538,8 @@ export const registerDictationHandlers = (options) => {
             return;
         }
         playEnabledDictationSound(payload.sound);
+        if (payload.sound === "startRecording" && dictationActive)
+            muteOutputForDictationAfter(DICTATION_START_SOUND_MUTE_DELAY_MS);
     });
     return {
         isEnabled: () => dictationBridgeIsSupported() &&

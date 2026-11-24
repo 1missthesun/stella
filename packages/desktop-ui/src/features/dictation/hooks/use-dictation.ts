@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import type { DictationToggle } from "@stella/contracts/desktop/ipc-contract";
 import {
+  armBrowserMicrophone,
+  disarmBrowserMicrophone,
   ensureDictationSuperFastWarm,
   DictationSession,
   isDictationSuperFastEnabled,
@@ -10,18 +13,60 @@ import {
   cachedDictationRoute,
   prewarmDictation,
   resolveDictationRoute,
+  type DictationRoute,
 } from "@/features/dictation/services/dictation-transcriber";
+import {
+  armNativeMicrophone,
+  discardNativeCapture,
+  nativeMicrophoneReady,
+} from "@/features/dictation/services/native-microphone";
 import { prewarmDictationSocket } from "@/features/dictation/services/dictation-stream";
 import {
   DICTATION_KEY_SAVED_EVENT,
   requestDictationKey,
 } from "@/features/dictation/components/DictationKeyDialog";
+import { isMicrophoneEnabled } from "@/features/voice/services/shared-microphone";
 import { showToast } from "@/ui/toast";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { presentComposerNotice } from "@/features/chat/composer-notice-store";
 import { useT } from "@/shared/i18n";
 
 export const DICTATION_TOGGLE_EVENT = "stella:dictation-toggle";
+
+/** Every composer that can dictate; a shortcut is for exactly one of them. */
+type DictationSurface = {
+  isActive: () => boolean;
+  canStart: () => boolean;
+  hasFocus: () => boolean;
+  toggle: (startId: string) => void;
+};
+
+const surfaces = new Set<DictationSurface>();
+
+const surfaceForShortcut = (): DictationSurface | undefined => {
+  const all = [...surfaces];
+  const active = all.find((surface) => surface.isActive());
+  if (active) return active;
+  const usable = all.filter((surface) => surface.canStart());
+  return usable.find((surface) => surface.hasFocus()) ?? usable.at(-1);
+};
+
+const onToggleEvent = (event: Event): void => {
+  const detail = (event as CustomEvent<DictationToggle | undefined>).detail;
+  const startId = detail?.startId ?? crypto.randomUUID();
+  const surface = surfaceForShortcut();
+  if (surface) surface.toggle(startId);
+  else discardNativeCapture(startId);
+};
+
+const registerSurface = (surface: DictationSurface): (() => void) => {
+  if (surfaces.size === 0) window.addEventListener(DICTATION_TOGGLE_EVENT, onToggleEvent);
+  surfaces.add(surface);
+  return () => {
+    surfaces.delete(surface);
+    if (surfaces.size === 0) window.removeEventListener(DICTATION_TOGGLE_EVENT, onToggleEvent);
+  };
+};
 
 type Setter<T> = (next: T | ((prev: T) => T)) => void;
 
@@ -32,10 +77,14 @@ interface UseDictationOptions {
   onTranscriptCommitted?: () => void;
   onCommit?: () => void;
   commitOnShortcutStop?: boolean;
+  /** The composer, to tell which one a shortcut is for. */
+  surfaceRef?: RefObject<HTMLElement | null>;
 }
 
 interface UseDictationResult {
   prewarm: () => void;
+  /** The microphone button is going down: its click will start dictation. */
+  arm: (event: { button: number }) => void;
   isRecording: boolean;
   isRecordingVisible: boolean;
   isTranscribing: boolean;
@@ -63,6 +112,7 @@ export const useDictation = ({
   onTranscriptCommitted,
   onCommit,
   commitOnShortcutStop = false,
+  surfaceRef,
 }: UseDictationOptions): UseDictationResult => {
   const t = useT();
   const [state, setState] = useState<DictationSessionState>("idle");
@@ -84,6 +134,7 @@ export const useDictation = ({
   const warmedRef = useRef(false);
   const awaitingKeyRef = useRef(false);
   const pendingStartRef = useRef<{ stopRequested: boolean } | null>(null);
+  const armedRef = useRef<string | null>(null);
 
   setMessageRef.current = setMessage;
   onErrorRef.current = onError;
@@ -150,39 +201,45 @@ export const useDictation = ({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [cancel, state]);
 
+  const showNeedsKey = useCallback(() => {
+    if (requestDictationKey()) {
+      awaitingKeyRef.current = true;
+      return;
+    }
+    const message = t("features.dictation.keyDialog.openStella");
+    setError(message);
+    onErrorRef.current?.(message);
+    showToast({ title: t("features.dictation.keyDialog.title"), description: message });
+  }, [t]);
+
   const start = useCallback(
-    async (source: "button" | "shortcut") => {
-      if (sessionRef.current || pendingStartRef.current) return;
-      if (disabled) return;
-      const pending = { stopRequested: false };
-      pendingStartRef.current = pending;
-      setState("starting");
-      window.electronAPI?.dictation?.activeChanged({ active: true });
-      const cached = cachedDictationRoute();
-      const route =
-        cached === "streaming" ||
-        cached === "managed" ||
-        cached === "openrouter" ||
-        cached === "on-device"
-          ? cached
-          : await resolveDictationRoute().catch(() => "needs-key" as const);
-      pendingStartRef.current = null;
-      if (pending.stopRequested || route === "needs-key") {
-        setState("idle");
-        window.electronAPI?.dictation?.activeChanged({ active: false });
-        fireCommitIfPending();
-      }
-      if (pending.stopRequested) return;
-      if (route === "needs-key") {
-        if (requestDictationKey()) {
-          awaitingKeyRef.current = true;
-        } else {
-          const message = t("features.dictation.keyDialog.openStella");
-          setError(message);
-          onErrorRef.current?.(message);
-          showToast({ title: t("features.dictation.keyDialog.title"), description: message });
-        }
+    async (source: "button" | "shortcut", captureId: string) => {
+      if (sessionRef.current || pendingStartRef.current || disabled) {
+        discardNativeCapture(captureId);
         return;
+      }
+      const cached = cachedDictationRoute();
+      let route: Promise<DictationRoute>;
+      if (cached === "needs-key") {
+        // Nothing could transcribe last time, so the microphone stays off
+        // until something can.
+        const pending = { stopRequested: false };
+        pendingStartRef.current = pending;
+        setState("starting");
+        window.electronAPI?.dictation?.activeChanged({ active: true });
+        const resolved = await resolveDictationRoute().catch(() => "needs-key" as const);
+        pendingStartRef.current = null;
+        if (pending.stopRequested || resolved === "needs-key") {
+          discardNativeCapture(captureId);
+          setState("idle");
+          window.electronAPI?.dictation?.activeChanged({ active: false });
+          fireCommitIfPending();
+          if (!pending.stopRequested) showNeedsKey();
+          return;
+        }
+        route = Promise.resolve(resolved);
+      } else {
+        route = cached ? Promise.resolve(cached) : resolveDictationRoute();
       }
       if (!warmedRef.current) {
         warmedRef.current = true;
@@ -199,8 +256,12 @@ export const useDictation = ({
 
       try {
         await session.start({
+          onNeedsKey: showNeedsKey,
           onStateChange: (next, errMessage) => {
             setState(next);
+            if (next === "listening") {
+              window.electronAPI?.dictation?.playSound({ sound: "startRecording" });
+            }
             window.electronAPI?.dictation?.activeChanged({
               active: next !== "idle" && next !== "error",
             });
@@ -245,7 +306,7 @@ export const useDictation = ({
             );
             onTranscriptCommittedRef.current?.();
           },
-        }, { streaming: route === "streaming", onDevice: route === "on-device" });
+        }, { route, captureId });
       } catch (err) {
         const errMessage = (err as Error).message;
         setError(errMessage);
@@ -256,15 +317,14 @@ export const useDictation = ({
         setShowRecordingBar(false);
       }
     },
-    [disabled, fireCommitIfPending, t],
+    [disabled, fireCommitIfPending, showNeedsKey, t],
   );
 
   useEffect(() => {
     const onKeySaved = () => {
       if (!awaitingKeyRef.current) return;
       awaitingKeyRef.current = false;
-      window.electronAPI?.dictation?.playSound({ sound: "startRecording" });
-      void start("button");
+      void start("button", crypto.randomUUID());
     };
     window.addEventListener(DICTATION_KEY_SAVED_EVENT, onKeySaved);
     return () => window.removeEventListener(DICTATION_KEY_SAVED_EVENT, onKeySaved);
@@ -280,10 +340,44 @@ export const useDictation = ({
       return;
     } else {
       sendAfterCommitRef.current = false;
-      window.electronAPI?.dictation?.playSound({ sound: "startRecording" });
-      void start("button");
+      const captureId = armedRef.current ?? crypto.randomUUID();
+      armedRef.current = null;
+      void start("button", captureId);
     }
   }, [start, stop]);
+
+  const arm = useCallback((event: { button: number }) => {
+    const route = cachedDictationRoute();
+    if (
+      event.button !== 0 ||
+      disabledRef.current ||
+      sessionRef.current ||
+      pendingStartRef.current ||
+      stateRef.current === "transcribing" ||
+      route === null ||
+      route === "needs-key"
+    ) {
+      return;
+    }
+    const captureId = crypto.randomUUID();
+    const native = nativeMicrophoneReady();
+    armedRef.current = captureId;
+    if (native) armNativeMicrophone(captureId);
+    else if (isMicrophoneEnabled()) armBrowserMicrophone();
+    const settle = () => {
+      window.removeEventListener("pointerup", settle, true);
+      window.removeEventListener("pointercancel", settle, true);
+      // The click that follows a release on the button comes first.
+      setTimeout(() => {
+        if (armedRef.current !== captureId) return;
+        armedRef.current = null;
+        if (native) discardNativeCapture(captureId);
+        else disarmBrowserMicrophone();
+      }, 0);
+    };
+    window.addEventListener("pointerup", settle, true);
+    window.addEventListener("pointercancel", settle, true);
+  }, []);
 
   const commitAndSend = useCallback(() => {
     const current = stateRef.current;
@@ -299,24 +393,37 @@ export const useDictation = ({
     onCommitRef.current?.();
   }, [stop]);
 
-  useEffect(() => {
-    const handler = () => {
-      const current = stateRef.current;
-      const recording = current === "starting" || current === "listening";
-      if (disabled && !recording && current !== "transcribing") return;
-      if (recording) {
-        sendAfterCommitRef.current = commitOnShortcutStopRef.current;
-        void stop();
-      } else if (current === "transcribing") {
-        if (commitOnShortcutStopRef.current) sendAfterCommitRef.current = true;
-      } else {
-        sendAfterCommitRef.current = false;
-        void start("shortcut");
-      }
-    };
-    window.addEventListener(DICTATION_TOGGLE_EVENT, handler);
-    return () => window.removeEventListener(DICTATION_TOGGLE_EVENT, handler);
-  }, [cancel, disabled, start, stop]);
+  useEffect(
+    () =>
+      registerSurface({
+        isActive: () => {
+          const current = stateRef.current;
+          return current === "starting" || current === "listening" || current === "transcribing";
+        },
+        canStart: () => {
+          if (disabled) return false;
+          if (!surfaceRef) return true;
+          const element = surfaceRef.current;
+          return Boolean(element?.checkVisibility() && !element.closest("[inert]"));
+        },
+        hasFocus: () => surfaceRef?.current?.contains(document.activeElement) === true,
+        toggle: (startId) => {
+          const current = stateRef.current;
+          if (current === "starting" || current === "listening") {
+            discardNativeCapture(startId);
+            sendAfterCommitRef.current = commitOnShortcutStopRef.current;
+            void stop();
+          } else if (current === "transcribing") {
+            discardNativeCapture(startId);
+            if (commitOnShortcutStopRef.current) sendAfterCommitRef.current = true;
+          } else {
+            sendAfterCommitRef.current = false;
+            void start("shortcut", startId);
+          }
+        },
+      }),
+    [disabled, start, stop, surfaceRef],
+  );
 
   useEffect(() => {
     return () => {
@@ -345,6 +452,7 @@ export const useDictation = ({
   }, []);
 
   return {
+    arm,
     isRecording: state === "listening",
     isRecordingVisible: state === "listening" && showRecordingBar,
     isTranscribing: state === "transcribing",

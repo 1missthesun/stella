@@ -497,6 +497,7 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
     onCommit: () => {
       submitFromDictationRef.current();
     },
+    surfaceRef: formRef,
   });
 
   const submitComposer = useCallback(() => {
@@ -603,6 +604,7 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
                   isTranscribing={dictation.isTranscribing}
                   disabled={dictation.isTranscribing}
                   onClick={dictation.toggle}
+                  onPointerDown={dictation.arm}
                   onPointerEnter={dictation.prewarm}
                   onFocus={dictation.prewarm}
                   title={

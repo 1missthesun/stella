@@ -35,20 +35,9 @@ import {
   json,
   errorMessage,
   log,
+  sharesUserChat,
 } from "./support.js";
-import { isSlackConversationId } from "../slack/workspace.js";
 import { OrchestratorTurnLifecycle } from "./turn-lifecycle.js";
-
-/** Sent by the user in their own chat: it takes over the turn ahead of it, as a message does on a computer. */
-const takesOver = (turn: ChatTurnRequest): boolean =>
-  turn.lane === "chat" &&
-  !turn.hiddenMessage &&
-  !turn.piAgent &&
-  !isSlackConversationId(turn.conversationId) &&
-  turn.source !== "schedule" &&
-  turn.source !== "agent-thread" &&
-  turn.source !== "probe" &&
-  turn.source !== "slack";
 
 export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
   protected async cancelTurn(turnId: string): Promise<void> {
@@ -89,17 +78,8 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     options: { resume?: boolean } = {},
   ): void {
     if (this.turnExecutions.has(turn.turnId)) return;
-    if (this.turnExecutions.size > 0 && takesOver(turn)) {
+    if (this.turnExecutions.size > 0 && !turn.hiddenMessage && sharesUserChat(turn)) {
       this.waitingUserTurns.add(turn.turnId);
-      const runtime = this.currentPiRun && this.piRuntime;
-      void runtime
-        ?.then((opened) => opened.takeOver(turn.prompt))
-        .catch((error: unknown) =>
-          log("error", "chat_turn_takeover_failed", {
-            turnId: turn.turnId,
-            message: errorMessage(error),
-          }),
-        );
     }
     const preceding = this.queue;
     const enqueuedAt = performance.now();

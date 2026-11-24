@@ -3025,9 +3025,6 @@ type NodeReplCellRecord = {
   settled: Promise<void>;
 };
 
-/** Tells whoever waits on a cell to stop waiting while the cell runs on; returns how to stop listening. */
-type OnYield = (handBack: () => void) => () => void;
-
 const notifyCellObservers = (cell: NodeReplCellRecord): void => {
   for (const listener of [...cell.listeners]) listener();
 };
@@ -3231,7 +3228,7 @@ export class NodeReplKernelRegistry {
   async startCell(
     code: string,
     context: ToolContext,
-    options: EvaluateOptions & { yieldTimeMs?: number; onYield?: OnYield } = {},
+    options: EvaluateOptions & { yieldTimeMs?: number } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
     const { id, kernel } = this.resolveKernel(context);
@@ -3306,7 +3303,6 @@ export class NodeReplKernelRegistry {
       options.signal,
       undefined,
       false,
-      options.onYield,
     );
   }
 
@@ -3318,7 +3314,6 @@ export class NodeReplKernelRegistry {
       terminate?: boolean;
       afterCursor?: number;
       signal?: AbortSignal;
-      onYield?: OnYield;
     } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
@@ -3338,8 +3333,6 @@ export class NodeReplKernelRegistry {
       options.waitMs ?? 10_000,
       options.signal,
       options.afterCursor,
-      true,
-      options.onYield,
     );
   }
 
@@ -3467,7 +3460,6 @@ export class NodeReplKernelRegistry {
     signal?: AbortSignal,
     requestedAfterCursor?: number,
     wakeOnContent = true,
-    onYield?: OnYield,
   ): Promise<NodeReplCellObservation> {
     const boundedWaitMs = Number.isFinite(waitMs)
       ? Math.max(0, Math.floor(waitMs))
@@ -3485,47 +3477,34 @@ export class NodeReplKernelRegistry {
         `Invalid code content cursor ${String(requestedAfterCursor)} for cell ${cell.cellId}; current cursor is ${cell.cursor}.`,
       );
     }
-    let handedBack = false;
-    const yielded = () => handedBack;
-    const stopListening = onYield?.(() => {
-      handedBack = true;
-      notifyCellObservers(cell);
-    });
-    try {
+    await waitForCellChange(
+      cell,
+      fromCursor,
+      boundedWaitMs,
+      signal,
+      wakeOnContent,
+    );
+    while (
+      !cell.outcome &&
+      cell.kernel.awaitingUser &&
+      !(wakeOnContent && cell.cursor > fromCursor)
+    ) {
+      await waitForCellChange(
+        cell,
+        fromCursor,
+        Number.POSITIVE_INFINITY,
+        signal,
+        wakeOnContent,
+        () => !cell.kernel.awaitingUser,
+      );
+      if (cell.outcome || cell.kernel.awaitingUser) continue;
       await waitForCellChange(
         cell,
         fromCursor,
         boundedWaitMs,
         signal,
         wakeOnContent,
-        yielded,
       );
-      while (
-        !cell.outcome &&
-        !yielded() &&
-        cell.kernel.awaitingUser &&
-        !(wakeOnContent && cell.cursor > fromCursor)
-      ) {
-        await waitForCellChange(
-          cell,
-          fromCursor,
-          Number.POSITIVE_INFINITY,
-          signal,
-          wakeOnContent,
-          () => yielded() || !cell.kernel.awaitingUser,
-        );
-        if (cell.outcome || yielded() || cell.kernel.awaitingUser) continue;
-        await waitForCellChange(
-          cell,
-          fromCursor,
-          boundedWaitMs,
-          signal,
-          wakeOnContent,
-          yielded,
-        );
-      }
-    } finally {
-      stopListening?.();
     }
     if (signal?.aborted) throw abortError(signal);
     const cursor = cell.cursor;

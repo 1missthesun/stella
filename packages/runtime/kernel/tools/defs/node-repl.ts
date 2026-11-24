@@ -6,7 +6,6 @@ import {
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import type { ToolDefinition } from "../types.js";
 import { CODE_TOOL_NAME } from "../code-tool.js";
-import { onToolCallYield } from "../tool-call-yield.js";
 import { browserApiHint } from "../../browser-use/api-hints.js";
 import {
   CODE_MAX_WAIT_MS,
@@ -158,7 +157,6 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
               ...(timeoutMs !== undefined ? { timeoutMs } : {}),
               ...(yieldTimeMs !== undefined ? { yieldTimeMs } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
-              onYield: (handBack) => onToolCallYield(context.requestId, handBack),
               ...(extras?.onUpdate ? { onToolUpdate: extras.onUpdate } : {}),
             })
           : await registry.waitCell((args.cell_id as string).trim(), context, {
@@ -166,7 +164,6 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
               ...(cursor !== undefined ? { afterCursor: cursor } : {}),
               ...(args.terminate === true ? { terminate: true } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
-              onYield: (handBack) => onToolCallYield(context.requestId, handBack),
             });
         return resultForObservation(
           observation,

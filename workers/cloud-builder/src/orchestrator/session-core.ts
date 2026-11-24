@@ -123,7 +123,11 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected ownerGeneration?: string;
 
   protected currentTurnCancellation?: TurnRetryCancellation;
-  protected currentPiRun?: { abort(): void };
+  protected currentPiRun?: {
+    abort(): void;
+    /** It ends between two steps for the user's next message. */
+    makesRoom: boolean;
+  };
   protected piRuntime?: Promise<
     import("../pi-runtime.js").PiConversationRuntime
   >;

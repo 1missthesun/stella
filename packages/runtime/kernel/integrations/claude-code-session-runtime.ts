@@ -244,8 +244,6 @@ type PendingStep = {
   stellaToolsRunning?: number;
   /** Stella interrupted this quiet step at Claude Code's nudge: whatever result follows ends it silent. */
   quietInterrupted?: boolean;
-  /** The user's next message took this step over: its interrupted result ends it as aborted, and the CLI goes on. */
-  takenOver?: () => void;
   /** The uuid this step's prompt was written with; Claude Code replays it when it takes the prompt. */
   promptUuid?: string;
   promptReplayed?: boolean;
@@ -1427,9 +1425,6 @@ const killProcess = (child: ChildProcess) => {
   }, SIGKILL_TIMEOUT_MS);
   child.once("exit", () => clearTimeout(sigkillTimer));
 };
-/** How long the CLI has to end a step its user took over before its process is ended instead. */
-const TAKEOVER_SETTLE_MS = 4_000;
-const isTakeover = (reason: unknown): boolean => reason instanceof Error && reason.name === "TakenOver";
 const abortProcess = (child: ChildProcess) => {
   if (processIsDead(child)) return;
   try {
@@ -3481,12 +3476,6 @@ class ClaudeCodeSessionRuntime {
           }
         }
         this.detachAbortListener(completed);
-        if (completed.takenOver) {
-          session.turnCount += 1;
-          session.lastUsedAt = Date.now();
-          completed.reject(completed.request.abortSignal?.reason ?? new Error("Claude Code run aborted."));
-          return undefined;
-        }
         if (completed.quietInterrupted) {
           // The interrupt can land while the nudged request is in flight, which
           // ends the step as an error; either way the quiet turn said nothing.
@@ -3782,27 +3771,13 @@ class ClaudeCodeSessionRuntime {
       };
       this.refreshPendingIdleTimer(processState, pending);
       if (request.abortSignal) {
-        const abort = () => {
+        pending.abortListener = () => {
           resetSessionMcpClients(
             session,
             request.abortSignal?.reason ??
               new Error("Claude Code run aborted."),
           );
           abortProcess(processState.child);
-        };
-        pending.abortListener = () => {
-          if (
-            !isTakeover(request.abortSignal?.reason) ||
-            pending.promptUuid === undefined ||
-            processState.compacting ||
-            hasUnconsumedInjection(pending) ||
-            processState.child.stdin.destroyed
-          ) {
-            abort();
-            return;
-          }
-          processState.child.stdin.write(`${buildClaudeCodeInterruptRequest()}\n`, () => {});
-          pending.takenOver = forkCancelableTimeout(TAKEOVER_SETTLE_MS, abort);
         };
         if (request.abortSignal.aborted) {
           pending.abortListener();
@@ -4004,7 +3979,6 @@ class ClaudeCodeSessionRuntime {
       clearTimeout(pending.idleTimer);
       pending.idleTimer = undefined;
     }
-    pending.takenOver?.();
     if (pending.abortListener && pending.request.abortSignal) {
       pending.request.abortSignal.removeEventListener(
         "abort",

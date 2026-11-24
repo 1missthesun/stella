@@ -3,13 +3,10 @@ import type { Message, UserMessage } from "@earendil-works/pi-ai";
 import { defineDoc, GenerationTask, hook, type ConversationId, type Harness } from "@earendil-works/pi-durable";
 import { piUserHidden, type PiPartMarks, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { appendMessageRefTag, formatMessageRefTag } from "@stella/contracts/reply-refs";
-import { cutWithin } from "../engine/taken-over.ts";
 import { boundedReplay } from "./doc-checkpoint.ts";
 
 const MAX_IDS = 2_000;
 const RECORD_WAIT_MS = 5_000;
-/** The same for a message that cut a step: its answer matters more than its number. */
-const CUT_RECORD_WAIT_MS = 1_000;
 const RECORD_POLL_MS = 50;
 const TAGGED_RE = /<system-reminder>message #\d+<\/system-reminder>/;
 
@@ -93,8 +90,7 @@ export const messageIdsHook = hook(GenerationTask, {
         : [],
     );
     if (waitFor.length > 0 && (await api.memo<boolean>(`message-ids:${waitFor.join(",")}`, context)) !== true) {
-      const limit = cutWithin(api.conversationId, RECORD_WAIT_MS) ? CUT_RECORD_WAIT_MS : RECORD_WAIT_MS;
-      for (let waited = 0; waited < limit && waitFor.some((id) => ids[id] === undefined); waited += RECORD_POLL_MS) {
+      for (let waited = 0; waited < RECORD_WAIT_MS && waitFor.some((id) => ids[id] === undefined); waited += RECORD_POLL_MS) {
         await sleep(RECORD_POLL_MS);
         ids = await read();
       }

@@ -82,6 +82,7 @@ import {
   errorMessage,
   log,
   requireCloudContext,
+  sharesUserChat,
   cloudContextFailure,
 } from "./support.js";
 import { OrchestratorCliTurn } from "./cli-turn.js";
@@ -1139,7 +1140,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           type: "input",
           requestId: `turn:${turn.turnId}`,
           whenBusy: "followUp",
-          content: await runtime.noted([
+          content: [
             {
               type: "text",
               text: `<current-time>${clock}</current-time>`,
@@ -1160,7 +1161,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
                 ]
               : []),
             ...images,
-          ]),
+          ],
         },
         context,
       );
@@ -1173,6 +1174,8 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         ...args.preparationTimings,
       });
       this.currentPiRun = {
+        makesRoom:
+          args.execution.engine !== "anthropic" && sharesUserChat(turn),
         abort: () => {
           runtime.stopClaudeCode();
           void root.abort(pi.contextFor()).catch((error: unknown) => {

@@ -27,6 +27,7 @@ import type {
   HarnessExecution,
   CloudContextComponent,
 } from "./types.js";
+import { isSlackConversationId } from "../slack/workspace.js";
 import { TERMINAL_NOTICE } from "./constants.js";
 
 export class OwnerPurgeFenceError extends Error {}
@@ -166,6 +167,16 @@ export const localTurnRetirementDeadline = (lease: LocalTurnLease): number => {
     ? lease.phase.deadlineAt
     : lease.expiresAt;
 };
+
+/** A turn in the user's own chat that nothing but the chat waits on. */
+export const sharesUserChat = (turn: ChatTurnRequest): boolean =>
+  turn.lane === "chat" &&
+  !turn.piAgent &&
+  !isSlackConversationId(turn.conversationId) &&
+  turn.source !== "schedule" &&
+  turn.source !== "agent-thread" &&
+  turn.source !== "probe" &&
+  turn.source !== "slack";
 
 export const json = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { "cache-control": "no-store" } });

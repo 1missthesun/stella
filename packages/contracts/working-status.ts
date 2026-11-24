@@ -1,4 +1,4 @@
-/** How long Stella is at one message before the chat offers Stop; a message is always the quicker way. */
+/** How long Stella is at one message before the chat offers Stop. */
 export const OVERDUE_TURN_MS = 60_000;
 
 const AGENT_WORK_VARIATIONS: readonly string[] = [

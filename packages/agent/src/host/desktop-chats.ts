@@ -55,6 +55,7 @@ import {
   piMessageText,
   piEventsForClients,
   piJournalUserMessage,
+  piUserHidden,
   piUserView,
   type PiChatEvent,
   type PiChatEventsPayload,
@@ -115,7 +116,6 @@ import {
   unansweredText,
 } from "../stella/agents.ts";
 import { agentToolSelection, type StellaToolHost } from "../stella/host-tools.ts";
-import { isStopInput, withTakeoverNote } from "../stella/takeover.ts";
 import {
   parseStellaModelId,
   STELLA_PROVIDER_ID,
@@ -440,7 +440,6 @@ type Chat = {
   harness: Harness;
   root: Conversation;
   refreshTools(): void;
-  takeover: OpenStellaHarness["takeover"];
   startAgent: OpenStellaHarness["startAgent"];
   agentRecords: OpenStellaHarness["agentRecords"];
   messageAgent: OpenStellaHarness["messageAgent"];
@@ -1655,7 +1654,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         const {
           harness,
           refreshTools,
-          takeover,
+          turnLimits,
           startAgent,
           agentRecords,
           messageAgent,
@@ -1863,7 +1862,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               ...cliEngines.map((engine) => engine.extension(conversationId)),
             ],
             env: environments.env,
-            takeover: { engines: cliEngines },
+            turnLimits: { engines: cliEngines },
             onReport: options.report,
           },
           context,
@@ -1871,7 +1870,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         harnessRef = harness;
         const orchestrator = orchestratorAgent(stellaModelRef("orchestrator"));
         const root = await harness.root(context, { agent: orchestrator });
-        takeover.bind(harness, root);
+        turnLimits.bind(harness, root);
         if (offersAgentTools(await root.agent(context))) await root.configure(orchestrator, context);
         resumedRun = (await harness.snapshot(LiveDoc, root.id, context))?.run?.taskId;
         const resumed = resumedRun !== undefined;
@@ -2036,7 +2035,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           modelsReady,
           safeguardStream,
           refreshTools,
-          takeover,
           startAgent,
           agentRecords,
           messageAgent,
@@ -2264,19 +2262,11 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await afterStop(chat.harness, chat.root, context);
     const input = await withReminders(conversationId, chat, content, sent);
-    const submission = await takeOver(chat, input, requestId);
-    return { submissionId: submission.id };
-  };
-
-  const takeOver = async (chat: Chat, input: UserInput, requestId: string) => {
-    const now = isStopInput(input);
-    const cuts = await chat.takeover.cuts(context, { now });
     const submission = await chat.root.submit(
-      { type: "input", content: cuts ? withTakeoverNote(input) : input, requestId, whenBusy: "steer" },
+      { type: "input", content: input, requestId, whenBusy: "steer" },
       context,
     );
-    void chat.takeover.begin(context, { now }).catch((error: unknown) => options.report(error));
-    return submission;
+    return { submissionId: submission.id };
   };
 
   const noteUserMessages = (messages: readonly Message[], into: ReminderContext): void => {
@@ -2522,8 +2512,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       content?: UserInput;
       visible: boolean;
       rejectIfBusy?: boolean;
-      /** The user sent it from another device: it takes over like a message typed here. */
-      takesOver?: boolean;
+      /** The user sent it from another device: a running turn reads it at its next step, as one typed here. */
+      steers?: boolean;
       placementRunId?: string;
       observe?: (events: PiChatEvent[]) => void;
     },
@@ -2555,6 +2545,20 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
+  const joinedLater = async (chat: Chat, message: EntryId, answer: EntryId): Promise<boolean> => {
+    let cursor: Cursor | undefined;
+    do {
+      const page = await chat.root.entries({ minEntryId: message, maxEntryId: answer }, 100, cursor, context);
+      const later = (page.items as unknown as PiEntry[]).some((entry) => {
+        const said = entry.model?.[0];
+        return entry.id !== message && said?.role === "user" && !piUserHidden(said as PiUserMessage);
+      });
+      if (later) return true;
+      cursor = page.next;
+    } while (cursor !== undefined);
+    return false;
+  };
+
   const automationTurn = async (
     conversationId: string,
     chat: Chat,
@@ -2564,7 +2568,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       content?: UserInput;
       visible: boolean;
       rejectIfBusy?: boolean;
-      takesOver?: boolean;
+      steers?: boolean;
       placementRunId?: string;
     },
   ): Promise<{ status: "ok"; finalText: string } | { status: "busy" | "error"; finalText: ""; error: string }> => {
@@ -2577,13 +2581,15 @@ export function desktopChats(options: DesktopChatsOptions) {
       turn.content ??
       (turn.visible ? turn.prompt : [{ type: "text", text: turn.prompt, stella: { hidden: true } } as TextContent]);
     try {
-      const input = turn.visible ? await withReminders(conversationId, chat, content) : content;
-      submission = turn.takesOver
-        ? await takeOver(chat, input, turn.requestId)
-        : await chat.root.submit(
-            { type: "input", content: input, requestId: turn.requestId, whenBusy: turn.rejectIfBusy ? "reject" : "followUp" },
-            context,
-          );
+      submission = await chat.root.submit(
+        {
+          type: "input",
+          content: turn.visible ? await withReminders(conversationId, chat, content) : content,
+          requestId: turn.requestId,
+          whenBusy: turn.rejectIfBusy ? "reject" : turn.steers ? "steer" : "followUp",
+        },
+        context,
+      );
     } catch (error) {
       if (error instanceof ConversationBusy) {
         return { status: "busy", finalText: "", error: "Stella is already handling another turn." };
@@ -2602,6 +2608,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (answer === undefined) return { status: "ok", finalText: "" };
     const page = await chat.root.entries({ minEntryId: answer, maxEntryId: answer }, 1, undefined, context);
     const message = (page.items[0] as unknown as PiEntry | undefined)?.model?.[0];
+    // One answer for every message of a run: the last of them carries it back.
+    if (turn.steers && settled.entry !== undefined && (await joinedLater(chat, settled.entry, answer))) return { status: "ok", finalText: "" };
     return { status: "ok", finalText: splitMessageReplyRefs(message).text.trim() };
   };
 

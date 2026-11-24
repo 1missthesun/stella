@@ -34,31 +34,38 @@ const text = (value: unknown, max: number): string => (typeof value === "string"
 const list = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object") : [];
 
+// The card as the user would see it, whole: Stella settles it from what it says.
+const QUESTION_MAX_CHARS = 2_000;
+const OPTION_MAX_CHARS = 500;
+
 const describeQuestions = (args: Record<string, unknown>): string =>
   list(args.questions)
     .map((question) => {
       const options = list(question.options)
-        .map((option) => text(option.label, 80))
-        .filter(Boolean)
-        .join(" / ");
-      const detail = text(question.detail, 300);
-      return `- ${text(question.question, 300)}${options ? ` (${options})` : ""}${detail ? `: ${detail}` : ""}`;
+        .map((option) => {
+          const label = text(option.label, OPTION_MAX_CHARS);
+          const hint = text(option.hint, OPTION_MAX_CHARS);
+          return label ? `  - ${label}${hint ? ` (${hint})` : ""}` : "";
+        })
+        .filter(Boolean);
+      const detail = text(question.detail, QUESTION_MAX_CHARS);
+      return [`- ${text(question.question, QUESTION_MAX_CHARS)}`, ...(detail ? [`  ${detail}`] : []), ...options].join("\n");
     })
     .join("\n");
 
 const describeSecureCard = (args: Record<string, unknown>): string => {
-  const service = text(args.service, 120);
-  const account = text(args.account, 120);
+  const service = text(args.service, 200);
+  const account = text(args.account, 200);
   const preset = text(args.preset, 16);
   const fields = list(args.fields)
-    .map((field) => text(field.label, 80) || text(field.id, 48))
+    .map((field) => text(field.label, OPTION_MAX_CHARS) || text(field.id, 48))
     .filter(Boolean);
   const asked = [preset === "login" ? "username and password" : preset === "card" ? "payment card" : "", ...fields]
     .filter(Boolean)
     .join(", ");
-  const detail = text(args.detail, 400);
+  const detail = text(args.detail, QUESTION_MAX_CHARS);
   return [
-    `a secure card: "${text(args.purpose, 300)}"`,
+    `a secure card: "${text(args.purpose, QUESTION_MAX_CHARS)}"`,
     service ? ` for ${service}${account ? ` (account ${account})` : ""}` : "",
     asked ? `, asking for ${asked}` : "",
     args.replace_saved === true ? " (the value saved for it did not work)" : "",
@@ -66,13 +73,13 @@ const describeSecureCard = (args: Record<string, unknown>): string => {
   ].join("");
 };
 
+/** How to answer is in Stella's own instructions; the note carries the card and the one fact that varies, the time. */
 const noteFor = (tool: string, args: Record<string, unknown>): string =>
   [
     tool === ASK_USER
       ? `${PI_ASK_FIRST_PREFIX} I'd ask them:\n${describeQuestions(args)}`
       : `${PI_ASK_FIRST_PREFIX} I'd show them ${describeSecureCard(args)}.`,
-    `I'm waiting for your reply with send_message. If what you know settles it (a standing rule, memory, an earlier answer, or how to go on without it), tell me. If only the user can give it, say so and it goes to them. With no reply in ${STELLA_FIRST_WAIT_MS / 1000} seconds it goes to them anyway.`,
-    "This exchange stays between us: the user doesn't see it, so send_message is your whole reply and you write nothing to them about it.",
+    `It goes to them in ${STELLA_FIRST_WAIT_MS / 1000} seconds unless you reply.`,
   ].join("\n\n");
 
 const repliedText = (tool: string, reply: string): string =>

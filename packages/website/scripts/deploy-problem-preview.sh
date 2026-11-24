@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Builds the website with the dev backend and deploys it to its own preview
-# Worker, stella-website-problem-preview.fromyou.workers.dev. A modified copy of
-# deploy-stella.sh dev: different Worker, no routes, and noindex everywhere
-# (robots.txt disallows all, X-Robots-Tag on every response).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

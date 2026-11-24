@@ -2,13 +2,6 @@ import React from "react";
 import { CHAT, type SkinProps } from "./content";
 import { F, STAR } from "./kit";
 
-/**
- * A 3D/VFX artist's Stella: the conversation is a node graph. Each message is a node
- * (yours are Prompt nodes, Stella's are Result nodes that expose what she found as typed
- * outputs), wired in order with noodles; data visibly flows along them. The session is a
- * Frame labelled with the timestamp, and the composer is a new node being wired in.
- */
-
 const UI = F.manrope;
 const MONO = F.mono;
 const BG = "#1b1d22";
@@ -30,7 +23,6 @@ const ROW_H = 30;
 const HEAD_H = 36;
 
 function nodeLayout(n: NodeSpec, fs: number) {
-  // text field height from an estimate of wrapped lines
   const cpl = Math.max(10, Math.floor((n.w - 36) / (fs * 0.55)));
   const words = n.text.split(" ");
   let lines = 1,
@@ -49,7 +41,6 @@ function nodeLayout(n: NodeSpec, fs: number) {
     const iOut = outs.indexOf(r);
     const iIn = ins.indexOf(r);
     if (n.vert) {
-      // top-to-bottom flow: inputs on the top edge, outputs along the bottom edge
       if (r.side === "in") return { x: n.x + n.w * 0.5, y: n.y };
       return { x: n.x + n.w * (0.5 + iOut * 0.17), y: n.y + h };
     }
@@ -110,7 +101,6 @@ const Node: React.FC<{ n: NodeSpec; fs: number }> = ({ n, fs }) => {
   );
 };
 
-/** Noodle: a horizontal-tangent cubic, with packets of data riding it. */
 function noodle(a: { x: number; y: number }, b: { x: number; y: number }, vert = false) {
   if (vert) {
     const dy = Math.max(50, Math.abs(b.y - a.y) * 0.5);
@@ -180,17 +170,14 @@ export const NodesSkin: React.FC<SkinProps> = ({ t, w, h }) => {
     { a: out(2), b: inn(3), c: W_TEXT },
   ].map((l) => ({ ...l, ...noodle(l.a, l.b, tall) }));
 
-  // the frame around the session
   const fx = tall ? 26 : 60;
   const fy = barH + (tall ? 40 : 46);
   const fw = w - fx * 2;
   const fh = Math.max(...nodes.map((n, i) => n.y + lay[i].h)) + 34 - fy;
 
-  // composer node
   const comp = tall ? { x: 50, y: h - 190, w: w - 100, h: 150 } : { x: 560, y: h - 168, w: 680, h: 138 };
   const cIn = tall ? { x: comp.x + comp.w / 2, y: comp.y } : { x: comp.x, y: comp.y + HEAD_H + 26 };
   const lastOut = out(3);
-  // the wire being dragged to the new node: its end sits just short of the socket and drifts
   const drift = Math.sin(t * 2.1) * 6;
   const dragEnd = tall ? { x: cIn.x + 26 + drift, y: cIn.y - 22 + Math.cos(t * 1.7) * 4 } : { x: cIn.x - 18 + drift, y: cIn.y + 10 + Math.cos(t * 1.7) * 4 };
   const drag = noodle(lastOut, dragEnd, tall);
@@ -198,7 +185,6 @@ export const NodesSkin: React.FC<SkinProps> = ({ t, w, h }) => {
 
   return (
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h, overflow: "hidden", background: BG }}>
-      {/* editor grid */}
       <svg width={w} height={h} style={{ position: "absolute", inset: 0 }}>
         <defs>
           <pattern id="nd-grid" width={24} height={24} patternUnits="userSpaceOnUse">
@@ -213,12 +199,10 @@ export const NodesSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         <rect width={w} height={h} fill="url(#nd-grid5)" />
       </svg>
 
-      {/* frame node */}
       <div style={{ position: "absolute", left: fx, top: fy, width: fw, height: fh, borderRadius: 10, background: "rgba(120,130,150,.08)", boxShadow: "inset 0 0 0 1px rgba(140,150,170,.18)" }}>
         <div style={{ position: "absolute", left: 16, top: 10, fontFamily: UI, fontWeight: 700, fontSize: 15, color: "#b9c0cc", letterSpacing: 0.2 }}>{CHAT.stamp}</div>
       </div>
 
-      {/* noodles */}
       <svg width={w} height={h} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
         {links.map((l, i) => (
           <g key={i}>
@@ -237,7 +221,6 @@ export const NodesSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         <Node key={i} n={n} fs={fs} />
       ))}
 
-      {/* the new node: the composer */}
       <div style={{ position: "absolute", left: comp.x, top: comp.y, width: comp.w, height: comp.h, borderRadius: 9, background: NODE, boxShadow: "0 0 0 1px #15161a, 0 10px 24px rgba(0,0,0,.45)", overflow: "hidden" }}>
         <div style={{ height: HEAD_H, background: H_NEW, display: "flex", alignItems: "center", gap: 9, padding: "0 12px", fontFamily: UI, fontWeight: 700, fontSize: 15, color: "#f4f6fa" }}>
           <svg width={10} height={10} viewBox="0 0 10 10">
@@ -265,7 +248,6 @@ export const NodesSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </div>
       </div>
       <Socket x={cIn.x} y={cIn.y} color={W_TEXT} filled={false} />
-      {/* the dragged wire's end, held by the pointer */}
       <svg width={w} height={h} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
         <path d={drag.d} stroke="#0e0f12" strokeWidth={6} fill="none" />
         <path d={drag.d} stroke={W_TEXT} strokeWidth={3} fill="none" strokeDasharray="10 7" strokeDashoffset={-t * 30} />
@@ -273,7 +255,6 @@ export const NodesSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         <path d={`M ${dragEnd.x + 4} ${dragEnd.y + 4} l 0 19 l 5 -5 l 4 9 l 3 -1.5 l -4 -8.5 l 7 0 Z`} fill="#fff" stroke="#111" strokeWidth={1.3} strokeLinejoin="round" />
       </svg>
 
-      {/* header */}
       <div style={{ position: "absolute", left: 0, top: 0, width: w, height: barH, background: "#25282e", boxShadow: "0 1px 0 #15161a", display: "flex", alignItems: "center" }}>
         <div style={{ display: "flex", gap: 8, marginLeft: 18 }}>
           {["#ff5f57", "#febc2e", "#28c840"].map((c) => (

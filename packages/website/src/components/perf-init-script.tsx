@@ -1,14 +1,3 @@
-/**
- * Inline script that runs before first paint to tag low-power / reduced-motion
- * devices with `data-low-power` on `<html>`. CSS uses this to drop the most
- * expensive continuous work (scroll-reveal blur transitions, infinite
- * marketing-mock animations, heavy backdrop-filters) on machines that can't
- * keep up — eliminating scroll jank without a flash of the full-fat animation
- * before React mounts.
- *
- * WebGL capability is probed separately inside the aurora component
- * (`lib/device-perf.ts`; creating a GL context here would block paint).
- */
 const PERF_INIT_SCRIPT = /* javascript */ `
 (() => {
   try {

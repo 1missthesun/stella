@@ -1,8 +1,3 @@
-// Tells IndexNow search engines (Bing, Yandex, Seznam, Naver…) about changed
-// stella.sh pages. The key is public by design: it is served at
-// https://stella.sh/<key>.txt from public/. Run after a website deploy:
-//   bun scripts/indexnow.ts                 every URL in the live sitemap
-//   bun scripts/indexnow.ts /ai /pricing    just these paths
 const KEY = "d956595a16cfd56ac830439dbfaac862";
 const HOST = "stella.sh";
 

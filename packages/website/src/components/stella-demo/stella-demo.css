@@ -1,4 +1,3 @@
-/* What the replica needs beyond the app's own rules (app.generated.css). */
 .sd {
   --font-family-sans: var(--sd-manrope), "Manrope", system-ui, sans-serif;
   position: relative;
@@ -97,7 +96,6 @@
   color: var(--text-base);
 }
 
-/* Still frames on guide cards. */
 .sd-still {
   pointer-events: none;
 }
@@ -106,11 +104,7 @@
   display: block;
 }
 
-/*
- * The app centres the home content with flexbox. A page counts every re-centre
- * as the prompt wraps as a layout shift, so the replica centres it with a
- * transform, which looks the same and isn't counted.
- */
+/* Browsers count a flexbox re-centre as a layout shift (CLS), but not a transform. */
 .sd .full-body-home-overlay > .home-content {
   position: absolute;
   top: 50%;

@@ -19,7 +19,6 @@ import {
 const abs = (path: string) => new URL(path, getSiteUrl()).href;
 const absLinks = (text: string) => text.replace(/\]\(\//g, `](${getSiteUrl().origin}/`);
 
-/** The body of a problem page, headings starting at `level`. */
 export function problemBody(page: ProblemPage, level = 2): string {
   const h = "#".repeat(level);
   const lines = [page.answer, "", `${h} What you get`, "", ...page.gets.map((line) => `- ${line}`), "", `${h} Ask Stella`, "", `> ${page.prompt}`, ""];
@@ -36,14 +35,12 @@ function header(title: string, route: string, tagline: string) {
   return [`# ${title}`, "", `> Markdown version of ${abs(route)} for agents and LLMs.`, `> ${tagline}`, ""].join("\n");
 }
 
-/** /how/<niche>/<slug>.md */
 export function renderProblemMarkdown(page: ProblemPage): string {
   return `${header(page.h1, problemPath(page), page.description)}\n${problemBody(page).trimEnd()}\n\nGet Stella: ${abs("/download")}. ${PRICE_LINE}\n`;
 }
 
 const listLine = (page: ProblemPage) => `- [${page.h1}](${abs(`${problemPath(page)}.md`)}): ${page.description}`;
 
-/** /how/<niche>.md */
 export function renderNicheMarkdown(slug: string): string {
   const niche = getNiche(slug)!;
   const groups = nicheSections(niche)
@@ -52,7 +49,6 @@ export function renderNicheMarkdown(slug: string): string {
   return `${header(niche.title, nichePath(niche), niche.description)}\n${niche.intro}\n\n${groups}\n`;
 }
 
-/** /how.md */
 export function renderHowIndexMarkdown(): string {
   const parts = [
     header(
@@ -67,7 +63,6 @@ export function renderHowIndexMarkdown(): string {
   return `${parts.join("\n").trimEnd()}\n`;
 }
 
-/** Lines for llms.txt: one section per niche. */
 export function howLlmsSections(): string[] {
   const lines: string[] = [];
   for (const niche of publishedNiches()) {
@@ -76,7 +71,6 @@ export function howLlmsSections(): string[] {
   return lines;
 }
 
-/** Every problem page in full, for llms-full.txt. */
 export function howLlmsFull(): string[] {
   const parts = ["# How-to guides", ""];
   for (const niche of publishedNiches()) {

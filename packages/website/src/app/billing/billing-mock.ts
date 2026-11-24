@@ -1,8 +1,6 @@
 import type { BillingPlanConfig, BillingStatus } from "@stella/contracts/backend/billing";
 import { PLAN_CATALOG, PLAN_ORDER, type BillingPlan } from "@/lib/plans";
 
-// Development-only fixtures for /billing?mock=…, so the page can be designed
-// and screenshotted without a backend account on each plan.
 export const BILLING_MOCK_MODES = ["free", "free-spent", "plus", "pro", "pro-limit", "max-cancel", "signed-out"] as const;
 export type BillingMockMode = (typeof BILLING_MOCK_MODES)[number];
 

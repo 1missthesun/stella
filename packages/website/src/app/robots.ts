@@ -3,10 +3,7 @@ import { getSiteUrl } from "@/lib/site-url";
 
 const PRIVATE = ["/api/", "/auth/", "/billing", "/challenge"];
 
-// Named groups for the AI search, assistant and training crawlers. A crawler
-// that matches a named group ignores `*`, so each one carries the same rules;
-// listing them makes the site's welcome explicit to the bots that decide
-// whether Stella can be cited.
+// RFC 9309: a crawler that matches a named group ignores `*`.
 const AI_AGENTS = [
   "OAI-SearchBot",
   "ChatGPT-User",
@@ -27,7 +24,6 @@ const AI_AGENTS = [
 
 export default function robots(): MetadataRoute.Robots {
   const base = getSiteUrl();
-  // Preview builds (scripts/deploy-problem-preview.sh) keep every crawler out.
   if (process.env.NEXT_PUBLIC_STELLA_NOINDEX === "1") {
     return { rules: [{ userAgent: "*", disallow: "/" }] };
   }

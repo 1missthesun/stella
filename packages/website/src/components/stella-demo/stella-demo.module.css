@@ -3,7 +3,6 @@
   min-width: 0;
 }
 
-/* One short line over the window, in the page's own type, changing with the beat. */
 .caption {
   display: grid;
   height: 1.2em;
@@ -185,7 +184,6 @@
   color: var(--h-ink, #0a0a0d);
 }
 
-/* Set by the inline script while the page parses: the app's empty home screen, where the replay starts. */
 .frame[data-armed] :global(.event-row),
 .frame[data-armed] :global(.chat-time-divider) {
   display: none;

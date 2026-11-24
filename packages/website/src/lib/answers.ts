@@ -2,8 +2,6 @@ import { MODEL_PAGES } from "@/lib/model-pages";
 import { PAID_BILLING_PLANS, PLAN_CATALOG, formatPlanPrice } from "@/lib/plans";
 export type Answer = { q: string; a: string };
 
-// Price wording (decided 2026-11-10): free without limit on the user's own
-// ChatGPT, Claude or Gemini plan; Stella's own models only get a small one-time trial.
 export const PRICE_LINE = "Free with the ChatGPT, Claude or Gemini plan you already have.";
 export const TRIAL_LINE = "New accounts also get a small free trial of Stella’s own models.";
 const PAID_PRICES = PAID_BILLING_PLANS.map(
@@ -97,15 +95,11 @@ export const FAQ: Answer[] = [
 export type CompareRow = { label: string; stella: string; them: string };
 
 export type Comparison = {
-  /** Column heading for the other product, e.g. "ChatGPT app". */
   them: string;
-  /** Heading over the reasons to pick the other product; defaults to "Pick the <them> if". */
   pickThem?: string;
   rows: CompareRow[];
-  /** Honest reasons to pick the other product. */
   themBetter: string[];
   stellaBetter: string[];
-  /** When and against what the other product's facts were checked. */
   checked: string;
   sources: { label: string; href: string }[];
 };
@@ -118,24 +112,17 @@ export type AnswerPage = {
   metaDescription: string;
   eyebrow: string;
   headline: string;
-  /** Answers the page's question in its first paragraph. */
   answer: string;
   compare?: Comparison;
   steps?: { title: string; body: string }[];
-  /** Heading over the steps; defaults to "How to do it." */
   stepsTitle?: string;
   visual?: "change-card";
   points?: { title: string; body: string }[];
   questions: Answer[];
-  /**
-   * "Use Claude for X" and "Best AI for X" pages: a short line under the headline, the
-   * model line with one marked, a coded Stella chat, a few short reasons and the guides.
-   */
   lede?: string;
   recommended?: "claude" | "gemini" | "chatgpt";
   demo?: { prompt: string; ack: string; task: string; rows: string[]; reply: string; files?: string[] };
   why?: { title: string; body: string }[];
-  /** /how guide ids ("niche/slug") shown as cards. */
   guides?: string[];
 };
 
@@ -811,7 +798,6 @@ export function faqJsonLd(items: Answer[], url: string) {
   };
 }
 
-/** FAQPage, BreadcrumbList and SoftwareApplication for one /ai page. */
 export function answerJsonLd(page: AnswerPage, site: URL) {
   const url = new URL(`/ai/${page.slug}`, site).href;
   const index = new URL("/ai", site).href;

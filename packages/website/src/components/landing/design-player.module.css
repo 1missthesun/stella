@@ -47,9 +47,6 @@
   transform-origin: 0 0;
 }
 
-/* The desktop's hot-reload focus pull (update-transition.ts focusPull): the old
-   window blurs to 12px and dissolves at peak blur while the new one, held at
-   12px underneath, pulls back into focus. */
 .look[data-role="enter"] {
   animation: focus-in var(--swap) linear both;
 }
@@ -74,7 +71,6 @@
   pointer-events: none;
 }
 
-/* Stella's own user message (full-shell.chat.css .event-item.user) at reading size. */
 .bubble {
   position: absolute;
   right: 0;
@@ -197,8 +193,6 @@
   color: #fff;
 }
 
-/* Sent: the app's bubble-pop (rise 14px, 0.84 -> 1 on the spring) just above the
-   composer at a slightly larger size, a beat of rest, then it travels to the corner. */
 @keyframes bubble-send {
   0% {
     transform: translate3d(var(--send-x), calc(var(--send-y) + 14px), 0) scale(calc(var(--send-scale) * 0.84));

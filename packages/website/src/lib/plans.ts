@@ -37,13 +37,11 @@ export const FEATURED_PLAN: BillingPlan = "pro";
 export const formatUsd = (usd: number): string =>
   Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`;
 
-// "$20/mo" or "$0".
 export const planPriceLabel = (plan: BillingPlan): string => {
   const def = PLAN_CATALOG[plan];
   return def.interval ? `${formatPlanPrice(def.monthlyPriceCents)}/mo` : formatPlanPrice(0);
 };
 
-// One line for summaries: "Plus — $20/mo, more usage".
 export const planSummary = (plan: BillingPlan): string => {
   const def = PLAN_CATALOG[plan];
   return `${def.label} — ${def.interval ? planPriceLabel(plan) : "$0"}, ${def.tagline.toLowerCase()}`;

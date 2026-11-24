@@ -2,15 +2,6 @@ import React from "react";
 import { CHAT, type SkinProps } from "./content";
 import { F, STAR, hash } from "./kit";
 
-/**
- * A trail runner's map (recreating the look a real Stella made for one).
- * Cream paper with topographic contour lines, set in a condensed map-sign sans.
- * Your messages are waypoint labels with an orange blaze; replies sit on paper notes
- * with a red dashed trail down the side; a dotted route links the conversation like
- * waypoints. Top bar: north arrow, a "1 mi" scale bar and the time. The TODAY panel
- * is a map legend.
- */
-
 const PAPER = "#f3ead8";
 const CONTOUR = "#d9c4a4";
 const INDEX = "#c8ab84";
@@ -23,7 +14,6 @@ const RED = "#c63a2c";
 const BLUE = "#3a62a6";
 const GREEN = "#4f7a3a";
 
-// ---------- terrain ----------
 function vnoise(x: number, y: number, seed: number) {
   const xi = Math.floor(x),
     yi = Math.floor(y);
@@ -54,7 +44,6 @@ function height(x: number, y: number) {
 
 const contourCache = new Map<string, [string, string]>();
 
-/** The map's contour lines for one design size, computed once per page. */
 export function trailContours(w: number, h: number): [string, string] {
   const key = `${w}x${h}`;
   let hit = contourCache.get(key);
@@ -67,7 +56,6 @@ export function trailContours(w: number, h: number): [string, string] {
 
 const MARGIN = 360;
 
-/** Marching squares over the height field; returns [normal path, index path]. */
 function contours(W: number, H: number, cell: number): [string, string] {
   const nx = Math.ceil(W / cell) + 1,
     ny = Math.ceil(H / cell) + 1;
@@ -141,7 +129,6 @@ function contours(W: number, H: number, cell: number): [string, string] {
   return [norm.join(""), idx.join("")];
 }
 
-// ---------- small marks ----------
 const ScaleBar: React.FC<{ w: number; h?: number; segs?: number }> = ({ w, h = 6, segs = 4 }) => (
   <svg width={w + 2} height={h + 2} style={{ display: "block" }}>
     <rect x={1} y={1} width={w} height={h} fill="#fff" stroke={INK} strokeWidth={1.2} />
@@ -199,14 +186,13 @@ export const TrailSkin: React.FC<SkinProps> = ({ t, w, h }) => {
   const sideW = tall ? 400 : 330;
   const colW = tall ? w - 70 : 860;
   const colX = tall ? 34 : Math.round((w - sideW - 40 - colW) / 2) + 6;
-  const gut = 46; // route gutter inside the chat column
+  const gut = 46;
   const caret = Math.floor(t * 2.4) % 2 === 0;
 
   const margin = MARGIN;
   const [cNorm, cIdx] = trailContours(w, h);
   const pan = Math.min(margin - 10, 40 + t * 7);
 
-  // spot heights and a creek label, in open map areas
   const spots: [number, number, string][] = tall
     ? [
         [70, 150, "1,482"],
@@ -274,7 +260,6 @@ export const TrailSkin: React.FC<SkinProps> = ({ t, w, h }) => {
 
   const chat = (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: tall ? 18 : 15 }}>
-      {/* the dotted route the waypoints sit on */}
       <div style={{ position: "absolute", left: gut / 2 - 1, top: 40, bottom: 30, width: 3 }}>
         <svg width={3} height="100%" style={{ display: "block", overflow: "visible" }}>
           <line x1={1.5} y1={0} x2={1.5} y2="100%" stroke="#8a5a3c" strokeWidth={2.4} strokeLinecap="round" strokeDasharray="0.1 8" strokeDashoffset={-t * 14} />
@@ -300,7 +285,6 @@ export const TrailSkin: React.FC<SkinProps> = ({ t, w, h }) => {
 
   return (
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h, overflow: "hidden", background: PAPER, fontFamily: F.barlow, fontWeight: 500 }}>
-      {/* the map */}
       <svg width={w} height={h} style={{ position: "absolute", left: 0, top: 0 }}>
         <g transform={`translate(${-pan} 0)`}>
           <path d={cNorm} stroke={CONTOUR} strokeWidth={1} fill="none" />
@@ -322,7 +306,6 @@ export const TrailSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </text>
       </svg>
 
-      {/* top bar */}
       <div style={{ position: "absolute", left: 0, top: 0, width: w, height: barH, background: "#f6f0e3", borderBottom: `1px solid ${INK}`, display: "flex", alignItems: "center", fontSize: 16, color: INK }}>
         <div style={{ position: "absolute", left: 0, right: 0, bottom: -5, height: 2, background: INK }} />
         <div style={{ display: "flex", gap: 8, marginLeft: 20 }}>
@@ -363,15 +346,12 @@ export const TrailSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </div>
       </div>
 
-      {/* legend */}
       <div style={{ position: "absolute", ...(tall ? { right: 34, top: barH + 34 } : { right: 34, top: 300 }) }}>
         <Legend w={sideW} />
       </div>
 
-      {/* the conversation */}
       <div style={{ position: "absolute", left: colX, width: colW, bottom: 118 }}>{chat}</div>
 
-      {/* composer */}
       <div style={{ position: "absolute", left: colX + gut - 6, width: colW - gut + 12, bottom: 22, height: 74, padding: 3, border: `1.5px solid ${INK}`, borderRadius: 8, background: "#fbf8f1" }}>
         <div style={{ height: "100%", border: `1px solid #cdbfa6`, borderRadius: 5, display: "flex", alignItems: "center", gap: 16, padding: "0 10px" }}>
           <div style={{ width: 42, height: 42, border: `1px solid ${INK}`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 400, color: INK }}>+</div>

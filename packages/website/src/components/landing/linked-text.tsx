@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { linkParts } from "@/lib/answers";
 
-// `code` spans inside plain text, e.g. an install command in a step.
 function CodeText({ text }: { text: string }) {
   const bits = text.split(/`([^`]+)`/g);
   if (bits.length === 1) return <>{text}</>;

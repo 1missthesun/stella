@@ -101,7 +101,6 @@ const fragment = /* glsl */ `
   }
 `;
 
-/** CSS `cubic-bezier(0.4, 0, 0.2, 1)`, the curve the page's own scene colour transition uses. */
 function sceneEase(t: number) {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
@@ -269,9 +268,6 @@ export function AuroraField({
 
     if (!defer) init();
 
-    // Deferred fields set up once the page has loaded and the main thread is idle, so the shader
-    // compile stays out of both the first load and the scroll that reaches them; scrolling close
-    // before then sets them up right away.
     let cancelIdle = () => {};
     const initWhenIdle = () => {
       if (typeof window.requestIdleCallback === "function") {

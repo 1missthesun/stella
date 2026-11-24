@@ -1,6 +1,5 @@
 import type { Niche } from "./types";
 
-/** Hubs, in the order the index lists them. A niche needs at least one published page. */
 export const NICHES: Niche[] = [
   {
     slug: "game-mods",

@@ -2,14 +2,6 @@ import React from "react";
 import { CHAT, type SkinProps } from "./content";
 import { F, STAR, hash, ovalLines, starEyes } from "./kit";
 
-/**
- * "Make it feel like a 90s anime."
- * A painted late-summer afternoon background (gouache sky, cel-shaded cumulonimbus,
- * a telephone pole and its wires), Stella as an inked, cel-painted character,
- * the conversation lettered into manga balloons, an episode title card, and
- * character animation held on twos/threes (12 fps) over a smoothly panning background.
- */
-
 const INK = "#1c1a2b";
 const PAPER = "#f7f1e2";
 const SKY_TOP = "#2a63bd";
@@ -26,15 +18,11 @@ const ST_RIM = "#ff9bd2";
 const YELLOW = "#ffd23c";
 const RED = "#e2403a";
 
-/** Character animation is held on 12 fps like hand-drawn cels; backgrounds pan smoothly. */
 const onTwos = (t: number) => Math.floor(t * 12) / 12;
-
-// ---------------------------------------------------------------- clouds
 
 type Puff = { x: number; y: number; r: number };
 
 function cumulus(seed: number, w: number, hgt: number): Puff[] {
-  // A towering cumulonimbus: a flat-ish base, a column of big puffs, a crown.
   const out: Puff[] = [];
   const n = 26;
   for (let i = 0; i < n; i++) {
@@ -46,7 +34,6 @@ function cumulus(seed: number, w: number, hgt: number): Puff[] {
     const r = (w * 0.16) * (1 - 0.45 * lvl) * (0.7 + 0.6 * hash(i, seed + 3));
     out.push({ x, y, r });
   }
-  // cauliflower edges: smaller puffs budding off the upper rim of each big one
   const buds: Puff[] = [];
   out.forEach((p, i) => {
     for (let k = 0; k < 3; k++) {
@@ -56,7 +43,6 @@ function cumulus(seed: number, w: number, hgt: number): Puff[] {
     }
   });
   out.push(...buds);
-  // the long flat base
   for (let i = 0; i < 9; i++) {
     const x = (i / 8 - 0.5) * w * 1.15;
     out.push({ x, y: hgt * 0.02 + hash(i, seed + 9) * 6, r: w * 0.085 * (0.8 + 0.5 * hash(i, seed + 7)) });
@@ -78,7 +64,6 @@ function smallCloud(seed: number, w: number): Puff[] {
 const circles = (p: Puff[], dx = 0, dy = 0, k = 1) =>
   p.map((c, i) => <circle key={i} cx={c.x + dx * c.r} cy={c.y + dy * c.r} r={c.r * k} />);
 
-/** Cel-painted cloud: flat shadow body, a mid tone, a hard-edged lit top-left, a flat cut base. */
 const Cloud: React.FC<{ id: string; puffs: Puff[]; x: number; y: number; s?: number; baseY?: number }> = ({ id, puffs, x, y, s = 1, baseY = 30 }) => (
   <g transform={`translate(${x} ${y}) scale(${s})`}>
     <defs>
@@ -98,8 +83,6 @@ const Cloud: React.FC<{ id: string; puffs: Puff[]; x: number; y: number; s?: num
   </g>
 );
 
-// ---------------------------------------------------------------- the character
-
 const Sparkle: React.FC<{ x: number; y: number; s: number; on: number; color?: string }> = ({ x, y, s, on, color = "#fff" }) => {
   if (on <= 0.02) return null;
   const k = s * on;
@@ -107,7 +90,6 @@ const Sparkle: React.FC<{ x: number; y: number; s: number; on: number; color?: s
   return <path d={d} transform={`translate(${x} ${y})`} fill={color} stroke={INK} strokeWidth={Math.max(1.4, s * 0.07)} strokeLinejoin="round" />;
 };
 
-/** Stella, inked and cel-painted: a lit rim upper-left, a hard shadow crescent lower-right, a painted shine, anime eyes. */
 const CelStella: React.FC<{ t: number; size: number; id: string; line?: number; simple?: boolean }> = ({ t, size, id, line = 3.4, simple }) => {
   const tq = onTwos(t + 0.4);
   const bob = Math.sin(tq * 2.6) * 0.035;
@@ -119,8 +101,8 @@ const CelStella: React.FC<{ t: number; size: number; id: string; line?: number; 
   const ey = eh * 0.5 * 1.16;
   const blinkCycle = (t + 0.4) % 3.2;
   const blink = blinkCycle > 2.92 && blinkCycle < 3.06;
-  const sh = C * 0.16; // shadow crescent depth
-  const li = C * 0.07; // lit rim depth
+  const sh = C * 0.16;
+  const li = C * 0.07;
   return (
     <svg width={size} height={size} viewBox={`${-C * 0.1} ${-C * 0.1} ${C * 2.2} ${C * 2.2}`} style={{ overflow: "visible", position: "absolute", left: 0, top: 0, transform: `translateY(${bob * size}px) rotate(${tilt}deg)` }}>
       <defs>
@@ -146,9 +128,7 @@ const CelStella: React.FC<{ t: number; size: number; id: string; line?: number; 
       <path d={STAR.path} fill={ST_SHADE} mask={`url(#${id}-sh)`} />
       {simple ? null : (
         <g clipPath={`url(#${id}-b)`}>
-          {/* warm bounce light in the shadow, the aurora's pink end */}
           <path d={STAR.path} fill="none" stroke={ST_RIM} strokeWidth={C * 0.05} transform={`translate(${-sh * 0.8 + C * 0.035} ${-sh + C * 0.035})`} opacity={0.9} clipPath={undefined} mask={`url(#${id}-sh)`} />
-          {/* painted shine on the upper-left arm */}
           <path d={`M${C * 0.42} ${C * 0.62} Q ${C * 0.5} ${C * 0.5} ${C * 0.66} ${C * 0.47}`} stroke="#fff" strokeWidth={C * 0.06} strokeLinecap="round" fill="none" />
           <circle cx={C * 0.78} cy={C * 0.46} r={C * 0.03} fill="#fff" />
         </g>
@@ -196,11 +176,8 @@ const CelStella: React.FC<{ t: number; size: number; id: string; line?: number; 
   );
 };
 
-// ---------------------------------------------------------------- balloons
-
 type BalloonSpec = { text: string; lines: number; me: boolean; cx: number; cy: number; fs: number; tail: [number, number]; tilt?: number };
 
-/** A lettered speech balloon: inked oval with a brush-weighted line (heavier lower right), a pointed tail. */
 const Balloon: React.FC<{ b: BalloonSpec; id: string; tone?: boolean }> = ({ b, id, tone }) => {
   const lines = ovalLines(b.text.toUpperCase(), b.lines);
   const cw = b.fs * 0.6;
@@ -210,7 +187,6 @@ const Balloon: React.FC<{ b: BalloonSpec; id: string; tone?: boolean }> = ({ b, 
   const rx = tw / 2 / 0.86 + b.fs * 0.9;
   const ry = th / 2 / 0.78 + b.fs * 0.55;
   const [tx, ty] = b.tail;
-  // tail base on the oval rim, aimed at the speaker
   const ang = Math.atan2((ty - b.cy) / ry, (tx - b.cx) / rx);
   const spread = 0.2;
   const p1 = [b.cx + Math.cos(ang - spread) * rx * 0.92, b.cy + Math.sin(ang - spread) * ry * 0.92];
@@ -226,7 +202,6 @@ const Balloon: React.FC<{ b: BalloonSpec; id: string; tone?: boolean }> = ({ b, 
   );
   return (
     <g transform={b.tilt ? `rotate(${b.tilt} ${b.cx} ${b.cy})` : undefined}>
-      {/* ink: the shape grown, and nudged down-right so the line swells like a brush */}
       <g fill={INK} transform="translate(1.4 1.8)">{shape(3.2)}</g>
       <g fill={INK}>{shape(2.4)}</g>
       <g fill="#fffefa">{shape(0)}</g>
@@ -262,8 +237,6 @@ const Balloon: React.FC<{ b: BalloonSpec; id: string; tone?: boolean }> = ({ b, 
     </g>
   );
 };
-
-// ---------------------------------------------------------------- top bar & composer
 
 const InkIcon: React.FC<{ kind: "gear" | "panel"; x: number; y: number }> = ({ kind, x, y }) => (
   <g transform={`translate(${x} ${y})`} stroke={INK} strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -314,7 +287,6 @@ const Composer: React.FC<{ t: number; x: number; y: number; w: number; h: number
   const caret = Math.floor(t * 2.2 + 0.3) % 2 === 0;
   return (
     <div style={{ position: "absolute", left: x, top: y, width: w, height: h }}>
-      {/* flat cel shadow, no blur */}
       <div style={{ position: "absolute", left: 7, top: 8, width: w, height: h, borderRadius: 14, background: INK }} />
       <div style={{ position: "absolute", inset: 0, borderRadius: 14, background: "#fffefa", border: `3px solid ${INK}`, overflow: "hidden" }}>
         <svg width={w} height={h} style={{ position: "absolute", left: -3, top: -3 }}>
@@ -330,7 +302,6 @@ const Composer: React.FC<{ t: number; x: number; y: number; w: number; h: number
           <rect x={-5.5} y={-12} width={11} height={17} rx={5.5} fill={PAPER} />
           <path d="M-10 -1 Q -10 10 0 10 Q 10 10 10 -1 M 0 10 V 14" />
         </g>
-        {/* send: a red disc with an inked arrow and three speed lines */}
         <g transform={`translate(${w - h / 2} ${h / 2})`}>
           <circle r={h * 0.33} fill={RED} stroke={INK} strokeWidth={2.8} />
           <path d={`M0 ${h * 0.15} V ${-h * 0.14} M ${-h * 0.12} ${-h * 0.02} L 0 ${-h * 0.15} L ${h * 0.12} ${-h * 0.02}`} stroke="#fff" strokeWidth={3.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -344,15 +315,12 @@ const Composer: React.FC<{ t: number; x: number; y: number; w: number; h: number
   );
 };
 
-// ---------------------------------------------------------------- scene
-
 export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
   const tall = h > w;
   const hBar = 58;
-  const pan = t * 9; // background pan, px/s
+  const pan = t * 9;
   const tq = onTwos(t);
 
-  // ---- layout
   const L = tall
     ? {
         mascot: { x: 70, y: 330, s: 320 },
@@ -373,7 +341,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         horizon: h * 0.8,
       };
 
-  // balloon stack (from the bottom up above the composer)
   const gap = tall ? 12 : 10;
   const specs: Omit<BalloonSpec, "cx" | "cy" | "tail">[] = [
     { text: CHAT.me1, lines: 3, me: true, fs: L.fs },
@@ -408,7 +375,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
   const stampY = yCursor - 8;
   const herTail = !tall;
 
-  // ---- telephone pole + wires
   const poleX = tall ? w - 70 : w - 64;
   const wireY0 = tall ? 300 : 150;
 
@@ -438,22 +404,18 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
           </filter>
         </defs>
         <rect width={w} height={h} fill="url(#an-sky)" />
-        {/* gouache drag: faint horizontal brush texture in the sky */}
         <rect width={w} height={h * 0.8} filter="url(#an-brush)" opacity={0.7} />
 
-        {/* far cirrus streaks */}
         {[0, 1, 2, 3].map((i) => {
           const y = (tall ? 170 : 92) + i * 22 + hash(i, 3) * 20;
           const x = ((hash(i, 4) * w * 1.4 - pan * 0.4) % (w * 1.4)) - w * 0.2;
           return <rect key={i} x={x} y={y} width={180 + hash(i, 5) * 220} height={3 + hash(i, 6) * 3} rx={3} fill="#e8f2fb" opacity={0.55} />;
         })}
 
-        {/* the cumulonimbus tower, slow pan */}
         <Cloud id="an-cb" puffs={cumulus(11, tall ? 620 : 640, tall ? 560 : 520)} x={(tall ? w * 0.52 : w * 0.7) - pan * 0.35} y={L.horizon - (tall ? 60 : 50)} baseY={40} />
         <Cloud id="an-c2" puffs={smallCloud(5, 300)} x={(tall ? 560 : 420) - pan * 0.7} y={tall ? 330 : 250} s={1} baseY={18} />
         <Cloud id="an-c3" puffs={smallCloud(9, 220)} x={(tall ? 160 : 1010) - pan * 0.8} y={tall ? 760 : 140} s={1} baseY={14} />
 
-        {/* distant town on the horizon, hazed */}
         <g fill="#93b5d2">
           {Array.from({ length: 40 }, (_, i) => {
             const bw = 26 + hash(i, 21) * 54;
@@ -470,7 +432,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
             return <rect key={i} x={x} y={L.horizon + 14 - bh} width={bw} height={bh + 30} />;
           })}
         </g>
-        {/* river, with glints that slide */}
         <rect x={0} y={L.horizon + 14} width={w} height={h} fill="#86b7da" />
         <rect x={0} y={L.horizon + 14} width={w} height={3} fill="#d9ecf6" />
         {Array.from({ length: 22 }, (_, i) => {
@@ -479,7 +440,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
           const x = ((hash(i, 53) * (w + 200) - pan * 1.6 * (0.5 + hash(i, 54))) % (w + 200) + w + 200) % (w + 200) - 100;
           return <rect key={i} x={x} y={y} width={len} height={2.5} rx={1.2} fill="#eef7fc" opacity={0.85} />;
         })}
-        {/* the grass embankment in the foreground: flat cel greens, a hard shade, tufts */}
         {(() => {
           const y0 = L.horizon + (tall ? 92 : 66);
           const d = `M -10 ${y0 + 22} C ${w * 0.25} ${y0 - 4}, ${w * 0.55} ${y0 + 10}, ${w + 10} ${y0 - 8} L ${w + 10} ${h + 10} L -10 ${h + 10} Z`;
@@ -501,7 +461,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
           );
         })()}
 
-        {/* telephone pole and wires: a silhouette against the sky */}
         <g>
           {[0, 1, 2, 3].map((i) => {
             const y0 = wireY0 + i * 10 + (i > 1 ? 34 : 0);
@@ -525,7 +484,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
           <rect x={poleX - 5} y={wireY0 - 40} width={3} height={h} fill="#555c80" />
         </g>
 
-        {/* speed lines behind the character: she is in motion, drawn on twos */}
         <g opacity={0.9}>
           {Array.from({ length: 16 }, (_, i) => {
             const seed = i + Math.floor(tq * 12) * 31;
@@ -538,12 +496,10 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </g>
       </svg>
 
-      {/* the character */}
       <div style={{ position: "absolute", left: L.mascot.x, top: L.mascot.y, width: L.mascot.s, height: L.mascot.s }}>
         <CelStella t={t} size={L.mascot.s} id="an-hero" />
       </div>
 
-      {/* sparkles and the kira sound effect */}
       <svg width={w} height={h} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
         {[
           [-0.08, -0.02, 26, 0],
@@ -575,7 +531,6 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         キラッ
       </div>
 
-      {/* episode title card */}
       <div style={{ position: "absolute", left: L.title.x, top: L.title.y, transform: "rotate(-3deg)", transformOrigin: "0 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontFamily: F.dela, fontSize: 24, color: "#fff", background: RED, border: `3px solid ${INK}`, padding: "1px 10px 3px", boxShadow: `3px 3px 0 ${INK}` }}>第1話</span>
@@ -602,14 +557,12 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </div>
       </div>
 
-      {/* the conversation, lettered */}
       <svg width={w} height={h} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
         {balloons.map((b, i) => (
           <Balloon key={i} b={herTail || b.me ? b : b} id={`an-b${i}`} tone={!b.me} />
         ))}
       </svg>
 
-      {/* stamp as a narration caption box */}
       <div
         style={{
           position: "absolute",
@@ -637,9 +590,7 @@ export const AnimeSkin: React.FC<SkinProps> = ({ t, w, h }) => {
 
       <TopBar t={t} w={w} hBar={hBar} />
 
-      {/* the warmth of painted cels shot on film */}
       <div style={{ position: "absolute", inset: 0, background: "#ffdcae", mixBlendMode: "multiply", opacity: 0.1, pointerEvents: "none" }} />
-      {/* film grain, re-rolled on twos */}
       <svg width={w} height={h} style={{ position: "absolute", left: 0, top: 0, mixBlendMode: "overlay", opacity: 0.22, pointerEvents: "none" }}>
         <rect width={w} height={h} filter="url(#an-grain)" />
       </svg>

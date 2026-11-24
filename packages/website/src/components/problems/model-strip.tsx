@@ -8,7 +8,6 @@ const MODELS: { id: ModelId; name: string; logo: string }[] = [
   { id: "chatgpt", name: "ChatGPT", logo: "/landing/logos/chatgpt.svg" },
 ];
 
-/** The three plans Stella runs on, in one quiet line, with the one we'd pick for this topic marked. */
 export function ModelStrip({ recommended, className }: { recommended?: ModelId; className?: string }) {
   return (
     <div className={`${s.strip} ${className ?? ""}`}>

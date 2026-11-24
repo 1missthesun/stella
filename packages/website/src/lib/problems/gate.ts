@@ -1,46 +1,26 @@
 import type { Niche, ProblemPage } from "./types";
 
-/**
- * The quality gate. Every published problem page passes through here when the
- * site builds (the routes, sitemap and llms.txt all read pages through
- * `publishedProblemPages()`), so a thin, duplicated, long or technical page fails
- * `next build` with a list of what to fix. Mark a page `draft: true` to keep
- * it out of the site while it's being written.
- */
-
-/** Share of a page's 5-word phrases that may also appear in any one other page. */
 export const MAX_OVERLAP = 0.25;
-/** Everything readable on the page that's its own, in words. */
 export const WORDS = { min: 80, max: 260 };
-/** A page whose facts weren't checked within this many days fails. */
 export const MAX_AGE_DAYS = 365;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** Copy rules from the brief, enforced so they hold at a few hundred pages. */
 const BANNED: { pattern: RegExp; why: string; except?: string[] }[] = [
-  // “letting agent”, “estate agent” and “literary agent” are trades, not the product.
   { pattern: /(?<!\b(?:letting|estate|literary) )\bagents?\b/i, why: "say “tasks”, not “agents”" },
   { pattern: /\brahul\b/i, why: "no personal names" },
-  // Alerts for flight prices and restaurant tables were asked for (2026-11-24); elsewhere they stay out.
   { pattern: /\b(flights?|restaurants?)\b/i, why: "demo tasks are never flights or restaurants", except: ["watches"] },
   { pattern: /free forever|actually free|try stella/i, why: "banned price wording" },
   { pattern: /log ?in with claude|sign in with claude/i, why: "say “use your Claude plan”" },
-  // “Seamless Co-op” is the name of a mod.
   { pattern: /\b(revolutionary|game-?changer|supercharge|seamless(?! co-?op)(ly)?|effortless(ly)?|magic(al)?)\b/i, why: "no hype" },
   { pattern: /\bunlimited\b/i, why: "never imply unlimited use" },
-  // Pages show how the job is done; cautions live in the terms of service.
   { pattern: /\bStella (?:won['’]t|can['’]t|cannot|can not|doesn['’]t|does not|will not|refuses?|stops short)\b/i, why: "no “Stella can't/won't” lines" },
   { pattern: /\b(?:copyright(?:ed)?|illegal(?:ly)?|legally|at your own risk|be careful|beware|disclaimer|not (?:legal|medical|financial|tax) advice)\b/i, why: "no cautions or disclaimers" },
   { pattern: /\bonly (?:for|with|use this on) (?:content|files|software|things) you own\b/i, why: "no cautions or disclaimers" },
   { pattern: /\bmake sure you have (?:permission|the right)/i, why: "no cautions or disclaimers" },
 ];
 
-/**
- * Guides are for people who don't know, and shouldn't need to know, how
- * it's done. These may appear only when they're part of what people search for.
- */
 const JARGON =
   /`|\\\\?[A-Z][a-z]+\\\\|\s--?[a-z]{2,}|\b(?:sha-?\d+|md5|checksums?|hash(?:es|ed|ing)?|bytecode|opcodes?|disassembl\w+|assembly|hex(?:adecimal)?|offsets?|binary|binaries|compil\w+|obfuscat\w+|symlinks?|hard[- ]?links?|regex|cli|command[- ]line|terminal|powershell|json|xml|yaml|lua|ini files?|config(?:uration)? files?|registry|environment variables?|dependenc(?:y|ies)|repositor(?:y|ies)|api|sdk|jdk|runtime|parser|script extender|dll|ports?|trackers?|dht|peers?|protocols?|encryption keys?|sftp|ssh|root|admin rights|plugins?|frameworks?|loaders?|manifests?|metadata|endpoints?|headers?|payloads?|certificates?)\b/gi;
 
@@ -56,7 +36,6 @@ const words = (text: string) =>
     .split(/[^a-z0-9.+#']+/)
     .filter(Boolean);
 
-/** The text that is this page's own: what the gate counts and compares. */
 export function uniqueText(page: ProblemPage): string {
   return [
     page.answer,
@@ -82,7 +61,6 @@ function shingles(text: string, n = 5): Set<string> {
 export type GateReport = {
   page: string;
   words: number;
-  /** Highest phrase overlap with another page, 0–1, and which page. */
   overlap: number;
   overlapWith: string | null;
   errors: string[];
@@ -90,14 +68,9 @@ export type GateReport = {
 
 const PHRASE_STOP = new Set(["a", "an", "the", "to", "how", "my", "your", "in", "on", "for", "of", "i", "do", "can", "you", "is", "it", "with"]);
 
-/** A search phrase reduced to its meaningful words, in order ("PDF to Excel" and "Excel to PDF" stay apart). */
 export const phraseKey = (phrase: string) =>
   (phrase.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => !PHRASE_STOP.has(w)).join(" ");
 
-/**
- * Each search a page targets belongs to one page on the site: two pages listing the same
- * search compete for it. `others` are the site's other pages (/ai, /fix) and their searches.
- */
 export function checkSearchOwnership(pages: ProblemPage[], others: { url: string; queries: string[] }[] = []): string[] {
   const owner = new Map<string, string>();
   const problems: string[] = [];
@@ -170,8 +143,6 @@ export function checkProblemPages(
     need(page.lede.length >= 20 && page.lede.length <= 90, `lede is ${page.lede.length} characters (20–90)`);
     need(!/stella/i.test(page.lede), "lede names the product; the answer does that, with stella.sh");
 
-    // The H1 is the search in the reader's words: it must share most of the
-    // main phrase's meaningful words.
     const key = words(page.searchPhrases[0] ?? "").filter((w) => !STOP.has(w));
     const h1 = new Set(words(page.h1));
     const hit = key.filter((w) => h1.has(w)).length;
@@ -200,7 +171,6 @@ export function checkProblemPages(
       }
     };
     plain([page.lede, page.answer, ...page.gets, page.prompt, ack, task, ...rows, reply].join("\n"), new Set(), "a guide");
-    // A question can use the word people typed; its answer may then use it too.
     for (const item of page.faq) plain(item.a, new Set(words(item.q)), "an answer");
 
     need((page.byHand ?? []).length <= 5, "at most 5 by-hand lines");
@@ -253,7 +223,6 @@ export function checkProblemPages(
   return { reports, errors: global };
 }
 
-/** Throws with every failure listed, so `next build` stops on a bad page. */
 export function assertProblemPages(pages: ProblemPage[], niches: Niche[]) {
   const { reports, errors } = checkProblemPages(pages, niches);
   const lines = [

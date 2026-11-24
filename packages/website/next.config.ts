@@ -76,9 +76,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      // Markdown twins of the /ai answer pages.
       { source: "/ai/:slug([a-z0-9-]+).md", destination: "/ai-md/:slug" },
-      // Markdown twins of the /how problem pages and their niche hubs.
       { source: "/how/:niche([a-z0-9-]+)/:problem([a-z0-9-]+).md", destination: "/how-md/:niche/:problem" },
       { source: "/how/:niche([a-z0-9-]+).md", destination: "/how-md/:niche" },
       ...(stellaBackendUrl
@@ -112,10 +110,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Must follow the `/chat-app/:path*` rule: when several rules match,
-        // Next applies them in order and the last value for a key wins, so
-        // listing this first left the hashed bundle revalidating on every
-        // visit.
         source: "/chat-app/assets/:path*",
         headers: [
           {

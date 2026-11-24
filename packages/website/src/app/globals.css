@@ -657,11 +657,6 @@ html[data-embedded="true"] .site-header {
   align-self: flex-start;
 }
 
-/* One primary button on the whole site, at the landing hero's exact metrics:
-   the hero's own override in `home-hero.module.css` sets these same clamps,
-   so the hero is untouched and every other primary CTA — the replaced blue
-   ones and the "Download Stella" buttons alike — now matches it pixel for
-   pixel at any viewport. */
 .button--primary,
 .button--accent,
 .button--download {
@@ -772,8 +767,6 @@ html[data-embedded="true"] .site-header {
   line-height: 1.4;
 }
 
-/* Phones get the app; this line gets the desktop download onto their computer.
-   It always takes its own row after the row's other items ("Free.", links). */
 .download-handoff {
   order: 10;
   flex-basis: 100%;

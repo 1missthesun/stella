@@ -14,12 +14,6 @@ import { TrailSkin, trailContours } from "./TrailSkin";
 export { loadFonts } from "./kit";
 export type { SkinProps } from "./content";
 
-/**
- * A look the window can take. `drawn` skins are pure functions of time laid out at a
- * fixed design size (1480x900 wide, 840x1400 tall) and scaled to the frame; `fluid`
- * ones lay themselves out in whatever box they're given and run their own motion. `warm`
- * does a drawn skin's one-off layout work ahead of its first frame.
- */
 export type Look =
   | { kind: "drawn"; Skin: ComponentType<SkinProps>; fonts: readonly FontSet[]; warm?: (w: number, h: number) => void }
   | { kind: "fluid"; Skin: ComponentType; fonts: readonly FontSet[] };

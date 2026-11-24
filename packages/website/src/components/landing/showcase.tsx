@@ -182,7 +182,6 @@ function JourneyView() {
       { rootMargin: "200px 0px" },
     );
 
-    // Content above the frame can change height after the first measure (fonts, lazy media).
     const ro = new ResizeObserver(onResize);
     ro.observe(document.body);
 

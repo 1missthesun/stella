@@ -4,7 +4,6 @@ import { windowThemeStyle } from "../window-theme";
 import { CHAT, type SkinProps } from "./content";
 import { F } from "./kit";
 
-/** What the small-changes ladder edits, in the order the asks add it. */
 export type Tweaks = { accent?: boolean; paper?: boolean; serif?: boolean; letter?: boolean };
 
 const TANGERINE = "#e19b6e";
@@ -57,7 +56,6 @@ function Lights({ s }: { s: number }) {
   );
 }
 
-/** Stella's window, drawn at the given size: top bar, the conversation, the composer. */
 export function ChatWindow({
   w,
   h,
@@ -199,7 +197,6 @@ export function ChatWindow({
   );
 }
 
-/** The type scale a full-frame window uses at each design size. */
 export const designScale = (w: number, h: number) => (h > w ? 1.42 : 1.22);
 
 const sameSize = (a: SkinProps, b: SkinProps) => a.w === b.w && a.h === b.h;

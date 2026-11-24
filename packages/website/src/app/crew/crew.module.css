@@ -1,8 +1,3 @@
-/* Crew settings (stella.sh/crew). A settings surface: a slim title row, the
- * workspace, then sections separated by hairlines with a sticky section list
- * beside them. Headings use two classes so they beat landing.module.css's
- * `.root :where(h1, …) { font-weight: inherit }`. */
-
 .root {
   --ink: #0a0a0d;
   --text: #2a2a31;

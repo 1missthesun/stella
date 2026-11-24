@@ -121,7 +121,6 @@ export function reportGoogleAdsSignup() {
     if (window.localStorage.getItem(SIGNUP_REPORTED_KEY)) return;
     window.localStorage.setItem(SIGNUP_REPORTED_KEY, String(Date.now()));
   } catch {
-    // Storage blocked — still report; Google dedupes per ad click server-side.
   }
 
   gtagSafe("event", "conversion", {

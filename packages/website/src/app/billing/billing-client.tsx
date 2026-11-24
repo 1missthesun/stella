@@ -37,7 +37,6 @@ const whenLabel = (at: number, now: number): string => {
 const resetLabel = (at: number | undefined, now: number): string =>
   typeof at === "number" && at > 0 ? `Resets ${whenLabel(at, now)}` : "";
 
-// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
 const usedPercent = (used: number, limit: number): string => {
   if (!Number.isFinite(limit) || limit <= 0 || !(used > 0)) return "0%";
   if (used >= limit) return "100%";
@@ -54,9 +53,7 @@ const pct = (used: number, limit: number) =>
 const errorText = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
-// A synthesized anchor opens Stripe once: window.open with noopener returns
-// null even on success, which used to open it twice. In the desktop web view
-// the click is routed to the system browser.
+// window.open with noopener returns null even on success, so a failed open can't be detected.
 const openExternal = (url: string) => {
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -388,7 +385,6 @@ function UsageSection({
   const mainUsed = Math.min(mainLimit, oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd);
   const credit = status.credits.balanceUsd;
   const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
-  // Backends before pricing v3 send no reservation or availability.
   const available: number | null | undefined = usage.availableUsd;
   const blocked = typeof available === "number" && available <= 0.0001;
   const blockingReset = (() => {

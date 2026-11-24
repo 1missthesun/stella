@@ -88,8 +88,6 @@ const handTokenBack = (args: {
   token: string;
 }) => {
   if (args.client === "web") {
-    // Same-origin openers only: a third-party page that opened this route
-    // must never receive a token minted for Stella's site key.
     window.opener?.postMessage(
       { type: "stella-turnstile", token: args.token, state: args.state },
       window.location.origin,

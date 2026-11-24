@@ -1,40 +1,17 @@
-/**
- * A chat with Stella, written as data, for the site's coded replica of the app
- * (components/stella-demo). A guide lists what is said and done; the replica
- * plays it with the app's own timing, indicator, hand-off and scroll.
- *
- *   demo: [
- *     { you: "All my downloads say stalled…" },
- *     { stella: "On it. Checking what's blocking them." },
- *     { task: "Getting your downloads moving", rows: ["Looking at your settings", "Fixing what's blocked"] },
- *     { stella: "All three finished. What was wrong: …", files: ["fixed-list.txt"] },
- *   ]
- *
- * Text may use **bold**, [links](https://…) and lines starting "- " for bullets.
- */
-
 export type DemoCard = {
-  /** Small line over the title, e.g. "Spreadsheet". */
   kind?: string;
   title: string;
-  /** A few short lines shown in the card's body. */
   lines?: string[];
   image?: { src: string; alt: string; width: number; height: number };
 };
 
 export type DemoStep =
-  /** You send this message. */
   | { you: string }
-  /** Stella replies, with files it hands over shown as the app's file pills. */
   | { stella: string; files?: string[] }
-  /** Stella starts a task: its name in the top bar and its steps in the activity list. */
   | { task: string; rows: string[] }
-  /** A result Stella shows under its reply. */
   | { card: DemoCard }
-  /** A short line set above the window from this point on. */
   | { caption: string };
 
-/** The usual guide exchange, from the prompt and what Stella says and does. */
 export function demoFrom({
   prompt,
   ack,
@@ -76,7 +53,6 @@ export function parseInline(text: string): DemoInline[] {
   return parts;
 }
 
-/** Paragraphs and bullet lists, as the app's markdown shows them. */
 export function parseBlocks(text: string): DemoBlock[] {
   const blocks: DemoBlock[] = [];
   for (const line of text.split("\n")) {
@@ -100,7 +76,6 @@ export function parseBlocks(text: string): DemoBlock[] {
   return blocks.filter((block) => block.kind === "ul" || block.parts.length);
 }
 
-/** The exchange as plain markdown, for the page's .md copy and llms files. */
 export function demoText(steps: DemoStep[]): string {
   const lines: string[] = [];
   for (const step of steps) {
@@ -118,7 +93,6 @@ export function demoText(steps: DemoStep[]): string {
   return lines.join("\n").trimEnd();
 }
 
-/** The last thing Stella says, for places that show one line of the answer. */
 export const demoReply = (steps: DemoStep[]) =>
   [...steps].reverse().find((step): step is Extract<DemoStep, { stella: string }> => "stella" in step)?.stella ?? "";
 
@@ -127,7 +101,6 @@ export type ChatItem =
   | { kind: "assistant"; text: string; files?: string[]; step: number }
   | { kind: "card"; card: DemoCard; step: number };
 
-/** The rows the chat shows, in order (tasks live in the top bar, captions outside the window). */
 export function chatItems(steps: DemoStep[]): ChatItem[] {
   const items: ChatItem[] = [];
   steps.forEach((step, i) => {

@@ -37,10 +37,6 @@ const applyTheme = (theme: EmbeddedTheme) => {
     html.style.setProperty("color-scheme", theme.mode);
   }
 
-  // Keep the sessionStorage cache used by `embedded-init-script.tsx`
-  // in sync so the next in-session navigation (e.g. clicking a Store
-  // tab link) restores the latest theme synchronously, not the one
-  // captured on the very first load.
   try {
     const cached: Record<string, string> = {};
     const remember = (key: string, value: string | undefined) => {
@@ -59,8 +55,6 @@ const applyTheme = (theme: EmbeddedTheme) => {
       window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
     }
   } catch {
-    // sessionStorage can throw in private mode; embedded styles still
-    // work via the URL params on the next navigation.
   }
 };
 

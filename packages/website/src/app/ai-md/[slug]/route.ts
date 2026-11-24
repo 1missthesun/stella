@@ -2,7 +2,6 @@ import { renderAnswerMarkdown } from "@/lib/agent-pages";
 import { ANSWER_PAGES, getAnswerPage } from "@/lib/answers";
 import { getSiteUrl } from "@/lib/site-url";
 
-// Served at /ai/<slug>.md through a rewrite in next.config.ts.
 export const dynamic = "force-static";
 export const dynamicParams = false;
 

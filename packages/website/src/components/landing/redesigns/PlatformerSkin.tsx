@@ -2,18 +2,8 @@ import React, { useLayoutEffect, useMemo, useRef } from "react";
 import { CHAT, type SkinProps } from "./content";
 import { F, hash } from "./kit";
 
-/**
- * "Turn yourself into a platformer."
- * A single-screen level drawn into a real low-resolution framebuffer (1 px = 4 screen px):
- * a dithered dusk sky, a setting sun, parallax ranges and hills, grass-capped earth.
- * Each message is a floating platform (Stella's are grassy earth, yours are blue stone),
- * stacked like a climb; the HUD is the top bar; the composer is a tablet set into the ground;
- * Stella, as a pixel hero, runs the lane at the bottom collecting task coins.
- */
+const P = 4;
 
-const P = 4; // screen px per art pixel
-
-// ---- palette (one cohesive dusk ramp)
 const HEX = {
   ink: "#1a1630",
   hud: "#14122a",
@@ -149,7 +139,6 @@ const toMask = (rows: string[]) => rows.map((r) => r.split("").map((c) => c === 
 const HERO_N = 21;
 const HERO_FRAMES = {
   idle: toMask(HERO_ROWS),
-  // squash: lose three rows on landing
   squash: toMask(HERO_ROWS.filter((_, i) => i !== 2 && i !== 18 && i !== 10)),
   stretch: toMask([...HERO_ROWS.slice(0, 3), HERO_ROWS[2], ...HERO_ROWS.slice(3, 10), HERO_ROWS[10], ...HERO_ROWS.slice(10, 18), HERO_ROWS[18], ...HERO_ROWS.slice(18)]),
 };
@@ -157,9 +146,8 @@ const HERO_FRAMES = {
 function drawHero(b: Buf, mask: boolean[][], x0: number, y0: number, blink: boolean, look: number) {
   const n = mask.length;
   const nw = mask[0].length;
-  y0 += HERO_N - n; // keep the feet on the ground whatever the frame
+  y0 += HERO_N - n;
   const at = (x: number, y: number) => x >= 0 && y >= 0 && x < nw && y < n && mask[y][x];
-  // outline first (1px around)
   for (let y = -1; y <= n; y++)
     for (let x = -1; x <= nw; x++) {
       if (at(x, y)) continue;
@@ -174,11 +162,9 @@ function drawHero(b: Buf, mask: boolean[][], x0: number, y0: number, blink: bool
       if (!at(x, y + 1) && x > 3 && x < nw - 3) c = "heroRim";
       b.px(x0 + x, y0 + y, c);
     }
-  // shine
   b.px(x0 + 8, y0 + 3, "white");
   b.px(x0 + 9, y0 + 2, "white");
   b.px(x0 + 3, y0 + 6, "white");
-  // eyes (white pills, 2x4) looking toward travel
   const ey = y0 + Math.round(n * 0.4);
   for (const ex of [x0 + 7 + look, x0 + 12 + look]) {
     if (blink) b.rect(ex, ey + 2, 2, 1, "ink");
@@ -189,7 +175,6 @@ function drawHero(b: Buf, mask: boolean[][], x0: number, y0: number, blink: bool
   }
 }
 
-// ---- coin (4-frame spin)
 const COIN = [
   ["..kkkk..", ".kyyyyk.", "kyYYyyyk", "kyYyyydk", "kyYyyydk", "kyYyyydk", "kyYyyydk", "kyyyyydk", ".kyyddk.", "..kkkk.."],
   ["..kkk...", ".kyYyk..", ".kYyyk..", ".kYydk..", ".kYydk..", ".kYydk..", ".kYydk..", ".kyydk..", ".kyddk..", "..kkk..."],
@@ -198,7 +183,6 @@ const COIN = [
 ];
 const COIN_MAP: Record<string, Col> = { k: "ink", y: "coin", Y: "coinLt", d: "coinDk" };
 
-// ---- snail (original critter)
 const SNAIL = [
   "....kkkk....",
   "...kSSSsk...",
@@ -213,7 +197,6 @@ const SNAIL = [
 ];
 const SNAIL_MAP: Record<string, Col> = { k: "ink", S: "shell", s: "shellLt", K: "dirtDeep", b: "snail" };
 
-// ---- pixel icons for the HUD
 const GEAR = ["..k.k..", ".kkkkk.", "kkk.kkk", ".k...k.", "kkk.kkk", ".kkkkk.", "..k.k.."];
 const PANEL = ["kkkkkkk", "k...k.k", "k...k.k", "k...k.k", "k...k.k", "kkkkkkk"];
 
@@ -237,12 +220,10 @@ function layout(W: number, H: number, tall: boolean) {
   return { hud, ground, plats };
 }
 
-/** Where the hero is at time t: running right along the lane, hopping a snail and a coin arc. */
 function heroAt(t: number, W: number, ground: number) {
-  const speed = 46; // art px per second
+  const speed = 46;
   const span = W + 40;
   const x = ((((t + 1.6) * speed) % span) + span) % span - 20;
-  // a jump every 2.2s (so one lands inside any 2.5s window)
   const ph = (t + 0.75) % 2.2;
   const jumpDur = 0.62;
   let lift = 0;
@@ -252,7 +233,6 @@ function heroAt(t: number, W: number, ground: number) {
     lift = 4 * 25 * u * (1 - u);
     frame = "idle";
   } else {
-    // running: little hops on every stride
     const s = ((t * 5.2) % 1 + 1) % 1;
     lift = Math.abs(Math.sin(s * Math.PI)) * 2.2;
     frame = s < 0.18 ? "squash" : "idle";
@@ -265,7 +245,6 @@ function paint(b: Buf, t: number, tall: boolean) {
     H = b.H;
   const { hud, ground, plats } = layout(W, H, tall);
 
-  // ---- sky: flat bands, dithered only at each seam
   const sky: Col[] = ["sky0", "sky1", "sky2", "sky3", "sky4", "sky5", "sky6", "sky7"];
   const skyTop = hud,
     skyBot = ground - (tall ? 40 : 34);
@@ -278,7 +257,6 @@ function paint(b: Buf, t: number, tall: boolean) {
       b.px(x, y, next ? sky[i + 1] : sky[i]);
     }
   }
-  // a few early stars in the dark top
   for (let i = 0; i < (tall ? 18 : 26); i++) {
     const x = Math.floor(hash(i, 70) * W);
     const y = skyTop + 2 + Math.floor(hash(i, 71) * (tall ? 34 : 26));
@@ -286,14 +264,12 @@ function paint(b: Buf, t: number, tall: boolean) {
     if (tw) b.px(x, y, hash(i, 73) > 0.6 ? "sunRim" : "snow");
   }
 
-  // ---- sun
   const sunX = tall ? 158 : 300,
     sunY = ground - (tall ? 66 : 54),
     sunR = tall ? 22 : 20;
   b.disc(sunX, sunY, sunR + 2, "sunRim");
   b.disc(sunX, sunY, sunR, "sun");
 
-  // ---- clouds (drift)
   const clouds = tall
     ? [
         [30, 214, 26, 0.0],
@@ -318,7 +294,6 @@ function paint(b: Buf, t: number, tall: boolean) {
     for (const [x, y, r] of pts) b.disc(x - 1, y - 1.5, r * 0.82, "cloud", cy);
   });
 
-  // ---- far range (slight parallax drift), lit on the sun side, snowcaps
   const cam = t * 6;
   const range = (x: number) => {
     const X = x + cam * 0.3;
@@ -338,7 +313,6 @@ function paint(b: Buf, t: number, tall: boolean) {
       b.px(x, y, c);
     }
   }
-  // ---- mid hills with trees (more parallax)
   const hillY = (x: number) => {
     const X = x + cam * 0.8;
     return ground - 10 - (Math.sin(X * 0.045) * 6 + Math.sin(X * 0.017 + 2) * 8 + 10);
@@ -355,21 +329,18 @@ function paint(b: Buf, t: number, tall: boolean) {
     const X = ((hash(i, 80) * (W + 40) - cam * 0.8) % (W + 40) + W + 40) % (W + 40) - 20;
     const top = Math.round(hillY(X));
     const th = 7 + Math.floor(hash(i, 81) * 7);
-    // pine: stacked widening rows
     for (let j = 0; j < th; j++) {
       const half = Math.floor((j / th) * 3.4) + (j % 3 === 2 ? 0 : 0);
       for (let k = -half; k <= half; k++) b.px(X + k, top - th + j + 2, k < 0 ? "treeLit" : "tree");
     }
     b.px(X, top + 2, "tree");
   }
-  // nearer hill band
   for (let x = 0; x < W; x++) {
     const X = x + cam * 1.6;
     const top = Math.round(ground - 4 - (Math.sin(X * 0.06 + 1) * 3 + 3));
     for (let y = top; y < ground; y++) b.px(x, y, "hillNear");
   }
 
-  // ---- ground: grass cap with tufts, earth with pebbles
   for (let x = 0; x < W; x++) {
     b.px(x, ground, "grassHi");
     b.rect(x, ground + 1, 1, 2, "grass");
@@ -391,11 +362,9 @@ function paint(b: Buf, t: number, tall: boolean) {
     b.px(x, y + 1, "dirtDk");
   }
 
-  // ---- platforms
   plats.forEach((p, k) => {
     const { x, y, w, h } = p;
     if (p.me) {
-      // blue stone slab: bevelled blocks at the ends, a flat face for the words
       b.rect(x - 1, y - 1, w + 2, h + 2, "ink");
       b.rect(x, y, w, h, "stoneFace");
       b.rect(x, y, w, 2, "stoneLt");
@@ -411,7 +380,6 @@ function paint(b: Buf, t: number, tall: boolean) {
       b.rect(x + 8, y + 2, 1, h - 4, "stoneDk");
       b.rect(x + w - 9, y + 2, 1, h - 4, "stoneLt");
     } else {
-      // earth with a grass cap, dangling roots
       b.rect(x - 1, y - 1, w + 2, h + 2, "ink");
       b.rect(x, y, w, h, "dirt");
       b.rect(x + 3, y + 5, w - 6, h - 8, "dirtDeep");
@@ -425,7 +393,6 @@ function paint(b: Buf, t: number, tall: boolean) {
         if (hash(i, 110 + k) > 0.84) b.px(x + i, y - 1, "grass");
       }
       for (const yy of [y + 6, y + h - 4]) for (const xx of [x + 1, x + w - 2]) b.px(xx, yy, "pebble");
-      // roots / vines swaying one pixel
       for (let r = 0; r < 4; r++) {
         const rx = x + 10 + Math.floor(hash(r, 120 + k) * (w - 20));
         const len = 3 + Math.floor(hash(r, 130 + k) * 5);
@@ -434,7 +401,6 @@ function paint(b: Buf, t: number, tall: boolean) {
           b.px(rx + (j > len - 3 ? sway : 0), y + h + 1 + j, j === len - 1 ? "grass" : "grassDk");
         }
       }
-      // a flower
       const fx = x + w - 14 - k * 3;
       b.px(fx, y - 2, "grassDk");
       b.px(fx, y - 3, k % 2 ? "flower" : "flower2");
@@ -444,7 +410,6 @@ function paint(b: Buf, t: number, tall: boolean) {
     }
   });
 
-  // ---- coins: floating over the lane and on the steps (spinning)
   const coinFrame = (i: number) => COIN[[0, 0, 1, 2, 3, 0][Math.floor(t * 9 + i * 0.7) % 6]];
   const coinsAt: [number, number][] = [
     [128, ground - 40],
@@ -454,7 +419,6 @@ function paint(b: Buf, t: number, tall: boolean) {
     ...(tall ? [] : ([[300, ground - 30], [312, ground - 30]] as [number, number][])),
   ];
   const hero = heroAt(t, W, ground);
-  // a coin the hero has passed through is taken (checked along the path so far) and leaves a brief twinkle
   const takenAt = (cx: number, cy: number) => {
     for (let tt = Math.max(0, t - 3); tt <= t; tt += 1 / 60) {
       const hh = heroAt(tt, W, ground);
@@ -480,15 +444,12 @@ function paint(b: Buf, t: number, tall: boolean) {
     b.sprite(coinFrame(i), cx, cy + Math.round(Math.sin(t * 3 + i) * 1), COIN_MAP);
   });
 
-  // ---- the snail, plodding left on the ground
   const sx = (((150 - t * 6) % (W + 20)) + W + 20) % (W + 20) - 10;
   b.sprite(SNAIL, Math.round(sx), ground - SNAIL.length + 1, SNAIL_MAP);
 
-  // ---- hero
   const blink = (t + 0.3) % 2.8 > 2.65;
   const hx = Math.round(hero.x),
     hy = hero.y;
-  // dust puffs behind the feet while running
   if (!hero.airborne) {
     for (let i = 0; i < 3; i++) {
       const age = ((t * 5.2 + i / 3) % 1 + 1) % 1;
@@ -497,7 +458,6 @@ function paint(b: Buf, t: number, tall: boolean) {
       if (age < 0.8) b.px(dx, dy, age < 0.4 ? "cloud" : "cloudSh");
     }
   } else {
-    // sparkle trail in the air
     for (let i = 1; i < 5; i++) {
       const u = (hero.ph - i * 0.05) / 0.62;
       if (u < 0 || u > 1) continue;
@@ -506,7 +466,6 @@ function paint(b: Buf, t: number, tall: boolean) {
     }
   }
   drawHero(b, HERO_FRAMES[hero.frame], hx, hy, blink, 1);
-  // "+1" popping from the last coin taken
   return { hud, ground, plats, hero };
 }
 
@@ -527,7 +486,6 @@ const PixelCanvas: React.FC<{ t: number; W: number; H: number; tall: boolean }> 
   return <canvas ref={ref} width={W} height={H} style={{ position: "absolute", left: 0, top: 0, width: W * P, height: H * P, imageRendering: "pixelated" }} />;
 };
 
-/** Tiny pixel sprite as an SVG (for HUD icons that sit over DOM). */
 const PixSvg: React.FC<{ rows: string[]; map: Record<string, string>; s: number; style?: React.CSSProperties }> = ({ rows, map, s, style }) => (
   <svg width={rows[0].length * s} height={rows.length * s} shapeRendering="crispEdges" style={style}>
     {rows.flatMap((r, y) =>
@@ -552,7 +510,6 @@ export const PlatformerSkin: React.FC<SkinProps> = ({ t, w, h }) => {
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h, overflow: "hidden", background: HEX.sky0 }}>
       <PixelCanvas t={t} W={W} H={H} tall={tall} />
 
-      {/* HUD = the top bar */}
       <div style={{ position: "absolute", left: 0, top: 0, width: w, height: hud * P, background: HEX.hud, borderBottom: `${P}px solid ${HEX.ink}`, boxShadow: `inset 0 -${P}px 0 ${HEX.hudHi}` }}>
         <div style={{ position: "absolute", left: 22, top: 0, height: hud * P - P, display: "flex", alignItems: "center", gap: 10 }}>
           {[HEX.red, HEX.amber, HEX.green].map((c, i) => (
@@ -576,7 +533,6 @@ export const PlatformerSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </div>
       </div>
 
-      {/* stamp as the level banner */}
       <div
         style={{
           position: "absolute",
@@ -595,7 +551,6 @@ export const PlatformerSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         {CHAT.stamp.toUpperCase()}
       </div>
 
-      {/* words on the platforms */}
       {plats.map((p, i) => (
         <div
           key={i}
@@ -621,7 +576,6 @@ export const PlatformerSkin: React.FC<SkinProps> = ({ t, w, h }) => {
         </div>
       ))}
 
-      {/* composer: a tablet set into the ground */}
       {(() => {
         const cx = (tall ? 6 : 20) * P;
         const cy = (ground + 7) * P;

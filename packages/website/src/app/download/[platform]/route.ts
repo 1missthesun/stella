@@ -4,7 +4,6 @@ import { RELEASE_ASSETS } from "@/lib/downloads";
 
 const ASSETS: Record<string, string> = {
   ...RELEASE_ASSETS,
-  // One universal launcher covers Apple silicon and Intel.
   mac: RELEASE_ASSETS["mac-arm64"],
   macos: RELEASE_ASSETS["mac-arm64"],
   win: RELEASE_ASSETS.windows,

@@ -1,8 +1,6 @@
 .hero {
   --h: max(100svh, 680px);
   --hero-top: clamp(92px, 14.5svh, 170px);
-  /* Height-capped so the subtitle and button clear the window that peeks up
-     from the next section on short laptop screens. */
   --title: clamp(44px, min(10.8vw, 15.4svh), 200px);
   --cta-gap: clamp(30px, 5svh, 56px);
   --cta-h: 64px;
@@ -11,8 +9,6 @@
   overflow: hidden;
 }
 
-/* One canvas draws both the light and the dark aurora (the shader eases uDark on scene
-   change); the fade-out edge eases between the two looks' masks on the same curve. */
 @property --aurora-solid {
   syntax: "<percentage>";
   inherits: false;
@@ -204,9 +200,6 @@
     flex-direction: column;
   }
 
-  /* The copy is in flow here and the mascot takes whatever height is left
-     under it, so a wrapped subtitle or the phone's extra line never pushes
-     the mascot over the button. */
   .copy {
     position: relative;
     inset: auto;

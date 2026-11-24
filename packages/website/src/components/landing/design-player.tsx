@@ -9,7 +9,6 @@ type Redesigns = typeof import("./redesigns");
 
 type Step = { look: string; ask: string; hold: number };
 
-/** Small tweaks, then new abilities, then whole redesigns: each ask is sent, then the window changes under it. */
 const STEPS: Step[] = [
   { look: "tangerine", ask: "Make your accent tangerine.", hold: 700 },
   { look: "paper", ask: "Light mode. Warm, like paper.", hold: 700 },
@@ -29,7 +28,6 @@ const STEPS: Step[] = [
 ];
 
 const SWAP_MS = 900;
-/** The ask is sent from the composer and rises to the window's corner; the swap starts as it settles. */
 const SEND_MS = 1100;
 const LEAD_MS = SEND_MS - 50;
 const durOf = (step: Step) => LEAD_MS + SWAP_MS + step.hold;
@@ -41,7 +39,6 @@ type Layout = keyof typeof DESIGN;
 let modulePromise: Promise<Redesigns> | null = null;
 const loadRedesigns = () => (modulePromise ??= import("./redesigns"));
 
-/** Skin time, published once per drawn frame so only the live skin re-renders. */
 function createClock() {
   let t = SKIN_T0;
   const subs = new Set<() => void>();
@@ -83,7 +80,6 @@ const useReducedMotion = () => useSyncExternalStore(subscribeReduced, prefersRed
 
 const NO_CLOCK = { subscribe: () => () => {}, get: () => 0 };
 
-/** One look in the frame. A drawn skin follows the clock while it's the look in focus, else holds `still`. */
 function LookLayer({ look, layout, clock, still }: { look: Look; layout: Layout; clock: Clock | null; still: number }) {
   const source = clock && look.kind === "drawn" ? clock : NO_CLOCK;
   const live = useSyncExternalStore(source.subscribe, source.get, source.get);
@@ -100,7 +96,6 @@ function LookLayer({ look, layout, clock, still }: { look: Look; layout: Layout;
   );
 }
 
-/** The user's message, shrunk to its longest line the way a chat bubble hugs wrapped text. */
 function Bubble({ text, leaving = false, follows = false }: { text: string; leaving?: boolean; follows?: boolean }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useLayoutEffect(() => {
@@ -123,19 +118,13 @@ function Bubble({ text, leaving = false, follows = false }: { text: string; leav
   );
 }
 
-/** A look mounted in the frame; `id` keeps its DOM across pre-mount, focus and blur-out. */
 type Layer = { id: number; look: number; still: number };
 
 type View = {
-  /** The ask on screen; -1 before the first one. */
   step: number;
-  /** The ask leaving as the next is said. */
   prevStep: number | null;
-  /** The look in focus: a STEPS index, or -1 for Stella as it ships. */
   shown: Layer;
-  /** The look blurring out during a swap. */
   leaving: Layer | null;
-  /** The next look, mounted hidden just before its swap so the swap itself does no work. */
   pending: Layer | null;
   nextId: number;
 };
@@ -143,12 +132,6 @@ type View = {
 const IDLE: View = { step: -1, prevStep: null, shown: { id: 0, look: -1, still: STILL_T }, leaving: null, pending: null, nextId: 1 };
 const PREMOUNT_MS = 380;
 
-/**
- * Asks and the windows they produce, played through on their own: the ask appears as the
- * user's message bubble over the window, then the window takes its new look with the
- * desktop's reload focus pull. One clock drives it, so the pause button and leaving the
- * viewport stop it exactly where it is.
- */
 export function DesignPlayer() {
   const rootRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -178,9 +161,6 @@ export function DesignPlayer() {
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    // Fetch the looks well before the player scrolls in, but only once the page has loaded and the
-    // main thread is idle, so the chunk never competes with the first paint or hydration.
-    // If the player itself scrolls into view first, fetch right away.
     let started = false;
     let cancelIdle = () => {};
     const start = () => {

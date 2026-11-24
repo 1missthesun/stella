@@ -1,17 +1,10 @@
 import type { AnswerPage } from "@/lib/answers";
 
-/**
- * "Use Claude / Gemini for X" and "Best AI for X": short pages for people who just found
- * out AI can do this for them. First screen: headline, the model line, the download button
- * and a coded Stella chat. Below: why doing it through Stella beats a browser chat, and the
- * guides. "Is Stella free?" is added by answers.ts.
- */
 type ModelPage = Omit<AnswerPage, "kind">;
 
 const FREE = "Free with the Claude, Gemini or ChatGPT plan you already have.";
 
 export const MODEL_PAGES_DATA: ModelPage[] = [
-  // ── Claude for … ──────────────────────────────────────────────
   {
     slug: "claude-for-game-modding",
     queries: ["Claude for game modding", "use Claude to mod games", "can Claude install mods", "Claude mod maker", "Claude Skyrim mods"],
@@ -203,7 +196,6 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
       { q: "Does it work on Windows 11?", a: "Yes, Windows 10 and 11, and Mac and Linux too." },
     ],
   },
-  // ── Gemini for … ──────────────────────────────────────────────
   {
     slug: "gemini-for-torrenting",
     queries: ["Gemini for torrenting", "use Gemini to set up qBittorrent", "Gemini qBittorrent", "Gemini torrent client setup"],
@@ -319,7 +311,6 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
       { q: "Which Google plan do I need?", a: "Google AI Pro or Ultra. Sign in with Google in Stella and Gemini is ready." },
     ],
   },
-  // ── Best AI for … ─────────────────────────────────────────────
   {
     slug: "ai-for-game-mods",
     queries: ["best AI for game modding", "AI for modding games", "AI that installs mods", "AI mod manager"],

@@ -735,4 +735,102 @@ export const LOCAL_AI_PAGES: ProblemPage[] = [
     platforms: ["windows", "mac", "linux"],
     lastChecked: "2026-11-24",
   }),
+  shortGuide({
+    slug: "torch-cuda-out-of-memory",
+    niche: "local-ai",
+    searchPhrases: [
+      "torch.cuda.outofmemoryerror: cuda out of memory",
+      "cuda out of memory. tried to allocate",
+      "cuda out of memory pytorch",
+      "cuda out of memory llm",
+      "lora training cuda out of memory",
+    ],
+    title: "torch.cuda.OutOfMemoryError: CUDA out of memory? Make it fit",
+    description:
+      "Model loading, training or chat stopping with CUDA out of memory, tried to allocate? Stella (stella.sh) shrinks the job to fit your graphics card and runs it.",
+    h1: "torch.cuda.OutOfMemoryError: CUDA out of memory",
+    short: "CUDA out of memory (PyTorch, LLMs, training)",
+    lede: "The model or training run finishing on the card you have.",
+    answer:
+      "The job asked your graphics card for more memory than it has left. Stella (stella.sh) frees what other programs hold, then loads a smaller copy of the model or trains in smaller steps so the same work fits.",
+    gets: [
+      "What's eating your card's memory, named",
+      "A 4-bit or 8-bit copy of the model when it helps",
+      "Training settings scaled to your card",
+    ],
+    prompt:
+      "Training a LoRA in kohya stops with torch.cuda.OutOfMemoryError: CUDA out of memory, tried to allocate 2 GB. RTX 3060 12 GB.",
+    demo: {
+      ack: "On it. Seeing what's already using your card.",
+      task: "Fitting LoRA training on 12 GB",
+      rows: ["Browser and Discord hold 1.4 GB", "Batch size 4 is too big", "Turning on memory-saving training options", "Restarting training from your folder"],
+      reply:
+        "Training runs now. Batch size is 1 with gradient checkpointing and 8-bit Adam, which keeps the 3060 under its 12 GB. Your LoRA saves to training/output every epoch as before.",
+    },
+    faq: [
+      ["Why does it say it tried to allocate only a little?", "Earlier steps already filled the card, so even a small extra request fails."],
+      ["Should I run a smaller model instead?", "Often a 4-bit copy of the same model is the better trade. It needs about a quarter of the memory and answers nearly as well."],
+    ],
+    byHand: [
+      "Close other programs using the GPU; check nvidia-smi for leftover Python.",
+      "Lower batch size or context length; turn on gradient checkpointing for training.",
+      "Load models in 4-bit or 8-bit with bitsandbytes, or use a GGUF in llama.cpp or Ollama.",
+    ],
+    related: [
+      "local-ai/comfyui-out-of-memory",
+      "local-ai/best-ollama-model-for-your-pc",
+      "local-ai/cuda-driver-version-is-insufficient",
+    ],
+    platforms: ["windows", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
+    slug: "cuda-driver-version-is-insufficient",
+    niche: "local-ai",
+    searchPhrases: [
+      "cuda driver version is insufficient for cuda runtime version",
+      "cuda driver version is insufficient",
+      "cuda driver version is insufficient for cuda runtime version windows",
+      "cuda driver version is insufficient for cuda runtime version docker",
+      "wsl cuda driver version is insufficient for cuda runtime version",
+    ],
+    title: "CUDA driver version is insufficient for CUDA runtime version",
+    description:
+      "AI app saying CUDA driver version is insufficient for CUDA runtime version? Stella (stella.sh) updates your NVIDIA driver or fits the app to it, then runs it.",
+    h1: "CUDA driver version is insufficient for CUDA runtime version",
+    short: "CUDA driver version is insufficient",
+    lede: "Your AI app on the graphics card again, without the version error.",
+    answer:
+      "Your AI app was built for a newer CUDA than your NVIDIA driver supports. Stella (stella.sh) compares the two, updates the driver when that's simplest, or installs the app's build that fits the driver you have.",
+    gets: [
+      "Your driver and the app's CUDA version compared",
+      "A newer NVIDIA driver, or an app build that fits",
+      "The same fix applied inside WSL or Docker",
+    ],
+    prompt:
+      "Whisper says CUDA driver version is insufficient for CUDA runtime version on my RTX 3070 laptop. Get it using the GPU.",
+    demo: {
+      ack: "On it. Comparing your driver with what Whisper needs.",
+      task: "Fixing the CUDA version error",
+      rows: ["Your driver is from early 2024", "Whisper's PyTorch wants a newer CUDA", "Installing the current NVIDIA Studio driver", "Running a short test file"],
+      reply:
+        "Your laptop's driver was older than the CUDA in Whisper's PyTorch. The current NVIDIA Studio driver is in and Whisper now transcribes on the RTX 3070 instead of failing at start.",
+    },
+    faq: [
+      ["How do I check my CUDA driver version?", "Open a command window and run nvidia-smi. The top right shows the newest CUDA version your driver supports."],
+      ["Does this happen in Docker or WSL too?", "Yes. Both borrow the Windows or host driver, so updating that driver is usually the whole fix."],
+    ],
+    byHand: [
+      "Run nvidia-smi and note the CUDA Version it shows.",
+      "Update the driver from [nvidia.com/drivers](https://www.nvidia.com/drivers), or the NVIDIA App.",
+      "Or reinstall PyTorch built for an older CUDA from the selector on pytorch.org.",
+    ],
+    related: [
+      "local-ai/torch-not-compiled-with-cuda-enabled",
+      "local-ai/torch-cuda-out-of-memory",
+      "local-ai/comfyui-python-version",
+    ],
+    platforms: ["windows", "linux"],
+    lastChecked: "2026-11-24",
+  }),
 ];

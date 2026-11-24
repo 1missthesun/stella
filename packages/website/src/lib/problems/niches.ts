@@ -290,14 +290,90 @@ export const NICHES: Niche[] = [
     ],
   },
   {
-    slug: "pc-cleanup",
-    name: "PC cleanup",
-    h1: "Get your space back, safely.",
-    title: "PC cleanup: free up disk space and tidy folders",
+    slug: "etsy-cricut",
+    recommended: "claude",
+    name: "Etsy and Cricut",
+    h1: "Files ready for your shop and your Cricut.",
+    title: "Etsy and Cricut made easy: SVGs, printables, mockups and listings",
     description:
-      "Sort a messy Downloads folder, find what's taking up space, delete empty folders and clear duplicates on Windows or Mac. Just ask Stella (stella.sh).",
+      "Make SVG cut files, printable packs in every size, mockups and Etsy listings, and get designs ready for Cricut Design Space. Just ask Stella (stella.sh).",
     intro:
-      "Find what's filling your computer and clear it out. Just ask Stella (stella.sh).",
+      "Say what you're selling or cutting. Stella (stella.sh) gets the files ready.",
+    sections: [
+      { title: "Cricut cut files.", slugs: ["make-svg-files-for-cricut",  "convert-png-to-svg-for-cricut",  "cricut-not-uploading-svg"] },
+      { title: "Stickers and sublimation.", slugs: ["make-stickers-with-cricut",  "sublimation-size-chart"] },
+      { title: "Printables and downloads.", slugs: ["printable-wall-art-sizes",  "sell-digital-downloads-on-etsy",  "make-worksheets-to-sell"] },
+      { title: "Your Etsy shop.", slugs: ["etsy-mockups",  "etsy-listing-generator",  "etsy-listing-photo-size",  "etsy-bookkeeping-spreadsheet"] },
+    ],
+  },
+  {
+    slug: "ebooks",
+    recommended: "claude",
+    name: "Kindle and fanfic",
+    h1: "Your library, on your Kindle.",
+    title: "Kindle made easy: fanfic to EPUB, Calibre, covers and reading stats",
+    description:
+      "Save AO3 fanfic as EPUBs with covers, send books to Kindle, tidy a Calibre library and see your reading stats. Just ask Stella (stella.sh).",
+    intro:
+      "Say what you want to read and where. Stella (stella.sh) gets it there, tidy and with covers.",
+    sections: [
+      { title: "Fanfic.", slugs: ["ao3-to-kindle",  "download-all-ao3-bookmarks",  "fanfiction-to-epub",  "make-a-fanfic-cover"] },
+      { title: "Books on your Kindle or Kobo.", slugs: ["send-epub-to-kindle",  "how-to-put-books-on-kobo"] },
+      { title: "A tidy library.", slugs: ["organize-kindle-library",  "organize-calibre-library",  "export-kindle-library-list",  "remove-duplicate-ebooks"] },
+      { title: "Goodreads and StoryGraph.", slugs: ["reading-wrapped",  "goodreads-to-storygraph"] },
+    ],
+  },
+  {
+    slug: "planning",
+    recommended: "claude",
+    name: "Notion and digital planners",
+    h1: "Your planner, set up the way you think.",
+    title: "Digital planning made easy: Notion dashboards, GoodNotes planners",
+    description:
+      "Get a Notion dashboard, a hyperlinked GoodNotes planner or a shared calendar made for how you plan. Just ask Stella (stella.sh).",
+    intro:
+      "Say how you like to plan. Stella (stella.sh) builds the dashboard, planner or calendar.",
+    sections: [
+      { title: "Notion pages.", slugs: ["make-a-notion-dashboard",  "make-an-aesthetic-notion-widget-page",  "make-a-notion-habit-tracker",  "make-a-notion-budget-from-your-bank-statement",  "make-a-notion-reading-list"] },
+      { title: "Moving into Notion.", slugs: ["import-into-notion",  "sync-notion-calendar-with-google-calendar"] },
+      { title: "GoodNotes and digital planners.", slugs: ["make-a-hyperlinked-digital-planner",  "make-a-custom-goodnotes-planner",  "import-a-planner-into-goodnotes"] },
+      { title: "Calendars.", slugs: ["make-a-shared-family-calendar",  "make-a-weekly-planner-from-your-calendar"] },
+    ],
+  },
+  {
+    slug: "music-library",
+    recommended: "claude",
+    name: "Spotify and Apple Music",
+    h1: "Your music, in the app you use.",
+    title: "Music library made easy: Spotify, Apple Music and local files",
+    description:
+      "Move playlists between Spotify, Apple Music and YouTube Music, add local files and unreleased tracks, and tidy your library. Just ask Stella (stella.sh).",
+    intro:
+      "Say which app and which music. Stella (stella.sh) moves it, adds it and tidies it.",
+    sections: [
+      { title: "Switching services.", slugs: ["transfer-spotify-playlists-to-apple-music",  "transfer-apple-music-playlists-to-spotify",  "transfer-spotify-to-youtube-music",  "transfer-itunes-library-to-new-computer"] },
+      { title: "Your own songs.", slugs: ["add-local-files-to-spotify",  "add-your-own-music-to-apple-music"] },
+      { title: "Fixing and building playlists.", slugs: ["fix-greyed-out-songs-on-spotify",  "remove-duplicates-from-spotify-playlist",  "make-spotify-playlist-from-list-of-songs",  "sort-spotify-playlist-by-bpm"] },
+      { title: "Backups and exports.", slugs: ["backup-spotify-playlists",  "export-apple-music-playlist"] },
+    ],
+  },
+  {
+    slug: "pc-cleanup",
+    recommended: "claude",
+    name: "Storage and photo cleanup",
+    h1: "Get your space back, safely.",
+    title: "Free up storage: Mac, Windows, iCloud and Google Photos",
+    description:
+      "Free up space on a Mac, PC, iPhone, iCloud or Google Photos: find what's big, clear duplicates and tidy folders. Just ask Stella (stella.sh).",
+    intro:
+      "Find what's filling your computer, phone or cloud and clear it out. Just ask Stella (stella.sh).",
+    sections: [
+      { title: "Mac running out of space.", slugs: ["free-up-space-on-mac",  "mac-system-data-too-large"] },
+      { title: "Windows and a full C drive.", slugs: ["free-up-space-on-c-drive",  "system-and-reserved-storage-huge",  "onedrive-taking-up-space"] },
+      { title: "Big files, duplicates and old apps.", slugs: ["find-large-files-taking-up-space",  "remove-leftover-files-after-uninstall",  "find-duplicate-files",  "organize-downloads-folder",  "delete-empty-folders"] },
+      { title: "iCloud, Google and phone storage.", slugs: ["icloud-storage-full",  "download-all-photos-from-icloud",  "google-photos-storage-full",  "whatsapp-media-taking-up-space"] },
+      { title: "Photo library cleanup.", slugs: ["delete-duplicate-photos-in-icloud",  "delete-blurry-photos",  "transfer-photos-from-old-laptop"] },
+    ],
   },
   {
     slug: "photos-files",
@@ -393,13 +469,21 @@ export const NICHES: Niche[] = [
   },
   {
     slug: "money-household",
-    name: "Money and household",
-    h1: "Your money files, added up properly.",
-    title: "Money how-tos: budgets, bank files, double charges, mileage",
+    recommended: "claude",
+    name: "Money, subscriptions and inbox",
+    h1: "Your money and inbox, sorted.",
+    title: "Money made easy: budgets, subscriptions, receipts and bill splits",
     description:
-      "Make a budget from bank downloads, find double charges, open OFX and QIF files, total mileage or timesheets, and see your Amazon spending, with Stella (stella.sh).",
+      "Find forgotten subscriptions, unsubscribe in bulk, sort receipts, split bills with friends and build a budget from your bank files. Just ask Stella (stella.sh).",
     intro:
-      "Budgets, receipts, mileage and double charges, worked out for you by Stella (stella.sh) from your own files.",
+      "Bank files, receipts and a busy inbox, sorted by Stella (stella.sh).",
+    sections: [
+      { title: "Subscriptions.", slugs: ["find-subscriptions-in-gmail",  "cancel-forgotten-subscriptions",  "find-duplicate-charges-on-credit-card"] },
+      { title: "Your inbox.", slugs: ["bulk-unsubscribe-from-emails",  "gmail-storage-full",  "email-receipts-to-spreadsheet",  "return-deadline-tracker"] },
+      { title: "Budgets, bills and net worth.", slugs: ["make-a-budget-from-bank-statement",  "bill-due-date-tracker",  "net-worth-spreadsheet",  "find-unclaimed-money",  "how-much-have-i-spent-on-amazon",  "convert-ofx-to-excel"] },
+      { title: "Splitting costs.", slugs: ["splitwise-alternative",  "split-bill-by-item"] },
+      { title: "Taxes and work.", slugs: ["organize-tax-documents",  "mileage-log-for-taxes",  "calculate-hours-worked-from-timesheet"] },
+    ],
   },
   {
     slug: "documents",
@@ -451,13 +535,21 @@ export const NICHES: Niche[] = [
   },
   {
     slug: "study",
-    name: "Study",
-    h1: "Study materials, made from what you have.",
-    title: "Study how-tos: flashcards, study guides, puzzles, timetables",
+    recommended: "claude",
+    name: "College and study",
+    h1: "Coursework, deadlines and revision, handled.",
+    title: "College made easy: syllabus to calendar, Anki, citations, charts",
     description:
-      "Turn notes into Anki cards or a study guide, print flashcards, word searches and crosswords, or build a timetable or reference list. Just ask Stella (stella.sh).",
+      "Put every deadline in your calendar, turn lectures into Anki decks, format APA or MLA, chart lab data and track applications. Just ask Stella (stella.sh).",
     intro:
-      "Flashcards, worksheets, timetables and references made from your own notes by Stella (stella.sh).",
+      "Syllabi, lectures, sources and deadlines, turned into what you need by Stella (stella.sh).",
+    sections: [
+      { title: "Classes and deadlines.", slugs: ["syllabus-to-google-calendar",  "canvas-assignments-to-google-calendar",  "make-a-class-timetable"] },
+      { title: "Lectures, notes and revision.", slugs: ["lecture-recording-to-notes",  "make-a-study-guide-from-notes",  "lecture-slides-to-anki-deck",  "make-anki-flashcards-from-notes",  "print-flashcards-double-sided",  "split-textbook-pdf-into-chapters",  "export-kindle-highlights"] },
+      { title: "Papers, labs and presentations.", slugs: ["format-a-paper-in-apa-7",  "make-a-bibliography-from-a-list-of-sources",  "set-up-zotero-citations-in-word",  "graph-lab-data-in-excel",  "lab-report-statistics-in-r-or-matlab",  "group-project-slides-from-notes"] },
+      { title: "Internships, scholarships and rent.", slugs: ["tailor-resume-for-internship",  "internship-application-tracker",  "find-scholarships-and-track-applications",  "roommate-agreement"] },
+      { title: "Puzzles for the classroom.", slugs: ["make-a-word-search",  "make-a-crossword-puzzle"] },
+    ],
   },
   {
     slug: "printing-labels",
@@ -471,13 +563,20 @@ export const NICHES: Niche[] = [
   },
   {
     slug: "weddings-events",
-    name: "Weddings and events",
-    h1: "Guest lists into headcounts, seating charts and place cards.",
-    title: "Wedding and event how-tos: RSVPs, seating charts, place cards",
+    recommended: "claude",
+    name: "Weddings, trips and events",
+    h1: "Weddings, trips and parties, planned.",
+    title: "Event planning made easy: weddings, trips, parties and guest lists",
     description:
-      "Count RSVPs when guests replied twice, make a seating chart and place cards from your guest list, and number raffle tickets, in Excel or with Stella (stella.sh).",
+      "Plan a wedding, trip or party: guest lists, seating charts, place cards, budgets, vendor quotes and day-by-day itineraries. Just ask Stella (stella.sh).",
     intro:
-      "Guest lists, headcounts and printables, sorted out by Stella (stella.sh) from the list you already have.",
+      "Bring the guest list, the dates or the ideas. Stella (stella.sh) turns them into the plan.",
+    sections: [
+      { title: "Wedding plans and money.", slugs: ["make-wedding-budget-spreadsheet",  "compare-wedding-vendor-quotes",  "wedding-day-timeline"] },
+      { title: "Guests, invitations and seating.", slugs: ["wedding-guest-list-with-addresses",  "address-wedding-invitations",  "count-wedding-rsvps",  "make-wedding-seating-chart",  "make-place-cards-from-guest-list",  "write-wedding-thank-you-notes"] },
+      { title: "Trips.", slugs: ["travel-itinerary-from-booking-emails",  "plan-a-road-trip-with-stops",  "make-a-packing-list-for-a-trip",  "split-group-trip-costs"] },
+      { title: "Parties and showers.", slugs: ["plan-a-bachelorette-party",  "plan-a-kids-birthday-party",  "baby-shower-checklist-and-guest-list",  "make-numbered-raffle-tickets"] },
+    ],
   },
   {
     slug: "reading-writing",

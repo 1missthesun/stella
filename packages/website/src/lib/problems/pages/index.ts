@@ -13,6 +13,10 @@ import { SIDELOADING_PAGES } from "./sideloading";
 import { DOWNLOADS_PAGES } from "./downloads";
 import { PUBLISHING_PAGES } from "./publishing";
 import { PRINTING_3D_PAGES } from "./3d-printing";
+import { ETSY_CRICUT_PAGES } from "./etsy-cricut";
+import { EBOOKS_PAGES } from "./ebooks";
+import { PLANNING_PAGES } from "./planning";
+import { MUSIC_LIBRARY_PAGES } from "./music-library";
 import { DOCUMENT_PAGES } from "./documents";
 import { EMULATION_PAGES } from "./emulation";
 import { FILES_FOLDERS_PAGES } from "./files-folders";
@@ -55,6 +59,10 @@ export const ALL_PROBLEM_PAGES: ProblemPage[] = [
   ...DOWNLOADS_PAGES,
   ...PUBLISHING_PAGES,
   ...PRINTING_3D_PAGES,
+  ...ETSY_CRICUT_PAGES,
+  ...EBOOKS_PAGES,
+  ...PLANNING_PAGES,
+  ...MUSIC_LIBRARY_PAGES,
   ...FILES_FOLDERS_PAGES,
   ...CONTACTS_CALENDAR_EMAIL_PAGES,
   ...STUDY_PAGES,

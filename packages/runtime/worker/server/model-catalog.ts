@@ -1,5 +1,8 @@
 import { Context, Effect, Layer } from "effect";
-import type { RuntimeModelCatalogSnapshot } from "@stella/contracts/model-catalog";
+import type {
+  RuntimeModelCatalogRow,
+  RuntimeModelCatalogSnapshot,
+} from "@stella/contracts/model-catalog";
 import { NOTIFICATION_NAMES } from "@stella/contracts/protocol";
 import type { ModelRuntimeSnapshot } from "../../kernel/model-runtime.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
@@ -15,20 +18,26 @@ import type { RuntimeRunner } from "./types.js";
 export const toCatalogWire = ({
   models,
   ...rest
-}: ModelRuntimeSnapshot): RuntimeModelCatalogSnapshot => ({
-  ...rest,
-  models: models.map((model) => ({
-    id: model.id,
-    name: model.name,
-    provider: model.provider,
-    api: model.api,
-    baseUrl: model.baseUrl,
-    reasoning: model.reasoning,
-    input: model.input,
-    contextWindow: model.contextWindow,
-    maxTokens: model.maxTokens,
-  })),
-});
+}: ModelRuntimeSnapshot): RuntimeModelCatalogSnapshot => {
+  const modelsByProvider: Record<string, RuntimeModelCatalogRow[]> = {};
+  for (const model of models) {
+    if (model.api === "stella" || model.provider === "stella") continue;
+    const flags =
+      (model.reasoning ? 1 : 0) | (model.input.includes("image") ? 2 : 0);
+    const list = (modelsByProvider[model.provider] ??= []);
+    list.push([
+      model.id,
+      model.name && model.name !== model.id ? model.name : 0,
+      model.contextWindow,
+      model.maxTokens,
+      flags,
+    ]);
+  }
+  return {
+    ...rest,
+    modelsByProvider,
+  };
+};
 
 export interface Interface {
   readonly ensureSubscription: () => Promise<

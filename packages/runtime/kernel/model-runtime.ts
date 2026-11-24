@@ -11,6 +11,7 @@ import {
 } from "@stella/contracts/provider-live-models";
 import {
   ModelConfig,
+  ensureModelConfigValidator,
   getRemoteCatalogModelValidationErrors,
   isRemoteCatalogModel,
   isModelConfigValueConfigured,
@@ -172,14 +173,18 @@ const jsonEqual = (a: unknown, b: unknown): boolean => {
   );
 };
 
-const validateRemoteCatalogEntries = (
+const validateRemoteCatalogEntries = async (
   providerId: string,
   entries: readonly unknown[],
-): {
+): Promise<{
   models: Model<Api>[];
   validCount: number;
   invalidCount: number;
-} => {
+}> => {
+  if (entries.length === 0) {
+    return { models: [], validCount: 0, invalidCount: 0 };
+  }
+  await ensureModelConfigValidator();
   const models: Model<Api>[] = [];
   let invalidCount = 0;
   for (const [index, entry] of entries.entries()) {
@@ -413,7 +418,7 @@ export class ModelRuntime {
     this.catalogBaseUrl = options.catalogBaseUrl ?? DEFAULT_CATALOG_BASE_URL;
     this.catalogRequestTimeoutMs =
       options.catalogRequestTimeoutMs ?? REMOTE_CATALOG_TIMEOUT_MS;
-    this.readStoredCatalogs();
+    await this.readStoredCatalogs();
     this.readLiveCatalogs();
     await this.reloadConfig();
     await this.refresh({ allowNetwork: options.allowNetwork ?? true });
@@ -422,7 +427,7 @@ export class ModelRuntime {
     }
   }
 
-  private readStoredCatalogs(): void {
+  private async readStoredCatalogs(): Promise<void> {
     if (!this.storePath) return;
     try {
       const parsed = JSON.parse(
@@ -432,7 +437,7 @@ export class ModelRuntime {
         if (isRetiredAssistantProvider(providerId)) continue;
         if (!entry || !Array.isArray(entry.models)) continue;
         this.storedCatalogs.set(providerId, structuredClone(entry));
-        const validation = validateRemoteCatalogEntries(
+        const validation = await validateRemoteCatalogEntries(
           providerId,
           entry.models,
         );
@@ -817,7 +822,7 @@ export class ModelRuntime {
     if (!Array.isArray(entries)) {
       throw new Error(`Invalid model catalog for ${providerId}`);
     }
-    const validation = validateRemoteCatalogEntries(providerId, entries);
+    const validation = await validateRemoteCatalogEntries(providerId, entries);
     if (entries.length > 0 && validation.validCount === 0) {
       throw new Error(
         `Invalid model catalog for ${providerId}: non-empty payload contained ${validation.invalidCount} invalid ${validation.invalidCount === 1 ? "entry" : "entries"} and no valid entries`,

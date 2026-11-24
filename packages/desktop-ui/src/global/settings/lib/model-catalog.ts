@@ -1,7 +1,8 @@
 import type { Api, Model } from "@stella/contracts/model-catalog";
-import type {
-  RuntimeModelCatalogModel,
-  RuntimeModelCatalogSnapshot,
+import {
+  expandRuntimeModelCatalogModels,
+  type RuntimeModelCatalogModel,
+  type RuntimeModelCatalogSnapshot,
 } from "@stella/contracts/model-catalog";
 import { getProviderDisplayName } from "@stella/contracts/provider-display";
 import { LOCAL_MODEL_PROVIDER_KEYS } from "./llm-providers";
@@ -169,7 +170,7 @@ export function normalizeRuntimeCatalogSnapshot(
   return {
     revision: snapshot?.revision ?? 0,
     directModels: normalizeRuntimeCatalogModels(
-      snapshot?.models ?? [],
+      expandRuntimeModelCatalogModels(snapshot),
       snapshot?.runtimeManagedProviders ?? [],
     ),
     configError: snapshot?.configError,

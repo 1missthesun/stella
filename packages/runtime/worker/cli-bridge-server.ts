@@ -1,5 +1,4 @@
 import { constants as fsConstants, promises as fsPromises } from "node:fs";
-import { z } from "zod";
 import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { forkDelayed } from "./effect-runtime.js";
@@ -148,70 +147,272 @@ export type CliBridgeServer = {
   stop: () => Promise<void>;
 };
 
-const runBackendActionParamsSchema = z.strictObject({
-  connectorId: z.string().trim().toLowerCase().min(1),
-  action: z.string().trim().min(1),
-  input: z.record(z.string(), z.unknown()),
-  requestId: z.string().trim().min(1).optional().catch(undefined),
-  account: z.string().trim().min(1).max(320).optional(),
-});
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-const listBackendActionsParamsSchema = z.strictObject({
-  connectorId: z.string().trim().toLowerCase().min(1),
-  action: z.string().trim().min(1).optional(),
-  query: z.string().trim().min(1).optional(),
-  cursor: z.string().trim().min(1).max(256).optional(),
-  limit: z.number().int().min(1).max(100).optional(),
-});
+const hasUnrecognizedKeys = (
+  record: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+): boolean => {
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) return true;
+  }
+  return false;
+};
 
-const requestPermissionParamsSchema = z.object({
-  kind: z.enum(["accessibility", "screen"]),
-});
+const parseTrimmedString = (
+  value: unknown,
+  options?: { min?: number; max?: number; lower?: boolean },
+): string | null => {
+  if (typeof value !== "string") return null;
+  let out = value.trim();
+  if (options?.lower) out = out.toLowerCase();
+  if (options?.min !== undefined && out.length < options.min) return null;
+  if (options?.max !== undefined && out.length > options.max) return null;
+  return out;
+};
 
-const spawnAutomationDaemonParamsSchema = z.object({
-  daemonSocketPath: z.string().min(1),
-  pidPath: z.string().min(1),
-  logPath: z.string().min(1),
-  sessionId: z.string().min(1),
-  stateDir: z.string().min(1),
-  env: z.unknown().optional(),
-});
+const parseOptionalTrimmedString = (
+  value: unknown,
+  options?: { min?: number; max?: number; lower?: boolean },
+): { ok: true; value: string | undefined } | { ok: false } => {
+  if (value === undefined) return { ok: true, value: undefined };
+  const parsed = parseTrimmedString(value, options);
+  return parsed === null ? { ok: false } : { ok: true, value: parsed };
+};
 
-const mediaRequestParamsSchema = z.discriminatedUnion("op", [
-  z.strictObject({
-    op: z.literal("models"),
-    deviceId: z.string().trim().min(1).max(128).optional(),
-  }),
-  z.strictObject({
-    op: z.literal("job"),
-    jobId: z.string().trim().min(1).max(256),
-    deviceId: z.string().trim().min(1).max(128).optional(),
-  }),
-  z.strictObject({
-    op: z.literal("generate"),
-    request: z.string().min(2),
-    idempotencyKey: z.string().trim().min(1).max(256).optional(),
-    deviceId: z.string().trim().min(1).max(128).optional(),
-  }),
+const RUN_BACKEND_ACTION_KEYS = new Set([
+  "connectorId",
+  "action",
+  "input",
+  "requestId",
+  "account",
 ]);
 
-const xApiRequestParamsSchema = z.discriminatedUnion("op", [
-  z.strictObject({ op: z.literal("connectUrl") }),
-  z.strictObject({ op: z.literal("finishConnect"), connectCode: z.string().trim().min(1).max(64) }),
-  z.strictObject({ op: z.literal("connections") }),
-  z.strictObject({
-    op: z.literal("request"),
-    path: z.string().trim().min(1).max(2048),
-    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
-    query: z.record(z.string(), z.unknown()).optional(),
-    body: z.unknown().optional(),
-  }),
+const parseRunBackendActionParams = (
+  params: unknown,
+):
+  | {
+      ok: true;
+      data: {
+        connectorId: string;
+        action: string;
+        input: Record<string, unknown>;
+        requestId?: string;
+        account?: string;
+      };
+    }
+  | { ok: false; unrecognizedKeys?: boolean } => {
+  if (!isPlainRecord(params)) return { ok: false };
+  if (hasUnrecognizedKeys(params, RUN_BACKEND_ACTION_KEYS)) {
+    return { ok: false, unrecognizedKeys: true };
+  }
+  const connectorId = parseTrimmedString(params.connectorId, { min: 1, lower: true });
+  const action = parseTrimmedString(params.action, { min: 1 });
+  if (!connectorId || !action || !isPlainRecord(params.input)) return { ok: false };
+  const account = parseOptionalTrimmedString(params.account, { min: 1, max: 320 });
+  if (!account.ok) return { ok: false };
+  const requestId = parseTrimmedString(params.requestId, { min: 1 }) ?? undefined;
+  return {
+    ok: true,
+    data: {
+      connectorId,
+      action,
+      input: params.input,
+      ...(requestId !== undefined ? { requestId } : {}),
+      ...(account.value !== undefined ? { account: account.value } : {}),
+    },
+  };
+};
+
+const LIST_BACKEND_ACTIONS_KEYS = new Set([
+  "connectorId",
+  "action",
+  "query",
+  "cursor",
+  "limit",
 ]);
 
-const accountMcpParamsSchema = z.strictObject({
-  op: z.enum(ACCOUNT_MCP_OPS),
-  args: z.record(z.string(), z.unknown()),
-});
+const parseListBackendActionsParams = (
+  params: unknown,
+): {
+  connectorId: string;
+  action?: string;
+  query?: string;
+  cursor?: string;
+  limit?: number;
+} | null => {
+  if (!isPlainRecord(params) || hasUnrecognizedKeys(params, LIST_BACKEND_ACTIONS_KEYS)) {
+    return null;
+  }
+  const connectorId = parseTrimmedString(params.connectorId, { min: 1, lower: true });
+  if (!connectorId) return null;
+  const action = parseOptionalTrimmedString(params.action, { min: 1 });
+  const query = parseOptionalTrimmedString(params.query, { min: 1 });
+  const cursor = parseOptionalTrimmedString(params.cursor, { min: 1, max: 256 });
+  if (!action.ok || !query.ok || !cursor.ok) return null;
+  let limit: number | undefined;
+  if (params.limit !== undefined) {
+    if (
+      typeof params.limit !== "number" ||
+      !Number.isInteger(params.limit) ||
+      params.limit < 1 ||
+      params.limit > 100
+    ) {
+      return null;
+    }
+    limit = params.limit;
+  }
+  return {
+    connectorId,
+    ...(action.value !== undefined ? { action: action.value } : {}),
+    ...(query.value !== undefined ? { query: query.value } : {}),
+    ...(cursor.value !== undefined ? { cursor: cursor.value } : {}),
+    ...(limit !== undefined ? { limit } : {}),
+  };
+};
+
+const parseRequestPermissionParams = (
+  params: unknown,
+): { kind: "accessibility" | "screen" } | null => {
+  if (!isPlainRecord(params)) return null;
+  if (params.kind !== "accessibility" && params.kind !== "screen") return null;
+  return { kind: params.kind };
+};
+
+const parseSpawnAutomationDaemonParams = (
+  params: unknown,
+): {
+  daemonSocketPath: string;
+  pidPath: string;
+  logPath: string;
+  sessionId: string;
+  stateDir: string;
+  env?: unknown;
+} | null => {
+  if (!isPlainRecord(params)) return null;
+  const nonEmpty = (value: unknown): string | null =>
+    typeof value === "string" && value.length >= 1 ? value : null;
+  const daemonSocketPath = nonEmpty(params.daemonSocketPath);
+  const pidPath = nonEmpty(params.pidPath);
+  const logPath = nonEmpty(params.logPath);
+  const sessionId = nonEmpty(params.sessionId);
+  const stateDir = nonEmpty(params.stateDir);
+  if (!daemonSocketPath || !pidPath || !logPath || !sessionId || !stateDir) {
+    return null;
+  }
+  return {
+    daemonSocketPath,
+    pidPath,
+    logPath,
+    sessionId,
+    stateDir,
+    ...(params.env !== undefined ? { env: params.env } : {}),
+  };
+};
+
+const MEDIA_MODELS_KEYS = new Set(["op", "deviceId"]);
+const MEDIA_JOB_KEYS = new Set(["op", "jobId", "deviceId"]);
+const MEDIA_GENERATE_KEYS = new Set(["op", "request", "idempotencyKey", "deviceId"]);
+
+const parseMediaRequestParams = (
+  params: unknown,
+): (MediaOperation & { deviceId?: string }) | null => {
+  if (!isPlainRecord(params)) return null;
+  const deviceId = parseOptionalTrimmedString(params.deviceId, { min: 1, max: 128 });
+  if (!deviceId.ok) return null;
+  if (params.op === "models") {
+    if (hasUnrecognizedKeys(params, MEDIA_MODELS_KEYS)) return null;
+    return {
+      op: "models",
+      ...(deviceId.value !== undefined ? { deviceId: deviceId.value } : {}),
+    };
+  }
+  if (params.op === "job") {
+    if (hasUnrecognizedKeys(params, MEDIA_JOB_KEYS)) return null;
+    const jobId = parseTrimmedString(params.jobId, { min: 1, max: 256 });
+    if (!jobId) return null;
+    return {
+      op: "job",
+      jobId,
+      ...(deviceId.value !== undefined ? { deviceId: deviceId.value } : {}),
+    };
+  }
+  if (params.op === "generate") {
+    if (hasUnrecognizedKeys(params, MEDIA_GENERATE_KEYS)) return null;
+    if (typeof params.request !== "string" || params.request.length < 2) return null;
+    const idempotencyKey = parseOptionalTrimmedString(params.idempotencyKey, {
+      min: 1,
+      max: 256,
+    });
+    if (!idempotencyKey.ok) return null;
+    return {
+      op: "generate",
+      request: params.request,
+      ...(idempotencyKey.value !== undefined
+        ? { idempotencyKey: idempotencyKey.value }
+        : {}),
+      ...(deviceId.value !== undefined ? { deviceId: deviceId.value } : {}),
+    };
+  }
+  return null;
+};
+
+const X_CONNECT_URL_KEYS = new Set(["op"]);
+const X_FINISH_CONNECT_KEYS = new Set(["op", "connectCode"]);
+const X_REQUEST_KEYS = new Set(["op", "path", "method", "query", "body"]);
+const X_HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+
+const parseXApiRequestParams = (params: unknown): XApiOperation | null => {
+  if (!isPlainRecord(params)) return null;
+  if (params.op === "connectUrl") {
+    return hasUnrecognizedKeys(params, X_CONNECT_URL_KEYS) ? null : { op: "connectUrl" };
+  }
+  if (params.op === "connections") {
+    return hasUnrecognizedKeys(params, X_CONNECT_URL_KEYS) ? null : { op: "connections" };
+  }
+  if (params.op === "finishConnect") {
+    if (hasUnrecognizedKeys(params, X_FINISH_CONNECT_KEYS)) return null;
+    const connectCode = parseTrimmedString(params.connectCode, { min: 1, max: 64 });
+    return connectCode ? { op: "finishConnect", connectCode } : null;
+  }
+  if (params.op === "request") {
+    if (hasUnrecognizedKeys(params, X_REQUEST_KEYS)) return null;
+    const reqPath = parseTrimmedString(params.path, { min: 1, max: 2048 });
+    if (!reqPath) return null;
+    let method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | undefined;
+    if (params.method !== undefined) {
+      if (typeof params.method !== "string" || !X_HTTP_METHODS.has(params.method)) {
+        return null;
+      }
+      method = params.method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    }
+    if (params.query !== undefined && !isPlainRecord(params.query)) return null;
+    return {
+      op: "request",
+      path: reqPath,
+      ...(method !== undefined ? { method } : {}),
+      ...(params.query !== undefined ? { query: params.query } : {}),
+      ...(params.body !== undefined ? { body: params.body } : {}),
+    };
+  }
+  return null;
+};
+
+const ACCOUNT_MCP_KEYS = new Set(["op", "args"]);
+const ACCOUNT_MCP_OP_SET = new Set<string>(ACCOUNT_MCP_OPS);
+
+const parseAccountMcpParams = (params: unknown): AccountMcpOperation | null => {
+  if (!isPlainRecord(params) || hasUnrecognizedKeys(params, ACCOUNT_MCP_KEYS)) {
+    return null;
+  }
+  if (typeof params.op !== "string" || !ACCOUNT_MCP_OP_SET.has(params.op)) return null;
+  if (!isPlainRecord(params.args)) return null;
+  return {
+    op: params.op as AccountMcpOperation["op"],
+    args: params.args,
+  };
+};
 
 const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
@@ -327,13 +528,9 @@ const dispatch = async (
       if (!handlers.runBackendConnectorAction) {
         return { ok: false, reason: "unsupported" };
       }
-      const parsed = runBackendActionParamsSchema.safeParse(params);
-      if (!parsed.success) {
-        if (
-          parsed.error.issues.some(
-            (issue) => issue.code === "unrecognized_keys",
-          )
-        ) {
+      const parsed = parseRunBackendActionParams(params);
+      if (!parsed.ok) {
+        if (parsed.unrecognizedKeys) {
           throw new Error(
             "connector.runBackendAction: arbitrary transport fields are not allowed",
           );
@@ -362,13 +559,13 @@ const dispatch = async (
       if (!handlers.listBackendConnectorActions) {
         return { ok: false, reason: "unsupported" };
       }
-      const parsed = listBackendActionsParamsSchema.safeParse(params);
-      if (!parsed.success) {
+      const parsed = parseListBackendActionsParams(params);
+      if (!parsed) {
         throw new Error(
           "connector.listBackendActions: connectorId and valid optional filters are required",
         );
       }
-      const { connectorId, action, query, cursor, limit } = parsed.data;
+      const { connectorId, action, query, cursor, limit } = parsed;
       return await handlers.listBackendConnectorActions({
         connectorId,
         ...(action ? { action } : {}),
@@ -382,30 +579,29 @@ const dispatch = async (
       if (!handlers.requestDesktopPermission) {
         return { ok: false, reason: "unsupported" };
       }
-      const parsed = requestPermissionParamsSchema.safeParse(params);
-      if (!parsed.success) {
+      const parsed = parseRequestPermissionParams(params);
+      if (!parsed) {
         throw new Error(
           "system.requestPermission: unsupported permission kind",
         );
       }
-      return await handlers.requestDesktopPermission(parsed.data);
+      return await handlers.requestDesktopPermission(parsed);
     }
     case "computerUse.spawnAutomationDaemon": {
       if (!handlers.spawnAutomationDaemon) {
         return { ok: false, reason: "unsupported" };
       }
-      const parsed = spawnAutomationDaemonParamsSchema.safeParse(params);
-      if (!parsed.success) {
+      const parsed = parseSpawnAutomationDaemonParams(params);
+      if (!parsed) {
         throw new Error(
           "computerUse.spawnAutomationDaemon: daemonSocketPath, pidPath, logPath, sessionId, and stateDir are required",
         );
       }
-      const { daemonSocketPath, pidPath, logPath, sessionId, stateDir } =
-        parsed.data;
+      const { daemonSocketPath, pidPath, logPath, sessionId, stateDir } = parsed;
       const env =
-        parsed.data.env && typeof parsed.data.env === "object"
+        parsed.env && typeof parsed.env === "object"
           ? Object.fromEntries(
-              Object.entries(parsed.data.env).filter(
+              Object.entries(parsed.env).filter(
                 (entry): entry is [string, string] =>
                   entry[0].startsWith("STELLA_COMPUTER_") &&
                   typeof entry[1] === "string",
@@ -425,12 +621,12 @@ const dispatch = async (
       if (!handlers.requestMedia) {
         throw new Error("media.request: unsupported");
       }
-      const parsed = mediaRequestParamsSchema.safeParse(params);
-      if (!parsed.success) {
+      const parsed = parseMediaRequestParams(params);
+      if (!parsed) {
         throw new Error("media.request: a valid media operation is required");
       }
       return await handlers.requestMedia({
-        ...parsed.data,
+        ...parsed,
         ...(signal ? { signal } : {}),
       });
     }
@@ -438,12 +634,12 @@ const dispatch = async (
       if (!handlers.requestAccountMcp) {
         throw new Error("connector.accountMcp: unsupported");
       }
-      const parsed = accountMcpParamsSchema.safeParse(params);
-      if (!parsed.success) {
+      const parsed = parseAccountMcpParams(params);
+      if (!parsed) {
         throw new Error("connector.accountMcp: a valid registry operation is required");
       }
       return await handlers.requestAccountMcp({
-        ...parsed.data,
+        ...parsed,
         ...(signal ? { signal } : {}),
       });
     }
@@ -451,12 +647,12 @@ const dispatch = async (
       if (!handlers.requestXApi) {
         throw new Error("x.request: unsupported");
       }
-      const parsed = xApiRequestParamsSchema.safeParse(params);
-      if (!parsed.success) {
+      const parsed = parseXApiRequestParams(params);
+      if (!parsed) {
         throw new Error("x.request: a valid X operation is required");
       }
       return await handlers.requestXApi({
-        ...(parsed.data as XApiOperation),
+        ...parsed,
         ...(signal ? { signal } : {}),
       });
     }

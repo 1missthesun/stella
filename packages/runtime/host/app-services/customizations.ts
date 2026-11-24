@@ -128,7 +128,7 @@ export const resetCustomizationsForApp = async (stellaAppDir: string, stellaData
 export const readSkillFrontmatter = async (
   request: { markdown?: unknown } | null | undefined,
 ): Promise<Record<string, unknown>> => {
-  const { extractFrontmatter } = await import("../../kernel/frontmatter.js");
-  return extractFrontmatter(typeof request?.markdown === "string" ? request.markdown : "")
+  const { extractFrontmatterAsync } = await import("../../kernel/frontmatter.js");
+  return (await extractFrontmatterAsync(typeof request?.markdown === "string" ? request.markdown : ""))
     .metadata as Record<string, unknown>;
 };

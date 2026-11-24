@@ -16,7 +16,7 @@ import { getCodexSubscriptionPreferences } from "../integrations/codex-subscript
 import {
   getClaudeCodeAgentModelId,
   getClaudeCodeRuntimeEffortLevel,
-} from "../integrations/claude-code-agent-runtime.js";
+} from "../integrations/claude-code-model-config.js";
 import type { ResolvedLlmRoute } from "../model-routing.js";
 import { canonicalStellaModelReference } from "../model-routing-stella.js";
 

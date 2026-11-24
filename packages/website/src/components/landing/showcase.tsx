@@ -49,7 +49,7 @@ function JourneyView() {
     const measure = () => {
       const rect = frame.getBoundingClientRect();
       frameDocTop = rect.top + window.scrollY;
-      frameHeight = rect.height;
+      frameHeight = frame.offsetHeight;
       start = Math.min(window.innerHeight * 0.9, frameDocTop);
     };
 

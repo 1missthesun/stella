@@ -1,23 +1,3 @@
-//! wakeword_listener — long-running native helper that watches the system mic
-//! for a wake word and emits NDJSON events on stdout.
-//!
-//! Subcommands:
-//!   probe --model <path.onnx>
-//!     Loads the classifier and prints a single ready event with model names,
-//!     then exits. Useful for smoke tests / Settings UI verification.
-//!
-//!   start --model <path.onnx> [--threshold 0.55] [--debounce-ms 2000]
-//!         [--predict-stride-ms 120] [--vad-hangover-ms 900]
-//!         [--energy-rms-threshold 0.002] [--energy-peak-threshold 0.015]
-//!         [--disable-energy-gate] [--disable-vad] [--device <name>]
-//!     Streams audio from the default input (or the named device) and emits
-//!     {"event":"wake",...} every time the wake word fires above threshold,
-//!     subject to debounce. Prints a single {"event":"ready",...} on startup
-//!     once the model is loaded and the audio stream has begun.
-//!
-//! Stdout is the IPC channel: every line is a JSON object terminated by '\n'.
-//! Stderr is for human-readable diagnostics and never used for IPC.
-
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, Receiver};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -32,48 +12,28 @@ use serde::Serialize;
 use silero::{SampleRate as VadSampleRate, Session as VadSession, StreamState as VadStreamState};
 
 /// Canonical sample rate expected by LiveKit's listener/model path.
-/// Device audio is resampled to this rate before buffering so prediction
-/// windows stay ~32k samples instead of ballooning on 48 kHz devices.
 const MODEL_SAMPLE_RATE: u32 = 16_000;
 
-/// Window of audio passed to predict() in seconds. Matches LiveKit's listener
-/// behavior: keep a ~2s rolling chunk at 16 kHz and pass that to the stateless
-/// model.
 const PREDICT_WINDOW_SECS: f32 = 2.0;
 
-/// Shipped classifier cadence. Mel/embedding state advances independently on
-/// its fixed 1280-sample (80 ms) lattice as audio arrives.
 const PREDICT_STRIDE_MS: u64 = 120;
 
-/// Cheap energy gate: skip Silero when input is clearly silent, but never stop
-/// buffering audio. On a silence -> active edge we replay this tail into Silero
-/// so the first syllable of the wake phrase is not clipped.
 const ENERGY_GATE_WINDOW_SECS: f32 = 0.4;
 const ENERGY_GATE_TAIL_SECS: f32 = 0.5;
 const ENERGY_RMS_THRESHOLD: f32 = 0.002;
 const ENERGY_PEAK_THRESHOLD: f32 = 0.015;
 
-/// Silero VAD gate: prefer running the wake-word model while speech-like audio
-/// is active, plus a short hangover so the wake phrase is not clipped between
-/// VAD frames. Energy-active audio can also trigger prediction so a preserved
-/// 2s ring is evaluated immediately while VAD is still catching up. Silero's
-/// 16 kHz frame is 512 samples (~32 ms).
 const VAD_START_THRESHOLD: f32 = 0.5;
 const VAD_RECENT_FRAMES: usize = 5;
 const VAD_MIN_VOICED_FRAMES: usize = 3;
 const VAD_HANGOVER_MS: u64 = 900;
 
-/// cpal callback chunk size hint, in samples. The OS may give us larger or
-/// smaller chunks regardless; we just buffer.
 const AUDIO_CHANNEL_CAPACITY: usize = 64;
 
-/// Exit status that tells the app the input went away or the system default
-/// input changed, so it respawns the listener on the current device at once.
 const INPUT_CHANGED_EXIT_CODE: i32 = 75;
 const DEFAULT_DEVICE_POLL: Duration = Duration::from_secs(2);
-/// An open input stream delivers buffers continuously, silence included.
-/// None for this long means the stream died without reporting an error
-/// (seen after system sleep), so the listener exits to be restarted.
+/// An open input stream delivers buffers continuously, silence included; after
+/// system sleep it can die without reporting an error.
 const AUDIO_STALL_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Parser, Debug)]
@@ -183,9 +143,6 @@ fn emit(event: &Event<'_>) {
     }
 }
 
-/// The app holds our stdin open for as long as it runs. When it is killed
-/// without stopping us (a crash, a force quit) the pipe closes, and the
-/// listener exits instead of keeping the microphone open with no one reading.
 /// Only when the spawner asks: an inherited or null stdin would read EOF at once.
 fn exit_when_stdin_closes() {
     if std::env::var("STELLA_EXIT_ON_STDIN_CLOSE").as_deref() != Ok("1") {
@@ -255,8 +212,6 @@ fn load_model(model_path: &PathBuf) -> Result<WakeWordModel> {
 }
 
 fn run_probe(model: PathBuf) -> Result<()> {
-    // Use the canonical 16 kHz so probe doesn't depend on a usable input
-    // device (some CI / headless boxes have no mic).
     let _model = load_model(&model)?;
     let stem = model
         .file_stem()
@@ -405,9 +360,6 @@ fn pick_device(name: Option<&str>) -> Result<Device> {
 }
 
 fn pick_input_config(device: &Device) -> Result<(StreamConfig, SampleFormat)> {
-    // Preference order: 16 kHz mono i16 (no resampling, no conversion).
-    // Falls back to the device's default input config; the WakeWordModel
-    // will resample any rate in [22050, 384000] internally.
     let supported = device
         .supported_input_configs()
         .context("query supported input configs")?
@@ -467,9 +419,6 @@ fn run_start(
 
     let (tx, rx) = sync_channel::<Vec<i16>>(AUDIO_CHANNEL_CAPACITY);
 
-    // Build the input stream in a sample-format-aware way. cpal hands us
-    // raw frames, we downmix to mono i16 here so the inference loop only
-    // ever sees i16 mono.
     let stream = build_input_stream(&device, &config, sample_format, channels, tx)?;
     stream.play().context("start cpal stream")?;
     if device_name.is_none() {
@@ -486,8 +435,6 @@ fn run_start(
 
     run_inference_loop(&mut model, &model_name, options, sample_rate, rx)?;
 
-    // Keep `stream` alive until the inference loop exits (it owns the cpal
-    // input callback). Drop here so the hardware is released cleanly.
     drop(stream);
     Ok(())
 }
@@ -591,9 +538,6 @@ fn run_inference_loop(
     let debounce = Duration::from_millis(options.debounce_ms);
     let mut resampler = LinearResampler::new(sample_rate, MODEL_SAMPLE_RATE);
     let mut stream = StreamState::new();
-    // Optional score smoothing: mean over the last N predictions. Default 1 is a
-    // no-op; raise via WAKEWORD_SMOOTHING to trade a little latency for fewer
-    // single-frame spikes when running at a larger predict stride.
     let smoothing = std::env::var("WAKEWORD_SMOOTHING")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -650,9 +594,6 @@ fn run_inference_loop(
         ring.extend_from_slice(&chunk);
         samples_since_predict += chunk.len();
 
-        // Cap ring at one window — older audio can't influence the next
-        // prediction (the model only consumes the last 16 embedding
-        // timesteps anyway) and unbounded growth would leak.
         if ring.len() > window_samples {
             let drop = ring.len() - window_samples;
             ring.drain(..drop);
@@ -704,10 +645,6 @@ fn run_inference_loop(
                 threshold: options.threshold,
                 timestamp_ms,
             });
-            // Match LiveKit's listener behavior: after a detection, discard the
-            // current window so stale wake-word audio cannot influence the next
-            // decision. The CLI has no wait_for_detection() consumer to pause
-            // on, so it immediately starts filling a fresh window.
             ring.clear();
             stream.reset();
             score_hist.clear();
@@ -895,8 +832,6 @@ impl LinearResampler {
             self.cursor += self.step;
         }
 
-        // Keep the final source sample so interpolation across callback
-        // boundaries is continuous.
         self.previous_sample = input.last().copied();
         self.cursor -= (input.len().saturating_sub(1)) as f64;
         out

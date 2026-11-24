@@ -24,12 +24,9 @@ pub fn shape_of(stroke: &Stroke) -> Shape {
     ink_of(stroke).shape
 }
 
-/// One stroke's shape and what a mark needs from it, in normalized coordinates.
 struct Ink {
     shape: Shape,
-    /// What the stroke covers: a circle's loop without its lead-in or tail, else the whole stroke.
     region: [f32; 4],
-    /// A one-stroke arrow's shaft start and tip.
     ends: Option<([f32; 2], [f32; 2])>,
 }
 
@@ -66,11 +63,9 @@ fn ink_of(stroke: &Stroke) -> Ink {
     if w.hypot(h) < 14.0 {
         plain(Shape::Tap)
     } else if encloses(chord, 0.35, len, b, 0.5 * shoelace.abs()) {
-        // A short tail or lead-in can still end close enough to count; what was circled is the
-        // loop inside it. A stroke that goes round more than once keeps its whole box.
         Ink {
             shape: Shape::Circle,
-            region: (len <= 1.5 * round(b))
+            region: (len <= 1.5 * ellipse_perimeter(b))
                 .then(loop_box)
                 .flatten()
                 .unwrap_or(region),
@@ -99,22 +94,13 @@ fn ink_of(stroke: &Stroke) -> Ink {
     }
 }
 
-/// The most points [`loop_in`] tries as a loop's ends.
 const MAX_LOOP_POINTS: usize = 512;
 
-/// Ramanujan's approximation of the perimeter of the ellipse filling box `b`.
-fn round(b: [f32; 4]) -> f32 {
+fn ellipse_perimeter(b: [f32; 4]) -> f32 {
     let (w, h) = (b[2] - b[0], b[3] - b[1]);
     PI / 2.0 * (3.0 * (w + h) - ((3.0 * w + h) * (w + 3.0 * h)).sqrt())
 }
 
-/// Whether a path (pixels) with these measures goes round something: it ends within `max_gap` of
-/// its long side of where it began, is longer than twice its long side, fills a third of its box,
-/// and the box's short side is over 0.42 of its long side. Flatter loops, to 5:1, count too (a
-/// wide cell or a line of text is circled with a flat loop) when they also close well within
-/// their short side, so a flat C doesn't, and go round at most three times (with slack for
-/// jitter), so a scribble over a line of text, which closes on itself and fills its box too,
-/// doesn't either.
 fn encloses(gap: f32, max_gap: f32, len: f32, b: [f32; 4], area: f32) -> bool {
     let (w, h) = (b[2] - b[0], b[3] - b[1]);
     let (big, small) = (w.max(h), w.min(h));
@@ -122,17 +108,9 @@ fn encloses(gap: f32, max_gap: f32, len: f32, b: [f32; 4], area: f32) -> bool {
         && len > 2.0 * big
         && small >= 18.0
         && area > 0.32 * w * h
-        && (small > 0.42 * big || (small > 0.2 * big && gap < 0.6 * small && len <= 3.5 * round(b)))
+        && (small > 0.42 * big || (small > 0.2 * big && gap < 0.6 * small && len <= 3.5 * ellipse_perimeter(b)))
 }
 
-/// The loop inside a stroke (pixels) that circles something once before or after a lead-in,
-/// tail or overshoot: the stretch `i..=j`, at least 0.6 of the stroke's length, whose ends meet
-/// (within 0.15 of its size), that [`encloses`] its box and goes round it at most one and a half
-/// times. Of several, the one whose ends meet closest.
-///
-/// Trying every pair of ends is quadratic and imported strokes have no point cap, so the ends
-/// are tried at every `step`th point only, but each stretch is judged by the recorded path's own
-/// length and area (prefix sums over every point), so sampling can't hide backtracking or turns.
 fn loop_in(points: &[[f32; 2]]) -> Option<(usize, usize)> {
     let n = points.len();
     if n < 3 {
@@ -181,7 +159,7 @@ fn loop_in(points: &[[f32; 2]]) -> Option<(usize, usize)> {
             let len = len as f32;
             let twice = twice_area[j] - twice_area[i] + z[0] as f64 * a[1] as f64
                 - a[0] as f64 * z[1] as f64;
-            if len <= 1.5 * round(b) && encloses(gap, 0.15, len, b, 0.5 * twice.abs() as f32) {
+            if len <= 1.5 * ellipse_perimeter(b) && encloses(gap, 0.15, len, b, 0.5 * twice.abs() as f32) {
                 best = Some((closeness, i, j));
             }
         }
@@ -189,20 +167,12 @@ fn loop_in(points: &[[f32; 2]]) -> Option<(usize, usize)> {
     best.map(|(_, i, j)| (i, j))
 }
 
-/// How far `p` is from the line through `a` and `b`.
 fn off_line(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
     ((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])).abs() / distance(a, b)
 }
 
-/// The tip of an arrow drawn in one stroke (pixels, `big` its box's long side): a straight shaft
-/// from the first point to the tip, where the stroke turns back into one or two straight barbs
-/// that end behind the tip, and the head reaches both sides of the shaft. Two barbs (out, back
-/// and out again) are each at most 0.9 of the shaft; a lone barb, which must then run on across
-/// the shaft, is at most 0.6 of it and clearly off it. An underline whose end hooks back to one
-/// side, check marks, V's and zigzags fail.
 fn arrow_tip(points: &[[f32; 2]], big: f32) -> Option<usize> {
     let start = points[0];
-    // The tip is where the stroke first heads back toward its start, once half its size away.
     let mut tip = 0;
     let mut turned = false;
     for (i, &p) in points.iter().enumerate() {
@@ -223,7 +193,6 @@ fn arrow_tip(points: &[[f32; 2]], big: f32) -> Option<usize> {
     {
         return None;
     }
-    // The direction the shaft arrives in, over its last 30%.
     let arc: f32 = points[..=tip]
         .windows(2)
         .map(|p| distance(p[0], p[1]))
@@ -243,7 +212,6 @@ fn arrow_tip(points: &[[f32; 2]], big: f32) -> Option<usize> {
         (t[0] - points[back][0]) / along,
         (t[1] - points[back][1]) / along,
     ];
-    // Barbs: runs away from the tip by at least `slack`, each from the nearest point before it.
     let slack = 0.15 * shaft;
     let mut barbs: Vec<(usize, usize)> = Vec::new();
     let (mut out, mut near, mut rising) = (tip, tip, true);
@@ -269,7 +237,6 @@ fn arrow_tip(points: &[[f32; 2]], big: f32) -> Option<usize> {
         barbs.push((near, out));
     }
     let cos = |deg: f32| deg.to_radians().cos();
-    // Each barb's length and the cosine of its angle to the shaft pointing back.
     let mut measured = Vec::with_capacity(barbs.len());
     for (from, end) in barbs {
         let (a, z) = (points[from], points[end]);
@@ -293,7 +260,6 @@ fn arrow_tip(points: &[[f32; 2]], big: f32) -> Option<usize> {
         [(_, c0), (_, c1)] => c0.max(c1) <= cos(5.0),
         _ => false,
     };
-    // The head spreads to both sides of the shaft; an underline that hooks back doesn't.
     let side = |p: [f32; 2]| dir[0] * (p[1] - t[1]) - dir[1] * (p[0] - t[0]);
     let reach = |sign: f32| {
         points[tip..]
@@ -397,7 +363,6 @@ pub fn marks_of(strokes: &[Stroke]) -> Vec<Mark> {
                     match shape {
                         Shape::Circle => {
                             mark.shape = Shape::Circle;
-                            // What was circled: the loops, without any lead-in or tail.
                             mark.box_norm = if rest.iter().all(|r| r.1.shape == Shape::Circle) {
                                 bounds(
                                     &sized
@@ -472,8 +437,6 @@ pub fn describe_mark(mark: &Mark) -> String {
     text
 }
 
-/// A label in curly quotes, unless it already quotes its own parts (`button “Area” #area` from
-/// `crate::ax`, `<div.capsule> in Pill (src/Pill.tsx:42)` from `crate::page`).
 pub(crate) fn quote_label(label: &str) -> String {
     if label.contains('“') || label.starts_with('<') {
         label.to_owned()
@@ -482,13 +445,11 @@ pub(crate) fn quote_label(label: &str) -> String {
     }
 }
 
-/// Whether `mark` belongs to `keyframe` (by `mark_id` or shared `frame` file).
 pub fn mark_on_keyframe(mark: &Mark, keyframe: &Keyframe) -> bool {
     keyframe.mark_id.as_ref() == Some(&mark.id)
         || (!keyframe.file.is_empty() && mark.frame.as_ref() == Some(&keyframe.file))
 }
 
-/// The inked marks a keyframe draws (every mark of its screen's group), in drawing order.
 pub fn marks_on<'a>(keyframe: &Keyframe, marks: &'a [Mark]) -> Vec<&'a Mark> {
     let mut shown: Vec<&Mark> = marks
         .iter()
@@ -498,7 +459,6 @@ pub fn marks_on<'a>(keyframe: &Keyframe, marks: &'a [Mark]) -> Vec<&'a Mark> {
     shown
 }
 
-/// Coalesce each label independently, even when other events occur during a burst.
 pub fn settled_events(events: &[InteractionEvent]) -> Vec<InteractionEvent> {
     let mut sorted = events.to_vec();
     sorted.sort_by_key(InteractionEvent::timestamp_ms);
@@ -705,10 +665,8 @@ pub fn timeline(bundle: &ScrawlBundle) -> Vec<String> {
     items.into_iter().map(|item| item.1).collect()
 }
 
-/// Longest app-provided screen name or context value shown in the summary.
 const CONTEXT_VALUE_CHARS: usize = 60;
 
-/// An app-provided string on one line, cut to `CONTEXT_VALUE_CHARS`.
 fn context_value(raw: &str) -> String {
     let compact = raw.split_whitespace().collect::<Vec<_>>().join(" ");
     if compact.chars().count() <= CONTEXT_VALUE_CHARS {
@@ -719,7 +677,6 @@ fn context_value(raw: &str) -> String {
     }
 }
 
-/// Agents given only the text fix what was said and skip the pictures, missing what only shows there.
 pub const LOOK_AT_IMAGES: &str = "Open contact-sheet.png and frames/ in that folder before changing anything: the marks and words only make sense on the images, which can show more than the text does.";
 
 pub fn summary_markdown(bundle: &ScrawlBundle, bundle_dir: &std::path::Path) -> String {
@@ -727,7 +684,6 @@ pub fn summary_markdown(bundle: &ScrawlBundle, bundle_dir: &std::path::Path) -> 
     summary_markdown_with(bundle, bundle_dir, agent_context)
 }
 
-/// `agent_context` is the `agentContext` experiment (`agent_context::keyframe_texts`).
 pub fn summary_markdown_with(
     bundle: &ScrawlBundle,
     bundle_dir: &std::path::Path,
@@ -784,7 +740,6 @@ pub fn summary_markdown_with(
         out.push_str(LOOK_AT_IMAGES);
         out.push('\n');
     }
-    // The screen at the start and the app's own values, on one line.
     let start_screen = bundle.screen_at(0);
     let context: Vec<String> = start_screen
         .map(|screen| format!("Screen: {}", context_value(screen)))
@@ -816,7 +771,6 @@ pub fn summary_markdown_with(
     {
         out.push_str(&format!("No transcript: {}\n", missing.reason));
     }
-    // App events and context changes nest under the keyframe on screen when they happened.
     let mut app_events: Vec<(u64, String)> = bundle
         .events
         .iter()
@@ -937,12 +891,8 @@ pub fn summary_markdown_with(
     out
 }
 
-/// A ⇧-click pin shows live only as a brief ring at the click, gone in this long; the pin itself
-/// stays data (keyframes, summary). Ordinary clicks draw nothing live.
 pub const PIN_PULSE_MS: u64 = 350;
 
-/// The live pulse for a pin dropped `age_ms` ago: a thin ring's radius (points) and opacity. It
-/// grows out fast and slows (ease-out cubic) while it fades to nothing.
 pub fn pin_pulse(age_ms: u64) -> Option<(f32, f32)> {
     if age_ms >= PIN_PULSE_MS {
         return None;
@@ -952,9 +902,6 @@ pub fn pin_pulse(age_ms: u64) -> Option<(f32, f32)> {
     Some((4.0 + 10.0 * grow, 0.55 * (1.0 - p) * (1.0 - p)))
 }
 
-/// Extracts the active `[now_ms - tail_ms, now_ms]` window of a timed laser stroke,
-/// linearly interpolating the exact tail cutoff point at `t_cutoff` so the tail
-/// glides continuously along the path at 120Hz instead of snapping vertex-by-vertex.
 pub fn slice_laser_window(
     timed_points: &[(f32, f32, u64)],
     now_ms: u64,
@@ -990,12 +937,6 @@ pub fn slice_laser_window(
     out
 }
 
-/// Smooths timed `(x, y, life_0_to_1)` laser samples using tldraw's two-stage pipeline:
-/// 1. Exponential `streamline` low-pass filter to remove mouse/trackpad stairstepping.
-/// 2. Midpoint Quadratic B-Spline (`quadraticCurveTo(P_i, midpoint(P_i, P_{i+1}))`) subdivision,
-///    which is variation-diminishing and $C^1$-continuous (never overshoots or kinks at corners).
-/// 3. Combined arc-length start taper (`u * (2 - u)`) × time-decay life (`smoothstep`) so fast
-///    strokes immediately taper to a fine needle tail and stationary strokes retract smoothly.
 pub fn smooth_laser_points(points: &[([f32; 2], f32)]) -> Vec<([f32; 2], f32)> {
     if points.is_empty() {
         return Vec::new();
@@ -1004,7 +945,6 @@ pub fn smooth_laser_points(points: &[([f32; 2], f32)]) -> Vec<([f32; 2], f32)> {
         return vec![points[0]];
     }
 
-    // Stage 1: tldraw streamline filter (streamline = 0.62 -> alpha = 0.47)
     let streamline_alpha = 0.47_f32;
     let mut filtered = Vec::with_capacity(points.len() + 1);
     filtered.push(points[0]);
@@ -1029,7 +969,6 @@ pub fn smooth_laser_points(points: &[([f32; 2], f32)]) -> Vec<([f32; 2], f32)> {
         return filtered;
     }
 
-    // Stage 2: Midpoint Quadratic B-Spline (`quadraticCurveTo(P_i, midpoint(P_i, P_{i+1}))`)
     let mut curve = Vec::with_capacity(filtered.len() * 6);
     if filtered.len() == 2 {
         let (a, la) = filtered[0];
@@ -1074,7 +1013,6 @@ pub fn smooth_laser_points(points: &[([f32; 2], f32)]) -> Vec<([f32; 2], f32)> {
         }
     }
 
-    // Stage 3: Combine tldraw's arc-length start taper (`u * (2 - u)`) with time decay (`life`).
     let mut lengths = Vec::with_capacity(curve.len());
     let mut total_len = 0.0_f32;
     lengths.push(0.0_f32);
@@ -1094,8 +1032,6 @@ pub fn smooth_laser_points(points: &[([f32; 2], f32)]) -> Vec<([f32; 2], f32)> {
     curve
 }
 
-/// Smooths a persistent ink stroke into `(point, pressure_scale)` samples using
-/// tldraw's streamline filter + midpoint quadratic Bezier curves + simulated velocity pressure.
 pub fn smooth_ink_points(points: &[[f32; 2]]) -> Vec<([f32; 2], f32)> {
     if points.is_empty() {
         return Vec::new();
@@ -1415,8 +1351,6 @@ pub fn freehand_outline(points: &[[f32; 2]], options: &FreehandOptions) -> Vec<[
     smooth_closed_polygon(&left)
 }
 
-/// Applies tldraw's `outline()` quadratic Bezier midpoint pass (`quadraticCurveTo(P_i, midpoint(P_i, P_{i+1}))`)
-/// around a closed outline polygon so freehand strokes have zero polygonal facets.
 fn smooth_closed_polygon(poly: &[[f32; 2]]) -> Vec<[f32; 2]> {
     if poly.len() < 4 {
         return poly.to_vec();

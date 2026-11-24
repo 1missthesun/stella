@@ -1,5 +1,3 @@
-//! From Scrawl's `zoom.rs`: picking the window and times of a zoom sheet. Stella reads the
-//! frames from the capture's own frame stream instead of decoding a movie.
 use anyhow::{Context, Result};
 
 use crate::model::{InteractionEvent, ScrawlBundle, parse_clock_ms};
@@ -12,8 +10,6 @@ fn normalize(text: &str) -> String {
         .to_lowercase()
 }
 
-/// Where `phrase` starts in the narration: the first run of transcript words matching it, else
-/// the segment containing it.
 pub fn find_phrase_ms(bundle: &ScrawlBundle, phrase: &str) -> Option<u64> {
     let needle: Vec<String> = normalize(phrase)
         .split_whitespace()
@@ -51,15 +47,12 @@ pub fn find_phrase_ms(bundle: &ScrawlBundle, phrase: &str) -> Option<u64> {
         .map(|s| s.t0)
 }
 
-/// Resolves `--at`: a time (`0:12`, `12.5`) or a phrase from the narration.
 pub fn resolve_moment(bundle: &ScrawlBundle, at: &str) -> Result<u64> {
     parse_clock_ms(at)
         .or_else(|| find_phrase_ms(bundle, at))
         .with_context(|| format!("“{at}” is neither a time nor a phrase in the narration"))
 }
 
-/// The window around `at_ms`: a quarter before, the rest after, since what the narration points
-/// at usually happens as or just after it is said. Clamped to the recording.
 pub fn window(at_ms: u64, span_ms: u64, duration_ms: u64) -> (u64, u64) {
     let span = span_ms.clamp(200, duration_ms.max(200));
     let mut from = at_ms.saturating_sub(span / 4);
@@ -71,8 +64,6 @@ pub fn window(at_ms: u64, span_ms: u64, duration_ms: u64) -> (u64, u64) {
     (from, to)
 }
 
-/// The window centred on a mark drawn over `[t0, t1]`: at least `span_ms`, and the whole mark
-/// with half a second either side. Clamped to the recording.
 pub fn mark_window(t0: u64, t1: u64, span_ms: u64, duration_ms: u64) -> (u64, u64) {
     let span = span_ms
         .max(t1.saturating_sub(t0) + 1_000)
@@ -86,8 +77,6 @@ pub fn mark_window(t0: u64, t1: u64, span_ms: u64, duration_ms: u64) -> (u64, u6
     (from, to)
 }
 
-
-/// Evenly spaced times across `[from, to]`, both ends included.
 pub fn sample_times(from: u64, to: u64, count: usize) -> Vec<u64> {
     let count = count.clamp(1, 48);
     if count == 1 || to <= from {
@@ -98,12 +87,8 @@ pub fn sample_times(from: u64, to: u64, count: usize) -> Vec<u64> {
         .collect()
 }
 
-/// How much of a gesture still under way a cell shows: the finger now and its recent path.
 const TRAIL_MS: u64 = 350;
 
-/// The interactions as they stood at `t`. A drag still under way is cut to its last
-/// `TRAIL_MS`, so the cell shows where the finger is rather than the whole gesture to come
-/// (its samples are evenly spaced in time, so a point's index gives its time).
 pub fn events_at(events: &[InteractionEvent], t: u64) -> Vec<InteractionEvent> {
     events
         .iter()
@@ -172,7 +157,6 @@ pub fn said_between(bundle: &ScrawlBundle, from: u64, to: u64) -> String {
         .join(" ")
 }
 
-/// The auto-crop of the keyframe nearest `t` (keyframe crops meet halfway between keyframes).
 pub fn crop_at(bundle: &ScrawlBundle, t: u64) -> Option<crate::autocrop::Rect> {
     let (k, _) = bundle
         .keyframes
@@ -182,7 +166,6 @@ pub fn crop_at(bundle: &ScrawlBundle, t: u64) -> Option<crate::autocrop::Rect> {
     crop_of(bundle, k)
 }
 
-/// The auto-crop of the `k`th keyframe (0-based).
 pub fn crop_of(bundle: &ScrawlBundle, k: usize) -> Option<crate::autocrop::Rect> {
     let crop = bundle.autocrop.as_ref()?.crops.get(k)?;
     (crop.kind != crate::autocrop::CropKind::Full).then(|| crop.rect(&bundle.target.frame))

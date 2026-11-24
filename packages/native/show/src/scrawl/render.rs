@@ -1,4 +1,3 @@
-//! PNG output and deterministic, CPU-rendered review images.
 use crate::model::*;
 use crate::sketch::{FreehandOptions, freehand_outline, slice_laser_window, smooth_laser_points};
 use std::path::Path;
@@ -85,7 +84,6 @@ fn solid(width: u32, height: u32, color: Color) -> RgbaFrame {
     RgbaFrame::new(0, width, height, rgba)
 }
 
-/// Source-over, retaining straight alpha even when the input is transparent.
 fn blend(frame: &mut RgbaFrame, x: i32, y: i32, color: Color, coverage: f32) {
     if x < 0 || y < 0 || x >= frame.width as i32 || y >= frame.height as i32 {
         return;
@@ -131,8 +129,6 @@ fn rounded(frame: &mut RgbaFrame, rect: [f32; 4], radius: f32, color: Color) {
     }
     let r = radius.max(0.0).min(w * 0.5).min(h * 0.5);
     for py in (y.floor() as i32 - 1).max(0)..((y + h).ceil() as i32 + 1).min(frame.height as i32) {
-        // Only fully covered, opaque pixels can bypass source-over. Keep the
-        // original distance/coverage calculation on all antialiased edges.
         let (start, end) =
             if color[3] == 255 && py >= y.ceil() as i32 && py < (y + h).floor() as i32 {
                 let inset = if py >= (y + r).ceil() as i32 && py < (y + h - r).floor() as i32 {
@@ -195,7 +191,6 @@ fn ring(frame: &mut RgbaFrame, center: [f32; 2], radius: f32, thickness: f32, co
     }
 }
 
-/// Four vertical subpixel scanlines, with exact horizontal span coverage.
 fn polygon(frame: &mut RgbaFrame, points: &[[f32; 2]], color: Color) {
     if points.len() < 3 || points.iter().flatten().any(|v| !v.is_finite()) {
         return;
@@ -320,8 +315,6 @@ pub fn annotate_keyframe_in_place(
     stamp_keyframe_badge_in_place(frame, keyframe);
 }
 
-/// Sizes for a frame of `w × h` pixels: `(k, stroke_size, pin_scale)`.
-/// Tuned for ~1280×800 screen frames; phone frames are taller and denser.
 pub(crate) fn annotation_sizes(w: f32, h: f32) -> (f32, f32, f32) {
     let k = (w.min(h) / 800.0).max(w.max(h) / 1280.0).clamp(1.0, 2.0);
     let size = (w.min(h) * 0.0065).clamp(4.2, 6.0) * k;
@@ -346,8 +339,6 @@ pub fn annotate_keyframe_marks_in_place(
         return;
     }
     let (k, size, pin_scale) = annotation_sizes(w, h);
-    // A mark keyframe shows every mark drawn on its screen. Flags carry no ink, so a flagged
-    // keyframe still shows the strokes of its moment.
     let shown = crate::sketch::marks_on(keyframe, marks);
     for (index, stroke) in strokes.iter().enumerate() {
         if stroke.laser {
@@ -385,7 +376,6 @@ pub fn annotate_keyframe_marks_in_place(
     for stroke in strokes.iter().filter(|s| s.laser) {
         draw_laser(frame, stroke, keyframe.t);
     }
-    // Phone swipes that ended just before this moment (or produced it) leave a trail.
     for event in events {
         if let InteractionEvent::Drag {
             t,
@@ -491,10 +481,6 @@ const DIGIT_MIDDLE: f32 = if cfg!(target_os = "macos") {
     0.5
 };
 
-/// The keyframe's number, bold black on a small white rounded square with a thin dark ring,
-/// inset from the top-left corner of `rect` (top-right when ink, a click or the cursor is there).
-/// `k` scales it: 1 is a 24 px square. A shaped container keeps a model from reading it as a
-/// number on the screen, and summary.md carries the time.
 fn draw_keyframe_badge(
     dst: &mut RgbaFrame,
     rect: [f32; 4],
@@ -576,7 +562,6 @@ fn draw_laser(frame: &mut RgbaFrame, stroke: &Stroke, time: u64) {
         return;
     }
     let points = smooth_laser_points(&raw_points);
-    // Subtle, realistic optical laser trail: soft atmospheric scatter + delicate ruby beam + incandescent core.
     for (radius, alpha, power, color) in [
         (7.5, 0.08, 1.1, [255, 22, 38, 255]),
         (4.2, 0.22, 1.2, [255, 36, 48, 255]),
@@ -600,7 +585,6 @@ fn draw_laser(frame: &mut RgbaFrame, stroke: &Stroke, time: u64) {
             line(frame, a, b, w0, w1, opacity(color, seg_alpha));
         }
     }
-    // Subtle pinpoint diode head at the tip of the beam.
     if let Some(&(tip, tip_age)) = points.last()
         && tip_age > 0.20
     {
@@ -617,8 +601,6 @@ fn draw_laser(frame: &mut RgbaFrame, stroke: &Stroke, time: u64) {
 
 const CLICK_BLUE: Color = [0, 136, 255, 255];
 
-/// Where a click landed, without hiding what's under it: a thin translucent ring with a hairline
-/// white edge (so it reads on dark and on blue) and a small centre dot. No fill.
 fn draw_click_ripple(frame: &mut RgbaFrame, p: [f32; 2], k: f32) {
     let r = 9.0 * k;
     ring(frame, p, r + 1.1 * k, 0.9 * k, opacity(WHITE, 0.4));
@@ -627,8 +609,6 @@ fn draw_click_ripple(frame: &mut RgbaFrame, p: [f32; 2], k: f32) {
     circle(frame, p, 1.3 * k, opacity(CLICK_BLUE, 0.9));
 }
 
-/// A finger's path: a thin translucent blue line from a small dot to a slightly larger one where
-/// it lifted (a tap's ring there, when the keyframe has one, stays the only ring).
 fn draw_touch_trail(frame: &mut RgbaFrame, points: &[[f32; 2]], k: f32) {
     let (Some(&start), Some(&end)) = (points.first(), points.last()) else {
         return;
@@ -641,8 +621,6 @@ fn draw_touch_trail(frame: &mut RgbaFrame, points: &[[f32; 2]], k: f32) {
     }
 }
 
-/// A round-capped polyline of half-width `radius`, blended once per pixel so a translucent line
-/// doesn't darken where its segments meet.
 fn polyline(frame: &mut RgbaFrame, points: &[[f32; 2]], radius: f32, color: Color) {
     if points.len() < 2 || points.iter().flatten().any(|v| !v.is_finite()) {
         return;
@@ -683,15 +661,10 @@ fn polyline(frame: &mut RgbaFrame, points: &[[f32; 2]], radius: f32, color: Colo
 const SHEET_PAD: u32 = 6;
 const SHEET_GAP: u32 = 6;
 const SHEET_BG: Color = [28, 29, 34, 255];
-/// One chip size on every tile, about 24 px square with its ring: the smallest that models still
-/// read on a sheet shown at half size (20 px wasn't).
 const SHEET_CHIP_K: f32 = 0.9;
 const SHEET_MAX_EDGE: f32 = 1600.0;
 const SHEET_MAX_PIXELS: f32 = 1_560_000.0;
 
-/// Partition `aspects` (in chronological order) into justified rows of 1..=6 frames so that
-/// per-frame displayed areas are balanced across wide and tall crops and the overall sheet aspect
-/// ratio sits near the vision-model sweet spot.
 fn plan_contact_sheet_rows(aspects: &[f32]) -> Vec<std::ops::Range<usize>> {
     let n = aspects.len();
     if n == 0 {
@@ -744,7 +717,6 @@ fn plan_contact_sheet_rows(aspects: &[f32]) -> Vec<std::ops::Range<usize>> {
             let sheet_aspect = 1.0 / inv_sum;
             let sheet_pen = (sheet_aspect / target_sheet).ln().powi(2) * 1.8;
 
-            // Relative displayed area of frame `i` in row `r` is `a_i / A_r^2`.
             let mut areas = [0.0f32; MAX_KEYFRAMES];
             let mut log_areas = [0.0f32; MAX_KEYFRAMES];
             let mut log_area_sum = 0.0f32;
@@ -983,8 +955,6 @@ pub fn render_contact_sheet_for_duration(
     sheet
 }
 
-/// An `M:SS.mmm` pill in the bottom-left corner, for `scrawl zoom` cells; `k` is how many frame
-/// pixels make one pixel of the finished sheet.
 pub fn draw_time_label(frame: &mut RgbaFrame, text: &str, k: f32) {
     let (w, h) = (frame.width as f32, frame.height as f32);
     if w == 0.0 || h == 0.0 {
@@ -1020,8 +990,6 @@ pub fn draw_time_label(frame: &mut RgbaFrame, text: &str, k: f32) {
     );
 }
 
-/// A tight grid of every frame of a `scrawl zoom` burst, in time order: four portrait or three
-/// landscape frames to a row.
 pub fn render_zoom_sheet(frames: &[RgbaFrame]) -> RgbaFrame {
     const PAD: f32 = 12.0;
     const GAP: f32 = 10.0;
@@ -1150,7 +1118,6 @@ fn blit_scaled(dst: &mut RgbaFrame, src: &RgbaFrame, rect: [f32; 4], radius: f32
         (y0 * src_w * 4, y1 * src_w * 4, sy - y0 as f32)
     };
 
-    // Precompute X sample taps across the horizontal span once.
     let span = (px_end - px_start) as usize;
     let mut x_taps = Vec::with_capacity(span);
     for px in px_start..px_end {
@@ -1225,7 +1192,6 @@ fn blit_scaled(dst: &mut RgbaFrame, src: &RgbaFrame, rect: [f32; 4], radius: f32
     }
 }
 
-/// Render at a stable design size, then scale to the requested capture geometry.
 pub fn render_synthetic_demo_frame(width: u32, height: u32, t_ms: u64, phase: u32) -> RgbaFrame {
     let mut frame = solid(1280, 800, [22, 23, 26, 255]);
     rounded(&mut frame, [0.0, 0.0, 244.0, 800.0], 0.0, [28, 29, 33, 255]);
@@ -1479,7 +1445,6 @@ fn wrap_text_indented(
             if !line.is_empty() {
                 lines.push(std::mem::take(&mut line));
             }
-            // Character boundaries avoid slicing inside UTF-8, including emoji.
             for ch in word.chars() {
                 let mut candidate = line.clone();
                 candidate.push(ch);
@@ -1572,7 +1537,6 @@ mod native_text {
     }
 }
 
-/// Arial (Windows' Helvetica) from the system fonts, through `ab_glyph`.
 #[cfg(target_os = "windows")]
 mod native_text {
     use ab_glyph::{Font, FontVec, PxScale, ScaleFont};
@@ -1593,7 +1557,6 @@ mod native_text {
         }
     }
 
-    /// Glyph positions along the baseline, kerned.
     fn layout(text: &str, size: f32, bold: bool) -> Option<(f32, Vec<ab_glyph::Glyph>)> {
         let font = font(bold)?.as_scaled(PxScale::from(size));
         let mut x = 0.0;
@@ -1615,7 +1578,6 @@ mod native_text {
         layout(text, size, bold).map(|(w, _)| w)
     }
 
-    /// An 8-bit coverage mask with 2 px of padding, like the macOS CoreText one.
     pub fn mask(text: &str, size: f32, bold: bool) -> Option<(usize, usize, Vec<u8>)> {
         let font = font(bold)?;
         let scaled = font.as_scaled(PxScale::from(size));
@@ -1708,7 +1670,6 @@ fn draw_text(
     }
 }
 
-/// Portable 5×7 fallback. Unsupported Unicode is a visible replacement glyph.
 fn glyph(ch: char) -> [u8; 7] {
     match ch.to_ascii_uppercase() {
         'A' => [14, 17, 17, 31, 17, 17, 17],

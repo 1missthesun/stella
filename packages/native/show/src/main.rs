@@ -1,11 +1,6 @@
 #![allow(dead_code)]
-//! `stella_show`: turns a Show Stella recording into a capture tasks can read, and zooms into
-//! moments of it. The selection, marks, auto-crop and rendering are Scrawl's
+//! The selection, marks, auto-crop and rendering are Scrawl's
 //! (https://github.com/kitlangton/scrawl, MIT, see LICENSE-scrawl).
-//!
-//! A recording folder holds `timeline.json` (what Stella saw while recording: target, ink,
-//! clicks, keys, cursor and the transcript) and `stream/<ms>.jpg` (the screen a few times a
-//! second). `build` writes `capture.json`, `summary.md`, `contact-sheet.png` and `frames/`.
 
 #[path = "scrawl/agent_context.rs"]
 mod agent_context;
@@ -105,7 +100,6 @@ fn main() {
     }
 }
 
-/// The stream's frames as `(ms, path)`, in time order.
 fn stream_frames(dir: &Path) -> Result<Vec<(u64, PathBuf)>> {
     let stream = dir.join(STREAM_DIR);
     let mut out = Vec::new();
@@ -143,7 +137,6 @@ fn decode_jpeg(path: &Path, t_ms: u64) -> Result<RgbaFrame> {
     Ok(RgbaFrame::new(t_ms, w as u32, h as u32, rgba))
 }
 
-/// Box-filtered copy whose longer edge is at most `edge`.
 fn downscale(frame: &RgbaFrame, edge: u32) -> RgbaFrame {
     let long = frame.width.max(frame.height);
     if long <= edge || long == 0 {
@@ -182,7 +175,6 @@ fn downscale(frame: &RgbaFrame, edge: u32) -> RgbaFrame {
     scaled
 }
 
-/// Decodes `picks` on every core, downscaled to `edge`.
 fn decode_many(picks: &[(u64, PathBuf)], edge: u32) -> Vec<RgbaFrame> {
     let workers = std::thread::available_parallelism()
         .map(|n| n.get())
@@ -210,8 +202,6 @@ fn decode_many(picks: &[(u64, PathBuf)], edge: u32) -> Vec<RgbaFrame> {
     out
 }
 
-/// At most `MAX_CANDIDATES` frames, evenly thinned, always keeping the frames nearest to ink and
-/// clicks.
 fn thin_candidates(
     frames: &[(u64, PathBuf)],
     strokes: &[Stroke],
@@ -309,7 +299,6 @@ fn build(dir: &Path) -> Result<()> {
     let baseline = candidates.first().cloned();
     drop(candidates);
 
-    // Keyframes at full size: the stream frame each candidate came from.
     let full_picks: Vec<(u64, PathBuf)> = selected
         .iter()
         .filter_map(|(kf, _)| nearest_frame(&stream, kf.t).cloned())

@@ -146,6 +146,12 @@ type AgentRecord = {
   catchUp?: true;
   waiting?: { waitingFor: string; at: number; wakers?: string[] };
   heldForHelpers?: true;
+  /**
+   * What a turn said that was held back (a helper still working, or another
+   * input on its way): its answer counts as handled, so the next report
+   * carries this text instead of re-reading it.
+   */
+  heldReport?: string;
 };
 
 export type AgentOrigin = { agentThread: true };
@@ -1189,10 +1195,11 @@ export function stellaAgents(host: StellaAgentsHost) {
             const earlier = failed
               ? []
               : await answersBetween(tx, agentConversationId, Math.max(0, ...agent.reported.map(Number)), settled.answer);
+            const held = agent.heldReport ? [agent.heldReport] : [];
             const said = [
               failed
-                ? textOf(answer)
-                : withClosingNotes(notes.closing.map((note) => note.message), onceEach([...earlier, textOf(answer)]).join("\n\n")),
+                ? onceEach([...held, textOf(answer)]).join("\n\n")
+                : withClosingNotes(notes.closing.map((note) => note.message), onceEach([...held, ...earlier, textOf(answer)]).join("\n\n")),
               hostNote ?? "",
             ]
               .filter((text) => text.trim())
@@ -1275,8 +1282,12 @@ export function stellaAgents(host: StellaAgentsHost) {
             if (busy && !failed) {
               end = { ...end, waiting: true };
               agent.heldForHelpers = true;
+              // Not reported yet: the turn that answers what it waits for
+              // reports these words with its own.
+              if (said.trim()) agent.heldReport = said;
               return { status: "running", checkpoint: { phase: "report", status: "completed", waiting: true, ...(send(false).length ? { notes: send(false) } : {}) } };
             }
+            delete agent.heldReport;
             return next(
               completedReport({
                 threadId,

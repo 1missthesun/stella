@@ -200,7 +200,6 @@ export type JournalMirror = {
 
 const PAGE = 100;
 const REMOTE_TURN_STALE_MS = 30 * 60_000;
-const LEASE_SILENCE = "lease_renewal_silence";
 const FINISH_FAILED = "finish:";
 const CONFIRM_RETRY_MS = 10_000;
 const UNSENT_RETRY_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
@@ -617,18 +616,7 @@ export async function journalMirror(args: {
   const leaseLost = (localTurnId: string) => (reason: string) => {
     const turn = known.get(localTurnId);
     if (stopped || (turn?.s !== "held" && turn?.s !== "beginning")) return;
-    if (reason !== LEASE_SILENCE) {
-      loseTurn(localTurnId, reason);
-      return;
-    }
-    void (async () => {
-      const record = await args.readBrain?.();
-      if (record !== undefined && !brainHere(record)) {
-        loseTurn(localTurnId, "brain_elsewhere");
-        return;
-      }
-      await importNow();
-    })().catch(report);
+    loseTurn(localTurnId, reason);
   };
 
   const adoptOnce = async (

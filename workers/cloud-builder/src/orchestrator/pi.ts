@@ -20,7 +20,6 @@ import {
   samePiBrainHost,
   movePiBrain,
   piBrainHandoffPrompt,
-  piBrainHostName,
   renewPiBrainLease,
   takeOverPiBrain,
   type PiBrainClaimDecision,
@@ -1582,11 +1581,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     try {
       if (lease.phase.s === "cancel_pending") await this.cancelLocalTurn(lease, true);
       else
-        await this.expireLocalLease(
-          lease,
-          true,
-          `Stella lost touch with ${piBrainHostName(prior)} before this was answered.`,
-        );
+        await this.expireLocalLease(lease, true, "taken_over");
     } catch (error) {
       log("error", "pi_brain_takeover_settle_failed", {
         conversationId: this.conversationId(),

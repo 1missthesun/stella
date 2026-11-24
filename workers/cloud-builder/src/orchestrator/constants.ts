@@ -52,6 +52,7 @@ export const CHAT_TURN_MODEL_CAPABILITY_KEY = "turnModelCapability";
 
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
 export const LOCAL_TURN_LEASE_MS = 2 * 60_000;
+export const LOCAL_TURN_LAPSE_HOLD_MS = 3 * 60_000;
 export const LOCAL_TURN_CANCEL_GRACE_MS = 45_000;
 export const LOCAL_TURN_BEGIN_MAX_BYTES = CLOUD_BUILDER_BODY_LIMITS.localTurnBegin;
 export const LOCAL_TURN_FINISH_MAX_ROWS = 1_024;

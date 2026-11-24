@@ -3,7 +3,7 @@ import type {
   CloudTranscriptOutboxRecord,
   RuntimeStore,
 } from "../storage/runtime-store.js";
-import { forkDelayedCall } from "./cloud-effect-runtime.js";
+import { forkDelayedCall, interruptibleCall } from "./cloud-effect-runtime.js";
 import { parseJournalCheckpoint, type JournalCheckpoint } from "@stella/contracts/journal-checkpoint";
 import type { SafeguardBlockInfo } from "@stella/contracts/safeguard-block";
 import {
@@ -136,8 +136,6 @@ export type CloudTranscriptWriterOptions = {
   getOwnerGeneration?: () => Promise<string>;
   fetchImpl?: typeof fetch;
   heartbeatIntervalMs?: number;
-  authoritySilenceMs?: number;
-  authorityExpiryMarginMs?: number;
   onDurableDeliveryFailure?: (failure: {
     conversationId: string;
     localTurnId: string;
@@ -180,6 +178,7 @@ export type CloudTranscriptWriter = {
   ) => Promise<{ queued: true; replayed: boolean }>;
   pending: () => number;
   resume: () => void;
+  networkChanged: () => void;
   stop: () => void;
 };
 
@@ -196,8 +195,8 @@ const MAX_RETRY_MS = 60_000;
 const TURN_BUSY_RETRY_MS = 3_000;
 const NO_AUTH_RETRY_MS = 4_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000;
-const DEFAULT_AUTHORITY_SILENCE_MS = 30_000;
-const DEFAULT_AUTHORITY_EXPIRY_MARGIN_MS = 10_000;
+const RENEWAL_TIMEOUT_MS = 5_000;
+const RENEWAL_RETRY_MS = [500, 1_000, 2_000, 4_000] as const;
 
 type BeginPayload = {
   deviceId: string;
@@ -240,7 +239,6 @@ type AttemptResult =
   | {
       kind: "ack";
       begin?: CloudTranscriptBeginAck;
-      authorityRequestStartedAt?: number;
     }
   | { kind: "dead_letter"; reason: string; userMessage?: string }
   | {
@@ -430,31 +428,22 @@ export const createCloudTranscriptWriter = (
   const historyWindows = new Map<string, CloudTranscriptHistory>();
   const historyRefreshes = new Map<string, Promise<void>>();
   const historyCacheVersions = new Map<string, number>();
-  const activeBegins = new Map<
-    string,
-    {
-      ack: CloudTranscriptBeginAck;
-      entry: CloudTranscriptOutboxRecord;
-      onLeaseLost?: (reason: string) => void;
-      cancelAuthorityDeadline: () => void;
-    }
-  >();
+  type ActiveBegin = {
+    ack: CloudTranscriptBeginAck;
+    entry: CloudTranscriptOutboxRecord;
+    onLeaseLost?: (reason: string) => void;
+    failures: { count: number; since: number; reason: string } | null;
+    interruptRenewal: (() => void) | null;
+    cancelRenewal: (() => void) | null;
+  };
+  const activeBegins = new Map<string, ActiveBegin>();
   const heartbeatIntervalMs = Math.max(
     10,
     options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
   );
-  const authoritySilenceMs = Math.max(
-    10,
-    options.authoritySilenceMs ?? DEFAULT_AUTHORITY_SILENCE_MS,
-  );
-  const authorityExpiryMarginMs = Math.max(
-    0,
-    options.authorityExpiryMarginMs ?? DEFAULT_AUTHORITY_EXPIRY_MARGIN_MS,
-  );
+  let connectionsSuspectSince: number | null = null;
   let cancelRetryDelay: (() => void) | null = null;
   let cancelJournalRetryDelay: (() => void) | null = null;
-  let cancelHeartbeatDelay: (() => void) | null = null;
-  let heartbeating = false;
   let draining = false;
   let journalDraining = false;
   let stopped = false;
@@ -626,59 +615,13 @@ export const createCloudTranscriptWriter = (
     void refreshHistory(conversationId);
   };
 
-  type ActiveBegin = NonNullable<ReturnType<typeof activeBegins.get>>;
-
-  const notifyLeaseLost = (
-    id: string,
-    active: ActiveBegin,
-    reason: string,
-  ): void => {
-    if (activeBegins.get(id) !== active) return;
-    activeBegins.delete(id);
-    active.cancelAuthorityDeadline();
-    try {
-      active.onLeaseLost?.(reason);
-    } catch {
-      log("error", "cloud_transcript_lease_lost_callback_failed", {
-        conversationId: active.entry.conversationId,
-        localTurnId: active.entry.localTurnId,
-        reason,
-      });
-    }
-    scheduleHeartbeat();
-    log("error", "cloud_transcript_authority_deadline", {
-      conversationId: active.entry.conversationId,
-      localTurnId: active.entry.localTurnId,
-      reason,
-    });
-  };
-
-  const activateBegin = (
-    id: string,
-    args: Omit<ActiveBegin, "cancelAuthorityDeadline">,
-    authorityRequestStartedAt = Date.now(),
-  ): ActiveBegin => {
-    activeBegins.get(id)?.cancelAuthorityDeadline();
-    const now = Date.now();
-    const authorityDeadline = Math.min(
-      args.ack.expiresAt - authorityExpiryMarginMs,
-      authorityRequestStartedAt + authoritySilenceMs,
-    );
-    let active!: ActiveBegin;
-    active = {
-      ...args,
-      cancelAuthorityDeadline: forkDelayedCall(
-        Math.max(0, authorityDeadline - now),
-        () => notifyLeaseLost(id, active, "lease_renewal_silence"),
-      ),
-    };
-    activeBegins.set(id, active);
-    return active;
-  };
-
   const attempt = async (
     entry: CloudTranscriptOutboxRecord,
-    attemptOptions: { renewLeaseToken?: string } = {},
+    renewal?: {
+      leaseToken: string;
+      freshConnection: boolean;
+      signal: AbortSignal;
+    },
   ): Promise<AttemptResult> => {
     if (!entry.ownerGeneration) {
       return {
@@ -711,16 +654,14 @@ export const createCloudTranscriptWriter = (
       entry.conversationId,
     )}/local-turns/${endpoint}`;
     let response: Response;
-    const authorityRequestStartedAt =
-      entry.kind === "begin" ? Date.now() : undefined;
     try {
       const body =
-        entry.kind === "begin" && attemptOptions.renewLeaseToken
+        renewal
           ? JSON.stringify({
               deviceId: entry.deviceId,
               expectedOwnerGeneration: entry.ownerGeneration,
               localTurnId: entry.localTurnId,
-              leaseToken: attemptOptions.renewLeaseToken,
+              leaseToken: renewal.leaseToken,
               renewOnly: true,
             } satisfies RenewPayload)
           : entry.payloadJson;
@@ -731,7 +672,13 @@ export const createCloudTranscriptWriter = (
           "content-type": "application/json",
         },
         body,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: renewal
+          ? AbortSignal.any([
+              renewal.signal,
+              AbortSignal.timeout(RENEWAL_TIMEOUT_MS),
+            ])
+          : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        ...(renewal?.freshConnection ? { keepalive: false } : {}),
       });
     } catch {
       return {
@@ -751,7 +698,6 @@ export const createCloudTranscriptWriter = (
         return {
           kind: "ack",
           begin: ack,
-          authorityRequestStartedAt,
         };
       }
       return {
@@ -1040,86 +986,151 @@ export const createCloudTranscriptWriter = (
     });
   };
 
-  const scheduleHeartbeat = (delayMs = heartbeatIntervalMs): void => {
-    if (cancelHeartbeatDelay) {
-      cancelHeartbeatDelay();
-      cancelHeartbeatDelay = null;
+  const renewalRetryDelay = (failures: number): number =>
+    RENEWAL_RETRY_MS[Math.min(failures, RENEWAL_RETRY_MS.length) - 1] ??
+    heartbeatIntervalMs;
+
+  const noteRenewalFailure = (
+    active: ActiveBegin,
+    result: Extract<AttemptResult, { kind: "retry" }>,
+  ): number => {
+    const prior = active.failures;
+    const failures = {
+      count: (prior?.count ?? 0) + 1,
+      since: prior?.since ?? Date.now(),
+      reason: result.reason,
+    };
+    active.failures = failures;
+    if (prior?.reason !== result.reason) {
+      log("error", "cloud_transcript_renewal_failing", {
+        conversationId: active.entry.conversationId,
+        localTurnId: active.entry.localTurnId,
+        reason: result.reason,
+        failures: failures.count,
+        leaseExpiresInMs: active.ack.expiresAt - Date.now(),
+      });
     }
-    if (stopped || activeBegins.size === 0) return;
-    cancelHeartbeatDelay = forkDelayedCall(Math.max(10, delayMs), () => {
-      cancelHeartbeatDelay = null;
-      void heartbeat();
+    return Math.min(heartbeatIntervalMs, renewalRetryDelay(failures.count));
+  };
+
+  const noteRenewed = (active: ActiveBegin): void => {
+    const { failures } = active;
+    active.failures = null;
+    if (!failures) return;
+    log("info", "cloud_transcript_renewal_recovered", {
+      conversationId: active.entry.conversationId,
+      localTurnId: active.entry.localTurnId,
+      reason: failures.reason,
+      failures: failures.count,
+      outageMs: Date.now() - failures.since,
     });
   };
 
-  const heartbeat = async (): Promise<void> => {
-    if (heartbeating || stopped || activeBegins.size === 0) return;
-    heartbeating = true;
-    let nextHeartbeatMs = heartbeatIntervalMs;
+  const endActive = (
+    id: string,
+    active: ActiveBegin,
+    result: Extract<AttemptResult, { kind: "dead_letter" | "terminal" }>,
+  ): void => {
+    dropActive(id);
     try {
-      for (const [id, active] of [...activeBegins.entries()]) {
-        if (stopped) break;
-        const result = await attempt(active.entry, {
-          renewLeaseToken: active.ack.leaseToken,
-        });
-        if (activeBegins.get(id) !== active) continue;
-        if (result.kind === "ack") {
-          if (result.begin) {
-            activateBegin(
-              id,
-              {
-                ...active,
-                ack: result.begin.renewed
-                  ? {
-                      ...active.ack,
-                      leaseToken: result.begin.leaseToken,
-                      expiresAt: result.begin.expiresAt,
-                    }
-                  : result.begin,
-              },
-              result.authorityRequestStartedAt,
-            );
-          } else {
-            nextHeartbeatMs = Math.min(nextHeartbeatMs, BASE_RETRY_MS);
-          }
-          continue;
-        }
-        if (result.kind === "retry") {
-          nextHeartbeatMs = Math.min(nextHeartbeatMs, result.delayMs);
-          log("info", "cloud_transcript_heartbeat_retry", {
-            conversationId: active.entry.conversationId,
-            localTurnId: active.entry.localTurnId,
-            reason: result.reason,
-          });
-          continue;
-        }
-        activeBegins.delete(id);
-        active.cancelAuthorityDeadline();
-        try {
-          active.onLeaseLost?.(result.reason);
-        } catch {
-          log("error", "cloud_transcript_lease_lost_callback_failed", {
-            conversationId: active.entry.conversationId,
-            localTurnId: active.entry.localTurnId,
-            reason: result.reason,
-          });
-        }
-        clearHistory(active.entry.conversationId);
-        if (result.kind === "dead_letter") {
-          options.store.deadLetterCloudTranscriptOutbox(id, result.reason);
-        } else {
-          options.store.deleteCloudTranscriptOutbox(id);
-        }
-        log("error", "cloud_transcript_heartbeat_terminal", {
-          conversationId: active.entry.conversationId,
-          localTurnId: active.entry.localTurnId,
-          reason: result.reason,
-        });
-      }
-    } finally {
-      heartbeating = false;
+      active.onLeaseLost?.(result.reason);
+    } catch {
+      log("error", "cloud_transcript_lease_lost_callback_failed", {
+        conversationId: active.entry.conversationId,
+        localTurnId: active.entry.localTurnId,
+        reason: result.reason,
+      });
     }
-    scheduleHeartbeat(nextHeartbeatMs);
+    clearHistory(active.entry.conversationId);
+    if (result.kind === "dead_letter") {
+      options.store.deadLetterCloudTranscriptOutbox(id, result.reason);
+    } else {
+      options.store.deleteCloudTranscriptOutbox(id);
+    }
+    log("error", "cloud_transcript_heartbeat_terminal", {
+      conversationId: active.entry.conversationId,
+      localTurnId: active.entry.localTurnId,
+      reason: result.reason,
+    });
+  };
+
+  const scheduleRenewal = (
+    id: string,
+    active: ActiveBegin,
+    delayMs: number,
+  ): void => {
+    active.cancelRenewal?.();
+    active.cancelRenewal = null;
+    if (stopped || active.interruptRenewal || activeBegins.get(id) !== active) {
+      return;
+    }
+    active.cancelRenewal = forkDelayedCall(Math.max(10, delayMs), () => {
+      active.cancelRenewal = null;
+      void renew(id, active);
+    });
+  };
+
+  const renew = async (id: string, active: ActiveBegin): Promise<void> => {
+    if (stopped || active.interruptRenewal || activeBegins.get(id) !== active) {
+      return;
+    }
+    const suspectedAt = connectionsSuspectSince;
+    const call = interruptibleCall<AttemptResult>(
+      (signal) =>
+        attempt(active.entry, {
+          leaseToken: active.ack.leaseToken,
+          freshConnection: suspectedAt !== null || active.failures !== null,
+          signal,
+        }),
+      { kind: "retry", delayMs: 0, reason: "network_changed" },
+    );
+    active.interruptRenewal = call.interrupt;
+    let nextMs = heartbeatIntervalMs;
+    try {
+      const result = await call.result.catch(
+        (error: unknown): AttemptResult => ({
+          kind: "retry",
+          delayMs: heartbeatIntervalMs,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      if (stopped || activeBegins.get(id) !== active) return;
+      if (result.kind === "retry") {
+        nextMs = noteRenewalFailure(active, result);
+        return;
+      }
+      if (result.kind !== "ack") {
+        endActive(id, active, result);
+        return;
+      }
+      if (connectionsSuspectSince === suspectedAt) connectionsSuspectSince = null;
+      if (result.begin) {
+        active.ack = result.begin.renewed
+          ? {
+              ...active.ack,
+              leaseToken: result.begin.leaseToken,
+              expiresAt: result.begin.expiresAt,
+            }
+          : result.begin;
+      }
+      noteRenewed(active);
+    } finally {
+      active.interruptRenewal = null;
+      scheduleRenewal(id, active, nextMs);
+    }
+  };
+
+  const dropActive = (id: string): void => {
+    const active = activeBegins.get(id);
+    if (!active) return;
+    activeBegins.delete(id);
+    active.cancelRenewal?.();
+    active.cancelRenewal = null;
+    active.interruptRenewal?.();
+  };
+
+  const renewActiveNow = (): void => {
+    for (const [id, active] of activeBegins) scheduleRenewal(id, active, 0);
   };
 
   const isParkedForResume = (entry: CloudTranscriptOutboxRecord): boolean => {
@@ -1249,7 +1260,7 @@ export const createCloudTranscriptWriter = (
           } else {
             options.store.deleteCloudTranscriptOutbox(entry.id);
           }
-          activeBegins.delete(entry.id);
+          dropActive(entry.id);
           const waiters = beginWaiters.get(entry.id);
           if (waiters?.length) {
             const error =
@@ -1318,16 +1329,16 @@ export const createCloudTranscriptWriter = (
           const onLeaseLost = waiters.find(
             (waiter) => waiter.onLeaseLost,
           )?.onLeaseLost;
-          activateBegin(
-            entry.id,
-            {
-              ack,
-              entry,
-              ...(onLeaseLost ? { onLeaseLost } : {}),
-            },
-            result.authorityRequestStartedAt,
-          );
-          scheduleHeartbeat();
+          const active: ActiveBegin = {
+            ack,
+            entry,
+            ...(onLeaseLost ? { onLeaseLost } : {}),
+            failures: null,
+            interruptRenewal: null,
+            cancelRenewal: null,
+          };
+          activeBegins.set(entry.id, active);
+          scheduleRenewal(entry.id, active, heartbeatIntervalMs);
           beginWaiters.delete(entry.id);
           for (const waiter of waiters) {
             waiter.cleanup();
@@ -1424,7 +1435,14 @@ export const createCloudTranscriptWriter = (
     if (stopped) return;
     scheduleDrain(0);
     scheduleJournalDrain(0);
-    scheduleHeartbeat(0);
+    renewActiveNow();
+  };
+
+  const networkChanged = (): void => {
+    if (stopped) return;
+    connectionsSuspectSince = performance.now();
+    for (const active of activeBegins.values()) active.interruptRenewal?.();
+    resume();
   };
 
   resume();
@@ -1611,9 +1629,7 @@ export const createCloudTranscriptWriter = (
             })
           : null,
       });
-      activeBegins.get(beginId)?.cancelAuthorityDeadline();
-      activeBegins.delete(beginId);
-      scheduleHeartbeat();
+      dropActive(beginId);
       if (tooManyRecords || tooManyBytes) {
         const reason = tooManyRecords
           ? "finish_record_limit_exceeded"
@@ -1679,6 +1695,7 @@ export const createCloudTranscriptWriter = (
       options.store.countCloudTranscriptOutbox() +
       options.store.countCloudJournalOutbox(),
     resume,
+    networkChanged,
     stop: () => {
       if (stopped) return;
       stopped = true;
@@ -1690,10 +1707,6 @@ export const createCloudTranscriptWriter = (
         cancelJournalRetryDelay();
         cancelJournalRetryDelay = null;
       }
-      if (cancelHeartbeatDelay) {
-        cancelHeartbeatDelay();
-        cancelHeartbeatDelay = null;
-      }
       const error = new Error("Cloud transcript writer stopped.");
       for (const waiters of beginWaiters.values()) {
         for (const waiter of waiters) {
@@ -1702,10 +1715,7 @@ export const createCloudTranscriptWriter = (
         }
       }
       beginWaiters.clear();
-      for (const active of activeBegins.values()) {
-        active.cancelAuthorityDeadline();
-      }
-      activeBegins.clear();
+      for (const id of [...activeBegins.keys()]) dropActive(id);
       finishFailureCallbacks.clear();
       historyWindows.clear();
       historyRefreshes.clear();

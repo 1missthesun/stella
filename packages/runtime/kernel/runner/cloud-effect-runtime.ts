@@ -48,3 +48,21 @@ export const raceWithTimeoutError = <A>(
       ),
     ),
   );
+
+export const interruptibleCall = <A>(
+  run: (signal: AbortSignal) => Promise<A>,
+  interrupted: A,
+): { result: Promise<A>; interrupt: () => void } => {
+  const canceled = Deferred.makeUnsafe<A>();
+  return {
+    result: runCloudWriterEffect(
+      Effect.raceFirst(
+        Effect.tryPromise({ try: run, catch: (error) => error }),
+        Deferred.await(canceled),
+      ),
+    ),
+    interrupt: () => {
+      Deferred.doneUnsafe(canceled, Effect.succeed(interrupted));
+    },
+  };
+};

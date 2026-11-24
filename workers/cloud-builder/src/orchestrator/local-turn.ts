@@ -503,6 +503,33 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     return { ...context, promptSeq: promptRow.seq };
   }
 
+  private async retireOwnLocalTurn(
+    lease: LocalTurnLease,
+  ): Promise<Response | null> {
+    if (lease.phase.s === "cancel_pending") {
+      if (lease.phase.deadlineAt > Date.now()) return null;
+      await this.cancelLocalTurn(lease, true);
+      return json(
+        {
+          code: "turn_finished",
+          message: "That local turn was canceled.",
+          turnId: lease.turnId,
+        },
+        409,
+      );
+    }
+    if (await this.localTurnStillHeld(lease)) return null;
+    await this.expireLocalLease(lease, true);
+    return json(
+      {
+        code: "turn_expired",
+        message: "That local turn lease expired.",
+        turnId: lease.turnId,
+      },
+      409,
+    );
+  }
+
   protected async handleLocalTurnRenewal(
     renewal: ParsedLocalTurnRenewal,
     ownerId: string,
@@ -545,23 +572,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     if (existing.ownerGeneration !== expectedOwnerGeneration) {
       return staleOwnerGenerationResponse();
     }
-    if (localTurnRetirementDeadline(existing) <= Date.now()) {
-      if (existing.phase.s === "cancel_pending") {
-        await this.cancelLocalTurn(existing, true);
-      } else {
-        await this.expireLocalLease(existing, true);
-      }
-      return json(
-        {
-          code: existing.phase.s === "cancel_pending" ? "turn_finished" : "turn_expired",
-          message: existing.phase.s === "cancel_pending"
-            ? "That local turn was canceled."
-            : "That local turn lease expired.",
-          turnId: existing.turnId,
-        },
-        409,
-      );
-    }
     if (
       existing.turnId !== turnId ||
       existing.deviceId !== deviceId ||
@@ -577,6 +587,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         409,
       );
     }
+    const retired = await this.retireOwnLocalTurn(existing);
+    if (retired) return retired;
 
     let renewed: LocalTurnLease | undefined;
     await this.ctx.blockConcurrencyWhile(async () => {
@@ -590,11 +602,18 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         current.ownerId !== ownerId ||
         current.ownerGeneration !== expectedOwnerGeneration ||
         current.leaseToken !== leaseToken ||
-        current.phase.s === "cancel_pending" ||
-        current.expiresAt <= Date.now() ||
+        !(await this.localTurnStillHeld(current)) ||
         this.journal.turnState(turnId)?.state === "terminal"
       ) {
         return;
+      }
+      const lapsedMs = Date.now() - current.expiresAt;
+      if (lapsedMs > 0) {
+        log("info", "conversation_local_turn_lease_revived", {
+          turnId,
+          deviceId,
+          lapsedMs,
+        });
       }
       current.expiresAt = Date.now() + LOCAL_TURN_LEASE_MS;
       await this.ctx.storage.put(LOCAL_TURN_LEASE_KEY, current);
@@ -842,23 +861,14 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       if (existing.ownerGeneration !== expectedOwnerGeneration) {
         return staleOwnerGenerationResponse();
       }
-      if (localTurnRetirementDeadline(existing) <= Date.now()) {
+      if (existing.turnId === turnId && existing.deviceId === deviceId) {
+        const retired = await this.retireOwnLocalTurn(existing);
+        if (retired) return retired;
+      } else if (localTurnRetirementDeadline(existing) <= Date.now()) {
         if (existing.phase.s === "cancel_pending") {
           await this.cancelLocalTurn(existing, true);
         } else {
           await this.expireLocalLease(existing, true);
-        }
-        if (existing.turnId === turnId) {
-          return json(
-            {
-              code: existing.phase.s === "cancel_pending" ? "turn_finished" : "turn_expired",
-              message: existing.phase.s === "cancel_pending"
-                ? "That local turn was canceled."
-                : "That local turn lease expired.",
-              turnId: existing.turnId,
-            },
-            409,
-          );
         }
       }
       if (
@@ -895,8 +905,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           current.ownerGeneration !== expectedOwnerGeneration ||
           current.leaseToken !== existing.leaseToken ||
           current.beginFingerprint !== beginFingerprint ||
-          current.phase.s === "cancel_pending" ||
-          current.expiresAt <= Date.now() ||
+          !(await this.localTurnStillHeld(current)) ||
           this.journal.turnState(turnId)?.state === "terminal"
         ) {
           return;
@@ -1405,23 +1414,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         409,
       );
     }
-    if (localTurnRetirementDeadline(lease) <= Date.now()) {
-      if (lease.phase.s === "cancel_pending") {
-        await this.cancelLocalTurn(lease, true);
-      } else {
-        await this.expireLocalLease(lease, true);
-      }
-      return json(
-        {
-          code: lease.phase.s === "cancel_pending" ? "turn_finished" : "turn_expired",
-          message: lease.phase.s === "cancel_pending"
-            ? "That local turn was canceled."
-            : "That local turn lease expired.",
-          turnId,
-        },
-        409,
-      );
-    }
+    const retired = await this.retireOwnLocalTurn(lease);
+    if (retired) return retired;
     let claimedLease: LocalTurnLease | undefined;
     let idempotencyConflict = false;
     await this.ctx.blockConcurrencyWhile(async () => {
@@ -1435,8 +1429,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         current.deviceId !== deviceId ||
         current.localTurnId !== localTurnId ||
         current.leaseToken !== leaseToken ||
-        current.expiresAt <= Date.now() ||
-        current.phase.s === "cancel_pending"
+        !(await this.localTurnStillHeld(current))
       ) {
         return;
       }

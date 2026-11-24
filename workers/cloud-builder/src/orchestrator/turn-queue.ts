@@ -2,6 +2,7 @@ import {
   startTurnExecution,
   type TurnRetryCancellation,
 } from "../turn-cancellation.js";
+import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import type { JournalRecord } from "../conversation-types.js";
 import {
   type LocalClientMessageReceipt,
@@ -24,7 +25,10 @@ import {
   CHAT_RESUME_DEADLINE_MARGIN_MS,
   CHAT_TURN_PHASE_KEY,
   LOCAL_TURN_CANCEL_GRACE_MS,
+  LOCAL_TURN_LAPSE_HOLD_MS,
   LOCAL_TURN_LEASE_KEY,
+  LOCAL_TURN_LEASE_MS,
+  PI_BRAIN_KEY,
   localTurnReceiptKey,
   localClientMessageKey,
   TERMINAL_NOTICE,
@@ -650,8 +654,9 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
   protected async expireLocalLease(
     lease: LocalTurnLease,
     resumeQueued: boolean,
-    notice: string = TERMINAL_NOTICE.timeout,
-  ): Promise<void> {
+    cause: "lapsed" | "taken_over" = "lapsed",
+  ): Promise<"retired" | "renewed"> {
+    const notice = `Stella lost touch with ${await this.localTurnHostName(lease)} before this was answered.`;
     const current =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (
@@ -659,8 +664,16 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       current.turnId !== lease.turnId ||
       current.leaseToken !== lease.leaseToken
     ) {
-      return;
+      return "retired";
     }
+    if (cause === "lapsed" && current.expiresAt > Date.now()) return "renewed";
+    log("info", "conversation_local_turn_lease_expired", {
+      conversationId: this.conversationId(),
+      turnId: lease.turnId,
+      deviceId: lease.deviceId,
+      cause,
+      lapsedMs: Date.now() - current.expiresAt,
+    });
     const priorState = this.journal.turnState(lease.turnId);
     const phase =
       priorState?.state === "terminal"
@@ -726,6 +739,55 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         message: errorMessage(error),
       });
     });
+    return "retired";
+  }
+
+  protected async localTurnHostName(lease: LocalTurnLease): Promise<string> {
+    const listed = await this.ownerGate(lease.ownerId)
+      .devices()
+      .catch(() => undefined);
+    const label = listed?.devices
+      .find((device) => device.deviceId === lease.deviceId)
+      ?.label?.trim();
+    if (label) return label;
+    const record = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+    const held = [record, record?.previous].find(
+      (host) => host?.host === "device" && host.deviceId === lease.deviceId,
+    );
+    return (
+      (held?.host === "device" && held.label?.trim()) ||
+      "the computer it was running on"
+    );
+  }
+
+  protected async localTurnStillHeld(lease: LocalTurnLease): Promise<boolean> {
+    if (lease.phase.s === "cancel_pending") return false;
+    if (lease.expiresAt > Date.now()) return true;
+    const record = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+    return (
+      !record ||
+      (record.host === "device" && record.deviceId === lease.deviceId)
+    );
+  }
+
+  protected async retireLapsedLocalLease(lease: LocalTurnLease): Promise<void> {
+    const holdUntil = lease.expiresAt + LOCAL_TURN_LAPSE_HOLD_MS;
+    const contended =
+      !(await this.localTurnStillHeld(lease)) ||
+      (
+        await this.ctx.storage.list<ChatTurnRequest>({
+          prefix: "queued:",
+          limit: 1,
+        })
+      ).size > 0;
+    if (!contended && Date.now() < holdUntil) {
+      await this.armLocalLeaseAlarm(holdUntil);
+      return;
+    }
+    const outcome = await this.expireLocalLease(lease, true);
+    if (outcome === "renewed") {
+      await this.armLocalLeaseAlarm(Date.now() + LOCAL_TURN_LEASE_MS);
+    }
   }
 
   protected abstract runTurn(

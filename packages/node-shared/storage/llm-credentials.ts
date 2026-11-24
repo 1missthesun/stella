@@ -52,9 +52,7 @@ const readCredentialFile = (stellaAppDir: string): StoredLlmCredentialFile => {
     ) {
       return parsed;
     }
-  } catch {
-    // Fall through to empty store.
-  }
+  } catch {}
 
   return {
     version: 1,

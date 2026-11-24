@@ -11,12 +11,6 @@ import {
 } from "./memory-layout.js";
 
 export const MEMORY_FILE_MAX_CHARS = 32_000;
-/**
- * The most a memory file can be and still sync between the user's computers
- * and the cloud (UTF-8 bytes). The character caps above are how big Stella
- * keeps files she writes through `memory.write`; sync carries any memory file
- * up to this, however it was written.
- */
 export const MEMORY_SYNC_MAX_BYTES = 512 * 1024;
 export const MEMORY_LIST_MAX_FILES = 500;
 
@@ -182,7 +176,6 @@ export const prepareMemoryWrite = async (
   return { bytes, sha: await memorySha(bytes) };
 };
 
-/** What `memory.files.write` stores: redacted, and refused only past what sync carries. */
 export const prepareMemorySync = async (
   path: string,
   content: string,

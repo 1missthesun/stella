@@ -71,21 +71,6 @@ CREATE INDEX IF NOT EXISTS idx_entry_ref_target
   ON entry_ref(conversation_id, target_kind, target_key, entry_seq);
 `;
 
-/**
- * Covering index over the rows that carry `search_text` (visible
- * user/assistant messages: ~12k of prod's ~1.9M `entry` rows). `payload`
- * precedes `search_text`/`created_at` in `entry`, so any filter on those
- * columns that reads the table walks multi-MB payload overflow chains; this
- * partial index lets message-history queries by conversation and time skip
- * the table row.
- *
- * Deliberately NOT part of the core schema or a migration: building it is
- * one full `entry` scan (~6 s warm, ~15-20 s cold on the 13 GiB prod file)
- * under the write lock, which must not run at open (Electron main migrates
- * synchronously). `maintenance.ts` builds it in the detached idle window.
- * Queries must never depend on it (no `INDEXED BY`): without it they return
- * the same rows, only slower.
- */
 export const SEARCH_TEXT_INDEX_NAME = "idx_entry_search_conv_created";
 export const SEARCH_TEXT_INDEX_SQL = `
 CREATE INDEX IF NOT EXISTS idx_entry_search_conv_created
@@ -365,9 +350,7 @@ export const migrateDesktopDatabase = (db: SqliteDatabase): void => {
   } catch (error) {
     try {
       db.exec("ROLLBACK;");
-    } catch {
-      /* the transaction may already be gone */
-    }
+    } catch {}
     throw error;
   }
 };

@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import path from "path";
 import os from "os";
 
-/** The bit of Electron's `app` these helpers read. */
 type App = { getAppPath: () => string };
 
 const __dirname = import.meta.dirname;
@@ -17,7 +16,7 @@ export const resolveStellaAppDir = (
   }
   return app
     ? path.resolve(app.getAppPath(), "..")
-    : // packages/node-shared/home -> the checkout root
+    :
       path.resolve(__dirname, "..", "..", "..");
 };
 

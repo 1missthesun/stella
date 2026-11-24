@@ -826,7 +826,6 @@ export class ChatLog {
     });
   }
 
-  /** Takes events out of the chat: those with an id in `ids`, or one that starts with a prefix in `idPrefixes`. */
   hideEvents(
     conversationId: string,
     ids: readonly string[],

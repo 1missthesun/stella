@@ -7,22 +7,6 @@ import {
   type LogFields,
 } from "./logger.js";
 
-/**
- * Local debug logger shared by every Stella
- * process (Electron main and the Bun runtime worker).
- *
- * Goals:
- *   - Capture errors/crashes and process lifecycle (workers + native
- *     helpers starting / being cleaned up) to plain `.txt` files.
- *   - Daily rotation with automatic retention cleanup.
- *   - Preserve the complete diagnostic context supplied by call sites,
- *     including nested values, paths, URLs, and error stacks.
- *
- * Every write lands synchronously so a line is still flushed even if the
- * process is mid-crash. Do NOT route hot-path / per-token / per-frame logging
- * through here.
- */
-
 export type {
   LogFields,
   FileLoggerOptions,
@@ -78,20 +62,9 @@ export const initFileLogger = (
 export const getFileLogger = (): FileLogger | null => sharedLogger;
 
 /**
- * Electron main's crash policy. Electron shows "A JavaScript error occurred
- * in the main process" for an uncaught exception and keeps running; its own
- * handler stands aside once any other `uncaughtException` listener exists,
- * so `showUncaught` shows that same dialog for everything this does not
- * survive.
- *
- * An error that only says a peer hung up (EPIPE, ECONNRESET: a caller,
- * child or client that closed its end) is logged with its full context and
- * survived without a dialog, as the runtime worker does: the stream it came
- * from is already destroyed, and the user can do nothing about it. Every
- * other uncaught exception is recorded and shown as before.
- *
- * Unhandled rejections are logged and swallowed (the process keeps running
- * with only a log line), as before.
+ * Electron shows "A JavaScript error occurred in the main process" for an
+ * uncaught exception and keeps running; its own handler stands aside once any
+ * other `uncaughtException` listener exists.
  */
 export const installMainCrashHandling = (
   logger: FileLogger,
@@ -117,13 +90,6 @@ export const installMainCrashHandling = (
   });
 };
 
-/**
- * The detached runtime worker's crash policy. It hosts every agent, so an
- * error that only says one peer hung up (EPIPE, ECONNRESET: a child or
- * client that closed its end) is logged with its full context and survived.
- * Anything else stays fatal, as before, but the worker first runs
- * `beforeFatalExit` so nothing it started outlives it.
- */
 export const installWorkerCrashHandling = (
   logger: FileLogger,
   options: { context: () => LogFields; beforeFatalExit: () => void },

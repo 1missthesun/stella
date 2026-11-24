@@ -1,10 +1,3 @@
-/**
- * Stand-ins for credentials masked out of browser output. They are made of
- * URL-unreserved characters so they survive URLs, headers, cookies, form
- * bodies and JSON unchanged, and the hyphens keep them from parsing as a
- * JavaScript identifier, so one outside a string literal is a syntax error
- * rather than a silently different value.
- */
 export const BROWSER_SECRET_PLACEHOLDER_PREFIX = "stella-secret-";
 
 const PLACEHOLDER_BODY = "[a-z2-7]{12}";

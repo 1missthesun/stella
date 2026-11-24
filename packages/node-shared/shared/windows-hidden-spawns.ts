@@ -1,20 +1,9 @@
 /**
  * Electron is a GUI program on Windows, so Electron's main process and every
- * `ELECTRON_RUN_AS_NODE` process (Stella's `node` shim and the `stella-*` CLI
- * shims run scripts that way) have no console. When a process without a
- * console starts a console program (git, cmd, powershell, npm, Stella's own
- * helpers) without `windowsHide`, Windows gives that program a new console,
- * and with Windows Terminal as the default terminal that is a visible, blank
- * Terminal window that stays open until the program exits.
- *
- * This makes `windowsHide: true` the default for every `child_process` call in
- * such a process: piped children start with CREATE_NO_WINDOW (a console with
- * no window, which their own children share), inheriting ones with SW_HIDE.
- * A caller that passes `windowsHide` itself keeps its choice.
- *
- * The function is self-contained on purpose: Stella's shell shims write its
- * source into a `--require` preload for Electron-as-Node (see
- * `windowsHiddenSpawnPreloadSource`), so it may use nothing from this module.
+ * `ELECTRON_RUN_AS_NODE` process have no console. When a process without a
+ * console starts a console program without `windowsHide`, Windows gives that
+ * program a new console, which with Windows Terminal as the default terminal is
+ * a visible, blank Terminal window that stays open until the program exits.
  */
 export function installWindowsHiddenSpawns(
   childProcess: object,
@@ -25,9 +14,6 @@ export function installWindowsHiddenSpawns(
   const marker = Symbol.for("stella.windowsHiddenSpawns");
   if (target[marker]) return false;
 
-  // Puts `windowsHide: true` into the options argument of a child_process
-  // call: (file, args?, options?, callback?) when `argsListFirst`, otherwise
-  // (command, options?, callback?).
   const withHiddenWindows = (
     callArgs: unknown[],
     argsListFirst: boolean,
@@ -63,9 +49,6 @@ export function installWindowsHiddenSpawns(
       return original.apply(this, withHiddenWindows(args, argsListFirst));
     };
     // Keep what Node hangs on these functions, above all
-    // `util.promisify.custom` on exec/execFile (the {stdout, stderr} form).
-    // That custom function calls Node's own execFile directly, so it is
-    // wrapped as well.
     for (const key of Reflect.ownKeys(original)) {
       if (
         key === "length" ||
@@ -108,17 +91,11 @@ export function installWindowsHiddenSpawns(
   }
   Object.defineProperty(target, marker, { value: true });
   // ESM `import { spawn } from "node:child_process"` bindings follow the
-  // CommonJS exports only after this.
   syncBuiltinESMExports?.();
   return true;
 }
 
-/**
- * Keeps the preload in `NODE_OPTIONS` so Node processes this one starts
- * (`fork`, `process.execPath`, npm scripts, `node` again) load it too. Inside
- * a quoted NODE_OPTIONS value a backslash escapes the next character, so the
- * path is written with forward slashes.
- */
+/** Inside a quoted NODE_OPTIONS value a backslash escapes the next character. */
 export function keepPreloadForChildren(preloadPath: string): void {
   const normalized = preloadPath.replace(/\\/g, "/");
   const current = process.env.NODE_OPTIONS ?? "";
@@ -127,11 +104,6 @@ export function keepPreloadForChildren(preloadPath: string): void {
     `--require "${normalized}"${current ? ` ${current}` : ""}`;
 }
 
-/**
- * Source for a CommonJS `--require` preload that installs the hidden-window
- * default in an Electron-as-Node process on Windows. It is a no-op anywhere
- * else (real Node has a console of its own, other platforms have none).
- */
 export const windowsHiddenSpawnPreloadSource = (): string =>
   [
     'if (process.platform === "win32" && process.versions.electron) {',

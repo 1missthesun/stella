@@ -66,9 +66,7 @@ const readFile = (stellaAppDir: string): ProfilesFile => {
         profiles: parsed.profiles,
       };
     }
-  } catch {
-    // Missing or unreadable: a new host.
-  }
+  } catch {}
   const fresh: ProfilesFile = {
     version: 1,
     hostId: createChatGptHostId(),

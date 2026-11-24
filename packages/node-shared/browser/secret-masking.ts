@@ -7,14 +7,6 @@ import {
   isBrowserSecretPlaceholder,
 } from "./secret-placeholder.js";
 
-/*
- * Credentials in browser output (captured traffic, cookies, page values) are
- * replaced with stable placeholders before an agent's code sees them. The real
- * values stay in this host-side vault; a placeholder the agent sends back
- * through the same browser session is swapped for its value only when the
- * destination is the site it was captured from.
- */
-
 const MAX_SECRETS_PER_SESSION = 4_096;
 const MAX_SESSIONS = 64;
 const GENERIC_MIN_LENGTH = 6;
@@ -38,13 +30,6 @@ const indexKey = (text: string, at: number): number =>
   (text.charCodeAt(at) * 65_536 + text.charCodeAt(at + 1)) * 65_536 +
   text.charCodeAt(at + 2);
 
-// ---------------------------------------------------------------------------
-// Sites
-// ---------------------------------------------------------------------------
-
-// Registrable-domain approximation: two labels, three under these suffixes.
-// Hosting suffixes are listed too because their subdomains belong to
-// different owners.
 const MULTI_LABEL_SUFFIXES = new Set([
   "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk",
   "com.au", "net.au", "org.au", "edu.au", "gov.au",
@@ -91,10 +76,6 @@ export const siteOfUrl = (raw: unknown): string | undefined => {
 
 const isAbsoluteHttpUrl = (raw: unknown): raw is string =>
   typeof raw === "string" && /^(?:https?|wss?):\/\//i.test(raw.trim());
-
-// ---------------------------------------------------------------------------
-// Secret names
-// ---------------------------------------------------------------------------
 
 const SECRET_TOKENS = new Set([
   "auth", "authorization", "authtoken", "cookie", "cookies", "credential",
@@ -207,7 +188,6 @@ export const cookieValueIsSecret = (
 const isUuid = (text: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);
 
-/** Path segments that look like credentials: JWTs, long hex, high-entropy base64. */
 const looksLikeTokenSegment = (segment: string): boolean => {
   if (segment.length < 24 || isUuid(segment) || segment.includes("${")) {
     return false;
@@ -236,11 +216,6 @@ const looksLikeTokenSegment = (segment: string): boolean => {
   );
 };
 
-// ---------------------------------------------------------------------------
-// Vault
-// ---------------------------------------------------------------------------
-
-/** What a vault needs to recognize its placeholders again, without the values that can't be sent back. */
 export type SavedBrowserSecrets = Readonly<{
   key: string;
   secrets: readonly (readonly [value: string, sites: readonly string[]])[];
@@ -273,7 +248,6 @@ export class BrowserSecretVault {
     return this.#byValue.size;
   }
 
-  /** The newest values that fit, oldest first. */
   save(maxChars: number): SavedBrowserSecrets {
     const secrets: (readonly [string, readonly string[]])[] = [];
     let room = maxChars;
@@ -328,7 +302,6 @@ export class BrowserSecretVault {
     return this.#byPlaceholder.get(placeholder);
   }
 
-  /** Replaces every known secret (and its URL-encoded form) inside text. */
   replaceKnown(text: string, extra?: ReadonlyMap<string, string>): string {
     if (text.length < INDEX_KEY_LENGTH) return text;
     const index = this.#indexFor(extra);
@@ -425,7 +398,6 @@ const buildIndex = (
 
 const vaults = new Map<string, BrowserSecretVault>();
 
-/** One vault per browser session, so placeholders outlive a REPL restart. */
 export const browserSecretVault = (sessionId: string): BrowserSecretVault => {
   let vault = vaults.get(sessionId);
   if (vault) {
@@ -441,11 +413,6 @@ export const browserSecretVault = (sessionId: string): BrowserSecretVault => {
   return vault;
 };
 
-// ---------------------------------------------------------------------------
-// Masking
-// ---------------------------------------------------------------------------
-
-/** One masking pass over one browser result. */
 export class BrowserSecretMaskRun {
   readonly #vault: BrowserSecretVault;
   readonly #reverse: ReadonlyMap<string, string> | undefined;
@@ -469,7 +436,6 @@ export class BrowserSecretMaskRun {
     return this.#pending.size > 0;
   }
 
-  /** Masks one value; site undefined binds it to the page once that is known. */
   secret(
     value: string,
     site: string | undefined = this.site,
@@ -496,7 +462,6 @@ export class BrowserSecretMaskRun {
     return output === text ? text : this.#vault.replaceKnown(output);
   }
 
-  /** The generic pass: every string in value, keys left as they are. */
   deep<T>(value: T, site: string | undefined = this.site, depth = 0): T {
     if (typeof value === "string") return this.text(value, site) as T;
     if (depth > MAX_JSON_DEPTH || value === null || typeof value !== "object") {
@@ -609,7 +574,6 @@ const maskTextPatterns = (
   return output;
 };
 
-/** Secret query/fragment fields, URL passwords, and (for traffic) token-like path segments. */
 export const protectUrl = (
   run: BrowserSecretMaskRun,
   raw: string,
@@ -749,7 +713,6 @@ export const protectHeaderValue = (
   return value;
 };
 
-/** Headers as a {name: value} map or a [{name, value}] list. */
 export const protectHeaders = (
   run: BrowserSecretMaskRun,
   headers: unknown,
@@ -823,9 +786,7 @@ export const protectBody = (
       const before = run.masked;
       const protectedValue = protectJson(run, parsed, site);
       return run.masked === before ? body : JSON.stringify(protectedValue);
-    } catch {
-      // Not JSON after all; the generic pass still covers it.
-    }
+    } catch {}
   }
   if (
     kind.includes("x-www-form-urlencoded") ||
@@ -867,7 +828,6 @@ const protectMultipart = (
     .join(delimiter);
 };
 
-/** Page data (evaluate results, JSON bodies): secret-named fields and secret-shaped strings. */
 export const protectJson = (
   run: BrowserSecretMaskRun,
   value: unknown,
@@ -1090,7 +1050,6 @@ const protectHarEntry = (run: BrowserSecretMaskRun, entry: unknown): unknown => 
   return next;
 };
 
-/** A HAR document ({log: {entries}}) with every exchange masked. */
 export const protectHar = (run: BrowserSecretMaskRun, har: unknown): unknown => {
   if (!isPlainRecord(har) || !isPlainRecord(har.log)) return run.deep(har);
   const entries = Array.isArray(har.log.entries) ? har.log.entries : [];
@@ -1133,7 +1092,6 @@ const PAGE_DATA_ACTIONS = new Set([
   "waitforfunction",
 ]);
 
-/** Structured masking of one action's result data; the generic pass runs after. */
 export const protectActionData = (
   run: BrowserSecretMaskRun,
   action: string,
@@ -1184,11 +1142,6 @@ export const protectActionData = (
   }
 };
 
-// ---------------------------------------------------------------------------
-// Page fields read back through value-exposing reads
-// ---------------------------------------------------------------------------
-
-/** Actions whose results can carry the value of a field the agent never saw. */
 export const FIELD_EXPOSING_ACTIONS = new Set([
   "evaluate",
   "waitforfunction",
@@ -1225,7 +1178,6 @@ export const PAGE_SECRET_FIELDS_SCRIPT = `(() => {
   return { href: location.href, fields };
 })()`;
 
-/** Registers the page's password, one-time-code and secret-named hidden values. */
 export const rememberPageSecretFields = (
   vault: BrowserSecretVault,
   report: unknown,
@@ -1250,7 +1202,6 @@ export const rememberPageSecretFields = (
   return site;
 };
 
-/** A value the agent typed through use_secure_value: masked everywhere, never replayable. */
 export const rememberFilledSecret = (
   vault: BrowserSecretVault,
   value: string,
@@ -1260,11 +1211,6 @@ export const rememberFilledSecret = (
 
 const SETTLE_STATES = new Set(["settled", "timeout", "navigating"]);
 
-/**
- * Whether a read's result could hold a field value the agent never saw. The
- * worker's own page-settle probe ({state, ms}) cannot, so it skips the extra
- * page round trip that collects field values.
- */
 export const mayCarryPageValues = (data: unknown): boolean => {
   const result = isPlainRecord(data) && "result" in data ? data.result : data;
   if (
@@ -1286,14 +1232,9 @@ const hasMaskableText = (value: unknown, depth = 0): boolean => {
   return Object.values(value).some((item) => hasMaskableText(item, depth + 1));
 };
 
-// ---------------------------------------------------------------------------
-// Placeholders sent back
-// ---------------------------------------------------------------------------
-
 export class BrowserSecretPlaceholderError extends Error {
   constructor(
     message: string,
-    /** The placeholder of a password or one-time code, which never goes back. */
     readonly unreplayable?: string,
   ) {
     super(message);
@@ -1505,10 +1446,6 @@ export type BrowserPlaceholderSubstitution = Readonly<{
   inserted: ReadonlyMap<string, string>;
 }>;
 
-/**
- * Swaps placeholders in a worker browser call for their values, refusing any
- * that would leave the site they came from. Null when the call has none.
- */
 export const substituteBrowserPlaceholders = async (
   vault: BrowserSecretVault,
   method: string,

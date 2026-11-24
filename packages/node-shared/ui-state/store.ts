@@ -1,10 +1,3 @@
-/**
- * Owns `~/.stella/ui-state.json`, the renderer's durable key/value state.
- * Electron main and the dev server's plain-browser host each run one against
- * the same file: a flush re-reads it and applies only this host's pending
- * changes, which stay queued until a write succeeds.
- */
-
 import fs from "fs";
 import path from "path";
 import * as Cause from "effect/Cause";
@@ -211,11 +204,9 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
     );
   };
 
-  // Watch the directory, not the file: atomic renames replace the inode,
-  // which silently kills direct file watches on some platforms. The
-  // prefix match (not equality) is deliberate — Bun's fs.watch reports a
-  // rename only under the *source* tmp name (`ui-state.json.<pid>….tmp`),
-  // never the destination, so an exact-name filter drops every event.
+  // Atomic renames replace the inode, which silently kills direct file watches on
+  // some platforms, and Bun's fs.watch reports a rename only under the source tmp
+  // name (`ui-state.json.<pid>….tmp`), never the destination.
   yield* Effect.acquireRelease(
     Effect.sync(() => {
       try {
@@ -234,11 +225,8 @@ const makeCore = Effect.fn("UiStateStore.make")(function* (
     (watcher) => Effect.sync(() => watcher?.close()),
   ).pipe(Scope.provide(scope));
 
-  // Stat-poll fallback: FSEvents/inotify can silently drop or coalesce
-  // events; a 1s mtime poll guarantees eventual cross-host convergence.
-  // Kept as fs.watchFile (not a Schedule loop) deliberately: its
-  // `persistent: false` stat timer never holds the process open, which a
-  // fiber-driven sleep loop would.
+  // FSEvents/inotify can silently drop or coalesce events. fs.watchFile's
+  // `persistent: false` stat timer never holds the process open.
   yield* Effect.acquireRelease(
     Effect.sync(() => {
       fs.watchFile(

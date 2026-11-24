@@ -122,9 +122,7 @@ const safeEndpoint = (raw: string, allowInsecure: boolean): string | null => {
     ) {
       return url.toString();
     }
-  } catch {
-    // Invalid/missing dynamic config disables this flush attempt.
-  }
+  } catch {}
   return null;
 };
 
@@ -266,8 +264,6 @@ export class RemoteTelemetryClient {
         ...(context.ownerIdSha256
           ? { ownerIdSha256: context.ownerIdSha256 }
           : {}),
-        // Keep no caller-owned reference: a mutation after validation must not
-        // be able to add content-bearing fields before a later flush/rewrite.
         event: structuredClone(event),
       };
       if (!isTelemetryEventV1(envelope)) {
@@ -449,9 +445,7 @@ export class RemoteTelemetryClient {
     let transport: RemoteTelemetryTransportConfig | null = null;
     try {
       transport = await this.options.getTransportConfig();
-    } catch {
-      // Dynamic auth/config lookup is best-effort.
-    }
+    } catch {}
     const endpoint = transport
       ? safeEndpoint(transport.endpoint, this.options.allowInsecureEndpoint)
       : null;

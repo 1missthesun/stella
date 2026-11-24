@@ -1,33 +1,14 @@
 /**
- * Terminate a spawned process together with everything it started.
- *
- * POSIX: the root is expected to lead its own process group (spawned with
- * `detached: true`). The group is frozen and the process table read before
- * any termination signal, so descendants that left the group (setsid,
- * daemons) are still reached by their parent links. The group itself is
- * signalled and checked on its own: an exited root does not end cleanup
- * while group members survive.
- *
- * Windows: there are no process groups. While the root is alive,
- * `taskkill /T` walks its tree. Once the root has exited its children are
- * orphaned, so they are found by their recorded parent pid and killed as
- * their own trees.
- *
- * Promise-returning so both the Electron main process and the runtime tool
- * host can await it.
+ * Windows has no process groups. While the root is alive, `taskkill /T` walks
+ * its tree; once the root has exited its children are orphaned and are found
+ * by their recorded parent pid.
  */
 
 import { execFile } from "node:child_process";
 import { logProcessSignal, readProcessCommand, readProcessIdentity } from "./process-identity.js";
 
 export type TerminateProcessTreeOptions = {
-  /**
-   * Whether the root is still the process the caller started: from its
-   * ChildProcess handle, or a recorded identity. Never just "the pid is
-   * alive": a pid held after its process ended may name someone else's.
-   */
   isRootRunning: () => boolean;
-  /** Why, for the process-kill log. */
   reason?: string;
   graceSignal?: NodeJS.Signals;
   forceAfterMs?: number;
@@ -155,8 +136,6 @@ const terminatePosixTree = async (
 ) => {
   if (!options.isRootRunning()) {
     if (isPidAlive(rootPid)) {
-      // Someone else's process holds the pid now; its group and children
-      // are not ours either.
       logProcessSignal({
         pid: rootPid,
         signal: options.graceSignal,
@@ -169,8 +148,6 @@ const terminatePosixTree = async (
       });
       return;
     }
-    // The root is gone; a group under its id can only be its own leftovers
-    // while that id has not been handed out again.
     if (!isGroupAlive(rootPid)) return;
   }
 
@@ -237,7 +214,6 @@ const terminatePosixTree = async (
   };
 
   // Freeze the group before reading the process table, so nothing in it can
-  // fork (and escape with setsid) between the snapshot and the signal.
   signalTarget(-rootPid, "SIGSTOP");
   await collectTargets();
   signalAll("SIGSTOP");
@@ -315,7 +291,5 @@ export const terminateProcessTree = async (
     } else {
       await terminatePosixTree(rootPid, resolved);
     }
-  } catch {
-    // Best-effort teardown; callers bound and log their own shutdown.
-  }
+  } catch {}
 };

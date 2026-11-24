@@ -5,12 +5,6 @@ const DEVELOPMENT_ENDPOINT =
 const PRODUCTION_ENDPOINT =
   "https://stella-v2-telemetry.fromyou.workers.dev/v1/events";
 
-/**
- * The backends whose tokens the default endpoints verify. A JWT's `iss` is
- * the backend that minted it, so a self-hosted deployment's tokens never go
- * to these endpoints; its telemetry is off unless STELLA_TELEMETRY_ENDPOINT
- * names its own telemetry worker.
- */
 const DEFAULT_ENDPOINT_ISSUERS: ReadonlySet<string> = new Set([
   "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
   "https://stella-v2-cloud-builder-prod.fromyou.workers.dev",

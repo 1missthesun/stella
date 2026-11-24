@@ -43,20 +43,6 @@ export type RuntimePaths = {
   lockFile: string;
   authKeyFile: string;
   socketPath: string;
-  /**
-   * Companion local-IPC endpoint the worker listens on for sidecar
-   * processes (e.g. the `stella-computer` daemon spawn path) and the
-   * in-process node_repl `connect` client — credential dialogs, brokered
-   * connector actions, permission prompts.
-   * Sidecars discover the path via the `STELLA_CLI_BRIDGE_SOCK` env var
-   * injected by `runtime/kernel/tools/shell.ts`. Kept under the same
-   * per-root namespace so multi-install machines don't collide. POSIX
-   * socket paths are len(homedir)-dependent and capped at 104 bytes on
-   * macOS (BSD `sun_path`, 103 usable), so the per-session endpoint from
-   * `createSecureCliBridgeEndpoint` lives under the short private `ipcDir`
-   * (`<ipcDir>/<22-char nonce>/b.sock`) and `startCliBridgeServer` enforces a
-   * defensive ceiling before binding.
-   */
   cliBridgeSocketPath: string;
   logDir: string;
   logFile: string;
@@ -105,11 +91,6 @@ export const createSecureCliBridgeEndpoint = (
       token,
     });
   }
-  // The nonce MUST stay its own directory component: startCliBridgeServer
-  // chmods the socket's parent directory to 0700 (that per-session dir is
-  // the unpredictability barrier) and removes it on stop. Components stay
-  // under the short IPC root: long durable state paths must never leak back
-  // into a bounded Unix-domain socket pathname.
   return path.join(paths.ipcDir, nonce, "b.sock");
 };
 
@@ -200,8 +181,6 @@ export const resolveRuntimePaths = (
     lockFile: path.join(rootDir, "runtime.lock"),
     authKeyFile: path.join(rootDir, "runtime-auth.key"),
     // macOS caps Unix domain socket paths at 104 bytes (BSD), Linux at 108.
-    // Keep sockets in a short per-user /tmp namespace; durable control files
-    // and logs remain under Electron userData.
     socketPath,
     cliBridgeSocketPath,
     logDir,

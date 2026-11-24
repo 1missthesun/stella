@@ -140,9 +140,7 @@ export const createObservabilityLogger = (
     for (const fd of openFiles.values()) {
       try {
         closeSync(fd);
-      } catch {
-        // Best-effort close before rotation.
-      }
+      } catch {}
     }
     openFiles.clear();
   };
@@ -178,9 +176,7 @@ export const createObservabilityLogger = (
             size: stat.size,
             mtimeMs: stat.mtimeMs,
           });
-        } catch {
-          // Skip files we can't stat/unlink.
-        }
+        } catch {}
       }
     } catch {
       return;
@@ -195,9 +191,7 @@ export const createObservabilityLogger = (
       try {
         unlinkSync(entry.filePath);
         total -= entry.size;
-      } catch {
-        // Skip files we can't unlink.
-      }
+      } catch {}
     }
   };
 
@@ -245,9 +239,7 @@ export const createObservabilityLogger = (
     }
     try {
       writeSync(fd, text);
-    } catch {
-      // Best-effort diagnostics; never throw from a logging call.
-    }
+    } catch {}
   };
 
   const format = (
@@ -286,9 +278,7 @@ export const createObservabilityLogger = (
         if (fd !== undefined) {
           try {
             closeSync(fd);
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
       }
       if (size !== null && size >= maxFileBytes) {
@@ -302,9 +292,7 @@ export const createObservabilityLogger = (
       }
 
       appendLine(channel, filePath, format(now, level, event, fields));
-    } catch {
-      // Best-effort diagnostics; never throw from a logging call.
-    }
+    } catch {}
   };
 
   const crash: Interface["crash"] = (event, error, fields) => {

@@ -276,10 +276,6 @@ export const resetDeviceIdentityEffect = (
     return identity;
   });
 
-/**
- * Drop the retained predecessor once the backend has accepted the succession,
- * so it is claimed exactly once.
- */
 export const clearSupersededDeviceId = async (
   statePath: string,
 ): Promise<void> => {
@@ -292,7 +288,5 @@ export const clearSupersededDeviceId = async (
     }
     const { supersededDeviceId: _dropped, ...rest } = parsed;
     await writePrivateFile(recordPath, JSON.stringify(rest, null, 2));
-  } catch {
-    // Nothing to clear; the next successful claim will be a no-op anyway.
-  }
+  } catch {}
 };

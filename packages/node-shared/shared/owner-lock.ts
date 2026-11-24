@@ -21,7 +21,6 @@ export type OwnerLockResult =
   | { readonly acquired: true; readonly owner: LockOwner }
   | { readonly acquired: false; readonly holder: LockOwner | null };
 
-/** A lock older than this with no readable owner is a crashed legacy writer's. */
 const UNREADABLE_LOCK_STALE_MS = 5_000;
 
 const readOwner = (file: string): { raw: string; owner: LockOwner | null } | null => {

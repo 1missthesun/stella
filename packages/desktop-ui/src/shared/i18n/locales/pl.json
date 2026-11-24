@@ -2596,7 +2596,7 @@
     },
     "secureValues": {
       "title": "Zapisane wartości prywatne",
-      "description": "Wartości z prywatnych próśb, które postanowiłeś zapamiętać. Są przechowywane w bezpiecznym magazynie tego komputera, dopóki ich nie usuniesz. Stella używa ich, nigdy ich nie odczytując.",
+      "description": "Wartości z prywatnych próśb, które wybrano do zapamiętania, przechowywane w bezpiecznym magazynie Twoich urządzeń, dopóki ich nie usuniesz. Stella używa ich, nigdy ich nie czytając.",
       "empty": "Na tym komputerze nie ma zapisanych wartości prywatnych.",
       "saved": "Zapisano {saved}",
       "delete": "Delete",

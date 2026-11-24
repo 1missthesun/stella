@@ -2576,7 +2576,7 @@
     },
     "secureValues": {
       "title": "Saved private values",
-      "description": "Values you chose to remember from private requests, kept in this computer’s secure store until you delete them. Stella uses them without ever reading them.",
+      "description": "Values you chose to remember from private requests, kept in your devices’ secure storage until you delete them. Stella uses them without ever reading them.",
       "empty": "No private values are saved on this computer.",
       "saved": "Saved {saved}",
       "delete": "Delete",

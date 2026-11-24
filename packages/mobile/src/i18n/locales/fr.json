@@ -2586,7 +2586,7 @@
     },
     "secureValues": {
       "title": "Valeurs privées enregistrées",
-      "description": "Les valeurs de demandes privées que vous avez choisi de mémoriser, conservées dans le stockage sécurisé de cet ordinateur jusqu’à ce que vous les supprimiez. Stella les utilise sans jamais les lire.",
+      "description": "Les valeurs de demandes privées que vous avez choisi de mémoriser, conservées dans le stockage sécurisé de vos appareils jusqu’à ce que vous les supprimiez. Stella les utilise sans jamais les lire.",
       "empty": "Aucune valeur privée n’est enregistrée sur cet ordinateur.",
       "saved": "Enregistrée {saved}",
       "delete": "Delete",

@@ -2576,7 +2576,7 @@
     },
     "secureValues": {
       "title": "Bewaarde privéwaarden",
-      "description": "Waarden uit privéverzoeken die je wilde laten onthouden, bewaard in de beveiligde opslag van deze computer tot je ze verwijdert. Stella gebruikt ze zonder ze ooit te lezen.",
+      "description": "Waarden uit privéverzoeken die je wilde laten onthouden, bewaard in de beveiligde opslag van je apparaten tot je ze verwijdert. Stella gebruikt ze zonder ze ooit te lezen.",
       "empty": "Er zijn geen privéwaarden bewaard op deze computer.",
       "saved": "Bewaard {saved}",
       "delete": "Delete",

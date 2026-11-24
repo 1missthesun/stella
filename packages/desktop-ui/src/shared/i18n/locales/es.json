@@ -2586,7 +2586,7 @@
     },
     "secureValues": {
       "title": "Valores privados guardados",
-      "description": "Valores de solicitudes privadas que decidiste recordar, guardados en el almacén seguro de este ordenador hasta que los borres. Stella los usa sin leerlos nunca.",
+      "description": "Valores de solicitudes privadas que elegiste recordar, guardados en el almacenamiento seguro de tus dispositivos hasta que los elimines. Stella los usa sin leerlos nunca.",
       "empty": "No hay valores privados guardados en este ordenador.",
       "saved": "Guardado {saved}",
       "delete": "Delete",

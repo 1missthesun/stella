@@ -2586,7 +2586,7 @@
     },
     "secureValues": {
       "title": "Valori privati salvati",
-      "description": "Valori di richieste private che hai scelto di ricordare, conservati nell’archivio sicuro di questo computer finché non li elimini. Stella li usa senza mai leggerli.",
+      "description": "I valori delle richieste private che hai scelto di ricordare, conservati nello spazio sicuro dei tuoi dispositivi finché non li elimini. Stella li usa senza mai leggerli.",
       "empty": "Nessun valore privato salvato su questo computer.",
       "saved": "Salvato {saved}",
       "delete": "Delete",

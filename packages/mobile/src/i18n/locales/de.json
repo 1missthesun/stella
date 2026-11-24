@@ -2576,7 +2576,7 @@
     },
     "secureValues": {
       "title": "Gespeicherte private Werte",
-      "description": "Werte aus privaten Anfragen, die du dir merken lassen wolltest. Sie bleiben im sicheren Speicher dieses Computers, bis du sie löschst. Stella verwendet sie, ohne sie je zu lesen.",
+      "description": "Werte aus privaten Anfragen, die du dir merken lassen wolltest. Sie bleiben im sicheren Speicher deiner Geräte, bis du sie löschst. Stella verwendet sie, ohne sie je zu lesen.",
       "empty": "Auf diesem Computer sind keine privaten Werte gespeichert.",
       "saved": "Gespeichert {saved}",
       "delete": "Delete",

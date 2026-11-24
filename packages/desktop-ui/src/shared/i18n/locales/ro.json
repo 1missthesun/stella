@@ -2586,7 +2586,7 @@
     },
     "secureValues": {
       "title": "Valori private salvate",
-      "description": "Valori din cereri private pe care ai ales să le ții minte, păstrate în spațiul de stocare securizat al acestui computer până le ștergi. Stella le folosește fără să le citească vreodată.",
+      "description": "Valori din cereri private pe care ai ales să le reții, păstrate în stocarea securizată a dispozitivelor tale până le ștergi. Stella le folosește fără să le citească vreodată.",
       "empty": "Nu există valori private salvate pe acest computer.",
       "saved": "Salvat {saved}",
       "delete": "Delete",

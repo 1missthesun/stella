@@ -2576,7 +2576,7 @@
     },
     "secureValues": {
       "title": "Tallennetut yksityiset arvot",
-      "description": "Yksityisten pyyntöjen arvot, jotka valitsit muistettaviksi. Ne säilytetään tämän tietokoneen suojatussa tallennustilassa, kunnes poistat ne. Stella käyttää niitä lukematta niitä koskaan.",
+      "description": "Yksityisistä pyynnöistä muistettavaksi valitsemasi arvot, tallessa laitteidesi suojatussa tallennustilassa, kunnes poistat ne. Stella käyttää niitä lukematta niitä koskaan.",
       "empty": "Tällä tietokoneella ei ole tallennettuja yksityisiä arvoja.",
       "saved": "Tallennettu {saved}",
       "delete": "Delete",

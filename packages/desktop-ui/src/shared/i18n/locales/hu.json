@@ -2576,7 +2576,7 @@
     },
     "secureValues": {
       "title": "Mentett privát értékek",
-      "description": "Privát kérésekből származó értékek, amelyeket megjegyeztetni választottál. A számítógép biztonságos tárolójában maradnak, amíg nem törlöd őket. Stella úgy használja őket, hogy sosem olvassa el.",
+      "description": "Privát kérésekből megjegyzésre választott értékek, az eszközeid biztonságos tárhelyén, amíg nem törlöd őket. A Stella úgy használja őket, hogy soha nem olvassa el.",
       "empty": "Ezen a számítógépen nincs mentett privát érték.",
       "saved": "Mentve: {saved}",
       "delete": "Delete",

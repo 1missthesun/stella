@@ -306,6 +306,7 @@ export class SavedValuesSync {
       this.stop();
       await this.client()?.call("savedValues.removeDevice", { deviceId: state.deviceId }).catch(() => undefined);
       this.latest = null;
+      this.status = { enabled: false, active: false, devices: 0, records: 0 };
       return this.getStatus();
     }
     state.synced = {};

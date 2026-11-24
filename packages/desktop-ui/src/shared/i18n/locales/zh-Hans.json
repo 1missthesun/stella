@@ -2566,7 +2566,7 @@
     },
     "secureValues": {
       "title": "已保存的私密值",
-      "description": "你在私密请求中选择记住的值，保存在这台电脑的安全存储中，直到你删除为止。Stella 使用它们，但从不读取。",
+      "description": "你选择记住的私密请求中的值，保存在你设备的安全存储中，直到你删除。Stella 使用它们时从不读取。",
       "empty": "这台电脑上没有保存私密值。",
       "saved": "保存于 {saved}",
       "delete": "Delete",

@@ -53,6 +53,7 @@ export default defineConfig([
       'react-hooks/use-memo': 'off',
       'react-refresh/only-export-components': 'off',
       'no-useless-assignment': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
       'preserve-caught-error': 'off',
       'no-restricted-imports': [
         'error',

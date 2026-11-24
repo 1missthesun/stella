@@ -11,14 +11,6 @@ import type { NativeConnectorCatalogEntry } from "../connectors/native-integrati
 import { createRuntimeLogger } from "../debug.js";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 
-/**
- * Stable engine capabilities exposed to home-loaded extensions.
- *
- * Extension files live outside the application bundle, so they must not reach
- * back into repo-relative kernel modules. The loader passes this object to
- * every factory instead. It deliberately exposes callable capabilities rather
- * than source paths, keeping the install layout private to the engine.
- */
 export const createExtensionRuntimeApi = (options: {
   stellaDataDir: string;
   stellaAppDir: string;

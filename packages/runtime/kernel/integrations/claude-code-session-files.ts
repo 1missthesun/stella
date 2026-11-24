@@ -86,11 +86,6 @@ export const listClaudeSessionFiles = async (
 
 type SelectedCli = Pick<ClaudeCliLaunch, "executable" | "identity" | "version">;
 
-/**
- * The Claude Code a new process would run right now (checked to start; see
- * claude-cli-launch.ts), without repairing anything. An update changes its
- * identity, so anything learned from the binary is keyed by it.
- */
 const selectedCli = async (): Promise<SelectedCli | null> =>
   await selectClaudeCli({ repair: "none" }).catch(() => null);
 

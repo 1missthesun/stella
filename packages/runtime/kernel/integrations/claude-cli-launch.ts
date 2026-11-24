@@ -20,23 +20,10 @@ import {
 } from "@stella/node-shared/integrations/external-cli-resolution.js";
 
 /**
- * Which Claude Code Stella runs, and only one that has shown it runs.
- *
- * Whatever PATH names (a native install's launcher, an npm or Homebrew link,
- * a version manager's wrapper) can be left unusable by an install that was cut
- * off: a truncated binary, one without its execute bit, a version manager
- * pointing at a version that never finished. So before a process starts,
- * Stella asks the binary for `--version`, which takes a few milliseconds. A
- * binary that answers becomes the last-known-good one, kept (hard-linked, so
- * it costs no space while the original exists) where no installer touches it.
- * One that doesn't is never run: Stella falls back to the last-known-good
- * one, repairs the install the way it was made when it can, and otherwise
- * fails with what the binary printed and what to do.
- *
  * A version manager's wrapper (mise) updates its tool in the foreground of
  * whatever runs it first after its update interval, so a 20-second status
  * check could cut a download off. Stella runs the binary the wrapper would
- * run instead, and leaves updating to its updater, which waits for it.
+ * run instead.
  */
 
 export const CLAUDE_CLI_UNUSABLE_CODE = "CLAUDE_CODE_CLI_UNUSABLE";
@@ -69,8 +56,6 @@ export class ClaudeCliUnusableError extends Error {
   }
 }
 
-// --- where things are -------------------------------------------------------
-
 const slashed = (file: string) => file.split(path.sep).join("/");
 
 const methodOf = (realPath: string): ClaudeCliInstallMethod => {
@@ -101,7 +86,6 @@ const miseEnv = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
   MISE_QUIET: "1",
 });
 
-/** What mise printed that says what's wrong: its errors, without its warnings and footers. */
 const miseErrors = (text: string): string =>
   text
     .split(/\r?\n/)
@@ -117,7 +101,6 @@ const miseErrors = (text: string): string =>
 const MISE_ANSWER_TTL_MS = 5_000;
 const miseAnswers = new Map<string, { at: number; answer: Promise<ClaudeCliInstall> }>();
 
-/** What PATH names, and what Stella should run for it. */
 export const describeClaudeCliInstall = async (
   launcher: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -126,7 +109,6 @@ export const describeClaudeCliInstall = async (
   if (!isMise(real)) {
     return { launcher, method: methodOf(real), executable: launcher };
   }
-  // Asked often (every turn, every session checkpoint): one answer serves a few seconds.
   const known = miseAnswers.get(launcher);
   if (known && Date.now() - known.at < MISE_ANSWER_TTL_MS) return await known.answer;
   const answer = askMise(launcher, real, env);
@@ -161,9 +143,6 @@ const askMise = async (
   };
 };
 
-// --- repair -------------------------------------------------------------------
-
-/** The npm package folder (and global prefix) a Claude Code npm install lives in. */
 const npmPackageOf = (realPath: string): { root: string; prefix: string } | null => {
   const file = slashed(realPath);
   const marker = "/node_modules/@anthropic-ai/claude-code/";
@@ -176,7 +155,6 @@ const npmPackageOf = (realPath: string): { root: string; prefix: string } | null
   return { root: root.split("/").join(path.sep), prefix: prefix.split("/").join(path.sep) };
 };
 
-/** In words, how to fix an install Stella can't fix itself. */
 export const claudeCliManualRepair = (install: ClaudeCliInstall | null): string => {
   switch (install?.method) {
     case "mise":
@@ -233,9 +211,7 @@ const runRepair = async (
       if (typeof manifest.version === "string" && CLI_VERSION_PATTERN.test(manifest.version)) {
         version = manifest.version;
       }
-    } catch {
-      // A package folder without its manifest: install the latest.
-    }
+    } catch {}
     const windows = process.platform === "win32";
     const npmBeside = path.join(pkg.prefix, windows ? "npm.cmd" : path.join("bin", "npm"));
     const npm = fs.existsSync(npmBeside) ? npmBeside : windows ? "npm.cmd" : "npm";
@@ -251,8 +227,6 @@ const runRepair = async (
   }
   return { status: "manual", how: claudeCliManualRepair(install) };
 };
-
-// --- choosing what to run -----------------------------------------------------
 
 const methodLabel: Record<ClaudeCliInstallMethod, string> = {
   mise: "installed with mise",
@@ -281,12 +255,6 @@ export const describeClaudeCliUnusable = (detail: ClaudeCliUnusable): string => 
     .trim();
 };
 
-/**
- * What PATH names. When nothing runnable is found but a `claude` is there
- * that can't be run (an install cut off midway: no execute bit, a link to a
- * file that's gone), that one, so it is repaired or stood in for; otherwise
- * the CLI's own "not found" error (Claude Code isn't installed).
- */
 const currentInstall = async (env: NodeJS.ProcessEnv): Promise<ClaudeCliInstall> => {
   let launcher: string;
   try {
@@ -319,28 +287,14 @@ export const claudeCliKeeper = createCliKeeper<ClaudeCliInstallMethod>({
   unusable: (detail) => new ClaudeCliUnusableError(describeClaudeCliUnusable(detail), detail),
 });
 
-/** Asks the binary for its version. Exit 0 with a version on stdout is a binary that runs. */
 export const checkClaudeCli = claudeCliKeeper.probe;
 
-/** A process started from this binary exited before it said anything: check it again next time. */
 export const noteClaudeCliLaunchFailed = claudeCliKeeper.noteLaunchFailed;
 
-/** The version Stella last saw run here, for anything that only needs to know. */
 export const lastGoodClaudeCliVersion = claudeCliKeeper.lastGoodVersion;
 
-/**
- * Repairs the install the way it was made: mise reinstalls its version, a
- * native install runs Anthropic's installer again, npm reinstalls the package.
- */
 export const repairClaudeCli = claudeCliKeeper.repair;
 
-/**
- * The Claude Code to run now. Throws the CLI's own "not found" error when
- * none is installed, and a `ClaudeCliUnusableError` (with what the binary
- * printed and what to do) when the installed one can't start and nothing
- * else can stand in.
- */
 export const selectClaudeCli = claudeCliKeeper.select;
 
-/** What `selectClaudeCli` would pick, without repairing anything: for checks that only look. */
 export const inspectClaudeCli = claudeCliKeeper.inspect;

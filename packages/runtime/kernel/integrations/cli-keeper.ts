@@ -3,33 +3,20 @@ import path from "node:path";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
 import { runCliCommand } from "./claude-cli-command.js";
 
-/**
- * Which copy of a command-line AI (Claude Code, Google Antigravity) Stella
- * runs, and only one that has shown it runs. Each says where its installs are
- * and how each kind is repaired; checking, keeping the last working copy,
- * falling back to it and repairing are the same for both.
- */
-
 const PROBE_TIMEOUT_MS = 15_000;
 const FAILED_CHECK_TTL_MS = 30_000;
-/** How long after a failed repair of the same binary Stella tries again by itself. */
 const REPAIR_RETRY_MS = 30 * 60_000;
 export const CLI_REPAIR_TIMEOUT_MS = 15 * 60_000;
 const REPAIR_LOCK_STALE_MS = CLI_REPAIR_TIMEOUT_MS + 5 * 60_000;
 const REPAIR_LOCK_POLL_MS = 2_000;
-/** How long a turn with nothing else to run waits for a repair. */
 const TURN_REPAIR_WAIT_MS = 10 * 60_000;
 export const CLI_VERSION_PATTERN = /\b(\d+\.\d+\.\d+)\b/;
 
 export type CliInstall<Method extends string = string> = {
-  /** What PATH or the configured path names. */
   launcher: string;
   method: Method;
-  /** What Stella runs: the launcher, or the binary behind a version manager's wrapper. */
   executable: string | null;
-  /** Why there is no executable (the version manager couldn't name one). */
   problem?: string;
-  /** The version manager's own program (mise). */
   manager?: string;
 };
 
@@ -38,9 +25,7 @@ export type CliCheck = { ok: true; version: string } | { ok: false; problem: str
 export type CliLaunch = {
   executable: string;
   version: string;
-  /** Changes whenever a different binary would run. */
   identity: string;
-  /** Set when the selected one can't start and this is the last one that did. */
   fallback?: { selected: string; problem: string };
 };
 
@@ -59,33 +44,18 @@ export type CliUnusable<Method extends string = string> = {
 export type SelectCliOptions = {
   env?: NodeJS.ProcessEnv;
   signal?: AbortSignal;
-  /**
-   * What a broken install sets off: `wait` repairs it and, when there is no
-   * working copy to run meanwhile, waits for the repair (a turn about to
-   * start); `background` repairs it without waiting; `none` only reports.
-   */
   repair?: "wait" | "background" | "none";
-  /** Called once when the caller is about to wait for a repair. */
   onRepairing?: () => void;
 };
 
 export type CliKeeperSpec<Method extends string> = {
-  /** The CLI's name in logs and messages. */
   label: string;
   log: string;
-  /** Stella's folder for it under its data folder's cache. */
   stateDirectory: string;
-  /** What a kept copy's file name starts with. */
   program: string;
   commandEnv(executable: string, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv;
-  /** What PATH names; throws when none is installed and it's the person's to install. */
   currentInstall(env: NodeJS.ProcessEnv): Promise<CliInstall<Method>>;
-  /** Why a version that runs still can't be used (too old), if so. */
   versionProblem?(version: string): string | undefined;
-  /**
-   * Why a version not run here before can't replace the kept one, if so.
-   * Asked once per binary; what it accepts isn't asked about again.
-   */
   selfCheck?(executable: string, kept: string, env: NodeJS.ProcessEnv): Promise<string | undefined>;
   repairable: readonly Method[];
   runRepair(install: CliInstall<Method>, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<CliRepairOutcome>;
@@ -118,10 +88,6 @@ const writeJson = (file: string, value: unknown) => {
   fs.renameSync(temp, file);
 };
 
-/**
- * Whether the kept copy is whole and its own file. An older Stella kept a hard
- * link, which is damaged with the install it's meant to stand in for.
- */
 const isSeparateCopy = (saved: string, source: string): boolean => {
   try {
     const copy = fs.statSync(saved, { bigint: true });
@@ -132,7 +98,6 @@ const isSeparateCopy = (saved: string, source: string): boolean => {
   }
 };
 
-/** A program file that runs on its own: not a script that needs its package beside it. */
 const isStandaloneProgram = (file: string): boolean => {
   try {
     const handle = fs.openSync(file, "r");
@@ -150,9 +115,7 @@ const isStandaloneProgram = (file: string): boolean => {
 
 type LastGood = {
   version: string;
-  /** Where it was installed. */
   binary: string;
-  /** Stella's own copy of it, which no installer removes. */
   saved: string | null;
   verifiedAt: number;
 };
@@ -175,11 +138,6 @@ const describeRunFailure = (
 };
 
 export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Method>) => {
-  /**
-   * Stella's own copy of the last CLI that ran, under its data folder. Only
-   * where Stella has one (the desktop and headless Stella); a cloud container
-   * keeps its own fallback in the image.
-   */
   const stateDir = (env: NodeJS.ProcessEnv): string | null => {
     const data = env.STELLA_DATA_DIR?.trim() || process.env.STELLA_DATA_DIR?.trim();
     return data ? path.join(path.resolve(data), "cache", spec.stateDirectory) : null;
@@ -187,7 +145,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   const checkCache = new Map<string, { check: CliCheck; at: number }>();
 
-  /** Asks the binary for its version. Exit 0 with a version on stdout is a binary that runs. */
   const probe = async (
     executable: string,
     env: NodeJS.ProcessEnv = process.env,
@@ -217,7 +174,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     return check;
   };
 
-  /** A process started from this binary exited before it said anything: check it again next time. */
   const noteLaunchFailed = (executable: string): void => {
     const identity = fileIdentity(executable);
     if (identity) checkCache.delete(identity);
@@ -238,7 +194,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   const acceptedFile = (dir: string) => path.join(dir, "accepted.json");
 
-  /** The spec's self-check, where there is a kept copy of another version to fall back to. */
   const selfCheckProblem = async (
     executable: string,
     version: string,
@@ -254,16 +209,12 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       if ((JSON.parse(fs.readFileSync(acceptedFile(dir), "utf8")) as { identity?: unknown }).identity === identity) {
         return undefined;
       }
-    } catch {
-      // None accepted yet.
-    }
+    } catch {}
     const problem = await spec.selfCheck(executable, kept.saved, env);
     if (!problem) {
       try {
         writeJson(acceptedFile(dir), { identity, version, at: Date.now() });
-      } catch {
-        // Only spares asking again.
-      }
+      } catch {}
     }
     return problem;
   };
@@ -278,7 +229,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       const temp = path.join(savedDir, `.${name}.${process.pid}.tmp`);
       try {
         await fs.promises.rm(temp, { force: true });
-        // A clone where the file system can, a copy elsewhere.
         await fs.promises.copyFile(real, temp, fs.constants.COPYFILE_FICLONE);
         if (process.platform !== "win32") await fs.promises.chmod(temp, 0o755);
         // Windows won't replace a program that is running (an old hard link is
@@ -295,7 +245,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     }
     for (const entry of await fs.promises.readdir(savedDir)) {
       if (entry !== name && entry.startsWith(`${spec.program}-`)) {
-        // One still running stays until a later save.
         await fs.promises.rm(path.join(savedDir, entry), { force: true }).catch(() => undefined);
       }
     }
@@ -304,7 +253,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   let saving: Promise<void> = Promise.resolve();
 
-  /** Keeps this verified binary as the one to fall back to. */
   const rememberLastGood = (env: NodeJS.ProcessEnv, executable: string, version: string) => {
     const dir = stateDir(env);
     if (!dir) return;
@@ -343,7 +291,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     });
   };
 
-  /** The last copy that ran here, if it still does. */
   const lastGoodLaunch = async (
     env: NodeJS.ProcessEnv,
     exclude: string | null,
@@ -368,7 +315,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     return null;
   };
 
-  /** The version Stella last saw run here, for anything that only needs to know. */
   const lastGoodVersion = (env: NodeJS.ProcessEnv = process.env): string | null => {
     const dir = stateDir(env);
     return dir ? (readLastGood(dir)?.version ?? null) : null;
@@ -386,7 +332,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   const repairLock = (dir: string) => path.join(dir, "repair.lock");
 
-  /** Held by a Stella process that is still running; one that quit or crashed midway holds nothing. */
   const repairLockHeld = (dir: string): boolean => {
     try {
       if (Date.now() - fs.statSync(repairLock(dir)).mtimeMs > REPAIR_LOCK_STALE_MS) return false;
@@ -420,9 +365,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
           fs.rmSync(lock, { recursive: true, force: true });
           return take();
         }
-      } catch {
-        // Another process took it in between.
-      }
+      } catch {}
       return false;
     }
   };
@@ -432,10 +375,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   const repairs = new Map<string, Promise<CliRepairOutcome>>();
 
-  /**
-   * Repairs the install the way it was made (the spec's `runRepair`). One repair at a time across Stella's processes; one that failed
-   * isn't retried by itself for half an hour (`force` does).
-   */
   const repairInstall = async (
     install: CliInstall<Method>,
     options: { env?: NodeJS.ProcessEnv; signal?: AbortSignal; force?: boolean } = {},
@@ -461,7 +400,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     }
     const work = (async (): Promise<CliRepairOutcome> => {
       if (!takeRepairLock(dir)) {
-        // Another Stella process is repairing: wait for it to finish.
         while (repairLockHeld(dir)) {
           if (options.signal?.aborted) return { status: "skipped", reason: "Stopped." };
           await new Promise<void>((resolve) => void forkTimeoutFiber(REPAIR_LOCK_POLL_MS, resolve));
@@ -478,9 +416,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
         }
         try {
           writeJson(repairFile(dir), { target: key, at: Date.now(), status: outcome.status } satisfies RepairRecord);
-        } catch {
-          // Only spares a repeat attempt.
-        }
+        } catch {}
         spec.afterRepair?.();
         console.warn(`[${spec.log}] repair finished`, {
           method: install.method,
@@ -498,11 +434,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   const fallbacksNoted = new Set<string>();
 
-  /**
-   * The copy to run now. Throws the CLI's own "not found" error when none is
-   * installed, and the spec's unusable error (with what the binary printed and
-   * what to do) when the installed one can't start and nothing else can stand in.
-   */
   const select = async (
     options: SelectCliOptions = {},
   ): Promise<CliLaunch> => {
@@ -522,8 +453,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     }
     const problem = check.ok ? "" : check.problem;
     const mode = options.repair ?? "background";
-    // Never tied to the caller's signal: a stopped turn must not cut off an
-    // install midway, which is how an install ends up broken.
     const repair = mode === "none" ? null : repairInstall(install, { env });
     const fallback = await lastGoodLaunch(env, target);
     if (fallback) {
@@ -549,7 +478,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
           const stopTimer = forkTimeoutFiber(TURN_REPAIR_WAIT_MS, () =>
             resolve({ status: "skipped", reason: "The repair is still running." }),
           );
-          // Stopping the turn stops the wait, not the repair.
           options.signal?.addEventListener(
             "abort",
             () => {
@@ -577,7 +505,6 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     throw spec.unusable(detail);
   };
 
-  /** What `select` would pick, without repairing anything: for checks that only look. */
   const inspect = async (
     env: NodeJS.ProcessEnv = process.env,
   ): Promise<{ install: CliInstall<Method>; check: CliCheck } | null> => {

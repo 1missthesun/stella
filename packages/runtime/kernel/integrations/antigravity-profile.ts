@@ -3,14 +3,6 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ANTIGRAVITY_GATED_TOOLS } from "./antigravity-native-tools.js";
 
-/**
- * Stella's own Antigravity profile (an `agy --gemini-dir`), set up only
- * through files Antigravity documents: a custom agent that replaces Google's
- * prompt and picks its tools, an MCP server entry whose tools load up front
- * under their own names, and a hook that refuses the tools an agent wasn't
- * given. All are shared by every session of the profile; what differs per
- * session reaches the MCP bridge and the hook through `agy`'s environment.
- */
 export const ANTIGRAVITY_MCP_SERVER_NAME = "stella";
 export const ANTIGRAVITY_MCP_SOCKET_ENV = "STELLA_AGY_MCP_SOCKET";
 export const ANTIGRAVITY_MCP_TOKEN_ENV = "STELLA_AGY_MCP_TOKEN";
@@ -134,7 +126,6 @@ export const createAntigravityProfile = (home: () => string) => {
   };
 
   return {
-    /** Writes the profile's files for this tool set and names the custom agent to launch `agy` with. */
     prepare: (nativeTools: readonly string[], stellaTools: readonly string[]): Promise<string> => {
       const next = queue.catch(() => undefined).then(() => prepare(nativeTools, stellaTools));
       queue = next;

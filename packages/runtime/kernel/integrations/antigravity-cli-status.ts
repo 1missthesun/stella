@@ -15,7 +15,6 @@ import { forkTimeoutFiber } from "../cli/effect-runtime.js";
 export const ANTIGRAVITY_APP_DATA_DIR = "antigravity-acp";
 const ASK_TIMEOUT_MS = 20_000;
 const CLOSE_TIMEOUT_MS = 3_000;
-/** How long an answer stands before a screen that shows it asks again. */
 const SIGNED_IN_FRESH_MS = 5 * 60_000;
 const SIGNED_OUT_FRESH_MS = 20_000;
 const AUTH_REQUIRED = -32000;
@@ -29,7 +28,6 @@ export const ACP_INITIALIZE = {
 export const antigravityHomeFor = (dataDir: string): string =>
   process.env.STELLA_ANTIGRAVITY_CLI_HOME?.trim() || path.join(dataDir, "antigravity-cli", "default");
 
-/** The environment every `agy` Stella starts gets: its own profile, no self-update, no browser. */
 export const antigravityCliEnv = (home: string): Record<string, string> => ({
   GEMINI_HOME: home,
   AGY_CLI_DISABLE_AUTO_UPDATE: "1",
@@ -48,12 +46,11 @@ export const antigravityAcpArgs = (home: string): string[] => [
 ];
 
 export type AntigravityCliAnswer =
-  | { ok: true; signedIn: boolean; /** It has what Stella's turns need of it. */ usable: boolean }
+  | { ok: true; signedIn: boolean; usable: boolean }
   | { ok: false; problem: string };
 
 type AcpReply = { id?: unknown; result?: any; error?: { code?: unknown; message?: unknown } };
 
-/** Starts `agy acp`, makes these calls one after another, and ends it. Opens no session and runs no model. */
 export const callAntigravityAcp = async (
   executable: string,
   home: string,
@@ -129,7 +126,6 @@ export const isAntigravityAuthRequired = (error: unknown): boolean => {
   return Number(code) === AUTH_REQUIRED || /authentication required/iu.test(String(message ?? ""));
 };
 
-/** What this `agy` says about this profile's sign-in. */
 export const askAntigravityCli = async (
   executable: string,
   home: string,
@@ -157,7 +153,6 @@ export const askAntigravityCli = async (
 type SignInRecord = {
   signedIn: boolean;
   at: number;
-  /** When Stella last signed this computer out: what was running then must close. */
   signedOutAt?: number;
 };
 
@@ -186,9 +181,7 @@ const writeJson = (file: string, value: unknown): void => {
 const writeRecord = (home: string, record: SignInRecord): void => writeJson(antigravitySignInRecordFile(home), record);
 
 type ModelsRecord = {
-  /** The account's Gemini models, as `agy` last reported them. */
   models: string[];
-  /** Removed models the user has been told about. */
   told: string[];
 };
 
@@ -206,7 +199,6 @@ const readModels = (home: string): ModelsRecord => {
   }
 };
 
-/** The Gemini models `agy` last reported for the account signed in here; none until a first turn. */
 export const knownAntigravityModels = (home: string): string[] => readModels(home).models;
 
 export const noteAntigravityModels = (home: string, reported: readonly string[]): void => {
@@ -216,7 +208,6 @@ export const noteAntigravityModels = (home: string, reported: readonly string[])
   writeJson(modelsFile(home), { ...last, models });
 };
 
-/** Whether the user still has to hear that this model is gone; true once. */
 export const claimAntigravityRemovalNotice = (home: string, model: string): boolean => {
   const last = readModels(home);
   if (last.told.includes(model)) return false;
@@ -227,7 +218,6 @@ export const claimAntigravityRemovalNotice = (home: string, model: string): bool
 /** Where `agy` before 1.5.16, and later ones off macOS, keep a sign-in: the only trace of one made before Stella kept a record. */
 export const antigravityTokenFile = (home: string): string => path.join(home, ANTIGRAVITY_APP_DATA_DIR, "antigravity-oauth-token");
 
-/** The last answer, without asking. */
 export const knownAntigravitySignIn = (home: string): boolean => readRecord(home)?.signedIn ?? existsSync(antigravityTokenFile(home));
 
 export const noteAntigravitySignIn = (home: string, signedIn: boolean): void => {
@@ -239,7 +229,6 @@ export const noteAntigravitySignIn = (home: string, signedIn: boolean): void => 
 
 export const noteAntigravitySignedOut = (home: string): void => {
   writeRecord(home, { signedIn: false, at: Date.now(), signedOutAt: Date.now() });
-  // The next account may have other models.
   const last = readModels(home);
   if (last.models.length > 0) writeJson(modelsFile(home), { ...last, models: [] });
 };
@@ -248,7 +237,6 @@ export const antigravitySignedOutSince = (home: string, since: number): boolean 
 
 const asking = new Map<string, Promise<boolean>>();
 
-/** Asks `agy`; an `agy` that can't say leaves the last answer standing. */
 export const refreshAntigravitySignIn = (home: string, executable: () => Promise<string | undefined>): Promise<boolean> => {
   const running = asking.get(home);
   if (running) return running;
@@ -261,7 +249,6 @@ export const refreshAntigravitySignIn = (home: string, executable: () => Promise
       console.warn("[antigravity-cli] couldn't check the sign-in", { problem: answer.problem });
       return knownAntigravitySignIn(home);
     }
-    // Signed out while it was answering: that stands.
     if (antigravitySignedOutSince(home, started)) return false;
     noteAntigravitySignIn(home, answer.signedIn);
     return answer.signedIn;
@@ -270,7 +257,6 @@ export const refreshAntigravitySignIn = (home: string, executable: () => Promise
   return ask;
 };
 
-/** The sign-in for a screen or a turn: the last answer while it's fresh, else a new one. */
 export const currentAntigravitySignIn = async (home: string, executable: () => Promise<string | undefined>): Promise<boolean> => {
   const record = readRecord(home);
   if (record && Date.now() - record.at < (record.signedIn ? SIGNED_IN_FRESH_MS : SIGNED_OUT_FRESH_MS)) return record.signedIn;

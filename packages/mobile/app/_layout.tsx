@@ -65,7 +65,7 @@ import {
 import { ShareIntentProvider } from "expo-share-intent";
 import { ThemeProvider } from "../src/theme/theme-context";
 import { ChatSearchProvider } from "../src/lib/chat-search";
-import { I18nProvider, useT } from "../src/i18n";
+import { I18nProvider, useI18nReady, useT } from "../src/i18n";
 import { ShareIntentHandler } from "../src/lib/share-intent-handler";
 import { useSavedValuesSync } from "../src/lib/saved-values";
 
@@ -181,7 +181,7 @@ function useBackendFollowsAccount(
   }, [account, session.isPending]);
 }
 
-function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
+function AuthenticatedLayout({ screensReady }: { screensReady: boolean }) {
   const session = authClient.useSession();
   useBackendFollowsAccount(session);
   useSavedValuesSync();
@@ -381,7 +381,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     authorityWaitExpired,
   ]);
 
-  if (!fontsReady) return null;
+  if (!screensReady) return null;
 
   return (
     <ServerStatusGate>
@@ -392,23 +392,25 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
 }
 
 function AppLayout({ fontsReady }: { fontsReady: boolean }) {
+  const screensReady = useI18nReady() && fontsReady;
+
   if (!hasMobileConfig) {
     return (
       <>
-        <HideSplashWhenThemed fontsReady={fontsReady} />
-        {fontsReady ? <RootStack /> : null}
+        <HideSplashWhenThemed screensReady={screensReady} />
+        {screensReady ? <RootStack /> : null}
       </>
     );
   }
 
-  return <AuthenticatedLayout fontsReady={fontsReady} />;
+  return <AuthenticatedLayout screensReady={screensReady} />;
 }
 
-function HideSplashWhenThemed({ fontsReady }: { fontsReady: boolean }) {
+function HideSplashWhenThemed({ screensReady }: { screensReady: boolean }) {
   useEffect(() => {
-    if (!fontsReady) return;
+    if (!screensReady) return;
     void SplashScreen.hideAsync().finally(markSplashHidden);
-  }, [fontsReady]);
+  }, [screensReady]);
   return null;
 }
 

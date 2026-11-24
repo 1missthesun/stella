@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deflateRawSync } from "node:zlib";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { isEntryPoint } from "../../../scripts/lib/entry-point.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -296,7 +296,7 @@ export const buildI18nCatalogOutputs = ({
     const zipBuf = buildSingleFileZip(`${locale}.json`, jsonBuf);
     const hash = createHash("sha256")
       .update(`${PACK_FORMAT}\n${JSON.stringify(keyOrder)}\n`)
-      .update(zipBuf)
+      .update(jsonBuf)
       .digest("hex")
       .slice(0, 12);
     const packName = `${locale}.zip`;
@@ -335,6 +335,26 @@ ${packEntries.join("\n")}
   );
 
   return { catalogFiles, packFiles, outputs };
+};
+
+const packPayload = (zip) => {
+  try {
+    const start = 30 + zip.readUInt16LE(26) + zip.readUInt16LE(28);
+    return inflateRawSync(zip.subarray(start, start + zip.readUInt32LE(18)));
+  } catch {
+    return null;
+  }
+};
+
+// A pack is current when it unpacks to the same strings: another Node's zlib
+// may compress them to different bytes, which must neither fail the check nor
+// rewrite the file (phones would download it again).
+const isCurrent = (relativePath, actual, expected) => {
+  if (!actual) return false;
+  if (actual.equals(expected)) return true;
+  if (!relativePath.startsWith("packs/")) return false;
+  const payload = packPayload(actual);
+  return payload !== null && payload.equals(packPayload(expected));
 };
 
 const readOutputBuf = (target) => {
@@ -380,7 +400,7 @@ export const syncI18nCatalogs = ({
     }
     for (const [relativePath, expected] of outputs) {
       const actual = readOutputBuf(join(outputRoot, relativePath));
-      if (!actual || !actual.equals(expected)) {
+      if (!isCurrent(relativePath, actual, expected)) {
         drift.push(relativePath);
       }
     }
@@ -406,6 +426,8 @@ export const syncI18nCatalogs = ({
     if (!expectedPackFiles.has(stale)) rmSync(join(outputPacks, stale));
   }
   for (const [relativePath, expected] of outputs) {
+    const actual = readOutputBuf(join(outputRoot, relativePath));
+    if (isCurrent(relativePath, actual, expected)) continue;
     writeFileSync(join(outputRoot, relativePath), expected);
   }
 

@@ -1,7 +1,8 @@
 .act {
   position: relative;
   content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
+  /* Its only child is .sticky, max(100svh, 720px) tall. */
+  contain-intrinsic-size: auto max(100svh, 720px);
 }
 
 .sticky {

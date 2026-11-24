@@ -256,6 +256,29 @@ export const ENGINE_CLAUDE_LOGIN_END_MIGRATION = {
   ],
 };
 
+/**
+ * The model the account last picked on each plan it connects, kept when a later
+ * pick runs elsewhere. Seeded from the current pick, or the last one before it
+ * that wasn't on a provider key.
+ */
+export const ENGINE_PLAN_PICKS_MIGRATION = {
+  id: "engines.10-plan-picks",
+  statements: [
+    `CREATE TABLE engine_plan_picks (
+       provider TEXT PRIMARY KEY,
+       execution TEXT NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`,
+    ...["legacy_execution", "execution"].map(
+      (column) => `INSERT OR REPLACE INTO engine_plan_picks (provider, execution, updated_at)
+       SELECT json_extract(${column}, '$.engine'), ${column}, updated_at
+       FROM engine_settings
+       WHERE json_valid(${column})
+         AND json_extract(${column}, '$.engine') IN ('anthropic', 'chatgpt')`,
+    ),
+  ],
+};
+
 const CONNECT_TTL_MS = 15 * 60_000;
 const MAX_ACCOUNTS_PER_PROVIDER = 10;
 
@@ -599,15 +622,29 @@ const cloudClaudeLoginEnded = (db: OwnerDbReader): boolean => {
   );
 };
 
-/** What the cloud runs when the account's pick can't: a connected plan first, then Stella's own model. */
+/** The account's last pick on a plan, with its reasoning level. */
+const lastPickOn = (db: OwnerDbReader, provider: EngineProvider): CloudExecutionSelection | null => {
+  const row = db.one<{ execution: string }>(
+    "SELECT execution FROM engine_plan_picks WHERE provider = ?",
+    provider,
+  );
+  const pick = parseStored(row?.execution ?? null);
+  return pick?.engine === provider ? pick : null;
+};
+
+/**
+ * What the cloud runs when the account's pick can't: a connected plan, on the
+ * model last picked there, then Stella's own model.
+ */
 const connectedPlanDefault = (
+  db: OwnerDbReader,
   connectedEngines: NonNullable<OwnerSnapshot["connectedEngines"]>,
   claudeRuns: boolean,
 ): CloudExecutionSelection =>
   claudeRuns && connectedEngines.includes("anthropic")
-    ? DEFAULT_CLOUD_ANTHROPIC_EXECUTION
+    ? (lastPickOn(db, "anthropic") ?? DEFAULT_CLOUD_ANTHROPIC_EXECUTION)
     : connectedEngines.includes("chatgpt")
-      ? DEFAULT_CLOUD_CODEX_EXECUTION
+      ? (lastPickOn(db, "chatgpt") ?? DEFAULT_CLOUD_CODEX_EXECUTION)
       : DEFAULT_EXECUTION;
 
 export const snapshotEngines = (
@@ -630,7 +667,7 @@ export const snapshotEngines = (
     execution:
       runnable && !prefersOwnPlan
         ? selection
-        : connectedPlanDefault(connectedEngines, options.cloudSandbox && !cloudClaudeLoginEnded(db)),
+        : connectedPlanDefault(db, connectedEngines, options.cloudSandbox && !cloudClaudeLoginEnded(db)),
     connectedEngines,
     connectedProviders,
   };
@@ -647,6 +684,15 @@ const writeSelection = (ctx: OwnerContext, execution: CloudExecutionSelection): 
     legacy,
     ctx.now,
   );
+  if (execution.engine === "anthropic" || execution.engine === "chatgpt") {
+    ctx.db.run(
+      `INSERT INTO engine_plan_picks (provider, execution, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT (provider) DO UPDATE SET execution = excluded.execution, updated_at = excluded.updated_at`,
+      execution.engine,
+      JSON.stringify(execution),
+      ctx.now,
+    );
+  }
 };
 
 export const resetExecutionForProvider = (ctx: OwnerContext, provider: string): void => {
@@ -1844,6 +1890,7 @@ export const enginesDomain = {
     ENGINE_CLAUDE_PER_PLACE_MIGRATION,
     ENGINE_CLAUDE_ONE_CHOICE_MIGRATION,
     ENGINE_CLAUDE_LOGIN_END_MIGRATION,
+    ENGINE_PLAN_PICKS_MIGRATION,
   ],
   views: {
     "engines.get": {
@@ -2008,6 +2055,7 @@ export const enginesDomain = {
     ctx.db.run("DELETE FROM engine_provider_settings");
     ctx.db.run("DELETE FROM engine_connects");
     ctx.db.run("DELETE FROM engine_settings");
+    ctx.db.run("DELETE FROM engine_plan_picks");
     return { pending: false };
   },
 } satisfies OwnerDomain;

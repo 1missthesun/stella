@@ -55,23 +55,11 @@ enum Prepare {
     }
 }
 
-/// `bundles/electron-<v>/Stella.app`: Electron as macOS knows Stella (bundle
-/// id, name, icon, microphone string), the Developer ID-signed copy CI
-/// publishes per Electron version (.github/workflows/build-electron-identity.yml).
-/// Its identity is the same across versions and reinstalls, so the Keychain
-/// item and privacy grants keep trusting it.
-///
-/// macOS ties those grants to the signature, so the launcher never switches
-/// to an unsigned copy on its own. When the signed copy for this Electron
-/// can't be downloaded, it keeps running the newest signed copy it already
-/// has and retries in the background; with none, it stops with
-/// `DownloadFailure` (the "Couldn't download Stella" screen). A local ad-hoc
-/// copy is built only when a developer sets `STELLA_LAUNCHER_UNSIGNED_ELECTRON=1`.
+/// macOS ties the Keychain item and privacy grants to the signature, so the
+/// launcher never switches to an unsigned copy on its own.
 enum ElectronIdentity {
     struct Resolved {
         let app: URL
-        /// The Electron version whose signed copy is still missing, when `app`
-        /// is an older signed copy standing in for it.
         let pendingVersion: String?
     }
 
@@ -118,7 +106,6 @@ enum ElectronIdentity {
             .trimmingCharacters(in: .whitespacesAndNewlines) == "1"
     }
 
-    /// Serializes installs between a launch and the background retry.
     private static let installLock = NSLock()
 
     static func signedMarker(_ version: String) -> String { "{\"electron\":\"\(version)\",\"signed\":true}" }
@@ -159,8 +146,6 @@ enum ElectronIdentity {
         throw DownloadFailure(version: version, underlying: failure)
     }
 
-    /// Background retry for a launch that fell back to an older signed copy.
-    /// The new copy lands in its own folder and is used from the next launch.
     static func retryDownload(paths: LauncherPaths, version: String, env: [String: String]) -> Bool {
         installLock.lock()
         defer { installLock.unlock() }

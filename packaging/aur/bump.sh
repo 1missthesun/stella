@@ -1,18 +1,4 @@
 #!/bin/bash
-# Bumps the AUR package stella-desktop-bin to a published launcher version and,
-# with --push, publishes it to the AUR.
-#
-#   packaging/aur/bump.sh            # to launcher/stable/VERSION
-#   packaging/aur/bump.sh 81         # to a given launcher version
-#   packaging/aur/bump.sh --push     # ...then commit and push to the AUR
-#
-# It pins launcher/releases/<version>/ (unchanging, unlike stable/), takes the
-# binaries' sums from that release's SHA256SUMS, re-pins the icon and LICENSE
-# to this checkout's origin/master, refreshes the local files' sums and
-# regenerates .SRCINFO. A package edit without a new launcher: bump pkgrel by
-# hand, then run this with the current version.
-#
-# Pushing uses the SSH key ~/.ssh/aur_stella (AUR account "fromyou").
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -43,7 +29,6 @@ x64="$(sum_of stella-launcher-linux-x64)"
 arm64="$(sum_of stella-launcher-linux-arm64)"
 [ -n "$x64" ] && [ -n "$arm64" ] || { echo "SHA256SUMS for $version lacks a Linux launcher" >&2; exit 1; }
 
-# Prove the pinned x64 binary is there and says the version it should.
 curl -fsSL "$releases/releases/$version/stella-launcher-linux-x64" -o "$tmp/launcher"
 [ "$(sha256sum "$tmp/launcher" | cut -d' ' -f1)" = "$x64" ] || { echo "x64 launcher doesn't match SHA256SUMS" >&2; exit 1; }
 chmod +x "$tmp/launcher"
@@ -69,7 +54,6 @@ sed -i \
   -e "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('$arm64')/" \
   "$pkg/PKGBUILD"
 [ "$old" = "$version" ] || sed -i "s/^pkgrel=.*/pkgrel=1/" "$pkg/PKGBUILD"
-# The four sums of source=(): icon, LICENSE, wrapper, desktop entry.
 python3 - "$pkg/PKGBUILD" "$icon" "$license" "$wrapper" "$desktop" <<'PY'
 import re, sys
 path, *sums = sys.argv[1:]

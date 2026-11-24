@@ -1,5 +1,4 @@
 #!/bin/bash
-# Build script for native helpers (macOS)
 set -e
 
 cd "$(dirname "$0")"
@@ -197,9 +196,6 @@ build_swift_universal "meeting_capture" "src/meeting_capture.swift" \
   -framework ScreenCaptureKit
 echo "Build successful: $OUTPUT_DIR/meeting_capture"
 
-# wakeword_listener — Rust binary, universal macOS via cargo + lipo. Skipped
-# silently if cargo is unavailable so this file is not a hard-dependency on
-# rustup for contributors who only touch the C++/Swift helpers.
 if command -v cargo >/dev/null 2>&1; then
   echo "Building wakeword_listener (macOS universal)..."
   pushd wakeword >/dev/null
@@ -223,7 +219,6 @@ else
   echo "Skipping wakeword_listener: cargo not on PATH (install rustup to enable)."
 fi
 
-# stella_show — Show Stella's capture builder (Rust, from Scrawl), universal macOS.
 if command -v cargo >/dev/null 2>&1; then
   echo "Building stella_show (macOS universal)..."
   pushd show >/dev/null

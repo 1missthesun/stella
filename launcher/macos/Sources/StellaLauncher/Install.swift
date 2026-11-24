@@ -162,8 +162,6 @@ enum Install {
             let access = try bootstrapAccess(backend: backend)
             remote = access.remote
             args += ["--branch", Pins.upstreamBranch]
-            // Through the environment, so the token stays out of argv and
-            // isn't written to the clone's config.
             env = [
                 "GIT_CONFIG_COUNT": "2",
                 "GIT_CONFIG_KEY_0": "http.extraHeader",

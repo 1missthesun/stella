@@ -1,14 +1,3 @@
-# Build script for native helpers
-#
-# MSVC is the toolchain the shipped Windows helpers are built with. The MinGW
-# and clang fallbacks exist only so contributors without Visual Studio can get
-# a working local build.
-#
-# Pass -Strict (CI does) to require MSVC and refuse every fallback. Without it,
-# an MSVC compile error is silently papered over by whichever other compiler
-# happens to accept the file, which is how a helper that no compiler could
-# build reached master and stalled the publish for a month.
-
 [CmdletBinding()]
 param(
     [switch]$Strict
@@ -73,7 +62,6 @@ function Build-WithClang($srcFile, $outFile, $gccLibs) {
     return ($exit -eq 0 -and $exists)
 }
 
-# Detect compiler
 $vcvars = $null
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if (Test-Path $vsWhere) {
@@ -153,9 +141,6 @@ Write-Host ""
 
 if (-not $allOk) { exit 1 }
 
-# wakeword_listener — Rust binary, x86_64 Windows via cargo. Skipped silently
-# when cargo is unavailable so non-Rust contributors aren't blocked, but it
-# ships in the helper set, so -Strict requires it.
 $cargo = Get-Command cargo -ErrorAction SilentlyContinue
 if ($cargo) {
     Write-Host "Building wakeword_listener.exe..."
@@ -184,7 +169,6 @@ if ($cargo) {
     Write-Host "Skipping wakeword_listener: cargo not on PATH (install rustup to enable)."
 }
 
-# stella_show — Show Stella's capture builder (Rust, from Scrawl).
 if ($cargo) {
     Write-Host "Building stella_show.exe..."
     Push-Location (Join-Path $PSScriptRoot "show")

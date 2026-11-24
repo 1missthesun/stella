@@ -2,16 +2,8 @@ import CryptoKit
 import Foundation
 import Security
 
-/// Signs and verifies the app tree (step 5b).
-///
-/// The signature is ECDSA P-256 / SHA-256 over `stella-tree-v1\n<HEAD^{tree}>\n`,
-/// DER-encoded, stored base64 as a git note under `refs/notes/stella-signed`
-/// on the commit. Notes are local; each device signs its own applies.
-///
-/// The private key lives in the login keychain as an item this launcher
-/// creates (the keychain's default ACL trusts only the creating app, so other
-/// programs get a prompt). `STELLA_LAUNCHER_KEY_FILE` points at a 0600 PEM
-/// instead, for testing on machines whose keychain is unavailable.
+/// The keychain's default ACL trusts only the creating app, so other programs
+/// get a prompt for the signing key.
 final class TreeSigner {
     static let notesRef = "stella-signed"
     static let keychainService = "sh.stella.launcher.tree-signing"
@@ -65,8 +57,6 @@ final class TreeSigner {
         return head
     }
 
-    /// What changed outside Stella's updates: the working tree as git would
-    /// commit it, compared with the newest commit this launcher signed.
     func outsideChanges(git: GitTool, app: URL) throws -> OutsideChanges? {
         let head = try git.run(["rev-parse", "HEAD"], cwd: app)
         let headTree = try git.run(["rev-parse", "HEAD^{tree}"], cwd: app)
@@ -89,9 +79,6 @@ final class TreeSigner {
         return OutsideChanges(head: head, tree: tree, files: files)
     }
 
-    /// Makes exactly `seen` the trusted state: commits the working tree as it
-    /// was shown, then signs it. Returns false, changing nothing, when the
-    /// checkout no longer matches what the user saw.
     func acceptOutsideChanges(_ seen: OutsideChanges, git: GitTool, app: URL) throws -> Bool {
         guard let now = try outsideChanges(git: git, app: app) else { return true }
         guard now.head == seen.head, now.tree == seen.tree else {
@@ -132,8 +119,6 @@ final class TreeSigner {
         return nil
     }
 
-    /// The tree `git add -A` would produce, built in a scratch copy of the
-    /// index so the checkout's own index is untouched.
     private func workingTree(git: GitTool, app: URL) throws -> String {
         let fm = FileManager.default
         let index = URL(fileURLWithPath: try git.run(["rev-parse", "--git-path", "index"], cwd: app), relativeTo: app)

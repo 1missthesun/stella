@@ -49,8 +49,6 @@ extern char **environ;
 #ifndef RELEASES_URL
 #define RELEASES_URL "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev"
 #endif
-/* Base64 of the raw 32-byte Ed25519 key that signs launcher/stable/SHA256SUMS.sig.
- * Empty refuses every self-update. */
 #ifndef UPDATE_PUBLIC_KEY
 #define UPDATE_PUBLIC_KEY ""
 #endif
@@ -1172,8 +1170,6 @@ static char *sign_head(const char *expected) {
     return head;
 }
 
-/* Files changed outside Stella's updates: the working tree as git would commit
- * it, compared with the newest commit this launcher signed. */
 typedef struct {
     char *head, *tree;
     StrList kinds, paths;
@@ -1216,8 +1212,6 @@ static char *newest_signed_ancestor(const char *head) {
     return found;
 }
 
-/* The tree `git add -A` would produce, built in a scratch copy of the index so
- * the checkout's own index is untouched. */
 static char *working_tree(void) {
     char *index = GIT("rev-parse", "--git-path", "index"), *absolute, *scratch, *slash, *env, *added, *tree = NULL;
     if (!index) return NULL;
@@ -1247,8 +1241,6 @@ static char *working_tree(void) {
     return tree;
 }
 
-/* 1 and fills `out` when something changed, 0 when HEAD is signed and clean, -1
- * on error. */
 static int outside_changes(OutsideChanges *out) {
     StrList dirty = {0};
     char *head = GIT("rev-parse", "HEAD"), *head_tree = GIT("rev-parse", "HEAD^{tree}"), *base = NULL, *diff = NULL;
@@ -1285,9 +1277,6 @@ static int outside_changes(OutsideChanges *out) {
     return 1;
 }
 
-/* Makes exactly `seen` the trusted state: commits the working tree as it was
- * shown, then signs it. Changes nothing when the checkout no longer matches
- * what the user saw; the next check shows it again. */
 static int accept_outside_changes(const OutsideChanges *seen) {
     OutsideChanges now;
     char *head, *head_tree, *signed_head;
@@ -1866,7 +1855,6 @@ static void ui_capture(const char *name, guint delay_ms) {
 
 static char *g_bun_bin;
 static char *g_bun_version;
-/* What rttime_prepare() found, passed to Electron (see there). */
 static const char *g_rtkit_state;
 static char *g_rttime_note;
 
@@ -1938,9 +1926,6 @@ static StrList electron_environment(void) {
     return env;
 }
 
-/* One fetch of url into dest, checked against sha256. curl retries timeouts
- * and 408/429/5xx itself; a transfer slower than 1 KB/s for a minute is
- * abandoned rather than left hanging. */
 static int download_once(const char *url, const char *dest, const char *sha256) {
     char *staging = xasprintf("%s.download", dest);
     char *argv[] = {"curl", "-fsSL", "--retry", "4", "--retry-max-time", "120", "--connect-timeout", "30",
@@ -1984,9 +1969,7 @@ static int download_once(const char *url, const char *dest, const char *sha256) 
 #define GITHUB_PREFIX "https://github.com/"
 
 /* GitHub release downloads answer 502/504 or time out for minutes at a time,
- * so a GitHub asset is fetched from Stella's mirror of it first
- * (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with a
- * growing pause. The checksum makes either source equally trustworthy. */
+ * so a GitHub asset is fetched from Stella's mirror of it first. */
 static int download(const char *url, const char *dest, const char *sha256) {
     static const unsigned pauses[] = {0, 10, 30};
     char *mirror = NULL;
@@ -2194,7 +2177,6 @@ static int clone_source(void) {
         if (bootstrap_access(&remote, &token) != 0) goto out;
         sl_push(&args, "--branch");
         sl_push(&args, UPSTREAM_BRANCH);
-        /* Through the environment: the token stays out of argv and the clone's config. */
         header = xasprintf("GIT_CONFIG_VALUE_0=Authorization: Bearer %s", token);
         sl_push(&extra, "GIT_CONFIG_COUNT=2");
         sl_push(&extra, "GIT_CONFIG_KEY_0=http.extraHeader");
@@ -2258,10 +2240,6 @@ static void install_desktop_entry(void) {
         installed, icon);
     existing = read_file(entry_path, NULL);
     if (packaged && *packaged && strcmp(packaged, "0") != 0) {
-        /* A distribution package (e.g. the AUR's stella-desktop-bin) ships the
-         * menu entry and icon, so this launcher doesn't add a second Stella to
-         * the menu, and removes the one an earlier curl install wrote. The copy
-         * above still happens: self-updates go to the per-user launcher. */
         if (existing && strcmp(existing, entry) == 0 && unlink(entry_path) == 0)
             LOG("install: packaged; removed %s", entry_path);
     } else {
@@ -3389,11 +3367,6 @@ static void on_signal(int sig) {
     _exit(128 + sig);
 }
 
-/* A self-update execs the new launcher in this same process, so the old
- * image's WebKit helpers stay our children while the new image knows nothing
- * of them: they exit when their IPC sockets close and stayed zombies. At
- * startup nothing has been spawned yet, so every child is such a leftover;
- * each is asked to stop and reaped by its own pid. */
 typedef struct {
     pid_t pids[64];
     size_t count;
@@ -3445,7 +3418,6 @@ static gpointer inherited_reaper(gpointer data) {
 
 static Inherited *g_inherited;
 
-/* Runs before this image spawns anything (updater included). */
 static void stop_inherited_children(void) {
     Inherited *inherited = calloc(1, sizeof(*inherited));
     size_t i;
@@ -3475,27 +3447,14 @@ static void reap_inherited_children(int with_main_loop) {
     free(inherited);
 }
 
-/* ---- Real-time CPU limit (RLIMIT_RTTIME) ----
- * On a Linux desktop without RealtimeKit, xdg-desktop-portal reports a
+/* On a Linux desktop without RealtimeKit, xdg-desktop-portal reports a
  * real-time budget of 0, and PipeWire's client library (module-rt) then sets
- * RLIMIT_RTTIME to 0 in every process that loads it: the desktop shell, a bar,
- * an app menu. Everything they start inherits that, and the kernel SIGKILLs a
- * process whose hard limit is 0 as soon as one of its threads arms a CPU-time
- * timer (a soft limit of 0 sends SIGXCPU, which also kills). No log line, no
- * OOM: Stella's GPU process, renderers, services and task shells just died
- * ("Electron exited (signal 9)").
- *
- * So, before this launcher starts anything:
- *  - a soft limit below the hard one is raised to it;
- *  - a hard limit of 0 only root can raise, but the user's systemd manager
- *    starts units with its own limits, so the launcher starts itself once more
- *    there and this copy leaves;
- *  - without RealtimeKit, DISABLE_RTKIT=1 stops PipeWire inside Stella (screen
- *    capture) and in what it starts from asking the portal and setting the
- *    limit to 0 again. Nothing can get real-time scheduling on such a system
- *    anyway, so nothing is lost.
- * Electron gets what was found (STELLA_LAUNCHER_RTKIT, STELLA_LAUNCHER_RTTIME),
- * logs it, and tells the user when the limit is still 0. */
+ * RLIMIT_RTTIME to 0 in every process that loads it, which everything they
+ * start inherits. The kernel SIGKILLs a process whose hard limit is 0 as soon
+ * as one of its threads arms a CPU-time timer (a soft limit of 0 sends
+ * SIGXCPU, which also kills). Only root can raise a hard limit of 0, but the
+ * user's systemd manager starts units with its own limits. DISABLE_RTKIT=1
+ * stops PipeWire from asking the portal and setting the limit to 0 again. */
 #define RTKIT_BUS_NAME "org.freedesktop.RealtimeKit1"
 #define RTTIME_RELAUNCHED_ENV "STELLA_LAUNCHER_RTTIME_RELAUNCHED"
 
@@ -3523,8 +3482,8 @@ static int rttime_hard_zero(void) {
     return rttime_get(&rl) == 0 && rl.rlim_max == 0;
 }
 
-/* Whether RealtimeKit runs or can be started on the system bus. A private
- * connection: the shared one exits the process when the bus goes away. */
+/* A private connection: the shared one exits the process when the bus goes
+ * away. */
 static int rtkit_available(void) {
     GError *error = NULL;
     char *address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
@@ -3569,11 +3528,8 @@ static int rtkit_available(void) {
     return found;
 }
 
-/* Starts this launcher again as a transient unit of the user's systemd
- * manager, which gives it the manager's limits instead of the 0 this process
- * inherited. The unit carries this environment and directory; KillMode=process
- * leaves what Stella started running after the launcher exits, as the app
- * scope it came from did. Returns 0 once the unit has started. */
+/* KillMode=process leaves what Stella started running after the launcher
+ * exits. */
 static int rttime_relaunch(int argc, char **argv) {
     static const char *skipped[] = {"INVOCATION_ID", "JOURNAL_STREAM", "SYSTEMD_EXEC_PID", "MANAGERPID",
                                     "NOTIFY_SOCKET", "LISTEN_PID", "LISTEN_FDS", "LISTEN_FDNAMES",
@@ -3633,7 +3589,6 @@ static int rttime_relaunch(int argc, char **argv) {
     return ok ? 0 : -1;
 }
 
-/* Returns 1 when this process should leave because a fresh copy has started. */
 static int rttime_prepare(int argc, char **argv, int *lock_fd) {
     struct rlimit rl;
     rttime_raise_soft();
@@ -3646,7 +3601,6 @@ static int rttime_prepare(int argc, char **argv, int *lock_fd) {
         } else {
             LOG("launcher: started with a real-time CPU limit (RLIMIT_RTTIME) of 0, which gets Stella's processes "
                 "killed; starting again under the user's systemd");
-            /* The fresh copy takes the lock; take it back if it never starts. */
             flock(*lock_fd, LOCK_UN);
             if (rttime_relaunch(argc, argv) == 0) return 1;
             if (flock(*lock_fd, LOCK_EX | LOCK_NB) != 0) {
@@ -3707,8 +3661,6 @@ int main(int argc, char **argv) {
         ask_running_launcher_to_show();
         return 0;
     }
-    /* First: after an in-place update the previous image's helpers are ours,
-     * and a relaunch below would leave them behind. */
     stop_inherited_children();
     if (rttime_prepare(argc, argv, &lock_fd)) return 0;
     state_load();

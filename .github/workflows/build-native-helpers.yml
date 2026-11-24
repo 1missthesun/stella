@@ -1,10 +1,5 @@
 name: Build Native Helpers
 
-# Native helpers (Swift/C/Rust binaries under packages/native/out/) are built per
-# platform on CI rather than committed to git. This workflow is the publishing
-# path for native helper payloads; desktop releases download the current
-# published helper set and bundle it without rebuilding native code.
-#
 on:
   push:
     branches: [master]
@@ -75,18 +70,16 @@ jobs:
           fi
 
           stage_arch() {
-            local arch_label="$1"   # arm64 or x86_64
+            local arch_label="$1"
             local stage_dir="$2"
             mkdir -p "$stage_dir"
             for entry in "$OUT"/*; do
               local name
               name="$(basename "$entry")"
               if [ -d "$entry" ]; then
-                # wakeword_models/ ships as-is to every arch
                 cp -R "$entry" "$stage_dir/$name"
                 continue
               fi
-              # Universal mach-o → thin to the requested arch
               if file "$entry" | grep -q "Mach-O"; then
                 if lipo -info "$entry" >/dev/null 2>&1; then
                   if lipo -info "$entry" | grep -q "$arch_label"; then
@@ -159,11 +152,7 @@ jobs:
           git --version
           Get-Command cl -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "cl: $($_.Source)" }
 
-      # dictation_bridge.exe does keyboard input synthesis (paste) and
-      # stella-computer-helper.exe does window control — both look like
-      # malware to Defender, which silently quarantines them. Disable every
-      # Defender protection knob we can on the runner. Realtime alone isn't
-      # enough on Microsoft Defender for Endpoint (what GHA runners use).
+      # Microsoft Defender for Endpoint quarantines helpers that synthesize keyboard input or control windows.
       - name: Disable Windows Defender protections
         shell: pwsh
         run: |
@@ -186,7 +175,6 @@ jobs:
             try {
               Set-MpPreference -Force @{ $key = $opts[$key] }
             } catch {
-              # Set-MpPreference takes named params; fall back to per-call.
             }
           }
           try {
@@ -206,9 +194,6 @@ jobs:
           }
           Get-MpPreference | Select-Object DisableRealtimeMonitoring,DisableBehaviorMonitoring,DisableIOAVProtection,DisableScriptScanning
 
-      # -Strict makes MSVC mandatory: without it an MSVC compile error is
-      # silently absorbed by the MinGW/clang fallbacks, which is how a helper
-      # that no compiler could build reached master unnoticed.
       - name: Build native helpers (Windows)
         shell: pwsh
         working-directory: packages/native
@@ -230,10 +215,7 @@ jobs:
             Write-Host "Get-MpThreatDetection unavailable: $_"
           }
 
-      # Nothing we ship installs the Visual C++ redistributable, so a helper
-      # that imports it fails to start on a clean Windows box and the feature
-      # dies silently. Assert the real import tables; a build flag that didn't
-      # take effect is exactly the kind of lie this job exists to catch.
+      # A clean Windows install has no Visual C++ redistributable.
       - name: Verify helpers need no Visual C++ redistributable
         shell: pwsh
         working-directory: packages/native
@@ -267,9 +249,6 @@ jobs:
           fi
           echo "Contents of $OUT after build:"
           ls -la "$OUT"
-          # Hard-fail if Defender (or anything else) ate a binary the
-          # build script said it produced; surface the regression in CI
-          # rather than shipping a broken Windows tarball.
           required=("window_info.exe" "recent_apps.exe" "window_text.exe" "selected_text.exe" "dictation_bridge.exe" "stella-computer-helper.exe" "meeting_capture.exe" "wakeword_listener.exe" "stella_show.exe" "wakeword_models/hey_stella.onnx")
           missing=0
           for name in "${required[@]}"; do
@@ -452,9 +431,6 @@ jobs:
 
           cp "$manifest_path" "$RUNNER_TEMP/published-manifest.json"
 
-      # A successful upload is not proof the manifest is actually being served.
-      # Read current.json back over the public URL and require it to match what
-      # we just pushed, including every asset digest.
       - name: Verify published manifest is being served
         env:
           R2_PUBLIC_BASE_URL: https://pub-a319aaada8144dc9be5a83625033769c.r2.dev

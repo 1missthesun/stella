@@ -1,116 +1,18 @@
 /**
- * Idle-time maintenance for the desktop database (`stella.sqlite`).
- *
- * The file is shared over WAL by four connections in three processes (this
- * worker, Electron main's chat-history service, the Electron cloud-cache
- * thread, the host's connector outbox). Nothing else ever checkpoints,
- * analyzes or vacuums it, so this module owns all of that, from the worker —
- * the process that owns the database lifetime (`worker/server/session/storage.ts`).
- *
- * Scheduling. One fixed-rate fiber (`forkFixedRateFiber`, the run-event-log
- * sweep idiom) ticks every `intervalMs`. A tick does nothing unless the
- * caller's `isIdle()` holds — the worker wires its session-work signal (no orchestrator run, no agents, no
- * in-flight RPC handler, no voice work). Consecutive idle ticks form
- * an idle streak; heavier steps need a longer streak, and a tick runs at most
- * one heavy step:
- *   - every idle tick: `wal_checkpoint(PASSIVE)`, or `TRUNCATE` once the WAL
- *     file exceeds `walTruncateBytes` (the WAL never shrinks on its own);
- *   - every idle tick, until drained: `deleteLegacyRunEventBatch` batches
- *     (entry-retention.ts, <= 5k rows, one immediate transaction each) over
- *     the unread legacy `run_event` rows, for up to 250 ms per tick with a
- *     client attached or 2 s with none, stopping early if the idle
- *     predicate flips between batches; drained is recorded in `meta`.
- *     The budget is checked after each batch, so one tick can overrun it by
- *     at most one batch. Drain estimate for prod's ~1.56 M rows: a 5k batch
- *     measured ~60 ms p50 / ~200 ms max on a prod-shaped fixture, so ~4
- *     batches (~20k rows) per attached idle minute → ~80–90 idle minutes
- *     attached, or ~10 detached ticks (~165k rows each) — versus ~5 idle
- *     hours at one batch per tick;
- *   - streak >= analyzeIdleTicks: one bounded `ANALYZE` per schema version
- *     (meta-guarded), so the planner finally has `sqlite_stat1`;
- *   - zero RPC clients attached AND streak >= reclaimIdleTicks, while
- *     `idx_entry_search_conv_created` is missing: build the search-text covering
- *     index (`SEARCH_TEXT_INDEX_SQL`, below) — before the reclaim, so the
- *     VACUUM that follows also compacts it;
- *   - the run_event sweep drained (deleted rows only return space through
- *     VACUUM) AND zero RPC clients attached AND streak >= reclaimIdleTicks
- *     (default 1 — the long streak only ever protected an attached
- *     Electron, and the reclaim never runs attached): the one-time freelist
- *     reclaim (below). Its cheap preconditions are evaluated on every idle
- *     tick while attached, so the idle-shutdown hold is in place at quit.
- * `PRAGMA optimize` runs on the worker's own connection once on the first
- * idle tick and again at shutdown (`stop()`), per SQLite's guidance for
- * long-lived connections.
- *
- * Every statement here is synchronous (bun:sqlite), so a tick can never
- * interleave with a turn's writes on this thread, and `stop()` — also
- * synchronous — cannot race an in-flight tick: cancelling the fiber IS the
- * join. Other processes are handled with SQLITE_BUSY: maintenance uses its
- * own connection with a short busy timeout, and BUSY is always "try again
- * next idle window", never an error.
- *
- * One-time reclaim. Migration v1 dropped the legacy tables without a VACUUM,
- * leaving most of the file on the freelist. When the freelist exceeds both
- * `reclaimMinFreelistBytes` and `reclaimMinFreelistRatio` of the file, and
- * statfs shows room for VACUUM's two transient copies (the temp database and,
- * in WAL mode, a WAL as large as the result), the reclaim runs:
- *   TRUNCATE checkpoint → VACUUM → record completion →
- *   TRUNCATE checkpoint (this is what actually shrinks the file).
- *
- * Why not `auto_vacuum = INCREMENTAL`: switching an existing database to it
- * requires a full VACUUM anyway (the one-time cost this module pays once),
- * and incremental vacuum only moves free pages to the end of the file — it
- * never defragments, so a long-lived chat log fragments steadily while paying
- * pointer-map overhead on every write.
- *
- * The detached window. VACUUM holds the write lock for its whole duration
- * (minutes on a multi-GiB file) and blocks this worker's event loop (the
- * driver is synchronous). With Electron attached that would stall the user's
- * next message and fail Electron-main / cloud-cache writes past their 5s
- * busy_timeout, so the reclaim only starts when the peer broker reports zero
- * attached clients (`WorkerPeerBroker.attachedCount`, the same attach/detach
- * events the lifecycle server's idle-shutdown counts). That is the worker's
- * pre-idle-shutdown window: Electron is gone, there are no other writers, and
- * blocking our own loop is harmless. Once the preconditions have held on an
- * idle tick, `holdsWorkerAlive()` is the lifecycle's `shouldKeepAlive`, so it
- * postpones idle shutdown until the next tick
- * has run the reclaim (the VACUUM itself is synchronous, so no timer can
- * fire mid-VACUUM). Three BUSY deferrals end the hold for the session.
- * Worst-case post-quit linger, once per database: one tick (<= 60 s) +
- * VACUUM + final checkpoint — about 5–7 minutes for the
- * 13.3 GiB prod file (~6 GiB live).
- *
- * The search-text index. The covering partial index is not in the
- * schema or a migration: building it is one full `entry` scan through every
- * row's payload overflow chain (~6 s warm, ~15–20 s cold on the 13 GiB prod
- * file) holding the write lock, which at open would freeze Electron main
- * (it migrates synchronously) and fail other writers' 5 s busy timeout. So
- * it is built here, in the same detached window as the reclaim, with the
- * same treatment: `holdsWorkerAlive()` pins idle shutdown while it is
- * missing and no client is attached, BUSY defers to the next idle tick,
- * three deferrals give up for the session. `CREATE INDEX` and
- * `ANALYZE idx_entry_search_conv_created` commit in one transaction: with
- * `sqlite_stat1` rows for the other `entry` indexes but none for this one,
- * the planner would pick it for the latest-visible-message lookup over
- * `idx_entry_conv_visible_seq`. The index is ~14 MB on prod, so it needs no
- * disk check. Queries never force it (no `INDEXED BY`); without it they
- * return the same rows, slower. Presence is read from `sqlite_master`.
- * This adds, once per database, one tick plus the build to the post-quit
- * linger below.
- *
- * Kill switch: `STELLA_DB_RECLAIM=0` disables only the reclaim; checkpoint,
- * optimize, ANALYZE and the run_event sweep keep running.
- *
- * Killed mid-VACUUM (e.g. Electron reattaches, the host's attach times out,
- * and its kill ladder SIGTERMs then SIGKILLs the worker — the SIGTERM handler
- * cannot run while VACUUM blocks the loop): VACUUM is one write transaction.
- * In WAL mode its pages go to the WAL and the commit frame is written last,
- * so a SIGKILL before commit leaves the main file untouched and recovery
- * ignores the uncommitted frames; the temp database is an unlinked-on-open
- * (unix) / delete-on-close (Windows) file, so nothing is left behind.
- * Verified by SIGKILLing a VACUUM on a 200 MiB fixture: integrity_check ok,
- * freelist unchanged, `freelist_reclaim_v1` unset, and the reclaim retries in
- * a later detached window.
+ * SQLite behaviour this maintenance rests on:
+ * - The WAL never shrinks on its own; only a TRUNCATE checkpoint shrinks it.
+ * - `auto_vacuum = INCREMENTAL` needs a full VACUUM to switch on and only
+ *   moves free pages to the end of the file, never defragmenting.
+ * - VACUUM holds the write lock for its whole run and bun:sqlite is
+ *   synchronous, so it blocks this event loop and fails other processes'
+ *   writes past their busy_timeout; it runs only with no client attached.
+ * - VACUUM is one write transaction: a SIGKILL before its WAL commit frame
+ *   leaves the main file untouched, and its temp database is unlinked on open
+ *   (unix) / deleted on close (Windows).
+ * - With `sqlite_stat1` rows for the other `entry` indexes but none for the
+ *   search-text index, the planner would pick it over
+ *   `idx_entry_conv_visible_seq`, so its CREATE INDEX and ANALYZE commit
+ *   together.
  */
 
 import fs from "node:fs";
@@ -332,9 +234,7 @@ const inImmediateTransaction = <A>(db: SqliteDatabase, fn: () => A): A => {
   } catch (error) {
     try {
       db.exec("ROLLBACK;");
-    } catch {
-      /* the transaction may already be gone */
-    }
+    } catch {}
     throw error;
   }
 };
@@ -362,12 +262,6 @@ export const searchTextIndexExists = (db: SqliteDatabase): boolean =>
       .get(SEARCH_TEXT_INDEX_NAME),
   );
 
-/**
- * Build the search-text covering index and its `sqlite_stat1` row in one
- * immediate transaction. Holds the write lock for the whole `entry` scan,
- * so callers run it only in the detached window. BUSY is a deferral.
- * `indexBytes` is the growth in live pages (the index plus its stat row).
- */
 export const buildSearchTextIndex = (
   connection: SqliteDatabase,
   options: {
@@ -647,13 +541,6 @@ export class DatabaseMaintenance {
     );
   }
 
-  /**
-   * True while the search-index build or the reclaim is running, or either
-   * is pending and waiting for the detached window. This is the lifecycle's
-   * idle-shutdown keep-alive (`shouldKeepAlive`), so it
-   * keeps the process up after the last client detaches until later ticks
-   * have run them. (Both are synchronous, so no timer can fire during them.)
-   */
   holdsWorkerAlive(): boolean {
     if (this.reclaimRunning || this.searchIndexRunning) return true;
     if (
@@ -686,9 +573,7 @@ export class DatabaseMaintenance {
     this.cancelTicks = null;
     try {
       this.connection?.close();
-    } catch {
-      /* already closed */
-    }
+    } catch {}
     this.connection = null;
     const startedAt = performance.now();
     try {
@@ -791,10 +676,6 @@ export class DatabaseMaintenance {
 
     const searchIndex = this.searchIndexStep(connection);
 
-    // Readiness is evaluated on every idle tick (cheap: pragmas + statfs)
-    // so the idle-shutdown hold is already in place when Electron quits;
-    // the VACUUM itself only runs detached (see reclaim()), and not on a
-    // tick that built the index or while the index is still pending.
     if (this.sweepDrained && !this.reclaimDone && !this.reclaimDisabled) {
       this.reclaim(connection, searchIndex === "settled");
     }
@@ -985,9 +866,6 @@ export class DatabaseMaintenance {
       this.handleOutcome(evaluation, 0);
       return;
     }
-    // The detached window: with a client attached, a multi-minute
-    // synchronous VACUUM would stall its messages and fail other
-    // processes' writes. Wait (and keep the worker alive) for zero clients.
     this.reclaimReady = true;
     if (!this.isDetached()) {
       this.logOnce("waiting-for-detach", "storage.maintenance.reclaim-waiting", {
@@ -996,8 +874,6 @@ export class DatabaseMaintenance {
       });
       return;
     }
-    // No attached client to protect, so no long streak: the default of one
-    // idle tick keeps the post-quit linger to a single tick.
     if (this.idleStreak < this.settings.reclaimIdleTicks) return;
     if (!mayRun) return;
     const startedAt = performance.now();

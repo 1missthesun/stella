@@ -22,9 +22,7 @@ export type LocalLlmCredentialAccessBroker = {
 export type ClaudeCodeConfigRequest = {
   recheck?: boolean;
   cached?: boolean;
-  /** Anthropic refused the login in this config directory (null: Claude Code's own). */
   rejectedConfigDir?: string | null;
-  /** Put logins Anthropic refused, that still read as signed in, back into use and read again. */
   retryRefused?: boolean;
 };
 
@@ -96,7 +94,6 @@ export const getAccessibleLocalLlmOAuthApiKey = async (
   if (!broker) {
     return await getLocalLlmOAuthApiKey(stellaDataDirPath, normalized, {
       ...options,
-      // The providers bring pi-ai; load them only when a sign-in is used.
       resolve: async (...args) =>
         await (await import("./llm-oauth-providers.js")).resolveLlmOAuthApiKey(...args),
     });

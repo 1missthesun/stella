@@ -3,7 +3,6 @@ import { inflateSync } from "node:zlib";
 export type DecodedPng = Readonly<{
   width: number;
   height: number;
-  /** Row-major RGBA, 4 bytes per pixel. */
   rgba: Uint8Array;
 }>;
 
@@ -25,11 +24,6 @@ const paeth = (left: number, up: number, upLeft: number): number => {
   return toUp <= toUpLeft ? up : upLeft;
 };
 
-/**
- * Decodes the PNGs Stella's native helpers write (8-bit greyscale, RGB or
- * RGBA, not interlaced, no palette) to RGBA. Returns null for anything else
- * so callers can fall back instead of guessing at pixels.
- */
 export const decodePng = (bytes: Uint8Array): DecodedPng | null => {
   if (bytes.length < 8) return null;
   for (let index = 0; index < 8; index += 1) {

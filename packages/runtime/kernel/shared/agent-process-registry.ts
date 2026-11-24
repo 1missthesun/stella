@@ -19,7 +19,6 @@ export type AgentProcessRecord = {
   label: string;
   command: string;
   startedAt: number;
-  /** Kernel start time (Linux) or `ps lstart` (macOS); guards pid reuse. */
   identity: string | null;
   processGroup: boolean;
 };
@@ -38,9 +37,7 @@ const persist = () => {
     const temp = `${registryFile}.${process.pid}.tmp`;
     writeFileSync(temp, JSON.stringify([...live.values()]), { mode: 0o600 });
     renameSync(temp, registryFile);
-  } catch {
-    // The exit lane still covers this process; only the restart lane is lost.
-  }
+  } catch {}
 };
 
 export const configureAgentProcessRegistry = (file: string): void => {
@@ -83,10 +80,6 @@ export const describeAgentProcesses = (): Array<{
     alive: isAlive(record.pid),
   }));
 
-/**
- * Synchronous so it can run from `process.on("exit")`: signal every tracked
- * CLI (its whole group when it leads one) and forget it.
- */
 export const killAgentProcessesSync = (
   signal: NodeJS.Signals = "SIGKILL",
 ): number => {
@@ -104,11 +97,6 @@ export const killAgentProcessesSync = (
   return signalled;
 };
 
-/**
- * Read and clear what a previous worker left in `file`. Only processes still
- * alive with the same start-time identity are returned, so a recycled pid is
- * never touched.
- */
 export const takeOrphanedAgentProcesses = (
   file: string,
 ): AgentProcessRecord[] => {

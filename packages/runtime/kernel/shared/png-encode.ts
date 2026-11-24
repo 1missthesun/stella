@@ -37,12 +37,6 @@ const paeth = (left: number, up: number, upLeft: number): number => {
   return toUp <= toUpLeft ? up : upLeft;
 };
 
-/**
- * RGBA pixels as a PNG, compressed the way image tools do: RGB when every
- * pixel is opaque, each row filtered with whichever of the five PNG filters
- * leaves the smallest residuals, then zlib. Photon's own PNG keeps the alpha
- * channel and filters nothing, which makes a retina screenshot ~30% larger.
- */
 export const encodePng = (rgba: Uint8Array, width: number, height: number): Uint8Array => {
   let opaque = true;
   for (let index = 3; index < rgba.length; index += 4) {

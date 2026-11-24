@@ -21,9 +21,7 @@ const immediateTransaction =
     } catch (error) {
       try {
         db.exec("ROLLBACK;");
-      } catch {
-        /* the transaction may already be gone */
-      }
+      } catch {}
       throw error;
     }
   };

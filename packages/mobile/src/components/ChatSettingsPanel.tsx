@@ -20,6 +20,7 @@ import { PlaceSwitcher } from "./chat-settings/PlaceSwitcher";
 import { ProviderMark } from "./chat-settings/ProviderMark";
 import { BrainPage, ProvidersPage } from "./chat-settings/ProviderPages";
 import { DrawerScrollView } from "./sidebar/DrawerStage";
+import { PanelPageHeader } from "./sidebar/PanelPageHeader";
 import { Rise } from "./sidebar/SidebarNav";
 import {
   SIDEBAR_BRAND_ROW,
@@ -27,7 +28,7 @@ import {
   SidebarTopFade,
 } from "./sidebar/SidebarPanel";
 import { authClient } from "../lib/auth-client";
-import { useDrawerOpen } from "../lib/drawer";
+import { useDrawerOpen, useDrawerSide } from "../lib/drawer";
 import { tapLight } from "../lib/haptics";
 import { useComputerControl } from "../lib/main-shell-store";
 import { takeChatSettingsBrainRequest } from "../lib/connect-plan";
@@ -50,7 +51,8 @@ export function ChatSettingsPanel({ width }: { width: number }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
   const computer = useComputerControl();
-  const active = useDrawerOpen();
+  const open = useDrawerOpen();
+  const active = useDrawerSide() === "end" && open;
   const signedIn = Boolean(session.data?.user);
   const showDestinations = computer !== null || signedIn;
   const contentWidth = width - KIT.gutter * 2;
@@ -157,7 +159,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
       </>
     ) : (
       <>
-        <PageHeader
+        <PanelPageHeader
           back={
             route.name === "brain" && route.from === "providers"
               ? "Providers"
@@ -179,7 +181,6 @@ export function ChatSettingsPanel({ width }: { width: number }) {
                 ? (accountsFor ?? undefined)
                 : undefined
           }
-          styles={styles}
         />
         {route.name === "providers" ? (
           <ProvidersPage
@@ -233,58 +234,6 @@ export function ChatSettingsPanel({ width }: { width: number }) {
   );
 }
 
-function PageHeader({
-  back,
-  onBack,
-  title,
-  mark,
-  styles,
-}: {
-  back: string;
-  onBack: () => void;
-  title: string;
-  mark?: string;
-  styles: ReturnType<typeof makeStyles>;
-}) {
-  const colors = useColors();
-  return (
-    <View style={styles.header}>
-      <Pressable
-        onPress={onBack}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel={`Back to ${back}`}
-        style={({ pressed }) => [styles.backRow, pressed && styles.pressed]}
-      >
-        <Icon
-          name="chevron-left"
-          size={16}
-          color={colors.textMuted}
-          weight="semibold"
-        />
-        <Text
-          style={styles.back}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {back}
-        </Text>
-      </Pressable>
-      <View style={styles.pageTitleRow}>
-        {mark ? <ProviderMark provider={mark} size={28} /> : null}
-        <Text
-          accessibilityRole="header"
-          style={styles.pageTitle}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {title}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     root: {
@@ -313,37 +262,5 @@ const makeStyles = (colors: Colors) =>
       fontFamily: fonts.display.semiBold,
       fontSize: 27,
       letterSpacing: -0.6,
-    },
-    header: {
-      marginBottom: 22,
-    },
-    backRow: {
-      alignItems: "center",
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      gap: 4,
-      height: SIDEBAR_BRAND_ROW,
-    },
-    back: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 16,
-    },
-    pageTitleRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 12,
-      marginTop: 6,
-    },
-    pageTitle: {
-      color: colors.text,
-      flexShrink: 1,
-      fontFamily: fonts.sans.bold,
-      fontSize: 30,
-      letterSpacing: -1,
-      lineHeight: 38,
-    },
-    pressed: {
-      opacity: 0.55,
     },
   });

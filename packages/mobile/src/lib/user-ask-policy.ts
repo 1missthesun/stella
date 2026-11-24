@@ -27,7 +27,10 @@ export type UserAskPolicyView = {
   update: (next: UserAskEscalationPolicy) => void;
 };
 
-export function useUserAskEscalationPolicy(enabled: boolean): UserAskPolicyView {
+export function useUserAskEscalationPolicy(
+  enabled: boolean,
+  active: boolean,
+): UserAskPolicyView {
   const [policy, setPolicy] = useState<UserAskEscalationPolicy>(
     DEFAULT_USER_ASK_ESCALATION_POLICY,
   );
@@ -37,7 +40,7 @@ export function useUserAskEscalationPolicy(enabled: boolean): UserAskPolicyView 
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !active) return;
     let cancelled = false;
     void getJson("/api/user-asks/policy", { origin: backendOrigin() })
       .then((payload) => {
@@ -54,7 +57,7 @@ export function useUserAskEscalationPolicy(enabled: boolean): UserAskPolicyView 
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [active, enabled]);
 
   const update = useCallback((next: UserAskEscalationPolicy) => {
     const normalized = normalizeUserAskEscalationPolicy(next);

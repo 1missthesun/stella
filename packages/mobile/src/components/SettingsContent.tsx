@@ -3,7 +3,6 @@ import {
   Alert,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -13,6 +12,8 @@ import { GlassToggle } from "./glass";
 import { Icon, type IconName } from "./Icon";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { FeedbackSheet } from "./FeedbackSheet";
+import { SettingsScroll } from "./settings/SettingsScroll";
+import { SIDEBAR_BRAND_ROW } from "./sidebar/SidebarPanel";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
 import { SavedLoginsSection } from "./settings/SavedLoginsSection";
 import { ServerSection } from "./settings/ServerSection";
@@ -50,7 +51,6 @@ import {
   listStoredPairedPhoneAccess,
   type StoredPhoneAccess,
 } from "../lib/phone-access";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userFacingError } from "../lib/user-facing-error";
 import { type Colors } from "../theme/colors";
 import {
@@ -81,7 +81,15 @@ const GRADIENT_COLOR_OPTIONS: { value: GradientColor; labelKey: string }[] = [
   { value: "strong", labelKey: "mobile.settings.backgroundColor.strong" },
 ];
 
-export function SettingsContent() {
+export function SettingsContent({
+  active,
+  inDrawer,
+  onOpenCloudHome,
+}: {
+  active: boolean;
+  inDrawer: boolean;
+  onOpenCloudHome: () => void;
+}) {
   const colors = useColors();
   const t = useT();
   const {
@@ -101,7 +109,6 @@ export function SettingsContent() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const settingsStyles = useMemo(() => makeSettingsStyles(colors), [colors]);
   const router = useRouter();
-  const bottomInset = useSafeAreaInsets().bottom;
   const session = authClient.useSession();
   const features = useServerFeatures();
   const [isResettingCloudBrowser, setIsResettingCloudBrowser] = useState(false);
@@ -253,18 +260,16 @@ export function SettingsContent() {
   };
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[
-        styles.scrollContent,
-        { paddingBottom: 32 + bottomInset },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.title} accessibilityRole="header">
-        {t("mobile.nav.account")}
-      </Text>
+    <SettingsScroll inDrawer={inDrawer}>
+      <View style={inDrawer ? styles.drawerTitleRow : styles.titleRow}>
+        <Text
+          style={styles.title}
+          accessibilityRole="header"
+          maxFontSizeMultiplier={inDrawer ? 1 : undefined}
+        >
+          {t("mobile.nav.account")}
+        </Text>
+      </View>
 
       <View style={settingsStyles.section}>
         <View style={settingsStyles.group}>
@@ -354,7 +359,7 @@ export function SettingsContent() {
               accessibilityLabel={t("mobile.cloudHome.openSettingsLabel")}
               styles={settingsStyles}
               colors={colors}
-              onPress={() => router.push("/cloud-home")}
+              onPress={onOpenCloudHome}
             />
             <View style={[settingsStyles.row, settingsStyles.rowDivider]}>
               <Icon
@@ -395,11 +400,18 @@ export function SettingsContent() {
       {isSignedIn ? <SavedLoginsSection styles={settingsStyles} /> : null}
 
       <View style={settingsStyles.section}>
-        <View style={styles.appearanceHeader}>
-          <Text style={[settingsStyles.sectionLabel, styles.appearanceLabel]}>
+        <View
+          style={inDrawer ? styles.appearanceStack : styles.appearanceHeader}
+        >
+          <Text
+            style={[
+              settingsStyles.sectionLabel,
+              !inDrawer && styles.appearanceLabel,
+            ]}
+          >
             {t("mobile.settings.appearanceSection")}
           </Text>
-          <View style={styles.modeControl}>
+          <View style={!inDrawer && styles.modeControl}>
             <SegmentedControl<ThemePreference>
               accessibilityLabel="Mode"
               value={preference}
@@ -517,6 +529,7 @@ export function SettingsContent() {
 
       <UserAskEscalationSection
         enabled={isSignedIn}
+        active={active}
         styles={settingsStyles}
       />
 
@@ -625,7 +638,7 @@ export function SettingsContent() {
         visible={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
       />
-    </ScrollView>
+    </SettingsScroll>
   );
 }
 
@@ -678,18 +691,16 @@ function LinkRow({
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    screen: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingTop: 0,
+    titleRow: { marginTop: 4 },
+    drawerTitleRow: {
+      height: SIDEBAR_BRAND_ROW,
+      justifyContent: "center",
     },
     title: {
       color: colors.text,
       fontFamily: fonts.display.semiBold,
       fontSize: 27,
       letterSpacing: -1.2,
-      marginTop: 4,
     },
     avatar: {
       width: 30,
@@ -714,6 +725,7 @@ const makeStyles = (colors: Colors) =>
       gap: 12,
       marginBottom: 14,
     },
+    appearanceStack: { marginBottom: 18 },
     appearanceLabel: { flex: 1, marginBottom: 0 },
     modeControl: { width: 220 },
     surfaceControls: { flexDirection: "row", gap: 10, marginTop: 26 },

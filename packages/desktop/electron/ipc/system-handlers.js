@@ -448,12 +448,16 @@ export const registerSystemHandlers = (options) => {
         }
         return await options.authService.applySessionToken(typeof payload?.sessionToken === "string" ? payload.sessionToken : "");
     });
-    handleIpc(IPC_AUTH_GET_TOKEN, async (event) => {
+    handleIpc(IPC_AUTH_GET_TOKEN, async (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_GET_TOKEN)) {
             throw new Error("Blocked untrusted auth token request.");
         }
-        const result = await options.authService.getAuthTokenResult();
-        return result.ok ? result.token : null;
+        // Served from the main process's JWT cache (scoped to the current
+        // credentials and backend); never an expired token.
+        return await options.authService.getAuthToken({
+            forceRefresh: payload?.forceRefresh === true,
+            allowStale: false,
+        });
     });
     handleIpc(IPC_AUTH_REVOKE_SESSIONS, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_REVOKE_SESSIONS)) {

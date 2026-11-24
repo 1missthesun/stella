@@ -59,7 +59,9 @@ export async function getAuthToken(
             scopedTokenExpiresAt = scoped.expiresAt;
           } else if (systemApi?.getAuthToken) {
             await configurePiRuntime();
-            token = await systemApi.getAuthToken();
+            token = await systemApi.getAuthToken(
+              forceRefresh ? { forceRefresh: true } : undefined,
+            );
           } else {
             const result = await authClient.token();
             token = result.data?.token ?? null;

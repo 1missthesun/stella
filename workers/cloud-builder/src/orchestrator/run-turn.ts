@@ -1139,7 +1139,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           type: "input",
           requestId: `turn:${turn.turnId}`,
           whenBusy: "followUp",
-          content: [
+          content: await runtime.noted([
             {
               type: "text",
               text: `<current-time>${clock}</current-time>`,
@@ -1160,7 +1160,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
                 ]
               : []),
             ...images,
-          ],
+          ]),
         },
         context,
       );

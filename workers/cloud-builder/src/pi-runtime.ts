@@ -27,6 +27,7 @@ import {
   type EntryRecord,
   type Harness,
   type SettledSubmissionRecord,
+  type UserInput,
 } from "@earendil-works/pi-durable";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import { dropPiTableSnapshot, keepPiTableSnapshots, snapshotPiTablesBeforeUpgrade } from "./pi-table-snapshot.js";
@@ -64,6 +65,7 @@ import {
   type StellaRequestRoute,
 } from "@stella/agent/provider/stella";
 import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
+import { isStopInput, withTakeoverNote } from "@stella/agent/stella/takeover";
 import { ownHistoryQuery } from "@stella/agent/stella/own-history";
 import {
   AGENT_MOVE_CLOUD,
@@ -357,6 +359,8 @@ export type PiRuntimeOptions = {
   /** Test deployments only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
   simulateSafeguardBlocks?: boolean;
   waitUntil(work: Promise<unknown>): void;
+  /** The user sent another message, queued behind the turn under way. */
+  userWaiting(): boolean;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
   deliverNote(note: AgentNote, authority: PiAuthority): Promise<void>;
@@ -536,6 +540,7 @@ type Opened = {
   root: Conversation;
   rootSession: string;
   refreshTools(): void;
+  takeover: OpenStellaHarness["takeover"];
   agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "stopAgent" | "agentStanding" | "markCatchUp" | "recheckWaiting">;
 };
 
@@ -630,6 +635,18 @@ export class PiConversationRuntime {
 
   async boundTurn(signal: AbortSignal): Promise<PiTurnBinding> {
     return await this.#turn(signal);
+  }
+
+  /** The user's next message, queued behind the turn under way, ends what that turn is doing. */
+  async takeOver(message: string): Promise<void> {
+    const { takeover } = await this.open();
+    await takeover.begin(BACKGROUND_CONTEXT, { now: isStopInput(message) });
+  }
+
+  /** A message's content, with what it cut off said when it took a turn over. */
+  async noted(content: Exclude<UserInput, string>): Promise<UserInput> {
+    const { takeover } = await this.open();
+    return takeover.takeCut() ? withTakeoverNote(content) : content;
   }
 
   stopClaudeCode(): void {
@@ -1780,7 +1797,7 @@ export class PiConversationRuntime {
         this.#options.log("pi_tables_kept_before_upgrade", {});
       }
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
-      const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting } = await openStellaHarness(
+      const { harness, takeover, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting } = await openStellaHarness(
         {
           storage,
           models: this.#models,
@@ -1794,6 +1811,12 @@ export class PiConversationRuntime {
             this.#agentLog.extension(),
             ...(this.#options.images ? [conversationImagesExtension(this.#options.images)] : []),
           ],
+          takeover: {
+            ...(this.#claudeCode ? { engines: [this.#claudeCode] } : {}),
+            userWaiting: () => this.#options.userWaiting(),
+            // A cold container can be silent for minutes before Claude Code starts; the turn's own watchdog bounds it.
+            watches: (provider) => provider !== CLAUDE_CODE_PROVIDER_ID,
+          },
           onReport: this.#options.report,
         },
         BACKGROUND_CONTEXT,
@@ -1809,6 +1832,7 @@ export class PiConversationRuntime {
         this.#options.report(new Error("The conversation's pi session failed; it opens again.", { cause: end.error }));
       });
       const root = await harness.root(BACKGROUND_CONTEXT);
+      takeover.bind(harness, root);
       const { contextStartSeq } = await this.#options.journalStart();
       if (await alignJournalContext(harness, root, contextStartSeq, BACKGROUND_CONTEXT)) {
         this.#options.log("pi_root_context_aligned", {});
@@ -1821,6 +1845,7 @@ export class PiConversationRuntime {
         root,
         rootSession,
         refreshTools,
+        takeover,
         agents: { startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting },
       };
     })().catch((error: unknown) => {

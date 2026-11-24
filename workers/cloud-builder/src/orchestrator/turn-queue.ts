@@ -36,7 +36,19 @@ import {
   errorMessage,
   log,
 } from "./support.js";
+import { isSlackConversationId } from "../slack/workspace.js";
 import { OrchestratorTurnLifecycle } from "./turn-lifecycle.js";
+
+/** Sent by the user in their own chat: it takes over the turn ahead of it, as a message does on a computer. */
+const takesOver = (turn: ChatTurnRequest): boolean =>
+  turn.lane === "chat" &&
+  !turn.hiddenMessage &&
+  !turn.piAgent &&
+  !isSlackConversationId(turn.conversationId) &&
+  turn.source !== "schedule" &&
+  turn.source !== "agent-thread" &&
+  turn.source !== "probe" &&
+  turn.source !== "slack";
 
 export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
   protected async cancelTurn(turnId: string): Promise<void> {
@@ -77,6 +89,18 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     options: { resume?: boolean } = {},
   ): void {
     if (this.turnExecutions.has(turn.turnId)) return;
+    if (this.turnExecutions.size > 0 && takesOver(turn)) {
+      this.waitingUserTurns.add(turn.turnId);
+      const runtime = this.currentPiRun && this.piRuntime;
+      void runtime
+        ?.then((opened) => opened.takeOver(turn.prompt))
+        .catch((error: unknown) =>
+          log("error", "chat_turn_takeover_failed", {
+            turnId: turn.turnId,
+            message: errorMessage(error),
+          }),
+        );
+    }
     const preceding = this.queue;
     const enqueuedAt = performance.now();
     const admission =
@@ -89,22 +113,24 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         : undefined;
     const execution = startTurnExecution({
       work: ({ cancellation, signal }) =>
-        preceding.then(() =>
-          this.runTurn(
+        preceding.then(() => {
+          this.waitingUserTurns.delete(turn.turnId);
+          return this.runTurn(
             turn,
             cancellation,
             signal,
             enqueuedAt,
             admission,
             options.resume === true,
-          ),
-        ),
+          );
+        }),
       onInterrupt: () => {
         if (this.current?.turnId === turn.turnId) this.currentPiRun?.abort();
       },
     });
     this.turnExecutions.set(turn.turnId, execution);
     const clear = () => {
+      this.waitingUserTurns.delete(turn.turnId);
       this.cloudHomePreparations.delete(turn.turnId);
       this.admittedOwnerModelGrants.delete(turn.turnId);
       if (this.turnExecutions.get(turn.turnId) === execution) {
@@ -225,6 +251,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       return json({ canceled: true, turnId: request.turnId, replayed: true });
     }
     if (target.kind === "unknown" || target.kind === "queued") {
+      this.waitingUserTurns.delete(request.turnId);
       return json(
         {
           canceled: true,

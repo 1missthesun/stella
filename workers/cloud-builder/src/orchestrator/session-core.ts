@@ -75,6 +75,8 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     totalMs: number;
   };
   protected queue: Promise<unknown> = Promise.resolve();
+  /** What the user sent while another turn was ahead of it. */
+  protected readonly waitingUserTurns = new Set<string>();
   protected readonly turnExecutions = new Map<
     string,
     TurnExecution<Response>

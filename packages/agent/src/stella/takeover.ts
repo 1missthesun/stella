@@ -156,6 +156,8 @@ export type TakeoverOptions = {
   engines?: readonly TakeoverEngine[];
   /** A later user turn waits outside pi's inbox (the cloud queues each turn). */
   userWaiting?(): boolean;
+  /** False for a provider whose requests are bounded elsewhere. */
+  watches?(provider: string): boolean;
 };
 
 export type Takeover = {
@@ -164,6 +166,8 @@ export type Takeover = {
   bind(harness: Harness, root: Conversation): void;
   /** Whether a message sent now would cut something (`now` as for `begin`). */
   cuts(context: Context, options?: { now?: boolean }): Promise<boolean>;
+  /** Whether the last step was cut, for a message that is added only after it; asking forgets it. */
+  takeCut(): boolean;
   /** Ends what the turn is doing so the waiting message is read; `now` also cuts reply text and gives calls no grace. */
   begin(context: Context, options?: { now?: boolean }): Promise<void>;
 };
@@ -176,6 +180,7 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
   let root: Conversation | undefined;
   let rootSession: string | undefined;
   let queuedAtRequest = false;
+  let cut = false;
   let under: { now: boolean } | undefined;
   const streams = new Map<string, ActiveStream>();
   const stalls = new Map<string, number>();
@@ -251,12 +256,15 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
         if (ended) return;
         const at = Date.now();
         if (active.wanted && !engines.some((engine) => engine.compacting(sessionId))) {
-          if (active.now || !active.writing()) return end(messageOf(model, partial), new TakenOver());
+          if (active.now || !active.writing()) {
+            cut = true;
+            return end(messageOf(model, partial), new TakenOver());
+          }
         }
         if (at - lastTickAt > SLEEP_GAP_MS) sleptAt = at;
         lastTickAt = at;
         // A model on the user's own computer can take minutes to read a long conversation.
-        if (model.provider === LOCAL_PROVIDER_ID || engines.some((engine) => engine.holding(sessionId) || engine.compacting(sessionId))) {
+        if (model.provider === LOCAL_PROVIDER_ID || options.watches?.(model.provider) === false || engines.some((engine) => engine.holding(sessionId) || engine.compacting(sessionId))) {
           lastEventAt = at;
           return;
         }
@@ -308,10 +316,12 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
       const waited = Date.now() - first;
       if (!now && waited < CALL_GRACE_MS) continue;
       if (!now && !yielded.has(slot.callId) && yieldToolCall(slot.callId)) {
+        cut = true;
         yielded.add(slot.callId);
         continue;
       }
       if (yielded.has(slot.callId) && waited < CALL_GRACE_MS + YIELD_GRACE_MS) continue;
+      cut = true;
       noteCutCall(slot.callId);
       await harness!.abortTask(slot.taskId, context);
     }
@@ -364,6 +374,7 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
         beforeTool: async (call, api, context) => {
           if (api.conversationId !== root?.id) return undefined;
           if (!engines.some((engine) => engine.ownsCall(call.id)) && (await userQueued(api, api.conversationId, context))) {
+            cut = true;
             return { block: UNSTARTED_CALL_TEXT };
           }
           const limit = CALL_LIMITS_MS[call.name] ?? CALL_LIMIT_MS;
@@ -416,6 +427,11 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
       if (!live?.run) return false;
       const active = rootSession ? streams.get(rootSession) : undefined;
       return active ? now || !active.writing() : (live.tools?.length ?? 0) > 0;
+    },
+    takeCut() {
+      const was = cut;
+      cut = false;
+      return was;
     },
     async begin(context, { now = false } = {}) {
       if (!harness || !root) return;

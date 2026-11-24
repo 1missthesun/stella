@@ -1705,6 +1705,33 @@ export function stellaAgents(host: StellaAgentsHost) {
     return found;
   };
 
+  /**
+   * Whether an input was taken into this turn while its latest finished report
+   * was being written (a message lands in the thread before the step that was
+   * already under way) or after it.
+   */
+  const inputCrossedDone = async (tx: Tx, conversationId: ConversationId, callIds: readonly string[]): Promise<boolean> => {
+    const last = callIds.at(-1);
+    let inputs = 0;
+    let passed = false;
+    let cursor: Parameters<Tx["scanEntries"]>[2];
+    for (let pages = 0; pages < 4; pages += 1) {
+      const page = await tx.scanEntries({ conversationId, order: "descending" }, 50, cursor);
+      for (const entry of page.items) {
+        if (entry.kind === "pi.user") inputs += 1;
+        if (entry.kind !== "pi.assistant") continue;
+        const message = entry.model?.[0] as AssistantMessage | undefined;
+        // The step before the report's own: this turn's only if it went on to more.
+        if (passed) return inputs > 0 && message?.stopReason === "toolUse";
+        passed = (message?.content ?? []).some((part) => part.type === "toolCall" && part.id === last);
+        if (passed && inputs > 0) return true;
+      }
+      cursor = page.next;
+      if (cursor === undefined) break;
+    }
+    return false;
+  };
+
   /** send_message with done: true, its finished report, filed when its turn ends. */
   const finishReport = async (api: ToolExecutionApi, to: string, message: string, stellaThread: string | undefined, context: Context) => {
     const self = await roleOf(api, api.conversationId, context);
@@ -1720,8 +1747,12 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (role.done?.callIds.includes(api.callId)) return false;
       // One finished report per turn: a model that keeps calling with more
       // acknowledgments ("Acknowledged.", "No further action") is told to stop.
-      if (role.done) return true;
-      role.done = { text: message.trim(), callIds: [api.callId] };
+      // Unless something reached it as it sent that one, too late to be in it:
+      // what it adds then goes out with it.
+      if (role.done && !(await inputCrossedDone(tx, api.conversationId, role.done.callIds))) return true;
+      role.done = role.done
+        ? { text: `${role.done.text}\n\n${message.trim()}`, callIds: [...role.done.callIds, api.callId] }
+        : { text: message.trim(), callIds: [api.callId] };
       return false;
     }, context);
     if (already) throw new Error(DONE_ALREADY_SENT);

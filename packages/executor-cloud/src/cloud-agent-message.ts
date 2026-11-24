@@ -71,7 +71,8 @@ export const createCloudAgentMessenger = (
       if (body.starter) toStarter = true;
       sent.push(message);
       if (done) {
-        report = message;
+        // A second one adds to the first (something arrived as it was sent).
+        report = report === undefined || report === message ? message : `${report}\n\n${message}`;
         return { result: DONE_ACCEPTED_TEXT };
       }
       return { result: body.text };

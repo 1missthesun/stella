@@ -23,6 +23,7 @@ import {
 import { markOnboardingSeen } from "./onboarding";
 import { clearAccountChatData } from "./chat-account-cleanup";
 import { tearDownPushNotifications } from "./notifications";
+import { withdrawSavedValuesDevice } from "./saved-values";
 
 const PUSH_TEARDOWN_BUDGET_MS = 4_000;
 
@@ -60,6 +61,7 @@ export const switchToServer = async (serverId: string): Promise<void> => {
 
 export const removeServer = async (serverId: string): Promise<void> => {
   const wasActive = serverId === launchServer.id;
+  if (wasActive) await withdrawSavedValuesDevice();
   await removeSelfHostedServer(serverId);
   if (wasActive) {
     await leaveActiveServer();

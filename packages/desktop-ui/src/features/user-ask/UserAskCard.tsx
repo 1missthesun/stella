@@ -238,6 +238,11 @@ function UserAskSecureInputBody({
           <KeyRound size={12} aria-hidden="true" />
           {t("userAsk.secureInput.replacing", { label: detail.save.label })}
         </p>
+      ) : detail.save?.usingSaved ? (
+        <p className="user-ask__replacing" role="note">
+          <KeyRound size={12} aria-hidden="true" />
+          {t("userAsk.secureInput.usingSaved", { label: detail.save.label })}
+        </p>
       ) : null}
       <div
         className="user-ask__fields"

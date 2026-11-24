@@ -147,6 +147,7 @@ export const createBootstrapServices = (options) => {
         getBackendUrl: () => authService.getBackendUrl(),
         getAuthToken: () => authService.getAuthToken(),
         notificationContext: { state },
+        log: (event, data) => getMainLogger()?.process(event, data),
     });
     void startupAppPainted.then(() => userAskService.startMirror());
     const engineAccountAccess = new EngineAccountAccess({

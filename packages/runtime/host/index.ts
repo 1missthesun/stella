@@ -794,6 +794,18 @@ export class StellaRuntimeHost {
           }
         }
         if (
+          request.method === "savedValues.release" &&
+          request.mobileDeviceId !== DEVICE_REQUEST_CLOUD_ASKER
+        ) {
+          // Only a cloud task, through Stella's cloud, asks for a saved value:
+          // a phone or computer holds its own sealed copy and never needs this.
+          return {
+            ok: false,
+            code: "forbidden",
+            message: "Only Stella's cloud asks this computer for a saved value.",
+          };
+        }
+        if (
           isDeviceClaudeLoginRequestMethod(request.method) &&
           request.mobileDeviceId !== DEVICE_REQUEST_CLOUD_ASKER
         ) {

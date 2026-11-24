@@ -26,6 +26,7 @@ import type { EmailCalls, EmailViews } from "./email.js";
 import type { EmailDigestCalls, EmailDigestViews } from "./email-digest-legacy.js";
 import type { McpServerCalls } from "./mcp-servers.js";
 import type { CatchUpCalls, CatchUpViews } from "./catch-ups.js";
+import type { SavedValueCalls, SavedValueViews } from "./saved-values.js";
 
 type SystemCalls = {
   "system.ping": { args: Record<string, never>; result: { now: number } };
@@ -58,7 +59,8 @@ export type BackendCalls = SystemCalls &
   EmailCalls &
   EmailDigestCalls &
   McpServerCalls &
-  CatchUpCalls;
+  CatchUpCalls &
+  SavedValueCalls;
 export type BackendViews = ConversationViews &
   AppSourceViews &
   AgentThreadViews &
@@ -80,7 +82,8 @@ export type BackendViews = ConversationViews &
   UserAskViews &
   EmailViews &
   EmailDigestViews &
-  CatchUpViews;
+  CatchUpViews &
+  SavedValueViews;
 
 export type CallName = keyof BackendCalls & string;
 export type ViewName = keyof BackendViews & string;

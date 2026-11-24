@@ -13,6 +13,11 @@ import {
   CLOUD_HOST_STATE,
   CLOUD_TOOL_PROCESS_IDENTITY,
 } from "./cloud-process-isolation.js";
+import {
+  SANDBOX_FINGERPRINTS_FILE,
+  SANDBOX_FINGERPRINTS_VIEW,
+  ensureFingerprints,
+} from "./secure-value-fingerprints.js";
 
 /**
  * Claude Code in the cloud runs its own Read/Edit/Write/Bash/Grep/Glob inside
@@ -40,6 +45,8 @@ export type ClaudeSandbox = {
   tmpDir: string;
   cwd: string;
   home: string;
+  /** The thread's secure-value fingerprints folder (root, read-only inside). */
+  fingerprintsDir: string;
 };
 
 const chownTree = async (target: string, owner: string): Promise<void> => {
@@ -112,12 +119,14 @@ export const prepareClaudeSandbox = async (args: {
   }
   await ownedByToolUser(args.stateRoot);
   await ownedByToolUser(args.accountDirectory);
+  const { directory: fingerprintsDir } = await ensureFingerprints(args.threadKey);
   return {
     stateRoot: args.stateRoot,
     accountDirectory: args.accountDirectory,
     tmpDir,
     cwd: args.cwd,
     home: args.home,
+    fingerprintsDir,
   };
 };
 
@@ -126,27 +135,32 @@ export const prepareClaudeSandbox = async (args: {
  * user. The three folders are bound to a stage first, the anchors are covered
  * with empty tmpfs (0711: passable, not listable), and the folders are bound
  * back at their own paths, so every path Claude Code keeps stays the same.
+ * The thread's secure-value fingerprints folder is bound read-only at its
+ * view inside the covered host state, where the redaction hook reads it.
  */
 const ENTER_SCRIPT = `set -eu
-state=$1 account=$2 tmp=$3 cwd=$4
-shift 5
+state=$1 account=$2 tmp=$3 cwd=$4 fingerprints=$5
+shift 6
 umask 022
 mkdir -p /mnt
 mount -t tmpfs -o mode=0700,size=64k stella-stage /mnt
-mkdir /mnt/state /mnt/account /mnt/tmp
+mkdir /mnt/state /mnt/account /mnt/tmp /mnt/fingerprints
 mount --bind "$state" /mnt/state
 mount --bind "$account" /mnt/account
 mount --bind "$tmp" /mnt/tmp
+mount --bind "$fingerprints" /mnt/fingerprints
 mount -t tmpfs -o mode=0711,size=1m stella-native-state ${CLOUD_NATIVE_STATE_ANCHOR}
 mount -t tmpfs -o mode=0711,size=1m stella-host-state ${CLOUD_HOST_STATE}
 for hidden in ${CLOUD_TURN_ATTEMPT_ANCHOR} ${PROCESS_LOGS_ANCHOR}; do
   if [ -d "$hidden" ]; then mount -t tmpfs -o mode=0700,size=64k stella-hidden "$hidden"; fi
 done
-mkdir -p "$state" "$account"
+mkdir -p "$state" "$account" ${SANDBOX_FINGERPRINTS_VIEW}
 mount --bind /mnt/state "$state"
 mount --bind /mnt/account "$account"
 mount --bind /mnt/tmp /tmp
-umount /mnt/state /mnt/account /mnt/tmp
+mount --bind /mnt/fingerprints ${SANDBOX_FINGERPRINTS_VIEW}
+mount -o remount,bind,ro ${SANDBOX_FINGERPRINTS_VIEW}
+umount /mnt/state /mnt/account /mnt/tmp /mnt/fingerprints
 umount /mnt
 mkdir -p "$cwd"
 cd "$cwd"
@@ -182,6 +196,7 @@ export const sandboxedClaudeLaunch = (
       sandbox.accountDirectory,
       sandbox.tmpDir,
       sandbox.cwd,
+      sandbox.fingerprintsDir,
       "--",
       dropped.command,
       ...dropped.args,
@@ -224,6 +239,10 @@ touch "$probe" 2>/dev/null && rm -f "$probe" || fail state_not_writable
 [ -r "$STELLA_SANDBOX_ACCOUNT/.credentials.json" ] || fail account_not_readable
 [ -w /tmp ] || fail tmp_not_writable
 [ -r "$STELLA_SANDBOX_HOOK" ] || fail hook_not_readable
+[ -r "${SANDBOX_FINGERPRINTS_FILE}" ] || fail fingerprints_not_readable
+[ -w "${SANDBOX_FINGERPRINTS_FILE}" ] && fail fingerprints_writable
+[ -w "${SANDBOX_FINGERPRINTS_VIEW}" ] && fail fingerprints_folder_writable
+mv "${SANDBOX_FINGERPRINTS_FILE}" "${SANDBOX_FINGERPRINTS_FILE}.moved" 2>/dev/null && fail fingerprints_movable
 [ -x "$STELLA_SANDBOX_RUNTIME" ] || fail runtime_not_executable
 [ $ok = 1 ] && echo SANDBOX_OK
 `;

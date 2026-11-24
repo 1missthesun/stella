@@ -707,7 +707,12 @@ export const serveTurnUserAskRequest = async (
   body: Record<string, unknown>,
 ): Promise<Response> => {
   const operation = body.op;
-  if (operation !== "register" && operation !== "answer" && operation !== "cancel") {
+  if (
+    operation !== "register" &&
+    operation !== "answer" &&
+    operation !== "cancel" &&
+    operation !== "release"
+  ) {
     return brokerFailure(400);
   }
   const conversationId =
@@ -718,6 +723,36 @@ export const serveTurnUserAskRequest = async (
       : undefined);
   if (operation === "register" && !conversationId) {
     return brokerFailure(403);
+  }
+  if (operation === "release") {
+    // A saved value from one of the owner's computers, sealed to the task's
+    // own key. The conversation and thread come from the turn, never the body.
+    const released = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
+      name: "savedValues.release",
+      args: {
+        releaseId: body.releaseId,
+        service: body.service,
+        ...(typeof body.account === "string" && body.account
+          ? { account: body.account }
+          : {}),
+        purpose: body.purpose,
+        fields: body.fields,
+        recipientKey: body.recipientKey,
+        ...(turn.conversationId ?? turn.originConversationId
+          ? { conversationId: turn.conversationId ?? turn.originConversationId }
+          : {}),
+        ...(turn.threadId ? { threadId: turn.threadId } : {}),
+        ...(turn.description ? { taskName: turn.description.slice(0, 240) } : {}),
+      },
+      ownerGeneration: turn.ownerGeneration,
+    })) as RpcResponse;
+    if (!released.ok) {
+      return driveJson(
+        { error: released.error.message, code: released.error.code },
+        rpcErrorStatus(released.error.code),
+      );
+    }
+    return driveJson(released.value);
   }
   const name =
     operation === "register"
@@ -742,6 +777,10 @@ export const serveTurnUserAskRequest = async (
             ? {}
             : { timeoutMs: body.timeoutMs }),
           detail: body.detail,
+          // The task's own key: a sensitive answer is sealed to it.
+          ...(body.recipientKey === undefined || body.recipientKey === null
+            ? {}
+            : { recipientKey: body.recipientKey }),
         }
       : { askId: body.askId };
   const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({

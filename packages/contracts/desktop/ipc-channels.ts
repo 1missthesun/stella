@@ -342,6 +342,14 @@ export const IPC_USER_ASK_SECURE_VALUES_DELETE =
   "userAsk:secureValuesDelete" as const;
 export const IPC_USER_ASK_SECURE_VALUES_RENAME =
   "userAsk:secureValuesRename" as const;
+export const IPC_USER_ASK_SECURE_VALUES_SYNC_GET =
+  "userAsk:secureValuesSyncGet" as const;
+export const IPC_USER_ASK_SECURE_VALUES_SYNC_SET =
+  "userAsk:secureValuesSyncSet" as const;
+export const IPC_USER_ASK_SECURE_VALUES_SYNC_ACTION =
+  "userAsk:secureValuesSyncAction" as const;
+export const IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED =
+  "userAsk:secureValuesSyncChanged" as const;
 
 export const IPC_CONNECTOR_CONNECT_REQUEST =
   "connector-connect:request" as const;

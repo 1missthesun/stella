@@ -9,6 +9,7 @@ const CLOUD_GENERAL_TOOLS = [
   "Grep",
   "ask_user",
   "request_secure_input",
+  "use_secure_value",
   "code",
 ] as const;
 

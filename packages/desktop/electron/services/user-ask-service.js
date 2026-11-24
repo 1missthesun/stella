@@ -2,9 +2,11 @@ import { randomInt, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { spawn } from "node:child_process";
+import { powerMonitor } from "electron";
 import {
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_OPENED,
+  IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED,
   IPC_USER_ASK_UPDATED,
 } from "@stella/contracts/desktop/ipc-channels";
 import { leaseBackendClient } from "@stella/contracts/backend/shared-client";
@@ -35,8 +37,10 @@ import {
   normalizeUserAskNote,
   normalizeUserAskQuestions,
   normalizeSavedValuePart,
+  savedServiceMatch,
   savedValueLabel,
   userAskFieldIsRememberable,
+  USER_ASK_CLOUD_ORIGIN_DEVICE_ID,
   userAskAcceptsAnswer,
   userAskAwaitsAnswer,
   userAskDeclinedNote,
@@ -57,13 +61,23 @@ import {
 import { showStellaNotification } from "./notification-service.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 import { SavedSecureValues, matchSavedFields } from "./saved-secure-values.js";
+import { SavedValuesSync } from "./saved-values-sync.js";
 import { UserAskEscalationEngine, localTimeZone, minuteOfDayAt } from "./user-ask-escalation.js";
 import {
+  canSealUserAskValue,
   createUserAskRecipientKey,
   openUserAskSealedValue,
   sealUserAskValue,
 } from "./user-ask-seal.js";
 const KEYCHAIN_FALLBACK_FILE = "user-ask-keychain.json";
+/** How many saved records a task is shown, by name, when its lookup found nothing. */
+const SAVED_SUMMARY_LIMIT = 60;
+/** A cloud task gets a saved value from this computer by itself at most this often; past it, the user answers a card. */
+const RELEASES_PER_HOUR = 20;
+const RELEASE_LOG_FILE = "saved-value-releases.json";
+const RELEASE_LOG_LIMIT = 50;
+/** The user counts as at this computer when its keyboard or mouse was used this recently. */
+const USER_ACTIVE_IDLE_SECONDS = 120;
 const KEYCHAIN_SCOPE_PREFIX = "user-ask-keychain";
 const COMMAND_PLACEHOLDER = "{{secret}}";
 const sharedHandles = (handles) => {
@@ -324,6 +338,7 @@ export class UserAskService {
     fingerprintCache = null;
     retainedFingerprints = EMPTY_SECRET_FINGERPRINTS;
     saved;
+    sync;
     mirrorStarted = false;
     mirrored = new Map();
     mirroredNotified = new Map();
@@ -331,6 +346,27 @@ export class UserAskService {
     constructor(options) {
         this.options = options;
         this.saved = new SavedSecureValues(() => this.options.getStellaAppDir() ?? null);
+        this.sync = new SavedValuesSync({
+            saved: this.saved,
+            getDataDir: () => this.options.getStellaAppDir() ?? null,
+            getDeviceId: () => this.options.getDeviceId() ?? null,
+            getBackendUrl: () => this.options.getBackendUrl?.() ?? null,
+            getAuthToken: async () => (await this.options.getAuthToken?.()) ?? null,
+            log: (event, detail) => this.options.log?.(event, detail),
+            onSyncedChange: () => {
+                this.fingerprintCache = null;
+            },
+            onStatus: (status) => this.broadcast(IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED, status),
+            isUserActive: () => {
+                try {
+                    return powerMonitor.getSystemIdleTime() < USER_ACTIVE_IDLE_SECONDS;
+                }
+                catch {
+                    return true;
+                }
+            },
+            getReleaseLog: () => this.releaseLog(),
+        });
         this.escalation = new UserAskEscalationEngine({
             getAsk: (askId) => this.asks.get(askId)?.ask ?? null,
             getPolicy: async () => await this.resolvePolicy(0),
@@ -364,12 +400,14 @@ export class UserAskService {
     }
     startMirror() {
         this.mirrorStarted = true;
+        this.sync.start();
         this.loadCloudOutbox();
         this.startRemoteAnswerSync();
         void this.refreshMirror();
     }
     noteAuthToken(token) {
         this.backend?.lease.noteAuthToken(token ?? null);
+        this.sync.noteAuthToken(token ?? null);
         if (!this.mirrorStarted) {
             return;
         }
@@ -573,7 +611,46 @@ export class UserAskService {
             return { ok: false, error: result.error };
         }
         this.dropMirrored(askId, "answered");
+        await this.rememberCloudAnswer(ask, payload, answer).catch((error) => {
+            this.options.log?.("user-ask-cloud-save-failed", { message: error?.message ?? String(error) });
+        });
         return { ok: true };
+    }
+    /**
+     * A cloud task's ask has no computer of its own to save the answer, so the
+     * one that answers it with Remember on keeps it, and sync carries it to the
+     * user's other devices. An ask from another computer is saved there.
+     */
+    async rememberCloudAnswer(ask, payload, answer) {
+        const detail = ask?.detail;
+        const service = normalizeSavedValuePart(detail?.save?.service);
+        if (ask?.originDeviceId !== USER_ASK_CLOUD_ORIGIN_DEVICE_ID ||
+            detail?.kind !== "secure_input" ||
+            !service ||
+            answer.remember === false) {
+            return;
+        }
+        const values = {};
+        for (const entry of payload.fields) {
+            if (entry?.kind !== "sealed" && typeof entry?.value === "string" && entry.value) {
+                values[entry.fieldId] = entry.value;
+            }
+        }
+        const keep = detail.fields
+            .filter((field) => values[field.id] && userAskFieldIsRememberable(field))
+            .map((field) => ({ field, value: values[field.id] }));
+        if (!keep.some(({ field }) => field.sensitive)) {
+            return;
+        }
+        const account = usableAccount(service, detail.save.account) ||
+            usableAccount(service, accountFromAnswer(detail.fields, values));
+        const existing = this.existingRecordFor(await this.saved.findMatches(service, ""), account);
+        await this.saved.save({
+            ...(existing ? { existingId: existing } : {}),
+            service,
+            account,
+            fields: keep,
+        });
     }
     async cancelMirrored(askId, reason) {
         const response = await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(askId)}/cancel`, {
@@ -606,21 +683,24 @@ export class UserAskService {
         const fields = request.fields ?? [];
         const save = normalizeSaveRequest(request.save);
         let replaceId = "";
+        let prefill = null;
         if (save?.service) {
-            const matches = await this.saved.findMatches(save.service, save.account);
+            const { exact, close } = await this.saved.findCandidates(save.service, save.account);
             if (save.replace) {
-                replaceId = matches[0]?.id ?? "";
+                replaceId = exact[0]?.id ?? "";
             }
             else {
-                const reused = await this.reuseSavedValue(save, fields, matches, request);
-                if (reused) {
-                    return reused;
+                const found = await this.findSaved(save, fields, exact.length > 0 ? exact : close, request);
+                if (found?.whole) {
+                    return found.whole;
                 }
+                prefill = found?.partial ?? null;
             }
         }
         if (request.savedOnly === true) {
-            return null;
+            return { outcome: "not_saved", savedHere: await this.savedSummaries() };
         }
+        const askFields = prefill ? fields.filter((field) => !prefill.covered.includes(field.id)) : fields;
         const label = save ? savedValueLabel(save.service, save.account) || request.purpose : "";
         return await this.open({
             request,
@@ -631,90 +711,263 @@ export class UserAskService {
                 kind: "secure_input",
                 purpose: request.purpose,
                 ...(request.detail ? { detail: request.detail } : {}),
-                fields,
+                fields: askFields,
                 ...(save
                     ? {
                         save: {
                             service: save.service,
                             ...(save.account ? { account: save.account } : {}),
-                            label,
+                            label: prefill ? prefill.label : label,
                             ...(replaceId ? { replacing: true } : {}),
+                            ...(prefill ? { usingSaved: true } : {}),
                         },
                     }
                     : {}),
             },
-            saveContext: save ? { ...save, replaceId } : null,
+            saveContext: save ? { ...save, replaceId, ...(prefill ? { prefill } : {}) } : null,
         });
     }
-    /** The saved values of one record for these fields, or null when it lacks one. */
-    async savedAnswer(entry, fields) {
+    /**
+     * A cloud task asks for a saved value (through Stella's cloud, from
+     * `savedValues.release`): when this computer has one that answers every
+     * field, each field is sealed to the task's own key, which only that task's
+     * sandbox holds, and nothing readable leaves this computer. Never shows a
+     * card; with nothing saved, the task gets the names of what is.
+     */
+    async releaseSaved(params) {
+        const releaseId = typeof params?.releaseId === "string" ? params.releaseId.slice(0, 128) : "";
+        const recipientKey = params?.recipientKey;
+        const fields = Array.isArray(params?.fields)
+            ? params.fields
+                .filter((field) => field && typeof field.id === "string" && typeof field.label === "string")
+                .map((field) => ({
+                id: field.id.slice(0, 64),
+                label: field.label.slice(0, 200),
+                type: typeof field.type === "string" ? field.type : "text",
+                sensitive: field.sensitive === true,
+                ...(field.optional === true ? { optional: true } : {}),
+            }))
+            : [];
+        const save = normalizeSaveRequest({ service: params?.service, account: params?.account });
+        if (!releaseId || !save?.service || fields.length === 0 || !canSealUserAskValue(recipientKey)) {
+            throw new Error("That request for a saved value is malformed.");
+        }
+        const owner = {
+            ...(typeof params.threadId === "string" && params.threadId ? { agentId: params.threadId } : {}),
+            ...(typeof params.conversationId === "string" && params.conversationId ? { conversationId: params.conversationId } : {}),
+        };
+        const { exact, close } = await this.saved.findCandidates(save.service, save.account);
+        let found;
+        try {
+            found = await this.findSaved(save, fields, exact.length > 0 ? exact : close, owner);
+        }
+        catch (error) {
+            return {
+                found: false,
+                reason: "not_saved",
+                savedHere: await this.savedSummaries(),
+                message: error instanceof Error ? error.message : String(error),
+            };
+        }
+        if (!found?.whole) {
+            return { found: false, reason: "not_saved", savedHere: await this.savedSummaries() };
+        }
+        const whole = found.whole;
+        const taskName = typeof params.taskName === "string" ? params.taskName.trim().slice(0, 240) : "";
+        const use = {
+            at: Date.now(),
+            label: whole.saved.label,
+            service: whole.saved.service || save.service,
+            ...(taskName ? { taskName } : {}),
+        };
+        if (this.releasesInLastHour() >= RELEASES_PER_HOUR) {
+            // Past the hourly cap this computer stops answering by itself: the task asks the user.
+            this.logRelease({ ...use, refused: true });
+            return { found: false, reason: "limit", savedHere: [] };
+        }
+        const requester = ownerOfRequest(owner);
+        const sealed = {};
+        for (const field of fields) {
+            let value = whole.values?.[field.id];
+            const handle = whole.handles?.[field.id];
+            if (value === undefined && handle) {
+                const resolved = await this.saved.resolve(handle, requester);
+                value = resolved.ok ? resolved.value : undefined;
+            }
+            if (typeof value !== "string") {
+                if (field.optional === true) {
+                    continue;
+                }
+                return { found: false, reason: "not_saved", savedHere: await this.savedSummaries() };
+            }
+            sealed[field.id] = sealUserAskValue({ askId: releaseId, fieldId: field.id, value, recipientKey });
+        }
+        const { label, account, savedAt, service, askedService } = whole.saved;
+        this.logRelease(use);
+        return {
+            found: true,
+            sealed,
+            saved: {
+                label,
+                ...(account ? { account } : {}),
+                savedAt,
+                ...(service ? { service, askedService } : {}),
+            },
+            deviceId: this.options.getDeviceId() ?? "",
+        };
+    }
+    /** Marks a saved-value note when this computer's saved values sync to the user's other devices. */
+    syncedFlag() {
+        return this.sync.getStatus().standing === "member" ? { synced: true } : {};
+    }
+    releaseLogPath() {
+        const dir = this.options.getStellaAppDir();
+        return dir ? path.join(dir, RELEASE_LOG_FILE) : null;
+    }
+    /** Cloud tasks' uses of saved values on this computer, newest first, for Settings and the bell. */
+    releaseLog() {
+        const file = this.releaseLogPath();
+        if (!file) {
+            return [];
+        }
+        try {
+            const stored = readPrivateJsonValueSync(file);
+            return Array.isArray(stored?.entries) ? stored.entries.slice(0, RELEASE_LOG_LIMIT) : [];
+        }
+        catch {
+            return [];
+        }
+    }
+    releasesInLastHour() {
+        const since = Date.now() - 60 * 60_000;
+        return this.releaseLog().filter((entry) => !entry.refused && entry.at >= since).length;
+    }
+    logRelease(entry) {
+        const file = this.releaseLogPath();
+        if (!file) {
+            return;
+        }
+        const entries = [entry, ...this.releaseLog()].slice(0, RELEASE_LOG_LIMIT);
+        writePrivateFileSync(file, JSON.stringify({ v: 1, entries }, null, 2));
+        this.sync.noteReleaseLogChanged();
+    }
+    /** What is saved on this computer, by name only (never a value), for a task that found nothing under the name it tried. */
+    async savedSummaries() {
+        return (await this.saved.list()).slice(0, SAVED_SUMMARY_LIMIT).map((entry) => ({
+            service: entry.service || entry.label,
+            ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
+            fields: entry.fieldLabels,
+        }));
+    }
+    /**
+     * The fields of one record that answer these, as readable values and
+     * handles, plus which fields it covered; null when its store can't be read.
+     */
+    async savedFieldsFor(entry, fields) {
         const stored = await this.saved.readValues(entry);
         if (!stored) {
             return null;
         }
         const values = {};
         const handles = {};
+        const covered = [];
+        const missing = [];
         const matched = matchSavedFields(entry.fields, fields);
         for (const field of fields) {
             const savedField = matched.get(field.id) ?? null;
             const value = savedField ? stored[savedField.id] : undefined;
-            if (!savedField || typeof value !== "string" || savedField.sensitive !== field.sensitive) {
-                if (field.optional === true) {
-                    continue;
+            if (!savedField ||
+                typeof value !== "string" ||
+                savedField.sensitive !== field.sensitive ||
+                (field.sensitive && !savedField.handle)) {
+                if (field.optional !== true) {
+                    missing.push(field.id);
                 }
-                return null;
+                continue;
             }
             if (field.sensitive) {
-                if (!savedField.handle) {
-                    return null;
-                }
                 handles[field.id] = savedField.handle;
             }
             else {
                 values[field.id] = value;
             }
+            covered.push(field.id);
         }
-        return handlesAreDistinct(handles) ? { values, handles } : null;
+        return handlesAreDistinct(handles) ? { values, handles, covered, missing } : null;
     }
-    async reuseSavedValue(save, fields, matches, request) {
+    /**
+     * Looks through the saved records that may be for this service: one that
+     * answers every field is used without asking anyone (`whole`); otherwise
+     * the newest one that answers some of them fills those, and the card asks
+     * only for the rest (`partial`).
+     */
+    async findSaved(save, fields, matches, request) {
         if (matches.length === 0) {
             return null;
         }
-        // Several records for one service: use the one that has every field
-        // asked for; only when more than one does is the account needed.
-        const fitting = [];
+        const owner = ownerOfRequest(request);
+        const whole = [];
+        let partial = null;
         for (const entry of matches) {
-            const answer = await this.savedAnswer(entry, fields);
-            if (answer) {
-                fitting.push({ entry, answer });
+            const answer = await this.savedFieldsFor(entry, fields);
+            if (!answer || answer.covered.length === 0) {
+                continue;
+            }
+            if (answer.missing.length === 0) {
+                whole.push({ entry, answer });
+            }
+            else if (!partial && answer.covered.some((id) => fields.find((field) => field.id === id)?.sensitive)) {
+                partial = { entry, answer };
             }
         }
-        if (fitting.length === 0) {
+        // Records for one account (an older save and a newer one) are one
+        // choice, the newest; only different accounts need the task to pick.
+        const accounts = [...new Set(whole.map(({ entry }) => usableAccount(entry.service, entry.account).toLowerCase() || entry.label))];
+        if (accounts.length > 1 && !save.account) {
+            throw new Error(`Several saved values for ${save.service} are on this computer, for different accounts (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
+        }
+        const chosen = whole[0] ?? partial;
+        if (!chosen) {
             return null;
         }
-        if (fitting.length > 1 && !save.account) {
-            const accounts = fitting.map(({ entry }) => usableAccount(entry.service, entry.account) || entry.label);
-            throw new Error(`Several saved values for ${save.service} are on this computer (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
-        }
-        const { entry, answer } = fitting[0];
-        const readable = await this.readableOrHandles(answer.values, fields, ownerOfRequest(request));
+        const { entry, answer } = chosen;
+        const readable = await this.readableOrHandles(answer.values, fields, owner);
         const handles = { ...answer.handles, ...readable.handles };
+        const asked = savedServiceMatch(entry.service, save.service) === "exact" ? {} : { service: entry.service, askedService: save.service };
+        if (whole.length === 0) {
+            return {
+                partial: {
+                    entryId: entry.id,
+                    label: entry.label,
+                    covered: answer.covered,
+                    values: readable.values,
+                    handles,
+                    asHandles: readable.asHandles,
+                    ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
+                    ...asked,
+                },
+            };
+        }
         await this.saved.markUsed(entry.id);
         return {
-            outcome: "answered",
-            askId: `saved:${entry.id}`,
-            ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
-            ...(Object.keys(handles).length > 0 ? { handles } : {}),
-            ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
-            ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
-            saved: {
-                label: entry.label,
-                ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
-                reused: true,
-                remembered: true,
-                savedAt: entry.updatedAt,
+            whole: {
+                outcome: "answered",
+                askId: `saved:${entry.id}`,
+                ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
+                ...(Object.keys(handles).length > 0 ? { handles } : {}),
+                ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
+                ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
+                saved: {
+                    label: entry.label,
+                    ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
+                    reused: true,
+                    remembered: true,
+                    savedAt: entry.updatedAt,
+                    ...asked,
+                    ...this.syncedFlag(),
+                },
+                answeredAt: Date.now(),
             },
-            answeredAt: Date.now(),
         };
     }
     /**
@@ -979,9 +1232,11 @@ export class UserAskService {
             const account = save.account || usableAccount(save.service, accountFromAnswer(detail.fields, values));
             const existing = save.replaceId
                 ? save.replaceId
-                : save.service
-                    ? this.existingRecordFor(await this.saved.findMatches(save.service, ""), account)
-                    : "";
+                : save.prefill
+                    ? save.prefill.entryId
+                    : save.service
+                        ? this.existingRecordFor(await this.saved.findMatches(save.service, ""), account)
+                        : "";
             const stored = await this.saved.save({
                 ...(existing ? { existingId: existing } : {}),
                 service: save.service || detail.purpose,
@@ -1036,14 +1291,33 @@ export class UserAskService {
         }
         this.fingerprintCache = null;
         const userNote = normalizeUserAskNote(payload.note);
+        // A card that asked only for what the saved record lacked: the saved
+        // fields join the answer as if they had been on the card.
+        const prefill = save?.prefill ?? null;
+        const answerValues = prefill ? { ...prefill.values, ...readable.values } : readable.values;
+        const answerHandles = prefill ? { ...prefill.handles, ...handles } : handles;
+        const answerAsHandles = prefill ? [...prefill.asHandles, ...readable.asHandles] : readable.asHandles;
+        if (prefill?.freshUntil) {
+            freshUntil = Math.max(freshUntil, prefill.freshUntil);
+        }
+        if (prefill) {
+            await this.saved.markUsed(prefill.entryId);
+            savedNote = {
+                ...(savedNote ?? { remembered: false }),
+                label: savedNote?.label ?? prefill.label,
+                reused: false,
+                fromSaved: prefill.covered,
+                ...(prefill.service ? { service: prefill.service, askedService: prefill.askedService } : {}),
+            };
+        }
         return {
             outcome: "answered",
             askId,
-            ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
-            ...(Object.keys(handles).length > 0 ? { handles } : {}),
-            ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
+            ...(Object.keys(answerValues).length > 0 ? { values: answerValues } : {}),
+            ...(Object.keys(answerHandles).length > 0 ? { handles: answerHandles } : {}),
+            ...(answerAsHandles.length > 0 ? { asHandles: answerAsHandles } : {}),
             ...(freshUntil ? { freshUntil } : {}),
-            ...(savedNote ? { saved: savedNote } : {}),
+            ...(savedNote ? { saved: { ...savedNote, ...(savedNote.remembered ? this.syncedFlag() : {}) } } : {}),
             ...(userNote ? { userNote } : {}),
             answeredAt,
             ...(late ? { late: true } : {}),
@@ -1145,6 +1419,35 @@ export class UserAskService {
             label: resolved.label,
             ...(resolved.expiresAt ? { expiresAt: resolved.expiresAt } : {}),
         };
+    }
+    getSavedValuesSync() {
+        return this.sync.getStatus();
+    }
+    async setSavedValuesSync(payload) {
+        return await this.sync.setEnabled(payload?.enabled !== false);
+    }
+    async savedValuesSyncAction(payload) {
+        switch (payload?.action) {
+            case "allow":
+            case "decline":
+                return typeof payload.joinId === "string"
+                    ? await this.sync.decideJoin(payload.joinId, payload.action === "allow")
+                    : { ok: false, error: "No request named." };
+            case "confirm":
+                this.sync.confirmJoin();
+                return { ok: true };
+            case "askAgain":
+                this.sync.askAgain();
+                return { ok: true };
+            case "startOver":
+                return await this.sync.startOver();
+            case "remove":
+                return typeof payload.deviceId === "string"
+                    ? await this.sync.removeListedDevice(payload.deviceId)
+                    : { ok: false, error: "No device named." };
+            default:
+                return { ok: false, error: "Unknown action." };
+        }
     }
     async listStoredSecureValues() {
         return await this.saved.list();

@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import {
   USER_ASK_SECRET_HANDLE_PREFIX,
   normalizeSavedValuePart,
+  savedServiceMatch,
   savedValueKey,
   savedValueLabel,
   type SecureValueStoreKind,
@@ -18,6 +19,13 @@ import {
   unprotectValue,
 } from "@stella/node-shared/shared/protected-storage";
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
+import {
+  SAVED_VALUES_FORMAT_VERSION,
+  matchSavedFields,
+  type SavedValuePayload,
+} from "@stella/contracts/saved-values";
+
+export { matchSavedFields };
 
 const INDEX_FILE = "user-ask-saved-values.json";
 const LEGACY_FILE = "user-ask-secrets.json";
@@ -248,57 +256,14 @@ const decodePayload = (payload: string | null): Record<string, string> | null =>
 
 const newHandle = () => `${USER_ASK_SECRET_HANDLE_PREFIX}${randomUUID()}`;
 
-const fieldKey = (value: string) =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, "");
-
-type MatchableField = Pick<UserAskField, "id" | "label" | "type" | "sensitive">;
-
-const sameKind = (saved: SavedField, field: MatchableField) =>
-  saved.sensitive === field.sensitive &&
-  (saved.type === "secret") === (field.type === "secret");
-
-/**
- * Pairs requested fields with saved ones, one to one: by id, then by label,
- * then (so a renamed field still finds its value) the only unclaimed saved field
- * of the same kind when exactly one requested field of that kind is left over.
- * No saved field is ever paired with two requested fields, so every field keeps
- * its own value and its own handle.
- */
-export const matchSavedFields = (
-  saved: readonly SavedField[],
-  fields: readonly MatchableField[],
-): Map<string, SavedField> => {
-  const matched = new Map<string, SavedField>();
-  const claimed = new Set<SavedField>();
-  const pair = (field: MatchableField, candidate: SavedField | undefined) => {
-    if (!candidate || claimed.has(candidate) || matched.has(field.id)) return;
-    matched.set(field.id, candidate);
-    claimed.add(candidate);
-  };
-  for (const field of fields) {
-    pair(field, saved.find((candidate) => candidate.id === field.id));
-  }
-  for (const field of fields) {
-    if (matched.has(field.id)) continue;
-    const label = fieldKey(field.label);
-    pair(
-      field,
-      saved.find((candidate) => !claimed.has(candidate) && fieldKey(candidate.label) === label),
-    );
-  }
-  for (const field of fields) {
-    if (matched.has(field.id)) continue;
-    const open = saved.filter((candidate) => !claimed.has(candidate) && sameKind(candidate, field));
-    const rivals = fields.filter(
-      (other) => !matched.has(other.id) && open.some((candidate) => sameKind(candidate, other)),
-    );
-    if (open.length === 1 && rivals.length === 1) pair(field, open[0]);
-  }
-  return matched;
-};
+/** A change made on this computer (not one taken from another device), for sync. */
+export type SavedValuesChange =
+  | { kind: "saved"; id: string }
+  | { kind: "removed"; ids: string[]; at: number };
 
 export class SavedSecureValues {
   private readonly getDir: () => string | null;
+  private readonly listeners = new Set<(change: SavedValuesChange) => void>();
   private readonly fresh = new Map<string, FreshValue>();
   private readonly expired = new Set<string>();
   private ready: Promise<void> | null = null;
@@ -306,6 +271,22 @@ export class SavedSecureValues {
 
   constructor(getDir: () => string | null) {
     this.getDir = getDir;
+  }
+
+  /** Called after every change made on this computer. */
+  onChange(listener: (change: SavedValuesChange) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit(change: SavedValuesChange) {
+    for (const listener of this.listeners) {
+      try {
+        listener(change);
+      } catch {
+        // A listener's failure never undoes the change.
+      }
+    }
   }
 
   private indexPath(dir: string) {
@@ -491,14 +472,32 @@ export class SavedSecureValues {
   }
 
   async findMatches(service: string, account: string): Promise<SavedEntry[]> {
+    return (await this.findCandidates(service, account)).exact;
+  }
+
+  /**
+   * Saved records for a service, newest first: `exact` ones saved under the
+   * same name, and `close` ones whose name is the asked one with words around
+   * it (or the other way round), for when nothing exact is saved.
+   */
+  async findCandidates(
+    service: string,
+    account: string,
+  ): Promise<{ exact: SavedEntry[]; close: SavedEntry[] }> {
     const dir = await this.ensureReady();
-    const serviceKey = savedValueKey(service);
-    if (!dir || !serviceKey) return [];
+    if (!dir || !savedValueKey(service)) return { exact: [], close: [] };
     const accountKey = account.trim().toLowerCase();
-    return Object.values(this.readIndex(dir).entries)
-      .filter((entry) => savedValueKey(entry.service) === serviceKey)
+    const exact: SavedEntry[] = [];
+    const close: SavedEntry[] = [];
+    const entries = Object.values(this.readIndex(dir).entries)
       .filter((entry) => !accountKey || entry.account.trim().toLowerCase() === accountKey)
       .sort((left, right) => right.updatedAt - left.updatedAt);
+    for (const entry of entries) {
+      const match = savedServiceMatch(entry.service, service);
+      if (match === "exact") exact.push(entry);
+      else if (match === "close") close.push(entry);
+    }
+    return { exact, close };
   }
 
   async get(id: string): Promise<SavedEntry | null> {
@@ -564,6 +563,7 @@ export class SavedSecureValues {
       fields,
       values,
     });
+    this.emit({ kind: "saved", id: entry.id });
     const handles: Record<string, string> = {};
     for (const { field } of input.fields) {
       const stored = placed.get(field.id);
@@ -700,7 +700,10 @@ export class SavedSecureValues {
       for (const handle of this.fresh.keys()) this.expired.add(handle);
       this.fresh.clear();
     }
-    if (targets.length > 0) this.writeIndex(dir, index);
+    if (targets.length > 0) {
+      this.writeIndex(dir, index);
+      this.emit({ kind: "removed", ids: targets.map((entry) => entry.id), at: Date.now() });
+    }
     return targets.length;
   }
 
@@ -712,8 +715,89 @@ export class SavedSecureValues {
     const entry = index.entries[id];
     if (!entry) return false;
     entry.label = next;
+    entry.updatedAt = Math.max(Date.now(), entry.updatedAt + 1);
     this.writeIndex(dir, index);
+    this.emit({ kind: "saved", id });
     return true;
+  }
+
+  /** Every record on this computer, with when it last changed. */
+  async heads(): Promise<{ id: string; updatedAt: number }[]> {
+    const dir = await this.ensureReady();
+    return dir
+      ? Object.values(this.readIndex(dir).entries).map((entry) => ({ id: entry.id, updatedAt: entry.updatedAt }))
+      : [];
+  }
+
+  /** A record as it syncs: names, fields with their handles, and values. */
+  async payloadOf(id: string): Promise<SavedValuePayload | null> {
+    const entry = await this.get(id);
+    if (!entry) return null;
+    const values = await this.readValues(entry);
+    if (!values) return null;
+    return {
+      v: SAVED_VALUES_FORMAT_VERSION,
+      id: entry.id,
+      service: entry.service,
+      account: entry.account,
+      label: entry.label,
+      fields: entry.fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        type: field.type,
+        sensitive: field.sensitive,
+        ...(field.handle ? { handle: field.handle } : {}),
+      })),
+      values,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    };
+  }
+
+  /**
+   * Takes a record another device saved: stored here under the same id and
+   * handles, so a handle works on every device. Not reported as a change.
+   */
+  async applySynced(payload: SavedValuePayload): Promise<void> {
+    const dir = await this.ensureReady();
+    if (!dir) return;
+    const existing = this.readIndex(dir).entries[payload.id] ?? null;
+    const base: SavedEntry = {
+      id: payload.id,
+      service: normalizeSavedValuePart(payload.service),
+      account: normalizeSavedValuePart(payload.account),
+      label: normalizeSavedValuePart(payload.label, 120) || payload.service || "Saved value",
+      fields: payload.fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        type: field.type,
+        sensitive: field.sensitive,
+        ...(field.sensitive && field.handle ? { handle: field.handle } : {}),
+      })),
+      store: existing?.store ?? "protected_file",
+      ...(existing?.chunks ? { chunks: existing.chunks } : {}),
+      createdAt: payload.createdAt,
+      updatedAt: payload.updatedAt,
+      ...(existing?.lastUsedAt ? { lastUsedAt: existing.lastUsedAt } : {}),
+    };
+    const placed = await this.writePayload(base, encodePayload({ ...payload.values }));
+    if (existing && existing.store !== placed.store) await this.removePayload(existing);
+    const { chunks: _chunks, valueProtected: _valueProtected, ...rest } = base;
+    const index = this.readIndex(dir);
+    index.entries[payload.id] = { ...rest, ...placed };
+    this.writeIndex(dir, index);
+  }
+
+  /** Removes a record another device removed. Not reported as a change. */
+  async removeSynced(id: string): Promise<void> {
+    const dir = await this.ensureReady();
+    if (!dir) return;
+    const index = this.readIndex(dir);
+    const entry = index.entries[id];
+    if (!entry) return;
+    await this.removePayload(entry);
+    delete index.entries[id];
+    this.writeIndex(dir, index);
   }
 
   async valuesKey(): Promise<string> {

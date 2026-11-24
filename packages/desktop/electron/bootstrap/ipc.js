@@ -296,6 +296,9 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         listStoredSecureValues: () => services.userAskService.listStoredSecureValues(),
         deleteStoredSecureValues: (payload) => services.userAskService.deleteStoredSecureValues(payload),
         renameStoredSecureValue: (payload) => services.userAskService.renameStoredSecureValue(payload),
+        getSavedValuesSync: () => services.userAskService.getSavedValuesSync(),
+        setSavedValuesSync: (payload) => services.userAskService.setSavedValuesSync(payload),
+        savedValuesSyncAction: (payload) => services.userAskService.savedValuesSyncAction(payload),
         respondConnectorConnect: (payload) => services.connectorConnectService.respond(payload),
         onPermissionGranted: (kind) => {
             if (kind === "accessibility") {
@@ -668,6 +671,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         renderOfficePreview: officePreview.renderForRequest,
         voiceConfig: voice.configForRequest,
         voiceExecuteTool: voice.executeToolForRequest,
+        releaseSavedValue: (params) => services.userAskService.releaseSaved(params),
         claudeLogin: services.claudeLocalAccounts
             ? {
                 start: (params) => services.claudeLocalAccounts.startRemoteLogin(params),

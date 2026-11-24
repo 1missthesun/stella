@@ -76,6 +76,12 @@ import {
   useUserAskSync,
 } from "../lib/user-asks";
 import { canSealUserAskValue, sealUserAskValue } from "../lib/user-ask-seal";
+import {
+  rememberOnDevices,
+  rememberedByPhone,
+  useSavedLogin,
+} from "../lib/saved-values";
+import { useSavedValuesTrust } from "../lib/saved-values-trust";
 import { useT } from "../i18n";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
@@ -112,6 +118,8 @@ const useRemaining = (deadlineAt: number | undefined): number | null => {
   }, [deadlineAt]);
   return deadlineAt === undefined ? null : Math.max(0, deadlineAt - now);
 };
+
+const NO_FILLS: Readonly<Record<string, string>> = {};
 
 const slotStyles = StyleSheet.create({ deckSlot: { alignSelf: "stretch" } });
 
@@ -804,18 +812,45 @@ function SecureAskSurface({
   const [note, setNote] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const offersRemember = userAskOffersRemember(detail);
+  const asksToRemember = userAskOffersRemember(detail);
+  const onDeviceList = useSavedValuesTrust().standing === "member";
+  const offersRemember =
+    asksToRemember && (onDeviceList || !rememberedByPhone(ask));
   const [remember, setRemember] = useState(true);
   const remaining = useRemaining(ask.blocking ? undefined : ask.deadlineAt);
   const sealable = canSealUserAskValue(ask.recipientKey);
   const originLabel = useUserAskOriginLabel(ask.originDeviceId);
   const needsComputer =
     !sealable && detail.fields.some((field) => field.sensitive);
-  const missing = detail.fields.some(
+  const saved = useSavedLogin(ask, sealable);
+  const [typing, setTyping] = useState(false);
+  const savedLogin = typing ? null : saved.login;
+  const fills = savedLogin?.fills ?? NO_FILLS;
+  const askedFields = savedLogin
+    ? detail.fields.filter((field) => fills[field.id] === undefined)
+    : detail.fields;
+  const savedFields = savedLogin
+    ? detail.fields.filter((field) => fills[field.id] !== undefined)
+    : [];
+  const missing = askedFields.some(
     (field) => !field.optional && !(values[field.id] ?? "").trim(),
   );
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  useEffect(() => {
+    const fillable = saved.login?.fills;
+    if (!fillable) return;
+    const typedSoFar = valuesRef.current;
+    if (
+      Object.keys(typedSoFar).some(
+        (id) => fillable[id] !== undefined && typedSoFar[id]?.trim(),
+      )
+    ) {
+      setTyping(true);
+    }
+  }, [saved.login]);
   const inputRefs = useRef(new Map<string, TextInput>());
-  const typedFieldIds = detail.fields
+  const typedFieldIds = askedFields
     .filter((field) => field.type !== "choice")
     .map((field) => field.id);
 
@@ -850,8 +885,11 @@ function SecureAskSurface({
   const send = useCallback(() => {
     setIssue(null);
     const payload: UserAskAnswerFieldValue[] = [];
+    const typed: { field: UserAskField; value: string }[] = [];
     for (const field of detail.fields) {
-      const raw = (values[field.id] ?? "").trim();
+      const fromSaved = fills[field.id];
+      const raw = fromSaved ?? (values[field.id] ?? "").trim();
+      if (fromSaved === undefined && raw) typed.push({ field, value: raw });
       if (!raw) {
         if (field.optional) continue;
         setIssue(t("mobile.userAsk.missingFields"));
@@ -883,21 +921,44 @@ function SecureAskSurface({
     }
     tapLight();
     const trimmedNote = note.trim();
+    const rememberHere = savedLogin === null && offersRemember && remember;
     void run(async () => {
       await answerUserAsk({
         askId: ask.askId,
         revision: ask.revision,
         kind: "fields",
         fields: payload,
-        ...(offersRemember ? { remember } : {}),
+        ...(asksToRemember
+          ? {
+              // A cloud task is told whether it's saved; what came from the saved logins is.
+              remember:
+                rememberHere || (savedLogin !== null && rememberedByPhone(ask)),
+            }
+          : {}),
         ...(trimmedNote ? { note: trimmedNote } : {}),
       });
       recordUserAskAnswer(
         ask.conversationId,
         userAskSecureRecord(ask, "provided", trimmedNote),
       );
+      if (rememberHere && rememberedByPhone(ask)) {
+        void rememberOnDevices({ detail, typed }).catch(() => undefined);
+      }
     }, "mobile.userAsk.answerFailed");
-  }, [ask, note, detail.fields, offersRemember, remember, run, sealable, t, values]);
+  }, [
+    ask,
+    note,
+    asksToRemember,
+    detail,
+    fills,
+    offersRemember,
+    remember,
+    run,
+    savedLogin,
+    sealable,
+    t,
+    values,
+  ]);
 
   const body = (
     <>
@@ -966,12 +1027,42 @@ function SecureAskSurface({
         </View>
       ) : (
         <View style={styles.body}>
-          {detail.save?.replacing ? (
+          {savedLogin ? (
+            <View style={styles.redirect}>
+              <Text style={styles.savedHeading}>
+                {t("mobile.userAsk.savedHeading")}
+              </Text>
+              <Text style={styles.redirectTitle}>{savedLogin.label}</Text>
+              <View style={styles.redirectFields}>
+                {savedFields.map((field) => (
+                  <View key={field.id} style={styles.savedFieldRow}>
+                    <Text style={styles.redirectField}>{field.label}</Text>
+                    <Text numberOfLines={1} style={styles.savedFieldValue}>
+                      {field.sensitive ? "••••••••" : fills[field.id]}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.redirectBody}>
+                {askedFields.length > 0
+                  ? t("mobile.userAsk.usingSaved", { label: savedLogin.label })
+                  : t("mobile.userAsk.savedBody")}
+              </Text>
+            </View>
+          ) : detail.save?.replacing ? (
             <Text style={styles.rememberHint}>
               {t("mobile.userAsk.replacing", { label: detail.save.label })}
             </Text>
+          ) : detail.save?.usingSaved ? (
+            <Text style={styles.rememberHint}>
+              {t("mobile.userAsk.usingSaved", { label: detail.save.label })}
+            </Text>
+          ) : detail.save && saved.status === "none" ? (
+            <Text style={styles.rememberHint}>
+              {t("mobile.userAsk.needsFromYou")}
+            </Text>
           ) : null}
-          {detail.fields.map((field) => {
+          {askedFields.map((field) => {
             const nextId =
               typedFieldIds[typedFieldIds.indexOf(field.id) + 1] ?? null;
             return (
@@ -1006,6 +1097,27 @@ function SecureAskSurface({
               />
             );
           })}
+          {saved.login ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              hitSlop={8}
+              onPress={() => {
+                tapLight();
+                setTyping((current) => !current);
+              }}
+              style={({ pressed }) => [
+                styles.savedSwitch,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.savedSwitchText}>
+                {savedLogin
+                  ? t("mobile.userAsk.typeInstead")
+                  : t("mobile.userAsk.useSavedInstead")}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
     </>
@@ -1047,7 +1159,7 @@ function SecureAskSurface({
 
       {needsComputer ? null : (
         <View style={styles.secureActions}>
-          {offersRemember ? (
+          {offersRemember && !savedLogin ? (
             <View style={styles.rememberRow}>
               <Switch
                 accessibilityHint={
@@ -1074,7 +1186,7 @@ function SecureAskSurface({
             onPress={send}
             style={({ pressed }) => [
               styles.primaryAction,
-              !offersRemember && styles.primaryActionWide,
+              (!offersRemember || savedLogin) && styles.primaryActionWide,
               pressed && styles.pressed,
               (busy || missing) && styles.disabled,
             ]}
@@ -1082,7 +1194,9 @@ function SecureAskSurface({
             <Text style={styles.primaryActionText}>
               {busy
                 ? t("mobile.userAsk.sending")
-                : t("mobile.userAsk.sendSecurely")}
+                : savedLogin && askedFields.length === 0
+                  ? t("mobile.userAsk.useSaved")
+                  : t("mobile.userAsk.sendSecurely")}
             </Text>
           </Pressable>
         </View>
@@ -1717,6 +1831,34 @@ const makeStyles = (colors: Colors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       gap: 2,
       paddingTop: 8,
+    },
+    savedFieldRow: {
+      alignItems: "baseline",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+    },
+    savedFieldValue: {
+      color: colors.text,
+      flexShrink: 1,
+      fontFamily: fonts.sans.regular,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    savedHeading: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 12,
+      letterSpacing: 0.2,
+    },
+    savedSwitch: {
+      alignSelf: "flex-start",
+      paddingVertical: 4,
+    },
+    savedSwitchText: {
+      color: colors.accent,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14,
     },
     redirectTitle: {
       color: colors.text,

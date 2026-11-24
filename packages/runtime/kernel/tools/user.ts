@@ -5,6 +5,7 @@ import {
   clampUrgency,
   normalizeUserAskOptions,
   userAskPresetFields,
+  type SecureInputNotSaved,
   type SecureValueTarget,
   type SecureValueUseReceipt,
   type UserAskField,
@@ -74,7 +75,7 @@ export type UserToolsConfig = {
   requestSecureInput?: (
     request: SecureInputRequest,
     signal?: AbortSignal,
-  ) => Promise<UserAskResolution | null>;
+  ) => Promise<UserAskResolution | SecureInputNotSaved | null>;
   useSecureValue?: (
     request: SecureValueUseRequest,
   ) => Promise<SecureValueUseReceipt>;
@@ -284,11 +285,47 @@ const mergePresetFields = (
 };
 
 /**
- * Internal argument: reuse a saved value if this computer has one, and
- * otherwise return `{ outcome: "not_saved" }` without showing a card.
+ * Internal argument (the public one is `saved_only`): reuse a saved value if
+ * this computer has one, and otherwise return `{ outcome: "not_saved" }`
+ * without showing a card.
  */
 export const SECURE_INPUT_SAVED_ONLY_ARG = "__savedOnly";
-const SECURE_INPUT_NOT_SAVED = { outcome: "not_saved" } as const;
+
+const cloudNotSavedNote = (service: string, found: SecureInputNotSaved): string => {
+  const retry = "Call again without saved_only to ask the user on a secure card (they can answer on any device; a phone that holds the login fills it with one tap).";
+  if (found.reason === "no_computer") {
+    return `None of the user's computers that hold their saved values is online, so Stella could not look for "${service}". ${retry}`;
+  }
+  if (found.reason === "limit") {
+    return `The user's computer that holds "${service}" has given saved values to cloud tasks many times in the last hour, so this one needs the user. ${retry}`;
+  }
+  if (found.reason === "sync_off") {
+    return `The user's saved values don't sync to any computer Stella can ask, so nothing saved was found for "${service}". ${retry}`;
+  }
+  if (found.savedHere.length === 0) {
+    return `Nothing is saved for "${service}" or anything else. ${retry}`;
+  }
+  return `Nothing saved matches "${service}". savedHere lists what is saved (names only). If one of them is what you need, call again with its service (and account); otherwise ${retry.charAt(0).toLowerCase()}${retry.slice(1)}`;
+};
+
+const notSavedResult = (service: string, found: SecureInputNotSaved | null): ToolResult => {
+  const savedHere = found?.savedHere ?? [];
+  if (found?.reason) {
+    const note = [found.message, cloudNotSavedNote(service, found)].filter(Boolean).join(" ");
+    const details = {
+      outcome: "not_saved" as const,
+      savedHere,
+      reason: found.reason,
+      ...(found.message ? { message: found.message } : {}),
+    };
+    return { result: { ...details, note }, details };
+  }
+  const note = savedHere.length === 0
+    ? `Nothing is saved on this computer for "${service}" or anything else. Call again without saved_only to ask the user on a secure card.`
+    : `Nothing saved on this computer matches "${service}". savedHere lists what is saved (names only). If one of them is what you need, call again with its service (and account); otherwise call again without saved_only to ask the user.`;
+  const details = { outcome: "not_saved" as const, savedHere };
+  return { result: { ...details, note }, details };
+};
 
 export const handleRequestSecureInput = async (
   config: UserToolsConfig,
@@ -323,7 +360,7 @@ export const handleRequestSecureInput = async (
         "replace_saved needs service (and account when you know it) so Stella knows which saved value to replace.",
     };
   }
-  const savedOnly = args[SECURE_INPUT_SAVED_ONLY_ARG] === true;
+  const savedOnly = args[SECURE_INPUT_SAVED_ONLY_ARG] === true || args.saved_only === true;
   try {
     const resolution = await config.requestSecureInput({
       purpose,
@@ -338,8 +375,8 @@ export const handleRequestSecureInput = async (
       urgency: clampUrgency(args.urgency),
       ...contextFields(context, args),
     }, signal);
-    if (resolution === null) {
-      return { result: SECURE_INPUT_NOT_SAVED, details: SECURE_INPUT_NOT_SAVED };
+    if (resolution === null || resolution.outcome === "not_saved") {
+      return notSavedResult(service, resolution);
     }
     return userAskResolutionResult(resolution, [], purpose);
   } catch (error) {

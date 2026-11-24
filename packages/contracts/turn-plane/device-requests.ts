@@ -12,6 +12,7 @@ export const DEVICE_REQUEST_METHODS = [
   "claude.login.start",
   "claude.login.finish",
   "claude.login.cancel",
+  "savedValues.release",
 ] as const;
 
 export type DeviceRequestMethod = (typeof DEVICE_REQUEST_METHODS)[number];

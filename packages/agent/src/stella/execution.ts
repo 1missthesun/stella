@@ -79,7 +79,6 @@ const pause = (ms: number, signal?: AbortSignal): Promise<void> =>
 
 const RETRIED_NOTE = `Checked again for ${DEVICE_OFFLINE_RETRY_MS / 1000} seconds.`;
 
-/** Retries an attempt the backend refused because its computer is offline, for a few seconds, then throws that refusal. */
 export const whileDeviceOffline = async <T>(attempt: () => Promise<T>, signal?: AbortSignal): Promise<T> => {
   const deadline = Date.now() + DEVICE_OFFLINE_RETRY_MS;
   for (;;) {
@@ -95,7 +94,6 @@ export const whileDeviceOffline = async <T>(attempt: () => Promise<T>, signal?: 
   }
 };
 
-/** Waits a few seconds for an offline computer to come back; the standing it ends on. */
 export const untilOnline = async (
   standing: ((deviceId: string, context: Context) => Promise<DeviceStanding | undefined>) | undefined,
   deviceId: string,

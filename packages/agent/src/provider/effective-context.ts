@@ -11,10 +11,9 @@ const capped = <M>(model: M): M => {
 };
 
 /**
- * Lists a provider's models at their effective window, which is what pi
- * compacts against and handovers fit to. Requests still carry the advertised
- * window: pi-ai caps each request's output at the window less its estimated
- * input, which near the compaction point would leave little room to answer.
+ * Requests still carry the advertised window: pi-ai caps each request's
+ * output at the window less its estimated input, which near the compaction
+ * point would leave little room to answer.
  */
 export const withEffectiveContext = (provider: Provider): Provider => {
   const advertised = (model: Model<Api>): Model<Api> => {
@@ -32,7 +31,6 @@ export const withEffectiveContext = (provider: Provider): Provider => {
   };
 };
 
-/** Every provider set on `models` from now on lists its models at their effective window. */
 export const effectiveContextModels = <M extends MutableModels>(models: M): M => {
   const setProvider = models.setProvider.bind(models);
   models.setProvider = (provider) => setProvider(withEffectiveContext(provider));

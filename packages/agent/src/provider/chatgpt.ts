@@ -6,7 +6,6 @@ import { siblingModel } from "@stella/contracts/provider-live-models";
 
 export const CHATGPT_PROVIDER_ID = "chatgpt";
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
-/** The adapter's bearer when the transport sets the real one; not an `sk-` key, so the plan's limits apply. */
 const TRANSPORT_PLACEHOLDER_KEY = "stella-chatgpt-plan";
 
 export type ChatGptTransport = {
@@ -14,11 +13,6 @@ export type ChatGptTransport = {
   fetch(request: Request, route: { sessionId?: string }): Promise<Response>;
 };
 
-/**
- * A plan model by its ChatGPT slug: pi-ai's entry for the OpenAI model, or,
- * for one pi-ai doesn't know yet, one shaped like its nearest sibling, else
- * like OpenAI's newest reasoning model.
- */
 export const chatGptModel = (modelId: string): Model<"openai-responses"> | undefined => {
   const openai = (Object.values(OPENAI_MODELS) as Model<Api>[]).filter(
     (model): model is Model<"openai-responses"> => model.api === "openai-responses",
@@ -38,11 +32,6 @@ export const chatGptModel = (modelId: string): Model<"openai-responses"> | undef
 
 type PayloadHook = (payload: unknown, model: Model<Api>) => unknown | undefined | Promise<unknown | undefined>;
 
-/**
- * The plan's own `web_search` tool stands in for Stella's `web`: OpenAI runs
- * the search and page reads on the user's ChatGPT plan, so the turn never
- * reaches Stella's paid search.
- */
 const isStellaWeb = (tool: unknown): boolean =>
   Boolean(tool) &&
   typeof tool === "object" &&

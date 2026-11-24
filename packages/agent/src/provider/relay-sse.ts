@@ -20,7 +20,6 @@ const sse = (frames: readonly { event?: string; data: unknown }[]): string =>
 
 const REASONING_FIELDS = ["reasoning_content", "reasoning", "reasoning_text"] as const;
 
-/** `chat.completion` JSON as the `chat.completion.chunk` stream the OpenAI SDK parses. */
 export function chatCompletionToSse(completion: unknown): string {
   if (!isObject(completion) || !Array.isArray(completion.choices)) {
     throw new Error("Stella gateway returned a malformed chat completion.");
@@ -60,7 +59,6 @@ export function chatCompletionToSse(completion: unknown): string {
   return sse([...frames.map((data) => ({ data })), { data: "[DONE]" }]);
 }
 
-/** Anthropic `message` JSON as the Messages SSE event stream. */
 export function anthropicMessageToSse(message: unknown): string {
   if (!isObject(message) || !Array.isArray(message.content)) {
     throw new Error("Stella gateway returned a malformed Anthropic message.");
@@ -120,7 +118,6 @@ export function anthropicMessageToSse(message: unknown): string {
   return sse(frames);
 }
 
-/** OpenAI Responses `response` JSON as the Responses SSE event stream. */
 export function responseToSse(response: unknown): string {
   if (!isObject(response) || !Array.isArray(response.output)) {
     throw new Error("Stella gateway returned a malformed Responses object.");

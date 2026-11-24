@@ -433,8 +433,6 @@ export const sealNativeState = async (args: {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     // Some filesystems include ordinary directory entries in st_nlink. Put a
-    // private placeholder at the excluded manifest path before hashing so the
-    // directory metadata is identical after the atomic manifest replacement.
     await writeFile(priorAttestationPath, "", {
       flag: "wx",
       mode: 0o600,

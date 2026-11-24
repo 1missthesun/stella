@@ -42,16 +42,9 @@ export const CLOUD_USER_ASK_PATH = "/api/cloud/user-ask";
 
 const ANSWER_POLL_MS = 10_000;
 const FIRST_POLL_MS = 1_500;
-/** Backoff between tries of a request that failed for a passing reason. */
 const RETRY_DELAYS_MS = [500, 1_000, 2_000, 4_000, 8_000, 15_000];
-/**
- * While waiting for the user, how long reads may keep failing for a passing
- * reason (a deploy, a dropped connection) before the question is given up.
- * The user may take hours to answer; one failed read must not end the ask.
- */
 const ANSWER_OUTAGE_MAX_MS = 10 * 60_000;
 
-/** A failure that says nothing about the ask itself: try again. */
 class TransientAskError extends Error {}
 
 const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -107,7 +100,6 @@ const answeredResolution = (
   };
 };
 
-/** What a field's value became: text the task reads, or a handle held here. */
 type Opened = {
   values: Record<string, string>;
   handles: Record<string, string>;
@@ -117,7 +109,6 @@ type Opened = {
 
 const emptyOpened = (): Opened => ({ values: {}, handles: {}, asHandles: [], freshUntil: 0 });
 
-/** The fields a release asks for: what request_secure_input normalized, no more. */
 const releaseFields = (fields: readonly UserAskField[]) =>
   fields.map((field) => ({
     id: field.id,
@@ -127,11 +118,6 @@ const releaseFields = (fields: readonly UserAskField[]) =>
     ...(field.optional ? { optional: true } : {}),
   }));
 
-/**
- * A masked field is never readable by a cloud task: the answering devices
- * seal only sensitive fields, and a value that reaches the cloud in plain
- * text is one the cloud could read.
- */
 const cloudFields = (fields: readonly UserAskField[]): readonly UserAskField[] =>
   fields.map((field) =>
     field.type === "secret" && !field.sensitive ? { ...field, sensitive: true } : field,
@@ -141,13 +127,9 @@ export const createCloudUserAskHost = (args: {
   post: (route: string, body: unknown) => Promise<Response>;
   turnId: string;
   conversationId: string;
-  /** The thread the task runs for: its handles work only for it. */
   threadId: string;
-  /** Holds the values this task is given; absent, sensitive fields are refused. */
   secureValues?: CloudSecureValueStore;
-  /** Where use_secure_value runs a command. */
   commandScope?: CloudSecureCommandScope;
-  /** The cloud browser use_secure_value fills. */
   browser?: CloudBrowserBridge;
 }): CloudUserAskHost => {
   const openAsks = new Set<string>();
@@ -184,8 +166,6 @@ export const createCloudUserAskHost = (args: {
     }
   };
 
-  // Every op is idempotent on the server (register by askId + toolCallId), so
-  // a try that failed in passing is simply sent again.
   const request = async (body: Record<string, unknown>): Promise<unknown> => {
     for (let index = 0; ; index += 1) {
       try {
@@ -208,8 +188,6 @@ export const createCloudUserAskHost = (args: {
     await request({ op: "cancel", askId }).catch(() => undefined);
   };
 
-  // Polled for as long as the user takes, so a read gets one try; the wait
-  // loop decides how long a run of passing failures may last.
   const readAnswer = async (askId: string): Promise<AnswerRead> =>
     (await attempt({ op: "answer", askId })) as AnswerRead;
 
@@ -229,7 +207,6 @@ export const createCloudUserAskHost = (args: {
     askId: string;
     deadlineAt: number | null;
     onDefault: () => UserAskResolution;
-    /** Turns an answer into the resolution (a secure input opens its sealed fields). */
     onAnswer?: (read: AnswerRead) => Promise<UserAskResolution>;
   }): Promise<UserAskResolution> => {
     let delay = FIRST_POLL_MS;
@@ -345,10 +322,6 @@ export const createCloudUserAskHost = (args: {
   const ownerOf = (request: { agentId?: string; conversationId?: string }): string =>
     request.agentId || request.conversationId || args.threadId;
 
-  /**
-   * One field's value: a sensitive one (or a readable one Stella would hide
-   * from the task anyway) is held here behind a handle; the rest is text.
-   */
   const place = async (
     opened: Opened,
     field: UserAskField,
@@ -374,7 +347,6 @@ export const createCloudUserAskHost = (args: {
     sealed: UserAskSealedValue,
   ): string => openSealedValue({ sealed, key, askId, fieldId });
 
-  /** Ask the user's computers for a value they saved, sealed to this request's key. */
   const release = async (input: {
     releaseId: string;
     key: TaskRecipientKey;
@@ -394,8 +366,6 @@ export const createCloudUserAskHost = (args: {
         recipientKey: input.key.recipientKey,
       })) as SavedValueReleaseResult;
     } catch (error) {
-      // No computer answered in time, or the cloud can't ask: the card
-      // still reaches the user.
       console.error(`saved value release failed: ${(error as Error).message}`);
       return { found: false, savedHere: [], reason: "no_computer" };
     }
@@ -420,8 +390,6 @@ export const createCloudUserAskHost = (args: {
     const replace = secureRequest.save?.replace === true;
     const byId = new Map(fields.map((field) => [field.id, field]));
 
-    // A saved value first: one of the user's computers releases it sealed
-    // to a key that exists only in this process.
     let prefill: { opened: Opened; covered: string[]; saved: UserAskSavedValueNote } | null = null;
     if (service && !replace && store) {
       const releaseId = randomUUID();
@@ -486,8 +454,6 @@ export const createCloudUserAskHost = (args: {
       return { outcome: "not_saved", savedHere: [], reason: "not_saved" };
     }
 
-    // Nothing saved answers: a secure card, answered on any of the user's
-    // devices and sealed to this request's own key.
     const key = createTaskRecipientKey();
     const askFields = prefill ? fields.filter((field) => !prefill!.covered.includes(field.id)) : fields;
     const label = service ? savedValueLabel(service, account) || secureRequest.purpose : "";
@@ -548,7 +514,6 @@ export const createCloudUserAskHost = (args: {
         }
         let saved: UserAskSavedValueNote | undefined;
         if (service && given.some((field) => field.sensitive && userAskFieldIsRememberable(field))) {
-          // The device the user answered on saves it when they chose to.
           const remembered = answer.remember !== false;
           saved = {
             label: prefill ? prefill.saved.label : label,

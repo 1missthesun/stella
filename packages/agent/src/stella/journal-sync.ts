@@ -29,11 +29,6 @@ type JournalOpenTurn = {
   entries: number[];
 };
 
-/**
- * One of this computer's turns as the cloud journal sees it. `held` names
- * the mirror instance (`holder`) that holds its lease, so a held turn left by
- * an earlier run of the app is one this run still has to adopt.
- */
 export type MirrorTurn =
   | { s: "beginning"; localTurnId: string }
   | {

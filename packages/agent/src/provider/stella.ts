@@ -159,12 +159,6 @@ const ranOutWhileThinking = (message: AssistantMessage): boolean =>
 const RAN_OUT_WHILE_THINKING =
   "The model ran out of room while thinking and wrote no answer. Try again, or pick a lower thinking level.";
 
-/**
- * Reasoning shares the output ceiling with the answer, and effort-only APIs
- * take no thinking cap, so a hard problem can end on `length` with nothing
- * written. That response is asked again once at low effort; if that also
- * ends empty, the turn fails with a message instead of ending silently.
- */
 const answerAfterRunningOut = (
   attempt: (options: SimpleStreamOptions | undefined) => AssistantMessageEventStream,
   options: SimpleStreamOptions | undefined,

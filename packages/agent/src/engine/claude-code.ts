@@ -76,7 +76,6 @@ export const CLAUDE_CODE_BUILTIN_TOOLS = [
 ] as const;
 const CLI_WEB_TOOLS: readonly string[] = ["WebSearch", "WebFetch"];
 
-/** Stella's tools keep their own names in Claude Code, as do its built-ins. */
 const sameToolName = (name: string): string => name;
 const ENGINE_ONLY_TOOLS = ["TaskStop", "Monitor", "Grep", "Glob", "WebSearch", "WebFetch"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
@@ -95,20 +94,13 @@ export const CLAUDE_CODE_MODEL_ALIASES = [
   "opus[1m]",
 ] as const;
 
-/**
- * What differs between the vendor CLIs this engine drives: how Stella names
- * the engine, which of the CLI's own tools it registers, and which of Stella's
- * tools the CLI's own replace.
- */
 export type CliEngineFlavor = {
   providerId: string;
   extensionName: string;
   api: string;
   label: string;
   modelAliases: readonly string[];
-  /** The CLI's own tools, registered so its calls appear in the conversation. */
   engineOnlyTools: readonly string[];
-  /** The CLI's own tools that share a name and shape with Stella's. */
   wrappedTools: readonly (typeof WRAPPED_TOOLS)[number][];
   builtinTools: readonly string[];
   webTools: readonly string[];
@@ -134,9 +126,7 @@ export const CLAUDE_CODE_FLAVOR: CliEngineFlavor = {
 };
 
 export const ANTIGRAVITY_CLI_API = "antigravity-cli-acp";
-/** Antigravity's own tools carry this prefix in Stella, so none collides with a Stella tool (both have `send_message`). */
 export const ANTIGRAVITY_NATIVE_PREFIX = "agy_";
-/** Any other tool of Antigravity's: its real name travels in the call's arguments. */
 export const ANTIGRAVITY_OTHER_TOOL = `${ANTIGRAVITY_NATIVE_PREFIX}tool`;
 export const ANTIGRAVITY_CLI_FLAVOR: CliEngineFlavor = {
   providerId: ANTIGRAVITY_CLI_PROVIDER_ID,
@@ -157,7 +147,6 @@ const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
-/** How long a new turn waits for the stopped one it replaces to end. */
 const SUPERSEDED_SETTLE_MS = 10_000;
 
 export type ClaudeCodeRole = "orchestrator" | "worker";
@@ -222,16 +211,11 @@ export type ClaudeCodeTransport = {
   resume?(session: ClaudeCodeSessionRef, args: { held?: string; lastReply?: string }): Promise<{ sessionId?: string; restored?: boolean }>;
   hydrate?(session: ClaudeCodeSessionRef, transcript: (meta: ClaudeCodeTranscriptMeta) => string): Promise<string>;
   close?(session: ClaudeCodeSessionRef): void;
-  /** Resume: continue the steps a usage limit holds in these sessions now. Returns how many. */
   wakeUsageLimitHolds?(sessionKeys: ReadonlySet<string>): number;
 };
 
 export type ClaudeCodeSessionRecord = {
   cliSessionId?: string;
-  /**
-   * A turn of this session is under way. Left set when Stella stops mid-turn (an update, a restart, a crash), so the
-   * turn that picks the task back up knows it was cut off, even when nothing was mid-call.
-   */
   open?: true;
   seen: string[];
   undelivered?: string[];
@@ -306,10 +290,8 @@ type Session = {
   turn?: Turn;
   cliSessionId?: string;
   wakes?: Set<string>;
-  /** Stella is closing this session (quitting): its turn ends cut off, not finished, and resumes on the next start. */
   closing?: true;
   lastSignAt?: number;
-  /** What the CLI said it is doing that can take long and shows in the chat. */
   hold?: "compacting" | "user";
 };
 
@@ -335,9 +317,7 @@ const markedError = (error: unknown): string => {
   const message = errorText(error);
   if (code === "CLAUDE_CODE_AUTH_REAUTH_REQUIRED") return `[claude-code/login-required] ${message}`;
   if (code === "CLAUDE_CODE_USAGE_LIMIT") return `[claude-code/usage-limit] ${message}`;
-  // The runtime couldn't find the claude executable on this computer.
   if (/Claude Code CLI executable was not found/i.test(message)) return `[claude-code/not-installed] ${message}`;
-  // It is installed but can't start (and nothing could stand in for it).
   if (code === "CLAUDE_CODE_CLI_UNUSABLE") return `[claude-code/cli-unusable] ${message}`;
   if (code === "CLAUDE_CODE_SAFEGUARD_BLOCK" || isSafeguardBlockText(message)) return markSafeguardBlock("claude-code", message);
   return message;
@@ -432,7 +412,6 @@ const renderMessage = (message: Message): string | undefined => {
     }
     case "assistant": {
       const said = textOf(message.content).trim();
-      // An older "nothing to post" placeholder reads as the marker it stands for.
       const text = said && isSilentReplyText(said) ? SILENT_REPLY_MARKER : said;
       const calls = message.content.filter((part): part is ToolCall => part.type === "toolCall");
       const lines = [
@@ -486,19 +465,10 @@ const userPrompt = (users: readonly Message[]): { text: string; images: ImageCon
   images: users.flatMap((message) => imagesOf(message.content)),
 });
 
-/**
- * A message after which the held CLI session no longer matches the
- * conversation: another engine compacted it, or messages were taken out of it.
- */
 const isContextBoundary = (message: Message): boolean => isPiCompactionBoundary(message) || isSafeguardContextBoundary(message);
 
 const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
 
-/**
- * The last resort for a CLI that can resume no session of this conversation
- * and was handed none (`ClaudeCodeTransport.hydrate`): the resident context,
- * then the recent history as text.
- */
 const rebuildPrompt = (messages: readonly Message[]): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(messages);
   const earlier = messages.slice(0, start);
@@ -553,10 +523,6 @@ export const CLAUDE_CODE_SESSION_LOST = "CLAUDE_CODE_SESSION_LOST";
 const sessionLost = (error: unknown): boolean => (error as { code?: unknown } | undefined)?.code === CLAUDE_CODE_SESSION_LOST;
 
 
-/**
- * What a tool result says when the call was cut off by Stella stopping (an update, a restart, a crash): pi-durable's
- * recovery of a call that may have run, and this engine's own for a call Claude Code never finished.
- */
 const RESTART_MARKS = ["was interrupted and may have partially run", "Stella restarted before Claude Code finished it"];
 
 const cutByRestart = (message: Message): boolean =>
@@ -571,7 +537,6 @@ const cutByRestart = (message: Message): boolean =>
 const RESUMED_AFTER_RESTART =
   "Stella stopped while you were in the middle of this step (an update, a restart or a crash on this computer) and has picked your task back up. Nobody stopped you or turned anything down: notes in your history that the user rejected a tool use, interrupted the request, or that no response was requested come from that restart, not from the user. A call marked interrupted was cut off and may have partly run: run it again when that is safe, otherwise first check what it already did. Calls with results finished; don't repeat those. What happened since:";
 
-/** The same, when nothing happened in the conversation since the step that was cut off. */
 const RESUMED_NOTHING_SINCE =
   "Stella stopped while you were in the middle of this step (an update, a restart or a crash on this computer) and has picked your task back up. Nobody stopped you or turned anything down: notes in your history that the user rejected a tool use, interrupted the request, or that no response was requested come from that restart, not from the user. If a command was cut off, run it again when that is safe, otherwise first check what it already did.";
 
@@ -928,7 +893,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     await options.transport.preflight?.(binding.session);
     session.record ??= (await options.sessions.read(session.piSessionId).catch(() => undefined)) ?? { seen: [] };
     const record = session.record;
-    // The last turn never ended here: Stella stopped in the middle of it and this one picks the task back up.
     const cutOff = record.open === true && !relaunched;
     const conversation = request.messages.filter((message) => message.role !== "system");
     const held = session.cliSessionId ?? record.cliSessionId;
@@ -1388,7 +1352,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               blocks.set(cliIndex, { index, kind: "thinking" });
               out.push({ type: "thinking_start", contentIndex: index, partial: output });
             } else if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
-              // Stella's tools carry their plain names (old sessions: `mcp__stella__<name>`); anything else is Claude Code's own.
               const stellaName = stellaToolNameOf(block.name, [
                 ...turn.toolSet.tools.map((tool) => tool.name),
                 ...(turn.nextToolSet?.tools.map((tool) => tool.name) ?? []),
@@ -1589,8 +1552,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     };
     session.request = request;
     if (!turn) {
-      // What the replaced turn's CLI never took in is known once its step
-      // ended; the new turn carries it. It waits for that CLI anyway.
       if (superseded && !superseded.done) {
         let timer: ReturnType<typeof setTimeout> | undefined;
         await Promise.race([
@@ -1832,11 +1793,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         abortTurn(session.turn, "Stopped.");
       }
     },
-    /**
-     * A task was stopped: its turn ends and its Claude Code process closes, so
-     * nothing the process still watches (a background command, a monitor)
-     * starts a turn by itself. Resuming the task starts it again from its session.
-     */
     stop(conversationId: string, threadId: string) {
       for (const [id, session] of sessions) {
         const ref = session.binding.session;
@@ -1846,7 +1802,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         sessions.delete(id);
       }
     },
-    /** Resume: steps a usage limit holds in this chat (its reply and its agents) continue now. */
     wakeUsageLimitHolds(conversationId: string): number {
       const keys = new Set<string>();
       for (const session of sessions.values()) {

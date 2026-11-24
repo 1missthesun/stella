@@ -310,10 +310,6 @@ export const reportProducedFiles = async (options: {
   }
   if (batch.length > 0) batches.push(batch);
 
-  // 413 means nothing in the batch landed and its body says why. Every
-  // delivery of a batch carries the same `batchKey`; the route records it on
-  // the rows it writes, so a re-send after a lost response replays as the
-  // same writer instead of reading as a second one.
   const send = async (
     entries: Payload[],
     batchKey: string,

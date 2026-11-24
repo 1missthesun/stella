@@ -1,29 +1,8 @@
 /**
- * Stella's resident context: the prompt sections that describe the user and
- * where this conversation runs (personality, memory, skills, devices,
- * destination, engine and model, media access, language) as the conversation's first message
- * after the system prompt, never inside it.
- *
- * pi-durable already keeps these sections the cache-friendly way in the
- * transcript: a complete baseline at the head of each context window, and a
- * positional `pi.system` patch where one changed. But pi-ai sends a system
- * message in the middle of a conversation only to models flagged for it, and
- * merges every other one into the leading system prompt, so any change (a
- * device going offline, a memory write) would rewrite the top of the request
- * and miss the provider prompt cache for the whole conversation.
- *
- * `residentContextHook` reshapes each request instead: the resident sections
- * of every system message go out as a hidden user message at that same
- * position. The baseline lands right after the system prompt; a later change
- * lands in front of the next input (a user message, or an agent's report or
- * message) and carries only what changed since the model last saw it. A
- * context update never starts or steers a turn: one written mid-turn is held
- * until that next input, and repeated updates fold into the latest state,
- * so a device that went offline and back shows nothing; compaction writes a
- * fresh baseline, which folds the changes in. The system prompt itself keeps
- * only Stella's static prompt, so it reads the same for every conversation.
- * The transcript is unchanged; this is a pure function of it, so every request
- * of a conversation renders the same bytes for the same history.
+ * pi-ai sends a system message in the middle of a conversation only to models
+ * flagged for it, and merges every other one into the leading system prompt,
+ * so any change there would rewrite the top of the request and miss the
+ * provider prompt cache for the whole conversation.
  */
 import { GenerationTask, hook } from "@earendil-works/pi-durable";
 import type { Message, ModelThinkingLevel, SystemMessage, UserMessage } from "@earendil-works/pi-ai";
@@ -96,7 +75,6 @@ const SHORTENED_MIN_SAVED = 20;
 
 type DiffLine = { kind: "same" | "removed" | "added"; text: string };
 
-/** The line diff of `before` → `after` (longest common subsequence), or undefined when too large to compute. */
 const lineDiff = (before: readonly string[], after: readonly string[]): DiffLine[] | undefined => {
   let start = 0;
   while (start < before.length && start < after.length && before[start] === after[start]) start += 1;
@@ -142,7 +120,6 @@ const lineDiff = (before: readonly string[], after: readonly string[]): DiffLine
 const PATCH_LEAD = (name: string) =>
   `Changed lines of ${name} only (- old line, cut to its start where it ends in …; + new line; a leading space marks an unchanged line, for place).`;
 
-/** What the model knows the part as: its file for a startup doc, else its tag. */
 const partName = (key: string, text: string): string => text.match(/<startup_doc path="([^"]+)">/)?.[1] ?? `<${key}>`;
 
 const wrapperOf = (lines: readonly string[]): { open: string; close: string } | undefined => {
@@ -152,11 +129,6 @@ const wrapperOf = (lines: readonly string[]): { open: string; close: string } | 
   return tag && lines.length >= 2 && close === `</${tag}>` ? { open: open!, close: close! } : undefined;
 };
 
-/**
- * A changed part as only its changed lines, when that is unambiguous and much
- * shorter: every removed line and every line shown for place occurs once in
- * the copy the model has. Otherwise undefined, and the whole part goes.
- */
 const linePatch = (key: string, text: string, before: string): string | undefined => {
   const was = before.split("\n");
   const now = text.split("\n");
@@ -170,7 +142,6 @@ const linePatch = (key: string, text: string, before: string): string | undefine
   for (const line of a) counts.set(line, (counts.get(line) ?? 0) + 1);
   const once = (line: string) => counts.get(line) === 1;
   const prefixOnce = (prefix: string) => a.filter((line) => line.startsWith(prefix)).length === 1;
-  // The shortest start of the line (from a few words on) that no other line shares.
   const shown = (line: string) => {
     for (let length = SHORTENED_PREFIX_CHARS; length + SHORTENED_MIN_SAVED < line.length; length += SHORTENED_PREFIX_STEP) {
       const prefix = line.slice(0, length);
@@ -198,7 +169,6 @@ const linePatch = (key: string, text: string, before: string): string | undefine
     const anchoredByRemoval = hunk.some((line) => line.kind === "removed" && line.text.trim() !== "");
     const place = placeBefore ?? placeAfter;
     if (!anchoredByRemoval && place && !once(place.text)) return undefined;
-    // A removed line already shows where; only a pure addition needs an unchanged line beside it.
     if (!anchoredByRemoval && place === placeBefore && placeBefore) out.push(` ${shown(placeBefore.text)}`);
     for (const line of hunk) if (line.kind === "removed" && line.text.trim() !== "") out.push(`-${shown(line.text)}`);
     for (const line of hunk) if (line.kind === "added" && line.text.trim() !== "") out.push(`+${line.text}`);

@@ -1,9 +1,3 @@
-/**
- * A context summary the model's safety system stops would fail every time it
- * is tried, and the conversation would grow until no request fits. The
- * summary then becomes a plain notice: the summarized part leaves the
- * model's context the way a fresh start does, and the recent messages stay.
- */
 import type { Models } from "@earendil-works/pi-ai/models";
 import { isSafeguardBlock, SAFEGUARD_UNSUMMARIZED_CONTEXT_NOTICE } from "@stella/contracts/safeguard-block";
 

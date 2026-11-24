@@ -46,7 +46,6 @@ export type ClaudeKeeperEvent =
       t: "attached";
       reused: boolean;
       fresh: ClaudeKeeperFreshReason;
-      /** For fresh "state": which parts differed. */
       differs?: string[];
     }
   | { t: "line"; line: string }

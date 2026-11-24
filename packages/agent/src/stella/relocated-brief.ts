@@ -4,7 +4,6 @@ export const relocatedAgentBrief = (moved: {
   entries: number;
   cwd?: string;
   message: string;
-  /** The input of a turn that was waiting to start on that computer and never reached it. */
   unstarted?: string;
   unstartedAttachments?: boolean;
 }): string =>

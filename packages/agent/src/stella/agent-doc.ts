@@ -11,14 +11,10 @@ export type StellaAgentRole = {
   moving?: { deviceId: string; name: string; brief: string; key: string };
   /** Set by older builds' end_turn_waiting; read only so a turn it marked still clears it. */
   waiting?: { waitingFor: string; afterEntry?: number };
-  /** Its finished report, sent with send_message `done: true`: filed as the report when the turn ends. */
   done?: { text: string; callIds: string[] };
   notes?: StellaPendingNote[];
-  /** Stella last answered this agent's ask_user or request_secure_input, which then goes straight to the user. */
   stellaReplied?: { tool: string; at: number };
-  /** An ask this agent put to Stella first and is waiting on; her next message lands in `reply`, not the inbox. */
   askingStella?: { key: string; reply?: string };
-  /** Its spawn asked for a large cloud workspace (`workspace: "large"`); a cloud host sizes its container from it. */
   workspace?: "large";
 };
 
@@ -28,7 +24,6 @@ export type StellaPendingNote = {
   message: string;
   from: { threadId: string; label: string };
   remote?: true;
-  /** Goes to this agent (a lead on another host) instead of Stella. */
   to?: string;
 };
 

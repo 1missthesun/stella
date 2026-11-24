@@ -171,27 +171,15 @@ const HISTORY_PAGE = 200;
 const CLIENT_PAGE_BYTES = 2 * 1024 * 1024;
 const VOICE_HISTORY_ENTRIES = 200;
 const LINKED_FILE_ENTRIES = 500;
-/** How long a turn waits for other devices' turns to be imported before it starts. */
 const JOURNAL_CATCH_UP_MS = 3_000;
 const IDLE_CHECK_MS = 30_000;
-/** How long a send waits for the models of tasks a restart left running (a model gone for good doesn't block the chat). */
 const MODELS_READY_WAIT_MS = 30_000;
-/** A task placed here (or resumed after a restart) waits this long for Stella's sign-in to reach its models. */
 const PLACED_MODELS_WAIT_MS = 120_000;
 const NOTE_APPEND_ATTEMPTS = 20;
 const NOTE_APPEND_RETRY_MS = 15_000;
-/** A sign-in made right away (the notice in the chat) needs no note to Stella. */
 const CLAUDE_SIGN_IN_NOTE_AFTER_MS = 3 * 60_000;
-/** A hold that comes back within this long (a refused login tried again) is the same episode. */
 const CLAUDE_SIGN_IN_EPISODE_GRACE_MS = 45 * 60_000;
-/** Claude answering again for this long ends the episode, and Stella hears it is over. */
 const CLAUDE_SIGN_IN_BACK_AFTER_MS = 60_000;
-/**
- * The user's phone hears of a hold once it has lasted this long. A hold only
- * starts after Anthropic's temporary failures have been retried for about
- * half an hour, and this outlasts the first re-checks of a refused login
- * (2 and 5 minutes), so an outage blip or a refusal by mistake never pings.
- */
 const CLAUDE_SIGN_IN_ALERT_AFTER_MS = 8 * 60_000;
 const FOLLOW_MS = 2_000;
 const BRAIN_TTL_MS = 5_000;
@@ -204,20 +192,13 @@ const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
 const AGENT_MOVE_TIMEOUT_MS = 25_000;
 const AGENT_REPORT_REQUEST_PREFIX = "agent-report:";
 const PROMPT_SCAN_PAGE = 200;
-// The cloud journal takes at most 256 rows and 4 MB per append.
 const IMPORT_BATCH_ROWS = 200;
 const IMPORT_BATCH_BYTES = 3 * 1024 * 1024;
 const IMPORT_RECORD_MAX_BYTES = 1024 * 1024;
 
-/** `startedBy`: the lead that placed it here from elsewhere; a task of Stella's has none. */
 export type ResumedTask = { threadId: string; description: string; startedBy?: AgentMessageSender };
 export type ResumedChat = { conversationId: string; agents: ResumedTask[] };
 
-/**
- * The hidden note a restart leaves for Stella: what was running on that
- * computer and how it stands now. With `helpers`, the same note for a lead
- * elsewhere about the helpers it placed there.
- */
 export const restartNoteText = (
   computer: { name: string; deviceId?: string },
   at: number,
@@ -245,11 +226,6 @@ export const restartNoteText = (
   ].join("\n");
 };
 
-/**
- * The hidden note Stella gets when work on this computer has been waiting a
- * while for a Claude sign-in: which login ended, what waits, and what she can
- * do. Only a person can sign in, so nothing here resolves it by itself.
- */
 export const claudeSignInNoteText = (
   computer: { name: string; deviceId?: string },
   since: number,
@@ -268,10 +244,8 @@ export const claudeSignInNoteText = (
 
 export type DesktopChatsOptions = {
   dataDir: string;
-  /** Resolves once the desktop has reconciled the tasks placed here with the server after this start. */
   placementSettled?(): Promise<void>;
   deviceId?: string;
-  /** This computer's name, as Stella's notes name it. */
   computerName?: string;
   workspace: string;
   siteAuth(): { baseUrl: string; authToken: string } | null;
@@ -282,7 +256,6 @@ export type DesktopChatsOptions = {
   stellaModel?(): string | undefined;
   credentials?: StellaCredentialAccess;
   resolveDirectModel?: DirectModelResolver;
-  /** What this computer's catalog knows of a provider's model: its limits, modalities and price. */
   listedModel?: (provider: string, modelId: string) => LiveProviderModel | undefined;
   thinkingLevel?(): ModelThinkingLevel;
   shellEnv?(target: { conversationId: string; agentId?: string; cwd: string }): Record<string, string> | undefined;
@@ -290,7 +263,6 @@ export type DesktopChatsOptions = {
   journal?(conversationId: string): DesktopJournal | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
   claudeCodeProblem?(): Promise<string | undefined>;
-  /** Google's own Antigravity CLI as an engine, on the same machinery as Claude Code's. */
   antigravityCliEngine?: ClaudeCodeEngine;
   antigravityCliProblem?(): Promise<string | undefined>;
   userReminders?(input: {
@@ -339,7 +311,6 @@ export type DesktopChatsOptions = {
     waiting: boolean;
     report?: string;
   }): void;
-  /** A task here ended its turn quietly (no done report): recorded as waiting, never reported. */
   agentWaiting?(agent: {
     conversationId: string;
     threadId: string;
@@ -347,7 +318,6 @@ export type DesktopChatsOptions = {
     attempt: number;
     text: string;
     waitingFor: string;
-    /** What could wake it as it waited, in words (empty: nothing could); absent when unknown. */
     wakers?: string[];
   }): void;
   subagentEnded?(agent: {
@@ -365,18 +335,13 @@ export type DesktopChatsOptions = {
     status: AgentAttemptOutcome;
     failed: boolean;
     report: string;
-    /** The turn this report ends (a later one may already be running). */
     attempt: number;
   }): void;
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
-  /** Ends the shell sessions a stopped task left running here; resolves with how many. */
   endAgentShells?(threadId: string): Promise<number>;
-  /** Tells a working task, once, of its background commands that ended meanwhile. */
   endedCommands?(threadId: string): Promise<string | undefined>;
-  /** What here could wake a task by itself: its background commands and monitors, schedules aimed at it. */
   wakeSources?(threadId: string): Promise<string[]>;
   localLog?(conversationId: string): DesktopLocalLog | undefined;
-  /** Records this computer's usage-limit pauses in the cloud and resumes a chat's paused work. */
   usageLimits?: {
     note(args: {
       conversationId: string;
@@ -388,7 +353,6 @@ export type DesktopChatsOptions = {
     }): Promise<void>;
     resume(args: { conversationId: string; requestId: string }): Promise<{ cloud: number }>;
   };
-  /** Pushes one alert to the user's phone while work here waits for a sign-in, and clears it once that's over. */
   signInAlert?(args: {
     provider: "claude";
     state: "held" | "cleared";
@@ -396,13 +360,10 @@ export type DesktopChatsOptions = {
     tasks: number;
     reply: boolean;
   }): Promise<unknown>;
-  /** Records a choice on a safety block in the chat's journal, where every place that holds the chat applies it. */
   safeguards?: {
     resolve(args: { conversationId: string; action: SafeguardAction; requestId: string }): Promise<unknown>;
   };
-  /** Test builds only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
   simulateSafeguardBlocks?: boolean;
-  /** Saves the model Stella answers with on this computer. */
   setStellaModel?(pick: string): void | Promise<void>;
   emit(payload: PiChatEventsPayload): void;
   report(error: unknown): void;
@@ -445,7 +406,6 @@ type Chat = {
   runPlacedAgent: OpenStellaHarness["runPlacedAgent"];
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
   mirror?: JournalMirror;
-  /** Resolves once the models of the work this chat had running are registered (and that work resumed). */
   modelsReady: Promise<void>;
   journalAdvanced?(): void;
   localLog?: LocalLogMirror;
@@ -700,10 +660,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     ),
   );
   const byok = byokModels(models, options.resolveDirectModel);
-  // What a usage limit has paused in each chat: this computer's own held
-  // Claude Code steps plus the pauses the chat's journal records elsewhere
-  // (the cloud, other computers). One card per chat shows them; Resume
-  // continues all of them.
   const usageLimitPauses = new Map<string, UsageLimitPauses>();
   const pausesOf = (conversationId: string) => {
     let pauses = usageLimitPauses.get(conversationId);
@@ -756,8 +712,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       })
       .catch((error: unknown) => options.report(error));
   };
-  // Subagents pause and resume with the rest, but the card counts only the
-  // reply and Stella's own tasks.
   const subagentThreads = new Set<string>();
   const heldThreads = new Set<string>();
   const noteUsageLimit = (
@@ -804,13 +758,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     emitUsageLimit(conversationId, { text: status.text, resumed: status.resumed });
   };
   const noteCloudUsageLimit = (conversationId: string, card: ClaudeUsageLimitCard, at: number) => {
-    // This computer's own pauses come back through the journal too; its
-    // engine is the truth for them.
     if (!card.resume && card.deviceId && card.deviceId === options.deviceId) return;
     const pauses = pausesOf(conversationId);
     const before = pauses.held.size;
     if (card.resume) {
-      // Resume pressed on another device: wake what this computer holds.
       if (card.requestId && ownResumes.has(card.requestId)) return;
       if (Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS) for (const engine of cliEngines) engine.wakeUsageLimitHolds(conversationId);
     }
@@ -819,7 +770,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       emitUsageLimit(conversationId, { text: USAGE_LIMIT_RESUMED_TITLE, resumed: Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS });
     }
   };
-  /** Resume pressed here: continue everything the limit paused in this chat, wherever it runs. */
   const resumeUsageLimit = async (conversationId: string): Promise<{ woken: number; cloud: number }> => {
     const woken = cliEngines.reduce((sum, engine) => sum + engine.wakeUsageLimitHolds(conversationId), 0);
     const pauses = pausesOf(conversationId);
@@ -834,9 +784,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     return { woken, cloud };
   };
-  // Replies and tasks waiting for a Claude sign-in, by chat: the chat shows
-  // one notice with Sign in while any of them waits, also when it is opened
-  // later.
   const loginHolds = new Map<string, Map<string, { text: string; email?: string }>>();
   const loginHoldEvent = (conversationId: string): PiChatEvent | undefined => {
     const first = loginHolds.get(conversationId)?.values().next().value;
@@ -844,12 +791,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       ? { type: "engine_status", state: "login-required", text: first.text, ...(first.email ? { email: first.email } : {}) }
       : undefined;
   };
-  // What waits for a sign-in, by chat: each task's thread id ("" for the
-  // reply) with when it began. agent_status shows them as waiting, and Stella
-  // gets one note per chat once a hold outlasts a sign-in made right away.
   const loginHeldSince = new Map<string, Map<string, number>>();
-  // One note per episode: a hold that ends while the computer tries a
-  // refused login again and comes straight back is the same episode.
   const loginEpisodes = new Map<
     string,
     {
@@ -860,14 +802,10 @@ export function desktopChats(options: DesktopChatsOptions) {
       back?: ReturnType<typeof setTimeout>;
     }
   >();
-  // The phone alert is per computer, across chats: one per hold, sent once
-  // it has lasted a while, and cleared when no chat's episode is left.
   const signInAlert: { timer?: ReturnType<typeof setTimeout>; sent?: true } = {};
   const sendSignInAlert = () => {
     signInAlert.timer = undefined;
     if (signInAlert.sent || !options.signInAlert) return;
-    // Nothing waits right now (the hold ended, or a refused login is being
-    // tried again): the next hold starts the wait afresh.
     if (loginHeldSince.size === 0) return;
     let tasks = 0;
     let reply = false;
@@ -897,7 +835,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     clearTimeout(signInAlert.timer);
     signInAlert.timer = undefined;
     if (!options.signInAlert) return;
-    // Cleared even when this run sent nothing: a restart mid-hold forgets it sent one.
     signInAlert.sent = undefined;
     console.info("[desktop-chats] claude sign-in alert cleared");
     void options
@@ -939,8 +876,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (held?.size === 0) loginHeldSince.delete(conversationId);
       const episode = loginEpisodes.get(conversationId);
       if (episode?.noted && status.resumed && !loginHeldSince.has(conversationId) && !episode.back) {
-        // Claude answers again: once that holds for a minute, Stella hears
-        // it, so she doesn't pass on a sign-in problem that is over.
         episode.back = setTimeout(() => {
           if (loginHeldSince.has(conversationId)) return;
           clearTimeout(episode.end);
@@ -951,8 +886,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         episode.back.unref?.();
       }
       if (episode && !loginHeldSince.has(conversationId) && !episode.end) {
-        // Over once nothing has waited again for a while; a later sign-in
-        // loss then gets its own note.
         episode.end = setTimeout(() => {
           clearTimeout(episode.note);
           loginEpisodes.delete(conversationId);
@@ -1024,11 +957,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!threadId) return;
       void (async () => {
         const chat = await ready(session.conversationId);
-        // A task stopped on purpose keeps the wake until it is resumed (the
-        // Reporter holds it). Dropping it here also dropped wakes for tasks that
-        // only read as stopped (a run cut short by a restart, or a stop that a
-        // later resume had not cleared), and their turn then ran with no Stella
-        // turn: every tool call refused and the reply reached no one.
         if (!(await chat.agentStanding(threadId, context))) return;
         await chat.messageAgent({ key: `${engineName}-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true, wake: true }, context);
       })().catch((error: unknown) => options.report(error));
@@ -1314,7 +1242,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     else await restoreOwnModel(ref);
   };
 
-  /** A conversation from when Antigravity was a provider of Stella's own: its model says Antigravity, its extensions don't. */
   const lacksAntigravityEngine = (agent: Agent): boolean =>
     antigravityCliEngine !== undefined &&
     onAntigravityCli(agent.model) &&
@@ -1336,7 +1263,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       try {
         return await ensureProvider(alias);
       } catch (error) {
-        // Signed out, Stella's models wait quietly for an account; the user can chat on their own engine meanwhile.
         if (attempt === 0 && options.siteAuth()) options.report(error);
         await new Promise((resolve) => setTimeout(resolve, PROVIDER_RETRY_MS));
       }
@@ -1473,7 +1399,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /** The chat a task on this computer lives in: one it started, or one placed here from another device. */
   const chatOfTask = async (threadId: string): Promise<string | undefined> => {
     const indexed = (await threadIndex())[threadId];
     if (indexed) return indexed;
@@ -1496,7 +1421,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { elsewhere: stopped.elsewhere };
   };
 
-  /** One hidden note in a chat for Stella's next turn (it runs none itself). */
   const appendHiddenNote = async (chat: Chat, conversationId: string, appendId: string, text: string, at: number) => {
     const message = { role: "user" as const, content: [{ type: "text" as const, text }], timestamp: at };
     if (conversationId.startsWith("local_")) {
@@ -1516,7 +1440,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     const journal = options.journal?.(conversationId);
     if (!journal?.appendNote) return;
-    // Just after a start, the cloud connection may still be on its way.
     for (let attempt = 1; ; attempt += 1) {
       try {
         await journal.appendNote({ appendId, payloadJson: JSON.stringify(message) });
@@ -1685,7 +1608,6 @@ export function desktopChats(options: DesktopChatsOptions) {
               const attempts = async (threadId: string) => {
                 if (!opened) return 1;
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
-                // Numbered as the runs are (`attemptOf`): only calls that ran here count.
                 return Math.max(
                   1,
                   Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId && call.reporter >= 0).length,
@@ -1738,11 +1660,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                   await noteAgentThread(run.threadId, conversationId);
                   const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
                   const agent = state?.agents[run.threadId];
-                  // A task placed here keeps the thread the cloud gave it: a turn
-                  // this computer starts of it is recorded there, so its report
-                  // goes to whoever the cloud says started it (a lead elsewhere),
-                  // not to Stella's chat here, where it sits as a top-level task.
-                  // Only one that came back after moving away is someone else's.
                   if (agent?.origin !== undefined) return;
                   agentStarted?.({
                     conversationId,
@@ -1767,7 +1684,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                             run.parentConversationId === opened.root.id
                               ? await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context)
                               : undefined;
-                          // A placed task's own turn ends waiting on its own thread too.
                           if (state?.agents[run.threadId]?.origin === undefined) {
                             agentWaiting({
                               conversationId,
@@ -1819,9 +1735,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                 },
                 ...(agentReported
                   ? {
-                      // Every turn's end is recorded with the turn it ends, even when
-                      // the next one has already started: the cloud keeps a report a
-                      // later turn superseded instead of losing it.
                       agentReported: (agent) => {
                         agentReported({ conversationId, ...agent });
                       },
@@ -1848,8 +1761,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                       const role = await api.snapshot(StellaAgentDoc, api.conversationId, gateContext);
                       if (!role?.threadId || role.parentConversationId === undefined) return false;
                       const parent = await api.snapshot(StellaAgentsDoc, role.parentConversationId as ConversationId, gateContext);
-                      // Placed here by the server's dispatch, or moved here: either way
-                      // the server may have stopped or moved it while this computer was off.
                       return (
                         parent?.agents[role.threadId]?.placedAs !== undefined ||
                         Object.entries(parent?.calls ?? {}).some(
@@ -1901,11 +1812,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         if (rootModel && accountProviderOfRegistryId(rootModel.provider)) accountRefs.push(rootModel);
         else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) await restoreOwnModel(rootModel);
         else aliases.add(aliasOf(rootModel));
-        // Work left running resumes once its models are registered. Anything
-        // that submits to the harness starts its scheduler too, so the journal
-        // import (which writes what was said elsewhere, a restart note among
-        // it) waits for the same point: earlier, a resumed task's next request
-        // finds no model and fails.
         const modelsReady: Promise<void> =
           aliases.size === 0 && accountRefs.length === 0
             ? Promise.resolve()
@@ -1998,7 +1904,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             });
         }, FOLLOW_MS);
         followCheck.unref?.();
-        // Every answer the conversation gains either raises a safety block or clears one.
         const safeguardStream = await onConversationChange(root, context, async (before, after) => {
           const noted: SafeguardEvent[] = [];
           for (const entry of appendedEntries(before, after)) {
@@ -2014,7 +1919,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           if (noted.length > 0) await noteSafeguard(conversationId, { harness, root }, noted).catch(options.report);
         });
         // A storage error fails the pi session for good (pi-durable 1.2): drop this chat so the next use opens it
-        // again from storage, and put a watching window back on the reopened one.
         const self = chats.get(conversationId);
         void harness.closed.then(async (end) => {
           if (end.kind !== "failed" || chats.get(conversationId) !== self) return;
@@ -2114,11 +2018,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
-  /**
-   * Copies what was said in a chat kept on this computer into an account
-   * conversation: the user's messages and Stella's written replies, without
-   * tool steps. Batches are idempotent, so a retry never duplicates.
-   */
   const importLocal = async (conversationId: string, fromConversationId: string): Promise<PiChatImportLocalResult> => {
     if (!fromConversationId.startsWith("local_") || conversationId.startsWith("local_")) {
       throw new Error("Only a chat kept on this computer can be copied to your account.");
@@ -2200,11 +2099,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     await stream?.stop().catch(() => undefined);
   };
 
-  /**
-   * A conversation answers with what was said elsewhere too: one stored in
-   * the cloud with other devices' turns, imported first, waiting at most a
-   * moment for the journal; one kept on this computer with another engine's.
-   */
   const transcriptHasPrompt = (chat: Chat, clientMsgId: string): Promise<boolean> =>
     chat.harness.commit(async (tx) => {
       let cursor: Parameters<typeof tx.scanEntries>[2];
@@ -2377,7 +2271,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (changed) emitSafeguard(conversationId, fold);
   };
 
-  /** Continues a blocked chat on `pick`: saves it as this computer's model and asks for the rest of the reply. */
   const continueOnModel = async (
     chat: Pick<Chat, "harness" | "root">,
     choice: { requestId: string; pick: string; label: string },
@@ -2397,7 +2290,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     );
   };
 
-  /** Applies a journaled choice on a block to this computer's copy of the chat. */
   const applySafeguardCard = async (
     conversationId: string,
     chat: Pick<Chat, "harness" | "root">,
@@ -2478,11 +2370,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
-  /**
-   * Anything that submits to, stops or aborts in a chat's harness starts it,
-   * which also picks up the tasks a restart left running there: their models
-   * must be registered first, or their next step fails with no_model.
-   */
   const modelsSettled = (chat: Chat, ms = MODELS_READY_WAIT_MS): Promise<void> =>
     within(chat.modelsReady, ms, "models not ready").catch(() => undefined);
 
@@ -2513,7 +2400,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       content?: UserInput;
       visible: boolean;
       rejectIfBusy?: boolean;
-      /** The user sent it from another device: a running turn reads it at its next step, as one typed here. */
       steers?: boolean;
       placementRunId?: string;
       observe?: (events: PiChatEvent[]) => void;
@@ -2609,7 +2495,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (answer === undefined) return { status: "ok", finalText: "" };
     const page = await chat.root.entries({ minEntryId: answer, maxEntryId: answer }, 1, undefined, context);
     const message = (page.items[0] as unknown as PiEntry | undefined)?.model?.[0];
-    // One answer for every message of a run: the last of them carries it back.
     if (turn.steers && settled.entry !== undefined && (await joinedLater(chat, settled.entry, answer))) return { status: "ok", finalText: "" };
     return { status: "ok", finalText: splitMessageReplyRefs(message).text.trim() };
   };
@@ -2732,10 +2617,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     try {
       let runsOn: RunsOn | undefined;
       if (model) {
-        // Only a model this computer can't run fails the task, with the
-        // reason. Anything else (the runtime shutting down for an update or
-        // restart: "Harness is closed") throws, so the placement runs it
-        // again once the runtime is back and it picks up where it was.
         const choice = await agentModel(conversationId, model).catch((error: unknown) => error instanceof Error ? error : new Error(String(error)));
         const problem =
           choice instanceof Error
@@ -2752,9 +2633,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         }
         runsOn = choice.runsOn;
       }
-      // Work placed here only comes while this computer is signed in to the
-      // account; just after a start, that sign-in may not have reached the
-      // models yet. Wait for it rather than fail the task.
       await modelsSettled(await open(conversationId), PLACED_MODELS_WAIT_MS);
       const chat = await ready(conversationId);
       const engineModel = runsOn?.model ?? (await chat.root.agent(context)).model;
@@ -2779,14 +2657,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         }
       }
       const result = await chat.runPlacedAgent({ ...placedRun, ...(runsOn ? { runsOn } : {}), signal: placed.cancel.signal }, context);
-      // Wakes from its own background work, monitors and schedules here find it
-      // (after a restart too); the turns they start are recorded on its thread.
       if (result.status !== "moved") await noteAgentThread(result.threadId, conversationId).catch((error: unknown) => options.report(error));
-      // A turn the placement ran ends like one this computer started: commands it
-      // left running in the background wake it when they exit (that turn runs
-      // here and reports to its lead), and its browser and computer-use end.
-      // Without this only turns started here armed those wakes, so a placed
-      // task waiting on its own background command was never woken.
       if (result.status !== "moved") {
         options.agentRunEnded?.({
           conversationId,
@@ -2814,7 +2685,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return await (await open(conversationId)).steerPlacedAgent(message, context);
   };
 
-  /** Tasks this computer runs for the chat (its own and those placed here) that are working now. */
   const tasksRunningHere = async (chat: Chat): Promise<ResumedTask[]> => {
     const state = await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context);
     const here = new Map(Object.entries(state?.agents ?? {}).filter(([, agent]) => !agent.remote));
@@ -2823,7 +2693,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return await Promise.all(
       running.map(async (record) => {
         const conversationId = here.get(record.threadId)?.conversationId;
-        // A helper a lead elsewhere placed here carries that lead as its starter.
         const role =
           conversationId !== undefined && conversationId >= 0
             ? await chat.harness.snapshot(StellaAgentDoc, conversationId as ConversationId, context).catch(() => undefined)
@@ -2837,7 +2706,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     );
   };
 
-  /** Stops of tasks canceled while this computer was off, per chat, still waiting for its models. */
   const stopsLanding = new Map<string, Set<Promise<unknown>>>();
 
   const cancelPlacedAgent = async (agentKey: string, runKey: string, stopped?: boolean): Promise<boolean> => {
@@ -2845,12 +2713,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (placed) {
       if (placed.runKey !== runKey) return false;
       placed.cancel.abort(stopped ? PLACED_AGENT_STOPPED : undefined);
-      // A stop also ends what the run leaves behind here (its shells, background
-      // commands and wake-ups, the agents it started), as a stop of any task does.
       if (!stopped) return true;
     }
-    // No run of it is live here: a restart paused it, and reopening its chat
-    // resumed its work on its own. A canceled dispatch must still end it.
     const candidates = new Set([...(placedIn.has(agentKey) ? [placedIn.get(agentKey)!] : []), ...chats.keys(), ...(await activeSet())]);
     for (const conversationId of candidates) {
       const chat = await open(conversationId).catch(() => undefined);
@@ -2860,9 +2724,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         state?.calls[`placed:${agentKey}`]?.threadId ??
         Object.entries(state?.agents ?? {}).find(([, agent]) => agent.placedAs === agentKey)?.[0];
       if (!threadId || state?.agents[threadId]?.remote) continue;
-      // However long its sign-in takes: until then nothing in this chat runs,
-      // and stopping first would start the other tasks without their models.
-      // The restart note waits for these stops to land.
       const stop = chat.modelsReady
         .catch(() => undefined)
         .then(() => chat.stopAgent(threadId, context));
@@ -2901,23 +2762,15 @@ export function desktopChats(options: DesktopChatsOptions) {
       threadId: string,
       text: string,
       messageId: string,
-      /** Who sent it, as the cloud judged; absent from older backends and this computer's own wakes. */
       sender?: AgentInputSender,
     ): Promise<"steered" | "resumed" | "queued" | "not_found"> {
-      // Placed tasks too: a turn this computer starts of one is recorded on its
-      // own thread in the cloud (hosted turns), so it reports to its real lead.
       const conversationId = await chatOfTask(threadId);
       if (!conversationId || !text.trim()) return "not_found";
       const chat = await ready(conversationId);
       const record = await chat.agentStanding(threadId, context);
       if (!record) return "not_found";
-      // A schedule that is gone matters only to a task still waiting (it may have waited for it).
       if (messageId.startsWith("schedule-gone:") && record.status !== "waiting") return "not_found";
       const report = parseAgentReportId(messageId);
-      // The shared rules decide: a schedule's fire or a background command's
-      // exit wakes a task by itself, and a note no one sent it on purpose comes
-      // in like any message; a stopped task keeps all of them until its starter
-      // or the user resumes it. (The cloud already held what another task sent.)
       const automatic = !report && (isAutomaticInputId(messageId) || sender === "other");
       const wake = automatic && isOwnWakeId(messageId);
       await chat.messageAgent(
@@ -2937,7 +2790,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       );
       return action === "steer" ? "steered" : action === "hold" ? "queued" : "resumed";
     },
-    /** Checks again a waiting task whose wakers could not all be listed when it waited. */
     async recheckWaiting(threadId: string): Promise<"told" | "live" | "unknown" | "not_waiting"> {
       const conversationId = (await threadIndex())[threadId];
       if (!conversationId) return "not_waiting";
@@ -2950,9 +2802,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
       const chat = await ready(conversationId);
       await caughtUp(chat);
-      // A ledger report carries its receipt, the client id the cloud and
-      // every computer give its prompt; one already in the transcript (taken
-      // on another computer, or by an earlier build) is not taken again.
       const reportId = report.requestId.startsWith(AGENT_REPORT_REQUEST_PREFIX)
         ? report.requestId.slice(AGENT_REPORT_REQUEST_PREFIX.length)
         : undefined;
@@ -3005,7 +2854,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     busy(): boolean {
       return activeNow.size > 0;
     },
-    /** Stella herself is mid-reply in an open chat here (her tasks don't count): a restart now would cut the reply. */
     async replying(): Promise<boolean> {
       for (const pending of chats.values()) {
         const chat = await pending.catch(() => undefined);
@@ -3013,10 +2861,6 @@ export function desktopChats(options: DesktopChatsOptions) {
       }
       return false;
     },
-    /**
-     * Reopens the chats that had work running when Stella last stopped, which
-     * resumes it, and says which tasks were running then (they are resuming).
-     */
     async resumeActive(): Promise<ResumedChat[]> {
       const resumed: ResumedChat[] = [];
       for (const conversationId of await activeSet()) {
@@ -3033,22 +2877,14 @@ export function desktopChats(options: DesktopChatsOptions) {
       }
       return resumed;
     },
-    /**
-     * Tells Stella, in one hidden note per chat, that this computer's Stella
-     * restarted and which of its tasks continued. The note runs no turn: she
-     * reads it with her next one, wherever she runs.
-     */
     async noteRestart(resumed: readonly ResumedChat[], computer: { name: string; deviceId?: string }, at: number): Promise<void> {
       for (const { conversationId, agents } of resumed) {
         try {
           const chat = await open(conversationId);
-          // Say how each task stands once the ones stopped meanwhile are stopped.
           await chat.modelsReady.catch(() => undefined);
           await Promise.allSettled([...(stopsLanding.get(conversationId) ?? [])]);
           const records = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record]));
           const doc = await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context);
-          // "Stayed stopped" only for a task someone stopped; one that ended
-          // short on its own (a failed step) couldn't continue.
           const now = (threadId: string) => {
             const record = records.get(threadId);
             if (!record || record.status === "running") return record;
@@ -3057,8 +2893,6 @@ export function desktopChats(options: DesktopChatsOptions) {
             if (record.status === "completed" && !record.stopped) return record;
             return { status: "error", error: record.error ?? "It ended without finishing after the restart." };
           };
-          // A lead elsewhere hears of the helpers it placed here; Stella of the
-          // rest, and of any helper whose lead could not be told.
           const forStella = agents.filter((agent) => !agent.startedBy);
           const byLead = new Map<string, ResumedTask[]>();
           for (const agent of agents) {
@@ -3155,11 +2989,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     async terminateCommands(): Promise<void> {
       await environments.terminateCommands(context);
     },
-    /**
-     * Closing seals each harness first: from then on nothing commits, and running tasks stay running in storage, so
-     * they resume when the chat opens again. Only then do Claude Code and the shells stop; stopped first, a killed
-     * command or engine would be written down as the task's failure.
-     */
     async close(): Promise<void> {
       const ids = [...chats.keys()];
       const opened = await Promise.all([...chats.values()].map((chat) => chat.catch(() => undefined)));

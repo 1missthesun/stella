@@ -130,7 +130,6 @@ export function stellaPromptExtension(sources: StellaContextSources, imageBudget
         }),
         { tag: false },
       ),
-      // Its own part, so an edit to one of the two files resends only that one.
       section(
         "standing-rules",
         async (input, context) => {

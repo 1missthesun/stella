@@ -3,29 +3,16 @@ import type { ConversationId, ToolExecutionApi, ToolRegistration, Tx, Wrap } fro
 import { PI_ASK_FIRST_PREFIX } from "@stella/contracts/pi-chat";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
-/**
- * A task's question or secure card goes to Stella before it reaches the user:
- * she holds the user's memory and this conversation, so she can often settle
- * it herself. The tool waits for her reply: while it waits, her send_message
- * to the task becomes the tool's result instead of a queued input, so every
- * engine (Claude Code included, which takes no input mid-turn) reads it at
- * once. With no reply in time, or once she has answered and the task asks
- * again, the card goes to the user as before. Values the user saved on this
- * computer are reused first, without asking anyone.
- */
-
 const ASK_USER = "ask_user";
 const REQUEST_SECURE_INPUT = "request_secure_input";
 export const STELLA_FIRST_TOOLS: readonly string[] = [ASK_USER, REQUEST_SECURE_INPUT];
 
 const STELLA_FIRST_WAIT_MS = 90_000;
 const STELLA_FIRST_POLL_MS = 1_000;
-/** After Stella replied, the task's next ask of the same kind goes straight to the user. */
 const STELLA_FIRST_PASS_MS = 15 * 60_000;
 const SECURE_INPUT_SAVED_ONLY_ARG = "__savedOnly";
 
 export type StellaFirstHost = {
-  /** Deliver a note to the Stella this agent works for, now. False when she can't be reached from here. */
   tellStella(api: ToolExecutionApi, key: string, message: string, context: Context): Promise<boolean>;
 };
 
@@ -34,7 +21,6 @@ const text = (value: unknown, max: number): string => (typeof value === "string"
 const list = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object") : [];
 
-// The card as the user would see it, whole: Stella settles it from what it says.
 const QUESTION_MAX_CHARS = 2_000;
 const OPTION_MAX_CHARS = 500;
 
@@ -75,7 +61,6 @@ const describeSecureCard = (args: Record<string, unknown>): string => {
 
 const SAVED_LIST_MAX = 40;
 
-/** What this computer has saved, by name only, after the lookup for the card's service found nothing. */
 const describeSavedHere = (savedHere: readonly Record<string, unknown>[]): string => {
   if (savedHere.length === 0) return "Nothing is saved in Stella on this computer.";
   const lines = savedHere.slice(0, SAVED_LIST_MAX).map((entry) => {
@@ -86,7 +71,6 @@ const describeSavedHere = (savedHere: readonly Record<string, unknown>[]): strin
   return `Nothing saved in Stella on this computer matched that service. Saved here (names only):\n${lines.join("\n")}`;
 };
 
-/** How to answer is in Stella's own instructions; the note carries the card and the facts that vary: what is saved, and the time. */
 const noteFor = (tool: string, args: Record<string, unknown>, savedHere?: readonly Record<string, unknown>[]): string =>
   [
     tool === ASK_USER
@@ -112,11 +96,6 @@ const sleep = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
 
 const FROM_STELLA = '<agent-message from="Stella"';
 
-/**
- * Inside the commit that would deliver `message` to an agent: when that agent
- * is waiting on Stella's answer to its ask and the message is hers, hand it to
- * the waiting tool and report true, so the caller doesn't also deliver it.
- */
 export const takeStellaReply = async (tx: Tx, conversationId: ConversationId, message: string): Promise<boolean> => {
   if (!message.includes(FROM_STELLA)) return false;
   const role = await tx.doc(StellaAgentDoc, conversationId);
@@ -125,7 +104,6 @@ export const takeStellaReply = async (tx: Tx, conversationId: ConversationId, me
   return true;
 };
 
-/** True when `message` would land as the answer to the agent's waiting ask, which the user never sees. */
 export const answersAsk = async (api: ToolExecutionApi, conversationId: ConversationId, message: string, context: Context): Promise<boolean> => {
   if (!message.includes(FROM_STELLA)) return false;
   const asking = (await api.snapshot(StellaAgentDoc, conversationId, context))?.askingStella;
@@ -140,7 +118,6 @@ const setAsking = (api: ToolExecutionApi, key: string | undefined, context: Cont
     return undefined;
   }, context);
 
-/** The saved-only lookup's miss, with what is saved here by name; undefined when it found a value (or failed). */
 const notSaved = (result: Awaited<ReturnType<ToolRegistration["execute"]>>): Record<string, unknown>[] | undefined => {
   const details = (result as { details?: unknown } | undefined)?.details;
   if (!details || typeof details !== "object" || (details as { outcome?: unknown }).outcome !== "not_saved") return undefined;

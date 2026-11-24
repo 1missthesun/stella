@@ -130,7 +130,6 @@ type KeptClaude = {
 
 export type CloudClaudeKeeperInput = {
   client: ClaudeKeeperClient;
-  /** Claude lists the tools once; another catalog needs another process. */
   toolCatalogHash: string;
 };
 
@@ -151,40 +150,20 @@ const streamJsonUserMessage = (
 
 type NativeEvent = (kind: string, payload: unknown) => void;
 
-/** The MCP server name Stella's tools come from (listed in the CLI's init event). */
 export const CLOUD_CLAUDE_MCP_SERVER_NAME = CLAUDE_CODE_STELLA_SERVER_NAME;
 
-/**
- * Stella's tools for one turn, served on the CLI's own stdin/stdout (the
- * runtime's `ClaudeCodeToolMcpHost`): the model sees their plain names.
- */
 export type CloudClaudeToolHost = Pick<
   ClaudeCodeToolMcpHost,
   "openControlChannel" | "claudeToolNames" | "waitForClientReady"
 >;
 
-/**
- * How an agent's turn ends when it has not sent its finished report
- * (`send_message` with done). While a background command it started is still
- * running, the turn stays open (the process is not parked, so the command
- * keeps running) and Claude Code wakes the agent itself when the command
- * finishes, as on the desktop. Before the turn ends quietly, `nudge` may give
- * the one message the agent gets about it; `live` says whether a background
- * command can still wake it in this turn.
- */
 export type CloudClaudeQuietEnd = {
   done: () => boolean;
   nudge: (live: boolean) => string | undefined;
 };
 
-/**
- * How long after the executor starts a turn may stay open for background
- * commands; the BuildSession watchdog ends a turn 15 minutes after it
- * starts, and sealing and checkpointing need the rest.
- */
 const CLOUD_CLAUDE_BACKGROUND_HOLD_LIMIT_MS = 11 * 60_000;
 
-/** How long a starting Claude Code may take to list Stella's tools (as on the desktop). */
 const CLOUD_CLAUDE_TOOL_CATALOG_TIMEOUT_MS = 40_000;
 
 export const cloudNativeStateRootForThread = (threadId: string): string =>
@@ -323,11 +302,6 @@ const consumeJsonLine = (
   }
 };
 
-// What a parked Claude Code process holds, by content: its login file and
-// every file of its session state. A turn picks the process up only when
-// both are exactly what they were when it was parked; timestamps and inodes
-// do not count, since each turn rewrites the login file with the same
-// credential.
 const credentialsIdentity = async (accountDirectory: string): Promise<string> =>
   createHash("sha256")
     .update(await readFile(path.join(accountDirectory, ".credentials.json")))
@@ -497,7 +471,6 @@ export type CloudClaudeRoleProfile = {
    */
   cwd: string;
   includePartialMessages: boolean;
-  /** Claude Code built-ins the CLI runs itself (its WebSearch and WebFetch). */
   nativeTools: readonly string[];
   mcpToolTimeoutMs?: number;
   autoCompactWindowTokens?: number;
@@ -593,7 +566,6 @@ export const buildClaudeChildEnv = (options: {
     MCP_CONNECTION_NONBLOCKING: "0",
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     ENABLE_CLAUDEAI_MCP_SERVERS: "false",
-    // Stella's tools keep their own names (no `mcp__stella__` prefix).
     [CLAUDE_CODE_PLAIN_TOOL_NAMES_ENV]: "1",
   };
   delete childEnv.ANTHROPIC_BASE_URL;
@@ -603,7 +575,6 @@ export const buildClaudeChildEnv = (options: {
   delete childEnv.CLAUDE_CODE_OAUTH_TOKEN;
   delete childEnv.STELLA_TURN_TOKEN;
   delete childEnv.STELLA_CODEX_TURN_TOKEN;
-  // Never let a host/image override defeat the turn's explicit selection.
   // `unset` is Claude Code's supported "send no output_config.effort" value.
   delete childEnv.CLAUDE_CODE_EFFORT_LEVEL;
   if (options.reasoningEffort === "none") {
@@ -630,7 +601,6 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   model: string;
   reasoningEffort: AgentModelReasoningEffort;
   systemPrompt: string;
-  /** The names Stella's tools carry (`ClaudeCodeToolMcpHost.claudeToolNames`). */
   stellaToolNames: readonly string[];
   resume: boolean;
   resumeAt?: string;
@@ -638,14 +608,12 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   inputPrompt?: string;
   includePartialMessages?: boolean;
   nativeTools?: readonly string[];
-  /** The command Claude Code runs after each of its own tools to redact the output. */
   postToolUseHookCommand?: string;
 }): string[] => [
   "-p",
   "--verbose",
   "--output-format",
   "stream-json",
-  // Always streamed: Stella's tools answer on this same stdin.
   "--input-format",
   "stream-json",
   "--replay-user-messages",
@@ -789,8 +757,6 @@ export const runCloudClaude = async (options: {
     await mkdir(profile.cwd, { recursive: true, mode: 0o700 });
   }
   const accountDirectory = cloudClaudeAccountDirectory(options.claudeAccount);
-  // A login past its time limit (or one Anthropic already refused) can't
-  // answer: say so in one sentence instead of starting Claude Code on it.
   const stored = readStoredClaudeLogin(
     await readFile(path.join(accountDirectory, ".credentials.json"), "utf8").catch(() => null),
   );
@@ -823,8 +789,6 @@ export const runCloudClaude = async (options: {
       : deterministicUuid(profile.sessionKey);
   markTurnStep("claudeStateChecked");
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
-  // Claude Code redacts its own tools' output through this command, run
-  // inside its sandbox (Stella's host redacts Stella's tools).
   const hookScript = fileURLToPath(
     new URL("./claude-post-tool-use-hook.ts", import.meta.url),
   );
@@ -842,8 +806,6 @@ export const runCloudClaude = async (options: {
       nativeTools: profile.nativeTools,
       postToolUseHookCommand,
     });
-  // Inside the sandbox an agent's home is the owner's world, as for Stella's
-  // own shell; the orchestrator has no files, so its home is its private /tmp.
   const sandboxHome = profile.role === "orchestrator" ? "/tmp" : WORLD_ROOT;
   const baseEnv = buildClaudeChildEnv({
     initialEnv: process.env,
@@ -864,7 +826,6 @@ export const runCloudClaude = async (options: {
     USER: CLOUD_TOOL_PROCESS_IDENTITY.user,
     LOGNAME: CLOUD_TOOL_PROCESS_IDENTITY.user,
     TMPDIR: "/tmp",
-    // The redaction hook's secure-value fingerprints (read-only, inside the sandbox).
     [SANDBOX_FINGERPRINTS_ENV]: SANDBOX_FINGERPRINTS_FILE,
   };
   const claudeCommand = resolveExternalCliPath("claude");
@@ -876,7 +837,6 @@ export const runCloudClaude = async (options: {
     threadKey: profile.sessionKey,
     fresh: !(options.keeper && inbox),
   }).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
-  // Every turn proves the sandbox for real before Claude Code runs in it.
   const escaped =
     typeof sandbox === "string"
       ? `FAIL prepare: ${sandbox}`
@@ -886,15 +846,11 @@ export const runCloudClaude = async (options: {
         });
   if (escaped || typeof sandbox === "string") {
     console.error(`claude sandbox probe failed: ${(escaped ?? "").slice(0, 2_000)}`);
-    // Which checks failed reaches the turn's timing log (paths and check
-    // names only).
     const failed = (escaped ?? "")
       .split("\n")
       .filter((line) => line.startsWith("FAIL "))
       .map((line) => line.slice(5));
     for (const check of failed.length > 0 ? failed : [`error ${escaped}`]) {
-      // Letters only, at most 64: the backend drops a turn's whole timing
-      // log for any other step name.
       markTurnStep(
         `claudeSandboxFailed${check
           .split(/[^A-Za-z]+/u)
@@ -972,11 +928,6 @@ export const runCloudClaude = async (options: {
   let kept: KeptClaude | undefined;
   let handedOn = false;
   let stdin: { write(data: string): void; end(): void } | undefined;
-  // Stella's tools answer on the CLI's stdin. A kept CLI that is picked up
-  // again already registered and listed them (its first turn wrote the
-  // initialize request, and only a process that listed them is kept); it
-  // lists an SDK server's tools once per process, so this turn's host just
-  // answers its calls.
   const toolChannel = options.toolHost.openControlChannel(
     (line) => stdin?.write(`${line}\n`),
     { listed: keeperReused },
@@ -989,7 +940,6 @@ export const runCloudClaude = async (options: {
   const promptUuid = crypto.randomUUID();
   let promptReplayed = false;
   let promptSent = false;
-  /** The wait for Stella's tools to be listed; interrupted when the process ends. */
   let toolsWait: { interruptUnsafe: () => void } | undefined;
   try {
     const args = argsFor(resume);
@@ -1019,7 +969,6 @@ export const runCloudClaude = async (options: {
       inboxPoll?.interruptUnsafe();
       stdin?.end();
     };
-    /** Ends the input unless a late message or the quiet end's one nudge carries the turn on. */
     const closeInput = async (): Promise<void> => {
       if (inputEnded || !inbox) return;
       const late = await inbox.close();
@@ -1038,11 +987,6 @@ export const runCloudClaude = async (options: {
       writeMessages(late);
     };
     const finishInput = (): Promise<void> => serialInput(closeInput);
-    /**
-     * The agent's query ended: a message on its way goes in first; then the
-     * nudge, when it is owed even though a background command can still wake
-     * the agent; then the hold for that command; else the input closes.
-     */
     const settleQuery = (): Promise<void> =>
       serialInput(async () => {
         if (inputEnded || !inbox) return;
@@ -1087,7 +1031,6 @@ export const runCloudClaude = async (options: {
     let quieted: Error | undefined;
     let lastEntryUuid: string | undefined;
     let quietResumeAt: string | undefined;
-    /** What the latest init said about Stella's tools, until it is judged. */
     let initVerdict: string | undefined;
     let initCount = 0;
     const judgeInit = (): void => {
@@ -1140,7 +1083,6 @@ export const runCloudClaude = async (options: {
         ),
       );
     };
-    /** Background commands Claude Code reports running (its own task list). */
     let liveBackgroundTasks = 0;
     let heldForBackground = false;
     let backgroundHoldTimer: { interruptUnsafe: () => void } | undefined;
@@ -1150,13 +1092,11 @@ export const runCloudClaude = async (options: {
       backgroundHoldTimer = undefined;
     };
     const backgroundHoldUntil = performance.timeOrigin + CLOUD_CLAUDE_BACKGROUND_HOLD_LIMIT_MS;
-    /** Whether the agent ended without its report while its own background command runs, with time left to hold for it. */
     const backgroundHoldable = (): boolean =>
       options.quietEnd !== undefined &&
       !options.quietEnd.done() &&
       liveBackgroundTasks > 0 &&
       Date.now() < backgroundHoldUntil;
-    /** Keeps the turn open while the agent's own background command runs. */
     const holdForBackground = (): boolean => {
       const until = backgroundHoldUntil;
       if (!backgroundHoldable()) return false;
@@ -1208,8 +1148,6 @@ export const runCloudClaude = async (options: {
           // when the prompt's query is known to be the one it opened.
           initVerdict = stellaToolsUnavailable(event);
           initCount += 1;
-          // Which init said what, in the turn's timing log.
-          // Step names are letters only (the backend drops other timings).
           markTurnStep(
             `claudeInit${["", "First", "Second", "Third"][initCount] ?? "Later"}${promptReplayed ? "AfterPrompt" : ""}Stella${stellaServerStatus(event).replace(/[^A-Za-z]/gu, "").replace(/^./u, (first) => first.toUpperCase())}`,
           );
@@ -1304,8 +1242,6 @@ export const runCloudClaude = async (options: {
             typeof event.result === "string" ? event.result.trim() : "";
           if (resultText) {
             answers.push(resultText);
-            // Stella's turn posts every answer it gave; a task's plain text
-            // only stands for its last words (its messages went by send_message).
             finalText = profile.role === "orchestrator" ? answers.join("\n\n") : resultText;
           }
           addResultUsage(event);
@@ -1445,8 +1381,6 @@ export const runCloudClaude = async (options: {
           ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toISOString()}.`
           : `Claude usage limit reached for ${options.claudeAccount.email}.`;
     }
-    // Only a process that listed Stella's tools is kept: the next turn that
-    // picks it up counts them as listed.
     if (kept && (error || !toolChannel.listed())) {
       await kept.discard().catch(() => undefined);
       kept = undefined;
@@ -1495,7 +1429,6 @@ export const cloudAgentProgressFromStream =
   };
 
 const NATIVE_SESSION_MARKER = "session-started";
-/** The entry a quiet turn ended on; the next turn resumes there, leaving Claude Code's no-visible-output nudge behind. */
 const QUIET_REPLY_MARKER = "quiet-reply";
 
 const settleHydratedLines = async (file: string, cwd: string): Promise<void> => {
@@ -1654,11 +1587,9 @@ export const runNativeAgentTurn = async (options: {
     await rm(stateRoot, { recursive: true, force: true });
   }
   let writtenSession: string | undefined;
-  if (adopted) {
-    // Another host's session: nothing of this cloud's sealed state to check.
-  } else if (options.fresh) {
+  if (!adopted && options.fresh) {
     await assertFreshNativeState(stateRoot);
-  } else if (recoveryHistory !== undefined) {
+  } else if (!adopted && recoveryHistory !== undefined) {
     if (nativeHistoryCursorFromRows(recoveryHistory) !== options.authoritativeHistoryCursor) {
       throw new Error("Native session recovery history does not match the canonical cursor.");
     }
@@ -1681,7 +1612,7 @@ export const runNativeAgentTurn = async (options: {
         prompt: options.prompt,
       });
     }
-  } else {
+  } else if (!adopted) {
     await assertNativeHistoryParity({
       stateRoot,
       engine: "anthropic",
@@ -1784,9 +1715,6 @@ export const runNativeAgentTurn = async (options: {
       ...(result.error ? { error: result.error } : {}),
     });
   const kept = result.kept;
-  // The CLI ran as the tool user and left its session folder owned by it.
-  // Give it back to root before the executor seals and archives it, so the
-  // native-state machinery sees the root-owned tree it requires.
   await restoreNativeStateOwner(stateRoot);
   let checkpoint: Awaited<ReturnType<typeof sealNativeState>>;
   try {

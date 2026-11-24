@@ -160,7 +160,6 @@ export type AttachedToolControlRequest =
       linkedPaths: readonly string[];
     }>;
 
-/** World pulls and pushes a container agent's turn made, and their cost. */
 export type WorldSyncTiming = {
   pulls: number;
   pullMs: number;
@@ -168,7 +167,6 @@ export type WorldSyncTiming = {
   pushes: number;
   pushMs: number;
   pushMaxMs: number;
-  /** World tree helper processes started (one per turn unless uploads ran in parallel). */
   helperStarts?: number;
 };
 

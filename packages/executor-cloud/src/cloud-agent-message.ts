@@ -29,14 +29,10 @@ export const cloudAgentMessageTool: ToolMetadata = {
   },
 };
 
-/** One turn's `send_message`: messages go out at once; a `done` report is held for the turn's end. */
 export type CloudAgentMessenger = {
   run: (callId: string, params: Record<string, unknown>) => Promise<ToolResult>;
-  /** The finished report the turn sent with done, if any. */
   report: () => string | undefined;
-  /** Whether the turn sent anything (a message or its report) to whoever started it. */
   sentToStarter: () => boolean;
-  /** Everything the turn sent, its report included. */
   sent: () => readonly string[];
 };
 
@@ -71,7 +67,6 @@ export const createCloudAgentMessenger = (
       if (body.starter) toStarter = true;
       sent.push(message);
       if (done) {
-        // A second one adds to the first (something arrived as it was sent).
         report = report === undefined || report === message ? message : `${report}\n\n${message}`;
         return { result: DONE_ACCEPTED_TEXT };
       }

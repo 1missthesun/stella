@@ -40,15 +40,6 @@ import type {
   ToolProcessIdentity,
 } from "@stella/runtime/kernel/tools/types.js";
 
-/**
- * The secure values a cloud task was given (released by one of the user's
- * computers, or typed on a card and sealed to this task's key), held only in
- * this executor process's memory. Each is behind a handle the task spends
- * with use_secure_value; it works any number of times for 30 minutes (as a
- * fresh value on a computer), for the thread that asked, and is gone when the
- * process ends with the turn. The values' fingerprints outlive them, so a
- * value that turns up in later output is still redacted.
- */
 export const CLOUD_SECURE_VALUE_TTL_MS = 30 * 60_000;
 
 const COMMAND_TIMEOUT_MS = 120_000;
@@ -66,9 +57,7 @@ type Held = {
 export type HeldValue = Readonly<{ handle: string; expiresAt: number }>;
 
 export type CloudSecureValueStore = {
-  /** Keep a value for this thread; resolves once its fingerprint reaches every redactor. */
   hold(value: string, label: string, owner: string): Promise<HeldValue>;
-  /** Whether Stella would hide this text from the task anyway, so it should go back as a handle. */
   hides(value: string): boolean;
   resolve(
     handle: string,
@@ -79,11 +68,6 @@ export type CloudSecureValueStore = {
   fingerprints(): SecretFingerprints;
 };
 
-/**
- * `load` gives the fingerprints kept for this thread (their salt is reused,
- * so old and new ones merge); `persist` stores them where Claude Code's hook
- * reads them.
- */
 export const createCloudSecureValueStore = async (args: {
   load: () => Promise<SecretFingerprints>;
   persist: (fingerprints: SecretFingerprints) => Promise<void>;
@@ -137,7 +121,6 @@ export const createCloudSecureValueStore = async (args: {
   };
 };
 
-/** Nothing of the value in text the task will read: verbatim, then by fingerprint and pattern. */
 export const scrubSecureValue = (
   text: string,
   value: string,
@@ -166,12 +149,6 @@ export type CloudSecureCommandScope = Readonly<{
   toolHome: string;
 }>;
 
-/**
- * One command as the tool user (the same uid, no privileges and no
- * capabilities as the task's own shell), in the workspace, with the value in
- * one environment variable for that process alone. Nothing of the executor's
- * own environment goes with it.
- */
 const runSecureCommand = async (args: {
   scope: CloudSecureCommandScope;
   command: string;
@@ -237,25 +214,16 @@ const runSecureCommand = async (args: {
 const isReport = (value: unknown): value is SecureFillPageReport =>
   !!value && typeof value === "object" && Array.isArray((value as { landed?: unknown }).landed);
 
-/** The tab the browser is on, by the id browser.tabs() gives it, for the receipt. */
 const activeTabId = async (browser: CloudBrowserBridge, signal: AbortSignal): Promise<string> => {
   try {
     const listed = (await browser.call("tabs", [], signal)) as { tabs?: unknown } | null;
     const tabs = Array.isArray(listed?.tabs) ? (listed.tabs as { tabId?: unknown; active?: unknown }[]) : [];
     const active = tabs.find((tab) => tab.active === true) ?? (tabs.length === 1 ? tabs[0] : undefined);
     if (typeof active?.tabId === "string" && active.tabId) return active.tabId;
-  } catch {
-    // The receipt still names where the value went, by field.
-  }
+  } catch {}
   return "current";
 };
 
-/**
- * Fill the cloud browser's field the way a computer fills its own: the
- * value goes in once through `fill`, and the page scripts find where it is by
- * a salted hash and its length (never the value), clear it from a wrong
- * field, and report where it landed.
- */
 const fillCloudBrowserField = async (args: {
   browser: CloudBrowserBridge;
   target: Extract<SecureValueTarget, { kind: "browser_field" }>;
@@ -316,7 +284,6 @@ export const MISSING_HANDLE_NOTES = {
     "This task holds no value behind that handle. A cloud task's handles last only until its turn ends; call request_secure_input again (a saved value comes back without asking the user). A handle from one of the user's computers works only there.",
 } as const;
 
-/** use_secure_value in a cloud task. */
 export const useCloudSecureValue = async (args: {
   store: CloudSecureValueStore;
   owner: string;

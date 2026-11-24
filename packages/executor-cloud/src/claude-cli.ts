@@ -8,18 +8,6 @@ import {
   runClaudeCliCommand,
 } from "@stella/runtime/kernel/integrations/claude-cli-update.js";
 
-/**
- * Claude Code in a cloud container.
- *
- * The image carries a pinned copy, and moving that pin changes the image,
- * which resets every owner's container snapshot. So the copy turns run is a
- * native install Claude Code's own installer keeps beside the image, root-owned
- * and readable by the tool user like the image's copy: installed when a container first needs it, checked
- * for a newer release at container start at most twice a day, and carried by
- * the owner's snapshots. Versions sit side by side, so a running turn keeps
- * its binary. The image's copy is what a container falls back to when the
- * install cannot be reached.
- */
 const CLI_HOME = "/opt/stella/claude-cli";
 const NATIVE_CLI = path.join(CLI_HOME, ".local", "bin", "claude");
 const IMAGE_CLI = "/usr/local/bin/claude";
@@ -42,7 +30,6 @@ const isExecutable = (file: string): boolean => {
   }
 };
 
-/** It is there and answers `--version`: a cut-off install is neither run nor updated with. */
 const nativeStarts = async (): Promise<boolean> =>
   isExecutable(NATIVE_CLI) &&
   (await readClaudeCliVersion(NATIVE_CLI, installerEnv()).catch(() => null)) !== null;
@@ -93,7 +80,6 @@ const takeRefreshLock = async (): Promise<boolean> => {
 };
 
 const runRefresh = async (): Promise<void> => {
-  // One that can't start can't update itself: the image's copy installs it again.
   const installed = await nativeStarts();
   const last = await readStatus();
   const env = installerEnv();
@@ -126,10 +112,6 @@ const runRefresh = async (): Promise<void> => {
   );
 };
 
-/**
- * `stella-executor --claude-cli-refresh`: install the native copy, or let it
- * update itself. One at a time per container; a no-op when checked recently.
- */
 export const refreshCloudClaudeCli = async (
   options: { lockHeld?: boolean } = {},
 ): Promise<void> => {
@@ -181,17 +163,9 @@ const pointAtNativeCli = async (): Promise<boolean> => {
   return true;
 };
 
-/**
- * Called before a Claude Code turn resolves `claude`. A container without the
- * native copy yet (a clean disk: first use, or the image moved) waits for the
- * install, bounded, because the image's pin may predate the model the turn
- * asked for; past that the turn runs on the image's copy. Nothing else waits.
- */
 export const prepareCloudClaudeCli = async (): Promise<void> => {
   if (!existsSync(EXECUTOR) || (await pointAtNativeCli())) return;
   if (isExecutable(NATIVE_CLI)) {
-    // Installed but it doesn't start (an install cut off): this turn runs the
-    // image's copy while the install is redone in the background.
     console.error(JSON.stringify({ event: "claude_cli_native_unusable", last: await readStatus() }));
     if (await takeRefreshLock()) startRefreshHoldingLock();
     return;
@@ -215,10 +189,6 @@ export const prepareCloudClaudeCli = async (): Promise<void> => {
   }
 };
 
-/**
- * `stella-executor --warm`, at container start: bring the binary the next
- * turn will run into the page cache, then look for a newer release.
- */
 export const warmCloudClaudeCli = async (): Promise<void> => {
   if (!existsSync(EXECUTOR)) return;
   if (!(await nativeStarts())) {

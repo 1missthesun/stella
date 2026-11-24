@@ -115,7 +115,6 @@ import { boundedReplay } from "./doc-checkpoint.ts";
 import { runFailureText } from "./conversation-events.ts";
 
 export const STELLA_AGENTS_EXTENSION = "stella-agents";
-/** Tasks only: the orchestrator's agent removes it. */
 export const STELLA_AGENT_WAITING_EXTENSION = "stella-agent-waiting";
 
 type AgentRecord = {
@@ -141,18 +140,15 @@ type AgentRecord = {
   placedAs?: string;
   catchUp?: true;
   waiting?: { waitingFor: string; at: number; wakers?: string[] };
-  /** A quiet turn took in its starter's message and another input followed before its nudge: the turn after it owes the answer. */
   owesStarter?: true;
 };
 
 export type AgentOrigin = { agentThread: true };
 
 /**
- * An agent that runs elsewhere (another computer, the cloud, an engine): its
- * last known state there. `seen` holds the report and stop ids applied and
- * `calls` the messages it had been given. Older builds read and write only
- * `remote`/`answered`/`outcome`/`failed`, so every change mirrors them, and a run
- * those builds changed since (other calls or answers) is derived again from them.
+ * Older builds read and write only `remote`/`answered`/`outcome`/`failed`, so
+ * every change mirrors them, and a run those builds changed since (other
+ * calls or answers) is derived again from them.
  */
 type RemoteRun =
   | { phase: "running"; seen: string[]; calls: number }
@@ -216,7 +212,6 @@ const noteRemote = (state: StellaAgents, threadId: string, event: RemoteEvent): 
 
 export type StellaAgentRecord = {
   threadId: string;
-  /** Running, and on one tool call past every time limit. */
   longCall?: CurrentToolCall;
   description: string;
   placement: AgentRecord["placement"];
@@ -263,9 +258,7 @@ export type AgentRunEnd = {
   aborted?: true;
   error?: string;
   waiting?: true;
-  /** It ended its turn quietly (no done report): recorded as waiting, never reported. */
   waitingFor?: string;
-  /** What could wake it as its turn ended waiting, in words; empty when nothing could. */
   wakers?: string[];
 };
 
@@ -279,8 +272,6 @@ export const agentRunOutcome = (
       : end?.answer !== undefined
         ? { outcome: "completed", text: end.answer }
         : undefined;
-
-/** How many earlier answers of one run a report carries (the newest ones). */
 
 const attemptOf = (
   state: { calls: Record<string, { threadId: string; reporter: number }> } | undefined,
@@ -410,11 +401,6 @@ export type StellaAgentsHost = {
   beginAgentRun?(run: AgentRun, context: Context): Promise<void>;
   ensureModel?(model: ModelRef, context: Context): Promise<void>;
   endAgentRun?(run: AgentRun, context: Context, end?: AgentRunEnd): Promise<void>;
-  /**
-   * What the host adds to a run's report, asked once the run has settled and
-   * before its report is written: a cloud container that ran out of memory or
-   * disk during it, say.
-   */
   runNote?(run: AgentRun, context: Context): Promise<string | undefined>;
   deliverReport?(report: AgentReport, context: Context): Promise<void>;
   deliverNote?(note: AgentNote, context: Context): Promise<void>;
@@ -425,19 +411,11 @@ export type StellaAgentsHost = {
     status: AgentAttemptOutcome;
     failed: boolean;
     report: string;
-    /** The turn this report ends (a later one may already be running). */
     attempt: number;
   }): void;
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
-  /** A stopped agent's own processes (its shells, tools and what they started) end; resolves with how many. */
   endAgentProcesses?(threadId: string): Promise<number>;
-  /** Tells a working agent, once, of its background commands that ended meanwhile; undefined when none did. */
   endedCommands?(threadId: string): Promise<string | undefined>;
-  /**
-   * What on this host could start a task's next turn by itself, in words: its
-   * background commands and monitors still running, schedules aimed at it.
-   * Without it nothing is refused for want of a wake.
-   */
   wakeSources?(threadId: string): Promise<string[]>;
   directory?: AgentDirectoryHost;
   agentDirectory?(threadId: string): string;
@@ -451,9 +429,7 @@ export type StellaAgentsHost = {
 
 export type AgentDirectoryHost = {
   conversationId(context: Context): Promise<string>;
-  /** A usage limit holds this agent's run on this computer right now. */
   usageLimitPaused?(threadId: string): boolean;
-  /** This agent's run waits for a Claude sign-in on this computer right now. */
   claudeSignInHeld?(threadId: string): boolean;
   list(
     context: Context,
@@ -467,7 +443,6 @@ export type AgentDirectoryHost = {
     args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true },
     context: Context,
   ): Promise<AgentMessageDelivery | undefined>;
-  /** `elsewhere`: it runs on another computer or in the cloud, so skip any copy of it here. */
   stop?(args: { key: string; threadId: string; requesterThreadId?: string; elsewhere?: true }, context: Context): Promise<AgentStopResult>;
   move?(
     args: { key: string; threadId: string; to: string; message: string; requesterThreadId?: string },
@@ -493,8 +468,6 @@ const mintAgentId = (description: string, taken: Readonly<Record<string, unknown
     if (!(candidate in taken)) return candidate;
   }
 };
-
-/** Each part once, in order: a turn that repeated itself (a waiting line after each wake, a note it also ended on) says it once. */
 
 const textOf = (message: AssistantMessage | undefined): string =>
   (message?.content ?? []).map((part) => (part.type === "text" ? part.text : "")).join("").trim();
@@ -523,7 +496,6 @@ const markStopped = async (
 
 const wasStopped = (agent: AgentRecord): boolean => agent.stopped === true || agent.paused === true;
 
-/** It runs on another host now: started there, or moved itself there. Its record there says how it stands. */
 const runsElsewhere = (agent: AgentRecord): boolean => agent.remote === true || agent.away === true;
 
 const messageText = (message: { content?: unknown } | undefined): string =>
@@ -537,7 +509,6 @@ const messageText = (message: { content?: unknown } | undefined): string =>
 const LATEST_PREVIEW_CHARS = 300;
 const LONG_CALL_OUTPUT_CHARS = 400;
 
-/** The longest-running call of an agent's current tool round, with what it has printed so far. */
 const currentToolCall = async (
   store: { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
   live: LiveState | undefined,
@@ -591,17 +562,11 @@ export const completedReport = (args: {
       : []),
   ].join("\n");
 
-/** What a task's failed model response says in its report: a block in plain words, else the provider's error. */
 const agentFailureText = (message: AssistantMessage | undefined): string =>
   message && isSafeguardBlock(message)
     ? safeguardTaskFailure(safeguardModelLabel(message.responseModel, message.model))
     : (message?.errorMessage ?? "The agent failed.");
 
-/**
- * Why a task's turn got no answer: a block in plain words, else what failed
- * in its own words (a failed model request settles with reason `model_error`
- * and the error itself as its detail), else the harness's reason.
- */
 export const unansweredText = (settled: { reason: string; detail?: unknown }): string => {
   const detail = typeof settled.detail === "string" ? settled.detail.trim() : "";
   if (detail && isSafeguardBlockText(detail)) return safeguardTaskFailure(undefined);
@@ -613,7 +578,6 @@ export const unansweredText = (settled: { reason: string; detail?: unknown }): s
 };
 const ENGINE_ERROR_MARK = /^\s*\[[a-z-]+\/[a-z-]+\]\s*/;
 
-/** A helper ended its turn waiting while its lead's report was held for it, so the lead hears it once. */
 export const failedReport = (args: { threadId: string; description: string; error: string }): string =>
   ["[Task failed]", `description: ${args.description}`, `thread_id: ${args.threadId}`, "status: failed", `error: ${bounded(args.error)}`].join("\n");
 
@@ -640,23 +604,13 @@ type ReporterInput = {
   message: string;
   fromUser?: true;
   report?: true;
-  /** A message from someone other than the agent's starter or the user: a stopped agent keeps it for when it is resumed. */
   note?: true;
-  /** Sent by no one on purpose (a schedule's fire): a stopped agent keeps it for when it is resumed. */
   wake?: true;
-  /**
-   * The one reminder after a quiet turn. `backstop`: that turn wasn't answering
-   * its starter (a brief, a wake, a helper's report), so if this one is quiet
-   * too with nothing live, the task ends with a silent-end report. After a
-   * starter's message ("thanks", "noted") staying quiet is a fine answer.
-   */
   nudge?: true;
   backstop?: true;
-  /** A nudge's turn: the answer it follows. Anything it took in since makes the nudge pointless. */
   after?: number;
 };
 
-/** Who sent what a Reporter delivers, for the shared rules (`agentInputAction`). */
 const reporterSender = (input: Pick<ReporterInput, "fromUser" | "report" | "note" | "wake">): AgentInputSender =>
   input.report || input.note || input.wake ? "other" : input.fromUser ? "user" : "starter";
 type ReporterState =
@@ -700,7 +654,6 @@ const liveReporters = async (
   return found;
 };
 
-/** Another input of this agent that is on its way or being taken in: queued, or already in the run when `placed` counts. */
 const inputComing = async (
   tx: Tx,
   home: ConversationId,
@@ -731,13 +684,6 @@ const agentsBusy = async (read: BusyReader, conversationId: ConversationId, dept
   return false;
 };
 
-/**
- * A stopped agent sends no report, so a starter whose turn ended waiting with
- * it as its last helper at work would wait for good: it hears that the helper
- * was stopped instead, which starts its next turn like a helper's report.
- * Nothing when the starter was stopped too (a stop marks the whole subtree
- * before aborting any of it) or still runs.
- */
 const wakeWaitingStarter = async (
   runtime: Pick<TaskRuntime<unknown, { phase: string }, unknown, object>, "snapshot"> & { conversationId: number },
   read: BusyReader,
@@ -751,7 +697,6 @@ const wakeWaitingStarter = async (
   if (starter.agentType === "orchestrator" || home === undefined || !starter.threadId) return;
   const own = runtime.conversationId as ConversationId;
   if ((await runtime.snapshot(LiveDoc, own, context))?.run !== undefined) return;
-  // Its record says it ended its turn waiting (the turn's own marker is gone by then).
   const record = (await runtime.snapshot(StellaAgentsDoc, home, context))?.agents[starter.threadId];
   if (!record?.waiting || wasStopped(record)) return;
   const others = Object.entries((await read.agents(own))?.agents ?? {}).filter(([threadId]) => threadId !== helperThreadId);
@@ -769,7 +714,6 @@ const wakeWaitingStarter = async (
   );
 };
 
-/** A task's runtime as a plain store: its commits change no task state. */
 const taskStore = (
   runtime: Pick<TaskRuntime<unknown, { phase: string }, unknown, object>, "snapshot" | "commit">,
 ): Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> } => ({
@@ -793,11 +737,6 @@ const busyReader = (
   reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
 });
 
-/**
- * How a task this host runs stands now, by the shared rules, with what was
- * read to tell: one place for agent_status, the activity list and the
- * directory, so they can't show it differently.
- */
 const localView = async (
   store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
   record: AgentRecord,
@@ -900,14 +839,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     execution && (execution.moveBrain || agentsMove)
       ? switchDestinationTool(execution, host.rootPlacement, agentsMove ? (args, api, context) => agentSwitch(args, api, context) : undefined)
       : undefined;
-  /**
-   * Starts a task's next turn with this input, in the conversation it was
-   * started from. Every turn gets an entry in `calls`, which is what numbers
-   * its attempt (`attemptOf`) here and in the cloud: a turn started without
-   * one (a "[Helper stopped]" wake, an "[Agent waiting]" notice, a "nothing
-   * can wake you" wake) took the number of the turn before it, and the cloud
-   * dropped its end as a repeat of that turn's, report and all.
-   */
   const nextTurn = async (tx: Tx, home: ConversationId, input: ReporterInput): Promise<void> => {
     const reporter = await tx.createTask(Reporter, input, { ownership: { kind: "conversation" }, background: true, conversationId: home });
     (await tx.doc(StellaAgentsDoc, home)).calls[`turn:${reporter}`] = { threadId: input.threadId, reporter };
@@ -939,7 +870,6 @@ export function stellaAgents(host: StellaAgentsHost) {
                 { placed: true, except: Number(reporter.id) },
               );
               if (coming || (await tookInputAfter(tx, agentConversationId, reporter.input.after))) {
-                // It is taking in something newer, and that turn's end decides for itself.
                 if (coming && agent && !reporter.input.backstop) agent.owesStarter = true;
                 return { status: "terminal", outcome: { status: "completed", result: null } };
               }
@@ -1014,9 +944,6 @@ export function stellaAgents(host: StellaAgentsHost) {
               {
                 type: "input",
                 content: [...carried, message].join("\n\n"),
-                // An automatic wake (a finished command or monitor, the one
-                // reminder after a quiet turn) that lands while the task's run is
-                // still going waits for that run to end and gets its own turn.
                 whenBusy: reporter.input.wake ? "followUp" : "steer",
                 requestId: `agent-msg:${reporter.id}`,
               },
@@ -1062,8 +989,6 @@ export function stellaAgents(host: StellaAgentsHost) {
             return;
           }
           const answered = settled?.status === "done" && settled.type === "input" ? settled.answer : undefined;
-          // Explicit messaging: what the turn sent its starter, and what could
-          // still wake it, decide how it ends (see contracts/agent-messaging).
           const stellaThread = answered !== undefined ? await host.directory?.conversationId(context).catch(() => undefined) : undefined;
           let turn: Awaited<ReturnType<typeof turnToStarter>> | undefined;
           if (answered !== undefined) {
@@ -1098,11 +1023,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             } else if (agent && (withdrawn || (!submitted && carried.length > 0))) {
               agent.held = [...carried, ...(withdrawn ? [message] : []), ...(agent.held ?? [])];
             }
-            // Its finished report (send_message done: true) goes out whatever
-            // happened after it: a stop or an error while it tidied up.
             const role = await tx.doc(StellaAgentDoc, agentConversationId);
-            // A later input that settled on this same answer reports it, so the
-            // report is the newest turn's end.
             const passOn = role.done !== undefined && answered !== undefined && (await laterInputAnswered(tx, { id: reporter.id, input: reporter.input, conversationId: runtime.conversationId }, agentConversationId, answered));
             const done = passOn ? undefined : role.done;
             if (done) delete role.done;
@@ -1159,7 +1080,6 @@ export function stellaAgents(host: StellaAgentsHost) {
                 checkpoint: { phase: "report", status: "completed", waiting: true, waitingFor, ...(send.length ? { notes: send } : {}) },
               };
             };
-            // Another input that settled on this same answer already ended it.
             if (passOn || agent.reported.includes(settled.answer)) return idle();
             agent.reported.push(settled.answer);
             const nudged = reporter.input.nudge === true || isIdleStopNudge(message);
@@ -1174,10 +1094,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               { placed: true, except: Number(reporter.id) },
             );
             if (said && !said.sent && owes && coming) agent.owesStarter = true;
-            // Another input is being taken in: the turn it starts decides instead.
             if (said && !said.sent && !coming && !reporter.input.fromUser) {
-              // One reminder that its plain text reached no one: for a turn that
-              // took in its starter's message, or one with nothing left to wake it.
               if (!nudged && (owes || live === false)) {
                 await nextTurn(tx, runtime.conversationId, {
                   threadId,
@@ -1190,8 +1107,6 @@ export function stellaAgents(host: StellaAgentsHost) {
                 });
                 return idle(["a message on its way to you"]);
               }
-              // Still quiet after it, with nothing that could ever wake it, and
-              // not just leaving a starter's message unanswered.
               if (nudged && reporter.input.backstop === true && live === false) {
                 const result = withNote(silentEndReport(said.lastWords));
                 end = { answer: result };
@@ -1210,10 +1125,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         const { waiting, notes } = reporter.state.checkpoint;
         let { report } = reporter.state.checkpoint;
         let stopped = reporter.state.checkpoint.stopped === true || reporter.state.checkpoint.paused === true;
-        // Stopped after its turn settled and before its end went out (stop_agent
-        // found it idle and said it stopped): Stella's own task holds that stop.
-        // What it said stays in its history, as for any stopped task; its end
-        // reaches the cloud as the stop, not as a report.
         const topLevel = await roleOf(runtime, runtime.conversationId, context).then(
           (role) => role.agentType === "orchestrator" || role.parentConversationId === undefined,
         );
@@ -1678,7 +1589,6 @@ export function stellaAgents(host: StellaAgentsHost) {
   const STELLA_UNREACHABLE =
     "The Stella you work for runs on another host, which a message can't reach from here. Your finished report (send_message with done: true) still reaches her.";
 
-  /** Who started this agent: Stella (a top-level task) or its lead. */
   const isStarterTarget = (self: StellaAgentRole, to: string, stellaThread: string | undefined): boolean => {
     const lead = self.startedBy?.threadId;
     if (lead !== undefined && to === lead) return true;
@@ -1686,7 +1596,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return stellaStarted && (to.toLowerCase() === STELLA_MESSAGE_TARGET || (stellaThread !== undefined && to === stellaThread));
   };
 
-  /** Its own helpers still at work, by name. */
   const helpersAtWork = async (store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> }, conversationId: ConversationId, context: Context): Promise<string[]> => {
     const read = busyReader(store, context);
     const helpers = await store.snapshot(StellaAgentsDoc, conversationId, context);
@@ -1705,11 +1614,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return found;
   };
 
-  /**
-   * Whether an input was taken into this turn while its latest finished report
-   * was being written (a message lands in the thread before the step that was
-   * already under way) or after it.
-   */
   const inputCrossedDone = async (tx: Tx, conversationId: ConversationId, callIds: readonly string[]): Promise<boolean> => {
     const last = callIds.at(-1);
     let inputs = 0;
@@ -1721,7 +1625,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (entry.kind === "pi.user") inputs += 1;
         if (entry.kind !== "pi.assistant") continue;
         const message = entry.model?.[0] as AssistantMessage | undefined;
-        // The step before the report's own: this turn's only if it went on to more.
         if (passed) return inputs > 0 && message?.stopReason === "toolUse";
         passed = (message?.content ?? []).some((part) => part.type === "toolCall" && part.id === last);
         if (passed && inputs > 0) return true;
@@ -1732,7 +1635,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return false;
   };
 
-  /** send_message with done: true, its finished report, filed when its turn ends. */
   const finishReport = async (api: ToolExecutionApi, to: string, message: string, stellaThread: string | undefined, context: Context) => {
     const self = await roleOf(api, api.conversationId, context);
     if (self.agentType === "orchestrator" || !self.threadId) throw new Error(DONE_ONLY_FOR_AGENTS);
@@ -1745,10 +1647,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     const already = await api.commit(async (tx) => {
       const role = await tx.doc(StellaAgentDoc, api.conversationId);
       if (role.done?.callIds.includes(api.callId)) return false;
-      // One finished report per turn: a model that keeps calling with more
-      // acknowledgments ("Acknowledged.", "No further action") is told to stop.
-      // Unless something reached it as it sent that one, too late to be in it:
-      // what it adds then goes out with it.
       if (role.done && !(await inputCrossedDone(tx, api.conversationId, role.done.callIds))) return true;
       role.done = role.done
         ? { text: `${role.done.text}\n\n${message.trim()}`, callIds: [...role.done.callIds, api.callId] }
@@ -1823,15 +1721,8 @@ export function stellaAgents(host: StellaAgentsHost) {
     return true;
   };
 
-  /** Results of calls that were cut off: their run ends or their model reads them late. */
   const UNREAD_RESULT_CODES: ReadonlySet<string> = new Set(["aborted", "abandoned", "interrupted", "restart_limit"]);
 
-  /**
-   * A background command that ends while its task works is told with the
-   * task's next tool result. Not with one its model may never read: a call
-   * that ends or moves the turn, a CLI's own tool, a nested or aborted call.
-   * One not told by the turn's end starts the task's next turn.
-   */
   const endedCommandsHook = hook(ToolTask, {
     afterTool: async (call, result, api, context) => {
       const native = takeNativeToolCall(call.id);
@@ -1846,7 +1737,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
-  /** Messages older builds queued for Stella and had not sent yet: they all go out now. */
   const settleNotes = async (tx: Tx, agentConversationId: ConversationId): Promise<StellaPendingNote[]> => {
     const role = await tx.doc(StellaAgentDoc, agentConversationId);
     const notes = (role.notes ?? []).map((note) => ({ ...note, from: { ...note.from } }));
@@ -1854,12 +1744,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return notes;
   };
 
-  /**
-   * What a turn (from its input through its answer) did about whoever started
-   * the agent: whether it took in a message from them, whether it sent them
-   * anything with send_message, and its last words in its own thread.
-   */
-  /** Whether anything reached this conversation after `after`. */
   const tookInputAfter = async (tx: Tx, conversationId: ConversationId, after: number | undefined): Promise<boolean> => {
     if (after === undefined) return false;
     let cursor: Parameters<Tx["scanEntries"]>[2];
@@ -1875,7 +1759,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return false;
   };
 
-  /** Whether a later live input of the same agent settled on `answer` too. */
   const laterInputAnswered = async (
     tx: Tx,
     reporter: { id: unknown; input: ReporterInput; conversationId: ConversationId },
@@ -2065,12 +1948,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return host.remote?.(placement);
   };
 
-  /**
-   * How helpers that run on other hosts stand, as their records in the cloud
-   * say. Only when those can't be read now (offline) does what this chat last
-   * heard of them stand in: a helper started elsewhere counts as at work until
-   * its report or stop came back here, one that moved itself away as at work.
-   */
   const helpersElsewhere = async (
     state: Readonly<StellaAgents> | undefined,
     helpers: ReadonlyArray<[string, AgentRecord]>,
@@ -2500,9 +2377,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     const elsewhere: AgentStopResult[] = [];
     let endedProcesses = 0;
     const order = [...below.reverse(), target];
-    // Everything in the subtree is marked stopped before any of it is aborted:
-    // a helper's stop must find its starter already stopped, or it would wake
-    // a starter that waits for it (see wakeWaitingStarter).
     for (const agent of order) {
       if (!agent.record.remote) await markStopped(store, agent.parentConversationId, agent.threadId, context);
     }
@@ -2521,8 +2395,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         await stopThere(agent);
         continue;
       }
-      // It moved itself to another computer or the cloud and runs there now:
-      // the stop goes where it runs, which stops everything it started there.
       if (record.away) {
         await (await store.conversation(record.conversationId as ConversationId, context))?.abort(context);
         local.push(agent.threadId);
@@ -2531,9 +2403,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       const id = record.conversationId as ConversationId;
       const idle = (await store.snapshot(LiveDoc, id, context))?.run === undefined;
-      // Between turns, no run ends to tell the cloud: one held for its helpers,
-      // or one that ended its turn waiting (the cloud lists it as waiting, and
-      // would otherwise let what no one sent it on purpose start it again).
       const waiting =
         idle && (record.waiting !== undefined || (await agentsBusy(busyReader(store, context), id).catch(() => false)));
       await (await store.conversation(id, context))?.abort(context);
@@ -2562,11 +2431,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       const scope = stella ? root : (api.conversationId as ConversationId);
       const target = scope === undefined ? undefined : (await agentTree(api, scope, context)).find((agent) => agent.threadId === threadId);
       if (target) {
-        // Already done here: its turn ended and its report went, with nothing
-        // waiting, nothing on its way to it and nothing it started still going.
-        // There is no run to stop; saying it stopped would be untrue. Only what
-        // it left running ends. (While its report is still on its way, it is
-        // stopped as usual and that report is not sent.)
         const { record } = target;
         if (!record.remote && !record.away && record.waiting === undefined && !wasStopped(record)) {
           const id = record.conversationId as ConversationId;
@@ -2788,7 +2652,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       fromOrchestrator?: boolean;
       report?: true;
       reportFrom?: string;
-      /** Not from its starter or the user (a note, another task's message): held while it is stopped. */
       note?: true;
       wake?: true;
     },
@@ -2909,10 +2772,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!current) return [];
       delete current.away;
       if (current.carried?.runKey === args.runKey) return [...current.carried.messages];
-      // A new run placed here is its starter resuming it (the cloud holds automatic
-      // wakes for a stopped task), so a stop marked here earlier no longer holds.
-      // Left in place, it kept every later wake here (a background command's exit,
-      // a helper's message) held as if the task were still stopped.
       delete current.stopped;
       delete current.paused;
       const messages = [...(current.held ?? [])];
@@ -2920,14 +2779,12 @@ export function stellaAgents(host: StellaAgentsHost) {
       current.carried = { runKey: args.runKey, messages };
       return messages;
     }, context);
-    // Messages older builds queued for Stella and had not sent yet.
     const settle = async (): Promise<void> => {
       const notes = await harness.commit((tx) => settleNotes(tx, agent.id), context);
       for (const note of notes) {
         await deliverNote(root.id, note, context, (id) => harness.conversation(id, context)).catch(() => false);
       }
     };
-    // Its finished report (send_message done: true), taken once.
     const takeDone = () =>
       harness.commit(async (tx) => {
         const role = await tx.doc(StellaAgentDoc, agent.id);
@@ -2957,8 +2814,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       let first: Awaited<ReturnType<typeof submission.wait>>;
       try {
         settled = first = await submission.wait(context);
-        // Messages steered into this run and still being answered are part of
-        // it: ending here would lose the report they lead to.
         const waited = new Set<string>();
         while (settled.status === "done" && settled.type === "input" && !args.signal?.aborted) {
           const steer = (await harness.snapshot(StellaAgentsDoc, root.id, context))?.agents[threadId]?.steers?.find(
@@ -3044,8 +2899,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       const answer = await harness.commit(async (tx) => tx.entry(AssistantEntry, settled.answer), context);
       const message = answer?.model?.[0] as AssistantMessage | undefined;
       if (message?.stopReason === "error") return { threadId, status: "error", error: agentFailureText(message) };
-      // Explicit messaging: a quiet turn ends idle (no report), after one
-      // reminder when it took in its starter's message or nothing can wake it.
       const stella = await host.directory?.conversationId(context).catch(() => undefined);
       const turn = await harness.commit((tx) => turnToStarter(tx, agent.id, requestId, settled.answer, stella), context);
       const wakers = await wakersOf(harness, agent.id, context, { atEnd: true }).catch(() => undefined);
@@ -3082,8 +2935,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         steers.map((steer) => tx.submissionByRequest(record.conversationId as ConversationId, `steer:${steer.key}`)),
       );
       const unreadSteers = steers.filter((_, index) => unread(outcomes[index]));
-      // Reports the run had not read go back to the thread so they wake it
-      // wherever it runs next; after a stop they wait with it until it is resumed.
       const rewake =
         stopped && !byStop && !wasStopped(record) ? unreadSteers.filter((steer) => parseAgentReportId(steer.key) !== null) : [];
       const withdrawn = unreadSteers.filter((steer) => !rewake.includes(steer)).map((steer) => steer.message);
@@ -3217,11 +3068,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       return undefined;
     }, context);
 
-  /**
-   * Whether the task asked whoever started it something (send_message to them
-   * or Stella, ask_user, request_secure_input) after the last message they sent
-   * it. Its finished report (done: true) closes any question before it.
-   */
   const askedStarter = async (
     store: { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
     agentConversationId: ConversationId,
@@ -3256,12 +3102,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       return false;
     }, context);
 
-  /**
-   * What could start a task's next turn by itself, in words: helpers at work,
-   * a message on its way, an open question to its starter, and what its host
-   * knows (background commands and monitors, schedules aimed at it). Undefined
-   * when this host can't tell.
-   */
   const wakersOf = async (
     store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
     agentConversationId: ConversationId,
@@ -3290,7 +3130,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     }
     const starter = role.parentConversationId as ConversationId | undefined;
     if (starter !== undefined) {
-      // Mid-turn, a placed one is the run asking; at its end, one still placed keeps the run going.
       const queued = await store.commit(
         (tx) => inputComing(tx, starter, { threadId: role.threadId!, conversationId: agentConversationId }, { placed: opts.atEnd === true }),
         context,
@@ -3305,10 +3144,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     return found;
   };
 
-  /**
-   * A waiting task whose wakers could not all be listed when it waited is
-   * checked again once they can: with nothing live by then, it hears so.
-   */
   const recheckWaiting = async (
     harness: Harness,
     threadId: string,
@@ -3352,7 +3187,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       ...(switchDestination ? [switchDestination] : []),
     ],
   });
-  // Held end_turn_waiting until explicit messaging; kept, empty, so stored agents that name it still resolve.
+  // Kept, empty, so stored agents that name it still resolve.
   const waitingExtension = defineExtension({ name: STELLA_AGENT_WAITING_EXTENSION, tools: [] });
   return {
     extension,

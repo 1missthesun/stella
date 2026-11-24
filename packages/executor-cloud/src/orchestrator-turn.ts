@@ -272,7 +272,6 @@ export class CliAssistantAssembler {
   #outputTokens = 0;
   #llmCalls = 0;
 
-  /** `isStellaTool` says which Claude Code tool names are Stella's own. */
   constructor(
     private readonly emit: (event: CloudOrchestratorEvent) => void,
     private readonly fallbackModel: string,

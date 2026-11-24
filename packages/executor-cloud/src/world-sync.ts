@@ -85,13 +85,6 @@ type WorldTreeHelper = {
 
 const idleHelpers = new Map<string, WorldTreeHelper[]>();
 
-/**
- * Every filesystem operation on the world tree runs in `world-tree.ts` as the
- * tool uid that owns the tree. Root keeps only the network, the credential,
- * the index and the marker, all outside the tree. A helper serves one request
- * at a time and stays for the rest of this process (a turn), so a sync costs
- * no process start; parallel uploads get one each.
- */
 const startWorldTree = (root: string): WorldTreeHelper => {
   const launch = isolateToolProcessLaunch({
     command: process.execPath,
@@ -135,7 +128,6 @@ const startWorldTree = (root: string): WorldTreeHelper => {
 
 type Referable = { ref?: () => unknown; unref?: () => unknown };
 
-/** An idle helper never keeps this process alive; a busy one does. */
 const holdProcessOpen = (helper: WorldTreeHelper, hold: boolean): void => {
   for (const handle of [
     helper.child,
@@ -162,7 +154,6 @@ const releaseWorldTree = (helper: WorldTreeHelper, finished: boolean) => {
     holdProcessOpen(helper, false);
     idleHelpers.set(helper.root, [...(idleHelpers.get(helper.root) ?? []), helper]);
   } else if (helper.child.exitCode === null) {
-    // Abandoned midway: its stream state is unknown, so it never serves again.
     helper.dead = true;
     helper.child.kill("SIGKILL");
   }
@@ -202,7 +193,6 @@ const sendToWorldTree = async (
   }
 };
 
-/** Data to the helper in frames of at most WORLD_TREE_DATA_FRAME_BYTES. */
 const sendDataToWorldTree = async (
   helper: WorldTreeHelper,
   data: string | Uint8Array,
@@ -217,7 +207,6 @@ const sendDataToWorldTree = async (
   }
 };
 
-/** The helper's frames for the current request, ending after its result. */
 async function* worldTreeReplies(
   helper: WorldTreeHelper,
 ): AsyncGenerator<Buffer, unknown> {
@@ -656,12 +645,6 @@ const baseFromExport = async (
   return base;
 };
 
-/**
- * The base this disk syncs against. A cold materialization leaves only a seed
- * (or nothing): the disk then holds exactly the export, and nothing has run
- * on it yet, so the disk itself becomes the base before the first revision
- * is applied.
- */
 const establishedBase = async (root: string): Promise<WorldIndex> => {
   const stored = await readIndex(statePaths(root).index);
   if (stored?.complete) return stored.entries;
@@ -683,7 +666,6 @@ const syncTiming: WorldSyncTiming = {
   helperStarts: 0,
 };
 
-/** The pulls and pushes since the last call, then starts counting afresh. */
 export const takeWorldSyncTiming = (): WorldSyncTiming => {
   const taken = { ...syncTiming };
   for (const key of Object.keys(syncTiming) as (keyof WorldSyncTiming)[]) {
@@ -872,10 +854,6 @@ const parseBlobOutcomes = async (
   }
 };
 
-/**
- * The upload body for `blobs`, read from the tree by the tool uid: a refusal
- * or a short read there fails the stream, and so the upload.
- */
 const blobBody = (
   root: string,
   blobs: readonly WorldBlobUpload[],
@@ -990,13 +968,6 @@ const uploadBatches = async (
   );
 };
 
-/**
- * Send the world what this disk changed since its base, and nothing else:
- * every file created or changed here, every path the base had that is gone.
- * A file this disk merely has an older copy of is never sent, and a file it
- * never saw is never deleted. Per path, the later push wins. Refuses on a
- * disk whose base a pull has not established yet.
- */
 export const pushWorldProjection = async (args: {
   root: string;
   access: WorldSyncAccess;

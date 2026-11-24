@@ -75,9 +75,7 @@ export type StellaHarnessOptions = {
   extensions?: readonly Extension[];
   env?: HarnessOptions["env"];
   settings?: HarnessSettings;
-  /** Test builds only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
   simulateSafeguardBlocks?: boolean;
-  /** `tools` runs agents' `Bash` and `write_stdin`, so pi's own `Bash` stays out. */
   hostShell?: boolean;
   turnLimits?: TurnLimitsOptions;
   onReport?: (error: unknown) => void;
@@ -118,7 +116,6 @@ export type OpenStellaHarness = {
       }
     | undefined
   >;
-  /** Checks again a waiting task whose wakers could not all be listed; tells it when nothing is live. */
   recheckWaiting(threadId: string, context: Context): Promise<"told" | "live" | "unknown" | "not_waiting">;
   agentRecords(context: Context): Promise<StellaAgentRecord[]>;
   messageAgent(

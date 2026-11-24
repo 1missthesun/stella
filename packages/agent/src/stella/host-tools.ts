@@ -14,11 +14,6 @@ import { StellaAgentDoc } from "./agent-doc.ts";
 import { ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
 import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
 
-/**
- * Stella tools a subscription engine replaces with its own, kept out of
- * `code` too: Claude Code and ChatGPT plans search and fetch the web on the
- * user's plan, not on Stella's paid `web`.
- */
 const WITHHELD_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
   [CLAUDE_CODE_PROVIDER_ID]: ["web"],
   [ANTIGRAVITY_CLI_PROVIDER_ID]: ["web"],
@@ -62,9 +57,7 @@ export type StellaToolCall = {
   callId: string;
   args: Record<string, unknown>;
   threadId?: string;
-  /** Where the caller's Bash runs; relative paths in tool arguments resolve here. */
   cwd?: string;
-  /** Tools the caller's engine replaces with its own; out of reach inside `code`. */
   withheld?: readonly string[];
 };
 
@@ -76,11 +69,6 @@ export type StellaToolOutcome = {
 
 export interface StellaToolHost {
   specs(role: StellaToolRole): readonly StellaToolSpec[];
-  /**
-   * Whether `run` takes a general agent's `Read` of an image, which the
-   * coding Read refuses. Then an agent can see an image it saved, or one a
-   * placeholder points it back to.
-   */
   readsImages?: boolean;
   run(call: StellaToolCall, context: Context): Promise<StellaToolOutcome>;
 }
@@ -185,11 +173,6 @@ export const STELLA_CODE_TOOL_NAME = "code";
 const READ_TOOL = "Read";
 const IMAGE_READ_CODES: ReadonlySet<string> = new Set(["image", "unsupported_image"]);
 
-/**
- * The coding `Read` (pi's) with images handed to the host's
- * `Read`, which fits them to the model and returns them as images. Text keeps
- * pi's reading: relative paths, line ranges and truncation as before.
- */
 const imageRead = (host: StellaToolHost): Wrap => ({
   tool: READ_TOOL,
   wrap: (tool: ToolRegistration): ToolRegistration => {

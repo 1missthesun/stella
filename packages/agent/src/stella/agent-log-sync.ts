@@ -63,11 +63,6 @@ const RECORD_SLACK_BYTES = 4 * 1024;
 
 const recordKey = (syncId: string, entry: EntryId | number) => `${syncId}:${entry}`;
 
-/**
- * A message as the log holds it: whole when it fits a record, else with its
- * images dropped and its text cut, saying so, so the next holder still reads
- * what it was.
- */
 export const boundedMessageJson = (message: Message): string => {
   const whole = JSON.stringify(message);
   const limit = AGENT_LOG_RECORD_MAX_BYTES - RECORD_SLACK_BYTES;
@@ -99,7 +94,6 @@ export function agentLogSync(options: {
   transport: () => AgentLogTransport | undefined;
   report: (error: unknown) => void;
   onAppend?: (stat: AgentLogAppendStat) => void;
-  /** Readies a message for the log, such as bringing stored images back inline; runs one entry at a time. */
   prepare?: (message: Message) => Promise<Message>;
   context: Context;
 }) {
@@ -146,7 +140,6 @@ export function agentLogSync(options: {
         bytes = 0;
         await save();
       };
-      // Drafted one entry at a time so a page of image-heavy entries never sits inline in memory at once.
       for (const entry of page) {
         const draft = await draftOf(harness, entry, syncId, context, options.prepare);
         if (draft) {

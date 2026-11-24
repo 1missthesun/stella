@@ -1,11 +1,3 @@
-/**
- * The world tree's filesystem work, run as the tool uid (`world-sync.ts`
- * starts this file through setpriv). The tool uid owns the tree and its shell
- * may run concurrently, so a by-path operation there as root could be
- * redirected by a symlink swapped in after a check. Root keeps the network,
- * the world credential, the index and the marker; nothing this process sends
- * back is trusted beyond what the tool uid could already write into the world.
- */
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants as fsConstants, createReadStream } from "node:fs";
@@ -97,11 +89,6 @@ const isDriveCopy = (relative: string): boolean => relative === "drive";
 const isSyncStaging = (relative: string): boolean =>
   relative === STAGING || relative.startsWith(`${STAGING}/`);
 
-/**
- * Where the sync marker lived before it moved beside the world root. A
- * container saved by the old code still has one (root-owned, unreadable to
- * the tool uid); it is never synced.
- */
 const LEGACY_MARKER = ".stella/world-manifest";
 
 export const isSyncedPath = (relative: string): boolean =>
@@ -131,11 +118,6 @@ class WorldFileShrankError extends Error {
   }
 }
 
-/**
- * The sha256 of the first `size` bytes, the size the listing recorded. A file
- * still being appended to (a dev server's log) hashes as it was when listed,
- * and its upload (`readWorldFiles`) sends that same prefix.
- */
 const fileSha256 = async (filePath: string, size: number): Promise<string> => {
   const hash = createHash("sha256");
   let read = 0;
@@ -199,8 +181,6 @@ export const listWorldTree = async (
       let sha256: string | undefined;
       if (kind === "file") {
         const prior = previous[child];
-        // A file truncated and rewritten while it was hashed is listed again
-        // at its new size; one that keeps shrinking fails the sync.
         for (let attempt = 1; sha256 === undefined; attempt += 1) {
           if (stat.size > WORLD_FILE_LIMIT_BYTES) {
             throw new Error(`World file exceeds 256 MiB: ${child}`);
@@ -346,7 +326,6 @@ const clearSyncedEntries = async (
   }
 };
 
-/** Bytes in from a stream, consumed exactly as the caller asks for them. */
 export class ExactReader {
   private buffered: Buffer[] = [];
   private bufferedBytes = 0;
@@ -386,7 +365,6 @@ export class ExactReader {
     }
   }
 
-  /** Exactly `bytes` bytes, or null when the stream ends before any of them. */
   async bytes(bytes: number): Promise<Buffer | null> {
     if (this.bufferedBytes === 0 && !(await this.fill())) return null;
     const parts: Buffer[] = [];
@@ -407,12 +385,6 @@ export class ExactReader {
   }
 }
 
-/**
- * The helper's wire format, both ways: a type byte, a 32-bit big-endian
- * length, the payload. Root sends a request (Q), then for apply and extract
- * its data as D frames closed by Z; the helper answers with D frames (read)
- * and one R (result JSON) or E (error, after which it exits).
- */
 export type WorldTreeFrameType = "Q" | "D" | "Z" | "R" | "E";
 
 export type WorldTreeFrame = Readonly<{
@@ -456,7 +428,6 @@ export class WorldTreeFrames {
     this.reader = new ExactReader(source);
   }
 
-  /** The next frame, or null when the stream ended between frames. */
   async next(): Promise<WorldTreeFrame | null> {
     const header = await this.reader.bytes(5);
     if (!header) return null;
@@ -472,7 +443,6 @@ export class WorldTreeFrames {
   }
 }
 
-/** The D payloads up to the closing Z. */
 async function* dataUntilEnd(frames: WorldTreeFrames): AsyncGenerator<Buffer> {
   for (;;) {
     const frame = await frames.next();
@@ -546,7 +516,6 @@ const parseOperation = (line: string): WorldTreeOperation => {
   throw new Error("World operation is invalid.");
 };
 
-/** Apply a pull's operations, read from `input` (one JSON line each, a file's bytes after its line). */
 export const applyWorldOperations = async (
   root: string,
   input: AsyncIterable<Buffer>,
@@ -613,7 +582,6 @@ export const applyWorldOperations = async (
   }
 };
 
-/** Replace the synced part of the tree with the tar stream on `input`. */
 export const extractWorldTree = async (
   root: string,
   input: NodeJS.ReadableStream,
@@ -632,7 +600,6 @@ export const extractWorldTree = async (
   if (exitCode !== 0) throw new Error(`World tar extraction exited ${exitCode}.`);
 };
 
-/** Hand `write` the first `size` bytes of each requested regular file. */
 export const readWorldFiles = async (
   root: string,
   files: readonly { path: string; size: number }[],
@@ -677,11 +644,6 @@ const send = async (type: WorldTreeFrameType, payload?: Uint8Array) => {
   }
 };
 
-/**
- * One helper serves a turn's world syncs, one request at a time, until root
- * closes its stdin. A failed request answers E and ends the helper, so root
- * never has to resynchronize a stream it abandoned midway.
- */
 const serve = async (root: string): Promise<void> => {
   const frames = new WorldTreeFrames(
     (process.stdin as AsyncIterable<Buffer>)[Symbol.asyncIterator](),

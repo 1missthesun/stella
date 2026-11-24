@@ -102,8 +102,7 @@ export function desktopEnvironments(
   const terminations = new Set<Promise<void>>();
   // pi keeps a command's pid until its output closes, which a background
   // child holding stdout can delay long after the shell itself exited and
-  // was reaped; by then the pid may be another program's (on 2026-11-14 an
-  // unexplained SIGKILL took Stella's own window processes). The shell is
+  // was reaped; by then the pid may be another program's. The shell is
   // only ours while it is still our unreaped child.
   const killCommandTree = (pid: number) => {
     const termination = terminateProcessTree(pid, {

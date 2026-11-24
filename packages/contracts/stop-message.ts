@@ -1,0 +1,87 @@
+const STOP_PHRASES = [
+  "stop",
+  "stop it",
+  "stop that",
+  "stop this",
+  "stop now",
+  "stop please",
+  "please stop",
+  "ok stop",
+  "okay stop",
+  "no stop",
+  "wait stop",
+  "stop stop",
+  "just stop",
+  "hold on",
+  "wait",
+  "cancel",
+  "cancel that",
+  "cancel it",
+  "cancel this",
+  "abort",
+  "never mind",
+  "nevermind",
+  "nvm",
+  "forget it",
+  "forget that",
+  "leave it",
+  "don't",
+  "actually never mind",
+  "actually nevermind",
+  "ok never mind",
+  "no never mind",
+  "stop nevermind",
+  "stop never mind",
+  "para",
+  "detente",
+  "cancela",
+  "olvídalo",
+  "olvidalo",
+  "déjalo",
+  "arrête",
+  "arrete",
+  "annule",
+  "laisse tomber",
+  "stopp",
+  "halt",
+  "abbrechen",
+  "vergiss es",
+  "fermati",
+  "annulla",
+  "lascia stare",
+  "pare",
+  "cancele",
+  "deixa pra lá",
+  "esquece",
+  "стоп",
+  "хватит",
+  "отмена",
+  "やめて",
+  "止めて",
+  "ストップ",
+  "キャンセル",
+  "停",
+  "停止",
+  "取消",
+  "算了",
+  "멈춰",
+  "그만",
+  "취소",
+  "रुको",
+  "बंद करो",
+  "توقف",
+] as const;
+
+const normalized = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[\p{P}\p{S}]/gu, (mark) => (mark === "'" ? mark : " "))
+    .replace(/\b(hey )?stella\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const PHRASES: ReadonlySet<string> = new Set(STOP_PHRASES.map(normalized));
+
+/** The whole message tells Stella to stop what she is doing, and says nothing else. */
+export const isStopMessage = (text: string): boolean => text.length <= 60 && PHRASES.has(normalized(text));

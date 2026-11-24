@@ -115,6 +115,7 @@ import {
   unansweredText,
 } from "../stella/agents.ts";
 import { agentToolSelection, type StellaToolHost } from "../stella/host-tools.ts";
+import { isStopInput, withTakeoverNote } from "../stella/takeover.ts";
 import {
   parseStellaModelId,
   STELLA_PROVIDER_ID,
@@ -439,6 +440,7 @@ type Chat = {
   harness: Harness;
   root: Conversation;
   refreshTools(): void;
+  takeover: OpenStellaHarness["takeover"];
   startAgent: OpenStellaHarness["startAgent"];
   agentRecords: OpenStellaHarness["agentRecords"];
   messageAgent: OpenStellaHarness["messageAgent"];
@@ -1653,6 +1655,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         const {
           harness,
           refreshTools,
+          takeover,
           startAgent,
           agentRecords,
           messageAgent,
@@ -1860,6 +1863,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               ...cliEngines.map((engine) => engine.extension(conversationId)),
             ],
             env: environments.env,
+            takeover: { engines: cliEngines },
             onReport: options.report,
           },
           context,
@@ -1867,6 +1871,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         harnessRef = harness;
         const orchestrator = orchestratorAgent(stellaModelRef("orchestrator"));
         const root = await harness.root(context, { agent: orchestrator });
+        takeover.bind(harness, root);
         if (offersAgentTools(await root.agent(context))) await root.configure(orchestrator, context);
         resumedRun = (await harness.snapshot(LiveDoc, root.id, context))?.run?.taskId;
         const resumed = resumedRun !== undefined;
@@ -2031,6 +2036,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           modelsReady,
           safeguardStream,
           refreshTools,
+          takeover,
           startAgent,
           agentRecords,
           messageAgent,
@@ -2258,11 +2264,19 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await afterStop(chat.harness, chat.root, context);
     const input = await withReminders(conversationId, chat, content, sent);
+    const submission = await takeOver(chat, input, requestId);
+    return { submissionId: submission.id };
+  };
+
+  const takeOver = async (chat: Chat, input: UserInput, requestId: string) => {
+    const now = isStopInput(input);
+    const cuts = await chat.takeover.cuts(context, { now });
     const submission = await chat.root.submit(
-      { type: "input", content: input, requestId, whenBusy: "steer" },
+      { type: "input", content: cuts ? withTakeoverNote(input) : input, requestId, whenBusy: "steer" },
       context,
     );
-    return { submissionId: submission.id };
+    void chat.takeover.begin(context, { now }).catch((error: unknown) => options.report(error));
+    return submission;
   };
 
   const noteUserMessages = (messages: readonly Message[], into: ReminderContext): void => {
@@ -2508,6 +2522,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       content?: UserInput;
       visible: boolean;
       rejectIfBusy?: boolean;
+      /** The user sent it from another device: it takes over like a message typed here. */
+      takesOver?: boolean;
       placementRunId?: string;
       observe?: (events: PiChatEvent[]) => void;
     },
@@ -2548,6 +2564,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       content?: UserInput;
       visible: boolean;
       rejectIfBusy?: boolean;
+      takesOver?: boolean;
       placementRunId?: string;
     },
   ): Promise<{ status: "ok"; finalText: string } | { status: "busy" | "error"; finalText: ""; error: string }> => {
@@ -2560,15 +2577,13 @@ export function desktopChats(options: DesktopChatsOptions) {
       turn.content ??
       (turn.visible ? turn.prompt : [{ type: "text", text: turn.prompt, stella: { hidden: true } } as TextContent]);
     try {
-      submission = await chat.root.submit(
-        {
-          type: "input",
-          content: turn.visible ? await withReminders(conversationId, chat, content) : content,
-          requestId: turn.requestId,
-          whenBusy: turn.rejectIfBusy ? "reject" : "followUp",
-        },
-        context,
-      );
+      const input = turn.visible ? await withReminders(conversationId, chat, content) : content;
+      submission = turn.takesOver
+        ? await takeOver(chat, input, turn.requestId)
+        : await chat.root.submit(
+            { type: "input", content: input, requestId: turn.requestId, whenBusy: turn.rejectIfBusy ? "reject" : "followUp" },
+            context,
+          );
     } catch (error) {
       if (error instanceof ConversationBusy) {
         return { status: "busy", finalText: "", error: "Stella is already handling another turn." };

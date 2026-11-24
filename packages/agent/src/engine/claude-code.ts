@@ -56,6 +56,7 @@ import { isSafeguardContextBoundary } from "../stella/safeguard.ts";
 import { ANTIGRAVITY_CLI_ENGINE_EXTENSION, ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 import { abandonToolCall } from "./abandoned-calls.ts";
 import { noteNativeToolCall } from "./native-calls.ts";
+import { isCutCall, isTakenOver, TakenOver } from "./taken-over.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
 export const CLAUDE_CODE_API = "claude-code-cli";
@@ -111,6 +112,8 @@ export type CliEngineFlavor = {
   wrappedTools: readonly (typeof WRAPPED_TOOLS)[number][];
   builtinTools: readonly string[];
   webTools: readonly string[];
+  /** A message that arrives mid-turn ends the CLI's turn and opens the next: the CLI takes nothing in while one runs. */
+  restartsForMessages?: true;
   contextWindow(model: string): number;
   toolSet(args: { role: ClaudeCodeRole; catalog: ClaudeCodeToolSpec[]; builtinsOff: boolean }): {
     tools: ClaudeCodeToolSpec[];
@@ -154,6 +157,7 @@ export const ANTIGRAVITY_CLI_FLAVOR: CliEngineFlavor = {
   wrappedTools: [],
   builtinTools: [...ANTIGRAVITY_NATIVE_TOOLS.map((name) => `${ANTIGRAVITY_NATIVE_PREFIX}${name}`), ANTIGRAVITY_OTHER_TOOL],
   webTools: [],
+  restartsForMessages: true,
   contextWindow: () => 1_048_576,
   toolSet: resolveAntigravityToolSet,
 };
@@ -314,6 +318,9 @@ type Session = {
   wakes?: Set<string>;
   /** Stella is closing this session (quitting): its turn ends cut off, not finished, and resumes on the next start. */
   closing?: true;
+  lastSignAt?: number;
+  /** What the CLI said it is doing that can take long and shows in the chat. */
+  hold?: "compacting" | "user";
 };
 
 const ZERO_USAGE = (): Usage => ({
@@ -803,6 +810,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (turn.done) return;
     turn.done = true;
     turn.outcome = outcome;
+    if (turn.session.turn === turn) delete turn.session.hold;
     const record = turn.session.record;
     if (record?.open && !turn.session.closing) {
       delete record.open;
@@ -822,9 +830,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     push(turn, { kind: "end" });
   };
 
-  const abortTurn = (turn: Turn | undefined, reason: string) => {
+  const abortTurn = (turn: Turn | undefined, reason: string | TakenOver) => {
     if (!turn || turn.done) return;
-    turn.abort.abort(new Error(reason));
+    turn.abort.abort(typeof reason === "string" ? new Error(reason) : reason);
   };
 
   const deliver = (turn: Turn, toolUseId: string, outcome: ClaudeCodeToolOutcome) => {
@@ -984,7 +992,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const foreign =
       options.transport.hydrate !== undefined &&
       resumedDelta !== undefined &&
-      (resumedDelta.some((message) => message.role === "assistant" && message.stopReason !== "aborted" && message.stopReason !== "error") ||
+      (resumedDelta.some((message) => message.role === "assistant" && message.content.length > 0 && message.stopReason !== "aborted" && message.stopReason !== "error") ||
         (boundary !== undefined && boundary !== record.boundary && !record.seen.includes(boundary)));
     const delta = foreign ? undefined : resumedDelta;
     const startedOver =
@@ -1084,6 +1092,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       ...(relaunched ? { relaunched: true as const } : {}),
     };
     session.turn = turn;
+    session.lastSignAt = Date.now();
     if (!record.open) {
       record.open = true;
       void saveRecord(session);
@@ -1153,6 +1162,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           }),
         onEvent: (event) => {
           if (turn.done) return;
+          session.lastSignAt = Date.now();
           if (event.type === "stream_event") answered();
           if (event.type === "user") {
             noteRefusals(turn, event as Record<string, unknown>);
@@ -1164,6 +1174,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           settleNative(toolUseId, { text: result, isError });
         },
         onStatus: (status) => {
+          session.lastSignAt = Date.now();
+          if (status.state === "compacting") session.hold = "compacting";
+          else if (status.state === "usage-limit" || status.state === "login-required") session.hold = "user";
+          else delete session.hold;
           for (const listener of statusListeners) {
             try {
               listener(binding.session, status);
@@ -1277,7 +1291,13 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       out.end(output);
     };
     const onAbort = () => {
-      abortTurn(turn, "Stopped.");
+      if (isTakenOver(signal?.reason)) {
+        abortTurn(turn, signal.reason);
+        if (!turn.prompted) {
+          noteSeen(turn.session, [output]);
+          void saveRecord(turn.session);
+        }
+      } else abortTurn(turn, "Stopped.");
       const wake = turn.wake;
       turn.wake = undefined;
       wake?.();
@@ -1503,7 +1523,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const current = turn;
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
       const stopped = turn.abort.signal.aborted;
-      const replaced = !ours || stopped || (turn.done && turn.queue.length === 0);
+      const restarts =
+        flavor.restartsForMessages &&
+        !turn.done &&
+        trailingUsers(tail).users.some((message) => !session.wakes?.has(textOf(message.content).trim()));
+      const replaced = !ours || stopped || restarts || (turn.done && turn.queue.length === 0);
       const moved = !replaced && !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
       if (moved) {
         turn.nextToolSet = toolSet;
@@ -1651,7 +1675,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const onAbort = () => {
         waiters.delete(settle);
         const record = calls.get(toolUseId);
-        abortTurn(record?.turn, "Stopped.");
+        abortTurn(record?.turn, isCutCall(toolUseId) ? new TakenOver() : "Stopped.");
         resolve({ text: "Stopped.", isError: true });
       };
       waiters.add(settle);
@@ -1851,6 +1875,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       return keys.size > 0 ? (options.transport.wakeUsageLimitHolds?.(keys) ?? 0) : 0;
     },
+    compacting: (piSessionId: string): boolean => sessions.get(piSessionId)?.hold === "compacting",
+    holding: (piSessionId: string): boolean => sessions.get(piSessionId)?.hold === "user",
+    lastSignAt: (piSessionId: string): number | undefined => sessions.get(piSessionId)?.lastSignAt,
+    ownsCall: (callId: string): boolean => calls.get(callId)?.native === true,
     running(conversationId: string): boolean {
       for (const session of sessions.values()) {
         if (session.binding.session.conversationId === conversationId && session.turn && !session.turn.done) return true;

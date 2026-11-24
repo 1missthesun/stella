@@ -3228,7 +3228,7 @@ export class NodeReplKernelRegistry {
   async startCell(
     code: string,
     context: ToolContext,
-    options: EvaluateOptions & { yieldTimeMs?: number } = {},
+    options: EvaluateOptions & { yieldTimeMs?: number; yieldSignal?: AbortSignal } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
     const { id, kernel } = this.resolveKernel(context);
@@ -3303,6 +3303,7 @@ export class NodeReplKernelRegistry {
       options.signal,
       undefined,
       false,
+      options.yieldSignal,
     );
   }
 
@@ -3314,6 +3315,7 @@ export class NodeReplKernelRegistry {
       terminate?: boolean;
       afterCursor?: number;
       signal?: AbortSignal;
+      yieldSignal?: AbortSignal;
     } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
@@ -3333,6 +3335,8 @@ export class NodeReplKernelRegistry {
       options.waitMs ?? 10_000,
       options.signal,
       options.afterCursor,
+      true,
+      options.yieldSignal,
     );
   }
 
@@ -3460,6 +3464,7 @@ export class NodeReplKernelRegistry {
     signal?: AbortSignal,
     requestedAfterCursor?: number,
     wakeOnContent = true,
+    yieldSignal?: AbortSignal,
   ): Promise<NodeReplCellObservation> {
     const boundedWaitMs = Number.isFinite(waitMs)
       ? Math.max(0, Math.floor(waitMs))
@@ -3477,34 +3482,44 @@ export class NodeReplKernelRegistry {
         `Invalid code content cursor ${String(requestedAfterCursor)} for cell ${cell.cellId}; current cursor is ${cell.cursor}.`,
       );
     }
-    await waitForCellChange(
-      cell,
-      fromCursor,
-      boundedWaitMs,
-      signal,
-      wakeOnContent,
-    );
-    while (
-      !cell.outcome &&
-      cell.kernel.awaitingUser &&
-      !(wakeOnContent && cell.cursor > fromCursor)
-    ) {
-      await waitForCellChange(
-        cell,
-        fromCursor,
-        Number.POSITIVE_INFINITY,
-        signal,
-        wakeOnContent,
-        () => !cell.kernel.awaitingUser,
-      );
-      if (cell.outcome || cell.kernel.awaitingUser) continue;
+    const yielded = () => yieldSignal?.aborted === true;
+    const onYield = () => notifyCellObservers(cell);
+    yieldSignal?.addEventListener("abort", onYield, { once: true });
+    try {
       await waitForCellChange(
         cell,
         fromCursor,
         boundedWaitMs,
         signal,
         wakeOnContent,
+        yielded,
       );
+      while (
+        !cell.outcome &&
+        !yielded() &&
+        cell.kernel.awaitingUser &&
+        !(wakeOnContent && cell.cursor > fromCursor)
+      ) {
+        await waitForCellChange(
+          cell,
+          fromCursor,
+          Number.POSITIVE_INFINITY,
+          signal,
+          wakeOnContent,
+          () => yielded() || !cell.kernel.awaitingUser,
+        );
+        if (cell.outcome || yielded() || cell.kernel.awaitingUser) continue;
+        await waitForCellChange(
+          cell,
+          fromCursor,
+          boundedWaitMs,
+          signal,
+          wakeOnContent,
+          yielded,
+        );
+      }
+    } finally {
+      yieldSignal?.removeEventListener("abort", onYield);
     }
     if (signal?.aborted) throw abortError(signal);
     const cursor = cell.cursor;

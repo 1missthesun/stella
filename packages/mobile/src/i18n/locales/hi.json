@@ -259,6 +259,7 @@
       }
     },
     "apps": {
+      "emailHint": "आपके इनबॉक्स के लिए Stella का पेज",
       "empty": "Stella आपके लिए जो ऐप बनाती है, वे यहाँ रहेंगे।",
       "emptyAction": "ऐप बनाएँ",
       "emptyActionPrompt": "मेरे लिए एक ऐप बनाओ जो "
@@ -419,8 +420,6 @@
       "backToChat": "चैट पर वापस जाएँ",
       "chat": "चैट",
       "chatSettingsLabel": "चैट सेटिंग्स",
-      "closeLabel": "नेविगेशन बंद करें",
-      "openLabel": "नेविगेशन खोलें",
       "settings": "सेटिंग्स",
       "signIn": "साइन इन"
     },

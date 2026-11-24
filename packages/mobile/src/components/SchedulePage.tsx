@@ -28,7 +28,7 @@ import { timeOfDay, upcomingSection } from "../lib/list-sections";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { authClient } from "../lib/auth-client";
 import { startChatWith } from "../lib/ask-stella";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBottomInset } from "../lib/bottom-bar";
 import { useColors } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
 import { ScheduleRow, makeScheduleRowStyles } from "./schedule-rows";
@@ -43,7 +43,7 @@ export function SchedulePage() {
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const focusedRef = useRef<string | null>(null);
   const rowStyles = useMemo(() => makeScheduleRowStyles(colors), [colors]);
-  const bottomInset = useSafeAreaInsets().bottom;
+  const bottomInset = useTabBottomInset();
   const session = authClient.useSession();
   const signedIn = Boolean(session.data?.user);
 

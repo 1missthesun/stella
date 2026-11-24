@@ -1151,6 +1151,7 @@
       }
     },
     "apps": {
+      "emailHint": "Trang của Stella cho hộp thư đến của bạn",
       "empty": "Các ứng dụng Stella tạo cho bạn sẽ hiển thị ở đây.",
       "emptyAction": "Tạo ứng dụng",
       "emptyActionPrompt": "Tạo cho tôi một ứng dụng "
@@ -1311,8 +1312,6 @@
       "backToChat": "Quay lại trò chuyện",
       "chat": "Trò chuyện",
       "chatSettingsLabel": "Cài đặt trò chuyện",
-      "closeLabel": "Đóng điều hướng",
-      "openLabel": "Mở điều hướng",
       "settings": "Cài đặt",
       "signIn": "Đăng nhập"
     },

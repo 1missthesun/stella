@@ -260,6 +260,7 @@
       }
     },
     "apps": {
+      "emailHint": "Pagina Stellei pentru inboxul tău",
       "empty": "Aplicațiile pe care Stella le creează pentru tine vor apărea aici.",
       "emptyAction": "Creează o aplicație",
       "emptyActionPrompt": "Creează-mi o aplicație care "
@@ -420,8 +421,6 @@
       "backToChat": "Înapoi la chat",
       "chat": "Chat",
       "chatSettingsLabel": "Setări chat",
-      "closeLabel": "Închide navigarea",
-      "openLabel": "Deschide navigarea",
       "settings": "Setări",
       "signIn": "Conectează-te"
     },

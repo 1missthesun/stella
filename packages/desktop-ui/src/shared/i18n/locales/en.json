@@ -1161,6 +1161,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stella's page for your inbox",
       "empty": "Apps Stella builds for you live here.",
       "emptyAction": "Build an app",
       "emptyActionPrompt": "Build me an app that "
@@ -1321,8 +1322,6 @@
       "backToChat": "Back to chat",
       "chat": "Chat",
       "chatSettingsLabel": "Chat settings",
-      "closeLabel": "Close navigation",
-      "openLabel": "Open navigation",
       "settings": "Settings",
       "signIn": "Sign in"
     },

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../Text";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,8 +18,7 @@ import { fadeHex } from "../../theme/oklch";
 import { useColors } from "../../theme/theme-context";
 import { Icon } from "../Icon";
 import { StellaMarkHero } from "../stella-mark/StellaMarkHero";
-import { DrawerScrollView } from "./DrawerStage";
-import { Rise, SIDEBAR_PLACES, SidebarPlaceRow } from "./SidebarNav";
+import { SIDEBAR_PLACES, SidebarPlaceRow } from "./SidebarNav";
 import { useEmailUnseenCount } from "../../lib/email";
 import { useEmailFeature } from "../../lib/email-feature";
 
@@ -34,12 +33,10 @@ const selectFileCount = (hub: ActivityHubData | null) => hub?.artifacts.length ?
 
 export function SidebarPanel({
   width,
-  animated = false,
   activeTab,
   onSelectTab,
 }: {
   width: number;
-  animated?: boolean;
   activeTab: MainTabId | null;
   onSelectTab: (tab: MainTabId) => void;
 }) {
@@ -59,11 +56,10 @@ export function SidebarPanel({
     files: fileCount > 0 ? String(fileCount) : undefined,
   };
   const onAccount = activeTab === "settings";
-  let i = 0;
 
   return (
     <View style={[styles.root, { width }]}>
-      <DrawerScrollView
+      <ScrollView
         contentContainerStyle={[
           styles.content,
           {
@@ -74,92 +70,87 @@ export function SidebarPanel({
         showsVerticalScrollIndicator={false}
         alwaysBounceVertical={false}
       >
-        <Rise i={i++} animated={animated}>
-          <View
-            style={styles.brand}
-            accessible
-            accessibilityRole="header"
-            accessibilityLabel="Stella"
-          >
-            <StellaMarkHero
-              size={BRAND_MARK}
-              faceColor={colors.background}
-              shape="soft"
-            />
-            <Text style={styles.wordmark} maxFontSizeMultiplier={1}>
-              Stella
-            </Text>
-          </View>
-        </Rise>
+        <View
+          style={styles.brand}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel="Stella"
+        >
+          <StellaMarkHero
+            size={BRAND_MARK}
+            faceColor={colors.background}
+            shape="soft"
+          />
+          <Text style={styles.wordmark} maxFontSizeMultiplier={1}>
+            Stella
+          </Text>
+        </View>
 
         <View style={styles.spacer} />
 
         {PLACES_FROM_TOP.filter((place) => place !== "email" || emailOn).map((place) => (
-          <Rise key={place} i={i++} animated={animated}>
-            <SidebarPlaceRow
-              place={place}
-              active={activeTab === place}
-              meta={metas[place]}
-              {...(place === "email" && emailUnseen > 0 ? { badge: emailUnseen } : {})}
-              onSelect={onSelectTab}
-            />
-          </Rise>
+          <SidebarPlaceRow
+            key={place}
+            place={place}
+            active={activeTab === place}
+            meta={metas[place]}
+            {...(place === "email" && emailUnseen > 0 ? { badge: emailUnseen } : {})}
+            onSelect={onSelectTab}
+          />
         ))}
 
         <View style={styles.rule} />
 
-        <Rise i={i++} animated={animated}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: onAccount }}
-            accessibilityLabel={
-              name ? `${name}, ${accountLabel}` : accountLabel
-            }
-            onPress={() => onSelectTab("settings")}
-            style={({ pressed }) => [styles.account, pressed && styles.pressed]}
-            testID="mobile-sidebar-nav-settings"
-          >
-            <View style={styles.avatar}>
-              {image ? (
-                <Image
-                  source={{ uri: image }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                />
-              ) : name ? (
-                <Text style={styles.initial} maxFontSizeMultiplier={1}>
-                  {name.slice(0, 1).toUpperCase()}
-                </Text>
-              ) : (
-                <Icon name="user" size={22} color={colors.accentForeground} />
-              )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: onAccount }}
+          accessibilityLabel={
+            name ? `${name}, ${accountLabel}` : accountLabel
+          }
+          onPress={() => onSelectTab("settings")}
+          style={({ pressed }) => [styles.account, pressed && styles.pressed]}
+          testID="mobile-sidebar-nav-settings"
+        >
+          <View style={styles.avatar}>
+            {image ? (
+              <Image
+                source={{ uri: image }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+              />
+            ) : name ? (
+              <Text style={styles.initial} maxFontSizeMultiplier={1}>
+                {name.slice(0, 1).toUpperCase()}
+              </Text>
+            ) : (
+              <Icon name="user" size={22} color={colors.accentForeground} />
+            )}
+          </View>
+          <View style={styles.identity}>
+            <View style={styles.titleLine}>
+              <Text
+                style={styles.name}
+                numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                {name || accountLabel}
+              </Text>
+              {!name && onAccount ? <View style={styles.current} /> : null}
             </View>
-            <View style={styles.identity}>
-              <View style={styles.titleLine}>
+            {name ? (
+              <View style={styles.accountLine}>
                 <Text
-                  style={styles.name}
-                  numberOfLines={1}
+                  style={styles.accountLink}
                   maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
                 >
-                  {name || accountLabel}
+                  {accountLabel}
                 </Text>
-                {!name && onAccount ? <View style={styles.current} /> : null}
+                {onAccount ? <View style={styles.current} /> : null}
               </View>
-              {name ? (
-                <View style={styles.accountLine}>
-                  <Text
-                    style={styles.accountLink}
-                    maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                  >
-                    {accountLabel}
-                  </Text>
-                  {onAccount ? <View style={styles.current} /> : null}
-                </View>
-              ) : null}
-            </View>
-          </Pressable>
-        </Rise>
-      </DrawerScrollView>
+            ) : null}
+          </View>
+        </Pressable>
+      </ScrollView>
       <SidebarTopFade />
     </View>
   );

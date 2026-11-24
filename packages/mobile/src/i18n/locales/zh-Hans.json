@@ -258,6 +258,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stella 的收件箱页面",
       "empty": "Stella 为你构建的应用会显示在这里。",
       "emptyAction": "构建应用",
       "emptyActionPrompt": "帮我做一个应用，"
@@ -418,8 +419,6 @@
       "backToChat": "返回聊天",
       "chat": "聊天",
       "chatSettingsLabel": "聊天设置",
-      "closeLabel": "关闭导航",
-      "openLabel": "打开导航",
       "settings": "设置",
       "signIn": "登录"
     },

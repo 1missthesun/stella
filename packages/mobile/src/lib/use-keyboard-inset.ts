@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Keyboard } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBottomInset } from "./bottom-bar";
 
 export function useKeyboardInset() {
-  const bottomInset = useSafeAreaInsets().bottom;
+  const bottomInset = useTabBottomInset();
   const [height, setHeight] = useState(0);
 
   useEffect(() => {

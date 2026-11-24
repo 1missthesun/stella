@@ -108,7 +108,6 @@ export type MessageRowActions = {
   ) => void;
   onOpenStellaFile?: (path: string, gallery?: readonly string[]) => void;
   onOpenMessageMenu: (request: MessageMenuRequest) => void;
-  onOpenAgentActivity?: () => void;
   onOpenReply?: (ref: ReplyRef) => void;
 };
 

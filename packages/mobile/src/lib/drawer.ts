@@ -6,27 +6,21 @@ import {
   cancelAnimation,
   makeMutable,
   runOnJS,
-  useSharedValue,
   withSpring,
   type WithSpringConfig,
 } from "react-native-reanimated";
 
-export type DrawerSide = "start" | "end";
-
 export const drawerProgress = makeMutable(0);
-export const drawerSign = makeMutable(1);
 
 type DrawerState = {
   open: boolean;
   live: boolean;
-  side: DrawerSide;
   held: boolean;
 };
 
 let state: DrawerState = {
   open: false,
   live: false,
-  side: "start",
   held: false,
 };
 const listeners = new Set<() => void>();
@@ -36,7 +30,6 @@ function setState(next: Partial<DrawerState>) {
   if (
     merged.open === state.open &&
     merged.live === state.live &&
-    merged.side === state.side &&
     merged.held === state.held
   ) {
     return;
@@ -54,7 +47,6 @@ function subscribe(listener: () => void) {
 
 const readOpen = () => state.open;
 const readLive = () => state.live;
-const readSide = () => state.side;
 const readHeld = () => state.held;
 
 export function useDrawerOpen(): boolean {
@@ -63,10 +55,6 @@ export function useDrawerOpen(): boolean {
 
 export function useDrawerLive(): boolean {
   return useSyncExternalStore(subscribe, readLive, readLive);
-}
-
-export function useDrawerSide(): DrawerSide {
-  return useSyncExternalStore(subscribe, readSide, readSide);
 }
 
 export function useDrawerHeld(): boolean {
@@ -96,31 +84,16 @@ const CLOSE: WithSpringConfig = {
   overshootClamping: true,
 };
 
-let openedAt = 0;
-
 function setOpen(open: boolean) {
-  if (open && !state.open) openedAt = Date.now();
   setState({ open, live: open || state.live });
-}
-
-export function drawerJustOpened(): boolean {
-  return Date.now() - openedAt < 380;
 }
 
 function setLive(live: boolean) {
   setState({ live });
 }
 
-function begin(side: DrawerSide) {
-  setState({ live: true, side });
-}
-
-function claimSide(side: DrawerSide) {
-  if (state.side === side) return;
-  if (state.live) cancelAnimation(drawerProgress);
-  drawerProgress.value = 0;
-  drawerSign.value = side === "start" ? 1 : -1;
-  setState({ side });
+function begin() {
+  setLive(true);
 }
 
 function rested() {
@@ -138,9 +111,8 @@ function settleDrawer(open: boolean, velocity = 0) {
   );
 }
 
-export function openDrawer(side: DrawerSide = "start") {
+export function openDrawer() {
   Keyboard.dismiss();
-  claimSide(side);
   setOpen(true);
   settleDrawer(true);
 }
@@ -150,37 +122,30 @@ export function closeDrawer() {
   settleDrawer(false);
 }
 
-export function isDrawerOpen(side?: DrawerSide): boolean {
-  return state.open && (side === undefined || state.side === side);
+export function isDrawerOpen(): boolean {
+  return state.open;
 }
 
 const SCALE = 0.9;
-const END_STRIP = 60;
+const PAGE_STRIP = 60;
 
-export function drawerTravels(width: number) {
-  const start = Math.round(Math.min(width * 0.75, 320));
-  const end = Math.max(
-    start,
-    Math.round(Math.min(width * (1 + SCALE) * 0.5 - END_STRIP, 400)),
+function drawerTravel(width: number) {
+  return Math.round(
+    Math.max(
+      Math.min(width * 0.75, 320),
+      Math.min(width * (1 + SCALE) * 0.5 - PAGE_STRIP, 400),
+    ),
   );
-  return { start, end };
 }
 
 export function useDrawerMetrics() {
   const { width } = useWindowDimensions();
-  const travels = drawerTravels(width);
   return {
     width,
-    travel: travels.start,
-    endTravel: travels.end,
+    travel: drawerTravel(width),
     scale: SCALE,
     radius: 40,
   };
-}
-
-export function useDrawerTravel(side: DrawerSide) {
-  const { travel, endTravel } = useDrawerMetrics();
-  return side === "start" ? travel : endTravel;
 }
 
 export const DRAWER_VEIL = {
@@ -247,21 +212,16 @@ let nextOwner = 1;
 
 type PanPoint = { translationX: number; absoluteX: number; absoluteY: number };
 
-function grab(owner: number, sign: number, e: PanPoint, travel: number) {
+function grab(owner: number, e: PanPoint, travel: number) {
   "worklet";
-  const translationX = e.translationX;
   cancelAnimation(drawerProgress);
-  if (drawerSign.value !== sign) {
-    drawerSign.value = sign;
-    drawerProgress.value = 0;
-  }
   dragTravel.value = travel;
-  dragOrigin.value = drawerProgress.value - (sign * translationX) / travel;
+  dragOrigin.value = drawerProgress.value + e.translationX / travel;
   dragOwner.value = owner;
   dragX.value = e.absoluteX;
   dragY.value = e.absoluteY;
   dragAt.value = Date.now();
-  runOnJS(begin)(sign === 1 ? "start" : "end");
+  runOnJS(begin)();
 }
 
 function track(owner: number, e: PanPoint) {
@@ -277,8 +237,7 @@ function track(owner: number, e: PanPoint) {
     abandon(owner);
     return;
   }
-  const raw =
-    dragOrigin.value + (drawerSign.value * e.translationX) / dragTravel.value;
+  const raw = dragOrigin.value - e.translationX / dragTravel.value;
   drawerProgress.value = raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
 }
 
@@ -294,72 +253,54 @@ function release(owner: number, velocityX: number) {
   "worklet";
   if (dragOwner.value !== owner) return;
   dragOwner.value = 0;
-  const v = (drawerSign.value * velocityX) / dragTravel.value;
+  const v = -velocityX / dragTravel.value;
   const open = drawerProgress.value + v * 0.2 > 0.5;
   runOnJS(setOpen)(open);
   settleDrawer(open, v);
 }
 
 export function useDrawerOpenPan({
-  start,
-  end,
+  enabled,
   open,
   held,
 }: {
-  start: boolean;
-  end: boolean;
+  enabled: boolean;
   open: boolean;
   held: boolean;
 }) {
-  const { travel, endTravel } = useDrawerMetrics();
-  const downX = useSharedValue(0);
+  const { travel } = useDrawerMetrics();
   return useMemo(() => {
     const owner = nextOwner++;
-    const offset: number | [number, number] =
-      start && end ? [-12, 12] : start ? 12 : -12;
     return Gesture.Pan()
-      .enabled((start || end) && !open && !held)
-      .activeOffsetX(offset)
-      .failOffsetY([-14, 14])
-      .onTouchesDown((e, manager) => {
-        const touch = e.changedTouches[0];
-        if (touch) downX.value = touch.absoluteX;
-        if (dragOwner.value === owner) manager.end();
-      })
-      .onStart((e) => {
-        let sign = drawerSign.value;
-        if (drawerProgress.value <= 0.001) {
-          // Android's pan reports translation from where it activated, so
-          // it is 0 here; the direction comes from the touch-down point.
-          const moved = e.absoluteX - downX.value || e.translationX;
-          sign = moved > 0 ? 1 : -1;
-          if (sign === 1 ? !start : !end) return;
-        }
-        grab(owner, sign, e, sign === 1 ? travel : endTravel);
-        runOnJS(dismissKeyboard)();
-      })
-      .onUpdate((e) => track(owner, e))
-      .onFinalize((e) => release(owner, e.velocityX));
-  }, [start, end, open, held, travel, endTravel, downX]);
-}
-
-export function useDrawerClosePan(
-  side: DrawerSide,
-  scroll?: ReturnType<typeof Gesture.Native>,
-) {
-  const travel = useDrawerTravel(side);
-  const sign = side === "start" ? 1 : -1;
-  return useMemo(() => {
-    const owner = nextOwner++;
-    const pan = Gesture.Pan()
-      .activeOffsetX(sign > 0 ? -12 : 12)
+      .enabled(enabled && !open && !held)
+      .activeOffsetX(-12)
+      .failOffsetX(12)
       .failOffsetY([-14, 14])
       .onTouchesDown((_e, manager) => {
         if (dragOwner.value === owner) manager.end();
       })
-      .onStart((e) => grab(owner, sign, e, travel))
+      .onStart((e) => {
+        grab(owner, e, travel);
+        runOnJS(dismissKeyboard)();
+      })
+      .onUpdate((e) => track(owner, e))
+      .onFinalize((e) => release(owner, e.velocityX));
+  }, [enabled, open, held, travel]);
+}
+
+export function useDrawerClosePan(scroll?: ReturnType<typeof Gesture.Native>) {
+  const { travel } = useDrawerMetrics();
+  return useMemo(() => {
+    const owner = nextOwner++;
+    const pan = Gesture.Pan()
+      .activeOffsetX(12)
+      .failOffsetY([-14, 14])
+      .onTouchesDown((_e, manager) => {
+        if (dragOwner.value === owner) manager.end();
+      })
+      .onStart((e) => grab(owner, e, travel))
       .onUpdate((e) => track(owner, e))
       .onFinalize((e) => release(owner, e.velocityX));
     return scroll ? pan.simultaneousWithExternalGesture(scroll) : pan;
-  }, [sign, travel, scroll]);
+  }, [travel, scroll]);
 }

@@ -1161,6 +1161,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stellan sivu postilaatikollesi",
       "empty": "Stellan sinulle rakentamat sovellukset näkyvät täällä.",
       "emptyAction": "Rakenna sovellus",
       "emptyActionPrompt": "Rakenna minulle sovellus, joka "
@@ -1321,8 +1322,6 @@
       "backToChat": "Takaisin keskusteluun",
       "chat": "Keskustelu",
       "chatSettingsLabel": "Keskustelun asetukset",
-      "closeLabel": "Sulje navigointi",
-      "openLabel": "Avaa navigointi",
       "settings": "Asetukset",
       "signIn": "Kirjaudu sisään"
     },

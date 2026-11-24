@@ -37,7 +37,6 @@ import {
   closeDrawer,
   drawerBlur,
   drawerProgress,
-  drawerSign,
   drawerVeil,
   isDrawerOpen,
   openDrawer,
@@ -47,9 +46,6 @@ import {
   useDrawerHeld,
   useDrawerOpen,
   useDrawerOpenPan,
-  useDrawerSide,
-  useDrawerTravel,
-  type DrawerSide,
 } from "../../lib/drawer";
 import { tapLight } from "../../lib/haptics";
 import { BlurView } from "expo-blur";
@@ -72,12 +68,7 @@ type ChevronSpec = {
   openCenterY: number;
   openLabel: string;
   closeLabel: string;
-};
-
-type EndSpec = {
-  panel: ReactNode;
-  enabled: boolean;
-  chevron: ChevronSpec & { restIcon: IconName };
+  restIcon: IconName;
 };
 
 export function DrawerStage({
@@ -85,24 +76,20 @@ export function DrawerStage({
   panel,
   enabled,
   chevron,
-  end,
 }: {
   children: ReactNode;
   panel: ReactNode;
   enabled: boolean;
   chevron: ChevronSpec;
-  end?: EndSpec;
 }) {
   const colors = useColors();
   const { isDark } = useTheme();
   const live = useDrawerLive();
   const open = useDrawerOpen();
   const held = useDrawerHeld();
-  const side = useDrawerSide();
   const p = drawerProgress;
   const floor = colors.background;
-  const endEnabled = Boolean(end?.enabled);
-  const { travel, endTravel, scale, radius } = useDrawerMetrics();
+  const { travel, scale, radius } = useDrawerMetrics();
   const reduce = useReducedMotion();
 
   const rest = useSharedValue(0);
@@ -133,10 +120,7 @@ export function DrawerStage({
     const s = reduce ? 1 : 1 - (1 - scale) * Math.min(v, 1.2);
     return {
       transform: [
-        {
-          translateX:
-            drawerSign.value * v * (drawerSign.value > 0 ? travel : endTravel),
-        },
+        { translateX: -v * travel },
         { scale: s },
       ],
       borderRadius: interpolate(v, [0, 0.12], [0, radius], CLAMP),
@@ -152,12 +136,7 @@ export function DrawerStage({
     intensity: reduce ? 0 : drawerBlur(p.value) * PAGE_BLUR,
   }));
 
-  const openPan = useDrawerOpenPan({
-    start: enabled,
-    end: endEnabled,
-    open,
-    held,
-  });
+  const openPan = useDrawerOpenPan({ enabled, open, held });
   const [swipeToOpen, setSwipeToOpen] = useState<GestureType | null>(null);
   useEffect(() => {
     if (openPan.handlerTag <= 0) return;
@@ -165,7 +144,7 @@ export function DrawerStage({
       current?.handlerTag === openPan.handlerTag ? current : openPan,
     );
   }, [openPan]);
-  const closePan = useDrawerClosePan(side);
+  const closePan = useDrawerClosePan();
   const catcher = useMemo(
     () =>
       Gesture.Exclusive(
@@ -180,14 +159,9 @@ export function DrawerStage({
   return (
     <DrawerSwipe.Provider value={swipeToOpen}>
       <View style={[styles.root, { backgroundColor: floor }]}>
-        <DrawerPanel side="start" open={open && side === "start"} live={live}>
+        <DrawerPanel open={open} live={live}>
           {panel}
         </DrawerPanel>
-        {end ? (
-          <DrawerPanel side="end" open={open && side === "end"} live={live}>
-            {end.panel}
-          </DrawerPanel>
-        ) : null}
 
         <GestureDetector gesture={openPan}>
           <Animated.View
@@ -231,12 +205,7 @@ export function DrawerStage({
           </Animated.View>
         </GestureDetector>
 
-        {live && side === "start" && enabled ? (
-          <FloatingChevron {...chevron} side="start" open={open} />
-        ) : null}
-        {live && side === "end" && end && endEnabled ? (
-          <FloatingChevron {...end.chevron} side="end" open={open} />
-        ) : null}
+        {live && enabled ? <FloatingChevron {...chevron} open={open} /> : null}
       </View>
     </DrawerSwipe.Provider>
   );
@@ -249,25 +218,20 @@ export function useDrawerSwipeGesture(): GestureType | null {
 }
 
 function DrawerPanel({
-  side,
   open,
   live,
   children,
 }: {
-  side: DrawerSide;
   open: boolean;
   live: boolean;
   children: ReactNode;
 }) {
   const { isDark } = useTheme();
-  const travel = useDrawerTravel(side);
+  const { travel } = useDrawerMetrics();
   const reduce = useReducedMotion();
-  const sign = side === "start" ? 1 : -1;
   const p = drawerProgress;
-  const ours = useDrawerSide() === side;
 
   const panelStyle = useAnimatedStyle(() => {
-    if (drawerSign.value !== sign) return { opacity: 0 };
     const v = Math.min(p.value, 1);
     return {
       opacity: interpolate(v, [0, 0.4], [0, 1], CLAMP),
@@ -278,7 +242,7 @@ function DrawerPanel({
               translateX: interpolate(
                 v,
                 [0, 1],
-                [-sign * travel * 0.18, 0],
+                [travel * 0.18, 0],
                 CLAMP,
               ),
             },
@@ -295,7 +259,7 @@ function DrawerPanel({
     opacity: p.value > 0.97 ? 0 : 1,
   }));
   const scroll = useMemo(() => Gesture.Native(), []);
-  const panelPan = useDrawerClosePan(side, scroll);
+  const panelPan = useDrawerClosePan(scroll);
 
   return (
     <PanelScroll.Provider value={scroll}>
@@ -303,7 +267,6 @@ function DrawerPanel({
         <Animated.View
           style={[
             styles.panel,
-            side === "start" ? styles.panelStart : styles.panelEnd,
             { width: travel },
             panelStyle,
           ]}
@@ -313,7 +276,7 @@ function DrawerPanel({
           onAccessibilityEscape={closeDrawer}
         >
           {children}
-          {live && ours && BLUR ? (
+          {live && BLUR ? (
             <AnimatedBlur
               pointerEvents="none"
               tint={isDark ? "dark" : "light"}
@@ -350,19 +313,12 @@ function FloatingChevron({
   open,
   openLabel,
   closeLabel,
-  side,
   restIcon,
-}: ChevronSpec & {
-  open: boolean;
-  side: DrawerSide;
-  restIcon?: IconName;
-}) {
+}: ChevronSpec & { open: boolean }) {
   const colors = useColors();
   const { width, height } = useWindowDimensions();
-  const { scale } = useDrawerMetrics();
-  const travel = useDrawerTravel(side);
+  const { scale, travel } = useDrawerMetrics();
   const reduce = useReducedMotion();
-  const sign = side === "start" ? 1 : -1;
   const cx = left + DRAWER_CHEVRON_SIZE / 2;
   const cy = top + DRAWER_CHEVRON_SIZE / 2;
   const openScale = reduce ? 1 : scale;
@@ -373,20 +329,13 @@ function FloatingChevron({
     const toRow = Math.min(Math.max(v, 0), 1) * settle;
     return {
       transform: [
-        { translateX: (cx - width / 2) * (s - 1) + sign * v * travel },
+        { translateX: (cx - width / 2) * (s - 1) - v * travel },
         { translateY: (cy - height / 2) * (s - 1) + toRow },
       ],
     };
   });
   const turn = useAnimatedStyle(() => {
     const v = drawerProgress.value;
-    if (!restIcon) {
-      return {
-        transform: [
-          { rotate: `${interpolate(v, [0, 1], [0, 180], CLAMP)}deg` },
-        ],
-      };
-    }
     return {
       opacity: interpolate(v, [0.05, 0.4], [0, 1], CLAMP),
       transform: [{ rotate: `${interpolate(v, [0, 1], [-90, 0], CLAMP)}deg` }],
@@ -401,8 +350,8 @@ function FloatingChevron({
   });
   const label = open ? closeLabel : openLabel;
   const press = () => {
-    if (isDrawerOpen(side)) closeDrawer();
-    else openDrawer(side);
+    if (isDrawerOpen()) closeDrawer();
+    else openDrawer();
   };
   const pressRef = useRef(press);
   pressRef.current = press;
@@ -449,19 +398,17 @@ function FloatingChevron({
             accessibilityHidden
             onPress={press}
           />
-          {restIcon ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.restIcon, restTurn]}
-            >
-              <Icon
-                name={restIcon}
-                size={19}
-                color={colors.text}
-                weight="semibold"
-              />
-            </Animated.View>
-          ) : null}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.restIcon, restTurn]}
+          >
+            <Icon
+              name={restIcon}
+              size={19}
+              color={colors.text}
+              weight="semibold"
+            />
+          </Animated.View>
         </Animated.View>
       </Animated.View>
     </GestureDetector>
@@ -473,10 +420,9 @@ const styles = StyleSheet.create({
   panel: {
     bottom: 0,
     position: "absolute",
+    right: 0,
     top: 0,
   },
-  panelStart: { left: 0 },
-  panelEnd: { right: 0 },
   stage: { flex: 1 },
   clip: { flex: 1, overflow: "hidden" },
   chevron: { position: "absolute" },

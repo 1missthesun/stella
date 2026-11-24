@@ -1171,6 +1171,7 @@
       }
     },
     "apps": {
+      "emailHint": "La pagina di Stella per la tua posta in arrivo",
       "empty": "Qui troverai le app che Stella crea per te.",
       "emptyAction": "Crea un’app",
       "emptyActionPrompt": "Creami un’app che "
@@ -1331,8 +1332,6 @@
       "backToChat": "Torna alla chat",
       "chat": "Chat",
       "chatSettingsLabel": "Impostazioni chat",
-      "closeLabel": "Chiudi la navigazione",
-      "openLabel": "Apri la navigazione",
       "settings": "Impostazioni",
       "signIn": "Accedi"
     },

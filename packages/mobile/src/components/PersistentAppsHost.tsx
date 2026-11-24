@@ -6,26 +6,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   AppState,
   BackHandler,
-  Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
-import { Text } from "./Text";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import { AppBackdrop } from "./AppBackdrop";
-import { Icon } from "./Icon";
-import { EmptyState } from "./EmptyState";
-import { startChatWith } from "../lib/ask-stella";
+import { publishAppsPage } from "../lib/apps-page-store";
 import { publishBackOverride } from "../lib/main-shell-store";
 import { useT } from "../i18n";
-import { MainDetailSurface, useShellTopInset } from "./MainScreenSurface";
-import { useColors } from "../theme/theme-context";
+import { useShellTopInset } from "./MainScreenSurface";
 import { getAuthTokenForSubject } from "../lib/auth-token";
 import { authClient } from "../lib/auth-client";
 import { env } from "../config/env";
@@ -69,21 +61,10 @@ const NATIVE_FEEL_SCRIPT = `(() => {
 true;`;
 
 export function PersistentAppsHost({ visible }: { visible: boolean }) {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session } = authClient.useSession();
   const origin = env.backendUrl || null;
   const owner = session?.user.id;
-  if (!owner || !origin)
-    return visible ? (
-      <View style={StyleSheet.absoluteFill}>
-        <MainDetailSurface>
-          {isPending ? (
-            <ActivityIndicator />
-          ) : (
-            <Text>Apps are unavailable. Please try again.</Text>
-          )}
-        </MainDetailSurface>
-      </View>
-    ) : null;
+  if (!owner || !origin) return null;
   return (
     <AppsHost
       key={appListCacheKey(owner, origin)}
@@ -103,11 +84,9 @@ function AppsHost({
   origin: string;
   visible: boolean;
 }) {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const topInset = useShellTopInset();
   const t = useT();
-  const router = useRouter();
   const [apps, setApps] = useState<WorkspaceApp[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
@@ -291,6 +270,16 @@ function AppsHost({
       }
     }
   };
+  const openFromPage = useEffectEvent((app: WorkspaceApp) => void open(app));
+  useEffect(() => {
+    publishAppsPage({
+      apps,
+      error,
+      opening,
+      open: (app) => openFromPage(app),
+    });
+  }, [apps, error, opening]);
+  useEffect(() => () => publishAppsPage(null), []);
   const pendingOpen = usePendingAppOpen();
   const openPending = useEffectEvent((slug: string) => {
     const app = apps?.find(
@@ -331,93 +320,12 @@ function AppsHost({
   };
   return (
     <View
-      style={[StyleSheet.absoluteFill, { display: visible ? "flex" : "none" }]}
-      pointerEvents={visible ? "auto" : "none"}
-      accessibilityElementsHidden={!visible}
-      importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+      style={[StyleSheet.absoluteFill, { display: frameOpen ? "flex" : "none" }]}
+      pointerEvents={frameOpen ? "auto" : "none"}
+      accessibilityElementsHidden={!frameOpen}
+      importantForAccessibility={frameOpen ? "auto" : "no-hide-descendants"}
     >
       <AppBackdrop />
-      <View style={{ flex: 1, display: frame ? "none" : "flex" }}>
-        <MainDetailSurface>
-          {apps?.length === 0 && !error ? (
-            <EmptyState
-              motif="apps"
-              message={t("mobile.apps.empty")}
-              paused={!visible || !active}
-              action={{
-                label: t("mobile.apps.emptyAction"),
-                onPress: () => startChatWith(router, t("mobile.apps.emptyActionPrompt")),
-              }}
-            />
-          ) : (
-          <ScrollView
-            style={{ display: frame ? "none" : "flex" }}
-            contentContainerStyle={{
-              gap: 16,
-              paddingBottom: insets.bottom + 24,
-              paddingTop: 8,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            {apps === null && !error ? <ActivityIndicator /> : null}
-            {error ? (
-              <Text accessibilityRole="alert" style={{ color: colors.text }}>
-                {error}
-              </Text>
-            ) : null}
-            {apps?.map((app) => (
-              <Pressable
-                key={app.slug}
-                accessibilityRole="button"
-                accessibilityLabel={app.title}
-                accessibilityState={{ busy: opening === app.slug }}
-                disabled={opening !== null || app.status !== "ready"}
-                onPress={() => void open(app)}
-                style={{
-                  alignItems: "center",
-                  backgroundColor: colors.surface,
-                  borderRadius: 12,
-                  flexDirection: "row",
-                  gap: 12,
-                  padding: 12,
-                }}
-              >
-                <View
-                  style={{
-                    alignItems: "center",
-                    backgroundColor: colors.surfaceInset,
-                    borderColor: colors.border,
-                    borderCurve: "continuous",
-                    borderRadius: 12,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    height: 44,
-                    justifyContent: "center",
-                    width: 44,
-                  }}
-                >
-                  {app.icon ? (
-                    <Text style={{ fontSize: 24 }} maxFontSizeMultiplier={1}>
-                      {app.icon}
-                    </Text>
-                  ) : (
-                    <Icon name="apps" size={22} color={colors.text} />
-                  )}
-                </View>
-                <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
-                  <Text style={{ color: colors.text, fontSize: 17 }}>
-                    {app.title}
-                  </Text>
-                  {app.error ? (
-                    <Text style={{ color: colors.text }}>{app.error}</Text>
-                  ) : null}
-                </View>
-                {opening === app.slug ? <ActivityIndicator /> : null}
-              </Pressable>
-            ))}
-          </ScrollView>
-          )}
-        </MainDetailSurface>
-      </View>
       {frames.map((entry) => (
         <View
           key={entry.url}

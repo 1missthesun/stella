@@ -57,7 +57,6 @@ import { useIsOffline } from "../../src/lib/use-network-status";
 import {
   publishActivityHub,
   publishComputerControl,
-  requestOpenSidebar,
 } from "../../src/lib/main-shell-store";
 import { useColors } from "../../src/theme/theme-context";
 import { fonts } from "../../src/theme/fonts";
@@ -634,7 +633,6 @@ function ChatSurface(props: {
         onOpenArtifact={openArtifact}
         conversationId={thread.conversationId}
         activityTasks={thread.conversationTasks}
-        onOpenActivity={requestOpenSidebar}
         catchingUp={thread.catchingUp}
         onFooterHeightChange={setComposerReserve}
       />

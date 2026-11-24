@@ -260,6 +260,7 @@
       }
     },
     "apps": {
+      "emailHint": "A página da Stella para sua caixa de entrada",
       "empty": "Os apps que a Stella criar para você ficarão aqui.",
       "emptyAction": "Criar um app",
       "emptyActionPrompt": "Crie um app para mim que "
@@ -420,8 +421,6 @@
       "backToChat": "Voltar ao chat",
       "chat": "Chat",
       "chatSettingsLabel": "Configurações do chat",
-      "closeLabel": "Fechar a navegação",
-      "openLabel": "Abrir a navegação",
       "settings": "Configurações",
       "signIn": "Entrar"
     },

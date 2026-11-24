@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator";
 import {
@@ -22,6 +22,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { BottomBar } from "../../src/components/BottomBar";
 import { Icon } from "../../src/components/Icon";
 import { GlassIconButton } from "../../src/components/GlassIconButton";
 import { StellaStatusHeader } from "../../src/components/StellaStatusHeader";
@@ -56,13 +57,11 @@ import Animated, {
 } from "react-native-reanimated";
 import {
   closeDrawer,
-  drawerJustOpened,
   drawerProgress,
   isDrawerOpen,
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
-  useDrawerSide,
 } from "../../src/lib/drawer";
 import { type Colors } from "../../src/theme/colors";
 import { useColors, useTheme } from "../../src/theme/theme-context";
@@ -79,10 +78,10 @@ import {
   type MainTabId,
 } from "../../src/lib/last-main-tab";
 import {
-  subscribeSidebarOpenRequests,
   useBackOverride,
   useTopBarAccessory,
 } from "../../src/lib/main-shell-store";
+import { isBottomBarTab, useWideLayout } from "../../src/lib/bottom-bar";
 import { useT } from "../../src/i18n";
 import { topBarCover, useTopBarCovered } from "../../src/lib/top-bar-cover";
 
@@ -105,12 +104,11 @@ const PAGE_TITLE_KEYS: Partial<Record<MainTabId, string>> = {
 export default function MainLayout() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const wide = width >= 920;
+  const wide = useWideLayout();
   const pathname = usePathname();
   const router = useRouter();
   const drawerLive = useDrawerLive();
-  const drawerSide = useDrawerSide();
-  const { travel, endTravel } = useDrawerMetrics();
+  const { travel } = useDrawerMetrics();
   const [activityMenuRunning, setActivityMenuRunning] = useState<
     readonly ActivityIndicatorEntry[] | null
   >(null);
@@ -167,10 +165,10 @@ export default function MainLayout() {
   }, [pathname, closeSearch]);
 
   useEffect(() => {
-    if (activeTab) {
+    if (activeTab && (wide || isBottomBarTab(activeTab))) {
       void saveLastMainTab(activeTab);
     }
-  }, [activeTab]);
+  }, [activeTab, wide]);
 
   useEffect(() => {
     if (!onChatSurface) return;
@@ -178,16 +176,14 @@ export default function MainLayout() {
     if (pending) router.push(MAIN_TAB_HREFS[pending]);
   }, [onChatSurface, router]);
 
-  const drawerAvailable = onChatSurface || (onTabRoot && !backOverride);
-  const backVisible = !drawerAvailable;
-
-  const openSidebar = () => openDrawer("start");
+  const onPlace = onChatSurface || (onTabRoot && !backOverride);
+  const barTab = !wide && isBottomBarTab(activeTab) ? activeTab : null;
+  const barVisible = onPlace && barTab !== null;
+  const backVisible = wide ? !onPlace : !barVisible;
 
   const selectTab = (tab: MainTabId) => {
-    if (!wide && drawerJustOpened()) return;
     const destination = MAIN_TAB_HREFS[tab];
     tapLight();
-    if (!wide) closeDrawer();
     if (destination === pathname) return;
     Keyboard.dismiss();
     if (destination === "/chat") {
@@ -205,11 +201,12 @@ export default function MainLayout() {
   };
 
   const onPressTopLeft = () => {
-    if (drawerAvailable) {
-      openSidebar();
+    tapLight();
+    if (!backVisible) {
+      Keyboard.dismiss();
+      router.push(MAIN_TAB_HREFS.settings);
       return;
     }
-    tapLight();
     if (backOverride) {
       backOverride.onPress();
       return;
@@ -223,26 +220,10 @@ export default function MainLayout() {
   }, [wide]);
 
   useEffect(() => {
-    if (!drawerAvailable && isDrawerOpen("start")) closeDrawer();
-  }, [drawerAvailable]);
-
-  useEffect(() => {
-    if (!onChatSurface && isDrawerOpen("end")) closeDrawer();
+    if (!onChatSurface && isDrawerOpen()) closeDrawer();
   }, [onChatSurface]);
 
-  const openSidebarRef = useRef(openSidebar);
-  openSidebarRef.current = openSidebar;
-  useEffect(
-    () =>
-      subscribeSidebarOpenRequests(() => {
-        if (!wide) openSidebarRef.current();
-      }),
-    [wide],
-  );
-
-  const startHandedOff =
-    drawerAvailable && drawerLive && drawerSide === "start";
-  const endHandedOff = onChatSurface && drawerLive && drawerSide === "end";
+  const settingsHandedOff = onChatSurface && drawerLive;
 
   const topBarFade = useAnimatedStyle(() => ({
     opacity:
@@ -268,7 +249,7 @@ export default function MainLayout() {
             />
             <View style={styles.content}>
               <View style={styles.contentSlot}>
-                <MainStack />
+                <MainStack wide />
               </View>
               <View
                 pointerEvents="box-none"
@@ -310,42 +291,26 @@ export default function MainLayout() {
         </>
       ) : (
         <DrawerStage
-          enabled={drawerAvailable}
-          panel={
-            <SidebarPanel
-              width={travel}
-              animated
-              activeTab={activeTab}
-              onSelectTab={selectTab}
-            />
-          }
-          end={{
-            enabled: onChatSurface,
-            panel: <ChatSettingsPanel width={endTravel} />,
-            chevron: {
-              left: width - TOP_BAR_INSET - TOP_BAR_BUTTON,
-              top: topBarHeight - TOP_BAR_BUTTON,
-              openCenterY: insets.top + SIDEBAR_BRAND_CENTER,
-              openLabel: t("mobile.nav.chatSettingsLabel"),
-              closeLabel: t("mobile.nav.backToChat"),
-              restIcon: "settings",
-            },
-          }}
+          enabled={onChatSurface}
+          panel={<ChatSettingsPanel width={travel} />}
           chevron={{
-            left: TOP_BAR_INSET,
+            left: width - TOP_BAR_INSET - TOP_BAR_BUTTON,
             top: topBarHeight - TOP_BAR_BUTTON,
             openCenterY: insets.top + SIDEBAR_BRAND_CENTER,
-            openLabel: t("mobile.nav.openLabel"),
-            closeLabel:
-              activeTab === "chat"
-                ? t("mobile.nav.backToChat")
-                : t("mobile.nav.closeLabel"),
+            openLabel: t("mobile.nav.chatSettingsLabel"),
+            closeLabel: t("mobile.nav.backToChat"),
+            restIcon: "settings",
           }}
         >
           <AppBackdrop />
           <View style={styles.content}>
-            <MainStack />
+            <MainStack wide={false} />
           </View>
+          <BottomBar
+            active={barTab}
+            visible={barVisible}
+            onSelect={selectTab}
+          />
 
           <Animated.View
             pointerEvents={topBarCovered ? "none" : "box-none"}
@@ -410,19 +375,15 @@ export default function MainLayout() {
               </View>
             ) : null}
             {search.isOpen ? null : (
-              <View
-                style={[styles.topBarSide, startHandedOff && styles.handedOff]}
-                pointerEvents={startHandedOff ? "none" : "auto"}
-                accessibilityElementsHidden={startHandedOff}
-              >
+              <View style={styles.topBarSide}>
                 <GlassIconButton
-                  icon={drawerAvailable ? "chevron-right" : "chevron-left"}
+                  icon={backVisible ? "chevron-left" : "user"}
                   size={TOP_BAR_BUTTON}
-                  iconSize={20}
+                  iconSize={backVisible ? 20 : 18}
                   accessibilityLabel={
-                    drawerAvailable
-                      ? t("mobile.nav.openLabel")
-                      : (backOverride?.label ?? t("mobile.common.back"))
+                    backVisible
+                      ? (backOverride?.label ?? t("mobile.common.back"))
+                      : t("mobile.nav.account")
                   }
                   onPress={onPressTopLeft}
                 />
@@ -438,17 +399,17 @@ export default function MainLayout() {
                 style={[
                   styles.topBarSide,
                   styles.topBarEnd,
-                  endHandedOff && styles.handedOff,
+                  settingsHandedOff && styles.handedOff,
                 ]}
-                pointerEvents={endHandedOff ? "none" : "auto"}
-                accessibilityElementsHidden={endHandedOff}
+                pointerEvents={settingsHandedOff ? "none" : "auto"}
+                accessibilityElementsHidden={settingsHandedOff}
               >
                 <GlassIconButton
                   icon="settings"
                   size={TOP_BAR_BUTTON}
                   iconSize={19}
                   accessibilityLabel={t("mobile.nav.chatSettingsLabel")}
-                  onPress={() => openDrawer("end")}
+                  onPress={openDrawer}
                 />
               </View>
             ) : null}
@@ -470,8 +431,9 @@ export default function MainLayout() {
   );
 }
 
-function MainStack() {
+function MainStack({ wide }: { wide: boolean }) {
   const pathname = usePathname();
+  const sidePageOptions = wide ? TAB_SCREEN_OPTIONS : PUSHED_SCREEN_OPTIONS;
   return (
     <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
       <View style={{ flex: 1 }}>
@@ -484,10 +446,10 @@ function MainStack() {
           }}
         >
           <Stack.Screen name="schedule" options={TAB_SCREEN_OPTIONS} />
-          <Stack.Screen name="email" options={TAB_SCREEN_OPTIONS} />
+          <Stack.Screen name="email" options={sidePageOptions} />
           <Stack.Screen name="apps" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="files" options={TAB_SCREEN_OPTIONS} />
-          <Stack.Screen name="settings" options={TAB_SCREEN_OPTIONS} />
+          <Stack.Screen name="settings" options={sidePageOptions} />
         </Stack>
         <PersistentAppsHost visible={pathname === "/apps"} />
       </View>
@@ -496,6 +458,7 @@ function MainStack() {
 }
 
 const TAB_SCREEN_OPTIONS = { animation: "none" } as const;
+const PUSHED_SCREEN_OPTIONS = { animation: "slide_from_right" } as const;
 
 const TRANSPARENT_NAVIGATION_THEME = {
   ...DefaultTheme,

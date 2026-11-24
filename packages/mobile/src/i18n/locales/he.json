@@ -260,6 +260,7 @@
       }
     },
     "apps": {
+      "emailHint": "הדף של Stella לתיבת הדואר שלך",
       "empty": "אפליקציות ש-Stella בונה בשבילך יופיעו כאן.",
       "emptyAction": "לבנות אפליקציה",
       "emptyActionPrompt": "תבני לי אפליקציה ש"
@@ -420,8 +421,6 @@
       "backToChat": "חזרה לצ׳אט",
       "chat": "צ׳אט",
       "chatSettingsLabel": "הגדרות צ׳אט",
-      "closeLabel": "סגירת הניווט",
-      "openLabel": "פתיחת הניווט",
       "settings": "הגדרות",
       "signIn": "התחברות"
     },

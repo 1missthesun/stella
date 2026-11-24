@@ -7,6 +7,7 @@ import {
   type SharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBottomInset } from "./bottom-bar";
 
 const COMPOSER_SPRING = { duration: 350, dampingRatio: 1 };
 
@@ -14,7 +15,8 @@ export function useBottomObstruction(
   composerHeight: number,
   composerOverlap = 0,
 ): SharedValue<number> {
-  const bottomInset = useSafeAreaInsets().bottom;
+  const safeAreaBottom = useSafeAreaInsets().bottom;
+  const tabBottomInset = useTabBottomInset();
   const keyboard = useReanimatedKeyboardAnimation().height;
   const composer = useSharedValue(composerHeight);
   useEffect(() => {
@@ -25,10 +27,10 @@ export function useBottomObstruction(
   }, [composer, composerHeight]);
   return useDerivedValue(() => {
     const keyboardHeight = Math.abs(keyboard.value);
-    if (composer.value <= 0) return Math.max(bottomInset, keyboardHeight);
+    if (composer.value <= 0) return Math.max(safeAreaBottom, keyboardHeight);
     return (
       Math.max(0, composer.value - composerOverlap) +
-      Math.max(0, keyboardHeight - bottomInset)
+      Math.max(0, keyboardHeight - tabBottomInset)
     );
   });
 }

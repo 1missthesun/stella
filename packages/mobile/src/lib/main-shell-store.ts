@@ -127,16 +127,3 @@ export function useActivityHubSelector<T>(
 export function useComputerControl(): ComputerControl | null {
   return useSyncExternalStore(subscribe, readComputer, readComputer);
 }
-
-const openRequestListeners = new Set<() => void>();
-
-export function requestOpenSidebar(): void {
-  for (const listener of openRequestListeners) listener();
-}
-
-export function subscribeSidebarOpenRequests(listener: () => void): () => void {
-  openRequestListeners.add(listener);
-  return () => {
-    openRequestListeners.delete(listener);
-  };
-}

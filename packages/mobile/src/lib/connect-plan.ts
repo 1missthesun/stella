@@ -24,12 +24,12 @@ export function startConnectPlan(conversationId: string | null): void {
   pending = { conversationId };
   brainRequest = "chatgpt";
   emit();
-  openDrawer("end");
+  openDrawer();
 }
 
 export function openChatSettingsAt(brainId: string): void {
   brainRequest = brainId;
-  openDrawer("end");
+  openDrawer();
 }
 
 export function takeChatSettingsBrainRequest(): string | null {

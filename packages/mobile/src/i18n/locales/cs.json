@@ -261,6 +261,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stránka Stelly pro vaši doručenou poštu",
       "empty": "Zde budou aplikace, které pro vás Stella vytvoří.",
       "emptyAction": "Vytvořit aplikaci",
       "emptyActionPrompt": "Vytvoř mi aplikaci, která "
@@ -421,8 +422,6 @@
       "backToChat": "Zpět do chatu",
       "chat": "Chat",
       "chatSettingsLabel": "Nastavení chatu",
-      "closeLabel": "Zavřít navigaci",
-      "openLabel": "Otevřít navigaci",
       "settings": "Nastavení",
       "signIn": "Přihlásit se"
     },

@@ -1201,6 +1201,7 @@
       }
     },
     "apps": {
+      "emailHint": "صفحة Stella لبريدك الوارد",
       "empty": "ستظهر هنا التطبيقات التي تبنيها Stella لك.",
       "emptyAction": "إنشاء تطبيق",
       "emptyActionPrompt": "أنشئ لي تطبيقًا "
@@ -1361,8 +1362,6 @@
       "backToChat": "العودة إلى المحادثة",
       "chat": "الدردشة",
       "chatSettingsLabel": "إعدادات المحادثة",
-      "closeLabel": "إغلاق التنقل",
-      "openLabel": "فتح التنقل",
       "settings": "الإعدادات",
       "signIn": "تسجيل الدخول"
     },

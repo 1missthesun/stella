@@ -22,7 +22,7 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBottomInset } from "../lib/bottom-bar";
 import { useT } from "../i18n";
 import { authClient } from "../lib/auth-client";
 import {
@@ -185,7 +185,7 @@ export function FilesPage() {
   const colors = useColors();
   const t = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const bottomInset = useSafeAreaInsets().bottom;
+  const bottomInset = useTabBottomInset();
   const hub = useActivityHub();
   const computer = useComputerControl();
   const session = authClient.useSession();

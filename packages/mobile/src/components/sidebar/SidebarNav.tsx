@@ -35,19 +35,13 @@ const PLACE_LABEL_KEYS: Record<SidebarPlace, string> = {
 
 export function Rise({
   i,
-  animated,
-  from = "start",
   children,
 }: {
   i: number;
-  animated: boolean;
-  from?: "start" | "end";
   children: ReactNode;
 }) {
-  const sign = from === "start" ? 1 : -1;
   const reduce = useReducedMotion();
   const style = useAnimatedStyle(() => {
-    if (!animated) return { opacity: 1, transform: [{ translateX: 0 }] };
     const v = Math.min(drawerProgress.value, 1);
     const from = Math.min(0.08 * i, 0.5);
     return {
@@ -59,7 +53,7 @@ export function Rise({
             : interpolate(
                 v,
                 [0, 1],
-                [sign * (-14 - i * 7), 0],
+                [14 + i * 7, 0],
                 Extrapolation.CLAMP,
               ),
         },

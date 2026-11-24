@@ -259,6 +259,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stellas sida för din inkorg",
       "empty": "Appar som Stella bygger åt dig visas här.",
       "emptyAction": "Bygg en app",
       "emptyActionPrompt": "Bygg en app åt mig som "
@@ -419,8 +420,6 @@
       "backToChat": "Tillbaka till chatten",
       "chat": "Chatt",
       "chatSettingsLabel": "Chattinställningar",
-      "closeLabel": "Stäng navigeringen",
-      "openLabel": "Öppna navigeringen",
       "settings": "Inställningar",
       "signIn": "Logga in"
     },

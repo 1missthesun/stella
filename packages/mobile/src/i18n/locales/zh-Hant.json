@@ -258,6 +258,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stella 的收件匣頁面",
       "empty": "Stella 為你打造的 App 會顯示在這裡。",
       "emptyAction": "打造 App",
       "emptyActionPrompt": "幫我做一個 App，"
@@ -418,8 +419,6 @@
       "backToChat": "返回聊天",
       "chat": "聊天",
       "chatSettingsLabel": "聊天設定",
-      "closeLabel": "關閉導覽",
-      "openLabel": "開啟導覽",
       "settings": "設定",
       "signIn": "登入"
     },

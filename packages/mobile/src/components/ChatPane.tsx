@@ -160,6 +160,7 @@ import { resolveChatDataChangeScrollOwner } from "../lib/chat-scroll-ownership";
 import { useChatScroll } from "../lib/use-chat-scroll";
 import { refreshLinkedWorkspaceApps } from "../lib/workspace-app-links";
 import { useKeyboardInset } from "../lib/use-keyboard-inset";
+import { useTabBottomInset } from "../lib/bottom-bar";
 import { useOverdueStop } from "../lib/use-overdue-stop";
 import { notifySuccess, tapMedium, tapLight } from "../lib/haptics";
 import {
@@ -356,7 +357,6 @@ export type ChatPaneProps = {
 
   activityTasks?: MobileTask[];
 
-  onOpenActivity?: () => void;
 
   topInset?: number;
 
@@ -573,7 +573,6 @@ export function ChatPane({
   onOpenArtifact,
   conversationId = null,
   activityTasks,
-  onOpenActivity,
   catchingUp = false,
   topInset: topInsetProp,
   onFooterHeightChange,
@@ -631,9 +630,8 @@ export function ChatPane({
   const readAloud = serverFeatures.readAloud
     ? readAloudPreference
     : { ...readAloudPreference, enabled: false };
-  const insets = useSafeAreaInsets();
-  const bottomInset = insets.bottom;
-  const safeAreaTop = insets.top;
+  const bottomInset = useTabBottomInset();
+  const safeAreaTop = useSafeAreaInsets().top;
   const shellTopInset = useShellTopInset();
   const topInset = topInsetProp ?? shellTopInset;
   const { height: screenHeight } = useWindowDimensions();
@@ -1602,14 +1600,9 @@ export function ChatPane({
       onOpenArtifact,
       onOpenStellaFile,
       onOpenMessageMenu: setMessageMenu,
-      onOpenAgentActivity: onOpenActivity,
       onOpenReply: setReplyFocus,
     }),
-    [
-      onOpenArtifact,
-      onOpenStellaFile,
-      onOpenActivity,
-    ],
+    [onOpenArtifact, onOpenStellaFile],
   );
   const menuCloneRowActions = useMemo<MessageRowActions>(
     () => ({

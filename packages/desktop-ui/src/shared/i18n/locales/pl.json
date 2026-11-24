@@ -1181,6 +1181,7 @@
       }
     },
     "apps": {
+      "emailHint": "Strona Stelli dla Twojej skrzynki odbiorczej",
       "empty": "Tutaj znajdą się aplikacje, które Stella dla Ciebie zbuduje.",
       "emptyAction": "Zbuduj aplikację",
       "emptyActionPrompt": "Zbuduj mi aplikację, która "
@@ -1341,8 +1342,6 @@
       "backToChat": "Powrót do czatu",
       "chat": "Czat",
       "chatSettingsLabel": "Ustawienia czatu",
-      "closeLabel": "Zamknij nawigację",
-      "openLabel": "Otwórz nawigację",
       "settings": "Ustawienia",
       "signIn": "Zaloguj się"
     },

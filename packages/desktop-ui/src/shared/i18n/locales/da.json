@@ -1161,6 +1161,7 @@
       }
     },
     "apps": {
+      "emailHint": "Stellas side til din indbakke",
       "empty": "Apps, som Stella bygger til dig, vises her.",
       "emptyAction": "Byg en app",
       "emptyActionPrompt": "Byg en app til mig, der "
@@ -1321,8 +1322,6 @@
       "backToChat": "Tilbage til chat",
       "chat": "Chat",
       "chatSettingsLabel": "Chatindstillinger",
-      "closeLabel": "Luk navigationen",
-      "openLabel": "Åbn navigationen",
       "settings": "Indstillinger",
       "signIn": "Log ind"
     },

@@ -27,7 +27,7 @@ import {
   SidebarTopFade,
 } from "./sidebar/SidebarPanel";
 import { authClient } from "../lib/auth-client";
-import { useDrawerOpen, useDrawerSide } from "../lib/drawer";
+import { useDrawerOpen } from "../lib/drawer";
 import { tapLight } from "../lib/haptics";
 import { useComputerControl } from "../lib/main-shell-store";
 import { takeChatSettingsBrainRequest } from "../lib/connect-plan";
@@ -50,8 +50,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
   const computer = useComputerControl();
-  const open = useDrawerOpen();
-  const active = useDrawerSide() === "end" && open;
+  const active = useDrawerOpen();
   const signedIn = Boolean(session.data?.user);
   const showDestinations = computer !== null || signedIn;
   const contentWidth = width - KIT.gutter * 2;
@@ -96,7 +95,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
     !settings ||
     (route.name === "accounts" && !accountsFor) ? (
       <>
-        <Rise i={i++} animated from="end">
+        <Rise i={i++}>
           <View style={styles.titleRow}>
             <Text
               accessibilityRole="header"
@@ -110,7 +109,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
         </Rise>
 
         {showDestinations ? (
-          <Rise i={i++} animated from="end">
+          <Rise i={i++}>
             <View style={styles.firstSection} />
             <SectionLabel>
               {t("mobile.settings.computer.sectionLabel")}
@@ -126,7 +125,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
 
         {settings ? (
           <>
-            <Rise i={i++} animated from="end">
+            <Rise i={i++}>
               <Hairline space={14} />
               <BrainSection
                 settings={settings}
@@ -138,14 +137,14 @@ export function ChatSettingsPanel({ width }: { width: number }) {
             </Rise>
 
             {settings.supportsEffortSelection ? (
-              <Rise i={i++} animated from="end">
+              <Rise i={i++}>
                 <Hairline space={14} />
                 <ThinkingRow settings={settings} />
               </Rise>
             ) : null}
 
             {accountsFor ? (
-              <Rise i={i++} animated from="end">
+              <Rise i={i++}>
                 <Hairline space={14} />
                 <EngineAccountRow
                   provider={accountsFor}

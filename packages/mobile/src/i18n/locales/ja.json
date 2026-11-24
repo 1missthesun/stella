@@ -258,6 +258,7 @@
       }
     },
     "apps": {
+      "emailHint": "受信トレイのためのStellaのページ",
       "empty": "Stella があなたのために作ったアプリはここに表示されます。",
       "emptyAction": "アプリを作成",
       "emptyActionPrompt": "こんなアプリを作って: "
@@ -418,8 +419,6 @@
       "backToChat": "チャットに戻る",
       "chat": "チャット",
       "chatSettingsLabel": "チャット設定",
-      "closeLabel": "ナビゲーションを閉じる",
-      "openLabel": "ナビゲーションを開く",
       "settings": "設定",
       "signIn": "サインイン"
     },

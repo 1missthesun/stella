@@ -218,8 +218,18 @@ export type SavedValuesSyncStatus = Readonly<{
    * on it. problem: the list couldn't be checked, so nothing syncs. off.
    */
   standing: "member" | "waiting" | "problem" | "off";
-  /** While waiting: the code to compare once it can be made, and whether the last ask was declined. */
-  waiting?: Readonly<{ code: string | null; declined?: boolean; approvers: readonly string[] }>;
+  /**
+   * While waiting: the code to compare once it can be made, the device that
+   * will show it, whether the user confirmed it here, and whether the last ask
+   * was declined (or this device was taken off).
+   */
+  waiting?: Readonly<{
+    code: string | null;
+    approver?: string;
+    confirmed?: boolean;
+    declined?: boolean;
+    removed?: boolean;
+  }>;
   problem?: "reset" | "rollback" | "fork" | "invalid";
   devices: readonly SavedValuesListedDevice[];
   requests: readonly SavedValuesJoinRequest[];

@@ -5,7 +5,12 @@ import type {
   SavedValueRecord,
   SavedValueSeal,
 } from "../saved-values.js";
-import type { SavedValuesJoin, SavedValuesMember, SavedValuesRosterEntry } from "../saved-values-trust.js";
+import type {
+  SavedValuesJoin,
+  SavedValuesMember,
+  SavedValuesRosterEntry,
+  SavedValuesRosterPin,
+} from "../saved-values-trust.js";
 
 /**
  * What the cloud holds for an owner's synced saved values: the devices' list
@@ -18,8 +23,6 @@ export type SavedValuesState = {
   records: SavedValueHead[];
   roster: SavedValuesRosterEntry[];
   joins: SavedValuesJoin[];
-  /** The account's computers and their long-standing device keys (Ed25519 SPKI, base64), for the founding. */
-  computers: { deviceId: string; identityKey: string; name?: string }[];
 };
 
 export type SavedValueCalls = {
@@ -68,9 +71,9 @@ export type SavedValueCalls = {
     args: { joinId: string; device: SavedValuesMember; commit: string };
     result: SavedValuesJoin;
   };
-  /** A device on the list adds its random number (step 2). */
+  /** A device on the list adds its random number and its pin of the list (step 2). */
   "savedValues.joinAnswer": {
-    args: { joinId: string; by: string; listedNonce: string };
+    args: { joinId: string; by: string; listedNonce: string; pin: SavedValuesRosterPin };
     result: SavedValuesJoin;
   };
   /** The joining device reveals its random number (step 3). */

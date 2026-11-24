@@ -10,15 +10,15 @@
  * entry it has seen (so the chain can't be rolled back or forked under it),
  * and seals values only to devices on it.
  *
- * - The first device founds the list, with itself on it. It also records the
- *   account's computers as they are at that moment, each with the device key
- *   it has had since it was set up, so each of them can join later by itself:
- *   its entry is signed by that same old key. That trusts the cloud once, at
- *   the founding, the way a first sign-in does.
+ * - The first device founds the list with only itself on it. (A device shown
+ *   an empty list by a lying cloud founds one alone, which seals to nothing
+ *   but itself.)
  * - Any other device joins when the user allows it on a device already on the
- *   list. Both devices show the same 6-digit code, made from both devices'
- *   random numbers after each had committed to its own, so the cloud can't
- *   craft a request of its own whose code matches.
+ *   list and confirms on the new device: both show the same 6-digit code. The
+ *   code covers the request, both devices' random numbers (each committed
+ *   before the other's was seen) and the approving device's view of the list,
+ *   so the cloud can neither slip in a device of its own nor show the new
+ *   device a list of its own.
  * - A device on the list can take any device off it; values are then never
  *   sealed to that device again.
  *
@@ -115,20 +115,6 @@ const verifyText = (publicKey: string, text: string, signature: string): boolean
   }
 };
 
-/**
- * A computer's long-standing device key as the cloud lists it (Ed25519 SPKI,
- * DER, base64), as the raw public key, base64url.
- */
-export const identityKeyFromSpki = (spkiBase64: string): string | null => {
-  try {
-    const der = fromBase64Url(spkiBase64);
-    if (der.length !== 44) return null;
-    return toBase64Url(der.subarray(12));
-  } catch {
-    return null;
-  }
-};
-
 // --- The list ----------------------------------------------------------------
 
 export type SavedValuesDeviceKind = "computer" | "phone";
@@ -144,14 +130,6 @@ export type SavedValuesMember = Readonly<{
   sealKey: string;
 }>;
 
-/** A computer recorded at the founding, which may join by itself with its old device key. */
-export type SavedValuesCarried = Readonly<{
-  deviceId: string;
-  /** Its long-standing Ed25519 device key, raw, base64url. */
-  identityKey: string;
-  name?: string;
-}>;
-
 type EntryCommon = {
   v: typeof SAVED_VALUES_TRUST_VERSION;
   seq: number;
@@ -163,13 +141,8 @@ type EntryCommon = {
 };
 
 export type SavedValuesRosterEntryBody =
-  | (EntryCommon & { op: "found"; device: SavedValuesMember; carried: readonly SavedValuesCarried[] })
-  | (EntryCommon & {
-      op: "add";
-      device: SavedValuesMember;
-      /** For a carried computer joining by itself: its old device key's signature over its new keys. */
-      carriedSig?: string;
-    })
+  | (EntryCommon & { op: "found"; device: SavedValuesMember })
+  | (EntryCommon & { op: "add"; device: SavedValuesMember })
   | (EntryCommon & { op: "remove"; target: string });
 
 export type SavedValuesRosterEntry = SavedValuesRosterEntryBody & Readonly<{ sig: string }>;
@@ -177,10 +150,6 @@ export type SavedValuesRosterEntry = SavedValuesRosterEntryBody & Readonly<{ sig
 const entryText = (body: SavedValuesRosterEntryBody): string => ROSTER_CONTEXT + stableJson(body);
 
 export const rosterEntryHash = (entry: SavedValuesRosterEntry): string => sha256Hex(stableJson(entry));
-
-/** What a carried computer's old device key signs to vouch for its new keys. */
-export const carriedSigText = (args: { genesis: string; device: SavedValuesMember }): string =>
-  CARRY_CONTEXT + stableJson({ genesis: args.genesis, device: args.device });
 
 export const signRosterEntry = (
   body: SavedValuesRosterEntryBody,
@@ -194,8 +163,6 @@ export type SavedValuesRosterMember = SavedValuesMember &
 
 export type SavedValuesRoster = Readonly<{
   members: ReadonlyMap<string, SavedValuesRosterMember>;
-  /** Computers from the founding that haven't joined (or been taken off) yet. */
-  carried: ReadonlyMap<string, SavedValuesCarried>;
   /** Every device that was ever on the list and was taken off. */
   removed: ReadonlySet<string>;
   head: SavedValuesRosterPin;
@@ -244,9 +211,7 @@ export const checkRoster = (
   const sorted = [...entries].sort((left, right) => left.seq - right.seq);
   const invalid = (detail: string): SavedValuesRosterCheck => ({ ok: false, reason: "invalid", detail });
   const members = new Map<string, SavedValuesRosterMember>();
-  const carried = new Map<string, SavedValuesCarried>();
   const removed = new Set<string>();
-  const seen = new Set<string>();
   let previous = "";
   let genesis = "";
   for (let index = 0; index < sorted.length; index += 1) {
@@ -265,54 +230,23 @@ export const checkRoster = (
       }
       if (!verifyText(entry.device.signKey, text, sig)) return invalid("the founding entry's signature is wrong");
       members.set(entry.device.deviceId, { ...entry.device, addedAt: entry.at, addedBy: entry.by });
-      seen.add(entry.device.deviceId);
-      for (const computer of Array.isArray(entry.carried) ? entry.carried : []) {
-        if (
-          computer &&
-          typeof computer.deviceId === "string" &&
-          typeof computer.identityKey === "string" &&
-          computer.identityKey.length === 43 &&
-          computer.deviceId !== entry.device.deviceId
-        ) {
-          carried.set(computer.deviceId, computer);
-        }
-      }
     } else if (index === 0) {
       return invalid("the list doesn't start with a founding entry");
     } else if (entry.op === "add") {
       if (!isMember(entry.device)) return invalid(`entry ${index} names no device`);
       const device = entry.device;
-      if (typeof entry.carriedSig === "string") {
-        // A computer from the founding joining by itself, once.
-        const old = carried.get(device.deviceId);
-        if (
-          !old ||
-          seen.has(device.deviceId) ||
-          device.kind !== "computer" ||
-          entry.by !== device.deviceId ||
-          !verifyText(device.signKey, text, sig) ||
-          !verifyText(old.identityKey, carriedSigText({ genesis, device }), entry.carriedSig)
-        ) {
-          return invalid(`entry ${index}: a carried computer's entry doesn't check out`);
-        }
-        carried.delete(device.deviceId);
-      } else {
-        const signer = members.get(entry.by);
-        if (!signer || !verifyText(signer.signKey, text, sig)) {
-          return invalid(`entry ${index} isn't signed by a device on the list`);
-        }
+      const signer = members.get(entry.by);
+      if (!signer || !verifyText(signer.signKey, text, sig)) {
+        return invalid(`entry ${index} isn't signed by a device on the list`);
       }
       members.set(device.deviceId, { ...device, addedAt: entry.at, addedBy: entry.by });
       removed.delete(device.deviceId);
-      seen.add(device.deviceId);
     } else if (entry.op === "remove") {
       const signer = members.get(entry.by);
       if (!signer || !verifyText(signer.signKey, text, sig) || typeof entry.target !== "string") {
         return invalid(`entry ${index} isn't signed by a device on the list`);
       }
       if (members.delete(entry.target)) removed.add(entry.target);
-      carried.delete(entry.target);
-      seen.add(entry.target);
     } else {
       return invalid(`entry ${index} has an unknown kind`);
     }
@@ -327,7 +261,7 @@ export const checkRoster = (
     const atPin = sorted[pin.seq];
     if (!atPin || rosterEntryHash(atPin) !== pin.hash) return { ok: false, reason: "fork" };
   }
-  return { ok: true, roster: { members, carried, removed, head } };
+  return { ok: true, roster: { members, removed, head } };
 };
 
 const nextBody = (roster: SavedValuesRoster | null, by: string, at: number) => ({
@@ -340,19 +274,10 @@ const nextBody = (roster: SavedValuesRoster | null, by: string, at: number) => (
 
 export const foundRoster = (args: {
   self: SavedValuesMember;
-  carried: readonly SavedValuesCarried[];
   key: SavedValuesSigningKey;
   at: number;
 }): SavedValuesRosterEntry =>
-  signRosterEntry(
-    {
-      ...nextBody(null, args.self.deviceId, args.at),
-      op: "found",
-      device: args.self,
-      carried: args.carried.filter((computer) => computer.deviceId !== args.self.deviceId),
-    },
-    args.key,
-  );
+  signRosterEntry({ ...nextBody(null, args.self.deviceId, args.at), op: "found", device: args.self }, args.key);
 
 export const addToRoster = (args: {
   roster: SavedValuesRoster;
@@ -360,17 +285,8 @@ export const addToRoster = (args: {
   by: string;
   key: SavedValuesSigningKey;
   at: number;
-  carriedSig?: string;
 }): SavedValuesRosterEntry =>
-  signRosterEntry(
-    {
-      ...nextBody(args.roster, args.by, args.at),
-      op: "add",
-      device: args.device,
-      ...(args.carriedSig ? { carriedSig: args.carriedSig } : {}),
-    },
-    args.key,
-  );
+  signRosterEntry({ ...nextBody(args.roster, args.by, args.at), op: "add", device: args.device }, args.key);
 
 export const removeFromRoster = (args: {
   roster: SavedValuesRoster;
@@ -414,15 +330,19 @@ export const savedValueRecipients = (args: {
  * A device asking to join. The cloud relays it; the devices check it.
  *
  * 1. The new device posts its keys and a commitment to a random number.
- * 2. A device on the list (any, automatically) adds its own random number.
+ * 2. A device on the list that the user is using adds its own random number
+ *    and where it stands on the list (its pin).
  * 3. The new device reveals its number.
- * 4. Both screens show the code made from the request and both numbers. The
- *    user allows it on a device on the list, which adds it, signed.
+ * 4. Both screens show the code made from all of that. The user allows it on
+ *    the device that answered, which adds it, signed, and confirms on the new
+ *    device, which then takes only a list that extends that pin.
  *
- * The cloud would have to fix its own request before seeing the listed
- * device's number and pick the number it shows the new device before seeing
- * the new device's, so a request of its own matches the code on the new
- * device's screen only by chance (1 in a million).
+ * Each side computes the code only from what it sent itself plus the first
+ * answer it saw, never from what the cloud shows later. The cloud would have
+ * to fix its own request before seeing the listed device's number, and the
+ * number it shows the new device before seeing the new device's, so its own
+ * request (or its own list) matches the code on the other screen only by
+ * chance: 1 in a million.
  */
 export type SavedValuesJoin = Readonly<{
   joinId: string;
@@ -431,9 +351,12 @@ export type SavedValuesJoin = Readonly<{
   commit: string;
   createdAt: number;
   expiresAt: number;
-  /** The listed device that added its number, and the number (base64url). */
+  /** The listed device that added its number, the number (base64url), and its pin of the list. */
   answeredBy?: string;
+  /** The answering device's name, for "Check «name» shows …". */
+  answeredByName?: string;
   listedNonce?: string;
+  pin?: SavedValuesRosterPin;
   /** The new device's number, revealed after the listed device's. */
   joinerNonce?: string;
   state: "open" | "allowed" | "declined";
@@ -443,8 +366,10 @@ export type SavedValuesJoin = Readonly<{
 export const joinCommit = (joinerNonce: string): string => sha256Hex(CODE_CONTEXT + joinerNonce);
 
 /** The 6-digit code both screens show, or null while it can't be made (or doesn't check out). */
-export const joinCode = (join: Pick<SavedValuesJoin, "joinId" | "device" | "commit" | "listedNonce" | "joinerNonce">): string | null => {
-  if (!join.listedNonce || !join.joinerNonce || joinCommit(join.joinerNonce) !== join.commit) return null;
+export const joinCode = (
+  join: Pick<SavedValuesJoin, "joinId" | "device" | "commit" | "listedNonce" | "joinerNonce" | "pin">,
+): string | null => {
+  if (!join.listedNonce || !join.joinerNonce || !join.pin || joinCommit(join.joinerNonce) !== join.commit) return null;
   const digest = sha256(
     utf8(
       CODE_CONTEXT +
@@ -453,6 +378,7 @@ export const joinCode = (join: Pick<SavedValuesJoin, "joinId" | "device" | "comm
           device: join.device,
           listedNonce: join.listedNonce,
           joinerNonce: join.joinerNonce,
+          pin: { genesis: join.pin.genesis, seq: join.pin.seq, hash: join.pin.hash },
         }),
     ),
   );

@@ -146,26 +146,9 @@ const readJoins = (db: OwnerDbReader, now: number): SavedValuesJoin[] =>
       }
     });
 
-const readComputers = (db: OwnerDbReader): SavedValuesState["computers"] => {
-  try {
-    return db
-      .all<{ device_id: string; public_key: string | null; name: string | null }>(
-        "SELECT device_id, public_key, name FROM devices WHERE public_key IS NOT NULL AND public_key != '' ORDER BY device_id",
-      )
-      .map((row) => ({
-        deviceId: row.device_id,
-        identityKey: row.public_key!,
-        ...(row.name ? { name: row.name } : {}),
-      }));
-  } catch {
-    return [];
-  }
-};
-
 const readState = (db: OwnerDbReader, now: number): SavedValuesState => ({
   roster: readRoster(db),
   joins: readJoins(db, now),
-  computers: readComputers(db),
   devices: db
     .all<DeviceRow>("SELECT * FROM saved_value_devices ORDER BY device_id")
     .map(deviceOf),
@@ -386,8 +369,7 @@ const rosterReset = (ctx: OwnerContext, raw: unknown): { seq: number } => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "savedValues.rosterReset", { count: 5, windowMs: 24 * 60 * 60_000 },
     "Your devices' list was started over too often today.");
   const entry = parseEntry(raw);
-  // A new start carries no computers: whoever starts over adds the others again.
-  if (entry.op !== "found" || entry.carried.length > 0 || !checkRoster([entry]).ok) {
+  if (entry.op !== "found" || !checkRoster([entry]).ok) {
     throw new RpcError("BAD_REQUEST", "A new list starts with one device, signed by itself.");
   }
   ctx.db.run("DELETE FROM saved_value_roster");
@@ -465,17 +447,26 @@ const joinStart = (
 
 const listedDevice = (ctx: OwnerContext, deviceId: string) => {
   const checked = checkRoster(readRoster(ctx.db));
-  if (!checked.ok || !checked.roster.members.has(deviceId)) {
-    throw new RpcError("FORBIDDEN", "Only a device on the list can do that.");
-  }
+  const member = checked.ok ? checked.roster.members.get(deviceId) : undefined;
+  if (!member) throw new RpcError("FORBIDDEN", "Only a device on the list can do that.");
+  return member;
 };
 
-const joinAnswer = (ctx: OwnerContext, args: { joinId: string; by: string; listedNonce: string }): SavedValuesJoin => {
+const joinAnswer = (
+  ctx: OwnerContext,
+  args: { joinId: string; by: string; listedNonce: string; pin: { genesis: string; seq: number; hash: string } },
+): SavedValuesJoin => {
   const join = loadJoin(ctx, args.joinId);
-  listedDevice(ctx, args.by);
+  const member = listedDevice(ctx, args.by);
   if (!NONCE.test(args.listedNonce)) throw new RpcError("BAD_REQUEST", "listedNonce must be 32 random bytes.");
   if (join.state !== "open" || join.listedNonce) return join;
-  return saveJoin(ctx, { ...join, answeredBy: args.by, listedNonce: args.listedNonce });
+  return saveJoin(ctx, {
+    ...join,
+    answeredBy: args.by,
+    answeredByName: member.name,
+    listedNonce: args.listedNonce,
+    pin: { genesis: args.pin.genesis, seq: args.pin.seq, hash: args.pin.hash },
+  });
 };
 
 const joinReveal = (ctx: OwnerContext, args: { joinId: string; joinerNonce: string }): SavedValuesJoin => {
@@ -610,7 +601,16 @@ export const savedValuesDomain = {
     },
     "savedValues.joinAnswer": {
       scope: "owner",
-      parse: object({ joinId: ID, by: ID, listedNonce: string({ min: 1, max: 64 }) }),
+      parse: object({
+        joinId: ID,
+        by: ID,
+        listedNonce: string({ min: 1, max: 64 }),
+        pin: object({
+          genesis: string({ min: 64, max: 64 }),
+          seq: number({ int: true, min: 0 }),
+          hash: string({ min: 64, max: 64 }),
+        }),
+      }),
       handler: joinAnswer,
     },
     "savedValues.joinReveal": {

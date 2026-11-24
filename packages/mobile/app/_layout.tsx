@@ -256,6 +256,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
 
   useEffect(() => {
     if (
+      !fontsReady ||
       !navigatorReady ||
       session.isPending ||
       !guestReady ||
@@ -323,6 +324,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
       router.replace(selfHostServersAvailable ? "/welcome" : "/login");
     }
   }, [
+    fontsReady,
     navigatorReady,
     mainChatRequested,
     pathname,
@@ -356,6 +358,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
       return;
     }
     if (
+      !fontsReady ||
       !navigatorReady ||
       session.isPending ||
       !guestReady ||
@@ -373,6 +376,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
       });
     });
   }, [
+    fontsReady,
     navigatorReady,
     session.isPending,
     guestReady,

@@ -67,6 +67,7 @@ import { helperStoppedText, isUnlistedWaker, starterMessageSender, UNLISTED_WORK
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import {
   DONE_ACCEPTED_TEXT,
+  DONE_ALREADY_SENT,
   DONE_NOT_TO_STARTER,
   DONE_ONLY_FOR_AGENTS,
   doneWhileHelpersWorkText,
@@ -1664,14 +1665,16 @@ export function stellaAgents(host: StellaAgentsHost) {
     assertMessageSize(message);
     const working = await helpersAtWork(api, api.conversationId, context);
     if (working.length > 0) throw new Error(doneWhileHelpersWorkText(working));
-    await api.commit(async (tx) => {
+    const already = await api.commit(async (tx) => {
       const role = await tx.doc(StellaAgentDoc, api.conversationId);
-      if (role.done?.callIds.includes(api.callId)) return undefined;
-      role.done = role.done
-        ? { text: `${role.done.text}\n\n${message.trim()}`, callIds: [...role.done.callIds, api.callId] }
-        : { text: message.trim(), callIds: [api.callId] };
-      return undefined;
+      if (role.done?.callIds.includes(api.callId)) return false;
+      // One finished report per turn: a model that keeps calling with more
+      // acknowledgments ("Acknowledged.", "No further action") is told to stop.
+      if (role.done) return true;
+      role.done = { text: message.trim(), callIds: [api.callId] };
+      return false;
     }, context);
+    if (already) throw new Error(DONE_ALREADY_SENT);
     return { output: [{ type: "text" as const, text: DONE_ACCEPTED_TEXT }] };
   };
 

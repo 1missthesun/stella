@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-/**
- * Syncs mobile translation catalogs from `packages/desktop-ui/src/shared/i18n/locales/*.json`.
- *
- * Only English (`src/i18n/locales/en.json`) is bundled into the Hermes JS bytecode.
- * The remaining locales are pruned to mobile-used keys, encoded as value-only arrays
- * in English leaf-path order (avoiding 27x repetition of key names), and packed as
- * minimal single-entry `.zip` static assets under `src/i18n/packs/*.zip` (`.zip` is
- * a stock Metro asset extension, requiring no custom Metro or native config). At
- * runtime the active non-English locale is unpacked on demand and cached in
- * `expo-file-system`, so all 28 languages work including on offline first launch
- * while keeping Hermes `.hbc` English-only.
- */
 
 import { createHash } from "node:crypto";
 import {
@@ -37,8 +25,6 @@ const banner = (source) =>
   `// by packages/mobile/scripts/sync-i18n-catalogs.mjs.\n`;
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
-// Keep all mobile-owned keys; shared workspace packages (`@stella/contracts`,
-// `@stella/theme`, ...) are discovered automatically from package.json below.
 const ALWAYS_INCLUDED_PREFIXES = ["mobile"];
 
 const isPluralNode = (value) => {
@@ -119,7 +105,6 @@ const walkSourceFiles = (dir, out = []) => {
   return out;
 };
 
-// The mobile package plus every workspace package it depends on, transitively.
 const mobileSourceRoots = (mobileSourceRoot) => {
   const packagesDir = dirname(mobileSourceRoot);
   const byName = new Map();
@@ -219,7 +204,6 @@ const crc32 = (buf) => {
   return (c ^ 0xffffffff) >>> 0;
 };
 
-/** Deterministic single-entry ZIP archive (zero timestamps so git & OTA hashes are reproducible). */
 const buildSingleFileZip = (fileName, dataBuf) => {
   const nameBuf = Buffer.from(fileName, "utf8");
   const compressed = deflateRawSync(dataBuf, { level: 9 });

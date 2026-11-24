@@ -28,7 +28,6 @@ export type ComposerAttachment = PickedAttachment & {
   failed?: { message: string };
 };
 
-/** The local image a tile shows: the photo itself, or a video's poster frame. */
 export const attachmentPreviewUri = (
   attachment: Pick<PickedAttachment, "kind" | "uri" | "posterUri">,
 ): string | undefined =>
@@ -60,7 +59,6 @@ const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   "video/x-m4v": ".m4v",
 };
 
-/** Picker names can lack an extension (videos especially); the agent needs one to know the type. */
 export const withMimeExtension = (name: string, mimeType: string): string => {
   if (/\.[A-Za-z0-9]{2,5}$/.test(name)) return name;
   return `${name}${EXTENSION_BY_MIME_TYPE[mimeType.toLowerCase()] ?? ""}`;

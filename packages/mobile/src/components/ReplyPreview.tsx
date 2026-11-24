@@ -67,7 +67,6 @@ export function ReplyPreview({
             onPress={onOpen}
             style={({ pressed }) => [styles.agentHead, pressed && styles.bubblePressed]}
           >
-            {/* The glyph alone carries the task's state (desktop parity). */}
             <View style={styles.agentIcon}>
               {status === "running" ? (
                 <ActivityIndicator size="small" color={colors.textMuted} style={styles.spinner} />

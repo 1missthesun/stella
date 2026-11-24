@@ -44,9 +44,6 @@ export function AgentActivityRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && onPress ? styles.rowPressed : null]}
     >
-      {/* Status glyph at FULL strength — solid strong ink, no dimming
-          (desktop parity); only the description keeps the muted/shimmer
-          treatment. */}
       {lifecycleStatus ? (
         <View style={styles.glyph}>
           <AgentLifecycleStatusIcon

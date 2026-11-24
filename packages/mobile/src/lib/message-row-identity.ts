@@ -32,7 +32,6 @@ type VisibleOptions = {
 
 const NOT_CONSULTED = Symbol("not-consulted");
 
-/** Whether a row is left out, and the reply context it read to decide (if any). */
 const hiddenVerdict = (
   message: ChatMessage,
   options: VisibleOptions,
@@ -76,10 +75,6 @@ const isScheduleNoticeOnly = (message: ChatMessage): boolean =>
   !messageHasText(message) &&
   (message.askRecords?.length ?? 0) === 0;
 
-/**
- * Adds a visible row to the list, folding a schedule notice into the run of
- * notices right before it: the run is one row, keyed by its first notice.
- */
 const pushVisible = (visible: ChatMessage[], message: ChatMessage): void => {
   const head = visible[visible.length - 1];
   if (head && isScheduleNoticeOnly(message) && isScheduleNoticeOnly(head)) {
@@ -103,11 +98,6 @@ export const visibleChatMessages = (
   return visible.length === messages.length ? messages : visible;
 };
 
-/**
- * `visibleChatMessages` for a transcript that changes mostly at its end. Rows
- * that kept their place and identity keep their verdict unless the reply
- * context they read changed; unchanged input returns the previous list.
- */
 export const createVisibleChatMessages = () => {
   let previous: {
     messages: readonly ChatMessage[];
@@ -116,7 +106,6 @@ export const createVisibleChatMessages = () => {
     consulted: number[];
     contextAt: Map<number, { kind: string } | undefined>;
     visibleBefore: number[];
-    /** The last visible row after each message: a notice run grows in place. */
     tailBefore: (ChatMessage | undefined)[];
     visible: ChatMessage[];
   } | null = null;

@@ -11,7 +11,6 @@ import {
 } from "@stella/contracts/safeguard-block";
 import { getBackendClient } from "./backend";
 
-/** What the chat's safety-block card shows; it sits in the message list where the stopped reply would be. */
 export type SafeguardCardState = {
   notice: SafeguardNotice;
   pending?: SafeguardAction;
@@ -60,11 +59,6 @@ const show = (conversationId: string, notice: SafeguardNotice) => {
   setCard(conversationId, { notice, choose });
 };
 
-/**
- * The chat's safety-block card: a reply the model's safety system stopped,
- * wherever it ran, with the ways to carry on. It goes once the journal
- * records a choice or a reply.
- */
 export function useSafeguardNotice(
   conversationId: string | null | undefined,
   records: readonly JournalRecord[],

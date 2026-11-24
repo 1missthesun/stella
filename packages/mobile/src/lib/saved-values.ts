@@ -63,18 +63,9 @@ import {
 } from "./saved-values-trust";
 import { useAppVisible } from "./use-app-visible";
 
-/**
- * This phone's copy of the user's synced saved values. Every saved record
- * comes sealed to this phone's own key, signed by the device that sealed it;
- * one that no device on the list signed is ignored. A cloud task's secure
- * card can be answered from here with one tap. Opened records live only in
- * memory, only while they're needed.
- */
-
 const PUBLISH_RETRY_MS = 10 * 60_000;
 const WITHDRAW_BUDGET_MS = 4_000;
 const GET_BATCH = 100;
-/** Computers go first at sealing records to a device that just joined; this phone fills in what is left. */
 const HEAL_DELAY_MS = 6_000;
 
 const sealKey = (
@@ -89,7 +80,6 @@ const sealKey = (
   };
 };
 
-/** The text inside a seal addressed to this phone; null when it isn't, or was altered. */
 const openSeal = (
   seal: SavedValueSeal,
   keys: SavedValuesDeviceKeys,
@@ -134,14 +124,12 @@ const sealTo = (
 
 const sealedRecords = new Map<string, SavedValueRecord>();
 
-/** Changes whenever the synced records change, so open cards look again. */
 export const useSavedValuesVersion = (): string =>
   useSyncExternalStore(subscribeSavedValues, savedValuesVersion);
 
 let publishing = false;
 let lastPublishAttemptAt = 0;
 
-/** On the list: keep this phone's check-in fresh, so records get sealed to it. */
 const publishDevice = async (): Promise<void> => {
   const membership = await savedValuesMembership();
   if (!membership) return;
@@ -170,7 +158,6 @@ const publishDevice = async (): Promise<void> => {
 
 const NO_ARGS = {} as const;
 
-/** While signed in: follow the devices' list and the synced records. */
 export const useSavedValuesSync = (): void => {
   const session = authClient.useSession();
   const owner = session.data?.user?.id ?? null;
@@ -217,16 +204,13 @@ const withdraw = async (): Promise<void> => {
   });
 };
 
-/** On sign-out: this phone comes off the list, and its keys are gone. */
 export const withdrawSavedValuesDevice = async (): Promise<void> => {
   try {
     await Promise.race([
       withdraw(),
       new Promise((resolve) => setTimeout(resolve, WITHDRAW_BUDGET_MS)),
     ]);
-  } catch {
-    // Best-effort: a device not seen for a while stops being sealed to anyway.
-  }
+  } catch {}
   resetSavedValuesTrust();
   await forgetDevice();
   lastPublishAttemptAt = 0;
@@ -236,7 +220,6 @@ export const withdrawSavedValuesDevice = async (): Promise<void> => {
 type OpenedRecord = {
   payload: SavedValuePayload;
   updatedAt: number;
-  /** What was sealed, as its signer sealed it. */
   envelope: string;
   signedBy: string;
 };
@@ -249,10 +232,8 @@ const signerOf = (envelope: string): string => {
 const envelopePayload = (envelope: string): string =>
   (JSON.parse(envelope) as { payload: string }).payload;
 
-/** Records whose signature checked out, and against which list, so each is verified once. */
 const verified = new WeakMap<SavedValueRecord, string>();
 
-/** Opening is slow pure JS; let the screen draw between records. */
 const breathe = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 const openRecord = (
@@ -299,7 +280,6 @@ type OpenedRecords = {
   records: OpenedRecord[];
 };
 
-/** Every record sealed to this phone that a device on the list signed, opened. Callers keep only what they need. */
 const openAll = async (): Promise<OpenedRecords | null> => {
   const membership = await savedValuesMembership();
   if (!membership) {
@@ -334,7 +314,6 @@ const openAll = async (): Promise<OpenedRecords | null> => {
     });
     for (const record of records) {
       await breathe();
-      // A record that doesn't check out never replaces one that did.
       if (!record.deleted && openRecord(record, keys, roster)) {
         sealedRecords.set(record.id, record);
       }
@@ -371,7 +350,6 @@ const sealEnvelope = (
   return sealed;
 };
 
-/** Sign and seal a record from this phone, to the devices on the list. */
 const putRecord = async (args: {
   payload: SavedValuePayload;
   keys: SavedValuesDeviceKeys;
@@ -405,7 +383,6 @@ const putRecord = async (args: {
 
 let healing = false;
 
-/** Seal the records this phone holds to devices on the list that lack them (one that just joined, one that's back). */
 const sealForNewDevices = async (): Promise<void> => {
   if (healing) return;
   const membership = await savedValuesMembership();
@@ -433,7 +410,6 @@ const sealForNewDevices = async (): Promise<void> => {
   );
   if (lacking.size === 0) return;
   healing = true;
-  // The seals other devices have now are kept, so these are read fresh.
   for (const id of lacking.keys()) sealedRecords.delete(id);
   try {
     const opened = await openAll();
@@ -457,10 +433,6 @@ const sealForNewDevices = async (): Promise<void> => {
   }
 };
 
-/**
- * Take a device off the list. What it last signed is signed again by this
- * phone first: once it's off, nothing it signed counts any more.
- */
 export const removeSavedValuesDevice = async (
   deviceId: string,
 ): Promise<void> => {
@@ -485,7 +457,6 @@ const ACCOUNT_FIELD_PATTERN =
 const sameAccount = (left: string, right: string) =>
   left.trim().toLowerCase() === right.trim().toLowerCase();
 
-/** An account that names nothing (the service's own name, redacted text) counts as none. */
 const usableAccount = (service: string, account: string | undefined): string => {
   const value = normalizeSavedValuePart(account ?? "");
   if (
@@ -513,7 +484,6 @@ const accountFromAnswer = (
   return "";
 };
 
-/** Records for a service, best first: saved under the same name, then close ones; newest first within each. */
 const candidatesFor = (
   records: readonly OpenedRecord[],
   service: string,
@@ -541,7 +511,6 @@ const candidatesFor = (
 
 export type SavedLogin = Readonly<{
   label: string;
-  /** Values for the asked fields, by the ask's field id. Kept only while the card is open. */
   fills: Readonly<Record<string, string>>;
 }>;
 
@@ -563,11 +532,6 @@ const answerableFrom = (
   return Object.keys(fills).length > 0 ? fills : null;
 };
 
-/**
- * The saved login this phone holds for a secure card, when it answers every
- * field a saved value can (a one-time code is still typed). None when the
- * task said the saved one didn't work.
- */
 export const findSavedLogin = async (ask: UserAsk): Promise<SavedLogin | null> => {
   const detail = ask.detail;
   if (detail.kind !== "secure_input" || !detail.save || detail.save.replacing) {
@@ -585,13 +549,11 @@ export const findSavedLogin = async (ask: UserAsk): Promise<SavedLogin | null> =
   return null;
 };
 
-/** Whether what the user types on this card is stored by no computer, so the phone stores it. */
 export const rememberedByPhone = (ask: UserAsk): boolean =>
   ask.originDeviceId === USER_ASK_CLOUD_ORIGIN_DEVICE_ID;
 
 const newHandle = () => `${USER_ASK_SECRET_HANDLE_PREFIX}${Crypto.randomUUID()}`;
 
-/** The record an answer updates: the one for the same account, or the only one when no account tells them apart. */
 const existingRecordFor = (
   matches: readonly OpenedRecord[],
   account: string,
@@ -607,12 +569,6 @@ const existingRecordFor = (
   return null;
 };
 
-/**
- * Store what the user typed on a cloud task's card in the synced saved
- * values, sealed to every device on the list: a new record, or the one already
- * saved for that service and account. Only while this phone is on the
- * devices' list.
- */
 export const rememberOnDevices = async (args: {
   detail: UserAskSecureInputDetail;
   typed: readonly { field: UserAskField; value: string }[];
@@ -692,7 +648,6 @@ export type SavedLoginLookup = Readonly<{
 const NO_SAVED_LOGIN: SavedLoginLookup = { status: "none", login: null };
 const CHECKING_SAVED_LOGIN: SavedLoginLookup = { status: "checking", login: null };
 
-/** The saved login this phone holds for an open secure card, looked up again when the synced records change. */
 export const useSavedLogin = (ask: UserAsk, enabled: boolean): SavedLoginLookup => {
   const version = useSavedValuesVersion();
   const [lookup, setLookup] = useState<SavedLoginLookup>(

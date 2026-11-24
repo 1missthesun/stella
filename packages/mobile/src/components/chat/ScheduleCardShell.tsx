@@ -7,11 +7,6 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
-/**
- * A chat card in an assistant bubble: an icon tile in a leading column,
- * centred against the headline and a quiet status line; trailing controls sit
- * at the right end of the status line, and an optional ✕ on the headline row.
- */
 export function ScheduleCardShell({
   colors,
   headline,
@@ -35,11 +30,9 @@ export function ScheduleCardShell({
   headline: string;
   status: string;
   trailing?: ReactNode;
-  /** Controls on their own row under the status, for a card with several choices. */
   actions?: ReactNode;
   icon?: IconName;
   iconColor?: string;
-  /** Let long text wrap instead of truncating. */
   wrap?: boolean;
   onDismiss?: () => void;
   dismissLabel?: string;
@@ -48,9 +41,7 @@ export function ScheduleCardShell({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   testID?: string;
-  /** Content under the status (a list); the tile then sits at the top. */
   children?: ReactNode;
-  /** A quiet line on the page: no bubble, no tile fill, smaller type. */
   bare?: boolean;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -164,7 +155,6 @@ const makeStyles = (colors: Colors) =>
     body: { flexShrink: 1, gap: 1 },
     bodyList: { flexGrow: 1 },
     headlineDismiss: { paddingRight: 24 },
-    // With a ✕: the status line drops so its primary pill clears the ✕ by ~10pt.
     metaDismiss: { marginTop: 4 },
     trailing: { flexShrink: 0 },
     actions: {
@@ -176,8 +166,6 @@ const makeStyles = (colors: Colors) =>
       paddingBottom: 3,
       rowGap: 10,
     },
-    // On the headline row; its visible 14pt icon's right edge = the card's
-    // content edge (paddingRight 14), so trailing buttons line up under it.
     dismiss: {
       alignItems: "center",
       height: 24,
@@ -214,7 +202,6 @@ const makeStyles = (colors: Colors) =>
     },
   });
 
-/** Chat-card actions on the status line at its size: secondaries as muted text; the primary an accent pill overhanging the 20pt line by 2pt each side. */
 export const makeChatCardButtonStyles = (colors: Colors) =>
   StyleSheet.create({
     actions: { alignItems: "baseline", flexDirection: "row", flexShrink: 0, gap: 14 },

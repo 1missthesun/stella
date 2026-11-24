@@ -121,11 +121,6 @@ function blockText(node: MarkdownNode, indent: string): string {
   }
 }
 
-/**
- * The words of a markdown reply as plain text a text view can select: one
- * paragraph per block, list markers kept, table rows on their own lines with
- * cells separated, and code verbatim.
- */
 export function selectableMarkdownText(markdown: string): string {
   const root = parseMarkdown(markdown, PARSER_OPTIONS);
   const text = blocksText(root.children ?? [], "").trim();

@@ -99,7 +99,6 @@ export function measuredMarkdownTableColumnWidths(
     const padding = columnIndex === lastColumn ? 0 : CELL_HORIZONTAL_PADDING;
     const wrapped = Math.min(natural, MAX_COLUMN_WIDTH - padding);
     const word = Math.min(longestWordWidths[columnIndex] ?? 0, MAX_WORD_COLUMN_WIDTH - padding);
-    // Widths arrive rounded to whole points; a point over keeps the text on its lines.
     const text = Math.ceil(Math.max(wrapped, word)) + 1;
     return Math.max(MIN_COLUMN_WIDTH, text + padding);
   });

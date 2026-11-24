@@ -131,8 +131,6 @@ export function ComposerNotice({
       <View style={styles.body}>
         <Text style={styles.title}>{title}</Text>
         {inline ? (
-          // Usage-limit card: reset text on the left, the button on the same row,
-          // under the ✕ (which sits on the title row).
           <View style={styles.inlineRow}>
             <Text style={[styles.description, styles.inlineDescription]}>{description ?? ""}</Text>
             {primary ? button(primary, true) : null}
@@ -179,8 +177,6 @@ const makeStyles = (colors: Colors) =>
       alignItems: "center",
       flexDirection: "row",
       gap: 10,
-      // A clear gap under the ✕; Resume's right edge lines up under the
-      // visible ✕ icon (card paddingRight 36, 14pt icon centred 8pt in = edge 13pt in).
       marginTop: 8,
       marginRight: -23,
     },
@@ -207,7 +203,6 @@ const makeStyles = (colors: Colors) =>
       lineHeight: 17,
       marginTop: 2,
     },
-    // On the title row: centred on its 19pt line (card paddingTop 8).
     dismissInline: { top: 5.5 },
     dismiss: {
       alignItems: "center",

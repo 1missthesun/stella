@@ -23,7 +23,6 @@ const megabytes = (bytes: number): string => {
   return `${value >= 10 ? Math.round(value) : Math.round(value * 10) / 10} MB`;
 };
 
-/** The reason to show when it is something the user can act on (a size limit, a missing file). */
 export const canvasShareFailureReason = (error: unknown): string | undefined => {
   if (error instanceof CanvasTooLargeError) return error.message;
   const code =

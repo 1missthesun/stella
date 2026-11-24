@@ -38,9 +38,7 @@ export function ShareIntentHandler() {
             kind,
             ...(mimeType.startsWith("video/") ? { video: true as const } : {}),
           });
-        } catch {
-          // Skip unreadable files rather than dropping the whole share.
-        }
+        } catch {}
         if (attachments.length >= CHAT_ATTACHMENT_MAX_COUNT) break;
       }
       if (cancelled) return;

@@ -219,17 +219,12 @@ const ensureEntry = (
   return entry;
 };
 
-/** Starts (or joins) the background upload and returns the Drive path it will land at. */
 export const startAttachmentUpload = (source: AttachmentUploadSource): string => {
   const entry = ensureEntry(source);
   void run(entry).catch(() => undefined);
   return entry.path;
 };
 
-/**
- * Resolves with the final Drive path once the upload lands. Restarts a failed
- * upload, and recreates one lost to an app relaunch from its local file.
- */
 export const awaitAttachmentUpload = (
   source: AttachmentUploadSource,
   path: string,
@@ -269,11 +264,9 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-/** Re-renders when any upload changes state; read individual states with attachmentUploadState. */
 export const useAttachmentUploadsVersion = (): number =>
   useSyncExternalStore(subscribe, () => version);
 
-/** Which of these uploads have failed, re-rendering only when that set changes. */
 export const useFailedAttachmentUploads = (
   ids: readonly string[],
 ): ReadonlySet<string> => {

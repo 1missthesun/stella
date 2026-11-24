@@ -28,9 +28,7 @@ export type ComposerNotice = {
   kind: ComposerNoticeKind;
   title: string;
   description?: string;
-  /** A button on the card; pressing it dismisses the card first. */
   action?: { label: string; onPress: () => void };
-  /** The free usage ran out: offer the ChatGPT plan first, plans second. */
   connectPlan?: boolean;
 };
 

@@ -92,13 +92,6 @@ export type MobileDisplayPayload =
       kind: "pdf";
       filePath: string;
       title?: string;
-      /**
-       * On-device PDF, kept on rows saved by the removed phone-side `pdf`
-       * tool. Present only for phone-generated PDFs; a `file://` URI that the artifact
-       * viewer previews and the share sheet saves/opens directly, with no
-       * desktop bridge. Absent for bridged desktop PDFs, which stream their
-       * bytes over the bridge from `filePath`.
-       */
       localUri?: string;
       sizeBytes?: number;
       textOffset?: number;
@@ -131,14 +124,6 @@ export type MobileDisplayPayload =
       createdAt: number;
       textOffset?: number;
       textOffsetsByAgentId?: Record<string, number>;
-      /**
-       * Per-agent produced-file sections computed desktop-side (each covered
-       * agent's completion-rollup files, noise-filtered, deliverables first).
-       * Present — possibly empty — on bridges that consolidate agent files
-       * onto this card; its presence means any loose file artifacts left on
-       * the row are orchestrator-direct. Absent on older desktops, where
-       * mobile falls back to row-scoped folding.
-       */
       agents?: MobileAgentWorkFileSection[];
       followUp?: boolean;
       failed?: boolean;
@@ -164,7 +149,6 @@ export type ComposerQuote = {
   text: string;
 };
 
-/** Long text pasted into the composer, sent beside the prompt as "Pasted text". */
 export type ComposerPastedText = {
   id: string;
   text: string;
@@ -174,68 +158,20 @@ export type ChatMessage = {
   askRecords?: readonly UserAskRecord[];
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };
   scheduleNotice?: import("@stella/contracts/schedule-notice").ScheduleNoticeCard;
-  /** Schedule notices that arrived in a row, shown as one card; starts with `scheduleNotice`. */
   scheduleNoticeRun?: readonly import("@stella/contracts/schedule-notice").ScheduleNoticeCard[];
   replyRefs?: ReplyRef[];
   reaction?: string;
   reactionAt?: number;
   agentStates?: Record<string, "running" | "completed" | "error" | "canceled">;
   spawnedThreadIds?: string[];
-  /**
-   * Descriptions of `spawn_agent` requests on this row. When the journal
-   * carries no thread id for a spawn, reply context matches these against
-   * the task titles later reports cite.
-   */
   spawnedDescriptions?: string[];
   id: string;
-  /**
-   * Desktop-local message id this row reconciled to. Mobile keeps `id` stable
-   * for the just-streamed row so sync does not remount the bubble.
-   */
   canonicalId?: string;
-  /**
-   * Desktop request id linking a row to its turn. Canonical assistant rows are
-   * stamped with the turn's user-message id desktop-side; the streamed local
-   * reply adopts it at turn end so later syncs can link the canonical reply to
-   * the bubble instead of duplicating it.
-   */
   requestId?: string;
-  /**
-   * Creation time (ms epoch) shown for the row and used as its LOCAL anchor.
-   * Local rows stamp this at send time (phone clock); desktop rows carry the
-   * canonical desktop `timestamp`. Transcript ORDERING among canonical rows
-   * uses `canonicalCreatedAt` — not this field — because the two clocks can
-   * disagree by minutes.
-   */
   createdAt?: number;
-  /**
-   * First-seen desktop timestamp for the canonical row this message is (or
-   * reconciled to). It positions genuinely new sync rows against canonical
-   * neighbours, then stays immutable: once a row is visible, replay,
-   * reconciliation, and card-state updates preserve the array's insertion
-   * order instead of globally re-sorting it. `createdAt` remains the local
-   * display stamp. Absent on rows with no canonical identity yet (in-flight
-   * optimistic turns, offline error bubbles) and on rows persisted by older
-   * builds.
-   */
   canonicalCreatedAt?: number;
-  /**
-   * Durable desktop source row used for backward keyset pagination. Synthetic
-   * mobile projections (for example `:agent` cards) keep their own stable id,
-   * but paging must continue from the real SessionStore row that produced
-   * them.
-   */
   sourceMessageId?: string;
   sourceTimestamp?: number;
-  /**
-   * Authoritative monotonic ordering key from the desktop (chat-ordering
-   * re-architecture). When every row carries it the transcript is ordered by it
-   * (jump-free, clock-independent). Present on canonical rows; absent on
-   * in-flight optimistic rows until they reconcile, and on rows from a peer
-   * desktop on an older build that never sends it — in those windows the merge
-   * falls back to canonical insertion order (see rederiveOrder) so a row never
-   * inverts above its neighbours.
-   */
   sequence?: number;
   role: "assistant" | "user";
   text: string;
@@ -254,15 +190,9 @@ export type ChatMessage = {
   documentNames?: string[];
   quotedText?: string;
   pastedTexts?: { lines: number; chars: number; text?: string }[];
-  /** A local user send still on this phone: waiting, not sent (retry or remove), or stopped. */
   send?: "queued" | "not_sent" | "stopped";
   sentWhileBusy?: boolean;
   stopped?: boolean;
-  /**
-   * Assistant message: the paired desktop was unreachable, so this reply was
-   * answered by the fallback responder instead. Renders a small "Answered
-   * while your computer was offline" caption.
-   */
   cloudFallback?: boolean;
 };
 
@@ -273,11 +203,8 @@ export type MobileTask = {
   parentAgentId?: string;
   status: "running" | "completed" | "error" | "canceled";
   authoritativeRunning?: true;
-  /** Ended its turn waiting for this: live but nothing running. */
   waitingFor?: string;
-  /** Its own turn is over and its report waits for its helpers. */
   waitingForHelpers?: boolean;
-  /** Not ended but held, so nothing of it runs now. */
   paused?: AgentPause;
   updatedAt?: number;
   statusText?: string;

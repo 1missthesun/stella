@@ -262,13 +262,10 @@ export function SettingsContent() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Same key as the sidebar's destination, so the two can't drift. */}
       <Text style={styles.title} accessibilityRole="header">
         {t("mobile.nav.account")}
       </Text>
 
-      {/* Account: who you are and what you pay for. The page title already
-          says Account, so this first group needs no label of its own. */}
       <View style={settingsStyles.section}>
         <View style={settingsStyles.group}>
           {isSignedIn ? (
@@ -321,8 +318,6 @@ export function SettingsContent() {
                 color={colors.accent}
                 style={settingsStyles.rowIcon}
               />
-              {/* The page's main action while signed out, so it takes the
-                  accent like the subscribe button. */}
               <Text
                 style={[
                   settingsStyles.rowLabel,
@@ -361,8 +356,6 @@ export function SettingsContent() {
               colors={colors}
               onPress={() => router.push("/cloud-home")}
             />
-            {/* Claude & ChatGPT now live in the chat's settings sheet, next
-                to the model that runs on them. */}
             <View style={[settingsStyles.row, settingsStyles.rowDivider]}>
               <Icon
                 name="globe"
@@ -463,7 +456,6 @@ export function SettingsContent() {
           })}
         </View>
 
-        {/* Secondary surface options, below the themes they tint. */}
         <View style={styles.surfaceControls}>
           <View style={styles.surfaceControl}>
             <SegmentedControl<GradientMode>
@@ -558,8 +550,6 @@ export function SettingsContent() {
           {t("mobile.settings.aboutSection")}
         </Text>
         <View style={settingsStyles.group}>
-          {/* Feedback is stored on the active server; on a self-hosted one
-              nobody at Stella would ever read it. */}
           {showFeedback ? (
             <LinkRow
               label={t("sidebar.feedback")}
@@ -611,8 +601,6 @@ export function SettingsContent() {
             </Pressable>
           </View>
 
-          {/* A self-hosted account belongs to the server's owner; it is
-              removed on the server, not from a paired phone. */}
           {isSelfHostedLaunch ? null : (
           <Pressable
             onPress={confirmDeleteAccount}

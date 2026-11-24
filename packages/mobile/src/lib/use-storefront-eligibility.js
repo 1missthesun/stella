@@ -6,19 +6,6 @@ import {
   isStorefrontModuleAvailable,
 } from "../../modules/stella-storefront";
 
-/**
- * Region gating for the mobile subscription surface.
- *
- * Eligibility for in-app subscription purchase is decided ONLY by the App
- * Store storefront country reported by StoreKit (see the native module). US
- * storefront -> eligible; every other storefront, plus "unknown" (no App
- * Store account, StoreKit unavailable, non-iOS, module missing), fails closed
- * to ineligible. Device language/locale and IP are never consulted.
- *
- * The value is re-read on mount, whenever the app returns to the foreground,
- * and whenever StoreKit reports a storefront change, so the UI re-gates
- * without a restart.
- */
 export const US_STOREFRONT_CODE = "USA";
 
 let debugStorefrontOverride;

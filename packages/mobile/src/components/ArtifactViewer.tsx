@@ -302,11 +302,8 @@ function CanvasDocumentWebView({
 }: {
   html: string;
   style: object;
-  /** Names the canvas in the messages its action buttons send. */
   identity: CanvasIdentity;
-  /** Where the canvas file lives; its relative links resolve against it. */
   location: CanvasDocumentLocation | null;
-  /** Opens a link the canvas can't follow itself (anything but a fragment). */
   onOpenLink: (link: CanvasLink) => void;
   onContentHeight?: (height: number) => void;
 }) {
@@ -620,9 +617,6 @@ export function ArtifactViewerContent({
         : null,
     [artifact.payload],
   );
-  // A canvas link opens the way the same link opens from chat: pages in the
-  // in-app browser, Drive files, canvases and a computer's files right here
-  // (Back returns to the canvas), apps in Apps.
   const openCanvasLink = useCallback(
     (link: CanvasLink) => {
       if (link.kind === "web" || link.kind === "external") {

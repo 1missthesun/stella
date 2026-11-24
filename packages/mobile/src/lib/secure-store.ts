@@ -2,14 +2,9 @@ import * as ExpoSecureStore from "expo-secure-store";
 import { launchServer, noteScopedKey, scopedKeyFor } from "./server-registry";
 
 /**
- * SecureStore with keychain items readable after the first unlock since boot.
  * CarPlay usually launches Stella with the iPhone locked, and the default
- * "when unlocked" accessibility hides the session token and consent flags
- * from that launch.
- *
- * Keys belong to the server this launch talks to: on a self-hosted server
- * each key gets that server's prefix, so sessions, consent and pairings
- * never cross servers. Stella's hosted service keeps the unprefixed keys.
+ * "when unlocked" keychain accessibility hides the session token and consent
+ * flags from that launch.
  */
 const options: ExpoSecureStore.SecureStoreOptions = {
   keychainAccessible: ExpoSecureStore.AFTER_FIRST_UNLOCK,
@@ -47,10 +42,6 @@ export const setItemForServerAsync = (
   return ExpoSecureStore.setItemAsync(target, value, options);
 };
 
-/**
- * Keys that must stay on this phone: left out of backups and never restored
- * onto another device.
- */
 const deviceOnlyOptions: ExpoSecureStore.SecureStoreOptions = {
   keychainAccessible: ExpoSecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
 };

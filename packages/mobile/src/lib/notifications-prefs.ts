@@ -30,9 +30,7 @@ export async function setNotificationsMuted(next: boolean): Promise<void> {
     } else {
       await AsyncStorage.removeItem(MUTED_STORAGE_KEY);
     }
-  } catch {
-    // ignore — in-memory value still wins until next reload
-  }
+  } catch {}
   for (const fn of listeners) fn(muted);
 }
 

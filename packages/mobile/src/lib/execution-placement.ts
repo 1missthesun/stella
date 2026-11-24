@@ -313,8 +313,6 @@ export const submitAutomaticExecution = async (
       ? await ensurePhoneAccess(target.deviceId)
       : access;
   const pairedAccess = target.mode === "cloud" ? undefined : deviceAccess;
-  // The account session authorises the send; the phone names itself and the
-  // computer it chose, which Stella offers the work to.
   const pairHeaders = pairedAccess
     ? mobileSessionPhoneHeaders(pairedAccess)
     : undefined;

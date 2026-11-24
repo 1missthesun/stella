@@ -761,8 +761,6 @@ export class MobileRealtimeVoiceSession {
     try {
       await refreshRecordingAudioSession(lease, REALTIME_VOICE_AUDIO_MODE);
     } catch (error) {
-      // A transient OS route failure should not tear down an otherwise healthy
-      // session; the next assistant reply retries the route.
       console.debug(
         "[realtime-voice] Could not route output through the loudspeaker:",
         error instanceof Error ? error.message : String(error),
@@ -840,10 +838,7 @@ export class MobileRealtimeVoiceSession {
         return;
       }
       await this.closeForLeaseLoss(response.reason);
-    } catch {
-      // The last renewed lease expiry is still enforced by the local timer,
-      // so a black-holed poll cannot leave WebRTC alive.
-    }
+    } catch {}
   }
 
   private async closeForLeaseLoss(reason: string | null) {
@@ -916,15 +911,11 @@ export class MobileRealtimeVoiceSession {
     await this.closeLiveSession();
     try {
       this.channel?.close();
-    } catch {
-      // Already closed.
-    }
+    } catch {}
     this.channel = null;
     try {
       this.pc?.close();
-    } catch {
-      // Already closed.
-    }
+    } catch {}
     this.pc = null;
     if (this.localStream) {
       for (const track of this.localStream.getTracks()) track.stop();

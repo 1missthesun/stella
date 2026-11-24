@@ -56,10 +56,6 @@ export const DictationRecordingBar = memo(function DictationRecordingBar({
   return (
     <View style={styles.recordingBar}>
       <View style={styles.recordingRow}>
-        {/* Cancel takes the slot the composer's + occupies at rest, so the
-            leading control is one place with one meaning: add something when
-            idle, back out when dictating. Every control in the row shares one
-            size, large enough to hit without aiming. */}
         <Pressable
           onPress={onCancel}
           accessibilityLabel="Cancel dictation"

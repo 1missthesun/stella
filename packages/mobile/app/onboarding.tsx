@@ -107,9 +107,6 @@ export default function OnboardingScreen() {
   const followEndRef = useRef(false);
   const pendingEntryScrollRef = useRef<string | null>(null);
 
-  // Decided while rendering (not in an effect) so the content-size event the
-  // new row causes already sees the right intent: a reply or the typing
-  // indicator follows the end, a new message scrolls to its own top.
   const lastEntry = entries[entries.length - 1];
   const scrollIntentKeyRef = useRef<string | null>(null);
   const scrollIntentKey = `${lastEntry?.id ?? ""}|${typing ? 1 : 0}`;

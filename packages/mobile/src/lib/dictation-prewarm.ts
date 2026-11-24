@@ -117,12 +117,6 @@ export const releaseDictationRecorderPrewarm = (): Promise<void> => {
   return pending;
 };
 
-/**
- * Takes the one native recorder for `owner`. "prewarmed" hands over the
- * recorder prepared with PREWARMED_RECORDING_OPTIONS; "fresh" means nothing is
- * prepared and the caller starts with its own options; null means another
- * owner is recording.
- */
 export const acquireDictationRecorder = async (
   owner: symbol,
   options: { usePrewarm: boolean },

@@ -23,7 +23,6 @@ const formatTime = (ms: number): string => {
     : date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 };
 
-/** A reminder that went off: what to do on row 1; "Reminder · 9:00 AM" on row 2 with Snooze / Done at its right end. */
 export const ReminderFireCard = memo(function ReminderFireCard({
   mark,
   text,

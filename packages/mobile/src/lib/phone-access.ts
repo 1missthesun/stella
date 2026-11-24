@@ -8,11 +8,6 @@ const PREFERRED_DESKTOP_DEVICE_ID_KEY =
 const PAIRED_DESKTOP_IDS_KEY = "stella-mobile_phone-access.paired-desktop-ids";
 const DESKTOP_ACCESS_KEY_PREFIX = "stella-mobile_phone-access.desktop.";
 
-/**
- * A computer this phone chose to work on. The account session is what lets
- * the phone reach it; this only remembers the choice. Records written by
- * older app versions also carry a pairing secret, which is no longer used.
- */
 export type StoredPhoneAccess = {
   desktopDeviceId: string;
   mobileDeviceId: string;

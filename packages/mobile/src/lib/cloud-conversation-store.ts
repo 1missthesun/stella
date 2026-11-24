@@ -49,11 +49,6 @@ export type ConversationState = ConversationViewState & {
 const EMPTY_AGENTS: readonly AgentActivityEntry[] = [];
 
 const EMIT_COALESCE_MS = 16;
-/**
- * Appends may run this far past the retention cap; the window is cut back
- * once the chat goes quiet (or the app leaves the foreground), so an arrival
- * in a full chat only appends instead of also dropping the oldest records.
- */
 const RETAINED_OVERFLOW = 400;
 const TRIM_IDLE_MS = 8_000;
 const TURN_END_HOLD_MS = 120;

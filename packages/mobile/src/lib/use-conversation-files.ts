@@ -163,9 +163,7 @@ export function useConversationFiles(
           headSeq.current = window.headSeq;
           const newer = conversationFilesFromEntries(page.entries, id);
           setFiles((current) => mergeNewer(current, newer));
-        } catch {
-          // The next message tries again.
-        }
+        } catch {}
       })();
     }, REFRESH_DEBOUNCE_MS);
     return () => {

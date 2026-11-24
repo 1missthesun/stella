@@ -147,10 +147,7 @@ export function invalidateChatStorageForAccountCleanup(): void {
   for (const listener of transcriptCleanupListeners) {
     try {
       listener();
-    } catch {
-      // Every mounted surface is independent; one bad listener must not leave
-      // another surface writing the departing account back into storage.
-    }
+    } catch {}
   }
   for (const thread of CHAT_THREAD_IDS) invalidateTranscriptWrites(thread);
   orderKeysByThread.clear();
@@ -328,13 +325,6 @@ export type ChatSyncState = {
 };
 
 const TASK_STATUSES = new Set(["running", "completed", "error", "canceled"]);
-
-/**
- * A persisted `running` snapshot that has gone quiet this long loads as
- * settled, so a task that finished while the app was closed can't shimmer the
- * pill forever. Shared with the hub's own stale-settle so a row can't be live
- * on one path and finished on the other.
- */
 
 function parseStoredToolSteps(value: unknown): ToolStep[] {
   if (!Array.isArray(value)) return [];

@@ -22,13 +22,11 @@ const resetTime = (until: number): string => {
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
 };
 
-/** Usage-limit cards, the only records the notice reads. */
 export const USAGE_LIMIT_CARDS: JournalView = {
   id: "usage-limit-cards",
   test: (record) => record.kind === "card" && record.card.type === "usage-limit",
 };
 
-/** What the chat's usage-limit card shows; it sits in the message list where the paused reply would be. */
 export type UsageLimitCardState = {
   title: string;
   description?: string;
@@ -81,10 +79,6 @@ const showPaused = (conversationId: string, summary: UsageLimitSummary) => {
   });
 };
 
-/**
- * The chat's usage-limit card: what a Claude usage limit paused (the reply
- * and tasks, wherever they run), with Resume; "Resumed" once it continued.
- */
 export function useClaudeUsageLimitNotice(
   conversationId: string | null | undefined,
   records: readonly JournalRecord[],

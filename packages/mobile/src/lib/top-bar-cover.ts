@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { makeMutable } from "react-native-reanimated";
 
-/** How much of the main top bar is covered by the page under it, 0 to 1. */
 export const topBarCover = makeMutable(0);
 
 let covered = false;

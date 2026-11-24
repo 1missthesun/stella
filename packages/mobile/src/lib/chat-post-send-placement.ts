@@ -36,11 +36,6 @@ export function resolvePostSendTarget({
     : rowTop - leadingInsetPx;
 }
 
-/**
- * `trailingSlackPx` is everything below the row (the chat tail plus the
- * reserved bottom inset), so `contentHeightPx - trailingSlackPx` is the row's
- * bottom.
- */
 export function resolvePostSendPlacement({
   contentHeightPx,
   viewportHeightPx,

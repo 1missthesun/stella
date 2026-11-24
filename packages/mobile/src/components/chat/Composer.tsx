@@ -67,7 +67,6 @@ const COMPOSER_INPUT_MAX_HEIGHT = 200;
 const ASK_SLOT_CHROME = 20;
 const ASK_MIN_HEIGHT = 160;
 const ASK_UNBOUNDED = 100_000;
-/** How far an ask card reaches into the top bar before the bar is gone. */
 const TOP_BAR_COVER_RAMP = 16;
 export const LAYOUT_SPRING = {
   duration: 350,
@@ -111,7 +110,6 @@ export type ComposerModelPickerConfig = {
 
 type InputHeightBounds = { min: number; max: number };
 
-/** The text one edit inserted, and the result without it. */
 const insertedText = (
   previous: string,
   next: string,
@@ -159,7 +157,6 @@ function ComposerTextInput({
   containerStyle?: StyleProp<ViewStyle>;
   heightBounds: InputHeightBounds;
   onContentHeight?: (height: number) => void;
-  /** A paste long enough to send as "Pasted text" instead of composer text. */
   onLongPaste?: (text: string) => void;
 }) {
   const value = useChatDraft(draftStore);
@@ -207,8 +204,6 @@ function ComposerTextInput({
       : style;
   return (
     <View style={containerStyle}>
-      {/* Scales with the input, which has no Dynamic Type cap of its own
-          (0 = none), so the measured height matches the input's text. */}
       <Text
         style={mirrorStyle}
         allowFontScaling={props.allowFontScaling}
@@ -423,11 +418,6 @@ export const Composer = memo(function Composer({
     }
   }, [draftEmpty, expanded]);
 
-  // Expansion is one-way while the user is typing: the pill and expanded
-  // shapes give the text different widths, so a 2-line pill can re-flow to
-  // 1 line in expanded shape — flipping back to pill would re-wrap and
-  // oscillate forever. Collapse happens only when the parent clears the
-  // draft (see the `useEffect` above) or via dedicated dictation handlers.
   const growForPillHeight = useCallback(
     (height: number) => {
       if (expanded || draftStore.get().length === 0) return;

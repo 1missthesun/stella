@@ -54,12 +54,6 @@ export const replaceEqualDeep = <T>(previous: unknown, next: T): T => {
 const NEARBY = 8;
 const TAIL = 4;
 
-/**
- * Keeps the previous object for every message that didn't change. Messages are
- * matched by position, following the shift when rows leave the top or arrive
- * at the bottom; an id lookup is built only for bigger moves, and new rows at
- * the tail never need it.
- */
 export const reuseEqualChatMessages = (
   previous: readonly ChatMessage[] | null,
   next: ChatMessage[],
@@ -87,8 +81,6 @@ export const reuseEqualChatMessages = (
     offset = at - index;
     return previous[at];
   };
-  // Rows above the newest change usually come through as the very same
-  // objects; skip them with a plain loop before any per-row matching.
   const limit = Math.min(previous.length, next.length);
   let start = 0;
   while (start < limit && next[start] === previous[start]) start += 1;

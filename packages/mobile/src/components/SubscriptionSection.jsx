@@ -30,7 +30,6 @@ function formatUsd(dollars) {
   return `$${Math.max(0, dollars || 0).toFixed(2)}`;
 }
 
-// Whole percent for display: never 0% once anything is used, never 100% until it's all used.
 function usedPercent(used, limit) {
   if (!(limit > 0) || !(used > 0)) return 0;
   if (used >= limit) return 100;
@@ -135,8 +134,6 @@ export function SubscriptionSection() {
     </Pressable>
   );
 
-  // Only the billing status gates the section. Until the storefront is
-  // known the plans show without purchase buttons, never a missing section.
   if (status === undefined) {
     return null;
   }
@@ -147,7 +144,6 @@ export function SubscriptionSection() {
     <View style={styles.section}>
       {header}
       <View style={styles.card}>
-        {/* Current plan */}
         <View style={styles.currentPlanRow}>
           <Text style={styles.currentPlanLabel}>
             {t("billing.mobile.currentPlanLabel")}

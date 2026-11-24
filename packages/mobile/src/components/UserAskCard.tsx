@@ -239,7 +239,6 @@ const AskFieldFocusContext = createContext<AskFieldFocus>({
   blur: () => {},
 });
 
-/** Keeps the field wrapped by `ref` in view inside the card while its input has focus. */
 function useAskFieldAnchor() {
   const { focus, blur } = useContext(AskFieldFocusContext);
   const ref = useRef<View>(null);
@@ -930,7 +929,6 @@ function SecureAskSurface({
         fields: payload,
         ...(asksToRemember
           ? {
-              // A cloud task is told whether it's saved; what came from the saved logins is.
               remember:
                 rememberHere || (savedLogin !== null && rememberedByPhone(ask)),
             }
@@ -1351,7 +1349,6 @@ function SecureField({
   );
 }
 
-/** Keyboard, autofill and length for a field, from its well-known id or type (card number, expiry, CVC, ZIP, login, code). */
 const nativeInputPropsForField = (field: UserAskField): Partial<TextInputProps> => {
   const kind = userAskFieldInputKind(field);
   const props = nativeInputPropsForKind(kind);

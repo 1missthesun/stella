@@ -57,9 +57,7 @@ function refreshWorkspaceApps(): Promise<void> {
       );
       if (!response.ok) return;
       shareWorkspaceApps(parseWorkspaceApps((await response.json()).apps));
-    } catch {
-      // A card stays in its loading look; the next mount retries.
-    } finally {
+    } catch {} finally {
       inflight = null;
       setLoading(false);
     }

@@ -17,19 +17,12 @@ import { Text } from "../Text";
 import { ScheduleCardShell, makeChatCardButtonStyles } from "./ScheduleCardShell";
 import { ScheduleNoticeCard } from "./ScheduleNoticeCard";
 
-/**
- * Schedule notices that arrived one after another. One the user will care
- * about keeps its own card; a run reads as one card with what it left behind,
- * opening in place to every notice. A background task's own follow-ups sit on
- * a plain line, without the card's bubble.
- */
 export const ScheduleNotices = memo(function ScheduleNotices({
   first,
   run,
   colors,
 }: {
   first: ScheduleNotice;
-  /** The whole run when more than one notice arrived in a row. */
   run?: readonly ScheduleNotice[];
   colors: Colors;
 }) {

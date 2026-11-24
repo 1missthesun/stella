@@ -55,8 +55,6 @@ export const AppPreviewCard = memo(function AppPreviewCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.preview}>
-        {/* Shown until the still arrives (it is captured on first view), and
-            in its place if it cannot be. */}
         <View style={styles.previewPlaceholder}>
           {app?.icon ? (
             <Text style={styles.previewEmoji}>{app.icon}</Text>

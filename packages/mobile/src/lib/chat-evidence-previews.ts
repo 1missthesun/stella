@@ -70,10 +70,7 @@ const directoryFor = (name: string): Directory => {
   const directory = new Directory(Paths.cache, CACHE_DIRNAME, name);
   try {
     directory.create({ intermediates: true, idempotent: true });
-  } catch {
-    // A concurrent request created it, or the cache is read-only; the caller's
-    // write is what reports a real failure.
-  }
+  } catch {}
   return directory;
 };
 
@@ -103,9 +100,7 @@ const writeManifest = (contentKey: string, preview: EvidencePreview): void => {
     const file = manifestFile(contentKey);
     file.create({ overwrite: true, intermediates: true });
     file.write(JSON.stringify(preview));
-  } catch {
-    // The preview still renders this session; only the next launch pays again.
-  }
+  } catch {}
 };
 
 export const evidenceDrivePath = (filePath: string): string | null => {
@@ -305,10 +300,7 @@ const videoPreviewFor = async (
   try {
     if (poster.exists) poster.delete();
     new File(frame.uri).moveSync(poster);
-  } catch {
-    // Keep the generator's own cache file when the move fails; it lives in the
-    // same cache directory and is just as readable.
-  }
+  } catch {}
   const preview: EvidencePreview = {
     kind: "video",
     posterUri: poster.exists ? poster.uri : frame.uri,

@@ -16,7 +16,6 @@ export type DesktopChatOutboxAttachment = {
   name: string;
   kind: "image" | "file";
   previewUri?: string;
-  /** Present while the file may still be uploading from this phone. */
   upload?: { id: string; uri: string; mimeType: string; sizeBytes: number };
 };
 
@@ -56,7 +55,6 @@ export type DesktopChatOutboxRecord = {
   structuredAttachments?: true;
   text: string;
   displayText: string;
-  /** Long text sent beside the prompt, shown as "Pasted text" attachments. */
   pastedTexts?: string[];
   createdAt: number;
   sequence: number;

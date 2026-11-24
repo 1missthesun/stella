@@ -29,7 +29,6 @@ import { useT } from "../i18n";
 const appPlatform = (): string =>
   `${Platform.OS === "ios" ? "iOS" : Platform.OS === "android" ? "Android" : Platform.OS} ${String(Platform.Version)}`;
 
-/** Store version, plus the over-the-air update it runs when it isn't the built-in one. */
 const appVersion = (): string | null => {
   const version = Constants.expoConfig?.version;
   if (!version) return null;

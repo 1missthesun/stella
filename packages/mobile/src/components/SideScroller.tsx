@@ -42,13 +42,6 @@ export type SideScrollerProps = {
   scrollXStep?: number;
 };
 
-/**
- * Sideways scrolling for content inside a chat message (tables, code, media
- * rows). While its content is wider than it, a drag that starts on it scrolls
- * it and the page's sidebar swipe waits for that scroll to fail, so the
- * sidebars never move from it, even when the content is already at an edge.
- * Content that fits takes no swipes at all.
- */
 export function SideScroller({
   children,
   style,

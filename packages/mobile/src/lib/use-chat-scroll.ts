@@ -21,12 +21,6 @@ const FOLLOW_NATIVE_SCROLL_MS = 420;
 const FOLLOW_HARD_SNAP_VIEWPORTS = 2;
 const FOLLOW_TARGET_EPSILON_PX = 0.5;
 const FOLLOW_TOP_PEEK_PX = 56;
-/**
- * How long after a send the latest user row's layout changes may re-run the
- * post-send placement. Covers the four-line clamp collapsing a long message a
- * few frames after the anchor was first computed, without letting much later
- * layout churn (e.g. a "Show more" tap) yank the scroll position around.
- */
 const POST_SEND_REANCHOR_WINDOW_MS = 1500;
 const ROW_SIZE_DRIFT_PX = 1;
 

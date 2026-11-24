@@ -41,9 +41,7 @@ const readRaw = (key: string): string | null => {
 const writeRaw = (key: string, value: string) => {
   try {
     ExpoSecureStore.setItem(key, value, options);
-  } catch {
-    // Web and broken keychains: the hosted server still works.
-  }
+  } catch {}
 };
 
 const deleteRaw = async (key: string) => {

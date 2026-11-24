@@ -54,14 +54,8 @@ video { position: fixed; inset: 0; display: block; width: 100%; height: 100%; ob
 let sequence = 0;
 
 /**
- * The viewer's video surface: the platform's own `<video>` player, sized to
- * the sheet with aspect-fit so nothing is clipped or scrolls at any size, and
- * started as soon as it can play. Until the first frame is actually playing,
- * the poster sits over it with a spinner instead of an empty black box.
- *
- * The page is written next to the media in the cache directory and loaded as
- * a file, because WKWebView only lets a page read local video and poster
- * files when it was itself loaded from a file with read access to them.
+ * WKWebView only lets a page read local video and poster files when it was
+ * itself loaded from a file with read access to them.
  */
 export function VideoPlayerView({
   uri,
@@ -95,9 +89,7 @@ export function VideoPlayerView({
       if (made) {
         try {
           new File(made).delete();
-        } catch {
-          // Already purged with the cache.
-        }
+        } catch {}
       }
     };
   }, [uri, posterUri]);
@@ -121,9 +113,7 @@ export function VideoPlayerView({
     () => () => {
       try {
         page?.delete();
-      } catch {
-        // Already purged with the cache.
-      }
+      } catch {}
     },
     [page],
   );
@@ -137,9 +127,7 @@ export function VideoPlayerView({
       if (message.type === "stella:video" && typeof message.state === "string") {
         setStarted(true);
       }
-    } catch {
-      // Not ours.
-    }
+    } catch {}
   }, []);
 
   return (

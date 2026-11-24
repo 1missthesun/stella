@@ -175,9 +175,7 @@ function cancelStreamSession(ticket: string) {
             signal,
           }),
       );
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   })();
 }
 
@@ -212,9 +210,7 @@ export function pauseReadAloud() {
   if (!currentPlayer || playbackState?.status !== "playing") return;
   try {
     currentPlayer.pause();
-  } catch {
-    /* ignore */
-  }
+  } catch {}
   playbackSession.release();
   setPlaybackState({ messageId: playbackState.messageId, status: "paused" });
 }
@@ -233,9 +229,7 @@ export function resumeReadAloud() {
   if (!currentPlayer || !playbackSession.hold()) return;
   try {
     currentPlayer.play();
-  } catch {
-    /* ignore */
-  }
+  } catch {}
   setPlaybackState({ messageId: playbackState.messageId, status: "playing" });
 }
 

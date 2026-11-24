@@ -45,9 +45,7 @@ export const reloadApp = async (): Promise<void> => {
         await Updates.reloadAsync();
         return;
       }
-    } catch {
-      /* fall through */
-    }
+    } catch {}
   }
   DevSettings.reload();
 };

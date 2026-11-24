@@ -64,9 +64,7 @@ const announceChatGptPlanUse = async (t: ReturnType<typeof useT>) => {
   try {
     if (await AsyncStorage.getItem(PLAN_WELCOME_KEY)) return;
     await AsyncStorage.setItem(PLAN_WELCOME_KEY, "1");
-  } catch {
-    // Storage unavailable: show it this time.
-  }
+  } catch {}
   Alert.alert(
     t("mobile.engineAccounts.planWelcomeTitle"),
     t("mobile.engineAccounts.planWelcomeBody"),
@@ -90,9 +88,7 @@ const announceClaudeSync = async (
   const key = `${CLAUDE_SYNC_NOTICE_KEY}:${userId}`;
   try {
     if (await AsyncStorage.getItem(key)) return;
-  } catch {
-    // Storage unavailable: show it this time.
-  }
+  } catch {}
   Alert.alert(
     t("settings.engineAccounts.claudeTitle"),
     t(
@@ -276,11 +272,8 @@ export function useEngineConnect(
   };
 
   /**
-   * Whether the pasteboard plausibly holds the thing we're waiting for.
-   *
    * `hasStringAsync` answers from the pasteboard's declared types without
-   * reading it, so it never trips iOS's "Allow Paste?" banner. Reading only
-   * happens when the user commits, which is the one moment they expect it.
+   * reading it, so it never trips iOS's "Allow Paste?" banner.
    */
   const refreshClipboardCandidate = useCallback(async () => {
     const has = await Clipboard.hasStringAsync().catch(() => false);
@@ -960,11 +953,6 @@ function ProviderSection({
             embedded === true && styles.embeddedPasteCard,
           ]}
         >
-          {/* The provider's own page already said to copy the code, so the
-              step doesn't repeat it. When the pasteboard already holds
-              something there is nothing to fill in either: Connect reads it
-              on the way through, and the field only appears if that comes up
-              empty or the user asks to type it. */}
           {!chatgpt ? (
             <Text style={settingsStyles.rowSub}>
               {claudeTargetName

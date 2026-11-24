@@ -102,12 +102,6 @@ true;
 `;
 }
 
-/**
- * The canvas-action bridge's transport in the WebView: taps go out on the
- * same private channel as links, with the token; what the app sends back
- * (action states, a built-in page's data) arrives through a receiver under
- * `receiverKey`, a different random name, so knowing it reveals nothing.
- */
 const actionTransport = (receiverKey: string) => String.raw`(() => {
     let receive = null;
     try {

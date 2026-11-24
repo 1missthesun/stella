@@ -45,12 +45,6 @@ const readExactIdentityClaim = (value: unknown, label: string): string => {
   return value;
 };
 
-/**
- * Reads the owner claims carried by the current JWT without changing them.
- * This decode is not an authorization decision: the same bearer token is sent
- * to the backend, which verifies its signature and checks the subject before
- * serving owner data.
- */
 export const decodeTokenOwner = (token: string): TokenOwner => {
   assert(
     typeof token === "string" &&

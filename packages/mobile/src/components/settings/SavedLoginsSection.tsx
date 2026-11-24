@@ -15,7 +15,6 @@ import {
 } from "../SavedLoginsCards";
 import type { SettingsStyles } from "./settings-styles";
 
-/** Which devices may use the user's saved logins, and this phone's place among them. */
 export function SavedLoginsSection({ styles }: { styles: SettingsStyles }) {
   const t = useT();
   const trust = useSavedValuesTrust();
@@ -88,7 +87,6 @@ function DeviceRow({
 }: {
   device: SavedValuesListedDevice;
   divided: boolean;
-  /** Another device has this name, so the row says when it was added. */
   sameName: boolean;
   busy: boolean;
   onRemove: () => void;

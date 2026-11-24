@@ -11,12 +11,6 @@ import { nativeBearerClient } from "./native-auth-client";
 
 export { MOBILE_SESSION_TOKEN_KEY } from "./native-auth-client";
 
-// `nativeBearerClient` replaces `expoClient`. React Native has no cookie jar,
-// so the Expo plugin emulated one in SecureStore and mirrored `Set-Cookie`
-// through a custom header. The bearer plugin on the backend returns one opaque
-// signed token in `set-auth-token` instead, and this plugin is what stores it
-// and attaches `Authorization: Bearer` (including the `origin` header the
-// backend's trusted-origin check needs, via `expo-origin`).
 const plugins = [
   nativeBearerClient({
     scheme: env.mobileScheme,

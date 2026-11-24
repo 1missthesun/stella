@@ -7,7 +7,6 @@ import type { Colors } from "../../theme/colors";
 import { useT } from "../../i18n";
 import { ScheduleCardShell, makeChatCardButtonStyles } from "./ScheduleCardShell";
 
-/** The chat's usage-limit card, in the message list where the paused reply would be. */
 export function UsageLimitChatCard({
   conversationId,
   colors,

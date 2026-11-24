@@ -1722,7 +1722,13 @@
       "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen.",
       "rememberOff": "Bruges kun til denne opgave og glemmes derefter.",
       "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
-      "usingSaved": "Resten kommer fra din gemte “{label}”. Kun det nedenfor mangler."
+      "usingSaved": "Resten kommer fra din gemte “{label}”. Kun det nedenfor mangler.",
+      "savedHeading": "Gemt på dine enheder",
+      "savedBody": "Du har gemt det før. Stella bruger det, som det er, uden at du skal skrive noget.",
+      "useSaved": "Brug gemt login",
+      "typeInstead": "Skriv et andet",
+      "useSavedInstead": "Brug det gemte i stedet",
+      "needsFromYou": "Der er intet gemt til det endnu, så Stella har brug for det fra dig."
     }
   },
   "onboarding": {

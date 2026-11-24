@@ -1742,7 +1742,13 @@
       "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala.",
       "rememberOff": "Použije se jen pro tento úkol a pak se zapomene.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
-      "usingSaved": "Zbytek pochází z vaší uložené hodnoty „{label}“. Stačí vyplnit, co je níže."
+      "usingSaved": "Zbytek pochází z vaší uložené hodnoty „{label}“. Stačí vyplnit, co je níže.",
+      "savedHeading": "Uloženo ve vašich zařízeních",
+      "savedBody": "Tohle jste už uložili. Stella to použije tak, jak je, nic nepíšete.",
+      "useSaved": "Použít uložené přihlášení",
+      "typeInstead": "Zadat jiné",
+      "useSavedInstead": "Použít raději uložené",
+      "needsFromYou": "Pro tohle zatím nic uloženého není, takže to Stella potřebuje od vás."
     }
   },
   "onboarding": {

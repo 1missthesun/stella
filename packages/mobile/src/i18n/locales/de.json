@@ -1722,7 +1722,13 @@
       "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen.",
       "rememberOff": "Nur für diese Aufgabe verwendet, danach vergessen.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
-      "usingSaved": "Der Rest kommt aus deinem gespeicherten „{label}“. Nur das Folgende fehlt noch."
+      "usingSaved": "Der Rest kommt aus deinem gespeicherten „{label}“. Nur das Folgende fehlt noch.",
+      "savedHeading": "Auf deinen Geräten gespeichert",
+      "savedBody": "Du hast das schon gespeichert. Stella nutzt es so, wie es ist, du musst nichts eingeben.",
+      "useSaved": "Gespeicherte Anmeldung verwenden",
+      "typeInstead": "Etwas anderes eingeben",
+      "useSavedInstead": "Doch die gespeicherte verwenden",
+      "needsFromYou": "Dafür ist noch nichts gespeichert, deshalb braucht Stella es von dir."
     }
   },
   "onboarding": {

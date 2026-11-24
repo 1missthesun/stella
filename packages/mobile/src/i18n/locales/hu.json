@@ -1722,7 +1722,13 @@
       "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne.",
       "rememberOff": "Csak ehhez a feladathoz használjuk, utána elfelejtjük.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
-      "usingSaved": "A többi a mentett „{label}” értékből jön. Csak az alábbiak kellenek."
+      "usingSaved": "A többi a mentett „{label}” értékből jön. Csak az alábbiak kellenek.",
+      "savedHeading": "Az eszközeiden mentve",
+      "savedBody": "Ezt már elmentetted. A Stella úgy használja, ahogy van, nem kell semmit beírnod.",
+      "useSaved": "Mentett belépés használata",
+      "typeInstead": "Másik megadása",
+      "useSavedInstead": "Inkább a mentettet használom",
+      "needsFromYou": "Ehhez még nincs semmi mentve, ezért a Stellának tőled kell megkapnia."
     }
   },
   "onboarding": {

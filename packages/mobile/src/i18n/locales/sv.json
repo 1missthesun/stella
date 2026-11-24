@@ -1722,7 +1722,13 @@
       "rememberOn": "Sparat som ”{label}”. Stella återanvänder det utan att fråga dig igen.",
       "rememberOff": "Används bara för den här uppgiften och glöms sedan bort.",
       "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade.",
-      "usingSaved": "Resten kommer från ditt sparade ”{label}”. Bara det nedan behövs."
+      "usingSaved": "Resten kommer från ditt sparade ”{label}”. Bara det nedan behövs.",
+      "savedHeading": "Sparat på dina enheter",
+      "savedBody": "Du har sparat det här tidigare. Stella använder det som det är, du behöver inte skriva något.",
+      "useSaved": "Använd sparad inloggning",
+      "typeInstead": "Skriv en annan",
+      "useSavedInstead": "Använd den sparade i stället",
+      "needsFromYou": "Inget är sparat för det här än, så Stella behöver det från dig."
     }
   },
   "onboarding": {

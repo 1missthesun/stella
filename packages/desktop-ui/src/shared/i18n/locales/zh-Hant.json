@@ -1712,7 +1712,13 @@
       "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你。",
       "rememberOff": "僅用於這個任務，之後會被忘掉。",
       "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
-      "usingSaved": "其餘內容來自你儲存的「{label}」。只需填寫下面的內容。"
+      "usingSaved": "其餘內容來自你儲存的「{label}」。只需填寫下面的內容。",
+      "savedHeading": "已儲存在你的裝置上",
+      "savedBody": "你之前儲存過。Stella 會直接使用，無需輸入。",
+      "useSaved": "使用已儲存的登入資訊",
+      "typeInstead": "輸入其他資訊",
+      "useSavedInstead": "改用已儲存的資訊",
+      "needsFromYou": "這項還沒有儲存任何內容，所以 Stella 需要你提供。"
     }
   },
   "onboarding": {

@@ -1712,7 +1712,13 @@
       "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda.",
       "rememberOff": "Hanya dipakai untuk tugas ini, lalu dilupakan.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
-      "usingSaved": "Sisanya diambil dari “{label}” yang Anda simpan. Hanya yang di bawah ini yang diperlukan."
+      "usingSaved": "Sisanya diambil dari “{label}” yang Anda simpan. Hanya yang di bawah ini yang diperlukan.",
+      "savedHeading": "Tersimpan di perangkat Anda",
+      "savedBody": "Anda pernah menyimpan ini. Stella memakainya apa adanya, tanpa perlu mengetik.",
+      "useSaved": "Gunakan login tersimpan",
+      "typeInstead": "Ketik yang lain",
+      "useSavedInstead": "Gunakan yang tersimpan saja",
+      "needsFromYou": "Belum ada yang tersimpan untuk ini, jadi Stella memerlukannya dari Anda."
     }
   },
   "onboarding": {

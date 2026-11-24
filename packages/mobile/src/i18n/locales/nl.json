@@ -1722,7 +1722,13 @@
       "rememberOn": "Bewaard als ‘{label}’. Stella gebruikt het opnieuw zonder het je nog eens te vragen.",
       "rememberOff": "Alleen voor deze taak gebruikt en daarna vergeten.",
       "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde.",
-      "usingSaved": "De rest komt uit je opgeslagen ‘{label}’. Alleen wat hieronder staat is nodig."
+      "usingSaved": "De rest komt uit je opgeslagen ‘{label}’. Alleen wat hieronder staat is nodig.",
+      "savedHeading": "Bewaard op je apparaten",
+      "savedBody": "Je hebt dit eerder bewaard. Stella gebruikt het zoals het is, je hoeft niets te typen.",
+      "useSaved": "Bewaarde inlog gebruiken",
+      "typeInstead": "Een andere invullen",
+      "useSavedInstead": "Toch de bewaarde gebruiken",
+      "needsFromYou": "Hiervoor is nog niets bewaard, dus Stella heeft het van jou nodig."
     }
   },
   "onboarding": {

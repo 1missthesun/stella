@@ -1732,7 +1732,13 @@
       "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe.",
       "rememberOff": "Folosit doar pentru această sarcină, apoi uitat.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
-      "usingSaved": "Restul vine din valoarea salvată „{label}”. E nevoie doar de ce e mai jos."
+      "usingSaved": "Restul vine din valoarea salvată „{label}”. E nevoie doar de ce e mai jos.",
+      "savedHeading": "Salvat pe dispozitivele tale",
+      "savedBody": "Ai salvat asta deja. Stella o folosește așa cum e, fără să tastezi nimic.",
+      "useSaved": "Folosește autentificarea salvată",
+      "typeInstead": "Introdu altceva",
+      "useSavedInstead": "Folosește totuși cea salvată",
+      "needsFromYou": "Nu e încă nimic salvat pentru asta, așa că Stella are nevoie de ea de la tine."
     }
   },
   "onboarding": {

@@ -1722,7 +1722,13 @@
       "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again.",
       "rememberOff": "Used for this task only, then forgotten.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
-      "usingSaved": "The rest comes from your saved “{label}”. Only what’s below is needed."
+      "usingSaved": "The rest comes from your saved “{label}”. Only what’s below is needed.",
+      "savedHeading": "Saved on your devices",
+      "savedBody": "You saved this before. Stella uses it as is, nothing to type.",
+      "useSaved": "Use saved login",
+      "typeInstead": "Type a different one",
+      "useSavedInstead": "Use the saved one instead",
+      "needsFromYou": "Nothing is saved for this yet, so Stella needs it from you."
     }
   },
   "onboarding": {

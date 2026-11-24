@@ -1732,7 +1732,13 @@
       "rememberOn": "Salvato come «{label}». Stella lo riutilizza senza chiedertelo di nuovo.",
       "rememberOff": "Usato solo per questa attività, poi dimenticato.",
       "replacing": "Il valore salvato per «{label}» non ha funzionato. Inserisci quello giusto; sostituirà quello salvato.",
-      "usingSaved": "Il resto viene dal tuo valore salvato “{label}”. Serve solo quanto segue."
+      "usingSaved": "Il resto viene dal tuo valore salvato “{label}”. Serve solo quanto segue.",
+      "savedHeading": "Salvato sui tuoi dispositivi",
+      "savedBody": "L’hai già salvato. Stella lo usa così com’è, senza che tu debba scrivere nulla.",
+      "useSaved": "Usa l’accesso salvato",
+      "typeInstead": "Inseriscine un altro",
+      "useSavedInstead": "Usa quello salvato",
+      "needsFromYou": "Non c’è ancora nulla di salvato per questo, quindi Stella ne ha bisogno da te."
     }
   },
   "onboarding": {

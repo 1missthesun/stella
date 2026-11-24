@@ -1712,7 +1712,13 @@
       "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn.",
       "rememberOff": "Chỉ dùng cho tác vụ này, sau đó quên đi.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
-      "usingSaved": "Phần còn lại lấy từ “{label}” bạn đã lưu. Chỉ cần điền phần bên dưới."
+      "usingSaved": "Phần còn lại lấy từ “{label}” bạn đã lưu. Chỉ cần điền phần bên dưới.",
+      "savedHeading": "Đã lưu trên các thiết bị của bạn",
+      "savedBody": "Bạn đã lưu thông tin này trước đó. Stella dùng nguyên như vậy, bạn không cần nhập gì.",
+      "useSaved": "Dùng đăng nhập đã lưu",
+      "typeInstead": "Nhập thông tin khác",
+      "useSavedInstead": "Dùng thông tin đã lưu",
+      "needsFromYou": "Chưa có gì được lưu cho mục này, nên Stella cần bạn cung cấp."
     }
   },
   "onboarding": {

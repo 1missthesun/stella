@@ -3,7 +3,7 @@ import { readBackendConnections } from "./backend-accounts.js";
 import { connect, type Socket } from "node:net";
 import { z } from "zod";
 
-import { forkTimeoutFiber } from "./effect-runtime.js";
+import { forkTimeoutFiber } from "./timers.js";
 import { parseCliBridgeEndpoint } from "@stella/node-shared/connectors/cli-bridge-endpoint.js";
 import type { ConnectorTokenPayload } from "./oauth.js";
 import type {

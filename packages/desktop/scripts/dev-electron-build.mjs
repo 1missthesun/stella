@@ -89,8 +89,10 @@ export const mainRuntimeBridgeFiles = [
   "packages/runtime/host/lifecycle.ts",
   "packages/runtime/host/lifecycle/",
   "packages/runtime/host/remote.ts",
+  "packages/runtime/kernel/shared/runtime-bytecode-stamp.ts",
   "packages/runtime/kernel/shared/runtime-paths.ts",
   "packages/runtime/observability/rotate-file.ts",
+  "packages/runtime/worker/effect-lazy.ts",
   "packages/runtime/worker/effect-runtime.ts",
   "packages/runtime/worker/lifecycle-server.ts",
   "packages/runtime/worker/runtime-auth.ts",
@@ -700,7 +702,7 @@ export const pruneStaleMainChunks = () => {
 };
 
 export const cleanOutdir = async () => {
-  await fsPromises.rm(path.join(desktopDir, outdir), {
+  await fsPromises.rm(path.join(desktopDir, outdir, "electron"), {
     force: true,
     recursive: true,
   });

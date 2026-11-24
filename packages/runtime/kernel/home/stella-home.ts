@@ -2,7 +2,7 @@ import path from "path";
 import { promises as fs } from "fs";
 import type { App } from "electron";
 
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import { ensurePrivateDir } from "@stella/node-shared/shared/private-fs.js";
 import {

@@ -7,15 +7,13 @@
 
 import fs from "fs";
 import path from "path";
-import {
-  Cause,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  ManagedRuntime,
-  Scope,
-} from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Scope from "effect/Scope";
 import { ensurePrivateDirSync } from "../shared/private-fs";
 import {
   UI_STATE_FILE_NAME,

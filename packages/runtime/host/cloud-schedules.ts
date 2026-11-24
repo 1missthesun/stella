@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type { BackendClient } from "@stella/contracts/backend/client";
 import type { ScheduleRow } from "@stella/contracts/backend/schedules";
 import {

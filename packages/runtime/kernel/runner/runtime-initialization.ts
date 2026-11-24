@@ -1,14 +1,12 @@
 import { mkdirSync, watch as fsWatch, type FSWatcher } from "node:fs";
 import path from "node:path";
-import {
-  Cause,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  ManagedRuntime,
-  Scope,
-} from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Scope from "effect/Scope";
 import {
   loadBundledAgents,
   mergeBundledAndExtensionAgents,

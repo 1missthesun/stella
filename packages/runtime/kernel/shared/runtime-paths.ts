@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { isRuntimeBytecodeSnapshotFresh } from "./runtime-bytecode-stamp.js";
 
 const moduleDir = import.meta.dirname;
 
@@ -66,7 +67,25 @@ export function resolveRuntimeSourceAsset(...segments: string[]): string {
 export function resolveBundledRuntimeFile(relativeToRuntimeRoot: string): string {
   const root = getStellaAppDir();
   const resourcesPath = process.env.STELLA_APP_RESOURCES_PATH?.trim();
-  const segments = relativeToRuntimeRoot.replace(/\\/g, "/").split("/");
+  const normalized = relativeToRuntimeRoot.replace(/\\/g, "/");
+  const segments = normalized.split("/");
+  if (
+    normalized === "worker/entry.js" &&
+    process.env.STELLA_RUNTIME_FROM_SOURCE !== "1"
+  ) {
+    const bytecodeEntry = path.join(
+      root,
+      "packages",
+      "desktop",
+      "dist-electron",
+      "runtime",
+      "worker",
+      "entry.js",
+    );
+    if (isRuntimeBytecodeSnapshotFresh(root, bytecodeEntry)) {
+      return bytecodeEntry;
+    }
+  }
   const sourceSegments = segments.map((segment, index) =>
     index === segments.length - 1 ? segment.replace(/\.js$/, ".ts") : segment,
   );

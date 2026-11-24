@@ -14,7 +14,8 @@ import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 import { executeToolWithInactivityBound } from "./tool-inactivity.js";
 import { CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS } from "./claude-code-mcp-timeouts.js";
 import {

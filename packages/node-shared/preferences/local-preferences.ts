@@ -1,15 +1,6 @@
 import fs from "fs";
 import path from "path";
 import {
-  Cause,
-  Context,
-  Effect,
-  Exit,
-  Layer,
-  ManagedRuntime,
-  Ref,
-} from "effect";
-import {
   ensurePrivateDirSync,
   writePrivateFileSync,
 } from "../shared/private-fs.js";
@@ -429,142 +420,82 @@ const writeAtomicSync = (filePath: string, prefs: LocalPreferences) => {
  * file is never overwritten with defaults: reads fall back to the last good
  * copy, and a write moves the file aside first.
  */
-export interface Interface {
-  readonly load: (stellaDataDir: string) => Effect.Effect<LocalPreferences>;
-  readonly update: (
-    stellaDataDir: string,
-    update: PreferencesUpdate,
-  ) => Effect.Effect<LocalPreferences, unknown>;
-}
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@stella/runtime/kernel/LocalPreferences",
-) {}
-
-export const layer = Layer.effect(
-  Service,
-  Effect.gen(function* () {
-    const cache = yield* Ref.make<CacheEntry | null>(null);
-    const lastGood = yield* Ref.make<LocalPreferences | null>(null);
-
-    const load = Effect.fn("LocalPreferences.load")(function* (
-      stellaDataDir: string,
-    ) {
-      const filePath = prefsPath(stellaDataDir);
-      const cached = yield* Ref.get(cache);
-      const loaded = yield* Effect.try({
-        try: (): CacheEntry | null => {
-          const stat = fs.statSync(filePath);
-          if (isTrustedHit(cached, fileKeyOf(filePath, stat))) return cached;
-          return readEntry(filePath);
-        },
-        catch: (error) => error,
-      }).pipe(
-        Effect.catch((error) =>
-          Effect.sync(() => {
-            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-              return null;
-            }
-            return "unreadable" as const;
-          }),
-        ),
-      );
-      if (loaded === "unreadable") {
-        const good = yield* Ref.get(lastGood);
-        return good ? { ...good } : { ...DEFAULT_PREFERENCES };
-      }
-      if (loaded === null) {
-        return { ...DEFAULT_PREFERENCES };
-      }
-      if (loaded !== cached) {
-        yield* Ref.set(cache, loaded);
-        yield* Ref.set(lastGood, loaded.prefs);
-      }
-      return loaded.prefs;
-    });
-
-    const update = Effect.fn("LocalPreferences.update")(function* (
-      stellaDataDir: string,
-      change: PreferencesUpdate,
-    ) {
-      const filePath = prefsPath(stellaDataDir);
-      const good = yield* Ref.get(lastGood);
-      const written = yield* Effect.try({
-        try: () =>
-          withFileLock(filePath, (): CacheEntry | null => {
-            let current: LocalPreferences | null = null;
-            for (let attempt = 0; current === null; attempt += 1) {
-              try {
-                current = readEntry(filePath)?.prefs ?? {
-                  ...DEFAULT_PREFERENCES,
-                };
-              } catch (error) {
-                if (!(error instanceof UnreadablePreferencesError)) throw error;
-                if (attempt + 1 < UNREADABLE_RETRIES) {
-                  sleepSync(20);
-                  continue;
-                }
-                const asidePath = `${filePath}.unreadable-${Date.now()}`;
-                fs.renameSync(filePath, asidePath);
-                console.warn(
-                  `[preferences] ${filePath} was unreadable (${error.message}); moved it to ${asidePath}.`,
-                );
-                current = good ? { ...good } : { ...DEFAULT_PREFERENCES };
-              }
-            }
-            const patch =
-              typeof change === "function" ? change(current) : change;
-            if (patch === null) return null;
-            const prefs = normalizeStoredPreferences({ ...current, ...patch });
-            writeAtomicSync(filePath, prefs);
-            return {
-              prefs,
-              key: fileKeyOf(filePath, fs.statSync(filePath)),
-              observedAtMs: Date.now(),
-            };
-          }),
-        catch: (error) => error,
-      });
-      if (written === null) return yield* load(stellaDataDir);
-      yield* Ref.set(cache, written);
-      yield* Ref.set(lastGood, written.prefs);
-      return written.prefs;
-    });
-
-    return { load, update };
-  }),
-);
-
-const preferencesRuntime = ManagedRuntime.make(layer);
-
-const runPreferences = <A, E>(effect: Effect.Effect<A, E, Service>): A => {
-  const exit = preferencesRuntime.runSyncExit(effect);
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
-  }
-  throw Cause.squash(exit.cause);
-};
+let cachedPrefs: CacheEntry | null = null;
+let lastGoodPrefs: LocalPreferences | null = null;
 
 export const loadLocalPreferences = (
   stellaDataDir: string,
-): LocalPreferences =>
-  runPreferences(
-    Effect.gen(function* () {
-      const service = yield* Service;
-      return yield* service.load(stellaDataDir);
-    }),
-  );
+): LocalPreferences => {
+  const filePath = prefsPath(stellaDataDir);
+  let loaded: CacheEntry | null | "unreadable";
+  try {
+    const stat = fs.statSync(filePath);
+    if (isTrustedHit(cachedPrefs, fileKeyOf(filePath, stat))) {
+      loaded = cachedPrefs;
+    } else {
+      loaded = readEntry(filePath);
+    }
+  } catch (error) {
+    loaded =
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+        ? null
+        : "unreadable";
+  }
+  if (loaded === "unreadable") {
+    return lastGoodPrefs ? { ...lastGoodPrefs } : { ...DEFAULT_PREFERENCES };
+  }
+  if (loaded === null) {
+    return { ...DEFAULT_PREFERENCES };
+  }
+  if (loaded !== cachedPrefs) {
+    cachedPrefs = loaded;
+    lastGoodPrefs = loaded.prefs;
+  }
+  return loaded.prefs;
+};
 
 export const updateLocalPreferences = (
   stellaDataDir: string,
-  update: PreferencesUpdate,
-): LocalPreferences =>
-  runPreferences(
-    Effect.gen(function* () {
-      const service = yield* Service;
-      return yield* service.update(stellaDataDir, update);
-    }),
-  );
+  change: PreferencesUpdate,
+): LocalPreferences => {
+  const filePath = prefsPath(stellaDataDir);
+  const good = lastGoodPrefs;
+  const written = withFileLock(filePath, (): CacheEntry | null => {
+    let current: LocalPreferences | null = null;
+    for (let attempt = 0; current === null; attempt += 1) {
+      try {
+        current = readEntry(filePath)?.prefs ?? {
+          ...DEFAULT_PREFERENCES,
+        };
+      } catch (error) {
+        if (!(error instanceof UnreadablePreferencesError)) throw error;
+        if (attempt + 1 < UNREADABLE_RETRIES) {
+          sleepSync(20);
+          continue;
+        }
+        const asidePath = `${filePath}.unreadable-${Date.now()}`;
+        fs.renameSync(filePath, asidePath);
+        console.warn(
+          `[preferences] ${filePath} was unreadable (${error.message}); moved it to ${asidePath}.`,
+        );
+        current = good ? { ...good } : { ...DEFAULT_PREFERENCES };
+      }
+    }
+    const patch = typeof change === "function" ? change(current) : change;
+    if (patch === null) return null;
+    const prefs = normalizeStoredPreferences({ ...current, ...patch });
+    writeAtomicSync(filePath, prefs);
+    return {
+      prefs,
+      key: fileKeyOf(filePath, fs.statSync(filePath)),
+      observedAtMs: Date.now(),
+    };
+  });
+  if (written === null) return loadLocalPreferences(stellaDataDir);
+  cachedPrefs = written;
+  lastGoodPrefs = written.prefs;
+  return written.prefs;
+};
 
 export const getModelOverride = (
   stellaDataDir: string,

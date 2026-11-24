@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { sleepMs } from "./effect-runtime.js";
+import { sleepMs } from "./timers.js";
 import {
   readProcessGroup,
   readProcessIdentity,

@@ -1,4 +1,5 @@
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 import { signalOwnChild } from "@stella/node-shared/shared/process-identity.js";
 import { createHash } from "node:crypto";
 import { StringDecoder } from "node:string_decoder";

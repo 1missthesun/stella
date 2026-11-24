@@ -64,7 +64,10 @@ import { RuntimeWorkerLifecycleController } from "./worker-lifecycle.js";
 import { buildStdioConnectionFactory } from "./stdio-connection.js";
 import { buildInprocConnectionFactory } from "./inproc-connection.js";
 import { resolveRuntimePaths } from "@stella/node-shared/worker/runtime-paths.js";
-import { Cause, Effect, Exit, Fiber } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import { forkDelayed, hostRuntime, type HostTimerHandle } from "./effect-runtime.js";
 import {
   clearPendingWorkerRestartFlag,

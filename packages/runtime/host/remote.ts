@@ -30,7 +30,7 @@ import { readRuntimeLaunchEnv } from "../worker/server-identity.js";
 import {
   probeRunningWorker,
 } from "../worker/lifecycle-server.js";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import {
   forkDelayed,
   runHostEffect,

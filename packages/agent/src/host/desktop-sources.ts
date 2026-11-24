@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -10,10 +11,15 @@ import {
 } from "@stella/contracts/execution-context";
 import { STELLA_PROMPTS_PATH } from "@stella/contracts/stella-api";
 import { readOrSeedPersonality } from "@stella/runtime/kernel/personality/personality";
+import { resolveRuntimeSourceAsset } from "@stella/runtime/kernel/shared/runtime-paths";
 import { renderSkillCatalogBlock } from "@stella/runtime/kernel/shared/skill-catalog";
 import type { StellaAgentPromptId, StellaContextSources, StellaMemory } from "../stella/context.ts";
 
-const BUNDLED_PROMPTS = fileURLToPath(new URL("../../../runtime/extensions/stella-runtime/", import.meta.url));
+const BUNDLED_PROMPTS = (() => {
+  const fromRelative = fileURLToPath(new URL("../../../runtime/extensions/stella-runtime/", import.meta.url));
+  if (existsSync(fromRelative)) return fromRelative;
+  return resolveRuntimeSourceAsset("extensions", "stella-runtime");
+})();
 
 const bundledPath = (id: StellaAgentPromptId): string =>
   path.join(BUNDLED_PROMPTS, "agent-metadata", id.replace(/^agents\//, ""));

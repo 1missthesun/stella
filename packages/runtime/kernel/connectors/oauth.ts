@@ -2,7 +2,8 @@ import http from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { URL } from "node:url";
 
-import { Deferred, Effect } from "effect";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
 
 import { acquireAbortLatch } from "../agent-core/abort-bridge.js";
 import {
@@ -24,29 +25,18 @@ import {
 
 export type { ConnectorTokenPayload } from "@stella/node-shared/connectors/token-store.js";
 
-export type ConnectorTokenStoreBroker = {
-  load: (tokenKey: string) => Promise<ConnectorTokenPayload | null>;
-  save: (tokenKey: string, payload: ConnectorTokenPayload) => Promise<void>;
-  delete: (tokenKeys: string[]) => Promise<void>;
+import {
+  getConnectorTokenStoreBroker,
+  hasConnectorTokenStoreBroker,
+  setConnectorTokenStoreBroker,
+  type ConnectorTokenStoreBroker,
+} from "./token-store-broker.js";
+
+export {
+  hasConnectorTokenStoreBroker,
+  setConnectorTokenStoreBroker,
+  type ConnectorTokenStoreBroker,
 };
-
-let tokenStoreBroker: ConnectorTokenStoreBroker | null = null;
-
-/**
- * Node-mode sidecar CLIs must not touch OS protected storage themselves:
- * macOS binds Electron Safe Storage access to the signed app identity and
- * otherwise presents a login-keychain password dialog that a background CLI
- * cannot service. The desktop installs an in-memory broker before reading any
- * connector credentials so encryption/decryption stays in the desktop host
- * and its configured stable protected-storage owner.
- */
-export const setConnectorTokenStoreBroker = (
-  broker: ConnectorTokenStoreBroker | null,
-) => {
-  tokenStoreBroker = broker;
-};
-
-export const hasConnectorTokenStoreBroker = (): boolean => tokenStoreBroker !== null;
 
 type OAuthProviderErrorLike = Error & {
   providerError?: string;
@@ -98,7 +88,7 @@ export const saveConnectorTokenPayload = async (
   tokenKey: string,
   payload: ConnectorTokenPayload,
 ) => {
-  const broker = tokenStoreBroker;
+  const broker = getConnectorTokenStoreBroker();
   if (broker) {
     await broker.save(tokenKey, payload);
     return;
@@ -145,7 +135,7 @@ export const loadConnectorTokenPayload = async (
     Effect.gen(function* () {
       // On the desktop the broker reads the store in Electron main, which
       // owns protected storage; refreshing an expired token happens here.
-      const broker = tokenStoreBroker;
+      const broker = getConnectorTokenStoreBroker();
       const payload = yield* tryConnectorOp(() =>
         broker ? broker.load(key) : readStoredConnectorToken(stellaAppDir, key),
       );
@@ -616,7 +606,7 @@ export const deleteConnectorAccessTokens = async (
     ...new Set([...tokenKeys].filter((key): key is string => Boolean(key))),
   ];
   if (keys.length === 0) return;
-  const broker = tokenStoreBroker;
+  const broker = getConnectorTokenStoreBroker();
   if (broker) {
     await broker.delete(keys);
     return;

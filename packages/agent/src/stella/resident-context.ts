@@ -29,7 +29,7 @@ import { GenerationTask, hook } from "@earendil-works/pi-durable";
 import type { Message, ModelThinkingLevel, SystemMessage, UserMessage } from "@earendil-works/pi-ai";
 import { SYSTEM_REMINDER_TAG, wrapSystemReminder } from "@stella/contracts/system-reminders";
 import { ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
-import { accountProviderOfRegistryId } from "../provider/account-byok.ts";
+import { accountProviderOfRegistryId } from "../provider/account-byok-ids.ts";
 import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 
 export const RESIDENT_SECTION_KEYS: ReadonlySet<string> = new Set([

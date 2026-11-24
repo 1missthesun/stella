@@ -1,4 +1,5 @@
-import { Effect, type Scope } from "effect";
+import * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
 import { HostLockBusyError, HostLockTimeoutError } from "./errors.js";
 import {
   type LockOwner,

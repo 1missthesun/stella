@@ -124,6 +124,7 @@ import {
 } from "../provider/stella.ts";
 import {
   byokModels,
+  CHATGPT_PROVIDER_ID,
   parseModelPick,
   stellaCredentialStore,
   storeOnlyAuthContext,
@@ -131,15 +132,10 @@ import {
   type ModelPick,
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
-import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
 import { effectiveContextModels } from "../provider/effective-context.ts";
-import {
-  accountByokProvider,
-  accountProviderModel,
-  accountProviderOfRegistryId,
-  accountRegistryId,
-  isAccountProviderId,
-} from "../provider/account-byok.ts";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import { isAccountProviderId } from "@stella/contracts/backend/providers";
+import { accountProviderOfRegistryId, accountRegistryId } from "../provider/account-byok-ids.ts";
 import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
@@ -1099,9 +1095,14 @@ export function desktopChats(options: DesktopChatsOptions) {
     return route.credentialless === true || Boolean((await route.getApiKey())?.trim());
   };
 
-  const accountModels = new Map<string, NonNullable<ReturnType<typeof accountProviderModel>>[]>();
+  let accountByokModule: Promise<typeof import("../provider/account-byok.ts")> | undefined;
+  const loadAccountByok = () => (accountByokModule ??= import("../provider/account-byok.ts"));
+  const accountModels = new Map<string, Model<Api>[]>();
   const ensureAccountModel = async (provider: string, modelId: string): Promise<ModelRef> => {
-    const { access, gatewayOrigin } = await ensureGateway();
+    const [{ access, gatewayOrigin }, { accountByokProvider, accountProviderModel }] = await Promise.all([
+      ensureGateway(),
+      loadAccountByok(),
+    ]);
     const model = accountProviderModel(provider, modelId, options.listedModel?.(provider, modelId));
     if (!model) throw new Error(`${provider}/${modelId} isn't a model Stella can run on your account's key.`);
     const entries = accountModels.get(provider) ?? [];
@@ -1134,7 +1135,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (pick.kind === "direct" && isAccountProviderId(pick.provider) && !(await hasOwnKey(pick.provider, pick.modelId))) {
       return await ensureAccountModel(pick.provider, pick.modelId);
     }
-    const ref = byok.ensure(pick);
+    const ref = await byok.ensure(pick);
     if ("error" in ref) throw new Error(ref.error);
     return ref;
   };
@@ -1309,7 +1310,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const accountProvider = ref ? accountProviderOfRegistryId(ref.provider) : undefined;
     if (ref && accountProvider) await ensureAccountModel(accountProvider, ref.modelId);
     else if (!ref || ref.provider === STELLA_PROVIDER_ID) await ensureProvider(aliasOf(ref));
-    else restoreOwnModel(ref);
+    else await restoreOwnModel(ref);
   };
 
   /** A conversation from when Antigravity was a provider of Stella's own: its model says Antigravity, its extensions don't. */
@@ -1318,12 +1319,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     onAntigravityCli(agent.model) &&
     !agent.extensions.some((extension) => extension.name === ANTIGRAVITY_CLI_ENGINE_EXTENSION);
 
-  const restoreOwnModel = (ref: ModelRef): void => {
+  const restoreOwnModel = async (ref: ModelRef): Promise<void> => {
     if (onCliEngine(ref)) {
       cliEngineOf(ref.provider)?.ensureModel(ref.modelId);
       return;
     }
-    byok.restore(ref);
+    await byok.restore(ref);
   };
 
   const aliasOf = (model: { modelId: string } | undefined): string =>
@@ -1888,13 +1889,13 @@ export function desktopChats(options: DesktopChatsOptions) {
             await conversation.configure({ extensions: { ...agentToolSelection, ...engineExtensionChange(model) } }, context);
           }
           if (model && accountProviderOfRegistryId(model.provider)) accountRefs.push(model);
-          else if (model && model.provider !== STELLA_PROVIDER_ID) restoreOwnModel(model);
+          else if (model && model.provider !== STELLA_PROVIDER_ID) await restoreOwnModel(model);
           else if (model && (await harness.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run) {
             aliases.add(aliasOf(model));
           }
         }
         if (rootModel && accountProviderOfRegistryId(rootModel.provider)) accountRefs.push(rootModel);
-        else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) restoreOwnModel(rootModel);
+        else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) await restoreOwnModel(rootModel);
         else aliases.add(aliasOf(rootModel));
         // Work left running resumes once its models are registered. Anything
         // that submits to the harness starts its scheduler too, so the journal

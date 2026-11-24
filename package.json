@@ -34,6 +34,7 @@
     "postinstall": "node packages/desktop/scripts/postinstall-workspace.mjs",
     "check:boundary": "node packages/runtime/scripts/check-boundary.mjs",
     "runtime:headless": "bun packages/runtime/headless/cli.ts",
+    "runtime:build-bytecode": "bun packages/runtime/scripts/build-worker-bytecode.mjs",
     "verify:source-exports": "node packages/desktop/scripts/verify-source-package-exports.mjs",
     "verify:source-identifiers": "node packages/desktop/scripts/verify-source-identifiers.mjs",
     "verify:local-named-imports": "node packages/desktop/scripts/verify-local-named-imports.mjs",

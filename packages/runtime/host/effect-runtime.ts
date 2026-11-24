@@ -1,12 +1,10 @@
-import {
-  Cause,
-  Deferred,
-  Effect,
-  Exit,
-  Layer,
-  ManagedRuntime,
-  Schedule,
-} from "effect";
+import * as Cause from "effect/Cause";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Schedule from "effect/Schedule";
 
 export const hostRuntime = ManagedRuntime.make(Layer.empty);
 

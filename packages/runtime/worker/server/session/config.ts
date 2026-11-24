@@ -1,4 +1,3 @@
-import { Context, Layer } from "effect";
 import type { WorkerInitializationState } from "../types.js";
 
 export interface Interface {
@@ -8,21 +7,19 @@ export interface Interface {
   readonly patch: (patch: Partial<WorkerInitializationState>) => void;
 }
 
-export class Service extends Context.Service<Service, Interface>()(
-  "@stella/runtime/worker/SessionConfig",
-) {}
-
-export const layer = (init: WorkerInitializationState, deviceId: string) =>
-  Layer.sync(Service, () => {
-    let state = init;
-    return {
-      deviceId,
-      get: () => state,
-      set: (next) => {
-        state = next;
-      },
-      patch: (patch) => {
-        state = { ...state, ...patch };
-      },
-    };
-  });
+export const make = (
+  init: WorkerInitializationState,
+  deviceId: string,
+): Interface => {
+  let state = init;
+  return {
+    deviceId,
+    get: () => state,
+    set: (next) => {
+      state = next;
+    },
+    patch: (patch) => {
+      state = { ...state, ...patch };
+    },
+  };
+};

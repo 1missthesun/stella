@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import type { ToolResult } from "./types.js";
 import { runToolEffect } from "./effect-runtime.js";
 

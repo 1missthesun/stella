@@ -18,7 +18,6 @@ import {
   type TelemetryEventContext,
   type TelemetryEventV1,
 } from "@stella/contracts/telemetry/events";
-import { Deferred, Effect, Layer, ManagedRuntime } from "effect";
 
 const DEFAULT_MAX_QUEUED_EVENTS = 2_000;
 const DEFAULT_MAX_SPOOL_BYTES = 8 * 1024 * 1024;
@@ -29,28 +28,39 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_INITIAL_RETRY_MS = 1_000;
 const DEFAULT_MAX_RETRY_MS = 60_000;
 
-const remoteTelemetryRuntime = ManagedRuntime.make(Layer.empty);
-
 type TelemetryTimer = {
   cancel: () => void;
 };
+
+let telemetryEffectModule: Promise<typeof import("effect")> | null = null;
+const loadTelemetryEffect = () => (telemetryEffectModule ??= import("effect"));
 
 const forkTelemetryTimer = (
   delayMs: number,
   fire: () => void,
 ): TelemetryTimer => {
-  const canceled = Deferred.makeUnsafe<void>();
-  void remoteTelemetryRuntime
-    .runPromise(
-      Effect.raceFirst(
-        Effect.sleep(delayMs).pipe(Effect.andThen(Effect.sync(fire))),
-        Deferred.await(canceled),
+  let canceled = false;
+  let cancelFiber: (() => void) | null = null;
+  void loadTelemetryEffect().then(({ Effect, Fiber }) => {
+    if (canceled) return;
+    const fiber = Effect.runFork(
+      Effect.sleep(delayMs).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            if (!canceled) fire();
+          }),
+        ),
       ),
-    )
-    .catch(() => undefined);
+    );
+    cancelFiber = () => {
+      void Effect.runFork(Fiber.interrupt(fiber));
+    };
+  });
   return {
     cancel: () => {
-      Deferred.doneUnsafe(canceled, Effect.void);
+      if (canceled) return;
+      canceled = true;
+      cancelFiber?.();
     },
   };
 };
@@ -131,13 +141,15 @@ const batchId = (events: readonly TelemetryEventV1[]): string =>
 const withUnrefTimeout = async <T>(
   promise: Promise<T>,
   timeoutMs: number,
-): Promise<T | null> =>
-  remoteTelemetryRuntime.runPromise(
+): Promise<T | null> => {
+  const { Effect } = await loadTelemetryEffect();
+  return Effect.runPromise(
     Effect.raceFirst(
       Effect.tryPromise(() => promise),
       Effect.sleep(timeoutMs).pipe(Effect.as(null)),
     ),
   );
+};
 
 export class RemoteTelemetryClient {
   private readonly options: Required<
@@ -461,7 +473,8 @@ export class RemoteTelemetryClient {
     let ok = false;
     let permanentRejection = false;
     try {
-      const response = await remoteTelemetryRuntime.runPromise(
+      const { Effect } = await loadTelemetryEffect();
+      const response = await Effect.runPromise(
         Effect.tryPromise({
           try: (signal) =>
             this.options.fetch(endpoint, {

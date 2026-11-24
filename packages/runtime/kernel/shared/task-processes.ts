@@ -32,7 +32,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { readProcessIdentity, type RecordedProcess, signalRecordedProcess } from "@stella/node-shared/shared/process-identity.js";
 
 export const TASK_PROCESS_OWNER_ENV = "STELLA_TASK_PROCESS_OWNER";

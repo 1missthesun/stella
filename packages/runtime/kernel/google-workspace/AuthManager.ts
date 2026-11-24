@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { OAuth2Client } from "googleapis-common";
 import {
   deleteConnectorAccessTokens,

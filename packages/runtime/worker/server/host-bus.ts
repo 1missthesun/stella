@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { Context, Layer } from "effect";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
 import type { WorkerPeerLike } from "../peer-broker.js";
 import type { UserAskResolution } from "@stella/contracts/user-ask";
@@ -25,10 +24,6 @@ export interface Interface {
     signal?: AbortSignal,
   ) => Promise<UserAskResolution>;
 }
-
-export class Service extends Context.Service<Service, Interface>()(
-  "@stella/runtime/worker/HostBus",
-) {}
 
 export const make = (peer: WorkerPeerLike): Interface => {
   const requestConnectCard = async (
@@ -116,5 +111,3 @@ export const make = (peer: WorkerPeerLike): Interface => {
     requestUserAsk,
   };
 };
-
-export const layer = (peer: WorkerPeerLike) => Layer.succeed(Service, make(peer));

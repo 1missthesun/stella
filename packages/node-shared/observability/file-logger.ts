@@ -1,9 +1,7 @@
-import { Context, Effect, Layer, ManagedRuntime, Scope } from "effect";
 import { resolveLogPaths } from "./log-paths.js";
 import { errorDiagnosticFields, isPeerDisconnectError } from "./error-fields.js";
 import {
-  ObservabilityLogger,
-  layer as observabilityLoggerLayer,
+  createObservabilityLogger,
   type FileLoggerOptions,
   type Interface as ObservabilityLoggerInterface,
   type LogFields,
@@ -20,15 +18,9 @@ import {
  *   - Preserve the complete diagnostic context supplied by call sites,
  *     including nested values, paths, URLs, and error stacks.
  *
- * This file is the plain synchronous facade over the Effect-native
- * `ObservabilityLogger` service in `logger.ts` — same exported names,
- * signatures, and behavior as the pre-Effect implementation; Effect types
- * never cross this boundary. Each `FileLogger` builds the scoped logger
- * resource onto its own never-closed scope (process lifetime, exactly the
- * old semantics) and runs every write synchronously on the one
- * module-level ManagedRuntime, so a line still lands on disk even if the
- * process is mid-crash — which is exactly when these logs matter most.
- * Do NOT route hot-path / per-token / per-frame logging through here.
+ * Every write lands synchronously so a line is still flushed even if the
+ * process is mid-crash. Do NOT route hot-path / per-token / per-frame logging
+ * through here.
  */
 
 export type {
@@ -36,57 +28,27 @@ export type {
   FileLoggerOptions,
 } from "./logger.js";
 
-const observabilityRuntime = ManagedRuntime.make(Layer.empty);
-
-/**
- * Build the scoped ObservabilityLogger resource. The scope is intentionally
- * never closed: the logger lives for the whole process (the pre-Effect
- * logger had no dispose either), and its descriptors are closed/reopened by
- * the daily rotation inside the write effect.
- */
-const buildLogger = (
-  options: FileLoggerOptions,
-): ObservabilityLoggerInterface =>
-  observabilityRuntime.runSync(
-    Effect.gen(function* () {
-      const scope = yield* Scope.make();
-      const context = yield* Layer.buildWithScope(
-        observabilityLoggerLayer(options),
-        scope,
-      );
-      return Context.get(context, ObservabilityLogger);
-    }),
-  );
-
 export class FileLogger {
   private readonly logger: ObservabilityLoggerInterface;
 
   constructor(options: FileLoggerOptions) {
-    this.logger = buildLogger(options);
+    this.logger = createObservabilityLogger(options);
   }
 
   process(event: string, fields?: LogFields): void {
-    this.run(this.logger.process(event, fields));
+    this.logger.process(event, fields);
   }
 
   warn(event: string, fields?: LogFields): void {
-    this.run(this.logger.warn(event, fields));
+    this.logger.warn(event, fields);
   }
 
   error(event: string, fields?: LogFields): void {
-    this.run(this.logger.error(event, fields));
+    this.logger.error(event, fields);
   }
 
   crash(event: string, error: unknown, fields?: LogFields): void {
-    this.run(this.logger.crash(event, error, fields));
-  }
-
-  private run(effect: Effect.Effect<void>): void {
-    try {
-      observabilityRuntime.runSync(effect);
-    } catch {
-      // Best-effort diagnostics; never throw from a logging call.
-    }
+    this.logger.crash(event, error, fields);
   }
 }
 

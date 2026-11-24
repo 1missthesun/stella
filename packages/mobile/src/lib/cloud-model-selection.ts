@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import { isComputerOnlyProviderId } from "@stella/contracts/backend/providers";
 import {
   REASONING_EFFORT_LEVELS,
   normalizeReasoningEffortLevel,
@@ -31,6 +32,7 @@ export function parseCloudModelSelection(value: unknown): CloudExecutionSelectio
     row.reasoningEffort === "none" ? "none" : normalizeReasoningEffortLevel(row.reasoningEffort);
   if (row.engine === "provider") {
     const provider = typeof row.provider === "string" ? row.provider.trim() : "";
+    if (isComputerOnlyProviderId(provider)) return undefined;
     return provider ? { engine: "provider", provider, model, reasoningEffort } : undefined;
   }
   if (row.engine !== row.provider) return undefined;

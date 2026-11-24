@@ -1,4 +1,4 @@
-import { isAccountProviderId } from "@stella/contracts/backend/providers";
+import { isAccountProviderId, isComputerOnlyProviderId } from "@stella/contracts/backend/providers";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";
 import { storedAgentStatusOf } from "@stella/contracts/agent-status";
@@ -85,6 +85,13 @@ export const parseCloudExecutionSelection = (
   } as CloudExecutionSelection;
 };
 
+/**
+ * A client's pick that runs only on the user's computers (Google Antigravity):
+ * the account may hold it, and the cloud answers with its own choice instead.
+ */
+export const isComputerOnlyExecution = (value: unknown): boolean =>
+  isRecord(value) && value.engine === "provider" && isComputerOnlyProviderId(value.provider);
+
 export const parseAgentThreadControl = (
   value: unknown,
 ): CloudAgentThreadControl | null => {
@@ -154,7 +161,7 @@ export const parseCloudTurnStartRequest = (
       return fail("originUserMessageId is malformed.");
     request.originUserMessageId = value.originUserMessageId;
   }
-  if (value.execution !== undefined) {
+  if (value.execution !== undefined && !isComputerOnlyExecution(value.execution)) {
     const execution = parseCloudExecutionSelection(value.execution);
     if (!execution) return fail("execution is malformed.");
     request.execution = execution;

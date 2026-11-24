@@ -1378,20 +1378,15 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
   const targetDeviceId = destination?.deviceId ?? null;
   const lookupConversationId = args.conversationId ?? readMainConversationId(ctx.db);
   const conversation = lookupConversationId
-    ? ctx.db.one<{ conversation_id: string; execution_json: string | null }>(
-        "SELECT conversation_id, execution_json FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
+    ? ctx.db.one<{ conversation_id: string }>(
+        "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
         lookupConversationId,
       )
     : null;
   if (args.conversationId && !conversation) {
     throw new RpcError("NOT_FOUND", "Conversation not found.", { reason: "conversation_not_found" });
   }
-  const snapshot = await ctx.host.snapshot();
-  const execution =
-    args.execution ??
-    (conversation?.execution_json
-      ? (JSON.parse(conversation.execution_json) as CloudExecutionSelection)
-      : snapshot.execution);
+  const execution = args.execution ?? (await ctx.host.snapshot()).execution;
   if (!targetDeviceId) await assertExecutionAvailable(ctx, execution);
   const raced = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
   if (raced) return raced;
@@ -1533,8 +1528,7 @@ const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffRe
     if (args.from.kind === "cloud") {
       throw new RpcError("BAD_REQUEST", "The agent already runs in the cloud.", { reason: "device_is_holder" });
     }
-    const execution = args.execution;
-    if (!execution) throw new RpcError("BAD_REQUEST", "A move to the cloud needs what the agent runs on there.");
+    const execution = args.execution ?? (await ctx.host.snapshot()).execution;
     target = {
       holder: AGENT_LOG_CLOUD_HOLDER,
       where: "in Stella's cloud",
@@ -1674,22 +1668,22 @@ const unavailableBecause = (
 const executionForCloudMove = async (
   ctx: OwnerContext,
   thread: ThreadRow,
-  fallback: CloudExecutionSelection | undefined,
+  requested: CloudExecutionSelection | undefined,
 ): Promise<CloudExecutionSelection> => {
+  const snapshot = await ctx.host.snapshot();
+  const fallback = requested ?? snapshot.execution;
   const candidates: CloudExecutionSelection[] = [];
-  if (thread.requested_model && fallback) {
+  if (thread.requested_model) {
     try {
       candidates.push(resolveCloudSpawnExecution(thread.requested_model, fallback));
     } catch {
       candidates.length = 0;
     }
   }
-  if (fallback) candidates.push(fallback);
-  const snapshot = candidates.some((execution) => execution.engine !== "stella") ? await ctx.host.snapshot() : null;
-  const usable = candidates.find((execution) => execution.engine === "stella" || snapshotAllowsExecution(snapshot!, execution));
+  candidates.push(fallback);
+  const usable = candidates.find((execution) => snapshotAllowsExecution(snapshot, execution));
   if (usable) return usable;
-  if (candidates[0]) throw new RpcError("CONFLICT", executionUnavailableMessage(candidates[0]));
-  throw new RpcError("BAD_REQUEST", "A move to the cloud needs what the agent runs on there.");
+  throw new RpcError("CONFLICT", executionUnavailableMessage(candidates[0]!));
 };
 
 const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveResult> => {

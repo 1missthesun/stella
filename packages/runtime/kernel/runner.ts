@@ -1,3 +1,4 @@
+import { computerOnlyProviderOf } from "@stella/contracts/backend/providers";
 import { readAgentMessageDelivery, readAgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { takeEndedCommands, writeBackgroundExitLog } from "./runner/background-exit-wake.js";
 import {
@@ -554,7 +555,9 @@ export const createStellaHostRunner = (
         ),
       handoff: async (args) => {
         const execution =
-          args.targetDeviceId === "cloud" ? await context.piCloudAgentThreads.execution(args.model) : undefined;
+          args.targetDeviceId === "cloud"
+            ? await context.piCloudAgentThreads.execution(computerOnlyProviderOf(args.model) ? undefined : args.model)
+            : undefined;
         return await context.backend.require().call("agentThreads.handoff", {
           ...args,
           ...(execution ? { execution } : {}),

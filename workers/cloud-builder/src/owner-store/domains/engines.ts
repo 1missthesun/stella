@@ -586,10 +586,25 @@ const connectedProvidersOf = (db: OwnerDbReader): string[] =>
     .all<{ provider: string }>("SELECT provider FROM provider_credentials WHERE status = 'ok' ORDER BY provider")
     .map((row) => row.provider);
 
-const ownerModeDefault = (
+/** A cloud Claude login that has reached its end can't run turns until someone signs in again. */
+const cloudClaudeLoginEnded = (db: OwnerDbReader): boolean => {
+  const accountId = claudeActiveByPlace(db).get(CLOUD_PLACE);
+  if (!accountId) return false;
+  return (
+    db.one<{ login_ended: number }>(
+      "SELECT login_ended FROM engine_claude_places WHERE account_id = ? AND place = ?",
+      accountId,
+      CLOUD_PLACE,
+    )?.login_ended === 1
+  );
+};
+
+/** What the cloud runs when the account's pick can't: a connected plan first, then Stella's own model. */
+const connectedPlanDefault = (
   connectedEngines: NonNullable<OwnerSnapshot["connectedEngines"]>,
+  claudeRuns: boolean,
 ): CloudExecutionSelection =>
-  connectedEngines.includes("anthropic")
+  claudeRuns && connectedEngines.includes("anthropic")
     ? DEFAULT_CLOUD_ANTHROPIC_EXECUTION
     : connectedEngines.includes("chatgpt")
       ? DEFAULT_CLOUD_CODEX_EXECUTION
@@ -597,7 +612,7 @@ const ownerModeDefault = (
 
 export const snapshotEngines = (
   db: OwnerDbReader,
-  options: { ownerMode?: boolean; managedModels?: boolean } = {},
+  options: { cloudSandbox: boolean; ownerMode?: boolean; managedModels?: boolean },
 ): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders"> => {
   const connectedEngines = connectedEnginesOf(db);
   const connectedProviders = connectedProvidersOf(db);
@@ -607,13 +622,15 @@ export const snapshotEngines = (
     (selection.engine === "provider"
       ? connectedProviders.includes(selection.provider)
       : connectedEngines.includes(selection.engine));
-  const fallback = options.ownerMode ? ownerModeDefault(connectedEngines) : DEFAULT_EXECUTION;
-  const usesDefault =
-    !runnable ||
-    (selection.engine === "stella" &&
-      (selection.model === DEFAULT_EXECUTION.model || options.managedModels === false));
+  const prefersOwnPlan =
+    options.ownerMode === true &&
+    selection.engine === "stella" &&
+    (selection.model === DEFAULT_EXECUTION.model || options.managedModels === false);
   return {
-    execution: usesDefault && options.ownerMode ? fallback : runnable ? selection : DEFAULT_EXECUTION,
+    execution:
+      runnable && !prefersOwnPlan
+        ? selection
+        : connectedPlanDefault(connectedEngines, options.cloudSandbox && !cloudClaudeLoginEnded(db)),
     connectedEngines,
     connectedProviders,
   };

@@ -16,7 +16,7 @@ import {
   DISPATCH_PAYLOAD_MAX_BYTES,
 } from "@stella/contracts/turn-plane/placement";
 import { parseCloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
-import { parseCloudExecutionSelection } from "./turn-start-request.js";
+import { isComputerOnlyExecution, parseCloudExecutionSelection } from "./turn-start-request.js";
 
 export const CLOUD_PROVIDED_CAPABILITIES: readonly ExecutionCapability[] = [
   "chat",
@@ -305,7 +305,7 @@ export const parseDispatchPayload = (
       `payload.prompt must be 1-${MAX_DISPATCH_PROMPT_CHARS} characters.`,
     );
   }
-  if (value.execution !== undefined && value.execution !== null) {
+  if (value.execution !== undefined && value.execution !== null && !isComputerOnlyExecution(value.execution)) {
     const execution = parseCloudExecutionSelection(value.execution);
     if (!execution) return fail("payload.execution is malformed.");
     payload.execution = execution;

@@ -17,6 +17,8 @@
  *   task just stays idle.
  */
 
+import { STELLA_MESSAGE_TARGET } from "./agent-directory.js";
+
 /** The `send_message` parameter that marks a finished report. */
 export const SEND_MESSAGE_DONE_PARAMETER = "done";
 
@@ -80,8 +82,11 @@ export const doneWhileHelpersWorkText = (helpers: readonly string[]): string =>
     helpers.length === 1 ? "its report" : "their reports"
   } (end your turn; it wakes you), or stop_agent ${helpers.length === 1 ? "it" : "them"}, then send your report with done: true. A message without done goes out now.`;
 
-export const DONE_NOT_TO_STARTER =
-  "done: true is only for your finished report to whoever started you. Send this without done.";
+/** A finished report sent somewhere other than to its starter: says where it goes. */
+export const doneNotToStarterText = (starterThreadId: string | undefined): string =>
+  starterThreadId && starterThreadId !== STELLA_MESSAGE_TARGET
+    ? `Not sent: done: true is only for your finished report to whoever started you, which is the agent with thread_id ${starterThreadId}. Send your report there with done: true, or send this without done.`
+    : `Not sent: done: true is only for your finished report to whoever started you, which is Stella ("${STELLA_MESSAGE_TARGET}"). Send your report there with done: true, or send this without done.`;
 
 export const DONE_ONLY_FOR_AGENTS = "done is for agents reporting to whoever started them; you are Stella, so send this without done.";
 
@@ -92,3 +97,27 @@ export const DONE_ACCEPTED_TEXT =
 /** A second finished report in one turn: the first already goes out as the turn ends. */
 export const DONE_ALREADY_SENT =
   "Not sent: your finished report for this turn is already on its way, and nothing more goes out this turn. End your turn now, without calling any more tools.";
+
+/**
+ * Who a task is and who started it, for its prompt: what it needs to address
+ * its messages and its finished report. A task with no starter given was
+ * started by Stella.
+ */
+export const agentIdentityText = (agent: {
+  threadId: string;
+  startedBy?: { threadId: string; label?: string; stella?: boolean };
+}): string => {
+  const by = agent.startedBy;
+  const starter = !by
+    ? `Stella started you; send_message to "${STELLA_MESSAGE_TARGET}" reaches it.`
+    : by.stella
+      ? `Stella started you; its thread_id is ${by.threadId} ("${STELLA_MESSAGE_TARGET}" also reaches it).`
+      : by.label
+        ? `The agent "${by.label}" started you; its thread_id is ${by.threadId}. Send your messages and your finished report to that thread_id, not to "${STELLA_MESSAGE_TARGET}".`
+        : `Another agent started you; its thread_id is ${by.threadId}. Send your messages and your finished report to that thread_id, not to "${STELLA_MESSAGE_TARGET}".`;
+  return [
+    `Your thread_id is ${agent.threadId}.`,
+    starter,
+    'Every message from Stella or another agent arrives as `<agent-message from="…" thread_id="…">`, marked `relation="started you"` when it is from whoever started you; answer it with send_message to that thread_id.',
+  ].join(" ");
+};

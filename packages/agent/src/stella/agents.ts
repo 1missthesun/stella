@@ -68,7 +68,7 @@ import { AGENT_REPORT_MAX_CHARS, parseAgentReportId } from "@stella/contracts/ba
 import {
   DONE_ACCEPTED_TEXT,
   DONE_ALREADY_SENT,
-  DONE_NOT_TO_STARTER,
+  doneNotToStarterText,
   DONE_ONLY_FOR_AGENTS,
   doneWhileHelpersWorkText,
   IDLE_STOP_NUDGE,
@@ -1661,7 +1661,9 @@ export function stellaAgents(host: StellaAgentsHost) {
   const finishReport = async (api: ToolExecutionApi, to: string, message: string, stellaThread: string | undefined, context: Context) => {
     const self = await roleOf(api, api.conversationId, context);
     if (self.agentType === "orchestrator" || !self.threadId) throw new Error(DONE_ONLY_FOR_AGENTS);
-    if (!isStarterTarget(self, to, stellaThread)) throw new Error(DONE_NOT_TO_STARTER);
+    if (!isStarterTarget(self, to, stellaThread)) {
+      throw new Error(doneNotToStarterText(self.startedBy && self.startedBy.label !== "Stella" ? self.startedBy.threadId : undefined));
+    }
     assertMessageSize(message);
     const working = await helpersAtWork(api, api.conversationId, context);
     if (working.length > 0) throw new Error(doneWhileHelpersWorkText(working));

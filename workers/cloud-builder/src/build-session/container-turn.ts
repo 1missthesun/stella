@@ -1,3 +1,4 @@
+import { agentIdentityText } from "@stella/contracts/agent-messaging";
 import {
   agentContainerSize,
   materializeAgentWorld,
@@ -1508,6 +1509,18 @@ export const runAgentAttempt = async (
         }),
         ...(rulesSection ? [rulesSection] : []),
         ...(devicesSection ? [devicesSection] : []),
+        // Who it is and who started it: where its messages and its finished
+        // report go (a helper's lead, not Stella).
+        ...(turn.threadId
+          ? [
+              agentIdentityText({
+                threadId: turn.threadId,
+                ...(turn.parentThreadId && turn.parentThreadId !== turn.threadId
+                  ? { startedBy: { threadId: turn.parentThreadId } }
+                  : {}),
+              }),
+            ]
+          : []),
       ].join("\n\n"),
     };
     if (orchestrator) {

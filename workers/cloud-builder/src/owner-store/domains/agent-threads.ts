@@ -63,7 +63,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
   type AgentTaskMessageResult,
 } from "@stella/contracts/backend/agent-threads";
-import { DONE_ACCEPTED_TEXT, DONE_NOT_TO_STARTER, doneResultJson, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
+import { DONE_ACCEPTED_TEXT, doneNotToStarterText, doneResultJson, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
 import { selectCloudModel } from "./engines.js";
@@ -2126,7 +2126,7 @@ const taskMessage = async (ctx: OwnerContext, args: TaskMessageArgs): Promise<Ag
   const to = isPlacementThreadId(requested) ? (placementAliasThreadId(ctx.db, requested) ?? requested) : requested;
   const starter = isStarterOf(sender, to);
   if (args.done) {
-    if (!starter) throw new RpcError("BAD_REQUEST", DONE_NOT_TO_STARTER);
+    if (!starter) throw new RpcError("BAD_REQUEST", doneNotToStarterText(sender.parent_thread_id ?? undefined));
     const helpers = liveDescendants(ctx.db, sender.thread_id);
     if (helpers.length > 0) {
       throw new RpcError(

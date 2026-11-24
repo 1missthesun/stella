@@ -88,8 +88,130 @@ const sameRun = (a: RunsOn, b: RunsOn): boolean => {
   return alias(a.model) !== undefined && alias(a.model) === alias(b.model);
 };
 
+const PATCH_MAX_SHARE = 0.6;
+const PATCH_MAX_CELLS = 4_000_000;
+const SHORTENED_PREFIX_CHARS = 40;
+const SHORTENED_PREFIX_STEP = 20;
+const SHORTENED_MIN_SAVED = 20;
+
+type DiffLine = { kind: "same" | "removed" | "added"; text: string };
+
+/** The line diff of `before` → `after` (longest common subsequence), or undefined when too large to compute. */
+const lineDiff = (before: readonly string[], after: readonly string[]): DiffLine[] | undefined => {
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) start += 1;
+  let endBefore = before.length;
+  let endAfter = after.length;
+  while (endBefore > start && endAfter > start && before[endBefore - 1] === after[endAfter - 1]) {
+    endBefore -= 1;
+    endAfter -= 1;
+  }
+  const a = before.slice(start, endBefore);
+  const b = after.slice(start, endAfter);
+  if (a.length * b.length > PATCH_MAX_CELLS) return undefined;
+  const width = b.length + 1;
+  const table = new Uint32Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    for (let j = b.length - 1; j >= 0; j -= 1) {
+      table[i * width + j] = a[i] === b[j] ? table[(i + 1) * width + j + 1]! + 1 : Math.max(table[(i + 1) * width + j]!, table[i * width + j + 1]!);
+    }
+  }
+  const middle: DiffLine[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) {
+      middle.push({ kind: "same", text: a[i]! });
+      i += 1;
+      j += 1;
+    } else if (j < b.length && (i === a.length || table[i * width + j + 1]! >= table[(i + 1) * width + j]!)) {
+      middle.push({ kind: "added", text: b[j]! });
+      j += 1;
+    } else {
+      middle.push({ kind: "removed", text: a[i]! });
+      i += 1;
+    }
+  }
+  return [
+    ...before.slice(0, start).map((text): DiffLine => ({ kind: "same", text })),
+    ...middle,
+    ...before.slice(endBefore).map((text): DiffLine => ({ kind: "same", text })),
+  ];
+};
+
+const PATCH_LEAD = (name: string) =>
+  `Changed lines of ${name} only (- old line, cut to its start where it ends in …; + new line; a leading space marks an unchanged line, for place).`;
+
+/** What the model knows the part as: its file for a startup doc, else its tag. */
+const partName = (key: string, text: string): string => text.match(/<startup_doc path="([^"]+)">/)?.[1] ?? `<${key}>`;
+
+const wrapperOf = (lines: readonly string[]): { open: string; close: string } | undefined => {
+  const open = lines[0];
+  const close = lines[lines.length - 1];
+  const tag = open?.match(/^<([a-z_-]+)[ >]/)?.[1];
+  return tag && lines.length >= 2 && close === `</${tag}>` ? { open: open!, close: close! } : undefined;
+};
+
+/**
+ * A changed part as only its changed lines, when that is unambiguous and much
+ * shorter: every removed line and every line shown for place occurs once in
+ * the copy the model has. Otherwise undefined, and the whole part goes.
+ */
+const linePatch = (key: string, text: string, before: string): string | undefined => {
+  const was = before.split("\n");
+  const now = text.split("\n");
+  const wrapper = wrapperOf(was);
+  const inner = wrapper && wrapperOf(now)?.open === wrapper.open && wrapperOf(now)?.close === wrapper.close;
+  const a = inner ? was.slice(1, -1) : was;
+  const b = inner ? now.slice(1, -1) : now;
+  const diff = lineDiff(a, b);
+  if (!diff) return undefined;
+  const counts = new Map<string, number>();
+  for (const line of a) counts.set(line, (counts.get(line) ?? 0) + 1);
+  const once = (line: string) => counts.get(line) === 1;
+  const prefixOnce = (prefix: string) => a.filter((line) => line.startsWith(prefix)).length === 1;
+  // The shortest start of the line (from a few words on) that no other line shares.
+  const shown = (line: string) => {
+    for (let length = SHORTENED_PREFIX_CHARS; length + SHORTENED_MIN_SAVED < line.length; length += SHORTENED_PREFIX_STEP) {
+      const prefix = line.slice(0, length);
+      if (prefixOnce(prefix)) return `${prefix}…`;
+    }
+    return line;
+  };
+  const out: string[] = [];
+  let index = 0;
+  while (index < diff.length) {
+    if (diff[index]!.kind === "same") {
+      index += 1;
+      continue;
+    }
+    let end = index;
+    while (end < diff.length && diff[end]!.kind !== "same") end += 1;
+    const hunk = diff.slice(index, end);
+    if (hunk.every((line) => line.text.trim() === "")) {
+      index = end;
+      continue;
+    }
+    for (const line of hunk) if (line.kind === "removed" && line.text.trim() !== "" && !once(line.text)) return undefined;
+    const placeBefore = diff.slice(0, index).findLast((line) => line.kind === "same" && line.text.trim() !== "");
+    const placeAfter = diff.slice(end).find((line) => line.kind === "same" && line.text.trim() !== "");
+    const anchoredByRemoval = hunk.some((line) => line.kind === "removed" && line.text.trim() !== "");
+    const place = placeBefore ?? placeAfter;
+    if (!anchoredByRemoval && place && !once(place.text)) return undefined;
+    // A removed line already shows where; only a pure addition needs an unchanged line beside it.
+    if (!anchoredByRemoval && place === placeBefore && placeBefore) out.push(` ${shown(placeBefore.text)}`);
+    for (const line of hunk) if (line.kind === "removed" && line.text.trim() !== "") out.push(`-${shown(line.text)}`);
+    for (const line of hunk) if (line.kind === "added" && line.text.trim() !== "") out.push(`+${line.text}`);
+    if (!anchoredByRemoval && place === placeAfter && placeAfter && !placeBefore) out.push(` ${shown(placeAfter.text)}`);
+    index = end;
+  }
+  const body = [PATCH_LEAD(partName(key, text)), ...out];
+  const patch = inner ? [wrapper!.open, ...body, wrapper!.close].join("\n") : body.join("\n");
+  return patch.length < text.length * PATCH_MAX_SHARE ? patch : undefined;
+};
+
 const changedText = (key: string, text: string, before: string | undefined, ranOn: RunsOn | undefined): string => {
-  if (key !== ENGINE_MODEL_SECTION) return text;
+  if (key !== ENGINE_MODEL_SECTION) return before === undefined ? text : (linePatch(key, text, before) ?? text);
   const now = sectionRunsOn(text);
   const told = sectionRunsOn(before);
   const was = ranOn && !(told && sameRun(told, ranOn)) ? ranOn : told;
@@ -98,7 +220,7 @@ const changedText = (key: string, text: string, before: string | undefined, ranO
 };
 
 const BASELINE_HEADER = "Context about the user and where this conversation runs. A later update replaces a part of it by name.";
-const CHANGE_HEADER = "This context changed. Each part below replaces the earlier part of the same name; the rest still holds.";
+const CHANGE_HEADER = "This context changed. Each part below replaces its earlier copy or lists its changed lines; the rest still holds.";
 
 export const residentContextKind = (message: Message): "baseline" | "change" | undefined => {
   if (message.role !== "user") return undefined;

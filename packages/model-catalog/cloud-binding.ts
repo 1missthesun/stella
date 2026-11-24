@@ -134,7 +134,6 @@ export const validateConnectedCloudBinding = (args: {
     };
   }
   // Sign in with ChatGPT's preview limits: store false, stream true, the
-  // whole history in `input`, no unsupported fields or hosted tools.
   const violation = chatGptRequestViolation(args.requestJson);
   if (violation) {
     return { ok: false, error: { status: 400, message: violation } };

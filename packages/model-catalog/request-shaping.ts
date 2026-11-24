@@ -23,7 +23,6 @@ export type RelayRequestShape = NativeRelayRequest & {
   resolvedModel: string;
   serviceTier?: string;
   managedReasoningEffort?: string;
-  /** The output ceiling the upstream is sent; thinking effort is fitted under it. */
   maxOutputTokens?: number;
 };
 
@@ -523,10 +522,8 @@ const applyManagedReasoningEffort = (
 };
 
 /**
- * Params DeepSeek documents as silently ignored. They cost nothing upstream,
- * but `store: true` in particular is a lie — the Responses API is stateless,
- * so `previous_response_id` continuations would fail. Dropping them keeps the
- * relayed body an honest description of what DeepSeek will actually do.
+ * DeepSeek documents these as silently ignored; its Responses API is stateless,
+ * so `previous_response_id` continuations would fail.
  */
 export const DEEPSEEK_IGNORED_PARAMS = [
   "store",
@@ -587,7 +584,6 @@ export const normalizeDeepSeekBody = (
   }
 
   // Chat completions use DeepSeek's own `thinking` object plus a top-level
-  // `reasoning_effort`; the nested Responses-style object is not understood.
   body.thinking = { type: effort === "none" ? "disabled" : "enabled" };
   delete body.reasoning;
   if (effort === "none") {
@@ -678,10 +674,8 @@ export const bodyForUpstream = (
       delete body.reasoning_effort;
     }
     if (provider !== "deepseek" && provider !== "openrouter") {
-      // Keep provider-side response state available for Responses
-      // continuations. DeepSeek is stateless and ignores `store` entirely;
-      // OpenRouter's stateful behavior is unverified for this model, so the
-      // relayed body stays limited to the verified request shape.
+      // DeepSeek is stateless and ignores `store`; OpenRouter's stateful behavior is
+      // unverified for this model.
       body.store = true;
     }
   }
@@ -701,8 +695,6 @@ export const bodyForUpstream = (
       pathIsChatCompletions)
   ) {
     // OpenRouter routes by `prompt_cache_key` to the replica that holds the
-    // conversation's prompt cache; without it every turn lands on a random
-    // replica and reads almost nothing from cache.
     const promptCacheKey = body.prompt_cache_key;
     normalizeChatCompletionsBody(body);
     if (provider === "openrouter" && typeof promptCacheKey === "string") {

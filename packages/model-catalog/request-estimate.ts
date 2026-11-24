@@ -113,7 +113,6 @@ const numberAt = (
   return undefined;
 };
 
-// Tool definitions are billed input; their JSON schemas count as written.
 const toolDefinitionsLength = (tools: unknown): number => {
   if (!Array.isArray(tools) || tools.length === 0) return 0;
   try {

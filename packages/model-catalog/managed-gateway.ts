@@ -44,7 +44,6 @@ const MANAGED_GATEWAY_CONFIGS: Record<
     apiKeyEnvVar: "FIREWORKS_API_KEY",
   },
   // DeepSeek first-party API. Both `/responses` and `/chat/completions` hang
-  // off the root — there is no `/v1` segment for the Responses endpoint.
   deepseek: {
     provider: "deepseek",
     baseURL: "https://api.deepseek.com",

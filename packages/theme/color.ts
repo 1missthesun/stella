@@ -156,10 +156,8 @@ export function rgbToOklch(r: number, g: number, b: number): OklchColor {
 }
 
 /**
- * OKLCH → sRGB in 0–1, channel-clipped. Clipping (rather than CSS Color 4's
- * chroma-reducing gamut map) is deliberate: it is what Chromium does when it
- * paints an out-of-gamut `oklch()` value, and Electron is Chromium, so this
- * keeps mobile in step with what the desktop actually shows.
+ * Chromium clips an out-of-gamut `oklch()` value per channel rather than
+ * gamut-mapping it as CSS Color 4 describes.
  */
 export function oklchToRgb(oklch: OklchColor): {
   r: number;

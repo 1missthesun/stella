@@ -31,13 +31,10 @@ export const dollarsToMicroCents = (dollars: number) =>
   centsToMicroCents(dollars * CENTS_PER_DOLLAR);
 
 export type GrossTokenUsage = {
-  /** Includes cached reads and cache writes. */
   inputTokens: number;
-  /** Includes reasoning tokens. */
   outputTokens: number;
   cachedInputTokens?: number;
   cacheWriteInputTokens?: number;
-  /** The part of `cacheWriteInputTokens` written to a 1-hour cache entry. */
   cacheWrite1hInputTokens?: number;
   reasoningTokens?: number;
 };

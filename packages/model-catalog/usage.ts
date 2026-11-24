@@ -45,9 +45,7 @@ const parseOpenAIUsage = (usage: unknown): RelayUsage => {
     outputTokens: toInt(record.completion_tokens ?? record.output_tokens),
     totalTokens: toInt(record.total_tokens),
     // DeepSeek reports cache hits at the top level as `prompt_cache_hit_tokens`
-    // (with `prompt_tokens` already gross) instead of inside
-    // `prompt_tokens_details`. Without this the chat-completions path would
-    // bill every cached read at the full uncached rate.
+    // (with `prompt_tokens` already gross) instead of inside `prompt_tokens_details`.
     cachedInputTokens:
       toInt(promptDetails?.cached_tokens) ??
       toInt(record.prompt_cache_hit_tokens),
@@ -59,8 +57,6 @@ const parseOpenAIUsage = (usage: unknown): RelayUsage => {
 };
 
 // OpenRouter reports what it billed as `usage.cost`. With our own provider
-// keys (BYOK) that is only OpenRouter's fee; the provider's charge is
-// `cost_details.upstream_inference_cost`.
 const openRouterCost = (
   usage: Record<string, unknown> | null,
 ): Pick<RelayUsage, "costMicroCents"> => {
@@ -90,13 +86,9 @@ const parseResponsesUsage = (usage: unknown): RelayUsage => {
 };
 
 /**
- * Anthropic reports `input_tokens` net of both cache buckets. Left as-is it
- * gets discounted a second time by `computeUsageCostMicroCents` — clamping to
- * zero on any cached conversation — so `grossAnthropicInput` folds the cache
- * counts back in once the stream's fields have merged. Extended thinking is
- * already inside `output_tokens` and is never broken out, so there is no
- * reasoning bucket to report. `cache_creation` splits the writes by TTL;
- * the 1-hour share is priced at its own (2x input) rate.
+ * Anthropic reports `input_tokens` net of both cache buckets. Extended thinking
+ * is already inside `output_tokens` and is never broken out. `cache_creation`
+ * splits the writes by TTL.
  */
 const parseAnthropicUsage = (usage: unknown): RelayUsage => {
   const record = asRecord(usage);
@@ -113,9 +105,8 @@ const parseAnthropicUsage = (usage: unknown): RelayUsage => {
 };
 
 /**
- * Applied after merging, not per event: `message_start` carries the cache
- * counts while `message_delta` may repeat `input_tokens` without them, so
- * converting per event could drop the cache half of the sum.
+ * `message_start` carries the cache counts while `message_delta` may repeat
+ * `input_tokens` without them.
  */
 const grossAnthropicInput = (usage: RelayUsage): RelayUsage =>
   usage.inputTokens === undefined
@@ -135,9 +126,7 @@ const parseGoogleUsage = (usage: unknown): RelayUsage => {
   const candidates = toInt(record.candidatesTokenCount);
   const reasoning = toInt(record.thoughtsTokenCount);
   // Gemini reports `candidatesTokenCount` exclusive of `thoughtsTokenCount`
-  // (totalTokenCount sums the two). Roll thinking back into the output count
-  // so the calculator's `output - reasoning` yields the visible completion
-  // rather than clamping to zero and billing the whole response at nothing.
+  // (totalTokenCount sums the two).
   const output =
     candidates === undefined && reasoning === undefined
       ? undefined
@@ -178,9 +167,7 @@ function createSseParser(
       if (record) {
         usage = mergeUsage(usage, parseEvent(record));
       }
-    } catch {
-      // Ignore partial or non-JSON provider comments.
-    }
+    } catch {}
   };
 
   return {
@@ -244,12 +231,9 @@ export function createRelayUsageParser(
   }
 
   if (provider === "deepseek") {
-    // DeepSeek serves both APIs, so the wire shape isn't fixed by the
-    // provider. Streaming Responses events nest usage under `response`;
-    // non-streaming Responses bodies carry it at the top level with the same
-    // `input_tokens` field names; chat completions use `prompt_tokens`.
-    // Choose the parser from the usage payload itself rather than the
-    // envelope, so a non-streamed Responses reply still reports cache hits.
+    // DeepSeek serves both APIs: streaming Responses events nest usage under
+    // `response`, non-streaming Responses bodies carry it at the top level with the
+    // same `input_tokens` names, and chat completions use `prompt_tokens`.
     return createSseParser((event) => {
       const response = asRecord(event.response);
       const usage = asRecord(response?.usage ?? event.usage);
@@ -300,13 +284,9 @@ export function createRelayUsageParser(
   }
 
   if (provider === "openrouter") {
-    // OpenRouter serves both APIs: chat completions for most models and the
-    // Responses API alongside Chat Completions.
-    // Streaming Responses events nest usage under `response` with
-    // input_tokens/output_tokens (+ reasoning in output_tokens_details);
-    // chat completions use prompt_tokens/completion_tokens at the top
-    // level. Pick the parser from the usage payload itself, mirroring the
-    // deepseek handling.
+    // OpenRouter serves both APIs: streaming Responses events nest usage under
+    // `response` with input_tokens/output_tokens; chat completions use
+    // prompt_tokens/completion_tokens at the top level.
     return createSseParser((event) => {
       const response = asRecord(event.response);
       const usage = asRecord(response?.usage ?? event.usage);

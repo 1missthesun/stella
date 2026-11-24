@@ -123,13 +123,6 @@ const GPT_6_LUNA_MODEL_CONFIG: ModeConfig = {
   providerOptions: { openai: { reasoningEffort: "high" } },
 };
 
-/**
- * Gateway overrides for pinnable upstream ids whose slug does not encode
- * their gateway. A raw `stella/<model>` pin resolves its gateway purely via
- * `inferManagedGatewayProviderFromModel`, which would send the
- * OpenRouter-hosted DeepSeek slug to the first-party gateway.
- * Consulted by `resolveStellaModelConfigForSelection` before inference.
- */
 export const MANAGED_MODEL_GATEWAY_OVERRIDES: Readonly<
   Record<string, ManagedGatewayProvider>
 > = {
@@ -137,13 +130,6 @@ export const MANAGED_MODEL_GATEWAY_OVERRIDES: Readonly<
   [GPT_6_LUNA_MODEL]: "openrouter",
 };
 
-/**
- * Wire-protocol overrides for pinnable upstream ids, mirroring
- * `MANAGED_MODEL_GATEWAY_OVERRIDES`. Consulted by
- * `resolveStellaModelConfigForSelection` when a raw `stella/<model>` pin is
- * resolved, so a pinned id carries the same transport as its mode config
- * regardless of which mode happens to be the agent default.
- */
 export const MANAGED_MODEL_API_OVERRIDES: Readonly<
   Record<string, ManagedProtocol>
 > = {
@@ -153,7 +139,6 @@ export const MANAGED_MODEL_API_OVERRIDES: Readonly<
 
 export const GEMINI_3_1_FLASH_LITE_MODEL = "google/gemini-3.1-flash-lite";
 
-// Through OpenRouter like every other managed model, so nothing needs a Google key.
 const GEMINI_3_1_FLASH_LITE_IMAGE_DESCRIPTION_CONFIG: ModelConfig = {
   model: GEMINI_3_1_FLASH_LITE_MODEL,
   managedGatewayProvider: "openrouter",
@@ -176,13 +161,11 @@ const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
 };
 
 /**
- * Input context window each managed upstream is compacted against, as its
- * route serves it. DeepSeek is pinned to OpenRouter's inference-net endpoint,
- * which serves 1,040,000 of the model's 1,048,576. GPT-6 Luna serves
- * 1,050,000 but is held to its price tier: pi compacts before any request
- * whose estimated input passes the window less its 16,384-token reserve, so
- * requests stay near 255k, under the tier. Verified 2026-10-11 against
- * OpenAI, Google and OpenRouter.
+ * DeepSeek is pinned to OpenRouter's inference-net endpoint, which serves
+ * 1,040,000 of the model's 1,048,576. GPT-6 Luna serves 1,050,000, but OpenAI
+ * bills prompts above 272K at a higher tier, and pi compacts before any request
+ * whose estimated input passes the window less its 16,384-token reserve.
+ * Verified 2026-10-11 against OpenAI, Google and OpenRouter.
  */
 export const MANAGED_MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   [GPT_6_LUNA_MODEL]: effectiveContextWindow(GPT_6_LUNA_MODEL, 1_050_000),
@@ -191,11 +174,6 @@ export const MANAGED_MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   [GEMINI_3_1_FLASH_LITE_MODEL]: 1_048_576,
 };
 
-/**
- * Most output tokens each managed upstream may return per request, reasoning
- * included (it shares the ceiling). A pinned `stella/<model>` takes its own
- * limit here, not the agent default's.
- */
 export const MANAGED_MODEL_MAX_OUTPUT_TOKENS: Readonly<Record<string, number>> = {
   [GPT_6_LUNA_MODEL]: GPT_6_LUNA_MAX_OUTPUT_TOKENS,
   [DEEPSEEK_V4_1_FLASH_MODEL]: DEEPSEEK_V4_1_FLASH_MAX_OUTPUT_TOKENS,
@@ -291,9 +269,6 @@ export const isStellaModelAllowedForAudience = (
 export const LOCKED_AGENT_TYPES: ReadonlySet<string> = new Set<string>([
   "chronicle",
   AGENT_IDS.OFFLINE_RESPONDER,
-  // Image descriptions must stay on a vision-capable Gemini route. Treating
-  // this utility pass as General lets restricted audiences coerce the model
-  // back to DeepSeek.
   "image_description",
 ]);
 

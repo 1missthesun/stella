@@ -167,7 +167,7 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
   },
   {
     slug: "claude-for-pc-fixes",
-    queries: ["Claude fix my PC", "use Claude to fix FPS drops", "AI fix PC game stutter", "Claude fix gaming PC", "AI PC troubleshooter"],
+    queries: ["Claude fix my PC", "use Claude to fix FPS drops", "Claude fix gaming PC", "Claude fix game stutter"],
     metaTitle: "Use Claude to fix your gaming PC: FPS, stutter, crashes",
     metaDescription:
       "Claude finds why games stutter, crash or drop frames and fixes drivers, settings and temps on your PC when you run it through Stella (stella.sh).",
@@ -206,7 +206,7 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
   // ── Gemini for … ──────────────────────────────────────────────
   {
     slug: "gemini-for-torrenting",
-    queries: ["Gemini for torrenting", "use Gemini to set up qBittorrent", "AI for torrenting", "Gemini qBittorrent", "AI torrent setup"],
+    queries: ["Gemini for torrenting", "use Gemini to set up qBittorrent", "Gemini qBittorrent", "Gemini torrent client setup"],
     metaTitle: "Use Gemini for torrenting: set up, fixed and automated",
     metaDescription:
       "Gemini sets up qBittorrent, fixes stalled downloads and gets new episodes by itself when you run it through Stella (stella.sh). Free with your Google plan.",
@@ -283,7 +283,7 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
   },
   {
     slug: "gemini-for-emulation",
-    queries: ["Gemini for emulation", "use Gemini to set up emulator", "AI emulator setup", "Gemini RetroArch", "Gemini Switch emulator"],
+    queries: ["Gemini for emulation", "use Gemini to set up emulator", "Gemini RetroArch", "Gemini Switch emulator"],
     metaTitle: "Use Gemini to set up emulators: Switch, PS2, PS3, RetroArch",
     metaDescription:
       "Gemini sets up emulators, controllers, ROM patches and saves on your computer when you run it through Stella (stella.sh). Free with your Google AI plan.",
@@ -322,7 +322,7 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
   // ── Best AI for … ─────────────────────────────────────────────
   {
     slug: "ai-for-game-mods",
-    queries: ["best AI for game modding", "AI for modding games", "AI mod maker", "AI that installs mods", "AI mod manager"],
+    queries: ["best AI for game modding", "AI for modding games", "AI that installs mods", "AI mod manager"],
     metaTitle: "The best AI for game modding (installs, fixes and makes mods)",
     metaDescription:
       "The best AI for game modding works on your PC: Claude through Stella (stella.sh) installs mods, fixes broken ones and makes new ones. Free with your plan.",
@@ -360,7 +360,7 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
   },
   {
     slug: "ai-for-reverse-engineering",
-    queries: ["best AI for reverse engineering", "AI reverse engineering", "AI decompiler", "best AI agent for reverse engineering", "AI that can decompile an exe or APK", "Ghidra AI"],
+    queries: ["best AI for reverse engineering", "AI reverse engineering", "best AI agent for reverse engineering", "AI that can decompile an exe or APK"],
     metaTitle: "The best AI for reverse engineering, on your own computer",
     metaDescription:
       "The best AI for reverse engineering works on the real file: Gemini or Claude through Stella (stella.sh) decompiles, explains and patches on your computer.",

@@ -23,7 +23,8 @@ export const isAccountProviderId = (value: unknown): value is AccountProviderId 
 /**
  * Plan sign-ins that live only on a computer (never in the account or the
  * cloud). The account's model choice can name one so every device shows the
- * same pick; the computers signed in run it, and the cloud runs its default.
+ * same pick; the computers signed in run it, and the cloud runs a connected
+ * plan (Claude, then ChatGPT) or else its default.
  */
 export const COMPUTER_ONLY_PROVIDER_IDS = ["antigravity"] as const;
 

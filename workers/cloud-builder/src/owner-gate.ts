@@ -1138,7 +1138,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           budgetMicroCents: 0,
         },
         ...snapshotDevices(ctx.db),
-        ...snapshotEngines(ctx.db, { ownerMode, ...(managedModels === undefined ? {} : { managedModels }) }),
+        ...snapshotEngines(ctx.db, { cloudSandbox: cloudSandboxAccess(ctx).enabled, ownerMode, ...(managedModels === undefined ? {} : { managedModels }) }),
         ...snapshotTimeZone(ctx.db),
         fetchedAt: now,
         ttlMs: SNAPSHOT_TTL_MS,

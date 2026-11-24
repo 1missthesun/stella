@@ -7,6 +7,7 @@ import {
   findUnrunnableExternalCliPath,
 } from "@stella/node-shared/integrations/external-cli-resolution.js";
 import { claudeCliCommandEnv, runCliCommand } from "./claude-cli-command.js";
+import { antigravityHomeFor, askAntigravityCli } from "./antigravity-cli-status.js";
 import { CLI_REPAIR_TIMEOUT_MS, cliRealPath, createCliKeeper, type CliInstall, type CliRepairOutcome } from "./cli-keeper.js";
 import { updateCli, type CliUpdateOutcome } from "./cli-update.js";
 
@@ -194,6 +195,36 @@ const unusable = (detail: { install: Install | null; problem: string; repair?: C
   );
 };
 
+/**
+ * Google ships new versions often and Stella hasn't run most of them, so the
+ * first run of each compares it with the kept one on this computer: one that
+ * lost something the kept one has (it doesn't answer Stella, dropped what
+ * turns need, or no longer sees the sign-in) isn't used. Relative, so a
+ * problem both share (offline, signed out) never blocks anyone.
+ */
+const selfCheck = async (executable: string, kept: string, env: NodeJS.ProcessEnv): Promise<string | undefined> => {
+  const dataDir = env.STELLA_DATA_DIR?.trim() || process.env.STELLA_DATA_DIR?.trim();
+  if (!dataDir) return undefined;
+  const home = antigravityHomeFor(path.resolve(dataDir));
+  // Never used here: nothing to compare.
+  if (!existsSync(home)) return undefined;
+  const now = await askAntigravityCli(executable, home, commandEnv(executable, env));
+  if (now.ok && now.usable && now.signedIn) return undefined;
+  const before = await askAntigravityCli(kept, home, commandEnv(kept, env));
+  if (!before.ok) return undefined;
+  if (!now.ok) return now.problem;
+  if (before.usable && !now.usable) return "no longer has what Stella needs of it.";
+  if (before.signedIn && !now.signedIn) return "doesn't see this computer's Google sign-in, which the version before it does.";
+  return undefined;
+};
+
+/** The `agy` to ask something of now, repairing nothing. */
+export const antigravityCliExecutable = async (): Promise<string | undefined> =>
+  await antigravityCliKeeper.select({ repair: "none" }).then(
+    (launch) => launch.executable,
+    () => undefined,
+  );
+
 export const antigravityCliKeeper = createCliKeeper<AntigravityCliInstallMethod>({
   label: "Google Antigravity",
   log: "antigravity-cli",
@@ -203,6 +234,7 @@ export const antigravityCliKeeper = createCliKeeper<AntigravityCliInstallMethod>
   currentInstall,
   versionProblem: (version) =>
     olderThan(version, MINIMUM_VERSION) ? `is version ${version}, and Stella needs ${MINIMUM_VERSION} or newer.` : undefined,
+  selfCheck,
   repairable: ["google", "other"],
   runRepair,
   manualRepair,

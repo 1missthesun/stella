@@ -1361,11 +1361,11 @@ export class StellaRuntimeHost {
 
   /** Whether Stella is signed in to Google Antigravity here. */
   private async antigravitySignedIn(): Promise<boolean> {
-    const { antigravityCliProblem, antigravityHomeFor } = await import(
-      "../kernel/integrations/antigravity-cli-acp.js"
+    const { antigravityHomeFor, knownAntigravitySignIn } = await import(
+      "../kernel/integrations/antigravity-cli-status.js"
     );
     const dataDir = this.options.initializeParams.stellaDataDirPath;
-    return antigravityCliProblem({ home: () => antigravityHomeFor(dataDir) }) === undefined;
+    return knownAntigravitySignIn(antigravityHomeFor(dataDir));
   }
 
   /** Which plan sign-ins this computer holds, read at most once a minute. */

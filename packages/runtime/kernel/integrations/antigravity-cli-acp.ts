@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
-import { existsSync, unwatchFile, watchFile } from "node:fs";
+import { unwatchFile, watchFile } from "node:fs";
 import { rm } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
@@ -13,8 +13,19 @@ import {
 } from "./claude-code-tool-mcp-host.js";
 import type { ToolResult } from "../tools/types.js";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
-import { antigravityCliKeeper } from "./antigravity-cli-install.js";
+import { antigravityCliExecutable, antigravityCliKeeper } from "./antigravity-cli-install.js";
 import type { CliLaunch } from "./cli-keeper.js";
+import {
+  ACP_INITIALIZE,
+  antigravityAcpArgs,
+  antigravityCliEnv,
+  antigravitySignedOutSince,
+  antigravitySignInRecordFile,
+  currentAntigravitySignIn,
+  isAntigravityAuthRequired,
+  noteAntigravitySignIn,
+  refreshAntigravitySignIn,
+} from "./antigravity-cli-status.js";
 import { ANTIGRAVITY_NATIVE_TOOLS } from "./antigravity-native-tools.js";
 import {
   ANTIGRAVITY_ALLOWED_TOOLS_ENV,
@@ -36,7 +47,6 @@ const NATIVE_PREFIX = "agy_";
 const OTHER_NATIVE_TOOL = `${NATIVE_PREFIX}tool`;
 /** Arguments Antigravity adds to every call for its own display; Stella's tools never take them. */
 const DISPLAY_ARGS = new Set(["toolSummary"]);
-export const ANTIGRAVITY_APP_DATA_DIR = "antigravity-acp";
 const TOOL_GROUP_SETTLE_MS = 250;
 const IDLE_CLOSE_MS = 20 * 60_000;
 const SIGN_OUT_CHECK_MS = 1_000;
@@ -102,26 +112,11 @@ const withoutDisplayArgs = (args: unknown): Record<string, unknown> => {
 
 const hash = (value: string) => crypto.createHash("sha256").update(value).digest("hex").slice(0, 24);
 
-/** The environment every `agy` Stella starts gets: its own profile, file-stored sign-in, no self-update, no browser. */
-export const antigravityCliEnv = (home: string): Record<string, string> => ({
-  GEMINI_HOME: home,
-  AGY_ACP_FORCE_FILE_STORAGE: "1",
-  AGY_CLI_DISABLE_AUTO_UPDATE: "1",
-  SSH_CONNECTION: process.env.SSH_CONNECTION || "127.0.0.1 0 127.0.0.1 0",
-  BROWSER: process.platform === "win32" ? "rem" : "true",
-});
-
 const allowedToolsOf = (request: { nativeTools: readonly string[] }): string => request.nativeTools.join(",");
 
-/** Where `agy` keeps its sign-in. Stella checks that it exists and removes it on sign-out; it never reads it. */
-export const antigravityTokenFile = (home: string): string => path.join(home, ANTIGRAVITY_APP_DATA_DIR, "antigravity-oauth-token");
-
-export const antigravityCliSignedIn = (home: string): boolean => existsSync(antigravityTokenFile(home));
-
-export const antigravityCliProblem = (config: Pick<AntigravityCliConfig, "home">): string | undefined => {
-  if (!antigravityCliSignedIn(config.home())) return ANTIGRAVITY_SIGN_IN_NEEDED;
-  return undefined;
-};
+/** Why a turn can't run on this computer's Antigravity sign-in, if it can't. */
+export const antigravityCliProblem = async (config: Pick<AntigravityCliConfig, "home">): Promise<string | undefined> =>
+  (await currentAntigravitySignIn(config.home(), antigravityCliExecutable)) ? undefined : ANTIGRAVITY_SIGN_IN_NEEDED;
 
 type Rpc = {
   request(method: string, params: unknown): Promise<any>;
@@ -425,9 +420,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const spawnProc = async (request: AntigravityTurnRequest, launch: CliLaunch): Promise<Proc> => {
     const home = config.home();
-    if (!antigravityCliSignedIn(home)) {
-      throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
-    }
+    const startedAt = Date.now();
     const key = request.ref.sessionKey;
     let current: Proc | undefined;
     const agent = await profile.prepare(request.nativeTools, request.tools.map((tool) => tool.name));
@@ -435,7 +428,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     const allowedTools = allowedToolsOf(request);
     const child = spawn(
       launch.executable,
-      ["acp", "--gemini-dir", home, "--app-data-dir", ANTIGRAVITY_APP_DATA_DIR, "--agent", agent, "--disable-telemetry", ...(request.ref.role === "worker" ? ["--dangerously-skip-permissions"] : [])],
+      [...antigravityAcpArgs(home), "--agent", agent, ...(request.ref.role === "worker" ? ["--dangerously-skip-permissions"] : [])],
       {
         cwd: request.cwd,
         env: {
@@ -513,16 +506,16 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     child.stderr?.on("data", (data: string) => {
       proc.stderr = `${proc.stderr}${data}`.slice(-4_000);
     });
-    const tokenFile = antigravityTokenFile(home);
+    const signInRecord = antigravitySignInRecordFile(home);
     // A process that outlived its sign-in would still hold it, and could store it again.
     const closeOnSignOut = () => {
-      if (!antigravityCliSignedIn(home)) kill(proc, "This computer signed out of Google Antigravity.");
+      if (antigravitySignedOutSince(home, startedAt)) kill(proc, "This computer signed out of Google Antigravity.");
     };
     const exited = (detail: string) => {
       if (proc.exited) return;
       proc.exited = true;
       if (!started) antigravityCliKeeper.noteLaunchFailed(launch.executable);
-      unwatchFile(tokenFile, closeOnSignOut);
+      unwatchFile(signInRecord, closeOnSignOut);
       for (const waiting of pending.values()) waiting.reject(new Error(`Antigravity CLI exited (${detail}).`));
       pending.clear();
       kill(proc, `Antigravity CLI exited (${detail}).${proc.stderr.trim() ? ` ${proc.stderr.trim().slice(-500)}` : ""}`);
@@ -532,18 +525,14 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     proc.ready = (async () => {
       const cancelStartTimeout = forkTimeoutFiber(START_TIMEOUT_MS, () => exited("did not start"));
       try {
-        await rpc.request("initialize", {
-          protocolVersion: 1,
-          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-          clientInfo: { name: "stella", title: "Stella", version: "1.0.0" },
-        });
+        await rpc.request("initialize", ACP_INITIALIZE);
       } finally {
         cancelStartTimeout();
       }
       return { models: [] };
     })();
     procs.set(key, proc);
-    watchFile(tokenFile, { interval: SIGN_OUT_CHECK_MS, persistent: false }, closeOnSignOut);
+    watchFile(signInRecord, { interval: SIGN_OUT_CHECK_MS, persistent: false }, closeOnSignOut);
     return proc;
   };
 
@@ -634,16 +623,12 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const runTurn = async (request: AntigravityTurnRequest): Promise<{ text: string; sessionId: string }> => {
     if (request.signal.aborted) throw new Error("Stopped.");
-    if (!antigravityCliSignedIn(config.home())) throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
+    if (await antigravityCliProblem(config)) throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
     const launch = await config.launch(request.signal);
     const key = request.ref.sessionKey;
     let proc = procs.get(key);
     if (proc && proc.binary.identity !== launch.identity) {
       kill(proc, "Google Antigravity was updated.");
-      proc = undefined;
-    }
-    if (proc && !antigravityCliSignedIn(config.home())) {
-      kill(proc, "Signed out.");
       proc = undefined;
     }
     if (proc && (proc.exited || proc.turn || proc.cwd !== request.cwd)) {
@@ -661,7 +646,15 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     proc ??= await spawnProc(request, launch);
     proc.idle?.();
     await proc.ready;
-    const resumed = await ensureSession(proc, request);
+    const opening = proc;
+    const resumed = await ensureSession(opening, request).catch(async (error: unknown) => {
+      if (!isAntigravityAuthRequired(error)) throw error;
+      // This process started signed out; the next turn starts another.
+      kill(opening, "Signed out.");
+      await refreshAntigravitySignIn(config.home(), antigravityCliExecutable);
+      throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
+    });
+    noteAntigravitySignIn(config.home(), true);
     const sessionId = proc.sessionId!;
     request.onSessionId(sessionId);
     const wire = antigravityWireModel(proc.models, request.model, request.thinkingLevel);
@@ -710,8 +703,9 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       request.onEvent({ type: "result", subtype: "success", result: turn.finalText, session_id: sessionId });
       return { text: turn.finalText, sessionId };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (/authentication required/i.test(message)) {
+      if (isAntigravityAuthRequired(error)) {
+        kill(live, "Signed out.");
+        await refreshAntigravitySignIn(config.home(), antigravityCliExecutable);
         throw errorWith(ANTIGRAVITY_LOGIN_REQUIRED, ANTIGRAVITY_SIGN_IN_NEEDED);
       }
       throw error;
@@ -747,6 +741,3 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 };
 
 export type AntigravityCliRuntime = ReturnType<typeof createAntigravityCliRuntime>;
-
-export const antigravityHomeFor = (dataDir: string): string =>
-  process.env.STELLA_ANTIGRAVITY_CLI_HOME?.trim() || path.join(dataDir, "antigravity-cli", "default");

@@ -82,6 +82,11 @@ export type CliKeeperSpec<Method extends string> = {
   currentInstall(env: NodeJS.ProcessEnv): Promise<CliInstall<Method>>;
   /** Why a version that runs still can't be used (too old), if so. */
   versionProblem?(version: string): string | undefined;
+  /**
+   * Why a version not run here before can't replace the kept one, if so.
+   * Asked once per binary; what it accepts isn't asked about again.
+   */
+  selfCheck?(executable: string, kept: string, env: NodeJS.ProcessEnv): Promise<string | undefined>;
   repairable: readonly Method[];
   runRepair(install: CliInstall<Method>, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<CliRepairOutcome>;
   afterRepair?(): void;
@@ -201,7 +206,9 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       timeoutMs: PROBE_TIMEOUT_MS,
     });
     const version = result.exitCode === 0 ? CLI_VERSION_PATTERN.exec(result.stdout)?.[1] : undefined;
-    const versionProblem = version ? spec.versionProblem?.(version) : undefined;
+    const versionProblem = version
+      ? (spec.versionProblem?.(version) ?? (await selfCheckProblem(executable, version, identity, env)))
+      : undefined;
     const check: CliCheck =
       version && !versionProblem
         ? { ok: true, version }
@@ -227,6 +234,38 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
     } catch {
       return null;
     }
+  };
+
+  const acceptedFile = (dir: string) => path.join(dir, "accepted.json");
+
+  /** The spec's self-check, where there is a kept copy of another version to fall back to. */
+  const selfCheckProblem = async (
+    executable: string,
+    version: string,
+    identity: string,
+    env: NodeJS.ProcessEnv,
+  ): Promise<string | undefined> => {
+    const dir = spec.selfCheck ? stateDir(env) : null;
+    if (!dir || !spec.selfCheck) return undefined;
+    const kept = readLastGood(dir);
+    if (!kept?.saved || kept.version === version || !fs.existsSync(kept.saved)) return undefined;
+    if (cliRealPath(executable) === cliRealPath(kept.saved)) return undefined;
+    try {
+      if ((JSON.parse(fs.readFileSync(acceptedFile(dir), "utf8")) as { identity?: unknown }).identity === identity) {
+        return undefined;
+      }
+    } catch {
+      // None accepted yet.
+    }
+    const problem = await spec.selfCheck(executable, kept.saved, env);
+    if (!problem) {
+      try {
+        writeJson(acceptedFile(dir), { identity, version, at: Date.now() });
+      } catch {
+        // Only spares asking again.
+      }
+    }
+    return problem;
   };
 
   const saveCopy = async (dir: string, real: string, version: string): Promise<string | null> => {
@@ -431,7 +470,12 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       }
       try {
         console.warn(`[${spec.log}] repairing ${spec.label}`, { method: install.method, target });
-        const outcome = await spec.runRepair(install, env, options.signal);
+        let outcome = await spec.runRepair(install, env, options.signal);
+        if (outcome.status === "repaired") {
+          const now = (await spec.currentInstall(env)).executable;
+          const check = now ? await probe(now, env, { fresh: true }) : undefined;
+          if (check && !check.ok) outcome = { status: "failed", output: check.problem };
+        }
         try {
           writeJson(repairFile(dir), { target: key, at: Date.now(), status: outcome.status } satisfies RepairRecord);
         } catch {

@@ -13,11 +13,11 @@ import type {
 import { resolveAgentWorkingDirectory } from "../../kernel/agent-runtime/shared.js";
 import {
   antigravityCliProblem,
-  antigravityHomeFor,
   createAntigravityCliRuntime,
   type AntigravityCliConfig,
 } from "../../kernel/integrations/antigravity-cli-acp.js";
 import { antigravityCliKeeper } from "../../kernel/integrations/antigravity-cli-install.js";
+import { antigravityHomeFor } from "../../kernel/integrations/antigravity-cli-status.js";
 import { stellaAgentShellEnvironment } from "../../kernel/tools/stella-agent-env.js";
 import { TOOL_RESULT_AUTHORIZED_IMAGES, type AuthorizedToolImage, type ToolResult } from "../../kernel/tools/types.js";
 import type { OpenSession } from "./sessions.js";
@@ -169,4 +169,4 @@ export const antigravityCliEngineFor = (session: OpenSession): Promise<ClaudeCod
   return engine;
 };
 
-export const antigravityCliProblemFor = (session: OpenSession): string | undefined => antigravityCliProblem(antigravityCliConfigFor(session));
+export const antigravityCliProblemFor = (session: OpenSession): Promise<string | undefined> => antigravityCliProblem(antigravityCliConfigFor(session));

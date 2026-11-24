@@ -2,7 +2,7 @@
 import { createCancelableRegistry } from "./cancelable.js";
 
 const loadSignIn = () => import("../../kernel/integrations/antigravity-sign-in.js");
-const loadCli = () => import("../../kernel/integrations/antigravity-cli-acp.js");
+const loadStatus = () => import("../../kernel/integrations/antigravity-cli-status.js");
 
 const signIns = createCancelableRegistry();
 
@@ -13,18 +13,18 @@ const loginIdOf = (request: { loginId?: unknown } | null | undefined): string =>
 };
 
 export const antigravityStatusForApp = async (dataDir: string): Promise<{ installed: boolean; signedIn: boolean }> => {
-  const [{ antigravityInstalled }, { antigravityCliSignedIn, antigravityHomeFor }] = await Promise.all([loadSignIn(), loadCli()]);
-  return { installed: antigravityInstalled(), signedIn: antigravityCliSignedIn(antigravityHomeFor(dataDir)) };
+  const [{ antigravityInstalled, antigravitySignedIn }, { antigravityHomeFor }] = await Promise.all([loadSignIn(), loadStatus()]);
+  return { installed: antigravityInstalled(), signedIn: await antigravitySignedIn(antigravityHomeFor(dataDir)) };
 };
 
 /** One scheduled check: install, update or repair `agy` where Stella uses it. */
 export const checkAntigravityCliUpdate = async (dataDir: string) => {
-  const [{ updateAntigravityCli }, { antigravityCliSignedIn, antigravityHomeFor }] = await Promise.all([
+  const [{ updateAntigravityCli }, { knownAntigravitySignIn, antigravityHomeFor }] = await Promise.all([
     import("../../kernel/integrations/antigravity-cli-install.js"),
-    loadCli(),
+    loadStatus(),
   ]);
   try {
-    return await updateAntigravityCli({ signedIn: antigravityCliSignedIn(antigravityHomeFor(dataDir)) });
+    return await updateAntigravityCli({ signedIn: knownAntigravitySignIn(antigravityHomeFor(dataDir)) });
   } catch (error) {
     return { status: "failed" as const, version: null, output: error instanceof Error ? error.message : String(error) };
   }
@@ -36,7 +36,7 @@ export const signInAntigravityForApp = async (
   onUrl: (url: string) => void,
 ): Promise<void> => {
   const loginId = loginIdOf(request);
-  const [{ signInAntigravity }, { antigravityHomeFor }] = await Promise.all([loadSignIn(), loadCli()]);
+  const [{ signInAntigravity }, { antigravityHomeFor }] = await Promise.all([loadSignIn(), loadStatus()]);
   await signIns.run(loginId, (signal) => signInAntigravity({ loginId, home: antigravityHomeFor(dataDir), signal, onUrl }));
 };
 
@@ -52,6 +52,6 @@ export const cancelAntigravitySignInForApp = (request: { loginId?: unknown } | n
 });
 
 export const signOutAntigravityForApp = async (dataDir: string): Promise<void> => {
-  const [{ signOutAntigravity }, { antigravityHomeFor }] = await Promise.all([loadSignIn(), loadCli()]);
+  const [{ signOutAntigravity }, { antigravityHomeFor }] = await Promise.all([loadSignIn(), loadStatus()]);
   await signOutAntigravity(antigravityHomeFor(dataDir));
 };

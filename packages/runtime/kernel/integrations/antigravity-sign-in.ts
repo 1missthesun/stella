@@ -1,13 +1,18 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
+import { antigravityCliExecutable, antigravityCliKeeper, findAntigravityCli } from "./antigravity-cli-install.js";
 import {
-  ANTIGRAVITY_APP_DATA_DIR,
+  ACP_INITIALIZE,
+  antigravityAcpArgs,
   antigravityCliEnv,
-  antigravityCliSignedIn,
   antigravityTokenFile,
-} from "./antigravity-cli-acp.js";
-import { antigravityCliKeeper, findAntigravityCli } from "./antigravity-cli-install.js";
+  askAntigravityCli,
+  callAntigravityAcp,
+  currentAntigravitySignIn,
+  noteAntigravitySignedOut,
+  noteAntigravitySignIn,
+} from "./antigravity-cli-status.js";
 
 /**
  * Signing in to Google Antigravity with Google's own login command
@@ -17,7 +22,8 @@ import { antigravityCliKeeper, findAntigravityCli } from "./antigravity-cli-inst
  */
 const URL_TIMEOUT_MS = 45_000;
 const FINISH_TIMEOUT_MS = 60_000;
-const LOGOUT_TIMEOUT_MS = 20_000;
+/** Longer than a running turn takes to notice a sign-out and close. */
+const TURNS_CLOSE_MS = 2_500;
 
 const canceled = () => new Error("Google sign-in was canceled.");
 
@@ -91,7 +97,11 @@ export const signInAntigravity = async (args: {
   const { loginId, home, signal } = args;
   const binary = await readyCli(signal);
   await mkdir(home, { recursive: true, mode: 0o700 });
-  const child = spawn(binary, ["acp", "--login", "--gemini-dir", home, "--app-data-dir", ANTIGRAVITY_APP_DATA_DIR, "--disable-telemetry"], {
+  // Already signed in, such as in a terminal: nothing to ask the person for.
+  const already = await askAntigravityCli(binary, home);
+  if (signal.aborted) throw canceled();
+  if (already.ok && already.signedIn) return noteAntigravitySignIn(home, true);
+  const child = spawn(binary, [...antigravityAcpArgs(home), "--login"], {
     cwd: home,
     env: { ...process.env, ...antigravityCliEnv(home) },
     stdio: ["pipe", "pipe", "pipe"],
@@ -126,9 +136,11 @@ export const signInAntigravity = async (args: {
     if (signal.aborted) abort();
     const code = await exit;
     if (signal.aborted) throw canceled();
-    if (code !== 0 || !antigravityCliSignedIn(home)) {
-      throw new Error(lastLine(output) || "Google didn't complete the sign-in. Start again.");
+    if (code === 0) {
+      const answer = /^logged in as /imu.test(output) ? undefined : await askAntigravityCli(binary, home);
+      if (!answer || (answer.ok && answer.signedIn)) return noteAntigravitySignIn(home, true);
     }
+    throw new Error(lastLine(output) || "Google didn't complete the sign-in. Start again.");
   } finally {
     stopTimer();
     waiting.delete(loginId);
@@ -137,45 +149,25 @@ export const signInAntigravity = async (args: {
   }
 };
 
-/** Signs out through the CLI, then removes its stored sign-in if that is still there. */
+/** Signs out through the CLI, wherever it keeps the sign-in. */
 export const signOutAntigravity = async (home: string): Promise<void> => {
-  const binary = findAntigravityCli();
-  if (binary && antigravityCliSignedIn(home)) {
-    const child = spawn(binary, ["acp", "--gemini-dir", home, "--app-data-dir", ANTIGRAVITY_APP_DATA_DIR, "--disable-telemetry"], {
-      cwd: home,
-      env: { ...process.env, ...antigravityCliEnv(home) },
-      stdio: ["pipe", "pipe", "ignore"],
-      windowsHide: true,
-    });
-    const exit = ended(child);
-    child.stdin.on("error", () => undefined);
-    const send = (id: number, method: string, params: unknown) =>
-      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    const stopTimer = forkTimeoutFiber(LOGOUT_TIMEOUT_MS, () => endChild(child));
-    let buffer = "";
-    child.stdout.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString("utf8");
-      for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
-        try {
-          const { id } = JSON.parse(line) as { id?: unknown };
-          if (id === 1) send(2, "logout", {});
-          if (id === 2) endChild(child);
-        } catch {
-          continue;
-        }
-      }
-    });
-    send(1, "initialize", {
-      protocolVersion: 1,
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-      clientInfo: { name: "stella", title: "Stella", version: "1.0.0" },
-    });
-    await exit;
-    stopTimer();
-  }
+  noteAntigravitySignedOut(home);
+  // A running turn still holds the sign-in, and could store it again.
+  await new Promise<void>((resolve) => void forkTimeoutFiber(TURNS_CLOSE_MS, resolve));
+  const { executable } = await antigravityCliKeeper.select({ repair: "wait" });
+  const { replies, problem } = await callAntigravityAcp(executable, home, [
+    { method: "initialize", params: ACP_INITIALIZE },
+    { method: "logout", params: {} },
+  ]);
   await rm(antigravityTokenFile(home), { force: true });
+  const answer = await askAntigravityCli(executable, home);
+  if (answer.ok && !answer.signedIn) return;
+  if (answer.ok) noteAntigravitySignIn(home, true);
+  const why = problem ?? (replies[1]?.error ? String(replies[1].error.message ?? "") : answer.ok ? "" : answer.problem);
+  throw new Error(`Google Antigravity couldn't sign out. Try again.${why ? ` (${why})` : ""}`);
 };
 
 export const antigravityInstalled = (): boolean => findAntigravityCli() !== undefined;
+
+/** For screens that show it. */
+export const antigravitySignedIn = (home: string): Promise<boolean> => currentAntigravitySignIn(home, antigravityCliExecutable);

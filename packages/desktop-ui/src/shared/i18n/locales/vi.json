@@ -1711,7 +1711,8 @@
       "remember": "Ghi nhớ trên máy tính đã hỏi",
       "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn.",
       "rememberOff": "Dùng một lần rồi xóa.",
-      "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu."
+      "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
+      "usingSaved": "Phần còn lại lấy từ “{label}” bạn đã lưu. Chỉ cần điền phần bên dưới."
     }
   },
   "onboarding": {
@@ -3102,6 +3103,7 @@
       "rememberOn": "Đã lưu thành “{label}”. Stella sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong {place}.",
       "rememberOff": "Dùng một lần rồi xóa.",
       "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu.",
+      "usingSaved": "Phần còn lại lấy từ “{label}” bạn đã lưu. Chỉ cần điền phần bên dưới.",
       "note": "Thêm ghi chú (không bắt buộc)",
       "provided": "Đã cung cấp",
       "declined": "Đã từ chối"

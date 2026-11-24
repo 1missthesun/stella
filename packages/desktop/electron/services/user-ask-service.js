@@ -35,6 +35,7 @@ import {
   normalizeUserAskNote,
   normalizeUserAskQuestions,
   normalizeSavedValuePart,
+  savedServiceMatch,
   savedValueLabel,
   userAskFieldIsRememberable,
   userAskAcceptsAnswer,
@@ -57,6 +58,8 @@ import {
 import { showStellaNotification } from "./notification-service.js";
 import { PendingRequestStore } from "./pending-request-store.js";
 import { SavedSecureValues, matchSavedFields } from "./saved-secure-values.js";
+/** How many saved records a task is shown, by name, when its lookup found nothing. */
+const SAVED_SUMMARY_LIMIT = 60;
 import { UserAskEscalationEngine, localTimeZone, minuteOfDayAt } from "./user-ask-escalation.js";
 import {
   createUserAskRecipientKey,
@@ -606,21 +609,24 @@ export class UserAskService {
         const fields = request.fields ?? [];
         const save = normalizeSaveRequest(request.save);
         let replaceId = "";
+        let prefill = null;
         if (save?.service) {
-            const matches = await this.saved.findMatches(save.service, save.account);
+            const { exact, close } = await this.saved.findCandidates(save.service, save.account);
             if (save.replace) {
-                replaceId = matches[0]?.id ?? "";
+                replaceId = exact[0]?.id ?? "";
             }
             else {
-                const reused = await this.reuseSavedValue(save, fields, matches, request);
-                if (reused) {
-                    return reused;
+                const found = await this.findSaved(save, fields, exact.length > 0 ? exact : close, request);
+                if (found?.whole) {
+                    return found.whole;
                 }
+                prefill = found?.partial ?? null;
             }
         }
         if (request.savedOnly === true) {
-            return null;
+            return { outcome: "not_saved", savedHere: await this.savedSummaries() };
         }
+        const askFields = prefill ? fields.filter((field) => !prefill.covered.includes(field.id)) : fields;
         const label = save ? savedValueLabel(save.service, save.account) || request.purpose : "";
         return await this.open({
             request,
@@ -631,90 +637,138 @@ export class UserAskService {
                 kind: "secure_input",
                 purpose: request.purpose,
                 ...(request.detail ? { detail: request.detail } : {}),
-                fields,
+                fields: askFields,
                 ...(save
                     ? {
                         save: {
                             service: save.service,
                             ...(save.account ? { account: save.account } : {}),
-                            label,
+                            label: prefill ? prefill.label : label,
                             ...(replaceId ? { replacing: true } : {}),
+                            ...(prefill ? { usingSaved: true } : {}),
                         },
                     }
                     : {}),
             },
-            saveContext: save ? { ...save, replaceId } : null,
+            saveContext: save ? { ...save, replaceId, ...(prefill ? { prefill } : {}) } : null,
         });
     }
-    /** The saved values of one record for these fields, or null when it lacks one. */
-    async savedAnswer(entry, fields) {
+    /** What is saved on this computer, by name only (never a value), for a task that found nothing under the name it tried. */
+    async savedSummaries() {
+        return (await this.saved.list()).slice(0, SAVED_SUMMARY_LIMIT).map((entry) => ({
+            service: entry.service || entry.label,
+            ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
+            fields: entry.fieldLabels,
+        }));
+    }
+    /**
+     * The fields of one record that answer these, as readable values and
+     * handles, plus which fields it covered; null when its store can't be read.
+     */
+    async savedFieldsFor(entry, fields) {
         const stored = await this.saved.readValues(entry);
         if (!stored) {
             return null;
         }
         const values = {};
         const handles = {};
+        const covered = [];
+        const missing = [];
         const matched = matchSavedFields(entry.fields, fields);
         for (const field of fields) {
             const savedField = matched.get(field.id) ?? null;
             const value = savedField ? stored[savedField.id] : undefined;
-            if (!savedField || typeof value !== "string" || savedField.sensitive !== field.sensitive) {
-                if (field.optional === true) {
-                    continue;
+            if (!savedField ||
+                typeof value !== "string" ||
+                savedField.sensitive !== field.sensitive ||
+                (field.sensitive && !savedField.handle)) {
+                if (field.optional !== true) {
+                    missing.push(field.id);
                 }
-                return null;
+                continue;
             }
             if (field.sensitive) {
-                if (!savedField.handle) {
-                    return null;
-                }
                 handles[field.id] = savedField.handle;
             }
             else {
                 values[field.id] = value;
             }
+            covered.push(field.id);
         }
-        return handlesAreDistinct(handles) ? { values, handles } : null;
+        return handlesAreDistinct(handles) ? { values, handles, covered, missing } : null;
     }
-    async reuseSavedValue(save, fields, matches, request) {
+    /**
+     * Looks through the saved records that may be for this service: one that
+     * answers every field is used without asking anyone (`whole`); otherwise
+     * the newest one that answers some of them fills those, and the card asks
+     * only for the rest (`partial`).
+     */
+    async findSaved(save, fields, matches, request) {
         if (matches.length === 0) {
             return null;
         }
-        // Several records for one service: use the one that has every field
-        // asked for; only when more than one does is the account needed.
-        const fitting = [];
+        const owner = ownerOfRequest(request);
+        const whole = [];
+        let partial = null;
         for (const entry of matches) {
-            const answer = await this.savedAnswer(entry, fields);
-            if (answer) {
-                fitting.push({ entry, answer });
+            const answer = await this.savedFieldsFor(entry, fields);
+            if (!answer || answer.covered.length === 0) {
+                continue;
+            }
+            if (answer.missing.length === 0) {
+                whole.push({ entry, answer });
+            }
+            else if (!partial && answer.covered.some((id) => fields.find((field) => field.id === id)?.sensitive)) {
+                partial = { entry, answer };
             }
         }
-        if (fitting.length === 0) {
+        // Records for one account (an older save and a newer one) are one
+        // choice, the newest; only different accounts need the task to pick.
+        const accounts = [...new Set(whole.map(({ entry }) => usableAccount(entry.service, entry.account).toLowerCase() || entry.label))];
+        if (accounts.length > 1 && !save.account) {
+            throw new Error(`Several saved values for ${save.service} are on this computer, for different accounts (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
+        }
+        const chosen = whole[0] ?? partial;
+        if (!chosen) {
             return null;
         }
-        if (fitting.length > 1 && !save.account) {
-            const accounts = fitting.map(({ entry }) => usableAccount(entry.service, entry.account) || entry.label);
-            throw new Error(`Several saved values for ${save.service} are on this computer (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
-        }
-        const { entry, answer } = fitting[0];
-        const readable = await this.readableOrHandles(answer.values, fields, ownerOfRequest(request));
+        const { entry, answer } = chosen;
+        const readable = await this.readableOrHandles(answer.values, fields, owner);
         const handles = { ...answer.handles, ...readable.handles };
+        const asked = savedServiceMatch(entry.service, save.service) === "exact" ? {} : { service: entry.service, askedService: save.service };
+        if (whole.length === 0) {
+            return {
+                partial: {
+                    entryId: entry.id,
+                    label: entry.label,
+                    covered: answer.covered,
+                    values: readable.values,
+                    handles,
+                    asHandles: readable.asHandles,
+                    ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
+                    ...asked,
+                },
+            };
+        }
         await this.saved.markUsed(entry.id);
         return {
-            outcome: "answered",
-            askId: `saved:${entry.id}`,
-            ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
-            ...(Object.keys(handles).length > 0 ? { handles } : {}),
-            ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
-            ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
-            saved: {
-                label: entry.label,
-                ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
-                reused: true,
-                remembered: true,
-                savedAt: entry.updatedAt,
+            whole: {
+                outcome: "answered",
+                askId: `saved:${entry.id}`,
+                ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
+                ...(Object.keys(handles).length > 0 ? { handles } : {}),
+                ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
+                ...(readable.freshUntil ? { freshUntil: readable.freshUntil } : {}),
+                saved: {
+                    label: entry.label,
+                    ...(usableAccount(entry.service, entry.account) ? { account: entry.account } : {}),
+                    reused: true,
+                    remembered: true,
+                    savedAt: entry.updatedAt,
+                    ...asked,
+                },
+                answeredAt: Date.now(),
             },
-            answeredAt: Date.now(),
         };
     }
     /**
@@ -979,9 +1033,11 @@ export class UserAskService {
             const account = save.account || usableAccount(save.service, accountFromAnswer(detail.fields, values));
             const existing = save.replaceId
                 ? save.replaceId
-                : save.service
-                    ? this.existingRecordFor(await this.saved.findMatches(save.service, ""), account)
-                    : "";
+                : save.prefill
+                    ? save.prefill.entryId
+                    : save.service
+                        ? this.existingRecordFor(await this.saved.findMatches(save.service, ""), account)
+                        : "";
             const stored = await this.saved.save({
                 ...(existing ? { existingId: existing } : {}),
                 service: save.service || detail.purpose,
@@ -1036,12 +1092,31 @@ export class UserAskService {
         }
         this.fingerprintCache = null;
         const userNote = normalizeUserAskNote(payload.note);
+        // A card that asked only for what the saved record lacked: the saved
+        // fields join the answer as if they had been on the card.
+        const prefill = save?.prefill ?? null;
+        const answerValues = prefill ? { ...prefill.values, ...readable.values } : readable.values;
+        const answerHandles = prefill ? { ...prefill.handles, ...handles } : handles;
+        const answerAsHandles = prefill ? [...prefill.asHandles, ...readable.asHandles] : readable.asHandles;
+        if (prefill?.freshUntil) {
+            freshUntil = Math.max(freshUntil, prefill.freshUntil);
+        }
+        if (prefill) {
+            await this.saved.markUsed(prefill.entryId);
+            savedNote = {
+                ...(savedNote ?? { remembered: false }),
+                label: savedNote?.label ?? prefill.label,
+                reused: false,
+                fromSaved: prefill.covered,
+                ...(prefill.service ? { service: prefill.service, askedService: prefill.askedService } : {}),
+            };
+        }
         return {
             outcome: "answered",
             askId,
-            ...(Object.keys(readable.values).length > 0 ? { values: readable.values } : {}),
-            ...(Object.keys(handles).length > 0 ? { handles } : {}),
-            ...(readable.asHandles.length > 0 ? { asHandles: readable.asHandles } : {}),
+            ...(Object.keys(answerValues).length > 0 ? { values: answerValues } : {}),
+            ...(Object.keys(answerHandles).length > 0 ? { handles: answerHandles } : {}),
+            ...(answerAsHandles.length > 0 ? { asHandles: answerAsHandles } : {}),
             ...(freshUntil ? { freshUntil } : {}),
             ...(savedNote ? { saved: savedNote } : {}),
             ...(userNote ? { userNote } : {}),

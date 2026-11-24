@@ -284,7 +284,7 @@ export const createCloudUserAskHost = (args: {
       throw new Error(
         `A value this agent must never see (${refused
           .map((field) => field.label)
-          .join(", ")}) can only be collected on one of the user's own computers: it is sealed to a key the asking computer holds, and this agent runs in Stella's cloud with nowhere safe to keep one. Ask for it from a desktop agent, or ask here only for values you may read, such as an address or a preference.`,
+          .join(", ")}) can only be collected or used on one of the user's own computers: logins and cards the user saved in Stella are kept there, a new one is sealed to a key the asking computer holds, and this agent runs in Stella's cloud with nowhere safe to keep one. Do the part that needs it on one of their computers (move there with switch_destination, or start a helper there with spawn_agent's destination); there request_secure_input finds a saved value without asking them. Here, ask only for values you may read, such as an address or a preference.`,
       );
     }
     const askId = await register({

@@ -541,6 +541,7 @@ const secureInputDetailParser = object({
       account: optional(string({ max: 240 })),
       label: string({ max: 240 }),
       replacing: optional(boolean()),
+      usingSaved: optional(boolean()),
     }),
   ),
 });

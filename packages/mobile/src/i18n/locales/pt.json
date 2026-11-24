@@ -1731,7 +1731,8 @@
       "remember": "Memorizar no computador que pediu",
       "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar.",
       "rememberOff": "Usado uma vez e depois apagado.",
-      "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado."
+      "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
+      "usingSaved": "O resto vem do seu valor salvo “{label}”. Só falta o que está abaixo."
     }
   },
   "onboarding": {
@@ -3140,6 +3141,7 @@
       "rememberOn": "Guardado como “{label}”. A Stella reutiliza-o sem voltar a perguntar; pode apagá-lo a qualquer momento em {place}.",
       "rememberOff": "Usado uma vez e depois apagado.",
       "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado.",
+      "usingSaved": "O resto vem do seu valor salvo “{label}”. Só falta o que está abaixo.",
       "note": "Adicione uma nota (opcional)",
       "provided": "Fornecido",
       "declined": "Recusado"

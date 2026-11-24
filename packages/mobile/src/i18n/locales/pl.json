@@ -1741,7 +1741,8 @@
       "remember": "Zapamiętaj na komputerze, który pytał",
       "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania.",
       "rememberOff": "Użyto raz, a potem usunięto.",
-      "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną."
+      "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
+      "usingSaved": "Reszta pochodzi z zapisanej wartości „{label}”. Potrzebne jest tylko to, co poniżej."
     }
   },
   "onboarding": {
@@ -3158,6 +3159,7 @@
       "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania; możesz to w każdej chwili usunąć w {place}.",
       "rememberOff": "Użyto raz, a potem usunięto.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
+      "usingSaved": "Reszta pochodzi z zapisanej wartości „{label}”. Potrzebne jest tylko to, co poniżej.",
       "note": "Dodaj notatkę (opcjonalnie)",
       "provided": "Podano",
       "declined": "Odrzucono"

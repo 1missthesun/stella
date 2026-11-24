@@ -1741,7 +1741,8 @@
       "remember": "Zapamatovat na počítači, který se ptal",
       "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala.",
       "rememberOff": "Použito jednou, pak smazáno.",
-      "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou."
+      "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
+      "usingSaved": "Zbytek pochází z vaší uložené hodnoty „{label}“. Stačí vyplnit, co je níže."
     }
   },
   "onboarding": {
@@ -3158,6 +3159,7 @@
       "rememberOn": "Uloženo jako „{label}“. Stella to znovu použije, aniž by se vás znovu ptala; kdykoli to můžete smazat v {place}.",
       "rememberOff": "Použito jednou, pak smazáno.",
       "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
+      "usingSaved": "Zbytek pochází z vaší uložené hodnoty „{label}“. Stačí vyplnit, co je níže.",
       "note": "Přidat poznámku (nepovinné)",
       "provided": "Poskytnuto",
       "declined": "Odmítnuto"

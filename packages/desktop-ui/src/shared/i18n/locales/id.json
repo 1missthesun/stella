@@ -1711,7 +1711,8 @@
       "remember": "Ingat di komputer yang meminta",
       "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda.",
       "rememberOff": "Dipakai sekali, lalu dihapus.",
-      "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan."
+      "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
+      "usingSaved": "Sisanya diambil dari “{label}” yang Anda simpan. Hanya yang di bawah ini yang diperlukan."
     }
   },
   "onboarding": {
@@ -3102,6 +3103,7 @@
       "rememberOn": "Disimpan sebagai “{label}”. Stella akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di {place}.",
       "rememberOff": "Dipakai sekali, lalu dihapus.",
       "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
+      "usingSaved": "Sisanya diambil dari “{label}” yang Anda simpan. Hanya yang di bawah ini yang diperlukan.",
       "note": "Tambahkan catatan (opsional)",
       "provided": "Diberikan",
       "declined": "Ditolak"

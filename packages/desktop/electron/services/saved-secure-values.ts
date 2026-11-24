@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import {
   USER_ASK_SECRET_HANDLE_PREFIX,
   normalizeSavedValuePart,
+  savedServiceMatch,
   savedValueKey,
   savedValueLabel,
   type SecureValueStoreKind,
@@ -491,14 +492,32 @@ export class SavedSecureValues {
   }
 
   async findMatches(service: string, account: string): Promise<SavedEntry[]> {
+    return (await this.findCandidates(service, account)).exact;
+  }
+
+  /**
+   * Saved records for a service, newest first: `exact` ones saved under the
+   * same name, and `close` ones whose name is the asked one with words around
+   * it (or the other way round), for when nothing exact is saved.
+   */
+  async findCandidates(
+    service: string,
+    account: string,
+  ): Promise<{ exact: SavedEntry[]; close: SavedEntry[] }> {
     const dir = await this.ensureReady();
-    const serviceKey = savedValueKey(service);
-    if (!dir || !serviceKey) return [];
+    if (!dir || !savedValueKey(service)) return { exact: [], close: [] };
     const accountKey = account.trim().toLowerCase();
-    return Object.values(this.readIndex(dir).entries)
-      .filter((entry) => savedValueKey(entry.service) === serviceKey)
+    const exact: SavedEntry[] = [];
+    const close: SavedEntry[] = [];
+    const entries = Object.values(this.readIndex(dir).entries)
       .filter((entry) => !accountKey || entry.account.trim().toLowerCase() === accountKey)
       .sort((left, right) => right.updatedAt - left.updatedAt);
+    for (const entry of entries) {
+      const match = savedServiceMatch(entry.service, service);
+      if (match === "exact") exact.push(entry);
+      else if (match === "close") close.push(entry);
+    }
+    return { exact, close };
   }
 
   async get(id: string): Promise<SavedEntry | null> {

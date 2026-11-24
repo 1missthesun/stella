@@ -1731,7 +1731,8 @@
       "remember": "Mémoriser sur l’ordinateur qui l’a demandé",
       "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander.",
       "rememberOff": "Utilisé une fois, puis supprimé.",
-      "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée."
+      "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
+      "usingSaved": "Le reste vient de votre valeur enregistrée « {label} ». Seul ce qui suit est nécessaire."
     }
   },
   "onboarding": {
@@ -3140,6 +3141,7 @@
       "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander ; supprimez-le quand vous voulez dans {place}.",
       "rememberOff": "Utilisé une fois, puis supprimé.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
+      "usingSaved": "Le reste vient de votre valeur enregistrée « {label} ». Seul ce qui suit est nécessaire.",
       "note": "Ajouter une note (facultatif)",
       "provided": "Fourni",
       "declined": "Refusé"

@@ -970,6 +970,10 @@ function SecureAskSurface({
             <Text style={styles.rememberHint}>
               {t("mobile.userAsk.replacing", { label: detail.save.label })}
             </Text>
+          ) : detail.save?.usingSaved ? (
+            <Text style={styles.rememberHint}>
+              {t("mobile.userAsk.usingSaved", { label: detail.save.label })}
+            </Text>
           ) : null}
           {detail.fields.map((field) => {
             const nextId =

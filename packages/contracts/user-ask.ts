@@ -115,6 +115,21 @@ export type UserAskSaveTarget = Readonly<{
   account?: string;
   label: string;
   replacing?: boolean;
+  /** Part of what the task needs came from this saved value; the card asks only for the rest. */
+  usingSaved?: boolean;
+}>;
+
+/** One saved record, by name only: what a task is told is saved when its lookup found nothing. */
+export type SavedSecureValueSummary = Readonly<{
+  service: string;
+  account?: string;
+  fields: readonly string[];
+}>;
+
+/** A saved-only lookup that found nothing for the service it was given. */
+export type SecureInputNotSaved = Readonly<{
+  outcome: "not_saved";
+  savedHere: readonly SavedSecureValueSummary[];
 }>;
 
 export const normalizeSavedValuePart = (value: unknown, max = 200): string =>
@@ -136,6 +151,63 @@ export const savedValueKey = (value: string): string =>
     .replace(/\/.*$/, "")
     .replace(/[^\p{L}\p{N}@.+_-]+/gu, "")
     .replace(/\.(com|org|net|io|dev|app|ai|co)$/u, "");
+
+/** Words that say nothing about which service is meant. */
+const SERVICE_FILLER_WORDS = new Set([
+  "a", "an", "the", "my", "our", "your", "of", "for", "to", "on", "at", "in", "and",
+  "login", "log", "logon", "signin", "sign", "account", "accounts", "online", "website",
+  "site", "web", "app", "portal", "page", "password", "credentials", "credential",
+  "www", "http", "https", "com", "org", "net", "io", "dev", "ai", "co", "localhost",
+]);
+
+/**
+ * The distinctive words of a service name, domain or URL: "Bank of America
+ * Online Banking" gives bank, america, banking; "https://secure.bankofamerica.com/login"
+ * gives secure, bankofamerica. Numbers (ports, IP addresses) and filler are left out.
+ */
+export const savedServiceWords = (value: string, keepFiller = false): string[] => [
+  ...new Set(
+    value
+      .normalize("NFKC")
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(
+        (word) =>
+          word.length > 1 && !/^\d+$/u.test(word) && (keepFiller || !SERVICE_FILLER_WORDS.has(word)),
+      ),
+  ),
+];
+
+/**
+ * How a saved value's service relates to the one a task asked for: "exact"
+ * when they name the same thing (case, spacing, scheme, "www." and a common
+ * TLD aside), "close" when one is the other with more words around it
+ * ("Northwind Credit Union (127.0.0.1:47811)", "secure.bankofamerica.com",
+ * "GitHub login"), else null.
+ */
+export const savedServiceMatch = (
+  saved: string,
+  asked: string,
+): "exact" | "close" | null => {
+  const savedKey = savedValueKey(saved);
+  const askedKey = savedValueKey(asked);
+  if (!savedKey || !askedKey) return null;
+  if (savedKey === askedKey) return "exact";
+  const savedWords = savedServiceWords(saved);
+  const askedWords = savedServiceWords(asked);
+  if (savedWords.length === 0 || askedWords.length === 0) return null;
+  if (savedWords.join("") === askedWords.join("")) return "close";
+  // "Bank of America" is also the single word of bankofamerica.com.
+  const run = (value: string) => savedServiceWords(value, true).join("");
+  const within = (inner: readonly string[], innerRun: string, outer: readonly string[]) =>
+    inner.some((word) => word.length >= 3) &&
+    (inner.every((word) => outer.includes(word)) ||
+      outer.includes(inner.join("")) ||
+      outer.includes(innerRun));
+  return within(savedWords, run(saved), askedWords) || within(askedWords, run(asked), savedWords)
+    ? "close"
+    : null;
+};
 
 export const USER_ASK_ESCALATION_STEP_MS = 90_000;
 
@@ -370,6 +442,11 @@ export type UserAskSavedValueNote = Readonly<{
   remembered: boolean;
   replaced?: boolean;
   savedAt?: number;
+  /** The service the value is saved under, when it isn't the one the task asked for. */
+  service?: string;
+  askedService?: string;
+  /** Fields that came from the saved value while the user gave the rest. */
+  fromSaved?: readonly string[];
 }>;
 
 export type UserAskResolution =

@@ -73,12 +73,26 @@ const describeSecureCard = (args: Record<string, unknown>): string => {
   ].join("");
 };
 
-/** How to answer is in Stella's own instructions; the note carries the card and the one fact that varies, the time. */
-const noteFor = (tool: string, args: Record<string, unknown>): string =>
+const SAVED_LIST_MAX = 40;
+
+/** What this computer has saved, by name only, after the lookup for the card's service found nothing. */
+const describeSavedHere = (savedHere: readonly Record<string, unknown>[]): string => {
+  if (savedHere.length === 0) return "Nothing is saved in Stella on this computer.";
+  const lines = savedHere.slice(0, SAVED_LIST_MAX).map((entry) => {
+    const account = text(entry.account, 200);
+    const fields = Array.isArray(entry.fields) ? entry.fields.map((field) => text(field, 60)).filter(Boolean) : [];
+    return `- ${text(entry.service, 200)}${account ? ` (${account})` : ""}${fields.length ? `: ${fields.join(", ")}` : ""}`;
+  });
+  return `Nothing saved in Stella on this computer matched that service. Saved here (names only):\n${lines.join("\n")}`;
+};
+
+/** How to answer is in Stella's own instructions; the note carries the card and the facts that vary: what is saved, and the time. */
+const noteFor = (tool: string, args: Record<string, unknown>, savedHere?: readonly Record<string, unknown>[]): string =>
   [
     tool === ASK_USER
       ? `${PI_ASK_FIRST_PREFIX} I'd ask them:\n${describeQuestions(args)}`
       : `${PI_ASK_FIRST_PREFIX} I'd show them ${describeSecureCard(args)}.`,
+    ...(savedHere ? [describeSavedHere(savedHere)] : []),
     `It goes to them in ${STELLA_FIRST_WAIT_MS / 1000} seconds unless you reply.`,
   ].join("\n\n");
 
@@ -126,9 +140,11 @@ const setAsking = (api: ToolExecutionApi, key: string | undefined, context: Cont
     return undefined;
   }, context);
 
-const notSaved = (result: Awaited<ReturnType<ToolRegistration["execute"]>>): boolean => {
+/** The saved-only lookup's miss, with what is saved here by name; undefined when it found a value (or failed). */
+const notSaved = (result: Awaited<ReturnType<ToolRegistration["execute"]>>): Record<string, unknown>[] | undefined => {
   const details = (result as { details?: unknown } | undefined)?.details;
-  return !!details && typeof details === "object" && (details as { outcome?: unknown }).outcome === "not_saved";
+  if (!details || typeof details !== "object" || (details as { outcome?: unknown }).outcome !== "not_saved") return undefined;
+  return list((details as { savedHere?: unknown }).savedHere);
 };
 
 const markPass = (api: ToolExecutionApi, tool: string | undefined, context: Context) =>
@@ -145,11 +161,12 @@ const askStella = async (
   args: Record<string, unknown>,
   api: ToolExecutionApi,
   context: Context,
+  savedHere?: readonly Record<string, unknown>[],
 ): Promise<string | undefined> => {
   const key = `stella-first:${String(api.taskId)}`;
   await setAsking(api, key, context);
   try {
-    const told = await host.tellStella(api, key, noteFor(tool, args), context).catch(() => false);
+    const told = await host.tellStella(api, key, noteFor(tool, args, savedHere), context).catch(() => false);
     if (!told) return undefined;
     const signal = context.abortSignal;
     const deadline = Date.now() + STELLA_FIRST_WAIT_MS;
@@ -179,11 +196,14 @@ export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
           await markPass(api, undefined, context);
           return await tool.execute(args, api, context);
         }
+        let savedHere: Record<string, unknown>[] | undefined;
         if (name === REQUEST_SECURE_INPUT && input.replace_saved !== true) {
           const saved = await tool.execute({ ...input, [SECURE_INPUT_SAVED_ONLY_ARG]: true }, api, context);
-          if (!notSaved(saved)) return saved;
+          savedHere = notSaved(saved);
+          if (!savedHere) return saved;
+          if (input.saved_only === true) return saved;
         }
-        const reply = await askStella(host, name, input, api, context);
+        const reply = await askStella(host, name, input, api, context, savedHere);
         if (reply === undefined) return await tool.execute(args, api, context);
         await markPass(api, name, context);
         return { output: [{ type: "text", text: repliedText(name, reply) }] };

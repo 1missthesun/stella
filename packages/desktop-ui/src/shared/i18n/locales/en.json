@@ -1721,7 +1721,8 @@
       "remember": "Remember on the computer that asked",
       "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again.",
       "rememberOff": "Used once, then deleted.",
-      "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one."
+      "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
+      "usingSaved": "The rest comes from your saved “{label}”. Only what’s below is needed."
     }
   },
   "onboarding": {
@@ -3122,6 +3123,7 @@
       "rememberOn": "Saved as “{label}”. Stella reuses it without asking you again; delete it any time in {place}.",
       "rememberOff": "Used once, then deleted.",
       "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one.",
+      "usingSaved": "The rest comes from your saved “{label}”. Only what’s below is needed.",
       "note": "Add a note (optional)",
       "provided": "Provided",
       "declined": "Declined"

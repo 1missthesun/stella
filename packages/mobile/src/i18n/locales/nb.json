@@ -1721,7 +1721,8 @@
       "remember": "Husk på datamaskinen som spurte",
       "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt.",
       "rememberOff": "Brukt én gang og deretter slettet.",
-      "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede."
+      "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
+      "usingSaved": "Resten kommer fra din lagrede «{label}». Bare det nedenfor trengs."
     }
   },
   "onboarding": {
@@ -3122,6 +3123,7 @@
       "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i {place}.",
       "rememberOff": "Brukt én gang og deretter slettet.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
+      "usingSaved": "Resten kommer fra din lagrede «{label}». Bare det nedenfor trengs.",
       "note": "Legg til et notat (valgfritt)",
       "provided": "Gitt",
       "declined": "Avslått"

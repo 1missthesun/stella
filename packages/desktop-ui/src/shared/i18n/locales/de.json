@@ -1721,7 +1721,8 @@
       "remember": "Auf dem anfragenden Computer merken",
       "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen.",
       "rememberOff": "Einmal verwendet, dann gelöscht.",
-      "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten."
+      "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
+      "usingSaved": "Der Rest kommt aus deinem gespeicherten „{label}“. Nur das Folgende fehlt noch."
     }
   },
   "onboarding": {
@@ -3122,6 +3123,7 @@
       "rememberOn": "Gespeichert als „{label}“. Stella verwendet den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit unter {place} löschen.",
       "rememberOff": "Einmal verwendet, dann gelöscht.",
       "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten.",
+      "usingSaved": "Der Rest kommt aus deinem gespeicherten „{label}“. Nur das Folgende fehlt noch.",
       "note": "Notiz hinzufügen (optional)",
       "provided": "Angegeben",
       "declined": "Abgelehnt"

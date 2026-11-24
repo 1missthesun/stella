@@ -1731,7 +1731,8 @@
       "remember": "Ține minte pe computerul care a cerut",
       "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe.",
       "rememberOff": "Folosit o dată, apoi șters.",
-      "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată."
+      "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
+      "usingSaved": "Restul vine din valoarea salvată „{label}”. E nevoie doar de ce e mai jos."
     }
   },
   "onboarding": {
@@ -3140,6 +3141,7 @@
       "rememberOn": "Salvat ca „{label}”. Stella îl refolosește fără să te mai întrebe; îl poți șterge oricând din {place}.",
       "rememberOff": "Folosit o dată, apoi șters.",
       "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată.",
+      "usingSaved": "Restul vine din valoarea salvată „{label}”. E nevoie doar de ce e mai jos.",
       "note": "Adaugă o notă (opțional)",
       "provided": "Furnizat",
       "declined": "Refuzat"

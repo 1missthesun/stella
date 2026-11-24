@@ -1711,7 +1711,8 @@
       "remember": "在提問的那台電腦上記住",
       "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你。",
       "rememberOff": "僅使用一次，然後刪除。",
-      "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。"
+      "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
+      "usingSaved": "其餘內容來自你儲存的「{label}」。只需填寫下面的內容。"
     }
   },
   "onboarding": {
@@ -3102,6 +3103,7 @@
       "rememberOn": "已儲存為「{label}」。Stella 之後會直接重複使用，不再詢問你；你可以隨時在「{place}」中刪除。",
       "rememberOff": "僅使用一次，然後刪除。",
       "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。",
+      "usingSaved": "其餘內容來自你儲存的「{label}」。只需填寫下面的內容。",
       "note": "新增備註（選填）",
       "provided": "已提供",
       "declined": "已拒絕"

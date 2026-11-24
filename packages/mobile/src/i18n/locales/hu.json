@@ -1721,7 +1721,8 @@
       "remember": "Megjegyzés a kérdező számítógépen",
       "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne.",
       "rememberOff": "Egyszer használva, majd törölve.",
-      "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet."
+      "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
+      "usingSaved": "A többi a mentett „{label}” értékből jön. Csak az alábbiak kellenek."
     }
   },
   "onboarding": {
@@ -3122,6 +3123,7 @@
       "rememberOn": "Mentve „{label}” néven. Stella újra felhasználja anélkül, hogy újra megkérdezne; bármikor törölheted itt: {place}.",
       "rememberOff": "Egyszer használva, majd törölve.",
       "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
+      "usingSaved": "A többi a mentett „{label}” értékből jön. Csak az alábbiak kellenek.",
       "note": "Megjegyzés hozzáadása (nem kötelező)",
       "provided": "Megadva",
       "declined": "Elutasítva"

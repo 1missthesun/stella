@@ -1721,7 +1721,8 @@
       "remember": "Husk på den computer, der spurgte",
       "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen.",
       "rememberOff": "Brugt én gang og derefter slettet.",
-      "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte."
+      "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
+      "usingSaved": "Resten kommer fra din gemte “{label}”. Kun det nedenfor mangler."
     }
   },
   "onboarding": {
@@ -3122,6 +3123,7 @@
       "rememberOn": "Gemt som “{label}”. Stella genbruger den uden at spørge dig igen; du kan slette den når som helst under {place}.",
       "rememberOff": "Brugt én gang og derefter slettet.",
       "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
+      "usingSaved": "Resten kommer fra din gemte “{label}”. Kun det nedenfor mangler.",
       "note": "Tilføj en note (valgfrit)",
       "provided": "Givet",
       "declined": "Afvist"

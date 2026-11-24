@@ -1721,7 +1721,8 @@
       "remember": "Soran bilgisayarda hatırla",
       "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır.",
       "rememberOff": "Bir kez kullanılır, sonra silinir.",
-      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır."
+      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
+      "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli."
     }
   },
   "onboarding": {
@@ -3122,6 +3123,7 @@
       "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır; istediğiniz zaman {place} bölümünden silebilirsiniz.",
       "rememberOff": "Bir kez kullanılır, sonra silinir.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
+      "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli.",
       "note": "Not ekle (isteğe bağlı)",
       "provided": "Verildi",
       "declined": "Reddedildi"

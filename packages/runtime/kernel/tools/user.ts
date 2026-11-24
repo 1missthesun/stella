@@ -5,6 +5,7 @@ import {
   clampUrgency,
   normalizeUserAskOptions,
   userAskPresetFields,
+  type SecureInputNotSaved,
   type SecureValueTarget,
   type SecureValueUseReceipt,
   type UserAskField,
@@ -74,7 +75,7 @@ export type UserToolsConfig = {
   requestSecureInput?: (
     request: SecureInputRequest,
     signal?: AbortSignal,
-  ) => Promise<UserAskResolution | null>;
+  ) => Promise<UserAskResolution | SecureInputNotSaved | null>;
   useSecureValue?: (
     request: SecureValueUseRequest,
   ) => Promise<SecureValueUseReceipt>;
@@ -284,11 +285,20 @@ const mergePresetFields = (
 };
 
 /**
- * Internal argument: reuse a saved value if this computer has one, and
- * otherwise return `{ outcome: "not_saved" }` without showing a card.
+ * Internal argument (the public one is `saved_only`): reuse a saved value if
+ * this computer has one, and otherwise return `{ outcome: "not_saved" }`
+ * without showing a card.
  */
 export const SECURE_INPUT_SAVED_ONLY_ARG = "__savedOnly";
-const SECURE_INPUT_NOT_SAVED = { outcome: "not_saved" } as const;
+
+const notSavedResult = (service: string, found: SecureInputNotSaved | null): ToolResult => {
+  const savedHere = found?.savedHere ?? [];
+  const note = savedHere.length === 0
+    ? `Nothing is saved on this computer for "${service}" or anything else. Call again without saved_only to ask the user on a secure card.`
+    : `Nothing saved on this computer matches "${service}". savedHere lists what is saved (names only). If one of them is what you need, call again with its service (and account); otherwise call again without saved_only to ask the user.`;
+  const details = { outcome: "not_saved" as const, savedHere };
+  return { result: { ...details, note }, details };
+};
 
 export const handleRequestSecureInput = async (
   config: UserToolsConfig,
@@ -323,7 +333,7 @@ export const handleRequestSecureInput = async (
         "replace_saved needs service (and account when you know it) so Stella knows which saved value to replace.",
     };
   }
-  const savedOnly = args[SECURE_INPUT_SAVED_ONLY_ARG] === true;
+  const savedOnly = args[SECURE_INPUT_SAVED_ONLY_ARG] === true || args.saved_only === true;
   try {
     const resolution = await config.requestSecureInput({
       purpose,
@@ -338,8 +348,8 @@ export const handleRequestSecureInput = async (
       urgency: clampUrgency(args.urgency),
       ...contextFields(context, args),
     }, signal);
-    if (resolution === null) {
-      return { result: SECURE_INPUT_NOT_SAVED, details: SECURE_INPUT_NOT_SAVED };
+    if (resolution === null || resolution.outcome === "not_saved") {
+      return notSavedResult(service, resolution);
     }
     return userAskResolutionResult(resolution, [], purpose);
   } catch (error) {

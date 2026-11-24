@@ -164,8 +164,20 @@ const modelAnswers = (
   });
 
 const savedValueNote = (saved: UserAskSavedValueNote): string => {
+  const under = saved.service
+    ? ` It is saved under the service "${saved.service}", the closest match to "${saved.askedService ?? ""}".`
+    : "";
+  const replace = saved.service
+    ? `If the login fails because this saved value is out of date, call request_secure_input again with service "${saved.service}" and replace_saved: true; if it is the wrong account or site altogether, call again with your own service and replace_saved: true, which saves the right one separately.`
+    : "If it turns out to be wrong (the login fails), call request_secure_input again with the same service and account and replace_saved: true to ask once for the right one.";
   if (saved.reused) {
-    return `Reused the value saved on this computer for "${saved.label}" without asking the user. If it turns out to be wrong (the login fails), call request_secure_input again with the same service and account and replace_saved: true to ask once for the right one.`;
+    return `Reused the value saved on this computer for "${saved.label}" without asking the user.${under} ${replace}`;
+  }
+  if (saved.fromSaved?.length) {
+    const kept = saved.remembered
+      ? " What they gave was added to the saved value."
+      : "";
+    return `${saved.fromSaved.join(", ")} came from the value saved on this computer for "${saved.label}"; the user gave only the rest.${kept}${under} ${replace}`;
   }
   if (saved.remembered) {
     return saved.replaced

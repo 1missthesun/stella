@@ -497,6 +497,17 @@ const mintAgentId = (description: string, taken: Readonly<Record<string, unknown
   }
 };
 
+/** Each part once, in order: a turn that repeated itself (a waiting line after each wake, a note it also ended on) says it once. */
+const onceEach = (parts: readonly string[]): string[] => {
+  const seen = new Set<string>();
+  return parts.filter((part) => {
+    const key = part.trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const textOf = (message: AssistantMessage | undefined): string =>
   (message?.content ?? []).map((part) => (part.type === "text" ? part.text : "")).join("").trim();
 
@@ -537,10 +548,6 @@ const messageText = (message: { content?: unknown } | undefined): string =>
       ? (message.content as Array<{ type?: string; text?: string }>).map((part) => (part.type === "text" ? (part.text ?? "") : "")).join("")
       : "";
 
-const RUNNING_STATUS_NOTE =
-  "Still running. Its report arrives on its own in [Agent completed]: end your turn now instead of waiting or checking again.";
-
-const STARTED_NOTE = "Its report arrives on its own as [Agent completed]; there is nothing to check before then.";
 
 const LATEST_PREVIEW_CHARS = 300;
 const LONG_CALL_OUTPUT_CHARS = 400;
@@ -850,18 +857,18 @@ const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDel
   output: [
     {
       type: "text" as const,
-      text: `Delivered to ${delivery.threadId}. ${
+      text: `Delivered to ${delivery.threadId}.${
         delivery.outcome === "answered"
-          ? "It was waiting on your answer to its question and has it now. The user sees none of this, so there is nothing to tell them: unless you were in the middle of answering them, your reply is `<no-reply/>`."
+          ? " It was waiting on your answer to its question and has it now."
           : delivery.outcome === "steered"
-          ? "It is working and reads your message before its next step."
+          ? " It is working and reads it before its next step."
           : delivery.outcome === "resumed"
-            ? "It was idle, so your message started its next run; its report goes to whoever started it."
+            ? " It was idle, so this started its next run."
             : delivery.outcome === "queued"
-              ? "That Stella reads it as its next turn."
+              ? " That Stella reads it as its next turn."
               : delivery.outcome === "held"
-                ? "The message is held for it and delivered as soon as it can take it; its report goes to whoever started it."
-                : "It reads your message before its next step; its report goes to whoever started it."
+                ? " It is held until it can take it."
+                : ""
       }${delivery.note ? ` ${delivery.note}` : ""}`,
     },
   ],
@@ -1184,7 +1191,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             const said = [
               failed
                 ? textOf(answer)
-                : withClosingNotes(notes.closing.map((note) => note.message), [...earlier, textOf(answer)].filter((text) => text.trim()).join("\n\n")),
+                : withClosingNotes(notes.closing.map((note) => note.message), onceEach([...earlier, textOf(answer)]).join("\n\n")),
               hostNote ?? "",
             ]
               .filter((text) => text.trim())
@@ -1709,7 +1716,6 @@ export function stellaAgents(host: StellaAgentsHost) {
                 "waiting" in started && started.waiting
                   ? waitingFor
                   : "",
-                STARTED_NOTE,
               ]
                 .filter(Boolean)
                 .join("\n"),
@@ -1743,7 +1749,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         output: [
           {
             type: "text",
-            text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}).\n${STARTED_NOTE}`,
+            text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}).`,
           },
         ],
         details: { thread_id: threadId },
@@ -1992,7 +1998,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     return new Set();
   };
 
-  const withClosingNotes = (closing: string[], answer: string): string => [...closing, answer].filter((part) => part.trim()).join("\n\n");
+  const withClosingNotes = (closing: string[], answer: string): string => onceEach([...closing, answer]).join("\n\n");
 
   // A run can end on a tool call, an empty message or a split turn. Its report
   // then carries the agent's newest words instead of arriving empty.
@@ -2574,7 +2580,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           ...entry,
           relation: mine ? "you started it" : relationOf(row, self, parentThreadId),
           ...(mine && entry.status === "running"
-            ? { note: row.offline ? OFFLINE_RUNNING_STATUS_NOTE : RUNNING_STATUS_NOTE }
+            ? row.offline ? { note: OFFLINE_RUNNING_STATUS_NOTE } : {}
             : {}),
           ...(reachable ? {} : { reachable: false }),
           ...(await agentDetails(api, threadId, found.record, context)),

@@ -90,7 +90,7 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { agentInvariants } from "./agent-invariants.js";
-import { boundReportText, endedWaiting, fileLateTurn, HELD_WHILE_STOPPED, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
+import { boundReportText, deriveAgentReport, endedWaiting, fileLateTurn, HELD_WHILE_STOPPED, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
 import {
   NOTHING_CAN_WAKE_MARK,
   WAITING_FOR_MAX_CHARS,
@@ -1793,6 +1793,16 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
     detail: { via: "agentThreads.move", requester: args.requesterThreadId ?? args.conversationId, outside: receipt },
   });
   supersedeHeldStops(ctx, thread.thread_id, args.moveId);
+  // Inputs held for the computer it left (a schedule's fire, a message) go
+  // where it runs now, instead of waiting out their retries for the old one.
+  let rerouted = 0;
+  for (const pending of ctx.db.all<{ command_id: string }>(
+    "SELECT command_id FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume') ORDER BY created_at ASC",
+    thread.thread_id,
+  )) {
+    ctx.jobs.schedule(COMMAND_JOB, ctx.now + rerouted, { messageId: pending.command_id }, { id: commandJobId(pending.command_id) });
+    rerouted += 1;
+  }
   if (running) {
     ctx.jobs.cancel(`dispatch:${running.turn_id}`);
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", running.turn_id);
@@ -3047,6 +3057,9 @@ const dropCommand = (ctx: OwnerContext, row: CommandRow, reason: string): void =
     reason,
     attempts: row.attempts,
   });
+  // A finished turn's report waited for this input to start the next turn;
+  // no turn comes of it, so the report goes out now.
+  deriveAgentReport(ctx.db, row.thread_id, ctx.now);
 };
 
 const flushDeviceCommands = (ctx: OwnerContext, raw: unknown): { scheduled: number } => {
@@ -4365,13 +4378,9 @@ const completeComputerThread = async (
   }
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
     // An earlier turn's end, after a later one began: what it said is kept.
-    if (
-      args.attemptGeneration < row.attempt_generation &&
-      args.status === "completed" &&
-      result !== undefined &&
-      !isPlaceholderAgentResult(JSON.stringify({ finalText: result }))
-    ) {
-      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, result, ctx.now);
+    if (args.attemptGeneration < row.attempt_generation && args.status === "completed") {
+      const said = result !== undefined && !isPlaceholderAgentResult(JSON.stringify({ finalText: result })) ? result : "";
+      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined);
       return { updated: false, status: row.status };
     }
     if (

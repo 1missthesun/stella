@@ -237,12 +237,18 @@ export const applyEmailPageUpdate = (
   };
 };
 
+/** How long something Stella handled stays on the page: long enough to see it and undo it, not for good. */
+export const EMAIL_HANDLED_SHOWN_MS = 3 * 24 * 60 * 60_000;
+
+const stillShown = (item: EmailPageItem, now: number): boolean =>
+  item.section !== "handled" || typeof item.at !== "number" || now - item.at < EMAIL_HANDLED_SHOWN_MS;
+
 export const readEmailPage = (json: string | null | undefined, now: number): EmailPage => {
   if (!json) return emptyEmailPage(now);
   try {
     const parsed = JSON.parse(json) as Partial<EmailPage>;
     return {
-      items: Array.isArray(parsed.items) ? parsed.items : [],
+      items: Array.isArray(parsed.items) ? parsed.items.filter((item) => stillShown(item, now)) : [],
       ignored: parsed.ignored && typeof parsed.ignored === "object" ? parsed.ignored : { count: 0 },
       ...(typeof parsed.readAt === "number" ? { readAt: parsed.readAt } : {}),
       updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : now,

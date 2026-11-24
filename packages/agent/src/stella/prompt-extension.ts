@@ -124,16 +124,17 @@ export function stellaPromptExtension(sources: StellaContextSources, imageBudget
         orchestratorOnly(async (_input, context) => {
           const docs = await memory(context);
           if (!docs.enabled) return undefined;
-          const shown = [memoryDoc(MAIN_MEMORY_DISPLAY_PATH, docs.main, MAIN_MEMORY_INJECTED_MAX_CHARS), rulesDoc(docs.rules)];
-          return shown.filter((doc) => doc !== undefined).join("\n\n") || undefined;
+          return memoryDoc(MAIN_MEMORY_DISPLAY_PATH, docs.main, MAIN_MEMORY_INJECTED_MAX_CHARS);
         }),
         { tag: false },
       ),
+      // Its own part, so an edit to one of the two files resends only that one.
       section(
         "standing-rules",
         async (input, context) => {
-          if ((await role(input, context)).agentType === "orchestrator") return undefined;
-          return standingRulesSection(await sources.rules?.(context));
+          if ((await role(input, context)).agentType !== "orchestrator") return standingRulesSection(await sources.rules?.(context));
+          const docs = await memory(context);
+          return docs.enabled ? rulesDoc(docs.rules) : undefined;
         },
         { tag: false },
       ),

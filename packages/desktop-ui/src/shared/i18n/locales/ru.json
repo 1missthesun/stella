@@ -2744,8 +2744,7 @@
     },
     "chatSidebar": {
       "add": "Добавить",
-      "dictationError": "Диктовка: {error}",
-      "stop": "Стоп"
+      "dictationError": "Диктовка: {error}"
     },
     "connectors": {
       "desktopRequired": "Коннекторы доступны в приложении Stella для компьютера.",

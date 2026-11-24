@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "Hinzufügen",
-      "dictationError": "Diktat: {error}",
-      "stop": "Stopp"
+      "dictationError": "Diktat: {error}"
     },
     "connectors": {
       "desktopRequired": "Connectors sind in der Stella-Desktop-App verfügbar.",

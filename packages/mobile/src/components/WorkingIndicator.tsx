@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import Reanimated, {
   Easing as ReanimatedEasing,
@@ -26,6 +26,8 @@ import {
   WORKING_INDICATOR_POSE_ROTATE_MS,
   type WorkingIndicatorCharacterState,
 } from "./working-indicator-character";
+import { useT } from "../i18n";
+import { tapLight } from "../lib/haptics";
 import { useMinimumVisibleValue } from "../lib/use-minimum-visible-value";
 import { useAppVisible } from "../lib/use-app-visible";
 import { useReplyHandoffController } from "./reply-handoff";
@@ -61,6 +63,7 @@ interface WorkingIndicatorProps {
   onScreen?: boolean;
   /** A reply landing in this render takes the indicator's place in the same commit. */
   vacateFor?: string | null;
+  onStop?: () => void;
 }
 
 function SwapText({
@@ -226,8 +229,10 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   exitImmediately = false,
   onScreen = true,
   vacateFor = null,
+  onStop,
 }: WorkingIndicatorProps) {
   const colors = useColors();
+  const t = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [reasoningSeed, setReasoningSeed] = useState(() => String(Date.now()));
   const wasActiveRef = useRef(false);
@@ -471,12 +476,13 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   return (
     <View
       style={[styles.slot, !showShell && styles.slotCollapsed]}
-      pointerEvents="none"
+      pointerEvents={onStop ? "box-none" : "none"}
     >
       {showShell ? (
         <Reanimated.View
           style={[styles.row, originStyle, shellStyle]}
           collapsable={false}
+          pointerEvents={onStop ? "box-none" : "none"}
         >
           <View style={[styles.bubble, !hasLabel && styles.bubbleDots]}>
             <View style={styles.markBox}>
@@ -496,6 +502,22 @@ export const WorkingIndicator = memo(function WorkingIndicator({
               />
             ) : null}
           </View>
+          {active && onStop ? (
+            <Pressable
+              onPress={() => {
+                tapLight();
+                onStop();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("app.chat.composer.stop")}
+              hitSlop={10}
+              style={styles.stop}
+            >
+              <Text style={styles.stopText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+                {t("app.chat.composer.stop")}
+              </Text>
+            </Pressable>
+          ) : null}
         </Reanimated.View>
       ) : null}
     </View>
@@ -534,6 +556,17 @@ const makeStyles = (colors: Colors) =>
       maxWidth: "100%",
       paddingHorizontal: 13,
       paddingVertical: BUBBLE_PAD_VERTICAL,
+    },
+    stop: {
+      flexShrink: 0,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    stopText: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14,
+      lineHeight: 20,
     },
     originLeftTop: {
       transformOrigin: "left top",

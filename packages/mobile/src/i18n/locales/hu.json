@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "Hozzáadás",
-      "dictationError": "Diktálás: {error}",
-      "stop": "Leállítás"
+      "dictationError": "Diktálás: {error}"
     },
     "connectors": {
       "desktopRequired": "Az összekötők a Stella asztali alkalmazásában érhetők el.",

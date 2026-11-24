@@ -155,7 +155,6 @@ export function StellaDemoPlayer({ steps, theme = "dark", label }: { steps: Demo
                     <ComposerView
                       fieldRef={(el) => void (parts.current.dockField = el ?? undefined)}
                       formRef={(el) => void (parts.current.dockForm = el ?? undefined)}
-                      stopRef={(el) => void (parts.current.dockStop = el ?? undefined)}
                       submitRef={(el) => void (parts.current.dockSubmit = el ?? undefined)}
                     />
                   </div>

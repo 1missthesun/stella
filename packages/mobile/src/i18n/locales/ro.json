@@ -2733,8 +2733,7 @@
     },
     "chatSidebar": {
       "add": "Adaugă",
-      "dictationError": "Dictare: {error}",
-      "stop": "Oprește"
+      "dictationError": "Dictare: {error}"
     },
     "connectors": {
       "desktopRequired": "Conectorii sunt disponibili în aplicația Stella pentru desktop.",

@@ -29,7 +29,6 @@ export type DemoParts = {
   status: HTMLElement;
   dockField: HTMLElement;
   dockForm: HTMLElement;
-  dockStop: HTMLElement;
   dockSubmit: HTMLElement;
   home: HTMLElement;
   greeting: HTMLElement;
@@ -459,7 +458,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     setIndicator("vacated");
     setField(p.homeField, p.homeForm, p.homeSubmit, "", false);
     setField(p.dockField, p.dockForm, p.dockSubmit, "", false);
-    p.dockStop.hidden = true;
     p.topLabel.hidden = true;
     p.topLabel.innerHTML = "";
     if (p.menu) p.menu.hidden = true;
@@ -512,7 +510,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
           p.chatLayer.classList.remove("full-body-chat-layer--hidden");
           (p.divider.parentElement as HTMLElement).hidden = false;
         }
-        p.dockStop.hidden = false;
         showRow(i);
         setIndicator("reserved");
       });
@@ -527,7 +524,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
       const reply = afterTask ? t + PACE.replyAfterDone : lastSend + (taskNext ? PACE.ackAfterSend : PACE.firstReplyAfterSend);
       if (afterTask) {
         at(t + 200, () => {
-          p.dockStop.hidden = false;
           setIndicator("reserved");
         });
         at(t + 200 + APP_TIMING.indicatorShowDelayMs, () => setIndicator("shown"));
@@ -543,7 +539,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
       }
       at(reply, () => {
         setIndicator("vacated");
-        p.dockStop.hidden = true;
         showRow(i);
       });
       t = reply + (taskNext ? 0 : readTime(step.stella));

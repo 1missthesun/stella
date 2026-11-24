@@ -9,7 +9,6 @@ import type { ChatContext } from "@/shared/types/electron";
 import { ComposerAddMenu } from "@/app/chat/ComposerAddMenu";
 import { ComposerAttachmentTilesSection } from "@/app/chat/ComposerContextSections";
 import {
-  ComposerStopButton,
   ComposerSubmitButton,
   ComposerTextarea,
 } from "@/features/chat/ComposerPrimitives";
@@ -38,7 +37,6 @@ type CompanionComposerProps = {
   isStreaming: boolean;
   focusRequestId: number;
   onSend: () => void;
-  onStop: () => void;
   onEscape: () => void;
   /** The + menu or its file picker is about to take focus from the panel. */
   onHoldOpen: (hold: boolean) => void;
@@ -63,7 +61,6 @@ export function CompanionComposer({
   isStreaming,
   focusRequestId,
   onSend,
-  onStop,
   onEscape,
   onHoldOpen,
 }: CompanionComposerProps) {
@@ -202,20 +199,11 @@ export function CompanionComposer({
                   {dictation.isTranscribing && (
                     <DictationCancelButton onClick={dictation.cancel} />
                   )}
-                  {isStreaming ? (
-                    <ComposerStopButton
-                      className="composer-stop"
-                      onClick={onStop}
-                      title={t("app.chat.composer.stop")}
-                      aria-label={t("app.chat.composer.stop")}
-                    />
-                  ) : (
-                    <ComposerSubmitButton
-                      className="composer-submit"
-                      disabled={!canSubmit}
-                      animated
-                    />
-                  )}
+                  <ComposerSubmitButton
+                    className="composer-submit"
+                    disabled={!canSubmit}
+                    animated
+                  />
                 </div>
               </div>
             </>

@@ -23,7 +23,6 @@ import { ComposerAddMenu } from "@/app/chat/ComposerAddMenu";
 import {
   ComposerMicButton,
   ComposerSubmitButton,
-  ComposerStopButton,
   ComposerTextarea,
 } from "@/features/chat/ComposerPrimitives";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
@@ -44,6 +43,7 @@ import {
   type ComposerMessageStore,
 } from "@/features/chat/hooks/use-composer-message-state";
 import { useOptimisticStop } from "@/features/chat/hooks/use-optimistic-stop";
+import { useOverdueStop } from "@/features/chat/hooks/use-overdue-stop";
 import { useEscapeToStop } from "@/features/chat/hooks/use-escape-to-stop";
 import { handleComposerPaste } from "@/features/chat/lib/paste-context";
 import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-aloud";
@@ -173,9 +173,14 @@ function AccountScopedChatPanelTab({
   const { store: inputTextStore, setMessage: setInputText } =
     useComposerMessageStore();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const { showStop, requestStop } = useOptimisticStop(isStreaming, onStop);
+  const { canStop, requestStop } = useOptimisticStop(isStreaming, onStop);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  useEscapeToStop({ active: showStop, stop: requestStop, inputRef });
+  const overdueStop = useOverdueStop({
+    working: isStreaming && canStop,
+    messageId: pendingUserMessageId,
+    stop: requestStop,
+  });
+  useEscapeToStop({ active: canStop, stop: requestStop, inputRef });
 
   const sidebarScroll = useChatScrollManagement({
     hasOlderEvents: hasOlderMessages,
@@ -250,6 +255,7 @@ function AccountScopedChatPanelTab({
         activeToolCallId,
         runtimeStatusText,
         isCompacting: Boolean(isCompacting),
+        onStop: overdueStop,
       }),
     [
       isStreaming,
@@ -259,6 +265,7 @@ function AccountScopedChatPanelTab({
       activeToolCallId,
       runtimeStatusText,
       isCompacting,
+      overdueStop,
     ],
   );
 
@@ -430,8 +437,6 @@ function AccountScopedChatPanelTab({
                     chatContext={chatContext}
                     selectedText={selectedText}
                     setChatContext={setChatContext}
-                    showStop={showStop}
-                    requestStop={requestStop}
                     onSend={sendCurrentMessage}
                   />
                 </div>
@@ -464,8 +469,6 @@ type SidebarComposerFormProps = {
   chatContext: ChatContext | null;
   selectedText: string | null;
   setChatContext: Dispatch<SetStateAction<ChatContext | null>>;
-  showStop: boolean;
-  requestStop: () => void;
   onSend: () => void;
 };
 
@@ -479,8 +482,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
   chatContext,
   selectedText,
   setChatContext,
-  showStop,
-  requestStop,
   onSend: sendCurrentMessage,
 }: SidebarComposerFormProps) {
   const t = useT();
@@ -613,14 +614,6 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
                       : undefined
                   }
                 />
-                {showStop && (
-                  <ComposerStopButton
-                    className="composer-stop"
-                    onClick={requestStop}
-                    title={t("shell.chatSidebar.stop")}
-                    aria-label={t("shell.chatSidebar.stop")}
-                  />
-                )}
                 <MemoComposerSubmitButton
                   className="composer-submit"
                   disabled={!canSubmitWithDictation}

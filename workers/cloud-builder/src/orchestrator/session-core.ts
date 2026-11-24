@@ -75,6 +75,8 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
     totalMs: number;
   };
   protected queue: Promise<unknown> = Promise.resolve();
+  /** What the user sent while another turn was ahead of it. */
+  protected readonly waitingUserTurns = new Set<string>();
   protected readonly turnExecutions = new Map<
     string,
     TurnExecution<Response>
@@ -121,7 +123,11 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected ownerGeneration?: string;
 
   protected currentTurnCancellation?: TurnRetryCancellation;
-  protected currentPiRun?: { abort(): void };
+  protected currentPiRun?: {
+    abort(): void;
+    /** It ends between two steps for the user's next message. */
+    makesRoom: boolean;
+  };
   protected piRuntime?: Promise<
     import("../pi-runtime.js").PiConversationRuntime
   >;

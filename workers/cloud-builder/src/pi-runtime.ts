@@ -64,6 +64,7 @@ import {
   type StellaRequestRoute,
 } from "@stella/agent/provider/stella";
 import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
+import { nextMessageExtension } from "./next-message.js";
 import { ownHistoryQuery } from "@stella/agent/stella/own-history";
 import {
   AGENT_MOVE_CLOUD,
@@ -357,6 +358,8 @@ export type PiRuntimeOptions = {
   /** Test deployments only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
   simulateSafeguardBlocks?: boolean;
   waitUntil(work: Promise<unknown>): void;
+  /** The user's next message is queued behind the turn under way, which makes room for it between two steps. */
+  userWaiting(): boolean;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
   deliverNote(note: AgentNote, authority: PiAuthority): Promise<void>;
@@ -1780,7 +1783,8 @@ export class PiConversationRuntime {
         this.#options.log("pi_tables_kept_before_upgrade", {});
       }
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
-      const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting } = await openStellaHarness(
+      let rootId: ConversationId | undefined;
+      const { harness, turnLimits, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting } = await openStellaHarness(
         {
           storage,
           models: this.#models,
@@ -1792,8 +1796,14 @@ export class PiConversationRuntime {
             piAttachedCoding((call, context) => this.#attachedTool(call, context)),
             ...(this.#claudeCode ? [this.#claudeCode.extension(CLAUDE_CODE_SCOPE)] : []),
             this.#agentLog.extension(),
+            nextMessageExtension((conversation) => conversation === rootId && this.#options.userWaiting()),
             ...(this.#options.images ? [conversationImagesExtension(this.#options.images)] : []),
           ],
+          turnLimits: {
+            ...(this.#claudeCode ? { engines: [this.#claudeCode] } : {}),
+            // A cold container can be silent for minutes before Claude Code starts; the turn's own watchdog bounds it.
+            watches: (provider) => provider !== CLAUDE_CODE_PROVIDER_ID,
+          },
           onReport: this.#options.report,
         },
         BACKGROUND_CONTEXT,
@@ -1809,6 +1819,8 @@ export class PiConversationRuntime {
         this.#options.report(new Error("The conversation's pi session failed; it opens again.", { cause: end.error }));
       });
       const root = await harness.root(BACKGROUND_CONTEXT);
+      turnLimits.bind(harness, root);
+      rootId = root.id;
       const { contextStartSeq } = await this.#options.journalStart();
       if (await alignJournalContext(harness, root, contextStartSeq, BACKGROUND_CONTEXT)) {
         this.#options.log("pi_root_context_aligned", {});
@@ -2393,7 +2405,10 @@ export class PiConversationRuntime {
   async answer(settled: SettledSubmissionRecord, context: Context): Promise<string> {
     if (settled.status !== "done" || settled.type !== "input") return "";
     const { root } = await this.open();
-    return assistantText(await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context));
+    const answer = await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
+    // It ended between two steps for the user's next message, which the turn after it answers.
+    const message = answer?.model?.[0];
+    return message?.role === "assistant" && message.stopReason === "toolUse" ? "" : assistantText(answer);
   }
 
   async watchForClients(

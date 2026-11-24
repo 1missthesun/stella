@@ -10,8 +10,6 @@ import {
   IPC_COMPANION_SEND,
   IPC_COMPANION_SEND_REQUESTED,
   IPC_COMPANION_SET_VISIBLE,
-  IPC_COMPANION_STOP,
-  IPC_COMPANION_STOP_REQUESTED,
   IPC_COMPANION_VISIBLE_CHANGED,
 } from "@stella/contracts/desktop/ipc-channels";
 import type {
@@ -36,12 +34,10 @@ export type CompanionHandlerOptions = {
   ) => boolean;
 };
 
-type PendingRequest =
-  | {
-      channel: typeof IPC_COMPANION_SEND_REQUESTED;
-      payload: CompanionSendRequest;
-    }
-  | { channel: typeof IPC_COMPANION_STOP_REQUESTED; payload: undefined };
+type PendingRequest = {
+  channel: typeof IPC_COMPANION_SEND_REQUESTED;
+  payload: CompanionSendRequest;
+};
 
 const MAX_PENDING_REQUESTS = 8;
 
@@ -153,17 +149,6 @@ export const registerCompanionHandlers = (
     dispatchToBrain({
       channel: IPC_COMPANION_SEND_REQUESTED,
       payload: { text, ...(attachments ? { attachments } : {}) },
-    });
-  });
-
-  onIpc(IPC_COMPANION_STOP, (event) => {
-    const controller = options.getCompanionController();
-    if (!controller?.isSender(event.sender)) return;
-    const win = fullWindowBrain();
-    if (!win) return;
-    dispatchToBrain({
-      channel: IPC_COMPANION_STOP_REQUESTED,
-      payload: undefined,
     });
   });
 

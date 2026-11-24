@@ -314,6 +314,9 @@ type Session = {
   wakes?: Set<string>;
   /** Stella is closing this session (quitting): its turn ends cut off, not finished, and resumes on the next start. */
   closing?: true;
+  lastSignAt?: number;
+  /** What the CLI said it is doing that can take long and shows in the chat. */
+  hold?: "compacting" | "user";
 };
 
 const ZERO_USAGE = (): Usage => ({
@@ -803,6 +806,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (turn.done) return;
     turn.done = true;
     turn.outcome = outcome;
+    if (turn.session.turn === turn) delete turn.session.hold;
     const record = turn.session.record;
     if (record?.open && !turn.session.closing) {
       delete record.open;
@@ -1084,6 +1088,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       ...(relaunched ? { relaunched: true as const } : {}),
     };
     session.turn = turn;
+    session.lastSignAt = Date.now();
     if (!record.open) {
       record.open = true;
       void saveRecord(session);
@@ -1153,6 +1158,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           }),
         onEvent: (event) => {
           if (turn.done) return;
+          session.lastSignAt = Date.now();
           if (event.type === "stream_event") answered();
           if (event.type === "user") {
             noteRefusals(turn, event as Record<string, unknown>);
@@ -1164,6 +1170,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           settleNative(toolUseId, { text: result, isError });
         },
         onStatus: (status) => {
+          session.lastSignAt = Date.now();
+          if (status.state === "compacting") session.hold = "compacting";
+          else if (status.state === "usage-limit" || status.state === "login-required") session.hold = "user";
+          else delete session.hold;
           for (const listener of statusListeners) {
             try {
               listener(binding.session, status);
@@ -1851,6 +1861,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       return keys.size > 0 ? (options.transport.wakeUsageLimitHolds?.(keys) ?? 0) : 0;
     },
+    compacting: (piSessionId: string): boolean => sessions.get(piSessionId)?.hold === "compacting",
+    holding: (piSessionId: string): boolean => sessions.get(piSessionId)?.hold === "user",
+    lastSignAt: (piSessionId: string): number | undefined => sessions.get(piSessionId)?.lastSignAt,
     running(conversationId: string): boolean {
       for (const session of sessions.values()) {
         if (session.binding.session.conversationId === conversationId && session.turn && !session.turn.done) return true;

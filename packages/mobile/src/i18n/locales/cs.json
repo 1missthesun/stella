@@ -2744,8 +2744,7 @@
     },
     "chatSidebar": {
       "add": "Přidat",
-      "dictationError": "Diktování: {error}",
-      "stop": "Zastavit"
+      "dictationError": "Diktování: {error}"
     },
     "connectors": {
       "desktopRequired": "Konektory jsou dostupné v desktopové aplikaci Stella.",

@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "Legg til",
-      "dictationError": "Diktering: {error}",
-      "stop": "Stopp"
+      "dictationError": "Diktering: {error}"
     },
     "connectors": {
       "desktopRequired": "Tilkoblinger er tilgjengelige i Stella-skrivebordsappen.",

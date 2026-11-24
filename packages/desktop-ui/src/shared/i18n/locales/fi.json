@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "Lisää",
-      "dictationError": "Sanelu: {error}",
-      "stop": "Pysäytä"
+      "dictationError": "Sanelu: {error}"
     },
     "connectors": {
       "desktopRequired": "Liitännät ovat käytettävissä Stellan työpöytäsovelluksessa.",

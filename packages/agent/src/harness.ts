@@ -31,6 +31,7 @@ import { createImageBudget } from "./stella/image-budget.ts";
 import { stellaPromptExtension } from "./stella/prompt-extension.ts";
 import { simulateSafeguardBlocks } from "./stella/safeguard-simulation.ts";
 import { summariesSurviveSafeguardBlocks } from "./stella/summary-fallback.ts";
+import { createTurnLimits, type TurnLimits, type TurnLimitsOptions } from "./stella/turn-limits.ts";
 
 const MODEL_REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -78,6 +79,7 @@ export type StellaHarnessOptions = {
   simulateSafeguardBlocks?: boolean;
   /** `tools` runs agents' `Bash` and `write_stdin`, so pi's own `Bash` stays out. */
   hostShell?: boolean;
+  turnLimits?: TurnLimitsOptions;
   onReport?: (error: unknown) => void;
 };
 
@@ -85,6 +87,7 @@ export type OpenStellaHarness = {
   harness: Harness;
   registry: Registry;
   refreshTools(): void;
+  turnLimits: TurnLimits;
   startAgent(
     args: {
       key: string;
@@ -148,6 +151,9 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   };
   refreshTools();
   for (const extension of options.extensions ?? []) registry.install(extension);
+  const report = options.onReport ?? ((error: unknown) => console.error("[stella-agent]", error));
+  const turnLimits = createTurnLimits(options.turnLimits ?? {}, report);
+  registry.install(turnLimits.extension);
   const base = options.settings ?? stellaHarnessSettings();
   const settings: HarnessSettings = {
     ...base,
@@ -160,13 +166,15 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   const harness = await Harness.open(
     options.storage,
     {
-      models: summariesSurviveSafeguardBlocks(
-        imageBudget.models(options.simulateSafeguardBlocks ? simulateSafeguardBlocks(options.models) : options.models),
+      models: turnLimits.models(
+        summariesSurviveSafeguardBlocks(
+          imageBudget.models(options.simulateSafeguardBlocks ? simulateSafeguardBlocks(options.models) : options.models),
+        ),
       ),
       registry,
       settings,
       ...(options.env ? { env: options.env } : {}),
-      onReport: options.onReport ?? ((error) => console.error("[stella-agent]", error)),
+      onReport: report,
     },
     context,
   );
@@ -175,6 +183,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     harness,
     registry,
     refreshTools,
+    turnLimits,
     startAgent: (args, startContext) => agents.startAgent(harness, args, startContext),
     agentRecords: (recordsContext) => agents.agentRecords(harness, recordsContext),
     messageAgent: (args, messageContext) => agents.messageAgent(harness, args, messageContext),

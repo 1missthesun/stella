@@ -48,6 +48,7 @@ const OTHER_NATIVE_TOOL = `${NATIVE_PREFIX}tool`;
 /** Arguments Antigravity adds to every call for its own display; Stella's tools never take them. */
 const DISPLAY_ARGS = new Set(["toolSummary"]);
 const TOOL_GROUP_SETTLE_MS = 250;
+const TAKE_IN_LIMIT_MS = 2_000;
 const IDLE_CLOSE_MS = 20 * 60_000;
 const SIGN_OUT_CHECK_MS = 1_000;
 const START_TIMEOUT_MS = 60_000;
@@ -82,6 +83,14 @@ export type AntigravityTurnRequest = {
   onEvent(event: Record<string, unknown>): void;
   onNativeToolEnd(end: { toolCallId: string; result: string; isError: boolean }): void;
   onSessionId(sessionId: string): void;
+  onControl(control: { inject(message: AntigravityMessage): boolean }): void;
+};
+
+export type AntigravityMessage = {
+  text: string;
+  images: ImageContent[];
+  onConsumed?: () => void;
+  onDropped?: () => void;
 };
 
 export type AntigravityCliConfig = {
@@ -135,6 +144,10 @@ type TurnState = {
   finalText: string;
   calls: Map<string, ToolCallState>;
   claimWaiters: Set<() => void>;
+  /** Messages the CLI was given and has not gone on from yet. */
+  given: Set<AntigravityMessage>;
+  /** Until the CLI took in the last of them: a call that returned before would go to its model without it. */
+  taking?: Promise<void>;
 };
 
 type Proc = {
@@ -231,9 +244,16 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const emit = (turn: TurnState, event: Record<string, unknown>) => turn.request.onEvent({ type: "stream_event", event });
 
+  const settleGiven = (turn: TurnState, how: "onConsumed" | "onDropped") => {
+    const given = [...turn.given];
+    turn.given.clear();
+    for (const message of given) message[how]?.();
+  };
+
   const openMessage = (turn: TurnState, model: string | undefined) => {
     if (turn.messageOpen) return;
     turn.messageOpen = true;
+    settleGiven(turn, "onConsumed");
     turn.blockIndex = -1;
     turn.blockKind = undefined;
     turn.toolsInMessage = 0;
@@ -371,8 +391,11 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           identityScope: key,
           nativeToolCallIds: true,
           claimNativeToolUseId: (name: string, args: Record<string, unknown>, signal: AbortSignal) => claim(proc, name, args, signal),
-          executeTool: (toolCallId: string, name: string, args: Record<string, unknown>, signal?: AbortSignal) =>
-            turn.request.executeTool(toolCallId, name, args, signal),
+          executeTool: async (toolCallId: string, name: string, args: Record<string, unknown>, signal?: AbortSignal) => {
+            const result = await turn.request.executeTool(toolCallId, name, args, signal);
+            await turn.taking;
+            return result;
+          },
         };
       },
     });
@@ -587,6 +610,11 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     }
   };
 
+  const promptOf = (text: string, images: ImageContent[]) => [
+    ...(text ? [{ type: "text", text }] : []),
+    ...images.map((image) => ({ type: "image", data: image.data, mimeType: image.mimeType })),
+  ];
+
   const sessionMeta = (systemPrompt: string) => (systemPrompt.trim() ? { _meta: { antigravity: { systemPrompt: { append: systemPrompt } } } } : {});
 
   const noteModels = (proc: Proc, result: any) => {
@@ -663,10 +691,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       proc.currentModel = wire;
     }
     const text = resumed || !request.resumeSessionId ? request.prompt : request.resumeFallbackPrompt;
-    const prompt = [
-      ...(text ? [{ type: "text", text }] : []),
-      ...request.images.map((image) => ({ type: "image", data: image.data, mimeType: image.mimeType })),
-    ];
+    const prompt = promptOf(text, request.images);
     const live = proc;
     const turn: TurnState & { reject?: (error: Error) => void } = {
       request,
@@ -678,6 +703,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       finalText: "",
       calls: new Map(),
       claimWaiters: new Set(),
+      given: new Set(),
     };
     live.turn = turn;
     const onAbort = () => live.rpc.notify("session/cancel", { sessionId });
@@ -685,7 +711,47 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     try {
       const result = await new Promise<any>((resolve, reject) => {
         turn.reject = reject;
-        live.rpc.request("session/prompt", { sessionId, prompt: prompt.length > 0 ? prompt : [{ type: "text", text: "Continue." }] }).then(resolve, reject);
+        let open = 0;
+        let taken: (() => void) | undefined;
+        // A prompt sent while one runs joins it: the CLI reads it after the calls in flight, answers the running
+        // prompt at once, and the turn ends with the last one.
+        const send = (content: unknown[], onFailed?: () => void) => {
+          open += 1;
+          live.rpc.request("session/prompt", { sessionId, prompt: content }).then(
+            (reply) => {
+              open -= 1;
+              taken?.();
+              if (open === 0) resolve(reply);
+            },
+            (error: unknown) => {
+              open -= 1;
+              taken?.();
+              onFailed?.();
+              if (open === 0) reject(error);
+            },
+          );
+        };
+        send(prompt.length > 0 ? prompt : [{ type: "text", text: "Continue." }]);
+        request.onControl({
+          inject: (message) => {
+            if (open === 0 || live.turn !== turn || live.exited || request.signal.aborted) return false;
+            turn.given.add(message);
+            turn.taking = new Promise((done) => {
+              const before = taken;
+              const stopTimer = forkTimeoutFiber(TAKE_IN_LIMIT_MS, () => taken?.());
+              taken = () => {
+                stopTimer();
+                taken = undefined;
+                before?.();
+                done();
+              };
+            });
+            send(promptOf(message.text, message.images), () => {
+              if (turn.given.delete(message)) message.onDropped?.();
+            });
+            return true;
+          },
+        });
       });
       const usage = result?.usage;
       closeMessage(
@@ -700,6 +766,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           : undefined,
       );
       if (result?.stopReason === "cancelled" || request.signal.aborted) throw new Error("Stopped.");
+      settleGiven(turn, "onConsumed");
       request.onEvent({ type: "result", subtype: "success", result: turn.finalText, session_id: sessionId });
       return { text: turn.finalText, sessionId };
     } catch (error) {
@@ -712,6 +779,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     } finally {
       request.signal.removeEventListener("abort", onAbort);
       if (live.turn === turn) live.turn = undefined;
+      settleGiven(turn, "onDropped");
       turn.closeTimer?.();
       if (procs.get(key) === live && !live.exited) {
         live.idle = forkTimeoutFiber(IDLE_CLOSE_MS, () => kill(live, "Idle."));

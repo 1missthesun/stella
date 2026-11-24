@@ -26,7 +26,7 @@ export function useOptimisticStop(isStreaming: boolean, onStop?: () => void) {
   }, [onStop]);
 
   return {
-    showStop: isStreaming && !stopRequested,
+    canStop: isStreaming && !stopRequested,
     requestStop,
   };
 }

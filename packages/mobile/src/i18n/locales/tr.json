@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "Ekle",
-      "dictationError": "Dikte: {error}",
-      "stop": "Durdur"
+      "dictationError": "Dikte: {error}"
     },
     "connectors": {
       "desktopRequired": "Bağlayıcılar Stella masaüstü uygulamasında kullanılabilir.",

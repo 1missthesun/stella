@@ -12,7 +12,6 @@ type ComposerForwardButton = ForwardRefExoticComponent<
 >;
 
 export const ComposerAddButton: ComposerForwardButton;
-export const ComposerStopButton: ComposerForwardButton;
 export const ComposerMicButton: ForwardRefExoticComponent<
   ComposerButtonProps &
     { isTranscribing?: boolean } &

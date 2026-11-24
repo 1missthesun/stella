@@ -2722,8 +2722,7 @@
     },
     "chatSidebar": {
       "add": "Toevoegen",
-      "dictationError": "Dictee: {error}",
-      "stop": "Stoppen"
+      "dictationError": "Dictee: {error}"
     },
     "connectors": {
       "desktopRequired": "Connectors zijn beschikbaar in de Stella-desktopapp.",

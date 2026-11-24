@@ -35,6 +35,7 @@ import {
   json,
   errorMessage,
   log,
+  sharesUserChat,
 } from "./support.js";
 import { OrchestratorTurnLifecycle } from "./turn-lifecycle.js";
 
@@ -77,6 +78,9 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
     options: { resume?: boolean } = {},
   ): void {
     if (this.turnExecutions.has(turn.turnId)) return;
+    if (this.turnExecutions.size > 0 && !turn.hiddenMessage && sharesUserChat(turn)) {
+      this.waitingUserTurns.add(turn.turnId);
+    }
     const preceding = this.queue;
     const enqueuedAt = performance.now();
     const admission =
@@ -89,22 +93,24 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
         : undefined;
     const execution = startTurnExecution({
       work: ({ cancellation, signal }) =>
-        preceding.then(() =>
-          this.runTurn(
+        preceding.then(() => {
+          this.waitingUserTurns.delete(turn.turnId);
+          return this.runTurn(
             turn,
             cancellation,
             signal,
             enqueuedAt,
             admission,
             options.resume === true,
-          ),
-        ),
+          );
+        }),
       onInterrupt: () => {
         if (this.current?.turnId === turn.turnId) this.currentPiRun?.abort();
       },
     });
     this.turnExecutions.set(turn.turnId, execution);
     const clear = () => {
+      this.waitingUserTurns.delete(turn.turnId);
       this.cloudHomePreparations.delete(turn.turnId);
       this.admittedOwnerModelGrants.delete(turn.turnId);
       if (this.turnExecutions.get(turn.turnId) === execution) {
@@ -225,6 +231,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
       return json({ canceled: true, turnId: request.turnId, replayed: true });
     }
     if (target.kind === "unknown" || target.kind === "queued") {
+      this.waitingUserTurns.delete(request.turnId);
       return json(
         {
           canceled: true,

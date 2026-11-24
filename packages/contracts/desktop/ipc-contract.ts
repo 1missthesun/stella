@@ -234,8 +234,6 @@ import {
   IPC_CONTEXT_MENU_ITEMS,
   IPC_CONTEXT_MENU_SELECT,
   IPC_COMPANION_STATE,
-  IPC_COMPANION_STOP,
-  IPC_COMPANION_STOP_REQUESTED,
   IPC_COMPANION_TOGGLE_EXPANDED,
   IPC_COMPANION_VISIBLE_CHANGED,
   IPC_CONNECTOR_CONNECT_REQUEST,
@@ -1664,7 +1662,6 @@ export type IpcSendContract = {
   [IPC_COMPANION_OPEN_MAIN]: [];
   [IPC_COMPANION_SHOW_CONTEXT_MENU]: [];
   [IPC_COMPANION_SEND]: [payload: CompanionSendRequest];
-  [IPC_COMPANION_STOP]: [];
   [IPC_COMPANION_PUBLISH_STATE]: [state: CompanionState];
   [IPC_SHELL_OPEN_EXTERNAL]: [url: string];
   [IPC_SHELL_SHOW_IN_FOLDER]: [filePath: string];
@@ -1724,7 +1721,6 @@ export type IpcEventContract = {
   [IPC_COMPANION_SET_EXPANDED]: { expanded: boolean };
   [IPC_COMPANION_STATE]: CompanionState;
   [IPC_COMPANION_SEND_REQUESTED]: CompanionSendRequest;
-  [IPC_COMPANION_STOP_REQUESTED]: void;
   [IPC_COMPANION_VISIBLE_CHANGED]: CompanionVisibility;
   [IPC_PI_CHAT_EVENTS]: PiChatEventsPayload;
   [IPC_RUNTIME_AVAILABILITY]: RuntimeAvailabilitySnapshot;

@@ -123,7 +123,7 @@ const SOURCES: { file: string; pick: Pick; keyframes: string[] }[] = [
   {
     file: "app/chat/full-shell.composer.css",
     pick: (s) =>
-      [".composer", ".composer-shell", ".composer-shell-content", ".composer-form", ".composer-input", ".composer-stop", ".composer-add-button", ".composer-submit", ".composer-mic"].includes(s) ||
+      [".composer", ".composer-shell", ".composer-shell-content", ".composer-form", ".composer-input", ".composer-add-button", ".composer-submit", ".composer-mic"].includes(s) ||
       /^\.composer-(toolbar|toolbar-left|toolbar-right)$/.test(s) ||
       /^\.composer-form(\.expanded| \.composer-add-button--toolbar|:not\(\.expanded\) \.composer-model-mention-field)/.test(s),
     keyframes: [],
@@ -350,7 +350,7 @@ function buildTimings(): string {
 }
 
 /** The app's own icons (ui/icons.tsx) the replica draws, as SVG inner markup. */
-const ICONS = ["Plus", "Mic", "Square", "ArrowUp", "CircleDot", "CheckCircle2", "FileText", "Bell", "Monitor", "SlidersHorizontal", "Settings", "MessageSquare"];
+const ICONS = ["Plus", "Mic", "ArrowUp", "CircleDot", "CheckCircle2", "FileText", "Bell", "Monitor", "SlidersHorizontal", "Settings", "MessageSquare"];
 
 const sharedIcon = (source: string, constant: string) => {
   const found = new RegExp(`const ${constant}\\s*=\\s*\\(?\\s*<>([\\s\\S]*?)</>\\s*\\)?;`).exec(source)?.[1];

@@ -82,6 +82,7 @@ import {
   errorMessage,
   log,
   requireCloudContext,
+  sharesUserChat,
   cloudContextFailure,
 } from "./support.js";
 import { OrchestratorCliTurn } from "./cli-turn.js";
@@ -1173,6 +1174,8 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         ...args.preparationTimings,
       });
       this.currentPiRun = {
+        makesRoom:
+          args.execution.engine !== "anthropic" && sharesUserChat(turn),
         abort: () => {
           runtime.stopClaudeCode();
           void root.abort(pi.contextFor()).catch((error: unknown) => {

@@ -1094,6 +1094,7 @@ export const piPlacedChat = async (
     prompt: run.userPrompt,
     content,
     visible: true,
+    ...(run.scheduled || run.handoff ? {} : { steers: true }),
     placementRunId: run.placementRunId,
   });
 };

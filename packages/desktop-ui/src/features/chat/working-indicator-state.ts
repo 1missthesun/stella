@@ -26,6 +26,7 @@ export type InlineWorkingIndicatorProps = {
   runningToolId?: string;
   status?: string | null;
   minimumVisibleMs?: number;
+  onStop?: () => void;
 };
 
 export type InlineWorkingIndicatorMountProps = InlineWorkingIndicatorProps & {
@@ -42,6 +43,7 @@ export function buildInlineWorkingIndicatorProps({
   activeToolCallId,
   runtimeStatusText,
   isCompacting,
+  onStop,
 }: {
   isStreaming: boolean;
   isToolActive: boolean;
@@ -50,6 +52,7 @@ export function buildInlineWorkingIndicatorProps({
   activeToolCallId?: string | null;
   runtimeStatusText?: string | null;
   isCompacting?: boolean;
+  onStop?: () => void;
 }): InlineWorkingIndicatorMountProps {
   const handoff = Boolean(answerLanded) && !isToolActive;
   const active = getInlineWorkingIndicatorActive({
@@ -66,6 +69,7 @@ export function buildInlineWorkingIndicatorProps({
     runningToolId: isToolActive ? (activeToolCallId ?? undefined) : undefined,
     status: isThinking ? (runtimeStatusText ?? null) : null,
     ...(isThinking && isCompacting ? { compacting: true } : {}),
+    ...(active && onStop ? { onStop } : {}),
   };
 }
 

@@ -347,7 +347,7 @@ export const automaticExecutionResultText = (
     );
   }
   const raw = dispatch.resultJson?.trim();
-  if (!raw) return "Done.";
+  if (!raw) return "";
   const visible = (text: string) => splitReplyRefs(text).text.trim();
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -359,9 +359,9 @@ export const automaticExecutionResultText = (
     }
     if (typeof parsed === "string" && visible(parsed)) return visible(parsed);
   } catch {
-    return visible(raw) || "Done.";
+    return visible(raw);
   }
-  return "Done.";
+  return "";
 };
 
 export type AutomaticExecutionAdmissionInput = {

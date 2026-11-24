@@ -160,6 +160,7 @@ import { resolveChatDataChangeScrollOwner } from "../lib/chat-scroll-ownership";
 import { useChatScroll } from "../lib/use-chat-scroll";
 import { refreshLinkedWorkspaceApps } from "../lib/workspace-app-links";
 import { useKeyboardInset } from "../lib/use-keyboard-inset";
+import { useOverdueStop } from "../lib/use-overdue-stop";
 import { notifySuccess, tapMedium, tapLight } from "../lib/haptics";
 import {
   pauseReadAloud,
@@ -1728,6 +1729,15 @@ export function ChatPane({
     [],
   );
 
+  const sentMessageId = useMemo(
+    () => visibleMessages.findLast((message) => message.role === "user")?.id,
+    [visibleMessages],
+  );
+  const overdueStop = useOverdueStop({
+    working: streaming,
+    messageId: sentMessageId,
+    stop: onStop,
+  });
   const listFooter = useMemo(
     () => (
       <View style={styles.chatTail}>
@@ -1744,6 +1754,7 @@ export function ChatPane({
           status={workingIndicator?.status}
           toolName={workingIndicator?.toolName}
           toolCallId={workingIndicator?.toolCallId}
+          onStop={overdueStop}
           onScreen={!scroll.tailOffscreen}
           vacateFor={landingReplyId}
         />
@@ -1752,6 +1763,7 @@ export function ChatPane({
     [
       streaming,
       workingIndicator,
+      overdueStop,
       styles.chatTail,
       scroll.tailOffscreen,
       scroll.scrollToBottom,
@@ -2119,9 +2131,7 @@ export function ChatPane({
             draftEmpty={draftEmpty}
             hasText={hasText}
             canSubmit={canSubmit}
-            streaming={streaming}
             onSubmit={submit}
-            onStop={onStop}
             onInputFocus={onComposerFocus}
             onPressPlus={onPressPlus}
             dictationStatus={dictationStatus}

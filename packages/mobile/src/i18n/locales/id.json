@@ -2711,8 +2711,7 @@
     },
     "chatSidebar": {
       "add": "Tambah",
-      "dictationError": "Dikte: {error}",
-      "stop": "Berhenti"
+      "dictationError": "Dikte: {error}"
     },
     "connectors": {
       "desktopRequired": "Konektor tersedia di aplikasi desktop Stella.",

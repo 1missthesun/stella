@@ -38,7 +38,6 @@ import {
 import { useChatDraft, type ChatDraftStore } from "../../lib/chat-draft-store";
 import { resolveComposerExpanded } from "../../lib/composer-model-layout";
 import type { DictationStatus } from "../../lib/dictation";
-import { tapLight } from "../../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { type Colors } from "../../theme/colors";
 import { fadeHex } from "../../theme/oklch";
@@ -309,37 +308,6 @@ function AnimatedSubmitButton({
   );
 }
 
-function StopButton({
-  onPress,
-  styles,
-  colors,
-}: {
-  onPress: () => void;
-  styles: ComposerStyles;
-  colors: Colors;
-}) {
-  return (
-    <Pressable
-      onPress={() => {
-        tapLight();
-        onPress();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel="Stop reply"
-      style={styles.submitButton}
-      hitSlop={4}
-    >
-      <Icon
-        name="stop"
-        size={13}
-        color={colors.accentForeground}
-        weight="heavy"
-        filled
-      />
-    </Pressable>
-  );
-}
-
 type MicHitArea = { top: number; bottom: number; left: number; right: number };
 
 // The mic's tap area reaches past its 32pt circle into the space around it,
@@ -383,9 +351,7 @@ export const Composer = memo(function Composer({
   draftEmpty,
   hasText,
   canSubmit,
-  streaming,
   onSubmit,
-  onStop,
   onInputFocus,
   onPressPlus,
   dictationStatus,
@@ -421,9 +387,7 @@ export const Composer = memo(function Composer({
   draftEmpty: boolean;
   hasText: boolean;
   canSubmit: boolean;
-  streaming: boolean;
   onSubmit: () => void;
-  onStop?: () => void;
   onInputFocus: () => void;
   onPressPlus: () => void;
   dictationStatus: DictationStatus;
@@ -530,13 +494,11 @@ export const Composer = memo(function Composer({
         </View>
       </Pressable>
     ) : null;
-  const pillHasButtonAfterMic =
-    showRealtimeVoice || (streaming && onStop != null);
   const pillMicButton = renderMicButton({
     top: PILL_MIC_VERTICAL_REACH,
     bottom: PILL_MIC_VERTICAL_REACH,
     left: PILL_MIC_LEADING_REACH,
-    right: pillHasButtonAfterMic ? CLUSTER_GAP_SHARE : PILL_EDGE_REACH,
+    right: showRealtimeVoice ? CLUSTER_GAP_SHARE : PILL_EDGE_REACH,
   });
   const toolbarMicButton = renderMicButton({
     top: TOOLBAR_MIC_TOP_REACH,
@@ -818,16 +780,6 @@ export const Composer = memo(function Composer({
                     colors={colors}
                     accessibilityLabel="Send message"
                   />
-                ) : streaming && onStop ? (
-                  <View style={styles.pillTrailingCluster}>
-                    {pillMicButton}
-                    {realtimeVoiceButton}
-                    <StopButton
-                      onPress={onStop}
-                      styles={styles}
-                      colors={colors}
-                    />
-                  </View>
                 ) : (
                   <View style={styles.pillTrailingCluster}>
                     {pillMicButton}
@@ -872,21 +824,13 @@ export const Composer = memo(function Composer({
                     ) : null}
                     {toolbarMicButton}
                     {realtimeVoiceButton}
-                    {streaming && onStop && !hasText ? (
-                      <StopButton
-                        onPress={onStop}
-                        styles={styles}
-                        colors={colors}
-                      />
-                    ) : (
-                      <AnimatedSubmitButton
-                        canSubmit={canSubmit}
-                        onPress={onSubmit}
-                        styles={styles}
-                        colors={colors}
-                        accessibilityLabel="Send message"
-                      />
-                    )}
+                    <AnimatedSubmitButton
+                      canSubmit={canSubmit}
+                      onPress={onSubmit}
+                      styles={styles}
+                      colors={colors}
+                      accessibilityLabel="Send message"
+                    />
                   </View>
                 </View>
               ) : null}

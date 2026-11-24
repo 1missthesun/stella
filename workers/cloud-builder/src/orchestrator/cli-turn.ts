@@ -32,7 +32,6 @@ import { json, log, previewArgs } from "./support.js";
 import { OrchestratorTools } from "./tools.js";
 import { ownerGateStub } from "../rpc-release.js";
 
-/** How long a Claude Code turn waits for its chat turn to bind (after an eviction). */
 const CLAUDE_CODE_TURN_WAIT_MS = 60_000;
 const CLAUDE_CODE_ATTEMPT_KEY = "claudeCodeAttempt";
 const CLAUDE_CODE_MODELS_KEY = "claudeCodeModels";

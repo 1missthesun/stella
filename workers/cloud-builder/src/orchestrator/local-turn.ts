@@ -308,7 +308,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         card = null;
       }
       if (!card) continue;
-      // A Resume press ended every pause before it.
       if (card.resume) break;
       const key = card.threadId ?? "";
       if (!latest.has(key)) latest.set(key, { card, createdAtMs: row.created_at });
@@ -650,7 +649,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       leaseToken?: string;
       renewOnly?: boolean;
       hidden?: boolean;
-      /** The computer's claim on the brain lease (`PiBrainClaim`); absent from a computer from before the lease. */
       brain?: unknown;
     };
     try {
@@ -798,10 +796,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         );
       }
 
-      // A computer from before the lease journals as it always did; one that
-      // claims it answers only as the brain's holder, by claiming it for a
-      // message its user typed while no host holds it, or by taking it over
-      // from a holder that can't answer.
       if (brainClaim) {
         const current = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
         const holder =
@@ -1585,8 +1579,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         phase: terminalPhase,
         lane: "chat",
         source: "desktop",
-        // The one line that says why a turn failed: room for an engine's own
-        // error and what to do about it (a Claude Code that can't start).
         ...(body.notice?.trim()
           ? { notice: body.notice.trim().slice(0, 2_000) }
           : {}),

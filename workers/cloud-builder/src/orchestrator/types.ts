@@ -13,10 +13,6 @@ import type { LocalTerminalPhase } from "../local-turn-protocol.js";
 
 export type WakeReport = { prompt: string; lifecycleReport?: string };
 
-/**
- * Binding names/types come from Wrangler. Storage fields remain optional here
- * solely for rolling-deploy compatibility.
- */
 export type Env = Pick<
   Cloudflare.Env,
   | "BUILD_SESSIONS"
@@ -145,7 +141,6 @@ export type LocalTurnLease = OwnerFencedTurn & {
   beginFingerprint: string;
   finishFingerprint?: string;
   phase: LocalTurnLeasePhase;
-  /** Pre-phase leases only; `restoreLocalLease` migrates them at wake. */
   cancelRequested?: boolean;
   cancelDeadlineAt?: number;
   clientMsgId?: string;

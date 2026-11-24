@@ -57,11 +57,6 @@ import {
 import { OwnerGateDeviceSockets } from "./device-sockets.js";
 
 
-/**
- * States a dispatch ends from without anything having run: still offered, or
- * claimed but not yet accepted. From any later state the executor may have
- * begun, even if the gate never heard "running".
- */
 const NEVER_STARTED_STATES: ReadonlySet<DispatchState> = new Set<DispatchState>(["offering", "computer_claimed"]);
 
 export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
@@ -81,12 +76,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     this.send(socket, { type: "dispatch", dispatch: dispatchSummary(row) });
   }
 
-  /**
-   * The one write of a dispatch row. It applies only while the row is still
-   * in the state the caller read (`row.state`), and `to` must be a legal edge
-   * from it. When the row moved on meanwhile nothing is written and the
-   * current row comes back with `applied: false`.
-   */
   protected async transitionDispatch(
     row: DispatchRow,
     to: DispatchState,
@@ -139,7 +128,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     return { applied: true, row: next };
   }
 
-  /** Whether this dispatch holds an owner-gate slot, whatever its state. */
   protected setGateHeld(dispatchId: string, held: boolean): void {
     this.ctx.storage.sql.exec(
       `UPDATE dispatches SET gate_held = ?, revision = revision + 1,
@@ -175,23 +163,15 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     }
   }
 
-  /**
-   * A schedule's run ends here, not when the schedule handed it over: the
-   * schedule hears how it ended so a failed run is retried or reported,
-   * never dropped.
-   */
   protected async reportScheduledRunSettled(row: DispatchRow, from: DispatchState): Promise<void> {
     if (row.ingress !== "schedule") return;
     const response = await this.ownerStore().internalCall("schedules.runSettled", {
       clientMsgId: row.idempotency_key,
       state: row.state,
-      // Whether it got as far as running anywhere: a run that never started
-      // did nothing, so running it again is safe.
       started: row.started_at !== null || !NEVER_STARTED_STATES.has(from),
       ...(row.executor_device_id ? { deviceId: row.executor_device_id } : {}),
       ...(row.error_code ? { errorCode: row.error_code } : {}),
       ...(row.error_message ? { errorMessage: row.error_message.slice(0, 2_000) } : {}),
-      // Canceled by request (Stop, a cancel) rather than ended by the executor.
       ...(row.state === "canceled" && row.cancel_request_id ? { onPurpose: true } : {}),
     });
     if (!response.ok) {
@@ -282,9 +262,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     snapshot: OwnerSnapshot,
   ): string[] {
     if (row.ingress === "mobile" && row.requesting_device_id) {
-      // The phone's chosen computer, checked at the door (a signed pairing on
-      // older apps, the account session otherwise); offers still need it to
-      // be one of the account's computers, present and willing.
       return row.pair_grant_device_id ? [row.pair_grant_device_id] : [];
     }
     if (
@@ -325,7 +302,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     );
   }
 
-  /** The stored consent for a device id, defaulted for pre-consent rows. */
   protected async deviceRemoteExecution(
     deviceId: string | null,
     now: number,
@@ -462,11 +438,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     row.gate_held = 0;
   }
 
-  /**
-   * The one legal local-to-cloud transition. Callers must prove the local
-   * executor has not acknowledged durable ownership before entering here: an
-   * accepted dispatch is never rerouted, it is reconciled.
-   */
   protected async resolveUnaccepted(
     row: DispatchRow,
     now: number,
@@ -577,8 +548,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         expectedGeneration &&
         expectedGeneration !== snapshot.ownerGeneration
       ) {
-        // The cache can lag a rotation whose push was lost. One forced
-        // refresh separates "stale cache" from "stale caller".
         snapshot = await this.snapshot({ refresh: true, now });
       }
     } catch (error) {
@@ -998,16 +967,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     await this.scheduleAlarm(now);
   }
 
-  /**
-   * Arm the one alarm at the earliest deadline this object holds. Every
-   * deadline comes from live state: open sockets (`sockets()` and the owner
-   * store's `liveSockets()` leave out sockets this side closed), rows, and
-   * pending retries. A deadline the alarm cannot clear would otherwise re-arm
-   * it at the floor forever, which is what kept owners awake around the
-   * clock; after `ALARM_HOT_STREAK_LIMIT` alarm runs in a row that each
-   * re-armed within `ALARM_HOT_REARM_MS`, the re-arm backs off exponentially
-   * to `ALARM_MAX_BACKOFF_MS` and the stuck deadline is logged by name.
-   */
   protected async scheduleAlarm(
     now: number,
     options: {
@@ -1026,9 +985,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     if (await this.modelGrants().pendingFenceBarrier()) {
       add("grant_fence_barrier", now + 5_000);
     }
-    // Socket deadlines the alarm just handled are not wakes: it closed every
-    // expired or stale socket it found, and a closed socket can still be
-    // listed (its peer never answered the close) with the same past deadline.
     const handledAt = options.afterAlarm ? now : undefined;
     const addSocket = (source: string, at: number) => {
       if (handledAt !== undefined && at <= handledAt) return;
@@ -1052,11 +1008,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         );
       }
     }
-    // Each column is one `MIN` seek into a partial index, so a wake reads a
-    // handful of rows no matter how many terminal dispatches this object has
-    // accumulated. Leases are asked for per state because a range over a state
-    // set cannot be answered by one seek, and scalar subqueries are used rather
-    // than a compound SELECT, whose term limit this storage enforces.
+    // Scalar subqueries rather than a compound SELECT, whose term limit Durable Object SQLite enforces.
     const rows = this.ctx.storage.sql
       .exec<Record<string, number | null>>(
         `SELECT
@@ -1083,10 +1035,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     for (const [column, at] of Object.entries(rows ?? {})) {
       add(`dispatch_${column}`, at);
     }
-    // A backoff in force holds back the sources that were looping, on every
-    // re-arm: a request that re-armed them at the floor undid the alarm's own
-    // backoff, which is how a looping source still woke the object every
-    // second or two while requests kept arriving.
     const backoff =
       (await this.ctx.storage.get<AlarmBackoff>(ALARM_BACKOFF_KEY)) ?? null;
     const heldUntil = (source: string): number =>
@@ -1137,8 +1085,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     try {
       await this.ctx.storage.setAlarm(at);
     } catch {
-      // Alarms are unavailable in some test harnesses; leases still expire on
-      // the next call that reads them.
     }
   }
 
@@ -1235,9 +1181,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         row.executor_device_id &&
         !row.cancel_request_id
       ) {
-        // A task waits for its computer however long that is away (a laptop
-        // asleep overnight): its work is kept there and continues when the
-        // computer is back. Stella heard of the absence after 10 minutes.
         await this.transitionDispatch(
           row,
           "reconciliation_required",
@@ -1260,11 +1203,6 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         now < row.updated_at + DISPATCH_STOP_HOLD_MS &&
         !this.liveSocket(row.executor_device_id)
       ) {
-        // A task stopped (or moved elsewhere) while its computer is away: the
-        // stop is held until that computer is back, as a message to it is,
-        // so it hears it as a stop there instead of finding its run ended
-        // without one and carrying on. The hold re-arms without counting as
-        // an update, so it ends a week after the stop at the latest.
         this.ctx.storage.sql.exec(
           `UPDATE dispatches SET lease_expires_at = ?
             WHERE dispatch_id = ? AND state = 'reconciliation_required'`,

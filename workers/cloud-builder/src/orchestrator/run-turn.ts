@@ -310,10 +310,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         return json({ ok: false, queued: true }, 202);
       }
     }
-    // Queued turns survive DO eviction and may predate the worker generation
-    // that introduced owner leases. Acquire (or re-acquire) before touching
-    // the journal; a blocked owner drops the queued turn without callbacks,
-    // because the reset/account purge is about to delete its owner row too.
     try {
       const registrationAt = performance.now();
       turn.ownerPurgeGeneration = await this.registerOwnerTurn(turn);
@@ -486,8 +482,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     };
     this.currentTurnCancellation = turnCancellation;
     let subscriptionLimitNotice: string | undefined;
-    // The owner's provider refused the latest model request itself (its key,
-    // its model or the request); the user reads the provider's reason.
     let providerRejection: string | undefined;
     let gatewayRefusal: GatewayPlanRefusal | undefined;
     try {

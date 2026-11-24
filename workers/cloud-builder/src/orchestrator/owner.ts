@@ -473,7 +473,6 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
       return false;
     }
     if (!receipt) {
-      // Rolling-deploy repair for a lease admitted before the durable receipt.
       const now = Date.now();
       const possibleRunSlotKey = await this.ownerFenceRunSlotKey(turn);
       const possibleRunSlot =

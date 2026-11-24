@@ -47,13 +47,7 @@ import { OwnerGateBase } from "./gate-base.js";
 const WEBSOCKET_OPEN = 1;
 
 export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
-  /**
-   * Open sockets, optionally one device's. A socket this side closed stays in
-   * `getWebSockets()` until its peer answers the close, and a peer that is
-   * gone (a laptop asleep, a phone in the background) never does. Counting
-   * those made every alarm drop the same stale socket again and re-arm one
-   * second out, which kept the object awake around the clock.
-   */
+  /** `getWebSockets()` keeps a socket this side closed until its peer answers the close, which a vanished peer never does. */
   protected sockets(deviceId?: string): WebSocket[] {
     let sockets: WebSocket[];
     try {
@@ -63,11 +57,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     } catch {
       return [];
     }
-    // A proven connection is live only while its device's presence row names
-    // it as connected: dropping a socket writes that row, while a socket this
-    // side closed can come back from hibernation reporting OPEN with its old
-    // attachment (the peer never answered the close). Reading the row keeps a
-    // dropped socket from being dropped, and alarmed on, again every wake.
+    // After hibernation a socket this side closed can still report OPEN with its old attachment.
     const current = new Map<string, string | null>();
     const currentConnection = (deviceId: string): string | null => {
       if (!current.has(deviceId)) {
@@ -104,11 +94,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     }
   }
 
-  /**
-   * When a proven device was last heard from. Current devices' keepalives
-   * are answered by the platform without waking this object, so the time of
-   * the last auto-response counts alongside the last frame handled here.
-   */
+  /** The platform answers keepalives through the auto-response without waking this object. */
   protected lastSeenAt(
     socket: WebSocket,
     attachment: PresenceAttachment,
@@ -119,7 +105,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       const answered = this.ctx.getWebSocketAutoResponseTimestamp(socket);
       if (answered) seen = Math.max(seen, answered.getTime());
     } catch {
-      // No timestamp; the last handled frame stands.
     }
     return seen;
   }
@@ -128,7 +113,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     try {
       socket.send(JSON.stringify(frame));
     } catch {
-      // The peer is gone; the close path cleans up.
     }
   }
 
@@ -138,13 +122,11 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       try {
         socket.serializeAttachment({ ...attachment, closedAtMs: Date.now() });
       } catch {
-        // Already gone.
       }
     }
     try {
       socket.close(code, reason);
     } catch {
-      // Already gone.
     }
   }
 
@@ -158,12 +140,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       : null;
   }
 
-  /**
-   * The one connected, proven socket for a device, if it has one: the open
-   * socket of the connection presence names. A replaced socket stays listed
-   * while its close waits on a peer that is gone, still marked connected, and
-   * anything sent to it is lost.
-   */
   protected connectedSocket(deviceId: string): WebSocket | null {
     const current = this.ctx.storage.sql
       .exec<{ connection_id: string }>(
@@ -309,8 +285,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     }
     attachment.lastSeenAtMs = now;
     if (frame.type === "ping") {
-      // Older devices' JSON keepalive. The attachment is where it lands:
-      // `presenceRow` reads last-seen from the socket, so this costs no write.
       socket.serializeAttachment(attachment);
       this.send(socket, { type: "pong", serverTimeMs: now });
       return;
@@ -517,11 +491,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     await this.scheduleAlarm(now);
   }
 
-  /**
-   * The computer is ready for work: scheduled runs that waited for it (Free
-   * plan), agent attempts waiting to start on it and messages held for it go
-   * now.
-   */
   protected async wakeWaitingSchedules(deviceId: string): Promise<void> {
     const woke = await this.ownerStore().internalCall("schedules.computerBack", {
       deviceId,
@@ -575,7 +544,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       attachment.connectionId,
       connected ? 1 : 0,
       availability.ready ? 1 : 0,
-      // Retained only for compatibility with existing SQLite tables.
       0,
       0,
       JSON.stringify(availability.capabilities),
@@ -605,9 +573,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     this.noteDeviceLost(attachment.deviceId);
   }
 
-  /** Stella hears of tasks waiting on this computer if it stays away (device-offline domain). */
   protected noteDeviceLost(deviceId: string): void {
-    // Its last connection names this absence: a new one needs it to be back.
     const connectionId = this.ctx.storage.sql
       .exec<{ connection_id: string | null }>(
         "SELECT connection_id FROM device_presence WHERE device_id = ?",

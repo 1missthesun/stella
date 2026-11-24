@@ -50,7 +50,6 @@ export const dispatchesTableDdl = (name: string): string =>
      updated_at                   INTEGER NOT NULL
    )`;
 
-/** Copies rows into a rebuilt `dispatches` table; a state outside the CHECK ends as failed. */
 export const dispatchesCopySql = (
   from: string,
   to: string,
@@ -99,10 +98,6 @@ export const DDL = [
   `CREATE UNIQUE INDEX IF NOT EXISTS dispatches_idempotency
      ON dispatches(idempotency_key)`,
   `CREATE INDEX IF NOT EXISTS dispatches_state ON dispatches(state)`,
-  // Deadline lookups run on every alarm and every authenticated call, so each
-  // one is answered by a seek into a partial index keyed by state. Terminal
-  // dispatches (blocked, canceled, completed, failed) carry no deadline that
-  // can fire, and this object keeps them forever.
   `CREATE INDEX IF NOT EXISTS dispatches_offer_deadline
      ON dispatches(state, offer_deadline_at)
      WHERE offer_deadline_at IS NOT NULL`,

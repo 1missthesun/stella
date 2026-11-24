@@ -71,7 +71,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     }
   }
 
-  /** A cloud run just started: it becomes this dispatch's execution unless the dispatch ended meanwhile. */
   protected async markCloudRunning(
     row: DispatchRow,
     patch: DispatchPatch,
@@ -285,8 +284,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     };
     const handoffKey = cloudChatHandoffKey(row.dispatch_id);
     let handoff = await this.ctx.storage.get<CloudChatHandoff>(handoffKey);
-    // Old unresolved dispatches may already have a conversation-created turn.
-    // Only a new dispatch starts the owner-created identity protocol.
     if (!handoff && row.cloud_attempts === 1) {
       const allocating: CloudChatHandoff = {
         phase: "allocating",
@@ -512,7 +509,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     if (!sessions) throw new Error("Build session namespace is not bound.");
     const snapshot = await this.snapshot({ now });
     const threadId = newAgentThreadId();
-    // A helper placed here stays a helper: its depth and starter come along.
     const lineage = readAgentLineage(payload.lineage) ?? { depth: 1 };
     const request: CloudAgentTurnStartRequest = {
       protocol: TURN_PLANE_PROTOCOL,
@@ -626,12 +622,6 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     return running.row;
   }
 
-  /**
-   * The owner's agent threads learn of an agent placed in the cloud, which
-   * runs as its BuildSession or pi agent reports it: without the row, its
-   * completion would land nowhere. The session does not record it itself,
-   * since this gate admitted it. Best effort: the agent already started.
-   */
   protected async recordPlacedAgent(
     row: DispatchRow,
     request: CloudAgentTurnStartRequest,

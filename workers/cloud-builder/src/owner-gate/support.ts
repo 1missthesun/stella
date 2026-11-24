@@ -24,7 +24,6 @@ import type {
   DispatchRow,
 } from "./types.js";
 
-/** Reject with `message` after `ms`; the underlying work is not cancelled. */
 export const withTimeout = <T>(
   work: Promise<T>,
   ms: number,

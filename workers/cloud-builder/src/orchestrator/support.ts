@@ -84,7 +84,6 @@ export class CliTurnFailedError extends Error {
   }
 }
 
-/** The model's safety system ended the turn's reply. */
 export class SafeguardBlockedError extends Error {
   constructor(readonly info: SafeguardBlockInfo) {
     super("The model's safety system stopped the reply.");
@@ -168,7 +167,6 @@ export const localTurnRetirementDeadline = (lease: LocalTurnLease): number => {
     : lease.expiresAt;
 };
 
-/** A turn in the user's own chat that nothing but the chat waits on. */
 export const sharesUserChat = (turn: ChatTurnRequest): boolean =>
   turn.lane === "chat" &&
   !turn.piAgent &&
@@ -211,12 +209,6 @@ export const log = (
 export const base64FromBytes = (bytes: Uint8Array): string =>
   Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");
 
-/**
- * Degrades an oversize payload in place. Used only on the synchronous
- * loop-persist path, where an R2 round trip is impossible: the Agent's event
- * sink is fire-and-forget, so an `await` there would silently drop the row.
- * The async append paths spill to R2 instead and keep the full bytes.
- */
 export const truncateMessage = (
   message: AgentMessage,
   limit: number,

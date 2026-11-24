@@ -160,6 +160,50 @@ export type AttachedToolControlRequest =
       linkedPaths: readonly string[];
     }>;
 
+/** World pulls and pushes a container agent's turn made, and their cost. */
+export type WorldSyncTiming = {
+  pulls: number;
+  pullMs: number;
+  pullMaxMs: number;
+  pushes: number;
+  pushMs: number;
+  pushMaxMs: number;
+  /** World tree helper processes started (one per turn unless uploads ran in parallel). */
+  helperStarts?: number;
+};
+
+const WORLD_SYNC_TIMING_KEYS = [
+  "pulls",
+  "pullMs",
+  "pullMaxMs",
+  "pushes",
+  "pushMs",
+  "pushMaxMs",
+] as const;
+
+const OPTIONAL_WORLD_SYNC_TIMING_KEYS = ["helperStarts"] as const;
+
+const worldSyncTimingOf = (value: unknown): WorldSyncTiming => {
+  const row = record(value, "worldSync");
+  exactKeys(
+    row,
+    [...WORLD_SYNC_TIMING_KEYS, ...OPTIONAL_WORLD_SYNC_TIMING_KEYS],
+    "worldSync",
+  );
+  const count = (entry: unknown): number => {
+    if (!Number.isSafeInteger(entry) || (entry as number) < 0) {
+      throw new AttachedToolProtocolError("worldSync");
+    }
+    return entry as number;
+  };
+  const timing = {} as WorldSyncTiming;
+  for (const key of WORLD_SYNC_TIMING_KEYS) timing[key] = count(row[key]);
+  for (const key of OPTIONAL_WORLD_SYNC_TIMING_KEYS) {
+    if (row[key] !== undefined) timing[key] = count(row[key]);
+  }
+  return timing;
+};
+
 export type AttachedToolControlResponse =
   | Readonly<{
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
@@ -170,6 +214,7 @@ export type AttachedToolControlResponse =
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
       status: "quiesced";
       deliveredFiles: readonly string[];
+      worldSync?: WorldSyncTiming;
     }>
   | Readonly<{
       version: typeof ATTACHED_TOOL_PROTOCOL_VERSION;
@@ -460,7 +505,11 @@ export const parseAttachedToolControlResponse = (
     return { version, status: "boot_report", notices: row.notices };
   }
   if (row.status === "quiesced") {
-    exactKeys(row, ["version", "status", "deliveredFiles"], "control");
+    exactKeys(
+      row,
+      ["version", "status", "deliveredFiles", "worldSync"],
+      "control",
+    );
     return {
       version,
       status: "quiesced",
@@ -469,6 +518,9 @@ export const parseAttachedToolControlResponse = (
         "deliveredFiles",
         ATTACHED_TOOL_MAX_DELIVERED_FILES,
       ),
+      ...(row.worldSync === undefined
+        ? {}
+        : { worldSync: worldSyncTimingOf(row.worldSync) }),
     };
   }
   if (row.status === "failed") {

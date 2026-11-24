@@ -466,6 +466,9 @@ export const createAgentSandboxAttachment = (
           error: response.error,
         });
       }
+      if (response.status === "quiesced" && response.worldSync) {
+        deps.emitEvent?.("world_sync_timing", response.worldSync);
+      }
       await reportDaemonLoss(response);
       return response;
     },

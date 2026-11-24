@@ -23,3 +23,11 @@ export const isWorldUnsyncedPath = (relative: string): boolean =>
   WORLD_UNSYNCED_PATHS.some(
     (prefix) => relative === prefix || relative.startsWith(`${prefix}/`),
   );
+
+/**
+ * The world revision a container's tree holds. Root writes it beside the world
+ * root, in a directory the tool uid cannot write, so model-run shell can
+ * neither forge it nor delete it to force a fresh extraction.
+ */
+export const worldSyncMarkerPath = (worldRoot: string): string =>
+  `${worldRoot.slice(0, worldRoot.lastIndexOf("/"))}/.stella-world-manifest`;

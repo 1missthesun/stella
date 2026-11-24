@@ -58,7 +58,7 @@ function EmailPageWebView({ state }: { state: EmailPageState }) {
   const { isDark } = useTheme();
   const locale = useLocale();
   const webViewRef = useRef<WebView>(null);
-  const token = useMemo(newToken, []);
+  const token = useMemo(() => newToken(), []);
   const source = useMemo(() => ({ html: withCanvasPolicy(EMAIL_PAGE_FRAME_HTML) }), []);
   const loadedRef = useRef(false);
   const actions = useMemo(() => emailPageActions(state.page, state.rules), [state.page, state.rules]);

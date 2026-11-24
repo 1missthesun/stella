@@ -47,7 +47,7 @@
     "prompts:sync-defaults": "bun workers/cloud-builder/scripts/sync-stella-prompt-defaults.ts",
     "prompts:check-defaults": "bun workers/cloud-builder/scripts/sync-stella-prompt-defaults.ts --check",
     "app-source:publish": "node scripts/publish-app-source.mjs",
-    "check:generated": "bun run routes:check && bun run prompts:check-defaults && node packages/mobile/scripts/sync-i18n-catalogs.mjs --check && bun run i18n:parity && bun packages/runtime/kernel/connectors/generate-oauth-provider-catalog-index.ts --check",
+    "check:generated": "bun run routes:check && bun run prompts:check-defaults && node packages/mobile/scripts/sync-i18n-catalogs.mjs --check && bun run i18n:parity && bun packages/runtime/kernel/connectors/generate-oauth-provider-catalog-index.ts --check && bun run check:invariants",
     "mobile:start": "cd packages/mobile && bun run start",
     "mobile:ios": "cd packages/mobile && bun run ios",
     "mobile:android": "cd packages/mobile && bun run android",
@@ -83,7 +83,8 @@
     "sites-host:typecheck": "cd workers/sites-host && bun run typecheck",
     "sites-host:lint:promises": "eslint --config eslint.workers.config.js workers/sites-host/src",
     "sites-host:build:dry-run": "cd workers/sites-host && bun run build:dry-run",
-    "check:ratchet": "node packages/runtime/scripts/check-effect-ratchet.mjs"
+    "check:ratchet": "node packages/runtime/scripts/check-effect-ratchet.mjs",
+    "check:invariants": "node scripts/check-invariants.mjs"
   },
   "dependencies": {
     "@googleapis/calendar": "^20.1.0",

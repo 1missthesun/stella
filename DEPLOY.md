@@ -926,7 +926,7 @@ account), from any Stella agent or chat:
 
 ```js
 spawn_agent({ description: "Prod smoke turn", destination: "cloud", model: "stella/default",
-  prompt: "Reply with exactly: ok. Do not run any tools." })
+  prompt: "Report exactly: ok. No other work is needed." })
 ```
 
 Its report must read `ok` (it arrives as `[Agent completed]`, typically within

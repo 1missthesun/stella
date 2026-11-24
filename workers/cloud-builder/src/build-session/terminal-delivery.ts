@@ -167,14 +167,10 @@ export const deliverTerminal = async (
         typeof pending.payload.waitingFor === "string" && pending.payload.waitingFor.trim()
           ? pending.payload.waitingFor.trim()
           : undefined;
-      const waitingReply =
-        typeof pending.payload.waitingReply === "string" && pending.payload.waitingReply.trim()
-          ? pending.payload.waitingReply.trim()
-          : undefined;
       const resultJson =
         pending.kind === "completed"
           ? waitingFor
-            ? waitingResultJson(finalText, waitingFor, waitingReply)
+            ? waitingResultJson(finalText, waitingFor)
             : JSON.stringify({ finalText })
           : undefined;
       const errorMessage =
@@ -195,7 +191,6 @@ export const deliverTerminal = async (
           ...(resultJson ? { resultJson } : {}),
           ...(errorMessage ? { errorMessage } : {}),
           completedAt,
-          ...(waitingFor && pending.kind === "completed" ? { wakeCheck: true as const } : {}),
         } satisfies ThreadCompletedEvent,
       ]);
     }

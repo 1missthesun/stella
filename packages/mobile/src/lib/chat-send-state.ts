@@ -76,12 +76,15 @@ export const nextSendState = (
   }
 };
 
-/** Holds the thread's single dispatch slot: one turn is admitted at a time. */
-export const occupiesSendSlot = (state: SendState): boolean =>
+/** Sent one after another so they arrive in order; a turn already under way holds nothing back. */
+export const holdsNextSend = (state: SendState): boolean =>
+  state.kind === "admitting";
+
+export const isUnderWay = (state: SendState): boolean =>
   state.kind === "admitting" || state.kind === "dispatched";
 
 export const keepsThreadSending = (state: SendState): boolean =>
-  occupiesSendSlot(state) || (state.kind === "persisting" && !state.behind);
+  isUnderWay(state) || (state.kind === "persisting" && !state.behind);
 
 export const messageSendStatus = (
   state: SendState | undefined,

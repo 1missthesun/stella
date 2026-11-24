@@ -31,7 +31,8 @@ import {
   keepsThreadSending,
   messageSendStatus,
   nextSendState,
-  occupiesSendSlot,
+  holdsNextSend,
+  isUnderWay,
   type NotSentReason,
   type SendEvent,
   type SendState,
@@ -789,7 +790,7 @@ export function useChatThread(opts: {
   const drainQueue = useCallback(() => {
     if (!admissionEnabledRef.current) return;
     const entries = [...sendsRef.current.values()];
-    if (entries.some((entry) => occupiesSendSlot(entry.state))) return;
+    if (entries.some((entry) => holdsNextSend(entry.state))) return;
     const next = entries
       .filter(
         (entry) =>
@@ -837,7 +838,9 @@ export function useChatThread(opts: {
   );
 
   const releaseSlot = useCallback(() => {
-    setWorkingActivity(IDLE_WORKING_ACTIVITY);
+    if (![...sendsRef.current.values()].some((entry) => isUnderWay(entry.state))) {
+      setWorkingActivity(IDLE_WORKING_ACTIVITY);
+    }
     if (appActiveRef.current) drainQueue();
   }, [drainQueue]);
 
@@ -1015,6 +1018,7 @@ export function useChatThread(opts: {
         });
         run.control = bindAutomaticExecutionAdmission(run.control, admitted);
         transition(id, { type: "admitted", serverDispatchId: admitted.dispatchId });
+        if (appActiveRef.current) drainQueue();
 
         const terminal = await waitForAutomaticExecution({
           dispatchId: admitted.dispatchId,
@@ -1039,11 +1043,10 @@ export function useChatThread(opts: {
           },
         });
         assertCurrent();
-        renderReply(
-          run.replyId,
-          automaticExecutionResultText(terminal),
-          terminal.state === "canceled",
-        );
+        const resultText = automaticExecutionResultText(terminal);
+        if (resultText) {
+          renderReply(run.replyId, resultText, terminal.state === "canceled");
+        } else removeReply(run.replyId);
         if (terminal.state === "failed" && terminal.errorMessage) {
           showComposerNoticeForError(
             terminal.errorMessage,
@@ -1090,9 +1093,11 @@ export function useChatThread(opts: {
       admitWithRetry,
       canonicalAuthorityLeaseCurrent,
       canonicalConversationId,
+      drainQueue,
       markNotSent,
       patchActivity,
       releaseSlot,
+      removeReply,
       renderReply,
       transition,
       transport,
@@ -1351,7 +1356,7 @@ export function useChatThread(opts: {
         (entry) =>
           entry.state.kind === "persisting" ||
           entry.state.kind === "queued" ||
-          occupiesSendSlot(entry.state),
+          holdsNextSend(entry.state),
       );
       const userMessageId = createId();
       const images = picked.filter((entry) => entry.kind === "image");
@@ -1519,7 +1524,7 @@ export function useChatThread(opts: {
       }
     }
     if (releasedSlot) releaseSlot();
-    else if (![...sendsRef.current.values()].some((entry) => occupiesSendSlot(entry.state))) {
+    else if (![...sendsRef.current.values()].some((entry) => isUnderWay(entry.state))) {
       setWorkingActivity(IDLE_WORKING_ACTIVITY);
     }
   }, [
@@ -1556,7 +1561,7 @@ export function useChatThread(opts: {
     let hasQueuedSend = false;
     for (const [id, state] of sendStates) {
       if (keepsThreadSending(state)) sending = true;
-      if (occupiesSendSlot(state)) active = id;
+      if (isUnderWay(state)) active = id;
       if (messageSendStatus(state) === "queued") hasQueuedSend = true;
     }
     return { active, sending, hasQueuedSend };

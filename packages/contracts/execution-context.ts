@@ -21,7 +21,6 @@ export type ExecutionContextDevice = Pick<
 > & { signedIn?: DeviceEngine[] };
 
 const DEVICE_ENGINES: readonly DeviceEngine[] = ["claude-code", "chatgpt", "antigravity"];
-/** Engines most computers have: a computer without one says so. Google Antigravity is only named where it's signed in. */
 const EXPECTED_DEVICE_ENGINES: readonly DeviceEngine[] = ["claude-code", "chatgpt"];
 const DEVICE_ENGINE_NAMES: Record<DeviceEngine, string> = {
   "claude-code": "Claude Code",
@@ -29,7 +28,6 @@ const DEVICE_ENGINE_NAMES: Record<DeviceEngine, string> = {
   antigravity: "Google Antigravity (antigravity/<model> runs there, e.g. antigravity/gemini-4-neon)",
 };
 
-/** The engines a computer is signed in to, when it reports them (`engine-sign-ins`); older computers report none. */
 export const deviceEngineSignIns = (capabilities: readonly unknown[] | undefined): DeviceEngine[] | undefined =>
   capabilities?.includes("engine-sign-ins")
     ? DEVICE_ENGINES.filter((engine) => capabilities.includes(engine))
@@ -50,7 +48,6 @@ export const mediaAccessForAudience = (
   return CAPABILITIES.every((capability) => hasCapability(plan, capability)) ? "included" : "upgrade";
 };
 
-/** Email is on: Stella reads these inboxes herself and keeps the Email page. */
 export type EmailAccess = { accounts: string[] };
 
 export type ExecutionContextSnapshot = {
@@ -301,10 +298,6 @@ export const renderMediaAccess = (snapshot: ExecutionContextSnapshot): string | 
     .join("\n");
 };
 
-/**
- * Stella's email instructions, for the orchestrator, only while Email is on
- * (Gmail connected through Stella and Email turned on).
- */
 export const renderEmailAccess = (snapshot: ExecutionContextSnapshot): string | undefined => {
   const accounts = snapshot.email?.accounts;
   if (!accounts?.length) return undefined;

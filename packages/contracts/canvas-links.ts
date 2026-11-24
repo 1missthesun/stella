@@ -2,31 +2,16 @@ import { driveLinkPath, safeDriveRelativePath } from "./cloud-world-paths";
 import { isAbsoluteLocalFilePath } from "./local-file-links";
 import { parseStellaAppUrl } from "./workspace-apps";
 
-/**
- * Where a canvas document lives, so its relative links resolve the way they
- * would in a browser that opened the file: a Drive document's siblings are
- * Drive files, a computer's document's siblings are files on that computer.
- */
 export type CanvasDocumentLocation =
   | { kind: "drive"; path: string }
   | { kind: "device"; path: string };
 
-/**
- * What a link inside a canvas points at. Every viewer (desktop, web chat,
- * phone) opens each kind the way the same link opens from a chat message.
- */
 export type CanvasLink =
-  /** A place in the canvas itself; an empty fragment is the top. */
   | { kind: "fragment"; fragment: string }
-  /** An http(s) page. */
   | { kind: "web"; url: string }
-  /** A link the system hands to another app: mail, phone. */
   | { kind: "external"; url: string }
-  /** A file in the owner's Drive (drive-relative path). */
   | { kind: "drive"; path: string }
-  /** A file or folder on one of the owner's computers (absolute path). */
   | { kind: "device"; path: string }
-  /** One of the owner's Stella apps. */
   | { kind: "app"; slug: string }
   | { kind: "blocked" };
 
@@ -57,7 +42,6 @@ const fragmentLink = (fragment: string | null): CanvasLink => ({
   fragment: fragment ? (decodePart(fragment) ?? fragment) : "",
 });
 
-/** `a/./b/../c` → `a/c`; null when `..` climbs above the start. */
 const normalizeSegments = (segments: readonly string[]): string[] | null => {
   const out: string[] = [];
   for (const segment of segments) {
@@ -99,7 +83,6 @@ const driveLink = (
   return { kind: "drive", path };
 };
 
-/** An absolute path from a link, without `.` or `..`, in its own OS's separators. */
 const absolutePath = (decoded: string): string | null => {
   const windows = /^([A-Za-z]:)[\\/](.*)$/u.exec(decoded);
   const separator = windows ? "\\" : "/";
@@ -149,12 +132,6 @@ const resolveRelative = (
   return deviceLink(path, fragment, document);
 };
 
-/**
- * Resolves an `href` (or form `action`) exactly as written in a canvas
- * against the canvas's own location. Anything that isn't a page, a mail or
- * phone link, a Stella file or app, or a place in the canvas itself is
- * blocked (`javascript:`, `data:`, `blob:`, the canvas's own scheme...).
- */
 export const resolveCanvasLink = (
   href: string,
   document: CanvasDocumentLocation | null,
@@ -201,7 +178,6 @@ export const resolveCanvasLink = (
   return { kind: "blocked" };
 };
 
-/** The location of a canvas whose file is at `filePath`. */
 export const canvasDocumentLocation = (
   filePath: string,
   driveBacked: boolean,

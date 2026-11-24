@@ -134,15 +134,9 @@ const bounded = (value: string | null, max: number): string => {
   return trimmed.length > 0 && trimmed.length <= max ? trimmed : "";
 };
 
-/** Phones on app versions from before session-authorised phones sign each request. */
 export const hasMobilePairingProofHeaders = (headers: Headers): boolean =>
   Boolean(headers.get(MOBILE_PAIRING_HEADERS.proof)?.trim());
 
-/**
- * A phone authorised by its account session names itself and, for sends that
- * let Stella choose, the computer it prefers. Neither is a credential: the
- * session already lets its holder reach every computer on the account.
- */
 export const readMobileSessionPhone = (
   headers: Headers,
 ): { mobileDeviceId: string; desktopDeviceId?: string } | null => {
@@ -216,7 +210,6 @@ export const readMobilePairingProofHeaders = (
   };
 };
 
-/** `sha256hex(pairSecret)`: the secret HMAC key of a pairing's proofs. */
 export type PairingHmacKey = string & { readonly __brand: "PairingHmacKey" };
 
 export type MobilePairingProofRejection =
@@ -237,14 +230,6 @@ export type MobilePairingProofResult =
     }
   | { ok: false; reason: MobilePairingProofRejection };
 
-/**
- * Verify a phone's proof. `pairingKey` is absent for an unpaired phone, which
- * is refused before any HMAC work so it learns nothing.
- *
- * `expectedChallenge` is the challenge the server derived from the request it
- * is about to act on, so a proof minted for one payload never authorizes
- * another.
- */
 export const verifyMobilePairingProof = async (input: {
   headers?: Headers;
   fields?: MobilePairingProofFields | null;
@@ -299,13 +284,6 @@ export const verifyMobilePairingProof = async (input: {
   };
 };
 
-/**
- * Whether each DispatchPayload field crosses the wire. The gate stores and
- * forwards exactly the canonical bytes below, so a field they leave out is
- * dropped in transit without a trace (a schedule's `scheduledAgent` was, and
- * its runs went to the wrong place). Adding a field to DispatchPayload fails
- * the typecheck here until it is decided; `true` must also be written below.
- */
 export const DISPATCH_PAYLOAD_WIRE_FIELDS = {
   schemaVersion: true,
   prompt: true,
@@ -321,17 +299,9 @@ export const DISPATCH_PAYLOAD_WIRE_FIELDS = {
   model: true,
   handoff: true,
   scheduledAgent: true,
-  // A helper's depth and starter, so it stays a helper on the computer it is
-  // placed on. Only the owner store sets it (a client's request never carries
-  // it), and only for a helper: a top-level task's bytes are unchanged.
   lineage: true,
 } as const satisfies Record<keyof DispatchPayload, boolean>;
 
-/**
- * The lineage a dispatch carries: a helper's (depth past 1, or a starter).
- * A top-level task carries none, which is what every computer assumes
- * without one, so its payload bytes are what they always were.
- */
 const wireLineage = (payload: DispatchPayload) => {
   const lineage = readAgentLineage(payload.lineage);
   return lineage && (lineage.depth > 1 || lineage.startedBy) ? lineage : undefined;
@@ -384,10 +354,6 @@ export const canonicalDispatchPayloadJson = (
   });
 };
 
-/**
- * The bytes builds before lineage crossed the wire stored for the same
- * payload: a dispatch submitted then and replayed now still matches.
- */
 export const legacyDispatchPayloadJson = (payload: DispatchPayload): string | undefined => {
   if (!wireLineage(payload)) return undefined;
   const { lineage: _lineage, ...rest } = payload;

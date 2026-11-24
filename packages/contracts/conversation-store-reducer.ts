@@ -174,10 +174,6 @@ export const olderRangeIsComplete = (
   );
 };
 
-/**
- * The window cut back to the retention cap, for a store that lets appends run
- * past it (`overflow`) and trims later; null when nothing needs trimming.
- */
 export const trimRetainedRecords = (
   view: Pick<ConversationViewState, "records" | "floorSeq">,
 ): { records: readonly JournalRecord[]; hasOlder: boolean } | null => {

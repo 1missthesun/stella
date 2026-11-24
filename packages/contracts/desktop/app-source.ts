@@ -9,11 +9,6 @@ export type AppSourceCommit = {
   kind: "version" | "other-computer" | "change";
 };
 
-/**
- * A version Stella could not merge with the user's own changes by itself:
- * `allowance` when merging it would spend a Free plan's allowance (so it waits
- * for a click), `unsure` when it tried and was not confident.
- */
 export type AppSourceConflicts = { files: string[]; why: "allowance" | "unsure" };
 
 export type AppSourceWaiting =
@@ -22,7 +17,6 @@ export type AppSourceWaiting =
       key: string;
       adding: boolean;
       draft?: string;
-      /** The task drafting or that drafted `draft`. */
       agentId?: string;
       conflicts?: AppSourceConflicts;
     }
@@ -46,9 +40,7 @@ export type AppSourceWaiting =
       stale: boolean;
       files: number;
       restart: boolean;
-      /** Touches only the interface's source, so it is added without a click once it is finished. */
       interfaceOnly: boolean;
-      /** Why the windows could not show this change the last time it was added. */
       problem?: string;
     };
 
@@ -68,49 +60,24 @@ export type AppSourceState = {
     count: number;
     subject: string;
   };
-  /** An agent Stella sent is drafting this merge; nothing else may start until it settles. */
   merging?: { from: "upstream" | "remote" | "draft"; draft: string };
   recent: AppSourceCommit[];
-  /**
-   * Stella runs from a developer's own checkout rather than an install (no
-   * launcher). Its updates never change that working tree: nothing is waiting,
-   * added, undone, caught up or shared with the account's other computers, and
-   * the Updates tab only lists the checkout's history.
-   */
   developerCheckout: boolean;
-  /**
-   * Changes made here are not reaching the user's other computers: they clash
-   * with a change from another computer this one hasn't taken ("conflict"),
-   * or the two together would not build ("build"). Taking that change shares
-   * them again.
-   */
   notShared?: "conflict" | "build";
   waiting: AppSourceWaiting[];
   skipped: AppSourceWaiting[];
   busy: boolean;
-  /** An update the user asked for waits until their screen recording and its finish card are done. */
   heldForRecording?: boolean;
-  /** An update that restarts Stella's runtime waits until she finishes the reply she's in the middle of. */
   heldForReply?: boolean;
-  /**
-   * The last version that was applied by itself: because the user pressed
-   * Update on another computer (`from` names it), or here before it was ready.
-   */
   arrived?: {
     sha: string;
     from: string | null;
     date: number;
     undone: boolean;
-    /** What Undo (or, once undone, Update) passes to `undo`. */
     flip: string;
   };
 };
 
-/**
- * Why an action failed, for the sentence the window shows. "unexpected" is
- * anything Stella didn't mean to say to the user (a file system or git
- * error): the window says so plainly and keeps `detail` behind a disclosure.
- */
 export type AppSourceFailure =
   | "nothing"
   | "unavailable"
@@ -128,9 +95,7 @@ export type AppSourceActionResult =
     }
   | {
       ok: false;
-      /** The main process's own words (English), kept for logs. */
       error: string;
       reason?: AppSourceFailure;
-      /** Technical detail, shown only behind a disclosure. */
       detail?: string;
     };

@@ -105,7 +105,6 @@ const isHttpUrl = (value: unknown): boolean => {
   }
 };
 
-// Media timestamps accept any number, NaN and Infinity included, as before.
 const isAnyNumber = (value: unknown): boolean => typeof value === "number";
 const isOptionalString = isOptional(isString);
 const isOptionalNumber = isOptional(isFiniteNumber);

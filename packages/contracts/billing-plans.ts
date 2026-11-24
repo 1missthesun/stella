@@ -1,6 +1,3 @@
-// The one source of truth for Stella's plans. Backend allowances, checkout
-// price validation and every plan display (website, desktop, mobile) read this.
-
 export const BILLING_PLANS = ["free", "plus", "pro", "max"] as const;
 export type BillingPlan = (typeof BILLING_PLANS)[number];
 
@@ -13,8 +10,6 @@ export const isBillingPlan = (value: unknown): value is BillingPlan =>
 export const isPaidBillingPlan = (value: unknown): value is PaidBillingPlan =>
   typeof value === "string" && (PAID_BILLING_PLANS as readonly string[]).includes(value);
 
-// Plan ids stored before pricing v3 (Go $5, the old $15 Pro). Old capability
-// tokens and owner rows can still carry them.
 export const normalizeBillingPlan = (value: unknown): BillingPlan => {
   if (isBillingPlan(value)) return value;
   if (value === "go" || value === "go_fallback") return "plus";
@@ -23,14 +18,10 @@ export const normalizeBillingPlan = (value: unknown): BillingPlan => {
 };
 
 export type PlanBudget = {
-  // Short window: a fixed window of `rollingWindowHours` from its first charge.
   rollingUsd: number;
   rollingWindowHours: number;
-  // Resets Monday 00:00 UTC.
   weeklyUsd: number;
-  // Calendar month anchored to the subscription period start.
   monthlyUsd: number;
-  // Free only: a one-time allowance that never resets.
   oneTimeUsd?: number;
 };
 
@@ -41,7 +32,6 @@ export type PlanDefinition = {
   currency: "usd";
   interval: "month" | null;
   budget: PlanBudget;
-  // Free accounts that only verified an email get this share of every window.
   emailOnlyBudgetShare?: number;
   cloudContainers: boolean;
   mediaGeneration: boolean;
@@ -56,15 +46,10 @@ export type PlanDefinition = {
     scheduleFiresPerDay: number;
     readAloudCharsPerDay: number;
   };
-  // How much usage the plan gives, relative to the others. Plan displays
-  // never show the dollar budget.
   tagline: string;
-  // Plain-terms lines for plan displays, most important first.
   includes: readonly string[];
 };
 
-// Abuse ceiling only, the same on every plan: plans never limit how much runs
-// at once. The budget is the only plan limit.
 const MODEL_REQUESTS_AT_ONCE = 64;
 
 const MB = 1024 * 1024;
@@ -205,7 +190,6 @@ export const planLabel = (plan: unknown): string => PLAN_CATALOG[normalizeBillin
 export const formatPlanPrice = (cents: number): string =>
   cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
 
-// Every plan, in words: what the usage budget pays for.
 export const BUDGET_COVERS = [
   "Stella's models",
   "Tasks Stella works on for you",

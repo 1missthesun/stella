@@ -71,9 +71,6 @@ const keyLooksSensitive = (key: string): boolean => {
   ) {
     return true;
   }
-  // Exact match only, so passwordless or accessKeyboard stay readable. These
-  // patterns are best-effort; secrets a user typed are redacted by
-  // fingerprint (secret-redaction.ts), not by guessing from key names.
   const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
   return FUSED_SECRET_KEYS.includes(normalized);
 };

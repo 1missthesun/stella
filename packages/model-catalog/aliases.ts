@@ -25,8 +25,6 @@ import {
 
 export const STELLA_PROVIDER = "stella";
 export const STELLA_DEFAULT_MODEL = `${STELLA_PROVIDER}/default`;
-// Bump this whenever Stella default/model/mode mappings change. The catalog
-// route reports it as `updatedAt`; clients revalidate by ETag.
 export const STELLA_MODEL_CATALOG_UPDATED_AT = Date.UTC(2026, 9, 6, 0, 0);
 
 export type StellaCatalogModel = {
@@ -74,12 +72,6 @@ const deriveDisplayName = (upstreamModel: string): string => {
   return titleCase(rawId);
 };
 
-// A default's `resolvedModel` must name the same id the catalog publishes as
-// `upstreamModel` whenever that id already routes to OpenRouter on its own
-// (DeepSeek V4.1 Flash): runtimes freeze it into agent snapshots as
-// `stella/<resolvedModel>`, and only the catalog spelling is pinnable. The
-// `openrouter/` namespace is added only where prefix inference would otherwise
-// pick a first-party gateway (e.g. `google/...` hosted on OpenRouter).
 const catalogRoutingModel = (config: ModelConfig): string =>
   config.managedGatewayProvider === "openrouter" &&
   !config.model.startsWith("openrouter/") &&
@@ -184,15 +176,9 @@ export const resolveStellaModelConfigForSelection = (
               providerOptions: structuredClone(DEEPSEEK_V4_1_FLASH_PROVIDER_OPTIONS),
             }
           : {}),
-        // Prefix inference alone would send `deepseek/deepseek-v4.1-flash`
-        // to the DeepSeek first-party gateway; it is an OpenRouter-hosted slug
-        // (see MANAGED_MODEL_GATEWAY_OVERRIDES in agent/model.ts).
         managedGatewayProvider:
           MANAGED_MODEL_GATEWAY_OVERRIDES[model] ??
           inferManagedGatewayProviderFromModel(model),
-        // Same for the wire protocol: the pinned id must not inherit the
-        // agent default's transport. `api: undefined` here intentionally
-        // clears a base-config value when the pinned model has no override.
         api: MANAGED_MODEL_API_OVERRIDES[model],
         maxOutputTokens: MANAGED_MODEL_MAX_OUTPUT_TOKENS[model],
       },

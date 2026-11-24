@@ -2,8 +2,6 @@ export type RealtimeVoiceProvider = "stella" | "openai" | "xai";
 
 export type RealtimeVoiceUnderlyingProvider = "gptlive" | "openai" | "xai";
 
-// "stella" is Stella's own read-aloud voice (Speechify Simba 3.5 today);
-// preferences saved before 2026-11-16 call it "gemini".
 export type ReadAloudVoiceProvider = "stella" | "openai";
 
 export type RealtimeVoiceSelections = {

@@ -20,12 +20,6 @@ export type AccountProviderId = (typeof ACCOUNT_PROVIDER_IDS)[number];
 export const isAccountProviderId = (value: unknown): value is AccountProviderId =>
   typeof value === "string" && (ACCOUNT_PROVIDER_IDS as readonly string[]).includes(value);
 
-/**
- * Plan sign-ins that live only on a computer (never in the account or the
- * cloud). The account's model choice can name one so every device shows the
- * same pick; the computers signed in run it, and the cloud runs a connected
- * plan (Claude, then ChatGPT) or else its default.
- */
 export const COMPUTER_ONLY_PROVIDER_IDS = ["antigravity"] as const;
 
 export type ComputerOnlyProviderId = (typeof COMPUTER_ONLY_PROVIDER_IDS)[number];
@@ -33,7 +27,6 @@ export type ComputerOnlyProviderId = (typeof COMPUTER_ONLY_PROVIDER_IDS)[number]
 export const isComputerOnlyProviderId = (value: unknown): value is ComputerOnlyProviderId =>
   typeof value === "string" && (COMPUTER_ONLY_PROVIDER_IDS as readonly string[]).includes(value);
 
-/** The computer-only plan a model reference ("antigravity/…", with or without an effort) names. */
 export const computerOnlyProviderOf = (reference: string | undefined): ComputerOnlyProviderId | undefined => {
   const provider = reference?.trim().toLowerCase().split(/[/:]/u, 1)[0];
   return isComputerOnlyProviderId(provider) ? provider : undefined;

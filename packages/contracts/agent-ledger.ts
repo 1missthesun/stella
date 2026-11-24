@@ -62,9 +62,7 @@ export const isTopLevelAgent = (agent: { parentAgentId?: string }): boolean =>
 export type TopLevelAgentActivity<T> = {
   task: T;
   status: TaskLifecycleStatus;
-  /** Something of it runs now: its own turn or a helper's. */
   working: boolean;
-  /** Not ended, nothing of it runs, and a hold (its own or a helper's) is why. */
   paused?: AgentPause;
   helpers: readonly T[];
 };
@@ -81,13 +79,6 @@ type ActivityAgent = {
 export const isAgentWorking = (agent: ActivityAgent): boolean =>
   agent.status === "running" && !agent.waitingFor && !agent.waitingForHelpers && !agent.paused;
 
-/**
- * Stella's own agents as the user sees their work: a finished agent whose
- * helpers are still live reads as running until they finish, and its helpers
- * are read with it, never as rows of their own. Only an agent that runs
- * something now, itself or through a helper, is working; one whose remaining
- * work is held carries that hold.
- */
 export const topLevelAgentActivity = <T extends ActivityAgent>(
   tasks: readonly T[],
 ): TopLevelAgentActivity<T>[] => {

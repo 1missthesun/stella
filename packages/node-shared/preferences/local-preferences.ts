@@ -72,7 +72,6 @@ export type LocalPreferences = {
   imageGeneration: ImageGenerationPreferences;
   realtimeVoice: RealtimeVoicePreferences;
   memoryEnabled: boolean;
-  /** The user's last explicit Memory choice, here or on their account; null until they make one. */
   memoryChoice: boolean | null;
   dictationShortcut: string;
   voiceRtcShortcut: string;
@@ -83,7 +82,6 @@ export type LocalPreferences = {
   dictationSoundEffectsEnabled: boolean;
   telemetryEnabled: boolean;
   telemetryAccountOffPending: boolean;
-  /** "Send anonymous usage counts". null until chosen: follows telemetryEnabled. */
   anonymousCountsEnabled: boolean | null;
   readAloudEnabled: boolean;
   companionEnabled: boolean;
@@ -287,17 +285,9 @@ const normalizeStoredPreferences = (
 });
 
 /**
- * Identity of the preferences file as last read or written. Electron main and
- * the worker both write this file (each process has its own cache), so every
- * load re-stats (~1 µs) and re-reads only when the identity changed.
- * `mtimeMs` alone is not enough: Linux stamps mtime from a coarse clock, so
- * two writes a few ms apart can share it; size and inode (a replace-by-rename
- * gets a new one) narrow that further. A same-size in-place rewrite inside
- * one mtime tick would still match, so, like git's "racily clean" index
- * entries, an entry is trusted only when it was observed more than
- * `RACY_WINDOW_MS` (wider than any filesystem's mtime granularity) after the
- * file's mtime. Until then every load re-reads: a few re-reads right after a
- * save buy an exact cache.
+ * Linux stamps mtime from a coarse clock, so two writes a few ms apart can share
+ * it. Like git's "racily clean" index entries, an entry is trusted only when it
+ * was observed more than `RACY_WINDOW_MS` after the file's mtime.
  */
 type FileKey = {
   readonly filePath: string;
@@ -412,14 +402,6 @@ const writeAtomicSync = (filePath: string, prefs: LocalPreferences) => {
   }
 };
 
-/**
- * Electron main, the runtime worker and the `stella-computer` CLI all write
- * this file. Every write takes the sibling `.lock`, re-reads the file, applies
- * only the patched keys and replaces the file by rename, so a reader never
- * sees a torn file and one process can't drop another's change. An unreadable
- * file is never overwritten with defaults: reads fall back to the last good
- * copy, and a write moves the file aside first.
- */
 let cachedPrefs: CacheEntry | null = null;
 let lastGoodPrefs: LocalPreferences | null = null;
 
@@ -684,7 +666,6 @@ export const getTelemetryEnabled = (stellaDataDir: string): boolean => {
   }
 };
 
-/** Off when chosen off, or, before any choice, when telemetry was turned off. */
 export const getAnonymousCountsEnabled = (stellaDataDir: string): boolean => {
   try {
     const prefs = loadLocalPreferences(stellaDataDir);
@@ -978,8 +959,6 @@ const normalizeRealtimeVoiceSelections = (
   if (typeof record.xai === "string" && record.xai.trim().length > 0) {
     out.xai = record.xai.trim();
   }
-  // A voice saved under the old "gemini" key belongs to the previous
-  // read-aloud model, so it is dropped rather than carried over.
   if (typeof record.stella === "string" && record.stella.trim().length > 0) {
     out.stella = record.stella.trim();
   }

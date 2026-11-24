@@ -93,7 +93,7 @@ const RESUME_GRACE_MS = 1_500;
 const MAX_NO_PROGRESS_BACKFILLS = 3;
 const PROBE_TIMEOUT_MS = 5_000;
 const OPEN_TIMEOUT_MS = 20_000;
-const KEEPALIVE_INTERVAL_MS = 30_000;
+const KEEPALIVE_INTERVAL_MS = SOCKET_STALE_MS / 3;
 
 const performanceNow = (): number =>
   typeof performance === "undefined" ? 0 : performance.now();
@@ -227,9 +227,7 @@ export class ConversationSocket {
       socket.onclose = null;
       try {
         socket.close(1000, "client");
-      } catch {
-        // Already closing; nothing to do.
-      }
+      } catch {}
     }
     this.setStatus("idle", { retryable: true });
   }
@@ -362,21 +360,6 @@ export class ConversationSocket {
     this.reauthTimer = null;
   }
 
-  /**
-   * Refresh the token before it lapses, on the client's own clock.
-   *
-   * The server's `auth.expiring` is only a backstop: it is emitted on the send
-   * path, so a socket that happens to be idle across the token's lifetime is
-   * never warned, lapses, and turns the next wake or scheduled reply into a
-   * 4401 and a reconnect. The period is learned from `ready` rather than
-   * hardcoded, so a deployment that changes the JWT lifetime needs no client
-   * change.
-   *
-   * Backgrounded clients deliberately do NOT refresh — letting an unwatched
-   * socket lapse and reconnect on demand is what keeps an idle conversation
-   * free. The cost while foregrounded is ~12 frames an hour, which is the
-   * protocol's own budget for this.
-   */
   private scheduleReauth(delayMs: number): void {
     if (this.reauthTimer) clearTimeout(this.reauthTimer);
     if (this.reauthPeriodMs <= 0) return;
@@ -393,19 +376,9 @@ export class ConversationSocket {
   }
 
   /**
-   * A slow keepalive, and the only reason the server can tell a live socket
-   * from an abandoned one.
-   *
-   * The DO answers `ping` from its hibernation auto-response, so this never
-   * wakes the object and never reaches application code — but it does stamp
-   * `getWebSocketAutoResponseTimestamp`, which is what the socket-cap reaper
-   * ranks on. Without it every socket looks equally stale and a 17th tab would
-   * evict a live one.
-   *
-   * Foreground only: a backgrounded client is meant to let its socket lapse and
-   * reconnect on demand, which is what keeps an idle conversation free. The
-   * interval is comfortably under `SOCKET_STALE_MS` so one dropped beat is not
-   * mistaken for a dead peer.
+   * The Durable Object answers `ping` from its hibernation auto-response, so this
+   * never wakes it, but it stamps `getWebSocketAutoResponseTimestamp`, which the
+   * socket-cap reaper ranks on.
    */
   private startKeepalive(): void {
     if (this.keepaliveTimer) clearInterval(this.keepaliveTimer);
@@ -416,9 +389,7 @@ export class ConversationSocket {
       if (Date.now() - this.lastFrameAtMs < KEEPALIVE_INTERVAL_MS) return;
       try {
         socket.send("ping");
-      } catch {
-        // The close handler owns reconnection; a failed beat is not an event.
-      }
+      } catch {}
     }, KEEPALIVE_INTERVAL_MS);
   }
 
@@ -551,9 +522,7 @@ export class ConversationSocket {
       socket.onopen = null;
       try {
         socket.close(1000, "resync");
-      } catch {
-        // Already closing.
-      }
+      } catch {}
     }
     this.clearTimers();
     if (!this.stopped) void this.connect();
@@ -692,12 +661,6 @@ export class ConversationSocket {
     this.armResumeGrace();
   }
 
-  /**
-   * `ready` names a head; records follow. If they do not — a dropped replay,
-   * a server that expects the client to ask — one backfill closes it. Without
-   * this the view would sit silently behind forever, which is the one failure
-   * mode a gapless counter cannot detect on its own.
-   */
   private armResumeGrace(): void {
     if (this.resumeTimer) clearTimeout(this.resumeTimer);
     if (this.headSeq < 0 || this.lastSeq >= this.headSeq) return;
@@ -740,9 +703,7 @@ export class ConversationSocket {
         async () => await this.options.getToken({ forceRefresh: true }),
       );
       if (token && isSubprotocolSafe(token)) this.send({ type: "auth", token });
-    } catch {
-      // Same reasoning.
-    } finally {
+    } catch {} finally {
       this.reauthInFlight = false;
     }
   }
@@ -828,9 +789,7 @@ export class ConversationSocket {
       socket.onopen = null;
       try {
         socket.close(1000, "incomplete-history");
-      } catch {
-        // Already closing; the explicit status below is the user-visible fact.
-      }
+      } catch {}
     }
     this.setStatus("blocked", {
       message:
@@ -875,12 +834,6 @@ export class ConversationSocket {
     if (!applied.length) return;
     this.headSeq = Math.max(this.headSeq, this.lastSeq);
     this.options.onEvent({ type: "records", records: applied });
-    // Re-arm rather than cancel. The opening replay is capped at
-    // MAX_RESUME_RECORDS, so a client returning from a long absence can be
-    // handed a burst that still stops short of the head — cancelling on the
-    // first record would leave it silently behind until the next turn happened
-    // to produce a gap. Re-arming debounces: the timer fires only once the
-    // burst has stopped, and only if `lastSeq` is still below `headSeq`.
     this.armResumeGrace();
   }
 

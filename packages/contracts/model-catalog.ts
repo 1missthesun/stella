@@ -42,10 +42,7 @@ export type RuntimeModelCatalogModel = {
   maxTokens: number;
 };
 
-/**
- * Compact per-provider wire tuple: [id, nameIfDifferentOr0, contextWindow, maxTokens, flags]
- * where flags bit 0 = reasoning, bit 1 = image input.
- */
+/** flags: bit 0 = reasoning, bit 1 = image input. */
 export type RuntimeModelCatalogRow = readonly [
   id: string,
   name: string | 0,

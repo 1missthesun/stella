@@ -78,11 +78,8 @@ type SocketConstructor = new (url: string, protocols: string[]) => SocketLike;
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 export type BackendCallOptions = {
-  /** The caller's cancellation or own deadline. */
   signal?: AbortSignal;
-  /** Overrides the call's default budget (`backendCallBudget`). */
   timeoutMs?: number;
-  /** Safe to repeat after a timeout or network failure. Defaults per call name. */
   idempotent?: boolean;
 };
 
@@ -278,7 +275,6 @@ export class BackendClient {
     };
   }
 
-  /** The view's current value: the cached one, else the first delivered. */
   read<K extends ViewName>(
     view: K,
     args: ViewArgs<K>,
@@ -418,8 +414,6 @@ export class BackendClient {
             message: "Sign in to load this.",
             retryable: false,
           });
-          // The token can arrive moments later (right after launch or an update):
-          // keep trying, so open views load without waiting for another to start.
           this.scheduleReconnect();
           return;
         }
@@ -491,9 +485,7 @@ export class BackendClient {
       }
       this.scheduleReconnect();
     };
-    socket.onerror = () => {
-      // `onclose` follows and owns the reconnect.
-    };
+    socket.onerror = () => {};
   }
 
   private handleFrame(data: unknown): void {
@@ -534,9 +526,7 @@ export class BackendClient {
           this.socketTokenExpiryMs = expiry;
           this.sendFrame({ t: "auth", token });
         })
-        .catch(() => {
-          // The server closes the socket at expiry; reconnect handles it.
-        });
+        .catch(() => {});
     }
   }
 
@@ -562,9 +552,7 @@ export class BackendClient {
     if (!socket || socket.readyState !== SOCKET_OPEN) return;
     try {
       socket.send(data);
-    } catch {
-      // A failed send means the socket is closing; `onclose` resubscribes.
-    }
+    } catch {}
   }
 
   private scheduleReconnect(): void {
@@ -645,9 +633,7 @@ export class BackendClient {
       socket.onerror = null;
       try {
         socket.close(code, reason);
-      } catch {
-        // Already closed.
-      }
+      } catch {}
     }
   }
 }

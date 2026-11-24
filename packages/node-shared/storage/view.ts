@@ -100,9 +100,7 @@ const projectEagerEventPayload = (
     if (fitsEnvelope(payload)) {
       return { payload, projected: false };
     }
-  } catch {
-    /* fall through to projection */
-  }
+  } catch {}
   const projected = markProjected(
     projectBoundedJsonValue(payload, 5, {
       stringChars: 768,
@@ -114,9 +112,7 @@ const projectEagerEventPayload = (
     if (fitsEnvelope(projected)) {
       return { payload: projected, projected: true };
     }
-  } catch {
-    /* fall through */
-  }
+  } catch {}
   const minimal = markProjected(
     projectBoundedJsonValue(payload, 3, {
       stringChars: 192,
@@ -128,9 +124,7 @@ const projectEagerEventPayload = (
     if (fitsEnvelope(minimal)) {
       return { payload: minimal, projected: true };
     }
-  } catch {
-    /* fall through */
-  }
+  } catch {}
   return {
     payload: {
       detailOmitted: true,

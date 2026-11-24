@@ -2,16 +2,10 @@
  * Sign in with ChatGPT (SIWC) for open-source apps: ChatGPT plan usage.
  * https://developers.openai.com/siwc/token-sharing-open-source
  *
- * Every place Stella talks to ChatGPT follows that contract, defined once
- * here: an install (or the owner's cloud) is an "agent host" with its own
- * persisted `ext_agent_host_id`; signing in registers a user-defined agent
+ * An install (or the owner's cloud) is an "agent host" with its own persisted
+ * `ext_agent_host_id`; signing in registers a user-defined agent
  * (`client_id=dynamic_agent_client` the first time, the issued `client_id`
- * after that) through a 127.0.0.1 loopback redirect; the host keeps the
- * issued client id, the validated identity and the tokens, refreshes them
- * itself, and calls the public Responses API with the access token.
- *
- * Pure: nothing here touches the network. The calls to auth.openai.com and
- * api.openai.com live in `chatgpt-siwc-flows.ts`.
+ * after that) through a 127.0.0.1 loopback redirect.
  */
 
 import { formEncode } from "./oauth-pkce.js";
@@ -206,9 +200,7 @@ const queryValues = (query: string): Map<string, string[]> => {
       const key = decodeURIComponent(rawKey.replaceAll("+", " "));
       const value = decodeURIComponent(rawValue.replaceAll("+", " "));
       values.set(key, [...(values.get(key) ?? []), value]);
-    } catch {
-      // A malformed pair is skipped.
-    }
+    } catch {}
   }
   return values;
 };
@@ -411,7 +403,6 @@ export const chatGptRequestViolation = (body: Record<string, unknown>): string |
 
 export type { ChatGptProfileSummary, ChatGptProfilesState } from "./chatgpt-siwc-types.js";
 
-/** What Stella keeps from a ChatGPT sign-in to sign in again without re-consent. */
 export type ChatGptSavedRegistration = {
   clientId: string;
   subject?: string;

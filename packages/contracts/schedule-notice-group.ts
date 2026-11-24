@@ -7,25 +7,16 @@ import {
   type ScheduleNoticeKind,
 } from "./schedule-notice.js";
 
-/**
- * Consecutive schedule notices in a chat read as one card: what the run left
- * behind (a schedule made and then removed inside it cancels out), with
- * numbered series ("Indexing 1/9" … "9/9") folded into one line. Every client
- * draws runs from this so desktop, web and phone say the same thing.
- */
-
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 type TranslatePlural = (key: string, count: number, params?: Record<string, string | number>) => string;
 export type ScheduleNoticeI18n = { t: Translate; tPlural: TranslatePlural; locale: string };
 
-/** What a run did to one schedule, net. */
 export type ScheduleNoticeNet = "created" | "updated" | "removed";
 
 export type ScheduleNoticeItem = {
   scheduleId: string;
   kind: ScheduleNoticeKind;
   net: ScheduleNoticeNet;
-  /** The schedule's latest notice in the run. */
   card: ScheduleNoticeCard;
 };
 
@@ -42,25 +33,18 @@ export type ScheduleNoticeEntry =
     };
 
 export type ScheduleNoticeSummary = {
-  /** How many notices the run holds. */
   notices: number;
   entries: ScheduleNoticeEntry[];
   counts: { net: ScheduleNoticeNet; kind: ScheduleNoticeKind; count: number }[];
-  /** Made and removed inside the run: out of the summary, still in the full list. */
   cancelled: ScheduleNoticeItem[];
-  /** The soonest upcoming run among what the run left scheduled. */
   next?: ScheduleNoticeCard;
-  /** Every notice is about a background task's own follow-up. */
   agentOnly: boolean;
-  /** How many agent threads those follow-ups wake. */
   agentThreads: number;
 };
 
-/** A task or watch that wakes an agent's thread rather than coming to the user. */
 export const isAgentScheduleNotice = (card: ScheduleNoticeCard): boolean =>
   card.kind !== "reminder" && Boolean(card.threadId);
 
-/** Shown as its own card: one notice the user will want to see as it is. */
 export const showsAsSingleScheduleCard = (cards: readonly ScheduleNoticeCard[]): boolean =>
   cards.length === 1 && !isAgentScheduleNotice(cards[0]!);
 
@@ -160,7 +144,6 @@ export const summarizeScheduleNotices = (
   };
 };
 
-/** When a notice's schedule runs, as its card says it. */
 export const scheduleNoticeWhenText = (
   card: ScheduleNoticeCard,
   i18n: ScheduleNoticeI18n,
@@ -176,7 +159,6 @@ export const scheduleNoticeWhenText = (
   return scheduleTimingText(timing, i18n);
 };
 
-/** A single notice's status line: "Task scheduled · Tomorrow at 9:00 AM". */
 export const scheduleNoticeStatusText = (
   card: ScheduleNoticeCard,
   i18n: ScheduleNoticeI18n,
@@ -186,10 +168,6 @@ export const scheduleNoticeStatusText = (
     .filter(Boolean)
     .join(" · ");
 
-/**
- * A notice's line in an opened run: the time alone for a schedule that was
- * made (the run's summary already says so), the change and time otherwise.
- */
 export const scheduleNoticeRunRowText = (
   card: ScheduleNoticeCard,
   i18n: ScheduleNoticeI18n,
@@ -229,11 +207,8 @@ const entryLabel = (entry: ScheduleNoticeEntry, i18n: ScheduleNoticeI18n): strin
 };
 
 export type ScheduleNoticeSummaryText = {
-  /** What the run is about: names, series folded ("Indexing, 9 runs, Nov 24 – Dec 2"). */
   headline: string;
-  /** What changed and when it next runs: "10 tasks scheduled · Today at 6:20 AM". */
   status: string;
-  /** Only made-and-removed schedules: the headline reads as removed. */
   undone: boolean;
 };
 

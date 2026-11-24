@@ -17,11 +17,6 @@ export type JournalAgent = {
   followUpTitles?: string[];
 };
 
-/**
- * The label a follow-up `send_message` gives a continued cloud thread: its
- * first line, clipped. Older runs stored it as the thread's description, so
- * a description equal to one of these is the follow-up, not the agent's name.
- */
 export const followUpLabel = (message: string): string => {
   const firstLine = message
     .replace(/\s+/g, " ")

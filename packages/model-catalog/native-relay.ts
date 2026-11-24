@@ -51,7 +51,6 @@ export const connectedCredentialForwardHeaders = (
   headers.set("content-type", "application/json");
   headers.set("authorization", `Bearer ${credential.accessToken}`);
   // The cloud host's Sign in with ChatGPT access token is the whole
-  // credential on the public Responses API.
   return headers;
 };
 

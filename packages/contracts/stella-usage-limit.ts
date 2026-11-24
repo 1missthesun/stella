@@ -50,10 +50,6 @@ const PLAN_LIMIT_PATTERNS = [
   "usage_limit",
 ] as const;
 
-/**
- * The usage limit an error text names, for hosts that only see a string (a
- * model error from the SDK, a failed send, a turn's terminal notice).
- */
 export const stellaUsageLimitOf = (text: string | null | undefined): StellaUsageLimitReason | null => {
   const normalized = (text ?? "").toLowerCase();
   if (!normalized) return null;
@@ -62,17 +58,9 @@ export const stellaUsageLimitOf = (text: string | null | undefined): StellaUsage
   return null;
 };
 
-/**
- * The plain sentence for an error text that names the usage limit: the
- * message the gateway or backend sent (it may arrive inside a raw JSON
- * error body), else the reason's standard wording. Null when the text is
- * about something else.
- */
 export const stellaUsageLimitText = (text: string | null | undefined): string | null => {
   const reason = stellaUsageLimitOf(text);
   if (!reason) return null;
-  // The connect-your-plan wording leads with the person's own plan, whatever
-  // an older gateway or backend still sends.
   if (reason === "free_allowance" && CONNECT_PLAN_OFFER_ENABLED) return CONNECT_PLAN_FREE_ALLOWANCE_MESSAGE;
   const quoted = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text ?? "")?.[1];
   if (quoted) {

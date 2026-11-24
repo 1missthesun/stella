@@ -1,4 +1,3 @@
-/** How long Stella is at one message before the chat offers Stop. */
 export const OVERDUE_TURN_MS = 60_000;
 
 const AGENT_WORK_VARIATIONS: readonly string[] = [
@@ -540,9 +539,7 @@ const tryFriendlyExecCommandStatus = (value: string): string | undefined => {
     ) {
       return "Command failed";
     }
-  } catch {
-    // Truncated or pretty-printed payloads still must not render raw.
-  }
+  } catch {}
   return computeStatus({ toolName: "Bash", seed: "" });
 };
 

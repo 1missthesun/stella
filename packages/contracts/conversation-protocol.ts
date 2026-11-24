@@ -40,12 +40,6 @@ export const MAX_RESUME_RECORDS = 2_000;
 export const MAX_CATCHUP_RESUME_RECORDS = 300;
 export const BACKFILL_BATCH_RECORDS = 200;
 export const SOCKET_STALE_MS = 90_000;
-/**
- * How far ahead of expiry the token is refreshed. Mirrors the server constant,
- * but the CLIENT timer is the primary one: the server's `auth.expiring` rides
- * on the send path, so an idle socket is never warned and would lapse silently,
- * making the next wake or scheduled reply cost a reconnect.
- */
 export const RE_AUTH_LEAD_MS = 60_000;
 export const RATE_BACKFILL_PER_MIN = 20;
 
@@ -53,11 +47,7 @@ export const MAX_CLIENT_RECORDS = 3_000;
 
 export const MAX_BUFFERED_AHEAD = 512;
 
-/**
- * Close codes the hub sends. The close *reason* is capped at 123 bytes by the
- * protocol, so it carries the code only; human text rides a preceding `error`
- * frame.
- */
+/** RFC 6455 caps the close reason at 123 bytes. */
 export const CLOSE_BAD_REQUEST = 4400;
 export const CLOSE_UNAUTHENTICATED = 4401;
 export const CLOSE_FORBIDDEN = 4403;
@@ -131,7 +121,6 @@ export type JournalTurnRecord = JournalRecordBase & {
   source?: string;
   notice?: string;
   wallClockMs?: number;
-  /** Set on a `failed` turn a model's safety system stopped. */
   safeguard?: SafeguardBlockInfo;
 };
 
@@ -533,10 +522,8 @@ const decodeLive = (value: unknown): LiveTurnSnapshot | null => {
 };
 
 /**
- * RFC 6455 subprotocol values must be RFC 7230 tokens. A backend JWT is
- * base64url with `.` separators, all of which are legal — but a token that
- * somehow is not would throw a `SyntaxError` out of the `WebSocket`
- * constructor, which is a crash rather than a readable failure.
+ * RFC 6455 subprotocol values must be RFC 7230 tokens; anything else throws a
+ * `SyntaxError` out of the `WebSocket` constructor.
  */
 const TOKEN_CHARSET = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/;
 

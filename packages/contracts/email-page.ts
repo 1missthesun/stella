@@ -1,16 +1,3 @@
-/**
- * The Email page: one living page that ships with Stella, which Stella fills
- * in from the mail she reads (with the `email` tool's `page`), shown in the
- * Email tab on the desktop, the web and the phone. It is a fixed frame (the
- * HTML below) fed with this data, rendered in the canvas sandbox, and its
- * buttons are canvas actions (see canvas-actions.ts), so a tap reaches Stella
- * as the user's message.
- *
- * Built around decisions, not emails: what needs the user (each with Stella's
- * recommendation and the one step she proposes), what she handled (with
- * undo), threads waiting on someone else, and a count of what she ignored.
- * Related mail is one item.
- */
 import type { CanvasAction } from "./canvas-actions.js";
 
 export const EMAIL_PAGE_CANVAS = "email";
@@ -21,37 +8,24 @@ export const EMAIL_PAGE_SECTIONS: readonly EmailPageSection[] = ["needs_you", "h
 export type EmailPageThread = { account: string; thread: string };
 
 export type EmailPageItem = {
-  /** Stella's id for the item (lowercase letters, digits, '-'). */
   id: string;
   section: EmailPageSection;
-  /** The matter, in a few words ("BlueMetal renewal: sign by Friday"). */
   title: string;
-  /** One or two sentences: what it is and Stella's recommendation (needs you), what she did (handled), who owes what (waiting). */
   gist: string;
-  /** Optional longer explanation, light markdown (paragraphs, "- " lists, **bold**). */
   detail?: string;
-  /** The text of the reply Stella drafted, shown for review under the item. */
   draft?: string;
-  /** The Gmail draft that text is saved as, which sending replaces (not shown). */
   draftId?: string;
-  /** The one step Stella proposes, as its button reads ("Send this reply", "Pay it"); on a handled item, how to undo it ("Undo", "Unarchive"). */
   action?: string;
-  /** Who it is from or with. */
   from?: string;
-  /** How many emails it stands for. */
   count?: number;
   threads?: EmailPageThread[];
-  /** Can't wait: shown first, and a push reaches the user's phone when it is first marked. */
   urgent?: boolean;
-  /** When it last changed. */
   at: number;
-  /** When its newest email arrived (set from its threads by the backend). */
   mailAt?: number;
 };
 
 export type EmailPageIgnored = {
   count: number;
-  /** One line on what it was ("GitHub notifications, receipts and two newsletters"). */
   gist?: string;
   senders?: { name: string; count: number }[];
 };
@@ -59,20 +33,15 @@ export type EmailPageIgnored = {
 export type EmailPage = {
   items: EmailPageItem[];
   ignored: EmailPageIgnored;
-  /** When Stella last read the mail. */
   readAt?: number;
   updatedAt: number;
 };
 
-/** What the frame is fed. */
 export type EmailPageView = {
-  /** Email is on and Gmail is connected through Stella. */
   enabled: boolean;
   accounts: string[];
   page: EmailPage;
-  /** New mail Stella hasn't read yet. */
   unread: number;
-  /** When she reads it next, on her own. */
   nextReadAt?: number;
 };
 
@@ -97,14 +66,12 @@ const line = (value: unknown, max: number): string =>
 const block = (value: unknown, max: number): string =>
   typeof value === "string" ? value.replace(/\r\n?/gu, "\n").replace(/[\u0000-\u0008\u000b-\u001f\u007f]+/gu, "").trim().slice(0, max) : "";
 
-/** One item of a `page` update: an id and the fields to set; null or "" clears an optional field. */
 export type EmailPageItemUpdate = { id: string } & Partial<Record<keyof Omit<EmailPageItem, "id" | "at" | "mailAt">, unknown>>;
 
 export type EmailPageUpdate = {
   items?: EmailPageItemUpdate[];
   remove?: string[];
   ignored?: { count?: unknown; gist?: unknown; senders?: unknown } | null;
-  /** Stella just read the mail (an `inbox` read precedes the update). */
   readAt?: number;
 };
 
@@ -121,11 +88,6 @@ const threadsOf = (value: unknown): EmailPageThread[] | undefined => {
   return out;
 };
 
-/**
- * Applies Stella's update to the page. Returns the new page, problems to tell
- * her (an item she left incomplete, an unknown id), and the items newly marked
- * urgent, which reach the user's phone.
- */
 export const applyEmailPageUpdate = (
   page: EmailPage,
   update: EmailPageUpdate,
@@ -237,7 +199,6 @@ export const applyEmailPageUpdate = (
   };
 };
 
-/** How long something Stella handled stays on the page: long enough to see it and undo it, not for good. */
 export const EMAIL_HANDLED_SHOWN_MS = 3 * 24 * 60 * 60_000;
 
 const stillShown = (item: EmailPageItem, now: number): boolean =>
@@ -258,7 +219,6 @@ export const readEmailPage = (json: string | null | undefined, now: number): Ema
   }
 };
 
-/** How the page reads to Stella: what is on it now, by id, for her next update. */
 export const describeEmailPage = (page: EmailPage): string => {
   if (page.items.length === 0 && page.ignored.count === 0) return "The Email page is empty.";
   const lines = EMAIL_PAGE_SECTIONS.flatMap((section) => {
@@ -280,22 +240,11 @@ export const describeEmailPage = (page: EmailPage): string => {
   ].join("\n");
 };
 
-// Actions --------------------------------------------------------------------
-
 export const EMAIL_PAGE_CHECK_ACTION = "check";
 
-/**
- * The page's actions, from its data: the proposed step and "Tell Stella" on
- * every item, undo on what Stella handled, and checking mail now. Labels name
- * the item so the chat (and Stella) can tell which one was tapped.
- */
 export const EMAIL_PAGE_OFF_ACTION = "off";
 export const EMAIL_PAGE_RULE_REMOVE_PREFIX = "rule-remove:";
 
-/**
- * Actions the host carries out itself rather than sending to Stella: removing
- * one of the user's rules, and turning Email off (after the host confirms).
- */
 export const isEmailPageHostAction = (id: string): boolean =>
   id === EMAIL_PAGE_OFF_ACTION || id.startsWith(EMAIL_PAGE_RULE_REMOVE_PREFIX);
 
@@ -314,14 +263,9 @@ export const emailPageActions = (page: EmailPage, rules: readonly { ruleId: stri
 export const gmailThreadUrl = (thread: EmailPageThread): string =>
   `https://mail.google.com/mail/?authuser=${encodeURIComponent(thread.account)}#all/${encodeURIComponent(thread.thread)}`;
 
-// The frame ------------------------------------------------------------------
-
 /**
- * The page's HTML. It renders only from `stella:data` (an EmailPageView plus
- * `theme` and `locale` from the host), with text set as text, so nothing in
- * an email can become markup or a control. Its script's end tag is joined on
- * outside the raw template: a raw template holding one gets rewritten by
- * source transforms into a helper the renderer can't load.
+ * A script end tag inside a raw template gets rewritten by source transforms into
+ * a helper the renderer can't load, so it is joined on outside the template.
  */
 export const EMAIL_PAGE_FRAME_HTML = String.raw`<!doctype html>
 <html lang="en">

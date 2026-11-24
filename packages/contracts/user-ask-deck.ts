@@ -109,10 +109,6 @@ export const userAskDeckAnswers = (
   }));
 };
 
-/**
- * `provided` / `declined` are secure-input outcomes: `question` is the
- * request's purpose and `answer` only the user's optional note, never a value.
- */
 export type UserAskRecordAnswer = Readonly<{
   question: string;
   answer: string;

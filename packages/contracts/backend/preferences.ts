@@ -71,10 +71,6 @@ export type PreferenceCalls = {
   };
   "support.grant": { args: Record<string, never>; result: Preferences };
   "support.revoke": { args: Record<string, never>; result: Preferences };
-  /**
-   * Works signed in or out. Signed in, the account is recorded and answered;
-   * signed out, `contact` (optional) is how to reply.
-   */
   "feedback.submit": {
     args: {
       message: string;

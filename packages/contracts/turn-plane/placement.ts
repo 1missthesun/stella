@@ -29,12 +29,6 @@ export const SELECTED_DEVICE_NEEDS_CONSENT =
 export type DeviceDestination = {
   deviceId: string;
   label?: string;
-  /**
-   * `remoteExecution === "enabled"`. Kept as its own field because every
-   * eligibility check reads it, and a boolean is what they mean: the four
-   * states exist to explain *why* a device is refusing, not to be re-derived
-   * at each call site.
-   */
   remoteExecutionEnabled: boolean;
   remoteExecution: DeviceRemoteExecution;
   remoteExecutionAskedAt?: number;
@@ -117,7 +111,6 @@ export const EXECUTION_CAPABILITIES = [
   "chatgpt",
   "antigravity",
   "engine-sign-ins",
-  // Has the email tool that keeps the Email page; a device without it gets no email turns.
   "email-page",
 ] as const;
 export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
@@ -298,7 +291,6 @@ export const DEVICE_TERMINAL_RESULT_MAX_BYTES = 1_000_000;
 export type DeviceAvailability = {
   ready: boolean;
   capabilities: ExecutionCapability[];
-  /** Signed in to Google Antigravity, the Gemini models its account has, once known. */
   antigravityModels?: string[];
 };
 
@@ -358,11 +350,6 @@ export type DevicePresenceServerFrame =
       threadId: string;
       ownerGeneration: string;
       text: string;
-      /**
-       * Who sent it, as the cloud judged by the shared rules (`agent-rules`):
-       * the computer holds an "other" one while the task is stopped. Older
-       * backends leave it out; older apps ignore it.
-       */
       sender?: "user" | "starter" | "other";
     }
   | {

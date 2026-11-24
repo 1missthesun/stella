@@ -16,10 +16,8 @@ import { normalizeBillingPlan } from "../billing-plans.js";
 const LEGACY_MANAGED_MODEL_AUDIENCES = new Set(["go", "go_fallback", "pro_fallback"]);
 
 /**
- * Compact-JWS capability signing and verification on WebCrypto only, so the
- * same code runs in workerd, Node, and Bun. ES256 (ECDSA P-256 with
- * SHA-256). WebCrypto emits and expects the raw `r || s` signature layout,
- * which is exactly what JWS specifies, so no DER conversion is needed.
+ * WebCrypto emits and expects the raw `r || s` signature layout JWS specifies,
+ * so no DER conversion is needed.
  */
 
 const textEncoder = new TextEncoder();
@@ -175,8 +173,6 @@ const isFiniteNumber = (value: unknown): value is number =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
-// Capabilities minted before plans were renamed carry go, go_fallback or
-// pro_fallback for the rest of their short lifetime.
 const withCurrentAudience = (claims: unknown): unknown =>
   isRecord(claims) &&
   typeof claims.audience === "string" &&

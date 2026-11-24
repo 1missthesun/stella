@@ -26,7 +26,6 @@ export type DriveFileUrl = {
   version: string;
 };
 
-/** Each path's current content version; null when the path holds no file. */
 export type DriveFileVersions = Record<string, string | null>;
 
 export const DRIVE_VERSIONS_MAX_PATHS = 200;

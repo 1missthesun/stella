@@ -1,42 +1,10 @@
-/**
- * Which devices may hold the user's saved values, decided by the devices
- * themselves, never by the cloud.
- *
- * The devices keep a list: an append-only chain of entries, each naming a
- * device and its two public keys (one to seal values to, one to sign with) and
- * each signed by a device already on the list. The cloud stores the chain and
- * passes it around but can't write a valid entry, so it can't add a device of
- * its own. Every device checks the whole chain itself, remembers the newest
- * entry it has seen (so the chain can't be rolled back or forked under it),
- * and seals values only to devices on it.
- *
- * - The first device founds the list with only itself on it. (A device shown
- *   an empty list by a lying cloud founds one alone, which seals to nothing
- *   but itself.)
- * - Any other device joins when the user allows it on a device already on the
- *   list and confirms on the new device: both show the same 6-digit code. The
- *   code covers the request, both devices' random numbers (each committed
- *   before the other's was seen) and the approving device's view of the list,
- *   so the cloud can neither slip in a device of its own nor show the new
- *   device a list of its own.
- * - A device on the list can take any device off it; values are then never
- *   sealed to that device again.
- *
- * Every record a device seals carries that device's signature, and every
- * deletion too, so the cloud can't plant, change or delete a saved value.
- *
- * The crypto is pure JS (@noble), so the desktop and the phone run the same
- * checks.
- */
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { SavedValueDevice } from "./saved-values.js";
 
 export const SAVED_VALUES_TRUST_VERSION = 1 as const;
-/** How long a device that asked to join waits for someone to allow it. */
 export const SAVED_VALUES_JOIN_TTL_MS = 15 * 60_000;
-/** A device on the list that hasn't been seen this long stops being sealed to until it's back. */
 export const SAVED_VALUES_QUIET_MS = 14 * 24 * 60 * 60_000;
 export const SAVED_VALUES_MAX_ROSTER_ENTRIES = 500;
 
@@ -80,7 +48,6 @@ export const fromBase64Url = (value: string): Uint8Array => {
   return new Uint8Array(out);
 };
 
-/** JSON with object keys sorted at every level: the same bytes on every device. */
 export const stableJson = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map((entry) => stableJson(entry === undefined ? null : entry)).join(",")}]`;
@@ -93,11 +60,8 @@ export const stableJson = (value: unknown): string => {
 export const sha256Hex = (value: string | Uint8Array): string =>
   bytesToHex(sha256(typeof value === "string" ? utf8(value) : value));
 
-// --- Signing keys -----------------------------------------------------------
-
 export type SavedValuesSigningKey = Readonly<{ secretKey: Uint8Array; publicKey: string }>;
 
-/** A device's signing key from its 32 secret bytes (made with the platform's own random source). */
 export const signingKeyFromSecret = (secretKey: Uint8Array): SavedValuesSigningKey => ({
   secretKey,
   publicKey: toBase64Url(ed25519.getPublicKey(secretKey)),
@@ -114,28 +78,21 @@ const verifyText = (publicKey: string, text: string, signature: string): boolean
   }
 };
 
-// --- The list ----------------------------------------------------------------
-
 export type SavedValuesDeviceKind = "computer" | "phone";
 
-/** A device on the list: what it's called and its two public keys (raw, base64url). */
 export type SavedValuesMember = Readonly<{
   deviceId: string;
   kind: SavedValuesDeviceKind;
   name: string;
-  /** Ed25519: what this device signs list entries and records with. */
   signKey: string;
-  /** X25519: what values are sealed to. */
   sealKey: string;
 }>;
 
 type EntryCommon = {
   v: typeof SAVED_VALUES_TRUST_VERSION;
   seq: number;
-  /** The previous entry's hash; empty for the founding entry. */
   prev: string;
   at: number;
-  /** The device whose signing key signed this entry. */
   by: string;
 };
 
@@ -162,7 +119,6 @@ export type SavedValuesRosterMember = SavedValuesMember &
 
 export type SavedValuesRoster = Readonly<{
   members: ReadonlyMap<string, SavedValuesRosterMember>;
-  /** Every device that was ever on the list and was taken off. */
   removed: ReadonlySet<string>;
   head: SavedValuesRosterPin;
 }>;
@@ -171,12 +127,6 @@ export type SavedValuesRosterCheck =
   | Readonly<{ ok: true; roster: SavedValuesRoster }>
   | Readonly<{
       ok: false;
-      /**
-       * empty: no list yet. reset: a different list than the one this device
-       * knew (started over on another device). rollback/fork: the cloud showed
-       * an older or different history than this device has seen. invalid: an
-       * entry that doesn't check out.
-       */
       reason: "empty" | "reset" | "rollback" | "fork" | "invalid";
       detail?: string;
     }>;
@@ -198,10 +148,6 @@ const isMember = (value: unknown): value is SavedValuesMember => {
   );
 };
 
-/**
- * Checks a list from its founding entry, and against what this device saw
- * last (`pin`). Only a list that passes may be sealed to.
- */
 export const checkRoster = (
   entries: readonly SavedValuesRosterEntry[],
   pin?: SavedValuesRosterPin | null,
@@ -296,17 +242,11 @@ export const removeFromRoster = (args: {
 }): SavedValuesRosterEntry =>
   signRosterEntry({ ...nextBody(args.roster, args.by, args.at), op: "remove", target: args.target }, args.key);
 
-/** Whether `device` is on the list with exactly these keys. */
 export const onRoster = (roster: SavedValuesRoster, device: SavedValuesMember): boolean => {
   const member = roster.members.get(device.deviceId);
   return !!member && member.signKey === device.signKey && member.sealKey === device.sealKey;
 };
 
-/**
- * Who a record is sealed to now: this device, and every other device on the
- * list that checked in recently with the same seal key the list has for it.
- * A device that went quiet gets its values again when it's back.
- */
 export const savedValueRecipients = (args: {
   roster: SavedValuesRoster;
   devices: readonly SavedValueDevice[];
@@ -322,8 +262,6 @@ export const savedValueRecipients = (args: {
     })
     .sort((left, right) => left.deviceId.localeCompare(right.deviceId));
 };
-
-// --- Joining ----------------------------------------------------------------
 
 /**
  * A device asking to join. The cloud relays it; the devices check it.
@@ -346,17 +284,13 @@ export const savedValueRecipients = (args: {
 export type SavedValuesJoin = Readonly<{
   joinId: string;
   device: SavedValuesMember;
-  /** sha256 hex of the new device's random number. */
   commit: string;
   createdAt: number;
   expiresAt: number;
-  /** The listed device that added its number, the number (base64url), and its pin of the list. */
   answeredBy?: string;
-  /** The answering device's name, for "Check «name» shows …". */
   answeredByName?: string;
   listedNonce?: string;
   pin?: SavedValuesRosterPin;
-  /** The new device's number, revealed after the listed device's. */
   joinerNonce?: string;
   state: "open" | "allowed" | "declined";
   decidedBy?: string;
@@ -364,7 +298,6 @@ export type SavedValuesJoin = Readonly<{
 
 export const joinCommit = (joinerNonce: string): string => sha256Hex(CODE_CONTEXT + joinerNonce);
 
-/** The 6-digit code both screens show, or null while it can't be made (or doesn't check out). */
 export const joinCode = (
   join: Pick<SavedValuesJoin, "joinId" | "device" | "commit" | "listedNonce" | "joinerNonce" | "pin">,
 ): string | null => {
@@ -385,24 +318,18 @@ export const joinCode = (
   return String(number % 1_000_000).padStart(6, "0");
 };
 
-/** "482913" as "482 913". */
 export const formatJoinCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`;
 
-// --- Records ----------------------------------------------------------------
-
-/** What is sealed: the record, and the signature of the device that sealed it. */
 export type SavedValueEnvelope = Readonly<{
   v: 2;
   by: string;
   sig: string;
-  /** The record (SavedValuePayload) as JSON text: what was signed. */
   payload: string;
 }>;
 
 export const signedEnvelope = (args: { payload: string; by: string; key: SavedValuesSigningKey }): string =>
   JSON.stringify({ v: 2, by: args.by, sig: signText(args.key, RECORD_CONTEXT + args.payload), payload: args.payload });
 
-/** The record inside an envelope, if a device on the list sealed it. */
 export const openEnvelope = (text: string, roster: SavedValuesRoster): string | null => {
   try {
     const envelope = JSON.parse(text) as Partial<SavedValueEnvelope>;

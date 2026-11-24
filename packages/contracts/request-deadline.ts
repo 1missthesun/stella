@@ -51,7 +51,6 @@ export type DeadlineOptions = {
   signal?: AbortSignal | null | undefined;
 };
 
-/** Settles at the deadline (or the caller's abort) even when `work` ignores its signal. */
 export const withDeadline = <T>(
   options: DeadlineOptions,
   work: (signal: AbortSignal) => Promise<T>,
@@ -95,10 +94,7 @@ export const withDeadline = <T>(
   });
 };
 
-/**
- * For text/JSON responses: the deadline covers the headers and the whole body
- * read. Rebuilt from text since React Native's fetch decodes ArrayBuffer bodies as Latin-1.
- */
+/** React Native's fetch decodes ArrayBuffer bodies as Latin-1. */
 export const fetchWithDeadline = async (
   fetchImpl: (input: string, init: RequestInit) => Promise<Response>,
   url: string,
@@ -118,7 +114,7 @@ export const fetchWithDeadline = async (
 const nullBodyStatus = (status: number): boolean =>
   status === 101 || status === 204 || status === 205 || status === 304;
 
-/** Errors the body once no bytes arrive for `idleMs`. Needs ReadableStream bodies (not mobile). */
+/** Needs ReadableStream bodies, which React Native's fetch lacks. */
 export const withIdleBody = (
   response: Response,
   options: { label: string; idleMs: number; onStall?: (error: RequestTimeoutError) => void },
@@ -178,12 +174,7 @@ const rejectOnAbort = (signal: AbortSignal): Promise<never> =>
     else signal.addEventListener("abort", () => reject(abortReason(signal)), { once: true });
   });
 
-/**
- * For streams and big downloads: fails only when the server goes silent for
- * `idleMs` (waiting for headers, or for the next chunk the reader asked for),
- * never for total time. The caller's signal keeps reaching the body.
- * Needs ReadableStream bodies (not mobile).
- */
+/** Needs ReadableStream bodies, which React Native's fetch lacks. */
 export const fetchWithInactivity = async (
   fetchImpl: (input: string, init: RequestInit) => Promise<Response>,
   url: string,
@@ -263,7 +254,6 @@ export const fetchWithInactivity = async (
   });
 };
 
-/** Aborts once `touch()` has not been called for `idleMs`. */
 export const inactivitySignal = (options: {
   label: string;
   idleMs: number;
@@ -322,7 +312,6 @@ export const isTransientRequestError = (error: unknown): boolean => {
   return error instanceof TypeError || /network|fetch failed|ECONNRESET|socket hang up/i.test(error.message);
 };
 
-/** Only for requests that are safe to repeat: reads, or writes keyed by an idempotency id. */
 export const retryIdempotent = async <T>(
   attempt: (index: number) => Promise<T>,
   options: {
@@ -354,7 +343,6 @@ type UploadBody = ArrayBuffer | Uint8Array | Blob;
 const uploadSize = (body: UploadBody): number =>
   body instanceof Blob ? body.size : body.byteLength;
 
-/** PUT to a presigned URL: deadline scaled by size, retried (same bytes, same object) on transient failures. */
 export const putSignedUpload = async (args: {
   url: string;
   body: UploadBody;

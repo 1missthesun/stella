@@ -27,11 +27,6 @@ export type CompanionLayout = {
   height: number;
   edgeH: CompanionEdgeH;
   edgeV: CompanionEdgeV;
-  /**
-   * Where the anchor (the mark's bottom centre) falls inside this window.
-   * Usually a corner of the layout, but the window is clamped to the work
-   * area, so near a screen edge the mark sits elsewhere.
-   */
   anchorX: number;
   anchorY: number;
 };
@@ -62,9 +57,7 @@ export type CompanionMessagePreview = {
   id: string;
   text: string;
   at: number;
-  /** User messages: the optimistic id the stored message was accepted from. */
   originId?: string;
-  /** Assistant messages: the user message this replies to. */
   replyTo?: string;
 };
 
@@ -88,7 +81,6 @@ export const EMPTY_COMPANION_STATE: CompanionState = {
   readAloudPlaying: false,
 };
 
-/** What the pet's + menu and paste can attach to a message. */
 export type CompanionAttachments = Pick<
   ChatContext,
   "files" | "regionScreenshots" | "pastedTexts"

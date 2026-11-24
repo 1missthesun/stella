@@ -1,13 +1,5 @@
-/**
- * Running a command with a secure value in it, without the value ever being
- * part of the command text: `{{secret}}` becomes a reference to an
- * environment variable the runner sets only for that one process, quoted so
- * the value expands as exactly one word wherever the marker stands.
- */
-
 export const SECURE_COMMAND_PLACEHOLDER = "{{secret}}";
 
-/** The variable a runner sets to the value for the one command it runs. */
 export const SECURE_COMMAND_VALUE_ENV = "STELLA_SECURE_VALUE";
 
 type QuoteState = "unquoted" | "double" | "single";
@@ -18,11 +10,6 @@ const POSIX_REFERENCE: Record<QuoteState, string> = {
   single: `'"$${SECURE_COMMAND_VALUE_ENV}"'`,
 };
 
-/**
- * Where the reader is in the command: plain text, inside quotes, or inside a
- * command substitution (`$( … )`, a bracket within one, or backticks), which
- * starts its own quoting even when it sits inside double quotes.
- */
 type Context = "unquoted" | "double" | "single" | "substitution" | "paren" | "backtick";
 
 const quoteStateOf = (context: Context): QuoteState =>
@@ -32,7 +19,6 @@ export type ResolvedSecureCommand =
   | Readonly<{ ok: true; command: string }>
   | Readonly<{ ok: false; error: string }>;
 
-/** A POSIX shell command with every marker replaced by a quoted reference to the variable. */
 export const resolveSecureCommand = (
   command: string,
   placeholder?: string,

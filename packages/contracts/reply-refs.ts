@@ -2,13 +2,7 @@ import { SYSTEM_REMINDER_TAG } from "@stella/contracts/system-reminders";
 
 export const REPLY_REFS_FENCE_TAG = "refs";
 
-/**
- * What a turn writes when it has nothing to post: a reply that is only this
- * (a refs block after it still adds its reactions) is no message at all, on
- * every surface. A written marker instead of an empty reply works on every
- * model: some can't end a turn with no text, and Claude Code nudges one that
- * does.
- */
+/** Some models can't end a turn with no text, and Claude Code nudges one that does. */
 export const SILENT_REPLY_MARKER = "<no-reply/>";
 
 const SILENT_MARKER_RE =
@@ -16,15 +10,12 @@ const SILENT_MARKER_RE =
 const SILENT_TOKEN_RE = /^no[-_](?:reply|response)$/i;
 const SILENT_BRACKETED_RE = /^[(\[]\s*no (?:reply|response)\s*[)\]]$/i;
 /**
- * Placeholders models wrote for "nothing to say" before the marker: Claude
- * Code's own "No response requested." (it writes that line into a session it
- * resumes after an interruption, where the model then reads it as its own
- * earlier reply) and its close variants. Matched only as the whole reply.
+ * Claude Code writes "No response requested." into a session it resumes after
+ * an interruption, where the model then reads it as its own earlier reply.
  */
 const SILENT_PHRASE_RE =
   /^no (?:reply|response|answer)(?: is)? (?:requested|needed|required|necessary|warranted|expected)$/i;
 
-/** Whether a whole reply (refs block already removed) says only "nothing to post". */
 export const isSilentReplyText = (text: string): boolean => {
   const trimmed = text.trim();
   if (!trimmed) return true;
@@ -128,10 +119,6 @@ const parseRefLine = (line: string): RawReplyRef | null => {
   return null;
 };
 
-/**
- * An assistant reply's visible text, its reply refs and its reactions. A reply
- * that says only "nothing to post" (see `isSilentReplyText`) has no text.
- */
 export const splitReplyRefs = (
   text: string,
 ): { text: string; refs: RawReplyRef[]; reactions: ReplyReaction[] } => {

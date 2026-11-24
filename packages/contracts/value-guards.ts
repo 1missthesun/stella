@@ -1,9 +1,3 @@
-// Plain checks for shapes that only need a yes or no. They match the zod
-// rules these files used (an object is any non-null, non-array object; a
-// number is finite; optional means missing or undefined, never null) without
-// loading zod, which costs a window about 650 KB of code and 3 MB of memory
-// at every launch when only a few fields need checking.
-
 export type UnknownRecord = Record<string, unknown>;
 
 export const isRecord = (value: unknown): value is UnknownRecord =>
@@ -36,7 +30,6 @@ export const isOneOf =
   (value: unknown): value is T[number] =>
     typeof value === "string" && (options as readonly string[]).includes(value);
 
-/** Every listed field passes its check; other fields are left alone. */
 export const hasFields = (
   value: unknown,
   fields: Readonly<Record<string, (field: unknown) => boolean>>,

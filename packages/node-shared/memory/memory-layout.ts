@@ -11,7 +11,6 @@ export const MAIN_MEMORY_DISPLAY_PATH = "~/.stella/memories/main.md";
 export const MAIN_MEMORY_INJECTED_MAX_CHARS = 23_000;
 export const MAIN_MEMORY_NEAR_CAP_RATIO = 0.9;
 
-/** The user's standing rules for all work: in Stella's context and in every task's and helper's. */
 export const RULES_MEMORY_FILE = "rules.md";
 export const RULES_MEMORY_RELATIVE_PATH = `${MEMORIES_DIR}/${RULES_MEMORY_FILE}`;
 export const RULES_MEMORY_DISPLAY_PATH = "~/.stella/memories/rules.md";

@@ -70,13 +70,6 @@ export const CAPABILITY_PLAN_LABELS: Record<CapabilityAudience, string> = {
 
 export const CAPABILITY_DENIED_CODE = "CAPABILITY_REQUIRED" as const;
 
-/**
- * Stable marker appended to denial prose so a client that only ever sees a
- * flattened `Error.message` — which is all the runtime hands the renderer
- * once a relay response has been turned into a throw — can still recover
- * which capability was denied. See
- * `desktop-ui/src/features/chat/streaming/stella-provider-error-classifier.ts`.
- */
 export const capabilityDenialMarker = (capability: Capability): string =>
   `[capability/${capability}]`;
 

@@ -1,6 +1,5 @@
 export const SECRET_FRAGMENT_WINDOW = 12;
 export const SECRET_MIN_MATCH_LENGTH = 8;
-/** Shorter secrets (a CVC, a ZIP, a card expiry) are only redacted as whole tokens, never inside longer text. */
 export const SECRET_MIN_EXACT_LENGTH = 3;
 export const SECRET_REDACTION_MARK = "[REDACTED]";
 
@@ -14,7 +13,6 @@ export type SecretFingerprints = SecretFingerprintParams & {
   windows: readonly SecretFingerprintWindow[];
 };
 
-/** `exact` windows hold whole short secrets and match only a complete token of that length. */
 export type SecretFingerprintWindow = {
   length: number;
   hashes: readonly number[];
@@ -185,7 +183,6 @@ export const fingerprintSecrets = (
   };
 };
 
-/** Combines two fingerprint sets made with the same params. */
 export const mergeSecretFingerprints = (
   left: SecretFingerprints,
   right: SecretFingerprints,
@@ -211,8 +208,6 @@ export const mergeSecretFingerprints = (
   };
 };
 
-// A token is letters and digits, optionally joined by / - . (so "11/31" and
-// "94107-1234" are one token, and a sentence's trailing period is not part of it).
 const SHORT_TOKEN_RE = /[\p{L}\p{N}]+(?:[/.-][\p{L}\p{N}]+)*/gu;
 
 const redactExactTokens = (

@@ -5,12 +5,10 @@ export type WindowBounds = {
   height: number;
 };
 
-/** A Show Stella capture waiting in the composer. */
 export type ShowCaptureAttachment = {
   id: string;
   status: "preparing" | "ready" | "failed";
   durationMs: number;
-  /** The capture's folder on this computer. */
   dir: string;
   contactSheet?: {
     path: string;
@@ -18,13 +16,10 @@ export type ShowCaptureAttachment = {
     width: number;
     height: number;
   };
-  /** What a task reads: the numbered moments and what was said at each. */
   summary?: string;
   moments?: number;
-  /** The start of what was said, for the card. */
   said?: string;
   video?: { path: string; name: string; size: number; mimeType: string };
-  /** Opt-in: the recording goes with the message, into the user's Drive. */
   saveVideoToDrive?: boolean;
   error?: string;
 };
@@ -90,7 +85,6 @@ export type ChatContext = {
   files?: ChatContextFile[];
   pastedTexts?: string[];
   showCaptures?: ShowCaptureAttachment[];
-  /** What sent Show Stella captures hold (moments and words): read by the task, never shown as chips. */
   captureSummaries?: string[];
   capturePending?: boolean;
   windowScreenshot?: {
@@ -122,9 +116,7 @@ export type LocalLlmCredentialSummary = {
   label: string;
   status: "active";
   updatedAt: number;
-  /** The account a sign-in belongs to (an email), when the provider says. */
   account?: string;
-  /** The plan that sign-in runs on, when the provider says. */
   plan?: string;
 };
 

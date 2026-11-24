@@ -1,8 +1,3 @@
-/**
- * Who a Stella session token belongs to, as a stable key: the backend's token
- * identifier, else the issuer and subject. Records and caches keyed by owner
- * use it so one account's data never shows under another.
- */
 export const resolveJwtOwnerScope = (
   token: string | null | undefined,
 ): string | null => {

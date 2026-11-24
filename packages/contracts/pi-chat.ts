@@ -81,7 +81,6 @@ export type PiEntry = {
 export type PiToolSlot = {
   callId: string;
   name: string;
-  /** `sleeping` and `waiting`: a call that parked (pi-durable 1.6) until it is woken; it has no output meanwhile. */
   status: "pending" | "running" | "sleeping" | "waiting" | "done";
   output?: string;
   entry?: number;
@@ -141,14 +140,11 @@ export type PiChatEvent =
       state: "usage-limit";
       text: string;
       until?: number;
-      /** What the limit paused in this chat; the card's text and Resume come from it. */
       paused?: import("./claude-usage-limit.js").UsageLimitSummary;
     }
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
-  /** No Claude login here can answer: the reply waits for a sign-in (email: the login to renew). */
   | { type: "engine_status"; state: "login-required"; text: string; email?: string }
   | { type: "engine_status"; state: "login-required-end"; text: string; resumed: boolean }
-  /** The chat's unresolved safety block, or null once nothing is blocked. */
   | { type: "safeguard"; notice: SafeguardNotice | null }
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
   | { type: "brain"; brain: PiChatBrainResult }
@@ -203,9 +199,7 @@ export type PiChatRequest =
   | { op: "journaled"; conversationId: string; requestId: string }
   | { op: "files"; conversationId: string }
   | { op: "journal"; conversationId: string }
-  /** A choice on the safety-block card: remove the blocked messages, continue on another model, or start fresh. */
   | { op: "safeguard"; conversationId: string; action: SafeguardAction }
-  /** Resume on the usage-limit card: continue everything the limit paused in this chat. */
   | { op: "resumeUsageLimit"; conversationId: string }
   | {
       op: "brain";
@@ -213,7 +207,6 @@ export type PiChatRequest =
       fresh?: boolean;
     }
   | { op: "move"; conversationId: string; target: PiChatMoveTarget }
-  /** Copy a chat kept on this computer into an account conversation, once the user chose to sync it. */
   | { op: "importLocal"; conversationId: string; fromConversationId: string };
 
 export type PiChatImportLocalResult = { imported: number };
@@ -252,7 +245,6 @@ export type PiChatAgent = {
   agentStatus?: AgentStatus;
   waitingFor?: string;
   paused?: LocalAgentPause;
-  /** Running, and on one tool call past every time limit. */
   longCall?: CurrentToolCall;
 };
 
@@ -479,8 +471,6 @@ export const piTerminalNotice = (message: {
           (message.errorMessage?.trimStart().startsWith("[claude-code/not-installed]")
             ? "Stella couldn't answer: Claude Code isn't installed on this computer."
             : null) ??
-          // A Claude login that needs signing in again says so in one
-          // sentence (written by the engine), with nothing stacked on it.
           (message.errorMessage?.trimStart().startsWith("[claude-code/login-required]")
             ? message.errorMessage.replace(ENGINE_ERROR_MARK, "").trim()
             : null) ??
@@ -509,7 +499,6 @@ export const isPiAgentText = (text: string): boolean => {
   );
 };
 
-/** Opens a task's note asking Stella before it asks the user; the turn it starts stays out of the chat. */
 export const PI_ASK_FIRST_PREFIX = "Before asking the user, I'm checking with you.";
 
 const ASK_FIRST_NOTE_RE = /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n([\s\S]*)\n<\/agent-message>$/;

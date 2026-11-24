@@ -30,9 +30,7 @@ const restrictModeSync = (targetPath: string, mode: number) => {
   }
 };
 
-// One inheritable (OI)(CI) grant per directory covers every file written in
-// it later; each icacls spawn is Defender-scanned, so a directory is not
-// granted twice in a process once icacls has succeeded.
+// Each icacls spawn is Defender-scanned.
 const grantedWindowsDirs = new Set<string>();
 
 const windowsDirGrant = (dirPath: string) => {
@@ -95,7 +93,6 @@ const sleepSync = (ms: number) => {
 
 const syncDirSync = (dirPath: string) => {
   // A directory can't be opened for fsync on Windows; there the rename is
-  // durable once MoveFileEx returns.
   if (IS_WINDOWS) return;
   try {
     const fd = fs.openSync(dirPath, "r");
@@ -136,12 +133,6 @@ const renameReplacing = async (from: string, to: string) => {
   }
 };
 
-/**
- * Writes the whole file or nothing: the content goes to a temp file beside
- * it, is flushed to disk, and replaces the file by rename. Writing in place
- * left torn files (a crash or power loss mid-write keeps part of the new
- * content and the old file's tail), which readers then took for empty.
- */
 export const writePrivateFile = async (
   filePath: string,
   content: string,
@@ -186,19 +177,12 @@ export const writePrivateFileSync = (
   } catch (error) {
     try {
       fs.rmSync(tempPath, { force: true });
-    } catch {
-      // The temp file is gone already or can't be removed; the error below matters more.
-    }
+    } catch {}
     throw error;
   }
   syncDirSync(dir);
 };
 
-/**
- * The text of the first complete JSON value at the start of `raw`, or null.
- * A file torn by an in-place write is the new content followed by the old
- * file's tail, so this is the newest whole state it holds.
- */
 export const leadingJsonValue = (raw: string): string | null => {
   let index = 0;
   while (index < raw.length && /\s/.test(raw[index]!)) index += 1;
@@ -228,23 +212,13 @@ export type PrivateJsonRead =
   | { kind: "ok"; value: unknown }
   | {
       kind: "damaged";
-      /** What could be saved, already written back in place of the damaged file. */
       recovered: unknown;
-      /** Where the damaged file was copied, beside it, before anything else touched it. */
       damagedCopy: string | null;
       error: string;
     };
 
-/** Damaged versions already reported in this process (path, size, mtime), so a hot reader doesn't copy one on every read. */
 const reportedDamage = new Map<string, Extract<PrivateJsonRead, { kind: "damaged" }>>();
 
-/**
- * Reads a JSON state file without ever silently treating a damaged one as
- * empty: the damaged file is copied beside it (`<name>.damaged-<time>`),
- * the newest whole state at its start is recovered and written back, and
- * the damage is logged. The caller decides what else to say (the local
- * scheduler tells the user and Stella which schedules came back).
- */
 export const readPrivateJsonFileSync = (filePath: string, label = path.basename(filePath)): PrivateJsonRead => {
   let raw: string;
   let stat: fs.Stats;
@@ -298,11 +272,6 @@ export const readPrivateJsonFileSync = (filePath: string, label = path.basename(
   }
 };
 
-/**
- * The JSON in a state file, or undefined when it is missing. A damaged file
- * gives what could be recovered from it (copied aside and logged by
- * `readPrivateJsonFileSync`), never a silent empty.
- */
 export const readPrivateJsonValueSync = (filePath: string, label?: string): unknown => {
   const read = readPrivateJsonFileSync(filePath, label);
   return read.kind === "ok" ? read.value : read.kind === "damaged" ? read.recovered : undefined;

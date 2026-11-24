@@ -1,10 +1,3 @@
-/**
- * Chat attachments that live in the owner's Drive, shared by the web and
- * desktop renderer, the mobile app and the runtime: where an upload lands,
- * the name shown for it, and the file list a prompt carries.
- */
-
-/** Drive folders chat uploads land in: the web renderer's and the phone's. */
 export const CHAT_ATTACHMENT_FOLDERS = {
   web: "Chat Attachments",
   mobile: "uploads",
@@ -12,7 +5,6 @@ export const CHAT_ATTACHMENT_FOLDERS = {
 
 const MAX_FILE_NAME_CHARS = 180;
 
-/** A Drive-safe file name: its last path segment, without control characters. */
 export const chatAttachmentFileName = (
   name: string,
   fallback = "attachment",
@@ -24,10 +16,6 @@ export const chatAttachmentFileName = (
   return (cleaned || fallback).slice(-MAX_FILE_NAME_CHARS);
 };
 
-/**
- * `<folder>/<YYYY-MM-DD>/<prefix>-<name>`. The prefix keeps same-named files
- * from colliding; `taken` adds a `-2`, `-3`… suffix when a path is reserved.
- */
 export const chatAttachmentDrivePath = (args: {
   folder: string;
   name: string;
@@ -53,7 +41,6 @@ const CHAT_UPLOAD_PATH = new RegExp(
   "i",
 );
 
-/** The name to show for a chat upload: its own name, without the path's prefix. */
 export const chatAttachmentDisplayName = (
   path: string,
   name?: string | null,
@@ -67,7 +54,6 @@ export const chatAttachmentDisplayName = (
     : shown;
 };
 
-/** Appends the Drive file list the agent reads its attachments from. */
 export const withAttachmentPreamble = (
   prompt: string,
   paths: readonly string[],
@@ -80,7 +66,6 @@ export const withAttachmentPreamble = (
 const ATTACHMENT_PREAMBLE = /(?:^|\n\n)Attached in my drive:\n((?:- [^\n]+(?:\n|$))+)$/;
 const MAX_LISTED_PATH_CHARS = 400;
 
-/** Splits the file list `withAttachmentPreamble` appended off a prompt. */
 export const splitAttachmentPreamble = (
   text: string,
 ): { text: string; paths: string[] } => {

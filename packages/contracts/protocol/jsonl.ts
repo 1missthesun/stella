@@ -98,11 +98,9 @@ export const attachJsonRpcPeerToStreams = (args: {
   lineReader.on("close", () => {
     closePeer(createRuntimeUnavailableError("Runtime RPC transport is closed."));
   });
-  // readline passes its input's errors on as its own "error" event: a peer that
-  // dies mid-read (a runtime killed or restarting for an Update) resets the
-  // socket, and with no listener here that reset is an uncaught exception that
-  // takes the whole app down. The connection just closes instead. Kept after
-  // dispose, since the stream can still fail then.
+  // readline re-emits its input's errors as its own "error" event; a peer that
+  // dies mid-read resets the socket, and without a listener that reset is an
+  // uncaught exception.
   lineReader.on("error", (error: unknown) => {
     args.onError?.(error);
     closePeer(error);

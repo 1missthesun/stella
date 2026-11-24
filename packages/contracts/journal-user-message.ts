@@ -4,7 +4,6 @@ import { PASTED_TEXT_ONLY_PROMPT } from "./pasted-text.js";
 
 export type JournalPastedText = { lines: number; chars: number; text?: string };
 
-/** What the composer showed beside the prompt (paste chips, quotes, selections). */
 export type JournalUserDisplayContext = {
   pastedTexts?: JournalPastedText[];
   appSelectionLabels?: string[];
@@ -20,20 +19,13 @@ export type JournalDeclaredFile = {
   size?: number;
 };
 
-/** A user journal message as every chat surface shows it. */
 export type JournalUserMessage = {
-  /** The user's words: the display text when one was stored, else the prompt without its Drive file list. */
   text: string;
-  /** The display text the sender stored, when it differs from the prompt. */
   displayText?: string;
-  /** Drive files sent with the message, from the turn's attachments and the prompt's file list. */
   drivePaths: string[];
-  /** Images sent inline as base64. */
   inlineImages: { data: string; mimeType: string }[];
-  /** Local files the sender declared (desktop turns). */
   declaredFiles: JournalDeclaredFile[];
   displayContext?: JournalUserDisplayContext;
-  /** Nothing to show: no words, files, images, context or other content. */
   blank: boolean;
 };
 

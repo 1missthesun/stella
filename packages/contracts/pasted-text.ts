@@ -5,13 +5,11 @@ import {
   type CloudTurnContext,
 } from "./turn-plane/turn-start.js";
 
-/** A paste at least this long becomes a "Pasted text" attachment instead of composer text. */
 export const PASTE_AS_ATTACHMENT_MIN_CHARS = 1200;
 export const PASTE_AS_ATTACHMENT_MIN_LINES = 18;
 
 export const PASTED_TEXT_PREVIEW_MAX_CHARS = 4000;
 
-/** The prompt a turn carries when the user sent only pasted text; chat surfaces show the paste instead. */
 export const PASTED_TEXT_ONLY_PROMPT = "(Pasted text)";
 const QUOTED_TEXT_PREVIEW_MAX_CHARS = 2000;
 
@@ -54,9 +52,7 @@ export const normalizePastedText = (text: string): string =>
   text.replace(/\s+$/, "");
 
 export type ChatSendParts = {
-  /** The words sent as the turn's prompt; always within TURN_PROMPT_MAX_CHARS. */
   prompt: string;
-  /** The text the user's bubble shows. */
   displayText: string;
   pastedTexts: string[];
   context?: CloudTurnContext;
@@ -71,11 +67,6 @@ export class ChatSendTooLargeError extends Error {
   }
 }
 
-/**
- * Splits what the composer holds into a prompt that fits a turn and context
- * that carries the rest: pasted text, quotes, and typed text too long for a
- * prompt, which travels as pasted text like a long paste does.
- */
 export const chatSendParts = (input: {
   typed: string;
   pastedTexts?: readonly string[];

@@ -1,10 +1,3 @@
-/**
- * Where a secure value went after Stella filled it into a web page, and how
- * to take it back out of a field it should not be in. The page scripts find
- * the value by a salted hash and its length, so the value itself is never
- * part of a script, and what they return describes fields, never contents.
- */
-
 export type SecureFillMode = "fill" | "move" | "clear";
 
 export const SECURE_FILL_MODES: readonly SecureFillMode[] = ["fill", "move", "clear"];
@@ -22,26 +15,20 @@ export type SecureFieldDescription = Readonly<{
 }>;
 
 export type SecureFillPageReport = Readonly<{
-  /** Fields that hold exactly the value now (first few). */
   landed: readonly SecureFieldDescription[];
   landedCount: number;
-  /** How many elements the selector matched, when it is CSS the page can run. */
   selectorMatches?: number;
-  /** The first element the selector matched, and whether it holds the value. */
   target?: SecureFieldDescription & Readonly<{ holdsValue: boolean; length: number; editable: boolean }>;
   cleared: number;
 }>;
 
 export type SecureFillOutcome = Readonly<{
   tabId: number | string;
-  /** Fields the value was cleared from before filling (mode "move"/"clear") or after a wrong landing. */
   cleared: number;
-  /** Visible fields the value landed in instead of the target, cleared again. */
   clearedWrong?: number;
   report?: SecureFillPageReport | null;
 }>;
 
-/** 53-bit string hash (cyrb53); the page script carries the same function. */
 export const secureFillHash = (value: string, seed: number): number => {
   let h1 = 0xdeadbeef ^ seed;
   let h2 = 0x41c6ce57 ^ seed;
@@ -57,15 +44,6 @@ export const secureFillHash = (value: string, seed: number): number => {
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
-/**
- * A synchronous page expression that finds every editable field holding the
- * value (in the page, its open shadow roots and same-origin frames), reports
- * them and the selector's target, and with `clear` empties them the way
- * typing would (so frameworks see the change).
- *
- * `clearOnly: "visible-not-target"` clears only visible fields other than the
- * selector's target: a wrong landing, while leaving the right field alone.
- */
 export const secureFieldScript = (input: {
   hash: number;
   seed: number;
@@ -216,10 +194,6 @@ const describeFieldText = (field: SecureFieldDescription): string => {
   return facts.length > 0 ? `${where} (${facts.join(", ")})` : where;
 };
 
-/**
- * The receipt text for a secure fill: where the value is now, and what to do
- * when that is the wrong place. Returns whether it reached the target.
- */
 export const secureFillReceipt = (input: {
   label: string;
   selector: string;

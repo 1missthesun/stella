@@ -7,7 +7,6 @@ export const GATEWAY_PREPARE_PATH = "/v1/models/prepare" as const;
 export const GATEWAY_RESOLVE_PATH = "/v1/models/resolve" as const;
 export const GATEWAY_SESSION_CAPABILITY_PATH = "/v1/capabilities/session" as const;
 export const GATEWAY_HEALTH_PATH = "/healthz" as const;
-/** Gemini Decision 1 for Stella's own background decisions (email sorting), served through OpenRouter. */
 export const GATEWAY_DECISIONS_PATH = "/v1/decisions" as const;
 export const GATEWAY_DECISIONS_MODEL = "google/gemini-decision-1" as const;
 export const GATEWAY_DECISIONS_MAX_BODY_BYTES = 6 * 1024 * 1024;
@@ -20,14 +19,8 @@ export const GATEWAY_BYOK_PLACEHOLDER_KEY = "stella-account-key" as const;
 export const gatewayByokRelayPath = (provider: string): string =>
   `${GATEWAY_BYOK_RELAY_PREFIX}/${encodeURIComponent(provider)}`;
 
-/**
- * On a BYOK response the provider itself refused (4xx), the provider's own
- * reason, cleaned of keys and cut short, URI-encoded. Absent when the gateway
- * refused the request, so a caller can tell the two apart.
- */
 export const GATEWAY_BYOK_REJECTION_HEADER = "x-stella-byok-rejection" as const;
 
-/** What a user reads when their provider refused a model request. */
 export const byokRejectionNotice = (providerName: string, header: string | null): string | undefined => {
   if (header === null) return undefined;
   let reason = "";

@@ -1,8 +1,5 @@
 /**
- * Brand glyph markup (24x24 viewBox), sourced from @lobehub/icons-static-svg.
- * `BRAND_ICON_MARKUP` glyphs are monochrome (fill: currentColor);
- * `BRAND_ICON_COLOR_MARKUP` glyphs embed their own brand fills and win when
- * present. Rendered by BrandIcon.
+ * Sourced from @lobehub/icons-static-svg.
  * @generated from the lobehub static SVG set - do not hand-edit paths.
  */
 export const BRAND_ICON_MARKUP: Record<string, string> = {

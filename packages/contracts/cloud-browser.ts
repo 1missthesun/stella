@@ -63,10 +63,7 @@ const LIVE_VIEW_TOOLBAR_HEIGHT = 50;
 const LIVE_VIEW_WIDTH = { min: 320, max: 1920 } as const;
 const LIVE_VIEW_HEIGHT = { min: 320, max: 1600 } as const;
 
-/**
- * The remote tab size that fills a Live View frame of this size. Live View
- * draws the tab 1:1 under its own toolbar and crops anything larger.
- */
+/** Live View draws the tab 1:1 under its own toolbar and crops anything larger. */
 export const cloudBrowserLiveViewViewport = (
   frameWidth: number,
   frameHeight: number,
@@ -256,20 +253,13 @@ export const CLOUD_BROWSER_METHODS = [
 
 export type CloudBrowserMethod = (typeof CLOUD_BROWSER_METHODS)[number];
 
-/** Methods that hand the browser to the user and wait until they finish. */
 export const CLOUD_BROWSER_HANDOFF_METHODS: ReadonlySet<string> = new Set<CloudBrowserMethod>([
   "requestLoginTakeover",
   "requestDeviceCodeFixture",
 ]);
 
-/** How a sign-in handed to the user ended. */
 export type CloudBrowserHandoffResult = "approved" | "canceled" | "expired" | "failed";
 
-/**
- * The `browser` global of a cloud agent's `code`, for its tool description.
- * `screenshots` says where a screenshot goes; `handoffEnd` what the agent
- * sees once the user finishes a sign-in.
- */
 export const cloudBrowserCodeSentence = (options: {
   screenshots: string;
   handoffEnd: string;

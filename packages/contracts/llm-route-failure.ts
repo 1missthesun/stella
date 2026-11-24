@@ -1,16 +1,3 @@
-/**
- * Shared (browser-safe) vocabulary for "couldn't resolve an LLM route".
- *
- * The runtime route resolver (runtime/kernel/model-routing.ts) builds these
- * failures and throws `formatLlmRouteFailure(...)`. The desktop toast resolver
- * (desktop/src/features/chat/streaming/stella-provider-error-toast.ts) maps the
- * thrown message back to an actionable toast via `detectLlmRouteFailureKind`.
- *
- * The two ends are linked by the stable `kind` markers embedded in the
- * message — NEVER by matching human-readable prose. Reworded or translated copy
- * therefore can't silently drop the specific error handling. Keep the
- * `formatLlmRouteFailure`/`detectLlmRouteFailureKind` round-trip aligned.
- */
 import { getProviderDisplayName } from "./provider-display.js";
 
 export type LlmRouteFailure =
@@ -31,10 +18,6 @@ export type LlmRouteFailure =
 
 export type LlmRouteFailureKind = LlmRouteFailure["kind"];
 
-/**
- * Stable, machine-readable markers appended to thrown route-failure messages.
- * UI matches on these tokens, not the surrounding prose.
- */
 export const LLM_ROUTE_FAILURE_MARKERS: Record<LlmRouteFailureKind, string> = {
   "unsupported-provider": "stella.route_error.unsupported_provider",
   "unknown-model": "stella.route_error.unknown_model",
@@ -42,7 +25,6 @@ export const LLM_ROUTE_FAILURE_MARKERS: Record<LlmRouteFailureKind, string> = {
   "no-stella-route": "stella.route_error.no_stella_route",
 };
 
-/** The marker a thrown message ends with; `provider` names the provider whose key is missing. */
 export const llmRouteFailureMarker = (
   kind: LlmRouteFailureKind,
   provider?: string,
@@ -68,11 +50,6 @@ const describeSelection = (
     : `selected model "${model}"`;
 };
 
-/**
- * Render a route failure into a user-facing message with a trailing stable
- * marker. The prose is for humans and logs; the marker is the contract the UI
- * matches on.
- */
 export const formatLlmRouteFailure = (failure: LlmRouteFailure): string => {
   switch (failure.kind) {
     case "missing-credential": {
@@ -111,10 +88,6 @@ export const formatLlmRouteFailure = (failure: LlmRouteFailure): string => {
 
 const MARKER_PATTERN = /\[(stella\.route_error\.[a-z_]+)(?: provider=([A-Za-z0-9._-]+))?\]/;
 
-/**
- * Recover the failure kind, and for a missing credential the provider whose
- * key is missing, from a thrown message via its stable marker.
- */
 export const detectLlmRouteFailure = (
   message: string | null | undefined,
 ): { kind: LlmRouteFailureKind; provider?: string } | null => {
@@ -127,10 +100,6 @@ export const detectLlmRouteFailure = (
   return match[2] ? { kind, provider: match[2] } : { kind };
 };
 
-/**
- * Recover the failure kind from a thrown message via its stable marker.
- * Returns null when the message isn't a recognized route failure.
- */
 export const detectLlmRouteFailureKind = (
   message: string | null | undefined,
 ): LlmRouteFailureKind | null => {

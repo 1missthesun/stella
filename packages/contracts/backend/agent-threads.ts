@@ -125,7 +125,6 @@ export const agentMessageDelivery = (result: AgentControlResult): AgentMessageDe
   ...(result.note ? { note: result.note } : {}),
 });
 
-/** The owner's answer to a cloud task's send_message: the tool result, and whether it was for whoever started the task. */
 export type AgentTaskMessageResult = { text: string; starter: boolean };
 
 export type AgentThreadPlacement = "cloud" | "computer";
@@ -137,7 +136,6 @@ export type AgentThreadSummary = {
   parentTurnId?: string;
   parentThreadId?: string;
   executorDeviceId?: string;
-  /** The computer that runs it: where it was dispatched, or for a computer task, where it started. */
   runsOnDeviceId?: string;
   description: string;
   placement: AgentThreadPlacement;
@@ -168,7 +166,6 @@ export type AgentThreadControl = {
 
 type Origin = { originDeviceId: string; originConversationId: string };
 
-/** Why a computer could not carry an agent on, so another place took it over. */
 export type AgentMoveReason = "offline" | "not_ready" | "declined" | "usage_limit" | "gone";
 
 export type AgentMoveResult = AgentThreadControl & {
@@ -180,7 +177,6 @@ export type AgentMoveResult = AgentThreadControl & {
   cwd?: string;
 };
 
-/** One task rule the event log checks (see the owner store's agent-invariants). */
 export type AgentInvariantKind =
   | "report_to_stella_not_lead"
   | "report_lost"
@@ -192,7 +188,6 @@ export type AgentInvariantKind =
 export type AgentInvariantReport = {
   since: number;
   checks: Array<{ kind: AgentInvariantKind; count: number; examples: string[] }>;
-  /** Turns a placed task's computer ran by itself, recorded on its own thread; `withoutStart` came from older apps. */
   hostedTurns: { recorded: number; withoutStart: number };
 };
 
@@ -329,18 +324,8 @@ export type AgentThreadCalls = {
       status: AgentAttemptOutcome | "paused";
       result?: string;
       error?: string;
-      /** It ended its turn waiting (end_turn_waiting): recorded with its result, never reported. */
       waitingFor?: string;
-      /**
-       * What its computer saw could wake it as it waited (helpers at work, its
-       * background commands, schedules aimed at it, a question to its starter),
-       * in words. Empty: nothing could. Absent: the computer could not tell.
-       */
       wakers?: string[];
-      /**
-       * Its finished report (explicit messaging): filed at once, even with a
-       * message queued for it. Older desktops leave it off.
-       */
       done?: true;
     };
     result: { updated: boolean; status: string };
@@ -363,17 +348,10 @@ export type AgentThreadCalls = {
     args: { originDeviceId: string; ownerGeneration: string };
     result: Array<{ threadId: string; conversationId: string; attemptGeneration: number }>;
   };
-  /** How often each task rule was broken in the last `days` (default 7), from the agent event log. */
   "agentThreads.invariants": {
     args: { days?: number };
     result: AgentInvariantReport;
   };
-  /**
-   * A computer records that a usage limit paused (`held`) or released
-   * (`resumed`) its reply (no threadId) or one of its tasks in a chat. The
-   * chat's journal gets the card every device shows; `holdId` makes repeats
-   * of one event land once.
-   */
   "usageLimits.note": {
     args: {
       conversationId: string;
@@ -387,21 +365,10 @@ export type AgentThreadCalls = {
     };
     result: { posted: boolean };
   };
-  /**
-   * Resume pressed on a chat's usage-limit card: work the cloud holds for it
-   * continues now, and a Resume card tells every computer to continue what it
-   * holds. Runs on whatever account and engine are selected now.
-   */
   "usageLimits.resume": {
     args: { conversationId: string; requestId: string };
     result: { cloud: number };
   };
-  /**
-   * A choice on a chat's safety block (`@stella/contracts/safeguard-block`):
-   * the chat's journal settles it and posts the card every host applies. A
-   * switch of a turn the cloud ran also selects the model there and
-   * continues the reply.
-   */
   "safeguards.resolve": {
     args: { conversationId: string; action: SafeguardAction; requestId: string };
     result: { card: SafeguardCard };

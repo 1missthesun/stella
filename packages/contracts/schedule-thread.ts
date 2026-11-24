@@ -33,7 +33,6 @@ const bodyOf = (name: string, fire: ScheduledThreadFire): string => {
   }
 };
 
-/** The message an existing agent thread gets when a schedule targeting it fires. */
 export const scheduledThreadMessage = (schedule: { scheduleId: string; name: string }, fire: ScheduledThreadFire): string => {
   const head = formatAgentMessage({ threadId: schedule.scheduleId, label: `schedule "${schedule.name}"` }, "x", {
     relation: AGENT_MESSAGE_SCHEDULE_RELATION,
@@ -46,6 +45,5 @@ export const scheduledThreadMessage = (schedule: { scheduleId: string; name: str
   );
 };
 
-/** Put ahead of the run Stella gets instead when the target thread can't take it. */
 export const scheduledThreadFallbackNote = (threadId: string, reason: string): string =>
   `(This schedule was set to wake agent ${threadId}, which ${reason}, so it comes to you instead. Handle it, or start an agent for it.)`;

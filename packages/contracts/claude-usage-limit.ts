@@ -1,7 +1,6 @@
 /**
- * A Claude usage limit. `monthly` is the account's monthly spend cap: it does
- * not lift at the session reset Claude may name alongside it, so nothing
- * retries it on a timer and `resetsAt` is left out.
+ * Claude's monthly spend cap does not lift at the session reset Claude may name
+ * alongside it.
  */
 export type ClaudeUsageLimit = { resetsAt?: number; monthly?: true };
 
@@ -124,13 +123,6 @@ export const formatClaudeUsageLimitReset = (resetsAt: number, now = Date.now()) 
   return `${day} ${time}`;
 };
 
-/**
- * A journaled usage-limit event in a chat. `held` pauses one piece of work
- * (the reply when `threadId` is absent, else that task); `resumed` ends that
- * pause. A `resumed` card with `resume: true` is a Resume press: every pause
- * in the chat continues now, wherever it runs. `deviceId` names the computer
- * a pause is held on (absent: the cloud).
- */
 export type ClaudeUsageLimitCard = {
   type: "usage-limit";
   state: "held" | "resumed";
@@ -139,7 +131,6 @@ export type ClaudeUsageLimitCard = {
   deviceId?: string;
   monthly?: true;
   resume?: true;
-  /** The Resume press, so the device that pressed it knows its own card. */
   requestId?: string;
 };
 
@@ -159,32 +150,23 @@ export const parseClaudeUsageLimitCard = (value: unknown): ClaudeUsageLimitCard 
   };
 };
 
-/** Pauses older than this with a reset time long past are leftovers, not live work. */
 export const USAGE_LIMIT_PAUSE_STALE_MS = 15 * 60_000;
-/** A pause with no reset time (a monthly cap, or an unnamed reset) stays live this long. */
 export const USAGE_LIMIT_PAUSE_UNTIMED_MS = 24 * 60 * 60_000;
 
-/** A pause this soon after a Resume press means Resume ran into the limit again. */
 export const USAGE_LIMIT_STILL_LIMITED_MS = 90_000;
 
-/** The pause key of a card: the task's thread id, or "" for the reply. */
 export const usageLimitPauseKey = (card: Pick<ClaudeUsageLimitCard, "threadId">): string => card.threadId ?? "";
 
 export type UsageLimitPauses = {
-  /** Live pauses by key ("" = the reply). */
   held: Map<string, { until?: number; monthly?: true; at: number; deviceId?: string }>;
-  /** When Resume was last pressed in this chat. */
   resumedAt?: number;
-  /** The last event was a Resume press or every pause ended after one. */
   resumed: boolean;
 };
 
 export const emptyUsageLimitPauses = (): UsageLimitPauses => ({ held: new Map(), resumed: false });
 
-/** Applies one usage-limit card (or a local pause event in card form) to a chat's pauses. */
 export const applyUsageLimitCard = (pauses: UsageLimitPauses, card: ClaudeUsageLimitCard, at: number): void => {
   if (card.resume) {
-    // Work paused again after the press is still paused (still limited).
     for (const [key, pause] of pauses.held) if (pause.at <= at) pauses.held.delete(key);
     pauses.resumedAt = Math.max(pauses.resumedAt ?? 0, at);
     pauses.resumed = pauses.held.size === 0;
@@ -204,7 +186,6 @@ export const applyUsageLimitCard = (pauses: UsageLimitPauses, card: ClaudeUsageL
   if (pauses.held.delete(key) && pauses.held.size === 0 && pauses.resumedAt !== undefined) pauses.resumed = true;
 };
 
-/** Drops pauses whose reset is long past (or, untimed, that are very old): leftovers, not live work. */
 export const dropStaleUsageLimitPauses = (pauses: UsageLimitPauses, now = Date.now()): void => {
   for (const [key, pause] of pauses.held) {
     const stale =
@@ -216,7 +197,6 @@ export const dropStaleUsageLimitPauses = (pauses: UsageLimitPauses, now = Date.n
   if (pauses.held.size > 0) pauses.resumed = false;
 };
 
-/** Folds a chat's usage-limit cards, oldest first, into what is paused now. */
 export const foldUsageLimitPauses = (
   cards: Iterable<{ card: ClaudeUsageLimitCard; createdAtMs: number }>,
   now = Date.now(),
@@ -229,33 +209,23 @@ export const foldUsageLimitPauses = (
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
-/** "your reply and 3 tasks": what a usage limit paused, in the user's words. */
 export const usageLimitPausedWhat = (pauses: { reply: boolean; tasks: number }): string =>
   [...(pauses.reply ? ["your reply"] : []), ...(pauses.tasks > 0 ? [plural(pauses.tasks, "task")] : [])].join(" and ") ||
   "your work";
 
-/** What a chat's usage-limit card shows, the same on every surface. */
 export type UsageLimitSummary = {
-  /** The reply is paused. */
   reply: boolean;
-  /** How many tasks are paused. */
   tasks: number;
-  /** The latest reset time named, if any. */
   until?: number;
-  /** A monthly spend cap: no reset time lifts it. */
   monthly?: true;
-  /** Resume was pressed, and everything paused since: the limit still holds. */
   stillLimited?: true;
 };
 
-/** Null when nothing is paused. */
 export const summarizeUsageLimitPauses = (pauses: UsageLimitPauses): UsageLimitSummary | null => {
   if (pauses.held.size === 0) return null;
   const values = [...pauses.held.values()];
   const reply = pauses.held.has("");
   const times = values.flatMap((pause) => (pause.until !== undefined ? [pause.until] : []));
-  // Paused again right after Resume: the limit still holds. A pause long after
-  // a Resume that went through is a new limit, not a failed Resume.
   const resumedAt = pauses.resumedAt;
   const stillLimited =
     resumedAt !== undefined &&
@@ -285,13 +255,11 @@ export const parseUsageLimitSummary = (value: unknown): UsageLimitSummary | null
 export type UsageLimitNotice = {
   title: string;
   description?: string;
-  /** Offer Resume: something is paused. */
   canResume: boolean;
 };
 
 export const USAGE_LIMIT_RESUMED_TITLE = "Resumed";
 
-/** The card for paused work, or the "Resumed" card once Resume continued it. */
 export const usageLimitNotice = (
   summary: UsageLimitSummary | "resumed",
   formatTime: (at: number) => string,
@@ -310,11 +278,9 @@ export const usageLimitNotice = (
   };
 };
 
-/** How agent_status names work a usage limit paused. */
 export const USAGE_LIMIT_PAUSED_STATUS = "paused: usage limit";
 
 
-/** What a background shell job left running when a pause restarted Claude Code means for the agent. */
 export const USAGE_LIMIT_BACKGROUND_NOTE =
   "Background shell commands you had started were stopped while the work was paused; check what they were doing and rerun any you still need.";
 

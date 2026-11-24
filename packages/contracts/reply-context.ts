@@ -42,7 +42,6 @@ const emptyReplyContextFold = (): ReplyContextFold => ({
 
 type Undo = () => void;
 
-/** Records how to take back each change a fold step makes, when `log` is given. */
 const tracked = (log: Undo[] | undefined) => ({
   set<K, V>(map: Map<K, V>, key: K, value: V) {
     if (log) {
@@ -141,15 +140,8 @@ export function projectReplyContexts(
   return { contexts: fold.contexts, counts: fold.counts, agentOrigins: fold.agentOrigins };
 }
 
-/** Rows a projector can take back without refolding from the start. */
 const REWINDABLE_ROWS = 64;
 
-/**
- * A projector for a transcript that mostly grows at its end. It folds only
- * rows after the part it already folded, and when the latest rows change it
- * takes their changes back (from an undo log kept for the last rows) instead
- * of refolding everything. Unchanged input returns the previous projection.
- */
 export function createReplyContextProjector(): (
   rows: readonly ReplyContextRow[],
 ) => ReplyContextProjection {
@@ -193,18 +185,6 @@ export function createReplyContextProjector(): (
   };
 }
 
-/**
- * Whether a task title names a thread id. The orchestrator picks thread ids
- * as slugs of the task description ("Pricing research" → `pricing-research`),
- * so a spawn that only recorded its description can still be matched to the
- * thread a later report cites when no title map is available.
- */
-/**
- * Whether a task title names a thread id. Desktop-run threads are keyed by
- * the slug of their description plus a short random tail
- * (`create-report-k3f9qz`); older ones were the bare slug. Either form names
- * the thread whose description slugs the same way.
- */
 const slugs = new Map<string, string>();
 const MAX_SLUGS = 4096;
 

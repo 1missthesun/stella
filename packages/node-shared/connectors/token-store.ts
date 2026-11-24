@@ -1,10 +1,3 @@
-/**
- * The connector credential file (`connectors/.credentials.json`), each token
- * sealed with OS protected storage. On the desktop only Electron main opens
- * it (the runtime reaches it through the token-store broker, since protected
- * storage is bound to the signed app); headless runs open it directly.
- * Refreshing an expired token is the runtime's job (connectors/oauth.ts).
- */
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -101,13 +94,10 @@ const decodeTokenPayload = (
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ConnectorTokenPayload;
     if (parsed?.accessToken) return parsed;
-  } catch {
-    // Treat corrupt protected entries as missing.
-  }
+  } catch {}
   return null;
 };
 
-/** The stored token as saved, expired or not. */
 export const readStoredConnectorToken = async (
   stellaAppDir: string,
   tokenKey: string,
@@ -156,7 +146,6 @@ export const deleteStoredConnectorTokens = async (
   if (changed) await writeTokenStore(stellaAppDir, store);
 };
 
-/** Store a bare access token (a user-pasted key, say) with its expiry. */
 export const saveConnectorAccessToken = (
   stellaAppDir: string,
   tokenKey: string,

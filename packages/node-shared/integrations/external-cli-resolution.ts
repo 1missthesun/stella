@@ -49,8 +49,7 @@ const pathExtValue = (env: NodeJS.ProcessEnv): string | undefined => {
   return key ? env[key] : undefined;
 };
 
-// Lower case, so the path reads as the file is named (`claude.exe`, not
-// `claude.EXE`); Windows file names don't distinguish case.
+// Windows file names don't distinguish case.
 const executableExtensions = (env: NodeJS.ProcessEnv): string[] =>
   (pathExtValue(env) ?? ".EXE;.CMD;.BAT;.COM")
     .split(";")
@@ -58,9 +57,8 @@ const executableExtensions = (env: NodeJS.ProcessEnv): string[] =>
     .filter(Boolean);
 
 // Windows runs a bare name only with one of PATHEXT's extensions, as `where`
-// finds it. A file with no extension beside them is a shell script npm
-// writes for Git Bash and can't be started, so it counts only when someone
-// named that exact file.
+// finds it. A file with no extension beside them is a shell script npm writes
+// for Git Bash and can't be started.
 const executableCandidates = (
   basePath: string,
   env: NodeJS.ProcessEnv,
@@ -102,10 +100,8 @@ const firstExecutable = (
 const SHIM_TARGET_PATTERN = /"%~?dp0%?\\?([^"%]+?\.exe)"/gi;
 
 /**
- * The program an npm or pnpm `.cmd` shim starts, when that is an `.exe`
- * (Claude Code's npm package installs `bin/claude.exe`). Node won't start a
- * `.cmd` without a shell, and quoting a turn's arguments through cmd.exe
- * isn't safe, so Stella runs the program the shim would.
+ * Node won't start a `.cmd` without a shell, and quoting arguments through
+ * cmd.exe isn't safe.
  */
 const unwrapWindowsShim = (executable: string): string => {
   if (process.platform !== "win32" || !/\.(cmd|bat)$/i.test(executable)) {
@@ -382,11 +378,6 @@ export const resolveExternalCliPath = (
   );
 };
 
-/**
- * Where the CLI is, or null when it isn't installed (or the configured path
- * doesn't point at it). Everything that asks whether Claude Code is installed
- * uses this, so it finds the same binary a turn runs.
- */
 export const findExternalCliPath = (
   cli: ExternalCli,
   options: ResolveExternalCliOptions = {},
@@ -407,12 +398,6 @@ const entryExists = (candidate: string): boolean => {
   }
 };
 
-/**
- * When no runnable CLI is found: the first place one is installed but can't
- * be run (a file without its execute bit, a link to a file that's gone), in
- * the order `resolveExternalCliPath` looks. An install cut off midway leaves
- * that; an uninstall leaves nothing.
- */
 export const findUnrunnableExternalCliPath = (
   cli: ExternalCli,
   options: ResolveExternalCliOptions = {},
@@ -485,9 +470,7 @@ export const buildExternalCliChildEnv = (
           ? user.username
           : path.basename(user.homedir || "");
       if (username) childEnv.USER ||= username;
-    } catch {
-      // No passwd entry: leave the environment as it is.
-    }
+    } catch {}
   }
   return childEnv;
 };

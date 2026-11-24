@@ -1,7 +1,3 @@
-// Contract between desktop main, which saves an agent's in-app browser
-// downloads under <stella data>/media/downloads/<owner>/ and appends one line
-// per finished download to the index there, and the runtime, which reads it.
-
 export const IN_APP_BROWSER_DOWNLOADS_INDEX = ".downloads.jsonl";
 
 export const inAppBrowserDownloadsOwnerSegment = (ownerId: string): string => {

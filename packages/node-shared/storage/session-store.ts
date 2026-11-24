@@ -189,9 +189,7 @@ export class SessionStore {
     } catch (error) {
       try {
         this.db.exec("ROLLBACK;");
-      } catch {
-        /* the transaction may already be gone */
-      }
+      } catch {}
       throw error;
     } finally {
       this.inTransaction = false;
@@ -709,10 +707,6 @@ export class SessionStore {
     this.computerAgentOutbox.delete(id);
   }
 
-  /**
-   * Removes an entry once what was sent is what it still holds: one rewritten
-   * while it was on its way (a stop queued over a run's end) stays to be sent.
-   */
   deleteSentComputerAgentCloudOutbox(id: string, payloadJson: string): void {
     this.cached
       .prepare("DELETE FROM computer_agent_cloud_outbox WHERE id = ? AND payload_json = ?")

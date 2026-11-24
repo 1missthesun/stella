@@ -7,6 +7,8 @@ import { ProviderOnlyPicker, type ProviderOption, } from "@/global/settings/Prov
 import { VoiceCatalogPicker } from "@/global/settings/VoiceCatalogPicker";
 import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
 import { coerceRealtimeVoiceProvider, resolveReadAloudProvider, type ReadAloudVoiceProvider, type RealtimeVoicePreferences, type RealtimeVoiceUnderlyingProvider, } from "@stella/contracts/local-preferences";
+import { useStellaModelsSignIn } from "@/global/auth/hooks/use-stella-models-sign-in";
+import { saveModelSelection } from "@/global/settings/lib/save-model-selection";
 import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
 import { useClaudeCodeModelCatalog } from "@/global/settings/hooks/use-claude-code-model-catalog";
 import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
@@ -21,7 +23,7 @@ import { announceChatGptPlanUse, ChatGptPlanInUse } from "@/features/chatgpt/Cha
 import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
-import { buildEngineReasoningPatch, buildEngineRoutingPatch, buildEngineTransitionReasoningPatch, buildModelSelectionPatch, DEFAULT_CHATGPT_MODEL, DEFAULT_CLAUDE_CODE_MODEL, formatRecentEngineModelId, fromChatGptModelId, getActiveEngineModelId, listChatGptCatalogModels, CHATGPT_PROVIDER, resolveChatGptEngineModel, type ModelPickerEngine, } from "@/global/settings/lib/engine-model-routing";
+import { buildEngineReasoningPatch, buildEngineRoutingPatch, buildEngineTransitionReasoningPatch, buildModelSelectionPatch, DEFAULT_CHATGPT_MODEL, DEFAULT_CLAUDE_CODE_MODEL, formatRecentEngineModelId, fromChatGptModelId, getActiveEngineModelId, isStellaModelId, listChatGptCatalogModels, CHATGPT_PROVIDER, resolveChatGptEngineModel, type ModelPickerEngine, } from "@/global/settings/lib/engine-model-routing";
 import "./AgentModelPicker.css";
 import { isWebsiteHost } from "@/platform/capabilities";
 import { WebsiteModelPicker } from "./WebsiteModelPicker";
@@ -142,6 +144,7 @@ export function AgentModelPicker(props: AgentModelPickerProps) {
 
 function DesktopAgentModelPicker({ active = true, onSelected, className, surface = "sidebar", focusSection = null, }: AgentModelPickerProps) {
     const t = useT();
+    const askToSignInForStella = useStellaModelsSignIn();
     const imageProviderOptions = useByokProviderOptions(IMAGE_PROVIDER_OPTIONS);
     const voiceProviderOptions = useByokProviderOptions(VOICE_PROVIDER_OPTIONS);
     const voiceVisible = useRealtimeVoiceVisible();
@@ -385,14 +388,17 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     const handleSelect = useCallback(async (value: string) => {
         if (!preferences || pendingAgent)
             return;
-        if (preferences.agentRuntimeEngine !== "default")
-            migrationAttemptedRef.current = null;
-        const patch = buildModelSelectionPatch(preferences, value, activeAssistant
+        const selectionTarget = activeAssistant
             ? {
-                assistant: true,
+                assistant: true as const,
                 configurableAgentKeys: configurableAgents.map((agent) => agent.key),
             }
-            : { agentKey: activeAgent });
+            : { agentKey: activeAgent };
+        if (isStellaModelId(value) && askToSignInForStella(() => void saveModelSelection(value, selectionTarget)))
+            return;
+        if (preferences.agentRuntimeEngine !== "default")
+            migrationAttemptedRef.current = null;
+        const patch = buildModelSelectionPatch(preferences, value, selectionTarget);
         setPendingAgent(activeAgent);
         setPreferences({ ...preferences, ...patch });
         try {
@@ -417,6 +423,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     }, [
         activeAgent,
         activeAssistant,
+        askToSignInForStella,
         configurableAgents,
         onSelected,
         pendingAgent,
@@ -528,6 +535,9 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                 : providerKey === "fal"
                     ? { provider: "fal" }
                     : { provider: "stella" };
+        if (nextImageGeneration.provider === "stella" &&
+            askToSignInForStella(() => void window.electronAPI?.system?.setLocalModelPreferences?.({ imageGeneration: nextImageGeneration })))
+            return;
         setPendingAgent(IMAGE_TARGET);
         setPreferences({
             ...preferences,
@@ -553,7 +563,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         finally {
             setPendingAgent(null);
         }
-    }, [onSelected, pendingAgent, preferences, setPreferences, t]);
+    }, [askToSignInForStella, onSelected, pendingAgent, preferences, setPreferences, t]);
     const patchRealtimeVoice = useCallback(async (next: RealtimeVoicePreferences, errorLabel: string) => {
         if (!preferences)
             return;
@@ -606,6 +616,9 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                 ? { readAloudProvider: previous.readAloudProvider }
                 : {}),
         };
+        if (next.provider === "stella" &&
+            askToSignInForStella(() => void window.electronAPI?.system?.setLocalModelPreferences?.({ realtimeVoice: next })))
+            return;
         setPendingAgent(VOICE_TARGET);
         setPreferences({ ...preferences, realtimeVoice: next });
         try {
@@ -626,7 +639,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         finally {
             setPendingAgent(null);
         }
-    }, [onSelected, pendingAgent, preferences, setPreferences, t]);
+    }, [askToSignInForStella, onSelected, pendingAgent, preferences, setPreferences, t]);
     const handleReasoningEffortSelect = useCallback(async (effort: ReasoningEffort) => {
         if (!preferences || pendingAgent)
             return;

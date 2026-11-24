@@ -13,6 +13,7 @@ import { showToast } from "@/ui/toast";
 import { useT, useTPlural } from "@/shared/i18n";
 import {
   clearLocalChatSync,
+  createPrivateConversation,
   markLocalChatSync,
   pendingLocalChatSync,
   settleSignedOutLocalMode,
@@ -103,6 +104,8 @@ export function SignedOutLocalChoice({
       if (!from || importing.current === target) return;
       importing.current = target;
       void importLocalPiChat(target, from)
+        // The copied chat belongs to the account now; signing out must not show it.
+        .then(createPrivateConversation)
         .then(() => {
           clearLocalChatSync();
           showToast({ title: t("global.localMode.synced"), variant: "success" });

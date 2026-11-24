@@ -56,13 +56,7 @@ export type AuthSessionSnapshot<Session = unknown> =
   | {
       status: "signed_out";
       identityIntent: "anonymous" | null;
-      reason: AuthSignedOutReason;
     };
-
-export type AuthSignedOutReason =
-  | "first_install"
-  | "explicit_sign_out"
-  | "session_rejected";
 
 export type AuthSessionObservation<Session = unknown> =
   | { kind: "authenticated"; session: Session }
@@ -117,7 +111,6 @@ export const resolveAuthSessionObservation = <Session>(args: {
   observation: AuthSessionObservation<Session>;
   identityIntent: AuthIdentityIntent | null;
   staleSession: Session | null;
-  signedOutReason?: AuthSignedOutReason;
 }): AuthSessionSnapshot<Session> => {
   const { observation, staleSession } = args;
   if (observation.kind === "authenticated") {
@@ -137,7 +130,6 @@ export const resolveAuthSessionObservation = <Session>(args: {
       return {
         status: "signed_out",
         identityIntent: "anonymous",
-        reason: "session_rejected",
       };
     }
     return {
@@ -168,18 +160,12 @@ export const resolveAuthSessionObservation = <Session>(args: {
   return {
     status: "signed_out",
     identityIntent: args.identityIntent,
-    reason:
-      args.signedOutReason ??
-      (args.identityIntent === "anonymous"
-        ? "session_rejected"
-        : "first_install"),
   };
 };
 
 export const resolveMissingCredentialSnapshot = <Session>(args: {
   identityIntent: AuthIdentityIntent | null;
   staleSession: Session | null;
-  signedOutReason?: "first_install" | "explicit_sign_out";
 }): AuthSessionSnapshot<Session> => {
   if (args.identityIntent === "connected") {
     return {
@@ -192,10 +178,5 @@ export const resolveMissingCredentialSnapshot = <Session>(args: {
   return {
     status: "signed_out",
     identityIntent: args.identityIntent,
-    reason:
-      args.signedOutReason ??
-      (args.identityIntent === "anonymous"
-        ? "explicit_sign_out"
-        : "first_install"),
   };
 };

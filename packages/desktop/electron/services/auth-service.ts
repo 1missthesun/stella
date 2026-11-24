@@ -1045,7 +1045,6 @@ export class AuthService {
     this.lastSessionSnapshot = resolveMissingCredentialSnapshot({
       identityIntent: "anonymous",
       staleSession: null,
-      signedOutReason: "explicit_sign_out",
     });
     return { ok: response?.ok !== false };
   }
@@ -1218,7 +1217,6 @@ export class AuthService {
     this.lastSessionSnapshot = resolveMissingCredentialSnapshot({
       identityIntent: "anonymous",
       staleSession: null,
-      signedOutReason: "explicit_sign_out",
     });
     return { ok: true, scheduled: body.message !== "User deleted" };
   }

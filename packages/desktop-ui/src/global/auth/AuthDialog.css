@@ -220,7 +220,7 @@
   -webkit-app-region: no-drag;
 }
 
-.auth-screen__account {
+.auth-remembered__account {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -229,7 +229,7 @@
   border-radius: 12px;
 }
 
-.auth-screen__avatar {
+.auth-remembered__avatar {
   flex: none;
   display: grid;
   place-items: center;
@@ -242,7 +242,7 @@
   font-weight: 600;
 }
 
-.auth-screen__who {
+.auth-remembered__who {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -250,7 +250,7 @@
   gap: 1px;
 }
 
-.auth-screen__name {
+.auth-remembered__name {
   overflow: hidden;
   color: var(--text-base);
   font-size: var(--font-size-md);
@@ -259,7 +259,7 @@
   white-space: nowrap;
 }
 
-.auth-screen__email {
+.auth-remembered__email {
   overflow: hidden;
   color: var(--muted-foreground);
   font-size: var(--font-size-sm);
@@ -267,14 +267,14 @@
   white-space: nowrap;
 }
 
-.auth-screen__links {
+.auth-remembered__links {
   display: flex;
   justify-content: center;
   gap: 18px;
   margin-top: -8px;
 }
 
-.auth-screen__link {
+.auth-remembered__link {
   margin: 0;
   padding: 0;
   border: 0;
@@ -287,6 +287,6 @@
   cursor: pointer;
 }
 
-.auth-screen__link:hover {
+.auth-remembered__link:hover {
   color: var(--text-base);
 }

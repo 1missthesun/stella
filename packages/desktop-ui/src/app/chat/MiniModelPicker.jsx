@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Lightbulb, SlidersHorizontal } from "@/ui/icons";
 import { BrandIcon } from "@/ui/brand-icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { useStellaModelsSignIn } from "@/global/auth/hooks/use-stella-models-sign-in";
+import { saveModelSelection } from "@/global/settings/lib/save-model-selection";
 import { openModelPicker } from "@/features/workspace-display/default-tabs";
 import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
 import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
 import { buildModelDefaultsMap, buildResolvedModelDefaultsMap, getConfigurableAgents, getLocalModelDefaults, getModelPickerDisplayLabel, normalizeModelOverrides, } from "@/global/settings/lib/model-defaults";
-import { buildEngineReasoningPatch, buildRecentModelSelectionPatch, getActiveEngineModelId, } from "@/global/settings/lib/engine-model-routing";
+import { buildEngineReasoningPatch, buildRecentModelSelectionPatch, getActiveEngineModelId, isStellaModelId, } from "@/global/settings/lib/engine-model-routing";
 import { listReasoningEffortOptions, } from "@/global/settings/lib/reasoning-effort-options";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { buildRecentModelRows, createKnownModelIdPredicate, readRecentModels, recordRecentModel, } from "@/global/settings/lib/recent-models";
@@ -26,6 +28,7 @@ const getModelBrandKey = (modelId, providersById) => {
 let cachedMiniPickerPreferences = null;
 export function MiniModelPicker() {
     const t = useT();
+    const askToSignInForStella = useStellaModelsSignIn();
     const { allModels, defaults: stellaDefaultModels } = useModelCatalog();
     const [preferences, setPreferencesRaw] = useState(cachedMiniPickerPreferences);
     const [recentIds, setRecentIds] = useState(() => readRecentModels());
@@ -151,13 +154,13 @@ export function MiniModelPicker() {
         setOpen(false);
         if (row.id === currentId || row.unavailable)
             return;
-        const patch = buildRecentModelSelectionPatch(preferences, row.id, {
-            assistant: true,
-            configurableAgentKeys,
-        });
+        const target = { assistant: true, configurableAgentKeys };
+        if (isStellaModelId(row.id) && askToSignInForStella(() => void saveModelSelection(row.id, target)))
+            return;
+        const patch = buildRecentModelSelectionPatch(preferences, row.id, target);
         setRecentIds(recordRecentModel(row.id));
         void applyPreferencesPatch(patch, t("app.chat.miniModelPicker.modelUpdateFailed"));
-    }, [applyPreferencesPatch, configurableAgentKeys, currentId, preferences, t]);
+    }, [applyPreferencesPatch, askToSignInForStella, configurableAgentKeys, currentId, preferences, t]);
     const handleOpenFullPicker = useCallback(() => {
         setOpen(false);
         openModelPicker();

@@ -6,6 +6,7 @@ import {
   useAccountProviders,
   useCloudEngines,
 } from "./cloud-engines-api";
+import { runAfterSignIn } from "@/global/auth/sign-in-then";
 import { uiState } from "@/platform/ui-state";
 import { BackendRequestError } from "@stella/contracts/backend/client";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
@@ -159,6 +160,9 @@ const createSelectionController = (accountId: string) => {
       lastServer = next;
       enqueue(() => applyServer(next));
     },
+    whenSettled(action: () => void) {
+      enqueue(async () => action());
+    },
     localChanged() {
       enqueue(async () => {
         const local = await readLocal();
@@ -212,6 +216,11 @@ export function CloudModelSelectionBridge() {
     if (!controller || !loaded || !execution) return;
     controller.serverSelection({ execution, selectedAt });
   }, [controller, loaded, execution, selectedAt]);
+
+  useEffect(() => {
+    if (!controller || !loaded) return;
+    controller.whenSettled(runAfterSignIn);
+  }, [controller, loaded]);
 
   useEffect(() => {
     if (!controller || !loaded) return;

@@ -13,6 +13,7 @@ import { useT } from "@/shared/i18n";
 import { secureSignOut } from "@/global/auth/services/auth";
 import { wipeAccountsFromThisComputer } from "@/features/cloud/paused-account";
 import { accountHintChanged } from "@/global/auth/hooks/use-account-hint";
+import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import "@/global/local-mode/local-mode.css";
 
 let open = false;
@@ -29,11 +30,15 @@ const subscribe = (listener: () => void) => {
 
 export const openSignOutDialog = () => setOpen(true);
 
-/** Signs this computer out; the chat stays in the account and is hidden here, or removed. */
+/**
+ * Signs this computer out; the chat stays in the account and is hidden here, or
+ * removed. Stella carries on in a chat on this computer and offers to sign in.
+ */
 export const signOutOfThisComputer = async (removeFromComputer: boolean) => {
   await secureSignOut("current_device", { forgetAccount: removeFromComputer });
   if (removeFromComputer) await wipeAccountsFromThisComputer(null);
   accountHintChanged();
+  SIGN_IN_TOAST_ACTION.onClick();
 };
 
 export function SignOutDialog() {

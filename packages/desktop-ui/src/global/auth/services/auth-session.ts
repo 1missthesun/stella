@@ -462,7 +462,6 @@ export const signOutAuthSession = async (options: SignOutOptions = {}) => {
     snapshot: {
       status: "signed_out",
       identityIntent: "anonymous",
-      reason: "explicit_sign_out",
     },
     isPending: false,
   });
@@ -500,7 +499,6 @@ export const deleteAuthUser = async (): Promise<{ scheduled: boolean }> => {
     snapshot: {
       status: "signed_out",
       identityIntent: "anonymous",
-      reason: "explicit_sign_out",
     },
     isPending: false,
   });

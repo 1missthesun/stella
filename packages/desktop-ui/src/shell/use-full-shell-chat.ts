@@ -143,7 +143,12 @@ export function useFullShellChat({
     discardViewState();
     composerOwner.set(scope);
     closeOpenItems();
-    if (router.state.location.href !== "/chat") void router.navigate({ to: "/chat" });
+    if (router.state.location.href !== "/chat") {
+      void router.navigate({
+        to: "/chat",
+        search: ({ dialog }) => (dialog === "auth" ? { dialog } : {}),
+      });
+    }
     composerTabMemory.clear();
     previousComposerConversationIdRef.current = null;
     setMessage("");

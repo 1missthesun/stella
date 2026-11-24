@@ -11,7 +11,10 @@ import {
 import { MagicLinkAuthFlow } from "./MagicLinkAuthFlow";
 import { authClient } from "./lib/auth-client";
 import { useAuthSessionState } from "./hooks/use-auth-session-state";
+import { accountLabel, useAccountHint } from "./hooks/use-account-hint";
 import { useAuthBootstrapState } from "./BackendAuthProvider";
+import { RememberedAccountSignIn } from "./RememberedAccountSignIn";
+import { dropAfterSignIn } from "./sign-in-then";
 import {
   applyAndVerifyAccountSessionToken,
   startBrowserGoogleSignIn,
@@ -143,9 +146,16 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   useEffect(() => {
     if (signedIn && open) onOpenChange(false);
   }, [signedIn, open, onOpenChange]);
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) dropAfterSignIn();
+      onOpenChange(next);
+    },
+    [onOpenChange],
+  );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent fit className="auth-dialog-content">
         <VisuallyHidden asChild>
           <DialogTitle>{t("global.auth.welcomeTitle")}</DialogTitle>
@@ -157,12 +167,30 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
         </VisuallyHidden>
         <DialogCloseButton className="auth-dialog-close" />
         <DialogBody className="auth-dialog-body">
-          <AuthMethods />
+          <SignInChoices onDismiss={() => handleOpenChange(false)} />
         </DialogBody>
       </DialogContent>
     </Dialog>
   );
 };
+
+function SignInChoices({ onDismiss }: { onDismiss: () => void }) {
+  const hint = useAccountHint();
+  const [showMethods, setShowMethods] = useState(false);
+  if (hint === undefined) return null;
+  const account = accountLabel(hint);
+  if (hint?.signedOut && account && !showMethods) {
+    return (
+      <RememberedAccountSignIn
+        hint={hint}
+        account={account}
+        onSignIn={() => setShowMethods(true)}
+        onDismiss={onDismiss}
+      />
+    );
+  }
+  return <AuthMethods loginHint={hint?.signedOut ? hint.email : null} />;
+}
 
 export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
   const t = useT();

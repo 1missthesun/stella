@@ -176,7 +176,7 @@ function RootLayout() {
         if (isOnChatRoute && routerConversationId !== id) {
           void router.navigate({
             to: "/chat",
-            search: { c: id },
+            search: (prev) => ({ ...prev, c: id }),
             replace: true,
           });
         }

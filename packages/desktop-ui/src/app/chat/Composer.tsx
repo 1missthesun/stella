@@ -44,6 +44,7 @@ import {
 import { ComposerModelMentionTextarea } from "./ModelMentionText";
 import { MiniModelPicker } from "./MiniModelPicker";
 import { useUiState } from "@/context/ui-state";
+import { useStellaModelsSignIn } from "@/global/auth/hooks/use-stella-models-sign-in";
 import { useT } from "@/shared/i18n";
 import "./full-shell.composer.css";
 import { BrowserAttachmentTray } from "./BrowserAttachmentTray";
@@ -202,6 +203,7 @@ function ComposerImpl({
     [suggestionsActive],
   );
 
+  const askToSignInForStella = useStellaModelsSignIn();
   const selectModelMention = useCallback(
     (option: ComposerModelMentionOption) => {
       if (!modelMentionTrigger) return;
@@ -212,6 +214,7 @@ function ComposerImpl({
       );
       setMessage(next.value);
       setModelMentionTrigger(null);
+      if (option.value === "stella" && askToSignInForStella(() => undefined)) return;
       requestAnimationFrame(() => {
         const textarea = textareaRef.current;
         textarea?.focus();
@@ -219,7 +222,7 @@ function ComposerImpl({
         updateComposerTextareaExpansion(textarea, setComposerExpanded);
       });
     },
-    [message, modelMentionTrigger, setMessage],
+    [askToSignInForStella, message, modelMentionTrigger, setMessage],
   );
 
   const hasAttachedChips = hasAttachedComposerChips(chatContext, selectedText);

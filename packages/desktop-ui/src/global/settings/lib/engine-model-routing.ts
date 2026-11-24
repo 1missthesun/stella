@@ -217,7 +217,7 @@ type ModelSelectionTarget =
   | { assistant: true; configurableAgentKeys: readonly string[] }
   | { assistant?: false; agentKey: string };
 
-const isStellaModelId = (modelId: string): boolean =>
+export const isStellaModelId = (modelId: string): boolean =>
   modelId === "" || modelId.startsWith("stella/");
 export function buildModelSelectionPatch(
   preferences: ModelSelectionPreferences,

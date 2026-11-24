@@ -125,6 +125,9 @@ export const agentMessageDelivery = (result: AgentControlResult): AgentMessageDe
   ...(result.note ? { note: result.note } : {}),
 });
 
+/** The owner's answer to a cloud task's send_message: the tool result, and whether it was for whoever started the task. */
+export type AgentTaskMessageResult = { text: string; starter: boolean };
+
 export type AgentThreadPlacement = "cloud" | "computer";
 
 export type AgentThreadSummary = {
@@ -334,6 +337,11 @@ export type AgentThreadCalls = {
        * in words. Empty: nothing could. Absent: the computer could not tell.
        */
       wakers?: string[];
+      /**
+       * Its finished report (explicit messaging): filed at once, even with a
+       * message queued for it. Older desktops leave it off.
+       */
+      done?: true;
     };
     result: { updated: boolean; status: string };
   };

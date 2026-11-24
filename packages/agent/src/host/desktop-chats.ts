@@ -343,7 +343,7 @@ export type DesktopChatsOptions = {
     waiting: boolean;
     report?: string;
   }): void;
-  /** A task here ended its turn waiting (end_turn_waiting): recorded as waiting, never reported. */
+  /** A task here ended its turn quietly (no done report): recorded as waiting, never reported. */
   agentWaiting?(agent: {
     conversationId: string;
     threadId: string;

@@ -1,3 +1,4 @@
+import { doneResultJson } from "@stella/contracts/agent-messaging";
 import { waitingResultJson } from "@stella/contracts/agent-waiting";
 import { isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentAttemptOutcomeOf } from "@stella/contracts/agent-status";
@@ -167,15 +168,12 @@ export const deliverTerminal = async (
         typeof pending.payload.waitingFor === "string" && pending.payload.waitingFor.trim()
           ? pending.payload.waitingFor.trim()
           : undefined;
-      const waitingReply =
-        typeof pending.payload.waitingReply === "string" && pending.payload.waitingReply.trim()
-          ? pending.payload.waitingReply.trim()
-          : undefined;
       const resultJson =
         pending.kind === "completed"
           ? waitingFor
-            ? waitingResultJson(finalText, waitingFor, waitingReply)
-            : JSON.stringify({ finalText })
+            ? waitingResultJson(finalText, waitingFor)
+            : // A task's completed end is its finished report (explicit messaging).
+              doneResultJson(finalText)
           : undefined;
       const errorMessage =
         pending.kind === "completed"
@@ -195,7 +193,6 @@ export const deliverTerminal = async (
           ...(resultJson ? { resultJson } : {}),
           ...(errorMessage ? { errorMessage } : {}),
           completedAt,
-          ...(waitingFor && pending.kind === "completed" ? { wakeCheck: true as const } : {}),
         } satisfies ThreadCompletedEvent,
       ]);
     }

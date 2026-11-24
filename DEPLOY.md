@@ -589,9 +589,11 @@ Steps (production, from `workers/cloud-builder`):
 
 Edit `packages/runtime/extensions/stella-runtime/{agent-metadata,prompts}/*.md`,
 run `bun run prompts:sync-defaults`, commit. Deploying cloud-builder publishes
-them to cloud turns and to desktops, which fetch `/api/stella/prompts`; no
-app-source publish is needed. Check: `curl -s <backend>/api/stella/prompts`
-revision equals `bun run prompts:check-defaults`.
+them to cloud turns and to desktops, which fetch `/api/stella/prompts/v2`; no
+app-source publish is needed. Desktops from before explicit messaging read
+`/api/stella/prompts`, whose frozen prompts are in
+`workers/cloud-builder/src/prompts/legacy/`. Check:
+`curl -s <backend>/api/stella/prompts/v2` revision equals `bun run prompts:check-defaults`.
 
 ## Desktop
 

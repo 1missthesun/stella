@@ -144,7 +144,6 @@ export type AgentExecutorResult = {
   finalText?: string;
   error?: string;
   waitingFor?: string;
-  waitingReply?: string;
   usage?: Record<string, unknown>;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   checkpointMs?: number;

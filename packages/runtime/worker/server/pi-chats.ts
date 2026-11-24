@@ -680,7 +680,12 @@ export const piChatsFor = (
             attemptGeneration: agent.attempt,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
             ...(agent.outcome === "completed"
-              ? { status: "completed" as const, ...(agent.text ? { result: agent.text.slice(0, AGENT_REPORT_MAX_CHARS) } : {}) }
+              ? {
+                  status: "completed" as const,
+                  ...(agent.text ? { result: agent.text.slice(0, AGENT_REPORT_MAX_CHARS) } : {}),
+                  // Every completed end is a finished report now (explicit messaging).
+                  done: true as const,
+                }
               : agent.outcome === "failed"
                 ? { status: "error" as const, error: (agent.text || "The agent failed.").slice(0, 10_000) }
                 : { status: "canceled" as const, error: (agent.text || AGENT_STOPPED_REASON).slice(0, 10_000) }),
@@ -700,6 +705,7 @@ export const piChatsFor = (
             status,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
             ...(body ? (status === "completed" ? { result: body } : { error: body }) : {}),
+            ...(status === "completed" ? { done: true as const } : {}),
             fallback: { conversationId: agent.conversationId, report: agent.report },
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));

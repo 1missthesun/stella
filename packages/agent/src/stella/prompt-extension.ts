@@ -6,7 +6,7 @@ import {
   renderEmailAccess,
   renderMediaAccess,
 } from "@stella/contracts/execution-context";
-import { STELLA_MESSAGE_TARGET } from "@stella/contracts/agent-directory";
+import { agentIdentityText } from "@stella/contracts/agent-messaging";
 import { renderStellaPrompt, stellaPromptTools } from "@stella/contracts/stella-prompts";
 import {
   MAIN_MEMORY_DISPLAY_PATH,
@@ -72,16 +72,18 @@ const workingDirectory = async (
 const agentIdentity: PromptSection["render"] = async (input, context) => {
   const agent = await role(input, context);
   if (agent.agentType === "orchestrator" || !agent.threadId) return undefined;
-  const starter = agent.startedBy
-    ? agent.startedBy.label === "Stella"
-      ? `Stella started you; its thread_id is ${agent.startedBy.threadId} ("${STELLA_MESSAGE_TARGET}" also reaches it).`
-      : `The agent "${agent.startedBy.label}" started you; its thread_id is ${agent.startedBy.threadId}.`
-    : `Stella started you; send_message to "${STELLA_MESSAGE_TARGET}" reaches it.`;
-  return [
-    `Your thread_id is ${agent.threadId}.`,
-    starter,
-    'Every message from Stella or another agent arrives as `<agent-message from="…" thread_id="…">`, marked `relation="started you"` when it is from whoever started you; answer it with send_message to that thread_id.',
-  ].join(" ");
+  return agentIdentityText({
+    threadId: agent.threadId,
+    ...(agent.startedBy
+      ? {
+          startedBy: {
+            threadId: agent.startedBy.threadId,
+            label: agent.startedBy.label,
+            ...(agent.startedBy.label === "Stella" ? { stella: true } : {}),
+          },
+        }
+      : {}),
+  });
 };
 
 const orchestratorOnly = (

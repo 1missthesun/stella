@@ -402,7 +402,7 @@ const backgroundWakeText = (wake: ClaudeCodeBackgroundWake): string =>
         "",
         ...wake.tasks.map((task) => `- ${task.summary}${task.outputFile ? `\n  Output: ${task.outputFile}` : ""}`),
         "",
-        "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
+        "You were resumed for this. Continue the work that was waiting on it, or pass on what you found.",
       ].join("\n");
 
 const dropsBuiltins = (from: { nativeTools: readonly string[] }, to: { nativeTools: readonly string[] }): boolean =>

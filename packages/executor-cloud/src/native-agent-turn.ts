@@ -164,15 +164,17 @@ export type CloudClaudeToolHost = Pick<
 >;
 
 /**
- * An agent that ends its turn waiting while a background command it started
- * is still running: the turn stays open (the process is not parked, so the
- * command keeps running) and Claude Code wakes the agent itself when the
- * command finishes, as on the desktop. `waiting` says whether the agent
- * ended waiting; `resume` tells the turn the agent was woken in place.
+ * How an agent's turn ends when it has not sent its finished report
+ * (`send_message` with done). While a background command it started is still
+ * running, the turn stays open (the process is not parked, so the command
+ * keeps running) and Claude Code wakes the agent itself when the command
+ * finishes, as on the desktop. Before the turn ends quietly, `nudge` may give
+ * the one message the agent gets about it; `live` says whether a background
+ * command can still wake it in this turn.
  */
-export type CloudClaudeBackgroundWait = {
-  waiting: () => boolean;
-  resume: () => void;
+export type CloudClaudeQuietEnd = {
+  done: () => boolean;
+  nudge: (live: boolean) => string | undefined;
 };
 
 /**
@@ -771,7 +773,7 @@ export const runCloudClaude = async (options: {
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
-  backgroundWait?: CloudClaudeBackgroundWait;
+  quietEnd?: CloudClaudeQuietEnd;
   quiet?: boolean;
   keeper?: CloudClaudeKeeperInput & {
     reusable: boolean;
@@ -1017,16 +1019,48 @@ export const runCloudClaude = async (options: {
       inboxPoll?.interruptUnsafe();
       stdin?.end();
     };
-    const finishInput = (): Promise<void> =>
-      serialInput(async () => {
-        if (inputEnded || !inbox) return;
-        const late = await inbox.close();
-        if (late.length === 0 && injected.size === 0) {
+    /** Ends the input unless a late message or the quiet end's one nudge carries the turn on. */
+    const closeInput = async (): Promise<void> => {
+      if (inputEnded || !inbox) return;
+      const late = await inbox.close();
+      if (late.length === 0 && injected.size === 0) {
+        const nudge = options.quietEnd?.nudge(false);
+        if (!nudge) {
           endInput();
           return;
         }
+        markTurnStep("claudeQuietNudged");
         await inbox.reopen();
-        writeMessages(late);
+        writeMessages([nudge]);
+        return;
+      }
+      await inbox.reopen();
+      writeMessages(late);
+    };
+    const finishInput = (): Promise<void> => serialInput(closeInput);
+    /**
+     * The agent's query ended: a message on its way goes in first; then the
+     * nudge, when it is owed even though a background command can still wake
+     * the agent; then the hold for that command; else the input closes.
+     */
+    const settleQuery = (): Promise<void> =>
+      serialInput(async () => {
+        if (inputEnded || !inbox) return;
+        if (backgroundHoldable()) {
+          const pending = await inbox.take();
+          if (pending.length > 0) {
+            writeMessages(pending);
+            return;
+          }
+          const nudge = options.quietEnd?.nudge(true);
+          if (nudge) {
+            markTurnStep("claudeQuietNudged");
+            writeMessages([nudge]);
+            return;
+          }
+          if (holdForBackground()) return;
+        }
+        await closeInput();
       });
     const inboxPoll = inbox
       ? Effect.runFork(
@@ -1115,13 +1149,17 @@ export const runCloudClaude = async (options: {
       backgroundHoldTimer?.interruptUnsafe();
       backgroundHoldTimer = undefined;
     };
-    /** Keeps the turn open while the waiting agent's own background command runs. */
+    const backgroundHoldUntil = performance.timeOrigin + CLOUD_CLAUDE_BACKGROUND_HOLD_LIMIT_MS;
+    /** Whether the agent ended without its report while its own background command runs, with time left to hold for it. */
+    const backgroundHoldable = (): boolean =>
+      options.quietEnd !== undefined &&
+      !options.quietEnd.done() &&
+      liveBackgroundTasks > 0 &&
+      Date.now() < backgroundHoldUntil;
+    /** Keeps the turn open while the agent's own background command runs. */
     const holdForBackground = (): boolean => {
-      const wait = options.backgroundWait;
-      const until = performance.timeOrigin + CLOUD_CLAUDE_BACKGROUND_HOLD_LIMIT_MS;
-      if (!wait || liveBackgroundTasks === 0 || !wait.waiting() || Date.now() >= until) {
-        return false;
-      }
+      const until = backgroundHoldUntil;
+      if (!backgroundHoldable()) return false;
       if (heldForBackground) return true;
       heldForBackground = true;
       markTurnStep("claudeHeldForBackground");
@@ -1184,13 +1222,9 @@ export const runCloudClaude = async (options: {
         }
         if (type === "system" && event.subtype === "task_notification" && heldForBackground) {
           // The command finished: Claude Code now runs a query of its own
-          // that wakes the agent, which is no longer waiting.
+          // that wakes the agent.
           endBackgroundHold();
           markTurnStep("claudeWokenByBackground");
-          options.backgroundWait?.resume();
-          // What the agent said while it waited is not its report; what it
-          // says once woken is (as on the desktop, where the waiting turn's
-          // words are not delivered).
           answers.length = 0;
           return;
         }
@@ -1270,7 +1304,9 @@ export const runCloudClaude = async (options: {
             typeof event.result === "string" ? event.result.trim() : "";
           if (resultText) {
             answers.push(resultText);
-            finalText = answers.join("\n\n");
+            // Stella's turn posts every answer it gave; a task's plain text
+            // only stands for its last words (its messages went by send_message).
+            finalText = profile.role === "orchestrator" ? answers.join("\n\n") : resultText;
           }
           addResultUsage(event);
           if (typeof event.num_turns === "number") {
@@ -1302,8 +1338,8 @@ export const runCloudClaude = async (options: {
             void serialInput(async () => endInput());
           } else if (!inbox) {
             void serialInput(async () => endInput());
-          } else if (injected.size === 0 && !holdForBackground()) {
-            void finishInput();
+          } else if (injected.size === 0) {
+            void settleQuery();
           }
         }
     };
@@ -1570,7 +1606,7 @@ export const runNativeAgentTurn = async (options: {
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
-  backgroundWait?: CloudClaudeBackgroundWait;
+  quietEnd?: CloudClaudeQuietEnd;
   quiet?: boolean;
   keeper?: CloudClaudeKeeperInput;
 }): Promise<NativeAgentTurnResult> => {
@@ -1678,7 +1714,7 @@ export const runNativeAgentTurn = async (options: {
       onStreamEvent,
       ...(options.cancellation ? { cancellation: options.cancellation } : {}),
       ...(options.inbox ? { inbox: options.inbox } : {}),
-      ...(options.backgroundWait ? { backgroundWait: options.backgroundWait } : {}),
+      ...(options.quietEnd ? { quietEnd: options.quietEnd } : {}),
       ...(options.quiet ? { quiet: true } : {}),
       ...(keeper
         ? {

@@ -1,3 +1,4 @@
+import { agentIdentityText } from "@stella/contracts/agent-messaging";
 import {
   agentContainerSize,
   materializeAgentWorld,
@@ -138,7 +139,7 @@ import { importAgentLogIntoThread } from "./agent-log-bridge.js";
 import { agentDevicesSection, takeAgentMove } from "./agent-move.js";
 import { agentRulesSection } from "./agent-rules.js";
 import { CLOUD_AGENT_MOVE_TOOL } from "@stella/executor-cloud/cloud-agent-move-protocol";
-import { END_TURN_WAITING_TOOL } from "@stella/contracts/agent-waiting";
+import { CLOUD_AGENT_MESSAGE_TOOL } from "@stella/executor-cloud/cloud-agent-message-protocol";
 
 export type ContainerTurnHost = Pick<
   BuildSessionInternals,
@@ -927,7 +928,6 @@ export const runContainerAgentTurn = async (
         payload: {
           finalText: result.finalText ?? "",
           ...(result.waitingFor ? { waitingFor: result.waitingFor } : {}),
-          ...(result.waitingFor && result.waitingReply ? { waitingReply: result.waitingReply } : {}),
           usage: result.usage,
           coldContainerStartMs,
           restoreMs,
@@ -1503,12 +1503,24 @@ export const runAgentAttempt = async (
           names: [
             ...cloudGeneralToolNames().filter((name) => name !== "write_stdin"),
             CLOUD_AGENT_MOVE_TOOL,
-            END_TURN_WAITING_TOOL,
+            CLOUD_AGENT_MESSAGE_TOOL,
           ],
           history: true,
         }),
         ...(rulesSection ? [rulesSection] : []),
         ...(devicesSection ? [devicesSection] : []),
+        // Who it is and who started it: where its messages and its finished
+        // report go (a helper's lead, not Stella).
+        ...(turn.threadId
+          ? [
+              agentIdentityText({
+                threadId: turn.threadId,
+                ...(turn.parentThreadId && turn.parentThreadId !== turn.threadId
+                  ? { startedBy: { threadId: turn.parentThreadId } }
+                  : {}),
+              }),
+            ]
+          : []),
       ].join("\n\n"),
     };
     if (orchestrator) {

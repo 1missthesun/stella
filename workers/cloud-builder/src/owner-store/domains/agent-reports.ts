@@ -1,3 +1,4 @@
+import { resultDone } from "@stella/contracts/agent-messaging";
 import {
   AGENT_REPORT_OFFER_MS,
   agentReportId,
@@ -459,9 +460,13 @@ export const deriveAgentReport = (
   }
   scheduleAudit(db, thread, now + REPORT_AUDIT_FIRST_MS, 0, false);
   const outcome = thread.status as AgentReportOutcome;
-  const queued = queuedInput(db, thread);
+  // A finished report it sent itself (explicit messaging) goes now: input
+  // queued for it starts a turn of its own, and its computer already refused
+  // the report while its helpers worked.
+  const done = outcome === "completed" && resultDone(thread.result_json);
+  const queued = !done && queuedInput(db, thread);
   const helpers =
-    !queued && outcome === "completed"
+    !done && !queued && outcome === "completed"
       ? liveDescendants(db, thread.thread_id)
       : [];
   if (queued || helpers.length > 0) {
@@ -481,7 +486,7 @@ export const deriveAgentReport = (
     if (deferred && queued) carryReport(db, thread.thread_id, reportText(thread, outcome));
     return;
   }
-  if (earlierTurnOnItsWay(db, thread)) {
+  if (!done && earlierTurnOnItsWay(db, thread)) {
     const held = appendAgentEvent(db, {
       key: `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`,
       kind: "report_deferred",
@@ -517,6 +522,7 @@ export const fileLateTurn = (
   text: string,
   now: number,
   waiting = false,
+  done = false,
 ): boolean => {
   const thread = readThread(db, threadId);
   if (!thread || attemptGeneration >= thread.attempt_generation) return false;
@@ -541,6 +547,21 @@ export const fileLateTurn = (
   const lateId = agentReportId(thread.thread_id, attemptGeneration);
   const known = (key: string) => db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", key) !== null;
   if (known(lateId) || known(`report_deferred:${thread.thread_id}:${attemptGeneration}`)) return false;
+  if (done) {
+    // The finished report it sent itself is that turn's own report: it goes
+    // out now, and says nothing about the later turn. It ends the earlier turn
+    // a later one's report may be waiting for.
+    fileReport(
+      db,
+      { ...thread, attempt_generation: attemptGeneration, status: "completed" },
+      lateId,
+      "completed",
+      boundReportText(withCarried(thread, text.trim()), thread.thread_id),
+      now,
+    );
+    deriveAgentReport(db, thread.thread_id, now);
+    return true;
+  }
   const kept = appendAgentEvent(db, {
     key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
     kind: "report_deferred",

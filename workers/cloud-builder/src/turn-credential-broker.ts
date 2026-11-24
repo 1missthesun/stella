@@ -1,4 +1,5 @@
 import { CLOUD_AGENT_MOVE_PATH } from "@stella/executor-cloud/cloud-agent-move-protocol";
+import { CLOUD_AGENT_MESSAGE_PATH } from "@stella/executor-cloud/cloud-agent-message-protocol";
 import { CLOUD_CODE_CONNECT_PATH } from "@stella/executor-cloud/cloud-code-connect-protocol";
 import { CLOUD_BROWSER_BROKER_PATH } from "@stella/executor-cloud/cloud-browser-broker-protocol";
 import {
@@ -45,6 +46,8 @@ export const TURN_BROKER_USER_ASK_PATH = "/api/cloud/user-ask";
 
 export const TURN_BROKER_AGENT_MOVE_PATH = CLOUD_AGENT_MOVE_PATH;
 
+export const TURN_BROKER_AGENT_MESSAGE_PATH = CLOUD_AGENT_MESSAGE_PATH;
+
 export const TURN_BROKER_CODE_CONNECT_PATH = CLOUD_CODE_CONNECT_PATH;
 
 export const TURN_BROKER_CLOUD_BROWSER_PATH = CLOUD_BROWSER_BROKER_PATH;
@@ -83,6 +86,7 @@ export type TurnBrokerTarget = {
     | "thread-history"
     | "user-ask"
     | "agent-move"
+    | "agent-message"
     | "code-connect"
     | "cloud-browser"
     | "orchestrator-tool"
@@ -396,6 +400,14 @@ export const validateTurnBrokerTarget = (
   if (parsed.pathname === TURN_BROKER_AGENT_MOVE_PATH) {
     return {
       kind: "agent-move",
+      method: "POST",
+      path: parsed.pathname,
+      maxBodyBytes: MAX_CONTROL_BODY_BYTES,
+    };
+  }
+  if (parsed.pathname === TURN_BROKER_AGENT_MESSAGE_PATH) {
+    return {
+      kind: "agent-message",
       method: "POST",
       path: parsed.pathname,
       maxBodyBytes: MAX_CONTROL_BODY_BYTES,

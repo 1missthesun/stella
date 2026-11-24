@@ -61,7 +61,9 @@ import {
   AGENT_PROMPT_MAX_CHARS,
   RUNNING_AGENT_THREADS_LIMIT,
   CONVERSATION_AGENT_THREADS_MAX,
+  type AgentTaskMessageResult,
 } from "@stella/contracts/backend/agent-threads";
+import { DONE_ACCEPTED_TEXT, doneNotToStarterText, doneResultJson, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
 import { selectCloudModel } from "./engines.js";
@@ -2090,6 +2092,78 @@ const senderStella = (
 
 const RESUME_TEXT = "Continue where you left off.";
 
+const senderThread = (ctx: OwnerContext, from: Pick<AgentMessageSender, "threadId">): ThreadRow | null =>
+  readThread(ctx.db, isPlacementThreadId(from.threadId) ? (placementAliasThreadId(ctx.db, from.threadId) ?? from.threadId) : from.threadId);
+
+/** Whether `to` (already resolved) is whoever started the task: its lead, or for a top-level task the chat it belongs to. */
+const isStarterOf = (thread: ThreadRow, to: string): boolean =>
+  thread.parent_thread_id
+    ? to === thread.parent_thread_id
+    : to === thread.conversation_id || (thread.origin_conversation_id !== null && to === thread.origin_conversation_id);
+
+type TaskMessageArgs = {
+  ownerGeneration: string;
+  threadId: string;
+  messageId: string;
+  to: string;
+  text?: string | undefined;
+  done?: boolean | undefined;
+};
+
+/**
+ * A cloud task's send_message, from its turn broker: the sender is the
+ * turn's thread. A message is routed like any agent message; `done` only
+ * checks that the finished report is for whoever started the task and that
+ * none of its helpers still works, since the report is filed as the turn ends.
+ */
+const taskMessage = async (ctx: OwnerContext, args: TaskMessageArgs): Promise<AgentTaskMessageResult> => {
+  const sender = readThread(ctx.db, args.threadId);
+  if (!sender || (sender.owner_generation !== null && sender.owner_generation !== args.ownerGeneration)) {
+    throw new RpcError("NOT_FOUND", "This agent is not recorded, so its message could not be sent.");
+  }
+  const from: AgentMessageSender = { threadId: sender.thread_id, label: sender.description.trim() || "An agent" };
+  const requested = senderStella(ctx, args.to.trim(), from);
+  const to = isPlacementThreadId(requested) ? (placementAliasThreadId(ctx.db, requested) ?? requested) : requested;
+  const starter = isStarterOf(sender, to);
+  if (args.done) {
+    if (!starter) throw new RpcError("BAD_REQUEST", doneNotToStarterText(sender.parent_thread_id ?? undefined));
+    const helpers = liveDescendants(ctx.db, sender.thread_id);
+    if (helpers.length > 0) {
+      throw new RpcError(
+        "BAD_REQUEST",
+        doneWhileHelpersWorkText(
+          helpers.map((helperId) => {
+            const description = readThread(ctx.db, helperId)?.description.trim();
+            return description ? `"${description.slice(0, 120)}" (thread_id: ${helperId})` : helperId;
+          }),
+        ),
+      );
+    }
+    return { text: DONE_ACCEPTED_TEXT, starter: true };
+  }
+  const text = args.text?.trim() ?? "";
+  if (!text) throw new RpcError("BAD_REQUEST", "message is required.");
+  const delivery = await messageAgent(ctx, {
+    ownerGeneration: args.ownerGeneration,
+    messageId: args.messageId,
+    to: args.to.trim(),
+    text,
+    from,
+  });
+  const toStella = conversationOfThread(ctx, delivery.threadId) === delivery.threadId;
+  const how =
+    delivery.outcome === "queued"
+      ? toStella
+        ? "Stella reads it as her next turn."
+        : "It reaches them the way reports do, even while their computer is off."
+      : delivery.outcome === "steered"
+        ? "It is working and reads it before its next step."
+        : delivery.outcome === "resumed"
+          ? "It was idle, so this started its next run."
+          : "It is held until it can take it.";
+  return { text: [`Delivered to ${toStella ? "Stella" : delivery.threadId}. ${how}`, delivery.note].filter(Boolean).join(" "), starter };
+};
+
 const deliverAgentMessage = async (
   ctx: OwnerContext,
   args: {
@@ -2131,6 +2205,19 @@ const deliverAgentMessage = async (
       `No agent or Stella session has the thread_id ${to}. agent_status without a thread_id lists who you can reach.`,
       { reason: "message_target_not_found" },
     );
+  }
+  // A task's message to the lead that started it goes the way its reports
+  // do: through the outbox, retried, and held for a computer that is off.
+  if (args.kind === "message" && senderThread(ctx, args.from)?.parent_thread_id === thread.thread_id) {
+    queueAgentNote(ctx, {
+      noteId: `msg:${(await sha256Hex(args.commandId)).slice(0, 48)}`,
+      parentThreadId: thread.thread_id,
+      conversationId: thread.conversation_id,
+      ownerGeneration: args.ownerGeneration,
+      fromThreadId: senderThread(ctx, args.from)!.thread_id,
+      text: framed(),
+    });
+    return { threadId: thread.thread_id, command: args.kind, outcome: "queued" };
   }
   return (
     await controlAgent(ctx, {
@@ -3964,7 +4051,7 @@ const endHostedAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   deviceId: string,
-  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string; wakers?: string[] },
+  ended: { status: TerminalStatus; result?: string; error: string | null; waitingFor?: string; wakers?: string[]; done?: true },
 ): Promise<{ updated: boolean; status: string }> => {
   recordAgentChange(
     ctx.db,
@@ -3983,9 +4070,11 @@ const endHostedAttempt = async (
         ended.status,
         ended.waitingFor
           ? waitingResultJson(ended.result ?? "", ended.waitingFor, undefined, ended.wakers)
-          : ended.result !== undefined
-            ? JSON.stringify({ finalText: ended.result })
-            : null,
+          : ended.done && ended.status === "completed"
+            ? doneResultJson(ended.result ?? "")
+            : ended.result !== undefined
+              ? JSON.stringify({ finalText: ended.result })
+              : null,
         ended.error,
         ctx.now,
         thread.thread_id,
@@ -4073,7 +4162,7 @@ const completeHostedTurn = async (
     status,
     ...(result !== undefined ? { result } : {}),
     error,
-    ...(waitingFor ? { waitingFor, ...(args.wakers ? { wakers: args.wakers } : {}) } : {}),
+    ...(waitingFor ? { waitingFor, ...(args.wakers ? { wakers: args.wakers } : {}) } : args.done ? { done: true as const } : {}),
   };
   const mapped = readHostedTurn(ctx.db, thread.thread_id, deviceId, args.attemptGeneration);
   if (mapped?.attempt_generation === thread.attempt_generation && ACTIVE_STATUSES.has(thread.status)) {
@@ -4384,7 +4473,7 @@ const completeComputerThread = async (
     // An earlier turn's end, after a later one began: what it said is kept.
     if (args.attemptGeneration < row.attempt_generation && args.status === "completed") {
       const said = result !== undefined && !isPlaceholderAgentResult(JSON.stringify({ finalText: result })) ? result : "";
-      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined);
+      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined, args.done === true);
       return { updated: false, status: row.status };
     }
     if (
@@ -4442,9 +4531,11 @@ const completeComputerThread = async (
         status,
         waitingFor
           ? waitingResultJson(result ?? "", waitingFor, undefined, args.wakers)
-          : result !== undefined
-            ? JSON.stringify({ finalText: result })
-            : null,
+          : args.done && status === "completed"
+            ? doneResultJson(result ?? "")
+            : result !== undefined
+              ? JSON.stringify({ finalText: result })
+              : null,
         error,
         ctx.now,
         row.thread_id,
@@ -5778,6 +5869,7 @@ export const agentThreadsDomain = {
         error: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
         waitingFor: optional(string({ max: 1_000 })),
         wakers: optional(array(string({ max: 300 }), { max: WAKERS_MAX })),
+        done: optional(literal(true)),
       }),
       handler: completeComputerThread,
     },
@@ -5917,6 +6009,18 @@ export const agentThreadsDomain = {
         })(raw),
       ),
     "agentThreads.message": async (ctx, raw) => await messageAgent(ctx, messageParser(raw)),
+    "agentThreads.taskMessage": async (ctx, raw) =>
+      await taskMessage(
+        ctx,
+        object({
+          ownerGeneration: generation,
+          threadId: id(256),
+          messageId: id(),
+          to: id(256),
+          text: optional(string({ max: AGENT_MESSAGE_MAX_CHARS * 2 })),
+          done: optional(boolean()),
+        })(raw),
+      ),
     "agentThreads.move": async (ctx, raw) => await moveFromOutside(ctx, moveParser(raw)),
     "agentThreads.stop": async (ctx, raw) => await stopAgent(ctx, stopParser(raw)),
     "agentThreads.pause": async (ctx, raw) => await legacyPauseAgent(ctx, pauseParser(raw)),

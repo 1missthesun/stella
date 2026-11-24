@@ -6,6 +6,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1080px;
 }
 
 .wall {
@@ -138,6 +140,8 @@
   overflow: hidden;
   padding: 120px var(--l-margin) 80px;
   color: #fff;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
 }
 
 .finaleAurora {
@@ -225,6 +229,8 @@
   color: rgba(255, 255, 255, 0.6);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 14px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
 }
 
 .footBrand {

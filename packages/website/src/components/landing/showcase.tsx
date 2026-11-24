@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { DesignPlayer } from "./design-player";
 import { clamp, ease, prefersReducedMotion, seg, useInViewOnce } from "./motion";
 import { StellaSkin } from "./skins";
-import { mixWindowVars, ThemeGradient, type WindowThemeKey } from "./window-theme";
+import { mixWindowVars, resolveWindowTheme, ThemeGradient, type WindowThemeKey } from "./window-theme";
 import w from "./showcase.module.css";
 
 const JOURNEY: WindowThemeKey[] = [
@@ -16,6 +16,89 @@ const JOURNEY: WindowThemeKey[] = [
   { id: "nightowl", dark: false },
   { id: "default", dark: false },
 ];
+
+const JOURNEY_START = 0.03;
+const JOURNEY_END = 0.86;
+
+const JOURNEY_SCROLL_CSS = (() => {
+  const stops = JOURNEY.map((theme) => resolveWindowTheme(theme).vars);
+  const varNames = Object.keys(stops[0]);
+  const pct = (i: number) =>
+    `${((JOURNEY_START + (i / (JOURNEY.length - 1)) * (JOURNEY_END - JOURNEY_START)) * 100).toFixed(2)}%`;
+
+  const props = varNames
+    .map(
+      (name) =>
+        `@property ${name} { syntax: "<color>"; inherits: true; initial-value: ${stops[0][name]}; }`,
+    )
+    .join("\n");
+
+  const themeFrames = stops
+    .map((vars, i) => {
+      const sel =
+        i === 0 ? `0%, ${pct(0)}` : i === stops.length - 1 ? `${pct(i)}, 100%` : pct(i);
+      const decls = varNames.map((n) => `${n}: ${vars[n]};`).join(" ");
+      return `  ${sel} { ${decls} animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }`;
+    })
+    .join("\n");
+
+  const canvasFrames = JOURNEY.map((theme, j) => {
+    if (theme.id === "default") return "";
+    const prev = pct(j - 1);
+    const peak = pct(j);
+    const next = pct(j + 1);
+    return [
+      `@keyframes stella-journey-c${j} {`,
+      `  0%, ${prev} { opacity: 0; animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }`,
+      `  ${peak} { opacity: 1; animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }`,
+      `  ${next}, 100% { opacity: 0; }`,
+      `}`,
+    ].join("\n");
+  })
+    .filter(Boolean)
+    .join("\n");
+
+  const canvasBindings = JOURNEY.map((theme, j) =>
+    theme.id === "default"
+      ? ""
+      : `  [data-journey-frame] canvas.journey-${j} { animation: stella-journey-c${j} linear both; animation-timeline: --stella-journey; animation-range: cover 14% cover 50%; }`,
+  )
+    .filter(Boolean)
+    .join("\n");
+
+  const mobileCanvasBindings = JOURNEY.map((theme, j) =>
+    theme.id === "default"
+      ? ""
+      : `    [data-journey-frame] canvas.journey-${j} { animation-range: cover 5% cover 50%; }`,
+  )
+    .filter(Boolean)
+    .join("\n");
+
+  return [
+    props,
+    `@keyframes stella-journey-theme {\n${themeFrames}\n}`,
+    canvasFrames,
+    `@supports (animation-timeline: view()) and (animation-range: cover 0% cover 50%) {`,
+    `  @media (prefers-reduced-motion: no-preference) {`,
+    `    [data-journey-window] > * { animation: stella-journey-theme linear both; animation-timeline: --stella-journey; animation-range: cover 14% cover 50%; }`,
+    canvasBindings,
+    `    @media (max-width: 700px) {`,
+    `      [data-journey-window] > * { animation-range: cover 5% cover 50%; }`,
+    mobileCanvasBindings,
+    `    }`,
+    `  }`,
+    `}`,
+  ].join("\n");
+})();
+
+function supportsCssScrollTimeline() {
+  return (
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("animation-timeline", "view()") &&
+    CSS.supports("animation-range", "cover 0% cover 50%")
+  );
+}
 
 function JourneyBackdrop() {
   return (
@@ -34,6 +117,7 @@ function JourneyView() {
   const tintRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (supportsCssScrollTimeline()) return;
     const frame = frameRef.current;
     const win = tintRef.current?.firstElementChild as HTMLElement | null;
     if (!frame || !win || prefersReducedMotion()) return;
@@ -118,9 +202,10 @@ function JourneyView() {
 
   return (
     <div className={w.journey}>
-      <div ref={frameRef} className={w.journeyFrame} aria-hidden="true">
+      <style dangerouslySetInnerHTML={{ __html: JOURNEY_SCROLL_CSS }} />
+      <div ref={frameRef} className={w.journeyFrame} data-journey-frame="" aria-hidden="true">
         <div className={w.journeyGlow} />
-        <div ref={tintRef} className={w.skinBox} data-live="1">
+        <div ref={tintRef} className={w.skinBox} data-journey-window="" data-live="1">
           <StellaSkin backdrop={<JourneyBackdrop />} />
         </div>
       </div>

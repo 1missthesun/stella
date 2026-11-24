@@ -9,7 +9,6 @@ export const EMAIL_CARD_TYPE = "email";
 export const EMAIL_CARD_MAX_ITEMS = 12;
 
 export type EmailCardItem = {
-  /** Its number in the card, which the user can refer to ("reply to the second one"). */
   n: number;
   itemId: string;
   account?: string;
@@ -23,19 +22,12 @@ export type EmailCardItem = {
   receivedAt: number;
 };
 
-/**
- * A briefing (shown in the Email tab and the bell, never in the chat). `urgent`: one email that couldn't wait.
- * `summary`: what built up since the last one. `rule`: an email that matched
- * a standing instruction the user asked to be told about.
- */
 export type EmailCard = {
   type: typeof EMAIL_CARD_TYPE;
   cardId: string;
   kind: "urgent" | "summary" | "rule";
   items: EmailCardItem[];
-  /** Emails left out as noise since the last summary. */
   noiseCount?: number;
-  /** The standing instruction, in the user's words (`rule`). */
   ruleText?: string;
 };
 
@@ -115,12 +107,6 @@ export const EMAIL_REASON_WORDS: Record<EmailReason, string> = {
   other: "Email",
 };
 
-/**
- * What Stella reads about a briefing the user got, so "reply to the Stripe
- * one" or "the second one" resolves to a real message. The chat shows none of
- * it; the list is in the Email view, in this order. Plain
- * text; ids are for the email tool.
- */
 export const emailCardNoteText = (card: EmailCard, lead?: string): string => {
   const heading =
     card.kind === "urgent"
@@ -144,7 +130,6 @@ export const emailCardNoteText = (card: EmailCard, lead?: string): string => {
   ].join("\n");
 };
 
-/** The email a digest action is about, as Stella's hidden note names it. */
 export type EmailFocusSubject = {
   from: string;
   fromAddress: string;
@@ -155,10 +140,6 @@ export type EmailFocusSubject = {
   threadId: string;
 };
 
-/**
- * Hidden context written just before the user's own message from a briefing
- * action, so a plain "Draft a reply to Blue Metal's email" names the real email.
- */
 export const emailFocusNoteText = (
   mails: readonly EmailFocusSubject[],
   action: "reply" | "handle" | "tell" | "suggest",

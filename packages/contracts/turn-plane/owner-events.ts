@@ -72,11 +72,6 @@ export type TurnEventEvent = OwnerEventBase & {
   payload: unknown;
   terminal: boolean;
   terminalStatus?: "completed" | "failed" | "canceled" | "waiting_for_user";
-  /**
-   * On a chat turn's terminal event: whether the turn began running. `false`
-   * means it ended before running (nothing of it happened); absent means
-   * unknown.
-   */
   began?: boolean;
   errorMessage?: string;
   resultJson?: string;
@@ -111,7 +106,6 @@ export type ThreadCompletedEvent = OwnerEventBase & {
   resultJson?: string;
   errorMessage?: string;
   completedAt: number;
-  /** A cloud turn that ended waiting: the owner checks that something can still wake the task. */
   wakeCheck?: true;
 };
 

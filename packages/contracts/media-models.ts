@@ -69,18 +69,12 @@ const gptImagePrice = (input: Record<string, unknown>): number => {
 };
 
 // fal's H3 Max list rates per second of output. Text and image-to-video run
-// 35% off until fal's promotion ends on October 31; from that day (UTC) the
-// list rate applies. Audio is always generated and costs nothing extra.
 const H3_MAX_PER_SECOND: Record<string, number> = { "480p": 0.05, "768p": 0.08, "1080p": 0.16, "2k": 0.32 };
 const H3_MAX_PROMO_ENDS_AT = Date.UTC(2026, 9, 31);
 const H3_MAX_PROMO_FACTOR = 0.65;
 const H3_MAX_DEFAULT_SECONDS = 5;
 const H3_MAX_MAX_SECONDS = 15;
 // Reference inputs above a 4,096-token allowance per request cost $0.02 per
-// 1,000 tokens. The files aren't inspected, so this assumes the largest counts:
-// 2,560 tokens per image (its most elongated shape), reference videos and
-// audio filling the output length up to their combined 15 s, and about 6,900
-// video tokens per second (2,700 at 480p) and 80 audio tokens per second.
 const H3_MAX_FREE_REFERENCE_TOKENS = 4_096;
 const H3_MAX_USD_PER_REFERENCE_TOKEN = 0.02 / 1_000;
 const H3_MAX_IMAGE_TOKENS = 2_560;
@@ -251,7 +245,6 @@ export const STELLA_MEDIA_MODELS = {
   imageEdit: "openai/gpt-image-2.5/flare/edit",
   video: "minimax/h3-max/text-to-video",
   imageToVideo: "minimax/h3-max/image-to-video",
-  // Read-aloud, on OpenRouter (not in the fal catalog above).
   speech: "speechify/simba-3.5",
   dictation: "elevenlabs/scribe-v2",
 } as const;

@@ -53,9 +53,6 @@ export const GPT_LIVE_VOICES: readonly RealtimeVoiceCatalogEntry[] = [
   },
 ];
 
-// Stella's own read-aloud voices: Speechify Simba 3.5 voice ids, as
-// OpenRouter takes them. The server falls back to the default for any other
-// id, including voices saved for an earlier read-aloud model.
 export const STELLA_TTS_VOICES: readonly RealtimeVoiceCatalogEntry[] = [
   { id: "beth", label: "Beth", description: "Natural and clear — the default read-aloud voice." },
 ];

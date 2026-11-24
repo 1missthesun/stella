@@ -1,20 +1,7 @@
 /**
- * Lossless, paced delivery of captured dictation audio to the realtime relay.
- *
- * Desktop and mobile start the microphone the moment the user presses it,
- * before the relay socket and Meta's realtime ASR session are ready, so the
- * first words are spoken into a session that does not exist yet. This queue
- * holds everything captured meanwhile, drops none of it, and releases it in
- * capture order once the provider's clock starts (its handshake
- * acknowledgment).
- *
- * Meta closes a session whose received audio runs too far ahead of that
- * clock ("Audio processing backlog too large"; a 10 s burst was accepted and
- * a 15 s burst refused against the live relay), so the queue never releases
- * more than `DICTATION_INGRESS_AHEAD_MS` ahead of it. A connect slower than
- * that only delays the transcript; every word still reaches the provider.
- *
- * Audio is 16 kHz mono signed 16-bit PCM.
+ * Meta closes a realtime ASR session whose received audio runs too far ahead of
+ * its clock ("Audio processing backlog too large"; a 10 s burst was accepted and
+ * a 15 s burst refused against the live relay).
  */
 
 export const DICTATION_PCM_BYTES_PER_MS = 32;

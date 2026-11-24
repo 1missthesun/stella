@@ -4,15 +4,8 @@ import {
   type TokenProvider,
 } from "./client.js";
 
-/**
- * One BackendClient, so one `/owners/me/live` socket, per backend origin in a
- * process. Every holder leases it with its own token source; the client asks
- * the holders in lease order and the first token wins, so the socket keeps
- * working while any holder is still signed in. The last release disposes it.
- */
 export type BackendClientLease = {
   readonly client: BackendClient;
-  /** Reconnects the shared socket when the signed-in account changed. */
   noteAuthToken(token: string | null): void;
   release(): void;
 };

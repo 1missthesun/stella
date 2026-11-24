@@ -1,5 +1,3 @@
-// "worklet" lets mobile run these on the UI thread; elsewhere it is a no-op.
-
 export const DICTATION_WAVEFORM_BAR_WIDTH = 3;
 export const DICTATION_WAVEFORM_BAR_GAP = 3;
 export const DICTATION_WAVEFORM_STRIDE =
@@ -14,8 +12,6 @@ const FADE_MIN_OPACITY = 0.18;
 const FADE_MIN_SCALE = 0.7;
 
 const WINDOW_MS = 20;
-// Fixed dBFS range: room and car background noise sits at or below the floor
-// (baseline dots), loud close speech reaches the ceiling.
 const FLOOR_DB = -48;
 const CEILING_DB = -10;
 const CURVE = 1.35;
@@ -120,8 +116,6 @@ export function stepDictationWaveform(
   state.progress = elapsed / DICTATION_WAVEFORM_BAR_MS;
 }
 
-// Bar at `age` 0 is the one still forming at the leading (right) edge; age k
-// is the k-th finished bar behind it. Returns null when there is no such bar.
 export function dictationWaveformLevel(
   state: DictationWaveformState,
   age: number,
@@ -135,7 +129,6 @@ export function dictationWaveformLevel(
   return state.bars[index] ?? 0;
 }
 
-// Distance in px from the waveform's right edge to the bar's right side.
 export function dictationWaveformOffset(
   state: DictationWaveformState,
   age: number,
@@ -157,8 +150,6 @@ export type DictationWaveformBarLook = {
   opacity: number;
 };
 
-// Height in px for a level, with a round dot at silence, and the fade toward
-// the older (left) end, where `offset` is from dictationWaveformOffset.
 export function dictationWaveformBarLook(
   level: number,
   offset: number,

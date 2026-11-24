@@ -93,7 +93,6 @@ const isLookup = (name: string): boolean => {
   return LOOKUP_SUFFIXES.includes(verb);
 };
 
-/** Default deadline for a backend call; callers with their own deadline pass it instead. */
 export const backendCallBudget = (name: CallName | string): CallBudget => {
   if (SLOW_CALLS.has(name)) {
     return { timeoutMs: REQUEST_BUDGET_MS.slow, idempotent: IDEMPOTENT_CALLS.has(name) };

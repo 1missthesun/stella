@@ -1,36 +1,13 @@
-/**
- * Canvas actions: controls in a sandboxed canvas that send something back to
- * Stella, shared by the `html` tool (desktop runtime and cloud), the desktop
- * and web renderer, Electron main and the mobile app.
- *
- * Trust: a canvas is untrusted HTML (it may show an email body or a web
- * page's text), so it never decides what an action means. The actions a
- * canvas offers are declared by Stella outside the page (`actions` on the
- * `html` tool), written by the tool as the file's very first bytes, and the
- * host that shows the canvas reads them from there; anything the page says
- * about an action other than which declared id was tapped and the fields it
- * carries is ignored. The label the chat shows and Stella reads comes from
- * the declaration. An action is only sent for a real tap: the bridge runs
- * before any page script, keeps its channel to the host private, and acts
- * only on trusted (user-made) events.
- */
-
 export type CanvasAction = {
-  /** Stable id the page refers to (`data-stella-action="<id>"`). */
   id: string;
-  /** What tapping it does, as the user should read it ("Send the reply to Ana"). */
   label: string;
 };
 
-/** A tap on a declared action, as the host turns it into a chat message. */
 export type CanvasActionEvent = {
-  /** The canvas's slug (or the built-in page's name, such as "email"). */
   canvas: string;
-  /** The canvas's title, shown with the action in the chat. */
   title: string;
   id: string;
   label: string;
-  /** Form fields (or `data-stella-value` as `value`) the page sent with the tap. */
   fields?: Record<string, string>;
 };
 
@@ -45,7 +22,6 @@ const MAX_FIELDS_TOTAL_CHARS = 8_000;
 const cleanLabel = (value: string): string =>
   value.replace(/[\u0000-\u001f\u007f]+/gu, " ").replace(/\s+/gu, " ").trim().slice(0, MAX_LABEL_CHARS);
 
-/** The declared actions from a tool call or a manifest; malformed entries are dropped. */
 export const parseCanvasActions = (value: unknown): CanvasAction[] => {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -63,7 +39,6 @@ export const parseCanvasActions = (value: unknown): CanvasAction[] => {
   return out;
 };
 
-/** Problems with the `actions` a model passed, for the tool's error. */
 export const canvasActionsProblem = (value: unknown): string | null => {
   if (value === undefined) return null;
   if (!Array.isArray(value)) return "actions must be a list of { id, label }.";
@@ -82,26 +57,18 @@ export const canvasActionsProblem = (value: unknown): string | null => {
   return null;
 };
 
-// Manifest ------------------------------------------------------------------
-
 const MANIFEST_OPEN = "<!--stella-actions ";
 const MANIFEST_CLOSE = "-->";
 const MANIFEST_ANYWHERE = /<!--stella-actions [\s\S]*?-->\n?/gu;
 
-/** JSON that can sit inside an HTML comment: no `<`, `>` or `-` survive unescaped. */
 const commentSafeJson = (value: unknown): string =>
   JSON.stringify(value).replace(/[<>-]/gu, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
-/**
- * The document as the `html` tool saves it: the declared actions as its first
- * bytes, and no other manifest anywhere in it (a page can't smuggle one in).
- */
 export const withCanvasActionManifest = (html: string, actions: readonly CanvasAction[]): string => {
   const body = html.replace(MANIFEST_ANYWHERE, "");
   return actions.length > 0 ? `${MANIFEST_OPEN}${commentSafeJson(actions)}${MANIFEST_CLOSE}\n${body}` : body;
 };
 
-/** The declared actions of a saved canvas: only a manifest at the very start counts. */
 export const readCanvasActionManifest = (html: string): CanvasAction[] => {
   const start = html.charCodeAt(0) === 0xfeff ? 1 : 0;
   if (!html.startsWith(MANIFEST_OPEN, start)) return [];
@@ -114,12 +81,8 @@ export const readCanvasActionManifest = (html: string): CanvasAction[] => {
   }
 };
 
-/** Enough of a file's start to hold any manifest, for hosts that read it separately. */
 export const CANVAS_ACTION_MANIFEST_MAX_BYTES = 64 * 1024;
 
-// Fields --------------------------------------------------------------------
-
-/** The fields a tap carries, bounded; anything else the page sent is dropped. */
 export const cleanCanvasActionFields = (value: unknown): Record<string, string> | undefined => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const out: Record<string, string> = {};
@@ -139,19 +102,12 @@ export const cleanCanvasActionFields = (value: unknown): Record<string, string> 
   return count > 0 ? out : undefined;
 };
 
-// Chat message --------------------------------------------------------------
-
 const TAG = "canvas-action";
 const attr = (value: string): string =>
   value.replace(/&/gu, "&amp;").replace(/"/gu, "&quot;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/\n/gu, " ");
 const unattr = (value: string): string =>
   value.replace(/&quot;/gu, '"').replace(/&lt;/gu, "<").replace(/&gt;/gu, ">").replace(/&amp;/gu, "&");
 
-/**
- * The user message a tap becomes. Stella reads the whole block; every chat
- * surface shows it as what the user did (`canvasActionDisplay`). Field values
- * are the page's, so they are fenced as data.
- */
 export const canvasActionMessage = (event: CanvasActionEvent): string => {
   const head = `<${TAG} canvas="${attr(event.canvas)}" title="${attr(event.title)}" id="${attr(event.id)}" label="${attr(event.label)}">`;
   const fields = event.fields
@@ -180,16 +136,9 @@ export const parseCanvasActionMessage = (text: string): CanvasActionEvent | null
   };
 };
 
-/**
- * How a chat surface shows a tap: the canvas it came from (a small chip) and
- * the bubble's words, which are what the user typed into the canvas when
- * they typed something, else the action's label.
- */
 export type CanvasActionDisplay = {
   canvas: string;
-  /** The chip: the canvas, with the action when the bubble shows typed words. */
   chip: string;
-  /** The bubble's words. */
   text: string;
 };
 
@@ -204,20 +153,6 @@ export const canvasActionDisplay = (text: string): CanvasActionDisplay | null =>
   };
 };
 
-// Bridge --------------------------------------------------------------------
-
-/**
- * The script that makes `data-stella-action` controls work, run in the canvas
- * before any of the page's own scripts. `transport` is a JS expression that
- * evaluates to `{ send(message), listen(receive) }` built from references it
- * captured first. Everything the bridge uses is captured at start, so a page
- * script that patches prototypes later can't steer it, and only trusted
- * (user-made) clicks and submits send anything.
- *
- * The page can watch `stella:action` on `document` (detail `{ id, state }`,
- * state "sending" | "sent" | "refused" | "failed") and `stella:data` on
- * `window` (detail: data the host feeds a built-in page).
- */
 export const canvasActionBridgeSource = (transport: string): string => String.raw`
 (() => {
   const apply = Reflect.apply;
@@ -350,12 +285,6 @@ export const canvasActionBridgeSource = (transport: string): string => String.ra
 })();
 `;
 
-/**
- * The bridge for a canvas in an iframe (desktop and web). The host hands the
- * frame a MessagePort once it loads; the bridge's listener is registered
- * before any page script, takes the port and stops the event, so only the
- * bridge ever holds it. The host acts only on what arrives on that port.
- */
 export const CANVAS_ACTION_FRAME_BRIDGE = canvasActionBridgeSource(String.raw`(() => {
     const addListener = EventTarget.prototype.addEventListener;
     const stopImmediate = Event.prototype.stopImmediatePropagation;
@@ -398,17 +327,11 @@ export const CANVAS_ACTION_FRAME_BRIDGE_TAG = `<script>${CANVAS_ACTION_FRAME_BRI
 
 const LEADING_PREAMBLE = /^﻿?\s*(?:<!--[\s\S]*?-->\s*)*(?:<!doctype[^>]*>)?/iu;
 
-/**
- * The document with the frame bridge as its first script: after the leading
- * comments and doctype (so it stays in standards mode), before anything the
- * page runs.
- */
 export const injectCanvasActionBridge = (html: string, bridgeTag = CANVAS_ACTION_FRAME_BRIDGE_TAG): string => {
   const preamble = LEADING_PREAMBLE.exec(html)?.[0] ?? "";
   return `${preamble}${bridgeTag}${html.slice(preamble.length)}`;
 };
 
-/** Messages the frame bridge sends to its host over the port. */
 export type CanvasBridgeMessage = { type: "action"; id: string; fields?: unknown };
 
 export const isCanvasBridgeAction = (value: unknown): value is CanvasBridgeMessage =>

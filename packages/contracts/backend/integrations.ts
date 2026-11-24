@@ -9,12 +9,6 @@ export const X_FINISH_CONNECT_PATH = "/api/x/finish";
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/google/oauth_callback";
 export const FINISH_CONNECT_PATH = "/api/native-integrations/finish-connect";
 
-/**
- * A finished Google sign-in waits under a one-time code until the Stella app
- * of whoever approved it redeems the code as its own signed-in user, so a
- * forwarded connect link can never attach someone else's account. The
- * callback page hands the code to the local app with this link.
- */
 const CONNECT_CLAIM_HOST = "connect";
 const CONNECT_CODE_PATTERN = /^[0-9A-Za-z]{4}(-?[0-9A-Za-z]{4}){2}$/u;
 
@@ -37,7 +31,6 @@ export const parseConnectClaimLink = (raw: string): string | null => {
 };
 
 export type IntegrationConnector = {
-  /** "stella": Google services Stella connects with its own Google app. */
   type: "composio" | "stella";
   toolkit: string;
   actionNamespace?: string;
@@ -106,22 +99,18 @@ export type IntegrationConnection = {
   accounts?: IntegrationAccount[];
 };
 
-/** Integrations whose users may connect several accounts at once (one per email). */
 export const integrationSupportsMultipleAccounts = (id: string): boolean => {
   const normalized = id.trim().toLowerCase();
   return normalized === "gmail" || (normalized.startsWith("google") && normalized !== "googleads");
 };
 
-/** Who connects a user's Google account: Stella's own Google app (default) or Composio. */
 export type GoogleConnectionProvider = "stella" | "composio";
 
 export type GoogleProviderState = {
   provider: GoogleConnectionProvider;
-  /** Google integrations this user already connected through Composio; they keep working. */
   composioConnected: string[];
 };
 
-/** Google integrations Stella can connect with its own Google app instead of Composio. */
 export const isGoogleIntegration = (id: string): boolean => {
   const normalized = id.trim().toLowerCase();
   return normalized === "gmail" || (normalized.startsWith("google") && normalized !== "googleads");

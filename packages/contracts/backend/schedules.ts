@@ -20,7 +20,6 @@ export type ScheduleRow = {
   scheduleId: string;
   kind: ScheduleKind;
   route: ScheduleRoute;
-  /** A task's fire or a watch's finding goes as a message to this existing agent thread instead of `route`. */
   targetThreadId?: string;
   once?: boolean;
   lastCheckAt?: number;
@@ -36,9 +35,7 @@ export type ScheduleRow = {
   description: string;
   lastError?: string;
   lastErrorAt?: number;
-  /** The account's plan runs scheduled work only on a computer, never in the cloud. */
   computerOnly?: true;
-  /** A run came due while its computer was away; it runs once the computer is back. */
   waitingSince?: number;
   createdAt: number;
   updatedAt: number;
@@ -67,16 +64,10 @@ export type ScheduleCalls = {
       targetThreadId?: string;
       script?: string;
       once?: boolean;
-      /** The agent that set it up: it hears too when a run fails. */
       createdByThreadId?: string;
     };
     result: ScheduleRow & { check?: WatchCheckResult };
   };
-  /**
-   * A message for Stella in a conversation, from a schedule that lives on a
-   * computer: it reaches her wherever the conversation runs (another
-   * computer or the cloud), like an agent's message would.
-   */
   "schedules.tellStella": {
     args: { conversationId: string; noteId: string; text: string };
     result: { queued: boolean };
@@ -90,7 +81,6 @@ export type ScheduleCalls = {
       description?: string;
       status?: "active" | "paused";
       route?: ScheduleRoute;
-      /** Without it, a `route` change clears the target thread. */
       targetThreadId?: string;
       script?: string;
       once?: boolean;

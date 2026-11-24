@@ -4,26 +4,15 @@ export type ClaudeLocalConfig = {
   loggedIn: boolean;
   email?: string;
   plan?: string;
-  /**
-   * When Anthropic ends this login (epoch ms). A Claude login lasts a fixed
-   * time from signing in, however often it is used; after it only signing
-   * in again works.
-   */
+  /** A Claude login lasts a fixed time from signing in, however often it is used. */
   loginExpiresAt?: number;
-  /** The login was there but has ended (time limit, or Anthropic refused it). */
   ended?: boolean;
 };
 
-/** Claude logins end this long ahead of time get a heads-up. */
 export const CLAUDE_LOGIN_WARN_BEFORE_MS = 3 * 24 * 60 * 60 * 1000;
 
-/**
- * The login Stella answers with on this computer needs the person: it ends
- * soon, or it has ended and nothing else here can answer.
- */
 export type ClaudeLoginAttention = {
   state: "ending" | "ended";
-  /** The login to sign in again; "default" is Claude Code's own login. */
   configId: string;
   email?: string;
   expiresAt?: number;
@@ -43,7 +32,6 @@ export type ClaudeLocalLoginStart = {
   authorizeUrl: string;
 };
 
-/** Progress of installing Claude Code from onboarding. */
 export type ClaudeCliInstallProgress =
   | { phase: "checking" }
   | { phase: "downloading"; received: number; total: number | null }
@@ -51,8 +39,6 @@ export type ClaudeCliInstallProgress =
 
 export type ClaudeCliInstallResult =
   | { status: "installed"; version: string | null; executable: string }
-  /** No connection to Anthropic's download service. */
   | { status: "offline"; detail: string }
-  /** Claude Code isn't offered here (platform, or a region Anthropic doesn't serve). */
   | { status: "unavailable"; detail: string }
   | { status: "failed"; detail: string };

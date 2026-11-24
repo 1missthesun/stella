@@ -31,21 +31,11 @@ export type OwnerSnapshot = {
   billingUnavailable?: true;
   execution: CloudExecutionSelection;
   timeZone?: string;
-  /** Active phone pairings; `pairingKey` is the secret HMAC key of each one's proofs. */
   pairedDevices?: Array<{
     mobileDeviceId: string;
     desktopDeviceId: string;
     pairingKey?: PairingHmacKey;
   }>;
-  /**
-   * The owner's execution devices (desktops) for placement: their device
-   * public key (verifies the presence socket proof), whether remote execution
-   * is enabled, and the capabilities they last advertised.
-   *
-   * Appearing here is only "this computer is signed in". `remoteExecution` is
-   * the separate fact of whether it agreed to run work sent from elsewhere;
-   * `remoteExecutionEnabled` is that state being `"enabled"`.
-   */
   devices?: Array<{
     deviceId: string;
     publicKey: string;

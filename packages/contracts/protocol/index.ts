@@ -77,14 +77,10 @@ export const METHOD_NAMES = {
   HOST_DISPLAY_UPDATE: "host.display.update",
   HOST_SYSTEM_REQUEST_PERMISSION: "host.system.requestPermission",
   /**
-   * Ask the Electron host process to spawn the desktop_automation daemon on
-   * behalf of the (detached) runtime worker. macOS attributes TCC permission
-   * checks (Accessibility) to the responsible process, which is inherited at
-   * spawn time. The worker outlives the Electron app that spawned it, so
-   * daemons spawned from the worker's process tree lose Stella.app attribution
-   * after an app restart and fail AXIsProcessTrusted(). Spawning from the live
-   * Electron main process keeps every automation process under the single
-   * "Stella" TCC identity the user granted.
+   * macOS attributes TCC permission checks (Accessibility) to the responsible
+   * process, inherited at spawn time. Daemons spawned from the detached worker
+   * lose Stella.app attribution after an app restart and fail
+   * AXIsProcessTrusted(), so the live Electron main process spawns them.
    */
   HOST_COMPUTER_USE_SPAWN_AUTOMATION_DAEMON:
     "host.computerUse.spawnAutomationDaemon",
@@ -129,7 +125,6 @@ export const METHOD_NAMES = {
     "internal.worker.localChat.getEventCount",
   INTERNAL_WORKER_ONE_SHOT_COMPLETION: "internal.worker.oneShotCompletion",
   INTERNAL_SCHEDULE_LIST_CRON_JOBS: "internal.schedule.listCronJobs",
-  /** Schedules with whether every one could be listed (the cloud's may fail or not be loaded yet). */
   INTERNAL_SCHEDULE_LIST_WAKE_JOBS: "internal.schedule.listWakeJobs",
   INTERNAL_SCHEDULE_LIST_HEARTBEATS: "internal.schedule.listHeartbeats",
   INTERNAL_SCHEDULE_ADD_CRON_JOB: "internal.schedule.addCronJob",
@@ -194,16 +189,9 @@ export type HostLlmCredentialsRequest =
     }
   | {
       operation: "claude-config";
-      /** Read every login again first: Anthropic just refused the one in use. */
       recheck?: boolean;
-      /** Answer from what is known (a turn waiting for a sign-in asks often). */
       cached?: boolean;
-      /** The login in this config directory was refused by Anthropic in a turn. */
       rejectedConfigDir?: string | null;
-      /**
-       * A turn waiting for a sign-in tries again: logins Anthropic refused
-       * that still read as signed in here are put back into use.
-       */
       retryRefused?: boolean;
     };
 
@@ -372,7 +360,6 @@ export type RuntimeAutomationTurnResult =
       status: "error";
       finalText: "";
       error: string;
-      /** Stella for this conversation runs on another computer or in the cloud, so nothing ran here. */
       code?: "brain_elsewhere";
     };
 
@@ -400,7 +387,6 @@ export type RuntimeLocalAgentMessageRequest = {
   text: string;
   messageId: string;
   ownerGeneration: string;
-  /** Who sent it, as the cloud judged by the shared rules (`agent-rules`); absent from older backends. */
   sender?: "user" | "starter" | "other";
 };
 

@@ -31,7 +31,6 @@ export type CloudOrchestratorCliTurnSpec = {
   startFresh?: true;
   compact?: true;
   quiet?: boolean;
-  /** Claude Code's own WebSearch and WebFetch, in place of Stella's `web`. */
   webTools?: true;
 };
 

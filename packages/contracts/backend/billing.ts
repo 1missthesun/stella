@@ -36,9 +36,7 @@ export type BillingUsage = {
   rollingResetsAt: number;
   weeklyResetsAt: number;
   monthlyResetsAt: number;
-  // Held by work still running (model streams, media jobs, cloud agents).
   reservedUsd: number;
-  // What can still be spent now: the tightest window plus credit, minus reserved.
   availableUsd: number | null;
 };
 

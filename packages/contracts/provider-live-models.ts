@@ -5,7 +5,6 @@ export type LiveProviderModel = {
   maxTokens?: number;
   input?: ("text" | "image")[];
   reasoning?: boolean;
-  /** USD per million tokens, as the provider lists it. */
   cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
 };
 
@@ -23,11 +22,6 @@ type CatalogShape = {
 type Listing = {
   url: string;
   auth: "none" | "bearer" | "anthropic" | "google";
-  /**
-   * The list describes each model (limits, modalities, tool use), so an id
-   * from a family Stella has never seen is still offered. A bare id list is
-   * only trusted for a newer version of a family Stella already runs.
-   */
   described: boolean;
 };
 
@@ -169,11 +163,6 @@ const listedModel = (value: unknown): LiveProviderModel | undefined => {
   };
 };
 
-/**
- * The models a provider's own API lists right now. Undefined when the
- * provider has no list Stella reads, or its list needs a key and none was
- * given; throws when the request fails.
- */
 export const fetchLiveProviderModels = async (
   provider: string,
   options: { apiKey?: string; fetch?: typeof fetch; signal?: AbortSignal } = {},
@@ -237,11 +226,6 @@ const publishedModel = (value: unknown): LiveProviderModel | undefined => {
   };
 };
 
-/**
- * What pi-ai's published catalog says of a provider's models: the limits
- * and prices of ones released after this build's bundled list. Throws when
- * the request fails.
- */
 export const fetchPublishedProviderModels = async (
   provider: string,
   options: { fetch?: typeof fetch; signal?: AbortSignal } = {},
@@ -286,10 +270,6 @@ const familyOf = <M extends { id: string }>(known: readonly M[], id: string): M[
   return known.filter((model) => model.id.toLowerCase().startsWith(stem));
 };
 
-/**
- * The known model closest to `id` within its family: `claude-fable-5-1` for
- * `claude-fable-5-2`, the newest Opus for `claude-opus-6`.
- */
 export const siblingModel = <M extends { id: string }>(known: readonly M[], id: string): M | undefined => {
   const target = id.toLowerCase();
   let best: M | undefined;
@@ -319,13 +299,6 @@ const isNewerVersionOfKnownFamily = (known: readonly { id: string }[], id: strin
   return versions.every(([major, minor]) => version[0] > major || (version[0] === major && version[1] >= minor));
 };
 
-/**
- * A runnable model for an id the catalog doesn't list. It takes its wire
- * shape (API, base URL, compat, effort levels) from its nearest sibling, or
- * from the provider's newest model when the family is new, and its limits,
- * modalities and price from `live` when the provider listed them. A price
- * nobody published is zero, never a sibling's.
- */
 export const modelForUnlistedId = <M extends CatalogShape>(
   known: readonly M[],
   id: string,
@@ -350,7 +323,6 @@ export const modelForUnlistedId = <M extends CatalogShape>(
   };
 };
 
-/** Catalog entries for the models a provider lists that `known` lacks. */
 export const unlistedLiveModels = <M extends CatalogShape>(
   provider: string,
   known: readonly M[],

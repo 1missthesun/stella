@@ -2,7 +2,6 @@ import { ANONYMOUS_COUNTS_ENABLED } from "./telemetry/anonymous-counts.js";
 
 export type LegalDocument = "terms" | "privacy";
 
-// Present only once anonymous install counts ship (contracts `telemetry/anonymous-counts.ts`).
 const SIGNED_OUT_TELEMETRY_LINE = ANONYMOUS_COUNTS_ENABLED
   ? "Telemetry is not sent while you are signed out, except the anonymous usage counts described in section 9."
   : "Telemetry is not sent while you are signed out (see section 9).";

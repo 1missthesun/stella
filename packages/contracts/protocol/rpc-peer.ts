@@ -231,7 +231,6 @@ export class JsonRpcPeer {
     }
   }
 
-  /** Never rejects: inbound failures go to `onError`, transport failures dispose the peer. */
   async handleMessage(message: JsonRpcMessage): Promise<void> {
     try {
       await this.dispatchMessage(message);

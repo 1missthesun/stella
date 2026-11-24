@@ -3,7 +3,6 @@ import {
   type DriveFileVersions,
 } from "./backend/drive";
 
-/** undefined: not known yet; null: no file at that path. */
 export type DriveFileVersion = string | null | undefined;
 
 type VersionsWatchClient = {
@@ -15,9 +14,7 @@ type VersionsWatchClient = {
 };
 
 export type DriveFileVersionStore = {
-  /** Keeps `path` live while the returned release is not called. */
   watch(path: string): () => void;
-  /** Keeps `path` live while it is among the most recently tracked paths. */
   track(path: string): void;
   version(path: string): DriveFileVersion;
   subscribe(listener: () => void): () => void;
@@ -26,10 +23,6 @@ export type DriveFileVersionStore = {
 
 const RESUBSCRIBE_DELAY_MS = 50;
 
-/**
- * One live `drive.versions` subscription for every Drive path a client has on
- * screen or in a cache, so a file replaced under the same name reaches it.
- */
 export const createDriveFileVersionStore = (
   getClient: () => VersionsWatchClient | null,
 ): DriveFileVersionStore => {

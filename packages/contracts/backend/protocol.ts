@@ -52,10 +52,8 @@ export const rpcErrorStatus = (code: BackendErrorCode): number => {
 };
 
 /**
- * The keepalive OwnerGate answers without waking: its one hibernation
- * auto-response pair. The live socket and the device presence socket both
- * land on that object, so both send exactly these bytes. Bare strings, not
- * JSON, because the platform matches the request byte for byte.
+ * Cloudflare's hibernation auto-response matches the request byte for byte, so
+ * these are bare strings, not JSON.
  */
 export const SOCKET_KEEPALIVE_PING = "ping";
 export const SOCKET_KEEPALIVE_PONG = "pong";

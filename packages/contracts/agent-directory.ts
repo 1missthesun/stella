@@ -27,17 +27,9 @@ export type AgentDirectoryAgentRow = {
   updatedAt: number;
   offline?: { lastSeenAt?: number };
   awaitingConsent?: true;
-  /**
-   * Why its run is held mid-way: a usage limit (Resume on the chat's card
-   * continues it), or its computer's Claude sign-in ended (it continues by
-   * itself once someone signs in to Claude there).
-   */
   pausedBy?: "usage-limit" | "claude-sign-in";
-  /** It ended its turn waiting for this, with no report; a message resumes it. */
   waitingFor?: string;
-  /** What its computer saw could wake it as it waited; empty when nothing could. */
   wakers?: string[];
-  /** Running, and on one tool call past every time limit (`LONG_TOOL_CALL_MS`). */
   longCall?: CurrentToolCall;
 };
 
@@ -94,11 +86,6 @@ export const selectAgentRoster = (rows: readonly AgentDirectoryAgentRow[]) => {
 const lastSeen = (lastSeenAt: number | undefined, now: number) =>
   lastSeenAt !== undefined ? ` (last seen ${formatAge(lastSeenAt, now)})` : "";
 
-/**
- * What holds for an agent whose computer is offline: messages to it are
- * refused, while a stop works now (it is recorded at once and held for that
- * computer, which applies it the moment it reconnects, up to a week later).
- */
 const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefined =>
   row.offline
     ? isLive(row.status)
@@ -106,7 +93,6 @@ const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefin
       : `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}; messages to it are refused until ${row.where} reconnects`
     : undefined;
 
-/** The note for a running agent of yours whose computer is offline: no report comes before it is back. */
 export const OFFLINE_RUNNING_STATUS_NOTE =
   "Its computer is offline, so its report comes only once that computer is back. Decide now whether to wait for it (end your turn waiting), carry it on elsewhere (send_message with destination), or stop it and redo the work: stop it first, then start the new one.";
 
@@ -218,7 +204,6 @@ export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = Date.
   relation: "another session",
 });
 
-/** Other sessions idle this long are left out of agent_status: they stay reachable by thread_id from history. */
 const DIRECTORY_SESSION_STALE_MS = 7 * 24 * 60 * 60_000;
 
 export const buildAgentDirectoryResult = (input: {

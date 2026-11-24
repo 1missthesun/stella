@@ -224,9 +224,7 @@ export const revokeChatGptRefreshToken = async (
       await response.body?.cancel().catch(() => undefined);
       if (response.status === 200) return true;
       if (response.status < 500) return false;
-    } catch {
-      // Retried once below.
-    }
+    } catch {}
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
   return false;

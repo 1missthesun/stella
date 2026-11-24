@@ -23,7 +23,6 @@ export type LocalCronPayload =
       kind: 'task'
       prompt: string
       route?: 'orchestrator' | 'agent'
-      /** Deliver each fire as a message to this existing agent thread, which resumes with its own context. */
       threadId?: string
     }
   | {
@@ -32,7 +31,6 @@ export type LocalCronPayload =
       script?: string
       instructions?: string
       route?: 'orchestrator' | 'agent'
-      /** Deliver a finding (or a failed check) as a message to this existing agent thread. */
       threadId?: string
       once?: boolean
     }
@@ -99,11 +97,8 @@ export type LocalCronJobRecord = {
     summary: string
     atMs: number
   }
-  /** Its runs happen only on a computer: a local schedule, or a plan without cloud runs. */
   runsOn?: 'computer'
-  /** A run came due while its computer was away and runs once the computer is back. */
   waitingSinceMs?: number
-  /** Stella was told its runs fail; cleared by the next run that works, so a failing streak tells once. */
   failureToldAtMs?: number
   createdAt: number
   updatedAt: number
@@ -154,7 +149,6 @@ export type LocalCronJobCreateInput = {
   enabled?: boolean
   deliver?: boolean
   deleteAfterRun?: boolean
-  /** The agent that set it up: it hears too when a run fails. */
   createdByThreadId?: string
 }
 

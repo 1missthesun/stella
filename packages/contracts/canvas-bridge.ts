@@ -1,16 +1,3 @@
-/**
- * The script every canvas document is served with: by Electron main on the
- * `stella-canvas:` scheme (see canvas-protocol.ts), and inlined into the
- * `srcdoc` the web chat renders a canvas from.
- *
- * A canvas runs on an opaque origin, so this is its only line to the app, and
- * it is postMessage: every link and form destination goes to the parent
- * exactly as written (`stella:canvas-link`), and the parent, which knows where
- * the canvas file lives, resolves and opens it (see `resolveCanvasLink` in
- * canvas-links.ts). Text selections and `[data-stella-compose]` targets feed
- * the Ask Stella chip. The parent checks that each message comes from the
- * canvas iframe's window, and that the user just interacted, before acting.
- */
 export const CANVAS_BRIDGE_SCRIPT = String.raw`
 (() => {
   const scrollToFragment = (hash) => {

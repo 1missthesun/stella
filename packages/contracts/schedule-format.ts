@@ -41,9 +41,8 @@ const formatClock12 = (h: number, m: number): string => {
 let deviceHourCycle: () => "h12" | "h23" | null = () => null;
 
 /**
- * Where the device's own 12/24-hour choice comes from, for a platform whose
- * `Intl` reports only its locale's default (Hermes on iOS ignores the
- * 24-Hour Time switch). Answer null to fall back to `Intl`.
+ * Hermes on iOS reports only the locale's default and ignores the 24-Hour Time
+ * switch.
  */
 export const setDeviceHourCycle = (read: () => "h12" | "h23" | null): void => {
   deviceHourCycle = read;
@@ -325,7 +324,6 @@ const timingOfCron = (expr: string, tz: string | undefined, nextRunAtMs: number 
   return { kind: "days", days: ALL_DAYS.filter((day) => days.has(day)), time };
 };
 
-/** When a schedule runs, in this device's time zone, as parts a client words in its own language. */
 export const describeScheduleTiming = (
   schedule: LocalCronSchedule,
   options: { nextRunAtMs?: number; zone?: string; nowMs: number },

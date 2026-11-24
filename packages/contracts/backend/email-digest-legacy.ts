@@ -1,15 +1,9 @@
-/**
- * The October email digest's calls, kept only so desktop and phone builds
- * from before the email redesign find them: the backend answers with an idle,
- * empty digest. Nothing new uses these.
- */
 export type EmailDigestItem = {
   from: string;
   subject: string;
   summary: string;
   threadId?: string;
   receivedAt?: number;
-  /** The connected Gmail account it arrived in, when several are connected. */
   account?: string;
 };
 

@@ -1,11 +1,5 @@
 import { GATEWAY_BYOK_RELAY_PREFIX, GATEWAY_RELAY_PREFIX, GATEWAY_VALIDATED_RELAY_PREFIX } from "./api.js";
 
-/**
- * A client that sends this on a non-streaming relay request gets headers at
- * once, a space every interval while the model works, and finally one
- * `RelayKeepaliveEnvelope` carrying the real status, headers and body.
- * JSON parsers skip the leading whitespace.
- */
 export const GATEWAY_RELAY_KEEPALIVE_HEADER = "x-stella-relay-keepalive" as const;
 export const GATEWAY_RELAY_KEEPALIVE_INTERVAL_MS = 15_000;
 
@@ -29,7 +23,6 @@ const isEnvelope = (value: unknown): value is RelayKeepaliveEnvelope =>
 
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
 
-/** Turns a keepalive response back into the response the relay produced; others pass through. */
 export const unwrapRelayKeepalive = async (response: Response): Promise<Response> => {
   if (response.headers.get(GATEWAY_RELAY_KEEPALIVE_HEADER) !== "1") return response;
   const text = (await response.text()).trim();

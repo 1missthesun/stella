@@ -80,10 +80,6 @@ const stem = (token: string): string => {
 const OPAQUE_SQL_RE =
   /'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/gu;
 
-/**
- * `history.sql`'s text: one statement that starts as a query. Each host makes
- * its database refuse writes; this only gives an early, readable error.
- */
 export const historyQueryStatement = (query: string): string => {
   const statement = query.trim().replace(/;\s*$/u, "");
   const code = statement.replace(OPAQUE_SQL_RE, " ").trim();
@@ -152,12 +148,6 @@ export type HistoryRecord = {
 
 const SNIPPET_TOKENS = 32;
 
-/**
- * `history.search` over records in memory, with the index's semantics: every
- * word or phrase must appear (words stemmed, phrases in order), best match
- * first by a BM25 score or newest first, and a snippet with each match in
- * brackets.
- */
 export const searchHistoryRecords = (
   records: readonly HistoryRecord[],
   text: string,

@@ -68,7 +68,6 @@ export type AgentReportCalls = {
       conversationId: string;
       fromThreadId: string;
       text: string;
-      /** A lead to give the note to, like a helper's report, instead of Stella. */
       toThreadId?: string;
     };
     result: { queued: boolean };
@@ -108,8 +107,6 @@ export const silentRunReport = (args: {
   ].join("\n\n");
 };
 
-// An empty result, or the stand-in a silent run reports, which a later
-// result for the same attempt may replace before the report is delivered.
 export const isPlaceholderAgentResult = (resultJson: string | null | undefined): boolean => {
   if (!resultJson?.trim()) return true;
   if (resultWaitingFor(resultJson) !== undefined) return false;

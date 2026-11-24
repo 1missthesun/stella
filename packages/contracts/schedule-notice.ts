@@ -13,11 +13,9 @@ export type ScheduleTiming =
 export const SCHEDULE_NOTICE_CARD_TYPE = "schedule-notice";
 export const SCHEDULE_NOTICE_MESSAGE_MAX_CHARS = 600;
 
-/** `waiting`: a run came due while the computer it runs on was away; it runs once that computer is back. */
 export type ScheduleNoticeAction = "created" | "updated" | "paused" | "resumed" | "removed" | "waiting";
 export type ScheduleNoticeKind = "reminder" | "task" | "watch";
 
-/** A schedule was set up, changed or removed; shown in its conversation. */
 export type ScheduleNoticeCard = {
   type: typeof SCHEDULE_NOTICE_CARD_TYPE;
   action: ScheduleNoticeAction;
@@ -27,9 +25,7 @@ export type ScheduleNoticeCard = {
   schedule?: LocalCronSchedule;
   zone?: string;
   nextRunAt?: number;
-  /** A reminder's own words, when they differ from its name. */
   message?: string;
-  /** The agent thread a task or watch wakes, when it isn't the user's chat: a background task's own follow-up. */
   threadId?: string;
 };
 
@@ -92,7 +88,6 @@ export const parseScheduleNoticeCard = (value: unknown): ScheduleNoticeCard | nu
   };
 };
 
-/** The i18n key under `schedule.notice.title` for a card's heading. */
 export const scheduleNoticeTitleKey = (card: Pick<ScheduleNoticeCard, "action" | "kind">): string =>
   `${card.action}.${card.kind}`;
 
@@ -126,7 +121,6 @@ const monthDay = (locale: string, atMs: number): string => {
 
 const KEY = "schedule.notice.when";
 
-/** Words for when a schedule runs, from the catalog's `schedule.notice.when` strings. */
 export const scheduleTimingText = (
   timing: ScheduleTiming,
   i18n: { t: Translate; tPlural: TranslatePlural; locale: string },

@@ -1,16 +1,3 @@
-/**
- * Anonymous install counts: a small, fixed set of events every desktop
- * install may send, signed in or not. The only identifier is a random install
- * ID made on the computer; the telemetry worker replaces it with a keyed hash
- * before anything is stored. No content, paths, account IDs or IP addresses.
- */
-
-/**
- * The one switch. While false, the desktop app records and sends nothing,
- * hides the "How did you find Stella?" question and the Settings toggle, and
- * the privacy text leaves out the counts paragraph. Turn it on only after the
- * telemetry worker's `/v1/counts` route is deployed.
- */
 export const ANONYMOUS_COUNTS_ENABLED: boolean = true;
 
 export const ANONYMOUS_COUNTS_SCHEMA_VERSION = 1 as const;
@@ -30,7 +17,6 @@ export const ANONYMOUS_COUNT_ENGINES = [
 ] as const;
 export type AnonymousCountEngine = (typeof ANONYMOUS_COUNT_ENGINES)[number];
 
-/** Answers to "How did you find Stella?", in the order the question shows them. */
 export const FOUND_VIA_ANSWERS = [
   "google",
   "youtube",
@@ -44,16 +30,12 @@ export const FOUND_VIA_ANSWERS = [
 export type FoundViaAnswer = (typeof FOUND_VIA_ANSWERS)[number];
 export type FoundViaChoice = FoundViaAnswer | "skipped";
 
-/** Desktop setup steps, in order; "chat" is the chat itself, once setup is done or skipped. */
 export const SETUP_STEPS = ["signin", "extras", "chat"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 
-/** Messages sent in an install's first 24 hours are counted up to this many. */
 export const DAY1_MESSAGE_CAP = 30;
-/** Failed replies are counted up to this many per local calendar day. */
 export const TURN_ERRORS_PER_DAY = 10;
 
-/** Why a reply failed or could not start; the kinds the desktop chat tells apart. */
 export const TURN_ERROR_KINDS = [
   "account-auth",
   "billing",
@@ -86,23 +68,17 @@ export const ANONYMOUS_COUNT_PLATFORMS = ["darwin", "win32", "linux"] as const;
 export type AnonymousCountPlatform = (typeof ANONYMOUS_COUNT_PLATFORMS)[number];
 
 export type AnonymousCountEvent =
-  /** First launch with counting on; `existingInstall` when onboarding was already done before counting existed. */
   | { type: "first_run"; existingInstall: boolean }
   | { type: "engine_chosen"; engine: AnonymousCountEngine }
   | { type: "first_reply"; engine: AnonymousCountEngine }
-  /** At most one per local calendar day. */
   | { type: "active_day" }
   | { type: "found_via"; answer: FoundViaChoice }
-  /** Once per step: how far setup got. */
   | { type: "setup_step"; step: SetupStep }
-  /** The nth message sent in the install's first 24 hours (n ≤ DAY1_MESSAGE_CAP). */
   | { type: "day1_message"; n: number; engine: AnonymousCountEngine }
-  /** A reply that failed or could not start (at most TURN_ERRORS_PER_DAY a day). */
   | { type: "turn_error"; kind: TurnErrorKind; engine: AnonymousCountEngine };
 
 export type AnonymousCountEventType = AnonymousCountEvent["type"];
 
-/** What the renderer may ask the main process to record; main fills in the engine. */
 export type AnonymousCountRequest =
   | { type: "engine_chosen" }
   | { type: "first_reply" }
@@ -205,7 +181,6 @@ const isItem = (value: unknown): value is AnonymousCountItem =>
   value.occurredAtMs > 0 &&
   isEvent(value.event);
 
-/** Strict: unknown keys, extra fields or out-of-set values reject the whole batch. */
 export const isAnonymousCountsBatch = (
   value: unknown,
 ): value is AnonymousCountsBatch =>
@@ -229,7 +204,6 @@ export const isAnonymousCountsBatch = (
   value.events.length <= ANONYMOUS_COUNTS_MAX_EVENTS &&
   value.events.every(isItem);
 
-/** The value written in the dimension column: the engine, the answer, the step, the count, the error kind, or "". */
 export const anonymousCountDetail = (event: AnonymousCountEvent): string => {
   switch (event.type) {
     case "engine_chosen":
@@ -250,6 +224,5 @@ export const anonymousCountDetail = (event: AnonymousCountEvent): string => {
   }
 };
 
-/** The second dimension column: the engine for day-1 messages and failed replies, else "". */
 export const anonymousCountEngineDetail = (event: AnonymousCountEvent): string =>
   event.type === "day1_message" || event.type === "turn_error" ? event.engine : "";

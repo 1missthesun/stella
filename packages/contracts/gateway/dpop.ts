@@ -80,8 +80,6 @@ export const expectedRawPublicKeyLength = (alg: DpopAlgorithm): number =>
   alg === "ed25519" ? ED25519_RAW_LENGTH : P256_RAW_LENGTH;
 
 // Literal object types rather than DOM names (`AlgorithmIdentifier`,
-// `EcdsaParams`): the Workers type library spells those differently, and
-// object literals satisfy both it and lib.dom.
 type ImportAlgorithm =
   | { name: "Ed25519" }
   | { name: "ECDSA"; namedCurve: "P-256" };

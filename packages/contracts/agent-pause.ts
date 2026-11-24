@@ -1,6 +1,5 @@
 import type { DeviceDestination } from "./turn-plane/placement.js";
 
-/** Why a task that hasn't ended runs nothing now; it carries on by itself once this clears. */
 export type AgentPause =
   | { reason: "computer-off"; computer?: string }
   | { reason: "usage-limit" }
@@ -11,11 +10,6 @@ export type LocalAgentPause = Exclude<AgentPause["reason"], "computer-off">;
 export const localAgentPause = (reason: LocalAgentPause | undefined): AgentPause | undefined =>
   reason ? { reason } : undefined;
 
-/**
- * A cloud-ledger thread's pause: a usage-limit hold, or a run on a computer
- * that is off. A device the list doesn't know (replaced by a reinstall) is
- * not read as off.
- */
 export const agentThreadPause = (
   thread: { status: string; placement: string; runsOnDeviceId?: string; executorDeviceId?: string },
   devices: readonly Pick<DeviceDestination, "deviceId" | "label" | "online">[] | undefined,

@@ -34,7 +34,6 @@ export type SlackWorkspaceGithub = {
   installationId: string;
   account: string;
   accountType: string;
-  /** `reconnect`: connected before Stella recorded which repositories the connecting GitHub user can reach. */
   status: "active" | "suspended" | "revoked" | "reconnect";
   manageUrl: string;
 };

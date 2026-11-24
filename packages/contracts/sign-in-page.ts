@@ -1,9 +1,3 @@
-/**
- * The page a browser lands on when a sign-in hands back to Stella on this
- * computer (ChatGPT, connector sign-ins). Every local
- * sign-in callback uses this one page, never a library's own (pi-ai ships a
- * Pi-branded one).
- */
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -147,7 +141,6 @@ export function signInErrorHtml(
   });
 }
 
-/** Headers every sign-in page is sent with: never cached, never leaks the callback address. */
 export const SIGN_IN_PAGE_HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
   "Cache-Control": "no-store",

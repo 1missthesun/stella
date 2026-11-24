@@ -489,7 +489,6 @@ export type DesktopTelemetryState = {
   accountOffPending: boolean;
 };
 
-/** `available` is false while the counts switch is off or on a self-hosted server. */
 export type DesktopAnonymousCountsState = {
   available: boolean;
   enabled: boolean;
@@ -654,7 +653,6 @@ export type DictationCaptureEvent = {
 };
 
 export type DictationToggle = {
-  /** Names this start, and the capture main opened for it. */
   startId?: string;
   action?: "toggle" | "start" | "stop" | "cancel";
   source?: "companion";
@@ -969,7 +967,6 @@ export type IpcInvokeContract = {
   [IPC_APP_SOURCE_APPLY]: Invoke<[name: string], AppSourceActionResult>;
   [IPC_APP_SOURCE_UNDO]: Invoke<[sha: string], AppSourceActionResult>;
   [IPC_APP_SOURCE_APPLY_REMOTE]: Invoke<[], AppSourceActionResult>;
-  /** `targets`: the other computers that update too; null is every one, [] only this one. */
   [IPC_APP_SOURCE_APPLY_UPSTREAM]: Invoke<[targets?: string[] | null], AppSourceActionResult>;
   [IPC_APP_SOURCE_SKIP]: Invoke<[key: string], AppSourceActionResult>;
 
@@ -1038,10 +1035,6 @@ export type IpcInvokeContract = {
     [payload: { requestId: string; wav: ArrayBuffer }],
     { text: string }
   >;
-  /**
-   * Says whether a start here would dictate (a transcriber is available), and
-   * answers whether the native microphone can be used for it.
-   */
   [IPC_DICTATION_CAPTURE_READY]: Invoke<
     [payload: { ready: boolean }],
     { native: boolean }

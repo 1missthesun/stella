@@ -5,11 +5,6 @@
  */
 export const OPENAI_LONG_CONTEXT_INPUT_TOKENS = 272_000;
 
-/**
- * The context Stella holds a model family to, whichever provider serves it.
- * Keys are bare model ids; a provider's vendor prefix (`openai/`), tier
- * suffixes (`-pro`, `-fast`, `-decisions`) and `:batch` are ignored.
- */
 const EFFECTIVE_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "gpt-5.4": OPENAI_LONG_CONTEXT_INPUT_TOKENS,
   "gpt-5.5": OPENAI_LONG_CONTEXT_INPUT_TOKENS,
@@ -40,11 +35,6 @@ const PLAN_CONTEXT_WINDOWS: Readonly<Record<string, Readonly<Record<string, numb
   chatgpt: { "gpt-6.1-sol": 500_000 },
 };
 
-/**
- * The window to compact a model against: the plan default where OpenAI sets
- * one, else its family's effective window when that is smaller than what the
- * provider advertises, else the advertised one.
- */
 export const effectiveContextWindow = (modelId: string, advertised: number, provider?: string): number => {
   const family = familyOf(modelId);
   const plan = provider === undefined ? undefined : PLAN_CONTEXT_WINDOWS[provider]?.[family];

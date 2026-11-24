@@ -75,6 +75,11 @@ export interface CreateStellaMarkOptions {
    * main thread busy. Defaults to 30 for marks of 48px or less, 60 otherwise.
    */
   maxFps?: number;
+  /**
+   * When true, once the mark settles into `"idle"` with no active animation,
+   * suppress ambient shimmer/bobbing and stop the rAF loop until state changes.
+   */
+  idleRest?: boolean;
 }
 
 export interface StellaMarkHandle {
@@ -397,6 +402,7 @@ export function createStellaMark(
     paused: false,
     visibilityGate: true,
     maxFps: null as number | null,
+    idleRest: false,
     ...opts,
   };
   const maxFps =
@@ -887,7 +893,8 @@ export function createStellaMark(
     const mixing = shapeMix.x < 0.999;
     const m = easeInOutCubic(clamp(shapeMix.x, 0, 1));
 
-    const shimmerAmp = paused || reduced ? 0 : 0.012 * (1 - twinkleW);
+    const resting = o.idleRest && state === "idle" && !activity && !prevActivity;
+    const shimmerAmp = paused || reduced || resting ? 0 : 0.012 * (1 - twinkleW);
     const shimmerPhase = now * 0.0009;
 
     const sweep = ((now - activityStart) / 1900) * TAU;
@@ -989,25 +996,32 @@ export function createStellaMark(
     if (poseMix < 1)
       poseMix = reduced ? 1 : clamp((t - poseAt) / poseDur, 0, 1);
 
+    const restingIdle = o.idleRest && state === "idle" && !activity && !prevActivity && !pointer;
     if (!paused && !reduced) {
-      if (t >= nextPoseAt) {
-        pickPose();
-        const e = POSE_EVERY[state] ?? POSE_EVERY.idle;
-        nextPoseAt = t + rand(e[0], e[1]);
-      }
-      if (t >= nextBlinkAt) {
-        blink.x = 1;
-        blink.t = 0.06;
-        setTimeout(() => {
-          blink.t = 1;
-        }, 78);
-        const b = BLINK_EVERY[state];
-        nextBlinkAt = b ? t + rand(b[0], b[1]) : Infinity;
-      }
+      if (restingIdle) {
+        bobX.t = 0;
+        bobY.t = 0;
+        breathe.t = 1;
+      } else {
+        if (t >= nextPoseAt) {
+          pickPose();
+          const e = POSE_EVERY[state] ?? POSE_EVERY.idle;
+          nextPoseAt = t + rand(e[0], e[1]);
+        }
+        if (t >= nextBlinkAt) {
+          blink.x = 1;
+          blink.t = 0.06;
+          setTimeout(() => {
+            blink.t = 1;
+          }, 78);
+          const b = BLINK_EVERY[state];
+          nextBlinkAt = b ? t + rand(b[0], b[1]) : Infinity;
+        }
 
-      bobX.t = Math.sin(t * 0.00042) * 2.6 + Math.sin(t * 0.001) * 0.9;
-      bobY.t = Math.sin(t * 0.00058) * 2.0 + Math.sin(t * 0.0013) * 0.7;
-      breathe.t = 1 + 0.013 * Math.sin(t * 0.0016);
+        bobX.t = Math.sin(t * 0.00042) * 2.6 + Math.sin(t * 0.001) * 0.9;
+        bobY.t = Math.sin(t * 0.00058) * 2.0 + Math.sin(t * 0.0013) * 0.7;
+        breathe.t = 1 + 0.013 * Math.sin(t * 0.0016);
+      }
     }
 
     if (pointer) {
@@ -1227,7 +1241,14 @@ export function createStellaMark(
     painted = true;
     const dotsAtRest =
       activity === "dots" && !prevActivity && Math.abs(fade.x - 1) < 0.001;
-    if (suspended() || (settled && (reduced || dotsAtRest))) {
+    const idleSettled =
+      restingIdle &&
+      Math.abs(bobX.x) < 0.02 &&
+      Math.abs(bobY.x) < 0.02 &&
+      Math.abs(breathe.x - 1) < 0.001 &&
+      Math.abs(gazeX.x) < 0.02 &&
+      Math.abs(gazeY.x) < 0.02;
+    if (suspended() || (settled && (reduced || dotsAtRest || idleSettled))) {
       running = false;
       raf = 0;
       return;

@@ -34,4 +34,5 @@ export const initializeBootstrapApplication = async (context) => {
     });
     context.state.startHostRunner = () => hostRunnerResource.start();
     launchBootstrapAppShell(context);
+    services.authService.prefetchAuthToken();
 };

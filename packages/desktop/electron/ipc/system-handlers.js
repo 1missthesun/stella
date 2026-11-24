@@ -443,12 +443,13 @@ export const registerSystemHandlers = (options) => {
         }
         return await options.authService.applySessionToken(typeof payload?.sessionToken === "string" ? payload.sessionToken : "");
     });
-    handleIpc(IPC_AUTH_GET_TOKEN, async (event) => {
+    handleIpc(IPC_AUTH_GET_TOKEN, async (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_GET_TOKEN)) {
             throw new Error("Blocked untrusted auth token request.");
         }
-        const result = await options.authService.getAuthTokenResult();
-        return result.ok ? result.token : null;
+        return await options.authService.getAuthToken({
+            forceRefresh: payload?.forceRefresh === true,
+        });
     });
     handleIpc(IPC_AUTH_REVOKE_SESSIONS, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_REVOKE_SESSIONS)) {

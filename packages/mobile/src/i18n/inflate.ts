@@ -228,26 +228,6 @@ const decodeUtf8 = (bytes: Uint8Array): string => {
   return out;
 };
 
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i += 1) {
-    let c = i;
-    for (let k = 0; k < 8; k += 1) {
-      c = (c & 1) !== 0 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    table[i] = c >>> 0;
-  }
-  return table;
-})();
-
-const crc32 = (bytes: Uint8Array): number => {
-  let c = 0xffffffff;
-  for (let i = 0; i < bytes.length; i += 1) {
-    c = CRC_TABLE[(c ^ bytes[i]!) & 0xff]! ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
-};
-
 export function extractSingleZipUtf8(zipBytes: Uint8Array): string {
   if (
     zipBytes.length < 30 ||
@@ -260,26 +240,17 @@ export function extractSingleZipUtf8(zipBytes: Uint8Array): string {
   }
   const view = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
   const method = view.getUint16(8, true);
-  const expectedCrc = view.getUint32(14, true);
   const compressedSize = view.getUint32(18, true);
   const uncompressedSize = view.getUint32(22, true);
   const nameLen = view.getUint16(26, true);
   const extraLen = view.getUint16(28, true);
   const dataOffset = 30 + nameLen + extraLen;
-  if (dataOffset + compressedSize > zipBytes.length) {
-    throw new Error("Truncated locale pack archive");
-  }
   const payload = zipBytes.subarray(dataOffset, dataOffset + compressedSize);
-  let data: Uint8Array;
   if (method === 0) {
-    data = payload;
-  } else if (method === 8) {
-    data = inflateRaw(payload, uncompressedSize);
-  } else {
-    throw new Error(`Unsupported locale pack compression method ${method}`);
+    return decodeUtf8(payload);
   }
-  if (data.length !== uncompressedSize || crc32(data) !== expectedCrc) {
-    throw new Error("Locale pack failed its integrity check");
+  if (method === 8) {
+    return decodeUtf8(inflateRaw(payload, uncompressedSize));
   }
-  return decodeUtf8(data);
+  throw new Error(`Unsupported locale pack compression method ${method}`);
 }

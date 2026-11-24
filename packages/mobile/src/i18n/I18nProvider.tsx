@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -50,81 +49,48 @@ export interface I18nProviderProps {
   children: ReactNode;
 }
 
-type I18nState = { locale: Locale; catalog: Catalog; settled: boolean };
-
-const I18N_BOOT_TIMEOUT_MS = 1500;
-
-const readStoredLocale = async (): Promise<Locale | null> => {
-  try {
-    const stored = await AsyncStorage.getItem(LOCALE_STORAGE_KEY);
-    return isSupportedLocale(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-};
-
-let bootState: I18nState | null = null;
-let bootTimedOut = false;
-const bootLoad: Promise<I18nState> = (async () => {
-  const locale = (await readStoredLocale()) ?? initialLocale();
-  const catalog = getCachedCatalogSync(locale) ?? (await loadCatalogAsync(locale));
-  return { locale, catalog, settled: true };
-})();
-const boot: Promise<I18nState> = Promise.race([
-  bootLoad,
-  new Promise<I18nState>((resolve) => {
-    setTimeout(() => {
-      bootTimedOut = true;
-      resolve({ locale: DEFAULT_LOCALE, catalog: getEnglishCatalog(), settled: false });
-    }, I18N_BOOT_TIMEOUT_MS);
-  }),
-]).then((state) => {
-  bootState = state;
-  return state;
-});
-
 export function I18nProvider({ children }: I18nProviderProps) {
-  const [state, setState] = useState<I18nState | null>(() => bootState);
-  const requestedLocale = useRef<Locale | null>(null);
+  const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  const [catalog, setCatalog] = useState<Catalog>(
+    () => getCachedCatalogSync(locale) ?? getEnglishCatalog(),
+  );
 
   useEffect(() => {
     let cancelled = false;
-    void boot.then((booted) => {
-      if (cancelled) return;
-      setState((current) => current ?? booted);
-      if (!bootTimedOut) return;
-      void bootLoad.then((late) => {
-        if (cancelled || requestedLocale.current !== null) return;
-        setState(late);
-      });
-    });
+    void AsyncStorage.getItem(LOCALE_STORAGE_KEY)
+      .then((stored) => {
+        if (cancelled) return;
+        if (isSupportedLocale(stored)) setLocaleState(stored);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const locale = state?.locale ?? DEFAULT_LOCALE;
-  const catalog = state?.catalog ?? getEnglishCatalog();
-  const settled = state?.settled ?? false;
+  useEffect(() => {
+    const sync = getCachedCatalogSync(locale);
+    if (sync) {
+      setCatalog(sync);
+      return;
+    }
+    let cancelled = false;
+    void loadCatalogAsync(locale).then((loaded) => {
+      if (!cancelled) setCatalog(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
 
   useEffect(() => {
-    if (settled) syncLayoutDirection(locale);
-  }, [locale, settled]);
+    syncLayoutDirection(locale);
+  }, [locale]);
 
   const setLocale = useCallback((next: Locale) => {
     if (!isSupportedLocale(next)) return;
-    requestedLocale.current = next;
+    setLocaleState(next);
     void AsyncStorage.setItem(LOCALE_STORAGE_KEY, next).catch(() => undefined);
-    const cached = getCachedCatalogSync(next);
-    if (cached) {
-      setState({ locale: next, catalog: cached, settled: true });
-    } else {
-      void loadCatalogAsync(next).then((loaded) => {
-        if (requestedLocale.current === next) {
-          setState({ locale: next, catalog: loaded, settled: true });
-        }
-      });
-    }
     void applyLayoutDirection(next);
   }, []);
 
@@ -158,8 +124,6 @@ export function I18nProvider({ children }: I18nProviderProps) {
     }),
     [locale, setLocale, t, tArray, tPlural],
   );
-
-  if (!state) return null;
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

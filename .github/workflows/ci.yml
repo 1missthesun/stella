@@ -240,4 +240,4 @@ jobs:
         run: bun run mobile:lint
 
       - name: Check generated mobile catalogs
-        run: git diff --exit-code -- packages/mobile/src/i18n
+        run: git diff --exit-code -- packages/mobile/src/i18n/locales

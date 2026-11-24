@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Metro can't resolve a require() whose argument is a variable, and EAS uploads only the
-// git-tracked tree before any build hook runs, so the catalogs are generated into src/.
 
 import { createHash } from "node:crypto";
 import {
@@ -25,8 +23,6 @@ const banner = (source) =>
   `// GENERATED FILE — DO NOT EDIT.\n` +
   `// Derived from packages/desktop-ui/src/shared/i18n/${source}\n` +
   `// by packages/mobile/scripts/sync-i18n-catalogs.mjs.\n`;
-
-const PACK_FORMAT = "stella-i18n-pack/1";
 
 const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
 const ALWAYS_INCLUDED_PREFIXES = ["mobile"];
@@ -294,11 +290,7 @@ export const buildI18nCatalogOutputs = ({
     });
     const jsonBuf = Buffer.from(JSON.stringify(values), "utf8");
     const zipBuf = buildSingleFileZip(`${locale}.json`, jsonBuf);
-    const hash = createHash("sha256")
-      .update(`${PACK_FORMAT}\n${JSON.stringify(keyOrder)}\n`)
-      .update(zipBuf)
-      .digest("hex")
-      .slice(0, 12);
+    const hash = createHash("sha256").update(zipBuf).digest("hex").slice(0, 12);
     const packName = `${locale}.zip`;
     packFiles.push(packName);
     outputs.set(`packs/${packName}`, zipBuf);

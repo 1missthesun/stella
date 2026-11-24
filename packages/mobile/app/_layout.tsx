@@ -65,7 +65,7 @@ import {
 import { ShareIntentProvider } from "expo-share-intent";
 import { ThemeProvider } from "../src/theme/theme-context";
 import { ChatSearchProvider } from "../src/lib/chat-search";
-import { I18nProvider, useT } from "../src/i18n";
+import { I18nProvider, useI18nReady, useT } from "../src/i18n";
 import { ShareIntentHandler } from "../src/lib/share-intent-handler";
 
 void SplashScreen.preventAutoHideAsync();
@@ -186,12 +186,12 @@ function useBackendFollowsAccount(
   }, [account, session.isPending]);
 }
 
-function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
+function AuthenticatedLayout({ screensReady }: { screensReady: boolean }) {
   const session = authClient.useSession();
   useBackendFollowsAccount(session);
   const router = useRouter();
   const pathname = usePathname();
-  // The stack mounts only once the fonts are in (see the return below), so
+  // The stack mounts only once the fonts and the language are in (see the return below), so
   // routing waits for the navigator to exist.
   const navigatorReady = Boolean(useRootNavigationState()?.key);
   const mainChatRequested = useMainChatRequested();
@@ -398,11 +398,12 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
   ]);
 
   // Local state, the session and the conversation authority load above while
-  // the fonts register; nothing visible mounts before them. Text laid out
+  // the fonts register and the language unpacks; nothing visible mounts before
+  // them. A screen mounted before its language would switch in view. Text laid out
   // with the system fallback keeps those glyphs and metrics after the font
   // arrives, so a screen mounted early would come out from under the splash in
   // the wrong font, or clipped.
-  if (!fontsReady) return null;
+  if (!screensReady) return null;
 
   return (
     <ServerStatusGate>
@@ -413,25 +414,29 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
 }
 
 function AppLayout({ fontsReady }: { fontsReady: boolean }) {
+  // Screens wait for the fonts and for the language's strings; everything else
+  // in startup runs alongside both.
+  const screensReady = useI18nReady() && fontsReady;
+
   if (!hasMobileConfig) {
     // No auth gate on this path, so nothing else lifts the splash — drop it
-    // once the theme and critical fonts are ready.
+    // once the theme, critical fonts and language are ready.
     return (
       <>
-        <HideSplashWhenThemed fontsReady={fontsReady} />
-        {fontsReady ? <RootStack /> : null}
+        <HideSplashWhenThemed screensReady={screensReady} />
+        {screensReady ? <RootStack /> : null}
       </>
     );
   }
 
-  return <AuthenticatedLayout fontsReady={fontsReady} />;
+  return <AuthenticatedLayout screensReady={screensReady} />;
 }
 
-function HideSplashWhenThemed({ fontsReady }: { fontsReady: boolean }) {
+function HideSplashWhenThemed({ screensReady }: { screensReady: boolean }) {
   useEffect(() => {
-    if (!fontsReady) return;
+    if (!screensReady) return;
     void SplashScreen.hideAsync().finally(markSplashHidden);
-  }, [fontsReady]);
+  }, [screensReady]);
   return null;
 }
 

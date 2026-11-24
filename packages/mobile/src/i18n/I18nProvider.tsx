@@ -32,6 +32,8 @@ import {
 import { applyLayoutDirection, needsDirectionFlip, syncLayoutDirection } from "./rtl";
 
 type I18nContextValue = {
+  /** False until the language and its catalog are loaded at startup. */
+  ready: boolean;
   locale: Locale;
   isRTL: boolean;
   setLocale: (locale: Locale) => void;
@@ -58,6 +60,12 @@ type I18nState = { locale: Locale; catalog: Catalog; settled: boolean };
 // shows English and swaps in the language when it arrives.
 const I18N_BOOT_TIMEOUT_MS = 1500;
 
+const unsettledEnglish = (): I18nState => ({
+  locale: DEFAULT_LOCALE,
+  catalog: getEnglishCatalog(),
+  settled: false,
+});
+
 const readStoredLocale = async (): Promise<Locale | null> => {
   try {
     const stored = await AsyncStorage.getItem(LOCALE_STORAGE_KEY);
@@ -68,29 +76,33 @@ const readStoredLocale = async (): Promise<Locale | null> => {
 };
 
 // Non-English catalogs are unpacked from their pack on the first launch (and
-// after an update that changed them), which is asynchronous. The first screen
-// must not mount until its language is known and loaded, or it would paint in
-// English (or the device language instead of the chosen one) and then switch.
-// This starts at module load, so it runs alongside the font load that holds
-// the first render anyway, and `I18nProvider` renders nothing until it lands.
+// after an update that changed them), which is asynchronous. No screen may
+// mount until its language is known and loaded, or it would paint in English
+// (or the device language instead of the chosen one) and then switch. Loading
+// starts with the module, and the provider itself never blocks: the root
+// layout joins `useI18nReady` to the gate that already holds screens for the
+// fonts, so session, theme and authority startup keep overlapping both.
 let bootState: I18nState | null = null;
 let bootTimedOut = false;
 const bootLoad: Promise<I18nState> = (async () => {
   const locale = (await readStoredLocale()) ?? initialLocale();
   const catalog = getCachedCatalogSync(locale) ?? (await loadCatalogAsync(locale));
   return { locale, catalog, settled: true };
-})();
+})().catch(() => unsettledEnglish());
 const boot: Promise<I18nState> = Promise.race([
   bootLoad,
   new Promise<I18nState>((resolve) => {
     setTimeout(() => {
-      bootTimedOut = true;
-      resolve({ locale: DEFAULT_LOCALE, catalog: getEnglishCatalog(), settled: false });
+      bootTimedOut = bootState === null;
+      resolve(unsettledEnglish());
     }, I18N_BOOT_TIMEOUT_MS);
   }),
 ]).then((state) => {
   bootState = state;
   return state;
+});
+void bootLoad.then((late) => {
+  bootState = late;
 });
 
 export function I18nProvider({ children }: I18nProviderProps) {
@@ -117,6 +129,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
   const locale = state?.locale ?? DEFAULT_LOCALE;
   const catalog = state?.catalog ?? getEnglishCatalog();
   const settled = state?.settled ?? false;
+  const ready = state !== null;
 
   useEffect(() => {
     if (settled) syncLayoutDirection(locale);
@@ -160,6 +173,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
 
   const value = useMemo<I18nContextValue>(
     () => ({
+      ready,
       locale,
       isRTL: isRtlLocale(locale),
       setLocale,
@@ -169,16 +183,14 @@ export function I18nProvider({ children }: I18nProviderProps) {
       tPlural,
       supportedLocales: SUPPORTED_LOCALES,
     }),
-    [locale, setLocale, t, tArray, tPlural],
+    [locale, ready, setLocale, t, tArray, tPlural],
   );
-
-  // Held under the native splash until the language is loaded (see `boot`).
-  if (!state) return null;
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
 const FALLBACK: I18nContextValue = {
+  ready: true,
   locale: DEFAULT_LOCALE,
   isRTL: false,
   setLocale: () => {
@@ -214,6 +226,10 @@ export function useT() {
 
 export function useTPlural() {
   return useI18n().tPlural;
+}
+
+export function useI18nReady(): boolean {
+  return useI18n().ready;
 }
 
 export function useLocale(): Locale {

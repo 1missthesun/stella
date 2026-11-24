@@ -38,6 +38,7 @@ import {
 import { isStopMessage } from "@stella/contracts/stop-message";
 import { yieldToolCall } from "@stella/runtime/kernel/tools/tool-call-yield";
 import { LOCAL_PROVIDER_ID } from "../provider/byok.ts";
+import { STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
 import { isCutCall, noteCutCall, noteCut, TakenOver } from "../engine/taken-over.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
@@ -59,6 +60,8 @@ const TAKEOVER_LIMIT_MS = 60_000;
 
 /** A model request that has not begun to answer by then is given up and tried again. */
 const MODEL_START_LIMIT_MS = 90_000;
+/** Stella's own models answer in one piece, so nothing is heard while they think and write. */
+const UNSTREAMED_LIMIT_MS = 5 * 60_000;
 /** The same for a response that goes silent midway. Hidden reasoning can be quiet for a while; Claude Code counts its tokens aloud, and text flows. */
 const MODEL_SILENCE_LIMIT_MS = 2 * 60_000;
 const AUDIBLE_SILENCE_LIMIT_MS = 60_000;
@@ -285,7 +288,9 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
         const signAt = Math.max(lastEventAt, ...signs);
         const silent = at - signAt;
         const limit = !begun
-          ? MODEL_START_LIMIT_MS
+          ? model.provider === STELLA_PROVIDER_ID
+            ? UNSTREAMED_LIMIT_MS
+            : MODEL_START_LIMIT_MS
           : model.provider === CLAUDE_CODE_PROVIDER_ID || phase === "text"
             ? AUDIBLE_SILENCE_LIMIT_MS
             : MODEL_SILENCE_LIMIT_MS;
@@ -305,7 +310,7 @@ export function createTakeover(options: TakeoverOptions, report: (error: unknown
         lastEventAt = Date.now();
         phase = phaseOf(event) ?? phase;
         if ("partial" in event) partial = event.partial;
-        if (phase !== "opening") begun = true;
+        begun = true;
         if (event.type === "done" || event.type === "error") {
           release();
           if (event.type === "done") stalls.delete(sessionId);

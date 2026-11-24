@@ -8,7 +8,7 @@ import {
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
 import { agentReportRecipient, agentStanding, recordedAgentFacts } from "@stella/contracts/agent-rules";
-import { resultWaitingFor, scheduleGoneText } from "@stella/contracts/agent-waiting";
+import { HANDED_ON_WAITING_FOR, resultWaitingFor, scheduleGoneText } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -446,10 +446,15 @@ export const deriveAgentReport = (
     // It settles without a report of its own; what it said in turns a later
     // one superseded still reaches whoever started it.
     if (!thread.carried_report?.trim()) return;
-    const tail = waiting
-      ? `(It is waiting now: ${resultWaitingForText(thread.result_json)}.)`
-      : "(It was stopped after this.)";
-    fileReport(db, thread, reportId, "completed", boundReportText(`${thread.carried_report.trim()}\n\n${tail}`, thread.thread_id), now);
+    // A turn that only handed its words on (to the report it carried) isn't
+    // waiting on anything the starter needs to hear about.
+    const handedOn = waiting && resultWaitingFor(thread.result_json) === HANDED_ON_WAITING_FOR;
+    const tail = handedOn
+      ? ""
+      : waiting
+        ? `(It is waiting now: ${resultWaitingForText(thread.result_json)}.)`
+        : "(It was stopped after this.)";
+    fileReport(db, thread, reportId, "completed", boundReportText([thread.carried_report.trim(), tail].filter(Boolean).join("\n\n"), thread.thread_id), now);
     return;
   }
   scheduleAudit(db, thread, now + REPORT_AUDIT_FIRST_MS, 0, false);

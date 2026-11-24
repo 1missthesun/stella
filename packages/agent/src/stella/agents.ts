@@ -81,6 +81,7 @@ import {
   unansweredWaitingReply,
 } from "@stella/contracts/agent-waiting";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
+import { HANDED_ON_WAITING_FOR } from "@stella/contracts/agent-waiting";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
 import { longToolCall, longToolCallText, type CurrentToolCall } from "@stella/contracts/long-tool-call";
 import {
@@ -146,6 +147,12 @@ type AgentRecord = {
   catchUp?: true;
   waiting?: { waitingFor: string; at: number; wakers?: string[] };
   heldForHelpers?: true;
+  /**
+   * What a turn said that was held back (a helper still working, or another
+   * input on its way): its answer counts as handled, so the next report
+   * carries this text instead of re-reading it.
+   */
+  heldReport?: string;
 };
 
 export type AgentOrigin = { agentThread: true };
@@ -1173,7 +1180,13 @@ export function stellaAgents(host: StellaAgentsHost) {
               return next(failedReport({ threadId, description, error: unansweredText(settled) }), "failed");
             }
             if (settled.type !== "input" || !agent) return next();
-            if (superseded) return next();
+            if (superseded) {
+              // The input after it reports this turn's words with its own. Its
+              // end still reaches the cloud, recorded waiting (no report), so
+              // that report isn't held for an end that would never come.
+              end = { waitingFor: HANDED_ON_WAITING_FOR, wakers: [HANDED_ON_WAITING_FOR] };
+              return next();
+            }
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
             const failed = answer?.stopReason === "error";
             if (answer && isSafeguardBlock(answer)) {
@@ -1189,10 +1202,11 @@ export function stellaAgents(host: StellaAgentsHost) {
             const earlier = failed
               ? []
               : await answersBetween(tx, agentConversationId, Math.max(0, ...agent.reported.map(Number)), settled.answer);
+            const held = agent.heldReport ? [agent.heldReport] : [];
             const said = [
               failed
-                ? textOf(answer)
-                : withClosingNotes(notes.closing.map((note) => note.message), onceEach([...earlier, textOf(answer)]).join("\n\n")),
+                ? onceEach([...held, textOf(answer)]).join("\n\n")
+                : withClosingNotes(notes.closing.map((note) => note.message), onceEach([...held, ...earlier, textOf(answer)]).join("\n\n")),
               hostNote ?? "",
             ]
               .filter((text) => text.trim())
@@ -1270,13 +1284,24 @@ export function stellaAgents(host: StellaAgentsHost) {
               answer: result,
               ...(failed ? { error: agentFailureText(answer) } : {}),
             };
-            if (agent.reported.includes(settled.answer)) return next();
+            if (agent.reported.includes(settled.answer)) {
+              // Another input's turn ended on this same answer and reported it:
+              // this turn still ends in the cloud, with no report of its own.
+              end = { waitingFor: HANDED_ON_WAITING_FOR, wakers: [HANDED_ON_WAITING_FOR] };
+              return next();
+            }
             agent.reported.push(settled.answer);
             if (busy && !failed) {
-              end = { ...end, waiting: true };
+              // Its turn ended; the cloud records it waiting (no report of its
+              // own), so the next turn's report isn't held for this one's end.
+              end = { ...end, waiting: true, waitingFor: HANDED_ON_WAITING_FOR, wakers: [HANDED_ON_WAITING_FOR] };
               agent.heldForHelpers = true;
+              // Not reported yet: the turn that answers what it waits for
+              // reports these words with its own.
+              if (said.trim()) agent.heldReport = said;
               return { status: "running", checkpoint: { phase: "report", status: "completed", waiting: true, ...(send(false).length ? { notes: send(false) } : {}) } };
             }
+            delete agent.heldReport;
             return next(
               completedReport({
                 threadId,

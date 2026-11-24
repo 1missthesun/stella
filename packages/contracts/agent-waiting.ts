@@ -118,6 +118,14 @@ export const resultWaitingReply = (resultJson: string | null | undefined): strin
   }
 };
 
+/**
+ * What a computer's turn "waits for" when its words go out with the next
+ * report instead of one of its own (an input already on its way, a helper
+ * still working, or the next turn already reported them): it ends there with no
+ * report, and nothing about it is news to whoever started the task.
+ */
+export const HANDED_ON_WAITING_FOR = "a message already on its way to it, or a helper still working";
+
 export const resultWaitingFor = (resultJson: string | null | undefined): string | undefined => {
   if (!resultJson?.trim()) return undefined;
   try {

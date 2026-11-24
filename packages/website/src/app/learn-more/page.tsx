@@ -144,7 +144,7 @@ export default function LearnMore() {
         <Finale
           title="Your assistant, wherever you need it."
           body="Use Stella in your browser, desktop app, or mobile app."
-          actions={<Link href="/chat" prefetch={false}>Open Stella</Link>}
+          actions={<Link href="/chat">Open Stella</Link>}
           note={PRICE_LINE}
         />
       }
@@ -163,7 +163,7 @@ export default function LearnMore() {
         </p>
         <div className={pg.cta}>
           <DownloadButton />
-          <Link className={pg.secondary} href="/chat" prefetch={false}>
+          <Link className={pg.secondary} href="/chat">
             Open Stella
           </Link>
         </div>
@@ -178,7 +178,7 @@ export default function LearnMore() {
                 {item.label}
               </a>
             ) : (
-              <Link key={item.href} href={item.href} prefetch={false}>
+              <Link key={item.href} href={item.href}>
                 {item.label}
               </Link>
             ),
@@ -275,7 +275,7 @@ export default function LearnMore() {
         <p className={pg.eyebrow}>Privacy</p>
         <h2 className={pg.h2}>Your privacy</h2>
         <p>
-          Read our <Link href="/privacy" prefetch={false}>Privacy Policy</Link> for details on how Stella handles your information
+          Read our <Link href="/privacy">Privacy Policy</Link> for details on how Stella handles your information
           and the choices available to you.
         </p>
       </section>
@@ -322,14 +322,14 @@ export default function LearnMore() {
               lives on its own page so you can scroll the history without leaving Learn More.
             </p>
           </div>
-          <Link className={pg.secondary} href="/learn-more/whats-new" prefetch={false}>
+          <Link className={pg.secondary} href="/learn-more/whats-new">
             Read the changelog
             <ArrowRight size={16} />
           </Link>
         </div>
         <div className={lm.news}>
           {recent.map((entry) => (
-            <Link key={`${entry.release}-${entry.date}`} href="/learn-more/whats-new" prefetch={false} className={lm.newsCard}>
+            <Link key={`${entry.release}-${entry.date}`} href="/learn-more/whats-new" className={lm.newsCard}>
               <span className={lm.newsMeta}>
                 <b>{entry.release}</b>
                 <span>{entry.date}</span>

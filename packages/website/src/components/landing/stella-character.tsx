@@ -34,15 +34,6 @@ export function StellaCharacter({
   const hostRef = useRef<HTMLSpanElement>(null);
   const markRef = useRef<StellaMarkHandle | null>(null);
   const initialState = useRef(state);
-  const layerLiveRef = useRef(true);
-  const inViewRef = useRef(false);
-
-  const syncPlay = () => {
-    const mark = markRef.current;
-    if (!mark) return;
-    if (layerLiveRef.current && inViewRef.current && !document.hidden) mark.resume();
-    else mark.pause();
-  };
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -55,23 +46,9 @@ export function StellaCharacter({
       glow,
       eyeColor,
     });
-    mark.pause();
     markRef.current = mark;
     if (handleRef) handleRef.current = mark;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        inViewRef.current = entry?.isIntersecting ?? false;
-        syncPlay();
-      },
-      { rootMargin: "120px 0px" },
-    );
-    io.observe(host);
-    const onVisibility = () => syncPlay();
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      io.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
-      inViewRef.current = false;
       markRef.current = null;
       if (handleRef) handleRef.current = null;
       mark.destroy();
@@ -83,8 +60,8 @@ export function StellaCharacter({
   }, [state]);
 
   useLayerLive(hostRef, (live) => {
-    layerLiveRef.current = live;
-    syncPlay();
+    if (live) markRef.current?.resume();
+    else markRef.current?.pause();
   });
 
   return (

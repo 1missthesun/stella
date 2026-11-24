@@ -101,6 +101,26 @@ const fragment = /* glsl */ `
   }
 `;
 
+/** CSS `cubic-bezier(0.4, 0, 0.2, 1)`, the curve the page's own scene colour transition uses. */
+function sceneEase(t: number) {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  const x1 = 0.4;
+  const x2 = 0.2;
+  const bx = (u: number) => 3 * (1 - u) * (1 - u) * u * x1 + 3 * (1 - u) * u * u * x2 + u * u * u;
+  let lo = 0;
+  let hi = 1;
+  let u = t;
+  for (let i = 0; i < 20; i += 1) {
+    u = (lo + hi) / 2;
+    if (bx(u) < t) lo = u;
+    else hi = u;
+  }
+  return 3 * (1 - u) * u * u + u * u * u;
+}
+
+const SCENE_MS = 900;
+
 export function AuroraField({
   className,
   dark = false,
@@ -131,7 +151,8 @@ export function AuroraField({
     let disposed = false;
     let darkValue = dark ? 1 : 0;
     let darkTarget = darkValue;
-    let lastDarkTick = 0;
+    let darkFrom = darkValue;
+    let darkStart = 0;
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const pointer = { x: 0.5, y: 0.2, tx: 0.5, ty: 0.2 };
@@ -152,15 +173,10 @@ export function AuroraField({
       pointer.x += (pointer.tx - pointer.x) * 0.05;
       pointer.y += (pointer.ty - pointer.y) * 0.05;
       if (darkValue !== darkTarget) {
-        const dt = lastDarkTick ? Math.min(100, now - lastDarkTick) : 16;
-        const step = dt / 900;
-        darkValue =
-          darkTarget > darkValue
-            ? Math.min(darkTarget, darkValue + step)
-            : Math.max(darkTarget, darkValue - step);
+        const k = sceneEase((performance.now() - darkStart) / SCENE_MS);
+        darkValue = k >= 1 ? darkTarget : darkFrom + (darkTarget - darkFrom) * k;
         program.uniforms.uDark.value = darkValue;
       }
-      lastDarkTick = now;
       program.uniforms.uTime.value = reduce ? 6 : now * 0.001;
       program.uniforms.uPointer.value = [pointer.x, pointer.y];
       program.uniforms.uLift.value = liftRef?.current ?? 0;
@@ -233,15 +249,18 @@ export function AuroraField({
     if (followScene) {
       const root = document.querySelector<HTMLElement>("[data-landing-root]");
       const syncScene = () => {
-        darkTarget = root?.dataset.scene === "dark" ? 1 : 0;
+        const next = root?.dataset.scene === "dark" ? 1 : 0;
+        if (next === darkTarget) return;
+        darkTarget = next;
+        darkFrom = darkValue;
+        darkStart = performance.now();
         if (reduce && program) {
           darkValue = darkTarget;
           program.uniforms.uDark.value = darkValue;
           draw(6000);
         }
       };
-      syncScene();
-      darkValue = darkTarget;
+      darkTarget = darkValue = darkFrom = root?.dataset.scene === "dark" ? 1 : 0;
       if (root) {
         mo = new MutationObserver(syncScene);
         mo.observe(root, { attributes: true, attributeFilter: ["data-scene"] });
@@ -249,6 +268,24 @@ export function AuroraField({
     }
 
     if (!defer) init();
+
+    // Deferred fields set up once the page has loaded and the main thread is idle, so the shader
+    // compile stays out of both the first load and the scroll that reaches them; scrolling close
+    // before then sets them up right away.
+    let cancelIdle = () => {};
+    const initWhenIdle = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        const id = window.requestIdleCallback(() => init(), { timeout: 4000 });
+        cancelIdle = () => window.cancelIdleCallback(id);
+      } else {
+        const id = window.setTimeout(init, 1500);
+        cancelIdle = () => window.clearTimeout(id);
+      }
+    };
+    if (defer) {
+      if (document.readyState === "complete") initWhenIdle();
+      else window.addEventListener("load", initWhenIdle, { once: true });
+    }
 
     const nearObserver = defer
       ? new IntersectionObserver(
@@ -280,6 +317,8 @@ export function AuroraField({
       ro?.disconnect();
       mo?.disconnect();
       nearObserver?.disconnect();
+      window.removeEventListener("load", initWhenIdle);
+      cancelIdle();
       io.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       try {

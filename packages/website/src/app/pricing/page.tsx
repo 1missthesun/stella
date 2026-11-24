@@ -84,7 +84,7 @@ export default function Pricing() {
                   <span className={pr.period}>{plan.interval ? "per month" : "No card needed"}</span>
                 </p>
                 {plan.interval ? (
-                  <Link className={featured ? pr.ctaPrimary : pr.cta} href={`/billing?plan=${id}`} prefetch={false}>
+                  <Link className={featured ? pr.ctaPrimary : pr.cta} href={`/billing?plan=${id}`}>
                     Choose {plan.label}
                   </Link>
                 ) : (

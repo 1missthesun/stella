@@ -141,8 +141,8 @@ export function Finale({
         <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
           Android
         </a>
-        <Link href="/chat" prefetch={false}>Web</Link>
-        <Link href="/download" prefetch={false}>All downloads</Link>
+        <Link href="/chat">Web</Link>
+        <Link href="/download">All downloads</Link>
       </div>
     </section>
   );

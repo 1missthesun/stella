@@ -82,16 +82,16 @@ export function LandingHeader({ getHref = "#get" }: { getHref?: string }) {
 
   return (
     <header ref={ref} className={h.header} data-tone="light">
-      <Link href="/" prefetch={false} className={h.brand} aria-label="Stella home">
+      <Link href="/" className={h.brand} aria-label="Stella home">
         <span className={h.mark}>
           <StellaMark size={30} />
         </span>
         <span className={h.word}>Stella</span>
       </Link>
       <nav className={h.nav} aria-label="Primary">
-        <Link href="/learn-more" prefetch={false}>Learn</Link>
-        <Link href="/pricing" prefetch={false}>Pricing</Link>
-        <Link href="/crew" prefetch={false}>Crew</Link>
+        <Link href="/learn-more">Learn</Link>
+        <Link href="/pricing">Pricing</Link>
+        <Link href="/crew">Crew</Link>
         <span className={h.account}>
           <SiteHeaderAccount />
         </span>

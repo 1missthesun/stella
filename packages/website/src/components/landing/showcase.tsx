@@ -66,9 +66,8 @@ function JourneyView() {
       }
       const span = (JOURNEY.length - 1) * seg(p, 0.03, 0.86);
       const i = Math.min(JOURNEY.length - 2, Math.floor(span));
-      const kRaw = ease.inOut(span - i);
-      const k = Math.round(kRaw * 32) / 32;
-      const next = `${i}:${k}`;
+      const k = ease.inOut(span - i);
+      const next = `${i}:${k.toFixed(3)}`;
       if (next === key) return;
       key = next;
       const vars = mixWindowVars(JOURNEY[i], JOURNEY[i + 1], k);
@@ -99,6 +98,10 @@ function JourneyView() {
       { rootMargin: "200px 0px" },
     );
 
+    // Content above the frame can change height after the first measure (fonts, lazy media).
+    const ro = new ResizeObserver(onResize);
+    ro.observe(document.body);
+
     measure();
     apply();
     io.observe(frame);
@@ -106,6 +109,7 @@ function JourneyView() {
     window.addEventListener("resize", onResize, { passive: true });
     return () => {
       io.disconnect();
+      ro.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
       cancelAnimationFrame(raf);

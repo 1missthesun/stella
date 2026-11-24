@@ -8,6 +8,8 @@ import path from "node:path";
 import { getMainLogger } from "../observability/main-logger.js";
 import { visibleDialogParent } from "../windows/dialog-parent.js";
 import { noteAppPainted } from "../observability/app-paint.js";
+import { resolveBundleFrames } from "../source/bundle-stacks.js";
+import { rendererCacheDir } from "../source/renderer-protocol.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/node-shared/observability/log-paths";
 import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getTelemetryState, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, setOnboardingCompleted, updateLocalModelPreferences, updateLocalPreferences, } from "@stella/node-shared/preferences/local-preferences";
@@ -582,11 +584,16 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_DIAGNOSTICS_REPORT_ERROR)) {
             return;
         }
-        getMainLogger()?.error("renderer.error", {
-            kind: payload?.kind,
-            source: payload?.source,
-            errorMessage: payload?.message,
-            ...(payload?.stack ? { stack: payload.stack } : {}),
+        const inSource = (text) => typeof text === "string"
+            ? resolveBundleFrames(text, rendererCacheDir()).catch(() => text)
+            : text;
+        void Promise.all([inSource(payload?.source), inSource(payload?.stack)]).then(([source, stack]) => {
+            getMainLogger()?.error("renderer.error", {
+                kind: payload?.kind,
+                source,
+                errorMessage: payload?.message,
+                ...(stack ? { stack } : {}),
+            });
         });
     });
     onIpc(IPC_DIAGNOSTICS_REPORT_TIMING, (event, payload) => {

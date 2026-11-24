@@ -37,6 +37,8 @@ const earlyPublicFile = (uiRoot: string, url: URL) => {
   return fs.existsSync(file) ? file : null;
 };
 
+export const rendererCacheDir = () => path.join(app.getPath("userData"), "Renderer Source Cache");
+
 export type RendererBuildMode = "development" | "production";
 
 export const STELLA_RENDERER_MODE_ENV = "STELLA_RENDERER_MODE";
@@ -226,8 +228,8 @@ const startSourceWorker = (options: {
     });
   return {
     request: (url: string) => call<Answer>({ type: "request", url }),
-    apply: (paths: string[], ran: RanImports | null) =>
-      call<{ result?: ApplyAnswer }>({ type: "apply", paths, ran }).then(
+    apply: (paths: string[], ran: RanImports | null, bundle: string | null) =>
+      call<{ result?: ApplyAnswer }>({ type: "apply", paths, ran, bundle }).then(
         (answer) => answer.result ?? { mode: "none" as const },
       ),
     dispose: () => {
@@ -278,7 +280,7 @@ export const serveRendererSource = (options: {
       uiRoot,
       repoRoot: options.sourceRoot,
       envDir: path.join(options.envRoot ?? options.sourceRoot, "packages", "desktop-ui"),
-      cacheDir: path.join(app.getPath("userData"), "Renderer Source Cache"),
+      cacheDir: rendererCacheDir(),
       mode: options.mode,
     },
     isolate: options.isolate ?? "thread",
@@ -365,7 +367,10 @@ export const serveRendererSource = (options: {
             () => null,
           )
         : null;
-      const result = await source.apply(paths, ran);
+      const bundle = full
+        ? await (full.executeJavaScript("globalThis.__stellaBundle ?? null") as Promise<string | null>).catch(() => null)
+        : null;
+      const result = await source.apply(paths, ran, bundle);
       if (result.mode === "failed" && !reload) {
         return { mode: "failed", error: result.error.replace(ANSI_STYLE, ""), reloaded: false };
       }

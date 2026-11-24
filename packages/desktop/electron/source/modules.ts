@@ -19,6 +19,8 @@ export type TransformedModule = {
   map: string | null;
   imports: ImportRef[];
   exports: string[];
+  /** What `export * from` names. */
+  starReexports: string[];
   hotAccepts: string[];
   /** Why loading the module again is not harmless; null when it only declares. */
   state: string | null;
@@ -30,7 +32,7 @@ export type ResolvedImport =
   | { kind: "asset"; file: string; url: string };
 
 /** Part of every cache key: bump it whenever transform output changes. */
-const TRANSFORM_VERSION = "5";
+const TRANSFORM_VERSION = "6";
 const SIDE_EFFECT_IMPORT = /(?<=^|[;\s])import\s*$/;
 
 export const isSideEffectImport = (code: string, ref: ImportRef): boolean =>
@@ -191,10 +193,11 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   const collectImportsAndExports = async (
     file: string,
     code: string,
-  ): Promise<Pick<TransformedModule, "imports" | "exports" | "state">> => {
+  ): Promise<Pick<TransformedModule, "imports" | "exports" | "starReexports" | "state">> => {
     const parsed = await parse(file, code, { lang: "js", sourceType: "module" });
     const imports: ImportRef[] = [];
     const exports: string[] = [];
+    const starReexports: string[] = [];
     for (const entry of parsed.module.staticImports) {
       const request = entry.moduleRequest;
       imports.push({ start: request.start, end: request.end, specifier: request.value, dynamic: false });
@@ -206,6 +209,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         const request = exported.moduleRequest;
         if (request) {
           imports.push({ start: request.start, end: request.end, specifier: request.value, dynamic: false });
+          if (name.kind === "None") starReexports.push(request.value);
         }
       }
     }
@@ -233,6 +237,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         .filter((ref) => (seen.has(ref.start) ? false : (seen.add(ref.start), true)))
         .sort((a, b) => a.start - b.start),
       exports,
+      starReexports,
       state: moduleStateReason(parsed.program as never, parsed.comments as never, code),
     };
   };
@@ -333,7 +338,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         ? `${code.slice(0, ref.callStart)}${call}${code.slice(ref.end)}`
         : `${code.slice(0, ref.start)}${JSON.stringify(url)}${code.slice(ref.end)}`;
     }
-    if (module.map) {
+    if (module.map && options.development) {
       const map = module.map.replace(
         `"sources":[${JSON.stringify(repoPath(file))}]`,
         `"sources":[${JSON.stringify(urlForFile(file))}]`,

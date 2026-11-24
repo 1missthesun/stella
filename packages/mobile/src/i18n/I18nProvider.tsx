@@ -56,7 +56,8 @@ export interface I18nProviderProps {
 // is a guess: layout direction must not be flipped (an app reload) on a guess.
 type I18nState = { locale: Locale; catalog: Catalog; settled: boolean };
 
-// Bounds how long the first screen waits for its language; past it the app
+// Bounds how long the first screen waits for its language, counted from the
+// first mount (the bundle may still be evaluating before it); past it the app
 // shows English and swaps in the language when it arrives.
 const I18N_BOOT_TIMEOUT_MS = 1500;
 
@@ -83,26 +84,13 @@ const readStoredLocale = async (): Promise<Locale | null> => {
 // layout joins `useI18nReady` to the gate that already holds screens for the
 // fonts, so session, theme and authority startup keep overlapping both.
 let bootState: I18nState | null = null;
-let bootTimedOut = false;
 const bootLoad: Promise<I18nState> = (async () => {
   const locale = (await readStoredLocale()) ?? initialLocale();
   const catalog = getCachedCatalogSync(locale) ?? (await loadCatalogAsync(locale));
   return { locale, catalog, settled: true };
 })().catch(() => unsettledEnglish());
-const boot: Promise<I18nState> = Promise.race([
-  bootLoad,
-  new Promise<I18nState>((resolve) => {
-    setTimeout(() => {
-      bootTimedOut = bootState === null;
-      resolve(unsettledEnglish());
-    }, I18N_BOOT_TIMEOUT_MS);
-  }),
-]).then((state) => {
-  bootState = state;
-  return state;
-});
-void bootLoad.then((late) => {
-  bootState = late;
+void bootLoad.then((loaded) => {
+  bootState = loaded;
 });
 
 export function I18nProvider({ children }: I18nProviderProps) {
@@ -111,18 +99,17 @@ export function I18nProvider({ children }: I18nProviderProps) {
 
   useEffect(() => {
     let cancelled = false;
-    void boot.then((booted) => {
-      if (cancelled) return;
-      setState((current) => current ?? booted);
-      if (!bootTimedOut) return;
-      // Late language: swap it in unless the user has picked one since.
-      void bootLoad.then((late) => {
-        if (cancelled || requestedLocale.current !== null) return;
-        setState(late);
-      });
+    const timer = setTimeout(() => {
+      setState((current) => current ?? unsettledEnglish());
+    }, I18N_BOOT_TIMEOUT_MS);
+    void bootLoad.then((loaded) => {
+      clearTimeout(timer);
+      if (cancelled || requestedLocale.current !== null) return;
+      setState((current) => (current?.settled ? current : loaded));
     });
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, []);
 
@@ -141,14 +128,17 @@ export function I18nProvider({ children }: I18nProviderProps) {
     void AsyncStorage.setItem(LOCALE_STORAGE_KEY, next).catch(() => undefined);
     // The language and its strings switch together, once its pack is loaded
     // (a few milliseconds; synchronous when it was used before).
+    const show = (catalog: Catalog) => {
+      // Kept for a remount (the root error boundary's retry).
+      bootState = { locale: next, catalog, settled: true };
+      setState(bootState);
+    };
     const cached = getCachedCatalogSync(next);
     if (cached) {
-      setState({ locale: next, catalog: cached, settled: true });
+      show(cached);
     } else {
       void loadCatalogAsync(next).then((loaded) => {
-        if (requestedLocale.current === next) {
-          setState({ locale: next, catalog: loaded, settled: true });
-        }
+        if (requestedLocale.current === next) show(loaded);
       });
     }
     void applyLayoutDirection(next);

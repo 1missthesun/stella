@@ -200,7 +200,6 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
       "split pdf into multiple files",
       "split pdf",
       "split a scanned pdf into separate documents",
-      "extract pages from pdf",
       "separate pdf pages into different files",
     ],
     title: "Split a PDF into multiple files, one per document",
@@ -415,7 +414,7 @@ export const PDF_EXCEL_PAGES: ProblemPage[] = [
   shortGuide({
     slug: "make-scanned-pdf-searchable",
     niche: "pdf-excel",
-    searchPhrases: ["make scanned pdf searchable", "ocr pdf", "make pdf searchable free", "scanned pdf to text", "ocr pdf mac"],
+    searchPhrases: ["make scanned pdf searchable", "ocr pdf", "make pdf searchable free", "ocr pdf mac"],
     title: "Make a scanned PDF searchable (free OCR, no upload)",
     description:
       "Can't search a scanned PDF? Stella (stella.sh) reads the pages on your computer and saves a copy you can search and copy from, looking exactly the same.",

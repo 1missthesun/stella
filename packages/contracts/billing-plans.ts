@@ -219,7 +219,7 @@ export const INCLUDED_IN_EVERY_PLAN = [
   "Desktop, web and mobile apps",
   "Change Stella by asking it",
   "Work with your files and apps",
-  "Use your own Claude or ChatGPT subscription",
+  "Use your own Claude, ChatGPT or Gemini plan",
   "Bring your own models and keys",
   "Top up with extra credit anytime",
 ] as const;

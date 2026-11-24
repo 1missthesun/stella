@@ -7,11 +7,11 @@ import f from "./models-act.module.css";
 const LEADS = [
   { name: "Claude Code", logo: "/landing/logos/claude-code.svg", tile: "claude", glow: "rgba(217, 119, 87, 0.55)" },
   { name: "ChatGPT", logo: "/landing/logos/chatgpt.svg", tile: "chatgpt", glow: "rgba(255, 255, 255, 0.35)" },
-  { name: "Pi", logo: "/landing/logos/pi.svg", tile: "pi", glow: "rgba(240, 144, 130, 0.45)" },
+  { name: "Gemini", logo: "/landing/logos/gemini-color.svg", tile: "gemini", glow: "rgba(120, 130, 240, 0.5)" },
 ];
 
 const MORE = [
-  { name: "Gemini", logo: "gemini" },
+  { name: "Pi", logo: "pi" },
   { name: "DeepSeek", logo: "deepseek" },
   { name: "Qwen", logo: "qwen" },
   { name: "Mistral", logo: "mistral" },

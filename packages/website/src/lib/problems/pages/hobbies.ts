@@ -5,7 +5,7 @@ export const HOBBIES_PAGES: ProblemPage[] = [
   shortGuide({
     slug: "transpose-chords",
     niche: "hobbies",
-    searchPhrases: ["transpose chords", "transpose chord chart", "transpose song", "transpose chords down", "chordpro transpose"],
+    searchPhrases: ["transpose chords", "transpose chord chart", "transpose chords down", "chordpro transpose"],
     title: "Transpose chords for a whole folder of chord sheets",
     description:
       "Need your chord sheets in a lower or higher key? Ask Stella (stella.sh) to transpose a whole folder of songs and save new copies next to the originals.",

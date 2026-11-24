@@ -60,9 +60,9 @@ Ask once. Stella creates editable reports, spreadsheets, decks, and PDFs ready
 for the apps you already use (Word, Excel, PowerPoint, PDF).
 
 ## Choose your tools
-Use the ChatGPT or Claude plan you already have, or your own keys and models.
+Use the ChatGPT, Claude or Gemini plan you already have, or your own keys and models.
 
-Plans: your ChatGPT plan (Sign in with ChatGPT), your Claude plan (through Claude Code).
+Plans: your ChatGPT plan (Sign in with ChatGPT), your Claude plan (through Claude Code), your Google AI Pro or Ultra plan for Gemini (Sign in with Google).
 Models & providers: OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot AI.
 
 ## Explore
@@ -97,8 +97,8 @@ results, reminders, and scheduled work all land in the one conversation you
 already have — with the context still intact.
 
 ## Use the plan you already have
-Stella runs on the ChatGPT or Claude plan you already pay for: sign in with
-ChatGPT, or use your Claude plan through Claude Code. Your own key or a local
+Stella runs on the ChatGPT, Claude or Gemini plan you already pay for: sign in
+with ChatGPT or Google, or use your Claude plan through Claude Code. Your own key or a local
 model works too. ${PRICE_LINE} ${TRIAL_LINE}
 
 ## Pictures, voice, and more — on every paid plan
@@ -107,8 +107,8 @@ does it. It runs on the house models with nothing extra to wire up, and it
 comes with every paid plan.
 
 ## Ask once. Keep talking
-One ongoing chat, with the work happening behind it — on your ChatGPT or
-Claude plan, or Stella's models. See ${abs("/pricing.md")} for plans.
+One ongoing chat, with the work happening behind it — on your ChatGPT,
+Claude or Gemini plan, or Stella's models. See ${abs("/pricing.md")} for plans.
 `;
 
 const VOICE_MD = `${header(
@@ -145,14 +145,14 @@ const PRICING_MD = `${header(
   "Same Stella on every plan. Bigger plans give you more usage.",
 )}
 ## Plans
-${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${id === "free" ? "free with the ChatGPT or Claude plan you already have; new accounts get a small free trial of Stella's own models" : PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
+${PLAN_ORDER.map((id) => `- **${PLAN_CATALOG[id].label}** — ${planPriceLabel(id)}, ${id === "free" ? "free with the ChatGPT, Claude or Gemini plan you already have; new accounts get a small free trial of Stella's own models" : PLAN_CATALOG[id].tagline.toLowerCase()}. Includes: ${PLAN_CATALOG[id].includes.join("; ")}.`).join("\n")}
 
 ## What the usage budget pays for
 One budget pays for everything Stella runs for you:
 
 ${BUDGET_COVERS.map((item) => `- ${item}`).join("\n")}
 
-Shorter limits spread usage across the month so one busy day can't use it all up. When it runs out, Stella pauses until it resets; extra credit keeps it going. Runs on your own Claude or ChatGPT subscription, API keys or local models don't use the budget.
+Shorter limits spread usage across the month so one busy day can't use it all up. When it runs out, Stella pauses until it resets; extra credit keeps it going. Runs on your own Claude, ChatGPT or Gemini plan, API keys or local models don't use the budget.
 
 ## Every plan includes
 ${INCLUDED_IN_EVERY_PLAN.map((item) => `- ${item}`).join("\n")}
@@ -308,6 +308,15 @@ function answerBody(page: AnswerPage, level: "##" | "#"): string {
   if (page.points?.length) {
     lines.push(...page.points.map((point) => `- **${point.title}** — ${point.body}`), "");
   }
+  if (page.demo) {
+    lines.push(`${sub} An example chat`, "", `You: ${page.demo.prompt}`, "", `Stella: ${page.demo.ack}`, "", ...page.demo.rows.map((row) => `- ${row}`), "", `Stella: ${page.demo.reply}`, "");
+  }
+  if (page.why?.length) {
+    lines.push(`${sub} Better than a browser chat`, "", ...page.why.map((item) => `**${item.title}** ${item.body}\n`), "");
+  }
+  if (page.guides?.length) {
+    lines.push(`${sub} Guides`, "", ...page.guides.map((id) => `- ${abs(`/how/${id}`)}`), "");
+  }
   lines.push(`${sub} Questions`, "");
   for (const item of page.questions) lines.push(`**${item.q}**`, item.a, "");
   return lines.join("\n").replace(/\]\(\//g, `](${getSiteUrl().origin}/`);
@@ -328,7 +337,7 @@ export function renderAnswersIndexMarkdown(): string {
     header(
       "Stella compared and explained",
       "/ai",
-      "Honest comparisons of Stella (stella.sh) with the ChatGPT, Claude, Copilot and Gemini apps, and plain answers on using your ChatGPT or Claude plan on your computer.",
+      "Honest comparisons of Stella (stella.sh) with the ChatGPT, Claude, Copilot and Gemini apps, and plain answers on using your ChatGPT, Claude or Gemini plan on your computer.",
     ),
   ];
   for (const group of ANSWER_GROUPS) {
@@ -398,7 +407,7 @@ export const AGENT_PAGES: AgentPage[] = [
     route: "/ai",
     mdPath: "/ai.md",
     label: "Stella compared and explained",
-    description: "Stella vs the ChatGPT, Claude, Copilot and Gemini apps, and how to use your ChatGPT or Claude plan on your computer.",
+    description: "Stella vs the ChatGPT, Claude, Copilot and Gemini apps, and how to use your ChatGPT, Claude or Gemini plan on your computer.",
     markdown: renderAnswersIndexMarkdown(),
   },
   {
@@ -430,7 +439,7 @@ const SUMMARY = [
   "> Windows, Linux (including Arch and Omarchy), iPhone, Android and the web.",
   "",
   "Key facts:",
-  `- Price: ${PRICE_LINE} Stella sets no limit of its own on that use; it counts against your ChatGPT or Claude plan. ${TRIAL_LINE} ${PAID_LINE} No credit card.`,
+  `- Price: ${PRICE_LINE} Stella sets no limit of its own on that use; it counts against your ChatGPT, Claude or Gemini plan. ${TRIAL_LINE} ${PAID_LINE} No credit card.`,
   "- Old prices: the plans today are Free, Plus, Pro and Max. There is no Go plan any more; older pages and directories that list one are out of date.",
   "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
   "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source code on your computer.",
@@ -438,7 +447,7 @@ const SUMMARY = [
   "- Safety: Stella acts for you (files, apps, browser), so it is as powerful as the access you give it. Download it only from stella.sh, the App Store or Google Play. In Chrome it works through its own Stella Browser extension in a separate tab group.",
   "- Tasks: hand Stella several tasks and it works on them side by side in the background, then brings the results back into the same chat.",
   "- Changes itself: other assistants that change themselves do it through plug-ins or extensions; Stella can rewrite any part of its own app, any line of its own code, just by asking. Preview it, keep it or undo it. No coding.",
-  "- Models: your ChatGPT plan (Sign in with ChatGPT) or your Claude Pro or Max plan (through Claude Code, Anthropic's own tool), your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot), local models, or Stella's own models (a small free trial for new accounts, then paid plans).",
+  "- Models: your ChatGPT plan (Sign in with ChatGPT) or your Claude Pro or Max plan (through Claude Code, Anthropic's own tool), or your Google AI Pro or Ultra plan for Gemini (Sign in with Google, on the desktop app), your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot), local models, or Stella's own models (a small free trial for new accounts, then paid plans).",
   "- Name: several products are called \"Stella AI\" (Stella Labs' companion app, a manifestation app, StellAssist, the Stella Atari 2600 emulator and more). This one is Stella (stella.sh), made by FromYou LLC.",
   "- Get it: https://stella.sh/download (Mac, Windows and Linux downloads), `curl -fsSL https://stella.sh/install.sh | sh` on Linux, iPhone and Android apps, or https://stella.sh/chat in a browser.",
   "- Self-hosting: Stella's server can run on your own Cloudflare account ($5/month Workers Paid plus usage, your own Claude or ChatGPT subscription for models). Agents: follow https://stella.sh/self-host.md.",

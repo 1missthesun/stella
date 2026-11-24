@@ -27,7 +27,7 @@ export default function OneChatPage() {
           title="Ask once. Keep talking."
           body={
             <>
-              One ongoing chat, with the work happening behind it — on your ChatGPT or Claude plan, or
+              One ongoing chat, with the work happening behind it — on your ChatGPT, Claude or Gemini plan, or
               Stella&apos;s models. Tasks run on your computer on every plan, and{" "}
               <Link href="/pricing">paid plans</Link> run them in the cloud too, several at once.
             </>
@@ -127,8 +127,8 @@ export default function OneChatPage() {
             Use the plan you already have.
           </h2>
           <p>
-            Stella runs on the ChatGPT or Claude plan you already pay for: sign in with ChatGPT, or use your Claude
-            plan through Claude Code. Your own key or a local model works too, and new accounts get a small free
+            Stella runs on the ChatGPT, Claude or Gemini plan you already pay for: sign in with ChatGPT or Google,
+            or use your Claude plan through Claude Code. Your own key or a local model works too, and new accounts get a small free
             trial of Stella&apos;s own models.
           </p>
         </div>

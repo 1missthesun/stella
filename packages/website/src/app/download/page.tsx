@@ -6,7 +6,7 @@ import d from "./download.module.css";
 export const metadata: Metadata = {
   title: "Download",
   description:
-    "Download Stella for Mac, Windows or Linux: the easy way to use ChatGPT or Claude on your computer, free with the plan you already have. iPhone and Android apps too.",
+    "Download Stella for Mac, Windows or Linux: the easy way to use ChatGPT, Claude or Gemini on your computer, free with the plan you already have. iPhone and Android apps too.",
   alternates: { canonical: "/download" },
 };
 

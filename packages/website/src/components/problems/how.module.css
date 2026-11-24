@@ -85,6 +85,11 @@
   margin-top: clamp(28px, 4.6svh, 50px);
 }
 
+.hero .models {
+  margin-top: clamp(20px, 3svh, 30px);
+  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) 240ms both;
+}
+
 /* The home mascot on the empty right of the first screen, wide desktops only. */
 .heroMascot {
   display: none;
@@ -520,4 +525,33 @@
   .copy {
     transition: none;
   }
+}
+
+/* ── "Better than a browser chat" on /ai model pages ─── */
+
+.whyList {
+  border-top: 1px solid var(--h-line);
+}
+
+.why {
+  padding: clamp(20px, 3svh, 28px) 0;
+  border-bottom: 1px solid var(--h-line);
+}
+
+.why h3 {
+  margin: 0 0 8px;
+  font-size: clamp(19px, 1.45vw, 23px);
+  font-weight: 680;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  color: var(--h-ink);
+}
+
+.why p {
+  max-width: 58ch;
+  margin: 0;
+  font-size: clamp(16px, 1.15vw, 18.5px);
+  line-height: 1.55;
+  letter-spacing: -0.008em;
+  color: var(--h-body);
 }

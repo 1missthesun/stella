@@ -84,13 +84,13 @@
   height: 58%;
 }
 
-.tile[data-tile="pi"] {
-  background: #f7f3ea;
+.tile[data-tile="gemini"] {
+  background: #ffffff;
 }
 
-.tile[data-tile="pi"] img {
-  width: 56%;
-  height: 56%;
+.tile[data-tile="gemini"] img {
+  width: 54%;
+  height: 54%;
 }
 
 .lead b {

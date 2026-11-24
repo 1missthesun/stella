@@ -13,7 +13,7 @@ import x from "./index.module.css";
 
 const TITLE = "Stella compared and explained";
 const DESCRIPTION =
-  "Honest comparisons of Stella (stella.sh) with the ChatGPT, Claude, Copilot and Gemini apps, and plain answers on using your ChatGPT or Claude plan on your computer.";
+  "Honest comparisons of Stella (stella.sh) with the ChatGPT, Claude, Copilot and Gemini apps, and plain answers on using your ChatGPT, Claude or Gemini plan on your computer.";
 
 export const metadata: Metadata = {
   title: { absolute: `${TITLE} | Stella` },
@@ -72,7 +72,7 @@ export default function AnswersIndex() {
           <p className={a.answer}>
             Stella (stella.sh) is an AI assistant for your computer that works with your files, apps and browser,
             does tasks for you, and is on your phone too. Here’s how it stacks up against the apps you know, and
-            how to use the ChatGPT or Claude plan you already pay for.
+            how to use the ChatGPT, Claude or Gemini plan you already pay for.
           </p>
           <div className={a.cta}>
             <DownloadButton />

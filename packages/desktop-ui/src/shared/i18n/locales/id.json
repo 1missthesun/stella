@@ -1719,6 +1719,31 @@
       "typeInstead": "Ketik yang lain",
       "useSavedInstead": "Gunakan yang tersimpan saja",
       "needsFromYou": "Belum ada yang tersimpan untuk ini, jadi Stella memerlukannya dari Anda."
+    },
+    "savedLogins": {
+      "allowTitle": "Izinkan {name}?",
+      "allowCheck": "Pastikan di sana tampil {code}",
+      "notNow": "Nanti saja",
+      "allow": "Izinkan",
+      "waitingTitle": "Dapatkan login Anda di sini",
+      "waitingBody": "Buka Stella di perangkat lain",
+      "startOver": "Mulai ulang",
+      "compare": "Pastikan {name} menampilkan {code}",
+      "matches": "Cocok",
+      "useAnother": "Pakai perangkat lain",
+      "confirmed": "Menunggu {name}…",
+      "declined": "Tidak diizinkan",
+      "removed": "Dihapus dari perangkat Anda",
+      "askAgain": "Minta lagi",
+      "section": "Login tersimpan",
+      "thisPhone": "Ponsel ini",
+      "quiet": "Lama tidak terlihat",
+      "remove": "Hapus",
+      "removeTitle": "Hapus {name}?",
+      "removeBody": "Perangkat ini tidak lagi menerima login tersimpan Anda.",
+      "problem": "Tidak bisa memeriksa perangkat Anda",
+      "startOverTitle": "Mulai ulang?",
+      "startOverBody": "Ini memulai daftar baru yang hanya berisi ponsel ini. Setiap perangkat Anda yang lain perlu diizinkan lagi."
     }
   },
   "onboarding": {

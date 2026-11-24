@@ -1719,6 +1719,31 @@
       "typeInstead": "다른 정보 입력",
       "useSavedInstead": "저장된 정보 사용",
       "needsFromYou": "아직 저장된 정보가 없어 Stella가 직접 입력을 요청합니다."
+    },
+    "savedLogins": {
+      "allowTitle": "{name}을(를) 허용할까요?",
+      "allowCheck": "{code}이(가) 표시되는지 확인하세요",
+      "notNow": "나중에",
+      "allow": "허용",
+      "waitingTitle": "여기서도 로그인 정보 사용하기",
+      "waitingBody": "다른 기기에서 Stella를 여세요",
+      "startOver": "처음부터 다시",
+      "compare": "{name}에 {code}이(가) 표시되는지 확인하세요",
+      "matches": "일치해요",
+      "useAnother": "다른 기기 사용",
+      "confirmed": "{name} 기다리는 중…",
+      "declined": "허용되지 않음",
+      "removed": "내 기기에서 제거됨",
+      "askAgain": "다시 요청",
+      "section": "저장된 로그인",
+      "thisPhone": "이 휴대폰",
+      "quiet": "최근에 사용되지 않음",
+      "remove": "제거",
+      "removeTitle": "{name}을(를) 제거할까요?",
+      "removeBody": "저장된 로그인을 더 이상 받지 않습니다.",
+      "problem": "기기를 확인할 수 없음",
+      "startOverTitle": "처음부터 다시 할까요?",
+      "startOverBody": "이 휴대폰만 있는 새 목록을 시작합니다. 다른 기기는 각각 다시 허용해야 합니다."
     }
   },
   "onboarding": {

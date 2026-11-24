@@ -1739,6 +1739,31 @@
       "typeInstead": "En saisir un autre",
       "useSavedInstead": "Utiliser plutôt celui enregistré",
       "needsFromYou": "Rien n’est encore enregistré pour cela, Stella en a donc besoin de votre part."
+    },
+    "savedLogins": {
+      "allowTitle": "Autoriser {name} ?",
+      "allowCheck": "Vérifie qu’il affiche {code}",
+      "notNow": "Pas maintenant",
+      "allow": "Autoriser",
+      "waitingTitle": "Récupère tes identifiants ici",
+      "waitingBody": "Ouvre Stella sur un autre appareil",
+      "startOver": "Recommencer",
+      "compare": "Vérifie que {name} affiche {code}",
+      "matches": "C’est pareil",
+      "useAnother": "Autre appareil",
+      "confirmed": "En attente de {name}…",
+      "declined": "Non autorisé",
+      "removed": "Retiré de tes appareils",
+      "askAgain": "Redemander",
+      "section": "Identifiants enregistrés",
+      "thisPhone": "Ce téléphone",
+      "quiet": "Pas vu récemment",
+      "remove": "Retirer",
+      "removeTitle": "Retirer {name} ?",
+      "removeBody": "Il ne recevra plus tes identifiants enregistrés.",
+      "problem": "Impossible de vérifier tes appareils",
+      "startOverTitle": "Recommencer ?",
+      "startOverBody": "Cela crée une nouvelle liste avec ce téléphone seulement. Tes autres appareils devront chacun être autorisés de nouveau."
     }
   },
   "onboarding": {

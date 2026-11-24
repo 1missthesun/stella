@@ -1729,6 +1729,31 @@
       "typeInstead": "Etwas anderes eingeben",
       "useSavedInstead": "Doch die gespeicherte verwenden",
       "needsFromYou": "Dafür ist noch nichts gespeichert, deshalb braucht Stella es von dir."
+    },
+    "savedLogins": {
+      "allowTitle": "{name} erlauben?",
+      "allowCheck": "Prüfe, ob dort {code} steht",
+      "notNow": "Nicht jetzt",
+      "allow": "Erlauben",
+      "waitingTitle": "Hol dir deine Logins hierher",
+      "waitingBody": "Öffne Stella auf einem anderen Gerät",
+      "startOver": "Neu anfangen",
+      "compare": "Prüfe, ob {name} {code} zeigt",
+      "matches": "Stimmt überein",
+      "useAnother": "Anderes Gerät nutzen",
+      "confirmed": "Warten auf {name}…",
+      "declined": "Nicht erlaubt",
+      "removed": "Von deinen Geräten entfernt",
+      "askAgain": "Erneut fragen",
+      "section": "Gespeicherte Logins",
+      "thisPhone": "Dieses Handy",
+      "quiet": "Länger nicht gesehen",
+      "remove": "Entfernen",
+      "removeTitle": "{name} entfernen?",
+      "removeBody": "Es bekommt deine gespeicherten Logins nicht mehr.",
+      "problem": "Deine Geräte lassen sich nicht prüfen",
+      "startOverTitle": "Neu anfangen?",
+      "startOverBody": "Damit beginnt eine neue Liste, auf der nur dieses Handy steht. Deine anderen Geräte müssen einzeln wieder erlaubt werden."
     }
   },
   "onboarding": {

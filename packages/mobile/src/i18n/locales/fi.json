@@ -1729,6 +1729,31 @@
       "typeInstead": "Kirjoita toinen",
       "useSavedInstead": "Käytä sittenkin tallennettua",
       "needsFromYou": "Tälle ei ole vielä tallennettu mitään, joten Stella tarvitsee sen sinulta."
+    },
+    "savedLogins": {
+      "allowTitle": "Sallitaanko {name}?",
+      "allowCheck": "Tarkista, että siinä näkyy {code}",
+      "notNow": "Ei nyt",
+      "allow": "Salli",
+      "waitingTitle": "Hae kirjautumisesi tänne",
+      "waitingBody": "Avaa Stella toisella laitteella",
+      "startOver": "Aloita alusta",
+      "compare": "Tarkista, että laitteessa {name} näkyy {code}",
+      "matches": "Täsmää",
+      "useAnother": "Käytä toista laitetta",
+      "confirmed": "Odotetaan: {name}…",
+      "declined": "Ei sallittu",
+      "removed": "Poistettu laitteistasi",
+      "askAgain": "Pyydä uudelleen",
+      "section": "Tallennetut kirjautumiset",
+      "thisPhone": "Tämä puhelin",
+      "quiet": "Ei nähty viime aikoina",
+      "remove": "Poista",
+      "removeTitle": "Poistetaanko {name}?",
+      "removeBody": "Se ei enää saa tallennettuja kirjautumisiasi.",
+      "problem": "Laitteitasi ei voi tarkistaa",
+      "startOverTitle": "Aloitetaanko alusta?",
+      "startOverBody": "Tämä aloittaa uuden luettelon, jossa on vain tämä puhelin. Muut laitteesi on sallittava uudelleen yksitellen."
     }
   },
   "onboarding": {

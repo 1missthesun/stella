@@ -1719,6 +1719,31 @@
       "typeInstead": "Nhập thông tin khác",
       "useSavedInstead": "Dùng thông tin đã lưu",
       "needsFromYou": "Chưa có gì được lưu cho mục này, nên Stella cần bạn cung cấp."
+    },
+    "savedLogins": {
+      "allowTitle": "Cho phép {name}?",
+      "allowCheck": "Kiểm tra xem có hiện {code} không",
+      "notNow": "Để sau",
+      "allow": "Cho phép",
+      "waitingTitle": "Dùng thông tin đăng nhập tại đây",
+      "waitingBody": "Mở Stella trên thiết bị khác",
+      "startOver": "Bắt đầu lại",
+      "compare": "Kiểm tra xem {name} có hiện {code} không",
+      "matches": "Khớp rồi",
+      "useAnother": "Dùng thiết bị khác",
+      "confirmed": "Đang chờ {name}…",
+      "declined": "Không được cho phép",
+      "removed": "Đã bị gỡ khỏi các thiết bị của bạn",
+      "askAgain": "Hỏi lại",
+      "section": "Thông tin đăng nhập đã lưu",
+      "thisPhone": "Điện thoại này",
+      "quiet": "Lâu chưa thấy",
+      "remove": "Gỡ",
+      "removeTitle": "Gỡ {name}?",
+      "removeBody": "Thiết bị này sẽ không nhận thông tin đăng nhập đã lưu của bạn nữa.",
+      "problem": "Không kiểm tra được các thiết bị của bạn",
+      "startOverTitle": "Bắt đầu lại?",
+      "startOverBody": "Thao tác này tạo danh sách mới chỉ có điện thoại này. Từng thiết bị khác của bạn sẽ cần được cho phép lại."
     }
   },
   "onboarding": {

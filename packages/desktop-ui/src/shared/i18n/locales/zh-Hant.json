@@ -1719,6 +1719,31 @@
       "typeInstead": "輸入其他資訊",
       "useSavedInstead": "改用已儲存的資訊",
       "needsFromYou": "這項還沒有儲存任何內容，所以 Stella 需要你提供。"
+    },
+    "savedLogins": {
+      "allowTitle": "允許 {name}？",
+      "allowCheck": "請確認它顯示 {code}",
+      "notNow": "暫時不要",
+      "allow": "允許",
+      "waitingTitle": "在這裡使用你的登入資訊",
+      "waitingBody": "在另一部裝置上開啟 Stella",
+      "startOver": "重新開始",
+      "compare": "請確認 {name} 顯示 {code}",
+      "matches": "一致",
+      "useAnother": "換一部裝置",
+      "confirmed": "正在等待 {name}…",
+      "declined": "未獲允許",
+      "removed": "已從你的裝置中移除",
+      "askAgain": "再次要求",
+      "section": "已儲存的登入資訊",
+      "thisPhone": "這支手機",
+      "quiet": "近期未出現",
+      "remove": "移除",
+      "removeTitle": "移除 {name}？",
+      "removeBody": "它將不再收到你儲存的登入資訊。",
+      "problem": "無法核對你的裝置",
+      "startOverTitle": "重新開始？",
+      "startOverBody": "這會建立一份只有這支手機的新清單。你的其他裝置都需要重新允許。"
     }
   },
   "onboarding": {

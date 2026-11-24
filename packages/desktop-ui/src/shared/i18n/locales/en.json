@@ -1729,6 +1729,31 @@
       "typeInstead": "Type a different one",
       "useSavedInstead": "Use the saved one instead",
       "needsFromYou": "Nothing is saved for this yet, so Stella needs it from you."
+    },
+    "savedLogins": {
+      "allowTitle": "Allow {name}?",
+      "allowCheck": "Check it shows {code}",
+      "notNow": "Not now",
+      "allow": "Allow",
+      "waitingTitle": "Get your logins here",
+      "waitingBody": "Open Stella on another device",
+      "startOver": "Start over",
+      "compare": "Check {name} shows {code}",
+      "matches": "It matches",
+      "useAnother": "Use another device",
+      "confirmed": "Waiting for {name}…",
+      "declined": "Not allowed",
+      "removed": "Removed from your devices",
+      "askAgain": "Ask again",
+      "section": "Saved logins",
+      "thisPhone": "This phone",
+      "quiet": "Not seen lately",
+      "remove": "Remove",
+      "removeTitle": "Remove {name}?",
+      "removeBody": "It stops getting your saved logins.",
+      "problem": "Can’t check your devices",
+      "startOverTitle": "Start over?",
+      "startOverBody": "This starts a new list with only this phone. Your other devices will each need to be allowed again."
     }
   },
   "onboarding": {

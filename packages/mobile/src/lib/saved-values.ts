@@ -6,7 +6,6 @@ import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import * as Crypto from "expo-crypto";
-import * as Device from "expo-device";
 import type { SavedValuesState } from "@stella/contracts/backend/saved-values";
 import {
   SAVED_VALUES_DEVICE_REFRESH_MS,
@@ -18,7 +17,6 @@ import {
   SAVED_VALUE_SEAL_ALGORITHM,
   matchSavedFields,
   parseSavedValuePayload,
-  savedValueRecipients,
   savedValueSealAad,
   savedValueSealSalt,
   type SavedValueField,
@@ -38,67 +36,46 @@ import {
   type UserAskField,
   type UserAskSecureInputDetail,
 } from "@stella/contracts/user-ask";
+import {
+  deletionValid,
+  openEnvelope,
+  removeFromRoster,
+  savedValueRecipients,
+  signedEnvelope,
+  type SavedValuesRoster,
+} from "@stella/contracts/saved-values-trust";
 import { authClient } from "./auth-client";
-import { getBackendClient, readBackendView, useBackendView } from "./backend";
+import { getBackendClient, useBackendView } from "./backend";
 import { base64UrlToBytes, bytesToBase64Url } from "./base64url";
 import { getOrCreateMobileDeviceId } from "./phone-access";
-import * as SecureStore from "./secure-store";
+import {
+  forgetDevice,
+  phoneName,
+  type SavedValuesDeviceKeys,
+} from "./saved-values-device";
+import {
+  noteSavedValuesState,
+  removeFromSavedValues,
+  resetSavedValuesTrust,
+  savedValuesMembership,
+  savedValuesVersion,
+  subscribeSavedValues,
+} from "./saved-values-trust";
+import { useAppVisible } from "./use-app-visible";
 
 /**
- * This phone's copy of the user's synced saved values. The phone has its own
- * X25519 key (the private half only in this device's keychain); every saved
- * record comes sealed to it, so a cloud task's secure card can be answered
- * from here with one tap. Opened records live only in memory, only while an
- * answer is being made.
+ * This phone's copy of the user's synced saved values. Every saved record
+ * comes sealed to this phone's own key, signed by the device that sealed it;
+ * one that no device on the list signed is ignored. A cloud task's secure
+ * card can be answered from here with one tap. Opened records live only in
+ * memory, only while they're needed.
  */
 
-const DEVICE_KEY_ITEM = "stella.savedValues.deviceKey.v1";
 const PUBLISH_RETRY_MS = 10 * 60_000;
 const WITHDRAW_BUDGET_MS = 4_000;
 const GET_BATCH = 100;
-
-type DeviceKey = {
-  deviceId: string;
-  secretKey: Uint8Array;
-  publicKey: string;
-};
-
-let deviceKey: Promise<DeviceKey> | null = null;
-
-const readSecretKey = (stored: string | null): Uint8Array | null => {
-  if (!stored) return null;
-  try {
-    const bytes = base64UrlToBytes(stored);
-    return bytes.byteLength === SAVED_VALUE_PUBLIC_KEY_BYTES ? bytes : null;
-  } catch {
-    return null;
-  }
-};
-
-const loadDeviceKey = (): Promise<DeviceKey> => {
-  deviceKey ??= (async () => {
-    const deviceId = await getOrCreateMobileDeviceId();
-    let secretKey = readSecretKey(
-      await SecureStore.getDeviceOnlyItemAsync(DEVICE_KEY_ITEM),
-    );
-    if (!secretKey) {
-      secretKey = Crypto.getRandomBytes(SAVED_VALUE_PUBLIC_KEY_BYTES);
-      await SecureStore.setDeviceOnlyItemAsync(
-        DEVICE_KEY_ITEM,
-        bytesToBase64Url(secretKey),
-      );
-    }
-    return {
-      deviceId,
-      secretKey,
-      publicKey: bytesToBase64Url(x25519.getPublicKey(secretKey)),
-    };
-  })().catch((error: unknown) => {
-    deviceKey = null;
-    throw error;
-  });
-  return deviceKey;
-};
+/** Computers go first at sealing records to a device that just joined; this phone fills in what is left. */
+const HEAL_DELAY_MS = 6_000;
 
 const sealKey = (
   sharedSecret: Uint8Array,
@@ -112,27 +89,24 @@ const sealKey = (
   };
 };
 
+/** The text inside a seal addressed to this phone; null when it isn't, or was altered. */
 const openSeal = (
   seal: SavedValueSeal,
-  key: DeviceKey,
+  keys: SavedValuesDeviceKeys,
   binding: SavedValueSealBinding,
-): SavedValuePayload | null => {
+): string | null => {
   if (seal.algorithm !== SAVED_VALUE_SEAL_ALGORITHM) return null;
   try {
     const shared = x25519.getSharedSecret(
-      key.secretKey,
+      keys.secretKey,
       base64UrlToBytes(seal.clientPublicKey),
     );
-    const { key: aesKey, aad } = sealKey(shared, binding);
-    const plaintext = gcm(aesKey, base64UrlToBytes(seal.iv), aad).decrypt(
-      base64UrlToBytes(seal.ciphertext),
+    const { key, aad } = sealKey(shared, binding);
+    return bytesToUtf8(
+      gcm(key, base64UrlToBytes(seal.iv), aad).decrypt(
+        base64UrlToBytes(seal.ciphertext),
+      ),
     );
-    const payload = parseSavedValuePayload(bytesToUtf8(plaintext));
-    return payload &&
-      payload.id === binding.recordId &&
-      payload.updatedAt === binding.updatedAt
-      ? payload
-      : null;
   } catch {
     return null;
   }
@@ -158,51 +132,35 @@ const sealTo = (
   };
 };
 
-let latestState: SavedValuesState | null = null;
-const stateListeners = new Set<() => void>();
 const sealedRecords = new Map<string, SavedValueRecord>();
-
-const setLatestState = (next: SavedValuesState | null) => {
-  latestState = next;
-  for (const listener of stateListeners) listener();
-};
-
-const subscribeState = (listener: () => void) => {
-  stateListeners.add(listener);
-  return () => stateListeners.delete(listener);
-};
 
 /** Changes whenever the synced records change, so open cards look again. */
 export const useSavedValuesVersion = (): string =>
-  useSyncExternalStore(subscribeState, () =>
-    latestState
-      ? latestState.records.map((head) => `${head.id}:${head.updatedAt}`).join(",")
-      : "",
-  );
-
-const phoneName = (): string =>
-  Device.deviceName?.trim() || Device.modelName?.trim() || "Phone";
+  useSyncExternalStore(subscribeSavedValues, savedValuesVersion);
 
 let publishing = false;
 let lastPublishAttemptAt = 0;
 
-const publishDevice = async (state: SavedValuesState): Promise<void> => {
-  const key = await loadDeviceKey();
-  const mine = state.devices.find((device) => device.deviceId === key.deviceId);
+/** On the list: keep this phone's check-in fresh, so records get sealed to it. */
+const publishDevice = async (): Promise<void> => {
+  const membership = await savedValuesMembership();
+  if (!membership) return;
+  const { keys, state } = membership;
+  const mine = state.devices.find((device) => device.deviceId === keys.deviceId);
   const current =
     mine !== undefined &&
     mine.kind === "phone" &&
-    mine.publicKey === key.publicKey &&
+    mine.publicKey === keys.publicKey &&
     Date.now() - mine.updatedAt < SAVED_VALUES_DEVICE_REFRESH_MS;
   if (current || publishing) return;
-  if (Date.now() - lastPublishAttemptAt < PUBLISH_RETRY_MS) return;
+  if (mine && Date.now() - lastPublishAttemptAt < PUBLISH_RETRY_MS) return;
   publishing = true;
   lastPublishAttemptAt = Date.now();
   try {
     await getBackendClient().call("savedValues.putDevice", {
-      deviceId: key.deviceId,
+      deviceId: keys.deviceId,
       kind: "phone",
-      publicKey: key.publicKey,
+      publicKey: keys.publicKey,
       name: phoneName(),
     });
   } finally {
@@ -212,53 +170,160 @@ const publishDevice = async (state: SavedValuesState): Promise<void> => {
 
 const NO_ARGS = {} as const;
 
-/** While signed in: watch the synced records and keep this phone's key published. */
+/** While signed in: follow the devices' list and the synced records. */
 export const useSavedValuesSync = (): void => {
   const session = authClient.useSession();
-  const signedIn = Boolean(session.data);
-  const view = useBackendView("savedValues.state", signedIn ? NO_ARGS : "skip");
+  const owner = session.data?.user?.id ?? null;
+  const view = useBackendView("savedValues.state", owner ? NO_ARGS : "skip");
   const value = view.value;
+  const version = useSavedValuesVersion();
+  const visible = useAppVisible();
   useEffect(() => {
-    if (!signedIn || !value) return;
-    setLatestState(value);
-    void publishDevice(value).catch(() => undefined);
-  }, [signedIn, value]);
+    if (!owner || !value) return;
+    void noteSavedValuesState(owner, value)
+      .then(publishDevice)
+      .catch(() => undefined);
+  }, [owner, value]);
+  useEffect(() => {
+    if (!owner || !visible) return;
+    void publishDevice().catch(() => undefined);
+    const timer = setTimeout(
+      () => void sealForNewDevices().catch(() => undefined),
+      HEAL_DELAY_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [owner, value, version, visible]);
+  useEffect(() => () => sealedRecords.clear(), [owner]);
 };
 
-/** On sign-out: this phone stops receiving saved values, and its key is gone. */
+const withdraw = async (): Promise<void> => {
+  const membership = await savedValuesMembership();
+  if (membership) {
+    const { keys, roster } = membership;
+    await getBackendClient()
+      .call("savedValues.rosterAppend", {
+        entry: removeFromRoster({
+          roster,
+          target: keys.deviceId,
+          by: keys.deviceId,
+          key: keys.signing,
+          at: Date.now(),
+        }),
+      })
+      .catch(() => undefined);
+  }
+  await getBackendClient().call("savedValues.removeDevice", {
+    deviceId: await getOrCreateMobileDeviceId(),
+  });
+};
+
+/** On sign-out: this phone comes off the list, and its keys are gone. */
 export const withdrawSavedValuesDevice = async (): Promise<void> => {
   try {
-    const deviceId = await getOrCreateMobileDeviceId();
     await Promise.race([
-      getBackendClient().call("savedValues.removeDevice", { deviceId }),
+      withdraw(),
       new Promise((resolve) => setTimeout(resolve, WITHDRAW_BUDGET_MS)),
     ]);
   } catch {
     // Best-effort: a device not seen for a while stops being sealed to anyway.
   }
-  await SecureStore.deleteDeviceOnlyItemAsync(DEVICE_KEY_ITEM).catch(
-    () => undefined,
-  );
-  deviceKey = null;
+  resetSavedValuesTrust();
+  await forgetDevice();
   lastPublishAttemptAt = 0;
   sealedRecords.clear();
-  setLatestState(null);
 };
 
-type OpenedRecord = { payload: SavedValuePayload; updatedAt: number };
+type OpenedRecord = {
+  payload: SavedValuePayload;
+  updatedAt: number;
+  /** What was sealed, as its signer sealed it. */
+  envelope: string;
+  signedBy: string;
+};
 
-const readState = async (): Promise<SavedValuesState> =>
-  latestState ?? (await readBackendView("savedValues.state", NO_ARGS));
+const signerOf = (envelope: string): string => {
+  const by = (JSON.parse(envelope) as { by?: unknown }).by;
+  return typeof by === "string" ? by : "";
+};
 
-/** Every record sealed to this phone, opened. Callers keep only what they need. */
-const openAll = async (): Promise<{
-  key: DeviceKey;
+const envelopePayload = (envelope: string): string =>
+  (JSON.parse(envelope) as { payload: string }).payload;
+
+/** Records whose signature checked out, and against which list, so each is verified once. */
+const verified = new WeakMap<SavedValueRecord, string>();
+
+/** Opening is slow pure JS; let the screen draw between records. */
+const breathe = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+const openRecord = (
+  record: SavedValueRecord,
+  keys: SavedValuesDeviceKeys,
+  roster: SavedValuesRoster,
+): OpenedRecord | null => {
+  const seal = record.sealed?.[keys.deviceId];
+  const envelope = seal
+    ? openSeal(seal, keys, {
+        recordId: record.id,
+        recipientId: keys.deviceId,
+        updatedAt: record.updatedAt,
+      })
+    : null;
+  const signed =
+    envelope === null
+      ? null
+      : verified.get(record) === roster.head.hash
+        ? envelopePayload(envelope)
+        : openEnvelope(envelope, roster);
+  const payload = signed === null ? null : parseSavedValuePayload(signed);
+  if (
+    envelope === null ||
+    !payload ||
+    payload.id !== record.id ||
+    payload.updatedAt !== record.updatedAt
+  ) {
+    return null;
+  }
+  verified.set(record, roster.head.hash);
+  return {
+    payload,
+    updatedAt: record.updatedAt,
+    envelope,
+    signedBy: signerOf(envelope),
+  };
+};
+
+type OpenedRecords = {
+  keys: SavedValuesDeviceKeys;
+  roster: SavedValuesRoster;
   state: SavedValuesState;
   records: OpenedRecord[];
-}> => {
-  const [key, state] = await Promise.all([loadDeviceKey(), readState()]);
+};
+
+/** Every record sealed to this phone that a device on the list signed, opened. Callers keep only what they need. */
+const openAll = async (): Promise<OpenedRecords | null> => {
+  const membership = await savedValuesMembership();
+  if (!membership) {
+    sealedRecords.clear();
+    return null;
+  }
+  const { keys, roster, state } = membership;
+  const deleted = new Set(
+    state.records
+      .filter(
+        (head) =>
+          head.deleted &&
+          deletionValid({
+            id: head.id,
+            updatedAt: head.updatedAt,
+            by: head.updatedBy,
+            sig: head.deleteSig,
+            roster,
+          }),
+      )
+      .map((head) => head.id),
+  );
   const heads = state.records.filter(
-    (head) => !head.deleted && head.recipients.includes(key.deviceId),
+    (head) => !head.deleted && head.recipients.includes(keys.deviceId),
   );
   const stale = heads
     .filter((head) => sealedRecords.get(head.id)?.updatedAt !== head.updatedAt)
@@ -267,25 +332,151 @@ const openAll = async (): Promise<{
     const { records } = await getBackendClient().call("savedValues.get", {
       ids: stale.slice(start, start + GET_BATCH),
     });
-    for (const record of records) sealedRecords.set(record.id, record);
-  }
-  const live = new Set(heads.map((head) => head.id));
-  for (const id of sealedRecords.keys()) {
-    if (!live.has(id)) sealedRecords.delete(id);
+    for (const record of records) {
+      await breathe();
+      // A record that doesn't check out never replaces one that did.
+      if (!record.deleted && openRecord(record, keys, roster)) {
+        sealedRecords.set(record.id, record);
+      }
+    }
   }
   const records: OpenedRecord[] = [];
-  for (const head of heads) {
-    const record = sealedRecords.get(head.id);
-    const seal = record?.sealed?.[key.deviceId];
-    if (!record || record.deleted || !seal) continue;
-    const payload = openSeal(seal, key, {
-      recordId: record.id,
-      recipientId: key.deviceId,
-      updatedAt: record.updatedAt,
-    });
-    if (payload) records.push({ payload, updatedAt: record.updatedAt });
+  for (const [id, record] of [...sealedRecords]) {
+    await breathe();
+    const opened = deleted.has(id) ? null : openRecord(record, keys, roster);
+    if (opened) records.push(opened);
+    else sealedRecords.delete(id);
   }
-  return { key, state, records };
+  return { keys, roster, state, records };
+};
+
+const sealEnvelope = (
+  envelope: string,
+  record: { id: string; updatedAt: number },
+  recipients: readonly { deviceId: string; sealKey: string }[],
+): Record<string, SavedValueSeal> => {
+  const plaintext = utf8ToBytes(envelope);
+  const sealed: Record<string, SavedValueSeal> = {};
+  for (const recipient of recipients) {
+    try {
+      sealed[recipient.deviceId] = sealTo(plaintext, recipient.sealKey, {
+        recordId: record.id,
+        recipientId: recipient.deviceId,
+        updatedAt: record.updatedAt,
+      });
+    } catch {
+      continue;
+    }
+  }
+  return sealed;
+};
+
+/** Sign and seal a record from this phone, to the devices on the list. */
+const putRecord = async (args: {
+  payload: SavedValuePayload;
+  keys: SavedValuesDeviceKeys;
+  roster: SavedValuesRoster;
+  state: SavedValuesState;
+  except?: string;
+}): Promise<boolean> => {
+  const { payload, keys, roster, state } = args;
+  const envelope = signedEnvelope({
+    payload: JSON.stringify(payload),
+    by: keys.deviceId,
+    key: keys.signing,
+  });
+  if (utf8ToBytes(envelope).byteLength > SAVED_VALUE_MAX_PAYLOAD_BYTES) {
+    return false;
+  }
+  const recipients = savedValueRecipients({
+    roster,
+    devices: state.devices,
+    selfId: keys.deviceId,
+    now: Date.now(),
+  }).filter((member) => member.deviceId !== args.except);
+  const result = await getBackendClient().call("savedValues.put", {
+    id: payload.id,
+    updatedAt: payload.updatedAt,
+    updatedBy: keys.deviceId,
+    sealed: sealEnvelope(envelope, payload, recipients),
+  });
+  return result.accepted;
+};
+
+let healing = false;
+
+/** Seal the records this phone holds to devices on the list that lack them (one that just joined, one that's back). */
+const sealForNewDevices = async (): Promise<void> => {
+  if (healing) return;
+  const membership = await savedValuesMembership();
+  if (!membership) return;
+  const { keys, roster, state } = membership;
+  const wanted = savedValueRecipients({
+    roster,
+    devices: state.devices,
+    selfId: keys.deviceId,
+    now: Date.now(),
+  });
+  const lacking = new Map(
+    state.records
+      .filter(
+        (head) => !head.deleted && head.recipients.includes(keys.deviceId),
+      )
+      .map(
+        (head) =>
+          [
+            head.id,
+            wanted.filter((member) => !head.recipients.includes(member.deviceId)),
+          ] as const,
+      )
+      .filter(([, members]) => members.length > 0),
+  );
+  if (lacking.size === 0) return;
+  healing = true;
+  // The seals other devices have now are kept, so these are read fresh.
+  for (const id of lacking.keys()) sealedRecords.delete(id);
+  try {
+    const opened = await openAll();
+    for (const record of opened?.records ?? []) {
+      const members = lacking.get(record.payload.id);
+      const held = sealedRecords.get(record.payload.id);
+      if (!members || !held || held.updatedAt !== record.updatedAt) continue;
+      await getBackendClient().call("savedValues.put", {
+        id: record.payload.id,
+        updatedAt: record.updatedAt,
+        updatedBy: held.updatedBy,
+        sealed: {
+          ...held.sealed,
+          ...sealEnvelope(record.envelope, record.payload, members),
+        },
+      });
+      sealedRecords.delete(record.payload.id);
+    }
+  } finally {
+    healing = false;
+  }
+};
+
+/**
+ * Take a device off the list. What it last signed is signed again by this
+ * phone first: once it's off, nothing it signed counts any more.
+ */
+export const removeSavedValuesDevice = async (
+  deviceId: string,
+): Promise<void> => {
+  const opened = await openAll();
+  if (!opened) return;
+  for (const record of opened.records) {
+    if (record.signedBy !== deviceId) continue;
+    await putRecord({
+      payload: { ...record.payload, updatedAt: record.updatedAt + 1 },
+      keys: opened.keys,
+      roster: opened.roster,
+      state: opened.state,
+      except: deviceId,
+    });
+  }
+  await removeFromSavedValues(deviceId);
 };
 
 const ACCOUNT_FIELD_PATTERN =
@@ -384,9 +575,10 @@ export const findSavedLogin = async (ask: UserAsk): Promise<SavedLogin | null> =
   }
   const service = normalizeSavedValuePart(detail.save.service);
   if (!service) return null;
-  const { records } = await openAll();
+  const opened = await openAll();
+  if (!opened) return null;
   const account = usableAccount(service, detail.save.account);
-  for (const record of candidatesFor(records, service, account, true)) {
+  for (const record of candidatesFor(opened.records, service, account, true)) {
     const fills = answerableFrom(record.payload, detail.fields);
     if (fills) return { label: record.payload.label, fills };
   }
@@ -417,8 +609,9 @@ const existingRecordFor = (
 
 /**
  * Store what the user typed on a cloud task's card in the synced saved
- * values, sealed to every current device: a new record, or the one already
- * saved for that service and account.
+ * values, sealed to every device on the list: a new record, or the one already
+ * saved for that service and account. Only while this phone is on the
+ * devices' list.
  */
 export const rememberOnDevices = async (args: {
   detail: UserAskSecureInputDetail;
@@ -433,7 +626,9 @@ export const rememberOnDevices = async (args: {
   const account =
     usableAccount(service, detail.save.account) ||
     usableAccount(service, accountFromAnswer(args.typed));
-  const { key, state, records } = await openAll();
+  const opened = await openAll();
+  if (!opened) return null;
+  const { keys, roster, state, records } = opened;
   const existing = existingRecordFor(
     candidatesFor(records, service, "", false),
     account,
@@ -486,34 +681,7 @@ export const rememberOnDevices = async (args: {
     updatedAt,
     ...(previous?.policy ? { policy: previous.policy } : {}),
   };
-  const plaintext = utf8ToBytes(JSON.stringify(payload));
-  if (plaintext.byteLength > SAVED_VALUE_MAX_PAYLOAD_BYTES) return null;
-  const recipients = new Map(
-    savedValueRecipients(state.devices, now).map((device) => [
-      device.deviceId,
-      device.publicKey,
-    ]),
-  );
-  recipients.set(key.deviceId, key.publicKey);
-  const sealed: Record<string, SavedValueSeal> = {};
-  for (const [recipientId, publicKey] of recipients) {
-    try {
-      sealed[recipientId] = sealTo(plaintext, publicKey, {
-        recordId: payload.id,
-        recipientId,
-        updatedAt,
-      });
-    } catch {
-      continue;
-    }
-  }
-  const result = await getBackendClient().call("savedValues.put", {
-    id: payload.id,
-    updatedAt,
-    updatedBy: key.deviceId,
-    sealed,
-  });
-  return result.accepted ? { label } : null;
+  return (await putRecord({ payload, keys, roster, state })) ? { label } : null;
 };
 
 export type SavedLoginLookup = Readonly<{

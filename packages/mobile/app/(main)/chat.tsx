@@ -70,6 +70,7 @@ import { ArtifactViewer } from "../../src/components/ArtifactViewer";
 import { useChatSendQueue } from "../../src/lib/chat-send-queue";
 import { CloudBrowserInterventionCard } from "../../src/components/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "../../src/components/CloudConnectorConnectCard";
+import { SavedLoginsChatCards } from "../../src/components/SavedLoginsCards";
 import { UserAskCard } from "../../src/components/UserAskCard";
 import { ChatIssueNotice } from "../../src/components/ChatIssueNotice";
 import { ComposerNotice } from "../../src/components/ComposerNotice";
@@ -568,6 +569,7 @@ function ChatSurface(props: {
     () => (
       <>
         <CloudBoundary resetKey={thread.conversationId}>
+          <SavedLoginsChatCards />
           <UserAskCard conversationId={thread.conversationId} />
           <CloudConnectorConnectCard conversationId={thread.conversationId} />
           <CloudBrowserInterventionCard

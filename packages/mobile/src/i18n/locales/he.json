@@ -1739,6 +1739,31 @@
       "typeInstead": "להקליד משהו אחר",
       "useSavedInstead": "להשתמש בשמור במקום",
       "needsFromYou": "עדיין לא נשמר דבר עבור זה, לכן Stella צריכה את זה ממך."
+    },
+    "savedLogins": {
+      "allowTitle": "לאשר את {name}?",
+      "allowCheck": "כדאי לוודא שמופיע שם {code}",
+      "notNow": "לא עכשיו",
+      "allow": "אישור",
+      "waitingTitle": "קבלת פרטי הכניסה שלך כאן",
+      "waitingBody": "יש לפתוח את Stella במכשיר אחר",
+      "startOver": "התחלה מחדש",
+      "compare": "כדאי לוודא שב-{name} מופיע {code}",
+      "matches": "זה תואם",
+      "useAnother": "מכשיר אחר",
+      "confirmed": "בהמתנה ל-{name}…",
+      "declined": "לא אושר",
+      "removed": "הוסר מהמכשירים שלך",
+      "askAgain": "בקשה חוזרת",
+      "section": "פרטי כניסה שמורים",
+      "thisPhone": "הטלפון הזה",
+      "quiet": "לא נראה לאחרונה",
+      "remove": "הסרה",
+      "removeTitle": "להסיר את {name}?",
+      "removeBody": "הוא יפסיק לקבל את פרטי הכניסה השמורים שלך.",
+      "problem": "לא ניתן לבדוק את המכשירים שלך",
+      "startOverTitle": "להתחיל מחדש?",
+      "startOverBody": "פעולה זו מתחילה רשימה חדשה עם הטלפון הזה בלבד. יהיה צורך לאשר מחדש כל אחד מהמכשירים האחרים שלך."
     }
   },
   "onboarding": {

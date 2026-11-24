@@ -1729,6 +1729,31 @@
       "typeInstead": "Başka bir tane yaz",
       "useSavedInstead": "Bunun yerine kayıtlı olanı kullan",
       "needsFromYou": "Bunun için henüz kayıtlı bir şey yok, bu yüzden Stella'nın sizden alması gerekiyor."
+    },
+    "savedLogins": {
+      "allowTitle": "{name} için izin verilsin mi?",
+      "allowCheck": "{code} gösterdiğini kontrol et",
+      "notNow": "Şimdi değil",
+      "allow": "İzin ver",
+      "waitingTitle": "Girişlerini buraya al",
+      "waitingBody": "Stella’yı başka bir cihazda aç",
+      "startOver": "Baştan başla",
+      "compare": "{name} cihazının {code} gösterdiğini kontrol et",
+      "matches": "Eşleşiyor",
+      "useAnother": "Başka cihaz kullan",
+      "confirmed": "{name} bekleniyor…",
+      "declined": "İzin verilmedi",
+      "removed": "Cihazlarından kaldırıldı",
+      "askAgain": "Tekrar iste",
+      "section": "Kayıtlı girişler",
+      "thisPhone": "Bu telefon",
+      "quiet": "Son zamanlarda görülmedi",
+      "remove": "Kaldır",
+      "removeTitle": "{name} kaldırılsın mı?",
+      "removeBody": "Kayıtlı girişlerini artık almaz.",
+      "problem": "Cihazların kontrol edilemiyor",
+      "startOverTitle": "Baştan başlansın mı?",
+      "startOverBody": "Yalnızca bu telefonun olduğu yeni bir liste başlar. Diğer cihazlarının her birine yeniden izin verilmesi gerekir."
     }
   },
   "onboarding": {

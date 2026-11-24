@@ -1739,6 +1739,31 @@
       "typeInstead": "Digitar outro",
       "useSavedInstead": "Usar o salvo",
       "needsFromYou": "Ainda não há nada salvo para isto, então a Stella precisa que você informe."
+    },
+    "savedLogins": {
+      "allowTitle": "Permitir {name}?",
+      "allowCheck": "Confira se aparece {code}",
+      "notNow": "Agora não",
+      "allow": "Permitir",
+      "waitingTitle": "Traga seus logins para cá",
+      "waitingBody": "Abra a Stella em outro dispositivo",
+      "startOver": "Começar de novo",
+      "compare": "Confira se {name} mostra {code}",
+      "matches": "Está igual",
+      "useAnother": "Usar outro dispositivo",
+      "confirmed": "Aguardando {name}…",
+      "declined": "Não permitido",
+      "removed": "Removido dos seus dispositivos",
+      "askAgain": "Pedir de novo",
+      "section": "Logins salvos",
+      "thisPhone": "Este telefone",
+      "quiet": "Não visto ultimamente",
+      "remove": "Remover",
+      "removeTitle": "Remover {name}?",
+      "removeBody": "Ele deixa de receber seus logins salvos.",
+      "problem": "Não foi possível verificar seus dispositivos",
+      "startOverTitle": "Começar de novo?",
+      "startOverBody": "Isso cria uma nova lista só com este telefone. Cada um dos seus outros dispositivos precisará ser permitido de novo."
     }
   },
   "onboarding": {

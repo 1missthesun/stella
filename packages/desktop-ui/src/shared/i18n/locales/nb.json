@@ -1729,6 +1729,31 @@
       "typeInstead": "Skriv inn en annen",
       "useSavedInstead": "Bruk den lagrede i stedet",
       "needsFromYou": "Ingenting er lagret for dette ennå, så Stella trenger det fra deg."
+    },
+    "savedLogins": {
+      "allowTitle": "Tillate {name}?",
+      "allowCheck": "Sjekk at den viser {code}",
+      "notNow": "Ikke nå",
+      "allow": "Tillat",
+      "waitingTitle": "Få påloggingene dine her",
+      "waitingBody": "Åpne Stella på en annen enhet",
+      "startOver": "Start på nytt",
+      "compare": "Sjekk at {name} viser {code}",
+      "matches": "Det stemmer",
+      "useAnother": "Bruk en annen enhet",
+      "confirmed": "Venter på {name}…",
+      "declined": "Ikke tillatt",
+      "removed": "Fjernet fra enhetene dine",
+      "askAgain": "Spør igjen",
+      "section": "Lagrede pålogginger",
+      "thisPhone": "Denne telefonen",
+      "quiet": "Ikke sett i det siste",
+      "remove": "Fjern",
+      "removeTitle": "Fjerne {name}?",
+      "removeBody": "Den får ikke lenger de lagrede påloggingene dine.",
+      "problem": "Kan ikke sjekke enhetene dine",
+      "startOverTitle": "Starte på nytt?",
+      "startOverBody": "Dette starter en ny liste med bare denne telefonen. Hver av de andre enhetene dine må tillates på nytt."
     }
   },
   "onboarding": {

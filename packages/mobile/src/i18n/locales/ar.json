@@ -1769,6 +1769,31 @@
       "typeInstead": "اكتب واحدًا آخر",
       "useSavedInstead": "استخدم المحفوظ بدلًا من ذلك",
       "needsFromYou": "لا شيء محفوظ لهذا بعد، لذا تحتاجه Stella منك."
+    },
+    "savedLogins": {
+      "allowTitle": "هل تسمح لـ {name}؟",
+      "allowCheck": "تأكد من أنه يعرض {code}",
+      "notNow": "ليس الآن",
+      "allow": "سماح",
+      "waitingTitle": "احصل على بيانات دخولك هنا",
+      "waitingBody": "افتح Stella على جهاز آخر",
+      "startOver": "البدء من جديد",
+      "compare": "تأكد من أن {name} يعرض {code}",
+      "matches": "متطابق",
+      "useAnother": "استخدام جهاز آخر",
+      "confirmed": "في انتظار {name}…",
+      "declined": "لم يُسمح",
+      "removed": "أُزيل من أجهزتك",
+      "askAgain": "الطلب مجددًا",
+      "section": "بيانات الدخول المحفوظة",
+      "thisPhone": "هذا الهاتف",
+      "quiet": "لم يظهر مؤخرًا",
+      "remove": "إزالة",
+      "removeTitle": "إزالة {name}؟",
+      "removeBody": "لن تصله بيانات دخولك المحفوظة بعد الآن.",
+      "problem": "تعذّر التحقق من أجهزتك",
+      "startOverTitle": "البدء من جديد؟",
+      "startOverBody": "يبدأ هذا قائمة جديدة فيها هذا الهاتف فقط. وسيلزم السماح لكل جهاز من أجهزتك الأخرى مجددًا."
     }
   },
   "onboarding": {

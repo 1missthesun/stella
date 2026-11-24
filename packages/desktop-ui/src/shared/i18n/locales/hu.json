@@ -1729,6 +1729,31 @@
       "typeInstead": "Másik megadása",
       "useSavedInstead": "Inkább a mentettet használom",
       "needsFromYou": "Ehhez még nincs semmi mentve, ezért a Stellának tőled kell megkapnia."
+    },
+    "savedLogins": {
+      "allowTitle": "Engedélyezed: {name}?",
+      "allowCheck": "Nézd meg, hogy ezt mutatja-e: {code}",
+      "notNow": "Most nem",
+      "allow": "Engedélyezés",
+      "waitingTitle": "Hozd ide a belépéseidet",
+      "waitingBody": "Nyisd meg a Stellát egy másik eszközön",
+      "startOver": "Újrakezdés",
+      "compare": "Nézd meg, hogy a(z) {name} ezt mutatja-e: {code}",
+      "matches": "Egyezik",
+      "useAnother": "Másik eszköz",
+      "confirmed": "Várakozás erre: {name}…",
+      "declined": "Nincs engedélyezve",
+      "removed": "Eltávolítva az eszközeid közül",
+      "askAgain": "Újra kérem",
+      "section": "Mentett belépések",
+      "thisPhone": "Ez a telefon",
+      "quiet": "Régen láttuk",
+      "remove": "Eltávolítás",
+      "removeTitle": "Eltávolítod: {name}?",
+      "removeBody": "Többé nem kapja meg a mentett belépéseidet.",
+      "problem": "Nem sikerült ellenőrizni az eszközeidet",
+      "startOverTitle": "Újrakezded?",
+      "startOverBody": "Ez új listát kezd, amelyen csak ez a telefon szerepel. A többi eszközödet egyenként újra engedélyezni kell."
     }
   },
   "onboarding": {

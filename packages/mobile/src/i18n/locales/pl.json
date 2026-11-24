@@ -1749,6 +1749,31 @@
       "typeInstead": "Wpisz inne",
       "useSavedInstead": "Użyj jednak zapisanego",
       "needsFromYou": "Nic nie jest jeszcze zapisane dla tego, więc Stella potrzebuje tego od Ciebie."
+    },
+    "savedLogins": {
+      "allowTitle": "Zezwolić na {name}?",
+      "allowCheck": "Sprawdź, czy pokazuje {code}",
+      "notNow": "Nie teraz",
+      "allow": "Zezwól",
+      "waitingTitle": "Pobierz tu swoje loginy",
+      "waitingBody": "Otwórz Stellę na innym urządzeniu",
+      "startOver": "Zacznij od nowa",
+      "compare": "Sprawdź, czy {name} pokazuje {code}",
+      "matches": "Zgadza się",
+      "useAnother": "Użyj innego urządzenia",
+      "confirmed": "Czekam na {name}…",
+      "declined": "Nie zezwolono",
+      "removed": "Usunięto z twoich urządzeń",
+      "askAgain": "Poproś ponownie",
+      "section": "Zapisane loginy",
+      "thisPhone": "Ten telefon",
+      "quiet": "Dawno niewidziane",
+      "remove": "Usuń",
+      "removeTitle": "Usunąć {name}?",
+      "removeBody": "Nie będzie już dostawać twoich zapisanych loginów.",
+      "problem": "Nie można sprawdzić twoich urządzeń",
+      "startOverTitle": "Zacząć od nowa?",
+      "startOverBody": "Powstanie nowa lista tylko z tym telefonem. Na każde z pozostałych urządzeń trzeba będzie zezwolić ponownie."
     }
   },
   "onboarding": {

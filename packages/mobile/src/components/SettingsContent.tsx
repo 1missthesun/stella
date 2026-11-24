@@ -14,6 +14,7 @@ import { Icon, type IconName } from "./Icon";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { FeedbackSheet } from "./FeedbackSheet";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
+import { SavedLoginsSection } from "./settings/SavedLoginsSection";
 import { ServerSection } from "./settings/ServerSection";
 import { useServerFeatures } from "../lib/server-features";
 import { isSelfHostedLaunch, launchServer } from "../lib/server-registry";
@@ -397,6 +398,8 @@ export function SettingsContent() {
           </View>
         </View>
       ) : null}
+
+      {isSignedIn ? <SavedLoginsSection styles={settingsStyles} /> : null}
 
       <View style={settingsStyles.section}>
         <View style={styles.appearanceHeader}>

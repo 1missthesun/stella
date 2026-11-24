@@ -1729,6 +1729,31 @@
       "typeInstead": "Skriv et andet",
       "useSavedInstead": "Brug det gemte i stedet",
       "needsFromYou": "Der er intet gemt til det endnu, så Stella har brug for det fra dig."
+    },
+    "savedLogins": {
+      "allowTitle": "Tillad {name}?",
+      "allowCheck": "Tjek, at den viser {code}",
+      "notNow": "Ikke nu",
+      "allow": "Tillad",
+      "waitingTitle": "Få dine logins her",
+      "waitingBody": "Åbn Stella på en anden enhed",
+      "startOver": "Start forfra",
+      "compare": "Tjek, at {name} viser {code}",
+      "matches": "De er ens",
+      "useAnother": "Brug en anden enhed",
+      "confirmed": "Venter på {name}…",
+      "declined": "Ikke tilladt",
+      "removed": "Fjernet fra dine enheder",
+      "askAgain": "Spørg igen",
+      "section": "Gemte logins",
+      "thisPhone": "Denne telefon",
+      "quiet": "Ikke set for nylig",
+      "remove": "Fjern",
+      "removeTitle": "Fjern {name}?",
+      "removeBody": "Den får ikke længere dine gemte logins.",
+      "problem": "Kan ikke tjekke dine enheder",
+      "startOverTitle": "Start forfra?",
+      "startOverBody": "Det starter en ny liste med kun denne telefon. Dine andre enheder skal hver især tillades igen."
     }
   },
   "onboarding": {

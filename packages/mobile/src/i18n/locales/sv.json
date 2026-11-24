@@ -1729,6 +1729,31 @@
       "typeInstead": "Skriv en annan",
       "useSavedInstead": "Använd den sparade i stället",
       "needsFromYou": "Inget är sparat för det här än, så Stella behöver det från dig."
+    },
+    "savedLogins": {
+      "allowTitle": "Tillåt {name}?",
+      "allowCheck": "Kontrollera att den visar {code}",
+      "notNow": "Inte nu",
+      "allow": "Tillåt",
+      "waitingTitle": "Få dina inloggningar här",
+      "waitingBody": "Öppna Stella på en annan enhet",
+      "startOver": "Börja om",
+      "compare": "Kontrollera att {name} visar {code}",
+      "matches": "Det stämmer",
+      "useAnother": "Använd en annan enhet",
+      "confirmed": "Väntar på {name}…",
+      "declined": "Inte tillåten",
+      "removed": "Borttagen från dina enheter",
+      "askAgain": "Fråga igen",
+      "section": "Sparade inloggningar",
+      "thisPhone": "Den här telefonen",
+      "quiet": "Inte sedd på sistone",
+      "remove": "Ta bort",
+      "removeTitle": "Ta bort {name}?",
+      "removeBody": "Den får inte längre dina sparade inloggningar.",
+      "problem": "Kan inte kontrollera dina enheter",
+      "startOverTitle": "Börja om?",
+      "startOverBody": "Det startar en ny lista med bara den här telefonen. Dina andra enheter måste tillåtas igen, var och en."
     }
   },
   "onboarding": {

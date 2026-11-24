@@ -1719,6 +1719,31 @@
       "typeInstead": "別のものを入力",
       "useSavedInstead": "保存したものを使う",
       "needsFromYou": "これにはまだ何も保存されていないため、Stella があなたからの入力を必要としています。"
+    },
+    "savedLogins": {
+      "allowTitle": "{name}を許可しますか？",
+      "allowCheck": "{code} と表示されているか確認",
+      "notNow": "今はしない",
+      "allow": "許可",
+      "waitingTitle": "ログイン情報をここでも使う",
+      "waitingBody": "別のデバイスでStellaを開いてください",
+      "startOver": "最初からやり直す",
+      "compare": "{name}に {code} と表示されているか確認",
+      "matches": "一致している",
+      "useAnother": "別のデバイスを使う",
+      "confirmed": "{name}を待っています…",
+      "declined": "許可されませんでした",
+      "removed": "デバイスから削除されました",
+      "askAgain": "もう一度頼む",
+      "section": "保存済みログイン",
+      "thisPhone": "このスマートフォン",
+      "quiet": "最近使われていません",
+      "remove": "削除",
+      "removeTitle": "{name}を削除しますか？",
+      "removeBody": "保存済みログインは届かなくなります。",
+      "problem": "デバイスを確認できません",
+      "startOverTitle": "最初からやり直しますか？",
+      "startOverBody": "このスマートフォンだけの新しいリストになります。ほかのデバイスはそれぞれもう一度許可する必要があります。"
     }
   },
   "onboarding": {

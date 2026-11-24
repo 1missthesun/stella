@@ -81,6 +81,7 @@ import {
   rememberedByPhone,
   useSavedLogin,
 } from "../lib/saved-values";
+import { useSavedValuesTrust } from "../lib/saved-values-trust";
 import { useT } from "../i18n";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
@@ -811,7 +812,10 @@ function SecureAskSurface({
   const [note, setNote] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const offersRemember = userAskOffersRemember(detail);
+  const asksToRemember = userAskOffersRemember(detail);
+  const onDeviceList = useSavedValuesTrust().standing === "member";
+  const offersRemember =
+    asksToRemember && (onDeviceList || !rememberedByPhone(ask));
   const [remember, setRemember] = useState(true);
   const remaining = useRemaining(ask.blocking ? undefined : ask.deadlineAt);
   const sealable = canSealUserAskValue(ask.recipientKey);
@@ -924,7 +928,7 @@ function SecureAskSurface({
         revision: ask.revision,
         kind: "fields",
         fields: payload,
-        ...(offersRemember ? { remember: rememberHere } : {}),
+        ...(asksToRemember ? { remember: rememberHere } : {}),
         ...(trimmedNote ? { note: trimmedNote } : {}),
       });
       recordUserAskAnswer(
@@ -938,6 +942,7 @@ function SecureAskSurface({
   }, [
     ask,
     note,
+    asksToRemember,
     detail,
     fills,
     offersRemember,

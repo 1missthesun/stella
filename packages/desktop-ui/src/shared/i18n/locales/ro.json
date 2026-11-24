@@ -1739,6 +1739,31 @@
       "typeInstead": "Introdu altceva",
       "useSavedInstead": "Folosește totuși cea salvată",
       "needsFromYou": "Nu e încă nimic salvat pentru asta, așa că Stella are nevoie de ea de la tine."
+    },
+    "savedLogins": {
+      "allowTitle": "Permiți {name}?",
+      "allowCheck": "Verifică dacă arată {code}",
+      "notNow": "Nu acum",
+      "allow": "Permite",
+      "waitingTitle": "Adu-ți aici conectările",
+      "waitingBody": "Deschide Stella pe alt dispozitiv",
+      "startOver": "Ia-o de la capăt",
+      "compare": "Verifică dacă {name} arată {code}",
+      "matches": "Se potrivește",
+      "useAnother": "Alt dispozitiv",
+      "confirmed": "Se așteaptă {name}…",
+      "declined": "Nu a fost permis",
+      "removed": "Eliminat din dispozitivele tale",
+      "askAgain": "Cere din nou",
+      "section": "Conectări salvate",
+      "thisPhone": "Acest telefon",
+      "quiet": "Nevăzut de curând",
+      "remove": "Elimină",
+      "removeTitle": "Elimini {name}?",
+      "removeBody": "Nu va mai primi conectările tale salvate.",
+      "problem": "Dispozitivele tale nu pot fi verificate",
+      "startOverTitle": "O iei de la capăt?",
+      "startOverBody": "Începe o listă nouă doar cu acest telefon. Fiecare dintre celelalte dispozitive va trebui permis din nou."
     }
   },
   "onboarding": {

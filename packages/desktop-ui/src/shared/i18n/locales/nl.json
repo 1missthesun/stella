@@ -1729,6 +1729,31 @@
       "typeInstead": "Een andere invullen",
       "useSavedInstead": "Toch de bewaarde gebruiken",
       "needsFromYou": "Hiervoor is nog niets bewaard, dus Stella heeft het van jou nodig."
+    },
+    "savedLogins": {
+      "allowTitle": "{name} toestaan?",
+      "allowCheck": "Controleer of daar {code} staat",
+      "notNow": "Niet nu",
+      "allow": "Toestaan",
+      "waitingTitle": "Haal je logins hierheen",
+      "waitingBody": "Open Stella op een ander apparaat",
+      "startOver": "Opnieuw beginnen",
+      "compare": "Controleer of {name} {code} toont",
+      "matches": "Het klopt",
+      "useAnother": "Ander apparaat gebruiken",
+      "confirmed": "Wachten op {name}…",
+      "declined": "Niet toegestaan",
+      "removed": "Verwijderd van je apparaten",
+      "askAgain": "Opnieuw vragen",
+      "section": "Opgeslagen logins",
+      "thisPhone": "Deze telefoon",
+      "quiet": "Lang niet gezien",
+      "remove": "Verwijderen",
+      "removeTitle": "{name} verwijderen?",
+      "removeBody": "Het krijgt je opgeslagen logins niet meer.",
+      "problem": "Kan je apparaten niet controleren",
+      "startOverTitle": "Opnieuw beginnen?",
+      "startOverBody": "Dit begint een nieuwe lijst met alleen deze telefoon. Je andere apparaten moeten elk opnieuw worden toegestaan."
     }
   },
   "onboarding": {

@@ -1739,6 +1739,31 @@
       "typeInstead": "Inseriscine un altro",
       "useSavedInstead": "Usa quello salvato",
       "needsFromYou": "Non c’è ancora nulla di salvato per questo, quindi Stella ne ha bisogno da te."
+    },
+    "savedLogins": {
+      "allowTitle": "Consentire {name}?",
+      "allowCheck": "Controlla che mostri {code}",
+      "notNow": "Non ora",
+      "allow": "Consenti",
+      "waitingTitle": "Porta qui i tuoi accessi",
+      "waitingBody": "Apri Stella su un altro dispositivo",
+      "startOver": "Ricomincia",
+      "compare": "Controlla che {name} mostri {code}",
+      "matches": "Corrisponde",
+      "useAnother": "Usa un altro dispositivo",
+      "confirmed": "In attesa di {name}…",
+      "declined": "Non consentito",
+      "removed": "Rimosso dai tuoi dispositivi",
+      "askAgain": "Chiedi di nuovo",
+      "section": "Accessi salvati",
+      "thisPhone": "Questo telefono",
+      "quiet": "Non visto di recente",
+      "remove": "Rimuovi",
+      "removeTitle": "Rimuovere {name}?",
+      "removeBody": "Non riceverà più i tuoi accessi salvati.",
+      "problem": "Impossibile controllare i tuoi dispositivi",
+      "startOverTitle": "Ricominciare?",
+      "startOverBody": "Verrà creato un nuovo elenco con solo questo telefono. Dovrai consentire di nuovo ciascuno degli altri dispositivi."
     }
   },
   "onboarding": {

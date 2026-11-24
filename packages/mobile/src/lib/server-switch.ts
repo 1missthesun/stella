@@ -29,10 +29,7 @@ const PUSH_TEARDOWN_BUDGET_MS = 4_000;
 
 const leaveActiveServer = async (): Promise<void> => {
   await Promise.race([
-    Promise.all([
-      tearDownPushNotifications().catch(() => undefined),
-      withdrawSavedValuesDevice(),
-    ]),
+    tearDownPushNotifications().catch(() => undefined),
     new Promise((resolve) => setTimeout(resolve, PUSH_TEARDOWN_BUDGET_MS)),
   ]);
   await clearAccountChatData().catch(() => undefined);
@@ -64,6 +61,7 @@ export const switchToServer = async (serverId: string): Promise<void> => {
 
 export const removeServer = async (serverId: string): Promise<void> => {
   const wasActive = serverId === launchServer.id;
+  if (wasActive) await withdrawSavedValuesDevice();
   await removeSelfHostedServer(serverId);
   if (wasActive) {
     await leaveActiveServer();

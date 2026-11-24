@@ -7,6 +7,7 @@ export const createRouteTreeGenerator = (
   loadTools: () => Promise<RouteTools>,
   uiRoot: string,
   cacheDir?: string,
+  fallbackCacheDir?: string,
 ) => {
   const configFile = path.join(uiRoot, "tsr.config.json");
   const inline = JSON.parse(fs.readFileSync(configFile, "utf8")) as Record<string, unknown>;
@@ -18,9 +19,12 @@ export const createRouteTreeGenerator = (
     uiRoot,
     typeof inline.generatedRouteTree === "string" ? inline.generatedRouteTree : "./src/routeTree.gen.ts",
   );
-  const signatureFile = cacheDir
-    ? path.join(cacheDir, "routes", `${createHash("sha256").update(uiRoot).digest("hex").slice(0, 16)}.json`)
-    : null;
+  const signatureRel = path.join(
+    "routes",
+    `${createHash("sha256").update(uiRoot).digest("hex").slice(0, 16)}.json`,
+  );
+  const signatureFile = cacheDir ? path.join(cacheDir, signatureRel) : null;
+  const fallbackSignatureFile = fallbackCacheDir ? path.join(fallbackCacheDir, signatureRel) : null;
   let generator: InstanceType<RouteTools["RouteGenerator"]> | null = null;
 
   const signature = async (): Promise<string> => {
@@ -57,7 +61,11 @@ export const createRouteTreeGenerator = (
     run: async (event?: { path: string; type: "create" | "update" | "delete" }) => {
       if (!signatureFile) return generate(event);
       const before = await signature();
-      const stored = await fs.promises.readFile(signatureFile, "utf8").catch(() => null);
+      const stored =
+        (await fs.promises.readFile(signatureFile, "utf8").catch(() => null)) ??
+        (fallbackSignatureFile
+          ? await fs.promises.readFile(fallbackSignatureFile, "utf8").catch(() => null)
+          : null);
       if (stored === before) return;
       await generate(event);
       const after = await signature();

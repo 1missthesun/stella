@@ -97,3 +97,22 @@ export const envDefines = (env: RendererEnv): Record<string, string> => {
   }
   return defines;
 };
+
+/**
+ * Compile-time defines for prebuilt production renderer bundles: static build
+ * flags stay compile-time constants for dead-code elimination, while `VITE_*`
+ * values resolve from `globalThis.__stellaEnv` at page load so prebuilt
+ * modules and page bundles stay valid across backend URLs and runtime configs.
+ */
+export const runtimeEnvDefines = (mode: string): Record<string, string> => {
+  const dev = mode !== "production";
+  return {
+    "import.meta.env": "globalThis.__stellaEnv",
+    "import.meta.env.MODE": JSON.stringify(mode),
+    "import.meta.env.DEV": JSON.stringify(dev),
+    "import.meta.env.PROD": JSON.stringify(!dev),
+    "import.meta.env.SSR": "false",
+    "import.meta.env.BASE_URL": JSON.stringify("/"),
+    "process.env.NODE_ENV": JSON.stringify(dev ? "development" : "production"),
+  };
+};

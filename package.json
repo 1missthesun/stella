@@ -26,6 +26,7 @@
     "stella-browser:download": "node packages/desktop/scripts/download-stella-browser.mjs",
     "stella-office:download": "node packages/stella-office/scripts/download-native.js",
     "electron:install": "bun ./node_modules/electron/install.js",
+    "desktop:prebuild-renderer": "bun packages/desktop/scripts/prebuild-renderer.mjs",
     "electron:dev": "node packages/desktop/scripts/ensure-stella-browser.mjs --allow-build-fallback --build-from-source && node packages/stella-office/scripts/ensure-native.js && node packages/desktop/scripts/launch-electron-dev.mjs",
     "electron:typecheck:core": "node node_modules/typescript-7/bin/tsc -p packages/desktop/tsconfig.electron.json --pretty false --noEmit && node node_modules/typescript-7/bin/tsc -p packages/desktop/tsconfig.preload.json --pretty false --noEmit && node node_modules/typescript-7/bin/tsc -p packages/desktop/tsconfig.browser-pages.json --pretty false --noEmit && bun run verify:source-exports && bun run verify:source-identifiers && bun run verify:local-named-imports",
     "electron:typecheck": "bun run electron:typecheck:core && bun run verify:ipc-handlers",

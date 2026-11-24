@@ -1,6 +1,7 @@
 import { parentPort, Worker, workerData } from "node:worker_threads";
 import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createTailwindBuild, type TailwindBuild } from "./css.js";
+import { resolvePrebuiltRendererDir } from "./prebuilt-cache.js";
 import { createRendererSource, type RanImports } from "./renderer-source.js";
 import { loadTailwindTools } from "./tools.js";
 import { SOURCE_DATA_ARG } from "./origin.js";
@@ -54,6 +55,8 @@ const connectPort = (): { port: Port; data: SourceWorkerData } => {
 const { port, data } = connectPort();
 const post = (message: SourceWorkerMessage) => port.post(message);
 const log = (message: string) => post({ type: "log", message });
+const fallbackCacheDir =
+  data.mode === "production" ? resolvePrebuiltRendererDir(data.repoRoot, data.cacheDir) : undefined;
 
 let tailwindWorker: Worker | null = null;
 let tailwindFailed = false;
@@ -67,7 +70,7 @@ const failTailwind = (error: Error) => {
 };
 try {
   tailwindWorker = new Worker(new URL("./tailwind-worker.js", import.meta.url), {
-    workerData: { root: data.uiRoot, cacheDir: data.cacheDir },
+    workerData: { root: data.uiRoot, cacheDir: data.cacheDir, fallbackCacheDir },
   });
   tailwindWorker.on("message", (message: { id: number; css?: string; error?: string }) => {
     const request = tailwindPending.get(message.id);
@@ -88,7 +91,13 @@ const localBuilds = new Map<string, TailwindBuild>();
 const compileHere = (file: string, css: string) => {
   let build = localBuilds.get(file);
   if (!build) {
-    build = createTailwindBuild({ loadTools: loadTailwindTools, file, root: data.uiRoot, cacheDir: data.cacheDir });
+    build = createTailwindBuild({
+      loadTools: loadTailwindTools,
+      file,
+      root: data.uiRoot,
+      cacheDir: data.cacheDir,
+      fallbackCacheDir,
+    });
     localBuilds.set(file, build);
   }
   return build.build(css);
@@ -106,6 +115,7 @@ const compileInWorker = (file: string, css: string) =>
 
 const source = createRendererSource({
   ...data,
+  fallbackCacheDir,
   log,
   onReloadNeeded: () => post({ type: "reload" }),
   tailwind: (file, css) =>

@@ -38,6 +38,7 @@ import {
   savedServiceMatch,
   savedValueLabel,
   userAskFieldIsRememberable,
+  USER_ASK_CLOUD_ORIGIN_DEVICE_ID,
   userAskAcceptsAnswer,
   userAskAwaitsAnswer,
   userAskDeclinedNote,
@@ -592,7 +593,46 @@ export class UserAskService {
             return { ok: false, error: result.error };
         }
         this.dropMirrored(askId, "answered");
+        await this.rememberCloudAnswer(ask, payload, answer).catch((error) => {
+            this.options.log?.("user-ask-cloud-save-failed", { message: error?.message ?? String(error) });
+        });
         return { ok: true };
+    }
+    /**
+     * A cloud task's ask has no computer of its own to save the answer, so the
+     * one that answers it with Remember on keeps it, and sync carries it to the
+     * user's other devices. An ask from another computer is saved there.
+     */
+    async rememberCloudAnswer(ask, payload, answer) {
+        const detail = ask?.detail;
+        const service = normalizeSavedValuePart(detail?.save?.service);
+        if (ask?.originDeviceId !== USER_ASK_CLOUD_ORIGIN_DEVICE_ID ||
+            detail?.kind !== "secure_input" ||
+            !service ||
+            answer.remember === false) {
+            return;
+        }
+        const values = {};
+        for (const entry of payload.fields) {
+            if (entry?.kind !== "sealed" && typeof entry?.value === "string" && entry.value) {
+                values[entry.fieldId] = entry.value;
+            }
+        }
+        const keep = detail.fields
+            .filter((field) => values[field.id] && userAskFieldIsRememberable(field))
+            .map((field) => ({ field, value: values[field.id] }));
+        if (!keep.some(({ field }) => field.sensitive)) {
+            return;
+        }
+        const account = usableAccount(service, detail.save.account) ||
+            usableAccount(service, accountFromAnswer(detail.fields, values));
+        const existing = this.existingRecordFor(await this.saved.findMatches(service, ""), account);
+        await this.saved.save({
+            ...(existing ? { existingId: existing } : {}),
+            service,
+            account,
+            fields: keep,
+        });
     }
     async cancelMirrored(askId, reason) {
         const response = await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(askId)}/cancel`, {

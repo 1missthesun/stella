@@ -344,6 +344,9 @@ export const userAskOffersRemember = (detail: UserAskDetail): boolean =>
 
 export type UserAskDetail = UserAskQuestionDetail | UserAskSecureInputDetail;
 
+/** The origin of an ask a cloud task raised (no computer of the user asked it). */
+export const USER_ASK_CLOUD_ORIGIN_DEVICE_ID = "stella-cloud";
+
 export const USER_ASK_SEAL_ALGORITHM =
   "x25519-hkdf-sha256-aes-256-gcm-v1" as const;
 

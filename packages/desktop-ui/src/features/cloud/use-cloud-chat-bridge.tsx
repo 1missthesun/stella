@@ -75,6 +75,7 @@ import {
   browserAttachmentUploads,
   hasUnsentBrowserAttachments,
   useBrowserAttachmentUploads,
+  type BrowserAttachmentUpload,
 } from "./browser-chat-attachments";
 import { provideCloudSendRecovery } from "./cloud-send-recovery";
 
@@ -83,7 +84,10 @@ const EMPTY_MESSAGES: MessageRecord[] = [];
 const EMPTY_TASKS: TaskItem[] = [];
 export const LOCAL_CLOUD_TASK_OVERLAY_TTL_MS = 10 * 60_000;
 
-const pendingAttachments = (entry: PendingPrompt): Attachment[] => [
+const pendingAttachments = (
+  entry: PendingPrompt,
+  uploads: readonly BrowserAttachmentUpload[],
+): Attachment[] => [
   ...entry.submission.attachments.map((attachment) => ({
     id: attachment.path,
     path: attachment.path,
@@ -92,7 +96,7 @@ const pendingAttachments = (entry: PendingPrompt): Attachment[] => [
     ...(attachment.contentType ? { mimeType: attachment.contentType } : {}),
   })),
   ...(entry.submission.uploadIds ?? []).flatMap((id): Attachment[] => {
-    const upload = browserAttachmentUploads.find(id);
+    const upload = uploads.find((entry) => entry.id === id);
     if (!upload) return [];
     return [
       {
@@ -108,9 +112,10 @@ const pendingAttachments = (entry: PendingPrompt): Attachment[] => [
 
 export const cloudPendingPromptsToEvents = (
   pending: readonly PendingPrompt[],
+  uploads: readonly BrowserAttachmentUpload[],
 ): EventRecord[] =>
   pending.map((entry) => {
-    const attachments = pendingAttachments(entry);
+    const attachments = pendingAttachments(entry, uploads);
     return {
       _id: entry.clientMsgId,
       timestamp: entry.createdAtMs,
@@ -188,11 +193,6 @@ export const cloudSendFromSendArgs = (
   return { prompt, ...(context ? { context } : {}) };
 };
 
-/**
- * Local execution rows are only a transient overlay while the canonical
- * socket is live. They are distinct from the explicitly labelled derived
- * cloud-journal cache and can never revive as an undeclared authority.
- */
 export const shouldUseLocalCloudOverlay = (
   status: CloudConversationView["status"],
 ): boolean => status === "live";
@@ -294,9 +294,6 @@ const useLocalOverlayClock = (
   tasks: readonly TaskItem[],
 ): number => {
   const [nowMs, setNowMs] = useState(() => Date.now());
-  // A newly arrived overlay needs a fresh comparison clock before paint. If
-  // the prior render is minutes old, using its timestamp can classify a real
-  // task as a future record and hide it until the TTL timer finally fires.
   useLayoutEffect(() => {
     setNowMs(Date.now());
   }, [activity, files, tasks]);
@@ -508,10 +505,8 @@ export function useCloudChatBridge({
   const optimisticEvents = useMemo(
     () =>
       enabled && webShell
-        ? cloudPendingPromptsToEvents(conversation.pending)
+        ? cloudPendingPromptsToEvents(conversation.pending, uploads)
         : EMPTY_EVENTS,
-    // Upload previews (a video's poster frame) can arrive after the send.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [conversation.pending, enabled, uploads, webShell],
   );
   useEffect(() => {

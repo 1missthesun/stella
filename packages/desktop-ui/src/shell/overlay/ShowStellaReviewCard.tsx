@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type {
   ShowStellaReviewAction,
   ShowStellaReviewState,
@@ -6,9 +6,7 @@ import type {
 import { ArrowUp, Record, X } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 
-/** A finish card nobody touches goes to the composer after this. */
 const KEEP_AFTER_MS = 20_000;
-/** A pointer merely resting on the card holds it this long after it's ready, at most. */
 const HOVER_HOLD_MAX_MS = 60_000;
 const CARD_WIDTH = 360;
 const CARD_TOP = 14;
@@ -18,11 +16,6 @@ const clock = (ms: number) => {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 };
 
-/**
- * Shown when a capture ends while another app is in front: Stella stays in
- * the background, and the capture can be sent with a note, opened in Stella,
- * or thrown away from here.
- */
 export function ShowStellaReviewCard({
   state,
   onHover,
@@ -50,20 +43,18 @@ export function ShowStellaReviewCard({
     void window.electronAPI?.showStella?.review(action);
   };
 
-  // Untouched, the card goes to the composer a little after it's ready. A
-  // pointer resting on it only delays that, up to a minute; a note being
-  // written keeps it.
+  const keepCapture = useEffectEvent((captureId: string) =>
+    answer({ captureId, action: "keep" }),
+  );
+
   useEffect(() => {
     if (!ready || typing) return;
+    const captureId = state.captureId;
     const wait = hovered
       ? Math.max(KEEP_AFTER_MS, (readyAt.current ?? Date.now()) + HOVER_HOLD_MAX_MS - Date.now())
       : KEEP_AFTER_MS;
-    const timer = setTimeout(
-      () => answer({ captureId: state.captureId, action: "keep" }),
-      wait,
-    );
+    const timer = setTimeout(() => keepCapture(captureId), wait);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- answer only reads refs and props
   }, [ready, typing, hovered, state.captureId]);
 
   useEffect(() => () => onHoverRef.current(false), []);
@@ -80,7 +71,6 @@ export function ShowStellaReviewCard({
         setHovered(true);
         onHover(true);
         if (!madeFocusable.current) {
-          // Typing a note needs keys; the overlay panel takes them without bringing Stella forward.
           madeFocusable.current = true;
           window.electronAPI?.showStella?.setReviewFocusable({ focusable: true });
         }

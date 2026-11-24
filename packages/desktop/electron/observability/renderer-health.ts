@@ -3,28 +3,6 @@ import { resolveBundleFrames } from "../source/bundle-stacks.js";
 import { rendererCacheDir } from "../source/renderer-protocol.js";
 import { getMainLogger } from "./main-logger.js";
 
-/**
- * Watches the main window's renderer from the main process so a hang, a
- * runaway, or a kill leaves a record of what the renderer was doing.
- *
- * Every SAMPLE_MS it:
- * - probes the renderer's main thread with a trivial script; the time until
- *   the answer comes back is how long a click or keypress would wait;
- * - reads the CPU and memory of the renderer and GPU processes.
- *
- * It logs (process log, written synchronously, so it survives SIGKILL):
- * - `main.renderer-stall` when a probe has been unanswered for STALL_MS, with
- *   the JavaScript stack the renderer is running when Chromium can give it,
- *   and `main.renderer-stall-ended` when it answers again;
- * - `main.renderer-busy` when the renderer has used most of a core for
- *   BUSY_AFTER_MS, and `main.renderer-busy-ended`;
- * - `main.renderer-health` every SUMMARY_MS: CPU, memory and probe latency
- *   over the period, so the minutes before a kill are on record;
- * - and gives `snapshot()` to whoever logs the renderer's exit.
- *
- * Cost: one empty script and one getAppMetrics call every two seconds.
- */
-
 const SAMPLE_MS = 2_000;
 const STALL_MS = 5_000;
 const SLOW_PROBE_MS = 1_000;
@@ -60,7 +38,6 @@ export class RendererHealthMonitor {
   private pid = 0;
   private timer: NodeJS.Timeout | null = null;
   private samples: Sample[] = [];
-  // cumulativeCPUUsage (CPU seconds) at the previous sample, per pid.
   // percentCPUUsage is divided by the core count on Linux, so a renderer
   // pegging one core reads ~3% on a 32-core machine; deltas don't lie.
   private cpuSeconds = new Map<number, { at: number; total: number }>();
@@ -104,7 +81,6 @@ export class RendererHealthMonitor {
     this.contents = null;
   }
 
-  /** A new renderer process took over (reload after a crash or kill). */
   resetProbe() {
     this.probeSeq += 1;
     this.probeSentAt = 0;
@@ -116,7 +92,6 @@ export class RendererHealthMonitor {
     this.pid = 0;
   }
 
-  /** What the renderer looked like just before it went away. */
   snapshot(): RendererHealthSnapshot {
     const now = Date.now();
     const recent = this.samples.slice(-15);
@@ -212,7 +187,6 @@ export class RendererHealthMonitor {
       .then((answered) => {
         if (seq !== this.probeSeq || this.probeSentAt !== sentAt) return;
         if (!answered) {
-          // Navigation or teardown, not an answer; probe again next tick.
           this.probeSentAt = 0;
           return;
         }

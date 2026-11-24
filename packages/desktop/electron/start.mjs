@@ -9,9 +9,7 @@ const start = async () => {
   });
   try {
     pruneStaleMainChunks();
-  } catch {
-    // Leftover chunks only take disk space; never hold the launch for them.
-  }
+  } catch {}
   await import("../dist-electron/electron/launch.js");
 };
 

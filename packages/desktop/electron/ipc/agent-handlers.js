@@ -39,8 +39,6 @@ export const registerAgentHandlers = (options) => {
         if (!conversationId) {
             throw new Error("conversationId is required.");
         }
-        // A message sent while the runtime restarts (just after an Update)
-        // waits for it rather than bouncing back to the composer.
         await stellaHostRunner.waitUntilConnected(op === "submit" ? 30_000 : 5_000);
         return await stellaHostRunner.piChat({ ...request, conversationId });
     });

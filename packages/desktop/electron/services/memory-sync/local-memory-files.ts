@@ -23,32 +23,16 @@ const errorCode = (error: unknown): string | undefined =>
 
 type CachedHash = { mtimeMs: number; size: number; ino: number; sha: string };
 
-/**
- * `moved`: the file was not at the expected sha and nothing changed.
- * `displaced`: another version was taken off the path and given to `preserve`.
- */
 export type LocalMutation =
   | { status: "done" }
   | { status: "moved" }
   | { status: "displaced" };
 
-/** Keeps bytes another writer put at `relative`; must be durable on return. */
 export type PreserveDisplaced = (
   relative: string,
   bytes: Uint8Array,
 ) => Promise<void>;
 
-/**
- * This computer's side of the memory sync: the synced files under
- * `~/.stella` (`isSyncedMemoryPath`).
- *
- * Other programs edit these files with ordinary writes, so no check can
- * promise the file is unchanged at the instant of a rename. Instead nothing
- * here destroys bytes it has not inspected: a new file is published with
- * link(), which fails rather than replace one; a replaced or deleted file is
- * first held under a hidden sibling and read, and any version other than the
- * expected one goes to `preserve`.
- */
 export class LocalMemoryFiles {
   private readonly hashes = new Map<string, CachedHash>();
 
@@ -168,7 +152,6 @@ export class LocalMemoryFiles {
     return displaced;
   }
 
-  /** Put `bytes` at `relative` if its sha is `expectSha` (`null`: absent). */
   async write(
     relative: string,
     bytes: Uint8Array,
@@ -218,7 +201,6 @@ export class LocalMemoryFiles {
     }
   }
 
-  /** Delete `relative` if its sha is `expectSha`; done when it is gone. */
   async remove(relative: string, expectSha: string): Promise<LocalMutation> {
     const current = await this.currentSha(relative);
     if (current === null) return { status: "done" };

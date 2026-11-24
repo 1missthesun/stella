@@ -59,9 +59,7 @@ const resolveRecoveryHtmlPath = (electronDir) => {
                 return candidate;
             }
         }
-        catch {
-            /* try next */
-        }
+        catch {}
     }
     return null;
 };
@@ -69,11 +67,8 @@ const resolveRecoveryHtmlPath = (electronDir) => {
  * Loads the recovery surface into a window. Reads `recovery.html` from disk
  * and serves it via a `data:` URL so we never have to do a `file://`
  * navigation from an `http://` (dev) origin — Chromium blocks that as
- * "Not allowed to load local resource", which used to leave the window blank.
+ * "Not allowed to load local resource".
  */
-// The exact recovery page URL each window was given, so its Reload button can
-// be trusted: it runs from a data: URL, not the app origin that privileged
-// IPC normally requires.
 const recoverySurfaceUrls = new WeakMap();
 export const isShellRecoverySurface = (event) => {
     const sender = event?.sender;

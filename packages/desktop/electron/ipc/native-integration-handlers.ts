@@ -15,9 +15,6 @@ import {
   type IntegrationFlowUi,
 } from "../services/integration-flows.js";
 
-// Settings → Integrations. The catalog, integration state, accounts and
-// sign-ins run in the runtime (host/app-services/native-integrations.ts); main
-// supplies Stella's session and the windows a sign-in needs.
 export type NativeIntegrationHandlersOptions = IntegrationFlowUi &
   IntegrationFlowAuth & {
     assertPrivilegedSender: (

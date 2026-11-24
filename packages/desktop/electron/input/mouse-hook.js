@@ -24,10 +24,6 @@ export class MouseHookManager {
     setDictationTapHandlers(handlers) {
         this.handlers = handlers;
     }
-    /**
-     * Every pointer and key event, for Show Stella's timeline. Starts the hook
-     * when nothing else has; returns false when it can't run.
-     */
     subscribeCapture(listener) {
         if (this.disposed)
             return false;

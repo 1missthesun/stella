@@ -20,15 +20,6 @@ import {
 } from "@stella/contracts/desktop/ipc-channels";
 import { t } from "./i18n-service.js";
 
-/**
- * Native right-click menus for every surface. One mechanism everywhere: the
- * OS draws the menu (so it never clips, works from the keyboard and follows
- * the platform), main adds what only Chromium knows (spelling, whether
- * cut/copy/paste apply), and Stella's own UI says what the clicked thing
- * offers. Web pages in Stella's browser get the standard page menu.
- */
-
-/** How long a right-click waits for the UI to say what it offers. */
 const REPLY_TIMEOUT_MS = 350;
 const MAX_ITEMS = 80;
 const MAX_LABEL = 160;
@@ -290,7 +281,6 @@ const selectionSection = (
     : []),
 ];
 
-/** What a plain web page offers: its links, images and history. */
 const pageSections = (
   contents: WebContents,
   params: ContextMenuParams,
@@ -434,10 +424,6 @@ const showMenu = async (
   });
 };
 
-/**
- * Give `contents` right-click menus. `askRenderer` is for Stella's own UI,
- * which says what the clicked thing offers; web pages leave it off.
- */
 export const installContextMenu = (
   contents: WebContents,
   options: { askRenderer: boolean; browser?: BrowserTabMenuHooks },

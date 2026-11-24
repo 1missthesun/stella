@@ -8,10 +8,6 @@ const RELEASE_LABEL = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,31}$/;
 const UPSTREAM_REF = "refs/remotes/stella-upstream/main";
 const LAUNCHER_LOG_TAIL_BYTES = 1024 * 1024;
 
-/**
- * The newest published Stella this checkout contains (the same commit on
- * every computer, never a local merge), shortened to 12 characters.
- */
 const publishedSource = async (appDir: string | null | undefined): Promise<string | null> => {
   if (!appDir) return null;
   const result = await gitRaw(appDir, ["merge-base", "HEAD", UPSTREAM_REF], {
@@ -22,10 +18,6 @@ const publishedSource = async (appDir: string | null | undefined): Promise<strin
   return /^[0-9a-f]{40,64}$/.test(commit) ? commit.slice(0, 12) : null;
 };
 
-/**
- * The launcher's version. Launchers from v86 on pass it in the environment;
- * older ones write it in their log as they start, before starting Electron.
- */
 const launcherVersion = async (): Promise<string | null> => {
   const fromEnv = process.env.STELLA_LAUNCHER_VERSION?.trim();
   if (fromEnv && /^\d{1,9}$/.test(fromEnv)) return fromEnv;
@@ -68,7 +60,6 @@ const OS_NAMES: Partial<Record<NodeJS.Platform, string>> = {
   linux: "Linux",
 };
 
-/** For example `macOS 15.6.1 (arm64)` or `Windows 10.0.26100 (x64)`. */
 export const osLabel = (): string => {
   const name = OS_NAMES[process.platform] ?? process.platform;
   const version = process.platform === "linux" ? os.release() : process.getSystemVersion();

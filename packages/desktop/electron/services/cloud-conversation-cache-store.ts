@@ -19,10 +19,6 @@ const TITLE_BYTES = 4 * 1024;
 const MAX_JSON_DEPTH = 64;
 const MAX_JSON_NODES = 50_000;
 
-// Journal text may quote credential-shaped words, but structured secret fields
-// must never cross the cache boundary. Normalize separators/case so common wire
-// spellings (for example `access_token`) cannot bypass the same rule enforced
-// at IPC ingress and again before SQLite writes/after SQLite reads.
 const SECRET_BEARING_JSON_FIELDS = new Set([
   "accesstoken",
   "apikey",
@@ -1015,9 +1011,7 @@ export class CloudConversationCacheStore {
     } catch (error) {
       try {
         this.db.exec("ROLLBACK;");
-      } catch {
-        // BEGIN/connection failure: preserve the original error.
-      }
+      } catch {}
       throw error;
     }
   }

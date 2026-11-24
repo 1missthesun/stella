@@ -124,7 +124,6 @@ export class ExternalLinkService {
     if (this.isTrustedRendererUrl(senderUrl)) {
       return true
     }
-    // data: URLs (the recovery page) carry the whole page; log only the start.
     const shownUrl = senderUrl.length > 120 ? `${senderUrl.slice(0, 120)}…` : senderUrl
     console.warn(`[security] Blocked untrusted IPC call to ${channel} from ${shownUrl}`)
     return false

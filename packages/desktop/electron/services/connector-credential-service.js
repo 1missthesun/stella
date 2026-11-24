@@ -474,9 +474,6 @@ export class ConnectorCredentialService {
         });
         return true;
     }
-    // The flow runs in the runtime. Main opens the page it names, answers a
-    // callback that came back through a stella:// link, and cancels it when
-    // the request is withdrawn.
     runtimeOAuthFlows = new Map();
     waitForRuntimeOAuthCallback = async (request) => {
         const signal = this.runtimeOAuthFlows.get(request?.flowId);
@@ -488,7 +485,6 @@ export class ConnectorCredentialService {
             callbackId: request.callbackId,
             signal,
         });
-        // The runtime reads the code from the callback itself.
         void waitForCode.catch(() => undefined);
         return await waitForCallback;
     };

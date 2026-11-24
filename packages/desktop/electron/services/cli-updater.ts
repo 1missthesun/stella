@@ -7,13 +7,11 @@ import { getFileLogger } from "@stella/node-shared/observability/file-logger";
 const CHECK_INTERVAL_MS = 12 * 60 * 60_000;
 const RETRY_INTERVAL_MS = 60 * 60_000;
 const NOT_INSTALLED_INTERVAL_MS = 15 * 60_000;
-/** An install that can't start is looked at (and its repair tried) again soon. */
 const UNUSABLE_INTERVAL_MS = 30 * 60_000;
 const AFTER_START_MS = 90_000;
 const RESTART_QUIET_MS = 10 * 60_000;
 const DUE_POLL_MS = 15 * 60_000;
 
-/** What one check found (the runtime's cli-update.ts CliUpdateOutcome). */
 type CliUpdateOutcome = {
   status:
     | "not_installed"
@@ -37,8 +35,6 @@ type UpdaterState = {
   version?: string | null;
 };
 
-// Until the CLI is installed a check only looks for it, so it looks often:
-// onboarding installs it minutes after the first check.
 const intervalAfter = (status: UpdaterState["status"]): number =>
   status === "failed"
     ? RETRY_INTERVAL_MS
@@ -49,11 +45,8 @@ const intervalAfter = (status: UpdaterState["status"]): number =>
         : CHECK_INTERVAL_MS;
 
 export type CliUpdaterOptions = {
-  /** The schedule's file in Stella's data folder. */
   stateFile: string;
-  /** The environment switch that turns it off (`off`). */
   offSwitch: string;
-  /** What its log lines start with. */
   log: string;
   service: "checkClaudeCliUpdate" | "checkAntigravityCliUpdate";
 };
@@ -72,16 +65,6 @@ export const ANTIGRAVITY_CLI_UPDATER: CliUpdaterOptions = {
   service: "checkAntigravityCliUpdate",
 };
 
-/**
- * Keeps a CLI Stella runs (Claude Code, Google Antigravity) current and
- * working for someone who never opens it in a terminal, where it would update
- * itself: Stella only ever runs it non-interactively. Checks shortly after
- * Stella starts and then twice a day, silently. An install that can't start is
- * repaired rather than updated, and a new version is checked to start before
- * any turn runs it; until it does, turns run the last one that did
- * (`cli-keeper.ts`). A session moves to a new version at the start of its next
- * turn.
- */
 export class CliUpdater {
   private readonly statePath: string;
   private readonly abort = new AbortController();
@@ -114,10 +97,6 @@ export class CliUpdater {
     this.arm();
   }
 
-  /**
-   * The CLI was found where the last check found none: check now, so
-   * it's on the schedule (and its version recorded) from the start.
-   */
   noteCliFound(): void {
     if (!this.started || this.lastStatus !== "not_installed") return;
     this.dueAt = Date.now();
@@ -151,7 +130,6 @@ export class CliUpdater {
     const previous = this.readState();
     let outcome: CliUpdateOutcome;
     try {
-      // How to update or repair the CLI is the runtime's; main keeps the schedule.
       outcome = await callRuntimeAppService<CliUpdateOutcome>(this.options.service, {
         previousVersion: previous.version ?? null,
       });
@@ -204,9 +182,6 @@ export class CliUpdater {
   private writeState(state: UpdaterState): void {
     try {
       fs.writeFileSync(this.statePath, `${JSON.stringify(state, null, 2)}\n`);
-    } catch {
-      // The schedule is also held in memory; the file only spares a check
-      // after a quick restart.
-    }
+    } catch {}
   }
 }

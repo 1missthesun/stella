@@ -55,8 +55,6 @@ export const openDraftPreview = async (options: {
         backgroundThrottling: false,
       }),
       ...(options.offscreen ? { offscreen: options.offscreen } : {}),
-      // Previews are agent tabs in a never-shown host; see
-      // in-app-browser-service createTab.
       disableDialogs: true,
     },
   });

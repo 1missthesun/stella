@@ -29,12 +29,8 @@ const LOGOUT_TIMEOUT_MS = 30_000;
 const FOCUS_REFRESH_MIN_INTERVAL_MS = 30_000;
 const REPORT_SETTLE_MS = 15_000;
 const REPORT_RETRY_MIN_INTERVAL_MS = 60_000;
-// Logins are checked at start and then on this beat, so one that is about to
-// end is noticed days before, not by a reply that fails.
 const FIRST_CHECK_DELAY_MS = 20_000;
 const PERIODIC_CHECK_MS = 30 * 60_000;
-// A turn waiting for a sign-in asks often; it re-reads the logins at most
-// this often while none can answer.
 const SIGNED_OUT_RECHECK_MS = 60_000;
 
 const STRIPPED_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"];
@@ -75,7 +71,6 @@ const readStoredLogin = (dir: string | null): StoredClaudeLogin & { plan?: strin
   return { ...stored, ...(plan ? { plan } : {}) };
 };
 
-/** The account a config directory last signed in to, even after it ended. */
 const storedEmail = (dir: string | null): string | undefined => {
   try {
     const parsed = JSON.parse(
@@ -123,16 +118,13 @@ export type ClaudeLocalAccountsOptions = {
   engineAccounts: EngineAccountAccess;
   loadDeviceId: () => Promise<string | null>;
   onChanged: () => void;
-  /** Claude Code turned up where it wasn't (installed by Stella or by hand). */
   onCliFound?: () => void;
 };
 
-// eslint-disable-next-line no-control-regex
 const ANSI_PATTERN = /\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b\[[0-9;?]*[A-Za-z]/g;
 const stripAnsi = (text: string) => text.replace(ANSI_PATTERN, "");
 
 export const parseClaudeLoginUrl = (output: string): string | null => {
-  // eslint-disable-next-line no-control-regex
   const osc = /\u001b\]8;[^;]*;(https:\/\/[^\u0007\u001b\s]+)(?:\u0007|\u001b\\)/.exec(output);
   if (osc?.[1]) return osc[1];
   const plain = /https:\/\/\S+/.exec(stripAnsi(output));
@@ -155,7 +147,6 @@ const text = (value: unknown): string | undefined =>
 export class ClaudeLocalAccounts {
   private configs: ConfigStatus[] | null = null;
   private cliInstalled = false;
-  /** Why the installed Claude Code can't start, when it can't. */
   private cliProblem: string | null = null;
   private refreshing: Promise<void> | null = null;
   private lastRefreshAt = 0;
@@ -170,12 +161,6 @@ export class ClaudeLocalAccounts {
   private installing: Promise<ClaudeCliInstallResult> | null = null;
   private readonly installListeners = new Set<(progress: ClaudeCliInstallProgress) => void>();
   private readonly installAbort = new AbortController();
-  /**
-   * Logins Anthropic refused in a turn although their status read fine,
-   * keyed by config, with the expiry they had then: they stay out of use
-   * until they are signed in again (the expiry changes) or a sign-in here
-   * finishes.
-   */
   private readonly rejected = new Map<string, number | null>();
   private readonly timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -198,8 +183,6 @@ export class ClaudeLocalAccounts {
   }
 
   async list(): Promise<ClaudeLocalAccountsState> {
-    // Every window surface that shows Claude logins asks on mount; a fresh
-    // read is shared rather than run once per surface.
     if (!this.configs || Date.now() - this.lastRefreshAt >= FOCUS_REFRESH_MIN_INTERVAL_MS) {
       await this.refresh();
     }
@@ -211,12 +194,6 @@ export class ClaudeLocalAccounts {
     void this.refresh().catch(() => undefined);
   }
 
-  /**
-   * The login a Claude Code turn runs on. `recheck` reads every login again
-   * first (a turn whose login Anthropic just refused); `cached` answers from
-   * what is known, re-reading in the background at most once a minute while
-   * nothing can answer (a turn waiting for a sign-in asks often).
-   */
   async configForTurn(
     options: { recheck?: boolean; cached?: boolean } = {},
   ): Promise<ClaudeCodeConfigForTurn> {
@@ -237,11 +214,6 @@ export class ClaudeLocalAccounts {
     return resolved;
   }
 
-  /**
-   * Anthropic refused the login a turn ran on (`configDir` as the turn had
-   * it). It stays out of use until it is signed in again, and Stella shows
-   * that it needs a sign-in.
-   */
   noteRejected(configDir: string | null): void {
     const config = (this.configs ?? []).find((entry) => entry.dir === configDir);
     if (!config) return;
@@ -253,12 +225,6 @@ export class ClaudeLocalAccounts {
     void this.reportIfChanged();
   }
 
-  /**
-   * A turn waiting for a sign-in tries the logins Anthropic refused again: a
-   * refusal can be Anthropic failing rather than the login ending, and a
-   * login that really ended reads as ended from its own file anyway. True
-   * when there was one to try (the caller then reads the logins again).
-   */
   retryRefused(): boolean {
     if (this.rejected.size === 0) return false;
     this.rejected.clear();
@@ -289,11 +255,6 @@ export class ClaudeLocalAccounts {
     };
   }
 
-  /**
-   * The login Stella answers with here when it ends within a few days, or
-   * the login that ended when nothing else here can answer. A computer that
-   * never had a Claude login needs no reminder.
-   */
   private attention(active: ConfigStatus | null): ClaudeLoginAttention | undefined {
     if (!this.cliInstalled) return undefined;
     if (active) {
@@ -508,11 +469,6 @@ export class ClaudeLocalAccounts {
     return { ok: true };
   }
 
-  /**
-   * Installs Claude Code with Anthropic's installer when it's missing, for
-   * someone who picks it in onboarding. One install at a time; a second
-   * caller joins the first and gets its progress from then on.
-   */
   async installCli(
     onProgress: (progress: ClaudeCliInstallProgress) => void,
   ): Promise<ClaudeCliInstallResult> {
@@ -524,7 +480,6 @@ export class ClaudeLocalAccounts {
     this.installListeners.add(onProgress);
     try {
       if (!this.installing) {
-        // The runtime installs it and reports progress; main relays it.
         const installId = randomBytes(12).toString("hex");
         const stopWatching = watchAppServiceProgress(installId, (notice) => {
           if (notice.type !== "install_progress") return;
@@ -563,17 +518,9 @@ export class ClaudeLocalAccounts {
     for (const pending of [...this.logins.values()]) this.endLogin(pending, { kill: true });
   }
 
-  /**
-   * The Claude Code a turn would run (checked to start, or the last one that
-   * did), or null. Never the wrapper of a version manager that updates in
-   * the foreground: a status check that times out must not cut off an
-   * install. An install that can't start counts as installed, so its logins
-   * aren't taken for signed out and a turn says what is wrong with it.
-   */
   private async resolveCli(): Promise<string | null> {
     let executable: string | null = null;
     let installed = false;
-    // The runtime finds (and in the background repairs) the CLI it runs.
     const selected = await callRuntimeAppService<
       | { ok: true; executable: string }
       | { ok: false; unusable: boolean; message: string }
@@ -678,8 +625,6 @@ export class ClaudeLocalAccounts {
       if (loggedIn && this.rejected.get(configId) === (loginExpiresAt ?? null)) loggedIn = false;
       else if (loggedIn) this.rejected.delete(configId);
     }
-    // A login that was here and no longer works has ended; a directory that
-    // never finished signing in has not.
     const ended = !loggedIn && (present || Boolean(storedEmail(dir)) || this.rejected.has(configId));
     return {
       ...base,
@@ -729,8 +674,6 @@ export class ClaudeLocalAccounts {
       if (!this.deviceId) await this.loadDeviceId();
       const executable = await this.resolveCli();
       if (!executable) {
-        // Installed but unable to start: its logins are as they were (a
-        // turn then fails with what is wrong with Claude Code, not a sign-in).
         this.configs = this.cliInstalled ? (this.configs ?? []) : [];
       } else {
         const entries = [
@@ -881,9 +824,7 @@ export class ClaudeLocalAccounts {
       const remove = () => {
         try {
           fs.rmSync(dir, { recursive: true, force: true });
-        } catch {
-          // Best effort; an empty leftover dir shows as signed out.
-        }
+        } catch {}
       };
       if (pending.exitCode === undefined) void pending.exited.then(remove);
       else remove();

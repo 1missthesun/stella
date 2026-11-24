@@ -309,9 +309,7 @@ export class SelfHostService {
       await this.options.applySessionToken(sessionToken);
       try {
         rememberServer(serverFileFor(link.server, discovery));
-      } catch {
-        // The session is live; the list entry is backfilled on the next listing.
-      }
+      } catch {}
       return { ok: true, relaunching: false };
     }
     const server = serverFileFor(link.server, discovery);
@@ -347,9 +345,7 @@ export class SelfHostService {
       if (current?.serverId === activeId) {
         try {
           rememberServer(current);
-        } catch {
-          // Listed from server.json below either way.
-        }
+        } catch {}
       }
     }
     const records = savedServerIds()

@@ -41,17 +41,7 @@ import {
   REQUEST_BUDGET_MS,
   withDeadline,
 } from "@stella/contracts/request-deadline";
-/**
- * Mint a replacement backend JWT this long before the cached one expires. It
- * must exceed the backend's reauthentication lead (two minutes), or a token
- * the server is already asking to replace still counts as fresh here and every
- * caller hands back the token the server rejected.
- */
 const HOST_AUTH_TOKEN_REFRESH_MARGIN_MS = 3 * 60_000;
-/**
- * The scheduled refresh fires earlier than the freshness margin so the timer,
- * not a caller hitting a stale token, is what normally does the minting.
- */
 const HOST_AUTH_TOKEN_SCHEDULE_MARGIN_MS = 4 * 60_000;
 const HOST_AUTH_TOKEN_SCHEDULE_MIN_DELAY_MS = 15_000;
 const HOST_AUTH_TOKEN_SCHEDULE_FALLBACK_MS = 3 * 60 * 1000;
@@ -61,7 +51,6 @@ const HOST_AUTH_TOKEN_RETRY_JITTER = 0.2;
 const SESSION_REFRESH_RETRY_BASE_MS = 2_000;
 const SESSION_REFRESH_RETRY_MAX_MS = 60_000;
 const SESSION_REFRESH_RETRY_JITTER = 0.2;
-/** The runtime gives up on `host.runtimeAuth.refresh` at `REQUEST_BUDGET_MS.call`; answer before it does. */
 const RUNTIME_AUTH_REFRESH_BUDGET_MS = REQUEST_BUDGET_MS.call - 5_000;
 const AUTH_STORAGE_SCOPE = "desktop-better-auth-storage";
 const AUTH_STORAGE_FILE = "better-auth-storage.json";
@@ -69,11 +58,6 @@ const ACCOUNT_HINT_FILE = "account-hint.json";
 const BETTER_AUTH_SESSION_DATA_STORAGE_KEY = "better-auth_session_data";
 const BETTER_AUTH_TOKEN_STORAGE_KEY = "better-auth_session_token";
 const AUTH_IDENTITY_INTENT_STORAGE_KEY = "auth_identity_intent";
-/**
- * The last known backend URL. `configurePiRuntime` is driven by the renderer,
- * so without this the main process could not mint on its own before the first
- * window loaded, which is exactly when the refresh timer needs to arm.
- */
 const BACKEND_URL_STORAGE_KEY = "backend_url";
 const AUTH_BASE_PATH = "/api/auth";
 const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -117,7 +101,6 @@ export const hasServerSession = (serverId: string): boolean => {
 
 export type ServerSessionCheck = "valid" | "expired" | "unreachable";
 
-/** Checks a saved (not active) server's sign-in without touching the live session. */
 export const checkServerSession = async (
   serverId: string,
   backendUrl: string,
@@ -286,8 +269,6 @@ export class AuthService {
   private hostAuthAuthenticated = false;
   private hostHasConnectedAccount = false;
   private hostAuthToken: string | null = null;
-  // The credential epoch and backend the cached JWT was minted for: a cached
-  // token is only handed out while both still match.
   private hostAuthTokenEpoch = -1;
   private hostAuthTokenBackendUrl: string | null = null;
   private authStorageCache: Record<string, string | null> | null = null;
@@ -470,9 +451,7 @@ export class AuthService {
       try {
         const parsed = JSON.parse(stored) as unknown;
         if (getAuthSessionIdentityIntent(parsed)) return parsed;
-      } catch {
-        // Fall through to the account hint.
-      }
+      } catch {}
     }
     const hint = this.readAccountHint();
     if (!hint || hint.signedOut || this.storedIntent() === "anonymous") {
@@ -499,8 +478,6 @@ export class AuthService {
     if (stored) return stored;
     const fromSession = getAuthSessionIdentityIntent(this.getStoredSession());
     if (fromSession) return fromSession;
-    // Credentials are on disk but this keyring can no longer read them: an
-    // account was signed in here, so its session ended rather than never began.
     const encoded = this.readEncodedAuthStorage();
     if (
       encoded[BETTER_AUTH_TOKEN_STORAGE_KEY] ||
@@ -764,9 +741,7 @@ export class AuthService {
           ) {
             return;
           }
-        } catch {
-          // Reject malformed navigation below.
-        }
+        } catch {}
         event.preventDefault();
         finishWithError(new Error("Human verification left the trusted page."));
       };
@@ -815,13 +790,6 @@ export class AuthService {
       ?.setHasConnectedAccount(hasConnectedAccount);
   }
 
-  /**
-   * Seed the derived state from the persisted session blob so the runner knows
-   * whether this is a connected account before the first network read
-   * completes. Cloud mode and the builder WebSocket both branch on it during
-   * boot, and an anonymous-looking gap there would show the user a downgraded
-   * shell for a round-trip. A network read still overwrites this.
-   */
   private hydrateSessionStateFromDisk() {
     if (this.sessionStateDerived || !this.getBearerToken()) {
       return;
@@ -1443,8 +1411,6 @@ export class AuthService {
     const payload = decodeBase64UrlJson(token.split(".")[1] ?? "");
     const exp = (payload as { exp?: unknown } | null)?.exp;
     if (typeof exp !== "number") {
-      // Tokens without a readable expiry can't be proactively refreshed;
-      // treat them as fresh and let the server be the judge.
       return true;
     }
     return Date.now() < exp * 1000 - HOST_AUTH_TOKEN_REFRESH_MARGIN_MS;
@@ -1514,7 +1480,6 @@ export class AuthService {
     await this.mintHostAuthToken();
   }
 
-  /** The cached JWT when it is fresh and was minted for the current credentials and backend. */
   getCachedAuthToken(): string | null {
     const cached = this.currentScopeAuthToken();
     return cached && this.isHostAuthTokenFresh(cached) ? cached : null;
@@ -1532,7 +1497,6 @@ export class AuthService {
     return cached;
   }
 
-  /** Mint the JWT ahead of first use (startup), so the renderer and the runtime find it cached. */
   prefetchAuthToken(): void {
     if (this.getCachedAuthToken() || !this.getBearerToken()) {
       return;
@@ -1540,13 +1504,6 @@ export class AuthService {
     void this.getAuthToken().catch(() => undefined);
   }
 
-  /**
-   * The JWT for the current credentials: the cached one while fresh, otherwise
-   * a new mint (coalesced with one already in flight). `forceRefresh` always
-   * mints. When a mint fails, `allowStale` (the default, for the runtime and
-   * schedules) falls back to the last token for these same credentials;
-   * without it an expired token is never returned.
-   */
   async getAuthToken(
     options: { forceRefresh?: boolean; allowStale?: boolean } = {},
   ): Promise<string | null> {
@@ -1561,18 +1518,12 @@ export class AuthService {
     }
     const startEpoch = this.credentialEpoch;
     let fresh = (await this.mintHostAuthToken())?.trim() || null;
-    // A mint already in flight when the credentials changed answers null for
-    // the old ones; mint once more for the current credentials.
     if (!fresh && this.credentialEpoch !== startEpoch && this.getBearerToken()) {
       fresh = (await this.mintHostAuthToken())?.trim() || null;
     }
     if (fresh) {
       return fresh;
     }
-    // The mint failed. Fall back to the last token only while the bearer is
-    // still stored and it was minted for these same credentials: if the mint
-    // cleared the bearer, this device is signed out, and a token from before a
-    // credential change belongs to another session.
     if (!this.getBearerToken()) {
       return null;
     }
@@ -1624,11 +1575,6 @@ export class AuthService {
     await this.awaitPendingResync();
     const epoch = this.credentialEpoch;
     if (this.getBackendUrl() && this.getBearerToken()) {
-      // The runtime branches on `hasConnectedAccount`: an anonymous identity
-      // still owns cloud conversations, a connected one also gets the
-      // account-bound surfaces. Minting alone never reads the session, so
-      // without this a boot-time refresh would report a connected user as
-      // anonymous until some later path happened to derive it.
       if (!this.sessionStateDerived) {
         await this.getBetterAuthSession().catch(() => null);
       }
@@ -1709,9 +1655,6 @@ export class AuthService {
       this.scheduleHostAuthTokenRefresh(cached);
       return;
     }
-    // The startup prefetch may still be minting (a fast first paint gets here
-    // before it lands). A mint that succeeds schedules its own refresh, so
-    // arm only once it has settled, instead of minting a second token now.
     const inflight = this.hostAuthTokenMintPromise;
     if (inflight) {
       void inflight

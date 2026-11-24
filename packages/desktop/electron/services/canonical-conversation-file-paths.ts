@@ -15,9 +15,7 @@ export const resolveCanonicalConversationFilePaths = async (
       const real = await fs.realpath(resolved);
       allowed.add(resolved);
       allowed.add(real);
-    } catch {
-      /* Missing or inaccessible files grant nothing. */
-    }
+    } catch {}
   }
   return allowed;
 };

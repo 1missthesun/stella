@@ -133,9 +133,9 @@ const focusPull = (): FocusPullMotion => ({
 const FROST_BLUR = 26;
 const FROST_SATURATE = 1.6;
 const FROST_SPRING = 0.34;
-/** When a critically damped spring of `duration` s is within 2% of rest:
- * (1 + x)e^-x = 0.02 at x = 5.83, x being ω0·t. */
-const nearlySettledMs = (duration: number) => Math.round((5.83 * duration * 1000) / (2 * Math.PI));
+const CRITICAL_SPRING_TWO_PERCENT_OMEGA_T = 5.83;
+const nearlySettledMs = (duration: number) =>
+  Math.round((CRITICAL_SPRING_TWO_PERCENT_OMEGA_T * duration * 1000) / (2 * Math.PI));
 const frost = (): FrostMotion => ({
   frost: {
     keyframes: [

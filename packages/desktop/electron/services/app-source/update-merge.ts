@@ -5,19 +5,6 @@ import { removeScratchDir } from "./dir-links.js";
 import { ensurePackageSet, ignoreLinkedModules, linkPackageSet } from "./draft-deps.js";
 import { copyEnvFiles } from "./update-gate.js";
 
-/**
- * Merging a published version with the user's own changes before it is
- * offered, on a scratch worktree the running checkout never sees.
- *
- * Resolutions come first from git's own memory (rerere), trained from the
- * merges already in the user's history, so a conflict resolved once is never
- * paid for again. What is left goes to a model, one file at a time, only when
- * the caller allows it. A model that is not sure leaves the file unresolved:
- * that case goes to the user, never into a version. The merged tree must then
- * typecheck (renderer, runtime, main and preload) with no error the published
- * version doesn't have itself.
- */
-
 export type ModelResolve = (request: { system: string; user: string }) => Promise<string>;
 
 export type BackgroundMerge =
@@ -97,7 +84,6 @@ const closeScratch = async (cwd: string, dir: string) => {
   await gitRaw(cwd, ["worktree", "prune"]).catch(() => undefined);
 };
 
-/** Teach rerere the resolutions in merges the user already has (what git's rerere-train does). */
 const trainRerere = async (cwd: string, scratch: Scratch, head: string, log: Log) => {
   const common = await git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   const file = path.join(common, TRAINED_FILE);
@@ -268,7 +254,6 @@ ${numbered.join("\n")}
 
 const TSC_ERROR = /^(.+?)\(\d+,\d+\): error (TS\d+): (.*)$/;
 
-/** Each project's errors, without positions, so a version's own errors can be told from new ones. */
 const typecheck = async (dir: string, signal?: AbortSignal) => {
   const errors = new Set<string>();
   const output: string[] = [];
@@ -338,7 +323,6 @@ export const mergeInBackground = async (args: {
         reasons.push(`${file}: ${outcome.why}`);
         continue;
       }
-      // Remembered now, so a merge cut short never pays for this file again.
       await scratch.raw(["rerere"]);
     }
     if (unresolved.length > 0) {
@@ -348,8 +332,6 @@ export const mergeInBackground = async (args: {
     const resolved = (await scratch.g(["diff", "--cached", "--name-only", head])).split("\n").filter(Boolean);
     await scratch.g(["commit", "-q", "--no-verify", "-m", subject]);
     const to = await scratch.g(["rev-parse", "HEAD"]);
-    // The type checker is a self-modification tool: it comes with the
-    // package set for these dependencies, not with the app's own install.
     const { store } = await ensurePackageSet({ source: dir, appRoot: cwd });
     await linkPackageSet(dir, store);
     ignoreLinkedModules(cwd);

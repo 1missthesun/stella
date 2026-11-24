@@ -1,6 +1,3 @@
-// Preload of the panel mirror for offscreen agent tabs (see
-// services/in-app-browser/offscreen-tabs.ts). The mirror page is a bare canvas;
-// this script draws the frames main sends and returns the user's input.
 import { ipcRenderer } from "electron";
 import {
   MIRROR_CURSOR_CHANNEL,

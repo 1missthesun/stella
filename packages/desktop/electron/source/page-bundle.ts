@@ -8,37 +8,26 @@ import { RENDERER_ORIGIN } from "./origin.js";
 import { BUNDLE_SCRIPT_PREFIX, bundlesDirIn } from "./page-bundle-paths.js";
 import type { DepTools, OxcTools } from "./tools.js";
 
-/**
- * A page's whole static graph as one script, served in place of its entry
- * module. Everything in it keeps exactly one instance: code the page loads
- * later (`import()`, a swap) reaches the bundled modules through `liveShim`,
- * which re-exports the script's own bindings.
- */
 const PAGE_BUNDLE_FORMAT_VERSION = "3";
 const KEPT_PER_PAGE = 3;
 const ENTRY_ID = "\0stella-page-entry";
 const EMPTY_ID = "\0stella-empty";
 const ASSET_PREFIX = "\0stella-asset:";
 type BundledModule = {
-  /** In order: the module's export `names[n]` is the script's export `m<index>$<n>`. */
   names: string[];
   index: number;
-  /** `/@deps/` URLs the module re-exports everything of. */
   stars: string[];
 };
 
 export type PageBundleMeta = {
   version: string;
   entryUrl: string;
-  /** By source URL path. */
   modules: Record<string, BundledModule>;
-  /** JSON module URL (with `?import`) → the script's export that holds it. */
   json: Record<string, string>;
 };
 
 export type PageBundleFile = {
   file: string;
-  /** The transform's content key; null for modules that are never cached. */
   key: string | null;
 };
 
@@ -96,10 +85,6 @@ export const readPageBundleMeta = async (
 const MAX_UNANSWERED = 2;
 const startsFile = (cacheDir: string, id: string) => path.join(bundlesDirIn(cacheDir), `${id}.starts`);
 
-/**
- * The script, unless the last pages that got it never ran it to its end
- * (`notePageBundleStarted`): those load module by module again.
- */
 export const takePageBundleCode = async (
   cacheDir: string,
   id: string,
@@ -128,7 +113,6 @@ export const notePageBundleStarted = async (cacheDir: string, id: string) => {
 
 const exported = (module: BundledModule, n: number) => `m${module.index}$${n}`;
 
-/** The module a page already holds, for code it loads later. */
 export const liveShim = (meta: PageBundleMeta, url: string): string | null => {
   const entry = JSON.stringify(meta.entryUrl);
   const json = meta.json[url];
@@ -354,7 +338,6 @@ export const buildPageBundle = async (options: {
 
 const building = new Map<string, Promise<void>>();
 
-/** Builds in a process of its own (see `runBuilder`); never in this one. */
 export const buildPageBundleApart = (request: PageBundleRequest, log: (message: string) => void): Promise<void> => {
   let build = building.get(request.id);
   if (!build) {

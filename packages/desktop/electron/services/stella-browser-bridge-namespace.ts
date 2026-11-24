@@ -28,11 +28,6 @@ export type BrowserBridgeNamespace = Readonly<{
   mode: BrowserBridgeMode;
   socketDir: string;
   claim: boolean;
-  /**
-   * This instance is the user's Stella rather than a dev checkout. Named for
-   * the packaged builds it once meant; Stella never packages, so it is now
-   * decided by `isProductInstance`.
-   */
   packaged: boolean;
   extPort: number | null;
   ownsExtensionChannel: boolean;
@@ -66,12 +61,6 @@ const defaultSocketDir = (env: NodeJS.ProcessEnv): string => {
 const isolatedSocketDirName = (dataDir: string): string =>
   `i-${createHash("sha256").update(path.resolve(dataDir)).digest("hex").slice(0, 12)}`;
 
-/**
- * Whether this instance IS the user's Stella, as opposed to a development
- * checkout running alongside it. One question, answered in one place: see
- * `../app-identity.ts` for why `app.isPackaged` cannot answer it and what
- * happened when the bridge namespace tried.
- */
 export const isProductInstance = (options: {
   isPackaged: boolean;
   env?: NodeJS.ProcessEnv;
@@ -114,12 +103,6 @@ export const resolveBrowserBridgeNamespace = (options: {
 
 let configuredNamespace: BrowserBridgeNamespace | null = null;
 
-/**
- * Resolve this process's bridge namespace and publish its socket directory in
- * the environment, so every module that reads it (the bridge config, the
- * native-messaging shim, the in-app browser endpoint) and the runtime spawned
- * from this process agree. Must run before those modules load.
- */
 export const configureBrowserBridgeNamespace = (options: {
   isPackaged: boolean;
   env?: NodeJS.ProcessEnv;
@@ -275,7 +258,6 @@ export const withBrowserBridgeClaimLock = async <T>(
   }
 };
 
-/** Rewrites the record only while this instance still owns it. */
 export const refreshBrowserBridgeOwner = (
   socketDir: string,
   session: string,
@@ -288,7 +270,6 @@ export const refreshBrowserBridgeOwner = (
     return true;
   });
 
-/** Best effort: a record left behind names a dead owner, which the next claimant treats as an orphan. */
 export const releaseBrowserBridgeOwner = async (
   socketDir: string,
   session: string,
@@ -312,11 +293,6 @@ export const releaseBrowserBridgeOwner = async (
   }
 };
 
-/**
- * Whether the recorded owner is a different, still-running instance: its
- * Electron process is alive and either its daemon is alive or it is still
- * launching one.
- */
 export const isLiveForeignOwner = (
   record: BrowserBridgeOwnerRecord | null,
   now = Date.now(),

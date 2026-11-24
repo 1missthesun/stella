@@ -23,19 +23,11 @@ const desktopDir = path.resolve(scriptDir, "..");
 const repoRootDir = path.resolve(desktopDir, "..", "..");
 const outdir = "dist-electron";
 const nodeTarget = `node${process.versions.node.split(".")[0]}`;
-// Main is split: what it reaches only through `import()` (provider SDKs,
-// sign-in providers, the zip library, the Claude Code session runtime, the
-// renderer's build tools) goes into chunk files beside main.js and loads on
-// first use instead of being read and compiled with main at every launch.
-// Chunks sit in main's own folder so `import.meta.url` and `__dirname` mean the
-// same folder wherever esbuild places a module.
 const splitMainEntryPoints = {
   "electron/main": "packages/desktop/electron/main.ts",
 };
 const MAIN_CHUNK_NAMES = "electron/chunk-[hash]";
 const MAIN_CHUNK_FILE = /^chunk-[A-Z0-9]+\.js$/;
-// Launch and the worker entries stay single files: launch must inline nothing
-// and load main by path, and each worker runs in its own thread or process.
 const electronMainEntryPoints = {
   "electron/launch": "packages/desktop/electron/launch.ts",
   "electron/cloud-conversation-cache-worker": "packages/desktop/electron/services/cloud-conversation-cache-worker.ts",
@@ -54,18 +46,13 @@ const desktopPublicEnv = {};
 for (const name of desktopEnvFiles(process.env.NODE_ENV || "development")) {
   try {
     Object.assign(desktopPublicEnv, parseEnv(readFileSync(path.join(desktopUiDir, name), "utf8")));
-  } catch {
-    // A missing env file is normal.
-  }
+  } catch {}
 }
 const publicTurnstileSiteKey =
   process.env.VITE_TURNSTILE_SITE_KEY ||
   desktopPublicEnv.VITE_TURNSTILE_SITE_KEY ||
   "";
 
-// Workspace packages are source inputs in this monorepo, not installed
-// runtime dependencies. Resolve them before `packages: "external"` is applied
-// so Electron never attempts to execute their TypeScript sources directly.
 const rendererSourceExternals = [
   "rolldown",
   "rolldown/*",
@@ -75,14 +62,6 @@ const rendererSourceExternals = [
   "cjs-module-lexer",
 ];
 
-/**
- * Electron main is the OS and window shell. The runtime (agents, sign-in
- * flows, model catalogs, connectors) runs in its own process and main reaches
- * it over the bridge, so the only runtime code main bundles is the bridge
- * client below, and none of @stella/agent. Code both processes run lives in
- * @stella/node-shared. assertMainBundleRuntimeBoundary holds the bundle to
- * this; check-boundary holds the sources to it.
- */
 export const mainRuntimeBridgeFiles = [
   "packages/runtime/host/client-protocol.ts",
   "packages/runtime/host/effect-runtime.ts",
@@ -121,11 +100,6 @@ export const assertMainBundleRuntimeBoundary = (metafile) => {
   }
 };
 
-// Every workspace package main can reach resolves to this tree's own source.
-// Without an alias, `@stella/x` resolves through node_modules, and an update's
-// check builds on a scratch copy whose node_modules are the installed
-// version's: it would bundle the old package (or fail on a file only the new
-// one has, as @stella/agent/provider/antigravity did on 2026-11-21).
 const workspaceAliases = {
   "@stella/contracts": path.join(repoRootDir, "packages", "contracts"),
   "@stella/model-catalog": path.join(repoRootDir, "packages", "model-catalog"),
@@ -235,11 +209,6 @@ const browserScriptPlugin = {
   },
 };
 
-// Where a workspace package's own third-party imports resolve when its
-// node_modules isn't there. An update's check builds the new main on a scratch
-// copy linked to the installed version's node_modules, before the update's own
-// install, so a package the update adds (node-shared was one) has none yet;
-// its dependencies are the runtime's, which the installed version has.
 const fallbackNodePaths = [
   path.join(repoRootDir, "packages", "runtime", "node_modules"),
   path.join(repoRootDir, "node_modules"),
@@ -351,13 +320,6 @@ const collectStaticallyReachableInputs = (metafile, roots) => {
   return reached;
 };
 
-/**
- * The external modules main loads before `ready`: those imported statically by
- * main.js and by the chunks of the other startup roots (main-process,
- * bootstrap), and by every chunk those import statically, transitively. A
- * chunk reached only through `import()` from elsewhere loads on first use and
- * is skipped.
- */
 const mainStartupStaticImports = (metafile, mainOutputPath) => {
   const found = [];
   const seen = new Set();
@@ -436,9 +398,7 @@ const writeOutputIfChanged = (absPath, contents) => {
     if (existing.length === contents.length && existing.equals(contents)) {
       return false;
     }
-  } catch {
-    // Missing file — fall through to the write.
-  }
+  } catch {}
   mkdirSync(path.dirname(absPath), { recursive: true });
   writeFileSync(absPath, contents);
   return true;
@@ -602,14 +562,6 @@ export const readBundleInputs = (file = fingerprintFilePath) => {
   return Array.isArray(inputs) ? inputs.filter((input) => typeof input === "string") : [];
 };
 
-/**
- * Which third-party packages are installed where this build resolves them:
- * the names in bun's package store. An update's check builds on a scratch copy
- * whose node_modules are the installed version's, before the update's own
- * install, so its bundle holds the old dependencies; recording what it was
- * built against lets the apply refuse that bundle when the install changed
- * them, and build again from the checkout instead.
- */
 export const installedPackagesStamp = () => {
   try {
     const names = readdirSync(path.join(repoRootDir, "node_modules", ".bun")).sort();
@@ -619,11 +571,6 @@ export const installedPackagesStamp = () => {
   }
 };
 
-/**
- * Every file the build wrote, relative to dist-electron: the entries plus
- * main's chunks, whose names change with their contents. A fingerprint from
- * before main was split has none, and its build wrote only the entries.
- */
 export const readBundleOutputs = (file = fingerprintFilePath) => {
   const outputs = readFingerprintFile(file)?.outputs;
   return Array.isArray(outputs) && outputs.every((output) => typeof output === "string")
@@ -651,9 +598,7 @@ const writeBundleFingerprint = (
         2,
       ),
     );
-  } catch {
-    // Best-effort; a missing fingerprint just means the next launch rebuilds.
-  }
+  } catch {}
 };
 
 export const requiredOutputsExist = () => {
@@ -664,19 +609,11 @@ export const requiredOutputsExist = () => {
     "preload.js",
     "offscreen-tab-mirror-preload.js",
   ].map((name) => `electron/${name}`);
-  // main.js imports its chunks by name, so one missing is a launch that
-  // cannot load main: treat it like a missing entry and build again.
   return [...entries, ...(readBundleOutputs() ?? [])].every((name) =>
     existsSync(path.join(outBase, name)),
   );
 };
 
-/**
- * Remove main's chunks that the current build no longer lists. Called by
- * start.mjs before main loads: the build never deletes them itself, because
- * an update rebuilds while the old main is still running and may yet load
- * one of its own chunks on the way out.
- */
 export const pruneStaleMainChunks = () => {
   const outputs = readBundleOutputs();
   if (!outputs) return 0;
@@ -694,9 +631,7 @@ export const pruneStaleMainChunks = () => {
     try {
       rmSync(path.join(dir, name), { force: true });
       removed += 1;
-    } catch {
-      // A chunk that cannot be removed now is tried again next launch.
-    }
+    } catch {}
   }
   return removed;
 };

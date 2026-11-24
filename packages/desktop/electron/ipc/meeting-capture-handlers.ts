@@ -111,9 +111,7 @@ export const registerMeetingCaptureHandlers = (
         : path.join(home, "meetings");
       try {
         await fs.mkdir(dir, { recursive: true });
-      } catch {
-        // best-effort
-      }
+      } catch {}
       shell.openPath(dir);
       return { ok: true } as const;
     },

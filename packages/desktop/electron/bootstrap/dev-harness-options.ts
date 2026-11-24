@@ -119,8 +119,6 @@ const resolveHarnessUserDataDir = (args: {
     }
   };
 
-  // Check the spelling before filesystem resolution, then check the canonical
-  // target as well so a symlink cannot redirect the harness into protected data.
   rejectBroadOrProtectedPath(lexical);
 
   let canonical: string;

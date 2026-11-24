@@ -8,10 +8,6 @@ import { guardCanvasFrames } from "./source/canvas-protocol.js";
 import { guardWorkspaceAppFrames } from "./source/workspace-app-frames.js";
 import { configureBrowserBridgeNamespace } from "./services/stella-browser-bridge-namespace.js";
 
-// Before anything resolves the browser bridge socket directory (the bridge
-// config, the in-app browser endpoint) and before the runtime is spawned with
-// this environment: a dev checkout gets its own bridge instead of fighting the
-// installed app for the shared one.
 configureBrowserBridgeNamespace({ isPackaged: app.isPackaged });
 
 registerRendererScheme();

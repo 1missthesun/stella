@@ -1,21 +1,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-/**
- * The renderer's source cache (transformed modules, dependency bundles,
- * module graphs) gains entries with every version and every draft preview
- * and never needed old ones again. Entries are touched when used
- * (`touchCacheEntry`), so whatever nothing used for a while is removed.
- */
 export const RENDERER_CACHE_MAX_AGE_MS = 21 * 24 * 60 * 60 * 1000;
 
-/** Marks a cache entry as used now; failures don't matter. */
 export const touchCacheEntry = (entry: string) => {
   const now = new Date();
   void fs.utimes(entry, now, now).catch(() => undefined);
 };
 
-// The bulk; graphs, routes and Tailwind results are a few small files per checkout.
 const SECTIONS = ["modules", "deps", "bundles"];
 
 export const pruneRendererCache = async (
@@ -50,9 +42,7 @@ export const pruneRendererCache = async (
         await fs.rm(entry, { recursive: true, force: true });
         removed += 1;
         bytes += size;
-      } catch {
-        // In use: next time.
-      }
+      } catch {}
     }
   }
   return { removed, bytes };

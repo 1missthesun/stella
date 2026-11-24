@@ -20,9 +20,7 @@ const readMap = async (cacheDir: string, id: string): Promise<SourceMap | null> 
     try {
       const body = await fs.promises.readFile(path.join(bundlesDirIn(dir), `${id}.js.map`), "utf8");
       return new SourceMap(JSON.parse(body));
-    } catch {
-      // Try next cache root.
-    }
+    } catch {}
   }
   return null;
 };
@@ -39,7 +37,6 @@ const mapFor = (cacheDir: string, id: string): Promise<SourceMap | null> => {
   return kept!.map;
 };
 
-/** A renderer stack trace with the frames in page bundles put back on the source files they came from. */
 export const resolveBundleFrames = async (text: string, cacheDir: string): Promise<string> => {
   const frames = [...text.matchAll(FRAME)];
   if (frames.length === 0) return text;

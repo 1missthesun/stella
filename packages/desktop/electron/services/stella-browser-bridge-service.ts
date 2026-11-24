@@ -1200,11 +1200,6 @@ export class StellaBrowserBridgeService {
     await this.stopOrphanedBundledDaemons();
   }
 
-  /**
-   * Stop a daemon named by an ownership record. Its control token is another
-   * instance's, so `close` would be refused; signal it directly. Windows
-   * daemons are cleared by their control port instead.
-   */
   private async stopRecordedDaemon(daemon: ProcessIdentity) {
     if (process.platform === "win32") return;
     const stillOwned = () =>
@@ -1541,9 +1536,7 @@ export const isStellaExtensionInstalled = (): boolean => {
         ) {
           return true;
         }
-      } catch {
-        // Ignore unreadable profile paths; keep probing the rest.
-      }
+      } catch {}
     }
   }
   return false;
@@ -1558,9 +1551,7 @@ export const isBrowserBridgeEagerStartWorthwhile = (): boolean => {
     if (existsSync(manifestPath)) {
       return true;
     }
-  } catch {
-    // existsSync only throws on pathological inputs; treat as "no signal".
-  }
+  } catch {}
 
   return isStellaExtensionInstalled();
 };

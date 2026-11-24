@@ -35,7 +35,6 @@ export type DeviceFileLocator = {
     readerDeviceId?: string | null,
   ) => Promise<DeviceFileLookup>;
   copyUrl: (drivePath: string, options?: { fresh?: boolean }) => Promise<DriveFileUrl>;
-  /** Drops cached URLs under `prefix`, so a reopened document reads its current files. */
   forgetCopyUrls: (prefix: string) => void;
   readCopy: (
     drivePath: string,

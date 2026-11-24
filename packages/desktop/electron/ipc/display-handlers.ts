@@ -262,18 +262,6 @@ export const isDisplayReadPathInLocalChatFiles = (
   return false;
 };
 
-/**
- * Subdirectories of `~/.stella` the phone may read from directly.
- *
- * These hold artifacts Stella itself produced and already renders in the UI
- * (generated media, `outputs/<app>/…` result files). The mirrored desktop UI
- * on the phone is the *same* bundle, so its media viewers — and user apps that
- * read their own output directory — need them to load at all.
- *
- * Everything else under `~/.stella` stays off-limits: credential stores like
- * `llm_credentials.json` and `connectors/.credentials.json` live at the root
- * and in sibling directories, and `.json` is an allowed display extension.
- */
 const MOBILE_READABLE_DATA_SUBDIRS = ["outputs", "media"] as const;
 
 export const REMOTE_VIEW_DENIAL_PREFIX = "Not available in phone view: ";
@@ -306,13 +294,6 @@ const resolveThroughSymlinks = async (target: string): Promise<string> => {
   }
 };
 
-/**
- * True when the phone may read `resolvedPath` without a conversation.
- *
- * Symlinks are resolved before the containment check so a link planted inside
- * `outputs/` (e.g. by a prompt-injected agent) can't be used to read a
- * credential file that the extension allowlist would otherwise permit.
- */
 export const isMobileReadableStellaPath = async (
   resolvedPath: string,
   stellaDataDir: string | null,
@@ -325,26 +306,6 @@ export const isMobileReadableStellaPath = async (
   );
 };
 
-/**
- * A cloud-world path reaching a local read is a routing mistake, not a missing
- * file. `/workspace/...` is the cloud sandbox; this machine has no such tree,
- * so `path.resolve` keeps it absolute, `fs.stat` raises ENOENT, and the handler
- * below reports `missing` — which every viewer renders as the file being gone.
- * That is false twice over: the file exists, and it was only ever asked of the
- * wrong machine.
- *
- * Refusing here rather than at a single call site is deliberate: this handler
- * is the one door onto the local filesystem for the whole display lane, so one
- * condition covers the tapped `stella://file` link, the activity hub, the
- * completion pills' `MediaPreviewCard`, the inline image tile, the canvas/PDF/
- * spreadsheet viewers and the canvas share bar's direct read. It also backs
- * a paired phone's `file.read` relayed through the cloud, so a phone whose
- * client-side guard is older still gets a true answer instead of a false one.
- *
- * Drive files never get here: the renderer maps `world/drive/...` onto an
- * owner-scoped drive URL through `cloudWorldDrivePath` first, and only a world
- * path the drive rule rejects falls through to this lane.
- */
 const assertNotCloudWorkspacePath = (filePath: string): void => {
   if (!isCloudWorkspacePath(filePath)) return;
   throw new Error(
@@ -447,11 +408,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return { bytes, mimeType };
   };
 
-  // A request that came from another device (a phone or another computer)
-  // never looks on the other computers: the requester probes each of them
-  // itself, and a computer that asked its peers would have each peer ask its
-  // peers in turn, bouncing one missing file between computers until the
-  // relay refused them as busy.
   const findPeerHolder = async (
     requestedPath: string,
     conversationId: string,

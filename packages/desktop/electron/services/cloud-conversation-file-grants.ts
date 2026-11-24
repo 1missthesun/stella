@@ -1,6 +1,5 @@
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 
-/** Records `history.read` returns per call (the server's batch cap). */
 const READ_BATCH = 200;
 const MAX_RECORDS = 4_000;
 const CACHE_TTL_MS = 15_000;

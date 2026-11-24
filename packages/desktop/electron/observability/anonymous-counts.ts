@@ -30,10 +30,8 @@ import { releaseLabel } from "./release-info.js";
 
 type CountsState = {
   installId: string;
-  /** Once-only events already counted: the event type, or `setup_step:<step>`. */
   recorded: Record<string, true>;
   lastActiveDay: string | null;
-  /** When this install's first run was counted; unset for installs counted before day-1 messages existed. */
   firstRunAtMs?: number;
   day1Messages?: number;
   turnErrorDay?: string;
@@ -64,7 +62,6 @@ type AnonymousCountsOptions = {
   environment: "development" | "production";
   isSignedIn: () => Promise<boolean>;
   isSelfHosted: () => boolean;
-  /** The app checkout, to find which published Stella it is built from. */
   getStellaAppDir?: () => string | null | undefined;
 };
 
@@ -81,7 +78,6 @@ const platform = (): AnonymousCountPlatform | null =>
     ? (process.platform as AnonymousCountPlatform)
     : null;
 
-/** Which engine the computer is set to use, from its local model preferences. */
 export const classifyAnonymousCountEngine = (
   stellaDataDir: string,
   signedIn: boolean,
@@ -96,11 +92,6 @@ export const classifyAnonymousCountEngine = (
   return signedIn ? "stella" : "none";
 };
 
-/**
- * Anonymous install counts (contracts `telemetry/anonymous-counts.ts`).
- * Everything is a no-op while `ANONYMOUS_COUNTS_ENABLED` is false, on a
- * self-hosted server, or when the user turned the Settings toggle off.
- */
 export class AnonymousCounts {
   private readonly statePath: string;
   private state: CountsState | null = null;
@@ -245,7 +236,6 @@ export class AnonymousCounts {
     });
   }
 
-  /** `decide` may update the state; the event it returns is queued (a repeating one is dropped when the queue is full). */
   private enqueueWhen(
     decide: (state: CountsState) => AnonymousCountEvent | null,
   ): Promise<boolean> {
@@ -295,7 +285,6 @@ export class AnonymousCounts {
     }
   }
 
-  /** "sent" on 2xx; "drop" on a rejected batch (it would never pass); "retry" otherwise. */
   private async send(batch: AnonymousCountsBatch): Promise<"sent" | "drop" | "retry"> {
     const endpoint =
       process.env.STELLA_ANONYMOUS_COUNTS_ENDPOINT?.trim() ||

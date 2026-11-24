@@ -2,11 +2,6 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ChatContext } from "@stella/contracts";
 
-/**
- * What the user attached to a message they have not sent yet, kept on disk so
- * a restart does not drop it. Only what they put there themselves is kept:
- * a captured window or its text describes a moment that has passed.
- */
 export type ComposerAttachments = Pick<
   ChatContext,
   "regionScreenshots" | "files" | "pastedTexts" | "showCaptures"
@@ -19,7 +14,6 @@ const MAX_BYTES = 32 * 1024 * 1024;
 export const composerAttachmentsOf = (context: ChatContext | null): ComposerAttachments | null => {
   if (!context) return null;
   const { regionScreenshots, files, pastedTexts } = context;
-  // A capture still being prepared would never finish after a restart.
   const showCaptures = context.showCaptures?.filter((capture) => capture.status === "ready");
   if (!regionScreenshots?.length && !files?.length && !pastedTexts?.length && !showCaptures?.length) {
     return null;

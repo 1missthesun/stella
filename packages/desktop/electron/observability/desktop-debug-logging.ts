@@ -91,9 +91,7 @@ const cleanupOldRuns = async (
         if (info.mtimeMs < cutoff) {
           await rm(target, { recursive: true, force: true });
         }
-      } catch {
-        // Cleanup is best-effort and must never prevent startup.
-      }
+      } catch {}
     }),
   );
 };
@@ -141,9 +139,7 @@ export const initDesktopDebugLogging = (stellaAppDir: string): void => {
   } catch (error) {
     try {
       console.warn("[diagnostics] failed to initialize desktop logging", error);
-    } catch {
-      // Ignore a broken inherited console pipe too.
-    }
+    } catch {}
   }
 
   void cleanupOldRuns(root, run);

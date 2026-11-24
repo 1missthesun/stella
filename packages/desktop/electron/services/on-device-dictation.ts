@@ -114,7 +114,6 @@ type Session = {
 type SpawnedHelper = {
   child: ChildProcess;
   done: Promise<OnDeviceTranscript>;
-  /** Settles once the recognizer runs, after any permission prompt is answered. */
   ready: Promise<void>;
 };
 

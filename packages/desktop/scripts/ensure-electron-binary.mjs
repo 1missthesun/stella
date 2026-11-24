@@ -76,11 +76,6 @@ export function isElectronBinaryHealthy() {
       return false;
     }
 
-    // `path.txt` is the source of truth `node_modules/electron/index.js` uses
-    // to locate the binary. We deliberately do NOT compare it against the stock
-    // `Electron.app` path used by the ordinary development command.
-    // (see `patchDevAppName` in `dev-electron.mjs`) and rewrites `path.txt`
-    // accordingly, so a healthy install can legitimately point elsewhere.
     const recordedPath = readFileSync(
       path.join(electronDir, "path.txt"),
       "utf8",
@@ -143,9 +138,7 @@ function resolveDownloadArch() {
       if (output.status === 0 && output.stdout.trim() === "1") {
         arch = "arm64";
       }
-    } catch {
-      // Ignore detection failures and keep the reported arch.
-    }
+    } catch {}
   }
 
   return arch;

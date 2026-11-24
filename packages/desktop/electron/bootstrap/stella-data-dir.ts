@@ -12,11 +12,6 @@ export type StellaDataDir = {
   workspacePath: string;
 };
 
-/**
- * Which app checkout and home folder this launch uses, published to the
- * environment for everything main starts. Seeding the home folder (bundled
- * skills, layout migrations) is the runtime's job when it starts.
- */
 export const resolveStellaDataDir = async (
   app: App,
   explicitRoot?: string,

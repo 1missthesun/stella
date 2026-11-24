@@ -126,9 +126,7 @@ async function installWindowsRegistry(manifestPath: string) {
           ["add", key, "/ve", "/t", "REG_SZ", "/d", manifestPath, "/f"],
           { windowsHide: true },
         );
-      } catch {
-        // Browser may not be installed; ignore.
-      }
+      } catch {}
     }),
   );
 }
@@ -149,9 +147,7 @@ function installUnixSymlinks(manifest: Record<string, unknown>) {
     try {
       mkdirSync(dir, { recursive: true });
       writeFileSync(path.join(dir, fileName), payload, "utf8");
-    } catch {
-      // Best-effort per profile location.
-    }
+    } catch {}
   }
 }
 

@@ -6,16 +6,8 @@ import { getFileLogger } from '@stella/node-shared/observability/file-logger'
 type DaemonChild = ChildProcessByStdio<Writable, Readable, null>
 
 const REQUEST_TIMEOUT_MS = 2_000
-// After this many consecutive failures (timeouts / write errors) stop using the
-// daemon for a cooldown and let callers spawn one-shot helpers, so a broken
-// daemon can't wedge the hot path indefinitely.
 const MAX_CONSECUTIVE_FAILURES = 3
 const DISABLE_COOLDOWN_MS = 60_000
-// An older `window_info.exe` (no `--serve`) treats `--serve` as junk argv,
-// prints usage, and exits immediately. If a freshly-spawned daemon dies this
-// fast without ever answering, assume it's unsupported and stop probing it for
-// a long while (binaries don't change mid-session) so we don't double-spawn
-// (failed daemon + one-shot fallback) on every call.
 const EARLY_EXIT_MS = 1_000
 const UNSUPPORTED_COOLDOWN_MS = 30 * 60_000
 const MAX_PENDING = 64
@@ -106,8 +98,6 @@ class LineDelimitedHelperDaemon {
       p.resolve(undefined)
     }
     this.pending.clear()
-    // Died immediately without ever answering → almost certainly an old binary
-    // that doesn't understand `--serve`. Stop probing it for the session.
     if (!answered && spawnedAt > 0 && Date.now() - spawnedAt < EARLY_EXIT_MS) {
       this.disabledUntil = Date.now() + UNSUPPORTED_COOLDOWN_MS
       getFileLogger()?.process('native.helper.daemon.unsupported', {
@@ -162,9 +152,7 @@ class LineDelimitedHelperDaemon {
     this.onChildGone(child)
     try {
       child.kill()
-    } catch {
-      // Already gone; nothing to do.
-    }
+    } catch {}
   }
 
   request(
@@ -188,9 +176,6 @@ class LineDelimitedHelperDaemon {
       const timer = setTimeout(() => {
         if (!this.pending.has(id)) return
         this.pending.delete(id)
-        // A timed-out daemon may be wedged (e.g. a hung target window's
-        // WM_GETTEXT). Recycle it so the next call gets a fresh process, and
-        // count it toward the disable threshold.
         this.noteFailure()
         this.kill()
         resolve(undefined)

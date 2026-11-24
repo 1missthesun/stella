@@ -35,12 +35,6 @@ const KEYCHAIN_SERVICE = "Stella saved value";
 const SECRET_SERVICE_ATTRIBUTE = "stella-saved-value";
 const KEYCHAIN_CHUNK_BYTES = 1800;
 const COMMAND_TIMEOUT_MS = 15_000;
-/**
- * How long a value the user gave without remembering it stays usable by the
- * task that asked for it. It can be used any number of times in that window
- * (a fill that landed in the wrong field is simply filled again), then it is
- * forgotten.
- */
 export const FRESH_VALUE_TTL_MS = 30 * 60_000;
 
 export type SavedField = {
@@ -67,7 +61,6 @@ export type SavedEntry = {
 
 type IndexFile = { version: 1; entries: Record<string, SavedEntry> };
 
-/** The task a fresh value belongs to: only it can use the value. */
 export type SecureValueOwner = { threadId?: string; conversationId?: string };
 
 type FreshValue = {
@@ -256,7 +249,6 @@ const decodePayload = (payload: string | null): Record<string, string> | null =>
 
 const newHandle = () => `${USER_ASK_SECRET_HANDLE_PREFIX}${randomUUID()}`;
 
-/** A change made on this computer (not one taken from another device), for sync. */
 export type SavedValuesChange =
   | { kind: "saved"; id: string }
   | { kind: "removed"; ids: string[]; at: number };
@@ -273,7 +265,6 @@ export class SavedSecureValues {
     this.getDir = getDir;
   }
 
-  /** Called after every change made on this computer. */
   onChange(listener: (change: SavedValuesChange) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -283,9 +274,7 @@ export class SavedSecureValues {
     for (const listener of this.listeners) {
       try {
         listener(change);
-      } catch {
-        // A listener's failure never undoes the change.
-      }
+      } catch {}
     }
   }
 
@@ -475,11 +464,6 @@ export class SavedSecureValues {
     return (await this.findCandidates(service, account)).exact;
   }
 
-  /**
-   * Saved records for a service, newest first: `exact` ones saved under the
-   * same name, and `close` ones whose name is the asked one with words around
-   * it (or the other way round), for when nothing exact is saved.
-   */
   async findCandidates(
     service: string,
     account: string,
@@ -572,11 +556,6 @@ export class SavedSecureValues {
     return { entry, handles };
   }
 
-  /**
-   * Keeps a value the user just gave (and chose not to remember, or that can't
-   * be remembered, like a one-time code) in memory for the task that asked,
-   * and returns its handle. It works any number of times until it expires.
-   */
   rememberFresh(value: string, label: string, owner: SecureValueOwner): string {
     this.sweepFresh();
     const now = Date.now();
@@ -594,7 +573,6 @@ export class SavedSecureValues {
     return handle;
   }
 
-  /** When a fresh handle stops working, or undefined for saved ones. */
   freshExpiresAt(handle: string): number | undefined {
     return this.fresh.get(handle)?.expiresAt;
   }
@@ -618,11 +596,6 @@ export class SavedSecureValues {
     return null;
   }
 
-  /**
-   * The value behind a handle, for the task asking. A fresh value only
-   * resolves for the task it was given to, and stays until it expires; a
-   * saved one resolves for anyone on this computer.
-   */
   async resolve(
     handle: string,
     requester: SecureValueOwner,
@@ -649,10 +622,6 @@ export class SavedSecureValues {
     return { ok: true, value, label: found.field.label, fresh: false };
   }
 
-  /**
-   * Hands a fresh value to Stella itself (a connector key typed into a card)
-   * and forgets it at once. Saved values are read, not removed.
-   */
   async take(handle: string): Promise<string | null> {
     const fresh = this.fresh.get(handle);
     if (fresh) {
@@ -664,7 +633,6 @@ export class SavedSecureValues {
     return resolved.ok ? resolved.value : null;
   }
 
-  /** Whether Stella ever issued this handle (so a miss means expired or removed, not mistyped). */
   async issued(handle: string): Promise<boolean> {
     if (this.fresh.has(handle) || this.expired.has(handle)) return true;
     return (await this.locate(handle)) !== null;
@@ -721,7 +689,6 @@ export class SavedSecureValues {
     return true;
   }
 
-  /** Every record on this computer, with when it last changed. */
   async heads(): Promise<{ id: string; updatedAt: number }[]> {
     const dir = await this.ensureReady();
     return dir
@@ -729,7 +696,6 @@ export class SavedSecureValues {
       : [];
   }
 
-  /** A record as it syncs: names, fields with their handles, and values. */
   async payloadOf(id: string): Promise<SavedValuePayload | null> {
     const entry = await this.get(id);
     if (!entry) return null;
@@ -754,10 +720,6 @@ export class SavedSecureValues {
     };
   }
 
-  /**
-   * Takes a record another device saved: stored here under the same id and
-   * handles, so a handle works on every device. Not reported as a change.
-   */
   async applySynced(payload: SavedValuePayload): Promise<void> {
     const dir = await this.ensureReady();
     if (!dir) return;
@@ -788,7 +750,6 @@ export class SavedSecureValues {
     this.writeIndex(dir, index);
   }
 
-  /** Removes a record another device removed. Not reported as a change. */
   async removeSynced(id: string): Promise<void> {
     const dir = await this.ensureReady();
     if (!dir) return;

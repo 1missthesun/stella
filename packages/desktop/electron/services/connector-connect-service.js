@@ -26,8 +26,6 @@ export class ConnectorConnectService {
         if (!stellaAppDir) {
             return { ok: false, reason: "unsupported" };
         }
-        // The runtime checks the connector can be connected and fingerprints
-        // it, so the accepted card connects the same connector.
         const offer = await runIntegrationFlow("describeConnectorOffer", {
             getAuthToken: this.options.getAuthToken,
             getBackendUrl: this.options.getBackendUrl,
@@ -75,14 +73,6 @@ export class ConnectorConnectService {
                 const meta = this.meta.get(requestId);
                 if (!this.pending.has(requestId))
                     return;
-                // A card the user never answered times out. An accepted flow
-                // normally settles itself well before this fires (the
-                // credential service's OAuth timeout, or the backend Composio
-                // completion wait's own deadline) — but none of those owners
-                // can cover a wedged await (e.g. a hung status probe), so
-                // this is the unconditional last-resort backstop: nothing may
-                // strand the card (and the CLI/tool call blocked on it) in
-                // "connecting" forever.
                 if (meta?.state === "connecting") {
                     meta.oauthAbort.abort(new Error("Connection timed out."));
                 }
@@ -141,9 +131,6 @@ export class ConnectorConnectService {
                 const meta = this.meta.get(requestId);
                 if (!this.pending.has(requestId))
                     return;
-                // Same last-resort backstop as the integration card above:
-                // the install poll is self-bounded, but nothing else may
-                // strand an accepted card in "connecting" forever.
                 if (meta?.state === "connecting") {
                     meta.oauthAbort.abort(new Error("Connection timed out."));
                 }

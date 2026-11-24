@@ -3,11 +3,9 @@ import { resolveNativeHelperPath } from "../../native-helper-path.js";
 
 const HELPER = "show_panel";
 
-/** A rectangle in Electron screen points. */
 export type PanelRect = { x: number; y: number; width: number; height: number };
 
 export type PanelCard = {
-  /** Horizontal centre and top edge, in screen points. */
   x: number;
   y: number;
   title: string;
@@ -57,9 +55,7 @@ export class ShowPanel {
         if (!line) continue;
         try {
           this.onEvent(JSON.parse(line) as PanelEvent);
-        } catch {
-          // Not a message.
-        }
+        } catch {}
       }
     });
     child.stderr.on("data", () => undefined);
@@ -77,10 +73,6 @@ export class ShowPanel {
     child.stdin.write(`${JSON.stringify(message)}\n`);
   }
 
-  /**
-   * While armed, ⇧ held on its own puts a click-catching layer over `rect`;
-   * the helper watches ⇧ itself so a quick ⇧-click can't beat it. Null disarms.
-   */
   arm(rect: PanelRect | null): void {
     if (!rect && !this.child) return;
     this.send({ cmd: "arm", rect });

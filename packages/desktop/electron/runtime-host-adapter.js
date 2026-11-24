@@ -25,7 +25,6 @@ export class RuntimeHostAdapter {
                 this.lastHealth = { ready: false };
             }
             this.emitAvailabilityChange();
-            // Flush any config patches that failed before the worker was ready
             if (this.started && Object.keys(this.pendingConfig).length > 0) {
                 void this.host.configure(this.pendingConfig).catch(() => { });
             }
@@ -233,7 +232,6 @@ export class RuntimeHostAdapter {
         this.emitAvailabilityChange();
         return this.lastHealth;
     }
-    /** One of the runtime's app services (RUNTIME_APP_SERVICE_CALLS). */
     async callRuntime(method, ...args) {
         const call = this.host[method];
         if (typeof call !== "function") {

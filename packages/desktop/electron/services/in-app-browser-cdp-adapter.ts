@@ -237,7 +237,6 @@ const responseError = (error: unknown) => ({
   message: error instanceof Error ? error.message : String(error),
 });
 
-// ws's WebSocket.OPEN; the library itself loads when the endpoint starts.
 const WEBSOCKET_OPEN = 1;
 
 const sendJson = (socket: WebSocket, payload: unknown) => {
@@ -331,8 +330,6 @@ export class InAppBrowserCdpAdapter {
         return;
       }
       const ownerId = route.ownerId;
-      // Owner routes are bearer capabilities: consume them on the first
-      // successful upgrade so a copied URL cannot attach a second daemon.
       this.ownerRoutes.delete(requestPath);
       webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
         Reflect.set(webSocket, "__stellaOwnerId", ownerId);
@@ -701,10 +698,6 @@ export class InAppBrowserCdpAdapter {
         );
       }
 
-      // A replacement daemon enables Page/Runtime while attaching to every
-      // retained tab, and network tooling enables Network on demand. Retry
-      // them once after terminating/reloading a poisoned renderer so
-      // bootstrap does not repeatedly kill healthy new daemons.
       if (debuggerSessionId) {
         await this.invalidateChildSession(tabId, debuggerSessionId);
         throw new Error(

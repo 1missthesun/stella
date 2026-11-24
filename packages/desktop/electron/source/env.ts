@@ -44,9 +44,7 @@ const readEnvFiles = (uiRoot: string, mode: string): Record<string, string> => {
   for (const name of [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`]) {
     try {
       Object.assign(merged, parseEnvFile(fs.readFileSync(path.join(uiRoot, name), "utf8")));
-    } catch {
-      // A missing env file is normal.
-    }
+    } catch {}
   }
   return merged;
 };
@@ -98,12 +96,6 @@ export const envDefines = (env: RendererEnv): Record<string, string> => {
   return defines;
 };
 
-/**
- * Compile-time defines for prebuilt production renderer bundles: static build
- * flags stay compile-time constants for dead-code elimination, while `VITE_*`
- * values resolve from `globalThis.__stellaEnv` at page load so prebuilt
- * modules and page bundles stay valid across backend URLs and runtime configs.
- */
 export const runtimeEnvDefines = (mode: string): Record<string, string> => {
   const dev = mode !== "production";
   return {

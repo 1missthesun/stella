@@ -50,7 +50,6 @@ const startsWithDirectory = (command: string, directory: string) =>
 
 const quotePowerShell = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
-/** Taken when found, so a stop later only reaches that same process. */
 const record = (pid: number, tag: string): RecordedProcess => ({
   pid,
   identity: readProcessIdentity(pid),

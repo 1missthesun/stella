@@ -1,13 +1,5 @@
 import type { ShowStellaInk } from "@stella/contracts/desktop/show-stella";
 
-/**
- * Turns global pointer and key events into Show Stella's timeline: ink drawn
- * while ⇧ is held, ⇧-click pins, clicks, drags, scrolls, shortcuts and the
- * cursor. Points are screen points (DIP); the timeline stores them normalized
- * to the recorded display, the way Scrawl's builder reads them. A ⇧ still held
- * from the shortcut was pressed before this listened, so it draws nothing.
- */
-
 const SCALE = 10_000;
 const KEY_SHIFT_L = 42;
 const KEY_SHIFT_R = 54;
@@ -28,7 +20,6 @@ const MODIFIER_KEYS = new Set([
   KEY_META_L,
   KEY_META_R,
 ]);
-/** A ⇧ press that moves less than this and lets go within PIN_MAX_MS is a pin. */
 const PIN_SLOP_PT = 12;
 const PIN_MAX_MS = 1_000;
 const DRAG_MIN_PT = 8;
@@ -109,9 +100,7 @@ export type CaptureTimeline = {
 type InputOptions = {
   display: DisplayRect;
   now: () => number;
-  /** Converts a hook point to a screen point (DIP); identity on macOS. */
   toScreen: (point: Point) => Point;
-  /** Screen point to the overlay's coordinates. */
   toOverlay: (point: Point) => Point;
   inkEnabled: boolean;
   onInk: (ink: ShowStellaInk) => void;
@@ -197,7 +186,6 @@ export class ShowStellaInput {
       return;
     }
     if (MODIFIER_KEYS.has(code) || repeat) return;
-    // Shortcuts only (⌘S, Ctrl+C), never typed text.
     const command = this.options.isMac
       ? this.pressed.has(KEY_META_L) || this.pressed.has(KEY_META_R)
       : this.pressed.has(KEY_CTRL_L) || this.pressed.has(KEY_CTRL_R);
@@ -231,10 +219,6 @@ export class ShowStellaInput {
     }
   }
 
-  /**
-   * While ⇧ alone is held the overlay takes the mouse, so a pin's click or a
-   * ⇧-drag never reaches the app below. Plain clicks still go through.
-   */
   private syncCatch(): void {
     const catching = this.options.inkEnabled && this.shiftHeld() && !this.otherModifierHeld();
     if (catching === this.catching) return;
@@ -432,7 +416,6 @@ export class ShowStellaInput {
     this.events.push({ kind: "scroll", t, x: round4(x), y: round4(y), dx, dy });
   }
 
-  /** Removes the last stroke or pin. Returns false when there was none. */
   undo(): boolean {
     const stroke = this.strokes.pop();
     if (!stroke) return false;

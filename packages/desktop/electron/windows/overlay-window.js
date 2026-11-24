@@ -423,11 +423,6 @@ export class OverlayWindowController {
     }
     async warmForStartup(timeoutMs) {
         const warmed = await this.ensureReady(timeoutMs);
-        // The warm-only create presents the window on Windows/Linux (see the
-        // ready-to-show handler) and nothing follows up to hide it, which would
-        // leave a screen-spanning layered surface composited all session (see
-        // OverlayWindow.fadeOut). Hide it once warm — the renderer stays alive,
-        // so the next summon is still instant — unless a surface beat us here.
         if (warmed && process.platform !== 'darwin' && !this.isAnyActive) {
             this.overlayWindow.concealAfterWarm();
         }
@@ -468,8 +463,6 @@ export class OverlayWindowController {
         const reqId = this.windowHighlightRequestId;
         if (!(await this.ensureReady()))
             return;
-        // A hide/newer-preview/newer-show landed while the renderer was rebuilding;
-        // don't resurrect a cleared or superseded highlight.
         if (reqId !== this.windowHighlightRequestId || !this.activeWindowHighlight)
             return;
         this.overlayWindow.show({ inactive: true });
@@ -556,9 +549,6 @@ export class OverlayWindowController {
         this.overlayWindow.setIgnoreMouseEvents(false);
     }
     endRegionCapture() {
-        // A hover lookup can resolve while the clicked target is being prepared.
-        // Invalidate it and clear the ring before deactivating capture so the
-        // highlight cannot keep this screen-spanning window mouse-interactive.
         this.windowHighlightRequestId += 1;
         this.clearWindowHighlight();
         this.hideSurface({
@@ -570,11 +560,6 @@ export class OverlayWindowController {
             focusable: false,
         });
     }
-    /**
-     * Show Stella: the capture bar, the red edge and live ink, never captured,
-     * then the finish card. `state.display` is in screen points; the overlay
-     * gets it in its own.
-     */
     async startShowStella(state) {
         const local = () => {
             const origin = this.overlayWindow.getOverlayOrigin();
@@ -610,7 +595,6 @@ export class OverlayWindowController {
         if (this.activeShowStella)
             this.overlayWindow.send(IPC_SHOW_STELLA_INK, ink);
     }
-    /** The finish card's note field needs keys; a panel takes them without activating Stella. */
     setShowStellaFocusable(focusable) {
         if (this.activeShowStella)
             this.overlayWindow.setFocusable(focusable);

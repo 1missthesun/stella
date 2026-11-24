@@ -103,7 +103,5 @@ if (failed.length > 0) {
 if (head && stampPath) {
   try {
     writeFileSync(stampPath, `${head}\n`);
-  } catch {
-    // Unnoted, the next run just checks again.
-  }
+  } catch {}
 }

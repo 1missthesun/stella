@@ -67,9 +67,7 @@ const commonJsExportNames = (
       for (const name of commonJsExportNames(tools, requireFrom.resolve(target), seen)) {
         names.add(name);
       }
-    } catch {
-      // An unresolvable reexport just contributes nothing.
-    }
+    } catch {}
   }
   return names;
 };
@@ -122,9 +120,7 @@ export const bundleDependencies = (options: {
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8")) as Record<string, string>;
     touchCacheEntry(path.join(dir, "manifest.json"));
     return Promise.resolve({ dir, entries: new Map(Object.entries(manifest)) });
-  } catch {
-    // Not built yet in primary cache.
-  }
+  } catch {}
   if (options.fallbackCacheDir) {
     const fallbackDir = path.join(options.fallbackCacheDir, "deps", key);
     try {
@@ -132,9 +128,7 @@ export const bundleDependencies = (options: {
         fs.readFileSync(path.join(fallbackDir, "manifest.json"), "utf8"),
       ) as Record<string, string>;
       return Promise.resolve({ dir: fallbackDir, entries: new Map(Object.entries(manifest)) });
-    } catch {
-      // Not built in prebuilt cache either.
-    }
+    } catch {}
   }
   let build = building.get(dir);
   if (!build) {

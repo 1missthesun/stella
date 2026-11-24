@@ -104,10 +104,6 @@ export class HyprlandIpc {
     return this.json<{ x: number; y: number }>("cursorpos");
   }
 
-  /**
-   * Runs dispatches, each given in both syntaxes, in one batch. The first
-   * call finds out which syntax this Hyprland accepts.
-   */
   async dispatch(
     calls: ReadonlyArray<HyprlandDispatch>,
   ): Promise<void> {

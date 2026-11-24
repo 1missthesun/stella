@@ -437,10 +437,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         state.processRuntime.registerCleanup("before-quit", "update-hold", () => updateTransition.finishHold());
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
-            // A developer running Stella from their own checkout (no launcher)
-            // keeps that working tree to themselves: updates neither change it
-            // nor share it. STELLA_APP_SOURCE_INSTALLED=1 lets a test sandbox
-            // stand in for an install.
             installed: isInstalledProduct() || process.env.STELLA_APP_SOURCE_INSTALLED === "1",
             broadcast: (next) => {
                 if (next.waiting.some((offer) => offer.kind === "draft" && !offer.stale) ||

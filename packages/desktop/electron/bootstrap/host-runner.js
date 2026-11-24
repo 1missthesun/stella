@@ -107,8 +107,6 @@ const spawnAutomationDaemonFromHost = async (params) => {
         !path.isAbsolute(logPath)) {
         return { ok: false, reason: "invalid_params" };
     }
-    // Only the fixed daemon argv for the bundled helper is ever spawned here;
-    // this handler must never grow into an arbitrary-exec RPC.
     const helperPath = resolveNativeHelperPath("desktop_automation");
     if (!helperPath) {
         return { ok: false, reason: "helper_not_found" };

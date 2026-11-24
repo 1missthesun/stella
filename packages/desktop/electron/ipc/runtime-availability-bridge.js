@@ -16,9 +16,7 @@ export const registerRuntimeAvailabilityBridge = ({ getStellaHostRunner, onStell
             try {
                 wc.send(IPC_RUNTIME_AVAILABILITY, snapshot);
             }
-            catch {
-                // Ignore renderer-side delivery failures (window closing, etc.)
-            }
+            catch {}
         }
     };
     const attach = (runner) => {
@@ -39,9 +37,7 @@ export const registerRuntimeAvailabilityBridge = ({ getStellaHostRunner, onStell
                 try {
                     wc.send(IPC_PREFERENCES_MODELS_UPDATED, snapshot);
                 }
-                catch {
-                    // Ignore renderer-side delivery failures while a window closes.
-                }
+                catch {}
             }
         });
     };

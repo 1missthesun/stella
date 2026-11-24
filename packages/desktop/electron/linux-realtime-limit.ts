@@ -33,7 +33,6 @@ type RealtimeLimitCheck = {
   limit: RealtimeCpuLimit | null;
   rtkit: RtkitState;
   zero: boolean;
-  /** The next start of Stella lifts the limit by itself (see launcherCuresOnNextStart). */
   curedOnNextStart: boolean;
 };
 
@@ -104,13 +103,6 @@ const probeRtkit = async (): Promise<RtkitState> => {
 const isZero = (limit: RealtimeCpuLimit | null) =>
   limit !== null && (limit.soft === 0 || limit.hard === 0);
 
-/**
- * Started by a launcher from before the fix: every launcher since passes
- * STELLA_LAUNCHER_RTKIT. That happens right after an app update, which restarts
- * Electron under the launcher already running; the launcher updates itself on
- * the next start, and the new one restarts under the user's systemd with fresh
- * limits. Nothing for the user to fix, so this is logged, not shown.
- */
 const launcherCuresOnNextStart = () =>
   process.env.STELLA_LAUNCHER?.trim() === "1" &&
   !process.env.STELLA_LAUNCHER_RTKIT?.trim();
@@ -151,7 +143,6 @@ const runCheck = async (): Promise<RealtimeLimitCheck> => {
   return { limit, rtkit, zero, curedOnNextStart };
 };
 
-/** Starts the check once (Linux only). Call early in main. */
 export const startLinuxRealtimeLimitCheck = (): void => {
   if (process.platform !== "linux" || check) return;
   check = runCheck().catch((error) => {
@@ -197,11 +188,6 @@ const noticeText = (rtkit: RtkitState) => {
   };
 };
 
-/**
- * Tells the user once when the limit is 0 and Stella cannot lift it by itself.
- * Remembered in userData until a start with a healthy limit, so the problem
- * coming back is told again.
- */
 export const noticeLinuxRealtimeLimitOnce = async (options: {
   showDialog: boolean;
   window?: BrowserWindow | null;

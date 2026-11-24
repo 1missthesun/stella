@@ -420,7 +420,6 @@ const scanSkill = async (args: {
   }
   let metadata: Record<string, unknown>;
   try {
-    // The runtime parses the YAML; main carries no YAML parser.
     metadata = await callRuntimeAppService<Record<string, unknown>>("readSkillFrontmatter", {
       markdown: UTF8.decode(skillMarkdown.bytes),
     });

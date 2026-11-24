@@ -13,9 +13,7 @@ const listInstalledThemes = async (stellaDataDir: string) => {
       try {
         const raw = await fs.readFile(path.join(themesDir, file), "utf-8");
         themes.push(JSON.parse(raw) as unknown);
-      } catch {
-        // One malformed theme file must not hide the user's other themes.
-      }
+      } catch {}
     }
     return themes;
   } catch {

@@ -1,8 +1,7 @@
 /*
  * Launch a macOS development process without inheriting Terminal's TCC
  * responsibility. This lets Electron's Stella.app bundle own Accessibility,
- * Screen Recording, and Microphone permission prompts just like a packaged
- * launch. Packaged Stella does not use this helper.
+ * Screen Recording, and Microphone permission prompts.
  */
 
 #include <dlfcn.h>

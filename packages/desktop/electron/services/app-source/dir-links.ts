@@ -22,7 +22,6 @@ import { git, gitRaw } from "./git.js";
 export const directoryLinkType = (platform: NodeJS.Platform = process.platform) =>
   platform === "win32" ? ("junction" as const) : ("dir" as const);
 
-/** Linking failed (a drive without links, a policy, antivirus): the caller falls back. */
 export class DirectoryLinkError extends Error {
   readonly code: string | undefined;
   constructor(link: string, cause: unknown) {
@@ -56,7 +55,6 @@ export const linkDirectorySync = (target: string, link: string) => {
 export const isDirectoryLink = (file: string): boolean =>
   fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink() === true;
 
-/** Removes `file` only when it is a link (never what it points at). */
 export const removeDirectoryLink = async (file: string): Promise<boolean> => {
   const stat = await fsp.lstat(file).catch(() => null);
   if (!stat?.isSymbolicLink()) return false;
@@ -82,7 +80,6 @@ export const removeDirectoryLinkSync = (file: string): boolean => {
   return true;
 };
 
-/** The `node_modules` links a scratch copy can hold: the root's and each package's. */
 export const removeModuleLinks = async (dir: string) => {
   await removeDirectoryLink(path.join(dir, "node_modules"));
   const packages = await fsp
@@ -143,20 +140,11 @@ export const removeTree = async (dir: string) => {
   }
 };
 
-/** Removes a scratch copy without ever following one of its links. */
 export const removeScratchDir = async (dir: string) => {
   await removeModuleLinks(dir);
   await removeTree(dir);
 };
 
-/**
- * Removes a git worktree (a draft, a scratch merge) of the checkout at `cwd`:
- * its links first, then the folder. On Windows the folder is removed by
- * `removeTree`, never by `git worktree remove`, which follows junctions and
- * can't delete a draft's own bun install; git then forgets it (`prune`).
- * `keepChanges` refuses, like `git worktree remove` without --force, when the
- * worktree has uncommitted or untracked files.
- */
 export const removeWorktree = async (cwd: string, dir: string, options: { keepChanges?: boolean } = {}) => {
   if (options.keepChanges && fs.existsSync(dir)) {
     // A linked node_modules shows as untracked (a link isn't the ignored folder).

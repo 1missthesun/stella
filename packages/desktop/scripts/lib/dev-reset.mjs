@@ -76,9 +76,6 @@ const waitForExit = async (pid, timeoutMs = 5000) => {
 
 const RESET_REASON = 'dev reset: stopping a leftover dev Electron';
 
-// Recorded at pgrep time and re-checked before each signal, so a pid that
-// exits and is reused while the reset runs is left alone. The group is
-// signalled only while the process still leads it.
 const killPosixTree = async (recorded) => {
   const group = readProcessGroup(recorded.pid) === recorded.pid;
   const signal = (name) => signalRecordedProcess(recorded, name, { reason: RESET_REASON, group });

@@ -4,6 +4,5 @@ import { installWindowsHiddenSpawns } from "@stella/node-shared/shared/windows-h
 
 // Electron main has no console on Windows, so any console program it starts
 // without `windowsHide` (a helper, git, powershell, a library's own spawn)
-// opens a visible Terminal window. Imported first by main.ts, before any
-// module that spawns.
+// opens a visible Terminal window.
 installWindowsHiddenSpawns(childProcess, syncBuiltinESMExports);

@@ -31,7 +31,6 @@ export type UiStateKvHandlersOptions = {
   ) => boolean;
 };
 
-/** Where a window is (`view.` keys) is that window's own: other windows are not told. */
 const sharedAcrossWindows = (changes: UiStateChanges): UiStateChanges =>
   Object.fromEntries(
     Object.entries(changes).filter(([key]) => !key.startsWith(VIEW_STATE_KEY_PREFIX)),

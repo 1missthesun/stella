@@ -125,7 +125,6 @@ export const registerCompanionHandlers = (
       const firstPublish = !readyBrains.has(event.sender.id);
       readyBrains.add(event.sender.id);
       if (firstPublish) {
-        // Once per renderer: adding it on every publish leaked listeners.
         const senderId = event.sender.id;
         event.sender.once("destroyed", () => readyBrains.delete(senderId));
       }

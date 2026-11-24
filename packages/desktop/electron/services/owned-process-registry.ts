@@ -17,15 +17,6 @@ import {
   type ProcessIdentity,
 } from "./process-identity.js";
 
-/**
- * Detached helpers a Stella instance spawns, recorded in one per-user
- * directory that every app version, dev worktree and verify run shares, so
- * any instance can reap what a dead one left behind. A record names both the
- * helper and its owner by pid + start time; a helper is reaped only when its
- * owner is gone and the helper is still the very process (and executable)
- * that was recorded, so a live instance's helper is never touched.
- */
-
 export type OwnedProcessKind = "stella-browser-daemon";
 
 type OwnedProcessRecord = Readonly<{
@@ -118,7 +109,6 @@ export const registerOwnedProcess = (
   }
 };
 
-/** Drops the record when it still names this instance's helper. */
 export const forgetOwnedProcess = (pid: number | undefined): void => {
   if (!pid) return;
   const record = readRecord(recordPath(pid));
@@ -151,7 +141,6 @@ const stillTheRecordedProcess = (record: OwnedProcessRecord) => {
   if (!processIdentityIsLive({ pid: record.pid, startedAtMs: record.startedAtMs })) {
     return false;
   }
-  // A record without a start time can't rule out pid reuse.
   if (record.startedAtMs === null) return false;
   const command = pidCommandLine(record.pid);
   return Boolean(
@@ -166,7 +155,6 @@ export type OwnedProcessReapResult = Readonly<{
   dropped: number[];
 }>;
 
-/** Stops helpers whose owning instance is gone, across versions and worktrees. */
 export const reapOrphanedOwnedProcesses = async (
   graceMs = 2_000,
 ): Promise<OwnedProcessReapResult> => {
@@ -214,7 +202,6 @@ export const reapOrphanedOwnedProcesses = async (
   return { reaped, keptLive, dropped };
 };
 
-/** Registered helpers are judged by their record, never by the legacy scan. */
 const registeredPids = (): Set<number> => {
   try {
     return new Set(
@@ -228,11 +215,6 @@ const registeredPids = (): Set<number> => {
   }
 };
 
-/**
- * Browser daemons from builds older than the registry: Electron spawns the
- * bridge and agent sessions directly, so one whose parent is no longer an
- * Electron process lost its owner. Matches any version's binary path.
- */
 const LEGACY_DAEMON_PATTERN =
   /(?:^|\s)(\S*\/stella-browser(?:-[a-z0-9-]+)?)\s+service\s+run\s+--session\s+(stella-app-bridge|agent-[0-9a-f]{32})(?:\s|$)/;
 

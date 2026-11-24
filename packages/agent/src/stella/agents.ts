@@ -81,6 +81,7 @@ import {
   unansweredWaitingReply,
 } from "@stella/contracts/agent-waiting";
 import { AGENT_REPORT_MAX_CHARS, parseAgentReportId, silentRunReport } from "@stella/contracts/backend/agent-reports";
+import { HANDED_ON_WAITING_FOR } from "@stella/contracts/agent-waiting";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
 import { longToolCall, longToolCallText, type CurrentToolCall } from "@stella/contracts/long-tool-call";
 import {
@@ -288,9 +289,6 @@ export const agentRunOutcome = (
       : end?.answer !== undefined
         ? { outcome: "completed", text: end.answer }
         : undefined;
-
-/** What a turn whose words the next report carries (an input on its way, a helper still working) waits on. */
-const HELD_WAITING_FOR = "a message already on its way to it, or a helper still working";
 
 /** How many earlier answers of one run a report carries (the newest ones). */
 const ANSWERS_IN_REPORT_MAX = 8;
@@ -1186,7 +1184,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               // The input after it reports this turn's words with its own. Its
               // end still reaches the cloud, recorded waiting (no report), so
               // that report isn't held for an end that would never come.
-              end = { waitingFor: HELD_WAITING_FOR, wakers: [HELD_WAITING_FOR] };
+              end = { waitingFor: HANDED_ON_WAITING_FOR, wakers: [HANDED_ON_WAITING_FOR] };
               return next();
             }
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
@@ -1286,12 +1284,17 @@ export function stellaAgents(host: StellaAgentsHost) {
               answer: result,
               ...(failed ? { error: agentFailureText(answer) } : {}),
             };
-            if (agent.reported.includes(settled.answer)) return next();
+            if (agent.reported.includes(settled.answer)) {
+              // Another input's turn ended on this same answer and reported it:
+              // this turn still ends in the cloud, with no report of its own.
+              end = { waitingFor: HANDED_ON_WAITING_FOR, wakers: [HANDED_ON_WAITING_FOR] };
+              return next();
+            }
             agent.reported.push(settled.answer);
             if (busy && !failed) {
               // Its turn ended; the cloud records it waiting (no report of its
               // own), so the next turn's report isn't held for this one's end.
-              end = { ...end, waiting: true, waitingFor: HELD_WAITING_FOR, wakers: [HELD_WAITING_FOR] };
+              end = { ...end, waiting: true, waitingFor: HANDED_ON_WAITING_FOR, wakers: [HANDED_ON_WAITING_FOR] };
               agent.heldForHelpers = true;
               // Not reported yet: the turn that answers what it waits for
               // reports these words with its own.

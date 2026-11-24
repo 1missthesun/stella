@@ -48,6 +48,7 @@ const OTHER_NATIVE_TOOL = `${NATIVE_PREFIX}tool`;
 /** Arguments Antigravity adds to every call for its own display; Stella's tools never take them. */
 const DISPLAY_ARGS = new Set(["toolSummary"]);
 const TOOL_GROUP_SETTLE_MS = 250;
+const TAKE_IN_LIMIT_MS = 2_000;
 const IDLE_CLOSE_MS = 20 * 60_000;
 const SIGN_OUT_CHECK_MS = 1_000;
 const START_TIMEOUT_MS = 60_000;
@@ -145,6 +146,8 @@ type TurnState = {
   claimWaiters: Set<() => void>;
   /** Messages the CLI was given and has not gone on from yet. */
   given: Set<AntigravityMessage>;
+  /** Until the CLI took in the last of them: a call that returned before would go to its model without it. */
+  taking?: Promise<void>;
 };
 
 type Proc = {
@@ -388,8 +391,11 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           identityScope: key,
           nativeToolCallIds: true,
           claimNativeToolUseId: (name: string, args: Record<string, unknown>, signal: AbortSignal) => claim(proc, name, args, signal),
-          executeTool: (toolCallId: string, name: string, args: Record<string, unknown>, signal?: AbortSignal) =>
-            turn.request.executeTool(toolCallId, name, args, signal),
+          executeTool: async (toolCallId: string, name: string, args: Record<string, unknown>, signal?: AbortSignal) => {
+            const result = await turn.request.executeTool(toolCallId, name, args, signal);
+            await turn.taking;
+            return result;
+          },
         };
       },
     });
@@ -706,6 +712,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       const result = await new Promise<any>((resolve, reject) => {
         turn.reject = reject;
         let open = 0;
+        let taken: (() => void) | undefined;
         // A prompt sent while one runs joins it: the CLI reads it after the calls in flight, answers the running
         // prompt at once, and the turn ends with the last one.
         const send = (content: unknown[], onFailed?: () => void) => {
@@ -713,10 +720,12 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           live.rpc.request("session/prompt", { sessionId, prompt: content }).then(
             (reply) => {
               open -= 1;
+              taken?.();
               if (open === 0) resolve(reply);
             },
             (error: unknown) => {
               open -= 1;
+              taken?.();
               onFailed?.();
               if (open === 0) reject(error);
             },
@@ -727,6 +736,16 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           inject: (message) => {
             if (open === 0 || live.turn !== turn || live.exited || request.signal.aborted) return false;
             turn.given.add(message);
+            turn.taking = new Promise((done) => {
+              const before = taken;
+              const stopTimer = forkTimeoutFiber(TAKE_IN_LIMIT_MS, () => taken?.());
+              taken = () => {
+                stopTimer();
+                taken = undefined;
+                before?.();
+                done();
+              };
+            });
             send(promptOf(message.text, message.images), () => {
               if (turn.given.delete(message)) message.onDropped?.();
             });

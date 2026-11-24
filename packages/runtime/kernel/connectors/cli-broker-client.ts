@@ -1,7 +1,6 @@
 import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { readBackendConnections } from "./backend-accounts.js";
 import { connect, type Socket } from "node:net";
-import { z } from "zod";
 
 import { forkTimeoutFiber } from "./effect-runtime.js";
 import { parseCliBridgeEndpoint } from "@stella/node-shared/connectors/cli-bridge-endpoint.js";
@@ -73,27 +72,31 @@ export type DesktopPermissionRequestResult =
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 let nextRequestId = 1;
 
-const spawnSuccessSchema = z.looseObject({
-  ok: z.literal(true),
-  pid: z.number(),
-  hostPid: z.number(),
-});
-
 const isSpawnSuccess = (
   value: unknown,
-): value is z.infer<typeof spawnSuccessSchema> =>
-  spawnSuccessSchema.safeParse(value).success;
-
-const permissionSuccessSchema = z.looseObject({
-  ok: z.literal(true),
-  granted: z.boolean(),
-  alreadyGranted: z.boolean(),
-});
+): value is { ok: true; pid: number; hostPid: number } => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    r.ok === true &&
+    typeof r.pid === "number" &&
+    Number.isFinite(r.pid) &&
+    typeof r.hostPid === "number" &&
+    Number.isFinite(r.hostPid)
+  );
+};
 
 const isPermissionSuccess = (
   value: unknown,
-): value is z.infer<typeof permissionSuccessSchema> =>
-  permissionSuccessSchema.safeParse(value).success;
+): value is { ok: true; granted: boolean; alreadyGranted: boolean } => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    r.ok === true &&
+    typeof r.granted === "boolean" &&
+    typeof r.alreadyGranted === "boolean"
+  );
+};
 
 const sendRequest = (
   socketPath: string,

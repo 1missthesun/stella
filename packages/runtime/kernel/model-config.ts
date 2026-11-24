@@ -1,21 +1,42 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import AjvModule, { type AnySchema, type ErrorObject, type ValidateFunction } from "ajv";
+import type { AnySchema, ErrorObject, ValidateFunction } from "ajv";
 
-const Ajv = ((AjvModule as unknown as { default?: typeof AjvModule }).default ??
-  AjvModule) as typeof AjvModule;
+type AjvInstance = {
+  compile(schema: AnySchema): ValidateFunction;
+};
 
-let schemaAjv: InstanceType<typeof Ajv> | undefined;
+let schemaAjv: AjvInstance | undefined;
+let schemaAjvPromise: Promise<AjvInstance> | undefined;
 const schemaValidators = new WeakMap<object, ValidateFunction>();
 
+export const ensureModelConfigValidator = async (): Promise<void> => {
+  if (schemaAjv) return;
+  schemaAjvPromise ??= import("ajv")
+    .then((mod) => {
+      const AjvCtor = ((mod as unknown as { default?: new (opts: object) => AjvInstance })
+        .default ?? (mod as unknown as new (opts: object) => AjvInstance));
+      schemaAjv = new AjvCtor({ allErrors: true, strict: false });
+      return schemaAjv;
+    })
+    .catch((error: unknown) => {
+      schemaAjvPromise = undefined;
+      throw error;
+    });
+  await schemaAjvPromise;
+};
+
 const schemaValidator = (schema: AnySchema): ValidateFunction => {
+  if (!schemaAjv) {
+    throw new Error("ModelConfig validator must be loaded before validation.");
+  }
   if (typeof schema === "boolean") {
-    return (schemaAjv ??= new Ajv({ allErrors: true, strict: false })).compile(schema);
+    return schemaAjv.compile(schema);
   }
   let validator = schemaValidators.get(schema);
   if (!validator) {
-    validator = (schemaAjv ??= new Ajv({ allErrors: true, strict: false })).compile(schema);
+    validator = schemaAjv.compile(schema);
     schemaValidators.set(schema, validator);
   }
   return validator;
@@ -447,6 +468,7 @@ export class ModelConfig {
 
     try {
       const parsed = JSON.parse(stripJsonComments(content)) as unknown;
+      await ensureModelConfigValidator();
       if (!isJsonSchemaValue<ModelsJson>(modelsJsonSchema, parsed)) {
         const details = getJsonSchemaValidationErrors(modelsJsonSchema, parsed)
           .slice(0, 8)

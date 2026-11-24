@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { renderStellaPrompt } from "@stella/contracts/stella-prompts";
 
-import { extractFrontmatter } from "../frontmatter.js";
+import { stripFrontmatter } from "../frontmatter.js";
 import { getPromptPresetSelection } from "@stella/node-shared/preferences/local-preferences.js";
 import {
   DEFAULT_PROMPT_PRESET_ID,
@@ -24,7 +24,7 @@ const agentMetadataDir = (): string =>
 const readBody = async (filePath: string): Promise<string | undefined> => {
   try {
     const raw = await fs.readFile(filePath, "utf-8");
-    const parsed = extractFrontmatter(raw).body.trim();
+    const parsed = stripFrontmatter(raw).trim();
     return parsed.length > 0 ? parsed : undefined;
   } catch {
     return undefined;

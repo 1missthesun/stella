@@ -6,7 +6,6 @@ import { createHash } from "crypto";
 import { resolveRuntimeStatePath } from "@stella/node-shared/home/stella-paths.js";
 import { createRuntimeLogger } from "../debug.js";
 import picomatch from "picomatch";
-import { z } from "zod";
 import { sanitizeSensitiveData } from "@stella/contracts/sensitive-data";
 import {
   DEFAULT_MAX_BYTES,
@@ -189,20 +188,37 @@ const fileExists = async (filePath: string) => {
 const hashBuffer = (buffer: Buffer) =>
   createHash("sha256").update(buffer).digest("hex");
 
-const secretMountRecordSchema = z.object({
-  id: z.string(),
-  mountPath: z.string(),
-  backupPath: z.string().optional(),
-  recordPath: z.string(),
-  mountedHash: z.string(),
-  createdAt: z.number(),
-});
-
-type SecretMountRecord = z.infer<typeof secretMountRecordSchema>;
+type SecretMountRecord = {
+  id: string;
+  mountPath: string;
+  backupPath?: string;
+  recordPath: string;
+  mountedHash: string;
+  createdAt: number;
+};
 
 const asSecretMountRecord = (value: unknown): SecretMountRecord | null => {
-  const parsed = secretMountRecordSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const r = value as Record<string, unknown>;
+  if (
+    typeof r.id !== "string" ||
+    typeof r.mountPath !== "string" ||
+    (r.backupPath !== undefined && typeof r.backupPath !== "string") ||
+    typeof r.recordPath !== "string" ||
+    typeof r.mountedHash !== "string" ||
+    typeof r.createdAt !== "number" ||
+    !Number.isFinite(r.createdAt)
+  ) {
+    return null;
+  }
+  return {
+    id: r.id,
+    mountPath: r.mountPath,
+    ...(r.backupPath !== undefined ? { backupPath: r.backupPath } : {}),
+    recordPath: r.recordPath,
+    mountedHash: r.mountedHash,
+    createdAt: r.createdAt,
+  };
 };
 
 const restoreBackup = async (backupPath: string, mountPath: string) => {

@@ -17,20 +17,151 @@ export const NICHES: Niche[] = [
       { title: "Skyrim, Fallout and Starfield.", slugs: ["mod-skyrim", "install-skse", "skyrim-load-order", "skyrim-crash-log", "mod-fallout-4", "downgrade-fallout-4", "install-f4se", "mod-fallout-new-vegas", "mod-starfield", "mod-oblivion-remastered"] },
       { title: "Big adventures.", slugs: ["mod-baldurs-gate-3", "bg3-mods-not-working", "bg3-script-extender", "mod-cyberpunk-2077", "cyberpunk-mods-not-working-after-2-5", "mod-elden-ring", "elden-ring-seamless-co-op", "mod-witcher-3", "witcher-3-script-merger", "mod-hogwarts-legacy", "mod-monster-hunter-wilds", "mod-resident-evil-4"] },
       { title: "Minecraft.", slugs: ["install-minecraft-mods", "install-sodium-iris-minecraft-1-21-fabric", "install-minecraft-shaders", "make-a-minecraft-mod", "make-a-minecraft-modpack", "install-minecraft-resource-pack", "install-minecraft-datapacks", "install-minecraft-map", "allocate-more-ram-to-minecraft", "minecraft-modpack-exit-code-1", "back-up-minecraft-worlds", "fix-corrupted-minecraft-world", "turn-on-cheats-in-minecraft-world", "find-all-minecraft-screenshots"] },
-      { title: "Cosy, building and survival.", slugs: ["mod-stardew-valley", "stardew-valley-mods-not-working", "install-sims-4-mods", "find-broken-sims-4-mods", "mod-valheim", "mod-terraria", "mod-rimworld", "mod-palworld", "mod-subnautica", "mod-project-zomboid", "mod-cities-skylines-2", "mod-lethal-company", "mod-balatro", "mod-silksong"] },
+      { title: "Sims 4.", slugs: ["install-sims-4-mods",  "install-sims-4-cc",  "sims-4-cc-not-showing-up",  "find-broken-sims-4-mods",  "install-mc-command-center",  "install-wickedwhims",  "sims-4-tray-files",  "sims-4-reshade-presets",  "sims-4-duplicate-cc"] },
+      { title: "Cosy, building and survival.", slugs: ["mod-stardew-valley",  "stardew-valley-mods-not-working",  "install-stardew-valley-expanded",  "stardew-valley-recolor-mods",  "cozy-minecraft-texture-packs",  "disney-dreamlight-valley-mods",  "coral-island-mods",  "mod-valheim",  "mod-terraria",  "mod-rimworld",  "mod-palworld",  "mod-subnautica",  "mod-project-zomboid",  "mod-cities-skylines-2",  "mod-lethal-company",  "mod-balatro",  "mod-silksong"] },
       { title: "Driving.", slugs: ["assetto-corsa-mods", "beamng-mods", "euro-truck-simulator-2-mods"] },
       { title: "Mod managers and making your own.", slugs: ["ai-mod-maker", "make-a-skyrim-mod", "install-nexus-mods", "vortex-mod-manager", "mod-organizer-2", "vortex-to-mod-organizer-2", "r2modman-thunderstore", "install-bepinex", "steam-deck-mods"] },
     ],
   },
   {
     slug: "video",
-    name: "Video editing",
-    h1: "Video edits, done on your computer.",
-    title: "Video how-tos: subtitles, cutting, vertical crops, converting",
+    recommended: "claude",
+    name: "Videos for TikTok and YouTube",
+    h1: "Finished videos from your raw clips.",
+    title: "Video editing made easy: TikToks, Reels, Shorts and YouTube",
     description:
-      "Add subtitles or music, cut out parts, crop to vertical, make quiet videos louder, and convert MOV, MKV, WebM or AVI to MP4. Just ask Stella (stella.sh).",
+      "Turn raw clips into finished TikToks, Reels, Shorts and YouTube videos: cuts, captions, music, B-roll and vertical crops. Just ask Stella (stella.sh).",
     intro:
-      "Subtitles, cuts, crops and converting. Tell Stella (stella.sh) what the video needs and get it back done.",
+      "Drop in your clips and say what you want. Stella (stella.sh) edits it into a finished video.",
+    sections: [
+      { title: "Finished TikToks, Reels and Shorts.", slugs: ["turn-long-video-into-shorts",  "make-instagram-reel",  "make-travel-video-from-clips",  "twitch-clips-to-tiktok",  "word-by-word-captions",  "auto-reframe-video",  "sync-video-to-music-beat"] },
+      { title: "YouTube videos.", slugs: ["edit-raw-footage-into-youtube-video",  "remove-filler-words-from-video",  "add-b-roll-to-video",  "make-youtube-intro",  "make-gaming-montage",  "color-match-clips"] },
+      { title: "Weddings, years and memories.", slugs: ["make-wedding-video-from-phone-clips",  "make-recap-video",  "make-slideshow-with-music"] },
+      { title: "Cuts, captions and sound.", slugs: ["burn-subtitles-into-video-for-tiktok",  "cut-silences-from-video",  "add-music-to-video",  "crop-video-to-vertical",  "combine-videos-into-one",  "cut-out-part-of-video",  "speed-up-video",  "reverse-video",  "make-video-louder",  "make-srt-subtitle-file"] },
+      { title: "Fix, shrink and convert.", slugs: ["stabilize-shaky-video",  "rotate-video",  "compress-video-for-discord",  "convert-mov-to-mp4",  "convert-mkv-to-mp4",  "convert-webm-to-mp4",  "convert-avi-to-mp4",  "make-gif-from-video",  "extract-frames-from-video",  "convert-srt-to-vtt"] },
+    ],
+  },
+  {
+    slug: "apps",
+    recommended: "claude",
+    name: "Your own apps",
+    h1: "Little apps, made just for you.",
+    title: "Make your own app without coding: trackers, planners, tools",
+    description:
+      "Describe the app you wish existed: a workout log, budget tracker, recipe box or trip planner. Stella (stella.sh) makes it on your computer.",
+    intro:
+      "Describe the app you wish you had. Stella (stella.sh) makes it, and changes it when you ask.",
+    sections: [
+      { title: "Start here.", slugs: ["make-an-app-without-coding",  "turn-a-spreadsheet-into-an-app"] },
+      { title: "Health and habits.", slugs: ["make-your-own-workout-tracker",  "make-your-own-habit-tracker",  "make-a-reading-tracker"] },
+      { title: "Food and trips.", slugs: ["make-a-recipe-app",  "make-a-meal-planner-with-shopping-list",  "make-a-trip-planner-app"] },
+      { title: "Money and home.", slugs: ["make-your-own-budget-app",  "make-a-family-chore-chart-app",  "make-a-plant-watering-tracker",  "make-a-home-inventory-app"] },
+    ],
+  },
+  {
+    slug: "websites",
+    recommended: "claude",
+    name: "Your own website",
+    h1: "Your own website, without code.",
+    title: "Make a website without code: portfolio, wedding or business",
+    description:
+      "Get a portfolio, wedding site, small business page or personal site made and put online, with no code and no builder. Just ask Stella (stella.sh).",
+    intro:
+      "Say what the site is for. Stella (stella.sh) makes it, puts it online and changes it when you ask.",
+    sections: [
+      { title: "Make a website.", slugs: ["make-a-website-without-coding",  "make-a-small-business-website",  "make-a-landing-page"] },
+      { title: "Portfolios, weddings and link in bio.", slugs: ["make-a-portfolio-website",  "make-a-wedding-website-with-rsvp",  "make-a-link-in-bio-page"] },
+      { title: "Online, on your own domain.", slugs: ["host-a-website-for-free",  "connect-a-domain-to-your-website",  "move-your-website-off-wix-or-squarespace"] },
+      { title: "Forms, Google and updates.", slugs: ["add-a-contact-form-to-your-website",  "get-your-website-on-google",  "update-your-website-by-asking"] },
+    ],
+  },
+  {
+    slug: "design",
+    recommended: "claude",
+    name: "Design and photos",
+    h1: "Thumbnails, posters and photos that look done.",
+    title: "Design made easy: thumbnails, posters, invites and photo edits",
+    description:
+      "Make YouTube thumbnails, posters, invites, flyers, menus, Twitch overlays and product photos, or fix your own pictures. Just ask Stella (stella.sh).",
+    intro:
+      "Say what you need made or fixed. Stella (stella.sh) designs it and hands you the files.",
+    sections: [
+      { title: "Posters, flyers and invitations.", slugs: ["make-an-event-poster",  "make-a-birthday-invitation",  "make-a-flyer-for-your-business",  "make-a-lost-pet-poster"] },
+      { title: "YouTube, Instagram and Twitch.", slugs: ["make-a-youtube-thumbnail",  "make-an-instagram-carousel",  "make-twitch-overlays"] },
+      { title: "For your business.", slugs: ["make-a-logo",  "make-a-cafe-menu",  "design-a-t-shirt",  "product-photos-white-background"] },
+      { title: "Fixing your photos.", slugs: ["retouch-portrait-photos",  "restore-old-photos",  "colorize-black-and-white-photos"] },
+    ],
+  },
+  {
+    slug: "watches",
+    recommended: "claude",
+    name: "Alerts and watches",
+    h1: "Told the moment it's available.",
+    title: "Alerts made easy: tickets, tables, restocks and price drops",
+    description:
+      "Get told when concert tickets, restaurant tables, restocks, cheaper flights, rentals, class seats or campsites open up. Stella (stella.sh) keeps checking.",
+    intro:
+      "Say what you're waiting for. Stella (stella.sh) keeps checking and tells you the moment it's there.",
+    sections: [
+      { title: "Tickets and tables.", slugs: ["ticketmaster-ticket-alerts",  "concert-ticket-price-drop-alert",  "resy-opentable-reservation-alerts",  "disney-dining-alerts"] },
+      { title: "Flights, hotels and campsites.", slugs: ["flight-price-drop-alert",  "hotel-price-drop-alert",  "campsite-cancellation-alerts"] },
+      { title: "Restocks and price drops.", slugs: ["restock-alert",  "pokemon-restock-alerts",  "price-drop-alert"] },
+      { title: "Homes, jobs, classes and appointments.", slugs: ["rental-listing-alerts",  "company-job-alerts",  "get-notified-when-a-class-opens",  "global-entry-appointment-alerts"] },
+      { title: "Any web page.", slugs: ["website-change-alert"] },
+    ],
+  },
+  {
+    slug: "emulation",
+    recommended: "gemini",
+    name: "Emulators and retro games",
+    h1: "Console and retro games, on your computer.",
+    title: "Emulators made easy: Switch, PS2, PS3, 3DS, GameCube, RetroArch",
+    description:
+      "Set up Switch, PS2, PS3, 3DS, GameCube and RetroArch emulators, fix stutter and controllers, patch ROMs and move saves. Just ask Stella (stella.sh).",
+    intro:
+      "Say which console and which game. Stella (stella.sh) sets up the emulator, the controller and the saves.",
+    sections: [
+      { title: "Nintendo Switch and 3DS.", slugs: ["set-up-switch-emulator-on-pc",  "switch-emulator-firmware-and-keys",  "switch-emulator-stuttering",  "set-up-azahar-3ds-emulator"] },
+      { title: "PlayStation.", slugs: ["set-up-pcsx2",  "pcsx2-stuttering-fix",  "set-up-rpcs3",  "ps1-emulator-for-pc",  "psp-emulator-for-pc"] },
+      { title: "GameCube, Wii and retro consoles.", slugs: ["set-up-dolphin-emulator",  "set-up-retroarch",  "retroarch-missing-bios",  "patch-rom-hacks-and-fan-translations"] },
+      { title: "Controllers, saves and Steam Deck.", slugs: ["emulator-controller-not-working",  "transfer-saves-between-emulators",  "set-up-emudeck-steam-deck"] },
+    ],
+  },
+  {
+    slug: "local-ai",
+    recommended: "claude",
+    name: "Local AI and ComfyUI",
+    h1: "AI that runs on your own computer.",
+    title: "Local AI made easy: ComfyUI, Ollama and models on your PC",
+    description:
+      "Install ComfyUI, fix broken nodes and workflows, add models and LoRAs, run Ollama and fix CUDA or VRAM errors. Just ask Stella (stella.sh).",
+    intro:
+      "Image makers and chat models that run on your own graphics card, set up and fixed by Stella (stella.sh).",
+    sections: [
+      { title: "Setting up ComfyUI.", slugs: ["install-comfyui",  "add-models-and-loras-to-comfyui",  "install-stable-diffusion-forge"] },
+      { title: "Making pictures.", slugs: ["comfyui-text-to-image-workflow",  "comfyui-upscale-image-workflow",  "run-flux-locally"] },
+      { title: "Fixing ComfyUI errors.", slugs: ["comfyui-missing-custom-nodes",  "fix-comfyui-workflow-errors",  "torch-not-compiled-with-cuda-enabled",  "comfyui-python-version"] },
+      { title: "Small graphics cards.", slugs: ["comfyui-out-of-memory",  "make-comfyui-faster-low-vram"] },
+      { title: "Chat AI on your computer.", slugs: ["run-ai-offline-on-your-computer",  "best-ollama-model-for-your-pc",  "ollama-open-webui-setup"] },
+    ],
+  },
+  {
+    slug: "pc-gaming",
+    recommended: "claude",
+    name: "PC and gaming fixes",
+    h1: "A PC that runs games smoothly.",
+    title: "PC gaming fixes: FPS drops, stutter, crashes, drivers, temps",
+    description:
+      "Fix FPS drops, stutter, crashes and black screens, update graphics drivers, cool a hot PC and sort monitors, sound and controllers. Just ask Stella (stella.sh).",
+    intro:
+      "Say what's wrong with your PC or your game. Stella (stella.sh) finds the cause and fixes it.",
+    sections: [
+      { title: "FPS drops, stutter and crashes.", slugs: ["fix-fps-drops-in-games",  "game-stuttering-on-pc",  "high-cpu-usage-while-gaming",  "games-crashing-to-desktop",  "black-screen-when-launching-games",  "d3dx9-43-dll-not-found"] },
+      { title: "Graphics drivers and heat.", slugs: ["update-graphics-drivers",  "clean-install-graphics-drivers",  "pc-overheating-when-gaming",  "undervolt-gpu"] },
+      { title: "Monitors and HDR.", slugs: ["second-monitor-not-detected",  "monitor-stuck-at-60hz",  "hdr-washed-out-windows-11"] },
+      { title: "Sound, controllers and Bluetooth.", slugs: ["no-sound-on-pc",  "bluetooth-headphones-sound-bad-on-pc",  "controller-not-working-on-pc"] },
+      { title: "Startup and game storage.", slugs: ["windows-11-slow-startup",  "move-steam-game-to-another-drive"] },
+    ],
   },
   {
     slug: "pc-cleanup",
@@ -263,59 +394,6 @@ export const NICHES: Niche[] = [
       { title: "Android, Java and scripts.", slugs: ["decompile-apk", "edit-apk", "decompile-jar-file", "deobfuscate-javascript", "extract-electron-asar", "decompile-lua"] },
       { title: "Games.", slugs: ["edit-save-file", "extract-unity-game-assets", "decompile-unity-game", "decompile-godot-game", "extract-renpy-rpa", "extract-pak-files"] },
       { title: "Formats, networks and devices.", slugs: ["reverse-engineer-a-file-format", "decode-network-protocol-from-pcap", "reverse-engineer-website-api", "inspect-app-traffic-with-mitmproxy", "extract-firmware"] },
-    ],
-  },
-  {
-    slug: "emulation",
-    recommended: "gemini",
-    name: "Emulators and retro games",
-    h1: "Console and retro games, on your computer.",
-    title: "Emulators made easy: Switch, PS2, PS3, 3DS, GameCube, RetroArch",
-    description:
-      "Set up Switch, PS2, PS3, 3DS, GameCube and RetroArch emulators, fix stutter and controllers, patch ROMs and move saves. Just ask Stella (stella.sh).",
-    intro:
-      "Say which console and which game. Stella (stella.sh) sets up the emulator, the controller and the saves.",
-    sections: [
-      { title: "Nintendo Switch and 3DS.", slugs: ["set-up-switch-emulator-on-pc",  "switch-emulator-firmware-and-keys",  "switch-emulator-stuttering",  "set-up-azahar-3ds-emulator"] },
-      { title: "PlayStation.", slugs: ["set-up-pcsx2",  "pcsx2-stuttering-fix",  "set-up-rpcs3",  "ps1-emulator-for-pc",  "psp-emulator-for-pc"] },
-      { title: "GameCube, Wii and retro consoles.", slugs: ["set-up-dolphin-emulator",  "set-up-retroarch",  "retroarch-missing-bios",  "patch-rom-hacks-and-fan-translations"] },
-      { title: "Controllers, saves and Steam Deck.", slugs: ["emulator-controller-not-working",  "transfer-saves-between-emulators",  "set-up-emudeck-steam-deck"] },
-    ],
-  },
-  {
-    slug: "local-ai",
-    recommended: "claude",
-    name: "Local AI and ComfyUI",
-    h1: "AI that runs on your own computer.",
-    title: "Local AI made easy: ComfyUI, Ollama and models on your PC",
-    description:
-      "Install ComfyUI, fix broken nodes and workflows, add models and LoRAs, run Ollama and fix CUDA or VRAM errors. Just ask Stella (stella.sh).",
-    intro:
-      "Image makers and chat models that run on your own graphics card, set up and fixed by Stella (stella.sh).",
-    sections: [
-      { title: "Setting up ComfyUI.", slugs: ["install-comfyui",  "add-models-and-loras-to-comfyui",  "install-stable-diffusion-forge"] },
-      { title: "Making pictures.", slugs: ["comfyui-text-to-image-workflow",  "comfyui-upscale-image-workflow",  "run-flux-locally"] },
-      { title: "Fixing ComfyUI errors.", slugs: ["comfyui-missing-custom-nodes",  "fix-comfyui-workflow-errors",  "torch-not-compiled-with-cuda-enabled",  "comfyui-python-version"] },
-      { title: "Small graphics cards.", slugs: ["comfyui-out-of-memory",  "make-comfyui-faster-low-vram"] },
-      { title: "Chat AI on your computer.", slugs: ["run-ai-offline-on-your-computer",  "best-ollama-model-for-your-pc",  "ollama-open-webui-setup"] },
-    ],
-  },
-  {
-    slug: "pc-gaming",
-    recommended: "claude",
-    name: "PC and gaming fixes",
-    h1: "A PC that runs games smoothly.",
-    title: "PC gaming fixes: FPS drops, stutter, crashes, drivers, temps",
-    description:
-      "Fix FPS drops, stutter, crashes and black screens, update graphics drivers, cool a hot PC and sort monitors, sound and controllers. Just ask Stella (stella.sh).",
-    intro:
-      "Say what's wrong with your PC or your game. Stella (stella.sh) finds the cause and fixes it.",
-    sections: [
-      { title: "FPS drops, stutter and crashes.", slugs: ["fix-fps-drops-in-games",  "game-stuttering-on-pc",  "high-cpu-usage-while-gaming",  "games-crashing-to-desktop",  "black-screen-when-launching-games",  "d3dx9-43-dll-not-found"] },
-      { title: "Graphics drivers and heat.", slugs: ["update-graphics-drivers",  "clean-install-graphics-drivers",  "pc-overheating-when-gaming",  "undervolt-gpu"] },
-      { title: "Monitors and HDR.", slugs: ["second-monitor-not-detected",  "monitor-stuck-at-60hz",  "hdr-washed-out-windows-11"] },
-      { title: "Sound, controllers and Bluetooth.", slugs: ["no-sound-on-pc",  "bluetooth-headphones-sound-bad-on-pc",  "controller-not-working-on-pc"] },
-      { title: "Startup and game storage.", slugs: ["windows-11-slow-startup",  "move-steam-game-to-another-drive"] },
     ],
   },
 ];

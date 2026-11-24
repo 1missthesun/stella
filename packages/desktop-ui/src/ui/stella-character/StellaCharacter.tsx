@@ -23,7 +23,6 @@ export interface StellaCharacterProps {
   eyeColor?: string;
   glow?: boolean;
   paused?: boolean;
-  idleRest?: boolean;
   followPointer?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -38,7 +37,6 @@ export function StellaCharacter({
   eyeColor,
   glow = false,
   paused = false,
-  idleRest = false,
   followPointer = false,
   className,
   style,
@@ -55,7 +53,6 @@ export function StellaCharacter({
       size,
       ink,
       glow,
-      idleRest,
       followPointer,
       ...readMotion(),
     };
@@ -66,7 +63,7 @@ export function StellaCharacter({
       setMark(null);
       created.destroy();
     };
-  }, [size, ink, glow, eyeColor, idleRest, followPointer]);
+  }, [size, ink, glow, eyeColor, followPointer]);
 
   useLayoutEffect(() => {
     if (!handleRef || !mark) return;

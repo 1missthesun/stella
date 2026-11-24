@@ -293,7 +293,6 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity() {
                 state={markState}
                 eyeColor={MARK_EYE_COLOR}
                 paused={!windowFocused}
-                idleRest
               />
             </motion.span>
             <AnimatePresence initial={false} mode="wait">

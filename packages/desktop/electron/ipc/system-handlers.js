@@ -447,8 +447,11 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_GET_TOKEN)) {
             throw new Error("Blocked untrusted auth token request.");
         }
+        // Served from the main process's JWT cache (scoped to the current
+        // credentials and backend); never an expired token.
         return await options.authService.getAuthToken({
             forceRefresh: payload?.forceRefresh === true,
+            allowStale: false,
         });
     });
     handleIpc(IPC_AUTH_REVOKE_SESSIONS, async (event) => {

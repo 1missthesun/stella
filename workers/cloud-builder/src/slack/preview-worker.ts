@@ -25,7 +25,7 @@
  */
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { KEY_PREFIX, cleanPath, extensionOf, previewBucket, servingHeaders, decodePath } from "./previews.js";
+import { KEY_PREFIX, cleanPath, extensionOf, previewBucket, servingHeaders, decodePath } from "./preview-helpers.js";
 
 export const WORKER_MANIFEST = "stella-worker.json";
 export const WORKER_CODE = "stella-worker-code.json";

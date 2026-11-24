@@ -1,7 +1,4 @@
-// @peculiar/x509 2.x (App Attest) runs tsyringe, which needs a Reflect polyfill
-// loaded before its lazily imported chunk evaluates.
-import "reflect-metadata";
-import { DurableObject } from "cloudflare:workers";
+import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { worker } from "./build-session/worker-router.js";
 import type { Env } from "./build-session/shared/env.js";
 import { OrchestratorSession } from "./orchestrator-session.js";
@@ -12,8 +9,14 @@ export { BillingControl } from "./billing/control.js";
 export { ComputeBilling } from "./billing/compute-billing.js";
 export { WorldStore } from "./world-store.js";
 export { AppReleaseChannel } from "./app-source-releases.js";
-export { SitesHost } from "./slack/previews.js";
 export { SlackPreviewAssets, SlackPreviewBindings, SlackPreviewData, SlackPreviewOutbound } from "./slack/preview-worker.js";
+
+export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
+  override async fetch(request: Request): Promise<Response> {
+    const { SitesHost: Impl } = await import("./slack/previews.js");
+    return await new Impl(this.ctx, this.env).fetch(request);
+  }
+}
 
 export { Sandbox, SandboxCode, SandboxEgress } from "./sandbox-container.js";
 

@@ -10,7 +10,7 @@ import {
   STELLA_JWT_AUDIENCE,
   STELLA_JWT_TTL_SECONDS,
   stellaJwtClaims,
-} from "./auth.js";
+} from "./config.js";
 
 /**
  * `GET /api/auth/token` for a signed `Authorization: Bearer` session token,

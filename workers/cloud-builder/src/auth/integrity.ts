@@ -348,6 +348,8 @@ const verifyAttestation = async (args: {
   teamIdentifier: string;
   allowDevelopmentEnvironment: boolean;
 }): Promise<string> => {
+  // @peculiar/x509 2.x runs tsyringe, which needs reflect-metadata evaluated first.
+  await import("reflect-metadata");
   const x509 = await import("@peculiar/x509");
   x509.cryptoProvider.set(crypto);
   const decoded = decodeCbor(args.attestation);

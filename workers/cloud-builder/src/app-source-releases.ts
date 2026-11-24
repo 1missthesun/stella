@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { DurableObject } from "cloudflare:workers";
 import {
   APP_SOURCE_RELEASES_PATH,
@@ -71,7 +70,7 @@ export class AppReleaseChannel extends DurableObject<Env> {
     const promise = (async () => {
       const previous = this.record();
       const wait = previous ? previous.checkedAt + MIN_CHECK_INTERVAL_MS - Date.now() : 0;
-      if (wait > 0) await Effect.runPromise(Effect.sleep(wait));
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
       read.at = Date.now();
       let version: string | null;
       try {

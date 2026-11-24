@@ -191,7 +191,7 @@ its patch or when workspaces link different copies of one patched package (two
 copies of `@earendil-works/pi-durable` in one bundle fail every cloud chat turn
 with "Not a Harness").
 
-Order: **D1 migrations → cloud-builder → model-gateway → the rest.** The gateway
+Order: **D1 migrations → app-compiler → cloud-builder → model-gateway → the rest.** `app-compiler` is a private Service Binding worker (`workers_dev: false`) that owns `esbuild.wasm` for cloud app builds and must exist before `cloud-builder` deploys against its `APP_COMPILER` binding. The gateway
 refuses any model it has no price for, and it prices models from
 cloud-builder's catalog. When a release adds or changes a model, deploy
 cloud-builder, wait a couple of minutes for the gateway to refresh its price
@@ -200,13 +200,15 @@ minutes. A deploy kills in-flight container agent turns.
 
 ```bash
 # dev
-cd workers/cloud-builder && bunx wrangler d1 migrations apply stella-v2-dev --remote
+cd workers/app-compiler && env -u CLOUDFLARE_API_TOKEN bun run deploy:dev
+cd ../cloud-builder && bunx wrangler d1 migrations apply stella-v2-dev --remote
 env -u CLOUDFLARE_API_TOKEN bun run deploy:dev            # cloud-builder
 cd ../model-gateway && env -u CLOUDFLARE_API_TOKEN bun run deploy:dev
 # then telemetry, browser-gateway, apps-host: bun run deploy:dev
 
 # prod
-cd workers/cloud-builder && bunx wrangler d1 migrations apply stella-v2-prod --env production --remote
+cd workers/app-compiler && env -u CLOUDFLARE_API_TOKEN bun run deploy:production
+cd ../cloud-builder && bunx wrangler d1 migrations apply stella-v2-prod --env production --remote
 env -u CLOUDFLARE_API_TOKEN bun run deploy:production
 cd ../model-gateway && env -u CLOUDFLARE_API_TOKEN bun run deploy:production
 # then telemetry, browser-gateway, apps-host: bun run deploy:production

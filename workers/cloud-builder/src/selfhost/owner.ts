@@ -1,4 +1,3 @@
-import { createAuth } from "../auth/auth.js";
 import { fail, json } from "../http/response.js";
 import { ownerModeEnabled } from "./owner-mode.js";
 
@@ -61,6 +60,7 @@ export const bootstrapOwnerRoute = async (request: Request, env: Cloudflare.Env)
   }
   const serverId = `srv_${randomId(16)}`;
   const name = requestedName ?? DEFAULT_NAME;
+  const { createAuth } = await import("../auth/auth.js");
   const context = await createAuth(env).$context;
   const user = await context.internalAdapter.createUser({
     email: `owner-${serverId.slice(4).toLowerCase()}@selfhost.stella.local`,

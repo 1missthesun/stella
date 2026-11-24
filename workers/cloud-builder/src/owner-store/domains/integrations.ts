@@ -41,10 +41,6 @@ import {
   type IntegrationRef,
 } from "./integration-accounts.js";
 import {
-  buildGoogleAdsMutationProxyRequest,
-  normalizeGoogleAdsProxyResponse,
-} from "../../integrations/google-ads.js";
-import {
   X_API_BASE_URL,
   X_OAUTH_SCOPES,
   X_OAUTH_STATE_TTL_MS,
@@ -603,11 +599,17 @@ const runAction = async (
   } else if (args.account) {
     throw new RpcError("BAD_REQUEST", "This integration connects a single account; omit `account`.");
   }
-  let proxy: Record<string, unknown> | null;
-  try {
-    proxy = buildGoogleAdsMutationProxyRequest(integration.toolkit, action.name, args.input);
-  } catch {
-    throw new RpcError("BAD_REQUEST", "Invalid Google Ads mutation input.");
+  const googleAds =
+    integration.toolkit.toLowerCase() === "googleads"
+      ? await import("../../integrations/google-ads.js")
+      : null;
+  let proxy: Record<string, unknown> | null = null;
+  if (googleAds) {
+    try {
+      proxy = googleAds.buildGoogleAdsMutationProxyRequest(integration.toolkit, action.name, args.input);
+    } catch {
+      throw new RpcError("BAD_REQUEST", "Invalid Google Ads mutation input.");
+    }
   }
   const fingerprint = await sha256Hex(
     JSON.stringify({
@@ -653,7 +655,7 @@ const runAction = async (
     throw new RpcError("UNAVAILABLE", "Could not run the integration action.", { retryable: false });
   }
   settleReceipt(ctx.db, args.requestId, "succeeded", Date.now());
-  return proxy ? normalizeGoogleAdsProxyResponse(payload) : payload;
+  return proxy && googleAds ? googleAds.normalizeGoogleAdsProxyResponse(payload) : payload;
 };
 
 const toRequest = (row: ConnectRow, now: number): CloudConnectorConnectRequest => ({

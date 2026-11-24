@@ -1,4 +1,8 @@
-import type { CreateAppResult } from "@cloudflare/worker-bundler";
+import type {
+  AppCompilerRpc,
+  CompiledWorkspaceApp,
+  CompiledWorkspaceAssetMetadata,
+} from "../../shared/workspace-app-compiler.js";
 import type { WorldSqlStore } from "./world/store.js";
 
 const SLUG = /^[a-z][a-z0-9-]{0,31}$/;
@@ -8,7 +12,6 @@ const decoder = new TextDecoder();
 import type { WorkspaceApp } from "@stella/contracts/workspace-apps";
 export type { WorkspaceApp } from "@stella/contracts/workspace-apps";
 type Release = { app: WorkspaceApp; chunks: number };
-const DEFAULT_SERVER = `import { DurableObject } from 'cloudflare:workers'; export class App extends DurableObject { fetch() { return new Response('Not found', {status:404}); } }`;
 
 export function parseAppManifest(text: string, slug: string) {
   const value = JSON.parse(text);
@@ -41,37 +44,105 @@ export function parseAppManifest(text: string, slug: string) {
 const MAX_PREVIEW_BYTES = 1_500_000;
 type StoredPreview = { revision: string; bytes: Uint8Array };
 
+type CachedBundle = {
+  revision: string;
+  result: CompiledWorkspaceApp;
+  manifest: Map<string, CompiledWorkspaceAssetMetadata>;
+};
+
+const decodePathname = (pathname: string): string =>
+  pathname
+    .split("/")
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join("/");
+
+const resolveAssetPath = (
+  decodedPathname: string,
+  manifest: Map<string, CompiledWorkspaceAssetMetadata>,
+): { pathname: string; meta: CompiledWorkspaceAssetMetadata } | null => {
+  const direct = manifest.get(decodedPathname);
+  if (direct) return { pathname: decodedPathname, meta: direct };
+  if (decodedPathname.endsWith("/")) {
+    const indexPath = `${decodedPathname}index.html`;
+    const meta = manifest.get(indexPath);
+    if (meta) return { pathname: indexPath, meta };
+  } else {
+    const htmlPath = `${decodedPathname}.html`;
+    const htmlMeta = manifest.get(htmlPath);
+    if (htmlMeta) return { pathname: htmlPath, meta: htmlMeta };
+    const indexPath = `${decodedPathname}/index.html`;
+    const indexMeta = manifest.get(indexPath);
+    if (indexMeta) return { pathname: indexPath, meta: indexMeta };
+  }
+  return null;
+};
+
+const serveCompiledAsset = (
+  request: Request,
+  cached: CachedBundle,
+): Response | null => {
+  const method = request.method.toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return null;
+  const url = new URL(request.url);
+  const decoded = decodePathname(url.pathname);
+  const matched = resolveAssetPath(decoded, cached.manifest);
+  if (!matched) return null;
+
+  const { pathname: assetPath, meta } = matched;
+  const strongETag = `"${meta.etag}"`;
+  const weakETag = `W/${strongETag}`;
+  const ifNoneMatch = request.headers.get("If-None-Match") || "";
+  const eTags = new Set(ifNoneMatch.split(",").map((tag) => tag.trim()));
+  const headers = new Headers();
+  headers.set("ETag", strongETag);
+  if (meta.contentType) headers.set("Content-Type", meta.contentType);
+  headers.set(
+    "Cache-Control",
+    assetPath.endsWith(".html")
+      ? "no-cache"
+      : "public, max-age=0, must-revalidate",
+  );
+  if (eTags.has(weakETag) || eTags.has(strongETag)) {
+    return new Response(null, { status: 304, headers });
+  }
+  const body = method === "HEAD" ? null : (cached.result.assets[assetPath] ?? null);
+  return new Response(body, { status: 200, headers });
+};
+
+type WorkspaceAppsEnv = Env;
+
 export class WorkspaceApps {
-  private bundles = new Map<
-    string,
-    { revision: string; result: CreateAppResult }
-  >();
+  private bundles = new Map<string, CachedBundle>();
   private queue: Promise<unknown> = Promise.resolve();
   constructor(
     private world: WorldSqlStore,
     private ctx: DurableObjectState,
-    private env: Env,
+    private env: WorkspaceAppsEnv,
   ) {}
 
-  private async bundle(files: Record<string, string>) {
-    const { createApp } = await import("@cloudflare/worker-bundler");
-    const assets: Record<string, string> = {};
-    const source: Record<string, string> = {};
-    for (const [path, text] of Object.entries(files)) {
-      if (path.startsWith("public/")) assets["/" + path.slice(7)] = text;
-      else if (path.startsWith("src/") || path === "package.json")
-        source[path] = text;
+  private async bundle(files: Record<string, string>): Promise<CompiledWorkspaceApp> {
+    const compiler = this.env.APP_COMPILER as unknown as AppCompilerRpc | undefined;
+    if (!compiler) {
+      throw new Error("App compiler service binding is not configured.");
     }
-    if (!assets["/index.html"]) throw new Error("Missing public/index.html.");
-    source["src/server.ts"] ??= DEFAULT_SERVER;
-    return createApp({
-      files: source,
-      server: "src/server.ts",
-      ...(source["src/client.tsx"] ? { client: "src/client.tsx" } : {}),
-      assets,
-      jsx: "automatic",
-      assetConfig: { not_found_handling: "none" },
-    });
+    return await compiler.compileWorkspaceApp(files);
+  }
+
+  private toCachedBundle(
+    revision: string,
+    result: CompiledWorkspaceApp,
+  ): CachedBundle {
+    return {
+      revision,
+      result,
+      manifest: new Map(result.assetManifest),
+    };
   }
 
   reconcile(): Promise<WorkspaceApp[]> {
@@ -172,7 +243,7 @@ export class WorkspaceApps {
         this.ctx.facets.abort(`app:${slug}`, new Error("App updated"));
         if (this.bundles.size >= 8)
           this.bundles.delete(this.bundles.keys().next().value!);
-        this.bundles.set(slug, { revision: app.revision, result });
+        this.bundles.set(slug, this.toCachedBundle(app.revision, result));
       } catch (error) {
         app.status = "error";
         app.error = (
@@ -243,24 +314,17 @@ export class WorkspaceApps {
       return new Response("App has not built successfully.", { status: 409 });
     let cached = this.bundles.get(slug);
     if (!cached || cached.revision !== release.app.revision) {
-      cached = {
-        revision: release.app.revision,
-        result: await this.bundle(await this.readReleaseFiles(slug, release)),
-      };
+      cached = this.toCachedBundle(
+        release.app.revision,
+        await this.bundle(await this.readReleaseFiles(slug, release)),
+      );
       if (this.bundles.size >= 8)
         this.bundles.delete(this.bundles.keys().next().value!);
       this.bundles.set(slug, cached);
     }
-    const { result } = cached;
-    const { createMemoryStorage, handleAssetRequest } =
-      await import("@cloudflare/worker-bundler");
-    const asset = await handleAssetRequest(
-      request,
-      result.assetManifest,
-      createMemoryStorage(result.assets),
-      result.assetConfig,
-    );
+    const asset = serveCompiledAsset(request, cached);
     if (asset) return asset;
+    const { result } = cached;
     const worker = this.env.LOADER.get(
       `app:${this.ctx.id}:${slug}:${cached.revision}`,
       () => ({

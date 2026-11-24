@@ -22,7 +22,7 @@ import {
   type SlackWorkspaceUpdate,
   type SlackWorkspacesResponse,
 } from "@stella/contracts/slack-workspace";
-import { websiteUrl } from "../auth/auth.js";
+import { websiteUrl } from "../auth/config.js";
 import { requireCaller } from "../http/caller.js";
 import type { OwnerCaller } from "../owner-store/registry.js";
 import { unwrapRpc } from "../owner-store/errors.js";

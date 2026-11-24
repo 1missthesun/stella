@@ -3,7 +3,7 @@ import {
   FEEDBACK_MAX_CHARS,
   type PreferenceCalls,
 } from "@stella/contracts/backend/preferences";
-import { sendEmail } from "../../auth/auth.js";
+import { sendEmail } from "../../auth/config.js";
 import { rateKeyForIp } from "../../http/client-ip.js";
 import { object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";

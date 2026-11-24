@@ -1,6 +1,5 @@
 import { releasingStub } from "../../rpc-release.js";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
-import { createModels } from "@earendil-works/pi-ai/models";
 import type { TSchema } from "@sinclair/typebox";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type {
@@ -15,11 +14,8 @@ import {
   type CatchUpSourceMessage,
 } from "@stella/contracts/catch-up";
 import { gatewayRelayBaseUrl } from "@stella/contracts/gateway/api";
-import { stellaModel, stellaProvider } from "@stella/agent/provider/stella";
 import { STELLA_DEFAULT_MODEL } from "@stella/model-catalog/aliases";
 import { mintTurnCapability } from "../../capability-signer.js";
-import { piModelSpec } from "../../orchestrator/support.js";
-import { runClaudeDigest } from "../../integrations/claude-digest.js";
 import { claudeCloudAccount } from "./engines.js";
 import { object, string } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -391,6 +387,7 @@ const summarize = async (
     const account = await claudeCloudAccount(ctx).catch(() => null);
     if (account && !("missing" in account)) {
       try {
+        const { runClaudeDigest } = await import("../../integrations/claude-digest.js");
         const outcome = await runClaudeDigest({
           env: ctx.env,
           ownerId: ctx.ownerId,
@@ -447,6 +444,11 @@ const summarizeWithStella = async (
     budgetMicroCents: Math.min(snapshot.allowance.budgetMicroCents, RUN_BUDGET_MICRO_CENTS),
     agentTypes: ["general"],
   });
+  const [{ createModels }, { stellaModel, stellaProvider }, { piModelSpec }] = await Promise.all([
+    import("@earendil-works/pi-ai/models"),
+    import("@stella/agent/provider/stella"),
+    import("../../orchestrator/support.js"),
+  ]);
   const spec = piModelSpec("general", execution, snapshot.allowance.audience);
   const relayBaseUrl = gatewayRelayBaseUrl(origin);
   const models = createModels();

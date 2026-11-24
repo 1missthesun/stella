@@ -142,6 +142,22 @@ const check = (worker, env) => {
     }
   }
 
+  if (worker === "cloud-builder") {
+    const appCompiler = envConfig(readConfig("app-compiler"), env);
+    if (appCompiler.workers_dev !== false) {
+      problems.push("workers/app-compiler must set workers_dev: false so it is not publicly routable.");
+    }
+    if (appCompiler.preview_urls !== false) {
+      problems.push("workers/app-compiler must set preview_urls: false so it is not publicly routable.");
+    }
+    const binding = (target.services ?? []).find((service) => service.binding === "APP_COMPILER");
+    if (!binding || binding.service !== appCompiler.name) {
+      problems.push(
+        `cloud-builder APP_COMPILER service binding (${binding?.service ?? "missing"}) does not match workers/app-compiler (${appCompiler.name}).`,
+      );
+    }
+  }
+
   if (worker === "canvas-share" || (worker === "cloud-builder" && production)) {
     const share = readConfig("canvas-share");
     const shareHosts = (share.routes ?? []).map((route) => route.pattern);

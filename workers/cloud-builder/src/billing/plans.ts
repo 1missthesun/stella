@@ -10,7 +10,6 @@ import {
   PLAN_CATALOG,
   type PlanDefinition,
 } from "@stella/contracts/billing-plans";
-import { stripeRequest, StripeError } from "./stripe.js";
 
 export type PlanCatalog = Record<BillingPlan, BillingPlanConfig>;
 
@@ -163,6 +162,7 @@ export const verifyStripePrice = async (
   const priceId = config.stripePrices[plan];
   const checked = verifiedPrices.get(priceId);
   if (checked !== undefined && Date.now() - checked < PRICE_CHECK_TTL_MS) return priceId;
+  const { stripeRequest, StripeError } = await import("./stripe.js");
   let price: StripePrice;
   try {
     price = await stripeRequest<StripePrice>(env, "GET", `/prices/${encodeURIComponent(priceId)}`);

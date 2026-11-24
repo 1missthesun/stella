@@ -1,11 +1,10 @@
-import { Effect } from "effect";
 import {
   MIN_SUPPORTED_SERVER_API,
   SERVER_API_VERSION,
   type ServerDiscovery,
   type ServerFeatures,
 } from "@stella/contracts/self-host";
-import { authUrl, backendUrl } from "../auth/auth.js";
+import { authUrl, backendUrl } from "../auth/config.js";
 import { billingConfig } from "../billing/plans.js";
 import { json } from "../http/response.js";
 import { ownerModeEnabled, signInAllowed } from "./owner-mode.js";
@@ -42,12 +41,17 @@ export const gatewayCapabilities = async (env: unknown): Promise<GatewayCapabili
   let value: GatewayCapabilities | null = null;
   try {
     if (control?.capabilities) {
-      const capabilities = control.capabilities.bind(control);
-      value = await Effect.runPromise(
-        Effect.tryPromise({ try: capabilities, catch: (error) => error }).pipe(
-          Effect.timeoutOrElse({ duration: GATEWAY_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
-        ),
-      );
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        value = await Promise.race([
+          control.capabilities(),
+          new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), GATEWAY_TIMEOUT_MS);
+          }),
+        ]);
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
     }
   } catch {
     value = null;

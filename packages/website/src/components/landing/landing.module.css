@@ -14,7 +14,8 @@
   font-optical-sizing: auto;
 }
 
-.root[data-cv-render] :is(main > section, footer) {
+.root[data-cv-render] :is(main > section, footer),
+.root :is(main > section, footer)[data-cv-render] {
   /* Drawn once so skipped sections remember their real height (content-visibility-settle.tsx). */
   content-visibility: visible !important;
 }

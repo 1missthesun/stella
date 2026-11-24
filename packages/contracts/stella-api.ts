@@ -1,7 +1,6 @@
 const STELLA_API_BASE_PATH = "/api/stella";
 export const STELLA_MODELS_PATH = `${STELLA_API_BASE_PATH}/models`;
 export const STELLA_PROMPTS_PATH = `${STELLA_API_BASE_PATH}/prompts/v2`;
-export const STELLA_PROMPTS_LEGACY_PATH = `${STELLA_API_BASE_PATH}/prompts`;
 export const STELLA_DEFAULT_MODEL = "stella/default";
 export const STELLA_STANDARD_MODEL = "stella/standard";
 export const STELLA_DEFAULT_UPSTREAM_MODEL = "openai/gpt-6-luna";

@@ -33,7 +33,6 @@ import { PREVIEW_SESSION_CAPABILITY_PATH } from "@stella/contracts/gateway/api";
 import { MAPS_RESOLVE_PATH } from "@stella/contracts/map-artifact";
 import {
   STELLA_MODELS_PATH,
-  STELLA_PROMPTS_LEGACY_PATH,
   STELLA_PROMPTS_PATH,
 } from "@stella/contracts/stella-api";
 import { bearerCredential } from "../../../shared/bearer.js";
@@ -966,10 +965,6 @@ app.get("/readyz", (c) => {
 app.get(STELLA_PROMPTS_PATH, async (c) => {
   const { stellaPromptsResponse } = await import("../prompts/route.js");
   return stellaPromptsResponse(c.req.raw);
-});
-app.get(STELLA_PROMPTS_LEGACY_PATH, async (c) => {
-  const { stellaLegacyPromptsResponse } = await import("../prompts/route.js");
-  return stellaLegacyPromptsResponse(c.req.raw);
 });
 app.get("/.well-known/stella", async (c) => {
   const { discoveryRoute } = await import("../selfhost/discovery.js");

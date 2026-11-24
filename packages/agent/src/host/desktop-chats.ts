@@ -371,7 +371,6 @@ export type DesktopChatsOptions = {
     /** The turn this report ends (a later one may already be running). */
     attempt: number;
   }): void;
-  agentReportRelayed?(agent: { conversationId: string; description: string }): void;
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
   /** Ends the shell sessions a stopped task left running here; resolves with how many. */
   endAgentShells?(threadId: string): Promise<number>;
@@ -1795,11 +1794,10 @@ export function desktopChats(options: DesktopChatsOptions) {
                   if (await noteOnBrain(conversationId, report.requestId, report.text, report.threadId)) return;
                   const root = await harness.conversation(report.rootConversationId, context);
                   if (!root) return;
-                  const submission = await root.submit(
+                  await root.submit(
                     { type: "input", content: report.text, whenBusy: "followUp", requestId: report.requestId },
                     context,
                   );
-                  relayedReport(conversationId, root, submission, report.text);
                 },
                 deliverNote: async (note, context) => {
                   if (!conversationId.startsWith("local_") && options.agentThreads) {
@@ -2657,19 +2655,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     return items;
   };
 
-  const relayedReport = (conversationId: string, root: Conversation, submission: Submission, text: string) => {
-    const relayed = options.agentReportRelayed;
-    if (!relayed) return;
-    void (async () => {
-      const settled = await submission.wait(context);
-      if (settled.status === "unanswered" || settled.type !== "input" || settled.answer === undefined) return;
-      const page = await root.entries({ minEntryId: settled.answer, maxEntryId: settled.answer }, 1, undefined, context);
-      const message = (page.items[0] as unknown as PiEntry | undefined)?.model?.[0];
-      if (message?.role !== "assistant" || !piMessageText(message).trim()) return;
-      relayed({ conversationId, description: /^description: (.*)$/m.exec(text)?.[1]?.trim() ?? "" });
-    })().catch((error: unknown) => options.report(error));
-  };
-
   const startAgent = async (
     conversationId: string,
     agent: { key: string; description: string; prompt: string },
@@ -2958,11 +2943,10 @@ export function desktopChats(options: DesktopChatsOptions) {
           ...(report.agentReport ? { agentReport: report.agentReport } : {}),
         },
       };
-      const submission = await chat.root.submit(
+      await chat.root.submit(
         { type: "input", content: [hidden], whenBusy: "followUp", requestId: report.requestId },
         context,
       );
-      relayedReport(conversationId, chat.root, submission, report.text);
     },
     async agentStatus(
       threadId: string,

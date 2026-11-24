@@ -1630,13 +1630,6 @@ export class LocalSchedulerService {
         cronJobId: active.id,
         cronJobName: active.name,
       })
-      this.fireOsNotification({
-        title: active.name?.trim() || 'Stella',
-        body: text,
-        conversationId: active.conversationId,
-        source: 'cron',
-        refId: active.id,
-      })
     }
 
     this.advanceCronAfterRun(active, finishedAt, false)
@@ -1841,21 +1834,10 @@ export class LocalSchedulerService {
     }
 
     const finalText = runResult.finalText.trim()
-    const deliver = active.deliver !== false
     active.lastStatus = finalText ? 'ok' : 'no-response'
     active.lastError = undefined
     active.failureToldAtMs = undefined
     active.lastOutputPreview = finalText ? truncatePreview(finalText) : undefined
-
-    if (deliver && finalText) {
-      this.fireOsNotification({
-        title: active.name?.trim() || 'Stella',
-        body: finalText,
-        conversationId: active.conversationId,
-        source: 'cron',
-        refId: active.id,
-      })
-    }
 
     this.advanceCronAfterRun(active, finishedAt, false)
     this.persistState()
@@ -2064,7 +2046,6 @@ export class LocalSchedulerService {
     }
 
     const finalText = turnResult.finalText.trim()
-    const deliver = active.deliver !== false
     active.lastStatus =
       escalation.reason === 'change'
         ? finalText
@@ -2075,16 +2056,6 @@ export class LocalSchedulerService {
       escalation.reason === 'sensor-error' ? escalation.summary : undefined
     active.failureToldAtMs = undefined
     active.lastOutputPreview = finalText ? truncatePreview(finalText) : undefined
-
-    if (deliver && finalText) {
-      this.fireOsNotification({
-        title: active.name?.trim() || 'Stella',
-        body: finalText,
-        conversationId: active.conversationId,
-        source: 'cron',
-        refId: active.id,
-      })
-    }
 
     this.advanceCronAfterRun(active, finishedAt, false)
     if (escalation.reason === 'change' && watch.once === true) {
@@ -2135,22 +2106,11 @@ export class LocalSchedulerService {
     }
 
     const finalText = runResult.finalText.trim()
-    const deliver = active.deliver !== false
     active.lastStatus = finalText ? 'ok' : 'no-response'
     active.lastError = undefined
     active.lastOutputPreview = finalText
       ? truncatePreview(finalText)
       : undefined
-
-    if (deliver && finalText) {
-      this.fireOsNotification({
-        title: active.name?.trim() || 'Stella',
-        body: finalText,
-        conversationId: active.conversationId,
-        source: 'cron',
-        refId: active.id,
-      })
-    }
 
     this.advanceCronAfterRun(active, finishedAt, false)
     this.persistState()
@@ -2259,13 +2219,6 @@ export class LocalSchedulerService {
 
     const deliver = active.deliver !== false
     if (deliver) {
-      this.fireOsNotification({
-        title: 'Stella check-in',
-        body: finalText,
-        conversationId: active.conversationId,
-        source: 'heartbeat',
-        refId: active.id,
-      })
       active.lastSentText = finalText
       active.lastSentAtMs = finishedAt
     }

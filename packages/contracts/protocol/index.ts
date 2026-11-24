@@ -75,7 +75,6 @@ export const METHOD_NAMES = {
   HOST_BROWSER_EXTENSION_CONNECT_REQUEST:
     "host.browserExtensionConnect.request",
   HOST_DISPLAY_UPDATE: "host.display.update",
-  HOST_NOTIFICATION_SHOW: "host.notification.show",
   HOST_SYSTEM_REQUEST_PERMISSION: "host.system.requestPermission",
   /**
    * Ask the Electron host process to spawn the desktop_automation daemon on

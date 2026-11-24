@@ -2582,13 +2582,6 @@ export class StellaRuntimeHost {
       },
     );
     peer.registerRequestHandler(
-      METHOD_NAMES.HOST_NOTIFICATION_SHOW,
-      async (params) => {
-        await this.options.hostHandlers.showNotification?.(params);
-        return { ok: true };
-      },
-    );
-    peer.registerRequestHandler(
       METHOD_NAMES.HOST_SYSTEM_REQUEST_PERMISSION,
       async (params) => {
         const kind = String(params ?? "");

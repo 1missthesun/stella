@@ -687,14 +687,6 @@ export const piChatsFor = (
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
-      agentReportRelayed: (agent) => {
-        void hostBus
-          .request(METHOD_NAMES.HOST_NOTIFICATION_SHOW, {
-            title: agent.description.trim() || "Task complete",
-            body: "",
-          })
-          .catch((error) => console.debug("[pi-chat] agent notification failed", error));
-      },
       agentReported: (agent) => {
         if (agent.conversationId.startsWith("local_")) return;
         const body = /\n(?:result|error): ([\s\S]*?)(?=\n(?:agent_state|routing|presentation): |$)/.exec(agent.report)?.[1]?.trim();

@@ -1,10 +1,3 @@
-/**
- * Per-tool compatibility shims for raw model arguments, run before schema
- * validation on every path (agent loop for top-level calls, the shared
- * tool-call pipeline for nested ones). Keyed by name rather than carried on
- * `ToolMetadata`, which must stay plain data.
- */
-
 import { EDIT_TOOL_NAME } from "./defs/edit-def.js";
 import { prepareEditArguments } from "./edit-text.js";
 

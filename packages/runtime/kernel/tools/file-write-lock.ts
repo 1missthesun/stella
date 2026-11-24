@@ -9,7 +9,6 @@ const errorCode = (error: unknown): string | undefined =>
     ? String((error as { code: unknown }).code)
     : undefined;
 
-/** The file a path names on disk, symlinks resolved. */
 const canonicalPath = async (filePath: string): Promise<string> => {
   const resolved = path.resolve(filePath);
   try {
@@ -38,11 +37,6 @@ const withLockKey = async <T>(key: string, fn: () => Promise<T>): Promise<T> => 
   return run;
 };
 
-/**
- * Run `fn` with this process's exclusive lock on the file `filePath` names.
- * Other processes are not excluded; `replaceFileText` refuses a write over
- * content the caller did not read.
- */
 export const withFileWriteLock = async <T>(
   filePath: string,
   fn: () => Promise<T>,
@@ -71,13 +65,6 @@ export class FileChangedError extends Error {
   }
 }
 
-/**
- * Replace the text of the file `filePath` names (through symlinks) with
- * `content`, published by an atomic rename so no reader sees half a file.
- * `expected`: the text the caller read (`null`: the file must not exist);
- * anything else on disk refuses the write with `FileChangedError`.
- * `exclusive`: create only, failing if the file exists.
- */
 export const replaceFileText = async (
   filePath: string,
   content: string,

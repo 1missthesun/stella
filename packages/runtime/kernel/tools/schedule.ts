@@ -317,7 +317,6 @@ const targetNote = (record: LocalCronJobRecord, context: ToolContext): string =>
     ? scheduleTargetLabel(record.payload.threadId, callerThreadId(context))
     : "";
 
-/** Where its runs happen, when that is only this computer. */
 const whereNote = (record: LocalCronJobRecord): string => {
   if (record.id.startsWith("cron:")) {
     return " It lives only on this computer and runs while Stella is open here; a run missed while Stella was closed happens once when it's back.";

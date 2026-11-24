@@ -19,7 +19,6 @@ export const resolveToolFallbackCwd = (
       const resolved = path.resolve(candidate);
       if (statSync(resolved).isDirectory()) return resolved;
     } catch {
-      // Missing paths and packaged app.asar files are invalid cwd fallbacks.
     }
   }
   return os.homedir();

@@ -1,15 +1,3 @@
-/**
- * The frozen `connect` object graph inside the Node REPL worker.
- *
- * Mirrors `browser-use/worker-api.ts`: this function's SOURCE is embedded
- * into the eval'd worker (via `toString()`), so keep every runtime
- * dependency inside the function body. It only shapes/validates arguments
- * and forwards them over the kernel protocol (`connect-call` messages);
- * all real work — catalog resolution, the CLI bridge, the backend
- * connector action broker — happens host-side in
- * `connectors/connect-service.ts`.
- */
-
 export type ConnectWorkerMethod = "discover" | "connectors" | "addMcp" | "remove";
 
 export type ConnectWorkerCall = (
@@ -25,11 +13,6 @@ export interface ConnectWorkerApi {
   remove(id: string): Promise<unknown>;
 }
 
-/**
- * Installs the `connect` client inside the Node REPL worker. Keep every
- * runtime dependency inside this function: its source is stringified into
- * the worker bootstrap.
- */
 export function installConnectWorkerApi(
   callConnect: ConnectWorkerCall,
 ): ConnectWorkerApi {

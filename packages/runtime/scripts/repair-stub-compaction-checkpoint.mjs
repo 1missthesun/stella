@@ -1,28 +1,7 @@
 #!/usr/bin/env node
-// Repair a certified stub compaction checkpoint without deleting raw thread
-// history. This is an OFFLINE utility; it is not imported by the runtime.
-// Dry-run is the default. Apply requires Stella to be stopped, verifies that
-// no Electron/Bun/other process still holds the DB or its WAL sidecars, takes
-// BEGIN IMMEDIATE before authoritative reads, and writes a durable logical
-// backup that can be reversed with --restore.
-//
 // RUNTIME REQUIREMENT: run this script under real Node >= 22
 // (e.g. /opt/homebrew/bin/node), NOT Bun. Bun 1.3.x
 // does not ship the `node:sqlite` module this script depends on.
-//
-// Repair:
-//   node packages/runtime/scripts/repair-stub-compaction-checkpoint.mjs \
-//     --db /offline/copy/stella.sqlite --entry <stub-entry-id>
-//   node packages/runtime/scripts/repair-stub-compaction-checkpoint.mjs \
-//     --db /offline/copy/stella.sqlite --entry <stub-entry-id> \
-//     --apply --confirm-stella-stopped --authorization-token <dry-run-token>
-//
-// Restore a repair from its JSON backup (dry-run first, then apply):
-//   node packages/runtime/scripts/repair-stub-compaction-checkpoint.mjs \
-//     --db /offline/copy/stella.sqlite --restore <backup.json>
-//   node packages/runtime/scripts/repair-stub-compaction-checkpoint.mjs \
-//     --db /offline/copy/stella.sqlite --restore <backup.json> \
-//     --apply --confirm-stella-stopped --authorization-token <dry-run-token>
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1175,9 +1154,6 @@ export const writeDurableJson = (filePath, value, options = {}) => {
         fs.closeSync(directoryFd);
       } catch {}
     }
-    // A receipt is authoritative only after file and directory fsync both
-    // succeed. Remove a partial/orphan artifact so discovery cannot later
-    // mistake it for a committed repair. Cleanup failure is surfaced too.
     let cleanupError;
     if (created) {
       try {
@@ -1355,9 +1331,6 @@ export const applyRepairPlan = (
   assertRepairPostconditions(db, plan);
   const outOfPlanAfter = captureOutOfPlanState(db, plan);
   assertOutOfPlanUnchanged(outOfPlanBefore, outOfPlanAfter);
-  // The verified transaction is still uncommitted here. Persist and fsync its
-  // reversible preimage before the caller may COMMIT; a backup write failure
-  // therefore rolls the SQLite changes back instead of committing unrecoverably.
   writeDurableJson(backupPath, backup, options.writeOptions);
   return { backupPath, backup, noop: false };
 };

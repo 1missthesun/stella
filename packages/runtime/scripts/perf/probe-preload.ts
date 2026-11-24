@@ -285,7 +285,6 @@ const snapshot = () => {
       try {
         bytes = readFileSync(file).byteLength;
       } catch {
-        // ignore
       }
       allCensus.push({ path: file, bytes, at: performance.now() - bootAt });
     }

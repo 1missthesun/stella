@@ -1,7 +1,4 @@
 /**
- * Loads Google Workspace tools directly via the per-API `@googleapis/*`
- * clients (gmail, calendar, drive, docs, people).
- *
  * @license
  * Portions Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0

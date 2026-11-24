@@ -1,8 +1,3 @@
-/**
- * Work the app can cancel by id (a sign-in, an install, a connector flow):
- * each runs as a fiber on the host runtime, and canceling interrupts it,
- * which aborts the signal the work was handed.
- */
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -15,10 +10,6 @@ type Running = { cancel: (reason: Error) => void };
 export const createCancelableRegistry = () => {
   const running = new Map<string, Running>();
 
-  /**
-   * Run `work` under `id`, canceling whatever already runs under it. A
-   * canceled run rejects with the reason it was canceled with.
-   */
   const run = async <A>(id: string, work: (signal: AbortSignal) => Promise<A>): Promise<A> => {
     running.get(id)?.cancel(new Error("Started again."));
     let canceledWith: Error | null = null;
@@ -42,7 +33,6 @@ export const createCancelableRegistry = () => {
     }
   };
 
-  /** Cancel the run under `id`; false when nothing runs under it. */
   const cancel = (id: string, reason: Error): boolean => {
     const entry = running.get(id);
     if (!entry) return false;
@@ -54,7 +44,6 @@ export const createCancelableRegistry = () => {
   return { run, cancel };
 };
 
-/** Wait `ms`, or less if `signal` aborts first. */
 export const sleepUnlessAborted = (ms: number, signal?: AbortSignal): Promise<void> =>
   hostRuntime.runPromise(
     Effect.raceFirst(

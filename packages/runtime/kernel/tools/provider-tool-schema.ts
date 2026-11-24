@@ -2,7 +2,6 @@ const ROOT_COMBINATOR_KEYS = ["oneOf", "anyOf", "allOf"] as const;
 /** Root keywords OpenAI's function schemas also refuse; they only narrow, so dropping them loosens. */
 const ROOT_DROPPED_KEYS = ["not", "enum", "const", "if", "then", "else"] as const;
 
-/** Whether a schema has root keywords some providers' tool schemas refuse. */
 export const needsProviderToolSchemaNormalization = (
   schema: Record<string, unknown>,
 ): boolean =>
@@ -33,19 +32,11 @@ const intersectRequired = (branches: Record<string, unknown>[]): string[] => {
 };
 
 /**
- * Return a provider-facing copy of a tool input schema.
- *
  * Anthropic custom tools reject root-level `oneOf`, `anyOf`, and `allOf`;
  * OpenAI's function schemas also refuse root `not`, `enum` and `const`
  * ("schema must have type 'object' and not have …"). OpenAI-compatible routers can forward the same schema to Anthropic or to
  * other providers with similarly narrow tool-schema support, so normalize at
  * every wire boundary instead of keying the behavior to the selected model.
- *
- * Nested combinators remain intact. Root alternatives are conservatively
- * loosened into one object: branch properties are retained, `allOf` required
- * fields are unioned, and only fields required by every `oneOf`/`anyOf`
- * branch remain required. Stella keeps the original schema for execution-side
- * validation, so this compatibility copy cannot authorize invalid arguments.
  */
 export const normalizeProviderToolInputSchema = (
   schema: Record<string, unknown>,

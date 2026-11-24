@@ -12,7 +12,6 @@ export type ShellStateOptions = {
   getStellaSiteAuth?: () => { baseUrl: string; authToken: string } | null;
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
   cliBridgeSocketPath?: string;
-  /** The host stops every command when the turn ends, so nothing reports an exit afterwards. */
   shellsEndWithTurn?: boolean;
 };
 
@@ -174,15 +173,6 @@ const buildUnixGitShimScript = (): string =>
     "",
   ].join("\n");
 
-/**
- * `bun`, guarded for drafts: a draft links a package set shared with every
- * draft that has its dependencies (draft-deps.ts; older drafts link the
- * app's own node_modules), and an install through that link would write
- * into packages others use. Before a command that installs, the link is
- * removed, so the draft gets packages of its own. An install inside a draft
- * also brings the self-modification tools (the type checker), which the
- * app's own install leaves out (its bunfig says `dev = false`).
- */
 const BUN_DRAFT_CONFIG = "bun-draft-install.toml";
 const BUN_DRAFT_CONFIG_SOURCE = "[install]\ndev = true\n";
 
@@ -248,13 +238,6 @@ const buildUnixBunShimScript = (): string =>
 
 const BUN_DRAFT_GUARD = "bun-draft-guard.cjs";
 
-/**
- * Windows' `bun`, guarded for drafts like the Unix one: a command that
- * installs goes through a guard (run by the real Bun) that removes the
- * draft's link to shared packages and runs the install with the draft's
- * config. Package sets sit in `<app>\.git\stella-packages` or, for a launcher
- * install, `<install root>\pkgs` (draft-deps.ts).
- */
 const buildWindowsBunShimScript = (): string =>
   [
     "@echo off",

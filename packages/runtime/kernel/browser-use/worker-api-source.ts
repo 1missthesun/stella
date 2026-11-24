@@ -47,9 +47,6 @@ const bundleWithBun = async (bun: typeof Bun): Promise<string> => {
   return output.text();
 };
 
-// A variable specifier keeps esbuild out of the cloud image, whose package
-// list is traced from the executor's static imports
-// (workers/cloud-builder/scripts/prepare-image.mjs); the image runs on Bun.
 const ESBUILD = "esbuild";
 
 const bundleWithEsbuild = async (): Promise<string> => {

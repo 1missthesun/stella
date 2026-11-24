@@ -274,10 +274,6 @@ export const closePiChats = async (session: OpenSession): Promise<void> => {
   await (await chats?.catch(() => undefined))?.close();
 };
 
-/**
- * Quitting: seal the chats before anything is killed, so a command or engine stopped by the quit isn't recorded as the
- * task's outcome and the task resumes after the restart. `stop` kills the session's shells.
- */
 const pausedShellsFile = (session: OpenSession) =>
   path.join(session.config.get().stellaDataDirPath, "agent", "stopped-shells.json");
 
@@ -305,7 +301,6 @@ const endCrashedShells = async (shells: readonly CrashedShell[]): Promise<Set<st
       const { pid, identity, sessionId } = shell;
       if (!sessionId || pid === undefined) return;
       if (process.platform === "win32" || !identity) {
-        // No start time to prove it is still the same process: never signal on a bare pid.
         if (pidIsAlive(pid)) left.add(sessionId);
         return;
       }
@@ -329,12 +324,6 @@ const endCrashedShells = async (shells: readonly CrashedShell[]): Promise<Set<st
   return left;
 };
 
-/**
- * The commands tasks run in the background, kept on disk as they start and
- * end: a crash leaves no time to save them, so what this file holds at the
- * next start is what the crash stopped, and each task hears so like after a
- * quit. A quit saves them to the stopped-shells file and clears this one.
- */
 export const trackTaskShells = (
   session: OpenSession,
   runner: Pick<RunnerPublicApi, "runningTaskShells" | "onTaskShellsChanged">,
@@ -367,8 +356,6 @@ export const trackTaskShells = (
   runner.onTaskShellsChanged(() => {
     if (quittingSessions.has(session)) return;
     try {
-      // Each command's start time, read once while it surely runs: after a
-      // crash its group is ended only while it is provably the same one.
       const shells = runner.runningTaskShells().map((shell) => {
         if (shell.pid !== undefined && !identities.has(shell.sessionId)) {
           identities.set(shell.sessionId, readProcessIdentity(shell.pid));
@@ -395,8 +382,6 @@ export const trackTaskShells = (
 export const quitPiChats = async (session: OpenSession, stop: () => Promise<unknown> | undefined): Promise<void> => {
   markClaudeCodeQuitting();
   quittingSessions.add(session);
-  // Tasks resume after the restart, but the background commands they started
-  // die with the app; remember them so each task is told when it resumes.
   try {
     const shells = session.runnerCell.get()?.runningTaskShells() ?? [];
     if (shells.length > 0) {
@@ -624,7 +609,6 @@ export const piChatsFor = (
         void runner.piTools
           .releaseAgentComputerUse(threadId)
           .catch((error) => console.warn("[pi-chat] stopping the agent's computer-use helper failed", error));
-        // One that ended with a stop is no news to start a turn for, unless the task waits for it.
         const sessionIds = runner.backgroundExits
           .untold(threadId)
           .filter((shell) => waiting || !shell.stoppedWithTask)
@@ -683,7 +667,6 @@ export const piChatsFor = (
               ? {
                   status: "completed" as const,
                   ...(agent.text ? { result: agent.text.slice(0, AGENT_REPORT_MAX_CHARS) } : {}),
-                  // Every completed end is a finished report now (explicit messaging).
                   done: true as const,
                 }
               : agent.outcome === "failed"
@@ -763,18 +746,11 @@ export const resumePiChats = async (
   } catch {
     active = false;
   }
-  // A task waiting on background work the restart stopped runs nothing, so its
-  // chat is not among the active ones: it still hears, or it would wait for good.
   if (!active && !stoppedShells && stoppedClaudeCode.length === 0) return;
   const chats = await piChatsFor(session, hostBus);
   const at = Date.now();
   const resumed = active ? await chats.resumeActive() : [];
-  // After the desktop has reconciled its placed tasks with the server (one
-  // stopped meanwhile stays stopped) and its sign-in has reached the models:
-  // tasks hear which of their background commands stopped, and the note says
-  // how each task stands.
   const reconciledHere = placementReconciled(RESTART_NOTE_WAIT_MS);
-  // Claude Code tasks need no Stella sign-in to take the news.
   void reconciledHere
     .then(() => tellTasksOfStoppedClaudeCodeBackground(stoppedClaudeCode, chats))
     .catch((error: unknown) => console.warn("[pi-chat] telling tasks of stopped Claude Code background work failed", error));
@@ -798,7 +774,6 @@ export const resumePiChats = async (
 };
 
 const RESTART_NOTE_WAIT_MS = 60_000;
-/** Stella's sign-in reaches the worker some time after a start (up to a minute or more). */
 const SIGN_IN_WAIT_MS = 10 * 60_000;
 
 const signedIn = async (session: OpenSession, maxMs: number): Promise<void> => {
@@ -808,11 +783,6 @@ const signedIn = async (session: OpenSession, maxMs: number): Promise<void> => {
   }
 };
 
-/**
- * A command a task left running in the background is not restarted: running
- * it again could repeat what it already did. The task hears which ones
- * stopped, with Stella's restart, and starts again what it still needs.
- */
 const tellTasksOfStoppedShells = async (
   session: OpenSession,
   chats: Awaited<ReturnType<typeof piChatsFor>>,
@@ -851,11 +821,6 @@ const tellTasksOfStoppedShells = async (
 };
 const WAKE_SOURCE_LIST_MS = 15_000;
 
-/**
- * What on this computer could start a task's next turn by itself: background
- * commands it started (Stella's own shells and Claude Code's), Claude Code
- * monitors, and schedules aimed at its thread.
- */
 const taskWakeSources = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string): Promise<string[]> => {
   const clip = (text: string) => {
     const line = text.replace(/\s+/g, " ").trim();
@@ -879,8 +844,6 @@ const taskWakeSources = async (session: OpenSession, hostBus: HostBus.Interface,
     aimed = true;
     found.push(`the schedule "${clip(job.name)}" (next ${new Date(job.nextRunAtMs).toISOString()})`);
   }
-  // A list that failed or has not loaded is not "no schedules": the task may
-  // wait on one. It is checked again once the list loads.
   if (!aimed && !listed?.complete) {
     found.push(UNLISTED_SCHEDULES_WAKER);
     recheckOnceListed(session, hostBus, threadId);
@@ -897,10 +860,6 @@ const RECHECK_EVERY_MS = 60_000;
 const RECHECK_FOR_MS = 24 * 60 * 60_000;
 const unlistedWaits = new WeakMap<OpenSession, { threads: Map<string, number>; running: boolean }>();
 
-/**
- * A task that waited while its schedules could not be listed is checked
- * again once they can be: with nothing live then, it hears so.
- */
 const recheckOnceListed = (session: OpenSession, hostBus: HostBus.Interface, threadId: string): void => {
   let state = unlistedWaits.get(session);
   if (!state) {
@@ -933,12 +892,6 @@ const recheckOnceListed = (session: OpenSession, hostBus: HostBus.Interface, thr
   })();
 };
 
-/**
- * Claude Code's background commands and monitors end with its process, which
- * Stella's quit or crash ended. The task that started them hears which, and
- * that it wakes for it, since a task waiting on one would otherwise wait for
- * good.
- */
 const tellTasksOfStoppedClaudeCodeBackground = async (
   stopped: readonly StoppedClaudeCodeBackground[],
   chats: Awaited<ReturnType<typeof piChatsFor>>,
@@ -965,11 +918,8 @@ const tellTasksOfStoppedClaudeCodeBackground = async (
   }
 };
 
-// One per worker process: the desktop's placement bridge reconciled the
-// tasks placed here since this worker started.
 const reconciled = { done: false, wake: new Set<() => void>() };
 
-/** The desktop reports that its placement bridge has reconciled the tasks placed here after a start. */
 export const markPlacementReconciled = (): void => {
   reconciled.done = true;
   for (const wake of reconciled.wake) wake();

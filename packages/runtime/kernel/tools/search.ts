@@ -375,7 +375,6 @@ export const handleGrep = async (
         }
       }
     } catch {
-      // Skip unreadable files.
     }
     if (results.length >= maxResults) break;
   }

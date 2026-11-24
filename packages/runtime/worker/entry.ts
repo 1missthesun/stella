@@ -90,7 +90,6 @@ const main = async () => {
       try {
         await finalizers[i]?.();
       } catch {
-        // Best effort during process shutdown.
       }
     }
     await closeRuntimeTelemetry();
@@ -101,7 +100,6 @@ const main = async () => {
     try {
       broker.dispose();
     } catch {
-      // Best effort during process shutdown.
     }
   });
   const runtimeServer = createRuntimeWorkerServer(broker);

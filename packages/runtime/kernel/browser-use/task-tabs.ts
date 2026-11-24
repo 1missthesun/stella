@@ -99,11 +99,6 @@ const readOwners = (raw: unknown): Record<string, OwnerRecord> => {
   return owners;
 };
 
-/**
- * Which browser tabs each task (browser owner) has open, when they should
- * close, and what was open when they did, so a resumed task gets them back.
- * Persisted so a scheduled close survives a restart of Stella.
- */
 export class TaskTabs {
   private readonly owners: Record<string, OwnerRecord>;
   private readonly running = new Set<string>();
@@ -158,7 +153,6 @@ export class TaskTabs {
     this.persist();
   }
 
-  /** A tab the task left open for the user: kept, and released to them, when the task's tabs close. */
   leftForUser(owner: string, backend: Backend, tabId: number): void {
     const record = this.owners[owner];
     if (!record) return;
@@ -177,7 +171,6 @@ export class TaskTabs {
     };
   }
 
-  /** Owners whose tabs should close now: past their grace period, or untouched for long and not running here. */
   due(now = Date.now()): string[] {
     return Object.entries(this.owners)
       .filter(
@@ -262,7 +255,6 @@ export class TaskTabs {
 export const rememberableTabUrl = (url: string): boolean =>
   /^(https?|file):/i.test(url);
 
-/** Whether a task's final report points the user at this tab, by its address or its title. */
 export const reportMentionsTab = (
   report: string,
   tab: Readonly<{ url?: string; title?: string }>,

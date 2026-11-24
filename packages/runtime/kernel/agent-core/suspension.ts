@@ -3,13 +3,6 @@ import {
   type CloudBrowserSuspension,
 } from "@stella/contracts/cloud-browser";
 
-/**
- * A trusted control-flow failure, not a model-facing tool failure.
- *
- * The descriptor is deliberately the secret-free shared contract. The error
- * message is fixed so a gateway response can never smuggle browser state into
- * logs or an assistant error placeholder through `Error.message`.
- */
 export class AgentToolSuspendedError extends Error {
   readonly suspension: CloudBrowserSuspension;
 

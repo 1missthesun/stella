@@ -3,6 +3,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { forkDelayed } from "./effect-runtime.js";
 import { runtimeIpcPathUsesFilesystem } from "@stella/node-shared/worker/runtime-paths.js";
+import { maxAutomationSocketPathBytes } from "@stella/node-shared/computer-use/automation-socket-paths.js";
 import {
   cliBridgeTokenMatches,
   isUsableCliBridgeToken,
@@ -28,16 +29,7 @@ import type {
   XApiOperation,
 } from "../kernel/cli/x-api-request.js";
 
-/**
- * Defensive ceiling kept below the 104-byte BSD `sun_path` limit (UTF-8
- * bytes + NUL, so 103 usable; Linux allows 108). Mirrors
- * `maxAutomationSocketPathBytes` in
- * `node-shared/computer-use/automation-socket-paths.ts`. The endpoint from
- * `createSecureCliBridgeEndpoint` lives under the short runtime IPC root;
- * fail with an error naming the path instead of an opaque bind failure if a
- * custom root still exceeds the limit.
- */
-export const maxCliBridgeSocketPathBytes = 100;
+export const maxCliBridgeSocketPathBytes = maxAutomationSocketPathBytes;
 
 const maxWindowsPipeNameChars = 256;
 

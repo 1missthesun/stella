@@ -172,7 +172,6 @@ const removeFileIfExists = async (filePath: string) => {
   try {
     await fs.unlink(filePath);
   } catch {
-    // Best-effort cleanup.
   }
 };
 

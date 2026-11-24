@@ -235,9 +235,6 @@ const extensionFor = (url: string, mimeType?: string): string => {
   if (fromUrl && /^(?:png|jpe?g|webp|gif)$/i.test(fromUrl)) {
     return fromUrl.toLowerCase() === "jpeg" ? "jpg" : fromUrl.toLowerCase();
   }
-  // Match the renderer's long-standing media-store filename contract. It
-  // only sees the output URL and falls back to .png, so using response MIME
-  // here would create a second jobId path when the sidebar materializes.
   return "png";
 };
 
@@ -361,8 +358,6 @@ const cancelRequest = async (args: {
       );
       if (response.ok) return true;
     } catch {
-      // A relay may be reconnecting; retry only the idempotent cancellation,
-      // never the generation itself.
     }
   }
   return false;

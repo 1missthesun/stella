@@ -102,7 +102,6 @@ const terminateBrowserChild = (child: SpawnedBrowserChild) => {
         try {
           child.kill("SIGKILL");
         } catch {
-          // Ignore cleanup errors when the child already exited.
         }
       }
     }),

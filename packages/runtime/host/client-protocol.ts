@@ -1,8 +1,3 @@
-/**
- * Work the app's Settings and pickers hand to the runtime instead of running
- * it in Electron main: sign-in flows, model lists, prompts, connectors. Each
- * is implemented in host/app-services.
- */
 export const RUNTIME_APP_SERVICE_CALLS = [
   "listLlmOAuthProviders",
   "signInLlmOAuth",

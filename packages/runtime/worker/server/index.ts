@@ -48,11 +48,6 @@ export const createRuntimeWorkerServer = (
 
   const interruptWork = (): Promise<void> => sessions.interruptWork();
 
-  // Start the runner-module import ahead of initialize (see
-  // runner-module.ts). It waits one timer tick so requests already buffered
-  // on the transport (a stdio host writes before the worker attaches) are
-  // dispatched first; starting it synchronously delayed the first response
-  // by the whole import (+38 ms in the perf lab) for no gain in spawn→ready.
   const prefetchRunner = (): void => {
     forkDelayed(0, () => {
       runnerModule.prefetch();

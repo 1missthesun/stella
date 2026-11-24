@@ -1,30 +1,8 @@
 /**
  * Ported from Pi (https://github.com/earendil-works/pi), MIT License,
  * Copyright (c) 2025 Mario Zechner.
- *
- * BM25 ranking for `tools.$search`, ported from Pi's tool search
- * (`@earendil-works/pi-durable` `search.ts`, which `tool_search` and code
- * mode's `searchTools()` use), with one addition from Stella's earlier
- * ranker: a query word inside a tool's name counts as a name match even
- * when the name has no boundary there (`draft` in `gmail_createdraft`).
- *
- * Okapi BM25 (k1 1.2, b 0.75) over a tool's text (description, search terms,
- * parameter names and descriptions), with the name as a separate field:
- * - A tool that matches more of the query's words, in any field, ranks above
- *   one that matches fewer, whatever their scores.
- * - A query word in the name scores more than any number of mentions in the text.
- * - A tool whose whole local name (after the last `__`) is in the query gets a
- *   bonus worth one more match of every query word.
- * - A query that is exactly a tool's name, or its name after a `__`, ranks it first.
- *
- * Indexing a tool (walking its schema and splitting its text into words) is
- * most of the cost, so indexed tools are cached: by object while the catalog
- * hands out the same objects, else by name while the tool's description,
- * search terms and schema are unchanged, as connector tools arrive as fresh
- * objects on every search.
  */
 
-/** What the ranker reads of a tool. */
 export type RankableTool = {
   name: string;
   description?: string;
@@ -44,12 +22,9 @@ type IndexedTool = {
 
 const K1 = 1.2;
 const B = 0.75;
-/** A name match counts this many times the word's IDF; the text part is at most `K1 + 1` (2.2) times. */
 const NAME_WEIGHT = 3;
-/** Shortest query word that matches inside a name without a word boundary. */
 const MIN_NAME_SUBSTRING = 4;
 const MAX_SCHEMA_DEPTH = 6;
-/** Tool names whose index is kept; well above the largest catalogs (a few thousand tools). */
 const MAX_CACHED_TOOLS = 20_000;
 
 const STOP_WORDS: ReadonlySet<string> = new Set([
@@ -87,7 +62,6 @@ const segmenter = (): Intl.Segmenter | null => {
   return wordSegmenter;
 };
 
-/** Naive singular form, so `issues` matches `issue` and `searches` matches `search`. */
 const stem = (term: string): string => {
   if (term.length > 4 && term.endsWith("ies")) return `${term.slice(0, -3)}y`;
   if (term.length > 4 && /(ches|shes|sses|xes|zes)$/.test(term)) {
@@ -99,7 +73,6 @@ const stem = (term: string): string => {
   return term;
 };
 
-/** Words of any script, split at identifier boundaries, without English stop words, singular. */
 export const tokenizeSearchText = (text: string): string[] => {
   const normalized = text
     .normalize("NFC")
@@ -107,8 +80,6 @@ export const tokenizeSearchText = (text: string): string[] => {
     .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
     .toLowerCase()
     .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ");
-  // Plain ASCII splits into the same words at spaces; only other text (Chinese
-  // written without spaces) needs the segmenter, which costs about 15 splits.
   const words =
     /^[a-z0-9 ]*$/.test(normalized) || !segmenter()
       ? normalized.split(" ")
@@ -120,7 +91,6 @@ export const tokenizeSearchText = (text: string): string[] => {
     .map((word) => (/^[a-z0-9]+$/.test(word) ? stem(word) : word));
 };
 
-/** Lowercase with characters invalid in identifiers as `_`, so `dev-radius` matches `dev_radius`. */
 const normalizeName = (name: string): string =>
   name
     .trim()
@@ -130,7 +100,6 @@ const normalizeName = (name: string): string =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-/** Schema descriptions and property names, recursively. */
 const collectSchemaText = (
   schema: unknown,
   depth: number,
@@ -189,7 +158,6 @@ type CachedTool = {
 };
 
 const byObject = new WeakMap<object, IndexedTool>();
-/** The newest index of each tool name, with what it was built from. */
 const byName = new Map<string, CachedTool>();
 const parameterText = new WeakMap<object, string>();
 
@@ -208,7 +176,6 @@ const parametersOf = (tool: RankableTool): string => {
   return text;
 };
 
-/** A tool's index: by object, else by name when built from the same content, else built and remembered. */
 const indexed = (tool: RankableTool): IndexedTool => {
   const known = byObject.get(tool);
   if (known) return known;
@@ -225,7 +192,6 @@ const indexed = (tool: RankableTool): IndexedTool => {
     cached.parameters === parameters
   ) {
     index = cached.index;
-    // Most recently used last, so the oldest go first.
     byName.delete(tool.name);
   } else {
     index = indexTool(tool);
@@ -240,7 +206,6 @@ const indexed = (tool: RankableTool): IndexedTool => {
   return index;
 };
 
-/** The best matches for `query`, best first; ties go by name, as before. */
 export const rankTools = <T extends RankableTool>(
   tools: readonly T[],
   query: string,

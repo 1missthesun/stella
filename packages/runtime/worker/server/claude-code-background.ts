@@ -2,13 +2,6 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { ClaudeCodeBackgroundTaskInfo } from "../../kernel/integrations/claude-code-session-runtime.js";
 
-/**
- * The background commands and monitors each task's Claude Code process runs,
- * kept on disk as they change. They end with the process, so what a quit or a
- * crash leaves here is what the restart stopped; each task hears that after
- * the next start. Entries name the worker that wrote them: the next worker
- * takes only its predecessors'.
- */
 type Entry = {
   conversationId: string;
   threadId: string;
@@ -57,7 +50,6 @@ export const noteClaudeCodeBackground = (
     const entry: Entry = { conversationId: ref.conversationId, threadId: ref.threadId, tasks: [...tasks], worker: WORKER, at: Date.now() };
     live.set(ref.sessionKey, entry);
     const earlier = entries[ref.sessionKey];
-    // A predecessor's entry for this session is what its quit stopped: keep it to be told.
     if (earlier && earlier.worker !== WORKER) entries[`${ref.sessionKey}@${earlier.worker}`] = earlier;
     entries[ref.sessionKey] = entry;
   }
@@ -68,11 +60,9 @@ export const noteClaudeCodeBackground = (
   }
 };
 
-/** What a task's Claude Code process runs in the background right now. */
 export const claudeCodeBackgroundOf = (threadId: string): ClaudeCodeBackgroundTaskInfo[] =>
   [...live.values()].filter((entry) => entry.threadId === threadId).flatMap((entry) => entry.tasks);
 
-/** Takes what earlier runs of Stella left running: their quit or crash stopped it. */
 export const takeStoppedClaudeCodeBackground = (stellaDataDir: string): StoppedClaudeCodeBackground[] => {
   const file = fileOf(stellaDataDir);
   const entries = read(file);

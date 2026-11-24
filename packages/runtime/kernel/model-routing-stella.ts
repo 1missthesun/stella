@@ -36,24 +36,11 @@ import {
 import type { DeviceSigner } from "@stella/node-shared/home/device.js";
 import type { ResolvedLlmRoute } from "./model-routing.js";
 
-/**
- * Fallback context window for Stella-managed relay routes, used only when the
- * resolved upstream model isn't found in the registry. When the model *is* in
- * the registry, `createRelayModel` carries its real provider-catalog-derived
- * context window instead — which the orchestrator compaction trigger keys off.
- */
 export const STELLA_CONTEXT_WINDOW = 80_000;
 const STELLA_MAX_TOKENS = 16_384;
 const STELLA_AUTH_REFRESH_SKEW_MS = 15_000;
 export const STELLA_PROVIDER = "stella";
 
-/**
- * Relay base for a Stella route built before the catalog advertised the
- * gateway origin. A reserved `.invalid` host can never resolve, so a
- * provisional route that slips past catalog enrichment fails closed on DNS
- * instead of sending a capability to some SDK default endpoint; the catalog
- * layer replaces the route (or fails loudly) before any model call.
- */
 export const STELLA_GATEWAY_ORIGIN_PENDING =
   "https://model-gateway.unconfigured.invalid";
 
@@ -107,12 +94,6 @@ export const inferManagedGatewayProviderFromModel = (
 
 const STELLA_OPENROUTER_FLASH_REFERENCE = `stella/openrouter/${STELLA_DEEPSEEK_V4_FLASH_UPSTREAM_MODEL}`;
 
-/**
- * The pinnable spelling of a Stella model reference. Catalogs before
- * 2026-10-06 published the default as `openrouter/deepseek/deepseek-v4.1-flash`,
- * so agent snapshots froze `stella/openrouter/...`, which the gateway rejects:
- * only the catalog id `stella/deepseek/deepseek-v4.1-flash` is listed.
- */
 export const canonicalStellaModelReference = <T extends string | undefined>(
   reference: T,
 ): T | string =>
@@ -337,9 +318,6 @@ const createRelayModel = (args: {
   (model as Model<Api> & { upstreamModelId?: string }).upstreamModelId =
     nativeId;
   if (!args.gatewayOrigin) {
-    // Provisional route (built before any catalog fetch): resolve the relay
-    // base lazily so the route self-heals the moment the catalog remembers
-    // the origin, instead of pinning the unresolvable sentinel forever.
     Object.defineProperty(model, "baseUrl", {
       enumerable: true,
       configurable: true,
@@ -450,7 +428,6 @@ const sessionCapabilityFetch = (
     const clockMoved = noteGatewayClock(requestUrl, response, sentAt, Date.now());
     let capability: string | undefined;
     if (await isDpopInvalid(response)) {
-      // Signed by a clock just corrected from this response: once more, same capability.
       if (!clockMoved) throw gatewayDeviceVerificationError(requestUrl);
       capability = firstCapability;
     } else {
@@ -494,12 +471,6 @@ export const createStellaRoute = (args: {
   resolvedModelId?: string;
   registryModel?: Model<Api> | null;
   api?: GatewayProtocol;
-  /**
-   * Gateway origin advertised by the model catalog. Defaults to the origin
-   * remembered from the last catalog fetch for this site; a route built
-   * before any catalog fetch gets the pending sentinel and must go through
-   * `withStellaModelCatalogMetadata` before use.
-   */
   gatewayOrigin?: string | null;
 }): ResolvedLlmRoute | null => {
   const siteBaseUrl = normalizeStellaBase(args.site.baseUrl);
@@ -523,12 +494,8 @@ export const createStellaRoute = (args: {
     return nextToken || undefined;
   };
 
-  // The Better Auth JWT never reaches a model request. It is exchanged at the
-  // gateway for a session capability; near-expiry JWTs are refreshed first
-  // so the exchange itself never fails on a stale token.
   const currentAuthToken = async (): Promise<string | undefined> => {
     const currentToken = args.site.getAuthToken()?.trim() || authToken;
-    // Stella's servers stamp the token: judge its expiry by their clock.
     const serverNow = gatewayNow(
       gatewayOrigin ?? getRememberedStellaGatewayOrigin(siteBaseUrl),
     );
@@ -539,8 +506,6 @@ export const createStellaRoute = (args: {
   };
 
   const session = createGatewaySessionClient({
-    // Resolved per call: a provisional route created before the catalog
-    // fetch learns the origin as soon as the catalog remembers it.
     gatewayOrigin: () =>
       gatewayOrigin ?? getRememberedStellaGatewayOrigin(siteBaseUrl),
     getAuthToken: currentAuthToken,
@@ -562,8 +527,6 @@ export const createStellaRoute = (args: {
     registryModel: args.registryModel,
   });
   const access: StellaGatewayAccess = {
-    // Read per request: a provisional route learns the gateway once the
-    // catalog remembers it.
     get relayBaseUrl() {
       return relayBaseUrlFor(siteBaseUrl, gatewayOrigin);
     },

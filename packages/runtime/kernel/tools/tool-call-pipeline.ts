@@ -54,11 +54,6 @@ export type ToolCallPipelineArgs = {
   context: ToolContext;
   hookEmitter?: Pick<HookEmitter, "emit">;
   agentType?: string;
-  /**
-   * JSON schema to validate (and coerce) `args` against. Omit only when the
-   * caller already validated against the same schema — the agent loop does
-   * for model-issued top-level calls.
-   */
   parameters?: Record<string, unknown>;
   prepareArguments?: (args: unknown) => unknown;
   execute: (args: Record<string, unknown>) => Promise<ToolResult>;

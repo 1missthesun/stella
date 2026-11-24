@@ -57,13 +57,6 @@ const walk = async (directory) => {
   return files;
 };
 
-/**
- * The code on a line outside template literals, which hold source that
- * runs elsewhere (a script evaluated in a browser page) or plain text, not
- * code this package runs. Quote strings and trailing `//` comments are
- * walked so their backticks don't open a template. `${…}` inside a
- * template counts as part of it.
- */
 const codeOutsideTemplates = (line, inTemplate) => {
   let code = "";
   let quote = null;

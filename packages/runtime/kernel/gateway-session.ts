@@ -31,16 +31,7 @@ export const STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE =
 
 const knownGatewayOrigins = new Map<string, string>();
 
-/**
- * The gateway refuses a device proof whose time is more than
- * GATEWAY_DPOP_MAX_SKEW_MS from its own clock, so a computer whose clock is
- * wrong (a dual-boot PC whose Windows reads the hardware clock Linux set to
- * UTC, time sync turned off) was refused on every request. Proofs and
- * capability expiry are timed by the gateway's clock as last seen in the Date
- * header of its responses: this computer's clock plus the offset learned here.
- */
 const gatewayClockOffsets = new Map<string, number>();
-/** Differences this small are the Date header's whole seconds and latency, not a wrong clock. */
 const GATEWAY_CLOCK_TOLERANCE_MS = 30_000;
 
 const clockKey = (url: string): string => {
@@ -57,11 +48,6 @@ export const gatewayNow = (gatewayUrl: string | null | undefined): number =>
 export const gatewayClockOffsetMs = (gatewayUrl: string): number =>
   gatewayClockOffsets.get(clockKey(gatewayUrl)) ?? 0;
 
-/**
- * Learns the gateway's clock from a response sent between `sentAt` and
- * `receivedAt` (this computer's clock). True when that changed the time
- * proofs are signed with, so a proof refused for its time is worth one retry.
- */
 export const noteGatewayClock = (
   gatewayUrl: string,
   response: Response,
@@ -97,10 +83,6 @@ const describeClockOffset = (offsetMs: number): string => {
   return `${amount} ${offsetMs > 0 ? "behind" : "ahead of"}`;
 };
 
-/**
- * A refused device proof: says when this computer's clock is too far off to
- * correct for, since restarting Stella would not help with that.
- */
 export const gatewayDeviceVerificationError = (gatewayUrl: string): Error => {
   const offset = gatewayClockOffsetMs(gatewayUrl);
   if (Math.abs(offset) <= GATEWAY_DPOP_MAX_SKEW_MS / 2) {
@@ -280,7 +262,6 @@ const readGatewayError = async (
   }
 };
 
-/** The gateway refused the device proof; `clockMoved` when it was timed by a clock now corrected. */
 class GatewayDeviceProofRefused extends Error {
   constructor(readonly clockMoved: boolean) {
     super(STELLA_GATEWAY_DEVICE_VERIFICATION_MESSAGE);

@@ -39,14 +39,6 @@ const isImageMimeType = (mimeType: string): boolean =>
 const encodeImageDataUrl = (mimeType: string, data: ArrayBuffer): string =>
   `data:${mimeType};base64,${Buffer.from(data).toString("base64")}`;
 
-/**
- * Pi-style attachment sizing: resize each composer image to fit the
- * per-image vision budget before it ever reaches the prompt. With every
- * image ≤4.5MB base64 (typically a few hundred KB), whole batches inline
- * directly and the spill-to-disk + Read fallback only triggers for
- * genuinely huge sets. Falls back to the original bytes when Photon
- * can't decode the format.
- */
 const resizeImageDataUrl = async (
   dataUrl: string,
   mimeType: string,

@@ -346,7 +346,6 @@ export const runLocalImageGeneration = async (
       operation.submissionState === "submitted" &&
       operation.jobId
     ) {
-      // The provider request id was durable before restart, so polling is safe.
     } else if (
       !claimImageOperationSubmission({
         stellaDataDir: dataDir,

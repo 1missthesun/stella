@@ -178,11 +178,6 @@ export const createRunnerContext = ({
     }
   };
 
-  /**
-   * A cloud agent's execution. Only the model it will run on is routed: an
-   * engine (named, or the one picked) never touches the configured model,
-   * which may be one this computer can't route for the cloud.
-   */
   const resolveCloudExecutionSelection = async ({
     model: modelOverride,
     spawnEngine,
@@ -281,7 +276,6 @@ export const createRunnerContext = ({
           ? configured
           : undefined;
     if (computerOnlyProviderOf(reference)) return undefined;
-    // The cloud runs these on the account's own key, whatever keys this computer holds.
     const slash = reference?.indexOf("/") ?? -1;
     const provider = reference?.slice(0, Math.max(slash, 0));
     const accountModel = reference?.slice(slash + 1).trim();

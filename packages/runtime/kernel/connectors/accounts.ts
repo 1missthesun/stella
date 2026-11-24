@@ -59,7 +59,6 @@ const readAccounts = async (stellaAppDir: string): Promise<AccountsFile> => {
     ) as AccountsFile;
     if (parsed?.version === 1 && parsed.providers) return parsed;
   } catch {
-    // Missing or unreadable index: start empty.
   }
   return { version: 1, providers: {} };
 };
@@ -166,11 +165,6 @@ const migrations = new Map<string, Promise<void>>();
 const legacyAttempts = new Map<string, number>();
 const LEGACY_RETRY_MS = 5 * 60_000;
 
-/**
- * A single pre-multi-account credential stored under the provider's legacy
- * key becomes the primary account: moved to `<provider>:<email>` once its
- * email is known, or kept under the legacy key until it can be resolved.
- */
 const migrateLegacy = async (
   stellaAppDir: string,
   config: ConnectorAccountProvider,

@@ -1,10 +1,3 @@
-/**
- * `connect.documentation()` text — the one description of the connector
- * client every code runtime hands the model. `installConnectWorkerApi`
- * (device kernel worker) carries a byte-identical inline copy because its
- * source is stringified into the eval'd worker and cannot import; a unit
- * test pins the two together.
- */
 export const CONNECT_DOCUMENTATION = `Connect client — manages the user's connections to third-party services (Gmail, Google Docs, Notion, Slack, MCP servers, ...). All methods are async; failures throw Error with the broker's message.
 
 Connected services' actions are tools: every action of an enabled connector is callable here as tools.<connector>_<action>(args), for example tools.gmail_send_email({ ... }). Find them with await tools.$search({ query: "gmail send" }), read one's input schema with await tools.$describe(name), and call it with a plain object; args are checked against that schema first. Enabling or disabling a connector adds or removes its tools immediately.

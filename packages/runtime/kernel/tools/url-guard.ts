@@ -1,11 +1,3 @@
-/**
- * SSRF classification shared by every host that fetches a model- or
- * user-supplied URL; pure so workerd can import it. IPv6 forms that embed an
- * IPv4 address (mapped, translated, NAT64) are classified as that IPv4.
- * Where no resolver is available (workerd), only literal addresses are
- * checked here and private-network denial is the platform's egress policy.
- */
-
 export const BLOCKED_HOSTNAMES = new Set([
   "localhost",
   "localhost.localdomain",
@@ -130,11 +122,6 @@ export const isLocalHostname = (hostname: string): boolean =>
   hostname.endsWith(".localhost") ||
   hostname.endsWith(".local");
 
-/**
- * Validate and canonicalize an outbound URL: http(s) only, no embedded
- * credentials, no local or private literal target, http upgraded to https.
- * Callers following redirects re-run it on every hop.
- */
 export const normalizeSafePublicUrl = (inputUrl: string): string => {
   const trimmed = inputUrl.trim();
   if (!trimmed) {

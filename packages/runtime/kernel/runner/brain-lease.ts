@@ -30,7 +30,6 @@ export const createBrainLeaseView = (deviceId: string): BrainLeaseView => {
         try {
           listener(conversationId, record);
         } catch {
-          // A listener's failure is its own.
         }
       }
     },

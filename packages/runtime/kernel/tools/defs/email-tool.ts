@@ -3,11 +3,6 @@ import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import type { ToolDefinition } from "../types.js";
 import { EMAIL_TOOL_DESCRIPTOR } from "./email-tool-def.js";
 
-/**
- * The email tool on this computer. Everything runs on Stella's backend, with
- * the Gmail connected through Stella, so it works whether or not Google is
- * also signed in here.
- */
 export const createEmailTool = (options: {
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
 }): ToolDefinition => ({

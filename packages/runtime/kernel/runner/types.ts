@@ -35,12 +35,6 @@ export type StellaHostRunnerOptions = {
   requestSecureInput?: import("../tools/user.js").UserToolsConfig["requestSecureInput"];
   useSecureValue?: import("../tools/user.js").UserToolsConfig["useSecureValue"];
   revealSecureValueForFill?: import("../tools/user.js").UserToolsConfig["revealSecureValueForFill"];
-  /**
-   * Legacy exec compatibility hop for the inline "connect the Stella browser
-   * extension" chat card. Production browser actions use the persistent
-   * browser service API. This hook blocks until the user connects, declines,
-   * or the card times out, then retries the intercepted operation on success.
-   */
   requestBrowserExtensionConnect?: (
     payload: {
       conversationId?: string;
@@ -230,7 +224,6 @@ export type PiReportDelivery = (report: {
 }) => Promise<void>;
 
 export type PiCloudAgentThreads = {
-  /** What a cloud agent runs on; undefined leaves it to the account's own cloud model. */
   execution: (model: string | undefined) => Promise<import("@stella/contracts/agent-engine").CloudExecutionSelection | undefined>;
   start: (request: {
     conversationId: string;
@@ -280,11 +273,8 @@ export type RunnerPublicApi = {
       interrupted?: boolean;
     }) => string[];
     disarm: (owner: { conversationId: string; agentId: string }) => void;
-    /** The agent's background commands it has not been told the end of. */
     untold: (agentId: string) => import("../tools/shell.js").UntoldTaskShell[];
-    /** Tells a working agent, once, of its background commands that ended; undefined when there are none. */
     takeEnded: (agentId: string) => Promise<string | undefined>;
-    /** Ends the shell sessions an agent left running; resolves with how many. */
     endAgentSessions: (agentId: string) => Promise<number>;
   };
   deliverOrchestratorNote: PiReportDelivery;
@@ -301,9 +291,7 @@ export type RunnerPublicApi = {
     import("@stella/contracts/execution-context").ExecutionContextSnapshot | undefined
   >;
   killAllShells: () => Promise<void>;
-  /** Background commands tasks started that are still running. */
   runningTaskShells: () => import("../tools/shell.js").RunningTaskShell[];
-  /** Called whenever a task's background command starts or ends. */
   onTaskShellsChanged: (listener: (() => void) | undefined) => void;
   piTools: import("./pi-tools.js").RunnerPiTools;
   agentHealthCheck: () => AgentHealth;
@@ -381,7 +369,6 @@ export type RunnerPublicApi = {
       args: AgentThreadCalls["usageLimits.resume"]["args"],
     ) => Promise<AgentThreadCalls["usageLimits.resume"]["result"]>;
   };
-  /** One push to the user's phone while work here waits for a sign-in; "cleared" once that's over. */
   signInAlert: (
     args: Omit<DeviceCalls["phone.notifySignIn"]["args"], "deviceId">,
   ) => Promise<DeviceCalls["phone.notifySignIn"]["result"]>;

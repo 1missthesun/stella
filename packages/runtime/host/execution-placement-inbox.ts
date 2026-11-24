@@ -222,7 +222,6 @@ export class ExecutionPlacementInbox {
       try {
         this.database.exec("ROLLBACK;");
       } catch {
-        // BEGIN itself failed.
       }
       throw error;
     }
@@ -282,7 +281,6 @@ export class ExecutionPlacementInbox {
       try {
         this.database.exec("ROLLBACK;");
       } catch {
-        // BEGIN itself failed.
       }
       throw error;
     }

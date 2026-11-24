@@ -164,17 +164,6 @@ const makeRunnerGate = (): RunnerGate => {
   return { published, open, fail };
 };
 
-/**
- * The RunnerModule handed to one session build.
- *
- * `load()` first waits for `published`: the session's background runner
- * build (RunnerHandle) must not construct/start the runner until the session
- * is published and the initialize response is on its way. Construction runs
- * boot recovery sweeps synchronously and `start()` begins extension and
- * models.json loading; started mid-build they share the worker thread with
- * the rest of the layer build and delay the initialize response. The import
- * itself is still prefetched at transport attach.
- */
 const sessionRunnerModule = (
   runnerModule: RunnerModule.Interface,
   timeline: BootTimeline,
@@ -321,7 +310,6 @@ export const make = (deps: {
           try {
             await finalizers[i]?.(succeeded);
           } catch {
-            // Best effort during session teardown.
           }
         }
       };
@@ -347,9 +335,6 @@ export const make = (deps: {
 
       let session: OpenSession;
       try {
-        // Composition order is load-bearing; finalizers run LIFO:
-        // runnerGate -> runner (await in-flight build, stop) -> cli bridge stop
-        // -> credential brokers cleared -> db.close.
         const config = SessionConfig.make(init, deviceIdentity.deviceId);
         const runnerCell = RunnerCell.make();
         const storage = timedSync("layerStorage", () =>
@@ -376,9 +361,6 @@ export const make = (deps: {
             addFinalizer,
           }),
         );
-        // Registered after RunnerHandle's own finalizer, so it runs first
-        // (LIFO): settle the runner gate before that finalizer awaits the
-        // background build.
         addFinalizer((succeeded) => {
           if (succeeded) {
             runnerGate.open();
@@ -417,8 +399,6 @@ export const make = (deps: {
       }
 
       currentSession = session;
-      // Let the background runner build proceed once the initialize
-      // response has been written.
       forkDelayed(0, runnerGate.open);
       session.storage.maintenance.start({
         isIdle: () => currentSession === session && !hasSessionWork(),

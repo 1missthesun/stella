@@ -34,10 +34,6 @@ type ConnectorBrokers =
 
 let connectorBrokers: Promise<ConnectorBrokers> | undefined;
 
-/**
- * A connector broker made on its first call: the module holds the action
- * schema validator and the connector catalog, which no boot needs.
- */
 const lazyConnectorBroker = <Args extends unknown[], Result>(
   make: (brokers: ConnectorBrokers) => (...args: Args) => Promise<Result>,
 ): ((...args: Args) => Promise<Result>) => {

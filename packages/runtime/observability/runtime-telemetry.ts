@@ -59,7 +59,6 @@ export const resolveRuntimeTelemetryPrincipalScope = (
       identity = `token:${JSON.stringify(tokenIdentifier)}`;
     }
   } catch {
-    // Opaque credentials still get an isolated, non-reversible lane.
   }
 
   return createHash("sha256")

@@ -108,7 +108,6 @@ export class RemoteRuntimeHost {
     options: {
       shutdownRuntime?: boolean;
       quit?: boolean;
-      /** The app relaunches and attaches to this runtime again, which keeps its work going meanwhile. */
       relaunching?: boolean;
       exitTimeoutMs?: number;
     } = {},
@@ -212,8 +211,6 @@ export class RemoteRuntimeHost {
         resolveBundledRuntimeFile("worker/entry.js"),
       ...(this.bunBinaryPath() ? { bunBinaryPath: this.bunBinaryPath() } : {}),
       expectedProtocolVersion: STELLA_RUNTIME_CLIENT_PROTOCOL_VERSION,
-      // Under Electron, the runtime's child processes use this binary as
-      // Node (ELECTRON_RUN_AS_NODE); a different binary respawns the runtime.
       ...(process.versions.electron ? { hostExecutablePath: process.execPath } : {}),
       verifyIdentity: { launchEnv: readRuntimeLaunchEnv(process.env) },
     });

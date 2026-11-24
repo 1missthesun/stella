@@ -388,10 +388,6 @@ const openRouterAutoRemoteCatalogModelSchema = {
   required: [...remoteCatalogRequired, "provider", "cost", "api", "baseUrl"],
 } as const satisfies AnySchema;
 
-// `providerId` is the authoritative identity derived from the fetched
-// endpoint/cache key. Entry-controlled `provider` metadata is not trusted to
-// select provider-specific validation exceptions before the runtime overwrites
-// it during composition.
 const remoteCatalogSchemaFor = (
   providerId: string,
   value: unknown,

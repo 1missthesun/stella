@@ -115,8 +115,6 @@ export const createBackendSession = (
     },
     async ownerIdentity(): Promise<OwnerIdentity> {
       if (identity && identity.subject === subject) return await identity.value;
-      // Cached, so a request that never answers must fail rather than hold
-      // every later spawn, message and stop that needs the owner generation.
       const value = raceWithTimeoutError(
         this.require().call("owner.identity", {}),
         OWNER_IDENTITY_TIMEOUT_MS,

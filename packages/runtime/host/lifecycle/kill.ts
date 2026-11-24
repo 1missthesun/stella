@@ -45,11 +45,6 @@ const waitForPidExit = (
     onDeadline: () => new ExitConfirmDeadlineError(),
   }).pipe(Effect.catch(() => Effect.succeed(false)));
 
-/**
- * Stop a worker from a stored pid: SIGTERM, then SIGKILL after `graceMs`.
- * Each signal goes only to the process that was recorded (start time or
- * the worker's own command line), never to whatever now holds the pid.
- */
 export const killWorkerProcess = (
   recorded: RecordedProcess,
   graceMs: number,
@@ -86,7 +81,6 @@ export const stopPids = (
         discard: true,
       });
 
-/** Command-line parts that name a worker of this Stella root. */
 export const workerCommandTags = (workerEntryPath: string, stellaAppDir: string): string[] => [
   workerEntryPath,
   `--stella-root`,

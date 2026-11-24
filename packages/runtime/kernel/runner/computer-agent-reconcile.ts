@@ -33,8 +33,6 @@ export const reconcileComputerAgents = async (args: {
 }): Promise<{ settled: string[] }> => {
   const settled: string[] = [];
   for (const thread of await args.running()) {
-    // Its own start or terminal is still queued here; that one settles it
-    // with the real result, so settling it now would win with an empty one.
     if (args.pending(thread.threadId)) continue;
     const here = await args.standing(thread.threadId);
     if (here?.status === "running") continue;

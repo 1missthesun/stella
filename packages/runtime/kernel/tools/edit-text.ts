@@ -45,7 +45,6 @@ export const prepareEditArguments = (
     try {
       edits = JSON.parse(edits);
     } catch {
-      // Left as a string; validation below reports the shape.
     }
   }
   if (looksLikeEdit(edits)) {

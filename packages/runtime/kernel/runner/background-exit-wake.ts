@@ -22,9 +22,7 @@ type WakeEntry = WakeOwner & {
 };
 export type BackgroundExitWakeDeps = {
   watchShellExit: (sessionId: string, listener: () => void) => () => void;
-  /** Takes a command's end to tell; null when its owner already knows. */
   claimShellExit: (sessionId: string) => ShellExitSnapshot | null;
-  /** Puts back an end that could not be told. */
   releaseShellExit: (sessionId: string) => void;
   getThreadStatus?: (
     agentId: string,
@@ -123,7 +121,6 @@ const buildWakeText = async (
     "",
     "You were resumed for this. Continue the work that was waiting on it, or send what you found with send_message.",
   ].join("\n");
-/** What a working agent is told, once, of its background commands that ended meanwhile. */
 export const takeEndedCommands = async (
   shells: {
     listUntoldTaskShells: (agentId: string) => UntoldTaskShell[];
@@ -168,7 +165,6 @@ export const writeBackgroundExitLog = (
         if (fs.statSync(stale).mtimeMs < cutoff)
           fs.rmSync(stale, { force: true });
       } catch {
-        // A file that vanished under us needs no pruning.
       }
     }
     const logPath = path.join(dir, `${sessionId}.log`);
@@ -199,7 +195,6 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = null;
     armed.delete(key);
-    // A delivery under way puts its own back when it fails.
     if (!entry.flushPromise) {
       for (const exit of entry.pendingDelivery?.exits ?? []) deps.releaseShellExit(exit.sessionId);
     }
@@ -251,7 +246,6 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
       return;
     }
     const isCurrent = () => !disposed && armed.get(key) === entry;
-    // Disarmed before it was told (the agent started working again): that turn tells it.
     const release = () => {
       for (const exit of exits) deps.releaseShellExit(exit.sessionId);
     };
@@ -270,7 +264,6 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
           return;
         }
       } catch {
-        // Status is an optimization; deliver rather than drop the wake.
       }
     }
     if (!isCurrent()) {
@@ -383,8 +376,6 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
           });
           entry.disposers.set(sessionId, dispose);
         } catch {
-          // One malformed/stale session must not keep the remaining
-          // owner-scoped watchers from being armed.
         }
       }
       if (entry.disposers.size === 0) clearEntry(key, entry);

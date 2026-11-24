@@ -31,10 +31,6 @@ export const SCHEDULE_SEARCH_TERMS = [
   "task",
 ] as const;
 
-/**
- * Flat on purpose: the handlers validate the shape per kind, so the schema
- * carries only the one-line contract instead of a oneOf per kind.
- */
 export const SCHEDULE_DEFINITION_PROPERTY = {
   type: "object",
   description:
@@ -235,11 +231,6 @@ const threadTarget = (threadId: string): ScheduleTarget => {
   return { kind: "thread", threadId };
 };
 
-/**
- * Who a task's fire or a watch's finding goes to. An agent's own schedule
- * defaults to its own thread; Stella's keeps each kind's default (undefined).
- * On update, undefined means unchanged.
- */
 export const resolveScheduleTarget = (
   args: Record<string, unknown>,
   caller: { threadId?: string },

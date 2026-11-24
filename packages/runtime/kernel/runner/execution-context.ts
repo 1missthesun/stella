@@ -135,7 +135,6 @@ export const loadMediaAccess = async (args: {
   };
 };
 
-/** The inboxes Stella reads while Email is on, from the backend's pushed view. */
 export const loadEmailAccess = async (client: BackendClient | null): Promise<EmailAccess | undefined> => {
   if (!client) return undefined;
   const held = holdView(client, "email.accounts", {});

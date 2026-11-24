@@ -22,15 +22,6 @@ import {
   resolveStellaDataSeedDir,
 } from "@stella/node-shared/home/stella-paths.js";
 
-// Path helpers are re-exported so existing Electron-side importers keep
-// working; runtime-worker code must import `stella-paths.js` directly so this
-// module (and the sync machinery it drags in) stays out of the worker bundle.
-export {
-  resolveRuntimeStatePath,
-  resolveStellaAppDir,
-  resolveStellaDataSeedDir,
-};
-
 export type StellaDataDir = {
   stellaAppDir: string;
   stellaDataDir: string;

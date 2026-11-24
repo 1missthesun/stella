@@ -124,7 +124,6 @@ export type CloudJournalAppendRequest = {
   ownerGeneration?: string;
   appendId: string;
   records: CloudJournalAppendRecord[];
-  /** What the history is: a voice transcript (default), local history imported once, or a hidden note for Stella. */
   source?: "voice" | "import" | "note";
 };
 
@@ -1392,8 +1391,6 @@ export const createCloudTranscriptWriter = (
             appendId: entry.appendId,
             reason: result.reason,
           });
-          // A hidden note stands alone (a backend without notes refuses it);
-          // only ordered appends hold back the ones queued after them.
           if (!isJournalNote(entry.payloadJson)) {
             deadConversations.set(entry.conversationId, entry.appendId);
           }
@@ -1459,8 +1456,6 @@ export const createCloudTranscriptWriter = (
           ),
         );
       }
-      // A begin written before a restart is the same message: the next
-      // runtime sends that one instead of a fresh copy of it.
       const adopted = stored?.kind === "begin" ? stored : undefined;
       let ownerGeneration: string;
       try {

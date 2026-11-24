@@ -29,12 +29,6 @@ export type LifecycleBudgets = {
   staleRetryTimeoutMs: number;
 };
 
-// The Bun worker cold-starts by loading the bundled kernel entry, which on
-// low-end Windows machines has been observed at ~9.5s (worker startupMs≈9466).
-// A 10s budget left effectively no margin, so a slightly slower boot timed out
-// and triggered a spawn-retry cascade (worker not "ready" until ~40s, plus a
-// failed startup source-history record that waits on it). 30s gives ample
-// headroom on slow machines while still surfacing a genuinely stuck worker.
 export const defaultLifecycleBudgets: LifecycleBudgets = {
   startPollIntervalMs: 50,
   startTimeoutMs: 30_000,

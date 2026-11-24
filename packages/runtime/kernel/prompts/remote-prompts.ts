@@ -157,7 +157,6 @@ const readCache = async (): Promise<void> => {
     if (endpoint && endpoint !== parsed.endpoint) return;
     if (!state.manifest) adopt(parsed.endpoint, manifest);
   } catch {
-    /* no cache, or unreadable: the bundle carries this launch */
   }
 };
 

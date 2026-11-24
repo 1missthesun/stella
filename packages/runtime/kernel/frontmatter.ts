@@ -39,26 +39,14 @@ const splitFrontmatter = (
   };
 };
 
-/*
- * Fast path for the flat frontmatter almost every skill, agent and prompt
- * uses (`key: plain words`, `key: "quoted"`, `key: [a, b]`, `key:` followed
- * by `  - item` lines), so loading them never pulls in the `yaml` package.
- * It only accepts input whose meaning under YAML 1.2's core schema (what
- * `yaml` parses with) is certain; anything else returns NOT_SIMPLE and the
- * caller parses the whole block with `yaml`. The contract is "same result
- * as `yaml`, or fall back", never "close enough".
- */
 const NOT_SIMPLE = Symbol("not-simple");
 type Scalar = string | number | boolean | null;
 
-/** Plain scalars the core schema resolves to something other than a string. */
 const CORE_SCHEMA_NON_STRING =
   /^(?:~|null|Null|NULL|true|True|TRUE|false|False|FALSE|[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
 const SIMPLE_NUMBER = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
-/** Characters a plain scalar may not start with, or that make its meaning depend on context. */
 const PLAIN_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
 const SIMPLE_KEY = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
-/** Tabs, control and Unicode line/space characters YAML treats differently from JS `trim`. */
 const UNUSUAL_CHARACTER = /[\u0000-\u001f\u007f-\u00a0\u1680\u2000-\u200b\u2028\u2029\u202f\u205f\u3000\ufeff]/;
 const trimSpaces = (value: string): string => value.replace(/^ +| +$/g, "");
 
@@ -140,7 +128,6 @@ const parseSimpleFrontmatter = (
       key === "__proto__" ||
       Object.prototype.hasOwnProperty.call(result, key)
     ) {
-      // Duplicate keys are an error to `yaml`; let it decide.
       return NOT_SIMPLE;
     }
     const rest = trimSpaces(match[2] ?? "");
@@ -178,11 +165,6 @@ const parseSimpleFrontmatter = (
 
 type YamlParse = (source: string) => unknown;
 let parseYaml: YamlParse | undefined;
-/**
- * `yaml` is loaded only when a file needs it. It is required synchronously
- * because agent definitions (and `loadHomeAgents`, part of the extension API)
- * load synchronously.
- */
 const loadYaml = (): YamlParse =>
   (parseYaml ??= (createRequire(import.meta.url)("yaml") as { parse: YamlParse }).parse);
 
@@ -195,12 +177,10 @@ const parseFrontmatterText = (frontmatterText: string): Record<string, unknown> 
       return parsed as Record<string, unknown>;
     }
   } catch {
-    // Fall through to empty metadata on parse errors.
   }
   return {};
 };
 
-/** The body without its frontmatter, without parsing the frontmatter. */
 export const stripFrontmatter = (content: string): string =>
   splitFrontmatter(content).body;
 

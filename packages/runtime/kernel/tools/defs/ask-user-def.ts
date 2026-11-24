@@ -163,7 +163,6 @@ const modelAnswers = (
     return { id: question.id, choice: response.choiceId };
   });
 
-/** A cloud task's values come from the user's devices; nothing is saved where the task runs. */
 const cloudSavedValueNote = (saved: UserAskSavedValueNote, under: string, replace: string): string => {
   if (saved.reused) {
     return `Reused the value the user saved in Stella for "${saved.label}": one of their computers released it to this task, sealed to this task's own key, without asking the user.${under} ${replace}`;
@@ -211,7 +210,6 @@ const clockTime = (at: number): string => {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 };
 
-/** How the task may use the handles it got, so it never asks the user twice for a value it still holds. */
 const handlesNote = (resolution: Extract<UserAskResolution, { outcome: "answered" }>): string => {
   const parts: string[] = [];
   if (resolution.freshUntil && resolution.heldBy === "cloud_task") {
@@ -233,10 +231,6 @@ const handlesNote = (resolution: Extract<UserAskResolution, { outcome: "answered
   return parts.join(" ");
 };
 
-/**
- * `request` (the secure card's purpose) goes into `details` only, so the
- * chat can show "Provided"/"Declined" with the user's note under it.
- */
 export const userAskResolutionResult = (
   resolution: UserAskResolution,
   questions: readonly UserAskQuestion[] = [],

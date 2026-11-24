@@ -133,8 +133,6 @@ export const loadConnectorTokenPayload = async (
   const key = tokenKey;
   return await runConnectorEffect(
     Effect.gen(function* () {
-      // On the desktop the broker reads the store in Electron main, which
-      // owns protected storage; refreshing an expired token happens here.
       const broker = getConnectorTokenStoreBroker();
       const payload = yield* tryConnectorOp(() =>
         broker ? broker.load(key) : readStoredConnectorToken(stellaAppDir, key),

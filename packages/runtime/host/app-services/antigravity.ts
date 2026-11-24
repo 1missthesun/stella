@@ -1,4 +1,3 @@
-/** Google Antigravity's sign-in, run through Google's own CLI (see kernel/integrations/antigravity-sign-in). */
 import type { AntigravityStatus } from "@stella/contracts/antigravity";
 import { createCancelableRegistry } from "./cancelable.js";
 
@@ -21,7 +20,6 @@ export const antigravityStatusForApp = async (dataDir: string): Promise<Antigrav
   return { installed: antigravityInstalled(), signedIn, ...(models.length > 0 ? { models } : {}) };
 };
 
-/** One scheduled check: install, update or repair `agy` where Stella uses it. */
 export const checkAntigravityCliUpdate = async (dataDir: string) => {
   const [{ updateAntigravityCli }, { knownAntigravitySignIn, antigravityHomeFor }] = await Promise.all([
     import("../../kernel/integrations/antigravity-cli-install.js"),

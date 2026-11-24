@@ -1,9 +1,3 @@
-/**
- * Saving a generated image or file the app shows into ~/.stella/media/outputs:
- * download it (public URLs only) or decode its data URL, check the bytes are
- * what the name says, and write it once. Runs in the runtime with the other
- * media tools; the app only asks.
- */
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fetchPublicUrl, normalizeSafeExternalUrl } from "../../kernel/tools/network-guards.js";

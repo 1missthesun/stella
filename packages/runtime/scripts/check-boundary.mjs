@@ -36,10 +36,6 @@ const isPiSignInPageImport = (specifier) =>
   /^@earendil-works\/pi-ai\/(?:dist\/)?(?:utils\/oauth-page|auth\/oauth\/callback-server)(?:\.js)?$/.test(
     specifier,
   );
-// Electron main is the OS and window shell: agents, sign-in flows, model
-// catalogs and connectors run in the runtime process, which main reaches over
-// the bridge. The bridge client is the only runtime module main imports; code
-// both processes run lives in @stella/node-shared.
 const MAIN_RUNTIME_IMPORTS = new Set([
   "@stella/runtime/host/remote",
   "@stella/runtime/host/remote.js",
@@ -154,9 +150,6 @@ export const checkBoundaries = async (repoRoot) => {
         specifier === "node:sqlite" &&
         !file.startsWith("packages/runtime/scripts/")
       ) {
-        // The detached worker runs under Bun, which has no node:sqlite; a
-        // static import crashes the runner chunk at load (desktop-v0.0.409,
-        // regressed again via kernel/tools/image-operation-store.ts).
         return BUN_SQLITE_REASON;
       }
       return null;

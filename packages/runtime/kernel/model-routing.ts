@@ -34,13 +34,6 @@ export type ResolvedLlmRoute = {
   model: Model<Api>;
   toolPolicyModel?: Pick<Model<Api>, "api" | "provider" | "id" | "name">;
   route: "direct-provider" | "stella";
-  /**
-   * True only when the route is KNOWN safe to call with no key: the `local/`
-   * OpenAI-compatible provider or an origin-verified credentialless proxy
-   * whose auth travels entirely in configured headers. A baseUrl alone proves
-   * nothing — registry models carry their provider's default baseUrl (e.g.
-   * https://api.anthropic.com) and still require a credential.
-   */
   credentialless?: boolean;
   getApiKey: () => Promise<string | undefined> | string | undefined;
   refreshApiKey?: (rejected?: string) => Promise<string | undefined> | string | undefined;
@@ -228,22 +221,6 @@ const getDirectProviderCandidates = (
   }
 };
 
-/**
- * Recover a gateway model's real context window from the full model catalog.
- *
- * Gateway ids (`<vendor>/<model>`) that aren't in the gateway provider's own
- * registry slice are synthesized from an arbitrary template below. Without
- * this, a large-context model (e.g. an OpenRouter Google Gemini at ~1M) would
- * be pinned to the conservative floor — so a conversation that comfortably
- * fits the real model crosses the compaction trigger (0.7 x window) and fails
- * the fit check, spuriously compacting on a model that never needed it. The
- * catalog aggregates every provider's models, so the same model is very often
- * present under a sibling provider (`google/…`, `vercel-ai-gateway/…`) with
- * its true window even when the requested gateway slice lacks the exact id.
- * Match by exact id first, then by the vendor-stripped base id, and take the
- * largest known window (a model's window is a property of the model, not the
- * gateway it's reached through).
- */
 const resolveCatalogContextWindow = (modelId: string): number | undefined => {
   const trimmed = modelId.trim();
   if (!trimmed) return undefined;
@@ -261,11 +238,6 @@ const resolveCatalogContextWindow = (modelId: string): number | undefined => {
   return best > 0 ? Math.floor(best) : undefined;
 };
 
-/**
- * A model the catalog doesn't list yet (newer than this build, or typed by
- * hand) still runs: the provider is the authority on its own ids, so a bogus
- * one fails loudly upstream instead of being refused here.
- */
 const modelForUnlistedReference = (
   registryProvider: string,
   modelId: string,
@@ -418,28 +390,6 @@ const resolveDirectProviderRoute = (args: {
   return { kind: "missing-credential" };
 };
 
-/**
- * Desktop-local engine model references (`claude-code/<model>`,
- * `codex-cli/<model>`) that can appear as a run's configured model when the
- * active engine is a desktop-local engine (Claude Code / Codex).
- *
- * The desktop model picker keeps `modelOverrides` resolvable — it stores a
- * Stella route for Claude Code and an `chatgpt/<model>` route for Codex,
- * and carries the engine-native model in a dedicated preference field
- * (`claudeCodeModel` / `codexModel`). The mobile picker mirrors the same engine
- * plus engine-native model, but writes the engine-prefixed id straight into
- * `modelOverrides`. Those prefixes are NOT cloud providers, so feeding them to
- * the direct-provider resolver rejects them as `unsupported-provider` — a
- * mobile-originated turn on a desktop-local engine then fails even though the
- * desktop runs the exact same selection fine.
- *
- * Normalize such a reference to the route a desktop turn resolves so the turn
- * dispatches to the desktop engine identically regardless of origin. The
- * engine-native model itself is always read from its dedicated preference field
- * downstream (`getClaudeCodeAgentModelId` / `getCodexSubscriptionPreferences`), so
- * rewriting only the prep/orchestrator *route* model here never changes which
- * engine model actually runs the turn.
- */
 const CLAUDE_CODE_ENGINE_PROVIDER = "claude-code";
 const CODEX_CLI_ENGINE_PROVIDER = "codex-cli";
 
@@ -448,15 +398,9 @@ const normalizeDesktopLocalEngineModelReference = (
 ): string | undefined => {
   const parsed = parseModelReference(modelName);
   if (!parsed) return modelName;
-  // Codex resolves its orchestrator/prep route through the OpenAI-Codex
-  // provider on desktop; map the mobile engine prefix onto that same provider.
   if (parsed.provider === CODEX_CLI_ENGINE_PROVIDER) {
     return `chatgpt/${parsed.modelId}`;
   }
-  // Claude Code keeps a Stella conversation/prep route on desktop; fall back to
-  // the default Stella route (no explicit model) so the engine executes the
-  // turn instead of the resolver rejecting an unknown provider.
-  // Google Antigravity runs in its own CLI the same way.
   if (parsed.provider === CLAUDE_CODE_ENGINE_PROVIDER || isComputerOnlyProviderId(parsed.provider)) {
     return undefined;
   }
@@ -529,12 +473,6 @@ const resolveLlmRouteResult = (args: {
       : { ok: false, failure: { kind: "no-stella-route" } };
   }
 
-  // Explicit non-Stella selection (BYOK / local / direct provider): the model
-  // id is the source of truth and must be honored exactly. We never silently
-  // re-route a user's explicit provider pick through Stella's managed gateway —
-  // that would swap their provider, billing, and sometimes the model itself
-  // without consent. Any failure is reported so the caller can fail loudly and
-  // let the user switch models.
   const direct = resolveDirectProviderRoute({
     stellaAppDir: args.stellaAppDir,
     provider: parsed.provider,
@@ -627,11 +565,6 @@ export const resolveLlmRoute = (args: {
   throw new Error(formatLlmRouteFailure(result.failure));
 };
 
-/**
- * Allows a bare Stella id with no safe offline resolution to reach the async
- * catalog layer. Callers must immediately pass the result to
- * `withStellaModelCatalogMetadata`, which replaces it or fails closed.
- */
 export const resolveLlmRouteForCatalogEnrichment = (args: {
   stellaAppDir: string;
   modelName: string | undefined;

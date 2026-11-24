@@ -39,12 +39,6 @@ import { forkDelayedCall, raceWithTimeoutError } from "./cloud-effect-runtime.js
 import { resolveJwtOwnerScope } from "@stella/node-shared/shared/jwt-owner-scope.js";
 
 const REQUEST_TIMEOUT_MS = 60_000;
-/**
- * A running turn's steps upload together at most this often: a computer that
- * disappears mid-turn leaves its last few seconds out of the cloud copy (its
- * own restart uploads them from the local file). A turn's end, a move to
- * another computer and a quit upload at once.
- */
 const STEP_BATCH_MS = 5_000;
 const SHUTDOWN_FLUSH_MS = 5_000;
 const FINAL_RECHECK_MS = 1_500;
@@ -93,7 +87,6 @@ export type ClaudeSessionSync = ClaudeSessionSyncSink & {
   stop(): void;
   pending(): number;
   flush(timeoutMs?: number): Promise<boolean>;
-  /** Uploads what is waiting before the runtime stops, briefly and only when signed in. */
   flushForShutdown(): Promise<void>;
   restore(args: {
     threadId: string;

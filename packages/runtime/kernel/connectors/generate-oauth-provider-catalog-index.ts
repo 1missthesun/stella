@@ -33,7 +33,6 @@ if (import.meta.main) {
     try {
       current = readFileSync(indexPath, "utf-8");
     } catch {
-      // Missing sidecar is drift.
     }
     if (current !== expected) {
       console.error(

@@ -40,7 +40,6 @@ const parseSseMessages = (text: string): RpcMessage[] => {
     try {
       messages.push(JSON.parse(data) as RpcMessage);
     } catch {
-      // Ignore malformed non-RPC SSE frames.
     }
   }
   return messages;

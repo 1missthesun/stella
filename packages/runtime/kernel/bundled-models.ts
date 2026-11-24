@@ -53,11 +53,6 @@ const chatModels = (catalog: Catalog): Model<Api>[] =>
     (model) => model.type === undefined || model.type === "chat",
   );
 
-/**
- * The catalog this build ships with: pi-ai's own list for each provider
- * Stella offers. The ChatGPT plan is pi-ai's Codex list under Stella's
- * provider id; the plan's transport sets the real endpoint.
- */
 export const bundledModels = (): Map<string, Model<Api>[]> => {
   const bundled = new Map<string, Model<Api>[]>();
   for (const [providerId, catalog] of Object.entries(CATALOGS)) {

@@ -223,10 +223,6 @@ export const runsHandlers: WorkerRpcHandlers = {
       ...message,
       ...(sender ? { sender } : {}),
     });
-    // A schedule on this computer fired for a task that runs elsewhere (a
-    // helper on another computer or in the cloud): the cloud, which keeps the
-    // task's thread, takes it there. Only for this computer's own schedules
-    // (no owner generation): a message the cloud sent here never goes back.
     if (
       outcome === "not_found" &&
       !payload.ownerGeneration &&
@@ -245,8 +241,6 @@ export const runsHandlers: WorkerRpcHandlers = {
     );
     const payload = params as RuntimeLocalAgentStopRequest;
     const threadId = String(payload.threadId ?? "");
-    // Runs of it queued to start before this stop arrived began without
-    // knowing of it: they are not announced (the stop ends them here).
     session.runnerCell.get()?.computerAgents.dropQueuedStarts(threadId);
     const stopped = await piStopAgent(session, ctx.hostBus, threadId);
     return { outcome: stopped === "not_found" ? "not_found" : "stopped" };
@@ -329,7 +323,6 @@ export const runsHandlers: WorkerRpcHandlers = {
   },
 };
 
-/** The cloud's delivery of a local schedule's fire, as a device outcome; undefined when it couldn't take it. */
 const scheduleFireThroughCloud = async (
   session: OpenSession,
   message: { threadId: string; text: string; messageId: string },

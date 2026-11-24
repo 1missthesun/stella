@@ -1,10 +1,3 @@
-/**
- * Model-provider sign-ins and model lists the app's Settings asks for. They
- * run in the runtime, which already carries the provider code (pi-ai, the
- * model catalog), so Electron main never loads it.
- * Main keeps only what needs the OS keychain: it stores the credentials a
- * sign-in returns, and asks resolveLlmOAuthApiKey to refresh them.
- */
 import type { OAuthCredentials } from "@stella/node-shared/storage/llm-oauth-credentials.js";
 import type { ChatGptRegistration } from "@stella/contracts/chatgpt-siwc";
 import type {
@@ -80,7 +73,6 @@ export const signInLlmOAuth = async (
 
 const loadChatGptSignIn = () => import("../../kernel/integrations/chatgpt-sign-in.js");
 
-/** Sign in to a ChatGPT account on this computer (Sign in with ChatGPT). */
 export const signInChatGpt = async (
   request:
     | {
@@ -115,11 +107,6 @@ export const signInChatGpt = async (
 
 const chatGptListeners = new Map<string, ChatGptLoopback>();
 
-/**
- * The loopback page ChatGPT redirects to, for the cloud connect, whose other
- * steps go through Stella's backend from main: open it, wait for the callback,
- * close it.
- */
 export const openChatGptCallbackListener = async (
   request: { listenerId?: unknown } | null | undefined,
 ): Promise<{ port: number; redirectUri: string }> => {
@@ -176,7 +163,6 @@ export const resolveLlmOAuthApiKeyForApp = async (
   });
 };
 
-/** The catalog's ChatGPT models, for when no ChatGPT account is signed in. */
 export const listChatGptCatalogModels = async (): Promise<
   Array<{ id: string; name: string }>
 > => {

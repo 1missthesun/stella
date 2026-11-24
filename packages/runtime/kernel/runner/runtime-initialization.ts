@@ -77,15 +77,6 @@ export type RuntimeInitializationLifecycleOverrides = {
   stopWatchers?: () => void;
 };
 
-/**
- * Interruptible Promise seam whose finalizer joins the actual Promise.
- *
- * `Effect.tryPromise` supplies the lifecycle AbortSignal. Its interruption is
- * intentionally not enough on its own: an extension factory can ignore the
- * signal, and closing SQLite while that promise still holds extension services
- * would recreate the startup-after-shutdown race. The ensuring finalizer keeps
- * scope close parked until the underlying promise really settles.
- */
 const interruptAndJoinPromise = <A>(
   operation: (signal: AbortSignal) => Promise<A>,
 ): Effect.Effect<A, unknown> =>
@@ -116,12 +107,6 @@ const interruptAndJoinPromise = <A>(
 
 export type ExtensionWatchScope = "resource-tree" | "agent-definitions" | "data-dir";
 
-/**
- * The non-recursive data-directory watcher exists only to observe the atomic
- * replacement of the `system` mirror. SQLite databases and their WAL/SHM
- * files live beside it, so treating every sibling write as an extension edit
- * creates a permanent reload loop while agents are active.
- */
 export const isExtensionWatchChangeRelevant = (
   scope: ExtensionWatchScope,
   filename: string | Buffer | null,
@@ -129,11 +114,6 @@ export const isExtensionWatchChangeRelevant = (
   if (scope === "data-dir") {
     return filename !== null && path.basename(String(filename)) === "system";
   }
-  // `agents/` holds the user's agent definitions as top-level `.md` files,
-  // and also every task's working folder (`agents/<day>/<thread>/`). Only
-  // the definitions matter; reacting to task files reloaded every extension
-  // on each file a task wrote (hundreds of reloads a day, each leaking the
-  // previous modules).
   if (scope === "agent-definitions") {
     if (filename === null) return false;
     const name = String(filename);
@@ -237,7 +217,6 @@ export const createRuntimeInitialization = (
   context: RunnerContext,
   deps: {
     disposeBackendClient: () => void;
-    /** Last uploads that need the backend client, before it goes. */
     flushBeforeStop: () => Promise<void>;
     shutdownTasks: () => void | Promise<void>;
     lifecycle?: RuntimeInitializationLifecycleOverrides;
@@ -248,23 +227,11 @@ export const createRuntimeInitialization = (
   let initializationGeneration = 0;
   let runtimeStopPromise: Promise<void> | null = null;
 
-  /**
-   * Keep extension registry swaps synchronous so the orchestrator queue never
-   * observes a partially installed extension set.
-   */
   const installLoadedExtensions = (extensions: LoadedExtensions): void => {
     context.state.loadedAgents = mergeBundledAndExtensionAgents(
       extensions.agents,
     );
     for (const hook of extensions.hooks) {
-      // Force `source: "extension"` even if the disk-loaded hook
-      // declared something else. Bundled hooks register through
-      // `registerBundledHooks` (a separate code path that runs at
-      // worker startup), so anything coming out of `loadExtensions`
-      // is by definition user-installable. Without this clamp, a
-      // hook that exported `{ source: "bundled", ... }` would survive
-      // every subsequent `clearBySource("extension")` sweep and
-      // accumulate duplicate registrations on each F1 reload.
       context.hookEmitter.register({
         ...hook,
         source: "extension",
@@ -436,16 +403,6 @@ export const createRuntimeInitialization = (
       return { status: "not-initialized" };
     }
     logger.info("extensions.reload.start");
-    // Load-then-swap to keep the reload atomic w.r.t. the orchestrator
-    // queue. If we swept first and awaited the disk load between sweep
-    // and install, a user message landing during the await would
-    // dequeue against an empty extension registry: missing tools,
-    // missing extension-provided model providers, mid-flight provider
-    // resolution failing over to fallbacks. Doing the disk read FIRST
-    // (the only async step) means the OLD registry stays intact during
-    // I/O; only the synchronous sweep+install block below mutates live
-    // state, and the orchestrator queue can't slip a turn into the
-    // middle of a synchronous block.
     let extensions: Awaited<ReturnType<typeof loadExtensions>>;
     try {
       extensions = await loadExtensions(
@@ -457,8 +414,6 @@ export const createRuntimeInitialization = (
       logger.warn("extensions.reload.load-failed", { error: reason });
       return { status: "load-failed", reason };
     }
-    // Synchronous swap: clear old + install new in one block. No
-    // awaits between these statements.
     context.hookEmitter.clearBySource("extension");
     context.toolHost.unregisterExtensionTools();
     installLoadedExtensions(extensions);
@@ -502,9 +457,6 @@ export const createRuntimeInitialization = (
         recursive: false,
         scope: "agent-definitions" as const,
       },
-      // The system mirror is replaced by an atomic directory swap, which a
-      // recursive watcher on the old inode would miss — watch the data dir
-      // itself (non-recursive) so the `system` entry rename triggers a reload.
       {
         path: context.stellaDataDir,
         recursive: false,
@@ -596,14 +548,12 @@ export const createRuntimeInitialization = (
     try {
       modelConfigWatcher?.close();
     } catch {
-      // Best-effort.
     }
     modelConfigWatcher = null;
     for (const watcher of resourceWatchers) {
       try {
         watcher.close();
       } catch {
-        // Best-effort.
       }
     }
     resourceWatchers = [];
@@ -617,11 +567,6 @@ export const createRuntimeInitialization = (
     void initializeRuntime();
   };
 
-  /**
-   * Interrupt and join the complete startup scope before any dependency that
-   * extension factories or model initialization can observe is disposed.
-   * Closing the scope also aborts/joins the post-ready catalog refresh.
-   */
   const stopInitialization = async (): Promise<void> => {
     initializationGeneration += 1;
     const scope = initializationScope;
@@ -642,9 +587,6 @@ export const createRuntimeInitialization = (
     context.state.isRunning = false;
     context.state.isInitialized = false;
     context.state.initializationStarted.reset();
-    // This join is deliberately before the backend client, tool-host, and ultimately
-    // session-storage teardown. Even a user extension factory that ignores its
-    // abort signal must settle before its captured services can be closed.
     await stopInitialization();
     await deps.flushBeforeStop().catch((error: unknown) => {
       logger.warn("runner.stop.flush-failed", {

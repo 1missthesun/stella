@@ -4,14 +4,6 @@ import { getFileLogger } from '@stella/node-shared/observability/file-logger';
 const FAILURE_LOG_THROTTLE_MS = 30_000;
 const SLOW_HELPER_LOG_THRESHOLD_MS = 500;
 const lastFailureLogAt = new Map();
-// Circuit breaker. A helper that's simply broken on this machine (e.g. a
-// crashing/hanging win32 `.exe`) must not be re-spawned on every cursor-move
-// / context refresh — each failed spawn costs a full process launch plus the
-// kill-timeout wait, which on Windows shows up as continuous system-wide lag.
-// After N consecutive failures we stop spawning the helper for a cooldown,
-// then allow a single probe; success closes the circuit, another failure
-// re-opens it. This caps a broken helper to ~one spawn per cooldown instead
-// of one per call.
 const CIRCUIT_FAILURE_THRESHOLD = 3;
 const CIRCUIT_COOLDOWN_MS = 60_000;
 const circuits = new Map();

@@ -72,8 +72,6 @@ export type CompanionWindowOptions = {
 const READY_TIMEOUT_MS = 4_000;
 const EDGE_MARGIN = 6;
 const HOVER_GRACE_MS = 340;
-// The arc's lowest button reaches this far past the mark's bottom edge (top
-// edge when the arc flips), so the panel and the screen clamp leave room.
 const ARC_OVERHANG = 34;
 const HYPRLAND_ATTACH_TIMEOUT_MS = 3_000;
 const HYPRLAND_DRAG_INTERVAL_MS = 16;
@@ -628,7 +626,6 @@ export class CompanionWindowController {
     this.placeOnHyprland();
   }
 
-  /** Mirrors the bounds just applied onto the real Hyprland windows. */
   private placeOnHyprland(): void {
     const hypr = this.hypr;
     if (!hypr) return;
@@ -740,19 +737,12 @@ export class CompanionWindowController {
     }
   }
 
-  /**
-   * While the panel is active it takes the pointer for the mark too (its hull
-   * holds the arc buttons and a hit target over the mark), so the mark's own
-   * window must not sit on top of the arc and swallow its clicks.
-   */
   private applyStacking(): void {
     const panel = this.live(this.panel);
     const mark = this.live(this.mark);
     if (!panel || !mark) return;
     const active = this.activity.panelActive;
     if (process.platform === "darwin" || process.platform === "win32") {
-      // The mark stays on top so it keeps drawing over the panel, but lets
-      // clicks through to the panel; forwarded moves keep its hover and eyes.
       if (active) mark.setIgnoreMouseEvents(true, { forward: true });
       else mark.setIgnoreMouseEvents(false);
       mark.moveTop();
@@ -818,10 +808,6 @@ export class CompanionWindowController {
     win.webContents.send(IPC_COMPANION_LAYOUT, layout);
   }
 
-  /**
-   * If the window manager overrode the bounds we asked for, ask again — but
-   * only a few times per second so a WM that refuses never starts a loop.
-   */
   private scheduleBoundsRepair(): void {
     if (this.wayland || this.boundsRepairTimer || this.drag) return;
     this.boundsRepairTimer = setTimeout(() => {

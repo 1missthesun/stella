@@ -18,7 +18,6 @@ const workspaceAppRoot = (value: string): string | null => {
 const EXTERNAL_OPEN_MIN_INTERVAL_MS = 1_000;
 let lastExternalOpenAtMs = 0;
 
-/** A link that leaves the app opens in the browser, like links in the main window. */
 const openOutsideApp = (value: string) => {
   let url: URL;
   try {
@@ -33,13 +32,6 @@ const openOutsideApp = (value: string) => {
   void shell.openExternal(url.toString());
 };
 
-/**
- * A workspace app frame (CloudAppPanel) is agent-authored and may load any
- * https script, and it shares the app session. It stays inside its own signed
- * app root; only the app renderer may point the frame elsewhere. A link it
- * follows out of that root opens in the browser instead.
- * Must run before any window exists.
- */
 export const guardWorkspaceAppFrames = () => {
   app.on("web-contents-created", (_event, contents) => {
     const guard = (

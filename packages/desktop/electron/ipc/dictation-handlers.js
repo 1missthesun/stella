@@ -48,9 +48,7 @@ const DICTATION_SOUND_VOLUME_BY_SOUND = {
     cancel: "0.35",
 };
 const DICTATION_START_SOUND_MUTE_DELAY_MS = 220;
-// A microphone that never goes live still mutes, as a slow one eventually does.
 const DICTATION_LIVE_MUTE_FALLBACK_MS = 1_500;
-// The companion's window may have to load before it can claim its capture.
 const SHORTCUT_CAPTURE_UNCLAIMED_MS = 6_000;
 const ARMED_CAPTURE_UNCLAIMED_MS = 1_500;
 const MIC_ENABLED_KEY = "stella-mic-enabled";
@@ -279,8 +277,6 @@ export const registerDictationHandlers = (options) => {
     const toggleDictation = () => {
         const target = pickFocusedStellaWindow();
         const startId = randomUUID();
-        // The microphone opens here, on the key itself: the window that will
-        // dictate can be busy, or still have to load.
         const openOrPlayStop = (window) => {
             if (isRendererRecording(window))
                 playEnabledDictationSound("stopRecording");
@@ -519,8 +515,6 @@ export const registerDictationHandlers = (options) => {
         }
         return { enabled: nextEnabled };
     });
-    // One cleanup listener per renderer, not one per dictation start (which
-    // piled up and tripped Node's MaxListeners warning on long sessions).
     const dictationSenders = new WeakSet();
     onPrivilegedIpc(options, IPC_DICTATION_ACTIVE_CHANGED, (event, payload) => {
         const sender = event.sender;

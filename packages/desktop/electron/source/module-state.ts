@@ -1,22 +1,3 @@
-/**
- * Whether loading a module a second time is harmless. A module that only
- * declares (functions, classes, constants built without running anything
- * that could keep or start something) can be loaded again next to its old
- * copy: nothing in the old one keeps running and nothing it knew is lost. A
- * module that holds a variable, fills a container, or runs code when loaded
- * cannot, and a change that needs it loaded again takes a page reload instead.
- *
- * A call counts as harmless when it is one of the known constructors below or
- * is marked with the standard pure annotation (the JSX and enum output of the
- * transform already is).
- *
- * A module whose state is only a cache, a count of what is mounted, or a
- * registration that the newer copy should replace says so with a
- * `@reloadable` comment and is then loaded again like one that only declares.
- * State the user would notice losing does not qualify: it lives in a module
- * of its own, or in the view state.
- */
-
 type Node = { type: string; start: number; end: number; [key: string]: unknown };
 type Comment = { type: string; value: string; start: number; end: number };
 
@@ -119,7 +100,6 @@ const isHotGuard = (test: Node) =>
   (test.property as Node).type === "Identifier" &&
   (test.property as Node).name === "hot";
 
-/** Why the module holds state, or null when it only declares. */
 export const moduleStateReason = (program: Node, comments: Comment[], code: string): string | null => {
   if (comments.some((comment) => RELOADABLE.test(comment.value))) return null;
   const text = (node: Node) => code.slice(node.start, Math.min(node.end, node.start + 48)).split("\n")[0]!;

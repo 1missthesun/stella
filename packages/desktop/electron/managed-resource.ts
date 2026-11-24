@@ -20,12 +20,6 @@ export type ManagedResourceConfig<TService> = {
   oneShot?: boolean;
 };
 
-/**
- * One service instance lives from `start()` to `stop()`. Launch failures and
- * unexpected exits re-run `config.start` on that same instance, so state the
- * service carries across restarts (agent backends, delegates) is never
- * orphaned in an abandoned instance.
- */
 type ResourcePhase<TService> =
   | { kind: "stopped" }
   | { kind: "launching"; service: TService; launch: Promise<void> }

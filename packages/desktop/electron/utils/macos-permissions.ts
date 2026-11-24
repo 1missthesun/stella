@@ -15,9 +15,7 @@ const getScreenCapturePermissions = (): ScreenCapturePermissionsModule | null =>
   try {
     const require = createRequire(import.meta.url)
     _screenCapturePermissions = require('mac-screen-capture-permissions') as ScreenCapturePermissionsModule
-  } catch {
-    // Native module not available; fall back to Electron APIs.
-  }
+  } catch {}
   return _screenCapturePermissions
 }
 

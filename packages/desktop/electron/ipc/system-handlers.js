@@ -452,8 +452,6 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_GET_TOKEN)) {
             throw new Error("Blocked untrusted auth token request.");
         }
-        // Served from the main process's JWT cache (scoped to the current
-        // credentials and backend); never an expired token.
         return await options.authService.getAuthToken({
             forceRefresh: payload?.forceRefresh === true,
             allowStale: false,
@@ -896,17 +894,13 @@ export const registerSystemHandlers = (options) => {
             try {
                 await contentTracing.stopRecording();
             }
-            catch {
-                // No active trace, or tracing already stopped.
-            }
+            catch {}
             return {
                 ok: false,
                 error: error instanceof Error ? error.message : String(error),
             };
         }
     });
-    // Prompt presets live in the runtime's home files; the runtime reads and
-    // writes them, and checks the agent id.
     const guardPromptPresets = (event, channel) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, channel)) {
             throw new Error(`Blocked untrusted ${channel} request.`);
@@ -986,10 +980,6 @@ export const registerSystemHandlers = (options) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_LIST_MODELS)) {
             throw new Error("Blocked untrusted preferences:listModels request.");
         }
-        // Do not let a renderer preload during runner attachment turn a
-        // transient lifecycle gap into a successful, 24-hour cached empty
-        // catalog. Await runner attachment instead so early renderer mounts
-        // resolve once the deferred host-runner initialization completes.
         const runner = await waitForConnectedRunner(options.getStellaHostRunner, {
             timeoutMs: 10_000,
             unavailableMessage: "Stella runtime model catalog is not ready.",
@@ -1098,9 +1088,7 @@ export const registerSystemHandlers = (options) => {
                 try {
                     window.webContents.send(IPC_VOICE_PREFERENCES_CHANGED, saved.realtimeVoice);
                 }
-                catch {
-                    // Ignore renderer delivery failures while a window closes.
-                }
+                catch {}
             }
         }
         return saved;
@@ -1140,8 +1128,6 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Local Stella root is unavailable.");
         }
         const providerId = asTrimmedString(payload?.provider).toLowerCase();
-        // The runtime runs the provider's sign-in; main opens the page it
-        // names and keeps the result in the keychain-backed store.
         const loginKey = `${event.sender.id}:${providerId}`;
         const previous = activeOAuthLogins.get(loginKey);
         if (previous) {
@@ -1324,8 +1310,6 @@ export const registerSystemHandlers = (options) => {
         const shared = !profileId && sharedClientId
             ? { clientId: sharedClientId, email: options.engineAccountAccess.chatGptRegistration(sharedClientId)?.email }
             : null;
-        // The runtime runs the sign-in and its loopback page; main opens the
-        // page it names and records the profile, which needs the keychain.
         if (activeChatGptSignIn) {
             void callRuntimeAppService("cancelLlmOAuthSignIn", { loginId: activeChatGptSignIn }).catch(() => undefined);
         }
@@ -1530,9 +1514,7 @@ export const registerSystemHandlers = (options) => {
             try {
                 options.ensureGlobalInputHooksOnMac?.();
             }
-            catch {
-                // Best-effort; hooks may still be starting.
-            }
+            catch {}
         }
         lastAccessibilityStatus = accessibility;
         return {

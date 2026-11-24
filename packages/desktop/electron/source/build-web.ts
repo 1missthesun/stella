@@ -390,7 +390,6 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     html = html.replace(/(<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*?script-src )/, (match) => `${match}${scriptSources.join(" ")} `);
   }
   fs.writeFileSync(path.join(outDir, "index.html"), html);
-  // Canvases render in this page, under their own policy rather than the chat's (canvas-host.ts).
   fs.writeFileSync(path.join(outDir, CANVAS_HOST_FILE), CANVAS_HOST_HTML);
 
   fs.cpSync(publicDir, outDir, { recursive: true });

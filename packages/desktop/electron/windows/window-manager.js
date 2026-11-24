@@ -19,9 +19,6 @@ const TRANSIENT_RELOAD_MAX_ATTEMPTS = 4;
 const TRANSIENT_RELOAD_BASE_DELAY_MS = 350;
 const RELOAD_RETRY_RESET_MS = 5_000;
 const UNRESPONSIVE_RECOVERY_THRESHOLD_MS = 10_000;
-// When the window's renderer dies (crash, OOM, or killed because it hung),
-// load a fresh one instead of leaving a dead window. More exits than this
-// within the window below means it keeps dying: show the recovery page.
 const RENDERER_AUTO_RELOAD_MAX = 2;
 const RENDERER_AUTO_RELOAD_WINDOW_MS = 5 * 60_000;
 const RENDERER_AUTO_RELOAD_DELAY_MS = 500;

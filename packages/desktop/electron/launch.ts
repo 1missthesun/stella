@@ -11,19 +11,8 @@ const COMPILE_CACHE_DIR_NAME = "Main Compile Cache";
 
 const enableMainCompileCache = (): void => {
   try {
-    // Node's default temp location, in every install. Stella's own userData
-    // would survive temp cleaners, but this module runs before the bundle it
-    // loads, and it is that bundle (bootstrap) which renames the app and points
-    // userData at Stella's profile: `app.getPath("userData")` here is still the
-    // pre-rename default and would plant a stray profile directory. This was an
-    // `app.isPackaged` branch that no install has taken since packaging was
-    // removed; moving the cache needs a path the launcher hands us, and this
-    // module may not import one to derive it (electron/launch.js must inline
-    // nothing — see assertMainBundleStartupBoundary).
     enableCompileCache();
-  } catch {
-    // Startup must never depend on the cache.
-  }
+  } catch {}
 };
 
 const pruneStaleCompileCacheVersions = async (activeDir: string) => {
@@ -55,9 +44,7 @@ if (compileCacheDir) {
   setTimeout(() => {
     try {
       flushCompileCache();
-    } catch {
-      // Best-effort; Node also persists pending entries at exit.
-    }
+    } catch {}
     void pruneStaleCompileCacheVersions(compileCacheDir).catch(() => {});
   }, COMPILE_CACHE_FLUSH_DELAY_MS).unref();
 }

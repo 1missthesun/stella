@@ -83,9 +83,6 @@ export const configureStellaSessionPermissions = ({
   const appSession = session.fromPartition(appPartition);
   allowLiveViewInAppFrames(appSession, isTrustedAppContents);
 
-  // The window is the app's, but a canvas frame inside it is model-authored
-  // content: whatever it asks for (camera, clipboard, notifications, ...) is
-  // refused, judged by the frame that asked rather than the window.
   appSession.setPermissionRequestHandler(
     (webContents, permission, callback, details) => {
       callback(

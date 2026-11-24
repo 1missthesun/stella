@@ -14,28 +14,6 @@ import {
   type CanvasAction,
 } from "@stella/contracts/canvas-actions";
 
-/**
- * `stella-canvas://` is where canvases render: model-authored HTML from the
- * `html` tool, cloud canvases, and HTML documents agents produce.
- *
- * As `srcdoc` a canvas inherited the app's CSP, which blocks the inline and
- * CDN scripts a canvas is made of. Served from its own scheme it gets its own
- * policy, the header below. Its `sandbox allow-scripts` (no
- * `allow-same-origin`) gives the document an opaque origin whether or not the
- * iframe is sandboxed too, so a canvas cannot read the app's DOM, storage,
- * cookies or preload API, open popups, or navigate the window.
- *
- * Two hosts:
- * - `dir/<token>/<path>`: a local `.html` file and what sits beside it, read
- *   from disk per request. The token stands for the document's own folder,
- *   so its relative images, styles and scripts load, and nothing outside
- *   that folder does.
- * - `memory/<id>`: HTML the renderer registered (a cloud canvas), under a
- *   random id. A document kept on another device, or in the owner's Drive,
- *   is `memory/<id>/<name>`, so its relative assets resolve under the id and
- *   are read on request from wherever that document's folder is reachable
- *   (that device, or Drive), held to that folder.
- */
 export const CANVAS_SCHEME = "stella-canvas";
 const DIRECTORY_HOST = "dir";
 const MEMORY_HOST = "memory";
@@ -247,7 +225,6 @@ export const canvasUrlForLocalFile = async (
   return `${CANVAS_SCHEME}://${DIRECTORY_HOST}/${token}/${encodeURIComponent(path.basename(file))}`;
 };
 
-/** The actions a local canvas file declares (its first bytes; see canvas-actions.ts). */
 export const canvasActionsOfLocalFile = async (
   filePath: string,
 ): Promise<CanvasAction[]> => {
@@ -294,11 +271,6 @@ const documentAssetPath = (
   return isDocumentFolderAsset(documentPath, assetPath) ? assetPath : null;
 };
 
-/**
- * A file inside a registered document folder. Hidden files and folders are
- * never served, and the real path must stay inside the folder, so neither
- * `..` nor a symlink reaches anything beside or above it.
- */
 const resolveDirectoryFile = async (
   token: string,
   segments: string[],
@@ -453,13 +425,6 @@ export const serveCanvasProtocol = (partition: string) => {
   });
 };
 
-/**
- * A canvas frame stays on the document it was given. The sandbox already
- * stops it navigating the window or opening popups; this stops it navigating
- * itself (assigning `location`, a meta refresh) anywhere else, including
- * another canvas. The app embedding it may still point the frame elsewhere.
- * Must run before any window exists.
- */
 export const guardCanvasFrames = () => {
   app.on("web-contents-created", (_event, contents) => {
     contents.on("will-frame-navigate", (details) => {

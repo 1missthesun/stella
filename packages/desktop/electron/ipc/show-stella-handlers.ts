@@ -24,7 +24,6 @@ import { onPrivilegedIpc, registerPrivilegedHandle } from "./privileged-ipc.js";
 
 type ShowStellaHandlersOptions = ShowStellaControllerOptions & {
   assertPrivilegedSender: (event: IpcMainEvent | IpcMainInvokeEvent, channel: string) => boolean;
-  /** Recorder messages only count from the overlay window. */
   isOverlaySender: (event: IpcMainEvent | IpcMainInvokeEvent) => boolean;
 };
 

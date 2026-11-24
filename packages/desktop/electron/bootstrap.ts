@@ -90,11 +90,7 @@ if (isDeveloperInstance) {
   process.env.STELLA_RUNTIME_STATE_DIR = stellaDataDirPath;
 }
 const installBrokenPipeGuards = () => {
-  const swallowBrokenPipe = (_error: Error & { code?: string }) => {
-    // Electron inherits stdio from whatever started it — the launcher for the
-    // product, the dev runner for a checkout. If that parent pipe disappears,
-    // logging should not crash the app.
-  };
+  const swallowBrokenPipe = (_error: Error & { code?: string }) => {};
 
   process.stdout.on("error", swallowBrokenPipe);
   process.stderr.on("error", swallowBrokenPipe);
@@ -109,8 +105,6 @@ export const bootstrapMainProcess = () => {
   connectLauncher();
   initMainProcessLogging(stellaAppDir);
   installBrokenPipeGuards();
-  // Linux: log the real-time CPU limit Stella runs under and keep PipeWire in
-  // this process from setting it to 0 (see linux-realtime-limit.ts).
   startLinuxRealtimeLimitCheck();
   // Stella ships its own chrome (custom top bar, custom window controls on
   // Windows). Electron's default application menu otherwise renders an

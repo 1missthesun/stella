@@ -4,7 +4,6 @@ import { IPC_CLIPBOARD_WRITE_TEXT, IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMA
 import {
   handleIpc,
 } from "./typed-ipc.js";
-// Electron 44's clipboard takes W3C-style ClipboardItems; images go on as PNG.
 const writeImageToClipboard = (image) => clipboard.write([
     new ClipboardItem({
         "image/png": new Blob([image.toPNG()], { type: "image/png" }),
@@ -20,7 +19,6 @@ export const registerBrowserHandlers = (options) => {
             return { ok: false, error: "Stella root not initialized" };
         }
         try {
-            // The runtime downloads or decodes it, checks it and writes it.
             return await callRuntimeAppService("saveMediaOutput", {
                 url: payload?.url,
                 fileName: payload?.fileName,

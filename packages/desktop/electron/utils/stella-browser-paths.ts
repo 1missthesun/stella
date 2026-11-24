@@ -74,9 +74,7 @@ const promoteStagedBinary = (binaryPath: string): boolean => {
     if (!existsSync(binaryPath) && existsSync(previousPath)) {
       try {
         renameSync(previousPath, binaryPath);
-      } catch {
-        // Preserve the original activation failure below.
-      }
+      } catch {}
     }
     throw new Error(
       `Cannot activate Stella Browser service update: ${error instanceof Error ? error.message : String(error)}`,

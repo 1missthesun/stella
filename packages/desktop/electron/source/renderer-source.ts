@@ -36,7 +36,6 @@ const PDF_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.mjs";
 const ENV_MODULE_URL = "/@env";
 const PACK_PREFIX = "/@pack/";
 const LIVE_PREFIX = "/@live/";
-/** Long enough for the page that asked, and whatever an agent is still editing, to settle. */
 const BUNDLE_DELAY_MS = 5_000;
 const GRAPH_FORMAT_VERSION = "1";
 const ROOT_MODULE_URL = "/src/app-root.tsx";
@@ -106,11 +105,6 @@ export type HotUpdate =
   | { type: "self"; id: string; url: string }
   | { type: "dep"; id: string; spec: string; url: string }
   | { type: "css"; id: string; url: string };
-/**
- * A change the full window takes without loading again: the modules that must
- * run again (`modules`, already at `version`) are imported through `root` and
- * the app is rendered from it; `css` are style modules to run again first.
- */
 export type SwapPayload = {
   version: number;
   root: string | null;
@@ -124,7 +118,6 @@ export type ApplyResult =
   | { mode: "swap"; payload: SwapPayload; reloadPages: string[] }
   | { mode: "failed"; error: string };
 
-/** `[importer, imported]` URL paths of dynamic imports a window has run. */
 export type RanImports = [string, string][];
 
 export type RendererSourceOptions = {
@@ -132,19 +125,14 @@ export type RendererSourceOptions = {
   repoRoot: string;
   envDir: string;
   cacheDir: string;
-  /** Read-only prebuilt cache root (e.g. `packages/desktop/.prebuilt-renderer`). */
   fallbackCacheDir?: string;
   mode: RendererBuildMode;
   log: (message: string) => void;
   onReloadNeeded: () => void;
   tailwind?: (file: string, source: string) => Promise<string>;
-  /** Build dependency bundles in a child process (default true). */
   apart?: boolean;
-  /** Skip delayed background page-bundle builds (used by offline prebuild). */
   skipAutoBundle?: boolean;
-  /** Skip eager post-sync module rendering (used by offline prebuild). */
   skipPrewarm?: boolean;
-  /** Delay before warming cached Tailwind compiler; 0 disables background warming. */
   tailwindWarmDelayMs?: number;
 };
 
@@ -212,7 +200,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   };
 
   const tailwind = new Map<string, Promise<string>>();
-  /** Incremental Tailwind builds by stylesheet: they outlive `tailwind`'s cached output. */
   const tailwindBuilds = new Map<string, TailwindBuild>();
   const compileTailwind =
     options.tailwind ??
@@ -233,7 +220,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     });
   const servedImports = new Map<string, Set<string>>();
   const servedStylesheets = new Set<string>();
-  /** JSON the window imported: kept by its address, so a swap can't give it the new data. */
   const servedData = new Set<string>();
   const tailwindStylesheets = new Set<string>();
   const versions = new Map<string, number>();
@@ -498,7 +484,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     }
   };
 
-  /** Served modules, per bundle (`""`: for pages loaded module by module). */
   const rendered = new Map<string, Map<string, Promise<Uint8Array>>>();
   const renderedFor = (bundle: string) => {
     let modules = rendered.get(bundle);
@@ -507,11 +492,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   };
   let generation = 0;
 
-  /**
-   * A bundle a page was served. Modules are known to that page by the bundle's
-   * id (`?b=`): what the bundle holds it takes from there (`liveShim`), except
-   * modules changed since the page loaded (`floor`).
-   */
   type HeldBundle = PageBundleMeta & { id: string; floor: number };
   const held = new Map<string, HeldBundle>();
   const holding = async (id: string | null): Promise<HeldBundle | null> => {
@@ -528,7 +508,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     const version = versions.get(file);
     return version !== undefined && version > (bundle?.floor ?? 0) ? version : undefined;
   };
-  /** The address a page that holds `bundle` knows a source module by. */
   const moduleUrl = (url: string, file: string, bundle: HeldBundle | null) => {
     if (!bundle) return withVersion(url, file);
     const version = versionFor(file, bundle);
@@ -596,7 +575,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
     }
     return inputs;
   };
-  /** The bundle that is exactly what the files hold now, if it was built. */
   const builtBundle = async (page: string) => {
     if (hot) return null;
     const inputs = await inputsOf(page);
@@ -605,10 +583,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
 
   const failedBundles = new Set<string>();
   let bundleTimer: ReturnType<typeof setTimeout> | null = null;
-  /**
-   * Bundles are for the pages loaded next: a page never waits for one to be
-   * built, it loads module by module until one is there.
-   */
   const buildBundlesLater = () => {
     if (hot || options.skipAutoBundle) return;
     if (bundleTimer) clearTimeout(bundleTimer);
@@ -808,7 +782,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
 
   const packCss = new Map<string, Promise<Uint8Array>>();
   const digestOf = (body: Uint8Array) => createHash("sha256").update(body).digest("hex");
-  /** The pack each page last ran, by digest: a swap skips styles that did not change. */
   const pagePack = new Map<string, string>();
   const packModule = (name: string): Promise<Uint8Array> => {
     let built = packCss.get(name);
@@ -1091,7 +1064,6 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   const applyChanges = async (
     repoPaths: string[],
     ran: RanImports | null = null,
-    /** The bundle the full window runs, if it runs one. */
     bundleId: string | null = null,
   ): Promise<ApplyResult> => {
     await prepare();
@@ -1197,9 +1169,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         try {
           const resolved = graph.resolveImport(ref.specifier, file);
           if (resolved?.kind === "dep" && !deps?.entries.has(resolved.file)) missing.add(resolved.file);
-        } catch {
-          // Fails the same way when the window imports it.
-        }
+        } catch {}
       }
     }
     if (missing.size > 0) {

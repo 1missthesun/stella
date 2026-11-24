@@ -87,7 +87,6 @@ const waitForProcessExit = async (pid, timeoutMs = 2_500) => {
         }
     }
 };
-/** Stop a preview found moments ago, only while it is still that process. */
 const stopPreviewProcess = async (preview) => {
     const pid = preview.pid;
     if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
@@ -108,9 +107,7 @@ const stopPreviewProcess = async (preview) => {
         await waitForProcessExit(pid);
         signalRecordedProcess(preview, "SIGKILL", { reason: `${reason}; it ignored SIGTERM`, group });
     }
-    catch {
-        // Best-effort preview cleanup.
-    }
+    catch {}
 };
 const findPreviewProcessIds = async (sessionId) => {
     if (!sessionId.trim()) {
@@ -194,12 +191,6 @@ export const startOfficePreviewBridge = (context) => {
     const previewRoot = resolvePreviewRoot(stellaDataDir);
     let watcher = null;
     let watchKickTimer = null;
-    // Create the preview root once up front so the per-tick scan never has to,
-    // then watch it so a NEW session appearing while idle triggers an immediate
-    // scan instead of waiting up to IDLE_POLL_INTERVAL_MS for the next heartbeat
-    // (the first preview from idle would otherwise take up to ~5s to show). The
-    // idle poll remains the safety net for platforms/filesystems where fs.watch
-    // misses events.
     void fs
         .mkdir(previewRoot, { recursive: true })
         .catch(() => undefined)
@@ -225,9 +216,7 @@ export const startOfficePreviewBridge = (context) => {
                 watcher = null;
             });
         }
-        catch {
-            // Root may not exist yet / platform quirk — poll remains the safety net.
-        }
+        catch {}
     };
     const arm = (intervalMs) => {
         if (stopped || intervalMs === currentIntervalMs) {

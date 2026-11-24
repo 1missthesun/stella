@@ -111,10 +111,6 @@ export const registerBootstrapLifecycle = (context) => {
         await shutdownBootstrapRuntime(context);
     });
     app.on("activate", () => {
-        // Quitting closes every window well before the process exits. Without
-        // this guard a dock click during that window rebuilds the whole UI on a
-        // runtime that is already torn down — which is how an update restart
-        // ends up showing the outgoing build, "Restart to update" and all.
         if (context.state.isQuitting) {
             return;
         }
@@ -143,9 +139,7 @@ export const registerBootstrapLifecycle = (context) => {
             try {
                 writeFileSync(devUserQuitRequestFile, `${process.pid}\n`, "utf8");
             }
-            catch {
-                // Best-effort dev-supervisor signal; quitting must never depend on it.
-            }
+            catch {}
         }
         event.preventDefault();
         context.state.isQuitting = true;

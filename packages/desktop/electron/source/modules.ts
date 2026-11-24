@@ -10,7 +10,6 @@ export type ImportRef = {
   end: number;
   specifier: string;
   dynamic: boolean;
-  /** Where a dynamic import's `import(` starts. */
   callStart?: number;
 };
 
@@ -19,10 +18,8 @@ export type TransformedModule = {
   map: string | null;
   imports: ImportRef[];
   exports: string[];
-  /** What `export * from` names. */
   starReexports: string[];
   hotAccepts: string[];
-  /** Why loading the module again is not harmless; null when it only declares. */
   state: string | null;
 };
 
@@ -31,7 +28,6 @@ export type ResolvedImport =
   | { kind: "dep"; file: string }
   | { kind: "asset"; file: string; url: string };
 
-/** Part of every cache key: bump it whenever transform output changes. */
 const TRANSFORM_VERSION = "6";
 const SIDE_EFFECT_IMPORT = /(?<=^|[;\s])import\s*$/;
 
@@ -286,9 +282,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         const module = JSON.parse(await fs.promises.readFile(primary, "utf8")) as TransformedModule;
         touchCacheEntry(primary);
         return module;
-      } catch {
-        // Not in writable cache; try read-only prebuilt cache.
-      }
+      } catch {}
       if (!fallbackModuleCacheDir) return null;
       try {
         return JSON.parse(

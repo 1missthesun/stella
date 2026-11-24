@@ -56,12 +56,6 @@ export const resolveRendererBuildMode = (options: {
   return options.isInstalledProduct ? "production" : "development";
 };
 
-/**
- * How a change reached the windows. `swap`: the full window took it in place.
- * `reload`: the windows loaded again and came back. `failed`: the new code
- * does not load or does not render; the window is showing what it showed
- * before (after a failed reload, whatever the files now hold once reloaded).
- */
 export type RendererApplyOutcome =
   | { mode: "none" | "hot" }
   | { mode: "swap"; swaps: number }
@@ -69,9 +63,7 @@ export type RendererApplyOutcome =
   | { mode: "failed"; error: string; reloaded: boolean };
 
 export type RendererSourceHandle = {
-  /** `reload`: load the windows again whatever the change allows. */
   applyChanges(paths: string[], options?: { reload?: boolean }): Promise<RendererApplyOutcome>;
-  /** Milliseconds since the user last touched the full window; null when there is none to ask. */
   quietFor(): Promise<number | null>;
   dispose(): void;
 };
@@ -94,7 +86,6 @@ const HEALTH_SCRIPT = `(() => {
 })()`;
 const ANSI_STYLE = /\u001b\[[0-9;]*m/g;
 
-/** Whether a window that loaded again shows the app rather than a crash or a page that never starts. */
 const cameBack = async (contents: Electron.WebContents): Promise<string | null> => {
   const deadline = Date.now() + RELOAD_HEALTH_TIMEOUT_MS;
   let emptySince: number | null = null;

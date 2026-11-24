@@ -2602,7 +2602,7 @@
     },
     "secureValues": {
       "title": "Uložené soukromé hodnoty",
-      "description": "Hodnoty ze soukromých žádostí, které jste se rozhodli zapamatovat. Jsou uložené v zabezpečeném úložišti tohoto počítače, dokud je nesmažete. Stella je používá, aniž by je kdy četla.",
+      "description": "Hodnoty ze soukromých žádostí, které jste si nechali zapamatovat, uložené v zabezpečeném úložišti vašich zařízení, dokud je nesmažete. Stella je používá, aniž by je kdy četla.",
       "empty": "Na tomto počítači nejsou uložené žádné soukromé hodnoty.",
       "saved": "Uloženo {saved}",
       "delete": "Delete",

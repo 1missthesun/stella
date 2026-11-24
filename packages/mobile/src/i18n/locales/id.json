@@ -2572,7 +2572,7 @@
     },
     "secureValues": {
       "title": "Nilai pribadi tersimpan",
-      "description": "Nilai dari permintaan pribadi yang Anda pilih untuk diingat, disimpan di penyimpanan aman komputer ini sampai Anda menghapusnya. Stella memakainya tanpa pernah membacanya.",
+      "description": "Nilai dari permintaan pribadi yang Anda pilih untuk diingat, disimpan di penyimpanan aman perangkat Anda sampai Anda menghapusnya. Stella menggunakannya tanpa pernah membacanya.",
       "empty": "Tidak ada nilai pribadi yang tersimpan di komputer ini.",
       "saved": "Disimpan {saved}",
       "delete": "Delete",

@@ -2582,7 +2582,7 @@
     },
     "secureValues": {
       "title": "Gemte private værdier",
-      "description": "Værdier fra private anmodninger, som du valgte at huske. De opbevares i denne computers sikre lager, indtil du sletter dem. Stella bruger dem uden nogensinde at læse dem.",
+      "description": "Værdier fra private anmodninger, som du valgte at huske, gemt i dine enheders sikre lager, indtil du sletter dem. Stella bruger dem uden nogensinde at læse dem.",
       "empty": "Der er ingen private værdier gemt på denne computer.",
       "saved": "Gemt {saved}",
       "delete": "Delete",

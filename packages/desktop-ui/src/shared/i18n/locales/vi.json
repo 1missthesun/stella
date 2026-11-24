@@ -2572,7 +2572,7 @@
     },
     "secureValues": {
       "title": "Giá trị riêng tư đã lưu",
-      "description": "Các giá trị từ yêu cầu riêng tư mà bạn chọn ghi nhớ, được giữ trong kho bảo mật của máy tính này cho đến khi bạn xóa. Stella dùng chúng mà không bao giờ đọc chúng.",
+      "description": "Các giá trị từ yêu cầu riêng tư mà bạn chọn ghi nhớ, được giữ trong bộ nhớ an toàn trên thiết bị của bạn cho đến khi bạn xóa. Stella dùng chúng mà không bao giờ đọc.",
       "empty": "Không có giá trị riêng tư nào được lưu trên máy tính này.",
       "saved": "Đã lưu {saved}",
       "delete": "Delete",

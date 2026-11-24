@@ -93,6 +93,7 @@ import { takeNativeToolCall } from "../engine/native-calls.ts";
 import { cliEnginePick, engineExtensionChange, onClaudeCode, onCliEngine } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
+import { computerOnlyProviderOf } from "@stella/contracts/backend/providers";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
 import {
   AGENT_MOVE_CLOUD,
@@ -390,7 +391,7 @@ export type RemoteAgentHost = {
       workspace?: AgentWorkspaceSize;
     },
     context: Context,
-  ): Promise<{ threadId: string; waiting?: boolean }>;
+  ): Promise<{ threadId: string; waiting?: boolean; note?: string }>;
   message(
     args: { key: string; threadId: string; message: string; framed?: boolean },
     context: Context,
@@ -1454,8 +1455,9 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
-  const sameEngine = (caller: RunsOn): string | undefined => {
+  const sameEngine = (caller: RunsOn, placement: StellaPlacement): string | undefined => {
     if (!caller.model || !onCliEngine(caller.model)) return undefined;
+    if (placement.kind === "cloud" && computerOnlyProviderOf(caller.model.provider)) return undefined;
     return cliEnginePick(caller.model, caller.thinkingLevel);
   };
 
@@ -1638,7 +1640,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!here && !placedRemote) throw new Error(`Agents can't start on ${describePlacement(placement)} from here.`);
       const named = args.model?.trim();
       const explicit = named && named !== "default" ? named : undefined;
-      const requested = explicit ?? (placedRemote ? sameEngine(callerAgent) : undefined) ?? host.defaultAgentModel?.(callerAgent);
+      const requested = explicit ?? (placedRemote ? sameEngine(callerAgent, placement) : undefined) ?? host.defaultAgentModel?.(callerAgent);
       const description = args.description.trim() || "agent";
       const choice = requested
         ? await chooseAgentModel(requested, callerAgent, placedRemote ? placement : undefined, context)
@@ -1709,6 +1711,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 "waiting" in started && started.waiting
                   ? waitingFor
                   : "",
+                "note" in started && started.note ? started.note : "",
                 STARTED_NOTE,
               ]
                 .filter(Boolean)

@@ -230,7 +230,8 @@ export type PiReportDelivery = (report: {
 }) => Promise<void>;
 
 export type PiCloudAgentThreads = {
-  execution: (model: string | undefined) => Promise<import("@stella/contracts/agent-engine").CloudExecutionSelection>;
+  /** What a cloud agent runs on; undefined leaves it to the account's own cloud model. */
+  execution: (model: string | undefined) => Promise<import("@stella/contracts/agent-engine").CloudExecutionSelection | undefined>;
   start: (request: {
     conversationId: string;
     requestId: string;
@@ -239,7 +240,7 @@ export type PiCloudAgentThreads = {
     model: string;
     parentThreadId?: string;
     workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
-  }) => Promise<{ threadId: string }>;
+  }) => Promise<{ threadId: string; note?: string }>;
   startOnDevice: (request: {
     conversationId: string;
     requestId: string;

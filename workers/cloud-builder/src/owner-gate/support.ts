@@ -1,3 +1,4 @@
+import { computerOnlyInCloudMessage, isComputerOnlyProviderId } from "@stella/contracts/backend/providers";
 import type { OwnerCaller } from "../owner-store/registry.js";
 import {
   HEADER_IDENTITY_LEVEL,
@@ -82,7 +83,9 @@ export const executionUnavailableMessage = (
     ? "Connect Claude before using that cloud execution route."
     : execution.engine === "chatgpt"
       ? "Connect ChatGPT before using that cloud execution route."
-      : `Add a key for ${execution.provider} in the model picker (Models on a computer, the chat settings on the phone) before using that cloud model.`;
+      : isComputerOnlyProviderId(execution.provider)
+        ? computerOnlyInCloudMessage(execution.provider)
+        : `Add a key for ${execution.provider} in the model picker (Models on a computer, the chat settings on the phone) before using that cloud model.`;
 
 export const snapshotAllowsCloudSandbox = (
   snapshot: Pick<OwnerSnapshot, "cloudSandbox">,

@@ -18,6 +18,8 @@ import type {
   StellaHostRunnerOptions,
 } from "./types.js";
 import { parseSpawnAgentModel } from "../tools/spawn-model.js";
+import { getCodexSubscriptionPreferences } from "../integrations/codex-subscription.js";
+import { computerOnlyInCloudMessage, computerOnlyProviderOf, isAccountProviderId } from "@stella/contracts/backend/providers";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { parseReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import type {
@@ -168,6 +170,19 @@ export const createRunnerContext = ({
       : {}),
   });
 
+  const codexRoute = (model: string, reasoningEffort: SpawnReasoningEffort | undefined) => {
+    try {
+      return resolveRunnerLlmRoute(context, AGENT_IDS.GENERAL, `chatgpt/${model}`, reasoningEffort);
+    } catch {
+      return undefined;
+    }
+  };
+
+  /**
+   * A cloud agent's execution. Only the model it will run on is routed: an
+   * engine (named, or the one picked) never touches the configured model,
+   * which may be one this computer can't route for the cloud.
+   */
   const resolveCloudExecutionSelection = async ({
     model: modelOverride,
     spawnEngine,
@@ -183,20 +198,30 @@ export const createRunnerContext = ({
       AGENT_IDS.GENERAL,
       agent,
     );
-    const model = modelOverride ?? configuredModel;
-    const resolvedLlm = await resolveRunnerLlmRouteWithMetadata(
-      context,
-      AGENT_IDS.GENERAL,
-      model,
-      reasoningEffort,
-    );
+    const engine = resolveAgentEngineForRun(getAgentRuntimeEngine(context.stellaDataDir), spawnEngine);
+    const configuredForCloud =
+      spawnEngine && !configuredModel?.startsWith("stella/") ? undefined : configuredModel;
+    const model = modelOverride ?? (engine === "default" ? configuredForCloud : configuredModel);
+    const codexModel =
+      engine === "codex_cli"
+        ? (spawnEngine?.model?.trim() ||
+          (configuredModel?.startsWith("chatgpt/") ? configuredModel.slice("chatgpt/".length) : undefined) ||
+          getCodexSubscriptionPreferences(stellaDataDir, configuredModel).model)
+        : undefined;
+    const resolvedLlm =
+      engine === "default"
+        ? await resolveRunnerLlmRouteWithMetadata(context, AGENT_IDS.GENERAL, model, reasoningEffort)
+        : ((codexModel ? codexRoute(codexModel, reasoningEffort) : undefined) ??
+          resolveRunnerLlmRoute(context, AGENT_IDS.GENERAL, undefined, reasoningEffort));
     const { modelConfigSnapshot } = resolveEffectiveAgentExecutionConfig(
       context,
       {
         agentType: AGENT_IDS.GENERAL,
         model,
         resolvedLlm,
-        ...(spawnEngine ? { spawnEngine } : {}),
+        ...(spawnEngine || codexModel
+          ? { spawnEngine: codexModel ? { engine: "codex_cli" as const, model: codexModel } : spawnEngine }
+          : {}),
         ...(reasoningEffort ? { spawnReasoningEffort: reasoningEffort } : {}),
       },
     );
@@ -236,7 +261,9 @@ export const createRunnerContext = ({
     );
   };
 
-  const cloudExecutionFor = async (model: string | undefined) => {
+  const cloudExecutionFor = async (model: string | undefined): Promise<CloudExecutionSelection | undefined> => {
+    const computerOnly = computerOnlyProviderOf(model);
+    if (computerOnly) throw new Error(computerOnlyInCloudMessage(computerOnly));
     const validModel = (modelName: string) => {
       try {
         resolveRunnerLlmRoute(context, AGENT_IDS.GENERAL, modelName);
@@ -246,8 +273,25 @@ export const createRunnerContext = ({
       }
     };
     const selection = parseSpawnAgentModel(model, validModel);
-    if (selection.kind === "model") {
-      await resolveRunnerLlmRouteWithMetadata(context, AGENT_IDS.GENERAL, selection.model, selection.reasoningEffort);
+    const configured = getConfiguredModel(context, AGENT_IDS.GENERAL, resolveAgent(context, AGENT_IDS.GENERAL));
+    const reference =
+      selection.kind === "model"
+        ? selection.model
+        : selection.kind === "default" && getAgentRuntimeEngine(stellaDataDir) === "default"
+          ? configured
+          : undefined;
+    if (computerOnlyProviderOf(reference)) return undefined;
+    // The cloud runs these on the account's own key, whatever keys this computer holds.
+    const slash = reference?.indexOf("/") ?? -1;
+    const provider = reference?.slice(0, Math.max(slash, 0));
+    const accountModel = reference?.slice(slash + 1).trim();
+    if (isAccountProviderId(provider) && accountModel) {
+      return {
+        engine: "provider",
+        provider,
+        model: accountModel,
+        reasoningEffort: selection.reasoningEffort ?? getReasoningEffort(stellaDataDir, AGENT_IDS.GENERAL),
+      };
     }
     return await resolveCloudExecutionSelection({
       ...(selection.kind === "model" ? { model: selection.model, spawnEngine: { engine: "default" } as const } : {}),
@@ -260,6 +304,7 @@ export const createRunnerContext = ({
     execution: cloudExecutionFor,
     start: async ({ conversationId, requestId, description, prompt, model, parentThreadId, workspace }) => {
       const execution = await cloudExecutionFor(model);
+      const configured = getConfiguredModel(context, AGENT_IDS.GENERAL, resolveAgent(context, AGENT_IDS.GENERAL));
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to run agents in the cloud.");
       }
@@ -271,7 +316,7 @@ export const createRunnerContext = ({
           prompt,
           originDeviceId: deviceId,
           originConversationId: conversationId,
-          execution,
+          ...(execution ? { execution } : {}),
           ...(parentThreadId ? { parentThreadId } : {}),
           ...(workspace ? { workspace } : {}),
         }))(),
@@ -281,7 +326,14 @@ export const createRunnerContext = ({
             "Stella's cloud did not accept the agent within 30s. Check the running agents before retrying so the same work does not start twice.",
           ),
       );
-      return { threadId: started.threadId };
+      return {
+        threadId: started.threadId,
+        ...(execution
+          ? {}
+          : {
+              note: `No model was named and the selected one (${configured}) runs only on a computer signed in to it, so this agent runs on the account's cloud model. Name a model to choose another.`,
+            }),
+      };
     },
     startOnDevice: async ({ conversationId, requestId, description, prompt, targetDeviceId, model, parentThreadId }) => {
       if (!backend.client() || !isCloudSignedIn()) {

@@ -1,5 +1,6 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { isComputerOnlyProviderId } from "@stella/contracts/backend/providers";
 import { modelForUnlistedId } from "@stella/contracts/provider-live-models";
 import type { StellaGatewayAccess, StellaModelSpec } from "@stella/agent/provider/stella";
 import { getModelProviders, getModels } from "./model-catalog.js";
@@ -455,7 +456,8 @@ const normalizeDesktopLocalEngineModelReference = (
   // Claude Code keeps a Stella conversation/prep route on desktop; fall back to
   // the default Stella route (no explicit model) so the engine executes the
   // turn instead of the resolver rejecting an unknown provider.
-  if (parsed.provider === CLAUDE_CODE_ENGINE_PROVIDER) {
+  // Google Antigravity runs in its own CLI the same way.
+  if (parsed.provider === CLAUDE_CODE_ENGINE_PROVIDER || isComputerOnlyProviderId(parsed.provider)) {
     return undefined;
   }
   return modelName;

@@ -429,7 +429,7 @@ export type DesktopEngineAgents = {
     model: string;
     parentThreadId?: string;
     workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
-  }): Promise<{ threadId: string }>;
+  }): Promise<{ threadId: string; note?: string }>;
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
   stop(threadId: string): Promise<AgentStopResult | void>;
 };

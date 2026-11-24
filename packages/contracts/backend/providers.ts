@@ -1,3 +1,5 @@
+import { getProviderDisplayName } from "../provider-display.js";
+
 export const ACCOUNT_PROVIDER_IDS = [
   "anthropic",
   "openai",
@@ -29,6 +31,17 @@ export type ComputerOnlyProviderId = (typeof COMPUTER_ONLY_PROVIDER_IDS)[number]
 
 export const isComputerOnlyProviderId = (value: unknown): value is ComputerOnlyProviderId =>
   typeof value === "string" && (COMPUTER_ONLY_PROVIDER_IDS as readonly string[]).includes(value);
+
+/** The computer-only plan a model reference ("antigravity/…", with or without an effort) names. */
+export const computerOnlyProviderOf = (reference: string | undefined): ComputerOnlyProviderId | undefined => {
+  const provider = reference?.trim().toLowerCase().split(/[/:]/u, 1)[0];
+  return isComputerOnlyProviderId(provider) ? provider : undefined;
+};
+
+export const computerOnlyInCloudMessage = (provider: ComputerOnlyProviderId): string => {
+  const name = getProviderDisplayName(provider);
+  return `${name} models ("${provider}/<model>") run only on a computer signed in to ${name}, never in the cloud. Name a model that runs in the cloud, or start the task on that computer (its device_id as destination).`;
+};
 
 export type ProviderAuthMethod =
   | {

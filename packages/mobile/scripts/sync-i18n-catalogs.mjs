@@ -47,16 +47,154 @@ const banner = (source) =>
   `// Copied from packages/desktop-ui/src/shared/i18n/${source}\n` +
   `// by packages/mobile/scripts/sync-i18n-catalogs.mjs.\n`;
 
-export const buildI18nCatalogOutputs = ({ desktopI18nRoot }) => {
+const PLURAL_CATEGORIES = new Set(["zero", "one", "two", "few", "many", "other"]);
+
+// Subtrees always kept in full: all mobile-owned keys and shared contract helpers
+// (`@stella/contracts/schedule-notice*`).
+const ALWAYS_INCLUDED_PREFIXES = ["mobile", "schedule.notice"];
+
+const isPluralNode = (value) => {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const entries = Object.entries(value);
+  return (
+    entries.length > 0 &&
+    entries.every(
+      ([category, form]) =>
+        PLURAL_CATEGORIES.has(category) && typeof form === "string",
+    )
+  );
+};
+
+const isLeafValue = (value) =>
+  typeof value === "string" ||
+  Array.isArray(value) ||
+  isPluralNode(value) ||
+  value === null ||
+  typeof value !== "object";
+
+const collectCatalogPaths = (node, prefix = "", leaves = new Set(), branches = new Set()) => {
+  if (isLeafValue(node)) {
+    if (prefix) leaves.add(prefix);
+    return { leaves, branches };
+  }
+  if (prefix) branches.add(prefix);
+  for (const [key, child] of Object.entries(node)) {
+    collectCatalogPaths(child, prefix ? `${prefix}.${key}` : key, leaves, branches);
+  }
+  return { leaves, branches };
+};
+
+const walkSourceFiles = (dir, out = []) => {
+  if (!existsSync(dir)) return out;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (
+        entry.name === "node_modules" ||
+        entry.name === "locales" ||
+        entry.name === ".expo" ||
+        entry.name === "dist"
+      ) {
+        continue;
+      }
+      walkSourceFiles(full, out);
+    } else if (/\.(ts|tsx|js|jsx|mjs)$/.test(entry.name)) {
+      out.push(full);
+    }
+  }
+  return out;
+};
+
+const collectUsedMobileKeys = ({ mobileSourceRoot, englishCatalog }) => {
+  const { leaves, branches } = collectCatalogPaths(englishCatalog);
+  const topSections = Object.keys(englishCatalog);
+  const exactKeys = new Set();
+  const branchPrefixes = new Set(ALWAYS_INCLUDED_PREFIXES);
+
+  if (topSections.length === 0) {
+    return { exactKeys, branchPrefixes };
+  }
+
+  const topAlt = topSections
+    .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const literalKeyRe = new RegExp(`["'\`]((?:${topAlt})\\.[a-zA-Z0-9_.-]+)["'\`]`, "g");
+  const templatePrefixRe = new RegExp(
+    `\`((?:${topAlt})(?:\\.[a-zA-Z0-9_-]+)*)\\.\\$\\{`,
+    "g",
+  );
+
+  const sourceFiles = [
+    ...walkSourceFiles(join(mobileSourceRoot, "src")),
+    ...walkSourceFiles(join(mobileSourceRoot, "app")),
+  ];
+
+  for (const file of sourceFiles) {
+    const text = readFileSync(file, "utf8");
+    for (const match of text.matchAll(literalKeyRe)) {
+      const candidate = match[1];
+      if (leaves.has(candidate)) {
+        exactKeys.add(candidate);
+      } else if (branches.has(candidate)) {
+        branchPrefixes.add(candidate);
+      }
+    }
+    for (const match of text.matchAll(templatePrefixRe)) {
+      const prefix = match[1];
+      if (branches.has(prefix) || leaves.has(prefix)) {
+        branchPrefixes.add(prefix);
+      }
+    }
+  }
+
+  return { exactKeys, branchPrefixes };
+};
+
+const filterCatalog = (node, { exactKeys, branchPrefixes }, prefix = "") => {
+  if (prefix && branchPrefixes.has(prefix)) {
+    return node;
+  }
+  if (isLeafValue(node)) {
+    return exactKeys.has(prefix) ? node : undefined;
+  }
+  const out = {};
+  let kept = false;
+  for (const [key, child] of Object.entries(node)) {
+    const childPath = prefix ? `${prefix}.${key}` : key;
+    const filtered = filterCatalog(child, { exactKeys, branchPrefixes }, childPath);
+    if (filtered !== undefined) {
+      out[key] = filtered;
+      kept = true;
+    }
+  }
+  return kept ? out : undefined;
+};
+
+export const buildI18nCatalogOutputs = ({
+  desktopI18nRoot,
+  mobileSourceRoot = mobileRoot,
+}) => {
   const catalogDir = join(desktopI18nRoot, "locales");
   const catalogFiles = readdirSync(catalogDir)
     .filter((name) => name.endsWith(".json"))
     .sort();
   const outputs = new Map();
 
+  const englishPath = join(catalogDir, "en.json");
+  const englishCatalog = existsSync(englishPath)
+    ? JSON.parse(readFileSync(englishPath, "utf8"))
+    : null;
+  const mobileFilter =
+    englishCatalog && mobileSourceRoot
+      ? collectUsedMobileKeys({ mobileSourceRoot, englishCatalog })
+      : null;
+
   for (const name of catalogFiles) {
     const parsed = JSON.parse(readFileSync(join(catalogDir, name), "utf8"));
-    outputs.set(`locales/${name}`, `${JSON.stringify(parsed, null, 2)}\n`);
+    const pruned = mobileFilter ? (filterCatalog(parsed, mobileFilter) ?? {}) : parsed;
+    outputs.set(`locales/${name}`, `${JSON.stringify(pruned, null, 2)}\n`);
   }
 
   // Metro has no `import.meta.glob` and cannot resolve a `require()` whose

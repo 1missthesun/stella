@@ -108,49 +108,51 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    void Promise.all([
-      AsyncStorage.getItem(MODE_KEY),
-      AsyncStorage.getItem(THEME_KEY),
-      AsyncStorage.getItem(CUSTOM_BASE_KEY),
-      AsyncStorage.getItem(GRADIENT_KEY),
-      AsyncStorage.getItem(GRADIENT_COLOR_KEY),
-    ]).then(
-      ([storedMode, storedTheme, storedBase, storedGradient, storedColor]) => {
-        let mode: ThemePreference | null =
-          storedMode === "light" ||
-          storedMode === "dark" ||
-          storedMode === "system"
-            ? storedMode
-            : null;
+    void AsyncStorage.multiGet([
+      MODE_KEY,
+      THEME_KEY,
+      CUSTOM_BASE_KEY,
+      GRADIENT_KEY,
+      GRADIENT_COLOR_KEY,
+    ]).then((entries) => {
+      const [storedMode, storedTheme, storedBase, storedGradient, storedColor] =
+        entries.map(([, value]) => value);
+      let mode: ThemePreference | null =
+        storedMode === "light" ||
+        storedMode === "dark" ||
+        storedMode === "system"
+          ? storedMode
+          : null;
 
-        const legacy =
-          (storedTheme && LEGACY_THEME_IDS[storedTheme]) ||
-          (storedBase && LEGACY_THEME_IDS[storedBase]) ||
-          null;
-        if (legacy) {
-          mode = legacy.mode;
-          void AsyncStorage.setItem(MODE_KEY, legacy.mode);
-          void AsyncStorage.setItem(THEME_KEY, defaultTheme.id);
-          void AsyncStorage.setItem(CUSTOM_BASE_KEY, legacy.id);
-        }
+      const legacy =
+        (storedTheme && LEGACY_THEME_IDS[storedTheme]) ||
+        (storedBase && LEGACY_THEME_IDS[storedBase]) ||
+        null;
+      if (legacy) {
+        mode = legacy.mode;
+        void AsyncStorage.multiSet([
+          [MODE_KEY, legacy.mode],
+          [THEME_KEY, defaultTheme.id],
+          [CUSTOM_BASE_KEY, legacy.id],
+        ]);
+      }
 
-        if (mode) setPreferenceState(mode);
+      if (mode) setPreferenceState(mode);
 
-        const nextTheme = legacy ? defaultTheme.id : storedTheme;
-        if (nextTheme && getThemeById(nextTheme)) setThemeIdState(nextTheme);
+      const nextTheme = legacy ? defaultTheme.id : storedTheme;
+      if (nextTheme && getThemeById(nextTheme)) setThemeIdState(nextTheme);
 
-        const nextBase = legacy ? legacy.id : storedBase;
-        if (nextBase && getThemeById(nextBase)) setCustomBaseState(nextBase);
+      const nextBase = legacy ? legacy.id : storedBase;
+      if (nextBase && getThemeById(nextBase)) setCustomBaseState(nextBase);
 
-        if (storedGradient === "soft" || storedGradient === "flat") {
-          setGradientPreferenceState(storedGradient);
-        }
-        if (storedColor === "relative" || storedColor === "strong") {
-          setGradientColorState(storedColor);
-        }
-        setLoaded(true);
-      },
-    );
+      if (storedGradient === "soft" || storedGradient === "flat") {
+        setGradientPreferenceState(storedGradient);
+      }
+      if (storedColor === "relative" || storedColor === "strong") {
+        setGradientColorState(storedColor);
+      }
+      setLoaded(true);
+    });
   }, []);
 
   const setPreference = useCallback((p: ThemePreference) => {

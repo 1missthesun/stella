@@ -185,7 +185,7 @@ function useBackendFollowsAccount(
   }, [account, session.isPending]);
 }
 
-function AuthenticatedLayout() {
+function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
   const session = authClient.useSession();
   useBackendFollowsAccount(session);
   const router = useRouter();
@@ -361,7 +361,7 @@ function AuthenticatedLayout() {
     if (splashHiddenRef.current) {
       return;
     }
-    if (session.isPending || !guestReady || !initialMainHref) {
+    if (!fontsReady || session.isPending || !guestReady || !initialMainHref) {
       return;
     }
     if (!authoritySettled && !authorityWaitExpired) {
@@ -374,6 +374,7 @@ function AuthenticatedLayout() {
       });
     });
   }, [
+    fontsReady,
     session.isPending,
     guestReady,
     initialMainHref,
@@ -389,30 +390,32 @@ function AuthenticatedLayout() {
   );
 }
 
-function AppLayout() {
+function AppLayout({ fontsReady }: { fontsReady: boolean }) {
   if (!hasMobileConfig) {
     // No auth gate on this path, so nothing else lifts the splash — drop it
-    // once the theme has painted.
+    // once the theme and critical fonts are ready.
     return (
       <>
-        <HideSplashWhenThemed />
+        <HideSplashWhenThemed fontsReady={fontsReady} />
         <RootStack />
       </>
     );
   }
 
-  return <AuthenticatedLayout />;
+  return <AuthenticatedLayout fontsReady={fontsReady} />;
 }
 
-function HideSplashWhenThemed() {
+function HideSplashWhenThemed({ fontsReady }: { fontsReady: boolean }) {
   useEffect(() => {
+    if (!fontsReady) return;
     void SplashScreen.hideAsync().finally(markSplashHidden);
-  }, []);
+  }, [fontsReady]);
   return null;
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts(criticalStellaFontAssets);
+  const [fontsLoaded, fontError] = useFonts(criticalStellaFontAssets);
+  const fontsReady = fontsLoaded || Boolean(fontError);
 
   useEffect(() => {
     if (!fontsLoaded) {
@@ -421,10 +424,6 @@ export default function RootLayout() {
 
     void loadAsync(deferredStellaFontAssets).catch(() => undefined);
   }, [fontsLoaded]);
-
-  if (!fontsLoaded) {
-    return null;
-  }
 
   return (
     <ShareIntentProvider>
@@ -437,7 +436,7 @@ export default function RootLayout() {
             <I18nProvider>
               <ThemeProvider>
                 <ChatSearchProvider>
-                  <AppLayout />
+                  <AppLayout fontsReady={fontsReady} />
                 </ChatSearchProvider>
               </ThemeProvider>
             </I18nProvider>

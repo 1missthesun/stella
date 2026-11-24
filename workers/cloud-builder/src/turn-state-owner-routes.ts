@@ -45,7 +45,6 @@ type OwnerLease = {
   ownerGeneration: string;
 };
 
-/** The fence as these routes check it: the KV record plus live SQL leases. */
 type TurnStateOwnerFence = {
   ownerId: string;
   generation: string;
@@ -1219,16 +1218,6 @@ const routeConflict = (error: unknown): never => {
   throw error;
 };
 
-/**
- * One turn-state operation, run inside OwnerGate (the owner fence lives
- * there). It performs no public authentication: its caller already selected
- * the owner-named object. It still treats every field as untrusted and repeats
- * the exact durable owner/generation/lease checks before touching state.
- * `createdAt`, `requireNative`, and the canonical workspace are trusted Builder
- * facts, but remain strictly typed and bounded here. In particular, createdAt
- * must be persisted once by the caller so a lost prepare response replays the
- * identical registry operation instead of introducing a new timestamp.
- */
 export const runTurnStateOwnerOperation = async (args: {
   op: TurnStateOwnerOp;
   body: unknown;

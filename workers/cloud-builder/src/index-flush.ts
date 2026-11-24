@@ -25,7 +25,6 @@ export type IndexIdentity = {
 
 export type IndexFlushDeps = {
   enqueue: (events: OwnerEvent[]) => Promise<void>;
-  /** The durable tombstone or in-memory seal that survives `deleteAll()`. */
   purged: () => boolean;
 };
 

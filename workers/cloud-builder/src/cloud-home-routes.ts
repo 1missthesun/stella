@@ -24,9 +24,6 @@ const routeError = (error: unknown): Response => {
       error.status && error.status >= 400 ? error.status : 400,
     );
   }
-  // Unknown exceptions may contain an upstream URL, object locator, secret,
-  // or parser detail. Only deliberately constructed protocol errors are safe
-  // to return to an authenticated client.
   return json({ error: "Cloud home request failed." }, 500);
 };
 

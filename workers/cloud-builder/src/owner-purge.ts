@@ -15,7 +15,6 @@ export type OwnerPurgePass = {
   pending: string[];
 };
 
-/** The owner fence as the purge drives it; OwnerGate passes its own. */
 export type OwnerPurgeFenceHandle = {
   begin(input: OwnerFenceBeginInput): Promise<OwnerFenceBeginResult>;
   assertBlocked(generation: string): Promise<OwnerFenceBlockedResult>;
@@ -23,11 +22,6 @@ export type OwnerPurgeFenceHandle = {
   purgeTurnState(generation: string): Promise<TurnStateOwnerResult>;
 };
 
-/**
- * Blocks the owner fence, then asks every object holding a lease on it to
- * stop its turn, until no lease is left. Activity leases are not canceled;
- * they end on their own (or expire).
- */
 const blockAndDrain = async (
   env: Env,
   ownerId: string,

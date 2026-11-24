@@ -60,7 +60,6 @@ export type PiComputeRecord = {
   sandboxId: string;
   sessionId: string;
   daemonDirectory: string;
-  /** Absent on records from before pi agents were sized: those ran small. */
   size?: InstanceSize;
   threadId?: string;
 };
@@ -72,7 +71,6 @@ export type PiComputeLease = {
   readonly ready: Promise<void>;
   call(call: PiWorkspaceCall): Promise<SerializedAgentToolResult>;
   quiesce(linkedPaths: readonly string[]): Promise<{ deliveredFiles: readonly string[] }>;
-  /** After a run that used the container: a memory or disk shortage there raises this agent's size. */
   probePressure(): Promise<AgentContainerPressure | undefined>;
   release(options?: { warm?: boolean }): Promise<void>;
   readonly expiresAt: number;
@@ -115,16 +113,9 @@ const publicOrigin = (host: PiComputeHost): string => {
   return origin;
 };
 
-/** The owner's world, or the Slack workspace's own world for a Stella Crew agent. */
 const piWorldName = async (host: PiComputeHost, owner: PiComputeOwner): Promise<string> =>
   await conversationWorldName(host.env, owner.ownerId, owner.conversationId, worldName);
 
-/**
- * Release one lease's resources by its record: its slot, the daemon, its
- * session, then the container, which snapshots (the warmest start for the
- * owner's next agent) and stops, after the warm window when `warm` so the
- * agent's next run soon after reuses it.
- */
 export const releasePiCompute = async (
   host: PiComputeHost,
   record: PiComputeRecord,
@@ -168,8 +159,6 @@ export const openPiComputeLease = async (
     attemptGeneration,
     size,
     threadId,
-    // Crew agents moved off the owner's world: a fresh container, never one
-    // that already holds the owner's files on disk.
     sandboxId: await agentSandboxId(
       owner.ownerId,
       `${isSlackConversationId(owner.conversationId) ? "crew-world:" : ""}pi:${owner.conversationId}:${threadId}`,

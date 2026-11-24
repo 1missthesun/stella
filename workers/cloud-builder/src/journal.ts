@@ -60,12 +60,6 @@ import {
 } from "@stella/contracts/history-search";
 import { redactSensitiveJson } from "@stella/contracts/sensitive-data";
 
-/**
- * A payload the activity fold can read. A spilled payload is a stub pointing at
- * R2, and the fold runs where there is no await to spend resolving one — but a
- * spawn result or a lifecycle wake prompt is far too small to have spilled, so
- * nothing the fold cares about is ever behind one.
- */
 const isAgentActivityPayload = (
   payload: unknown,
 ): payload is Record<string, unknown> =>
@@ -206,13 +200,6 @@ const DDL = [
    )`,
 ];
 
-/**
- * A current `meta` row is committed only after the complete DDL list (and a
- * migration version only after its statements) has run. Probe those named
- * objects in the same SQLite read so a previously interrupted bootstrap or a
- * damaged store takes the existing repair path instead of silently trusting
- * its version stamp.
- */
 const CURRENT_SCHEMA_OBJECT_NAMES = [
   "meta",
   "journal",
@@ -629,12 +616,6 @@ export class Journal {
     });
   }
 
-  /**
-   * This conversation's encryption, provisioned on first use: a fresh
-   * random DEK wrapped under the deployment KEK and kept on `meta`. Null
-   * when no KEK is configured (a deployment without one keeps the legacy
-   * plaintext form rather than bricking its conversations).
-   */
   ensureCrypto(): JournalCrypto | null {
     if (this.crypto !== undefined) return this.crypto;
     if (!this.keks) {
@@ -691,7 +672,6 @@ export class Journal {
     return this.ensureCrypto()?.encryptText(payloadJson) ?? payloadJson;
   }
 
-  /** Plaintext JSON of a stored payload. Legacy plaintext reads unchanged. */
   decodePayload(stored: string): string {
     if (!isEncryptedJournalValue(stored)) return stored;
     const crypto = this.ensureCrypto();
@@ -714,10 +694,6 @@ export class Journal {
     const existing = this.sql
       .exec<{ count: number }>("SELECT COUNT(*) AS count FROM meta")
       .one().count;
-    // A recreated DO under the same name must not reuse the old epoch, or a
-    // client holding a stale cursor would silently splice two different
-    // transcripts together. The witness lives in the async KV, which survives
-    // everything a SQLite-only reset can destroy.
     const witness =
       (await this.ctx.storage.get<number>(EPOCH_WITNESS_KEY)) ?? 0;
     if (existing === 0) {
@@ -891,11 +867,6 @@ export class Journal {
     );
   }
 
-  /**
-   * The cold-path fast check is deliberately fail-open to the full bootstrap:
-   * missing metadata, an old version, a missing named schema object, or a SQL
-   * error all retain the historical DDL and migration repair behavior.
-   */
   private currentBootstrapMeta(): { epoch: number } | null {
     try {
       const row = this.sql
@@ -1111,14 +1082,6 @@ export class Journal {
     return text.length > 160 ? `${text.slice(0, 160)}…` : text;
   }
 
-  /**
-   * Always read from SQL: a cached mirror is one forgotten write from drift.
-   *
-   * A missing row means `deleteAll()` ran — the purge path destroys the schema
-   * along with everything else, and the object can outlive that in memory. It
-   * reads back as a tombstone rather than throwing, so a late request gets a
-   * clean 410 instead of a 500.
-   */
   meta(): MetaRow {
     try {
       const rows = this.sql
@@ -1130,7 +1093,6 @@ export class Journal {
         .toArray();
       if (rows.length > 0) return rows[0]!;
     } catch {
-      // Table gone with the rest of the storage.
     }
     return PURGED_META;
   }
@@ -1337,9 +1299,7 @@ export class Journal {
     const createdAt = input.createdAt ?? Date.now();
     const full = input.payloadJson ?? JSON.stringify(input.message);
     const fullBytes = utf8Length(full);
-    // A spilled row stores the stub, never the bytes: writing both would put
-    // the oversize payload back in SQLite, which is the exact thing the spill
-    // exists to avoid (and would breach the 2 MB platform row cap).
+    // The platform caps a SQLite row at 2 MB.
     const messageRecord = input.message as {
       timestamp?: unknown;
       toolCallId?: unknown;
@@ -1564,18 +1524,8 @@ export class Journal {
   }
 
   /**
-   * Closes any tool call the tail left unanswered.
-   *
-   * Eviction, `/cancel` or a watchdog abort can leave the newest row as an
-   * assistant message carrying `toolCall` blocks with no matching results.
-   * Anthropic rejects that history on the NEXT turn, which bricks the
-   * conversation permanently. The old code avoided this by persisting nothing
-   * on error; incremental persistence removes that rule, so the guarantee
-   * moves here — to the read side, where it also covers the eviction case in
-   * which no unwind code ever runs.
-   *
-   * Synthetic results are written durably rather than patched in transiently:
-   * what the model reads and what the user sees must be the same rows.
+   * Anthropic rejects a history whose newest assistant message carries
+   * `toolCall` blocks with no matching results, on every later turn.
    */
   repairTail(now: number): AppendResult[] {
     const rows = this.sql
@@ -1604,8 +1554,6 @@ export class Journal {
         continue;
       }
       if (row.role !== "assistant" || row.open_calls === 0) continue;
-      // A spilled assistant message is > 1 MB of content; its tool calls are
-      // still in the stub-free copy only, so skip rather than guess.
       if (row.spill_key) continue;
       let parsed: unknown;
       try {
@@ -1651,11 +1599,6 @@ export class Journal {
     return appended;
   }
 
-  /**
-   * The calls `repairTail` would close, with what a resume needs to rerun
-   * them: name and arguments, oldest first. Same scan, same skip of spilled
-   * rows, so a call this omits is one `repairTail` closes as interrupted.
-   */
   openTailCalls(): Array<{
     turnId: string;
     toolCallId: string;
@@ -1892,13 +1835,6 @@ export class Journal {
     return max;
   }
 
-  /**
-   * Two metadata passes, no payload reads in the first.
-   *
-   * Deliberately not a `SUM(...) OVER (...)` window function: window-function
-   * support in DO SQLite is unverified, and pass 1 already reads three small
-   * columns. A micro-optimisation is not worth an unverified dependency.
-   */
   contextStartSeq(excludeTurnId: string, budgetTokens: number, afterSeq = -1): number {
     const scan = this.sql
       .exec<{ seq: number; tokens: number; role: string | null }>(
@@ -1918,8 +1854,7 @@ export class Journal {
       if (used > budgetTokens) break;
       start = index;
     }
-    // Never open the window on an orphaned toolResult: the provider rejects a
-    // result with no preceding call. Same rule pruneAgentHistory applies.
+    // The provider rejects a toolResult with no preceding call.
     while (start < scan.length && scan[start]!.role !== "user") start += 1;
     return start < scan.length ? scan[start]!.seq : this.meta().next_seq;
   }
@@ -2008,11 +1943,6 @@ export class Journal {
     };
   }
 
-  /**
-   * Replaces an unhydratable spilled payload with an honest placeholder. A
-   * tool result keeps its original `toolCallId` — dropping it would orphan
-   * the call it answers, which is the one thing the provider will not accept.
-   */
   omittedPlaceholder(
     role: string,
     now: number,
@@ -2039,7 +1969,6 @@ export class Journal {
     this.sql.exec(`UPDATE journal SET model_skip = 1 WHERE seq = ?`, seq);
   }
 
-  /** The newest turn and card records, oldest first. */
   recentOutcomes(limit: number): JournalRecord[] {
     return this.selectRows(
       `WHERE kind IN ('turn', 'card') ORDER BY seq DESC LIMIT ?`,
@@ -2049,7 +1978,6 @@ export class Journal {
       .map((row) => this.rowToRecord(row));
   }
 
-  /** Seq of the newest completed turn's terminal record, or -1. */
   lastCompletedSeq(): number {
     return (
       this.sql
@@ -2060,11 +1988,6 @@ export class Journal {
     );
   }
 
-  /**
-   * Takes every message in `fromSeq..toSeq` out of what any model is given
-   * from this journal (its context, history search and history reads), and
-   * returns the turns they belong to. The rows themselves stay.
-   */
   skipModelRange(fromSeq: number, toSeq: number, turnLimit: number): string[] {
     const turnIds = this.sql
       .exec<{ turn_id: string }>(
@@ -2229,12 +2152,6 @@ export class Journal {
         throughSeq: -1,
         epoch: meta.epoch,
       };
-      // Every resident row, not a fixed tail: an agent is reported as running
-      // precisely because nothing has settled it, so its `agent-started` row is
-      // as old as the agent, and a tail cap would silently retire exactly the
-      // long-running agents this answer exists for. The catch-up below reads
-      // the whole hot set a page at a time (older rows have rolled into R2 and
-      // cannot be read from here), once per object lifetime.
       this.agentActivity = cached;
     }
     while (cached.throughSeq < headSeq) {
@@ -2438,12 +2355,6 @@ export class Journal {
     );
   }
 
-  /**
-   * Single-threaded execution gives total order but not CORRECT order: a
-   * foreign append landing between an assistant's toolCall and its result
-   * produces a history the provider rejects next turn. Foreign writers stage
-   * here and drain at the turn's clean boundary.
-   */
   stageInbox(input: {
     writer: string;
     writerKey: string;

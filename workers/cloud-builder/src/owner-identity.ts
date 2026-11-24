@@ -1,10 +1,3 @@
-/**
- * Tell an owner's object its verified caller's identity level, for routes that reach the owner through another
- * object, such as a conversation's turns. RPC and live calls carry the caller
- * to the owner object themselves. Each isolate tells an owner once per
- * identity it sees.
- */
-
 import type { VerifiedToken } from "./auth-jwt.js";
 import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
 import { ownerGateStub } from "./rpc-release.js";

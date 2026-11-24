@@ -12,17 +12,7 @@ import type {
 } from "./turn-state-owner-routes.js";
 import { releasingStub } from "./rpc-release.js";
 
-/**
- * How objects other than OwnerGate reach the owner fence: typed RPC methods
- * on the owner's OwnerGate.
- *
- * Mixed-version window: after a deploy an OwnerGate instance can keep running
- * the previous Worker for minutes, and that Worker only serves the old
- * `/owner-fence/*` fetch routes. A call that the old instance does not
- * implement falls back to that route. Remove `legacy` (and OwnerGate's route
- * adapter, owner-fence-legacy-route.ts) once no deployed Worker predates the
- * typed methods.
- */
+// After a deploy an OwnerGate can keep running the previous Worker for minutes.
 
 type OwnerGateFenceRpc = {
   fenceRegister(input: OwnerFenceLeaseInput): Promise<OwnerFenceRegisterResult>;

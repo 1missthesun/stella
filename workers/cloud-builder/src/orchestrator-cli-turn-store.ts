@@ -1,20 +1,3 @@
-/**
- * The orchestrator CLI turn's bulky and long-lived state in a `BuildSession`'s
- * own SQLite (see cloud-orchestrator-cli.ts for the turn itself).
- *
- * The spec (the DO's system prompt and tool catalog, up to 512 KiB of
- * characters and 512 KiB of JSON) cannot ride inside the `turn` key-value
- * record: that record is read on almost every lifecycle step, and its
- * serialized size could pass the 2 MB per-value limit (a prompt of
- * multi-byte or escaped characters is several bytes per character). It is
- * stored here once, in chunks well under the 2 MB row limit, and read back
- * only when the executor's turn input is written.
- *
- * The terminal frame each attempt sent its conversation is kept here too,
- * because the key-value turn record is deleted once that frame is acked: a
- * DO that was evicted mid-turn polls by `{turnId, attemptGeneration}` and
- * must still learn how it ended. The last {@link TERMINALS_KEPT} are kept.
- */
 import type {
   CloudCliTurnTerminal,
   CloudOrchestratorCliTurnSpec,

@@ -1,36 +1,3 @@
-/**
- * The conversation's socket surface: one hibernatable WebSocket fan-out per
- * conversation Durable Object.
- *
- * Three properties this file exists to hold, each of which is easy to lose:
- *
- * 1. IDLE COSTS NOTHING. No timer is ever armed unless a turn is streaming, no
- *    JSON heartbeat is exchanged (the platform's auto-response answers "ping"
- *    without waking the DO), and token expiry is enforced on the send path
- *    rather than by an alarm. A hibernated conversation with sixteen watchers
- *    bills nothing until something is actually said.
- *
- * 2. NO IN-MEMORY SOCKET REGISTRY. Everything a socket needs to be understood
- *    lives in its own `serializeAttachment`. A `Map<WebSocket, meta>` field
- *    would appear to work right up until the first eviction, after which every
- *    reconnected socket is anonymous and unauthorizable. `ctx.getWebSockets()`
- *    plus `deserializeAttachment()` is the only supported way to know who is
- *    listening.
- *
- * 3. BACKPRESSURE IS BOUNDED AT THE SOURCE. `bufferedAmount` does not exist on
- *    workerd's WebSocket, and client acks would be incoming frames (billed
- *    20:1 against a transport chosen because outgoing is free). So the agent
- *    loop never awaits a send, and outgoing volume is a function of how many
- *    rows a turn commits and how many tool calls it makes, not of listener
- *    count or model speed. A slow client cannot stall the loop.
- *
- * The durability rule the frames encode: a frame carrying `seq` is replayable,
- * a frame without one is advisory and may be dropped at any time. Assistant
- * text is delivered whole, so the committed `record` is the ONLY thing that
- * ever carries it — the hub broadcasts no per-token `delta` frames. `tool` is
- * the one remaining advisory frame, and losing it costs a live tool chip.
- */
-
 import {
   LEGACY_SOCKET_TOKEN_SUBPROTOCOL_PREFIX,
   SOCKET_TICKET_SUBPROTOCOL_PREFIX,
@@ -116,28 +83,7 @@ export type GapFrame = {
 
 export type ResetFrame = { type: "reset"; reason: "epoch" | "window" };
 
-/**
- * Retired: assistant text is delivered whole on `record`, and nothing on the
- * server constructs this any more. The shape stays declared because clients
- * still parse it defensively while their own delta handling is retired.
- */
-export type DeltaFrame = {
-  type: "delta";
-  turnId: string;
-  streamId: string;
-  ordinal: number;
-  kind: "text" | "thinking";
-  text: string;
-};
-
 export type ToolFrame = { type: "tool" } & ToolInput;
-
-/** Retired alongside `DeltaFrame`; declared for the same reason. */
-export type DeltasDroppedFrame = {
-  type: "deltas_dropped";
-  turnId: string;
-  streamId: string;
-};
 
 export type AuthExpiringFrame = { type: "auth.expiring"; atMs: number };
 
@@ -165,9 +111,7 @@ export type ServerFrame =
   | BackfillFrame
   | GapFrame
   | ResetFrame
-  | DeltaFrame
   | ToolFrame
-  | DeltasDroppedFrame
   | AuthExpiringFrame
   | BrainFrame
   | ErrorFrame;
@@ -178,17 +122,6 @@ export type ClientFrame =
   | { type: "cancel"; turnId: string }
   | { type: "pi.older"; requestId: string; beforeEntryId: number };
 
-/**
- * Identity headers the worker sets after verifying the JWT, and which it
- * strips from the client's own request first. They are trustworthy inside the
- * DO for the reason the rest of this worker's DO traffic is: a Durable Object
- * namespace is not publicly addressable.
- *
- * Defined on the shared seam (`conversation-types.ts`) rather than here: the
- * DO rebuilds the identity from them too, and storage must not have to import
- * this module to do it — the hub is wired by registry precisely so the two
- * sides stay independently deployable.
- */
 export {
   HEADER_ISSUER,
   HEADER_OWNER,
@@ -214,12 +147,6 @@ const WEBSOCKET_HANDSHAKE_HEADERS = new Set([
   "sec-websocket-extensions",
 ]);
 
-/**
- * A new request for a Durable Object that trusts identity headers. Caller
- * credentials and client `x-stella-*` headers are never copied; a WebSocket
- * offer carries only `subprotocol`. `headers: "websocket"` copies just the
- * handshake headers.
- */
 export const trustedInternalRequest = (
   request: Request,
   url: string,
@@ -264,14 +191,9 @@ const CLOSE_REASONS: Record<number, string> = {
 const closeReason = (code: number): string => CLOSE_REASONS[code] ?? "closed";
 
 /**
- * Refuse a connection by completing the handshake and immediately closing with
- * a real code. An HTTP 4xx before the 101 would reach the browser as close code
- * 1006 with no detail, which a client cannot tell apart from a dropped network
- * — and "refresh your token" and "back off forever" are opposite responses.
- *
- * Deliberately a plain `accept()`, not `ctx.acceptWebSocket()`: a refusal must
- * not consume a hibernation slot, and at the worker layer there is no DO to
- * hibernate into at all.
+ * An HTTP 4xx before the 101 reaches the browser as close code 1006 with no
+ * detail. A plain `accept()` consumes no hibernation slot, unlike
+ * `ctx.acceptWebSocket()`.
  */
 export const refuseUpgrade = (
   request: Request,
@@ -293,12 +215,10 @@ export const refuseUpgrade = (
       } satisfies ErrorFrame),
     );
   } catch {
-    // The peer is already gone; the close below is still the right answer.
   }
   try {
     server.close(code, closeReason(code));
   } catch {
-    // Same.
   }
   // Echoing a subprotocol the client never offered fails the handshake in the
   // browser, which would replace our close code with an opaque 1006 — the
@@ -333,11 +253,6 @@ export const tokenFromSubprotocol = (
   return { token, ticket, offered };
 };
 
-/**
- * Everything the DO must know about a socket after an eviction. Kept small on
- * purpose: it is rewritten on every INCOMING frame (never on outgoing ones, or
- * a chatty turn would pay a serialization per delta per socket).
- */
 type SocketAttachment = {
   v: 1;
   ownerId: string;
@@ -477,25 +392,15 @@ class ConversationHubImpl implements ConversationHub {
       url.searchParams.get("pi") === "1" &&
       (await this.deps.pi?.enabled().catch(() => false)) === true;
 
-    // Tagged by a hash of the owner, not the owner: the raw `${issuer}|${sub}`
-    // can exceed the 256-char tag limit and is PII-shaped in logs. The tag
-    // exists so a service-secret route can kill every socket belonging to one
-    // user immediately.
+    // The raw `${issuer}|${sub}` can exceed the platform's 256-char tag limit.
     const tag = `o:${(await sha256Hex(ownerId)).slice(0, 32)}`;
 
-    // The LAST await in this method. Everything after it runs to completion
-    // synchronously, so no `broadcastRecord` can interleave and deliver a
-    // `record` ahead of `ready`.
     const opening = await this.openingWindow(
       head,
       url.searchParams.get("since"),
       url.searchParams.get("epoch"),
     );
 
-    // Final, exact gate. `reserveSocketSlot` did the reaping, but two connects
-    // can both pass it and then both wait on the same R2 read above; only a
-    // check with no await between it and `acceptWebSocket` actually holds the
-    // cap.
     if (
       this.deps.ctx.getWebSockets().length >= MAX_SOCKETS_PER_CONVERSATION
     ) {
@@ -532,18 +437,9 @@ class ConversationHubImpl implements ConversationHub {
     this.deps.ctx.acceptWebSocket(server, [tag]);
     server.serializeAttachment(attachment);
     this.deps.onSocketAuthenticated(ownerId);
-    // A socket that connects with less than RE_AUTH_LEAD_MS of token left would
-    // otherwise be warned by the very first send — which is `ready`, so the
-    // client would receive `auth.expiring` before it had been told anything at
-    // all. `ready.authExpiresAtMs` carries the same fact in the right order;
-    // the warning is cleared again below so the next broadcast still backstops.
     this.warned.set(server, attachment.authExpiresAtMs);
 
     const fresh = this.deps.reader.head();
-    // A resume that had to decompress an R2 segment held an await open, and a
-    // turn may have committed rows while it did. Those rows are in SQLite and
-    // readable without awaiting, so close the hole here rather than making
-    // every client discover it as a gap.
     const records = opening.records;
     let delivered = records.length > 0 ? records[records.length - 1]!.seq : -1;
     if (delivered >= 0 && fresh.headSeq > delivered) {
@@ -579,9 +475,6 @@ class ConversationHubImpl implements ConversationHub {
     }
     this.warned.delete(server);
 
-    // Storage flushes a lagging owner index row here: a connect is the
-    // only signal that arrives for a conversation whose last index write 5xx'd
-    // and whose next turn may never come.
     try {
       this.deps.onConnect();
     } catch (error) {
@@ -690,8 +583,7 @@ class ConversationHubImpl implements ConversationHub {
     try {
       ws.send(payload);
     } catch {
-      // A closing socket throws on send. There is nothing to do and nothing
-      // to report: the client will reconnect and resume from its own cursor.
+      // A closing socket throws on send.
     }
   }
 
@@ -708,7 +600,6 @@ class ConversationHubImpl implements ConversationHub {
       try {
         ws.close(CLOSE_INTERNAL, closeReason(CLOSE_INTERNAL));
       } catch {
-        // Already gone.
       }
       return;
     }
@@ -726,7 +617,6 @@ class ConversationHubImpl implements ConversationHub {
       try {
         ws.close(CLOSE_UNAUTHENTICATED, "token_expired");
       } catch {
-        // Already gone.
       }
       return;
     }
@@ -812,9 +702,6 @@ class ConversationHubImpl implements ConversationHub {
       }
       this.broadcast({ type: "record", ...record });
       this.agentsChanged();
-      // Storage also calls endTurn explicitly. Doing it here as well costs
-      // nothing (it is idempotent) and means a missed call upstream leaks a
-      // tool map rather than being invisible.
       if (record.kind === "turn" && record.phase !== "started") {
         this.endTurn(record.turnId);
       }
@@ -883,7 +770,6 @@ class ConversationHubImpl implements ConversationHub {
     try {
       this.turns.delete(turnId);
     } catch {
-      // Teardown of advisory state can never be allowed to fail a turn.
     }
   }
 
@@ -900,16 +786,6 @@ class ConversationHubImpl implements ConversationHub {
     return created;
   }
 
-  /**
-   * Storage is authoritative for whether a turn is live. The hub only fills in
-   * what storage cannot know across an eviction: the open tool calls, which
-   * are in-memory by design.
-   *
-   * `partialText` is always empty. A mid-turn joiner sees the working
-   * indicator (driven by the turn record's `started` phase) and then the
-   * finished reply when its row commits; there is no partial reply to preview
-   * any more, and inventing one would put half a message on screen.
-   */
   private liveSnapshot(): LiveTurnSnapshot | null {
     const live = this.deps.reader.liveTurn();
     if (!live) return null;
@@ -1187,8 +1063,6 @@ class ConversationHubImpl implements ConversationHub {
     let truncated = false;
     for (const record of range.records) {
       const size = utf8Length(JSON.stringify(record));
-      // Always emit at least one record even if it alone blows the budget:
-      // a batch that can return nothing is a client that retries forever.
       if (records.length > 0 && bytes + size > BACKFILL_BATCH_BYTES) {
         truncated = true;
         break;
@@ -1240,20 +1114,16 @@ class ConversationHubImpl implements ConversationHub {
     _reason: string,
     wasClean: boolean,
   ): Promise<void> {
-    // Completes the closing handshake from our side. 1006 is synthetic and
-    // 1001–1015 are reserved for the protocol itself, so anything that is not
-    // one of ours (3000–4999) goes back as a plain 1000.
+    // 1006 is synthetic and 1001–1015 are reserved for the protocol itself.
     try {
       ws.close(code >= 3000 && code <= 4999 ? code : 1000, "");
     } catch {
-      // Already closed; the accounting below is the only thing left to do.
     }
     this.warned.delete(ws);
     if (readAttachment(ws)?.pi && this.piSockets().every((socket) => socket === ws)) {
       try {
         this.deps.pi?.detach();
       } catch {
-        // Advisory teardown.
       }
     }
     if (!wasClean) {
@@ -1301,11 +1171,6 @@ class ConversationHubImpl implements ConversationHub {
     return counts;
   }
 
-  /**
-   * Human text always goes in an `error` frame first; the close reason is
-   * capped at 123 bytes and carries the code only. No raw provider or
-   * infrastructure string ever reaches either one.
-   */
   private closeWith(
     ws: WebSocket,
     code: number,
@@ -1324,7 +1189,6 @@ class ConversationHubImpl implements ConversationHub {
     try {
       ws.close(code, closeReason(code));
     } catch {
-      // Already gone.
     }
     this.warned.delete(ws);
   }

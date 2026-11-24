@@ -1,11 +1,5 @@
 export const OWNER_FENCE_LEASE_SCHEMA_VERSION = 1;
 export const OWNER_FENCE_DEFAULT_MAX_LEASE_MS = 30 * 60_000;
-/**
- * A caller derives `expiresAt` from its own clock, so a caller running ahead
- * of this object would otherwise cross the maximum by exactly its skew. Leases
- * requested within this much of the cap are clamped to the cap instead of
- * rejected, which is what lets a caller ask for the full maximum TTL.
- */
 export const OWNER_FENCE_CLOCK_SKEW_MS = 5 * 60_000;
 export const OWNER_FENCE_RETIRED_RETENTION_MS = 2 * 60 * 60_000;
 export const OWNER_FENCE_RETIRED_PRUNE_LIMIT = 256;

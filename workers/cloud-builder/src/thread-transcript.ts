@@ -74,11 +74,6 @@ const decode = (sql: SqlStorage, stored: string): string => {
   return crypto.decryptText(stored);
 };
 
-/**
- * Provision this thread's DEK (wrapped under the deployment KEK) and, once,
- * encrypt rows a pre-encryption isolate wrote. Call from the owning
- * object's constructor; without a KEK the transcript keeps its legacy form.
- */
 export const configureThreadTranscriptCrypto = (
   sql: SqlStorage,
   keks: OwnerKeks | null,
@@ -207,10 +202,6 @@ export const ensureThreadTranscriptSchema = (
   for (const statement of THREAD_TRANSCRIPT_DDL) sql.exec(statement);
   provisioned.add(sql);
   if (skipBackfill) return;
-  // Backfill only when the index is behind the transcript: a thread created
-  // before `thread_fts` existed has rows the per-append indexing never saw.
-  // Every later provisioning (one per isolate lifetime) finds the counts equal
-  // and skips the scan, so a cold start does not re-index the whole thread.
   const index = indexFor(sql);
   const stored = sql
     .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM thread_messages`)

@@ -190,7 +190,6 @@ import { containerBudgetMessage } from "./container-meter.js";
 import { piAgentContainerSizeKeys, raiseAgentContainerSize } from "./agent-container.js";
 import { initialInstanceSize } from "./instance-size.js";
 
-/** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
 const CAPABILITY_RENEW_MS = 60_000;
 const BROWSER_BUDGET_CHECK_MS = 60_000;
@@ -330,7 +329,6 @@ export type PiRuntimeEnv = Pick<
       | "BROWSER_GATEWAY"
     >
   > & {
-    /** `drop` ends the way back from pi-durable 1.5's storage upgrade (pi-table-snapshot.ts). */
     PI_UPGRADE_COPIES?: string;
   };
 
@@ -355,10 +353,8 @@ export type PiRuntimeOptions = {
     ): Promise<{ entries: ReadonlyArray<{ id: number; record: unknown }>; hasOlder: boolean }>;
     has(piConversationId: number, beforeId?: number): boolean;
   };
-  /** Test deployments only: answer `SAFEGUARD_TEST_TRIGGER` with a simulated safety block. */
   simulateSafeguardBlocks?: boolean;
   waitUntil(work: Promise<unknown>): void;
-  /** The user's next message is queued behind the turn under way, which makes room for it between two steps. */
   userWaiting(): boolean;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
@@ -368,7 +364,6 @@ export type PiRuntimeOptions = {
   agentStarted?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   agentStopped?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   agentWaiting?(event: PiAgentInfo & { threadId: string; turnId: string; waitingFor: string }): void;
-  /** Schedules aimed at a task, in words: what could wake it here besides its helpers and messages. */
   wakeSources?(threadId: string, authority: PiAuthority): Promise<string[]>;
   agentsChanged?(): void;
   agentLedger?(event: PiAgentLedgerEvent): void;
@@ -402,13 +397,11 @@ export type PiRuntimeOptions = {
   ): Promise<readonly CloudCodeSourceAgentTool[]>;
   browserHandoff?(handoff: PiBrowserHandoff, signal: AbortSignal | undefined): Promise<PiBrowserHandoffEnd>;
   agentGuard?(authority: PiAuthority, turnId: string): Promise<PiAgentGuard>;
-  /** The owner's `memories/rules.md`, read fresh for each task prompt. */
   rules?(authority: PiAuthority): Promise<string | null>;
   claudeCode?: ClaudeCodeTransport & {
     resolvedModel?(alias: string): string | undefined;
     contextWindow?(model: string): number | undefined;
   };
-  /** Holds conversation images in R2: entries keep references and requests carry signed URLs. */
   images?: ConversationImages;
 };
 
@@ -485,7 +478,6 @@ type AgentLease = {
   inFlight: number;
   used: boolean;
   linked: Set<string>;
-  /** The pressure probe raised its size: its container stops at release instead of staying warm. */
   resized?: boolean;
 };
 
@@ -646,7 +638,6 @@ export class PiConversationRuntime {
     for (const ready of waiters) ready();
   }
 
-  /** Wait until `ready()` has an answer, for at most {@link BINDING_WAIT_MS}. */
   async #await<T>(key: string, ready: () => T | undefined, refusal: string, signal?: AbortSignal | null): Promise<T> {
     const now = ready();
     if (now !== undefined) return now;
@@ -728,7 +719,6 @@ export class PiConversationRuntime {
     });
   }
 
-  /** A message with its stored images back inline, for a reader that only takes bytes (an agent log a device imports). */
   async #inlineMessage(message: Message): Promise<Message> {
     const images = this.#options.images;
     if (!images || typeof message.content === "string") return message;
@@ -1626,8 +1616,6 @@ export class PiConversationRuntime {
     const resized = held.resized === true;
     lease.abort();
     await Promise.race([lease.ready.catch(() => undefined), scheduler.wait(LEASE_STOP_WAIT_MS)]);
-    // A resized agent's container must stop now, or its next run soon after
-    // would find it warm at the old size.
     await lease.release({ warm: !end.aborted && !resized }).catch((error: unknown) => this.#options.report(error));
     this.#live.delete(`${record.turnId}:${record.attemptGeneration}`);
     await forgetPiCompute(this.#computeHost(), piComputeKey(agentConversationId), record).catch((error: unknown) =>
@@ -1775,8 +1763,6 @@ export class PiConversationRuntime {
       }
       if (kept) this.#state = kept;
       await this.#setModels(kept);
-      // Keep pi's tables as pi-durable 1.1.0 left them before this version migrates them: the way back
-      // (pi-table-snapshot.ts), until PI_UPGRADE_COPIES=drop ends it.
       if (!keepPiTableSnapshots(this.#options.env)) {
         if (dropPiTableSnapshot(this.#options.storage) === "dropped") this.#options.log("pi_tables_copy_dropped", {});
       } else if (snapshotPiTablesBeforeUpgrade(this.#options.storage) === "taken") {
@@ -1801,7 +1787,6 @@ export class PiConversationRuntime {
           ],
           turnLimits: {
             ...(this.#claudeCode ? { engines: [this.#claudeCode] } : {}),
-            // A cold container can be silent for minutes before Claude Code starts; the turn's own watchdog bounds it.
             watches: (provider) => provider !== CLAUDE_CODE_PROVIDER_ID,
           },
           onReport: this.#options.report,
@@ -2037,7 +2022,6 @@ export class PiConversationRuntime {
     context: Context,
   ): Promise<void> {
     const { agents } = await this.open();
-    // A schedule-gone notice matters only to a task still waiting on it.
     if (isScheduleGoneText(args.text) && (await agents.agentStanding(args.threadId, context))?.status !== "waiting") return;
     await agents.messageAgent(
       {
@@ -2138,7 +2122,6 @@ export class PiConversationRuntime {
       await Promise.race([stopped, waitFor(ORIGIN_STOP_HOLD_MS)]);
       return "stopped";
     }
-    // A schedule-gone notice matters only to a task still waiting on it.
     if (isScheduleGoneText(input.text ?? "") && standing.status !== "waiting") return running ? "steered" : "resumed";
     await agents.messageAgent(
       { key: `control:${input.commandId}`, threadId: input.threadId, message: input.text ?? "", fromOrchestrator: true },
@@ -2147,7 +2130,6 @@ export class PiConversationRuntime {
     return running ? "steered" : "resumed";
   }
 
-  /** Checks again a waiting task whose schedules could not be listed when it waited. */
   async recheckWaiting(threadId: string, context: Context): Promise<"told" | "live" | "unknown" | "not_waiting"> {
     const { agents } = await this.open();
     return await agents.recheckWaiting(threadId, context);
@@ -2268,7 +2250,6 @@ export class PiConversationRuntime {
     this.#options.log("pi_safeguard_removed", { seq, entries: targets.length });
   }
 
-  /** What the turn's failed reply says about a safety block, when a block is what ended it. */
   async safeguardBlock(execution: PiExecution, context: Context): Promise<SafeguardBlockInfo | undefined> {
     const { harness, root } = await this.open();
     const blocked = await harness.commit(async (tx) => {
@@ -2355,7 +2336,6 @@ export class PiConversationRuntime {
     const toolSlots = (view: { docs: Readonly<Record<string, unknown>> }) =>
       ((view.docs["pi.live"] as { tools?: Array<{ callId: string; name: string; status: string; entry?: number }> } | undefined)
         ?.tools ?? []);
-    // The window starts right after the last entry mirrored; when more came since than it holds, the gap is paged first.
     const stream = await onConversationChange(
       root,
       context,
@@ -2406,7 +2386,6 @@ export class PiConversationRuntime {
     if (settled.status !== "done" || settled.type !== "input") return "";
     const { root } = await this.open();
     const answer = await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context);
-    // It ended between two steps for the user's next message, which the turn after it answers.
     const message = answer?.model?.[0];
     return message?.role === "assistant" && message.stopReason === "toolUse" ? "" : assistantText(answer);
   }
@@ -2502,11 +2481,6 @@ export class PiConversationRuntime {
   }
 }
 
-/**
- * Tool results store their images in R2 before the result entry is written,
- * so the conversation keeps a reference and each request sends a signed URL.
- * Listed last so it sees the result every other extension settled on.
- */
 const conversationImagesExtension = (images: ConversationImages) =>
   defineExtension({
     name: "stella-conversation-images",

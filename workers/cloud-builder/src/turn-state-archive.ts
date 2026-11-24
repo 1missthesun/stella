@@ -436,9 +436,6 @@ const buildArchiveCommand = (
     `test ! -L ${source}`,
     `test "$(/usr/bin/readlink -f -- ${source})" = ${source}`,
     `test "$(/usr/bin/stat -c '%u:%g:%a' -- ${source})" = ${targetOwnerMode(target)}`,
-    // Excluding xattrs keeps the archive's authority aligned with the native
-    // attestation (which binds paths, bytes, owner, mode and link count, not
-    // ambient security.capability or other unaccounted-for attributes).
     `/usr/bin/mksquashfs ${source} ${archivePath} -noappend -comp zstd -no-progress -no-xattrs -reproducible -mkfs-time 0 >/dev/null`,
     `test -f ${archivePath}`,
     `test ! -L ${archivePath}`,
@@ -773,13 +770,6 @@ const withScratchCleanup = async <T>(
   }
 };
 
-/**
- * Build and upload one pre-registered Stella checkpoint object.
- *
- * The caller must quiesce all model-controlled processes before invoking this
- * function. The key comes from `prepareTurnStateOperation`; this helper accepts
- * no arbitrary directory and never interpolates the key into a shell command.
- */
 export const uploadTurnStateArchive = async (args: {
   session: TurnStateArchiveSession;
   bucket: Pick<R2Bucket, "head" | "put">;

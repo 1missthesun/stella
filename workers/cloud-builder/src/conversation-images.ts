@@ -1,26 +1,3 @@
-/**
- * Images a cloud conversation keeps in R2 instead of in its Durable Object.
- *
- * A model bills an image by its pixels (~1k tokens), but an inline block
- * carries its base64, ~2 MB for a fitted photo. Held in pi entries, every
- * request reloaded, decoded and serialized every image in context, which ran
- * the object out of its 128 MB. Each image is instead fitted once, written to
- * the drive bucket under the conversation's own prefix, and stored in the
- * entry as a reference (`image-ref.ts`). A request then carries a signed URL
- * the provider fetches itself: the object never holds the bytes again.
- *
- * Where a provider takes no URLs the model gateway inlines them (it is a
- * stateless Worker, and the fallback is per request); here the bytes come
- * back only for paths that cannot carry a URL at all (Claude Code's tool
- * results, agent logs other computers read).
- *
- * Keys: `conversation-images/<sha256(owner)>/<conversation>/<sha256(bytes)>.<ext>`.
- * Content-addressed, so the same screenshot read twice is one object. Only
- * keys under this owner's prefix are ever signed or read back, so a reference
- * forged into an imported entry can't reach another owner's images. A
- * conversation purge sweeps its prefix; an owner purge sweeps the owner's.
- */
-
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { Buffer } from "node:buffer";
 import { Effect } from "effect";
@@ -45,13 +22,6 @@ import { sweepR2Prefix } from "./build-session/shared/keys.js";
 
 export const CONVERSATION_IMAGES_ROOT = "conversation-images/";
 
-/**
- * A signed URL is stable for this window, so the same image keeps the same URL
- * across a conversation's requests and the providers' prompt caches still
- * match; it then stays valid for `URL_LIFETIME_SECONDS` from the window's
- * start, so a URL handed out at the window's end still outlives a long
- * request and its retries by hours.
- */
 const URL_WINDOW_MS = 6 * 60 * 60_000;
 const URL_LIFETIME_SECONDS = 12 * 60 * 60;
 
@@ -117,7 +87,6 @@ export class ConversationImages {
     this.#log = options.log;
   }
 
-  /** Whether images can be stored here at all; without it they stay inline, as before. */
   get available(): boolean {
     return Boolean(this.#env.DRIVE && this.#scope());
   }
@@ -138,7 +107,6 @@ export class ConversationImages {
     return this.#signer;
   }
 
-  /** A key this owner may read, or null for a reference that isn't its own. */
   async #ownedKey(data: string): Promise<string | null> {
     const prefix = await this.#prefix();
     const key = imageRefKey(data);
@@ -146,12 +114,6 @@ export class ConversationImages {
     return key;
   }
 
-  /**
-   * An inline image as a stored reference: checked, fitted to the model's
-   * limits, written once. A reference passes through; an image that can't be
-   * decoded becomes the note the request path would have sent anyway. When
-   * storage is unavailable or the write fails, the image stays inline.
-   */
   async store(block: ImageContent): Promise<ImageContent | TextContent> {
     if (isImageRef(block.data)) return block;
     const bucket = this.#env.DRIVE;
@@ -174,10 +136,6 @@ export class ConversationImages {
     return await this.storeFitted(bytes, mimeType);
   }
 
-  /**
-   * Bytes already fitted to the model's limits, stored as a reference; inline
-   * when storage is unavailable or the write fails.
-   */
   async storeFitted(bytes: Uint8Array, mimeType: string): Promise<ImageContent> {
     const bucket = this.#env.DRIVE;
     const prefix = await this.#prefix();
@@ -197,7 +155,6 @@ export class ConversationImages {
     return { type: "image", mimeType, data: imageRef(key) };
   }
 
-  /** `content` with every inline image stored; the same array when there was none. */
   async storeContent<T extends Block>(content: readonly T[]): Promise<readonly T[]> {
     if (!this.available || !content.some((part) => part.type === "image" && refOf(part) === undefined)) {
       return content;
@@ -213,20 +170,11 @@ export class ConversationImages {
     return out;
   }
 
-  /**
-   * An image prepared elsewhere under this owner (an attachment's model-ready
-   * copy) copied into this conversation, so the conversation keeps it
-   * after the original goes and its purge takes it. `name` names the copy, so
-   * attaching the same file again reuses it. Null when it can't be copied.
-   */
   async adopt(sourceKey: string, name: string): Promise<ImageContent | "missing" | null> {
     const bucket = this.#env.DRIVE;
     const prefix = await this.#prefix();
     if (!bucket || !prefix || !sourceKey.startsWith(prefix.owner)) return null;
     try {
-      // Streamed bucket to bucket through the binding: no S3 round trip, and
-      // the bytes never sit whole in the isolate. The read is also the check
-      // that the source is there.
       const object = await withTimeout(bucket.get(sourceKey), "Image read");
       if (!object) return "missing";
       const mimeType = object.httpMetadata?.contentType ?? "";
@@ -246,7 +194,6 @@ export class ConversationImages {
     }
   }
 
-  /** Deletes every image this conversation stored; `done` is false while more remain. */
   async purge(): Promise<{ deleted: number; done: boolean }> {
     const bucket = this.#env.DRIVE;
     const prefix = await this.#prefix();
@@ -254,7 +201,6 @@ export class ConversationImages {
     return await sweepR2Prefix(bucket, prefix.conversation);
   }
 
-  /** A provider-fetchable GET URL for a reference, stable within a window; null when it can't be signed. */
   async signedUrl(data: string, now = Date.now()): Promise<string | null> {
     const key = await this.#ownedKey(data);
     const signer = this.#signerOf();
@@ -267,7 +213,6 @@ export class ConversationImages {
     });
   }
 
-  /** The base64 of a reference, read back; null when it isn't this owner's or is gone. */
   async bytesBase64(data: string): Promise<string | null> {
     const key = await this.#ownedKey(data);
     const bucket = this.#env.DRIVE;
@@ -277,7 +222,6 @@ export class ConversationImages {
     return Buffer.from(await object.arrayBuffer()).toString("base64");
   }
 
-  /** A reference back inline, for a path that can only carry bytes; a note when it can't be read. */
   async inline(block: ImageContent): Promise<ImageContent | TextContent> {
     if (!isImageRef(block.data)) return block;
     const data = await this.bytesBase64(block.data);
@@ -297,13 +241,6 @@ export class ConversationImages {
     return out;
   }
 
-  /**
-   * A model request with every stored image as a signed URL, in the shape of
-   * the request's own protocol: an OpenAI data URL (Chat Completions'
-   * `image_url.url`, Responses' `image_url`) becomes the URL, and an Anthropic
-   * base64 source becomes a URL source. An image that can't be signed goes
-   * inline. Bodies without a reference pass untouched.
-   */
   async rewriteRequest(request: Request): Promise<Request> {
     if (request.method !== "POST" || !request.body) return request;
     const type = request.headers.get("content-type") ?? "";
@@ -343,15 +280,12 @@ export class ConversationImages {
     const walk = async (value: unknown): Promise<unknown> => {
       if (typeof value === "string") {
         if (isImageRef(value)) {
-          // A bare base64 field (a protocol without URL sources): the bytes.
           inlined += 1;
           return (await this.bytesBase64(value)) ?? BLANK_GIF;
         }
         const match = DATA_URL_REF.exec(value);
         if (!match) return value;
         const resolved = await resolve(match[2]!);
-        // An unreadable image in a URL slot can't be dropped from here; a
-        // 1x1 transparent GIF keeps the request well-formed.
         if (!resolved) return `data:image/gif;base64,${BLANK_GIF}`;
         return "url" in resolved ? resolved.url : `data:${match[1]};base64,${resolved.base64}`;
       }

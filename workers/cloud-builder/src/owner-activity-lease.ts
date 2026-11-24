@@ -11,11 +11,6 @@ export const withOwnerActivityLease = async <T>(
   const sessionId = `activity-${activityId}`;
   const turnId = activityId;
   const leaseId = crypto.randomUUID();
-  // Activity leases cannot be canceled by owner purge, so every one needs a
-  // durable crash expiry. Thirty minutes leaves ample room for large world
-  // operations while guaranteeing an evicted isolate cannot wedge the owner.
-  // The fence clamps the request to its own maximum and tolerates a caller
-  // clock that runs ahead, so asking for the full maximum is safe.
   const expiresAt = Date.now() + OWNER_FENCE_DEFAULT_MAX_LEASE_MS;
   const registered = await fence.register({
     leaseId,

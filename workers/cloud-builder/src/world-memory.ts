@@ -1,26 +1,3 @@
-/**
- * The owner's cloud memory: plain Markdown files in their world, laid out and
- * named exactly as the desktop keeps them under `~/.stella`.
- *
- *   /workspace/world/.stella/memories/main.md
- *   /workspace/world/.stella/memories/areas/<area>.md
- *   /workspace/world/.stella/memories/**.md
- *   /workspace/world/.stella/PERSONALITY.md
- *
- * They are ordinary world files: General agents edit them with their file
- * tools and shell, the orchestrator through `memory.*` inside `code`
- * (`createWorldMemory`, whose path rules, redaction and caps are the shared
- * ones in `memory-client.ts`), and the turn reads the resident ones fresh
- * every time (`AgentHome.readDocuments`). The world has no locks, so the last
- * write wins; `memory.write`'s `expectSha` is the one compare-and-set. A wipe
- * erases them with `erasePaths`, after which the world refuses any memory
- * write based on a revision from before it.
- *
- * Each of the owner's computers keeps its `~/.stella` copy the same as these
- * through `createWorldMemorySync` (the `memory.files.*` calls), which writes
- * and deletes only by compare-and-set, so a sync never loses a cloud edit.
- */
-
 import {
   MEMORY_LIST_MAX_FILES,
   MEMORY_SYNC_MAX_BYTES,
@@ -69,9 +46,7 @@ export const ownerMemoryWorld = async (
   worlds: Cloudflare.Env["WORLDS"],
   ownerId: string,
 ): Promise<MemoryWorld> => {
-  // Every result is plain data, so each is released as it arrives. An
-  // unreleased RPC result holds its call open until GC, and the owner object's
-  // `memory.files.list` polls (about one a minute per desktop) kept it awake.
+  // An unreleased RPC result holds its call open until GC.
   const stub = releasingStub(worlds.getByName(await worldName(ownerId)));
   return {
     head: () => stub.head(),
@@ -226,11 +201,6 @@ export const createWorldMemory = (
   fence?: MemoryEpochFence,
 ): MemoryClient => createMemoryClient(createWorldMemoryStore(world, fence));
 
-/**
- * Write `bytes` to a memory file only if it does not exist yet, as they are
- * (no caps: legacy content moving in). The sha written, or null when the
- * file was already there.
- */
 export const createWorldMemoryFile = async (
   world: () => Promise<MemoryWorld>,
   fence: MemoryEpochFence,
@@ -297,10 +267,6 @@ export const createWorldMemorySync = (
       | { status: "conflict"; actualSha: string | null }
     > => {
       const path = syncedPath(input);
-      // Sync carries a file as the user's computer has it. The character caps
-      // are how big Stella keeps the files she writes through `memory.write`;
-      // applying them here left any bigger file (an area file a task grew past
-      // 32,000 characters with its file tools) on one computer for good.
       let prepared: { bytes: Uint8Array; sha: string };
       try {
         prepared = await prepareMemorySync(path, content);

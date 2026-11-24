@@ -128,7 +128,6 @@ export class PiEntryArchive {
         const parent = (JSON.parse(row.record) as { parent?: { conversationId?: unknown } }).parent;
         if (typeof parent?.conversationId === "number") forked.add(parent.conversationId);
       } catch {
-        // Unreadable: treat nothing as forked from it; it is not pruned either.
         forked.add(row.id);
       }
     }
@@ -339,7 +338,6 @@ export class PiEntryArchive {
         const row = JSON.parse(line) as EntryRow;
         out.push({ id: row.id, record: JSON.parse(row.record) });
       } catch {
-        // A corrupt line costs that entry, not the read.
       }
     }
     return out;

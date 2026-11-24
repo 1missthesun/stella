@@ -10,30 +10,14 @@ import {
   type OwnerFenceLeaseRole,
 } from "./owner-fence-store.js";
 
-/**
- * The owner purge fence, owned by OwnerGate. An owner has one fence
- * generation; active cloud work holds a lease on it (SQL rows in
- * `owner_fence_leases`). A purge (`begin`) blocks new leases and waits for
- * the active ones to drain; a reset purge ends with `release`, which opens a
- * new generation. OwnerGate calls this class directly; other objects reach it
- * through OwnerGate's typed RPC methods (`owner-fence-client.ts`).
- */
-
 export const OWNER_FENCE_KEY = "ownerPurgeFence";
 export const OWNER_FENCE_LEASE_TTL_MS = 30 * 60_000;
 const OWNER_FENCE_MAX_ACTIVE_LEASES = 512;
-/**
- * Until 2026-11 the KV record carried an `active` map mirroring the SQL rows
- * for rollback to a Worker that predated SQL leases (`leaseStorageVersion: 2`).
- * Nothing reads that mirror any more. Version 3 with an empty map tells a
- * rolled-back Worker to rebuild its mirror from SQL instead of trusting a
- * stale one.
- */
+// Version 3 with an empty `active` map tells a rolled-back Worker to rebuild its mirror from SQL.
 const OWNER_FENCE_RECORD_VERSION = 3;
 
 export type OwnerPurgeMode = "temporary" | "permanent";
 
-/** The durable KV record (key `ownerPurgeFence`). */
 export type OwnerPurgeFence = {
   ownerId?: string;
   generation: string;
@@ -130,7 +114,6 @@ export class OwnerFence {
     this.store = new OwnerFenceStore(ctx.storage.sql);
   }
 
-  /** Lease rows, for checks that run inside OwnerGate's own transactions. */
   leases(now = Date.now()): OwnerFenceStore {
     if (!this.initialized) {
       this.store.initialize(now);
@@ -139,7 +122,6 @@ export class OwnerFence {
     return this.store;
   }
 
-  /** The fence record, created (and its old rollback mirror cleared) on first use. */
   async record(now = Date.now()): Promise<OwnerPurgeFence> {
     this.leases(now);
     const stored = await this.ctx.storage.get<OwnerPurgeFence>(OWNER_FENCE_KEY);
@@ -280,7 +262,6 @@ export class OwnerFence {
     return { ok: true };
   }
 
-  /** Proves a lease is still open; renews it once half its time is gone. */
   async assert(
     input: OwnerFenceAssertInput,
     now = Date.now(),
@@ -330,11 +311,6 @@ export class OwnerFence {
     };
   }
 
-  /**
-   * Blocks the fence for a purge. The same request id resumes (and may turn a
-   * temporary purge permanent); a different one is refused while blocked.
-   * `beforeAuthorityChange` runs before a new block or an upgrade is stored.
-   */
   async begin(
     input: OwnerFenceBeginInput,
     beforeAuthorityChange?: () => Promise<void>,

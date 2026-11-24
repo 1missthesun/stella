@@ -326,8 +326,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     try {
       generation = (await this.snapshot()).ownerGeneration;
     } catch {
-      // Without a snapshot the events still land; a reset is rare and its
-      // fences catch anything that matters.
     }
     const current = events.filter(
       (event) =>
@@ -399,11 +397,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return readSessionRevocations(this.ownerStore().context(null).db);
   }
 
-  /**
-   * Records a sign-out, then closes every socket it reaches that the signed-out
-   * session opened: this object's live and presence sockets, and the sockets
-   * of each conversation that noted one within the token lifetime.
-   */
   async revokeSessions(revocation: SessionRevocation): Promise<void> {
     const response =
       "minIatMs" in revocation
@@ -577,11 +570,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     name: string;
     args: unknown;
     ownerGeneration: string;
-    /**
-     * A Stella Crew caller: the call runs in that workspace's drive space and
-     * may only be one of `CREW_OWNER_CALLS`. Set by server code from the
-     * Slack installation, never from a request body.
-     */
     crew?: OwnerCrewScope;
   }): Promise<RpcResponse> {
     const crew = input.crew;
@@ -682,7 +670,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     request: SessionCapabilityRequest,
   ): Promise<BillingControlResult<GatewaySessionCapabilityResponse>> {
     const now = Date.now();
-    // Gateways deployed before the session fields send neither.
     if (
       typeof request.sessionId === "string" &&
       callerSessionRevoked(this.ownerStore().context(null, now).db, {
@@ -814,9 +801,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     await this.billingWrite((ctx) => releaseSpend(ctx, id));
   }
 
-  // Requests and CPU the owner's hosted apps and Crew previews served,
-  // charged in batches. Serving stops while the budget is out, and past a
-  // daily request cap that backstops a traffic spike.
   async settleHosting(input: {
     receiptId: string;
     sku: "dynamic-worker" | "static-site";
@@ -1009,7 +993,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return await this.issueModelGrant({ ...args, expiresAt: lease.expiresAt });
   }
 
-  /** Typed owner fence calls for BuildSession, OrchestratorSession and the Worker. */
   async fenceRegister(
     input: OwnerFenceLeaseInput,
   ): Promise<OwnerFenceRegisterResult> {
@@ -1022,7 +1005,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return await this.ownerFence().assert(input);
   }
 
-  /** Retires a lease, then the model grants and cloud chat admission it held. */
   async fenceUnregister(
     input: OwnerFenceUnregisterInput,
   ): Promise<OwnerFenceUnregisterResult> {
@@ -1118,13 +1100,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     });
   }
 
-  /**
-   * The owner snapshot, built from this object's own tables on every read:
-   * generation and writability from `account`, identity as the owner's last
-   * verified token claimed it, enforcement from `abuse`, plan and turn
-   * allowance from `billing`, execution from `engines`, devices from
-   * `devices`. `refresh` is accepted for callers that still pass it.
-   */
   async snapshot(
     options: { refresh?: boolean; now?: number } = {},
   ): Promise<OwnerSnapshot> {
@@ -1294,8 +1269,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         input.expectedGeneration &&
         input.expectedGeneration !== snapshot.ownerGeneration
       ) {
-        // The cache can lag a rotation whose push was lost. One forced
-        // refresh separates "stale cache" from "stale caller".
         snapshot = await this.snapshot({ refresh: true, now });
       }
     } catch (error) {
@@ -1380,8 +1353,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { ok: true, snapshot: await this.reserveTurnBudget(snapshot, turnId, now), replayed: false };
   }
 
-  // Each admitted turn holds its own slice of the budget, so concurrent turns
-  // can't each spend the same headroom through their turn capabilities.
   private async reserveTurnBudget(snapshot: OwnerSnapshot, turnId: string, now: number): Promise<OwnerSnapshot> {
     const wanted = snapshot.allowance.budgetMicroCents;
     if (wanted === GATEWAY_BUDGET_UNLIMITED || wanted <= 0) return snapshot;
@@ -1431,8 +1402,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const running = sql
       .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM agent_containers`)
       .one().count;
-    // Plans never cap how many cloud agents run at once; the budget is the
-    // only limit. Free has no cloud containers at all.
     const cloud =
       PLAN_CATALOG[billingPlan(this.ownerStore().context(null, now)).plan].cloudContainers;
     if (!held && !cloud) {
@@ -1540,7 +1509,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         try {
           server.close(LIVE_CLOSE.unauthenticated, "unauthenticated");
         } catch {
-          // Peer already gone.
         }
         return new Response(null, {
           status: 101,
@@ -1550,8 +1518,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       }
       noteCallerIdentity(db, caller);
       const response = store.acceptLive(caller);
-      // Always: the new socket's token expiry and re-auth deadline only reach
-      // the alarm through here, and nothing else closes it once its JWT ends.
       await this.scheduleAlarm(Date.now());
       return response;
     }
@@ -1799,8 +1765,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       )
       .toArray()[0];
     if (existing) {
-      // A helper's dispatch submitted before its lineage crossed the wire
-      // was stored without it; the same request replayed now is that one.
       const legacyJson = legacyDispatchPayloadJson(request.payload);
       const legacy = legacyJson ? fingerprintOf(await sha256Hex(legacyJson)) : undefined;
       if (existing.routing_fingerprint !== fingerprint && existing.routing_fingerprint !== legacy) {
@@ -2038,9 +2002,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     }
 
     const terminal = state === "blocked";
-    // The payload is deleted the moment a computer durably accepts it: after
-    // that the desktop's own inbox is the only copy and this object must
-    // never be able to serve it a second time.
     const keepsPayload = !terminal && state !== "computer_accepted";
     this.ctx.storage.sql.exec(
       `INSERT INTO dispatches (
@@ -2281,12 +2242,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return { outcome: await acknowledged };
   }
 
-  /**
-   * Stop an agent a device runs locally, and the agents it started there,
-   * and wait for the device to say how it landed (`agent-pause`, the frame's
-   * name from before `stop_agent`). `unreachable` means no live socket;
-   * `timeout` that no answer came in time, so it may still have landed.
-   */
   async stopLocalAgent(input: {
     deviceId: string;
     threadId: string;

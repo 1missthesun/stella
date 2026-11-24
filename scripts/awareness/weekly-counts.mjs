@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-// Weekly awareness numbers: anonymous install counts (telemetry worker),
-// stella.sh/r/<source> short-link hits (website worker), and Cloudflare Web
-// Analytics referrers for stella.sh.
-//
-//   node scripts/awareness/weekly-counts.mjs            # production, last 7 days
-//   node scripts/awareness/weekly-counts.mjs --dev      # dev datasets
-//   node scripts/awareness/weekly-counts.mjs --days 14  # wider window
-//   node scripts/awareness/weekly-counts.mjs --json
-//
-// Credentials (never printed): the Analytics Engine queries use
-// CLOUDFLARE_API_TOKEN, else the token file below, else wrangler's own login
-// (`wrangler auth token`). Web Analytics (RUM) needs an API token with
-// "Account Analytics: Read" (env CLOUDFLARE_ANALYTICS_TOKEN or the token file,
-// ~/.config/stella-dev/cloudflare-analytics-token on omarchy: Cloudflare user
-// token "stella-agents-analytics-read"); wrangler's login cannot read RUM, so
-// that section is skipped without one.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -34,8 +18,7 @@ const daysArg = args.indexOf("--days");
 const days = daysArg >= 0 ? Math.max(1, Math.min(60, Number(args[daysArg + 1]) || 7)) : 7;
 const COUNTS = dev ? "stella_anonymous_counts_dev" : "stella_anonymous_counts";
 const SHORT_LINKS = dev ? "stella_short_links_dev" : "stella_short_links";
-// Analytics Engine can't delete rows. The 12 prod hits before this time were
-// our own launch tests (2026-11-10 07:31–07:52 UTC), so prod counts start here.
+// Analytics Engine can't delete rows; production rows before this time are launch tests.
 const SHORT_LINKS_SINCE = dev ? "1970-01-01 00:00:00" : "2026-11-10 08:00:00";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -63,12 +46,12 @@ const wranglerToken = () => {
       const token = JSON.parse(out).token;
       if (typeof token === "string" && token) return token;
     } catch {
-      // Try the next install.
     }
   }
   return null;
 };
 
+// Cloudflare: wrangler's login cannot read Web Analytics; that needs a token with "Account Analytics: Read".
 const analyticsToken = process.env.CLOUDFLARE_ANALYTICS_TOKEN?.trim() || readTokenFile();
 const engineToken = process.env.CLOUDFLARE_API_TOKEN?.trim() || analyticsToken || wranglerToken();
 
@@ -83,7 +66,7 @@ const sql = async (query) => {
   return JSON.parse(text).data ?? [];
 };
 
-// A dataset that has never been written does not exist yet; treat it as empty.
+// Analytics Engine: a dataset that has never been written does not exist yet.
 const sqlOrEmpty = async (query) => {
   try {
     return { rows: await sql(query), error: null };
@@ -104,7 +87,6 @@ const now = Date.now();
 const windowStart = now - days * DAY_MS;
 
 const installCounts = async () => {
-  // Rows are tiny (one per event); 60 days covers the cohort for 7-day return.
   const { rows, error } = await sqlOrEmpty(
     `SELECT index1 AS install, blob1 AS type, blob2 AS detail, blob3 AS platform, blob7 AS engine, double1 AS at, _sample_interval AS weight
      FROM ${COUNTS}
@@ -128,7 +110,6 @@ const installCounts = async () => {
   const foundVia = [];
   const activeInWindow = new Set();
   const cohort = { size: 0, returned: 0 };
-  // Setup funnel for installs first run in the window: the furthest step each reached.
   const SETUP_ORDER = ["signin", "extras", "chat"];
   const lastSetupStep = [];
   const day1Messages = [];
@@ -164,8 +145,6 @@ const installCounts = async () => {
       turnErrors.push(event.detail);
       turnErrorEngines.push(event.engine || "(unknown)");
     }
-    // 7-day return: installs from 8-14 days ago that were opened on another
-    // local day within their first 7 days (one active_day per local day).
     if (firstRun?.detail === "new" && firstRun.at <= now - 8 * DAY_MS && firstRun.at > now - 15 * DAY_MS) {
       cohort.size += 1;
       const activeDays = events.filter(
@@ -189,7 +168,7 @@ const installCounts = async () => {
     setupFunnel: { lastStepReached: tally(lastSetupStep) },
     day1MessagesPerNewInstall: tally(day1Messages),
     turnErrors: { total: turnErrors.length, byKind: tally(turnErrors), byEngine: tally(turnErrorEngines) },
-    // Analytics Engine samples bursts from one install; true means some rows stand for several events.
+    // Analytics Engine samples bursts, so one row can stand for several events.
     sampled: rows.some((row) => Number(row.weight) > 1),
   };
 };

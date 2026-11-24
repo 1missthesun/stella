@@ -1,10 +1,3 @@
-/**
- * Lists the hash of every earlier version of each bundled skill in a ref's
- * history, so the desktop recognises an untouched old copy in a user's home
- * and updates it (packages/runtime/kernel/home/skills-sync.ts).
- *
- *   bun scripts/shipped-skill-hashes.ts [--ref <rev>] [--out <file>]
- */
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
@@ -38,7 +31,6 @@ const readBlob = (id: string) => {
   return content;
 };
 
-/** Regular files only: the desktop's hash skips symlinks, and git has no other kinds. */
 const unitFiles = (commit: string, dir: string): Map<string, string> | null => {
   let listing: string;
   try {

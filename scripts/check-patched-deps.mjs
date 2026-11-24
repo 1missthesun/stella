@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-// Every installed copy of a patchedDependencies package must carry its patch.
-// `bun install --omit peer` (the runtime and backend kinds of `bun run deps`)
-// skips patchedDependencies, and a bundle that mixes patched and unpatched
-// copies broke every cloud chat turn ("Not a Harness", 2026-10-15).
-// `--fix` applies a missing patch in place; without it the script refuses.
+// `bun install --omit peer` skips patchedDependencies.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -30,7 +26,7 @@ const installedCopies = ({ name, version }) => {
     .map((dir) => realpathSync(dir));
 };
 
-// git apply outside any repository, so paths resolve against the package dir.
+// Inside a repository, git apply resolves paths against the repository root.
 const gitApply = (dir, patchFile, args) =>
   spawnSync("git", ["apply", ...args, patchFile], {
     cwd: dir,
@@ -40,8 +36,7 @@ const gitApply = (dir, patchFile, args) =>
 
 const isPatched = (dir, patchFile) => gitApply(dir, patchFile, ["--reverse", "--check"]).status === 0;
 
-// Store files are hardlinks into bun's global cache; replace each touched file
-// with its own copy so the patch never edits the cache.
+// Bun's store files are hardlinks into its global cache.
 const detachTouchedFiles = (dir, patchFile) => {
   const touched = new Set();
   for (const line of readFileSync(patchFile, "utf8").split("\n")) {
@@ -74,7 +69,6 @@ const manifestOf = (dir) => {
   return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
 };
 
-// A bundle is a workspace plus the workspaces it depends on, transitively.
 const bundleWorkspaces = (entry) => {
   const byName = new Map();
   for (const dir of workspaceDirs()) {
@@ -103,9 +97,6 @@ const defaultBundles = () => {
   return workspaceDirs().filter((dir) => path.dirname(dir) === workers);
 };
 
-// Two copies of one patched package in a bundle break identity checks
-// (`instanceof`, brands), so every workspace in a bundle must link the same
-// copy. Copies used only by other apps (mobile's peer variant) don't matter.
 const splitLinks = ({ spec, name }, bundles) => {
   const problems = [];
   for (const entry of bundles) {

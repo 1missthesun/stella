@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Usage: node scripts/check-deploy-config.mjs <cloud-builder|model-gateway|canvas-share> [env]
-// Fails a deploy whose Wrangler config breaks a deployment trust rule.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,7 +54,6 @@ const PRODUCTION_FORBIDDEN_VARS = [
   "STELLA_PLAINTEXT_STORAGE",
 ];
 
-/** Bindings the dev and production deployments intentionally share. */
 const SHARED_ACROSS_ENVS = new Set(["r2:stella-canvas-shares"]);
 
 const resourceIds = (config) => {

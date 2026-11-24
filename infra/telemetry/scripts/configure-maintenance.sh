@@ -32,8 +32,7 @@ bucket_name="$(terraform -chdir="${stack_dir}" output -raw bucket_name)"
   exit 65
 }
 
-# The Cloudflare Terraform provider exposes maintenance configuration as
-# read-only. These setters are safe to repeat and converge on the desired state.
+# The Cloudflare Terraform provider exposes maintenance configuration as read-only.
 bunx wrangler r2 bucket catalog compaction enable \
   "${bucket_name}" \
   --target-size 128 \

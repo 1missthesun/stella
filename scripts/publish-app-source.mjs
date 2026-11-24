@@ -9,11 +9,6 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const UPSTREAM_REPO = "upstream";
 
-// An installed Stella is the desktop app's source: what a task on the
-// user's computer can change and see take effect. The phone app, the cloud
-// backend, the website, the launchers and this repo's own tooling and docs
-// stay out, so a task asked for a change never goes looking in them. (A
-// self-hoster deploys the backend from a clone of this repo, not from here.)
 const EXCLUDED_PATHS = [
   ".agents",
   ".codex",
@@ -26,7 +21,6 @@ const EXCLUDED_PATHS = [
   "packages/mobile",
   "packages/mobile-screenshots",
   "packages/website",
-  // OfficeCLI's source: installs download its build.
   "packages/stella-office/vendor/officecli/src",
   "AGENTS.md",
   "CLAUDE.md",
@@ -35,7 +29,6 @@ const EXCLUDED_PATHS = [
   "TESTING.md",
   "eslint.workers.config.js",
 ];
-/** Of the repo's own scripts, only what the app's scripts import. */
 const KEPT_ROOT_SCRIPTS = new Set(["lib/entry-point.mjs"]);
 const INSTALL_GUIDE = "scripts/app-source/install-guide.md";
 
@@ -46,7 +39,6 @@ const option = (name, fallback) => {
 };
 const namespace = option("namespace", "stella-app-dev");
 const ref = option("ref", "HEAD");
-/** Writes the tree an install would get to this folder and publishes nothing. */
 const outDir = option("out", "");
 
 const NAMESPACE_BACKENDS = {
@@ -56,7 +48,6 @@ const NAMESPACE_BACKENDS = {
 };
 const backend = option("backend", NAMESPACE_BACKENDS[namespace]);
 
-/** Tell the backend's connected desktops; never fails the publish. */
 const announce = async (expected) => {
   if (!backend) {
     console.log(`No backend follows ${namespace}; pass --backend <url> to tell its desktops.`);
@@ -125,12 +116,6 @@ const lockedVersions = (dir) => {
   return locked;
 };
 
-/**
- * The root manifest as an install needs it: workspaces, scripts, patches and
- * trusted install scripts for what the install has, nothing for what it
- * doesn't; the self-modification tools (devDependencies) left to the
- * package set a draft installs (packages/desktop/electron/services/app-source/draft-deps.ts).
- */
 const shapeInstallManifest = (dir) => {
   const file = path.join(dir, "package.json");
   const manifest = JSON.parse(readFileSync(file, "utf8"));
@@ -143,7 +128,6 @@ const shapeInstallManifest = (dir) => {
     changed = false;
     for (const [name, command] of Object.entries(scripts)) {
       const missingPath = pathsIn(command).some((ref) => !existsSync(path.join(dir, ref.replace(/[.,;:)]+$/, ""))));
-      // `bun run x` names a root script unless the command moved into a package first.
       const missingScript =
         !/(^|&&|;)\s*cd\s/.test(command) &&
         [...command.matchAll(/bun run ([\w:.-]+)/g)].some((m) => !(m[1] in scripts));
@@ -165,9 +149,6 @@ const shapeInstallManifest = (dir) => {
   if (existsSync(path.join(dir, "patches")) && readdirSync(path.join(dir, "patches")).length === 0) {
     rmSync(path.join(dir, "patches"), { recursive: true });
   }
-  // Electron's own install script would download a binary a Mac never runs
-  // (the launcher's signed Stella.app does); the app's postinstall
-  // (ensure-electron-binary.mjs) fetches it where it is needed.
   manifest.trustedDependencies = (manifest.trustedDependencies ?? []).filter(
     (name) => name !== "electron" && locked.has(name),
   );
@@ -239,7 +220,6 @@ try {
   ).status === 0;
   if (fetched) git(["reset", "-q", "--soft", "FETCH_HEAD"]);
   git(["add", "-A"]);
-  // The repo ignores AGENTS.md (each checkout's own); the install guide ships.
   git(["add", "-f", "AGENTS.md"]);
   if (fetched && spawnSync("git", ["diff", "--cached", "--quiet", "FETCH_HEAD"], { cwd: workDir }).status === 0) {
     console.log(`Upstream already matches ${sourceSha.slice(0, 12)}; nothing to publish.`);
@@ -254,5 +234,4 @@ try {
   rmSync(workDir, { recursive: true, force: true });
 }
 
-// Also after "nothing to publish": a notice lost last time is sent again.
 await announce(publishedTip);

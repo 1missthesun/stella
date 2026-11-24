@@ -42,23 +42,6 @@ export const scheduleGoneText = (name: string, change: "removed" | "paused"): st
     "You were resumed for this. If you were waiting on it, check directly whether what it was for has happened; if you still need to wait, set up another way to be woken (a background command or monitor that ends when it happens, or a scheduled check aimed at you), or report.",
   ].join("\n");
 
-export const NOTHING_CAN_WAKE_MARK = "[Nothing can wake you]";
-
-const NOTHING_LIVE =
-  "no background command or monitor of yours is running, no helper of yours is at work, no schedule is aimed at you, no message is on its way to you, and you have no question open with whoever started you";
-
-const NOTHING_CAN_WAKE_STEPS =
-  "Check directly now whether it has already happened. If it has not and you still need to wait, first set up what will wake you: a background command or monitor that ends when it happens, or a scheduled check aimed at you (schedule_add in code, a task with your thread). Then end your turn waiting again. If only a person can move it on, ask them (ask_user), or end your turn with your report.";
-
-export const nothingCanWakeRefusal = (waitingFor: string): string =>
-  `You can't end this turn waiting for ${waitingFor}: nothing that could wake you is live (${NOTHING_LIVE}), so you would wait until someone noticed. ${NOTHING_CAN_WAKE_STEPS}`;
-
-export const nothingCanWakeText = (waitingFor: string): string =>
-  `${NOTHING_CAN_WAKE_MARK} You ended your turn waiting for ${waitingFor}, but by the time it ended nothing that could wake you was live (${NOTHING_LIVE}). You were resumed for this. ${NOTHING_CAN_WAKE_STEPS}`;
-
-export const nothingCanWakeNowText = (waitingFor: string): string =>
-  `${NOTHING_CAN_WAKE_MARK} You are waiting for ${waitingFor}, but nothing that could wake you is live (${NOTHING_LIVE}). You were resumed for this. ${NOTHING_CAN_WAKE_STEPS}`;
-
 export const UNLISTED_SCHEDULES_WAKER = "schedules aimed at you (they could not be listed just now)";
 export const UNLISTED_WORK_WAKER = "work of yours on this computer that could not be listed just now";
 export const isUnlistedWaker = (waker: string): boolean => waker === UNLISTED_SCHEDULES_WAKER || waker === UNLISTED_WORK_WAKER;
@@ -79,20 +62,6 @@ export const resultWakers = (resultJson: string | null | undefined): string[] | 
     return undefined;
   }
 };
-
-export const resultWaitingReply = (resultJson: string | null | undefined): string | undefined => {
-  if (!resultJson?.trim()) return undefined;
-  try {
-    const parsed = JSON.parse(resultJson) as { reply?: unknown; waitingFor?: unknown } | null;
-    return parsed && typeof parsed === "object" && typeof parsed.waitingFor === "string" && typeof parsed.reply === "string" && parsed.reply.trim()
-      ? parsed.reply.trim()
-      : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-export const HANDED_ON_WAITING_FOR = "a message already on its way to it, or a helper still working";
 
 export const resultWaitingFor = (resultJson: string | null | undefined): string | undefined => {
   if (!resultJson?.trim()) return undefined;

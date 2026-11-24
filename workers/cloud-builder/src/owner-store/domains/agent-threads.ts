@@ -63,7 +63,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
   type AgentTaskMessageResult,
 } from "@stella/contracts/backend/agent-threads";
-import { DONE_ACCEPTED_TEXT, doneNotToStarterText, doneResultJson, doneWhileHelpersWorkText, helperWait } from "@stella/contracts/agent-messaging";
+import { DONE_ACCEPTED_TEXT, doneNotToStarterText, doneResultJson, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
 import { selectCloudModel } from "./engines.js";
@@ -93,14 +93,11 @@ import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { appendAgentEvent, endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { agentInvariants } from "./agent-invariants.js";
-import { boundReportText, deriveAgentReport, endedWaiting, fileLateTurn, HELD_WHILE_STOPPED, heldAncestorIds, liveDescendants, queueAgentNote, queueStellaNote, reportHeldForHelpers, resultTextOf } from "./agent-reports.js";
+import { boundReportText, deriveAgentReport, endedWaiting, fileEarlierAttemptReport, HELD_WHILE_STOPPED, liveDescendants, queueAgentNote, queueStellaNote, resultTextOf } from "./agent-reports.js";
 import {
-  NOTHING_CAN_WAKE_MARK,
   WAITING_FOR_MAX_CHARS,
   helperStoppedText,
-  nothingCanWakeText,
   resultWaitingFor,
-  resultWaitingReply,
   resultWakers,
   WAKERS_MAX,
   waitingResultJson,
@@ -1886,11 +1883,7 @@ const agentDirectory = async (
     const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
     const waitingFor = endedWaiting(row) ? resultWaitingFor(row.result_json) : undefined;
     const wakers = waitingFor !== undefined ? resultWakers(row.result_json) : undefined;
-    const status = reportHeldForHelpers(ctx.db, row)
-      ? "waiting_for_helpers"
-      : waitingFor !== undefined
-        ? "waiting"
-        : normalizeAgentDirectoryStatus(row.status);
+    const status = waitingFor !== undefined ? "waiting" : normalizeAgentDirectoryStatus(row.status);
     const live = isLiveAgentStatus(status);
     return {
       threadId: row.thread_id,
@@ -4416,8 +4409,9 @@ const completeComputerThread = async (
   }
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
     if (args.attemptGeneration < row.attempt_generation && args.status === "completed") {
-      const said = result !== undefined && !isPlaceholderAgentResult(JSON.stringify({ finalText: result })) ? result : "";
-      fileLateTurn(ctx.db, row.thread_id, args.attemptGeneration, said, ctx.now, args.waitingFor !== undefined, args.done === true);
+      if (args.waitingFor === undefined && result !== undefined && !isPlaceholderAgentResult(JSON.stringify({ finalText: result }))) {
+        fileEarlierAttemptReport(ctx.db, row.thread_id, args.attemptGeneration, result, ctx.now);
+      }
       return { updated: false, status: row.status };
     }
     if (
@@ -5292,8 +5286,7 @@ export const applyAgentThreadEvent = (
         event.status === "waiting_for_user"
           ? event.status
           : agentThreadTerminalStatus(event.status);
-      const wake = event.wakeCheck && ended === "completed" ? waitingWake(db, thread, event.resultJson) : "live";
-      const resultJson = wake === "report" ? JSON.stringify({ finalText: waitingFinalText(event.resultJson) }) : event.resultJson;
+      const resultJson = event.resultJson;
       const limit =
         ended === "failed" && jobs && threadExecutor(thread).kind === "cloud"
           ? claudeUsageLimitOf(event.errorMessage ?? "")
@@ -5350,46 +5343,6 @@ export const applyAgentThreadEvent = (
           ),
         });
       }
-      if (wake === "tell" && thread.owner_generation) {
-        const waitingFor = resultWaitingFor(resultJson) ?? "something";
-        queueAgentNote(
-          { db, now: event.completedAt },
-          {
-            noteId: agentReportReceipt(`nothing-can-wake:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
-            parentThreadId: thread.thread_id,
-            conversationId: thread.conversation_id,
-            ownerGeneration: thread.owner_generation,
-            fromThreadId: thread.thread_id,
-            text: nothingCanWakeText(waitingFor),
-          },
-        );
-      }
-      const reply = status === "completed" ? resultWaitingReply(resultJson) : undefined;
-      if (reply && thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id && thread.owner_generation) {
-        queueAgentNote(
-          { db, now: event.completedAt },
-          {
-            noteId: agentReportReceipt(`waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
-            parentThreadId: thread.parent_thread_id,
-            conversationId: thread.conversation_id,
-            ownerGeneration: thread.owner_generation,
-            fromThreadId: thread.thread_id,
-            text: formatAgentMessage({ threadId: thread.thread_id, label: thread.description || "An agent" }, reply),
-          },
-        );
-      }
-      if (reply && !thread.parent_thread_id && thread.owner_generation) {
-        queueStellaNote(
-          { db, now: event.completedAt },
-          {
-            noteId: agentReportReceipt(`waiting-reply:${thread.thread_id}:${event.attemptGeneration}:${event.turnId}`),
-            conversationId: thread.origin_conversation_id ?? thread.conversation_id,
-            ownerGeneration: thread.owner_generation,
-            fromThreadId: thread.thread_id,
-            text: formatAgentMessage({ threadId: thread.thread_id, label: thread.description || "An agent" }, reply),
-          },
-        );
-      }
       if (event.status === "completed" && thread.origin_device_id === null) {
         const files = threadOutputFiles(db, thread.thread_id);
         if (files.length > 0) {
@@ -5404,47 +5357,6 @@ export const applyAgentThreadEvent = (
       return;
     }
   }
-};
-
-const waitingFinalText = (resultJson: string | undefined): string => {
-  try {
-    const parsed = JSON.parse(resultJson ?? "") as { finalText?: unknown };
-    return typeof parsed.finalText === "string" ? parsed.finalText : "";
-  } catch {
-    return "";
-  }
-};
-
-const waitingWake = (db: OwnerDbReader, thread: ThreadRow, resultJson: string | undefined): "live" | "tell" | "report" => {
-  if (resultWaitingFor(resultJson) === undefined || resultWaitingReply(resultJson) !== undefined) return "live";
-  const id = thread.thread_id;
-  if (liveDescendants(db, id).length > 0) return "live";
-  const helpers = db.all<Pick<ThreadRow, "status" | "result_json">>(
-    "SELECT status, result_json FROM agent_threads WHERE parent_thread_id = ? AND thread_id <> ?",
-    id,
-    id,
-  );
-  // A waiting helper wakes its lead only through something of its own; a wait on the lead's reply never does.
-  const helperLive = (helper: Pick<ThreadRow, "status" | "result_json">) => {
-    const waitingFor = resultWaitingFor(helper.result_json);
-    const wakers = resultWakers(helper.result_json);
-    return helperWait({ ...(waitingFor !== undefined ? { waitingFor } : {}), ...(wakers ? { wakers } : {}) }).live;
-  };
-  if (helpers.some((helper) => endedWaiting(helper) && helperLive(helper))) return "live";
-  const queued = db.one<{ found: number }>(
-    `SELECT 1 AS found WHERE EXISTS (SELECT 1 FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume'))
-        OR EXISTS (SELECT 1 FROM agent_report_outbox WHERE requester_kind = 'agent' AND requester_id = ? AND state IN ('pending', 'offered'))
-        OR EXISTS (SELECT 1 FROM schedules WHERE target_thread_id = ? AND status = 'active')`,
-    id,
-    id,
-    id,
-  );
-  if (queued) return "live";
-  const last = db.one<{ text: string | null }>(
-    "SELECT text FROM agent_commands WHERE thread_id = ? AND kind = 'message' ORDER BY created_at DESC LIMIT 1",
-    id,
-  );
-  return last?.text?.includes(NOTHING_CAN_WAKE_MARK) ? "report" : "tell";
 };
 
 const conversationThreadRows = (
@@ -5477,11 +5389,7 @@ const presentedSummary = (db: OwnerDbReader, row: ThreadRow, ownerId: string): A
     ...summary(row, ownerId),
     ...(deviceId ? { runsOnDeviceId: resolveCurrentDeviceId(db, deviceId) } : {}),
   };
-  return reportHeldForHelpers(db, row)
-    ? { ...presented, status: "waiting_for_helpers" }
-    : endedWaiting(row)
-      ? { ...presented, status: "waiting" }
-      : presented;
+  return endedWaiting(row) ? { ...presented, status: "waiting" } : presented;
 };
 
 const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] => {
@@ -5491,13 +5399,7 @@ const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: stri
     ` AND status IN ${LIVE_STATUSES_SQL}`,
     RUNNING_AGENT_THREADS_LIMIT,
   );
-  const held = heldAncestorIds(db, live).flatMap((threadId) => {
-    const row = readThread(db, threadId);
-    return row && (row.conversation_id === conversationId || row.origin_conversation_id === conversationId)
-      ? [row]
-      : [];
-  });
-  return [...live, ...held].map((row) => presentedSummary(db, row, ownerId));
+  return live.map((row) => presentedSummary(db, row, ownerId));
 };
 
 const deviceThreads = (

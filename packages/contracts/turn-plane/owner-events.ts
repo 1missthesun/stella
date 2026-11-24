@@ -106,7 +106,6 @@ export type ThreadCompletedEvent = OwnerEventBase & {
   resultJson?: string;
   errorMessage?: string;
   completedAt: number;
-  wakeCheck?: true;
 };
 
 /**

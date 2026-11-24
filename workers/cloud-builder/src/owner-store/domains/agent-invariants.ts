@@ -3,7 +3,6 @@ import { agentInputSender, sentByStarter } from "@stella/contracts/agent-rules";
 import type { AgentInvariantKind, AgentInvariantReport } from "@stella/contracts/backend/agent-threads";
 import type { OwnerDbReader } from "../registry.js";
 
-const WAITING_TOO_LONG_MS = 6 * 60 * 60_000;
 const EXAMPLES_MAX = 5;
 const SCAN_MAX = 5_000;
 
@@ -18,8 +17,6 @@ const parse = (json: string | null): Record<string, unknown> => {
   }
 };
 
-const tableExists = (db: OwnerDbReader, name: string): boolean =>
-  db.one<{ found: number }>("SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = ?", name) !== null;
 
 export const agentInvariants = (db: OwnerDbReader, now: number, days: number): AgentInvariantReport => {
   const since = now - days * 24 * 60 * 60_000;
@@ -100,23 +97,6 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     if (parse(row.detail).reason === "stopped") add("stopped_task_took_input", `${row.thread_id} ran a turn after its stop`);
   }
 
-  const schedules = tableExists(db, "schedules");
-  for (const row of db.all<{ thread_id: string; updated_at: number; result_json: string | null }>(
-    `SELECT thread_id, updated_at, result_json FROM agent_threads t
-      WHERE status = 'completed' AND updated_at >= ? AND updated_at < ?
-        AND json_extract(result_json, '$.waitingFor') IS NOT NULL
-        AND COALESCE(json_array_length(result_json, '$.wakers'), 0) = 0
-        AND NOT EXISTS (SELECT 1 FROM agent_threads c WHERE c.parent_thread_id = t.thread_id AND c.status IN ('running', 'waiting_for_user'))
-        AND NOT EXISTS (SELECT 1 FROM agent_commands m WHERE m.thread_id = t.thread_id AND m.state = 'pending')
-        ${schedules ? "AND NOT EXISTS (SELECT 1 FROM schedules s WHERE s.target_thread_id = t.thread_id AND s.status = 'active')" : ""}
-      LIMIT ${SCAN_MAX}`,
-    since,
-    now - WAITING_TOO_LONG_MS,
-  )) {
-    const waitingFor = String(parse(row.result_json).waitingFor ?? "").slice(0, 80);
-    add("waiting_on_nothing_seen", `${row.thread_id} since ${new Date(row.updated_at).toISOString()}: ${waitingFor}`);
-  }
-
   for (const row of db.all<{ thread_id: string; attempt_generation: number; sources: string }>(
     `SELECT thread_id, attempt_generation, group_concat(DISTINCT source) AS sources FROM agent_events
       WHERE created_at >= ? AND thread_id IS NOT NULL AND attempt_generation IS NOT NULL
@@ -131,16 +111,6 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     add("two_hosts_one_attempt", `${row.thread_id}:${row.attempt_generation} (${row.sources})`);
   }
 
-  for (const row of db.all<{ thread_id: string; status: string }>(
-    `SELECT thread_id, status FROM agent_threads
-      WHERE carried_report IS NOT NULL AND status NOT IN ('running', 'queued') AND updated_at >= ? AND updated_at < ?
-      LIMIT ${SCAN_MAX}`,
-    since,
-    now - 60 * 60_000,
-  )) {
-    add("report_carried_not_sent", `${row.thread_id} (${row.status})`);
-  }
-
   const hosted = db.one<{ turns: number; unannounced: number }>(
     `SELECT COUNT(*) AS turns,
             COALESCE(SUM(CASE WHEN json_extract(detail, '$.startMissing') = 1 THEN 1 ELSE 0 END), 0) AS unannounced
@@ -153,9 +123,7 @@ export const agentInvariants = (db: OwnerDbReader, now: number, days: number): A
     "report_to_stella_not_lead",
     "report_lost",
     "stopped_task_took_input",
-    "waiting_on_nothing_seen",
     "two_hosts_one_attempt",
-    "report_carried_not_sent",
   ];
   return {
     since,

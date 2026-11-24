@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { antigravityModelsOf } from "@stella/contracts/engine-model-catalog";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
 
 /**
@@ -171,16 +172,56 @@ const readRecord = (home: string): SignInRecord | undefined => {
   }
 };
 
-const writeRecord = (home: string, record: SignInRecord): void => {
+const writeJson = (file: string, value: unknown): void => {
   try {
-    mkdirSync(home, { recursive: true, mode: 0o700 });
-    const file = antigravitySignInRecordFile(home);
+    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
     const temp = `${file}.${process.pid}.tmp`;
-    writeFileSync(temp, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+    writeFileSync(temp, `${JSON.stringify(value)}\n`, { mode: 0o600 });
     renameSync(temp, file);
   } catch (error) {
-    console.warn("[antigravity-cli] couldn't remember the sign-in", { error: error instanceof Error ? error.message : String(error) });
+    console.warn("[antigravity-cli] couldn't write", { file: path.basename(file), error: error instanceof Error ? error.message : String(error) });
   }
+};
+
+const writeRecord = (home: string, record: SignInRecord): void => writeJson(antigravitySignInRecordFile(home), record);
+
+type ModelsRecord = {
+  /** The account's Gemini models, as `agy` last reported them. */
+  models: string[];
+  /** Removed models the user has been told about. */
+  told: string[];
+};
+
+const modelsFile = (home: string): string => path.join(home, "stella-models.json");
+
+const readModels = (home: string): ModelsRecord => {
+  try {
+    const parsed = JSON.parse(readFileSync(modelsFile(home), "utf8")) as Partial<ModelsRecord>;
+    return {
+      models: antigravityModelsOf(parsed?.models),
+      told: Array.isArray(parsed?.told) ? parsed.told.filter((id): id is string => typeof id === "string") : [],
+    };
+  } catch {
+    return { models: [], told: [] };
+  }
+};
+
+/** The Gemini models `agy` last reported for the account signed in here; none until a first turn. */
+export const knownAntigravityModels = (home: string): string[] => readModels(home).models;
+
+export const noteAntigravityModels = (home: string, reported: readonly string[]): void => {
+  const models = antigravityModelsOf(reported);
+  const last = readModels(home);
+  if (models.length === 0 || models.join() === last.models.join()) return;
+  writeJson(modelsFile(home), { ...last, models });
+};
+
+/** Whether the user still has to hear that this model is gone; true once. */
+export const claimAntigravityRemovalNotice = (home: string, model: string): boolean => {
+  const last = readModels(home);
+  if (last.told.includes(model)) return false;
+  writeJson(modelsFile(home), { ...last, told: [...last.told, model].slice(-50) });
+  return true;
 };
 
 /** Where `agy` before 1.5.16, and later ones off macOS, keep a sign-in: the only trace of one made before Stella kept a record. */
@@ -196,8 +237,12 @@ export const noteAntigravitySignIn = (home: string, signedIn: boolean): void => 
   writeRecord(home, { signedIn, at: Date.now(), ...(signedOutAt ? { signedOutAt } : {}) });
 };
 
-export const noteAntigravitySignedOut = (home: string): void =>
+export const noteAntigravitySignedOut = (home: string): void => {
   writeRecord(home, { signedIn: false, at: Date.now(), signedOutAt: Date.now() });
+  // The next account may have other models.
+  const last = readModels(home);
+  if (last.models.length > 0) writeJson(modelsFile(home), { ...last, models: [] });
+};
 
 export const antigravitySignedOutSince = (home: string, since: number): boolean => (readRecord(home)?.signedOutAt ?? 0) >= since;
 

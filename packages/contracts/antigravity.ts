@@ -2,6 +2,8 @@
 export type AntigravityStatus = {
   installed: boolean;
   signedIn: boolean;
+  /** The account's Gemini models, as `agy` last reported them; absent until it has. */
+  models?: string[];
 };
 
 export type AntigravitySignInProgress =

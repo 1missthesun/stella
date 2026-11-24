@@ -20,7 +20,7 @@ import { getPlanLabel, isRestrictedModelOverrideAudience, } from "@/global/billi
 import { EnginePlace, enginePlaceBadge } from "@/features/execution-placement/EnginePlace";
 import { modelBlockedAt, planSignedInAt, useModelDestination } from "@/features/execution-placement/use-model-destination";
 import { AntigravityModelSection } from "@/features/antigravity/AntigravityModelSection";
-import { ANTIGRAVITY_ENGINE_MODELS } from "@stella/contracts/engine-model-catalog";
+import { antigravityModelInUse, antigravityModelOptions, currentModelReference } from "@stella/contracts/engine-model-catalog";
 import { announceChatGptPlanUse, ChatGptPlanInUse } from "@/features/chatgpt/ChatGptBrand";
 import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
 import { showToast } from "@/ui/toast";
@@ -76,7 +76,7 @@ const NATIVE_CLAUDE_CODE_RUNTIME_PENDING_TARGET = "__native_claude_code_runtime_
 const CHATGPT_SECTION_KEY = "chatgpt-engine";
 const CLAUDE_CODE_SECTION_KEY = "claude-code-engine";
 const ANTIGRAVITY_SECTION_KEY = "antigravity";
-const ANTIGRAVITY_MODELS = ANTIGRAVITY_ENGINE_MODELS.map((model) => ({ id: model.id, label: model.name, description: model.description }));
+const antigravityRows = (models: readonly string[] | undefined) => antigravityModelOptions(models).map((model) => ({ id: model.id, label: model.name, description: model.description }));
 const HIDDEN_CATALOG_PROVIDERS = ["chatgpt", ANTIGRAVITY_SECTION_KEY];
 const SECTION_ORDER = [
     "stella",
@@ -735,8 +735,8 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             : engineGovernsActiveTab && activeEngineModelId
                 ? activeEngineModelId
                 : activeAssistant
-                    ? (overrides.orchestrator ?? overrides.general ?? "")
-                    : (overrides[activeAgent] ?? "");
+                    ? currentModelReference(overrides.orchestrator ?? overrides.general ?? "")
+                    : currentModelReference(overrides[activeAgent] ?? "");
     const defaultLabel = activeProviderSetting
         ? "Stella"
         : !ready
@@ -907,7 +907,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                     badge: enginePlaceBadge(t, destination, "antigravity"),
                     selected: current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`),
                     content: () => (<AntigravityModelSection destination={destination} computers={computers} selected={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`)}>
-                        <EngineScopedModelList engineLabel="Google Antigravity" hideHead selectedRowExtra={reasoningControl} models={ANTIGRAVITY_MODELS} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? current.slice(ANTIGRAVITY_SECTION_KEY.length + 1) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>
+                        {(models) => (<EngineScopedModelList engineLabel="Google Antigravity" hideHead selectedRowExtra={reasoningControl} models={antigravityRows(models)} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? antigravityModelInUse(current.slice(ANTIGRAVITY_SECTION_KEY.length + 1), models) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>)}
                       </AntigravityModelSection>),
                 },
                 {

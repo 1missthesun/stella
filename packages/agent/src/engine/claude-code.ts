@@ -39,6 +39,7 @@ import {
   type ToolExecutionResult,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
+import { ANTIGRAVITY_MODEL_IDS } from "@stella/contracts/engine-model-catalog";
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
@@ -137,19 +138,12 @@ export const ANTIGRAVITY_CLI_API = "antigravity-cli-acp";
 export const ANTIGRAVITY_NATIVE_PREFIX = "agy_";
 /** Any other tool of Antigravity's: its real name travels in the call's arguments. */
 export const ANTIGRAVITY_OTHER_TOOL = `${ANTIGRAVITY_NATIVE_PREFIX}tool`;
-export const ANTIGRAVITY_MODEL_ALIASES = [
-  "gemini-4-neon",
-  "gemini-4-carbon",
-  "gemini-4-argon",
-  "gemini-4-hydrogen",
-  "gemini-3.8-flash",
-] as const;
 export const ANTIGRAVITY_CLI_FLAVOR: CliEngineFlavor = {
   providerId: ANTIGRAVITY_CLI_PROVIDER_ID,
   extensionName: ANTIGRAVITY_CLI_ENGINE_EXTENSION,
   api: ANTIGRAVITY_CLI_API,
   label: "Google Antigravity",
-  modelAliases: ANTIGRAVITY_MODEL_ALIASES,
+  modelAliases: ANTIGRAVITY_MODEL_IDS,
   engineOnlyTools: [...ANTIGRAVITY_NATIVE_TOOLS.map((name) => `${ANTIGRAVITY_NATIVE_PREFIX}${name}`), ANTIGRAVITY_OTHER_TOOL],
   wrappedTools: [],
   builtinTools: [...ANTIGRAVITY_NATIVE_TOOLS.map((name) => `${ANTIGRAVITY_NATIVE_PREFIX}${name}`), ANTIGRAVITY_OTHER_TOOL],

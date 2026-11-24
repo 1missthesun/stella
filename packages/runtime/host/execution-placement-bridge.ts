@@ -1167,6 +1167,7 @@ export class ExecutionPlacementBridge {
     return {
       ready: availability.ready,
       capabilities: [...new Set(availability.capabilities)].sort(),
+      ...(availability.antigravityModels ? { antigravityModels: availability.antigravityModels } : {}),
     };
   }
 

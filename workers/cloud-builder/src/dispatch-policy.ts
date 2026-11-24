@@ -108,6 +108,7 @@ export type DevicePresenceState = {
   connected: boolean;
   ready: boolean;
   capabilities: ExecutionCapability[];
+  antigravityModels?: string[];
   protocolVersion: number;
   lastSeenAt: number;
 };

@@ -42,8 +42,8 @@ const WINDOWS_LIST_TIMEOUT_MS = 4_000;
 const TASKKILL_TIMEOUT_MS = 3_000;
 
 const sleep = async (ms: number): Promise<void> => {
-  const { Effect } = await import("effect");
-  await Effect.runPromise(Effect.sleep(ms));
+  const { sleep: effectSleep } = await import("./effect-timers.js");
+  await effectSleep(ms);
 };
 
 const signalTarget = (target: number, signal: NodeJS.Signals | 0) => {

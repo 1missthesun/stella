@@ -130,8 +130,8 @@ const renameReplacing = async (from: string, to: string) => {
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | null)?.code ?? "";
       if (attempt >= RENAME_ATTEMPTS || !RENAME_RETRY_CODES.has(code)) throw error;
-      const { Effect } = await import("effect");
-      await Effect.runPromise(Effect.sleep(RENAME_RETRY_MS * attempt));
+      const { sleep } = await import("./effect-timers.js");
+      await sleep(RENAME_RETRY_MS * attempt);
     }
   }
 };

@@ -32,8 +32,9 @@ type TelemetryTimer = {
   cancel: () => void;
 };
 
-let telemetryEffectModule: Promise<typeof import("effect")> | null = null;
-const loadTelemetryEffect = () => (telemetryEffectModule ??= import("effect"));
+let effectTimersModule: Promise<typeof import("../shared/effect-timers.js")> | null = null;
+const loadEffectTimers = () =>
+  (effectTimersModule ??= import("../shared/effect-timers.js"));
 
 const forkTelemetryTimer = (
   delayMs: number,
@@ -41,20 +42,11 @@ const forkTelemetryTimer = (
 ): TelemetryTimer => {
   let canceled = false;
   let cancelFiber: (() => void) | null = null;
-  void loadTelemetryEffect().then(({ Effect, Fiber }) => {
+  void loadEffectTimers().then(({ forkDelayed }) => {
     if (canceled) return;
-    const fiber = Effect.runFork(
-      Effect.sleep(delayMs).pipe(
-        Effect.andThen(
-          Effect.sync(() => {
-            if (!canceled) fire();
-          }),
-        ),
-      ),
-    );
-    cancelFiber = () => {
-      void Effect.runFork(Fiber.interrupt(fiber));
-    };
+    cancelFiber = forkDelayed(delayMs, () => {
+      if (!canceled) fire();
+    });
   });
   return {
     cancel: () => {
@@ -142,13 +134,8 @@ const withUnrefTimeout = async <T>(
   promise: Promise<T>,
   timeoutMs: number,
 ): Promise<T | null> => {
-  const { Effect } = await loadTelemetryEffect();
-  return Effect.runPromise(
-    Effect.raceFirst(
-      Effect.tryPromise(() => promise),
-      Effect.sleep(timeoutMs).pipe(Effect.as(null)),
-    ),
-  );
+  const { nullAfter } = await loadEffectTimers();
+  return nullAfter(promise, timeoutMs);
 };
 
 export class RemoteTelemetryClient {
@@ -473,25 +460,23 @@ export class RemoteTelemetryClient {
     let ok = false;
     let permanentRejection = false;
     try {
-      const { Effect } = await loadTelemetryEffect();
-      const response = await Effect.runPromise(
-        Effect.tryPromise({
-          try: (signal) =>
-            this.options.fetch(endpoint, {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-                "x-stella-telemetry-batch-id": batchId(events),
-                ...(transport.authToken?.trim()
-                  ? { authorization: `Bearer ${transport.authToken.trim()}` }
-                  : {}),
-              },
-              body: JSON.stringify(body),
-              signal,
-              redirect: "error",
-            }),
-          catch: (error) => error,
-        }).pipe(Effect.timeout(this.options.requestTimeoutMs)),
+      const { withTimeout } = await loadEffectTimers();
+      const response = await withTimeout(
+        (signal) =>
+          this.options.fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-stella-telemetry-batch-id": batchId(events),
+              ...(transport.authToken?.trim()
+                ? { authorization: `Bearer ${transport.authToken.trim()}` }
+                : {}),
+            },
+            body: JSON.stringify(body),
+            signal,
+            redirect: "error",
+          }),
+        this.options.requestTimeoutMs,
       );
       ok = response.ok;
       permanentRejection = [400, 413, 415, 422].includes(response.status);

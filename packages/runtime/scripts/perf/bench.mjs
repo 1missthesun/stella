@@ -8,13 +8,14 @@ import path from "node:path";
 const HERE = import.meta.dirname;
 const REPO = path.resolve(HERE, "..", "..", "..", "..");
 const SOURCE_ENTRY = path.join(REPO, "packages", "runtime", "worker", "entry.ts");
+// The bytecode build's fixed loader (build with
+// `bun packages/runtime/scripts/build-worker-bytecode.mjs`).
 const BUNDLE_ENTRY = path.join(
   REPO,
   "packages",
   "desktop",
   "dist-electron",
-  "runtime",
-  "worker",
+  "runtime-bytecode",
   "entry.js",
 );
 const PRELOAD = path.join(HERE, "probe-preload.ts");

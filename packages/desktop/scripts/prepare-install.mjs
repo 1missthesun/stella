@@ -25,11 +25,6 @@ if (head && stampPath && !process.argv.includes("--force") && readStamp() === he
   process.exit(0);
 }
 
-const bunBinary =
-  process.versions?.bun
-    ? process.execPath
-    : process.env.STELLA_BUN_PATH?.trim() || "bun";
-
 const steps = [
   ["native helpers", process.execPath, "packages/desktop/scripts/download-native-helpers.mjs"],
   [
@@ -43,11 +38,6 @@ const steps = [
     process.execPath,
     "packages/stella-office/scripts/ensure-native.js",
     "--best-effort",
-  ],
-  [
-    "runtime worker bytecode",
-    bunBinary,
-    "packages/runtime/scripts/build-worker-bytecode.mjs",
   ],
 ];
 

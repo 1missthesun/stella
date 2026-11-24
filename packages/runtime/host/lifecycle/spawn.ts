@@ -61,11 +61,11 @@ export const resolveBunBinaryPath = (): string => {
  * app's profile files and, under a debugging port, its listening socket, so
  * a runtime that outlived its app kept the next one from opening that port.
  */
-const CLOSE_INHERITED_THEN_EXEC =
+export const CLOSE_INHERITED_THEN_EXEC =
   'for fd in /dev/fd/*; do n=${fd##*/}; if [ "$n" -gt 2 ] 2>/dev/null; then eval "exec $n>&-" 2>/dev/null; fi; done; exec "$@"';
-const BASH = "/bin/bash";
+export const BASH = "/bin/bash";
 
-const onPath = (command: string): string | null => {
+export const onPath = (command: string): string | null => {
   if (command.includes("/")) return existsSync(command) ? command : null;
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
     if (dir && existsSync(join(dir, command))) return join(dir, command);

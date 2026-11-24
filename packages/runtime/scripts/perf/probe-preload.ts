@@ -7,8 +7,8 @@ const env = process.env;
 type CensusEntry = { path: string; bytes: number; at: number };
 const census: CensusEntry[] = [];
 if (env.STELLA_PERF_MODULE_CENSUS === "1") {
-  // Intercept TypeScript sources via Bun.plugin. Precompiled CJS bytecode
-  // bundles under dist-electron/runtime/ cannot be re-fed through onLoad
+  // Intercept TypeScript sources via Bun.plugin. The precompiled CJS bytecode
+  // bundle under dist-electron/runtime-bytecode/ cannot be re-fed through onLoad
   // (returning JS text disables CJS/bytecode detection), so they are observed
   // from require.cache at snapshot time instead.
   const filter = new RegExp(
@@ -279,7 +279,7 @@ const snapshot = () => {
   if (env.STELLA_PERF_MODULE_CENSUS === "1") {
     const seen = new Set(allCensus.map((entry) => entry.path));
     for (const file of Object.keys(require.cache)) {
-      if (seen.has(file) || !file.includes("dist-electron/runtime/")) continue;
+      if (seen.has(file) || !file.includes("dist-electron/runtime-bytecode/")) continue;
       seen.add(file);
       let bytes = 0;
       try {

@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { readRuntimeBytecodeFingerprint } from "../kernel/shared/runtime-bytecode-stamp.js";
+import {
+  computeRuntimeSourceStamp,
+  runningRuntimeBytecodeStamp,
+  stellaRootOfWorkerEntry,
+} from "../kernel/shared/runtime-bytecode.js";
 
 export const RUNTIME_BUILD_STAMP_UNAVAILABLE = "unavailable";
 
@@ -64,14 +68,13 @@ const collectStampLines = (
   }
 };
 
+/** Stamp of the runtime code on disk now, for the worker at this entry. */
 export const computeRuntimeBuildStamp = (workerEntryPath: string): string => {
   const trimmedEntry = workerEntryPath?.trim();
   if (!trimmedEntry) return RUNTIME_BUILD_STAMP_UNAVAILABLE;
   try {
-    const bytecodeFp = readRuntimeBytecodeFingerprint(path.dirname(trimmedEntry));
-    if (bytecodeFp) {
-      return bytecodeFp.stamp.slice(0, 32);
-    }
+    const stellaRoot = stellaRootOfWorkerEntry(trimmedEntry);
+    if (stellaRoot) return computeRuntimeSourceStamp(stellaRoot).slice(0, 32);
     const lines: string[] = [];
     for (const rootDir of resolveRuntimeCodeRoots(trimmedEntry)) {
       collectStampLines(rootDir, rootDir, lines);
@@ -87,3 +90,11 @@ export const computeRuntimeBuildStamp = (workerEntryPath: string): string => {
     return RUNTIME_BUILD_STAMP_UNAVAILABLE;
   }
 };
+
+/**
+ * Stamp of the code this worker process loaded: a bytecode worker reports
+ * the build it runs (the tree may have moved on since it was built); a
+ * source worker stamps the tree as it boots.
+ */
+export const computeLoadedRuntimeBuildStamp = (workerEntryPath: string): string =>
+  runningRuntimeBytecodeStamp()?.slice(0, 32) ?? computeRuntimeBuildStamp(workerEntryPath);

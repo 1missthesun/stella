@@ -1722,7 +1722,13 @@
       "rememberOn": "“{label}” olarak kaydedildi. Stella size tekrar sormadan yeniden kullanır.",
       "rememberOff": "Yalnızca bu görev için kullanılır, sonra unutulur.",
       "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır.",
-      "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli."
+      "usingSaved": "Gerisi kayıtlı “{label}” değerinden geliyor. Yalnızca aşağıdakiler gerekli.",
+      "savedHeading": "Cihazlarınıza kaydedildi",
+      "savedBody": "Bunu daha önce kaydettiniz. Stella olduğu gibi kullanır, bir şey yazmanız gerekmez.",
+      "useSaved": "Kayıtlı girişi kullan",
+      "typeInstead": "Başka bir tane yaz",
+      "useSavedInstead": "Bunun yerine kayıtlı olanı kullan",
+      "needsFromYou": "Bunun için henüz kayıtlı bir şey yok, bu yüzden Stella'nın sizden alması gerekiyor."
     }
   },
   "onboarding": {

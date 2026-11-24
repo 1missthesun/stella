@@ -1732,7 +1732,13 @@
       "rememberOn": "Guardado como «{label}». Stella lo reutiliza sin volver a preguntarte.",
       "rememberOff": "Se usa solo para esta tarea y luego se olvida.",
       "replacing": "El valor guardado para «{label}» no funcionó. Introduce el correcto; sustituirá al guardado.",
-      "usingSaved": "El resto sale de tu valor guardado «{label}». Solo falta lo de abajo."
+      "usingSaved": "El resto sale de tu valor guardado «{label}». Solo falta lo de abajo.",
+      "savedHeading": "Guardado en tus dispositivos",
+      "savedBody": "Ya lo guardaste. Stella lo usa tal cual, sin que escribas nada.",
+      "useSaved": "Usar inicio de sesión guardado",
+      "typeInstead": "Escribir otro",
+      "useSavedInstead": "Usar el guardado",
+      "needsFromYou": "Aún no hay nada guardado para esto, así que Stella lo necesita de ti."
     }
   },
   "onboarding": {

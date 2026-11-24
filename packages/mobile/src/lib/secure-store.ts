@@ -46,3 +46,22 @@ export const setItemForServerAsync = (
   noteScopedKey(serverId, target);
   return ExpoSecureStore.setItemAsync(target, value, options);
 };
+
+/**
+ * Keys that must stay on this phone: left out of backups and never restored
+ * onto another device.
+ */
+const deviceOnlyOptions: ExpoSecureStore.SecureStoreOptions = {
+  keychainAccessible: ExpoSecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+};
+
+export const getDeviceOnlyItemAsync = (key: string) =>
+  ExpoSecureStore.getItemAsync(scoped(key), deviceOnlyOptions);
+
+export const setDeviceOnlyItemAsync = (key: string, value: string) => {
+  noteWrite(key);
+  return ExpoSecureStore.setItemAsync(scoped(key), value, deviceOnlyOptions);
+};
+
+export const deleteDeviceOnlyItemAsync = (key: string) =>
+  ExpoSecureStore.deleteItemAsync(scoped(key), deviceOnlyOptions);

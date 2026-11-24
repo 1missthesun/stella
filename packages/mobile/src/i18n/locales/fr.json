@@ -1732,7 +1732,13 @@
       "rememberOn": "Enregistré sous « {label} ». Stella le réutilise sans vous le redemander.",
       "rememberOff": "Utilisé pour cette tâche uniquement, puis oublié.",
       "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
-      "usingSaved": "Le reste vient de votre valeur enregistrée « {label} ». Seul ce qui suit est nécessaire."
+      "usingSaved": "Le reste vient de votre valeur enregistrée « {label} ». Seul ce qui suit est nécessaire.",
+      "savedHeading": "Enregistré sur vos appareils",
+      "savedBody": "Vous l’avez déjà enregistré. Stella l’utilise tel quel, rien à saisir.",
+      "useSaved": "Utiliser l’identifiant enregistré",
+      "typeInstead": "En saisir un autre",
+      "useSavedInstead": "Utiliser plutôt celui enregistré",
+      "needsFromYou": "Rien n’est encore enregistré pour cela, Stella en a donc besoin de votre part."
     }
   },
   "onboarding": {

@@ -1722,7 +1722,13 @@
       "rememberOn": "Tallennettu nimellä ”{label}”. Stella käyttää sitä uudelleen kysymättä sinulta.",
       "rememberOff": "Käytetään vain tähän tehtävään ja unohdetaan sitten.",
       "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun.",
-      "usingSaved": "Loput tulevat tallentamastasi kohteesta ”{label}”. Vain alla oleva tarvitaan."
+      "usingSaved": "Loput tulevat tallentamastasi kohteesta ”{label}”. Vain alla oleva tarvitaan.",
+      "savedHeading": "Tallennettu laitteillesi",
+      "savedBody": "Olet tallentanut tämän aiemmin. Stella käyttää sitä sellaisenaan, sinun ei tarvitse kirjoittaa mitään.",
+      "useSaved": "Käytä tallennettua kirjautumista",
+      "typeInstead": "Kirjoita toinen",
+      "useSavedInstead": "Käytä sittenkin tallennettua",
+      "needsFromYou": "Tälle ei ole vielä tallennettu mitään, joten Stella tarvitsee sen sinulta."
     }
   },
   "onboarding": {

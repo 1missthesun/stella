@@ -1742,7 +1742,13 @@
       "rememberOn": "Zapisano jako „{label}”. Stella użyje tego ponownie bez pytania.",
       "rememberOff": "Użyte tylko do tego zadania, potem zapomniane.",
       "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
-      "usingSaved": "Reszta pochodzi z zapisanej wartości „{label}”. Potrzebne jest tylko to, co poniżej."
+      "usingSaved": "Reszta pochodzi z zapisanej wartości „{label}”. Potrzebne jest tylko to, co poniżej.",
+      "savedHeading": "Zapisane na Twoich urządzeniach",
+      "savedBody": "Już to zapisałeś. Stella użyje tego bez zmian, nie musisz nic wpisywać.",
+      "useSaved": "Użyj zapisanego logowania",
+      "typeInstead": "Wpisz inne",
+      "useSavedInstead": "Użyj jednak zapisanego",
+      "needsFromYou": "Nic nie jest jeszcze zapisane dla tego, więc Stella potrzebuje tego od Ciebie."
     }
   },
   "onboarding": {

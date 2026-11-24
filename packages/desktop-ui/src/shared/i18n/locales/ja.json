@@ -1712,7 +1712,13 @@
       "rememberOn": "「{label}」として保存しました。Stella は次回からあなたに尋ねずに再利用します。",
       "rememberOff": "このタスクにだけ使い、その後は破棄します。",
       "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。",
-      "usingSaved": "残りは保存済みの「{label}」から使います。必要なのは下の項目だけです。"
+      "usingSaved": "残りは保存済みの「{label}」から使います。必要なのは下の項目だけです。",
+      "savedHeading": "あなたのデバイスに保存済み",
+      "savedBody": "以前に保存したものです。Stella がそのまま使うので、入力は不要です。",
+      "useSaved": "保存したログインを使う",
+      "typeInstead": "別のものを入力",
+      "useSavedInstead": "保存したものを使う",
+      "needsFromYou": "これにはまだ何も保存されていないため、Stella があなたからの入力を必要としています。"
     }
   },
   "onboarding": {

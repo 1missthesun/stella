@@ -66,6 +66,7 @@ import { ThemeProvider } from "../src/theme/theme-context";
 import { ChatSearchProvider } from "../src/lib/chat-search";
 import { I18nProvider, useT } from "../src/i18n";
 import { ShareIntentHandler } from "../src/lib/share-intent-handler";
+import { useSavedValuesSync } from "../src/lib/saved-values";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -188,6 +189,7 @@ function useBackendFollowsAccount(
 function AuthenticatedLayout() {
   const session = authClient.useSession();
   useBackendFollowsAccount(session);
+  useSavedValuesSync();
   const router = useRouter();
   const pathname = usePathname();
   const mainChatRequested = useMainChatRequested();

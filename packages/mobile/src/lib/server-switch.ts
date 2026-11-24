@@ -23,12 +23,16 @@ import {
 import { markOnboardingSeen } from "./onboarding";
 import { clearAccountChatData } from "./chat-account-cleanup";
 import { tearDownPushNotifications } from "./notifications";
+import { withdrawSavedValuesDevice } from "./saved-values";
 
 const PUSH_TEARDOWN_BUDGET_MS = 4_000;
 
 const leaveActiveServer = async (): Promise<void> => {
   await Promise.race([
-    tearDownPushNotifications().catch(() => undefined),
+    Promise.all([
+      tearDownPushNotifications().catch(() => undefined),
+      withdrawSavedValuesDevice(),
+    ]),
     new Promise((resolve) => setTimeout(resolve, PUSH_TEARDOWN_BUDGET_MS)),
   ]);
   await clearAccountChatData().catch(() => undefined);

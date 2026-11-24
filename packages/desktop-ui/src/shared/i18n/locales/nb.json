@@ -1722,7 +1722,13 @@
       "rememberOn": "Lagret som «{label}». Stella bruker den igjen uten å spørre deg på nytt.",
       "rememberOff": "Brukes bare til denne oppgaven, og glemmes så.",
       "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede.",
-      "usingSaved": "Resten kommer fra din lagrede «{label}». Bare det nedenfor trengs."
+      "usingSaved": "Resten kommer fra din lagrede «{label}». Bare det nedenfor trengs.",
+      "savedHeading": "Lagret på enhetene dine",
+      "savedBody": "Du har lagret dette før. Stella bruker det som det er, uten at du må skrive noe.",
+      "useSaved": "Bruk lagret pålogging",
+      "typeInstead": "Skriv inn en annen",
+      "useSavedInstead": "Bruk den lagrede i stedet",
+      "needsFromYou": "Ingenting er lagret for dette ennå, så Stella trenger det fra deg."
     }
   },
   "onboarding": {

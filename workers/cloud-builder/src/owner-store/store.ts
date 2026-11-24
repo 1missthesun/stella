@@ -7,6 +7,7 @@ import {
   type LiveClientFrame,
   type LiveServerFrame,
 } from "@stella/contracts/backend/protocol";
+import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { RpcError, toBackendError } from "./errors.js";
 import { sessionRevokedBy, type SessionRevocations } from "../session-revocation.js";
 import type {
@@ -691,19 +692,16 @@ export class OwnerStore {
       this.flushNow();
       return;
     }
-    if (!this.cancelFlush) {
-      const timer = setTimeout(() => {
-        this.cancelFlush = null;
-        try {
-          this.flushNow();
-        } catch (error) {
-          this.log("error", "owner_views_flush_failed", {
-            message: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }, wait);
-      this.cancelFlush = () => clearTimeout(timer);
-    }
+    this.cancelFlush ??= forkAbortTimer(wait, () => {
+      this.cancelFlush = null;
+      try {
+        this.flushNow();
+      } catch (error) {
+        this.log("error", "owner_views_flush_failed", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
   }
 
   private flushNow(): void {

@@ -6,6 +6,7 @@ import type {
   ClaudeCliInstallProgress,
   ClaudeCliInstallResult,
 } from "@stella/contracts/claude-local-accounts";
+import { forkCancelableInterval } from "./effect-runtime.js";
 
 export type { ClaudeCliInstallProgress, ClaudeCliInstallResult };
 
@@ -196,7 +197,7 @@ export const installClaudeCli = async (
   const prefix = `claude-${version}-${platform}`;
   let settingUp = false;
   let lastReceived = -1;
-  const poll = setInterval(() => {
+  const stopPolling = forkCancelableInterval(POLL_MS, () => {
     if (settingUp) return;
     const received = sizeOnDisk(downloadDir, prefix);
     if (received === lastReceived) return;
@@ -206,7 +207,7 @@ export const installClaudeCli = async (
       received: total ? Math.min(received, total) : received,
       total,
     });
-  }, POLL_MS);
+  });
   report({ phase: "downloading", received: 0, total });
 
   let result: { exitCode: number | null; output: string };
@@ -218,7 +219,7 @@ export const installClaudeCli = async (
       }
     });
   } finally {
-    clearInterval(poll);
+    stopPolling();
     fs.rmSync(workDir, { recursive: true, force: true });
   }
 

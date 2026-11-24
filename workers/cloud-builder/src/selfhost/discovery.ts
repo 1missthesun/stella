@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import {
   MIN_SUPPORTED_SERVER_API,
   SERVER_API_VERSION,
@@ -41,17 +42,12 @@ export const gatewayCapabilities = async (env: unknown): Promise<GatewayCapabili
   let value: GatewayCapabilities | null = null;
   try {
     if (control?.capabilities) {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        value = await Promise.race([
-          control.capabilities(),
-          new Promise<null>((resolve) => {
-            timer = setTimeout(() => resolve(null), GATEWAY_TIMEOUT_MS);
-          }),
-        ]);
-      } finally {
-        if (timer !== undefined) clearTimeout(timer);
-      }
+      const capabilities = control.capabilities();
+      value = await Effect.runPromise(
+        Effect.tryPromise({ try: () => capabilities, catch: (error) => error }).pipe(
+          Effect.timeoutOrElse({ duration: GATEWAY_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+        ),
+      );
     }
   } catch {
     value = null;

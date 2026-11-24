@@ -22,6 +22,7 @@ import {
   type SavedValuesMember,
   type SavedValuesRosterEntry,
 } from "@stella/contracts/saved-values-trust";
+import { Effect } from "effect";
 import { array, json, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -635,12 +636,14 @@ export const savedValuesDomain = {
   },
   internal: {
     "savedValues.release": (ctx, args) =>
-      Promise.race([
-        release(ctx, args),
-        new Promise<SavedValueReleaseResult>((resolve) =>
-          setTimeout(() => resolve({ found: false, savedHere: [], reason: "no_computer" }), 45_000),
+      Effect.runPromise(
+        Effect.tryPromise({ try: () => release(ctx, args), catch: (error) => error }).pipe(
+          Effect.timeoutOrElse({
+            duration: 45_000,
+            orElse: () => Effect.succeed<SavedValueReleaseResult>({ found: false, savedHere: [], reason: "no_computer" }),
+          }),
         ),
-      ]).catch((error) => {
+      ).catch((error) => {
         throw new RpcError("UNAVAILABLE", error instanceof Error ? error.message : RELEASE_TIMEOUT_NOTE, { retryable: true });
       }),
   },

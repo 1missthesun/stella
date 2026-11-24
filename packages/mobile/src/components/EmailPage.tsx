@@ -30,7 +30,6 @@ const EMAIL_PAGE_IDENTITY = { canvas: EMAIL_PAGE_CANVAS, title: "Email" };
 const newToken = (): string =>
   Array.from(getRandomBytes(24), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/** Removing a rule and turning Email off happen here; every other tap goes to Stella. */
 const runHostAction = async (event: CanvasActionEvent): Promise<CanvasActionOutcome> => {
   try {
     if (event.id === EMAIL_PAGE_OFF_ACTION) {
@@ -48,11 +47,6 @@ const runHostAction = async (event: CanvasActionEvent): Promise<CanvasActionOutc
   }
 };
 
-/**
- * The Email page: the frame that ships with Stella (email-page.ts) in a
- * WebView of its own, fed the page Stella keeps. A tap on one of its buttons
- * goes to Stella in the chat as the user's message; the page stays open.
- */
 function EmailPageWebView({ state }: { state: EmailPageState }) {
   const colors = useColors();
   const { isDark } = useTheme();
@@ -139,7 +133,6 @@ export function EmailPage() {
   const feed = useBackendView("email.page", signedIn ? {} : "skip");
   const value = feed.value;
   const [waiting, setWaiting] = useState(false);
-  // Looking at the page clears the unseen badge, including what changes while it is open.
   useFocusEffect(
     useCallback(() => {
       markEmailSeen();

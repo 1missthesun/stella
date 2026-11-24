@@ -323,9 +323,7 @@ export default function LoginScreen() {
             });
             return;
           }
-        } catch {
-          // Retry silently on network errors.
-        }
+        } catch {}
       }
     };
 

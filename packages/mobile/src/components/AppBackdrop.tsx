@@ -77,7 +77,6 @@ export function AppBackdrop({ style }: { style?: StyleProp<ViewStyle> }) {
         style,
       ]}
     >
-      {/* Sized to the window so every mount shows the same canvas. */}
       <Image
         source={{ uri }}
         style={{ position: "absolute", top: 0, left: 0, width, height }}

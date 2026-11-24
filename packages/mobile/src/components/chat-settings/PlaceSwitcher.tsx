@@ -114,8 +114,6 @@ export function PlaceSwitcher({
     };
   }, [focused, open, canListDevices, refreshToken]);
 
-  // A paired computer missing from the owner's device list reads as offline
-  // forever. The two id spaces can drift, so log each distinct miss once.
   const reportedJoinMissRef = useRef("");
   useEffect(() => {
     if (destinations === undefined) return;

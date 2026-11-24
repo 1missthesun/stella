@@ -159,9 +159,7 @@ function AppsHost({
           try {
             const cached = parseWorkspaceApps(JSON.parse(stored));
             setApps((current) => current ?? cached);
-          } catch {
-            /* Ignore an obsolete or damaged cache. */
-          }
+          } catch {}
         }
       })
       .catch(() => undefined);

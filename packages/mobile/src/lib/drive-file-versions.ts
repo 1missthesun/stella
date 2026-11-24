@@ -56,10 +56,6 @@ export const useDriveFileVersions = (
 export const useDriveFileVersion = (path: string | null): DriveFileVersion =>
   useDriveFileVersions(path ? [path] : [])[0];
 
-/**
- * "" while the file is still the version first seen here, then the new
- * version once it is replaced: a key that reloads only on a real change.
- */
 export const useDriveFileRevision = (path: string | null): string => {
   const version = useDriveFileVersion(path);
   const first = useRef<{ path: string | null; version: DriveFileVersion }>({

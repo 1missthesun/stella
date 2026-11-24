@@ -245,20 +245,6 @@ function ReactionBadge({
 
 export type MessageMenuRequest = { message: ChatMessage; anchor: AnchorRect };
 
-/**
- * User message body with collapse/expand for long text — the mobile analogue
- * of desktop's `UserMessageBody`. Collapsed by default when the rendered text
- * exceeds `USER_MESSAGE_COLLAPSE_LINES`; a tappable "Show more" / "Show less"
- * toggle then reveals or re-hides the overflow.
- *
- * Overflow is detected from the native text-layout line boxes (not a
- * character count). The measuring pass renders at the collapse cap plus one
- * line — enough to distinguish "fits" from "overflows" without ever painting
- * a long message at full height (a full-height first paint used to inflate
- * the row after send and skew the post-send scroll anchor). Later width
- * changes remeasure so wrap at a new bubble width can grow or shrink the
- * toggle.
- */
 function UserMessageText({
   text,
   styles,
@@ -279,9 +265,6 @@ function UserMessageText({
     measuredWidthRef.current = null;
   }, [text]);
 
-  // Remeasure from the viewport width, not the text box itself. User bubbles
-  // are width:fit-content, so clamping the first four lines can shrink the
-  // box and would otherwise oscillate if we keyed off the text layout width.
   useEffect(() => {
     if (
       shouldRemeasureUserMessageWidth(measuredWidthRef.current, windowWidth)
@@ -644,12 +627,6 @@ export const carryCompletionQuotes = (
 
 type CompletionQuoteCarry = ReturnType<typeof carryCompletionQuotes>;
 
-/**
- * `carryCompletionQuotes` over the rows `skip` doesn't drop, for a transcript
- * that changes mostly at its end: it refolds only from the last row before
- * the change where nothing was pending. Unchanged input returns the previous
- * result.
- */
 export const createCompletionQuoteCarry = () => {
   let previous: {
     messages: readonly ChatMessage[];
@@ -879,8 +856,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     const attachmentPreviews = item.attachmentPreviews ?? [];
     const showThumbs = thumbs.length > 0;
     const documentNames = item.documentNames ?? [];
-    // A tap on a canvas button arrives as a <canvas-action> block: a chip
-    // naming the canvas, and only what the user chose or typed in the bubble.
     const canvasAction = canvasActionDisplay(item.text);
     const userText = canvasAction ? canvasAction.text : item.text;
     const showText = userText.trim().length > 0;
@@ -1268,8 +1243,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         <View
           style={[styles.artifactGroup, hasText && styles.artifactGroupSpaced]}
         >
-          {/* Running agents surface in the top bar's status mark, not as
-              transcript rows; finished ones arrive as quotes above replies. */}
           {linkedAppSlugs.map((slug) => (
             <AppPreviewCard key={`app:${slug}`} slug={slug} colors={colors} />
           ))}
@@ -1286,7 +1259,6 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         </View>
       ) : null}
       {hasText ? null : evidenceMedia}
-      {/* A stopped reply already says so in its own bubble ("Stopped."). */}
       {item.cloudFallback ? (
         <Text
           style={styles.cloudTag}

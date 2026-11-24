@@ -9,7 +9,6 @@ import { getBackendClient } from "./backend";
 
 const REFRESH_MARGIN_MS = 30_000;
 
-/** A preview still on this phone: shown at once, unlike the full-size Drive copy. */
 const localFileUri = (uri: string | undefined): string | undefined => {
   if (!uri?.startsWith("file:")) return undefined;
   try {
@@ -73,9 +72,7 @@ export function useChatAttachmentPreviews(
             }),
           });
           setRevision((value) => value + 1);
-        } catch {
-          // Keep local previews and retry transient auth/network failures.
-        }
+        } catch {}
       }
     };
     void Promise.all(Array.from({ length: Math.min(4, pending.length) }, worker))

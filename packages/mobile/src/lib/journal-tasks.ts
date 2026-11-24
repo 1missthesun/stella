@@ -31,16 +31,6 @@ export const agentSnapshotTasks = (
     ...(agent.statusText ? { statusText: agent.statusText } : {}),
   }));
 
-/**
- * Re-stamps `authoritativeRunning` after a merge.
- *
- * The merge rules prefer whichever snapshot is newer and copy only a few named
- * fields forward, so a row the server named as running can come out of a merge
- * carrying a local fold's shape instead. The server's word is about the agent,
- * not about one snapshot of it, so it is applied again afterwards — and only to
- * rows the merge still considers running, because a terminal row this device
- * genuinely saw is newer evidence than the list.
- */
 export const markAuthoritativeRunning = (
   tasks: readonly MobileTask[],
   agents: readonly AgentActivityEntry[],
@@ -56,13 +46,6 @@ export const markAuthoritativeRunning = (
   );
 };
 
-/**
- * The server's running-agent list is what runs. A row the record fold left
- * running and the list does not name has ended, or never ran at all (a start
- * card whose end was never written): it reads as done. Except a row started
- * after the list was read (`listedAtMs`, the server's clock as records'
- * times are), which the next list has yet to name.
- */
 export const settleUnlistedTasks = (
   tasks: readonly MobileTask[],
   agents: readonly AgentActivityEntry[],
@@ -97,7 +80,6 @@ const journalTask = (
   ...(entry.error ? { errorMessage: entry.error } : {}),
 });
 
-/** The records `foldAgentActivity` reads; the rest of the journal never changes a task. */
 export const JOURNAL_TASK_RECORDS: JournalView = {
   id: "journal-tasks",
   test: (record) => {

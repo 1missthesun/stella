@@ -1,25 +1,7 @@
 /**
- * Keeps dictation audio ingress at real time, without losing any of it.
- *
- * The microphone starts on the press, before the relay and Meta's realtime
- * ASR are connected. Everything captured meanwhile waits in a lossless
- * `DictationIngressQueue` and is released in order once the provider
- * acknowledges its handshake, never far enough ahead of its clock to trip
- * its backlog limit.
- *
  * Meta's realtime ASR runs a wall clock from the handshake and closes the
  * session (code 1008, "ingress audio slower than real-time") once the audio it
- * has received falls a cumulative ten seconds behind that clock. The phone
- * only ever hands us what the microphone captured, so any gap in capture
- * (audio-session interruption, route change, a brief suspension) becomes
- * permanent lateness that eventually ends the session mid-sentence.
- *
- * The pacer accounts for the audio it forwards and, from a timer, fills any
- * lateness beyond a small tolerance with silence. Silence is only sent when
- * the timer fires on schedule and nothing captured is still waiting: a late
- * timer means the JS thread was blocked, and the recorder's queued buffers are
- * about to catch the stream up on their own. Padding on top of those would
- * push the session past the backlog limit instead.
+ * has received falls a cumulative ten seconds behind that clock.
  */
 
 import {
@@ -29,11 +11,8 @@ import {
 import type { DictationStream } from "./dictation-stream";
 
 const TICK_MS = 250;
-/** A tick this late means the JS thread stalled; queued audio will follow. */
 const STALLED_TICK_MS = 200;
-/** Lateness we tolerate before sending silence. */
 const PAD_AFTER_MS = 1_000;
-/** Lateness left in place so an in-flight recorder chunk cannot overshoot. */
 const PAD_KEEP_MS = 250;
 const MAX_PAD_MS = 1_000;
 

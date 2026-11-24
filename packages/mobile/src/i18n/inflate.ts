@@ -1,9 +1,3 @@
-/**
- * Minimal zero-dependency RFC 1951 raw-DEFLATE + single-entry ZIP extractor
- * for unpacking compressed mobile locale packs (`src/i18n/packs/*.zip`)
- * without adding any native dependency.
- */
-
 const LEN_BASE = [
   3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67,
   83, 99, 115, 131, 163, 195, 227, 258,
@@ -234,10 +228,6 @@ const decodeUtf8 = (bytes: Uint8Array): string => {
   return out;
 };
 
-/**
- * Extracts the first entry from a standard single-file ZIP archive (`PK\x03\x04`)
- * and decodes its UTF-8 text payload.
- */
 export function extractSingleZipUtf8(zipBytes: Uint8Array): string {
   if (
     zipBytes.length < 30 ||

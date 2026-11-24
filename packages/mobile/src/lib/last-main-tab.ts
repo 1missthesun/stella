@@ -62,8 +62,6 @@ let pendingMainTab: MainTabId | null = null;
 export function enterMainShell(router: MainShellRouter, href: string): void {
   const tab = readMainTabFromPath(href);
   pendingMainTab = tab && tab !== "chat" ? tab : null;
-  // The (main) stack anchors chat beneath every route, so replacing the
-  // index with /chat stacked a second chat screen on the anchor's.
   router.dismissTo(MAIN_TAB_HREFS.chat);
 }
 

@@ -177,7 +177,6 @@ Notifications.setNotificationHandler({
     if (!pushDeliveryEnabled()) return { ...SILENT };
     if (getNotificationsMuted()) return { ...SILENT };
     if (parseReminderPushData(notification.request.content.data)) {
-      // In the app the reminder's card in chat is the notice; a banner would show it twice.
       if (isPhoneInForeground()) return { ...SILENT };
       return {
         shouldShowAlert: true,
@@ -328,9 +327,7 @@ async function registerOnce(subject: string): Promise<void> {
       capabilities,
     }, { origin: backendOrigin() });
     if (generation === registrationGeneration) registeredSubject = subject;
-  } catch {
-    // Best-effort — don't block the app if registration fails.
-  }
+  } catch {}
 }
 
 export async function tearDownPushNotifications(): Promise<void> {
@@ -353,9 +350,7 @@ export async function tearDownPushNotifications(): Promise<void> {
       mobileDeviceId,
       ...(token ? { token } : {}),
     }, { origin: backendOrigin() });
-  } catch {
-    // Best-effort — sign-out proceeds, and the server's own teardown covers it.
-  }
+  } catch {}
 }
 
 const handledResponses = new Set<string>();
@@ -394,7 +389,6 @@ const handleNotificationResponse = (
     return;
   }
   if ((response.notification.request.content.data as { kind?: unknown } | null)?.kind === EMAIL_PUSH_KIND) {
-    // Email lives on the Email page, never in the chat.
     requestMainChat("email");
     return;
   }
@@ -449,9 +443,7 @@ export async function installNotificationCategoriesAndListeners(): Promise<() =>
         REMINDER_ACTIONS,
       ),
     ]);
-  } catch {
-    // Best-effort; some platforms (Expo Go) just don't support categories.
-  }
+  } catch {}
 
   return () => {
     subscription.remove();

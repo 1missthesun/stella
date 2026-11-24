@@ -162,12 +162,6 @@ function RootStack() {
   );
 }
 
-/**
- * The backend's live channel authenticates once, when it connects. When the
- * signed-in account changes (sign-in, sign-out, a switch, a guest upgrading)
- * it reconnects with the new account's token, so live views stop serving the
- * previous account's values.
- */
 function useBackendFollowsAccount(
   session: ReturnType<typeof authClient.useSession>,
 ) {
@@ -193,8 +187,6 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
   useSavedValuesSync();
   const router = useRouter();
   const pathname = usePathname();
-  // The stack mounts only once the fonts are in (see the return below), so
-  // routing waits for the navigator to exist.
   const navigatorReady = Boolean(useRootNavigationState()?.key);
   const mainChatRequested = useMainChatRequested();
   const [guestReady, setGuestReady] = useState(false);
@@ -341,16 +333,6 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     initialMainHref,
   ]);
 
-  // Hold the native splash until auth + local startup state have resolved, so a
-  // returning user goes straight from splash to their app — no flash of the
-  // "Checking your session" / login screen while `useSession()` does its first
-  // network round-trip. This runs after the routing effect above, and the
-  // double `requestAnimationFrame` lets the chosen destination paint underneath
-  // the splash before it lifts.
-  //
-  // The session is the last of those to resolve, so the authority handshake
-  // started above would otherwise begin exactly as the splash lifts and run
-  // under a spinner. Hold the splash a bounded moment longer for it.
   const authoritySettled =
     useCloudConversationAuthoritySettled(cloudIdentityKey);
   const [authorityWaitExpired, setAuthorityWaitExpired] = useState(false);
@@ -399,11 +381,6 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     authorityWaitExpired,
   ]);
 
-  // Local state, the session and the conversation authority load above while
-  // the fonts register; nothing visible mounts before them. Text laid out
-  // with the system fallback keeps those glyphs and metrics after the font
-  // arrives, so a screen mounted early would come out from under the splash in
-  // the wrong font, or clipped.
   if (!fontsReady) return null;
 
   return (
@@ -416,8 +393,6 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
 
 function AppLayout({ fontsReady }: { fontsReady: boolean }) {
   if (!hasMobileConfig) {
-    // No auth gate on this path, so nothing else lifts the splash — drop it
-    // once the theme and critical fonts are ready.
     return (
       <>
         <HideSplashWhenThemed fontsReady={fontsReady} />
@@ -439,8 +414,6 @@ function HideSplashWhenThemed({ fontsReady }: { fontsReady: boolean }) {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(criticalStellaFontAssets);
-  // A font that fails to load must not hold the splash forever: the app then
-  // draws in the system font instead.
   const fontsReady = fontsLoaded || Boolean(fontError);
 
   useEffect(() => {

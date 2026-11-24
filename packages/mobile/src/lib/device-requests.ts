@@ -69,9 +69,7 @@ const readError = async (
     } else if (typeof detail === "string" && detail.trim()) {
       message = detail.trim();
     }
-  } catch {
-    // Keep the generic copy.
-  }
+  } catch {}
   return new DeviceRequestError(
     messageForCode[code] ?? message,
     code,

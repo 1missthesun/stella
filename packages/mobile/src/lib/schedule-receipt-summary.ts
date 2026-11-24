@@ -1,11 +1,3 @@
-/**
- * Anything that reads as serialized structure is never receipt copy: the
- * persisted schedule side-channel JSON, a non-envelope JSON result, or — the
- * sneaky one — a runtime `resultPreview` sliced at 200 chars mid-envelope,
- * which fails `JSON.parse` yet would otherwise fall through to the raw-string
- * path and render truncated JSON garbage in chat. Prefix check on purpose:
- * a parse test cannot recognise the truncated forms.
- */
 const looksLikeSerializedStructure = (text: string): boolean =>
   text.startsWith("{") || text.startsWith("[");
 
@@ -59,8 +51,6 @@ export const pickScheduleToolSummary = (payload: {
     if (typeof candidate !== "string") continue;
     const envelopeText = textFromToolResultEnvelope(candidate);
     if (envelopeText) {
-      // An envelope whose text block is itself serialized structure renders
-      // nothing from this candidate; a later candidate may still be prose.
       if (looksLikeSerializedStructure(envelopeText)) continue;
       return envelopeText;
     }
@@ -76,9 +66,6 @@ export const scheduleReceiptText = (payload: {
   result?: unknown;
 }): string | undefined => {
   const envelopeText = textFromToolResultEnvelope(payload.result);
-  // An envelope whose text is itself serialized structure (the persisted
-  // side-channel JSON, say) renders nothing — and must not fall through to
-  // the raw-string path.
   if (envelopeText) {
     return looksLikeSerializedStructure(envelopeText)
       ? undefined

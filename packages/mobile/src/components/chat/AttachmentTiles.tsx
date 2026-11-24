@@ -329,7 +329,6 @@ const markStyles = StyleSheet.create({
   },
 });
 
-/** The only upload state a tile ever shows: a small red mark that retries on tap. */
 export function AttachmentFailedMark({
   colors,
   label,

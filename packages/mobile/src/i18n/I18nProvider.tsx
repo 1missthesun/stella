@@ -131,9 +131,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
 const FALLBACK: I18nContextValue = {
   locale: DEFAULT_LOCALE,
   isRTL: false,
-  setLocale: () => {
-    /* no-op — provider missing */
-  },
+  setLocale: () => {},
   localeChangeReloads: () => false,
   t: (key, params) => translate(getEnglishCatalog(), key, params),
   tArray: (key, params) => translateArray(getEnglishCatalog(), key, params),
@@ -148,12 +146,6 @@ const FALLBACK: I18nContextValue = {
   supportedLocales: SUPPORTED_LOCALES,
 };
 
-/**
- * Reading i18n outside the provider falls back to English rather than
- * throwing. On mobile the alternative is a fatal render error in release
- * (see the boot-crash ErrorBoundary in `app/_layout.tsx`), and untranslated
- * English is strictly better than a dead app.
- */
 function useI18n(): I18nContextValue {
   return useContext(I18nContext) ?? FALLBACK;
 }

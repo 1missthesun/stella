@@ -61,7 +61,6 @@ interface WorkingIndicatorProps {
   toolCallId?: string;
   exitImmediately?: boolean;
   onScreen?: boolean;
-  /** A reply landing in this render takes the indicator's place in the same commit. */
   vacateFor?: string | null;
   onStop?: () => void;
 }
@@ -154,10 +153,6 @@ function SwapText({
 
   return (
     <View style={styles.swapText}>
-      {
-        // Invisible sizer: the animated layers are absolutely positioned, so
-        // this gives the bubble its intrinsic width for the current label.
-      }
       <Text
         style={[styles.statusText, styles.swapSizer]}
         numberOfLines={1}
@@ -322,8 +317,6 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const leavingRef = useRef(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Collapsing during render keeps the slot change in the reply's own commit;
-  // a handoff from the bubble's layout effect would cost a second commit.
   const [vacated, setVacated] = useState<{ id: string; shown: boolean } | null>(
     null,
   );

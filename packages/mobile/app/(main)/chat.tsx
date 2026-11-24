@@ -367,8 +367,6 @@ function ChatSurface(props: {
           (entry) => entry.deviceId === desktopDeviceId,
         );
         if (!device) {
-          // A computer that rotated its device id is listed under the new one;
-          // re-file the pairing there instead of reading it as offline forever.
           const moved = await followDesktopDeviceIdSuccession(
             desktopDeviceId,
           ).catch(() => null);
@@ -490,7 +488,6 @@ function ChatSurface(props: {
   ]);
 
   const sendReady = thread.composerGate.kind === "ready";
-  // What a canvas button or the Email page asked goes out as an ordinary message here.
   useChatSendQueue(thread.sendPrompt, sendReady);
   const handoffSentRef = useRef(false);
   useEffect(() => {

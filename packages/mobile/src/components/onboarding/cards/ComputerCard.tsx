@@ -222,14 +222,12 @@ function HopArt({ connected, running }: { connected: boolean; running: boolean }
           </Svg>
         </Animated.View>
 
-        {/* Phone */}
         <View style={[art.phone, { left: FROM_X - 15 }]}>
           <View style={art.phoneNotch} />
           <View style={art.phoneBubbleRight} />
           <View style={art.phoneBubbleLeft} />
         </View>
 
-        {/* Computer */}
         <Animated.View style={[art.computer, { left: TO_X - 38 }, screenStyle]}>
           <View style={art.screen}>
             <Animated.View style={[StyleSheet.absoluteFill, art.screenGlow, glowStyle]} />
@@ -240,7 +238,6 @@ function HopArt({ connected, running }: { connected: boolean; running: boolean }
           <View style={art.base} />
         </Animated.View>
 
-        {/* The task, mid-hop */}
         <Animated.View style={[art.chip, chipStyle]}>
           <StellaStarGlyph size={10} color={colors.accentForeground} />
         </Animated.View>

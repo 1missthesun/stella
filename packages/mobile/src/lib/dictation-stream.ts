@@ -64,9 +64,7 @@ const connectRelay = async (): Promise<WebSocket> => {
       }
       try {
         socket.close();
-      } catch {
-        /* The peer may already be gone. */
-      }
+      } catch {}
       reject(error);
     };
     const timer = setTimeout(() => {
@@ -85,9 +83,7 @@ const closeQuietly = (socket: WebSocket, reason: string) => {
   socket.onclose = null;
   try {
     socket.close(1000, reason);
-  } catch {
-    /* Already closed. */
-  }
+  } catch {}
 };
 
 export const warmDictationSocket = (): void => {
@@ -181,7 +177,6 @@ export class DictationStream {
     return this.streamError;
   }
 
-  /** The relay answered the start with an error (a usage limit, no service). */
   get refused(): boolean {
     return this.refusedToStart;
   }
@@ -209,9 +204,7 @@ export class DictationStream {
     if (this.cancelled) {
       try {
         socket.close(1000, "Cancelled");
-      } catch {
-        /* Already closed. */
-      }
+      } catch {}
       throw new Error("Dictation cancelled.");
     }
     this.socket = socket;
@@ -226,9 +219,7 @@ export class DictationStream {
         if (this.socket === socket) this.socket = null;
         try {
           socket.close();
-        } catch {
-          /* The peer may already be gone. */
-        }
+        } catch {}
         reject(error);
       };
       const timer = setTimeout(() => {
@@ -355,9 +346,7 @@ export class DictationStream {
         socket.onerror = null;
         try {
           socket.close();
-        } catch {
-          /* Already closed by the relay. */
-        }
+        } catch {}
       }
       return this.finalTranscript.trim();
     }
@@ -377,9 +366,7 @@ export class DictationStream {
         if (this.socket === socket) this.socket = null;
         try {
           socket.close();
-        } catch {
-          /* Settlement must still complete. */
-        }
+        } catch {}
         if (error) reject(error);
         else resolve(text);
       };
@@ -419,9 +406,7 @@ export class DictationStream {
     }
     try {
       this.socket?.close(1000, "Cancelled");
-    } catch {
-      /* Best effort. */
-    }
+    } catch {}
     this.socket = null;
   }
 }

@@ -190,10 +190,8 @@ const LIST_TOP_GAP = 84;
 const TOP_TAPER_TAIL = 24;
 const CATCH_UP_PILL_GAP = 10;
 const ASK_TOP_GAP = 12;
-/** Rows appended at once beyond which an arrival counts as a catch-up. */
 const CATCH_UP_APPENDED_ROWS = 3;
 
-/** True when at least CATCH_UP_APPENDED_ROWS rows follow the previous tail. */
 function isCatchUpAppend(
   messages: readonly ChatMessage[],
   previousTailId: string,
@@ -444,12 +442,6 @@ const agentLabelRow = (
   return row;
 };
 
-/**
- * The rows whose agent chip is hidden because the row before already names
- * that agent (`projectAgentLabels`), for a transcript that changes mostly at
- * its end: the label fold resumes after the unchanged rows unless a new
- * placement alias renames an agent an earlier row shows.
- */
 const createHiddenAgentChips = () => {
   let previous: {
     messages: readonly ChatMessage[];
@@ -787,10 +779,6 @@ export function ChatPane({
   const onPaneLayout = useCallback((e: LayoutChangeEvent) => {
     setPaneHeight(Math.round(e.nativeEvent.layout.height));
   }, []);
-  // A conversation first observed empty mounts its list on the optimistic
-  // send. Our post-send owner already places that row; starting Legend's
-  // footer-preserving end bootstrap as well would move it a second time.
-  // Existing history still bootstraps at its tail once hydration completes.
   const initialScrollAtEndRef = useRef<boolean | null>(null);
   if (!historyLoading && initialScrollAtEndRef.current === null) {
     initialScrollAtEndRef.current = visibleMessages.length > 0;
@@ -839,12 +827,6 @@ export function ChatPane({
     if (isNewAssistant) {
       scroll.resetAssistantAutoScroll();
     }
-    // Only engage the animated catch-up while a reply is actively streaming
-    // (or pending, for the computer chat). Without this gate, hydrating saved
-    // history on tab mount looks like a fresh assistant message with huge
-    // "growth" (baseline=0 before the list lays out), and the follow loop
-    // animates a ~400px scroll on top of the initial scrollToEnd — the chat
-    // visibly readjusts every time the user switches to the tab.
     if (streaming && (isNewAssistant || grewText)) {
       scroll.prepareAssistantLayoutFollow();
     }
@@ -855,17 +837,12 @@ export function ChatPane({
     assistantIdRef.current = null;
   }
 
-  // Assistant identity changes reset its measurements above. A busy-state
-  // transition alone must not cancel the in-flight post-send placement.
-
   const pendingSendNudgeRef = useRef<{
     userMessageId: string;
   } | null>(null);
   useEffect(() => {
     const pending = pendingSendNudgeRef.current;
     if (!pending) return;
-    // onSubmit can return before its optimistic row reaches this list. Starting
-    // placement against the previous tail discards the anchor before onLayout.
     if (
       !canStartPostSendPlacement(
         pending.userMessageId,
@@ -893,9 +870,6 @@ export function ChatPane({
     }
   }, [sendPinSuppressForId, streaming, lastMessage?.id]);
 
-  // The landed reply whose placement owns the tail, and until when. A ref
-  // rather than state: setting state from the layout effect below re-rendered
-  // the whole pane synchronously, inside the frame the reply arrived in.
   const replyPinRef = useRef<{ id: string; untilMs: number } | null>(null);
   const [, setReplyPinExpiry] = useState(0);
   const settledReplyIdsRef = useRef<Set<string> | null>(null);
@@ -905,11 +879,6 @@ export function ChatPane({
     settledReplyIdsRef.current = null;
   }
   const placedReplyIdRef = useRef<string | null>(null);
-  // A catch-up (reconnect, bulk history) appends many rows in one render. Its
-  // newest reply lands far below the rendered window, so placing that row
-  // would wait for a layout that never comes while Legend's tail pin is off,
-  // leaving the list where it was. Settle it here instead: the data change
-  // stays with Legend's tail pin, which keeps a reader at the bottom pinned.
   const tailTrackRef = useRef<{
     conversationId: typeof conversationId;
     id: string | null;
@@ -1028,7 +997,6 @@ export function ChatPane({
       return;
     }
     const tail = visibleMessages[visibleMessages.length - 1];
-    // A background task's own follow-ups don't call the reader down.
     const quietTail =
       tail?.scheduleNotice !== undefined &&
       (tail.scheduleNoticeRun ?? [tail.scheduleNotice]).every(isAgentScheduleNotice);
@@ -1141,9 +1109,6 @@ export function ChatPane({
   const dictationStarting = dictation.isStarting;
   const toggleVoice = useCallback(async () => {
     if (dictationStatus === "idle" && !dictationStarting()) {
-      // No tap here: `useDictation` fires on the real transition, once the
-      // mic is actually live. Buzzing on the press as well double-tapped the
-      // start and lied whenever consent or the mic permission refused.
       // In-flight progressive TTS can otherwise apply Expo's playback audio
       // mode after recording starts. On iOS that mode stops every recorder.
       await startAfterStoppingReadAloud(() => startDictation());
@@ -1171,10 +1136,8 @@ export function ChatPane({
     realtimeVoiceOpeningRef.current = true;
     tapMedium();
     try {
-      // Resolve microphone access before the voice screen exists. The system
-      // prompt suspends the app (Android reports it as `background`), which
-      // used to close a voice screen that had only just opened. An already
-      // granted permission resolves silently and never shows a prompt.
+      // The system prompt suspends the app (Android reports it as `background`),
+      // which would close a voice screen that had only just opened.
       const permission = realtimeVoiceSignInRequired
         ? ({ granted: true } as const)
         : await ensureMicrophonePermission();
@@ -1701,10 +1664,6 @@ export function ChatPane({
       onLatestUserLayout,
     ],
   );
-  // Rows read the env from this store, so `renderItem` never changes and the
-  // list never re-renders every mounted row when the pane does. Staged during
-  // render so a row mounting in this commit reads it; published after commit
-  // so only rows whose slice changed re-render.
   const [rowEnvStore] = useState(() => createChatRowEnvStore(rowEnv));
   rowEnvStore.stage(rowEnv);
   useLayoutEffect(() => rowEnvStore.publish(), [rowEnv, rowEnvStore]);
@@ -2005,13 +1964,6 @@ export function ChatPane({
                   }
                 />
               </Reanimated.View>
-              {/* Top taper — fades the list into the surface at the top edge so
-                  messages scrolling under the top bar dissolve instead of
-                  hard-cutting. Cross-platform (RN `fadingEdgeLength` is
-                  Android-only). Paints the *actual* app backdrop (aligned to the
-                  screen via the top-bar offset) and masks it to a vertical fade,
-                  so it matches the soft gradient seamlessly instead of stamping a
-                  flat `colors.background` band over it. */}
               {/* Android's native MaskedView does not implement pointerEvents.
                   Keep touch exclusion on a real RN View around the whole mask,
                   including its screen-height backdrop child. */}
@@ -2273,8 +2225,6 @@ const makeStyles = (colors: Colors) =>
     list: {
       paddingHorizontal: CHAT_HORIZONTAL_INSET,
     },
-    // Every row carries the gap below it, the last one too, so a new row never
-    // resizes the one before it. The tail is shorter by the same gap.
     listRow: { paddingBottom: MESSAGE_LIST_GAP },
     chatTail: {
       minHeight: CHAT_TAIL_GAP - MESSAGE_LIST_GAP,

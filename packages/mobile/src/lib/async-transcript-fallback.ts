@@ -171,9 +171,7 @@ async function readLocators(
       ) {
         locators.set(uniqueIds[index]!, parsed);
       }
-    } catch {
-      // A missing/corrupt locator is repaired the next time its page is saved.
-    }
+    } catch {}
   }
   return locators;
 }

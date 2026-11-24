@@ -1,19 +1,3 @@
-/**
- * Mobile translation runtime.
- *
- * This is a deliberate mirror of
- * `packages/desktop-ui/src/shared/i18n/catalogs.ts`: same nested-object
- * catalogs, same dot-path lookup, same `{name}` interpolation, same
- * English-then-raw-key fallback chain, and the same CLDR plural handling
- * via `Intl.PluralRules`. A key means exactly the same thing on both
- * platforms, so `t("mobile.account.title")` resolves identically.
- *
- * The ONLY difference is how a catalog is obtained. The desktop uses
- * Vite's `import.meta.glob`, which Metro does not have — mobile reads from
- * the generated static require registry instead (see
- * `scripts/sync-i18n-catalogs.mjs`).
- */
-
 import { Asset } from "expo-asset";
 import { Directory, File, Paths } from "expo-file-system";
 import {
@@ -123,23 +107,18 @@ const writeDiskCachedCatalog = (locale: Locale, hash: string, catalog: Catalog):
     const dir = localeCacheDir();
     if (!dir) return;
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-    // Remove older cached hashes for this locale so cache size stays bounded.
     const prefix = `${locale}-`;
     const targetName = `${locale}-${hash}.json`;
     for (const item of dir.list()) {
       if (item instanceof File && item.name.startsWith(prefix) && item.name !== targetName) {
         try {
           item.delete();
-        } catch {
-          /* ignore */
-        }
+        } catch {}
       }
     }
     const file = new File(dir, targetName);
     file.write(JSON.stringify(catalog));
-  } catch {
-    /* cache write is best-effort */
-  }
+  } catch {}
 };
 
 export const getEnglishCatalog = (): Catalog => {
@@ -150,12 +129,6 @@ export const getEnglishCatalog = (): Catalog => {
   return catalog;
 };
 
-/**
- * Synchronously returns the catalog when already in memory or cached unpacked
- * on disk (English is always synchronous; non-English is synchronous from the
- * second launch onward). Returns null on first-ever non-English launch until
- * `loadCatalogAsync` unpacks the bundled compressed locale pack.
- */
 export const getCachedCatalogSync = (locale: Locale): Catalog | null => {
   if (locale === DEFAULT_LOCALE) return getEnglishCatalog();
   const inMemory = catalogCache.get(locale);
@@ -168,11 +141,6 @@ export const getCachedCatalogSync = (locale: Locale): Catalog | null => {
   return null;
 };
 
-/**
- * Loads a locale catalog on demand from memory, the unpacked expo-file-system
- * cache, or the bundled compressed `.zip` static asset (works offline on first
- * launch for all 28 languages).
- */
 export const loadCatalogAsync = async (locale: Locale): Promise<Catalog> => {
   const cached = getCachedCatalogSync(locale);
   if (cached) return cached;
@@ -301,8 +269,6 @@ const pluralRulesFor = (locale: string): Intl.PluralRules | undefined => {
   const cached = pluralRulesCache.get(locale);
   if (cached !== undefined) return cached ?? undefined;
   try {
-    // Hermes ships `Intl.PluralRules` on both platforms; older engines (and
-    // JSC without ICU) may not, hence the guard + null memo.
     if (typeof Intl === "undefined" || typeof Intl.PluralRules !== "function") {
       pluralRulesCache.set(locale, null);
       return undefined;

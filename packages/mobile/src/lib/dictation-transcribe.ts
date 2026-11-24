@@ -146,9 +146,7 @@ export const transcribeDictationWav = async (
   let parsed: { text?: unknown; error?: unknown; code?: unknown } = {};
   try {
     parsed = JSON.parse(body) as typeof parsed;
-  } catch {
-    /* A proxy interstitial, handled as a generic failure below. */
-  }
+  } catch {}
   if (!response.ok) {
     const code = typeof parsed.code === "string" ? parsed.code : null;
     const message = typeof parsed.error === "string" ? parsed.error.trim() : "";

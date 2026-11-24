@@ -25,7 +25,6 @@ export const fetchWithinDeadline = async (
     async (signal) => await fetch(urlOf(input), { ...init, signal }),
   );
 
-/** Fails once no bytes arrive for a minute, so large healthy downloads keep going. */
 export const downloadFileWithinIdle = async (
   url: string,
   target: File,

@@ -141,9 +141,7 @@ export default function MainLayout() {
       try {
         await tearDownPushNotifications();
         await authClient.signOut();
-      } catch {
-        /* ignore — the local session is gone either way */
-      }
+      } catch {}
       router.replace("/login");
     })();
   }, [router]);
@@ -349,10 +347,6 @@ export default function MainLayout() {
             <MainStack />
           </View>
 
-          {/* The top bar floats over the routes: the chat runs edge to
-              edge underneath it, and every other route starts below it
-              (`useShellTopInset`). Taps between its controls pass through
-              to the page. */}
           <Animated.View
             pointerEvents={topBarCovered ? "none" : "box-none"}
             accessibilityElementsHidden={topBarCovered}
@@ -489,8 +483,6 @@ function MainStack() {
             gestureEnabled: false,
           }}
         >
-          {/* Tabs switch instantly; pages pushed from a tab (Cloud Home)
-              keep the slide. */}
           <Stack.Screen name="schedule" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="email" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="apps" options={TAB_SCREEN_OPTIONS} />

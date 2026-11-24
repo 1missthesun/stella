@@ -1,14 +1,9 @@
 import { requireOptionalNativeModule } from "expo-modules-core";
 
 /**
- * Capabilities the installed native binary declares in its embedded app
- * config (`expo.extra.nativeCapabilities` in app.json at build time).
- *
- * This reads the config compiled INTO the binary (expo-constants'
- * `EXConstants.bundle/app.config`), never the OTA update's manifest, so an
- * update published to an older store build cannot turn a capability on. A
- * feature whose first exposure has to be a store build (App Review) or that
- * needs native pieces the old binary lacks checks here.
+ * expo-constants' `EXConstants.bundle/app.config` is the config compiled into
+ * the binary, never the OTA update's manifest, so an update published to an
+ * older store build cannot turn a capability on.
  */
 export type NativeCapability =
   "self-host-servers";

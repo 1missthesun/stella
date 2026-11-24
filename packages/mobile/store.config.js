@@ -1,18 +1,3 @@
-// App Store listing for `eas metadata:push` (eas.json points `metadataPath` here).
-//
-// The listing itself lives in store.config.json. The App Review contact (a
-// person's name and phone number) is not kept in this public repo: it is read at
-// push time from environment variables or from a local file outside the repo.
-// See "App Store review contact" in DEPLOY.md.
-//
-//   STELLA_ASC_REVIEW_FIRST_NAME, STELLA_ASC_REVIEW_LAST_NAME,
-//   STELLA_ASC_REVIEW_PHONE, STELLA_ASC_REVIEW_EMAIL (optional)
-//
-// or a JSON file { "firstName", "lastName", "phone", "email"? } at
-// $STELLA_ASC_REVIEW_CONTACT_FILE, defaulting to
-// ~/.config/stella-dev/app-store-review-contact.json. Environment variables win
-// over the file, field by field. A missing field stops the push.
-
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -69,7 +54,6 @@ module.exports = () => {
     text(committedReview[field]),
   );
   if (leaked.length > 0) {
-    // `eas metadata:pull` writes the live contact back into store.config.json.
     throw new Error(
       `packages/mobile/store.config.json has apple.review.${leaked.join(", apple.review.")} set. ` +
         "Move the review contact to the local contact file or environment variables " +

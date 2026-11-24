@@ -15,25 +15,16 @@ export type CanvasIdentity = { canvas: string; title: string };
 const randomName = (): string =>
   Array.from(getRandomBytes(16), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-/**
- * The app's end of a canvas's action channel in a WebView (see
- * canvas-actions.ts): only taps carrying the document's token and naming a
- * declared action count, and the label sent is the declaration's.
- */
 export function useCanvasActionChannel(args: {
   webViewRef: RefObject<WebView | null>;
   token: string;
   actions: readonly CanvasAction[] | undefined;
   identity: CanvasIdentity;
-  /** Data fed to a built-in page (`stella:data`), re-sent when it changes. */
   data?: unknown;
-  /** Handles a tap instead of sending it to the chat; undefined sends it on. */
   onAction?: (event: CanvasActionEvent) => Promise<CanvasActionOutcome | undefined> | CanvasActionOutcome | undefined;
 }): {
   receiverKey: string;
-  /** Handles a message from the page; true when it was an action message. */
   handleMessage: (message: Record<string, unknown>) => boolean;
-  /** Call when the document has loaded. */
   onLoaded: () => void;
 } {
   const { token, webViewRef } = args;

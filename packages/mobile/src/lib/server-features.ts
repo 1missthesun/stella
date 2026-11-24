@@ -17,11 +17,8 @@ import {
 } from "./server-registry";
 
 /**
- * What the active server offers. Stella's hosted service offers everything
- * (and its behavior must not change), so it never depends on discovery. A
- * self-hosted server reports its features in `/.well-known/stella`; the app
- * hides what it lacks, and always hides plans and checkout there (App Store
- * 3.1.1: pairing with a server must never unlock paid features).
+ * App Store 3.1.1: pairing with a self-hosted server must never unlock paid
+ * features, so plans and checkout stay hidden there.
  */
 
 const HOSTED_FEATURES: ServerFeatures = {

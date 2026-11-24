@@ -30,9 +30,7 @@ export async function setVoiceEnabled(next: boolean): Promise<void> {
     } else {
       await AsyncStorage.removeItem(STORAGE_KEY);
     }
-  } catch {
-    // ignore — in-memory value still wins until next reload
-  }
+  } catch {}
   for (const fn of listeners) fn(enabled);
 }
 

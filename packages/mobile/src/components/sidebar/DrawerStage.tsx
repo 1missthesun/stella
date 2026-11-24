@@ -244,11 +244,6 @@ export function DrawerStage({
 
 const DrawerSwipe = createContext<GestureType | null>(null);
 
-/**
- * The page's swipe-to-open-a-sidebar gesture, once it is attached (its
- * handler tag is what a blocking relation resolves to). Content that scrolls
- * sideways makes this gesture wait for its own native scroll to fail.
- */
 export function useDrawerSwipeGesture(): GestureType | null {
   return useContext(DrawerSwipe);
 }

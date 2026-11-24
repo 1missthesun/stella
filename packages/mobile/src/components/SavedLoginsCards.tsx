@@ -36,12 +36,6 @@ export function useSavedLoginsAction() {
 
 let waitingDismissed = false;
 
-/**
- * Above the composer: a device to allow, or this phone asking for the user's
- * logins. The user can put the waiting card away until Stella next starts; it
- * comes back by itself once another device shows a code. A question or a
- * secure card needs the same room, so it goes first.
- */
 export function SavedLoginsChatCards({
   conversationId,
 }: {
@@ -70,7 +64,6 @@ export function SavedLoginsChatCards({
   );
 }
 
-/** A device asking for the user's saved logins, once it and this phone show the same code. */
 export function SavedLoginsRequestCard({
   request,
 }: {
@@ -98,7 +91,6 @@ export function SavedLoginsRequestCard({
   );
 }
 
-/** This phone asking for the user's saved logins. */
 export function SavedLoginsWaitingCard({
   waiting,
   onDismiss,
@@ -167,7 +159,6 @@ export function SavedLoginsWaitingCard({
   );
 }
 
-/** The devices' list doesn't check out, so nothing saved is used here. */
 export function SavedLoginsProblemCard() {
   const t = useT();
   const { busy, run } = useSavedLoginsAction();
@@ -217,7 +208,6 @@ function LinkAction({
 
 const CODE_MARK = "\u2063";
 
-/** A sentence with the code in it, the code set large. */
 function CodeLine({
   id,
   name = "",
@@ -248,7 +238,6 @@ function CodeLine({
   );
 }
 
-/** Starting the list over, behind a confirmation. */
 function StartOver({ disabled, run }: { disabled: boolean; run: Run }) {
   const t = useT();
   return (

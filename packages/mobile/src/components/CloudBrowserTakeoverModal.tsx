@@ -160,8 +160,6 @@ export function CloudBrowserTakeoverModal({
   useEffect(() => {
     if (!visible) return;
     const subscription = AppState.addEventListener("change", (state) => {
-      // A backgrounded app must not retain a human-control bearer URL. Closing
-      // the view leaves the challenge pending; reopening mints a fresh one.
       if (state !== "active") onDismiss();
     });
     return () => subscription.remove();
@@ -181,9 +179,7 @@ export function CloudBrowserTakeoverModal({
         ) {
           return true;
         }
-      } catch {
-        // Fall through to the remote browser fallback.
-      }
+      } catch {}
       setNotice(t("cloudBrowser.takeover.localOriginFallback"));
       setMode("remote");
       return false;
@@ -241,9 +237,6 @@ export function CloudBrowserTakeoverModal({
     >
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          {/* Steps back to chat without deciding. iOS has no back button and
-              this sheet is full screen, so without it the only exits were
-              Done or Cancel. The request stays pending and can be reopened. */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("common.close")}

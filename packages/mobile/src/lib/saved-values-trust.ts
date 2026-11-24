@@ -32,16 +32,6 @@ import {
   type SavedValuesTrust,
 } from "./saved-values-device";
 
-/**
- * This phone's place on the user's list of devices that may hold saved
- * values: checking the list, asking to join it, and letting other devices
- * join. The rules are in `@stella/contracts/saved-values-trust`.
- *
- * Everything a code is made from stays in memory here: this phone's own
- * number, and the other device's request or answer exactly as it first
- * arrived. What the cloud says about a request later never changes a code.
- */
-
 const NONCE_BYTES = 32;
 const RETRY_MS = 30_000;
 const JOIN_RETRY_MS = 60_000;
@@ -49,7 +39,6 @@ const APPEND_ATTEMPTS = 4;
 const APPEND_RETRY_MS = 1_000;
 const BEHIND_GRACE_MS = 10_000;
 const WAKE_SLACK_MS = 1_000;
-/** How long after an ask ended the user may still say the codes matched. */
 const DECIDED_GRACE_MS = 5 * 60_000;
 
 export type SavedValuesRequestView = Readonly<{
@@ -68,14 +57,10 @@ export type SavedValuesTrustView =
     }>
   | Readonly<{
       standing: "waiting";
-      /** The code to compare, once another device answered. */
       code: string | null;
-      /** The device that answered, which is where to allow this phone. */
       answeredBy: string | null;
-      /** The user said here that the codes match; the other device hasn't allowed it yet. */
       confirmed: boolean;
       stopped: SavedValuesStopped | null;
-      /** It stopped while Stella has been open, so the user hasn't been told yet. */
       stoppedNow: boolean;
     }>
   | Readonly<{
@@ -89,25 +74,20 @@ type MyJoin = {
   nonce: string;
   commit: string;
   expiresAt: number;
-  /** The first answer that arrived, kept as it was. */
   answer: {
     byName: string;
     listedNonce: string;
     pin: SavedValuesRosterPin;
   } | null;
   revealed: boolean;
-  /** The user said on this phone that the codes match. */
   confirmed: boolean;
-  /** The other device allowed it. */
   allowed: boolean;
 };
 
-/** A request this phone answered, as it was then, with this phone's own number and pin. */
 type MyAnswer = {
   join: SavedValuesJoin;
   nonce: string;
   pin: SavedValuesRosterPin;
-  /** The other device's number, the first one that fits what it committed to. */
   joinerNonce: string | null;
 };
 
@@ -146,7 +126,6 @@ export const useSavedValuesTrust = (): SavedValuesTrustView =>
 
 export const savedValuesState = (): SavedValuesState | null => state;
 
-/** Changes when the synced records or the list they're checked against change. */
 export const savedValuesVersion = (): string =>
   state
     ? [
@@ -155,11 +134,8 @@ export const savedValuesVersion = (): string =>
       ].join(",")
     : "";
 
-// --- Checking the list ---------------------------------------------------------
-
 let lastCheck: { key: string; result: SavedValuesRosterCheck } | null = null;
 
-/** Checking means verifying every signature, so an unchanged list is checked once. */
 const check = (
   entries: SavedValuesState["roster"],
   pin: SavedValuesRosterPin | null,
@@ -198,8 +174,6 @@ const randomNonce = () => toBase64Url(Crypto.getRandomBytes(NONCE_BYTES));
 const isConflict = (error: unknown) =>
   (error as { code?: unknown } | null)?.code === "CONFLICT";
 
-// --- Settling ------------------------------------------------------------------
-
 let running: Promise<void> | null = null;
 let again = false;
 let wakeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -215,7 +189,6 @@ const wakeAt = (at: number) => {
   );
 };
 
-/** Brings this phone in step with the list as the cloud shows it now. */
 export const settle = (): Promise<void> => {
   if (running) {
     again = true;
@@ -242,12 +215,10 @@ const acceptState = (next: SavedValuesState) => {
   return settle();
 };
 
-/** What this phone just wrote, without waiting for the cloud to push it back. */
 const noteEntries = (entries: SavedValuesState["roster"]) => {
   if (state) state = { ...state, roster: entries };
 };
 
-/** Called with each state the cloud pushes for the signed-in account. */
 export const noteSavedValuesState = (
   owner: string,
   next: SavedValuesState,
@@ -259,7 +230,6 @@ export const noteSavedValuesState = (
   return acceptState(next);
 };
 
-/** Forget everything held in memory for the account (sign-out, another account). */
 export const resetSavedValuesTrust = () => {
   session += 1;
   ownerId = null;
@@ -293,7 +263,6 @@ const step = async (): Promise<void> => {
       (checked.reason === "reset" && state.roster.length === 0));
   if (!behind) behindSince = null;
   else {
-    // A push from before this phone's own last entry can arrive after it; give the next one time.
     behindSince ??= Date.now();
     if (Date.now() - behindSince < BEHIND_GRACE_MS) {
       wakeAt(behindSince + BEHIND_GRACE_MS);
@@ -301,7 +270,6 @@ const step = async (): Promise<void> => {
     }
   }
   if (!checked.ok && checked.reason === "reset" && state.roster.length > 0) {
-    // Another device started a new list, which this phone isn't on.
     await updateTrust({ pin: null, listed: false });
     myAnswers.clear();
     checked = check(state.roster, null);
@@ -333,7 +301,6 @@ const step = async (): Promise<void> => {
   myAnswers.clear();
   if (mine !== session || !state) return;
   if (checked.roster.members.size === 0) {
-    // Every device left this list, so there is nobody to ask and nothing it guards.
     await startList(keys, "rosterReset");
     return;
   }
@@ -356,7 +323,6 @@ const startList = async (
   });
   const hash = rosterEntryHash(entry);
   const before = trust;
-  // Remembered first: if the answer is lost, this phone still knows its own list.
   await updateTrust({
     pin: { genesis: hash, seq: 0, hash },
     listed: true,
@@ -378,8 +344,6 @@ const startList = async (
   noteEntries([entry]);
   again = true;
 };
-
-// --- On the list ---------------------------------------------------------------
 
 const listedDevices = (
   list: SavedValuesRoster,
@@ -435,7 +399,6 @@ const openRequests = (deviceId: string, now: number): SavedValuesRequestView[] =
   const requests: SavedValuesRequestView[] = [];
   for (const join of openJoins(deviceId, now)) {
     const answer = myAnswers.get(join.joinId);
-    // Answered on another device, or on this phone before it restarted: its code isn't this phone's to show.
     if (!answer) continue;
     if (
       !answer.joinerNonce &&
@@ -456,10 +419,6 @@ const openRequests = (deviceId: string, now: number): SavedValuesRequestView[] =
   return requests;
 };
 
-/**
- * While Stella is open here, this phone adds its own number to a request
- * nobody has answered, which makes it the device that shows the code.
- */
 const answerJoins = async (
   open: readonly SavedValuesJoin[],
   list: SavedValuesRoster,
@@ -482,7 +441,6 @@ const answerJoins = async (
         listedNonce: answer.nonce,
         pin: answer.pin,
       });
-      // Another device answered first: the code is on that one.
       if (result.listedNonce !== answer.nonce) myAnswers.delete(join.joinId);
     } catch (error) {
       myAnswers.delete(join.joinId);
@@ -516,7 +474,6 @@ const stayMember = async (
   await answerJoins(open, list, keys);
 };
 
-/** This phone's keys and the list it checked, while it is on it. */
 export const savedValuesMembership = async (): Promise<{
   keys: SavedValuesDeviceKeys;
   roster: SavedValuesRoster;
@@ -540,7 +497,6 @@ const append = async (
       await getBackendClient().call("savedValues.rosterAppend", { entry });
     } catch (error) {
       if (!isConflict(error) || attempt >= APPEND_ATTEMPTS) throw error;
-      // Another device added to the list first; its entry is on the way here.
       await new Promise((resolve) => setTimeout(resolve, APPEND_RETRY_MS));
       continue;
     }
@@ -550,7 +506,6 @@ const append = async (
   }
 };
 
-/** The user saw the same code on both and allowed it. */
 export const allowSavedValuesJoin = async (joinId: string): Promise<void> => {
   const answer = myAnswers.get(joinId);
   if (!answer || !codeFor(answer)) return;
@@ -599,8 +554,6 @@ export const removeFromSavedValues = (target: string): Promise<void> =>
       : null,
   );
 
-// --- Asking to join ------------------------------------------------------------
-
 const appIsOpen = () => AppState.currentState === "active";
 
 AppState.addEventListener("change", (next) => {
@@ -645,7 +598,6 @@ const ask = async (
     if (mine !== session) return;
   }
   if (myJoin?.answer && myJoin.confirmed && myJoin.allowed && state) {
-    // The list is the real one only if it continues from what the other device put in the code.
     const real = check(state.roster, myJoin.answer.pin);
     if (real.ok && isSelfListed(real.roster, me)) {
       await updateTrust({ pin: real.roster.head, listed: true, stopped: null });
@@ -707,13 +659,11 @@ const ask = async (
   });
 };
 
-/** The user saw the same code on both, here. */
 export const confirmSavedValuesCode = (): Promise<void> => {
   if (myJoin?.answer && myJoin.revealed) myJoin.confirmed = true;
   return settle();
 };
 
-/** A fresh ask: after a decline or a removal, or to allow this phone on another device. */
 export const askSavedValuesAgain = async (): Promise<void> => {
   await updateTrust({ stopped: null });
   nextJoinAt = 0;
@@ -721,7 +671,6 @@ export const askSavedValuesAgain = async (): Promise<void> => {
   await settle();
 };
 
-/** None of the devices can allow this phone: a new list with only this phone on it. */
 export const startSavedValuesOver = async (): Promise<void> => {
   if (running) await running;
   if (!ownerId) return;

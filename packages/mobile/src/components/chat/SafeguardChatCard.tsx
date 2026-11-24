@@ -9,7 +9,6 @@ import {
   makeChatCardButtonStyles,
 } from "./ScheduleCardShell";
 
-/** The chat's safety-block card, in the message list where the stopped reply would be. */
 export function SafeguardChatCard({
   conversationId,
   replying,
@@ -19,7 +18,6 @@ export function SafeguardChatCard({
   conversationId: string | null | undefined;
   replying: boolean;
   colors: Colors;
-  /** The card appeared or got taller, so part of it may be below the fold. */
   onGrew: () => void;
 }) {
   const card = useSafeguardCard(conversationId);

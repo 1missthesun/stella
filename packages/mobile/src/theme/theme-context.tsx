@@ -152,8 +152,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setGradientColorState(storedColor);
       }
     })
-      // Unreadable storage still shows the app (in the default theme): the
-      // tree below, and with it the splash, waits for `loaded`.
       .catch(() => undefined)
       .finally(() => setLoaded(true));
   }, []);

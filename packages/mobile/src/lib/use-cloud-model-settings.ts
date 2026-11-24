@@ -70,7 +70,6 @@ export type Brain =
       mark: string;
     }
   | {
-      /** A plan that runs only on a computer signed in to it (Google Antigravity). */
       id: string;
       kind: "computer";
       provider: ComputerOnlyProviderId;
@@ -98,7 +97,6 @@ const COMPUTER_BRAINS: ReadonlyArray<{
   label: string;
 }> = [{ provider: "antigravity", label: "Google Antigravity" }];
 
-/** The model a computer-only plan starts on when it is picked. */
 const computerDefaultModel = (reported: readonly string[]): string =>
   antigravityModelOptions(reported)[0]?.id ?? ANTIGRAVITY_MODEL_IDS[0]!;
 
@@ -220,7 +218,6 @@ export function useCloudModelSettings(active: boolean) {
     "devices.list",
     active && scope ? {} : "skip",
   );
-  // Which computers can run each computer-only plan: the sign-ins they report while online.
   const computerSignIns = useMemo(() => {
     const signedIn: Record<string, string[]> = {};
     for (const device of devices?.devices ?? []) {
@@ -232,7 +229,6 @@ export function useCloudModelSettings(active: boolean) {
     }
     return signedIn;
   }, [devices]);
-  // The Gemini models those computers' own accounts have, once they say.
   const antigravityModels = useMemo(
     () =>
       (devices?.devices ?? []).flatMap((device) =>

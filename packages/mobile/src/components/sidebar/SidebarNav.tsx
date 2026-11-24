@@ -79,7 +79,6 @@ export function SidebarPlaceRow({
   place: SidebarPlace;
   active: boolean;
   meta?: string;
-  /** New items since the place was last opened (Email). */
   badge?: number;
   onSelect: (next: MainTabId) => void;
 }) {

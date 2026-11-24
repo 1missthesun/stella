@@ -12,12 +12,6 @@ import { base64UrlToBytes, bytesToBase64Url } from "./base64url";
 import { getOrCreateMobileDeviceId } from "./phone-access";
 import * as SecureStore from "./secure-store";
 
-/**
- * What this phone alone keeps for the user's saved values, never in a backup
- * and never sent anywhere: its key to open values, its key to sign with, and
- * which devices' list it knows.
- */
-
 const SEAL_KEY_ITEM = "stella.savedValues.deviceKey.v1";
 const SIGN_KEY_ITEM = "stella.savedValues.signKey.v1";
 const TRUST_ITEM = "stella.savedValues.trust.v1";
@@ -84,14 +78,11 @@ export const selfMember = (keys: SavedValuesDeviceKeys): SavedValuesMember => ({
   sealKey: keys.publicKey,
 });
 
-/** Why this phone doesn't ask to join again by itself. */
 export type SavedValuesStopped = "declined" | "removed";
 
 export type SavedValuesTrust = Readonly<{
   ownerId: string;
-  /** The newest list this phone checked; kept when it's taken off, so it can check it's the same list it's back on. */
   pin: SavedValuesRosterPin | null;
-  /** Whether it was on that list then. */
   listed: boolean;
   stopped: SavedValuesStopped | null;
 }>;
@@ -106,7 +97,6 @@ const isPin = (value: unknown): value is SavedValuesRosterPin => {
   );
 };
 
-/** What this phone knows for this account; another account starts knowing nothing. */
 export const loadTrust = async (ownerId: string): Promise<SavedValuesTrust> => {
   const nothing: SavedValuesTrust = {
     ownerId,

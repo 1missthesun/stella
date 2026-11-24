@@ -1,12 +1,6 @@
 import { createContext, useContext } from "react";
 import type { SharedValue } from "react-native-reanimated";
 
-/**
- * Where an ask card may grow, in points. `belowTopBar` is the height from
- * the top bar down to the bottom of the pane with no keyboard; while the
- * keyboard opens the card also takes the `topBar` height above it, in step
- * with the keyboard.
- */
 export type AskRoom = {
   belowTopBar: number;
   topBar: number;

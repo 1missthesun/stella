@@ -17,24 +17,6 @@ export const isAgentWorkArtifact = (
   artifact: ChatArtifact,
 ): artifact is AgentWorkChatArtifact => artifact.payload.kind === "agent-work";
 
-/**
- * Mobile port of the desktop agent-artifact consolidation semantics
- * (desktop: `path-to-viewer.ts` `isNoiseProducedPath` / `isDeclaredOutputPath`
- * + `agent-completion.ts` `rankDeliverablesFirst`). Files a background agent
- * produces fold INTO that turn's agent-work card as pills — revealed together
- * once the card settles — instead of popping as loose file cards while the
- * agent is still running.
- *
- * The desktop↔mobile bridge ships each synced row's artifacts as loose
- * display payloads with NO per-agent attribution (the `agent-work` payload
- * carries no file list), so consolidation here is row-scoped: a row that
- * carries an agent-work card treats its file artifacts as that card's
- * deliverables. Agents spawned on different turns ride different rows, which
- * keeps attribution correct across concurrent agents at the granularity
- * mobile can represent at the row level. Inline rendering later projects that
- * row into one independently keyed card per agent.
- */
-
 const DECLARED_OUTPUTS_RE = /(?:^|[\\/])(?:\.stella|state)[\\/]outputs[\\/]/;
 
 export const isDeclaredOutputPath = (filePath: string): boolean =>
@@ -84,12 +66,6 @@ export const rankDeliverablesFirst = (
 export type ConsolidatedRowArtifacts = {
   agentWork: AgentWorkChatArtifact[];
   maps: MapRouteChatArtifact[];
-  /**
-   * Fallback-only: files folded into the agent-work card as pills when the
-   * bridge predates per-agent sections. Populated only when the row carries
-   * an agent-work card WITHOUT a desktop-computed `agents` list;
-   * noise-filtered, deliverables first.
-   */
   agentFiles: ChatArtifact[];
   looseFiles: ChatArtifact[];
   agentWorkSettled: boolean;
@@ -103,13 +79,6 @@ export type AgentWorkCardSection = {
   summary?: string;
 };
 
-/**
- * Desktop-computed per-agent file sections for one agent-work card, mapped
- * to openable `ChatArtifact`s. Returns `null` when the payload predates the
- * consolidating bridge (no `agents` field) — callers fall back to row-scoped
- * folding. File ids reuse the path-keyed `artifactId` so the same file
- * dedupes against the artifacts browser.
- */
 export const agentWorkCardSections = (
   artifact: AgentWorkChatArtifact,
 ): AgentWorkCardSection[] | null => {
@@ -144,15 +113,6 @@ export type AgentWorkCardRender = {
   sections: AgentWorkCardSection[];
 };
 
-/**
- * The card(s) to render for one agent-work artifact.
- *
- * The desktop-to-mobile transcript projection historically ships one aggregate
- * `agent-work` payload for every agent spawned by a turn. Expand that payload
- * at the inline-rendering boundary so each task retains its own identity and
- * can transition independently. The activity pill/tray continues to consume
- * the original `MobileTask` collection and is deliberately unaffected.
- */
 export const settledAgentWorkCards = (
   artifact: AgentWorkChatArtifact,
   tasks: readonly MobileTask[] = [],
@@ -322,10 +282,6 @@ export const consolidateRowArtifacts = (
     files.filter((artifact) => !sectionFileIds.has(artifact.id)),
   );
   const hasAgentWork = agentWork.length > 0;
-  // A card carrying an `agents` list marks a consolidating bridge: agent
-  // files ride the card's own sections and whatever is left loose on the row
-  // is orchestrator-direct. Older desktops omit the field entirely, so the
-  // row's files fold into the card as an unattributed group instead.
   const bridgeConsolidated = agentWork.some(
     (artifact) => artifact.payload.agents !== undefined,
   );

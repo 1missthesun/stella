@@ -3,15 +3,6 @@ import { CONNECT_PLAN_OFFER_MOBILE_ENABLED } from "@stella/contracts/connect-pla
 import type { ChatMessage } from "../types";
 import { openDrawer, useDrawerOpen } from "./drawer";
 
-/**
- * The phone's connect-your-plan flow for when a Free account's usage of
- * Stella's own models runs out. A Free account can only keep going in the
- * cloud on its ChatGPT plan (cloud Claude needs a paid plan), so the offer
- * opens the chat settings panel on ChatGPT. Once ChatGPT is connected the
- * chat switches to it and the message that didn't go through comes back
- * into the composer, one tap from sending. Off until the owner gives an explicit go-ahead
- * (`@stella/contracts/connect-plan-offer`).
- */
 export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_MOBILE_ENABLED;
 
 type Pending = { conversationId: string | null };
@@ -36,13 +27,11 @@ export function startConnectPlan(conversationId: string | null): void {
   openDrawer("end");
 }
 
-/** Opens the chat settings panel on one provider's page, such as `provider:openrouter`. */
 export function openChatSettingsAt(brainId: string): void {
   brainRequest = brainId;
   openDrawer("end");
 }
 
-/** The chat settings page the offer asked for, once. */
 export function takeChatSettingsBrainRequest(): string | null {
   const request = brainRequest;
   brainRequest = null;
@@ -71,11 +60,6 @@ const lastOwnText = (messages: readonly ChatMessage[]): string | null => {
   return null;
 };
 
-/**
- * In the chat screen: after the offer's Connect ChatGPT, switch this chat to
- * ChatGPT as soon as it's connected and put the kept message back in the
- * composer (unless the person already typed something new).
- */
 export function useConnectPlanResend({
   conversationId,
   messages,
@@ -98,7 +82,6 @@ export function useConnectPlanResend({
     if (waiting && kept.current === null) kept.current = lastOwnText(messages);
   }, [messages, waiting]);
 
-  // Leaving the settings panel: pick up a connection made there.
   useEffect(() => {
     if (waiting && !drawerOpen) void refresh();
   }, [drawerOpen, refresh, waiting]);

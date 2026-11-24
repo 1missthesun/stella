@@ -1,14 +1,10 @@
 import { File, Paths } from "expo-file-system";
 
 /**
- * Materializes artifact bytes as a real file in the cache directory.
- *
- * Most previews are happy with the base64 `data:` URI `bytesToDataUri`
- * produces, but the two native media surfaces are not: WKWebView refuses
- * top-level navigation to a `data:` URL, so the PDF viewer can't reach the
- * system PDF renderer that way, and expo-audio hands its source to AVPlayer,
- * which wants a real URL. Both take a `file://` URI, and both infer the media
- * type from its extension — so the extension has to be right.
+ * WKWebView refuses top-level navigation to a `data:` URL, so the PDF viewer
+ * can't reach the system PDF renderer that way, and expo-audio hands its
+ * source to AVPlayer, which wants a real URL. Both take a `file://` URI, and
+ * both infer the media type from its extension.
  */
 
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -77,9 +73,7 @@ export function writeArtifactMediaFile(
     remove: () => {
       try {
         file.delete();
-      } catch {
-        // Already gone, or the OS purged the cache under us.
-      }
+      } catch {}
     },
   };
 }

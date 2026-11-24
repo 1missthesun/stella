@@ -701,11 +701,6 @@ export function useChatThread(opts: {
     [acknowledgeSend, publishSends, updateMessages],
   );
 
-  /**
-   * Puts a message that was not sent back in the composer, ahead of anything
-   * typed since, and removes its bubble. Messages with files stay as bubbles,
-   * since their files cannot be put back in the composer.
-   */
   const returnNotSentToComposer = useCallback(
     (userMessageId: string, onlyIntoEmptyComposer: boolean): boolean => {
       const entry = sendsRef.current.get(userMessageId);

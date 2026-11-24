@@ -32,12 +32,6 @@ import {
 
 export const INLINE_ASK_RECORD_PREFIX = "inline-ask-record:";
 
-/**
- * Everything a transcript row reads besides its own message. The pane
- * publishes a fresh one per render; each row picks out only what concerns it,
- * so an arriving message re-renders the rows whose view actually changed
- * instead of every mounted row (the list's `renderItem` stays stable).
- */
 export type ChatRowEnv = {
   conversationId: string;
   colors: Colors;
@@ -65,9 +59,7 @@ export type ChatRowEnv = {
 
 export type ChatRowEnvStore = {
   get: () => ChatRowEnv;
-  /** Makes `env` what rows read from now on, without waking them. */
   stage: (env: ChatRowEnv) => void;
-  /** Wakes rows if the staged env differs from the one they last saw. */
   publish: () => void;
   subscribe: (listener: () => void) => () => void;
 };
@@ -158,7 +150,6 @@ const selectRowView = (
   };
 };
 
-/** Which scroll measurement a row's layout feeds, read when the layout lands. */
 const rowLayoutRole = (env: ChatRowEnv, id: string): "assistant" | "user" | null =>
   id === env.activeAssistantId && id !== env.placingReplyId
     ? "assistant"
@@ -173,7 +164,6 @@ const sameRowView = (a: RowView, b: RowView): boolean => {
   return true;
 };
 
-/** One row's slice of the pane state; re-renders only when that slice changes. */
 function useRowView(store: ChatRowEnvStore, id: string): RowView {
   const cache = useRef<{ env: ChatRowEnv; id: string; view: RowView } | null>(
     null,
@@ -217,8 +207,6 @@ function ChatMessageListRow({
   store: ChatRowEnvStore;
 }) {
   const view = useRowView(store, item.id);
-  // Entry animation is decided once, when the row first mounts: an id the
-  // pane has never shown pops in, and a reply pops only while it is the tail.
   const [entry] = useState(() => {
     const env = store.get();
     const fresh = shouldAnimateMessageEntry(env.seenMessageIds, item.id);
@@ -229,8 +217,6 @@ function ChatMessageListRow({
   });
   const { env } = view;
   const id = item.id;
-  // Always attached and resolved when the layout lands: swapping the handler
-  // as roles move would re-render the previous rows after every arrival.
   const onRowLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const current = store.get();

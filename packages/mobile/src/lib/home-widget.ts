@@ -42,7 +42,5 @@ export function updateStellaWidget(props: StellaWidgetProps): void {
   if (!widget) return;
   try {
     widget.updateSnapshot(props);
-  } catch {
-    // best-effort
-  }
+  } catch {}
 }

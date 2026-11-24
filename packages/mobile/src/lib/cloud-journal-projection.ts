@@ -307,7 +307,6 @@ const projectTurn = (
   if (out.length > 0) return out;
   let userMessageId = `cloud:${turnId}:user`;
   let turnUserRecord: JournalMessageRecord | undefined;
-  // A task asking Stella before it asks the user: her side of it stays out of the chat.
   let quiet = false;
   let terminal: Extract<JournalRecord, { kind: "turn" }> | undefined;
   const toolResults = new Map<
@@ -525,10 +524,6 @@ type WindowReactions = {
 
 const NO_REACTIONS: WindowReactions = { bySeq: new Map(), keyByTurn: new Map() };
 
-/**
- * Reactions on visible user messages, as `journalUserReactions` reads them,
- * from just the assistant records that carry one.
- */
 const reactionsByView = new WeakMap<
   readonly JournalRecord[],
   { first: JournalRecord | undefined; reactions: WindowReactions }
@@ -590,7 +585,6 @@ const leadingTurnLacksPrompt = (turn: JournalTurn): boolean =>
           record.card.type === EMAIL_CARD_TYPE)),
   );
 
-/** The turns a window shows: all but a leading turn cut off from its prompt. */
 export const displayedJournalTurns = (
   index: JournalIndex,
   hasOlder: boolean,
@@ -645,7 +639,6 @@ const projectionOf = (
   return projection;
 };
 
-/** Keeps the previous object for each message of a re-projected turn that didn't change. */
 const shareUnchanged = (
   before: readonly ChatMessage[],
   after: ChatMessage[],
@@ -696,7 +689,6 @@ const turnPhases = (turn: JournalTurn): TurnPhases => {
   return memo.phases;
 };
 
-/** Whether the turn ended in anything other than completion. */
 export const journalTurnUnsuccessful = (index: JournalIndex, turnId: string): boolean => {
   const turn = index.turn(turnId);
   return turn ? turnPhases(turn).failed : false;
@@ -746,7 +738,6 @@ const turnDispatchIds = (turn: JournalTurn): readonly string[] => {
       : []));
 };
 
-/** The bound dispatch ids the journal already holds a user record for. */
 export const acknowledgedCloudDispatchIds = (
   index: JournalIndex,
   dispatchBindings: ReadonlyMap<string, string | null>,
@@ -909,10 +900,6 @@ export const mergeCanonicalCloudMessages = (args: {
   return merged;
 };
 
-/**
- * Whether every reply already follows the message it answers, so placing
- * replies after their owners leaves the order as it is.
- */
 const ownersPrecede = (messages: readonly ChatMessage[]): boolean => {
   const positions = new Map<string, number>();
   messages.forEach((message, at) => positions.set(message.id, at));

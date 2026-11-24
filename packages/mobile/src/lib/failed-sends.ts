@@ -1,11 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 export type FailedSendActions = {
-  /** Why it was not sent, in words for the user. */
   message: string;
-  /** Absent when sending the same message again cannot work. */
   retry?: () => void;
-  /** Puts the message back in the composer to change it. */
   edit?: () => void;
   remove: () => void;
 };

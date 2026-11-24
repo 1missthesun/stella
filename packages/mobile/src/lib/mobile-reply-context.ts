@@ -71,7 +71,6 @@ function readSummaryExcerpt(result: string): string {
   return `${cut.trimEnd()}…`;
 }
 
-/** One turn's projected messages; `facts` is this module's per-projection scratch. */
 export type ProjectedTurn = {
   readonly turnId: string;
   readonly messages: readonly ChatMessage[];
@@ -158,7 +157,6 @@ type Lifecycle = {
   journal: ReturnType<typeof journalAgents>;
   titles: Map<string, string>;
   attached: Map<string, Map<string, ChatArtifact[]>>;
-  /** Agent-ref titles found in spawn descriptions; reused while those only grow. */
   describedThreads: Map<string, { checked: number; title?: string }>;
 };
 
@@ -173,11 +171,6 @@ const MAX_CACHED_LIFECYCLES = 4;
 const sameList = <T>(a: readonly T[], b: readonly T[]): boolean =>
   a.length === b.length && a.every((value, i) => value === b[i]);
 
-/**
- * Agent lifecycle, spawn and wake artifacts, and agent titles on reply refs.
- * Reads only the agent-related records of the window and keeps every turn's
- * messages as they were unless what they show changed.
- */
 export function projectMobileLifecycle(
   turns: readonly ProjectedTurn[],
   index: JournalIndex,
@@ -669,12 +662,6 @@ const ownedAgentIds = (message: ChatMessage, learning: OwnedLearning): string[] 
 const sameIds = (a: readonly string[] | undefined, b: readonly string[] | undefined) =>
   a === b || (!!a && !!b && a.length === b.length && a.every((id, i) => id === b[i]));
 
-/**
- * `mobileReplyContexts` for a transcript that changes mostly at its end:
- * rows of messages that kept their place and identity are reused, the
- * spawn rows whose owned agents depend on the whole transcript are rebuilt
- * only when what they read changed, and the fold rewinds rather than restarts.
- */
 export function createMobileReplyContexts(): (messages: readonly ChatMessage[]) => MobileReplyContexts {
   const project = createReplyContextProjector();
   let previous: {

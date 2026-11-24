@@ -21,7 +21,6 @@ export type MobileSchedule = {
   targetDeviceId?: string;
   lastStatus?: string;
   lastError?: string;
-  /** Due while its computer was away; runs once the computer is back. */
   waitingSinceMs?: number;
   running: boolean;
 };

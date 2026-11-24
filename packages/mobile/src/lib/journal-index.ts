@@ -1,21 +1,9 @@
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 
-/**
- * Incremental view of a conversation's retained journal window.
- *
- * The store only ever appends records (trimming the oldest at the retention
- * cap), prepends an older page, or replaces the window. Each new window is
- * derived from the previous one by touching just the records that changed, so
- * an arrival in a 3,000-record chat costs about what it costs in a short one.
- * Turn and view arrays keep their identity while their records are unchanged,
- * which is what downstream memos key on.
- */
-
 export type JournalTurn = {
   readonly turnId: string;
   readonly records: readonly JournalRecord[];
   readonly firstSeq: number;
-  /** Per-version scratch space for consumers; a changed turn gets a new one. */
   readonly memo: Record<string, unknown>;
 };
 
@@ -45,10 +33,6 @@ const lowerBound = (records: readonly JournalRecord[], seq: number): number => {
   return low;
 };
 
-/**
- * A changed turn keeps its previous version's memo under `prior` (one level
- * deep), so consumers can share what didn't change.
- */
 const makeTurn = (
   turnId: string,
   records: readonly JournalRecord[],
@@ -96,10 +80,6 @@ class Index implements JournalIndex {
     return this.turnMap().get(turnId);
   }
 
-  /**
-   * The turn map is handed to the next window derived from this one; a window
-   * that has been superseded rebuilds its own on demand.
-   */
   turnMap(): Map<string, JournalTurn> {
     return (this.byId ??= new Map(this.turns.map((turn) => [turn.turnId, turn])));
   }
@@ -325,10 +305,6 @@ const mergeByFirstSeq = (
 const latest = new Map<string, Index>();
 const MAX_CACHED_CONVERSATIONS = 4;
 
-/**
- * The index for `records`, derived from the last window seen under `key`
- * when the new one extends, trims or prepends to it.
- */
 export const journalIndex = (
   key: string,
   records: readonly JournalRecord[],

@@ -203,9 +203,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     recordingLeaseRef.current = null;
     try {
       await releaseRecordingAudioSession(lease);
-    } catch {
-      // best-effort; the OS will reset on app suspension regardless.
-    }
+    } catch {}
   }, []);
 
   const discardCapture = useCallback((capture: DictationCapture | null) => {
@@ -519,9 +517,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       if (uri) {
         try {
           new File(uri).delete();
-        } catch {
-          /* ignore */
-        }
+        } catch {}
       }
 
       const pcmBytes = capture?.bytes ?? 0;

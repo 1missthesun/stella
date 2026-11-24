@@ -55,11 +55,6 @@ const messageHubArtifacts = (
   return out.length ? out : NO_ARTIFACTS;
 };
 
-/**
- * Artifacts for the activity hub, newest first and deduplicated by id. Reads
- * only messages after the unchanged start of the transcript and returns the
- * previous list when no artifact came or went.
- */
 export const createActivityHubArtifacts = () => {
   let previous: {
     messages: readonly Pick<ChatMessage, "artifacts">[];

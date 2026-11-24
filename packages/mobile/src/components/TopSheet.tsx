@@ -236,9 +236,6 @@ export function TopSheet({
         accessibilityRole="button"
         accessibilityLabel="Close"
       />
-      {/* Auto-height: the sheet takes its own height and the floating
-          footer sits under it, so the pair slide together and the footer
-          always hugs the sheet's bottom edge. */}
       <Animated.View
         style={[styles.slide, slide]}
         pointerEvents="box-none"

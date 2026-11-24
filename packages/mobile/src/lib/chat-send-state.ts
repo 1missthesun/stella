@@ -25,7 +25,6 @@ export type SendEvent =
   | { type: "failed"; reason: NotSentReason }
   | { type: "retry" };
 
-/** The next state, or null when the event does not apply to `state`. */
 export const nextSendState = (
   state: SendState,
   event: SendEvent,
@@ -76,7 +75,6 @@ export const nextSendState = (
   }
 };
 
-/** Sent one after another so they arrive in order; a turn already under way holds nothing back. */
 export const holdsNextSend = (state: SendState): boolean =>
   state.kind === "admitting";
 
@@ -117,7 +115,6 @@ const PERMANENT_ERROR_CODES = new Set([
 
 const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429]);
 
-/** A send error that retrying the same request cannot fix. */
 export const isPermanentSendError = (error: unknown): boolean => {
   if (error instanceof AutomaticExecutionRequestError) return true;
   if (error instanceof HttpRequestError) {

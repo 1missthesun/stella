@@ -40,11 +40,6 @@ const sharedPrefix = <T>(a: readonly T[], b: readonly T[]): number => {
   return kept;
 };
 
-/**
- * Every agent the transcript names, in first-seen order, reading only the
- * messages after the unchanged start; the same list comes back while it
- * didn't change.
- */
 const createTranscriptAgentIds = () => {
   let previous: {
     messages: readonly ChatMessage[];
@@ -94,7 +89,6 @@ const createTranscriptAgentIds = () => {
   };
 };
 
-/** `cachedTitledMessage` over the transcript, redoing only rows after the unchanged start. */
 const createTitledMessages = () => {
   let previous: {
     messages: readonly ChatMessage[];

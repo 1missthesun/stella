@@ -282,12 +282,6 @@ function track(owner: number, e: PanPoint) {
   drawerProgress.value = raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
 }
 
-/**
- * The drag's own touch is gone and a new tap has arrived in its place. The
- * drag is over and the rest of that touch is ignored; the tap, landing on the
- * page, the strip or the chevron, asks for what a tap there does while a
- * sidebar is out: close it.
- */
 function abandon(owner: number) {
   "worklet";
   if (dragOwner.value !== owner) return;

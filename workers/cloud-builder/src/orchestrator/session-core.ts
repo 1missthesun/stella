@@ -190,6 +190,9 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
         this.ctx.waitUntil(
           this.ownerGate(ownerId)
             .noteConversationSocket(conversationId)
+            .then((revocations) => {
+              this.hub.closeRevokedSockets(revocations);
+            })
             .catch((error: unknown) =>
               log("error", "conversation_socket_note_failed", {
                 conversationId,

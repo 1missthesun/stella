@@ -122,6 +122,7 @@ const authenticateConversationCaller = async (
   wantsSocket: boolean,
   requestId: string,
   socketScope?: { purpose: SocketTicketPurpose; resource: string },
+  freshRevocations = false,
 ): Promise<
   { ok: true; caller: ConversationCaller } | { ok: false; response: Response }
 > => {
@@ -176,6 +177,7 @@ const authenticateConversationCaller = async (
   }
 
   const authStartedAt = Date.now();
+  const revocations = ownerGateRevocations(env, { fresh: wantsSocket || freshRevocations });
   let ticketCaller: VerifiedToken | null = null;
   if (ticket) {
     ticketCaller = socketScope
@@ -201,8 +203,8 @@ const authenticateConversationCaller = async (
     }
   }
   const verified = ticketCaller
-    ? await admitSession(ticketCaller, ownerGateRevocations(env))
-    : await verifyUserToken(token, env);
+    ? await admitSession(ticketCaller, revocations)
+    : await verifyUserToken(token, env, revocations);
   if (!verified.ok) {
     log(verified.retryable ? "error" : "info", "conversation_auth_rejected", {
       requestId,
@@ -845,7 +847,7 @@ const isIntegrationPath = (path: string): boolean =>
   path === PROVIDER_OAUTH_CALLBACK_PATH;
 
 const userAuth = (
-  { socket }: { socket?: "conversation" | "presence" } = {},
+  { socket, freshRevocations }: { socket?: "conversation" | "presence"; freshRevocations?: boolean } = {},
 ): MiddlewareHandler<RouterEnv> =>
   async (c, next) => {
     const auth = await authenticateConversationCaller(
@@ -858,6 +860,7 @@ const userAuth = (
         : socket === "presence"
           ? { purpose: "presence", resource: c.req.param("deviceId") ?? "" }
           : undefined,
+      freshRevocations,
     );
     if (!auth.ok) return auth.response;
     c.set("caller", auth.caller);
@@ -1210,7 +1213,7 @@ app.post(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}/cancel`, (c) =>
 app.all(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}`, methodNotAllowed());
 app.all(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}/cancel`, methodNotAllowed());
 
-app.post(SOCKET_TICKET_PATH, userAuth(), jsonBody(1024), async (c) => {
+app.post(SOCKET_TICKET_PATH, userAuth({ freshRevocations: true }), jsonBody(1024), async (c) => {
   const body = (await c.req.raw.json().catch(() => null)) as {
     purpose?: unknown;
     resource?: unknown;

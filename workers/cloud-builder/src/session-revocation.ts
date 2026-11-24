@@ -7,7 +7,9 @@ export type SessionRevocations = {
   sessionIds: readonly string[];
 };
 
-export type SessionRevocation = { minIatMs: number } | { sessionId: string };
+export type SessionRevocation =
+  | { minIatMs: number; sessionIds: readonly string[]; keepSockets?: true }
+  | { sessionId: string };
 
 export type SessionHolder = { issuedAtMs?: number; sessionId?: string };
 
@@ -43,10 +45,11 @@ const isMissingRevocationMethod = (error: unknown): boolean =>
 const ownerSessionRevocations = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   ownerId: string,
+  fresh: boolean,
 ): Promise<SessionRevocations> => {
   const now = Date.now();
   const cached = cache.get(ownerId);
-  if (cached && now - cached.fetchedAtMs < REVOCATION_CACHE_MS) return cached.revocations;
+  if (!fresh && cached && now - cached.fetchedAtMs < REVOCATION_CACHE_MS) return cached.revocations;
   let revocations: SessionRevocations;
   try {
     revocations = await withInfrastructureDeadline(
@@ -75,9 +78,9 @@ const ownerSessionRevocations = async (
 export type RevocationSource = (ownerId: string) => SessionRevocations | Promise<SessionRevocations>;
 
 export const ownerGateRevocations =
-  (env: Pick<Cloudflare.Env, "OWNER_GATES">): RevocationSource =>
+  (env: Pick<Cloudflare.Env, "OWNER_GATES">, { fresh = false } = {}): RevocationSource =>
   (ownerId) =>
-    ownerSessionRevocations(env, ownerId);
+    ownerSessionRevocations(env, ownerId, fresh);
 
 export const admitSession = async (
   token: VerifiedToken,

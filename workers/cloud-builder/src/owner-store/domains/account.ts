@@ -227,12 +227,25 @@ const runAccountPurge = async (ctx: OwnerContext, payload: unknown): Promise<voi
   );
 };
 
-const parseSessionsRevoked = (args: unknown): { minIatMs: number } => {
-  const minIatMs = (args as { minIatMs?: unknown } | null)?.minIatMs;
+const isSessionId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 256;
+
+const holdRevokedSession = (db: OwnerDb, sessionId: string, now: number): void =>
+  db.run(
+    "INSERT OR REPLACE INTO revoked_sessions (session_id, until_ms) VALUES (?, ?)",
+    sessionId,
+    now + REVOKED_SESSION_HOLD_MS,
+  );
+
+const parseSessionsRevoked = (args: unknown): { minIatMs: number; sessionIds: string[] } => {
+  const { minIatMs, sessionIds = [] } = (args ?? {}) as { minIatMs?: unknown; sessionIds?: unknown };
   if (typeof minIatMs !== "number" || !Number.isSafeInteger(minIatMs) || minIatMs <= 0) {
     throw new RpcError("BAD_REQUEST", "minIatMs must be a timestamp.");
   }
-  return { minIatMs };
+  if (!Array.isArray(sessionIds) || !sessionIds.every(isSessionId)) {
+    throw new RpcError("BAD_REQUEST", "sessionIds must be a list of session ids.");
+  }
+  return { minIatMs, sessionIds };
 };
 
 export const accountDomain: OwnerDomain = {
@@ -252,22 +265,20 @@ export const accountDomain: OwnerDomain = {
   },
   internal: {
     "account.sessionsRevoked": (ctx, args) => {
-      const { minIatMs } = parseSessionsRevoked(args);
+      const { minIatMs, sessionIds } = parseSessionsRevoked(args);
       readOwnerState(ctx.db);
       ctx.db.run("UPDATE owner_state SET min_iat_ms = MAX(min_iat_ms, ?) WHERE id = 1", minIatMs);
+      ctx.db.run("DELETE FROM revoked_sessions WHERE until_ms <= ?", ctx.now);
+      for (const sessionId of sessionIds) holdRevokedSession(ctx.db, sessionId, ctx.now);
       return null;
     },
     "account.sessionRevoked": (ctx, args) => {
       const sessionId = (args as { sessionId?: unknown } | null)?.sessionId;
-      if (typeof sessionId !== "string" || !sessionId || sessionId.length > 256) {
+      if (!isSessionId(sessionId)) {
         throw new RpcError("BAD_REQUEST", "sessionId is required.");
       }
       ctx.db.run("DELETE FROM revoked_sessions WHERE until_ms <= ?", ctx.now);
-      ctx.db.run(
-        "INSERT OR REPLACE INTO revoked_sessions (session_id, until_ms) VALUES (?, ?)",
-        sessionId,
-        ctx.now + REVOKED_SESSION_HOLD_MS,
-      );
+      holdRevokedSession(ctx.db, sessionId, ctx.now);
       return null;
     },
   },

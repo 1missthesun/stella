@@ -2,7 +2,7 @@ import { createAuth, sendAccountEmail, testAccountsEnabled } from "./auth.js";
 import { forgetFeedbackSender } from "../owner-store/domains/feedback.js";
 import { buildAccountDeletionEmail, type AccountDeletionEmailKind } from "./email-templates.js";
 import { ownerGateStub } from "../rpc-release.js";
-import { revokeOwnerSessions } from "../session-revocation.js";
+import { signOutEverywhere } from "./sign-out-everywhere.js";
 import { ownerModeEnabled } from "../selfhost/owner-mode.js";
 
 export const ACCOUNT_DELETION_GRACE_MS = 7 * 24 * 60 * 60_000;
@@ -59,15 +59,6 @@ const isSelfHostOwner = async (env: Cloudflare.Env, userId: string): Promise<boo
   return row !== null;
 };
 
-const revokeTokensIssuedBefore = async (env: Cloudflare.Env, userId: string, minIatMs: number) => {
-  await revokeOwnerSessions(env, userId, { minIatMs });
-  const gate = ownerGateStub(env.OWNER_GATES, userId);
-  const { ownerGeneration } = await gate.snapshot();
-  await gate
-    .ownerInternal({ name: "devices.pushSessionsRevoked", args: {}, ownerGeneration })
-    .catch((error: unknown) => log("error", "account_deletion_push_revoke_failed", { message: messageOf(error) }));
-};
-
 const reply = (status: number, body: Record<string, unknown>) => Response.json(body, { status });
 
 export const requestAccountDeletion = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
@@ -112,8 +103,7 @@ export const requestAccountDeletion = async (request: Request, env: Cloudflare.E
     if (!row || row.status !== "pending") throw new Error(`Deletion request is ${row?.status ?? "missing"}.`);
     await gate.setDeletionHold(true);
     if (testAccount && email.includes("+deletefail")) throw new Error("Simulated failure for a +deletefail test account.");
-    await revokeTokensIssuedBefore(env, user.id, now);
-    await d1(env).prepare('DELETE FROM "session" WHERE "userId" = ?').bind(user.id).run();
+    await signOutEverywhere(env, user.id);
   } catch (error) {
     log("error", "account_deletion_request_failed", { message: messageOf(error) });
     if (inserted) {

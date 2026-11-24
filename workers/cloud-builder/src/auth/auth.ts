@@ -32,6 +32,7 @@ import { oauthStateBinding } from "./oauth-binding.js";
 import { ottCookieHeader } from "./ott-cookie.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { revokeOwnerSessions } from "../session-revocation.js";
+import { signOutEverywhere } from "./sign-out-everywhere.js";
 import { ownerModeEnabled, ownerModeRefusesAuthPath } from "../selfhost/owner-mode.js";
 import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 import {
@@ -268,25 +269,17 @@ export const ownerInternalCall = async (
   await gate.ownerInternal({ name, args, ownerGeneration });
 };
 
-const revokedTokenFloor = (env: AuthEnv): BetterAuthPlugin => ({
-  id: "stella-revoked-token-floor",
-  hooks: {
-    before: [
-      {
-        matcher: (ctx) => ctx.path === "/revoke-sessions",
-        handler: createAuthMiddleware(async (ctx) => {
-          // Before hooks can run ahead of bearer()'s, so fall back to the
-          // bearer itself: `<session token>.<signature>`.
-          const ending = await endingSession(ctx as never);
-          if (!ending) {
-            console.warn(JSON.stringify({ event: "auth_revoke_floor_skipped", reason: "no_session" }));
-            return;
-          }
-          await revokeOwnerSessions(env, ending.userId, { minIatMs: Date.now() });
-          await ownerInternalCall(env, ending.userId, "devices.pushSessionsRevoked", {});
-        }),
+const signOutEverywhereEndpoint = (env: AuthEnv): BetterAuthPlugin => ({
+  id: "stella-sign-out-everywhere",
+  endpoints: {
+    revokeSessions: createAuthEndpoint(
+      "/revoke-sessions",
+      { method: "POST", use: [sensitiveSessionMiddleware], requireHeaders: true },
+      async (ctx) => {
+        await signOutEverywhere(env, ctx.context.session.user.id);
+        return ctx.json({ status: true });
       },
-    ],
+    ),
   },
 });
 
@@ -551,7 +544,7 @@ const buildOptions = (env: AuthEnv) => {
       expoOAuthProxy(),
       oauthStateBinding(),
       bearer({ requireSignature: true }),
-      revokedTokenFloor(env),
+      signOutEverywhereEndpoint(env),
       revokedSessionTeardown(env),
       signedInDevices(env),
       pushSignOutTeardown(env),

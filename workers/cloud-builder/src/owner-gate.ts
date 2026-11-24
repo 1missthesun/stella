@@ -402,11 +402,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       "minIatMs" in revocation
         ? await this.ownerStore().internalCall("account.sessionsRevoked", {
             minIatMs: revocation.minIatMs,
+            sessionIds: revocation.sessionIds,
           })
         : await this.ownerStore().internalCall("account.sessionRevoked", {
             sessionId: revocation.sessionId,
           });
     if (!response.ok) throw new Error(`Session revocation failed: ${response.error.message}`);
+    if ("keepSockets" in revocation && revocation.keepSockets) return;
     const revocations = this.sessionRevocations();
     const now = Date.now();
     const closed = { live: 0, presence: 0, conversation: 0 };
@@ -456,8 +458,9 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     });
   }
 
-  noteConversationSocket(conversationId: string): void {
+  noteConversationSocket(conversationId: string): SessionRevocations {
     noteConversationSocket(this.ownerStore().context(null).db, conversationId, Date.now());
+    return this.sessionRevocations();
   }
 
   async storageReport(): Promise<{

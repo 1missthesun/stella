@@ -76,11 +76,6 @@ export const accountProviderModels = (providerId: string): Model<Api>[] =>
     return ready ? [ready] : [];
   });
 
-/**
- * The model an account key runs `modelId` as. One this build doesn't list
- * (released since, or typed by hand) is shaped like its nearest sibling, with
- * the limits and price in `listed` when the provider published them.
- */
 export const accountProviderModel = (
   providerId: string,
   modelId: string,
@@ -113,11 +108,6 @@ const listedProviderModels = (providerId: string): Promise<LiveProviderModel[]> 
   return models;
 };
 
-/**
- * `accountProviderModel` for a host with no catalog of its own: an unlisted
- * model takes the limits and price pi-ai's published catalog or the
- * provider's public list gives it.
- */
 export const listedAccountProviderModel = async (providerId: string, modelId: string): Promise<Model<Api> | undefined> => {
   const known = accountProviderModels(providerId).find((model) => model.id === modelId);
   if (known) return known;

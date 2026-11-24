@@ -22,7 +22,6 @@ const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434/v1";
 const NO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 /** A local server often takes no key, but the OpenAI client always sends one. */
 const LOCAL_PLACEHOLDER_KEY = "stella-local";
-/** The same for a models.json proxy whose auth travels in its configured headers. */
 const CREDENTIALLESS_PLACEHOLDER_KEY = "stella-credentialless";
 
 export type DirectModelRoute = {
@@ -190,7 +189,6 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
   const ensureDirect = async (pick: Extract<ModelPick, { kind: "direct" }>): Promise<ModelRef | { error: string }> => {
     const family = PROVIDER_FAMILIES[pick.provider] ?? [pick.provider];
     const familyProviders = await Promise.all(family.map((id) => ensureUpstream(id)));
-    // The picker writes some ids with dots where the provider uses dashes.
     for (const provider of family) {
       for (const candidate of [pick.modelId, pick.modelId.replace(/\./g, "-")]) {
         if (models.getModel(provider, candidate)) return { provider, modelId: candidate };

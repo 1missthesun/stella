@@ -14,7 +14,6 @@ export const StellaCoding = defineExtension({
   tools: [{ ...createBashTool(), name: "Bash" }, ...fileTools],
 });
 
-/** For a host whose tool host runs `Bash` and `write_stdin` itself. */
 export const StellaCodingFiles = defineExtension({
   name: STELLA_CODING_EXTENSION,
   tools: fileTools,

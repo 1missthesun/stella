@@ -1,13 +1,6 @@
 /**
- * Stop: abort what a conversation is running, and leave the stop in its
- * transcript. pi-durable records a stopped reply only when one had started
- * streaming (it keeps the partial as an `aborted` assistant entry). A Stop
- * before the reply began, or while its tools ran, would leave no trace, and
- * every reader of the transcript (the journal mirror, the chat views, the
- * chat log) would take the turn for one that completed. So the same `aborted`
- * assistant entry, with no content, is written first whenever pi will not
- * write one. Assistants that stopped are never model context, so it changes
- * nothing the model reads.
+ * pi-durable records a stopped reply only when one had started streaming (it
+ * keeps the partial as an `aborted` assistant entry).
  */
 import type { Context } from "@earendil-works/chord/context";
 import type { AssistantMessage } from "@earendil-works/pi-ai";

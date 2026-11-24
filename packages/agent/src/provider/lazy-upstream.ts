@@ -60,10 +60,6 @@ const PROVIDER_LOADERS: Readonly<Record<string, () => Promise<Provider>>> = {
 
 const loaded = new Map<string, Promise<Provider>>();
 
-/**
- * Load a single built-in pi-ai provider on demand instead of pulling all 43
- * provider modules and generated model catalogs through `providers/all`.
- */
 export const loadUpstreamProvider = (id: string): Promise<Provider | undefined> => {
   const cached = loaded.get(id);
   if (cached) return cached;

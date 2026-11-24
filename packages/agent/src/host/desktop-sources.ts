@@ -58,9 +58,7 @@ function servedPrompts(backendUrl: string | undefined) {
         prompts: new Map(body.prompts.map((prompt) => [prompt.id, prompt.content])),
         checkedAt: Date.now(),
       };
-    } catch {
-      // Offline: the bundled prompt, or the last bundle, serves until the next refresh.
-    }
+    } catch {}
   };
   const start = () => (pending ??= refresh().finally(() => (pending = undefined)));
   return async (id: string): Promise<string | undefined> => {

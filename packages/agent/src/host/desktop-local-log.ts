@@ -44,7 +44,6 @@ export type LocalLogMessage = { id: string; seq: number; role: "user" | "assista
 export type DesktopLocalLog = {
   read(afterSeq: number, limit: number): Promise<{ messages: LocalLogMessage[]; throughSeq: number; complete: boolean }>;
   write(message: LocalLogWrite): Promise<{ id: string; seq?: number }>;
-  /** Takes the rows written under `keys`, and the user rows `clientMsgIds`, out of the chat. */
   hide(rows: { keys: string[]; clientMsgIds: string[] }): Promise<void>;
 };
 
@@ -495,7 +494,6 @@ export async function localLogMirror(args: {
 
   await importNow().catch(report);
 
-  // Mirror when the conversation gains entries or a run ends.
   const stream = await onConversationChange(root, context, (before, after) => {
     if (appendedEntries(before, after).length > 0 || runEnded(before, after)) sync();
   });

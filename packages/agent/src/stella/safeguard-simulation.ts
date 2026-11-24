@@ -1,9 +1,3 @@
-/**
- * Test builds only: a model request whose messages name
- * `SAFEGUARD_TEST_TRIGGER` ends the way a provider's safety system ends one,
- * without sending anything. `stella-test-safeguard-block:<part>` stops only
- * models whose id contains `<part>`.
- */
 import { createAssistantMessageEventStream, type AssistantMessage, type Message } from "@earendil-works/pi-ai";
 import type { Models } from "@earendil-works/pi-ai/models";
 import { SAFEGUARD_TEST_TRIGGER } from "@stella/contracts/safeguard-block";

@@ -96,7 +96,6 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
     const clockMoved = noteGatewayClock(request.url, response, sentAt, Date.now());
     const unwrapped = await unwrapRelayKeepalive(response);
     if (await dpopInvalid(unwrapped)) {
-      // Signed by a clock just corrected from this response: sign it again once.
       if (clockMoved && !clockRetried) return send(request, body, capability, true);
       throw gatewayDeviceVerificationError(request.url);
     }

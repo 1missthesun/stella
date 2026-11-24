@@ -23,19 +23,11 @@ import { isImageRef } from "@stella/runtime/kernel/shared/image-ref";
 import { boundedReplay } from "./doc-checkpoint.ts";
 
 /**
- * How many images one model request carries. Every image a conversation has
- * seen stays in its transcript, and every request resends them: past a
- * provider's limit (the gateway's 24 MiB body, a provider's 30 MB of downloaded
- * image URLs, Anthropic's 2000px rule above 20 images) every later turn fails
- * the same way. Older images are set aside as a text placeholder that names
- * the file, so the model can open it again.
- *
- * Changing an old message breaks the provider's prompt cache from that point,
- * so the set aside images move in batches: nothing changes until a request
- * would cross the high mark, then the oldest go at once until the rest fit the
- * low mark. The decision is replayed over the transcript in order, so a
- * conversation decides the same way on every turn, after a restart, and on any
- * computer, and placeholders render byte for byte the same each time.
+ * Every request resends every image a transcript holds: past a provider's
+ * limit (the gateway's 24 MiB body, a provider's 30 MB of downloaded image
+ * URLs, Anthropic's 2000px rule above 20 images) every later turn fails the
+ * same way. Changing an old message breaks the provider's prompt cache from
+ * that point.
  */
 export const IMAGE_BUDGET = {
   highBytes: 16 * 1024 * 1024,
@@ -44,15 +36,10 @@ export const IMAGE_BUDGET = {
   lowCount: 10,
 } as const;
 
-/**
- * A stored image's bytes are not in the request; the cloud stores every one
- * fitted under this, base64-measured, so it is the bound to count.
- */
 const STORED_IMAGE_COST = DURABLE_OBJECT_READ_IMAGE_CAPS.maxBytes;
 
 const COMPACTION_SUMMARY_PREFIX = "The conversation history before this point was compacted into the following summary:";
 
-/** Images before this timestamp were set aside after a provider refused a request for its images. */
 export const StellaImageBudgetDoc = defineDoc<{ floorAt: number }>({
   kind: "stella.image-budget",
   version: 1,
@@ -128,7 +115,6 @@ const findCall = (messages: readonly Message[], before: number, id: string): Too
   return undefined;
 };
 
-/** The placeholder for the `ordinal`-th image of `messages[index]`; a function of the transcript alone. */
 const placeholder = (messages: readonly Message[], index: number, ordinal: number, total: number): string => {
   const message = messages[index]!;
   if (message.role === "toolResult") {
@@ -148,14 +134,6 @@ const placeholder = (messages: readonly Message[], index: number, ordinal: numbe
   return `[image attached by the user — ${SET_ASIDE} ${where}]`;
 };
 
-/**
- * Which images of `messages` stay: the replay of the high/low watermark over
- * every message with images, in order. Images up to `floorAt` are set aside
- * outright; a compaction summary trims what it carried forward to the low mark,
- * since its new prefix breaks the cache anyway; and the images of the message
- * being added are the last to go, only while that message alone is over the
- * high mark.
- */
 const plan = (messages: readonly Message[], floorAt: number): { setAside: Set<Slot>; kept: Slot[] } => {
   const setAside = new Set<Slot>();
   const kept: Slot[] = [];
@@ -195,7 +173,6 @@ const plan = (messages: readonly Message[], floorAt: number): { setAside: Set<Sl
 
 export type ImageBudgetResult = { messages: readonly Message[]; kept: number; keptBytes: number; setAside: number };
 
-/** `messages` with the images the budget sets aside replaced by their placeholders; the same array when none is. */
 export const budgetImages = (messages: readonly Message[], floorAt = 0): ImageBudgetResult => {
   const { setAside, kept } = plan(messages, floorAt);
   const keptBytes = kept.reduce((sum, slot) => sum + slot.cost, 0);
@@ -222,13 +199,6 @@ export const budgetImages = (messages: readonly Message[], floorAt = 0): ImageBu
   return { messages: next, kept: kept.length, keptBytes, setAside: setAside.size };
 };
 
-/**
- * The floor that sets aside more of the images `messages` still carries after
- * a provider refused it for them. The newest message's images stay while
- * older ones remain; those keep at most the low mark, and at most half of what
- * was sent, so each refusal makes progress. When only the newest message has
- * images, they go too. Undefined when nothing is left to set aside.
- */
 export const emergencyFloor = (messages: readonly Message[]): number | undefined => {
   const batches = batchesOf(messages);
   const costOf = (batch: Batch) => batch.slots.reduce((sum, slot) => sum + slot.cost, 0);
@@ -272,13 +242,6 @@ export type ImageBudget = {
   bind(harness: Harness): void;
 };
 
-/**
- * The image budget of one harness: the request hook that applies it, and the
- * models wrapper that, when a provider still refuses a request for its images,
- * sets aside more and sends it once more. The floor that retry used is
- * recorded on the conversation, so later turns start from it instead of being
- * refused first.
- */
 export function createImageBudget(): ImageBudget {
   let harness: Harness | undefined;
   const floors = new Map<string, number>();

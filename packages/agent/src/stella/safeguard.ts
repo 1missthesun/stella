@@ -1,11 +1,3 @@
-/**
- * A safety block in a conversation's own storage. The block itself is the
- * run's failed model response; what the user chose is an entry that edits the
- * model's context: `removed` omits the blocked messages with pi's context
- * edits and leaves a notice in their place, `cleared` starts the context
- * over. Entries are immutable, so compaction, resume and another engine's
- * session all read the edited context; nothing is deleted from the history.
- */
 import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import {
@@ -63,7 +55,6 @@ const textOf = (message: Message): string =>
       ? message.content
       : message.content.map((part) => (part.type === "text" ? part.text : "")).join("");
 
-/** A message that changes what came before it for every reader: a removal or a fresh start. */
 export const isSafeguardContextBoundary = (message: Message): boolean => {
   if (message.role !== "user") return false;
   const text = textOf(message);
@@ -76,7 +67,6 @@ export const readSafeguardFold = async (
   context: Context,
 ): Promise<SafeguardFold> => (await harness.snapshot(SafeguardDoc, conversationId, context))?.fold ?? emptySafeguardFold();
 
-/** Applies events to the conversation's fold; returns it and whether it changed. */
 export const noteSafeguardEvents = async (
   harness: Harness,
   conversationId: ConversationId,
@@ -105,7 +95,6 @@ const isReply = (entry: EntryRecord): boolean => {
   );
 };
 
-/** The newest entries of the active context, newest first, down to where it starts. */
 const recentContextEntries = async (
   harness: Harness,
   root: Conversation,
@@ -134,18 +123,12 @@ const recentContextEntries = async (
     return found;
   }, context);
 
-/** Everything the model has seen since the conversation last got a reply. */
 export const entriesSinceLastReply = async (harness: Harness, root: Conversation, context: Context): Promise<EntryId[]> =>
   (await recentContextEntries(harness, root, context, isReply))
     .filter((entry) => MESSAGE_KINDS.has(entry.kind))
     .map((entry) => entry.id)
     .reverse();
 
-/**
- * This host's entries for a journaled removal: those it imported with a
- * journal seq in the span, and each of its own turns in it, from the turn's
- * prompt to the next prompt.
- */
 export const entriesOfJournalSpan = async (
   harness: Harness,
   root: Conversation,
@@ -177,7 +160,6 @@ const removedNotice = (): Message => ({
   timestamp: Date.now(),
 });
 
-/** Takes `targets` out of the model's context. Returns false when this removal was already applied. */
 export const removeFromContext = async (
   harness: Harness,
   root: Conversation,
@@ -208,10 +190,6 @@ export const removeFromContext = async (
   return true;
 };
 
-/**
- * Starts the model's context over. `journalCheckpoint` is the journal seq the
- * fresh start is recorded at, so no host publishes it as a compaction of its own.
- */
 export const clearContext = async (
   harness: Harness,
   root: Conversation,
@@ -242,7 +220,6 @@ export const clearContext = async (
   return true;
 };
 
-/** A line in the timeline for a choice that changed no entry's place in the context. */
 export const noteInTimeline = async (
   harness: Harness,
   root: Conversation,

@@ -107,7 +107,6 @@ export type DesktopJournal = {
   finishOutcome?(localTurnId: string): { s: "pending" } | { s: "delivered" } | { s: "dead"; reason: string };
   tools?(update: { localTurnId: string; leaseToken: string; tools: JournalTool[] }): void;
   appendVoice(append: { appendId: string; role: "user" | "assistant"; payloadJson: string; hidden: boolean }): Promise<void>;
-  /** A hidden note for Stella that runs no turn; every place she runs reads it with her next turn. */
   appendNote?(append: { appendId: string; payloadJson: string }): Promise<void>;
   appendHistory?(append: {
     appendId: string;
@@ -193,7 +192,6 @@ export type JournalMirror = {
   importNow(): Promise<void>;
   remoteTurns(): PiRemoteTurn[];
   turnOpen(): boolean;
-  /** Waits until the journal has every turn this computer ran; false when `withinMs` passes first. */
   delivered(withinMs: number): Promise<boolean>;
   standing: Promise<boolean>;
   sync(): void;
@@ -216,11 +214,6 @@ const abortOf = (signal: AbortSignal | undefined): Promise<void> =>
     else signal.addEventListener("abort", () => resolve(), { once: true });
   });
 
-/**
- * Holds the run this computer was in the middle of when its runtime opened the chat until the journal confirms the
- * turn is still this computer's. The verdict belongs to that run only: every later run began its own journal turn,
- * which decided where it runs, so a turn lost across a restart never takes the next turns' tools with it.
- */
 export const journalTurnGate = (standing: Promise<boolean>, resumedRun: () => TaskId | undefined): Extension => {
   const proceed = async (api: HookApi, context: Context): Promise<undefined> => {
     if (api.conversationId !== ROOT_CONVERSATION_ID) return undefined;
@@ -244,13 +237,6 @@ export const journalTurnGate = (standing: Promise<boolean>, resumedRun: () => Ta
   });
 };
 
-/**
- * A task placed on this computer by another one resumes as soon as its chat
- * reopens after a restart, before the desktop has asked the server whether it
- * was stopped or moved meanwhile. Its model calls and tools wait for that
- * answer (once per start), so a stopped task never takes another step here:
- * not a tool call, and not a last reply that would go out as its report.
- */
 export const placedTaskGate = (
   settled: () => Promise<void>,
   placed: (api: HookApi, context: Context) => Promise<boolean>,
@@ -296,11 +282,8 @@ export async function journalMirror(args: {
   report: (error: unknown) => void;
   onRemoteTurns?: (turns: PiRemoteTurn[]) => void;
   onUsageLimit?: (card: ClaudeUsageLimitCard, createdAtMs: number) => void;
-  /** What a blocked reply of this computer's own turn says about the block. */
   safeguardInfo?: (blocked: AssistantMessage) => Promise<SafeguardBlockInfo> | SafeguardBlockInfo;
-  /** A turn's outcome or a choice on a block, in journal order. */
   onSafeguard?: (event: SafeguardEvent) => Promise<void>;
-  /** A choice on a block, once every message before it is imported. */
   onSafeguardCard?: (card: SafeguardCard, record: { seq: number; ownPrompts: EntryId[]; own: boolean }) => Promise<void>;
   readBrain?: () => Promise<PiBrainRecord | null>;
   resumed: boolean;
@@ -752,11 +735,6 @@ export async function journalMirror(args: {
         return;
       }
     }
-    // A turn ends when the orchestrator goes idle. Idleness is read before
-    // the scan that follows it, so every entry of a run that had ended by
-    // then is in that scan: read after it, a run that finished meanwhile
-    // would close its turn without the replies it just wrote, and those
-    // would never be journaled.
     const idleNow = async () => !(await harness.snapshot(LiveDoc, root.id, context))?.run;
     let idle = await idleNow();
     for (;;) {
@@ -827,9 +805,6 @@ export async function journalMirror(args: {
                   return undefined;
                 });
               if (unreachable !== undefined) {
-                // The cloud can't be asked yet (the runtime is still starting,
-                // signed out, offline): the prompt stays the next entry to
-                // mirror, here and after a restart, until it is journaled.
                 await apply(events.splice(0), (current) => {
                   current.syncId = syncId;
                   current.mirrored = mirrored;
@@ -912,7 +887,6 @@ export async function journalMirror(args: {
       })
     : Promise.resolve(true);
 
-  // Mirror when the conversation gains entries, a tool call finishes or a run ends.
   const stream = await onConversationChange(root, context, (before, after) => {
     if (appendedEntries(before, after).length > 0 || toolFinished(before, after) || runEnded(before, after)) sync();
   });

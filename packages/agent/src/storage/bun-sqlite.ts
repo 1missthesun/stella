@@ -1,10 +1,6 @@
 /**
- * pi-durable storage on `bun:sqlite`.
- *
  * Bun has no `node:sqlite`, so pi-durable's own Node adapter cannot load in
- * the desktop runtime. This is the same adapter over Bun's built-in driver:
- * one connection, statements cached by SQL text, and a queue that keeps every
- * other call out of an open transaction (the `SqliteDatabase` contract).
+ * the desktop runtime.
  */
 import { Database, type SQLQueryBindings, type Statement } from "bun:sqlite";
 import { mkdir } from "node:fs/promises";
@@ -94,11 +90,6 @@ abstract class BunSqliteExecutor implements SqliteExecutor {
     return this.runOperation(() => this.statement(sql).all(...bindings(params)) as T[]);
   }
 
-  /**
-   * Prepared statements, most recently used last. Bounded like Chord's own
-   * SQLite drivers: SQL whose shape varies (a query builder's) would otherwise
-   * keep every statement it ever prepared.
-   */
   private statement(sql: string): Statement {
     let statement = this.statements.get(sql);
     if (statement === undefined) {
@@ -196,7 +187,6 @@ export async function openBunSqliteDatabase(path: string): Promise<BunSqliteData
   }
 }
 
-/** Opens pi's storage in one SQLite file, keeping a copy of a pi-durable 1.1.0 file before it is migrated. */
 export async function openBunSqliteStorage(path: string): Promise<SqliteStorage> {
   await snapshotBeforePiUpgrade(path);
   return SqliteStorage.open(await openBunSqliteDatabase(path));

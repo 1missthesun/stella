@@ -1,17 +1,3 @@
-/**
- * Handing a conversation to another engine or model. The conversation's
- * journal is its one history, whichever engine wrote it; the incoming model
- * starts from it (the resident context, the latest compaction summary, then
- * everything after it). When that is more than the incoming model's window
- * holds, the outgoing model compacts first, while the conversation is still
- * its own, down to fit with headroom: the incoming model can't summarize
- * what it can't read.
- *
- * Should that compaction fail three times, the recent part that fits stays
- * and a compaction boundary marked `truncated` drops the rest, telling the
- * incoming model that older context is gone unsummarized. Either way the
- * journal only grows.
- */
 import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import { estimateMessageTokens } from "@earendil-works/pi-ai/utils/estimate";
@@ -45,7 +31,6 @@ export const handoverBudget = (window: number): number => Math.max(0, Math.floor
 const compactionInstructions = (budget: number) =>
   `The conversation is moving to a model whose context window is smaller. Keep the summary well under ${Math.floor(budget / 2)} tokens, and keep every fact, decision, name, path, number and open task the work still needs.`;
 
-/** The first entry of the newest run of whole turns, from a prompt on, that fits `budget`; else the last prompt's. */
 const truncationHead = (view: ContextView, budget: number): number | undefined => {
   const start = view.head === undefined ? 0 : 1;
   const opensTurn = (index: number) => view.contributions[index]?.[0]?.role === "user";

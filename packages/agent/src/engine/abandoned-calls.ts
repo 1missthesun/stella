@@ -1,13 +1,3 @@
-/**
- * Tool calls an engine's CLI stopped waiting for. Claude Code can give up on a
- * Stella tool it called (its MCP call timed out or was canceled) while the
- * Stella tool task for that call still runs; left alone, that task holds the
- * conversation's tool round, so every later call waits behind it, and a code
- * cell it started keeps running. The engine marks such a call here and the
- * tool host aborts the matching execution. Call ids are the CLI's own
- * tool_use ids, unique across conversations.
- */
-
 const EARLY_LIMIT = 256;
 
 const live = new Map<string, Set<AbortController>>();
@@ -28,7 +18,6 @@ export const abandonToolCall = (callId: string, reason: unknown): void => {
   }
 };
 
-/** A signal aborted once the CLI abandons `callId`; release it when the call ends. */
 export const watchToolCallAbandonment = (callId: string): { signal: AbortSignal; release: () => void } => {
   const controller = new AbortController();
   if (early.has(callId)) {

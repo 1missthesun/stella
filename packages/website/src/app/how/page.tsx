@@ -13,7 +13,7 @@ import { getSiteUrl } from "@/lib/site-url";
 
 const TITLE = "How to do it: step-by-step guides";
 const DESCRIPTION =
-  "Specific problems, answered properly: Minecraft mods, video edits, messy folders and PDFs to Excel. The manual steps, and Stella (stella.sh) doing it on a real computer.";
+  "Game mods, torrents, video edits, messy folders, PDFs to Excel and more: specific problems answered, and Stella (stella.sh) doing them on your computer.";
 
 export const metadata: Metadata = {
   title: { absolute: `${TITLE} | Stella` },
@@ -68,7 +68,7 @@ export default function HowIndex() {
           <header className={h.hero} data-mascot="">
             <HeroMascot />
             <HowTitle text="Stuck? Here’s how." />
-            <p className={h.sub}>The free way to fix it yourself, and a real recording of Stella doing it for you.</p>
+            <p className={h.sub}>Find your problem. Ask Stella, and it gets done on your computer.</p>
             <HeroCta />
           </header>
 

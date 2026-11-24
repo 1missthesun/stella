@@ -1,10 +1,11 @@
-import { PRICE_LINE, TRIAL_LINE, plainText, softwareApplicationJsonLd } from "@/lib/answers";
+import { PRICE_LINE, plainText, softwareApplicationJsonLd } from "@/lib/answers";
+import { demoFrom, type DemoStep } from "@/lib/demo";
 import { assertProblemPages } from "./gate";
 import { NICHES, getNiche } from "./niches";
 import { ALL_PROBLEM_PAGES } from "./pages";
-import type { Faq, Niche, Platform, ProblemPage, Proof } from "./types";
+import type { Faq, Niche, Platform, ProblemPage } from "./types";
 
-export type { Niche, ProblemPage, Proof } from "./types";
+export type { Niche, ProblemPage } from "./types";
 export { NICHES, getNiche };
 
 const ALL_PAGES = ALL_PROBLEM_PAGES;
@@ -52,6 +53,11 @@ export function nicheSections(niche: Niche): { title?: string; pages: ProblemPag
   return groups.filter((group) => group.pages.length);
 }
 
+/** The exchange a guide plays in its Stella replica. */
+export function pageDemo(page: ProblemPage): DemoStep[] {
+  return demoFrom({ prompt: page.prompt, ...page.demo });
+}
+
 export function getProblemPage(niche: string, slug: string) {
   return publishedProblemPages().find((page) => page.niche === niche && page.slug === slug);
 }
@@ -77,14 +83,8 @@ export function neighbours(page: ProblemPage, limit = 6): ProblemPage[] {
   return out.slice(0, limit);
 }
 
-/** What a visitor gets on the page, in their words (cards on the index and hubs). */
-export const guideLabel = (page: ProblemPage) => {
-  if (page.proof.kind === "video") {
-    const m = Math.max(1, Math.round((page.proof.video.realDuration ?? page.proof.video.duration) / 60));
-    return `Watch Stella do it · ${m} min`;
-  }
-  return page.proof.kind === "shots" ? "See Stella's result" : "Step-by-step guide";
-};
+/** What a visitor gets on a guide, in their words (cards on the index and hubs). */
+export const GUIDE_LABEL = "Just ask Stella";
 
 /** The price line exactly as the home page shows it under the download button. */
 export const FREE_LINE = "Free with the plan you already have.";
@@ -97,73 +97,13 @@ export const PLATFORM_NAMES: Record<Platform, string> = {
 
 /** Asked on every problem page; not counted as the page's own content. */
 export function sharedFaq(page: ProblemPage): Faq[] {
-  const where = page.platforms.map((p) => PLATFORM_NAMES[p]).join(", ").replace(/, ([^,]*)$/, " and $1");
-  return [
-    {
-      q: "Is Stella free for this?",
-      a:
-        page.costNote ??
-        `Yes. ${PRICE_LINE} Sign in with your ChatGPT plan, or use your Claude plan through Claude Code, and this task costs nothing extra. ${TRIAL_LINE}`,
-    },
-    {
-      q: "Can I control what Stella changes on my computer?",
-      a: `Yes. Stella works on ${where} with your own files and shows each step in the chat, so you can watch it, change the instructions and stop it at any point.`,
-    },
-  ];
-}
-
-export const captionsPath = (page: ProblemPage) =>
-  page.proof.kind === "video" ? (page.proof.video.captions ?? `${problemPath(page)}/captions.vtt`) : null;
-
-const vttTime = (seconds: number) => {
-  const ms = Math.round(seconds * 1000);
-  const h = Math.floor(ms / 3_600_000);
-  const m = Math.floor((ms % 3_600_000) / 60_000);
-  const s = Math.floor((ms % 60_000) / 1000);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(ms % 1000).padStart(3, "0")}`;
-};
-
-/** WebVTT built from a video proof's transcript moments: each runs until the next. */
-export function captionsVtt(page: ProblemPage): string | null {
-  const proof = page.proof;
-  if (proof.kind !== "video") return null;
-  const cues = proof.moments.map((moment, i) => {
-    const end = Math.min(proof.moments[i + 1]?.at ?? proof.video.duration, moment.at + 8);
-    return `${i + 1}\n${vttTime(moment.at)} --> ${vttTime(Math.max(end, moment.at + 1))}\n${moment.text}`;
-  });
-  return `WEBVTT\n\n${cues.join("\n\n")}\n`;
+  return [{ q: "Is Stella free?", a: page.costNote ?? `Yes. ${PRICE_LINE}` }];
 }
 
 export const formatDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-export const formatDuration = (seconds: number) => {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return m ? `${m} min ${String(s).padStart(2, "0")} s` : `${s} s`;
-};
-
-const isoDuration = (seconds: number) => `PT${Math.floor(seconds / 60)}M${Math.round(seconds % 60)}S`;
-
-function videoJsonLd(page: ProblemPage, proof: Extract<Proof, { kind: "video" }>, url: string, site: URL) {
-  const abs = (src: string) => new URL(src, site).href;
-  return {
-    "@context": "https://schema.org",
-    "@type": "VideoObject",
-    "@id": `${url}#proof`,
-    name: `Stella: ${page.h1}`,
-    description: `${proof.result} Recorded ${formatDate(proof.recordedOn)} on ${proof.platform} with ${proof.model}.`,
-    thumbnailUrl: [abs(proof.video.poster)],
-    uploadDate: `${proof.recordedOn}T12:00:00Z`,
-    duration: isoDuration(proof.video.duration),
-    contentUrl: abs(proof.video.src),
-    embedUrl: url,
-    transcript: proof.moments.map((m) => m.text).join(" "),
-    publisher: { "@id": `${site.origin}/#organization` },
-  };
-}
-
-/** BreadcrumbList, FAQPage, VideoObject (when there's a recording) and SoftwareApplication. */
+/** BreadcrumbList, FAQPage and SoftwareApplication. */
 export function problemJsonLd(page: ProblemPage, site: URL) {
   const niche = getNiche(page.niche)!;
   const url = new URL(problemPath(page), site).href;
@@ -190,7 +130,6 @@ export function problemJsonLd(page: ProblemPage, site: URL) {
         acceptedAnswer: { "@type": "Answer", text: plainText(item.a) },
       })),
     },
-    ...(page.proof.kind === "video" ? [videoJsonLd(page, page.proof, url, site)] : []),
     softwareApplicationJsonLd(site, page.description),
   ];
 }

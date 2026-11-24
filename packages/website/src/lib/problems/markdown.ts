@@ -1,15 +1,15 @@
 import { PRICE_LINE } from "@/lib/answers";
+import { demoText } from "@/lib/demo";
 import { getSiteUrl } from "@/lib/site-url";
 import {
   HOW_INDEX_PATH,
   PLATFORM_NAMES,
-  formatDate,
-  formatDuration,
   getNiche,
   neighbours,
   nichePages,
   nicheSections,
   nichePath,
+  pageDemo,
   problemPath,
   publishedNiches,
   sharedFaq,
@@ -19,58 +19,16 @@ import {
 const abs = (path: string) => new URL(path, getSiteUrl()).href;
 const absLinks = (text: string) => text.replace(/\]\(\//g, `](${getSiteUrl().origin}/`);
 
-const stamp = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
-
 /** The body of a problem page, headings starting at `level`. */
 export function problemBody(page: ProblemPage, level = 2): string {
   const h = "#".repeat(level);
-  const lines: string[] = [page.answer, ""];
-  lines.push(
-    `- Checked: ${formatDate(page.lastChecked)}`,
-    `- Stella does it on: ${page.platforms.map((p) => PLATFORM_NAMES[p]).join(", ")}`,
-    "",
-    `${h} Stella doing it`,
-    "",
-  );
-  const proof = page.proof;
-  if (proof.kind === "steps-only") {
-    lines.push(`No recording yet. ${proof.reason}`, "");
-  } else {
-    lines.push(
-      `Recorded ${formatDate(proof.recordedOn)} on ${proof.platform} with ${proof.model}.`,
-      `Result: ${proof.result}${proof.note ? ` ${proof.note}` : ""}`,
-      "",
-    );
-    if (proof.kind === "video") {
-      const speed = proof.video.speed && proof.video.speed > 1 ? `, sped up ${proof.video.speed}×` : "";
-      lines.push(`Video (${formatDuration(proof.video.duration)}${speed}): ${abs(proof.video.src)}`, "", "Transcript:", "");
-      for (const moment of proof.moments) lines.push(`- ${stamp(moment.at)} ${moment.text}`);
-      lines.push("");
-    }
-  }
-  lines.push("What Stella does:", "");
-  page.stellaSteps.forEach((step, i) => lines.push(`${i + 1}. ${step}`));
-  lines.push(
-    "",
-    `${h} The prompt to paste`,
-    "",
-    "```text",
-    page.prompt,
-    "```",
-    "",
-    `${h} ${page.manualTitle ?? "Do it yourself"}`,
-    "",
-  );
-  page.manualSteps.forEach((step, i) => lines.push(`${i + 1}. **${step.title}.** ${step.body}`));
-  lines.push("", `${h} Questions`, "");
+  const lines = [page.answer, "", `${h} What you get`, "", ...page.gets.map((line) => `- ${line}`), "", `${h} Ask Stella`, "", `> ${page.prompt}`, ""];
+  lines.push(`${h} An example chat`, "", demoText(pageDemo(page)), "");
+  lines.push(`Works on ${page.platforms.map((p) => PLATFORM_NAMES[p]).join(", ")}.`, "", `${h} Questions`, "");
   for (const item of [...page.faq, ...sharedFaq(page)]) lines.push(`**${item.q}**`, item.a, "");
-  lines.push(`Sources: ${page.sources.map((s) => `[${s.label}](${s.href})`).join(", ")}.`, "");
-  const near = neighbours(page);
-  if (near.length) {
-    lines.push(`${h} Related problems`, "");
-    for (const other of near) lines.push(`- [${other.h1}](${abs(`${problemPath(other)}.md`)})`);
-    lines.push("");
-  }
+  if (page.byHand?.length) lines.push(`${h} By hand`, "", ...page.byHand.map((line, i) => `${i + 1}. ${line}`), "");
+  const near = neighbours(page, 3);
+  if (near.length) lines.push(`${h} Related`, "", ...near.map((other) => `- [${other.h1}](${abs(`${problemPath(other)}.md`)})`), "");
   return absLinks(lines.join("\n"));
 }
 
@@ -100,7 +58,7 @@ export function renderHowIndexMarkdown(): string {
     header(
       "How-to guides",
       HOW_INDEX_PATH,
-      "Specific problems answered properly: the manual steps, and Stella (stella.sh) doing it on a real computer.",
+      "Specific problems answered properly, and Stella (stella.sh) doing them on your computer.",
     ),
   ];
   for (const niche of publishedNiches()) {

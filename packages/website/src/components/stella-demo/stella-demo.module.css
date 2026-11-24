@@ -1,0 +1,200 @@
+.frame {
+  margin: 0;
+  min-width: 0;
+}
+
+/* One short line over the window, in the page's own type, changing with the beat. */
+.caption {
+  display: grid;
+  height: 1.2em;
+  margin: 0 0 clamp(14px, 2vw, 22px);
+  font-family: var(--l-sans), system-ui, sans-serif;
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  color: var(--h-ink, #0a0a0d);
+}
+
+.caption span {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.window {
+  position: relative;
+  container-type: inline-size;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: clamp(10px, 1vw, 14px);
+  background: #1c1c1e;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.09),
+    0 50px 120px -30px rgba(10, 20, 60, 0.55);
+  pointer-events: none;
+  user-select: none;
+}
+
+.window[data-theme="light"] {
+  background: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .window {
+    aspect-ratio: 4 / 5;
+  }
+}
+
+.sd {
+  position: absolute;
+  inset: 0;
+}
+
+.topbar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 38px;
+}
+
+.lights {
+  flex: none;
+  width: 52px;
+  height: 12px;
+  margin-right: 12px;
+  background:
+    radial-gradient(circle at 6px 6px, var(--border-strong) 5.5px, transparent 6px),
+    radial-gradient(circle at 26px 6px, var(--border-strong) 5.5px, transparent 6px),
+    radial-gradient(circle at 46px 6px, var(--border-strong) 5.5px, transparent 6px);
+}
+
+.topbar :global(.shell-topbar-tab) {
+  color: var(--text-strong);
+}
+
+.topIcon,
+.topButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--text-muted, var(--text-weak));
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+}
+
+.topIcon {
+  width: 26px;
+}
+
+.topButton {
+  gap: 6px;
+  padding: 0 8px;
+}
+
+@container (max-width: 560px) {
+  .topButton span,
+  .topIcon {
+    display: none;
+  }
+
+  .topButton {
+    width: 26px;
+    padding: 0;
+  }
+
+  .lights {
+    display: none;
+  }
+}
+
+.body {
+  position: absolute;
+  inset: 38px 0 0;
+  display: flex;
+}
+
+.chatColumn {
+  --chat-composer-overlap: 12px;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroller {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 30;
+  translate: -50% 0;
+}
+
+.taskIcon {
+  display: inline-flex;
+}
+
+.taskRow[data-status="running"] .taskIcon[data-icon="done"],
+.taskRow[data-status="completed"] .taskIcon[data-icon="running"] {
+  display: none;
+}
+
+.progress {
+  margin: 4px 0 2px;
+  padding-left: 31px;
+}
+
+.controls {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 34px;
+  margin-top: 10px;
+}
+
+.controls[data-status="idle"] {
+  visibility: hidden;
+}
+
+.control {
+  appearance: none;
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  font-family: var(--l-sans), system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--h-muted, rgba(10, 10, 13, 0.5));
+  cursor: pointer;
+}
+
+.control:hover {
+  color: var(--h-ink, #0a0a0d);
+}
+
+/* Set by the inline script while the page parses: the app's empty home screen, where the replay starts. */
+.frame[data-armed] :global(.event-row),
+.frame[data-armed] :global(.chat-time-divider) {
+  display: none;
+}
+
+.frame[data-armed] .home[hidden] {
+  display: flex !important;
+}
+
+.frame[data-armed] :global(.full-body-chat-layer) {
+  opacity: 0;
+}

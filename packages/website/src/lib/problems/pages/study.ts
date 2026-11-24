@@ -1,766 +1,373 @@
-import { PROOFS, webCuts } from "../media";
+import { shortGuide } from "../short";
 import type { ProblemPage } from "../types";
 
-const MODEL = "Claude Code with Opus, on a Claude plan";
-
 export const STUDY_PAGES: ProblemPage[] = [
-  {
+  shortGuide({
     slug: "export-kindle-highlights",
     niche: "study",
-    searchPhrases: ["export kindle highlights", "kindle highlights", "my clippings txt", "kindle highlights to notion", "kindle highlights to markdown"],
+    searchPhrases: [
+      "export kindle highlights",
+      "kindle highlights",
+      "my clippings txt",
+      "kindle highlights to notion",
+      "kindle highlights to markdown",
+    ],
     title: "Export Kindle highlights: one clean file per book, no repeats",
     description:
-      "Split Kindle's My Clippings.txt into one tidy file per book, without the repeated and half-finished highlights: by hand, Amazon's notebook, or Stella (stella.sh).",
+      "Export Kindle highlights from My Clippings.txt into one clean file per book, repeats removed and your notes kept. Stella (stella.sh) sorts them out for you.",
     h1: "Export your Kindle highlights into one file per book",
     short: "Export Kindle highlights",
-    lede: "One messy My Clippings.txt as five tidy files, one per book, every repeat gone.",
+    lede: "All your Kindle highlights, one clean file per book",
     answer:
-      "Every highlight you make is saved in `My Clippings.txt` in the Kindle's documents folder: plug it in by USB and copy it off. The file mixes all your books together, and Kindle adds a new entry each time you extend a highlight, so it fills with repeats. Amazon's notebook page at read.amazon.com/notebook shows highlights for books bought from the Kindle store only. Stella (stella.sh) splits the file into one clean file per book on your computer, repeats removed and notes kept.",
-    stellaSteps: [
-      "Reads `My Clippings.txt` in Documents: five books' highlights, notes and bookmarks mixed together",
-      "Drops 10 exact repeats, and 15 cut-off highlights that were later saved again longer, keeping the longer version each time",
-      "Leaves out 10 empty bookmarks",
-      "Writes one Markdown file per book, highlights in reading order with page and location, each of your 13 notes under the highlight it belongs to",
-      "Saves them in a new Kindle Highlights by Book folder and leaves My Clippings.txt untouched",
-    ],
+      "Copy My Clippings.txt off your Kindle and ask Stella (stella.sh) to split it. You get one tidy file per book, highlights in reading order, repeats gone and your notes kept beside them.",
+    gets: ["One file per book", "Repeats and half-finished highlights gone", "Files that open in Notion or Obsidian"],
     prompt:
-      "I copied My Clippings.txt from my Kindle into Documents. Split my highlights into one tidy file per book, without the duplicates, so I can read them back.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "Five files in about a minute. Checked afterwards against an answer key written before the run: one file per book, each with every final highlight of that book once, no repeats or half-finished versions, nothing from other books, no bookmarks, every note kept, in reading order, and My Clippings.txt unchanged.",
-      note: "The books and highlights are made up, written in Kindle's real My Clippings.txt format with its repeats on purpose. The work is sped up 4×.",
-      video: {
-        src: `${PROOFS}/study/export-kindle-highlights/proof.mp4`,
-        cuts: webCuts("study/export-kindle-highlights"),
-        poster: `${PROOFS}/study/export-kindle-highlights/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 48.4,
-        realDuration: 100,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. My Clippings.txt, copied off a Kindle, is in Documents." },
-        { at: 2.1, text: "The prompt: one tidy file per book, without the duplicates." },
-        { at: 18.1, text: "Stella replies: it will drop repeats, including the longer copies Kindle saves when you re-highlight." },
-        { at: 23.9, text: "Splitting the highlights, sped up 4×." },
-        { at: 34.4, text: "Done: five files with 11 to 13 highlights each, 25 repeats removed, notes kept under their highlights." },
-      ],
+      "I copied My Clippings.txt from my Kindle into Documents. Split my highlights into one tidy file per book, without the duplicates.",
+    demo: {
+      ack: "Sure. Sorting your highlights by book.",
+      task: "Kindle highlights by book",
+      rows: ["Reading five books' highlights", "Dropping 25 repeats"],
+      reply:
+        "Done. Five files are in a new **Kindle Highlights by Book** folder, one per book, with all 13 of your notes kept.",
+      files: ["Kindle Highlights by Book"],
     },
-    manualTitle: "Export them yourself",
-    manualSteps: [
-      {
-        title: "Copy the file off the Kindle",
-        body: "Connect the Kindle with a USB cable. It shows up as a drive; open its `documents` folder and copy `My Clippings.txt` to your computer. Some newer Kindles connect as a media device instead of a drive; on a Mac those need a file-transfer app such as the free OpenMTP.",
-      },
-      {
-        title: "Or use Amazon's notebook",
-        body: "Sign in at read.amazon.com/notebook to see highlights for books bought from the Kindle store, one book at a time. Highlights in documents and books you sent to the Kindle yourself aren't there, and some publishers limit how much you can export.",
-      },
-      {
-        title: "Split by book",
-        body: "Open the file in a text editor. Each entry is the book title, a line with page, location and date, the highlight, then `==========`. Search for each title and copy its entries into a new document.",
-      },
-      {
-        title: "Remove the repeats",
-        body: "Kindle never edits an entry: if you highlight a sentence and then extend it, both are saved. Delete exact repeats, and any highlight that is the start of a longer one at the same location.",
-      },
+    faq: [
+      ["Where is My Clippings.txt on a Kindle?", "Plug the Kindle into your computer and open its documents folder. The file holds highlights, notes and bookmarks from every book."],
+      ["Can I see my highlights on a computer without the Kindle?", "read.amazon.com/notebook shows them for books bought from the Kindle store, one book at a time."],
+    ],
+    byHand: [
+      "Connect the Kindle by USB, open its documents folder and copy My Clippings.txt to your computer.",
+      "Open it in a text editor. Entries end with ==========; copy each book's entries into its own document.",
+      "Delete repeats, and any highlight that is the start of a longer one at the same location.",
+    ],
+    related: [
+      "study/make-anki-flashcards-from-notes",
+      "study/make-a-bibliography-from-a-list-of-sources",
+      "study/print-flashcards-double-sided",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Where is My Clippings.txt on a Kindle?",
-        a: "In the `documents` folder at the top of the Kindle's storage when it's connected by USB. It holds highlights, notes and bookmarks from every book on that Kindle.",
-      },
-      {
-        q: "Can I get the highlights into Notion or Obsidian?",
-        a: "Stella's files are Markdown, which Obsidian opens as notes and Notion imports (Import, Markdown). Ask for Word or PDF instead if you prefer.",
-      },
-      {
-        q: "Can it make flashcards from my highlights?",
-        a: "Yes, in the same chat. See [make Anki flashcards from notes](/how/study/make-anki-flashcards-from-notes) and [print flashcards double-sided](/how/study/print-flashcards-double-sided).",
-      },
-      {
-        q: "What about ebooks that won't open on my Kindle?",
-        a: "See [convert EPUB to PDF](/how/pdf-excel/convert-epub-to-pdf) for reading on other devices.",
-      },
-      {
-        q: "Why is a highlight I deleted still in My Clippings.txt?",
-        a: "The Kindle only ever adds to the file, so deleting a highlight in the book leaves its entry in place. Delete it from that book's file once the highlights are split.",
-      },
-    ],
-    related: ["study/make-anki-flashcards-from-notes", "study/make-a-bibliography-from-a-list-of-sources", "study/print-flashcards-double-sided", "pdf-excel/convert-epub-to-pdf", "chats-data-exports/see-your-spotify-listening-history"],
-    lastChecked: "2026-11-13",
-    sources: [{ label: "Amazon Kindle notebook (web)", href: "https://read.amazon.com/notebook" }],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "make-anki-flashcards-from-notes",
     niche: "study",
-    searchPhrases: ["turn notes into flashcards", "how to create anki deck", "convert notes to anki", "anki import csv", "make anki cards from word document"],
+    searchPhrases: [
+      "turn notes into flashcards",
+      "how to create anki deck",
+      "convert notes to anki",
+      "anki import csv",
+      "make anki cards from word document",
+    ],
     title: "Make Anki flashcards from your notes (a file Anki imports)",
     description:
-      "Turn the key terms and definitions in your Word notes into an Anki import file, one card per term: a spreadsheet and Anki's Import, or Stella (stella.sh).",
+      "Turn your notes into Anki flashcards: one card per key term with its definition, in a file Anki imports straight away. Stella (stella.sh) writes it for you.",
     h1: "Make Anki flashcards from your notes",
     short: "Anki flashcards from notes",
-    lede: "24 terms from a Word document as Anki cards, term on the front, definition behind.",
+    lede: "Turn your class notes into flashcards Anki can import",
     answer:
-      "Anki imports plain text: put each term in column A and its definition in column B of a spreadsheet, save it as CSV UTF-8, then in Anki use File, Import, map column 1 to Front and column 2 to Back, and import. The slow part is copying the terms out of your notes. Stella (stella.sh) reads your notes on your computer, picks out the terms and definitions, including ones in tables, and writes an Anki import file, without uploading your notes to a flashcard site.",
-    stellaSteps: [
-      "Finds `Bio 101 notes - Cells.docx` in Documents",
-      "Takes 16 terms from the bold “term – definition” lines and 8 from the glossary table",
-      "Skips lines that aren't terms: the test-date reminder, the to-do list and the table's header row",
-      "Writes `Bio 101 - Cells - Anki flashcards.txt` next to the notes: tab-separated, with header lines telling Anki the note type and a deck called Bio 101::Unit 2 Cells",
-      "Flags one thing in the notes that looks misplaced",
+      "Ask Stella (stella.sh) to make Anki cards from your notes. It picks out each key term and its definition, tables included, and saves a file you import into Anki in one step.",
+    gets: [
+      "One card per term, definition on the back",
+      "Terms from tables picked up too",
+      "Reminders and to-do lines left out",
     ],
-    prompt: "Turn my biology notes in Documents into Anki flashcards I can import, one card per key term with its definition.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "24 cards in about 40 seconds. Checked afterwards against an answer key written before the run: a tab-separated text file in Anki's import format, with cards for all 24 terms, each with its own definition on the back, no cards for the reminder or the table header, and the notes unchanged.",
-      note: "The biology notes were written for this run. The work is sped up 2×.",
-      video: {
-        src: `${PROOFS}/study/make-anki-flashcards-from-notes/proof.mp4`,
-        cuts: webCuts("study/make-anki-flashcards-from-notes"),
-        poster: `${PROOFS}/study/make-anki-flashcards-from-notes/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 46.5,
-        realDuration: 77,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. Biology notes in Word are in Documents." },
-        { at: 2, text: "The prompt: Anki flashcards, one card per key term with its definition." },
-        { at: 14.6, text: "Stella replies: an import file next to the notes, term on the front, definition on the back." },
-        { at: 20.5, text: "Reading the notes, sped up 2×." },
-        { at: 32.5, text: "Done: 24 cards, 16 from the term lines and 8 from the glossary table, non-terms left out, import steps given." },
-      ],
+    prompt:
+      "Turn my biology notes in Documents into Anki flashcards I can import, one card per key term with its definition.",
+    demo: {
+      ack: "Sure. Picking out the key terms.",
+      task: "Anki cards from Bio 101 notes",
+      rows: ["Finding 16 bold terms", "Adding 8 from the glossary table"],
+      reply:
+        "Done. **24 cards** are ready next to your notes, in a deck called Bio 101. In Anki, choose File, Import and pick the file.",
+      files: ["Bio 101 - Cells - Anki flashcards.txt"],
     },
-    manualTitle: "Make the cards yourself",
-    manualSteps: [
-      {
-        title: "Copy terms into a spreadsheet",
-        body: "Put each term in column A and its definition in column B, one per row, with no header row. Terms in a table in Word can be copied straight into the sheet.",
-      },
-      {
-        title: "Save as CSV UTF-8",
-        body: "Excel: File, Save As, CSV UTF-8 (Comma delimited). Numbers: File, Export To, CSV. UTF-8 keeps symbols and accents intact.",
-      },
-      {
-        title: "Import into Anki",
-        body: "In Anki on your computer, choose File, Import, pick the CSV, check the field separator is Comma, set the note type to Basic, the deck you want, and map field 1 to Front and field 2 to Back. Click Import.",
-      },
-      {
-        title: "Check a few cards",
-        body: "Browse the new deck and fix any card where a definition has split across fields, usually because it contained a comma and wasn't in quotes.",
-      },
+    faq: [
+      ["How do I import flashcards into Anki?", "In Anki on your computer, choose File, Import, pick the file, set the note type to Basic and choose your deck, then click Import."],
+      ["Notes in plain text vs cards in plain text in Anki?", "Both are export options. Notes in Plain Text saves each note's fields and imports back cleanly; Cards in Plain Text saves each card as it's shown."],
+    ],
+    byHand: [
+      "Put terms in column A and definitions in column B of a spreadsheet, with no title row.",
+      "Save it as CSV UTF-8 (File, Save As in Excel).",
+      "In Anki, use File, Import, and match field 1 to Front and field 2 to Back.",
+    ],
+    related: [
+      "study/print-flashcards-double-sided",
+      "study/make-a-bibliography-from-a-list-of-sources",
+      "study/export-kindle-highlights",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "What file types can Anki import?",
-        a: "Plain text (comma- or tab-separated), and Anki's own .apkg and .colpkg packages. A text file with term and definition per line is the simplest. Ask Stella for an .apkg if you'd rather have a deck package.",
-      },
-      {
-        q: "Can it make cards from a PDF or slides?",
-        a: "Yes, from any notes it can read: Word, PDF, PowerPoint or text. Scanned pages need text recognition first, which is slower.",
-      },
-      {
-        q: "Can I print the cards instead?",
-        a: "Yes: see [print flashcards double-sided](/how/study/print-flashcards-double-sided), where fronts and backs line up.",
-      },
-      {
-        q: "Can it make cards from my Kindle highlights?",
-        a: "Yes. First [export the highlights](/how/study/export-kindle-highlights), then ask for cards from the book's file.",
-      },
-    ],
-    related: ["study/print-flashcards-double-sided", "study/make-a-bibliography-from-a-list-of-sources", "study/export-kindle-highlights", "pdf-excel/make-scanned-pdf-searchable", "study/make-a-study-guide-from-notes"],
-    lastChecked: "2026-11-13",
-    sources: [{ label: "Anki Manual: Importing text files", href: "https://docs.ankiweb.net/importing/text-files.html" }],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "print-flashcards-double-sided",
     niche: "study",
-    searchPhrases: ["how to print flashcards double sided", "how to print flashcards front and back", "printable flashcards", "make flashcards from a spreadsheet"],
+    searchPhrases: [
+      "how to print flashcards double sided",
+      "how to print flashcards front and back",
+      "printable flashcards",
+      "make flashcards from a spreadsheet",
+    ],
     title: "Print flashcards double-sided so fronts and backs line up",
     description:
-      "Make a printable flashcard PDF from a vocabulary list, with each meaning printed exactly behind its word on two-sided printing: Word tables, or Stella (stella.sh).",
+      "Print flashcards double-sided so fronts and backs line up: word on the front, meaning behind it, cutting lines included. Stella (stella.sh) makes the PDF.",
     h1: "Print flashcards double-sided so the backs line up",
     short: "Print double-sided flashcards",
-    lede: "30 Spanish words as cut-out cards, each meaning printed right behind its word.",
+    lede: "Flashcards you print front and back, each answer behind its word",
     answer:
-      "Put the words in a table on one page and the meanings on the next, with the columns swapped left to right on the back page, because flipping the sheet on its long edge mirrors it. Print with two-sided on and “flip on long edge”, at 100% scale, and check one sheet against the light first. Stella (stella.sh) builds that PDF from your spreadsheet, with the backs mirrored and a number on both sides of every card.",
-    stellaSteps: [
-      "Finds `Spanish vocab - Unit 3.xlsx` in Documents: 30 words with their meanings, a header row and a Done? column",
-      "Lays the words out 8 cards to a page with dashed cutting lines, on fronts, and the meanings on the following backs",
-      "Mirrors each back page left to right, so every meaning lands behind its word when flipped on the long edge",
-      "Prints a small matching number on both sides of each card, and checks that each meaning lines up behind its word",
-      "Saves `Spanish vocab - Unit 3 - flashcards.pdf` on A4, gives the print settings (two-sided, flip on long edge, 100% scale) and offers a version without the words marked done",
+      "Give Stella (stella.sh) your word list. It makes a PDF with words on the fronts and meanings on mirrored backs, so every meaning lands behind its word when you print double-sided.",
+    gets: [
+      "A PDF ready to print front and back",
+      "Each meaning right behind its word",
+      "Cutting lines and a number on both sides",
     ],
     prompt:
-      "I have a vocabulary list for my Spanish class in a spreadsheet in Documents. Make printable flashcards, word on the front and meaning on the back, that line up when I print double-sided.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "An 8-page PDF in about 2 minutes. Checked afterwards against an answer key written before the run, by measuring positions in the PDF: all 30 words are on front pages, every meaning sits at the mirrored spot behind its word for long-edge two-sided printing, fronts and backs alternate, no meaning is on a word side, and the spreadsheet is unchanged.",
-      note: "The vocabulary list was made for this run. The work is sped up 8×.",
-      video: {
-        src: `${PROOFS}/study/print-flashcards-double-sided/proof.mp4`,
-        cuts: webCuts("study/print-flashcards-double-sided"),
-        poster: `${PROOFS}/study/print-flashcards-double-sided/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 51.5,
-        realDuration: 154,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A Spanish vocabulary spreadsheet is in Documents." },
-        { at: 2.1, text: "The prompt: printable flashcards, word on the front, meaning on the back, lined up for double-sided printing." },
-        { at: 18.9, text: "Stella replies: the back pages will be laid out so each meaning prints behind its word." },
-        { at: 24.6, text: "Building and checking the PDF, sped up 8×." },
-        { at: 37.5, text: "Done: 30 cards on 4 sheets, with the print settings to use and a numbered pair check on each card." },
-      ],
+      "My Spanish vocabulary list is a spreadsheet in Documents. Make printable flashcards, word on the front and meaning on the back, that line up when printed double-sided.",
+    demo: {
+      ack: "Sure. Laying out your cards.",
+      task: "Spanish Unit 3 flashcards",
+      rows: ["Placing 30 words, 8 per page", "Mirroring the backs so they line up"],
+      reply:
+        "Your 8-page PDF is in Documents. Print it two-sided, flip on long edge, at 100% scale.",
+      files: ["Spanish vocab - Unit 3 - flashcards.pdf"],
     },
-    manualTitle: "Make them yourself",
-    manualSteps: [
-      {
-        title: "Make the front page",
-        body: "In Word or Pages, insert a table with 2 columns and 4 or 5 rows that fills the page, and set fixed row heights. Type one word per cell.",
-      },
-      {
-        title: "Make the back page, mirrored",
-        body: "On the next page, add the same table. Put each meaning in the same row but the opposite column: the meaning for the top-left word goes top-right. That's what long-edge flipping does to the sheet.",
-      },
-      {
-        title: "Print one test sheet",
-        body: "Print pages 1–2 with two-sided on, “flip on long edge” (Windows: Print on Both Sides, Flip pages on long edge), at 100% or Actual size. Hold it up to the light to check each meaning sits behind its word.",
-      },
-      {
-        title: "No two-sided printer?",
-        body: "Print the odd pages, put the stack back in the tray as your printer's manual shows, then print the even pages. Test with one sheet first, as printers feed differently.",
-      },
-      {
-        title: "Cut along the lines",
-        body: "Use a ruler and craft knife or a paper trimmer. Card stock or thicker paper stops the backs showing through.",
-      },
+    faq: [
+      ["How do I print flashcards front and back from a PDF?", "Turn on two-sided printing, choose flip on long edge, and print at 100% or Actual size rather than fit to page."],
+      ["Why don't my flashcard backs line up?", "The back page wasn't mirrored, or fit to page scaled the two sides differently. Mirror the back's columns and print at 100%."],
+    ],
+    byHand: [
+      "In Word, make a table on one page with one word per cell.",
+      "On the next page, put each meaning in the same row but the opposite column.",
+      "No two-sided printer? Print the odd pages, put the stack back in the tray, then print the even pages.",
+    ],
+    related: [
+      "study/make-anki-flashcards-from-notes",
+      "study/export-kindle-highlights",
+      "photos-files/combine-photos-into-one-pdf",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Why don't my flashcard backs line up?",
-        a: "Usually because the back page isn't mirrored, or because “fit to page” scaled the two sides differently. Mirror the back's columns for long-edge flip and print at 100%.",
-      },
-      {
-        q: "Long edge or short edge?",
-        a: "For portrait pages, long edge flips like a book. Stella's PDF is made for long edge; if your printer only flips on the short edge, ask for a short-edge version.",
-      },
-      {
-        q: "Can I get the cards on US Letter paper?",
-        a: "Yes. Ask for Letter in the prompt and Stella sets the page size and margins for it; the PDF in this run is A4.",
-      },
-      {
-        q: "Can I study the same words in Anki?",
-        a: "Yes: see [make Anki flashcards from notes](/how/study/make-anki-flashcards-from-notes); a spreadsheet works as the source too.",
-      },
-      {
-        q: "Can it combine my class handouts into one PDF to print?",
-        a: "Yes. For photos of pages, see [combine photos into one PDF](/how/photos-files/combine-photos-into-one-pdf).",
-      },
-    ],
-    related: ["study/make-anki-flashcards-from-notes", "study/export-kindle-highlights", "photos-files/combine-photos-into-one-pdf", "printing-labels/print-business-cards-at-home", "study/make-a-word-search"],
-    lastChecked: "2026-11-13",
-    sources: [
-      {
-        label: "Microsoft Support: Print on both sides of the paper (duplex) in Word",
-        href: "https://support.microsoft.com/office/print-on-both-sides-of-the-paper-duplex-printing-in-word-2cd60d2f-3a57-4210-96ac-9a6ca71ca7a3",
-      },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "make-a-word-search",
     niche: "study",
-    searchPhrases: ["word search maker", "word search generator", "make a word search", "spelling word search", "printable word search with answer key"],
+    searchPhrases: [
+      "word search maker",
+      "word search generator",
+      "make a word search",
+      "spelling word search",
+      "printable word search with answer key",
+    ],
     title: "Make a printable word search from your spelling list",
     description:
-      "Turn a class spelling list into a printable word search with a word bank and a separate answer key: a free puzzle-maker site, or Stella (stella.sh) from your own file.",
+      "Make a printable word search from your spelling words, with the answer key on page 2 and a grid that suits the age group. Stella (stella.sh) builds it.",
     h1: "Make a word search from your spelling words",
     short: "Make a word search",
-    lede: "A week's spelling list as a 15×15 puzzle, with the answer key on its own page.",
+    lede: "A printable word search from this week's spelling list",
     answer:
-      "Free puzzle-maker sites build one if you paste in the words, pick a grid size and print the puzzle and its answer key. For young children, keep words running forwards and down only. Stella (stella.sh) reads the spelling list straight from your Word file, skips the lines that aren't words, and makes a print-ready PDF with the answer key on page 2, without retyping or ads.",
-    stellaSteps: [
-      "Finds `Week 12 spelling words.docx` in Documents and picks out the 15 spelling words and the two optional challenge words, leaving out the test-day line and the note to parents",
-      "Fits them into a 15×15 grid, running across, down or diagonally down-right only, never backwards, to suit Year 4 as the sheet says",
-      "Fills the gaps with random letters and adds Name and Date lines and a word bank with tick boxes",
-      "Draws the answer key on page 2 with every word highlighted",
-      "Saves `Week 12 spelling word search.pdf` in Documents next to the list, and offers an A4 version since the list uses UK spelling",
-    ],
-    prompt: "Make a printable word search for my class from the spelling words in my Documents, with the answer key on a separate page.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "A two-page puzzle PDF in about a minute and a half. Checked afterwards against an answer key written before the run, by reading the letters back out of the PDF: a 15×15 grid in which every one of the 15 spelling words can be found, the word list printed with the puzzle, the answer key on a separate page, and the spelling list unchanged.",
-      note: "The spelling list was written for this run, with non-word lines mixed in on purpose. The work is sped up 4×.",
-      video: {
-        src: `${PROOFS}/study/make-a-word-search/proof.mp4`,
-        cuts: webCuts("study/make-a-word-search"),
-        poster: `${PROOFS}/study/make-a-word-search/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 47.2,
-        speed: 4,
-        realDuration: 91,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A Week 12 spelling list in Word is in Documents." },
-        { at: 2.1, text: "The prompt: a printable word search with the answer key on a separate page." },
-        { at: 15.8, text: "Stella replies: a PDF with the puzzle on page 1 and the key on page 2." },
-        { at: 21.7, text: "Building the puzzle, sped up 4×." },
-        { at: 33.2, text: "Done: a 15×15 grid with all 15 words and two challenge words, no backwards words, and the key highlighted." },
-      ],
+      "Give Stella (stella.sh) your spelling list. It makes a print-ready word search PDF with every word hidden in the grid, a word bank to tick off, and the answer key on a second page.",
+    gets: ["A puzzle with every word hidden", "Directions that suit the age group", "The answer key on page 2"],
+    prompt:
+      "Make a printable word search for my class from the spelling words in my Documents, with the answer key on a separate page.",
+    demo: {
+      ack: "Fun. Building the grid now.",
+      task: "Week 12 word search",
+      rows: ["Picking out the 15 spelling words", "Hiding them across and down"],
+      reply:
+        "**Week 12 spelling word search.pdf** is in Documents, puzzle on page 1 and answers on page 2. Words run forwards and down only, to suit Year 4.",
     },
-    manualTitle: "Make one yourself",
-    manualSteps: [
-      {
-        title: "Use a free puzzle maker",
-        body: "Open a free word-search maker such as Discovery Education's [Puzzlemaker](https://puzzlemaker.discoveryeducation.com/word-search). Type a title and paste the words, one per line.",
-      },
-      {
-        title: "Pick the size and directions",
-        body: "A 15×15 grid suits 15 words of up to 11 letters. For younger children, allow only left-to-right and top-to-bottom; for older ones, add diagonals and backwards words.",
-      },
-      {
-        title: "Print the puzzle and the key",
-        body: "Generate the puzzle, print it, then print or save the answer key separately. Print to PDF if you want to keep a copy for next year.",
-      },
-      {
-        title: "Or make it by hand",
-        body: "Insert a 15×15 table in Word with square cells. Write the words in first, in pencil on a printout if easier, then fill every empty square with a random letter. Copy the table to a second page and shade the words for the key.",
-      },
-    ],
-    platforms: ["windows", "mac", "linux"],
     faq: [
-      {
-        q: "How big should a word search grid be?",
-        a: "At least one square wider than the longest word. 10×10 suits 8–10 short words; 15×15 fits 15 to 20 words of up to 11 letters.",
-      },
-      {
-        q: "Can it make one a week from each new list?",
-        a: "Yes. Ask in the same chat each week and Stella uses the same layout with the new list.",
-      },
-      {
-        q: "Can it leave out the hardest directions?",
-        a: "Yes: it chose forwards, down and down-right only for Year 4. Ask for backwards and upward words for older pupils.",
-      },
-      {
-        q: "What about a crossword from the same words?",
-        a: "See [make a crossword puzzle](/how/study/make-a-crossword-puzzle), or [print double-sided flashcards](/how/study/print-flashcards-double-sided) for the same list.",
-      },
+      ["How big should a word search grid be?", "At least one square wider than the longest word. A 15×15 grid fits 15 to 20 words of up to 11 letters."],
+    ],
+    byHand: [
+      "Open a free maker such as [Puzzlemaker](https://puzzlemaker.discoveryeducation.com/word-search) and paste the words, one per line.",
+      "Pick a grid size. For young children, allow only left to right and top to bottom.",
+      "Print the puzzle, then the answer key.",
     ],
     related: ["study/make-a-crossword-puzzle", "study/print-flashcards-double-sided", "study/make-a-study-guide-from-notes"],
-    lastChecked: "2026-11-14",
-    sources: [{ label: "Discovery Education Puzzlemaker: Word Search", href: "https://puzzlemaker.discoveryeducation.com/word-search" }],
-  },
-  {
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "make-a-crossword-puzzle",
     niche: "study",
-    searchPhrases: ["crossword maker", "crossword puzzle maker", "make a crossword puzzle", "vocabulary crossword", "crossword from vocabulary list"],
+    searchPhrases: [
+      "crossword maker",
+      "crossword puzzle maker",
+      "make a crossword puzzle",
+      "vocabulary crossword",
+      "crossword from vocabulary list",
+    ],
     title: "Make a crossword puzzle from a vocabulary list",
     description:
-      "Turn a vocabulary spreadsheet into a printable crossword, definitions as numbered clues and answers on a separate page: a free maker site, or Stella (stella.sh).",
+      "Make a crossword puzzle from your vocabulary list, with the definitions as clues and the answers on a separate page. Stella (stella.sh) makes the printable PDF.",
     h1: "Make a crossword puzzle from your vocabulary list",
     short: "Make a crossword puzzle",
-    lede: "12 earth science words in one interlocking crossword, definitions as the clues.",
+    lede: "A printable crossword from your vocabulary list, answers separate",
     answer:
-      "Free crossword makers build an interlocking grid from words and clues you type in, then print a blank puzzle and an answer sheet. Copying a long list in one word at a time is the slow part. Stella (stella.sh) reads your vocabulary spreadsheet, uses the definitions as clues and makes a printable PDF with the answers on page 2, on your computer.",
-    stellaSteps: [
-      "Finds `Unit 5 vocabulary - Earth science.xlsx` in Documents: 12 words with their definitions",
-      "Installs a spreadsheet reader and a PDF library into its own work folder",
-      "Fits all 12 words into one interlocking grid where every crossing spells real words, with no stray letter runs",
-      "Numbers the squares and lists Across and Down clues, each the definition word for word with the answer's length, and points out two clues that mention other answers",
-      "Saves `Unit 5 vocabulary - Earth science crossword.pdf`: the blank grid with name and date lines and the clues on page 1, the filled-in answers on page 2",
-    ],
+      "Give Stella (stella.sh) your vocabulary list. It fits the words into one crossword, uses the definitions as clues and saves a printable PDF with the answers on page 2.",
+    gets: ["Every word in one connected grid", "Numbered Across and Down clues", "Answers on a separate page"],
     prompt:
       "Make a printable crossword puzzle from the vocabulary list in my Documents, using the definitions as clues, with the answers on a separate page.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "A two-page crossword PDF in under 2 minutes. Checked afterwards against an answer key written before the run, by reading the grid back out of the PDF: all 12 words placed, every across and down run is one of the words, the words interlock in one connected grid, the puzzle page has numbered Across and Down clues from the definitions and an empty grid, the answers are on a separate page, and the vocabulary list is unchanged.",
-      note: "The vocabulary list was made for this run. The work is sped up 5×.",
-      video: {
-        src: `${PROOFS}/study/make-a-crossword-puzzle/proof.mp4`,
-        cuts: webCuts("study/make-a-crossword-puzzle"),
-        poster: `${PROOFS}/study/make-a-crossword-puzzle/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 50.7,
-        speed: 5,
-        realDuration: 113,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. An earth science vocabulary spreadsheet is in Documents." },
-        { at: 2.1, text: "The prompt: a printable crossword using the definitions as clues, answers on a separate page." },
-        { at: 18.9, text: "Stella replies: a PDF with the puzzle and clues first and the answer key on its own page." },
-        { at: 24.7, text: "Building the grid, sped up 5×." },
-        { at: 36.7, text: "Done: all 12 words fit, clues are the definitions word for word, answers on page 2." },
-      ],
+    demo: {
+      ack: "Sure. Fitting the words together.",
+      task: "Earth science crossword",
+      rows: ["Reading 12 words and definitions", "Fitting them into one grid", "Numbering the clues"],
+      reply:
+        "Your crossword is in Documents, blank grid and clues on page 1, answers on page 2. Two clues mention other answers, so you may want to reword them.",
     },
-    manualTitle: "Make one yourself",
-    manualSteps: [
-      {
-        title: "Use a free crossword maker",
-        body: "Open a free maker such as Discovery Education's [Criss-Cross Puzzlemaker](https://puzzlemaker.discoveryeducation.com/criss-cross). Enter each word followed by its clue, one per line, in the format the site shows.",
-      },
-      {
-        title: "Copy from the spreadsheet",
-        body: "If the words are in column A and definitions in column B, add a column that joins them in the site's format, such as `=A2&\" \"&B2`, fill it down and paste that column into the maker.",
-      },
-      {
-        title: "Generate and check",
-        body: "Generate the puzzle. If a word won't fit, the maker leaves it out or warns you; regenerate or swap a word. Read the clues for any that give away another answer.",
-      },
-      {
-        title: "Print both pages",
-        body: "Print the blank puzzle with its clues, then the answer key separately. Save each as PDF if you'll reuse it.",
-      },
-    ],
-    platforms: ["windows", "mac", "linux"],
     faq: [
-      {
-        q: "Can I use my own clues instead of definitions?",
-        a: "Yes. Put the clues in a column of the spreadsheet, or tell Stella which column to use.",
-      },
-      {
-        q: "Will the answers show on the puzzle page?",
-        a: "No. Page 1 has the empty grid and the clues; the filled-in grid is on page 2, so you can print them separately.",
-      },
-      {
-        q: "Can it make a version for each class with different words?",
-        a: "Yes. Point it at each list in turn, or at one spreadsheet with a sheet per class.",
-      },
-      {
-        q: "What if one of my words won't fit the grid?",
-        a: "With a long or awkward list, Stella leaves out any word that won't interlock and names it, so you can swap it for another or ask for a second puzzle with the leftovers.",
-      },
-      {
-        q: "What else can I make from the same list?",
-        a: "A [word search](/how/study/make-a-word-search), [printable flashcards](/how/study/print-flashcards-double-sided) or [Anki cards](/how/study/make-anki-flashcards-from-notes).",
-      },
+      ["Can I use my own clues instead of definitions?", "Yes. Put them in a column of the spreadsheet, or tell Stella which column to use."],
+    ],
+    byHand: [
+      "Open a free maker such as [Criss-Cross Puzzlemaker](https://puzzlemaker.discoveryeducation.com/criss-cross).",
+      "Enter each word and its clue, one per line, in the format the site shows.",
+      "Generate it, check every word fitted, then print the puzzle and the key.",
     ],
     related: ["study/make-a-word-search", "study/print-flashcards-double-sided", "study/make-anki-flashcards-from-notes"],
-    lastChecked: "2026-11-14",
-    sources: [{ label: "Discovery Education Puzzlemaker: Criss-Cross", href: "https://puzzlemaker.discoveryeducation.com/criss-cross" }],
-  },
-  {
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "make-a-study-guide-from-notes",
     niche: "study",
-    searchPhrases: ["make a study guide", "study guide maker", "study guide generator", "study guide from notes", "how to make a study guide"],
+    searchPhrases: [
+      "make a study guide",
+      "study guide maker",
+      "study guide generator",
+      "study guide from notes",
+      "how to make a study guide",
+    ],
     title: "Make a study guide from your lecture notes",
     description:
-      "Turn lecture notes in Word, PDF, Markdown and text into one study guide: key terms with short definitions and each lecture's main points. By hand, or Stella (stella.sh).",
+      "Make a study guide from your lecture notes: each lecture's main points and every key term defined, from Word, PDF or text files. Stella (stella.sh) drafts it.",
     h1: "Make a study guide from your lecture notes",
     short: "Study guide from notes",
-    lede: "Four lectures in four file types as one guide: 24 terms and each lecture's main points.",
+    lede: "One study guide built from all your lecture notes",
     answer:
-      "Open your notes lecture by lecture and, in one new document, write a heading per lecture, its two or three main points, and each key term with a one-line definition in your own words. Doing it yourself is also good revision. Stella (stella.sh) drafts the guide on your computer from notes in any mix of Word, PDF, Markdown and text files, keeping other courses out.",
-    stellaSteps: [
-      "Finds the four BIO 152 lectures in Documents, each in a different format (Word, PDF, Markdown and plain text), plus the midterm info sheet",
-      "Leaves out the history notes in another folder, and checks the info sheet to confirm the midterm covers all four lectures",
-      "Writes the guide lecture by lecture: main points first, then the key terms with short definitions, 24 terms in all",
-      "Saves it as a web page, `BIO 152 Midterm Study Guide.html`, in the BIO 152 folder, which opens in any browser and prints",
-      "Flags that the exam date in the notes may be from an old syllabus, and that a quiz deadline has no date",
+      "Point Stella (stella.sh) at your lecture notes, in any mix of Word, PDF and text files. It writes one study guide with each lecture's main points and every key term defined.",
+    gets: [
+      "Main points, lecture by lecture",
+      "Every key term with a short definition",
+      "Only the course you asked about",
     ],
     prompt:
-      "Make me one study guide for my biology midterm from my lecture notes in Documents: the key terms with short definitions and the main points of each lecture.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "A study guide in about a minute and a half. Checked afterwards against an answer key written before the run: one guide with all 24 key terms, each defined as in the notes, 11 of the 12 main points the key listed, nothing from the history notes, lectures in order 1–4, and the notes unchanged.",
-      note: "The lecture notes were written for this run and were already short: the guide is 496 words against their 465. The work is sped up 3×.",
-      video: {
-        src: `${PROOFS}/study/make-a-study-guide-from-notes/proof.mp4`,
-        cuts: webCuts("study/make-a-study-guide-from-notes"),
-        poster: `${PROOFS}/study/make-a-study-guide-from-notes/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 47.4,
-        speed: 3,
-        realDuration: 92,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. Four biology lectures in different file types are in Documents." },
-        { at: 2.1, text: "The prompt: one study guide with key terms, short definitions and each lecture's main points." },
-        { at: 15.3, text: "Stella replies it has started going through the notes." },
-        { at: 21.1, text: "Reading the notes and writing the guide, sped up 3×." },
-        { at: 33.4, text: "Done: all four lectures, 24 terms, history notes left out, and a warning that the exam date may be old." },
-      ],
+      "Make me one study guide for my biology midterm from my lecture notes in Documents: key terms with short definitions and the main points of each lecture.",
+    demo: {
+      ack: "Good luck. Reading your lectures now.",
+      task: "BIO 152 midterm study guide",
+      rows: ["Reading four lectures", "Pulling out 24 key terms", "Leaving out your history notes"],
+      reply:
+        "Your study guide is in the BIO 152 folder. The exam date in your notes may be from an old syllabus, so check it.",
+      files: ["BIO 152 Midterm Study Guide.html"],
     },
-    manualTitle: "Make it yourself",
-    manualSteps: [
-      {
-        title: "Gather the right notes",
-        body: "Check the syllabus or exam sheet for which lectures are covered, and open only those. Notes in PDF can be copied from; scanned pages need retyping or text recognition.",
-      },
-      {
-        title: "One heading per lecture",
-        body: "In a new Word or Google Docs document, add a heading for each lecture in order. Under each, write two or three sentences on the main ideas.",
-      },
-      {
-        title: "Terms and definitions",
-        body: "List every bold or defined term with a one-line definition in your own words. A two-column table (term, definition) makes it easy to cover one side and test yourself.",
-      },
-      {
-        title: "Keep it short",
-        body: "A guide should be shorter than the notes. If a section runs long, cut examples and keep the definitions. The [UNC Learning Center](https://learningcenter.unc.edu/tips-and-tools/studying-101-study-smarter-not-harder/) suggests turning it into practice questions too.",
-      },
+    faq: [
+      ["Can it make practice questions too?", "Yes. Ask for multiple-choice or short-answer questions, with the answers on a separate page."],
+    ],
+    byHand: [
+      "Check which lectures the exam covers and open just those.",
+      "In a new document, add a heading per lecture and two or three sentences on its main ideas.",
+      "List each key term with a one-line definition in your own words.",
+    ],
+    related: [
+      "study/make-anki-flashcards-from-notes",
+      "study/make-a-bibliography-from-a-list-of-sources",
+      "study/print-flashcards-double-sided",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Can it make practice questions too?",
-        a: "Yes, from the same notes, in the same chat. Ask for multiple-choice or short-answer questions with an answer key on a separate page.",
-      },
-      {
-        q: "Does it work with handwritten or scanned notes?",
-        a: "Scans work: Stella runs text recognition on them first. Typed notes read most accurately, then neat handwriting.",
-      },
-      {
-        q: "Can it add material from my textbook?",
-        a: "Yes. Point Stella at the textbook file or chapter and ask for it; otherwise the guide sticks to what's in your notes.",
-      },
-      {
-        q: "Can I get the guide as a Word document or PDF?",
-        a: "Yes, name the format in the prompt. Without one, Stella saves a web page that opens in any browser and prints.",
-      },
-      {
-        q: "Can I get the terms as flashcards?",
-        a: "Yes: see [make Anki flashcards from notes](/how/study/make-anki-flashcards-from-notes) or [print double-sided flashcards](/how/study/print-flashcards-double-sided).",
-      },
-      {
-        q: "Can it put my class times in a timetable?",
-        a: "Yes: see [make a class timetable](/how/study/make-a-class-timetable) from your registration PDF.",
-      },
-    ],
-    related: ["study/make-anki-flashcards-from-notes", "study/make-a-bibliography-from-a-list-of-sources", "study/print-flashcards-double-sided", "study/make-a-class-timetable", "pdf-excel/make-scanned-pdf-searchable"],
-    lastChecked: "2026-11-14",
-    sources: [{ label: "UNC Learning Center: Studying 101", href: "https://learningcenter.unc.edu/tips-and-tools/studying-101-study-smarter-not-harder/" }],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "make-a-class-timetable",
     niche: "study",
-    searchPhrases: ["class timetable maker", "class schedule maker", "make a class timetable", "weekly class schedule template", "college schedule from registration"],
+    searchPhrases: [
+      "class timetable maker",
+      "class schedule maker",
+      "make a class timetable",
+      "weekly class schedule template",
+      "college schedule from registration",
+    ],
     title: "Make a class timetable from your registration PDF",
     description:
-      "Turn a college registration summary into a printable weekly timetable spreadsheet, Monday to Friday with times down the side: by hand in Excel, or Stella (stella.sh).",
+      "Make a class timetable from your registration: Monday to Friday, times down the side, each class in its slot with its room. Stella (stella.sh) builds the spreadsheet.",
     h1: "Make a class timetable from your registration",
     short: "Class timetable",
-    lede: "A registration PDF as a one-page weekly timetable, each class in its own colour.",
+    lede: "Your weekly class timetable, ready to print",
     answer:
-      "Put Monday to Friday across the top of a spreadsheet and times in half-hour steps down the side, then for each class merge the cells from its start to its end time on each day it meets and type the course and room. Leave out dropped courses and list online ones underneath. Stella (stella.sh) builds that timetable from the registration PDF your college gives you, on your computer.",
-    stellaSteps: [
-      "Finds `Spring 2027 registration - Pellow State.pdf` in Documents and reads its course table: 12 weekly meetings across six in-person courses, including a Thursday lab",
-      "Leaves out HIST 105, marked Dropped, and keeps the online PSY 101 off the grid because it has no meeting time",
-      "Builds a spreadsheet with its built-in Office document tool: Monday to Friday across, 8 AM to 5 PM down the side, each class a colour-coded block with course, time and room",
-      "Notes the online course and the dropped one under the grid, and sets it to print on one landscape page",
-      "Saves `Spring 2027 timetable - Pellow State.xlsx` in Documents with a print preview image, and flags a likely credit typo in the registration",
+      "Give Stella (stella.sh) your registration PDF. It builds a printable weekly timetable, Monday to Friday with times down the side, each class in the right slot with its room.",
+    gets: [
+      "Every class on the right day and time",
+      "A colour per course, room included",
+      "Dropped and online courses kept off the grid",
     ],
     prompt:
       "Turn my class registration in Documents into a weekly timetable spreadsheet I can print, Monday to Friday with the times down the side.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "A printable timetable in about 3 minutes. Checked afterwards against an answer key written before the run: a new spreadsheet with Monday to Friday across and times down the side, all 12 weekly class meetings in the right day and time slot, no class on a day or time it doesn't meet, the dropped HIST 105 left out, the online PSY 101 not given a time slot, and the registration PDF unchanged.",
-      note: "The college, courses and registration are made up for this run, with a dropped course and an online one on purpose. The work is sped up 11×.",
-      video: {
-        src: `${PROOFS}/study/make-a-class-timetable/proof.mp4`,
-        cuts: webCuts("study/make-a-class-timetable"),
-        poster: `${PROOFS}/study/make-a-class-timetable/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 48.2,
-        speed: 11,
-        realDuration: 177,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A class registration PDF is in Documents." },
-        { at: 2.1, text: "The prompt: a printable weekly timetable spreadsheet, Monday to Friday with times down the side." },
-        { at: 16.5, text: "Stella replies it is building the timetable to print on one landscape page." },
-        { at: 22.3, text: "Reading the registration and building the spreadsheet, sped up 11×." },
-        { at: 34.2, text: "Done: colour-coded blocks from 8 AM to 5 PM, the online and dropped courses noted, and a possible credit typo flagged." },
-      ],
+    demo: {
+      ack: "Sure. Reading your registration.",
+      task: "Spring 2027 timetable",
+      rows: ["Placing 12 weekly class meetings", "Leaving out the dropped HIST 105"],
+      reply:
+        "Your timetable is in Documents and prints on one page. Online PSY 101 has no set time, so it's listed under the grid.",
+      files: ["Spring 2027 timetable - Pellow State.xlsx"],
     },
-    manualTitle: "Make it yourself",
-    manualSteps: [
-      {
-        title: "Set up the grid",
-        body: "In Excel, Numbers or Google Sheets, type Monday to Friday across row 1 from column B, and times down column A in half-hour steps (8:00, 8:30 … 17:00) from row 2.",
-      },
-      {
-        title: "Add each class",
-        body: "For each meeting, select the cells in that day's column from the start time to the end time, merge them (Excel: Home, [Merge & Center](https://support.microsoft.com/en-us/office/merge-and-unmerge-cells-5cbd15d5-9375-4540-907f-c673a93fcedf)) and type the course code, time and room. Give each course its own fill colour.",
-      },
-      {
-        title: "Handle the odd ones",
-        body: "Leave out anything marked Dropped or Withdrawn. Online courses with no meeting time go in a note under the grid, not in a time slot.",
-      },
-      {
-        title: "Fit it to one page",
-        body: "In Excel choose Page Layout, Orientation, Landscape, and under Scale to Fit set Width and Height to 1 page. Check File, Print preview before printing.",
-      },
+    faq: [
+      ["Can I put the timetable in my calendar?", "Yes. Ask for a calendar file with repeating events for the term. Google Calendar, Outlook and Apple Calendar all import it."],
+    ],
+    byHand: [
+      "In a spreadsheet, put Monday to Friday across the top and times in half-hour steps down the side.",
+      "For each class, merge the cells from its start to end time and type the course and room.",
+      "Set the page to Landscape and scale it to fit one page.",
+    ],
+    related: [
+      "study/make-a-study-guide-from-notes",
+      "contacts-calendar-email/convert-ics-to-excel",
+      "study/make-anki-flashcards-from-notes",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Can I put the timetable in my calendar instead?",
-        a: "Yes. Ask Stella for a calendar file (.ics) with repeating events for the term, which Google Calendar, Outlook and Apple Calendar import.",
-      },
-      {
-        q: "Will it work with my college's registration format?",
-        a: "Any registration summary or schedule with course, days and times works: a PDF, a screenshot, or text copied from the student portal.",
-      },
-      {
-        q: "Can I change the colours or the time range?",
-        a: "It's an ordinary spreadsheet, so edit it directly, or ask Stella to change colours, hours or paper size.",
-      },
-      {
-        q: "A room or time changed after I registered. Can it update the timetable?",
-        a: "Yes. Tell Stella the change and it updates the sheet. For a class that meets only on alternate weeks, give the weeks and it adds a note for that class under the grid.",
-      },
-      {
-        q: "Can it help with studying for those classes?",
-        a: "Yes: see [make a study guide from notes](/how/study/make-a-study-guide-from-notes) and [make Anki flashcards](/how/study/make-anki-flashcards-from-notes).",
-      },
-    ],
-    related: ["study/make-a-study-guide-from-notes", "contacts-calendar-email/convert-ics-to-excel", "study/make-anki-flashcards-from-notes"],
-    lastChecked: "2026-11-14",
-    sources: [
-      { label: "Microsoft Support: Merge and unmerge cells", href: "https://support.microsoft.com/en-us/office/merge-and-unmerge-cells-5cbd15d5-9375-4540-907f-c673a93fcedf" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "make-a-bibliography-from-a-list-of-sources",
     niche: "study",
-    searchPhrases: ["apa reference list generator", "bibliography generator", "create bibliography", "reference list generator", "generate reference list apa 7"],
+    searchPhrases: [
+      "apa reference list generator",
+      "bibliography generator",
+      "create bibliography",
+      "reference list generator",
+      "generate reference list apa 7",
+    ],
     title: "Make an APA 7 reference list from your messy notes",
     description:
-      "Turn sources pasted from your notes into an APA 7 reference list in Word, sorted and formatted, with gaps flagged: Zotero, Word's References tab, or Stella (stella.sh).",
+      "Make an APA 7 reference list from a messy list of sources: formatted, sorted and in Word, with gaps highlighted rather than made up. Stella (stella.sh) does it.",
     h1: "Make an APA reference list from your list of sources",
     short: "APA reference list from notes",
-    lede: "Twelve sources written twelve different ways, as one sorted APA 7 list in Word.",
+    lede: "A proper APA 7 reference list from your messy source notes",
     answer:
-      "Citation sites and Word's References tab take one source at a time through a form. With a list already in your notes, Zotero can fetch most details from DOIs, and you type the rest. Either way, sort by surname then year and check every entry. Stella (stella.sh) turned a messy list of twelve sources into an APA 7 reference list in Word, and highlighted the two entries where the notes lacked details instead of making them up.",
-    stellaSteps: [
-      "Reads sources.txt in Documents: twelve sources in twelve styles, plus a note about a podcast that isn't being used",
-      "Formats each as APA 7: surname and initials, the year in brackets, sentence-case titles, volume(issue) and pages, and DOIs as https://doi.org/ links",
-      "Sorts them the APA way, so Lindqvist alone comes before Lindqvist & Osei, and an author's 2015 book before their 2019 one",
-      "Saves `APA References - Sleep Essay.docx` on A4 paper, with journal and book titles in italics and hanging indents",
-      "Highlights two entries in yellow where the notes lacked details, and says so in its reply",
-      "Notices that every DOI and web address in the notes is a placeholder that won't open, so it built the entries from the notes alone",
-    ],
-    prompt: "My essay sources are listed in sources.txt in Documents. Turn them into a proper APA 7 reference list in a Word document, in the right order.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "A reference list in under two minutes. Checked afterwards against an answer key written before the run: a new Word document with all 12 sources, each with its year after the authors, in APA order, with DOI links, volume(issue), pages, “&” and URLs right, titles in italics, hanging indents, the podcast left out, no placeholder text, and sources.txt unchanged.",
-      note: "The sources are fictitious, written for this run, with DOIs on a test prefix (10.5555) and web addresses ending in .example. The work is sped up 5×.",
-      video: {
-        src: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/proof.mp4`,
-        cuts: webCuts("study/make-a-bibliography-from-a-list-of-sources"),
-        poster: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 43,
-        speed: 5,
-        realDuration: 101,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A list of essay sources, sources.txt, is in Documents." },
-        { at: 1.7, text: "The prompt: a proper APA 7 reference list in a Word document, in the right order." },
-        { at: 12.1, text: "Stella replies it will build the list and say if any source is missing details." },
-        { at: 18.2, text: "Formatting and sorting the sources, sped up 5×." },
-        { at: 28.8, text: "Done: 12 entries, the podcast left out, two entries flagged for missing details, and a note that the links in the notes are placeholders." },
-      ],
-      shots: [
-        {
-          src: `${PROOFS}/study/make-a-bibliography-from-a-list-of-sources/references.jpg`,
-          alt: "The first page of the Word reference list: “References” centred, then entries from Achterberg 2015 to Wakefield & Patel 2016 with hanging indents and italic titles. “Osei” in the Lindqvist & Osei 2021 entry and “n.d.” in the Ministry of Student Affairs entry are highlighted yellow.",
-          width: 910,
-          height: 1110,
-          caption: "The first page of the Word file Stella made. Yellow marks the two gaps it flagged.",
-        },
-      ],
+      "Give Stella (stella.sh) your list of sources, in whatever shape it's in. It formats each one in APA 7, sorts them properly and saves a Word document, highlighting any detail your notes lack.",
+    gets: ["Every source in APA 7 style", "Sorted by surname, then year", "Missing details highlighted, never guessed"],
+    prompt:
+      "My essay sources are listed in sources.txt in Documents. Turn them into a proper APA 7 reference list in a Word document, in the right order.",
+    demo: {
+      ack: "Sure. Formatting your sources.",
+      task: "APA list for the sleep essay",
+      rows: ["Formatting 12 sources", "Sorting by author and year", "Marking two incomplete entries"],
+      reply:
+        "Your reference list is saved in Documents. Two entries are highlighted in yellow; one is missing Osei's initials.",
+      files: ["APA References - Sleep Essay.docx"],
     },
-    manualTitle: "Make it yourself",
-    manualSteps: [
-      {
-        title: "Fetch what you can from DOIs",
-        body: "In the free Zotero, or ZoteroBib in a browser, use Add item by identifier and paste each DOI. It fills in authors, title, journal, volume and pages. Books can come in by ISBN; type the rest by hand.",
-      },
-      {
-        title: "Or use Word's References tab",
-        body: "In Word on Windows, choose References › Style: APA, then Manage Sources › New for each source, and Bibliography › References to insert the list. It's one form per source, so slow for a long list.",
-      },
-      {
-        title: "Sort it the APA way",
-        body: "Order by the first author's surname. One author alone comes before the same author with co-authors, and two works by the same author go oldest first. Ignore “The” and “A” at the start of a group author or title.",
-      },
-      {
-        title: "Format the details",
-        body: "Initials after surnames, “&” before the last author, the year in brackets, journal names and volume numbers in italics, then (issue), pages and the DOI as a link. Titles of articles and books take sentence case.",
-      },
-      {
-        title: "Fill the gaps",
-        body: "If there's no date, APA uses (n.d.). For an author's missing initials, look them up in the original article. Then set a hanging indent of 0.5 inch in the paragraph settings (Special: Hanging).",
-      },
+    faq: [
+      ["Can it do MLA or Chicago instead?", "Yes. Name the style and edition in your message."],
+    ],
+    byHand: [
+      "In the free ZoteroBib, paste each DOI to fill in the details, and type in the rest.",
+      "Sort by first author's surname. One author alone comes before the same author with co-authors.",
+      "Set a 0.5 inch hanging indent (Paragraph, Special: Hanging).",
+    ],
+    related: [
+      "study/make-a-study-guide-from-notes",
+      "study/make-anki-flashcards-from-notes",
+      "study/export-kindle-highlights",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Can it do MLA or Chicago instead of APA?",
-        a: "Yes, say which style and edition in the prompt, and your paper size if it's US Letter. The same rule applies: it formats what's in your notes and flags what's missing.",
-      },
-      {
-        q: "What happens when my notes are missing a detail?",
-        a: "Stella uses (n.d.) where there's no publication date and highlights any gap in yellow, such as Osei's missing initials, so you can fill it from the original source. Where it borrows a detail from another of your sources, like Lindqvist's initials, it says so in its reply.",
-      },
-      {
-        q: "Can it check that my DOIs are real?",
-        a: "Yes. Stella tries each DOI and link, and with real ones it can look the source up online. Here every DOI used a test prefix and the web addresses ended in .example, so it said none would open and worked from the notes.",
-      },
-      {
-        q: "Can it turn my notes into study material too?",
-        a: "Yes: see [make a study guide from notes](/how/study/make-a-study-guide-from-notes) and [make Anki flashcards from notes](/how/study/make-anki-flashcards-from-notes).",
-      },
-    ],
-    related: ["study/make-a-study-guide-from-notes", "study/make-anki-flashcards-from-notes", "study/export-kindle-highlights", "documents/merge-word-documents"],
-    lastChecked: "2026-11-14",
-    sources: [
-      { label: "APA Style: Reference examples", href: "https://apastyle.apa.org/style-grammar-guidelines/references/examples" },
-      { label: "APA Style: Missing reference information", href: "https://apastyle.apa.org/style-grammar-guidelines/references/missing-information" },
-      { label: "Zotero: Creating bibliographies", href: "https://www.zotero.org/support/creating_bibliographies" },
-    ],
-  },
+    lastChecked: "2026-11-24",
+  }),
 ];

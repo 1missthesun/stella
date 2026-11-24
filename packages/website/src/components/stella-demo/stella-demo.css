@@ -1,0 +1,121 @@
+/* What the replica needs beyond the app's own rules (app.generated.css). */
+.sd {
+  --font-family-sans: var(--sd-manrope), "Manrope", system-ui, sans-serif;
+  position: relative;
+  height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  text-align: left;
+  -webkit-text-size-adjust: 100%;
+}
+
+.sd [hidden] {
+  display: none !important;
+}
+
+.sd p,
+.sd ul {
+  margin: 0;
+}
+
+.sd button {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  cursor: default;
+}
+
+.sd .markdown a {
+  pointer-events: none;
+}
+
+.sd[data-paused] *,
+.sd[data-paused] *::before,
+.sd[data-paused] *::after {
+  animation-play-state: paused !important;
+}
+
+.sd .sd-placeholder {
+  color: var(--text-weaker);
+}
+
+.sd .sd-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1.15em;
+  margin: 0 0 -0.2em;
+  background: var(--text-strong);
+  animation: sd-caret 1060ms steps(1) infinite;
+}
+
+.sd .sd-caret + .sd-placeholder {
+  margin-left: -1px;
+}
+
+@keyframes sd-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.sd .sd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sd .event-user-body,
+.sd .composer-model-mention-field {
+  min-width: 0;
+}
+
+.sd .composer-model-mention-field {
+  display: flex;
+  flex: 1;
+}
+
+.sd .composer-input {
+  min-width: 0;
+}
+
+.sd .file-preview-card [data-demo-card-image] {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sd .file-preview-card [data-demo-card-lines] {
+  margin: 0;
+  padding: 10px 14px 12px;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: var(--font-size-md);
+  color: var(--text-base);
+}
+
+/* Still frames on guide cards. */
+.sd-still {
+  pointer-events: none;
+}
+
+.sd-still .app {
+  display: block;
+}
+
+/*
+ * The app centres the home content with flexbox. A page counts every re-centre
+ * as the prompt wraps as a layout shift, so the replica centres it with a
+ * transform, which looks the same and isn't counted.
+ */
+.sd .full-body-home-overlay > .home-content {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  transform: translateY(-50%);
+}

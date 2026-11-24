@@ -3,17 +3,15 @@ import type { Niche, ProblemPage } from "./types";
 /**
  * The quality gate. Every published problem page passes through here when the
  * site builds (the routes, sitemap and llms.txt all read pages through
- * `publishedProblemPages()`), so a thin, duplicated or unproven page fails
+ * `publishedProblemPages()`), so a thin, duplicated, long or technical page fails
  * `next build` with a list of what to fix. Mark a page `draft: true` to keep
  * it out of the site while it's being written.
  */
 
-/** Words of page-specific content (answer, Stella steps, prompt, manual steps, FAQ). */
-export const MIN_UNIQUE_WORDS = 380;
 /** Share of a page's 5-word phrases that may also appear in any one other page. */
 export const MAX_OVERLAP = 0.25;
-/** Published pages allowed without a proof run at once. */
-export const MAX_STEPS_ONLY = 3;
+/** Everything readable on the page that's its own, in words. */
+export const WORDS = { min: 80, max: 260 };
 /** A page whose facts weren't checked within this many days fails. */
 export const MAX_AGE_DAYS = 365;
 
@@ -28,7 +26,8 @@ const BANNED: { pattern: RegExp; why: string }[] = [
   { pattern: /\b(flights?|restaurants?)\b/i, why: "demo tasks are never flights or restaurants" },
   { pattern: /free forever|actually free|try stella/i, why: "banned price wording" },
   { pattern: /log ?in with claude|sign in with claude/i, why: "say “use your Claude plan”" },
-  { pattern: /\b(revolutionary|game-?changer|supercharge|seamless(ly)?|effortless(ly)?|magic(al)?)\b/i, why: "no hype" },
+  // “Seamless Co-op” is the name of a mod.
+  { pattern: /\b(revolutionary|game-?changer|supercharge|seamless(?! co-?op)(ly)?|effortless(ly)?|magic(al)?)\b/i, why: "no hype" },
   { pattern: /\bunlimited\b/i, why: "never imply unlimited use" },
   // Pages show how the job is done; cautions live in the terms of service.
   { pattern: /\bStella (?:won['’]t|can['’]t|cannot|can not|doesn['’]t|does not|will not|refuses?|stops short)\b/i, why: "no “Stella can't/won't” lines" },
@@ -36,6 +35,13 @@ const BANNED: { pattern: RegExp; why: string }[] = [
   { pattern: /\bonly (?:for|with|use this on) (?:content|files|software|things) you own\b/i, why: "no cautions or disclaimers" },
   { pattern: /\bmake sure you have (?:permission|the right)/i, why: "no cautions or disclaimers" },
 ];
+
+/**
+ * Guides are for people who don't know, and shouldn't need to know, how
+ * it's done. These may appear only when they're part of what people search for.
+ */
+const JARGON =
+  /`|\\\\?[A-Z][a-z]+\\\\|\s--?[a-z]{2,}|\b(?:sha-?\d+|md5|checksums?|hash(?:es|ed|ing)?|bytecode|opcodes?|disassembl\w+|assembly|hex(?:adecimal)?|offsets?|binary|binaries|compil\w+|obfuscat\w+|symlinks?|hard[- ]?links?|regex|cli|command[- ]line|terminal|powershell|json|xml|yaml|lua|ini files?|config(?:uration)? files?|registry|environment variables?|dependenc(?:y|ies)|repositor(?:y|ies)|api|sdk|jdk|runtime|parser|script extender|dll|ports?|trackers?|dht|peers?|protocols?|encryption keys?|sftp|ssh|root|admin rights|plugins?|frameworks?|loaders?|manifests?|metadata|endpoints?|headers?|payloads?|certificates?)\b/gi;
 
 const STOP = new Set(
   "a an the and or of on in to for with your you my is it how do i can what why at by from into this that be".split(" "),
@@ -53,11 +59,15 @@ const words = (text: string) =>
 export function uniqueText(page: ProblemPage): string {
   return [
     page.answer,
-    ...page.stellaSteps,
+    ...page.gets,
     page.prompt,
     page.costNote ?? "",
-    ...page.manualSteps.flatMap((step) => [step.title, step.body]),
     ...page.faq.flatMap((item) => [item.q, item.a]),
+    page.demo.ack,
+    page.demo.task,
+    ...page.demo.rows,
+    page.demo.reply,
+    ...(page.byHand ?? []),
   ].join(" ");
 }
 
@@ -111,13 +121,6 @@ export function checkProblemPages(
     }
   }
 
-  const stepsOnly = live.filter((page) => page.proof.kind === "steps-only");
-  if (stepsOnly.length > MAX_STEPS_ONLY) {
-    global.push(
-      `${stepsOnly.length} published pages are steps-only (max ${MAX_STEPS_ONLY}): record proofs or mark some as drafts.`,
-    );
-  }
-
   const prints = new Map(live.map((page) => [`${page.niche}/${page.slug}`, shingles(uniqueText(page))]));
 
   const reports = live.map((page): GateReport => {
@@ -147,18 +150,35 @@ export function checkProblemPages(
     need(key.length > 0 && hit / key.length >= 0.5, `h1 shares only ${hit}/${key.length} words with “${page.searchPhrases[0]}”`);
 
     const answerWords = words(page.answer).length;
-    need(answerWords >= 30 && answerWords <= 110, `answer is ${answerWords} words (30–110: two or three sentences)`);
+    need(answerWords >= 18 && answerWords <= 50, `answer is ${answerWords} words (18–50: one or two sentences)`);
     need(page.answer.includes("Stella (stella.sh)"), "answer must name “Stella (stella.sh)” on first mention");
-    need(page.stellaSteps.length >= 3, "at least 3 Stella steps");
+    need(page.gets.length >= 2 && page.gets.length <= 4, "2 to 4 things you get");
+    for (const line of page.gets) need(words(line).length <= 16, `“${line}” is ${words(line).length} words (max 16)`);
+    need(page.faq.length >= 1 && page.faq.length <= 4, "1 to 4 questions");
+    for (const item of page.faq) need(words(item.a).length <= 35, `the answer to “${item.q}” is ${words(item.a).length} words (max 35)`);
+
+    const { ack, task, rows, reply } = page.demo;
+    need(words(ack).length >= 3 && words(ack).length <= 20, `demo ack is ${words(ack).length} words (3–20)`);
+    need(task.length <= 44, "demo task name over 44 characters");
+    need(rows.length >= 2 && rows.length <= 4, "2 to 4 demo rows");
+    for (const row of rows) need(words(row).length <= 9, `demo row “${row}” is ${words(row).length} words (max 9)`);
+    need(words(reply).length >= 8 && words(reply).length <= 50, `demo reply is ${words(reply).length} words (8–50)`);
+
+    const searched = new Set(words([page.title, page.h1, ...page.searchPhrases].join(" ")));
+    const plain = (text: string, ok: Set<string>, where: string) => {
+      for (const hit of text.matchAll(JARGON)) {
+        const said = words(hit[0]);
+        if (!said.length || !said.every((w) => searched.has(w) || ok.has(w))) errors.push(`“${hit[0].trim()}” is too technical for ${where}`);
+      }
+    };
+    plain([page.lede, page.answer, ...page.gets, page.prompt, ack, task, ...rows, reply].join("\n"), new Set(), "a guide");
+    // A question can use the word people typed; its answer may then use it too.
+    for (const item of page.faq) plain(item.a, new Set(words(item.q)), "an answer");
+
+    need((page.byHand ?? []).length <= 5, "at most 5 by-hand lines");
+    for (const line of page.byHand ?? []) need(words(line).length <= 28, `by-hand line “${line.slice(0, 40)}…” is ${words(line).length} words (max 28)`);
     need(words(page.prompt).length >= 8, "prompt under 8 words: make it specific enough to paste");
-    need(page.manualSteps.length >= 3, "at least 3 manual steps");
-    for (const step of page.manualSteps) {
-      need(words(step.body).length >= 12, `manual step “${step.title}” is too thin`);
-    }
-    need(page.faq.length >= 3, "at least 3 FAQ entries");
     need(page.platforms.length > 0, "list the platforms");
-    need(page.sources.length >= 1, "cite at least one source");
-    for (const source of page.sources) need(/^https:\/\//.test(source.href), `source ${source.href} must be https`);
 
     need(page.related.length >= 2, "link at least 2 related problems");
     for (const rel of page.related) {
@@ -171,37 +191,14 @@ export function checkProblemPages(
     need(age >= -1, "lastChecked is in the future");
     need(age <= MAX_AGE_DAYS, `facts last checked ${Math.floor(age)} days ago: recheck and update lastChecked`);
 
-    const proof = page.proof;
-    if (proof.kind === "steps-only") {
-      need(proof.reason.length >= 20, "steps-only pages must say why there's no proof yet");
-    } else {
-      need(ISO_DATE.test(proof.recordedOn), "proof.recordedOn must be YYYY-MM-DD");
-      need(proof.platform && proof.model, "proof must name its platform and model");
-      need(words(proof.result).length >= 8, "proof.result must say what the run produced");
-      if (proof.kind === "video") {
-        need(/\.mp4$/.test(proof.video.src), "video must be an MP4");
-        need(proof.video.poster, "video needs a poster");
-        need(!proof.video.captions || /\.vtt$/.test(proof.video.captions), "captions must be WebVTT");
-        need(proof.moments.length >= 3, "video needs at least 3 transcript moments");
-        if (proof.output) need(/\.mp4$/.test(proof.output.src) && proof.output.poster, "output video needs an MP4 and a poster");
-        need(
-          proof.moments.every((m, i, all) => m.at >= 0 && m.at <= proof.video.duration && (i === 0 || m.at > all[i - 1].at)),
-          "transcript moments must be in order and inside the video",
-        );
-      } else {
-        need(proof.shots.length >= 3, "a screenshot proof needs at least 3 shots");
-      }
-      for (const shot of proof.shots ?? []) need(shot.alt.length >= 10, `shot ${shot.src} needs real alt text`);
-    }
-
-    const text = [page.title, page.h1, page.description, page.lede, uniqueText(page), proof.kind === "steps-only" ? "" : `${proof.result} ${proof.note ?? ""}`].join(" ");
+    const text = [page.title, page.h1, page.description, page.lede, uniqueText(page)].join(" ");
     for (const rule of BANNED) {
       const match = text.match(rule.pattern);
       if (match) errors.push(`“${match[0]}”: ${rule.why}`);
     }
 
     const count = words(uniqueText(page)).length;
-    need(count >= MIN_UNIQUE_WORDS, `${count} words of its own content (min ${MIN_UNIQUE_WORDS})`);
+    need(count >= WORDS.min && count <= WORDS.max, `${count} words (${WORDS.min}–${WORDS.max})`);
 
     let overlap = 0;
     let overlapWith: string | null = null;

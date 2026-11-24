@@ -107,7 +107,7 @@
   }
 }
 
-/* ── Stage: the recording as a window, like the home product shot ── */
+/* ── Stage: the example chat as a window, like the home product shot ── */
 
 .stage {
   position: relative;
@@ -117,117 +117,6 @@
   box-sizing: content-box;
   max-width: calc(100% - 2 * var(--l-margin));
   animation: rise 1300ms cubic-bezier(0.2, 1, 0.3, 1) 320ms both;
-}
-
-.wall {
-  position: relative;
-}
-
-/* Steps-only pages: the prompt card on a plain light panel. */
-.wall[data-prompt] {
-  padding: clamp(40px, 6vw, 88px) clamp(16px, 4vw, 64px);
-  border-radius: clamp(18px, 2vw, 26px);
-  background: #f4f4f6;
-}
-
-.window {
-  position: relative;
-  overflow: hidden;
-  border-radius: clamp(8px, 1vw, 14px);
-  background: #1c1c1f;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.09),
-    0 50px 120px -30px rgba(10, 20, 60, 0.55);
-}
-
-.video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  cursor: pointer;
-}
-
-.play {
-  position: absolute;
-  left: clamp(10px, 1.6vw, 20px);
-  bottom: clamp(10px, 1.6vw, 20px);
-  display: grid;
-  place-items: center;
-  width: clamp(36px, 3.4vw, 46px);
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0a0a0d;
-  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  transition: transform 260ms cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-
-.play:hover {
-  transform: scale(1.06);
-}
-
-.play svg {
-  width: 42%;
-  height: 42%;
-  fill: currentColor;
-}
-
-.progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.progress i {
-  display: block;
-  height: 100%;
-  width: calc(var(--p, 0) * 100%);
-  background: rgba(255, 255, 255, 0.85);
-}
-
-.caption {
-  display: flex;
-  gap: 14px;
-  align-items: baseline;
-  max-width: 62ch;
-  min-height: 3.2em;
-  margin: clamp(20px, 3svh, 28px) 0 0;
-  font-size: clamp(17px, 1.3vw, 20px);
-  font-weight: 520;
-  line-height: 1.4;
-  letter-spacing: -0.015em;
-  color: var(--h-ink);
-}
-
-.caption time {
-  flex: none;
-  font-variant-numeric: tabular-nums;
-  font-weight: 640;
-  color: var(--h-accent);
-}
-
-.made {
-  max-width: 70ch;
-  margin: 10px 0 0;
-  font-size: 15px;
-  line-height: 1.5;
-  letter-spacing: -0.008em;
-  color: var(--h-muted);
-}
-
-/* Steps-only guides: the prompt itself is the visual. */
-.stageNote {
-  max-width: 62ch;
-  margin: clamp(18px, 2.6svh, 24px) 0 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--h-muted);
 }
 
 /* ── Sections, laid out like the home page's Questions ─ */
@@ -286,8 +175,7 @@
 .answer a,
 .text a,
 .rows a,
-.lead a,
-.result a {
+.lead a {
   color: var(--h-ink);
   font-weight: 600;
   text-decoration: underline;
@@ -300,8 +188,7 @@
 .answer a:hover,
 .text a:hover,
 .rows a:hover,
-.lead a:hover,
-.result a:hover {
+.lead a:hover {
   color: var(--h-accent);
 }
 
@@ -314,92 +201,6 @@
   font-weight: 560;
   color: var(--h-ink);
   overflow-wrap: anywhere;
-}
-
-/* What happened */
-
-.result {
-  max-width: 50ch;
-  margin: 0;
-  font-size: clamp(20px, 1.7vw, 26px);
-  font-weight: 520;
-  line-height: 1.38;
-  letter-spacing: -0.022em;
-  color: var(--h-ink);
-}
-
-.timeline {
-  margin: clamp(30px, 4svh, 44px) 0 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--h-line);
-}
-
-.timeline button {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 10px;
-  width: 100%;
-  padding: 15px 0;
-  border: 0;
-  border-bottom: 1px solid var(--h-line);
-  background: none;
-  font: inherit;
-  font-size: clamp(16px, 1.1vw, 17.5px);
-  line-height: 1.45;
-  letter-spacing: -0.01em;
-  text-align: left;
-  color: var(--h-body);
-  cursor: pointer;
-  transition: color 160ms ease;
-}
-
-.timeline button:hover {
-  color: var(--h-ink);
-}
-
-.timeline time {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--h-muted);
-}
-
-.timeline button[data-current] {
-  color: var(--h-ink);
-}
-
-.timeline button[data-current] time {
-  color: var(--h-accent);
-}
-
-.figure {
-  margin: clamp(30px, 4svh, 44px) 0 0;
-}
-
-.frame {
-  overflow: hidden;
-  border-radius: 14px;
-  background: #1c1c1f;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.09), 0 40px 90px -36px rgba(10, 20, 60, 0.45);
-}
-
-.frame img,
-.frame video {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.figure[data-tall] .frame {
-  max-width: 360px;
-}
-
-.figure figcaption {
-  margin-top: 14px;
-  max-width: 60ch;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--h-muted);
 }
 
 /* Numbered rows: what Stella does, and the manual way */
@@ -470,11 +271,6 @@
     0 30px 70px -36px rgba(10, 20, 60, 0.35);
 }
 
-.wall .prompt {
-  margin: 0 auto;
-  box-shadow: 0 0 0 1px var(--h-line), 0 30px 70px -36px rgba(10, 20, 60, 0.35);
-}
-
 .page .promptText {
   margin: 0;
   font-size: clamp(19px, 1.6vw, 24px);
@@ -520,33 +316,6 @@
 
 .copy:hover {
   transform: translateY(-1px) scale(1.03);
-}
-
-.sources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 22px;
-  margin: clamp(30px, 4svh, 40px) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 15px;
-  font-weight: 560;
-  letter-spacing: -0.012em;
-}
-
-.sources a {
-  color: var(--h-muted);
-  transition: color 160ms ease;
-}
-
-.sources a:hover {
-  color: var(--h-ink);
-}
-
-.checked {
-  margin: 14px 0 0;
-  font-size: 15px;
-  color: var(--h-muted);
 }
 
 /* ── Guide cards (index, hubs, "More guides") ─────────── */
@@ -603,7 +372,7 @@
   overflow: hidden;
   aspect-ratio: 16 / 10;
   border-radius: 18px;
-  background: #1c1c1f;
+  background: #fff;
   box-shadow: 0 0 0 1px var(--h-line), 0 30px 60px -36px rgba(30, 30, 80, 0.5);
   transition:
     transform 500ms cubic-bezier(0.2, 1, 0.3, 1),
@@ -615,81 +384,19 @@
   box-shadow: 0 0 0 1px var(--h-line), 0 40px 70px -34px rgba(60, 30, 160, 0.55);
 }
 
-.thumb img {
+/* The app's chat at its own size, drawn at 80% so a card shows the request and the reply. */
+.thumb > :global(.sd-still) {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 0;
-  transform: scale(1.7);
-  transform-origin: 50% 2%;
+  inset: 0 auto auto 0;
+  width: 125%;
+  height: 125%;
+  transform: scale(0.8);
+  transform-origin: 0 0;
 }
 
-/* Stills from the zoomed cuts are already cropped to the reply and result. */
-.thumb img[data-cut] {
-  transform: none;
+.thumb :global(.sd-still-column) {
+  padding: 22px 24px;
 }
-
-.thumbPlay {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
-  color: #0a0a0d;
-  box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.5);
-  transition: transform 260ms cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-
-.card:hover .thumbPlay {
-  transform: scale(1.08);
-}
-
-.thumbPlay svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-.thumbWall {
-  background: #f4f4f6;
-}
-
-.thumbPrompt {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 22px;
-}
-
-.thumbPrompt p {
-  margin: 0;
-  max-width: 300px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 24px 50px -24px rgba(20, 10, 60, 0.6);
-}
-
-.thumbPrompt p span {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 520;
-  line-height: 1.35;
-  letter-spacing: -0.012em;
-  color: #0a0a0d;
-}
-
-
 
 .page .cardTitle {
   margin: 20px 0 0;
@@ -783,21 +490,6 @@
     max-width: calc(100% - 24px);
   }
 
-  .stage > .caption,
-  .stage > .made,
-  .stage > .stageNote {
-    padding: 0 calc(var(--l-margin) - 12px);
-  }
-
-  /* Phones play the square cut of the chat and the result. */
-  .window[data-square] {
-    aspect-ratio: 1 / 1 !important;
-  }
-
-  .wall[data-prompt] {
-    padding: 34px 14px;
-  }
-
   .section,
   .group {
     padding-top: 88px;
@@ -825,8 +517,7 @@
   }
 
   .thumb,
-  .copy,
-  .play {
+  .copy {
     transition: none;
   }
 }

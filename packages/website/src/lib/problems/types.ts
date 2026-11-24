@@ -1,107 +1,30 @@
 /**
  * Problem pages: one page per specific problem someone searches for
  * ("install Sodium and Iris on Minecraft 1.21"), answered properly: a direct
- * answer, Stella doing it on a real computer, the prompt to paste, the manual
- * way. Served at /how/<niche>/<slug>.
+ * answer, the chat with Stella that does it, the message to copy. Served at
+ * /how/<niche>/<slug>. Written with shortGuide() (short.ts).
  *
  * Text fields accept the same light markup as the /ai pages: `code` spans and
  * [label](href) links. Keep them plain and specific.
  */
 
-/** One cropped web cut of a recording. */
-export type VideoCut = { src: string; poster: string; width: number; height: number };
-
 export type Platform = "windows" | "mac" | "linux";
-
-export type Source = { label: string; href: string };
-
-/** One step of a how-to. `body` may hold `code` and [links](https://…). */
-export type Step = { title: string; body: string };
 
 export type Faq = { q: string; a: string };
 
-/** A moment in a proof recording, for the transcript and the seekable step list. */
-export type ProofMoment = {
-  /** Seconds into the recording. */
-  at: number;
-  text: string;
+/** A guide's exchange after the prompt, as data: what Stella says, does and answers. */
+export type DemoText = {
+  /** Stella's first reply, one short sentence. */
+  ack: string;
+  /** The task's name in Stella's list, e.g. "Sorting your downloads". */
+  task: string;
+  /** Two to four things it's seen doing, a few words each. */
+  rows: string[];
+  /** The final reply. May use **bold** and "- " bullets. */
+  reply: string;
+  /** Files it hands over, by name. */
+  files?: string[];
 };
-
-export type ProofShot = {
-  src: string;
-  alt: string;
-  width: number;
-  height: number;
-  caption?: string;
-};
-
-type ProofBase = {
-  /** ISO date the run was recorded, e.g. "2026-11-10". */
-  recordedOn: string;
-  /** The computer it ran on, as a reader would say it: "Windows 11", "macOS 15", "Linux (Omarchy)". */
-  platform: string;
-  /** The engine and model that did the work, e.g. "ChatGPT plan (GPT-5.5)". */
-  model: string;
-  /** What the run produced, in one sentence: the evidence it worked. */
-  result: string;
-  /** Anything a careful reader should know about the run (sped up, trimmed, a retry). */
-  note?: string;
-};
-
-/** A real screen recording of Stella doing the task. */
-export type VideoProof = ProofBase & {
-  kind: "video";
-  video: {
-    /** H.264 MP4, ~720p, a few MB. Absolute URL (R2) or a /public path. */
-    src: string;
-    poster: string;
-    width: number;
-    height: number;
-    /** Length of the file as played, in seconds. */
-    duration: number;
-    /**
-     * WebVTT captions. Leave out to use the ones built from `moments`, served at
-     * /how/<niche>/<slug>/captions.vtt.
-     */
-    captions?: string;
-    /** How much the recording is sped up, if at all (shown to the reader). */
-    speed?: number;
-    /** How long the run really took, in seconds, when sped up. */
-    realDuration?: number;
-    /**
-     * The same footage with the same timing, cropped in on the chat and the
-     * result so the app's text is readable: 16:10 for wide screens, square
-     * for phones. The page plays these instead of the full window.
-     */
-    cuts?: { wide: VideoCut; square: VideoCut; thumb: { src: string; width: number; height: number } };
-  };
-  /** Timestamped transcript of the run. Also rendered as text for search and screen readers. */
-  moments: ProofMoment[];
-  /** The file Stella made, when it's a video worth showing on its own (the before/after). */
-  output?: {
-    src: string;
-    poster: string;
-    width: number;
-    height: number;
-    /** What it is and where the input came from, e.g. its licence. */
-    caption: string;
-  };
-  shots?: ProofShot[];
-};
-
-/** Real screenshots from a proof run, in order. */
-export type ShotsProof = ProofBase & {
-  kind: "shots";
-  shots: ProofShot[];
-};
-
-export type Proof = VideoProof | ShotsProof;
-
-/**
- * A page published before its proof run exists. Must say so on the page,
- * and only a few of these are allowed at a time (see the quality gate).
- */
-export type StepsOnly = { kind: "steps-only"; reason: string };
 
 export type ProblemPage = {
   /** URL segment, lowercase-hyphenated, matching the search phrase. */
@@ -120,17 +43,16 @@ export type ProblemPage = {
   short: string;
   /** One line under the H1: the outcome in plain words, no product name (≤90 characters). */
   lede: string;
-  /** Two or three sentences that answer it, including the do-it-yourself route. */
+  /** One or two sentences that answer it. */
   answer: string;
-  /** What Stella does on this problem, in order, in plain words. */
-  stellaSteps: string[];
-  /** The exact prompt to paste into Stella. */
+  /** What you get or can ask for. */
+  gets: string[];
+  /** What you type to Stella: the first message of the demo and the one to copy. */
   prompt: string;
-  proof: Proof | StepsOnly;
-  /** The honest manual way, complete enough to follow without Stella. */
-  manualSteps: Step[];
-  /** Heading over the manual steps; defaults to "Do it yourself". */
-  manualTitle?: string;
+  /** The rest of the exchange the page plays (see lib/demo.ts). */
+  demo: DemoText;
+  /** Up to five short lines, folded at the bottom: how to do it without Stella. */
+  byHand?: string[];
   /**
    * Replaces the shared "Is Stella free for this?" answer when part of the job
    * needs a paid Stella plan (e.g. Stella's own transcription or media models).
@@ -141,9 +63,8 @@ export type ProblemPage = {
   faq: Faq[];
   /** Slugs of neighbouring pages ("<niche>/<slug>"), shown as related problems. */
   related: string[];
-  /** ISO date the manual steps and facts were last checked. */
+  /** ISO date the facts were last checked. */
   lastChecked: string;
-  sources: Source[];
   /** Kept out of routes, sitemap and llms.txt; never fails the gate. */
   draft?: boolean;
 };

@@ -1,8 +1,8 @@
-import { PROOFS, webCuts } from "../media";
+import { shortGuide } from "../short";
 import type { ProblemPage } from "../types";
 
 export const PC_CLEANUP_PAGES: ProblemPage[] = [
-  {
+  shortGuide({
     slug: "organize-downloads-folder",
     niche: "pc-cleanup",
     searchPhrases: [
@@ -14,122 +14,45 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "Organize a messy Downloads folder (Windows and Mac)",
     description:
-      "Sort a cluttered Downloads folder, find duplicates and old installers, and clear space safely, by hand or with Stella (stella.sh) told to ask before deleting.",
+      "Downloads folder a mess? Ask Stella (stella.sh) to sort it into folders by type, find the files saved twice and clear them out. Works on Windows and Mac.",
     h1: "Organize a messy Downloads folder",
     short: "Sort a messy Downloads folder",
-    lede: "Everything sorted into folders and the duplicates found, with nothing lost.",
+    lede: "A tidy Downloads folder, with every file in a folder that makes sense.",
     answer:
-      "Sort the folder by type, move documents, pictures, videos and archives into their own folders, then delete installers you've already used and the duplicate copies with “(1)” in the name. Windows can also clear old downloads automatically. Stella (stella.sh) does the sorting on your computer, finds true duplicates by their contents rather than their names, and, because the prompt says so, deletes nothing until you tell it to.",
-    stellaSteps: [
-      "Sorts every file into a handful of folders by name and type: Documents (split into Finance, Personal, Travel and so on), Images, Installers, Archives, Audio & Video",
-      "Leaves anything unclear where it is; in the recording, two half-finished downloads stayed in Downloads for you to check",
-      "Finds true duplicates by comparing contents (SHA-256), and flags files with similar names but different contents as possible revisions, not duplicates",
-      "Writes a report and a log of every move; in the recording it deleted nothing until it was told to go ahead, as the prompt asks",
-      "When you approve, removes only the exact extra copies, checking each one again just before, and logs every removed path next to the copy it kept",
+      "To clean up your Downloads folder, ask Stella (stella.sh). It sorts every file into a few clear folders and clears out true duplicates, even ones saved under different names.",
+    gets: [
+      "Files sorted into a handful of folders",
+      "Repeat copies found, whatever they're called",
+      "A log of every move",
     ],
-    prompt: "My Downloads folder is a mess, sort it into folders and find duplicates, but don't delete anything without asking.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-10",
-      platform: "Linux (Omarchy)",
-      model: "Stella’s own models (GPT-6 Luna)",
-      result:
-        "297 of 299 files sorted into 14 folders, 46 groups of identical files found and reported with nothing deleted, then, after the go-ahead typed in the chat, 58 extra copies removed with one of each kept. 241 files remain, and every move and removal is in a log.",
-      note: "The Downloads folder is a test folder of 299 files made for this run. The waits are sped up.",
-      video: {
-        src: `${PROOFS}/pc-cleanup/organize-downloads-folder/proof.mp4`,
-        cuts: webCuts("pc-cleanup/organize-downloads-folder"),
-        poster: `${PROOFS}/pc-cleanup/organize-downloads-folder/poster.jpg`,
-        width: 1280,
-        height: 800,
-        duration: 81.8,
-        realDuration: 244,
-      },
-      moments: [
-        { at: 0, text: "The prompt, typed into Stella on a Linux computer." },
-        { at: 6, text: "Sent." },
-        { at: 15, text: "Stella replies that it's sorting Downloads and checking for duplicates, won't delete anything, and will report the duplicates for review." },
-        { at: 16, text: "Sorting 299 files, sped up 15×." },
-        { at: 23, text: "Done: 297 of 299 files sorted, two incomplete downloads left in place, 46 groups of identical files and three similar-name pairs found. Nothing deleted." },
-        { at: 36, text: "The cleanup report Stella wrote: files per folder, and every duplicate group with its checksum." },
-        { at: 57, text: "The go-ahead, typed in the chat: “Thanks. Go ahead and delete the extra copies, keep one of each.”" },
-        { at: 64, text: "Stella confirms it will remove only the identical copies and leave the possible revisions and incomplete downloads alone." },
-        { at: 69, text: "Done: 58 extra copies removed, one kept from each group. No exact duplicates remain." },
-      ],
-      shots: [
-        {
-          src: `${PROOFS}/pc-cleanup/organize-downloads-folder/report.jpg`,
-          alt: "Stella's Downloads cleanup report: 297 files organised, 58 redundant copies removed from 46 identical groups with approval, and a table of files remaining per folder.",
-          width: 1800,
-          height: 2200,
-          caption: "The report Stella wrote after the cleanup, with the files left in each folder.",
-        },
-      ],
+    prompt:
+      "My Downloads folder is a total mess. Sort everything into sensible folders and get rid of anything I've downloaded twice.",
+    demo: {
+      ack: "Sure. Going through your Downloads now.",
+      task: "Tidying your Downloads",
+      rows: ["Sorting 299 files by type", "Finding repeat copies", "Moving extras to the Trash"],
+      reply:
+        "Done. **297 files** are sorted into 14 folders, like Documents, Images and Installers. 58 extra copies went to the Trash, and two half-finished downloads stayed put.",
+      files: ["Downloads"],
     },
-    manualSteps: [
-      {
-        title: "See what's there, biggest first",
-        body: "Open Downloads. On Windows, switch File Explorer to Details view and click the Size column; on a Mac, use View, then as List, and sort by Size. Big video files and disk images are usually most of the space.",
-      },
-      {
-        title: "Group by type",
-        body: "On Windows, right-click an empty spot and choose Group by, then Type. On a Mac, choose View, then Use Groups, and group by Kind. You now see all PDFs, images, installers and archives together.",
-      },
-      {
-        title: "Make folders and drag each group in",
-        body: "Create a handful of folders (Documents, Images, Video, Audio, Archives, Installers) and drag each group into its folder. Keep it to a few; ten folders become their own mess.",
-      },
-      {
-        title: "Delete what you've already used",
-        body: "Installers (.exe and .msi on Windows, .dmg and .pkg on Mac) are safe to delete once the app is installed. Zip files you've already extracted can go too. Files named like `report (1).pdf` are usually repeat downloads: open both and check before deleting one.",
-      },
-      {
-        title: "Stop it piling up again",
-        body: "Windows: Settings, System, Storage, Storage Sense, then set “Delete files in my Downloads folder if they haven't been opened for more than” to 30 or 60 days. Mac: there's no built-in timer for Downloads, so put a monthly reminder in your calendar.",
-      },
+    faq: [
+      ["What can I delete from my Downloads folder?", "Installers for apps you already have, zips you've opened, and repeats like 'report (1).pdf'. Move documents and photos into folders first."],
+      ["Can Downloads be sorted automatically every week?", "Yes. Ask Stella to repeat the sort every Sunday."],
+    ],
+    byHand: [
+      "Open Downloads and group by type: right-click, Group by, Type on Windows; View, Use Groups on a Mac.",
+      "Drag each group into its own folder, then delete installers (.exe, .dmg) for apps you've installed.",
+      "Windows: Settings, System, Storage, Storage Sense can clear downloads you haven't opened in 30 or 60 days.",
+    ],
+    related: [
+      "photos-files/find-duplicate-photos",
+      "pc-cleanup/find-large-files-taking-up-space",
+      "pdf-excel/bank-statement-pdf-to-excel",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Is it safe to delete everything in Downloads?",
-        a: "Installers and duplicate copies, yes. Downloads is sometimes the only copy of a tax form or photo, so move documents and pictures into folders first, then delete the rest.",
-      },
-      {
-        q: "How do I find duplicate files on Windows?",
-        a: "Windows has no built-in duplicate finder. Sorting by name shows copies like “file (1)”, but true duplicates can have different names. A tool that compares file contents, or Stella, catches those.",
-      },
-      {
-        q: "Will moving files out of Downloads break anything?",
-        a: "No. Apps don't run from files in Downloads. The only catch is a browser's download list, whose links stop working once a file moves.",
-      },
-      {
-        q: "What should I do with all the bank statements in Downloads?",
-        a: "Move them into one Statements folder first. If you need the numbers, [turn the statement PDFs into one Excel sheet](/how/pdf-excel/bank-statement-pdf-to-excel); then the PDFs can go to an archive folder or your cloud storage.",
-      },
-      {
-        q: "Can I sort Downloads automatically every week?",
-        a: "Yes. Ask Stella to repeat the same sort every Sunday; it runs on schedule and tells you in the chat what it moved. Storage Sense on Windows only deletes old files; it doesn't sort them.",
-      },
-      {
-        q: "Can the extra copies go to the Trash instead of being deleted?",
-        a: "Yes. Say “move the extra copies to the Trash” in your go-ahead and they go to the Recycle Bin or Trash, where you can restore them.",
-      },
-      {
-        q: "Can I choose the folder names?",
-        a: "Yes. List your own folders in the prompt, such as Taxes, Kids' school or Receipts, and Stella sorts into those. If Downloads syncs with OneDrive or iCloud, the moves show up in the cloud copy too; say so if you'd like synced files left where they are.",
-      },
-    ],
-    related: ["photos-files/find-duplicate-photos", "pc-cleanup/find-large-files-taking-up-space", "pdf-excel/bank-statement-pdf-to-excel"],
-    lastChecked: "2026-11-10",
-    sources: [
-      {
-        label: "Microsoft: Manage drive space with Storage Sense",
-        href: "https://support.microsoft.com/en-us/windows/manage-drive-space-with-storage-sense-654f6ada-7bfc-45e5-966b-e24aded96ad5",
-      },
-      { label: "Apple: Organize files in folders on Mac", href: "https://support.apple.com/guide/mac-help/organize-files-in-folders-mh26885/mac" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "delete-empty-folders",
     niche: "pc-cleanup",
     searchPhrases: [
@@ -140,98 +63,43 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "Delete empty folders in one go, including nested ones",
     description:
-      "Delete every empty folder, including ones that only hold other empty folders, without touching anything with a file in it: Terminal, PowerShell or Stella (stella.sh).",
+      "Get rid of all your empty folders at once, nested ones included. Ask Stella (stella.sh) and it clears them on Windows or Mac and keeps every folder that holds a file.",
     h1: "Delete all empty folders at once",
     short: "Delete empty folders",
-    lede: "28 empty folders gone from Documents, every file left where it was.",
+    lede: "Every empty folder gone, and every folder with a file in it kept.",
     answer:
-      "On a Mac, `find ~/Documents -type d -empty -delete` in Terminal removes empty folders from the bottom up, so a folder that held only empty folders goes too. On Windows, a one-line PowerShell command does the same, or a free tool such as Remove Empty Directories. The catch: a folder holding only a hidden `.DS_Store` or `Thumbs.db` isn't empty to these tools. Stella (stella.sh) clears every empty folder level by level and leaves any folder with a file in it.",
-    stellaSteps: [
-      "Scans every folder in Documents, hidden files included",
-      "Deletes folders with nothing in them, like the old “New folder (2)” leftovers, and then the parents they leave empty, such as `Work/Old/Archive`",
-      "Keeps every folder with a file in it, including one whose only file is an empty `placeholder.txt`",
-      "Leaves four folders whose only contents are hidden system files (`.DS_Store`, `Thumbs.db`), because the prompt said not to touch anything with files, and offers to remove them",
-      "Reports how many folders went and that all 31 files are where they were",
-    ],
+      "To delete all empty folders at once, including ones that only hold other empty folders, ask Stella (stella.sh). It clears them level by level and keeps any folder with a file in it.",
+    gets: ["Every empty folder removed, deepest first", "Folders with files left as they were"],
     prompt:
-      "My Documents folder is full of empty folders left over from years of moving things around. Delete all the empty ones, but don't touch anything that has files in it.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: "Claude Code with Opus, on a Claude plan",
-      result:
-        "28 empty folders deleted in under 30 seconds. Checked afterwards against an answer key written before the run: all 28 are gone, including those that only held other empty folders, all 33 folders with files are still there, and no file was deleted or changed. The four folders holding only hidden system files were kept, as the prompt asked, and Stella offered to remove them.",
-      note: "The Documents folder is a test folder made for this run. The run isn't sped up.",
-      video: {
-        src: `${PROOFS}/pc-cleanup/delete-empty-folders/proof.mp4`,
-        cuts: webCuts("pc-cleanup/delete-empty-folders"),
-        poster: `${PROOFS}/pc-cleanup/delete-empty-folders/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 42.8,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. Documents is full of empty leftover folders." },
-        { at: 2.1, text: "The prompt: delete the empty ones, but don't touch anything with files in it." },
-        { at: 12.9, text: "Stella replies: no files moved or deleted, folders holding only empty folders removed too, Documents itself kept." },
-        { at: 28.9, text: "Done: 28 empty folders deleted, all 31 files in place, four folders with only hidden system files left for you to decide." },
+      "Documents is full of empty folders from years of moving things around. Delete every empty one and keep anything with files in it.",
+    demo: {
+      ack: "On it. Looking through your Documents.",
+      task: "Clearing empty folders",
+      rows: [
+        "Checking every folder, hidden files too",
+        "Removing folders with nothing inside",
+        "Clearing parents left empty",
       ],
+      reply:
+        "All clear. I deleted **28 empty folders**, including old 'New folder (2)' leftovers. All 31 of your files are where they were.",
     },
-    manualTitle: "Delete them yourself",
-    manualSteps: [
-      {
-        title: "Mac: list them first",
-        body: "Open Terminal and run `find ~/Documents -type d -empty -print` and read through the list.",
-      },
-      {
-        title: "Mac: delete them",
-        body: "Run `find ~/Documents -type d -empty -delete`. It works from the deepest level up, so a folder that only contained empty folders is removed too. They're deleted outright, not moved to the Trash.",
-      },
-      {
-        title: "Mac: folders with only .DS_Store",
-        body: "Finder leaves hidden `.DS_Store` files that make a folder look non-empty to `find`. To clear those too, first run `find ~/Documents -name .DS_Store -delete` (Finder recreates them as needed), then the delete command again.",
-      },
-      {
-        title: "Windows: PowerShell",
-        body: "Open PowerShell and run `Get-ChildItem $HOME\\Documents -Directory -Recurse | Sort-Object { $_.FullName.Length } -Descending | Where-Object { -not (Get-ChildItem $_.FullName -Force) } | Remove-Item`. Add `-WhatIf` at the end first to see what would go.",
-      },
-      {
-        title: "Windows: a free tool",
-        body: "Remove Empty Directories and similar free tools show a list of empty folders before deleting, and can treat `Thumbs.db` and `desktop.ini` as junk. Check the list before you click delete.",
-      },
+    faq: [
+      ["Why won't a folder that looks empty go?", "It holds a hidden file like .DS_Store or Thumbs.db. Ask Stella to treat those as junk and the folder goes too."],
+      ["How do I remove empty folders in Windows 11?", "Windows has no button for it. The free Remove Empty Directories lists them before deleting."],
+    ],
+    byHand: [
+      "Mac: in Terminal, find ~/Documents -type d -empty -delete removes empty folders from the bottom up.",
+      "Windows: the free Remove Empty Directories lists empty folders and deletes the ones you tick.",
+    ],
+    related: [
+      "pc-cleanup/find-large-files-taking-up-space",
+      "files-folders/move-files-from-subfolders-into-one-folder",
+      "pc-cleanup/organize-downloads-folder",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Is it safe to delete empty folders?",
-        a: "In your own Documents, Desktop or Pictures, yes. Keep to your own folders: program folders, game folders and system locations hold empty folders that apps expect to find.",
-      },
-      {
-        q: "Why does a folder look empty but won't count as empty?",
-        a: "It holds a hidden file, usually `.DS_Store` from a Mac or `Thumbs.db` and `desktop.ini` from Windows. Show hidden files (Cmd-Shift-. on a Mac; View, Show, Hidden items on Windows) to see them.",
-      },
-      {
-        q: "Where do all these empty folders come from?",
-        a: "Moving files out of folders, unzipping, and apps that create folders they never use. Flattening a folder tree leaves many: see [move files from subfolders into one folder](/how/files-folders/move-files-from-subfolders-into-one-folder).",
-      },
-      {
-        q: "What else frees up space?",
-        a: "Empty folders take almost no space. For real gains, [find the large files taking up space](/how/pc-cleanup/find-large-files-taking-up-space) and [sort out the Downloads folder](/how/pc-cleanup/organize-downloads-folder).",
-      },
-      {
-        q: "How do I clear folders that only hold .DS_Store or Thumbs.db?",
-        a: "Add “ignore .DS_Store and Thumbs.db” to the prompt and Stella treats those hidden files as junk, so their folders go too.",
-      },
-    ],
-    related: ["pc-cleanup/find-large-files-taking-up-space", "files-folders/move-files-from-subfolders-into-one-folder", "pc-cleanup/organize-downloads-folder"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Microsoft Learn: Remove-Item", href: "https://learn.microsoft.com/powershell/module/microsoft.powershell.management/remove-item" },
-      { label: "GNU findutils manual: -empty and -delete", href: "https://www.gnu.org/software/findutils/manual/html_mono/find.html" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "find-large-files-taking-up-space",
     niche: "pc-cleanup",
     searchPhrases: [
@@ -243,100 +111,42 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "Find the large files and folders taking up space",
     description:
-      "See which files and folders take the most space, biggest first, without a cleaner app: Storage settings, WinDirStat, Terminal, or Stella (stella.sh) saving you a list.",
+      "Running out of space? Stella (stella.sh) finds the biggest files and folders on your Windows PC or Mac and saves you a simple list, biggest first, with sizes.",
     h1: "Find what's taking up space on your computer",
     short: "Find large files taking up space",
-    lede: "A saved report of the biggest files and folders, with nothing deleted.",
+    lede: "See exactly what's filling your computer, biggest first.",
     answer:
-      "Windows: Settings, System, Storage, Cleanup recommendations, Large or unused files; for a folder-by-folder map, the free WinDirStat or WizTree. Mac: System Settings, General, Storage, then the info button next to Documents for Large Files. Both list single files, so a folder of thousands of small files (an old phone backup) can hide. Stella (stella.sh) measures files and folders, saves a report of the biggest, and deletes nothing unless you ask.",
-    stellaSteps: [
-      "Scans your home folder, hidden folders included, and measures every file and folder",
-      "Finds the biggest single files (videos, backups, archives, audio) and folders full of small files, like an old phone backup of 1,200 photos",
-      "Checks the whole disk too, and says when your own folders aren't what's filling it",
-      "Saves `Disk space report.html` on the Desktop: folders by size, what's usually safe to clear, and the biggest personal files with sizes",
-      "Deletes nothing, and offers a read-only scan of the whole drive",
-    ],
+      "To see what's taking up space on your PC or Mac, ask Stella (stella.sh). It measures every file and folder, even ones packed with thousands of small files, and lists the biggest.",
+    gets: ["The biggest files and folders, with sizes", "Hidden space hogs, like old phone backups"],
     prompt:
-      "My computer keeps saying it's running out of space. Find what's taking up the most room in my user folders and save me a list of the biggest files and folders on my Desktop. Don't delete anything.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: "Claude Code with Opus, on a Claude plan",
-      result:
-        "A report in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: the report names all 10 large files hidden around the folders and the Old phone backup folder (the biggest folder, made of 1,200 small files), shows sizes, and nothing was deleted or changed. The report opens with folder totals and cleanup tips, then lists the big personal files biggest first.",
-      note: "The test home folder sat on a shared test computer, so the disk totals in Stella's answer (1.3 TB used) and a 1.5 GB set of programming tools are that computer's, not part of the test files. The search is sped up 5×.",
-      video: {
-        src: `${PROOFS}/pc-cleanup/find-large-files-taking-up-space/proof.mp4`,
-        cuts: webCuts("pc-cleanup/find-large-files-taking-up-space"),
-        poster: `${PROOFS}/pc-cleanup/find-large-files-taking-up-space/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 43.3,
-        realDuration: 106,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer, with large files spread over the user folders." },
-        { at: 2, text: "The prompt: find what's taking the most room, save a list on the Desktop, delete nothing." },
-        { at: 11.3, text: "Stella replies: it will scan the home folder, hidden caches included, and point out what's usually safe to clear." },
-        { at: 17.2, text: "Measuring files and folders, sped up 5×." },
-        { at: 29.3, text: "Done: the report on the Desktop, the biggest folders and files listed, nothing deleted, and an offer to scan the whole drive." },
-      ],
+      "My computer keeps saying it's almost out of space. Find what's taking up the most room and list the biggest files and folders for me.",
+    demo: {
+      ack: "Let me measure everything first.",
+      task: "Finding what's using your space",
+      rows: ["Measuring every folder, hidden ones too", "Ranking everything by size"],
+      reply:
+        "The biggest item is an **Old phone backup** folder of 1,200 photos, then 10 large videos and archives. The full list is on your Desktop.",
+      files: ["Disk space report.html"],
     },
-    manualTitle: "Find them yourself",
-    manualSteps: [
-      {
-        title: "Windows: Cleanup recommendations",
-        body: "Open Settings, System, Storage, Cleanup recommendations, and expand Large or unused files. It lists big files with their sizes; tick only what you're sure about.",
-      },
-      {
-        title: "Windows: see folders too",
-        body: "Storage settings shows categories, not a ranked list of folders. The free WinDirStat or WizTree scans a drive and shows every folder by size, so a folder of thousands of small files stands out.",
-      },
-      {
-        title: "Mac: Storage settings",
-        body: "Apple menu, System Settings, General, Storage. Click the info button next to Documents and open Large Files to see the biggest first.",
-      },
-      {
-        title: "Mac: folder sizes in Terminal",
-        body: "Large Files lists files only. For folders, open Terminal and run `du -sh ~/* ~/*/* 2>/dev/null | sort -h | tail -20` to see the 20 biggest folders in your home folder.",
-      },
-      {
-        title: "Decide what goes",
-        body: "Copy old videos and backups to an external drive before deleting them. Installers and zips you've already extracted can usually go straight away.",
-      },
+    faq: [
+      ["What is taking up space on my PC?", "Usually videos, old phone backups, games and Downloads, plus system files you never see. Stella checks all of it."],
+      ["Is there a free disk space analyzer?", "Yes. WinDirStat and WizTree show every folder by size on Windows."],
+    ],
+    byHand: [
+      "Windows: Settings, System, Storage, Cleanup recommendations, then Large or unused files.",
+      "For folder sizes, the free [WinDirStat](https://windirstat.net) or [WizTree](https://diskanalyzer.com) maps the whole drive.",
+      "Mac: System Settings, General, Storage, then the info button next to Documents.",
+    ],
+    related: [
+      "pc-cleanup/organize-downloads-folder",
+      "pc-cleanup/delete-empty-folders",
+      "photos-files/find-duplicate-photos",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Why is my disk full when my folders look small?",
-        a: "The space may be outside your folders: system files, updates, restore points, app caches or other users. Stella checks the whole disk too, says when your own folders aren't the cause, and offers a read-only scan of the whole drive.",
-      },
-      {
-        q: "Are disk cleaner apps worth it?",
-        a: "Most aren't needed. The built-in Storage settings plus a free size map like WinDirStat show the same thing, and you decide what goes.",
-      },
-      {
-        q: "How do I find duplicate files taking space?",
-        a: "See [find duplicate photos](/how/photos-files/find-duplicate-photos), which compares contents rather than names, and [organize the Downloads folder](/how/pc-cleanup/organize-downloads-folder).",
-      },
-      {
-        q: "Can it shrink big files instead of deleting them?",
-        a: "Often. [Compress a video](/how/video/compress-video-for-discord) or [compress a PDF](/how/pdf-excel/compress-pdf-too-large-to-email), keeping the originals until you've checked the copies.",
-      },
-    ],
-    related: ["pc-cleanup/organize-downloads-folder", "pc-cleanup/delete-empty-folders", "photos-files/find-duplicate-photos", "pc-cleanup/find-duplicate-files"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Apple: Change Storage settings on Mac", href: "https://support.apple.com/guide/mac-help/mchl3d437fbc/mac" },
-      { label: "Microsoft: Free up drive space in Windows", href: "https://support.microsoft.com/help/17421" },
-      { label: "Pureinfotech: Cleanup recommendations on Windows 11", href: "https://pureinfotech.com/free-up-space-cleanup-recommendations-windows-11/" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "free-up-space-on-c-drive",
-    // Held back from stella.sh until there's a recorded run (steps-only).
-    draft: true,
     niche: "pc-cleanup",
     searchPhrases: [
       "how to free up space on c drive",
@@ -348,86 +158,40 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "How to free up space on C drive (full for no reason?)",
     description:
-      "Free up a C drive that's full for no reason: find the hidden space users (updates, restore points, hibernation, caches) and clean safely, or use Stella (stella.sh).",
+      "C drive full for no reason? Stella (stella.sh) finds the hidden space eaters on your Windows PC, like update leftovers and temp files, and clears them out.",
     h1: "How to free up space on C drive when it's full for no reason",
     short: "Free up space on C drive",
-    lede: "Find the hidden gigabytes and get them back, safely.",
+    lede: "Gigabytes back on a full C drive, even when nothing looks big.",
     answer:
-      "When the C drive fills up “for no reason”, the space is usually in places File Explorer doesn't show: Windows Update leftovers, restore points, the hibernation file, temp folders, old iPhone backups and game caches. Settings › System › Storage and Disk Cleanup's “Clean up system files” recover most of it, and a free tool like WizTree shows the rest. Stella (stella.sh) measures all of it on your PC, explains each item and, because the prompt asks it to, cleans only what you approve.",
-    stellaSteps: [
-      "Measures every large folder on C, hidden and system areas included, with PowerShell",
-      "Explains each big item in plain words: what it is, whether it's safe to remove, and how much you'd get back",
-      "Runs Windows' own cleanups: Disk Cleanup's system files, the component store cleanup and temp folders",
-      "Points out big personal folders (old iPhone backups, game libraries, videos) and offers to move them to another drive",
-      "Waits for your go-ahead before deleting anything or turning hibernation off, because the prompt asks for that",
+      "When your C drive fills up for no reason, the space is usually hidden in update leftovers, temp files and old phone backups. Stella (stella.sh) finds it on your PC and clears out the junk.",
+    gets: [
+      "What's filling your C drive, in plain words",
+      "Update leftovers and temp files cleared",
+      "Big folders you could move to another drive",
     ],
     prompt:
-      "My C drive is almost full and I don't know why. Find what's using the space, including hidden and system files, explain it, and only clean up what I approve.",
-    proof: {
-      kind: "steps-only",
-      reason: "We haven't recorded this one yet: it needs a Windows PC with a genuinely full C drive.",
+      "My C drive is almost full and I have no idea why. Find what's using all the space, hidden stuff included, and clear out the junk.",
+    demo: {
+      ack: "Okay. Measuring your C drive now.",
+      task: "Freeing up space on C",
+      rows: ["Measuring hidden and system folders", "Clearing Windows Update leftovers", "Emptying temp folders"],
+      reply:
+        "Done. I cleared **Windows Update leftovers**, temp files and old error reports. Most of what's left is an old iPhone backup and your games. Want me to move those to your D drive?",
     },
-    manualSteps: [
-      {
-        title: "Start with Storage settings",
-        body: "Open Settings, System, Storage. Windows shows what's using the drive by category; click “Show more categories” to see all of them. Temporary files often hold several gigabytes, and you can clear them from there with a tick-box list.",
-      },
-      {
-        title: "Clean up system files",
-        body: "Search the Start menu for Disk Cleanup, pick C:, then click “Clean up system files”. Tick Windows Update Cleanup, Delivery Optimization Files and Temporary files. “Previous Windows installation(s)” is your way back after an upgrade, so only remove it once you're happy with the new version.",
-      },
-      {
-        title: "See exactly what's big",
-        body: "Install the free [WizTree](https://diskanalyzer.com) or [WinDirStat](https://windirstat.net) and scan C:. The usual surprises are `hiberfil.sys` (about the size of your RAM), `pagefile.sys`, old iPhone backups in `%APPDATA%\\Apple Computer\\MobileSync\\Backup`, game shader caches and huge Downloads or Videos folders.",
-      },
-      {
-        title: "Shrink restore points",
-        body: "Search for “Create a restore point”, select C:, click Configure, and lower Max Usage to around 5%, or delete older points. Restore points are useful, but some PCs let them grow to tens of gigabytes.",
-      },
-      {
-        title: "Turn hibernation off, if you never use it",
-        body: "In Terminal opened as administrator, run `powercfg /h off`. This deletes `hiberfil.sys` straight away. It also switches off Fast Startup, so the PC may take a few seconds longer to boot.",
-      },
-      {
-        title: "Move big personal things off C",
-        body: "In Settings, System, Storage, open Advanced storage settings, then “Where new content is saved” to send new files to another drive. Move a Steam library from Steam's Settings, Storage, and move big video or photo folders by hand.",
-      },
-    ],
-    manualTitle: "Do it yourself (about 20 minutes)",
-    platforms: ["windows"],
     faq: [
-      {
-        q: "Why does my C drive keep filling up by itself?",
-        a: "Windows updates download in the background, restore points and temp files grow, OneDrive may keep downloaded copies of cloud files, and games update themselves. None of it is visible as files in your folders, which is why it looks like nothing.",
-      },
-      {
-        q: "Is it safe to delete the WinSxS folder?",
-        a: "Not by hand: Windows needs it. To shrink it safely, run `Dism.exe /online /Cleanup-Image /StartComponentCleanup` in an administrator Terminal, or use Disk Cleanup's Windows Update Cleanup.",
-      },
-      {
-        q: "Is it safe to delete Windows.old?",
-        a: "Yes, once you're sure you don't want to go back to your previous Windows version. Use Disk Cleanup's “Previous Windows installation(s)” rather than deleting it in File Explorer. Windows removes it by itself after about ten days.",
-      },
-      {
-        q: "How much free space does Windows need?",
-        a: "Leave at least 20 GB free so big updates can download and install. Below about 10 GB, updates start failing and the PC slows down.",
-      },
+      ["Why does my C drive keep filling up by itself?", "Windows downloads updates in the background, and temp files and restore points grow. None of it shows in your folders."],
+      ["Is it safe to delete Windows.old?", "Yes, once you're happy with your Windows version. Windows clears it by itself after about ten days."],
     ],
-    related: ["pc-cleanup/organize-downloads-folder", "game-mods/find-broken-sims-4-mods"],
-    lastChecked: "2026-11-10",
-    sources: [
-      {
-        label: "Microsoft: Manage drive space with Storage Sense",
-        href: "https://support.microsoft.com/en-us/windows/manage-drive-space-with-storage-sense-654f6ada-7bfc-45e5-966b-e24aded96ad5",
-      },
-      {
-        label: "Microsoft: Clean up the WinSxS folder",
-        href: "https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/clean-up-the-winsxs-folder",
-      },
-      { label: "WizTree", href: "https://diskanalyzer.com" },
+    byHand: [
+      "Search Start for Disk Cleanup, pick C:, click Clean up system files and tick Windows Update Cleanup.",
+      "Settings, System, Storage, Temporary files often holds several gigabytes you can clear.",
+      "The free [WizTree](https://diskanalyzer.com) shows every big folder on C:, hidden ones included.",
     ],
-  },
-  {
+    related: ["pc-cleanup/find-large-files-taking-up-space", "pc-cleanup/organize-downloads-folder"],
+    platforms: ["windows"],
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "find-duplicate-files",
     niche: "pc-cleanup",
     searchPhrases: [
@@ -439,93 +203,36 @@ export const PC_CLEANUP_PAGES: ProblemPage[] = [
     ],
     title: "Find duplicate files and move the extra copies to the Trash",
     description:
-      "Find exact duplicate files in Documents and Downloads, even renamed ones, keep one of each and send the rest to the Trash, with PowerShell or Stella (stella.sh).",
+      "Same files saved twice all over your computer? Stella (stella.sh) finds exact duplicates, even renamed ones, keeps one of each and moves the rest to the Trash.",
     h1: "Find duplicate files and clear the extra copies",
     short: "Find duplicate files",
-    lede: "Two folders checked by content: 16 extra copies in the Trash, one of each file kept.",
+    lede: "One copy of every file, and the extras in the Trash.",
     answer:
-      "Exact duplicates have identical contents, whatever their names, so compare files by a fingerprint (a hash), not by name or size. PowerShell's `Get-FileHash` on Windows or `shasum` in the Mac Terminal lists files that match, and you move the extras to the Recycle Bin or Trash yourself. Stella (stella.sh) does the comparison on your computer, keeps the copy with the tidiest name, moves the rest to the Trash so you can restore them, and leaves look-alikes that aren't really the same alone.",
-    stellaSteps: [
-      "Goes through Documents and Downloads, subfolders included, 60 files, and compares them by content, not name",
-      "Finds 12 sets of identical files, including renamed ones such as a phone photo saved again as Holiday 1.jpg",
-      "Keeps the copy with the clearer name, or the one in Documents, and moves 16 extra copies to the Trash after checking each byte for byte",
-      "Leaves alone files that only look alike: two different Notes.txt, a budget that differs by a row, a photo re-saved smaller",
-      "Leaves three empty files in place and offers to trash them, and saves a list of what went to the Trash and the copy each matched",
-    ],
+      "To find duplicate files on Windows 11 or a Mac, compare what's inside them, not their names. Stella (stella.sh) does that, keeps the clearest-named copy and moves the extras to the Trash.",
+    gets: ["Exact duplicates found, even renamed ones", "Extras in the Trash, easy to restore"],
     prompt:
-      "My Documents and Downloads folders are full of the same files saved twice. Find all the exact duplicates and get rid of the extra copies, keeping one of each. Put the extras in the Trash rather than deleting them.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: "Claude Code with Opus, on a Claude plan",
-      result:
-        "Under a minute. Checked afterwards against an answer key written before the run: exactly one copy left of each of the 12 duplicated files, all 29 files that aren't duplicates kept (look-alikes included), all 16 extra copies recoverable in the Trash, and the tidy copy kept each time.",
-      note: "The files are made up for this run, with renamed copies and look-alikes on purpose. The work is sped up 3×.",
-      video: {
-        src: `${PROOFS}/pc-cleanup/find-duplicate-files/proof.mp4`,
-        cuts: webCuts("pc-cleanup/find-duplicate-files"),
-        poster: `${PROOFS}/pc-cleanup/find-duplicate-files/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 43.8,
-        realDuration: 79,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. Documents and Downloads hold the same files saved twice, some under new names." },
-        { at: 2, text: "The prompt: find exact duplicates, keep one of each, extras to the Trash." },
-        { at: 13.2, text: "Stella replies: it compares contents, keeps the cleaner name and sends every extra to the Trash." },
-        { at: 19.1, text: "Comparing the files, sped up 3×." },
-        { at: 29.8, text: "Done: 16 extra copies in the Trash from 12 sets, look-alikes left, and a list of what moved." },
-      ],
+      "Documents and Downloads are full of files I've saved more than once. Find the exact duplicates, keep one of each, and put the extras in the Trash.",
+    demo: {
+      ack: "Sure. Comparing your files now.",
+      task: "Clearing duplicate files",
+      rows: ["Comparing 60 files by what's inside", "Moving extras to the Trash"],
+      reply:
+        "Done. **12 files** were saved more than once, and the 16 extra copies are in the Trash. Look-alikes, like two different Notes.txt files, are still there.",
     },
-    manualTitle: "Find them yourself",
-    manualSteps: [
-      {
-        title: "Windows: list duplicates with PowerShell",
-        body: "Open PowerShell and run `Get-ChildItem $HOME\\Documents,$HOME\\Downloads -Recurse -File | Get-FileHash | Group-Object Hash | Where-Object Count -gt 1`. Each group is a set of files with identical contents; expand a group's Group property to see the paths.",
-      },
-      {
-        title: "Mac: list duplicates in Terminal",
-        body: "Finder has no duplicate finder. In Terminal: `find ~/Documents ~/Downloads -type f -exec shasum -a 256 {} + | sort | uniq -w64 -D` prints files with the same fingerprint next to each other. (`uniq -w` needs GNU uniq; on a stock Mac, sort the list and read down it.)",
-      },
-      {
-        title: "Decide which copy to keep",
-        body: "Keep the one with the clearest name in the folder you actually use. Names with (1), copy or a camera number are usually the extras.",
-      },
-      {
-        title: "Move extras to the Trash",
-        body: "Delete them in File Explorer or Finder so they go to the Recycle Bin or Trash, and empty it a few days later.",
-      },
-    ],
-    platforms: ["windows", "mac", "linux"],
     faq: [
-      {
-        q: "Does Windows 11 have a duplicate file finder?",
-        a: "No. Storage Sense clears temporary files but doesn't look for duplicates. PowerShell's `Get-FileHash` does it without installing anything.",
-      },
-      {
-        q: "Are two files with the same name duplicates?",
-        a: "Not necessarily. Two different Notes.txt files share a name but not their contents. Only identical contents make a duplicate, and renamed copies count too.",
-      },
-      {
-        q: "Will it free a lot of space?",
-        a: "Only as much as the extras take up. In the run it was about 156 KB of small documents. For space, see [find large files taking up space](/how/pc-cleanup/find-large-files-taking-up-space).",
-      },
-      {
-        q: "What about two copies of a whole folder?",
-        a: "See [compare two folders](/how/files-folders/compare-two-folders), which merges an old copy into a new one without losing anything.",
-      },
+      ["Does Windows 11 have a duplicate file finder?", "No. Storage Sense clears temporary files but doesn't look for duplicates."],
+      ["Are two files with the same name duplicates?", "Not always. Only identical contents make a duplicate, and a renamed copy still counts."],
+    ],
+    byHand: [
+      "Free tools like dupeGuru or Czkawka compare what's inside files and list the copies.",
+      "Keep the copy with the clearest name; ones with (1) or copy are usually the extras.",
     ],
     related: [
       "photos-files/find-duplicate-photos",
       "pc-cleanup/find-large-files-taking-up-space",
       "files-folders/compare-two-folders",
     ],
-    lastChecked: "2026-11-14",
-    sources: [
-      { label: "Microsoft Learn: Get-FileHash", href: "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-filehash" },
-      { label: "Apple Support: Free up storage space on your Mac", href: "https://support.apple.com/en-us/102624" },
-    ],
-  },
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
 ];

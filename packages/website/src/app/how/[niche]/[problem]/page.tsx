@@ -11,16 +11,14 @@ import f from "@/components/landing/faq.module.css";
 import { HeroMascot } from "@/components/problems/hero-mascot";
 import h from "@/components/problems/how.module.css";
 import { BackLink, GuideGrid, HeroCta, HowTitle, PromptCard } from "@/components/problems/how-ui";
-import { MomentList, OutputVideo, RecordingStage } from "@/components/problems/proof-video";
+import { StellaDemo } from "@/components/stella-demo/stella-demo";
 import {
   PLATFORM_NAMES,
-  captionsPath,
-  formatDate,
-  formatDuration,
   getNiche,
   getProblemPage,
   neighbours,
   nichePath,
+  pageDemo,
   problemJsonLd,
   problemPath,
   publishedProblemPages,
@@ -51,9 +49,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       description: page.description,
       url: path,
       type: "article",
-      ...(page.proof.kind === "video"
-        ? { videos: [{ url: new URL(page.proof.video.src, getSiteUrl()).href, width: page.proof.video.width, height: page.proof.video.height, type: "video/mp4" }] }
-        : {}),
     },
     twitter: { card: "summary_large_image", title: page.title, description: page.description },
   };
@@ -61,24 +56,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 const platformList = (page: ProblemPage) =>
   page.platforms.map((p) => PLATFORM_NAMES[p]).join(", ").replace(/, ([^,]*)$/, " and $1");
-
-const computer = (platform: string) => {
-  const name = platform.replace(/\s*\(.*\)$/, "");
-  return /^(windows|mac|linux)/i.test(name) ? `a ${name} computer` : name;
-};
-
-/** One quiet sentence under the recording: when, where, which model, how it was edited. */
-function madeLine(page: ProblemPage) {
-  const proof = page.proof;
-  if (proof.kind === "steps-only") return "";
-  const parts = [`A real run on ${formatDate(proof.recordedOn)}, on ${computer(proof.platform)}, using ${proof.model}.`];
-  if (proof.kind === "video") {
-    const real = proof.video.realDuration ? formatDuration(proof.video.realDuration) : null;
-    if (proof.video.speed && proof.video.speed > 1) parts.push(`Shown ${proof.video.speed}× faster${real ? `; it took ${real}` : ""}.`);
-    else if (real) parts.push(`The waiting is sped up; it took ${real} in real time.`);
-  }
-  return parts.join(" ");
-}
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -94,81 +71,10 @@ function Section({ id, title, children }: { id: string; title: string; children:
 }
 
 function Stage({ page }: { page: ProblemPage }) {
-  const proof = page.proof;
-  if (proof.kind === "video") {
-    return (
-      <div className={h.stage}>
-        <RecordingStage
-          src={proof.video.src}
-          poster={proof.video.poster}
-          captions={captionsPath(page)!}
-          width={proof.video.width}
-          height={proof.video.height}
-          label={`Screen recording of Stella: ${page.h1}`}
-          moments={proof.moments}
-          made={madeLine(page)}
-          cuts={proof.video.cuts}
-        />
-      </div>
-    );
-  }
-  if (proof.kind === "shots") {
-    const shot = proof.shots[0];
-    return (
-      <div className={h.stage}>
-        <div className={h.wall}>
-          <div className={h.window}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- proof media lives on R2, already sized */}
-            <img className={h.video} src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} />
-          </div>
-        </div>
-        <p className={h.made}>{madeLine(page)}</p>
-      </div>
-    );
-  }
   return (
     <div className={h.stage}>
-      <div className={h.wall} data-tone="calm" data-prompt="">
-        <PromptCard text={page.prompt} />
-      </div>
-      <p className={h.stageNote}>No recording of this one yet: {proof.reason.replace(/^We haven't recorded this one yet: /, "")}</p>
+      <StellaDemo steps={pageDemo(page)} label={`An example chat with Stella: ${page.h1}`} />
     </div>
-  );
-}
-
-function Happened({ page }: { page: ProblemPage }) {
-  const proof = page.proof;
-  if (proof.kind === "steps-only") return null;
-  return (
-    <Section id="result" title="What happened.">
-      <p className={h.result}>
-        <LinkedText text={proof.result} />
-      </p>
-      {proof.note ? <p className={h.text}>{proof.note}</p> : null}
-      {proof.kind === "video" ? <MomentList moments={proof.moments} /> : null}
-      {proof.kind === "video" && proof.output ? (
-        <figure className={h.figure} data-tall={proof.output.height > proof.output.width ? "" : undefined}>
-          <OutputVideo
-            src={proof.output.src}
-            poster={proof.output.poster}
-            width={proof.output.width}
-            height={proof.output.height}
-          />
-          <figcaption>
-            <LinkedText text={proof.output.caption} />
-          </figcaption>
-        </figure>
-      ) : null}
-      {(proof.kind === "video" ? (proof.shots ?? []) : proof.shots.slice(1)).map((shot) => (
-        <figure key={shot.src} className={h.figure}>
-          <div className={h.frame}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- proof media lives on R2, already sized */}
-            <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} loading="lazy" />
-          </div>
-          {shot.caption ? <figcaption>{shot.caption}</figcaption> : null}
-        </figure>
-      ))}
-    </Section>
   );
 }
 
@@ -181,7 +87,6 @@ export default async function ProblemPageRoute({ params }: Params) {
   const site = getSiteUrl();
   const faq = [...page.faq, ...sharedFaq(page)];
   const near = neighbours(page, 3);
-  const recorded = page.proof.kind !== "steps-only";
 
   return (
     <div className={`${l.root} ${landingFontVars}`} data-landing-root="" data-native-scroll="">
@@ -207,11 +112,9 @@ export default async function ProblemPageRoute({ params }: Params) {
             <p className={h.text}>Stella does this on {platformList(page)}.</p>
           </Section>
 
-          <Happened page={page} />
-
-          <Section id="how" title="How Stella does it.">
+          <Section id="how" title="What you get.">
             <ol className={h.rows}>
-              {page.stellaSteps.map((step) => (
+              {page.gets.map((step) => (
                 <li key={step}>
                   <LinkedText text={step} />
                 </li>
@@ -219,24 +122,8 @@ export default async function ProblemPageRoute({ params }: Params) {
             </ol>
           </Section>
 
-          {recorded ? (
-            <Section id="prompt" title="The prompt.">
-              <PromptCard text={page.prompt} />
-              <p className={h.text}>This is the exact prompt from the recording. If your files are somewhere else, say where.</p>
-            </Section>
-          ) : null}
-
-          <Section id="diy" title="Do it yourself.">
-            <ol className={h.rows}>
-              {page.manualSteps.map((step) => (
-                <li key={step.title}>
-                  <h3 className={h.rowTitle}>{step.title}</h3>
-                  <p>
-                    <LinkedText text={step.body} />
-                  </p>
-                </li>
-              ))}
-            </ol>
+          <Section id="prompt" title="Just ask.">
+            <PromptCard text={page.prompt} />
           </Section>
 
           <section className={f.faq} aria-labelledby="faq-title" id="faq">
@@ -259,16 +146,23 @@ export default async function ProblemPageRoute({ params }: Params) {
                   </div>
                 </details>
               ))}
-              <ul className={h.sources} aria-label="Sources">
-                {page.sources.map((source) => (
-                  <li key={source.href}>
-                    <a href={source.href} target="_blank" rel="noopener noreferrer">
-                      {source.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              <p className={h.checked}>Checked against these sources on {formatDate(page.lastChecked)}.</p>
+              {page.byHand?.length ? (
+                <details className={f.item}>
+                  <summary className={f.q}>
+                    <span>Can I do it without Stella?</span>
+                    <i className={f.icon} aria-hidden="true" />
+                  </summary>
+                  <div className={f.a}>
+                    <ol>
+                      {page.byHand.map((line) => (
+                        <li key={line}>
+                          <LinkedText text={line} />
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </details>
+              ) : null}
             </div>
           </section>
 

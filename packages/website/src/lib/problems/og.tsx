@@ -1,9 +1,64 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
+import { chatItems, parseBlocks, type DemoInline, type DemoStep } from "@/lib/demo";
 import { FREE_LINE } from "./index";
 
 export const OG_SIZE = { width: 1200, height: 630 };
+
+/** The app's dark chat colours (app.generated.css, dark theme). */
+const CHAT = { bg: "#1c1c1e", user: "#2871c9", userText: "#f2fbff", reply: "#3a3a3c", replyText: "#f5f5f7", edge: "rgba(0,0,0,0.09)" };
+
+type OgChat = { you: string; stella?: string };
+
+const plain = (parts: DemoInline[]) => parts.map((part) => part.text).join("");
+
+const clip = (text: string, max: number) => {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 12)).replace(/[\s,.;:]+$/, "")}…`;
+};
+
+/** The request and the first lines of Stella's last reply, as plain text for the share image. */
+export function ogChat(steps: DemoStep[]): OgChat | undefined {
+  const items = chatItems(steps);
+  const you = items.find((item) => item.kind === "user");
+  const reply = items.findLast((item) => item.kind === "assistant");
+  if (!you || you.kind !== "user") return undefined;
+  const first = reply?.kind === "assistant" ? parseBlocks(reply.text).find((block) => (block.kind === "p" ? block.parts.length : block.items.length)) : undefined;
+  let stella = first ? (first.kind === "p" ? plain(first.parts) : first.items.map(plain).join(". ")) : undefined;
+  if (stella?.endsWith(":") && stella.includes(". ")) stella = stella.slice(0, stella.lastIndexOf(". ") + 1);
+  return { you: clip(you.text, 110), stella: stella ? clip(stella, 120) : undefined };
+}
+
+function ChatStill({ chat }: { chat: OgChat }) {
+  const bubble = { display: "flex", padding: "11px 15px", borderRadius: 18, fontSize: 21, fontWeight: 500, lineHeight: 1.32, letterSpacing: "-0.01em" } as const;
+  return (
+    <div
+      style={{
+        width: 470,
+        height: 300,
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        padding: "26px 24px",
+        borderRadius: 14,
+        background: CHAT.bg,
+        boxShadow: `0 0 0 1px ${CHAT.edge}, 0 30px 70px -30px rgba(10,20,60,0.55)`,
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ ...bubble, maxWidth: 360, background: CHAT.user, color: CHAT.userText }}>{chat.you}</div>
+      </div>
+      {chat.stella ? (
+        <div style={{ display: "flex" }}>
+          <div style={{ ...bubble, maxWidth: 380, background: CHAT.reply, color: CHAT.replyText }}>{chat.stella}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const font = (file: string) => readFile(path.join(process.cwd(), "assets/og-fonts", file));
 
@@ -12,20 +67,20 @@ export async function problemOgImage({
   eyebrow,
   headline,
   note,
-  poster,
+  chat,
 }: {
   eyebrow: string;
   headline: string;
   note?: string;
-  /** A frame from the proof recording, shown beside the headline. */
-  poster?: string;
+  /** A still of the guide's example chat, shown beside the headline. */
+  chat?: OgChat;
 }) {
   const [medium, heavy, logo] = await Promise.all([
     font("MonaSans-Medium.ttf"),
     font("MonaSans-ExtraBold.ttf"),
     readFile(path.join(process.cwd(), "public/stella-logo.svg")),
   ]);
-  const size = poster
+  const size = chat
     ? headline.length > 40 ? 56 : 66
     : headline.length > 52 ? 64 : headline.length > 36 ? 76 : 92;
   return new ImageResponse(
@@ -61,7 +116,7 @@ export async function problemOgImage({
         <div style={{ marginTop: 20, display: "flex", gap: 40, alignItems: "flex-start" }}>
           <div
             style={{
-              maxWidth: poster ? 560 : 1000,
+              maxWidth: chat ? 560 : 1000,
               fontSize: size,
               fontWeight: 800,
               lineHeight: 0.98,
@@ -70,16 +125,7 @@ export async function problemOgImage({
           >
             {headline}
           </div>
-          {poster ? (
-            // eslint-disable-next-line @next/next/no-img-element -- rendered by next/og, not the browser
-            <img
-              src={poster}
-              width={456}
-              height={256}
-              alt=""
-              style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(10,10,13,0.12)" }}
-            />
-          ) : null}
+          {chat ? <ChatStill chat={chat} /> : null}
         </div>
         <div
           style={{

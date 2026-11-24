@@ -1,486 +1,230 @@
-import { PROOFS, webCuts } from "../media";
+import { shortGuide } from "../short";
 import type { ProblemPage } from "../types";
 
-const MODEL = "Claude Code with Opus, on a Claude plan";
-
 export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
-  {
+  shortGuide({
     slug: "convert-csv-to-vcf",
     niche: "contacts-calendar-email",
-    searchPhrases: ["csv to vcf", "convert csv to vcard", "convert csv to vcf", "excel to vcf", "import contacts from excel to iphone"],
+    searchPhrases: [
+      "csv to vcf",
+      "convert csv to vcard",
+      "convert csv to vcf",
+      "excel to vcf",
+      "import contacts from excel to iphone",
+    ],
     title: "Convert CSV to VCF (vCard) with names and accents intact",
     description:
-      "Turn a contacts spreadsheet (CSV or Excel) into a .vcf your phone imports, without garbled accents or lost numbers: Google Contacts, or Stella (stella.sh) offline.",
+      "Convert a contacts CSV to a VCF file for your phone, with accented names intact and phone numbers tidied. Stella (stella.sh) makes it, nothing uploaded anywhere.",
     h1: "Convert a contacts CSV to a VCF file for your phone",
     short: "Convert CSV to VCF",
-    lede: "64 contacts from a spreadsheet as one .vcf, with Zoë and José spelled right.",
+    lede: "Turn a contacts spreadsheet into a file your phone imports",
     answer:
-      "The free route is Google Contacts: Import the CSV at contacts.google.com, then Export the contacts as vCard. If names with accents come out as “ZoÃ«”, the CSV was saved in an older Windows encoding: re-save it from Excel as “CSV UTF-8” first. Stella (stella.sh) makes the .vcf on your computer instead, reading the encoding correctly, tidying phone numbers and skipping blank rows, so your address book isn't uploaded anywhere.",
-    stellaSteps: [
-      "Opens `contacts.csv` in Documents: 64 people and 2 blank rows, saved the way Excel saves “CSV (Comma delimited)”",
-      "Spots that it's in the older Windows text encoding and reads every accented name correctly",
-      "Puts every phone number in one format with the +1 country code, mobile and home labelled separately",
-      "Carries over emails, birthdays (read as US month/day dates), addresses, workplaces and notes, and leaves out the blank rows",
-      "Saves `contacts.vcf` next to the spreadsheet, points out email addresses that lost their accented letters in the spreadsheet, and explains how to import it on an iPhone or Android phone",
-    ],
-    prompt: "My contacts are in a spreadsheet, contacts.csv in my Documents. Turn it into a contacts file I can import into my new phone.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "One .vcf in under 30 seconds. Checked afterwards against an answer key written before the run: exactly 64 valid contact cards, every person found by name with all 10 accented names intact, every mobile, home number and email on the right card, all 25 birthdays carried over as US dates, and the CSV unchanged.",
-      note: "The 64 people are made up, with 555 numbers and example.com emails. The run isn't sped up; a long idle stretch after the answer is cut.",
-      video: {
-        src: `${PROOFS}/contacts-calendar-email/convert-csv-to-vcf/proof.mp4`,
-        cuts: webCuts("contacts-calendar-email/convert-csv-to-vcf"),
-        poster: `${PROOFS}/contacts-calendar-email/convert-csv-to-vcf/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 42.8,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. contacts.csv, exported from Excel, is in Documents." },
-        { at: 2, text: "The prompt: turn it into a contacts file the new phone can import." },
-        { at: 28.8, text: "Done: contacts.vcf with all 64 people, accents fixed, phone numbers tidied, blank rows skipped, plus import steps for iPhone and Android." },
-      ],
+      "Give Stella (stella.sh) your contacts spreadsheet and it makes a VCF file any iPhone or Android phone imports, with accented names intact, numbers tidied and blank rows left out.",
+    gets: ["One contacts file for any phone", "Names like Zoë spelled right", "Mobile and home numbers labelled"],
+    prompt:
+      "My contacts are in a spreadsheet, contacts.csv in my Documents. Turn it into a contacts file I can import into my new phone.",
+    demo: {
+      ack: "Sure. Reading your contacts.",
+      task: "Contacts file for your new phone",
+      rows: ["Reading 64 people", "Fixing the accented names"],
+      reply:
+        "**contacts.vcf** is next to your spreadsheet, with all 64 people. On an iPhone, open it and tap Add All Contacts.",
+      files: ["contacts.vcf"],
     },
-    manualTitle: "Convert it yourself",
-    manualSteps: [
-      {
-        title: "Save the CSV as UTF-8 first",
-        body: "Open it in Excel and choose File, Save As, “CSV UTF-8 (Comma delimited)”. On a Mac, open it in Numbers and use File, Export To, CSV, which saves UTF-8. This stops accented names turning into “Ã«” or “?”.",
-      },
-      {
-        title: "Import into Google Contacts",
-        body: "Go to contacts.google.com, click Import, choose the CSV and import. Open a few contacts with accents and a few with two phone numbers to check they look right.",
-      },
-      {
-        title: "Export as vCard",
-        body: "Select the imported contacts (they get a label like “Imported on …”), click Export, choose vCard (for iOS Contacts) and save the .vcf.",
-      },
-      {
-        title: "Import on the phone",
-        body: "iPhone: email or AirDrop the .vcf to yourself, open it and tap Add All Contacts. Android: in the Contacts app, Fix & manage, Import from file. Or, if the phone syncs with that Google account, the contacts are already there.",
-      },
-      {
-        title: "Outlook instead of Google",
-        body: "In classic Outlook on Windows: File, Open & Export, Import/Export, Import from another program or file, Comma Separated Values, then map the columns.",
-      },
+    faq: [
+      ["Why do accented names look wrong after converting?", "Excel's plain CSV option saves in an older text format, so Zoë turns into ZoÃ«. Save as CSV UTF-8, or let Stella read it."],
+      ["Can I import a CSV straight into an iPhone?", "No. iPhone Contacts takes VCF files, not CSV, so convert it first."],
+    ],
+    byHand: [
+      "In Excel, File, Save As, CSV UTF-8 (Comma delimited).",
+      "At contacts.google.com, click Import and choose the CSV.",
+      "Select the imported contacts, click Export and choose vCard. Open the .vcf on your phone.",
+    ],
+    related: [
+      "contacts-calendar-email/convert-vcf-to-excel",
+      "contacts-calendar-email/merge-duplicate-contacts",
+      "pdf-excel/combine-excel-files-into-one-sheet",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Why do accented names look wrong after converting?",
-        a: "Excel's plain “CSV (Comma delimited)” saves in an older Windows encoding, and most converters read it as UTF-8, turning “Zoë” into “ZoÃ«”. Save as CSV UTF-8, or let Stella detect the encoding.",
-      },
-      {
-        q: "Can I import a CSV straight into an iPhone?",
-        a: "No. iPhone Contacts imports vCard (.vcf) files, not CSV. Convert first, or import the CSV into iCloud or Google and let it sync.",
-      },
-      {
-        q: "Can it go the other way, VCF to Excel?",
-        a: "Yes: see [convert a VCF to Excel](/how/contacts-calendar-email/convert-vcf-to-excel). If you have two lists to combine first, [merge duplicate contacts](/how/contacts-calendar-email/merge-duplicate-contacts).",
-      },
-      {
-        q: "Will my phone numbers keep working?",
-        a: "Stella wrote every number with its country code (+1 here), which works on any phone and abroad. Mobile and home numbers stayed labelled as such.",
-      },
-    ],
-    related: ["contacts-calendar-email/convert-vcf-to-excel", "contacts-calendar-email/merge-duplicate-contacts", "pdf-excel/combine-excel-files-into-one-sheet"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Google: Import your contacts into Google Contacts", href: "https://support.google.com/contacts/answer/15147365" },
-      { label: "Cisdem: How to convert CSV to vCard", href: "https://cisdem.com/resource/convert-csv-to-vcard.html" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "convert-vcf-to-excel",
     niche: "contacts-calendar-email",
     searchPhrases: ["vcf to excel", "convert vcf to excel", "vcf to csv", "vcard to csv", "how to open vcf file in excel"],
     title: "Convert a VCF to Excel: one row per contact, names readable",
     description:
-      "Turn a phone's contacts .vcf into an Excel sheet with one row per person and readable accented names: the Google Contacts route, or Stella (stella.sh) offline.",
+      "Convert a VCF contacts file to Excel with one row per person, readable names, and every phone number and email in its own column. Stella (stella.sh) does it.",
     h1: "Convert a VCF contacts file to Excel",
     short: "Convert VCF to Excel",
-    lede: "85 contacts from an old phone's .vcf as one tidy row each in Excel.",
+    lede: "See your phone's contacts in a spreadsheet, one row per person",
     answer:
-      "Opening a .vcf in Excel directly gives one line per field, not per person. The free route is to import the .vcf at contacts.google.com and Export as Google CSV, which Excel opens with one row per person (wide, with a column per phone and email). Stella (stella.sh) does it on your computer: it decodes the scrambled accents Android exports use, leaves photo data out of the cells and saves an .xlsx with one row each.",
-    stellaSteps: [
-      "Opens `Contacts 2026-11-02.vcf` in Downloads: 85 contacts in the vCard 2.1 format Android phones export",
-      "Decodes the 11 accented names stored in the phone's encoded form (like `=C3=89`), so they read correctly",
-      "Puts each phone type (mobile, home, work, other) in its own column, written the same way, and a second email in an Email 2 column",
-      "Leaves the 12 contact photos out of the sheet",
-      "Saves `Contacts.xlsx` in Downloads, sorted by last name, points out email addresses the old phone saved without their accented letters, and leaves the .vcf unchanged",
-    ],
+      "Give Stella (stella.sh) the VCF your phone exported. It makes an Excel sheet with one row per person, names readable, each phone number and email in its own column.",
+    gets: ["One row per person, sorted by last name", "A column for each kind of number", "Scrambled accents fixed"],
     prompt:
-      "My old phone exported my contacts as a .vcf file (it's in my Downloads). Put them in an Excel spreadsheet, one row per person, with their name, phone numbers and email.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "The spreadsheet in about 1 minute 40 seconds. Checked afterwards against an answer key written before the run: 85 rows, one per person, every name present with all 10 encoded accented names decoded correctly, every phone number and email in its person's row, no photo data or garbled characters in any cell, and the .vcf unchanged.",
-      note: "The contacts are made up, with 555 numbers and example emails. The work is sped up 7×.",
-      video: {
-        src: `${PROOFS}/contacts-calendar-email/convert-vcf-to-excel/proof.mp4`,
-        cuts: webCuts("contacts-calendar-email/convert-vcf-to-excel"),
-        poster: `${PROOFS}/contacts-calendar-email/convert-vcf-to-excel/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 43.6,
-        realDuration: 135,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. An old phone's contacts export (.vcf) is in Downloads." },
-        { at: 2, text: "The prompt: an Excel sheet, one row per person, with name, phone numbers and email." },
-        { at: 10.8, text: "Stella replies: one row per person, saved in Downloads." },
-        { at: 16.7, text: "Reading 85 contacts, sped up 7×." },
-        { at: 29.5, text: "Done: Contacts.xlsx with 85 rows, accents decoded, a column per phone type, photos left out." },
-      ],
+      "My old phone exported my contacts as a .vcf file in my Downloads. Put them in an Excel spreadsheet, one row per person, with name, phone numbers and email.",
+    demo: {
+      ack: "Sure. Opening your contacts file.",
+      task: "Contacts into Excel",
+      rows: ["Reading 85 contacts", "Fixing 11 scrambled names", "Leaving the photos out"],
+      reply:
+        "**Contacts.xlsx** is in Downloads, 85 people sorted by last name, with mobile, home and work numbers in their own columns.",
+      files: ["Contacts.xlsx"],
     },
-    manualTitle: "Convert it yourself",
-    manualSteps: [
-      {
-        title: "Import the .vcf into Google Contacts",
-        body: "Go to contacts.google.com, click Import and choose the .vcf. Google decodes the phone's encoded names. This adds the contacts to your Google account; you can delete them afterwards.",
-      },
-      {
-        title: "Export as Google CSV",
-        body: "Select the imported contacts (they carry an “Imported on …” label), click Export and choose Google CSV.",
-      },
-      {
-        title: "Open it in Excel",
-        body: "Use Data, From Text/CSV, pick the file and click Load, so accented names come through as UTF-8. The sheet is wide: one column per field, like Phone 1 - Value and Phone 2 - Value, but one row per person.",
-      },
-      {
-        title: "Trim the columns",
-        body: "Delete the columns you don't need and keep name, phones and emails. Save as .xlsx.",
-      },
-      {
-        title: "On a Mac without Google",
-        body: "The Contacts app imports the .vcf and exports only vCard, so for a spreadsheet use the Google route above or Stella.",
-      },
+    faq: [
+      ["How do I open a VCF file in Excel?", "Opened directly, Excel shows one line per detail, not per person. Convert it first, through Google Contacts or Stella."],
+    ],
+    byHand: [
+      "At contacts.google.com, click Import and choose the .vcf.",
+      "Select the imported contacts, click Export and choose Google CSV.",
+      "In Excel, use Data, From Text/CSV to open it, then delete the columns you don't need.",
+    ],
+    related: [
+      "contacts-calendar-email/convert-csv-to-vcf",
+      "contacts-calendar-email/merge-duplicate-contacts",
+      "contacts-calendar-email/convert-ics-to-excel",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Why does Excel show my VCF as one long column?",
-        a: "A .vcf is a text file with one line per field (name, phone, email), so Excel shows each line as a row. It needs converting to put each person on one row.",
-      },
-      {
-        q: "What are the =C3=89 characters in my contacts file?",
-        a: "Android writes accented letters in an encoded form called quoted-printable. `=C3=89` is “É”. A proper converter decodes it; Stella did for all of them.",
-      },
-      {
-        q: "Can I turn the spreadsheet back into contacts later?",
-        a: "Yes: see [convert CSV to VCF](/how/contacts-calendar-email/convert-csv-to-vcf). To combine two contact lists, see [merge duplicate contacts](/how/contacts-calendar-email/merge-duplicate-contacts).",
-      },
-      {
-        q: "Can it convert a calendar file to Excel too?",
-        a: "Yes: see [convert an .ics calendar to Excel](/how/contacts-calendar-email/convert-ics-to-excel).",
-      },
-    ],
-    related: ["contacts-calendar-email/convert-csv-to-vcf", "contacts-calendar-email/merge-duplicate-contacts", "contacts-calendar-email/convert-ics-to-excel"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Google: Import your contacts into Google Contacts", href: "https://support.google.com/contacts/answer/15147365" },
-      { label: "Fone.tips: VCF to CSV", href: "https://fone.tips/vcf-to-csv/" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "merge-duplicate-contacts",
     niche: "contacts-calendar-email",
-    searchPhrases: ["merge duplicate contacts", "remove duplicate contacts", "duplicate contacts", "combine two contact lists", "remove duplicate contacts iphone"],
+    searchPhrases: [
+      "merge duplicate contacts",
+      "remove duplicate contacts",
+      "duplicate contacts",
+      "combine two contact lists",
+      "remove duplicate contacts iphone",
+    ],
     title: "Merge duplicate contacts from two lists without losing numbers",
     description:
-      "Combine an old phone's contacts and an email account's contacts into one list with no duplicates and every number kept: Apple, Google, or Stella (stella.sh).",
+      "Merge duplicate contacts from two lists into one, matching by phone and email so Bob and Robert become one and no number is lost. Stella (stella.sh) does it.",
     h1: "Merge duplicate contacts from two lists",
     short: "Merge duplicate contacts",
-    lede: "Two contact exports, 96 people, each once, with every number and email kept.",
+    lede: "Combine two contact lists into one, every number kept",
     answer:
-      "Inside one account, iPhone's View Duplicates, the Mac's Card, Look for Duplicates and Google Contacts' Merge & fix all merge contacts with the same name. They miss “Bob” and “Robert” with the same email, can wrongly merge two different people with one name, and don't work across two accounts. Stella (stella.sh) merges two exports by matching phone numbers and emails, keeps every number, and lists the matches it wasn't sure of.",
-    stellaSteps: [
-      "Reads both files in Downloads: 78 cards from the old phone (.vcf) and 65 rows from the email account (.csv)",
-      "Spots 6 people saved twice on the phone, and 41 people who are on both lists",
-      "Matches people by phone number and email, whatever the formatting or capitals, so Bob and Robert Quayle become one contact with the short name kept as a nickname",
-      "Keeps the two Sam Patels apart, since they share no number or email, and names the two pairs it merged on name alone because nothing conflicted",
-      "Saves `Merged contacts.vcf` with 96 people, checks every number and email from both files is in it, and lists the matches worth a look",
-    ],
+      "Give Stella (stella.sh) both contact lists. It matches people by phone number and email, not just name, merges the doubles into one card each and keeps every number and email.",
+    gets: ["One list with everyone once", "Bob and Robert matched by number", "Two people with one name kept apart"],
     prompt:
-      "I've got two contact lists in my Downloads: an export from my old phone (the .vcf) and one from my email account (the .csv). Combine them into one list with no duplicates, without losing anyone's numbers or emails.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "One merged list in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: 96 contacts, each of the 96 people exactly once with all their phones and emails, no record mixing two people, both Sam Patels kept separate, and both original files unchanged.",
-      note: "Both contact lists are made up, with 555 numbers and example emails. The work is sped up 5×.",
-      video: {
-        src: `${PROOFS}/contacts-calendar-email/merge-duplicate-contacts/proof.mp4`,
-        cuts: webCuts("contacts-calendar-email/merge-duplicate-contacts"),
-        poster: `${PROOFS}/contacts-calendar-email/merge-duplicate-contacts/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 43.4,
-        realDuration: 103,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A phone export (.vcf) and an email export (.csv) are in Downloads." },
-        { at: 2.1, text: "The prompt: combine them with no duplicates and no lost numbers or emails." },
-        { at: 12.1, text: "Stella replies: people on both lists become one contact, and it will flag matches it isn't sure of." },
-        { at: 17.9, text: "Matching contacts, sped up 5×." },
-        { at: 29.5, text: "Done: 96 contacts in Merged contacts.vcf, Bob/Robert-style pairs merged, the two Sam Patels kept apart." },
-      ],
+      "I've got two contact lists in my Downloads, one from my old phone and one from my email account. Combine them into one list with no duplicates, keeping every number and email.",
+    demo: {
+      ack: "Sure. Comparing both lists.",
+      task: "Merging your two contact lists",
+      rows: ["Reading 78 phone and 65 email contacts", "Matching by number and email"],
+      reply:
+        "Done. **Merged contacts.vcf** has 96 people, each once, with every number and email from both lists. Two matches made on name alone are listed to check.",
+      files: ["Merged contacts.vcf"],
     },
-    manualTitle: "Merge them yourself",
-    manualSteps: [
-      {
-        title: "Get both lists into one account",
-        body: "On a Mac, open Contacts and use File, Import for each file, into the same account (such as iCloud). Or import both at contacts.google.com. The built-in tools only merge within one account.",
-      },
-      {
-        title: "Mac: Look for Duplicates",
-        body: "In Contacts, choose Card, Look for Duplicates, then Merge. It matches identical names, so check “Bob” and “Robert”-style pairs by hand.",
-      },
-      {
-        title: "Google: Merge & fix",
-        body: "In Google Contacts, click Merge & fix, review each suggestion and merge. Before Merge all, check that two different people with the same name aren't on the list.",
-      },
-      {
-        title: "iPhone",
-        body: "When the iPhone finds duplicates, the top of your contacts list shows Duplicates Found, View Duplicates. Tap Merge All or go through them one by one.",
-      },
-      {
-        title: "Search for the leftovers",
-        body: "Search for a few surnames and phone numbers you know were on both lists. Nicknames, maiden names and old work emails are where duplicates hide.",
-      },
+    faq: [
+      ["How do I merge two contacts on an iPhone?", "Open one contact, tap Edit, scroll to Link Contacts and pick the other. For many at once, use View Duplicates at the top of your contacts."],
+    ],
+    byHand: [
+      "Import both files into one account, such as iCloud or contacts.google.com.",
+      "Google: click Merge & fix and review each suggestion. Mac Contacts: Card, Look for Duplicates.",
+      "Search a few surnames and numbers you know were on both lists to catch leftovers.",
+    ],
+    related: [
+      "contacts-calendar-email/convert-vcf-to-excel",
+      "contacts-calendar-email/convert-csv-to-vcf",
+      "pdf-excel/compare-two-excel-files",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "Why didn't my iPhone find all the duplicates?",
-        a: "It matches contacts with the same name. A contact saved as “Liz” on one list and “Elizabeth” on the other, or with a typo, isn't recognised, even if the number is the same.",
-      },
-      {
-        q: "Can I merge contacts from two Google accounts?",
-        a: "Not directly; Merge & fix only works within one account. Export both, merge them, then import the result into the account you keep.",
-      },
-      {
-        q: "What file should I import on my phone?",
-        a: "A .vcf works on iPhone, Android, Google, iCloud and Outlook. Stella saved one. To review it in a sheet first, [convert the VCF to Excel](/how/contacts-calendar-email/convert-vcf-to-excel).",
-      },
-      {
-        q: "Can it remove duplicates in a spreadsheet instead?",
-        a: "Yes. For any spreadsheet, see [compare two Excel files](/how/pdf-excel/compare-two-excel-files) or ask for duplicate rows to be removed.",
-      },
-      {
-        q: "How do I swap my phone's contacts for the merged list?",
-        a: "Stella writes a new merged file and leaves your phone and accounts as they are. To switch over, export the current contacts as a backup, delete them from the account you keep, then import `Merged contacts.vcf` there.",
-      },
-    ],
-    related: ["contacts-calendar-email/convert-vcf-to-excel", "contacts-calendar-email/convert-csv-to-vcf", "pdf-excel/compare-two-excel-files", "pdf-excel/fix-garbled-characters-in-csv"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Google: Merge duplicate contacts", href: "https://support.google.com/contacts/answer/7078226" },
-      { label: "Apple: Merge contact cards in Contacts on Mac", href: "https://support.apple.com/guide/contacts/adrbk1456/mac" },
-      { label: "How-To Geek: Find and merge duplicate contacts on iPhone", href: "https://www.howtogeek.com/837552/how-to-find-and-merge-duplicate-contacts-on-iphone/" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "convert-ics-to-excel",
     niche: "contacts-calendar-email",
-    searchPhrases: ["ics to excel", "ics to csv", "export google calendar to excel", "how to open ics file", "export calendar to spreadsheet"],
+    searchPhrases: [
+      "ics to excel",
+      "ics to csv",
+      "export google calendar to excel",
+      "how to open ics file",
+      "export calendar to spreadsheet",
+    ],
     title: "Convert an ICS calendar file to Excel, every repeat listed",
     description:
-      "Turn an exported calendar (.ics) into a spreadsheet of every appointment in a date range, repeats expanded, in your time zone: Outlook, or Stella (stella.sh).",
+      "Convert an ICS calendar file to an Excel spreadsheet with every repeat listed and times in your own time zone. Stella (stella.sh) makes the sheet for you.",
     h1: "Convert an ICS calendar file to an Excel spreadsheet",
     short: "Convert ICS to Excel",
-    lede: "Six months of a family calendar as 57 rows, weekly lessons and all, in Chicago time.",
+    lede: "Every appointment in your calendar file, one row each in Excel",
     answer:
-      "Classic Outlook on Windows can do it: open the .ics to import it, then File, Open & Export, Import/Export, Export to a file, Comma Separated Values, choose the calendar and set a date range. New Outlook, Apple Calendar and Google Calendar can't export to a spreadsheet. Online converters often list a weekly event once instead of every week, and show times in UTC. Stella (stella.sh) lists every occurrence in your range, in your time zone, in an .xlsx.",
-    stellaSteps: [
-      "Reads `Family calendar export.ics` in Downloads",
-      "Expands every repeating event into one row per date: weekly piano lessons, monthly book club, fortnightly bins, a yearly birthday",
-      "Leaves out the piano lesson cancelled on 31 March and everything outside January to June 2026",
-      "Converts invites stored in universal time to Chicago time, and flags one that lands at 11:30 PM as worth checking",
-      "Saves `Family appointments Jan-Jun 2026.xlsx` in Downloads, with multi-day events as one row with an end date, plus a separate Notes sheet explaining its choices, so the first sheet stays ready to sort and filter",
+      "Give Stella (stella.sh) the .ics file and the dates you want. It lists every appointment in Excel, one row each, with weekly and monthly repeats spelled out and times in your own time zone.",
+    gets: [
+      "One row per appointment, ready to sort",
+      "Every repeat listed, cancelled ones gone",
+      "Times in your own time zone",
     ],
     prompt:
-      "I exported my family calendar as an .ics file (in my Downloads). Make me a spreadsheet of every appointment from January to June 2026, one row each, with the date, start and end time, title and location. We're in Chicago.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "The spreadsheet in about 1 minute 20 seconds. Checked afterwards against an answer key written before the run: all 57 appointments are there with the right date and Chicago start time, repeats expanded, nothing from outside January to June, no piano lesson on 31 March, and the .ics unchanged. The appointments sheet has exactly 57 rows.",
-      note: "The calendar is made up for this run, with repeating events, a cancelled date and invites stored in universal time on purpose. The work is sped up 6×.",
-      video: {
-        src: `${PROOFS}/contacts-calendar-email/convert-ics-to-excel/proof.mp4`,
-        cuts: webCuts("contacts-calendar-email/convert-ics-to-excel"),
-        poster: `${PROOFS}/contacts-calendar-email/convert-ics-to-excel/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 44.2,
-        realDuration: 115,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A family calendar export (.ics) is in Downloads." },
-        { at: 2, text: "The prompt: every appointment from January to June 2026, one row each, in Chicago time." },
-        { at: 12.8, text: "Stella replies: repeating appointments included, all times in Chicago time." },
-        { at: 18.7, text: "Reading the calendar, sped up 6×." },
-        { at: 30.1, text: "Done: 57 appointments sorted by date, the cancelled lesson left out, four universal-time invites converted, one late-night time flagged." },
-      ],
+      "I exported my family calendar as an .ics file. Make me a spreadsheet of every appointment from January to June 2026 with date, times, title and location. We're in Chicago.",
+    demo: {
+      ack: "Sure. Reading your calendar.",
+      task: "Family appointments, Jan to Jun",
+      rows: ["Listing every weekly and monthly repeat", "Dropping the cancelled piano lesson"],
+      reply:
+        "Done. **57 appointments** are in a spreadsheet in Downloads, one row each. One invite lands at 11:30 PM, worth checking.",
+      files: ["Family appointments Jan-Jun 2026.xlsx"],
     },
-    manualTitle: "Convert it yourself",
-    manualSteps: [
-      {
-        title: "Windows with classic Outlook",
-        body: "Double-click the .ics to import it into Outlook. Then File, Open & Export, Import/Export, Export to a file, Comma Separated Values, pick the calendar, and set the date range when asked. Open the CSV in Excel.",
-      },
-      {
-        title: "No classic Outlook",
-        body: "New Outlook, Outlook on the web, Apple Calendar and Google Calendar can import an .ics but can't export a spreadsheet. Import it into Google Calendar (Settings, Import & export) and use a third-party export add-on, or print the agenda view to PDF.",
-      },
-      {
-        title: "Check the repeats",
-        body: "Check that a weekly event appears on every date, not just once, and that cancelled dates are gone. Converters that read the file directly often get this wrong.",
-      },
-      {
-        title: "Check the times",
-        body: "Invites from other people are often stored in universal time (UTC). If a 10 AM call shows as 4 PM, the converter didn't change it to your time zone.",
-      },
+    faq: [
+      ["How do I open an ICS file in Excel?", "Excel can't read it as rows. Convert it to xlsx first, with classic Outlook or Stella."],
+      ["Why does my weekly event only appear once?", "The file stores it once with a repeat rule. A good converter lists every date and drops cancelled ones."],
+    ],
+    byHand: [
+      "In classic Outlook on Windows, double-click the .ics to import it.",
+      "Then File, Open & Export, Import/Export, Export to a file, Comma Separated Values, and pick a date range.",
+      "Open the CSV in Excel. Google Calendar and Apple Calendar can't export to a spreadsheet.",
+    ],
+    related: [
+      "contacts-calendar-email/convert-vcf-to-excel",
+      "contacts-calendar-email/convert-eml-to-pdf",
+      "pdf-excel/combine-excel-files-into-one-sheet",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "How do I open an .ics file?",
-        a: "Double-click it: it opens in Calendar on a Mac or Outlook on Windows and offers to add the events. To just read it, open it in a text editor, but repeating events appear once, as a rule.",
-      },
-      {
-        q: "Why does my weekly event only appear once in the spreadsheet?",
-        a: "The .ics stores it once with a repeat rule. A converter has to expand the rule into dates and drop any cancelled ones; many don't.",
-      },
-      {
-        q: "Can I export Google Calendar to Excel?",
-        a: "Export it from Google Calendar's Settings, Import & export (you get .ics files in a zip), then convert the .ics as shown here.",
-      },
-      {
-        q: "Which time zone will the times be in?",
-        a: "The one you name in the prompt, as with Chicago here. Stella converts invites stored in universal time to that zone, so a call at 10 AM your time reads 10 AM.",
-      },
-      {
-        q: "What else can it convert?",
-        a: "Contacts both ways: [VCF to Excel](/how/contacts-calendar-email/convert-vcf-to-excel) and [CSV to VCF](/how/contacts-calendar-email/convert-csv-to-vcf). Saved emails can go into one PDF: see [EML to PDF](/how/contacts-calendar-email/convert-eml-to-pdf).",
-      },
-    ],
-    related: ["contacts-calendar-email/convert-vcf-to-excel", "contacts-calendar-email/convert-eml-to-pdf", "pdf-excel/combine-excel-files-into-one-sheet"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Timetackle: Export Outlook calendar to CSV", href: "https://www.timetackle.com/how-to-export-outlook-calendar-to-csv/" },
-      { label: "Google Calendar Help: Import events", href: "https://support.google.com/calendar/answer/37118" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "convert-eml-to-pdf",
     niche: "contacts-calendar-email",
     searchPhrases: ["eml to pdf", "convert eml to pdf", "how to open eml file", "save emails as one pdf", "mbox to pdf"],
     title: "Convert EML to PDF: one person's emails in one PDF, by date",
     description:
-      "Put every saved email from one sender into a single PDF, oldest first, with attachments shown: Mail or Outlook one at a time, or Stella (stella.sh) for the whole folder.",
+      "Convert EML files to one PDF, oldest first: every email from one sender, with dates and photos in place. Stella (stella.sh) picks them out of your saved emails.",
     h1: "Convert EML files to one PDF, oldest first",
     short: "Convert EML to PDF",
-    lede: "Eleven emails from a landlord, out of 36, in one dated PDF for a deposit dispute.",
+    lede: "One person's emails in a single PDF, oldest first",
     answer:
-      "Open each .eml (Mail on a Mac, Outlook or the Mail app on Windows), save or print it as a PDF, then combine the PDFs in date order: in Preview on a Mac by dragging thumbnails, or with a free PDF tool on Windows. For a few emails that's fine; for a folder it's slow, and Mail's export can cut off the right edge. Stella (stella.sh) picks out one sender's emails from a folder and makes one PDF, oldest first, without uploading them.",
-    stellaSteps: [
-      "Reads the 36 saved emails in the Flat emails folder, whose file names aren't in date order",
-      "Picks the 11 sent by the landlord by their actual sender, including two from his phone address under the same name, and leaves the 22 unrelated ones and your own replies out",
-      "Decodes every body type (plain, HTML-only and encoded) and keeps special characters like the em dash",
-      "Builds one PDF, oldest first: a contents page listing all 11, then each email on its own page with sender, date and full text, and the carpet-stain photo after the email it came with",
-      "Points out gaps worth knowing for a dispute, such as a reply to an email that isn't in the folder, and offers to add your own emails, marked as yours",
+      "Tell Stella (stella.sh) whose emails you need and where they're saved. It picks out every email from that person and makes one PDF, oldest first, with dates, full text and attached photos.",
+    gets: [
+      "One PDF of everything they sent",
+      "Oldest first, with a contents page",
+      "Photos after the email they came with",
     ],
     prompt:
-      "For a deposit dispute I need every email my landlord, Gareth Pemberton, sent me in one PDF, oldest first. The emails are saved in the Flat emails folder in my Documents.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-13",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "One PDF in about 1 minute 10 seconds. Checked afterwards against an answer key written before the run: it holds all 11 of the landlord's emails from both his addresses, oldest first, none of the 22 unrelated emails, the em dash intact, the photo attachment shown, each email's date and subject, and the .eml files unchanged.",
-      note: "The emails, landlord and flat are made up for this run; nearly all of them end “Regards, Gareth”, whoever sent them. The work is sped up 5×.",
-      video: {
-        src: `${PROOFS}/contacts-calendar-email/convert-eml-to-pdf/proof.mp4`,
-        cuts: webCuts("contacts-calendar-email/convert-eml-to-pdf"),
-        poster: `${PROOFS}/contacts-calendar-email/convert-eml-to-pdf/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 49.4,
-        realDuration: 109,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. 36 saved emails (.eml) are in Documents/Flat emails." },
-        { at: 2, text: "The prompt: every email from the landlord in one PDF, oldest first." },
-        { at: 18.9, text: "Stella replies: it will pull out his emails and report how many went in and anything odd." },
-        { at: 24.7, text: "Reading the emails, sped up 5×." },
-        { at: 35.4, text: "Done: all 11 of his emails, March 2025 to April 2026, a contents page, the photo attachment, and notes on gaps for the dispute." },
-      ],
+      "For a deposit dispute I need every email my landlord Gareth Pemberton sent me in one PDF, oldest first. They're saved in the Flat emails folder in Documents.",
+    demo: {
+      ack: "Sure. Finding Gareth's emails.",
+      task: "Landlord's emails as one PDF",
+      rows: ["Reading 36 saved emails", "Picking out 11 from Gareth"],
+      reply:
+        "Done. All 11 of Gareth's emails, from both his addresses, are in one PDF, oldest first. One of them replies to an email that isn't in the folder.",
     },
-    manualTitle: "Make the PDF yourself",
-    manualSteps: [
-      {
-        title: "Find the right emails",
-        body: "File names rarely sort in date order. Open each .eml (double-click) and note the sender and date, including any from the same person's second address.",
-      },
-      {
-        title: "Mac: export each as PDF",
-        body: "With an email open in Mail, choose File, Export as PDF, and name it starting with the date, like `2025-03-01 Welcome.pdf`, so they sort in order. If the right edge is cut off, use File, Print, PDF, Save as PDF instead.",
-      },
-      {
-        title: "Windows: print each to PDF",
-        body: "Open the .eml in classic Outlook or the Mail app, choose Print, pick Microsoft Print to PDF, and save with the date at the front of the name.",
-      },
-      {
-        title: "Combine them",
-        body: "Mac: open the first PDF in Preview, show Thumbnails, and drag the others into the sidebar in date order, then save. Windows: use a free PDF tool to merge them in name order.",
-      },
-      {
-        title: "Add attachments",
-        body: "Photos and documents attached to the emails aren't included in a printed email. Save them separately and add them after the email they came with.",
-      },
+    faq: [
+      ["How do I open an .eml file?", "Double-click it. It opens in Mail on a Mac and in Outlook or the Mail app on Windows."],
+    ],
+    byHand: [
+      "Open each .eml and note the sender and date.",
+      "Mac: File, Export as PDF. Windows: Print, Microsoft Print to PDF. Start each name with the date.",
+      "Combine them in date order, in Preview on a Mac or a free PDF tool on Windows.",
+    ],
+    related: [
+      "files-folders/find-files-containing-text",
+      "pdf-excel/redact-pdf",
+      "contacts-calendar-email/convert-ics-to-excel",
     ],
     platforms: ["windows", "mac", "linux"],
-    faq: [
-      {
-        q: "How do I open an .eml file?",
-        a: "Double-click it. It opens in Mail on a Mac and in Outlook or the Mail app on Windows. Without a mail app, rename it to .txt to read the text, though attachments and HTML won't display.",
-      },
-      {
-        q: "How do I save emails as .eml files?",
-        a: "In Mail on a Mac, drag an email from the list into a Finder folder. In Gmail, open the email, click the three-dot menu and choose Download message. In Outlook, use File, Save As.",
-      },
-      {
-        q: "Can I add my own replies to the PDF?",
-        a: "Yes. Ask for them and Stella adds your replies in date order, each marked as yours. The original .eml files stay as they were, with their full headers.",
-      },
-      {
-        q: "Can it find the other documents about the same person?",
-        a: "Yes: [find every file that mentions a name](/how/files-folders/find-files-containing-text). To blank out details before sending, [redact the PDF](/how/pdf-excel/redact-pdf).",
-      },
-    ],
-    related: ["files-folders/find-files-containing-text", "pdf-excel/redact-pdf", "contacts-calendar-email/convert-ics-to-excel", "contacts-calendar-email/open-mbox-file"],
-    lastChecked: "2026-11-13",
-    sources: [
-      { label: "Apple: Save emails as files or PDFs in Mail on Mac", href: "https://support.apple.com/guide/mail/mlhlp1044/mac" },
-      { label: "Apple Community: Mail export as PDF cuts off right side", href: "https://discussions.apple.com/thread/251140151" },
-    ],
-  },
-  {
+    lastChecked: "2026-11-24",
+  }),
+  shortGuide({
     slug: "open-mbox-file",
     niche: "contacts-calendar-email",
     searchPhrases: [
@@ -493,96 +237,41 @@ export const CONTACTS_CALENDAR_EMAIL_PAGES: ProblemPage[] = [
     ],
     title: "Open an mbox file: every email listed, every attachment saved",
     description:
-      "Open the mbox from Google Takeout or Thunderbird: list every email with date, sender and subject and save all the attachments, with Thunderbird or Stella (stella.sh).",
+      "Open an mbox file from Google Takeout without a mail program: a list of every email and a folder of all the attachments. Stella (stella.sh) sorts it out.",
     h1: "How to open an mbox file",
     short: "Open an mbox file",
-    lede: "A mailbox download as a spreadsheet of every email and one folder of its attachments.",
+    lede: "Read an old mailbox download and get every attachment out",
     answer:
-      "An mbox is one big text file holding a whole mailbox, as Google Takeout gives you Gmail. To read it, import it into a mail program: the free Thunderbird with the ImportExportTools NG add-on on Windows, Mac or Linux, or Apple Mail's Import Mailboxes on a Mac. Stella (stella.sh) opens it without any mail program: a spreadsheet with a row for every email and a folder of all the attachments, with readable subjects and no file overwritten by another of the same name.",
-    stellaSteps: [
-      "Opens the Google Takeout zip in Downloads and finds the mbox of 45 emails inside it",
-      "Decodes the subjects and file names that are stored in encoded form, so “Café de Flore – réservation confirmée” and “Reçu Novembre.pdf” read right",
-      "Writes `Email list.xlsx` with the date, sender name and address, recipient, subject, Gmail labels and attachments of every email",
-      "Saves all 12 attachments into one Attachments folder, keeping two different files both called invoice.pdf as `invoice.pdf` and `invoice (2).pdf`",
-      "Notes that one attachment was already damaged in the original email, puts it all in a new Old Gmail export folder and leaves the zip unchanged",
+      "An mbox holds a whole mailbox in one file, like the Gmail download from Google Takeout. Stella (stella.sh) opens it for you: a spreadsheet of every email and a folder with all the attachments.",
+    gets: [
+      "A list of every email: date, sender, subject",
+      "Every attachment saved in one folder",
+      "Two files with one name both kept",
     ],
     prompt:
-      "I downloaded my old email from Google and got a zip in my Downloads with an mbox file I can't open. Make me a spreadsheet listing every email with the date, who it's from and the subject, and save all the attachments into one folder.",
-    proof: {
-      kind: "video",
-      recordedOn: "2026-11-14",
-      platform: "Linux (Omarchy)",
-      model: MODEL,
-      result:
-        "About a minute. Checked afterwards against an answer key written before the run: a row for each of the 45 emails with sender address, readable subject and date, all 12 attachments saved as files including both different invoice.pdf files, and the accented attachment name readable.",
-      note: "The mailbox is made up, written in the format of a Gmail Takeout mbox, including encoded subjects and two attachments with the same name. The work is sped up 5×.",
-      video: {
-        src: `${PROOFS}/contacts-calendar-email/open-mbox-file/proof.mp4`,
-        cuts: webCuts("contacts-calendar-email/open-mbox-file"),
-        poster: `${PROOFS}/contacts-calendar-email/open-mbox-file/poster.jpg`,
-        width: 1280,
-        height: 860,
-        duration: 42.2,
-        realDuration: 105,
-      },
-      moments: [
-        { at: 0, text: "Stella on a Linux computer. A Google Takeout zip with an mbox of old email is in Downloads." },
-        { at: 2, text: "The prompt: a spreadsheet of every email and all the attachments in one folder." },
-        { at: 10.8, text: "Stella replies: one row per email, every attachment kept even when two share a name." },
-        { at: 16.7, text: "Reading the mailbox, sped up 5×." },
-        { at: 28.2, text: "Done: 45 emails listed and 12 attachments saved, with one file that was damaged in the original email." },
-      ],
+      "I downloaded my old email from Google and got a zip with an mbox file I can't open. List every email with date, sender and subject, and save all the attachments in one folder.",
+    demo: {
+      ack: "Sure. Opening your old mailbox.",
+      task: "Old Gmail, listed and unpacked",
+      rows: ["Finding the mbox in the zip", "Listing all 45 emails"],
+      reply:
+        "Done. Your email list and an Attachments folder are in a new **Old Gmail export** folder. The two different invoice.pdf files are both there.",
+      files: ["Old Gmail export"],
     },
-    manualTitle: "Open it yourself",
-    manualSteps: [
-      {
-        title: "Get the mbox out of the zip",
-        body: "Google Takeout puts Gmail in `Takeout/Mail/` as a file such as `All mail Including Spam and Trash.mbox`. Unzip the download first; the mbox can be several gigabytes for a big mailbox.",
-      },
-      {
-        title: "Mac: import into Apple Mail",
-        body: "In Mail, File, Import Mailboxes, choose Files in mbox format and pick the folder holding the .mbox. The emails appear under On My Mac. Select messages and use File, Save Attachments to save their files.",
-      },
-      {
-        title: "Windows, Mac or Linux: Thunderbird",
-        body: "Install the free Thunderbird and its ImportExportTools NG add-on (Tools, Add-ons). Right-click Local Folders, ImportExportTools NG, Import mbox file, and pick the .mbox. No email account is needed for this.",
-      },
-      {
-        title: "List the emails and save attachments",
-        body: "Right-click the imported folder, ImportExportTools NG, Export all messages in the folder, Spreadsheet (CSV) for a list. To save attachments, select all messages and use the add-on's save attachments option. Check for files with the same name, which some tools overwrite or skip.",
-      },
-    ],
-    platforms: ["windows", "mac", "linux"],
     faq: [
-      {
-        q: "What is an mbox file?",
-        a: "A plain text file with a whole mail folder in it, one email after another. Google Takeout, Thunderbird and Apple Mail all use it for exports.",
-      },
-      {
-        q: "Can I open an mbox file without installing an email program?",
-        a: "Not usefully on its own: a text editor shows raw headers and encoded attachments. Stella reads it directly and gives you a spreadsheet and the files.",
-      },
-      {
-        q: "Can I turn some of the emails into a PDF?",
-        a: "Yes: see [convert EML to PDF](/how/contacts-calendar-email/convert-eml-to-pdf), which puts one person's emails in one PDF by date.",
-      },
-      {
-        q: "Can it do the same with chat downloads?",
-        a: "Yes: see [read Facebook messages from your data download](/how/chats-data-exports/read-facebook-messages-from-data-download) and [export a WhatsApp chat to PDF](/how/chats-data-exports/export-whatsapp-chat-to-pdf).",
-      },
+      ["What is an mbox file?", "One text file holding a whole mail folder, email after email. Google Takeout, Thunderbird and Apple Mail use it for exports."],
+    ],
+    byHand: [
+      "Unzip the Takeout download; Gmail is in Takeout/Mail as a .mbox file.",
+      "Mac: in Mail, File, Import Mailboxes, Files in mbox format.",
+      "Anywhere: install the free Thunderbird and its ImportExportTools NG add-on, then right-click Local Folders to import the mbox.",
     ],
     related: [
       "contacts-calendar-email/convert-eml-to-pdf",
       "chats-data-exports/read-facebook-messages-from-data-download",
       "files-folders/find-files-containing-text",
     ],
-    lastChecked: "2026-11-14",
-    sources: [
-      { label: "Google Account Help: Download your data", href: "https://support.google.com/accounts/answer/3024190" },
-      {
-        label: "ImportExportTools NG add-on for Thunderbird",
-        href: "https://addons.thunderbird.net/en-US/thunderbird/addon/importexporttools-ng/",
-      },
-    ],
-  },
+    platforms: ["windows", "mac", "linux"],
+    lastChecked: "2026-11-24",
+  }),
 ];

@@ -2,11 +2,11 @@ export const slides = [
   { slug: "assistant", title: ["Your personal", "assistant."] },
   { slug: "computer", title: ["Your computer,", "in your pocket."], tabletTitle: ["Your computer,", "from anywhere."] },
   { slug: "approve", title: ["You just", "say yes."] },
-  { slug: "trip", title: ["Plans the", "whole trip."] },
+  { slug: "work", title: ["Gets real", "work done."] },
   { slug: "create", title: ["Make what", "you imagine."] },
-  { slug: "apps", title: ["Apps made", "just for you."] },
-  { slug: "morning", title: ["Ready before", "you are."] },
-  { slug: "models", title: ["Bring the AI", "you pay for."] },
+  { slug: "apps", title: ["Create", "any app."] },
+  { slug: "schedule", title: ["Runs while", "you’re away."] },
+  { slug: "models", title: ["Bring your", "favorite AI."] },
 ] as const satisfies readonly { slug: string; title: readonly [string, string]; tabletTitle?: readonly [string, string] }[];
 
 export type SlideSlug = (typeof slides)[number]["slug"];

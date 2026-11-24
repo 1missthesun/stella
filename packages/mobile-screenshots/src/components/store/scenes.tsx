@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { CANVAS, type Frame, type SlideSlug } from "@/store/slides";
 import { BrandCharacter } from "../BrandCharacter";
-import { ChatBar, Composer, Mascot, Mine, Notification, Photo, ProviderMark, RoundButton, ViewerBar } from "./app";
+import { AppIcon, ChatBar, Composer, Mascot, Mine, Notification, Photo, ProviderMark, RoundButton, ViewerBar } from "./app";
 import { DeviceFrame, FRAMES, Icon, Laptop, frameSize } from "./frames";
 import type { IconName } from "./icons";
 
@@ -20,7 +20,7 @@ function Assistant(props: SceneProps) {
   const { frame } = props;
   const { tablet } = FRAMES[frame];
   return (
-    <DeviceFrame frame={frame} {...fit(props)} locked screen={
+    <DeviceFrame frame={frame} {...fit(props)} locked light screen={
       <div className={`lock ${tablet ? "tablet" : ""}`}>
         <div className="lock-date">Friday, June 12</div>
         <div className="lock-time">9:41</div>
@@ -113,36 +113,39 @@ function Approve(props: SceneProps) {
   );
 }
 
-function Pin({ photo, x, y, size }: { photo: string; x: string; y: string; size: number }) {
-  return <div className="pin" style={{ left: x, top: y, width: size, height: size, marginLeft: -size / 2, marginTop: -size - 9 }}><Photo name={photo} style={{ width: "100%", height: "100%", borderRadius: "50%" }} /></div>;
-}
-
-// Walking route between the four stops, from OpenStreetMap routing, in map pixels.
-const ROUTE = "M533 963L541 974L534 979L539 987L549 990L558 992L565 997L597 1047L603 1055L606 1062L598 1072L594 1078L608 1121L612 1128L604 1131L595 1136L583 1144L583 1163L583 1201L582 1219L585 1229L588 1241L567 1252L560 1256L522 1274L513 1279L504 1283L494 1283L490 1289L488 1348L487 1374L489 1382L490 1391L501 1394L505 1385L511 1381L528 1377L548 1374L569 1371L579 1371L596 1381L618 1392L650 1391L660 1389L680 1384L687 1380L699 1377L710 1376L735 1368L755 1428L771 1483L773 1491L782 1516L794 1546L804 1577L807 1588L810 1599L819 1597L826 1594L835 1591L865 1582L860 1565L852 1538L842 1505L890 1490L895 1485L945 1467L955 1466L979 1459L988 1457L1018 1448L1018 1428L1024 1417L1039 1391L1052 1368L1060 1353L1069 1352L1099 1334L1097 1313L1081 1297L1098 1299L1107 1301L1127 1307L1160 1322L1180 1330L1201 1304L1207 1296L1213 1289L1218 1277L1221 1270L1224 1260L1198 1231L1211 1223L1225 1212L1231 1205L1238 1197L1244 1192L1251 1184L1252 1162L1257 1151L1260 1143L1263 1134L1276 1116L1280 1110L1279 1093L1278 1084L1272 1071L1264 1064L1253 1051L1247 1044L1241 1039L1234 1022L1222 1005L1205 981L1190 964L1185 959L1170 945L1165 932L1162 919L1160 906L1154 868L1175 865";
-
-// 4 — a trip you can see.
-function Trip(props: SceneProps) {
-  const { tablet, w } = FRAMES[props.frame];
-  const mapW = props.frame === "ipad" ? w : tablet ? w * 1.12 : 610;
-  const pin = tablet ? 124 : 90;
-  const days = [["tram", "Fri", "Alfama"], ["belem", "Sat", "Belém"], ["miradouro", "Sun", "Graça"]];
+// 4 — real work, finished: mail answered, the budget, the form, the shopping.
+function Work(props: SceneProps) {
+  const { tablet } = FRAMES[props.frame];
+  const budget = [["Home", 92, "#4b8bff"], ["Food", 64, "#ff9f0a"], ["Fun", 38, "#ff5c93"]] as const;
   return (
     <DeviceFrame frame={props.frame} {...fit(props)} screen={
-      <div className={`trip ${tablet ? "tablet" : ""}`}>
-        <div className="trip-map" style={{ width: mapW, height: (mapW * 2000) / 1629, left: (w - mapW) / 2 }}>
-          <Photo name="lisbon-map" style={{ width: "100%", height: "100%" }} />
-          <svg viewBox="0 0 1629 2000" preserveAspectRatio="none" fill="none" strokeLinejoin="round" strokeLinecap="round"><path d={ROUTE} stroke="#fff" strokeWidth={30} /><path d={ROUTE} stroke="#0a84ff" strokeWidth={18} /></svg>
-          <Pin photo="hotel" x="33.3%" y="47.8%" size={pin} />
-          <Pin photo="pastel" x="30.4%" y="68.7%" size={pin} />
-          <Pin photo="tram" x="73.8%" y="65.2%" size={pin} />
-          <Pin photo="miradouro" x="72.1%" y="43.5%" size={pin} />
+      <div className={`mail ${tablet ? "tablet" : ""}`}>
+        <div className="app-bar"><RoundButton icon="chevron-right" /><b className="page-title">Email</b><span style={{ width: 44 }} /></div>
+        <div className="mail-item">
+          <h2>Dinner on Thursday</h2>
+          <p>Marco Ruiz · 9:12 AM</p>
+          <div className="mail-draft">Thursday at 7 works for us.</div>
+          <div className="mail-row"><b>Send reply</b><span>Tell Stella</span></div>
         </div>
-        <ViewerBar title="Lisbon" />
-        <div className="trip-sheet"><span>© OpenStreetMap</span></div>
       </div>
     } over={
-      <div className={`trip-days ${tablet ? "tablet" : ""}`}>
-        {days.map(([photo, day, place]) => <div className="trip-day" key={day}><Photo name={photo} style={{ width: "100%", height: "100%" }} /><div><span>{day}</span><b>{place}</b></div></div>)}
+      <div className={`works ${tablet ? "tablet" : ""}`}>
+        <div className="work sheet">
+          <div className="work-head"><span>Budget</span><i><Icon name="check" size={18} color="#fff" stroke={3.4} /></i></div>
+          <div className="sheet-grid">{budget.map(([name, v, ink]) => <div key={name}><b>{name}</b><span><u style={{ width: `${v}%`, background: ink }} /></span></div>)}</div>
+        </div>
+        <div className="work form">
+          <div className="form-page">
+            <em>PDF</em>
+            <strong>Lease</strong>
+            {[100, 88, 94].map((w, i) => <s key={i} style={{ width: `${w}%` }} />)}
+            <q><Icon name="check" size={15} color="#0a84ff" stroke={3.4} /></q><q className="short"><Icon name="check" size={15} color="#0a84ff" stroke={3.4} /></q>
+          </div>
+        </div>
+        <div className="work shop">
+          {["chair2", "chair1", "chair3"].map((name, i) => <div key={name} className={i === 1 ? "pick" : ""}><Photo name={name} style={{ width: "100%", height: "100%" }} />{i === 1 && <i><Icon name="check" size={18} color="#fff" stroke={3.2} /></i>}</div>)}
+        </div>
+        <div className="work tasks"><Mascot size={58} /><b>3 tasks in progress</b><span>{[72, 48, 26].map((v) => <svg key={v} viewBox="0 0 36 36" fill="none" strokeWidth={5.5} strokeLinecap="round"><circle cx="18" cy="18" r="14" stroke="#e4eaf4" /><circle cx="18" cy="18" r="14" stroke="#0a84ff" pathLength={100} strokeDasharray={`${v} 100`} transform="rotate(-90 18 18)" /></svg>)}</span></div>
       </div>
     } />
   );
@@ -210,23 +213,28 @@ function Apps(props: SceneProps) {
   );
 }
 
-// 7 — the morning, drawn.
-function Morning(props: SceneProps) {
+type Scheduled = [icon: IconName, title: string, when: string];
+
+// 7 — the app's Schedule page, and what one of its watches found.
+function Schedule(props: SceneProps) {
   const { tablet } = FRAMES[props.frame];
-  const rain = [0, 0, 18, 64, 92, 58, 22, 0, 0];
+  const sections: [string, Scheduled[]][] = [
+    ["Today", [["eye", "New apartments", "9:45 AM"], ["list-checks", "Sort my inbox", "5:00 PM"], ["bell", "Call Grandma", "7:30 PM"]]],
+    ["Tomorrow", [["list-checks", "Morning briefing", "7:30 AM"], ["eye", "Concert tickets", "9:00 AM"]]],
+  ];
+  if (props.frame === "androidTablet") sections[1][1].push(["bell", "Water the plants", "6:00 PM"]);
   return (
-    <DeviceFrame frame={props.frame} {...fit(props)} light darkHome screen={
-      <div className={`morning ${tablet ? "tablet" : ""}`}>
-        <div className="morning-sky"><Photo name="sunrise" position="50% 100%" style={{ width: "100%", height: "100%" }} /><div className="morning-hello">Good morning</div><div className="morning-temp">18°</div></div>
-        <div className="morning-day">
-          {([["10:30", "Dentist", "#ff9f0a", "#fff1db"], ["1:00", "Lunch with Ana", "#34c759", "#e2f7e7"], ["5:00", "Mia’s recital", "#af52de", "#f5e8fb"]] as const).map(([time, what, ink, bg]) =>
-            <div key={time} className="morning-row"><span>{time}</span><div style={{ background: bg }}><i style={{ background: ink }} /><b>{what}</b></div></div>)}
-        </div>
+    <DeviceFrame frame={props.frame} {...fit(props)} screen={
+      <div className={`schedule ${tablet ? "tablet" : ""}`}>
+        <div className="app-bar"><RoundButton icon="chevron-right" /><b className="page-title">Schedule</b><span style={{ width: 44 }} /></div>
+        {sections.map(([label, rows]) => <section key={label}><h2>{label}</h2>
+          {rows.map(([icon, title, when]) => <div key={title} className={`schedule-row ${title === "New apartments" ? "highlighted" : ""}`}><Icon name={icon} size={27} color="#0a84ff" /><b>{title}</b><span>{when}</span></div>)}
+        </section>)}
       </div>
     } over={
-      <div className={`umbrella ${tablet ? "tablet" : ""}`}>
-        <i className="umbrella-icon"><Icon name="umbrella" size={38} color="#fff" stroke={2.1} /></i>
-        <div><strong>Take an umbrella</strong><span>Rain from 10 to 11</span><div className="umbrella-rain">{rain.map((v, i) => <u key={i} style={{ height: `${Math.max(8, v)}%`, opacity: v ? 1 : 0.22 }} />)}</div></div>
+      <div className={`found ${tablet ? "tablet" : ""}`}>
+        <div className="found-head"><AppIcon size={52} /><div><strong>Found an apartment</strong><span>Two bedrooms, by the park</span></div></div>
+        <Photo name="room" position="60% 40%" style={{}} />
       </div>
     } />
   );
@@ -248,6 +256,6 @@ function Models(props: SceneProps) {
 }
 
 export const SCENES: Record<SlideSlug, (props: SceneProps) => ReactNode> = {
-  assistant: Assistant, computer: Computer, approve: Approve, trip: Trip,
-  create: Create, apps: Apps, morning: Morning, models: Models,
+  assistant: Assistant, computer: Computer, approve: Approve, work: Work,
+  create: Create, apps: Apps, schedule: Schedule, models: Models,
 };

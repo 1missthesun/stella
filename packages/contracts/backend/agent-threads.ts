@@ -182,9 +182,7 @@ export type AgentInvariantKind =
   | "report_to_stella_not_lead"
   | "report_lost"
   | "stopped_task_took_input"
-  | "waiting_on_nothing_seen"
-  | "two_hosts_one_attempt"
-  | "report_carried_not_sent";
+  | "two_hosts_one_attempt";
 
 export type AgentInvariantReport = {
   since: number;

@@ -1,4 +1,4 @@
-import { helperWait, helperWaitsOnYouText, INPUT_ON_ITS_WAY_WAKER, resultDone } from "@stella/contracts/agent-messaging";
+import { helperWait, helperWaitsOnYouText, INPUT_ON_ITS_WAY_WAKER } from "@stella/contracts/agent-messaging";
 import {
   AGENT_REPORT_OFFER_MS,
   agentReportId,
@@ -9,7 +9,7 @@ import {
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
 import { agentReportRecipient, agentStanding, recordedAgentFacts } from "@stella/contracts/agent-rules";
-import { HANDED_ON_WAITING_FOR, resultWaitingFor, resultWakers, scheduleGoneText } from "@stella/contracts/agent-waiting";
+import { resultWaitingFor, resultWakers, scheduleGoneText } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -68,7 +68,6 @@ type ThreadRow = {
   executor_device_id: string | null;
   placement: string;
   execution_json: string | null;
-  carried_report: string | null;
 };
 
 type OutboxState = "pending" | "offered" | "delivered" | "dropped";
@@ -142,24 +141,6 @@ const readOutbox = (db: OwnerDbReader, reportId: string): OutboxRow | null =>
     reportId,
   );
 
-const queuedInput = (db: OwnerDbReader, thread: ThreadRow): boolean =>
-  Boolean(
-    db.one(
-      `SELECT 1 AS found FROM agent_commands
-        WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume') LIMIT 1`,
-      thread.thread_id,
-    ),
-  ) ||
-  Boolean(
-    db.one(
-      `SELECT 1 AS found FROM agent_report_outbox
-        WHERE requester_kind = 'agent' AND requester_id = ? AND requester_generation = ?
-          AND requester_was_live = 0 AND state <> 'dropped' LIMIT 1`,
-      thread.thread_id,
-      thread.attempt_generation,
-    ),
-  );
-
 export const HELD_WHILE_STOPPED = "held_while_stopped";
 
 export const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
@@ -227,8 +208,6 @@ const reportText = (thread: ThreadRow, outcome: AgentReportOutcome): string => {
     thread.thread_id,
   );
 };
-
-const resultWaitingForText = (resultJson: string | null): string => resultWaitingFor(resultJson)?.trim() || "something it named";
 
 const deliveryJobId = (reportId: string): string => `agent-report:${reportId}`;
 
@@ -307,96 +286,6 @@ const runsOnCloudEngine = (executionJson: string | null): boolean => {
 export const endedWaiting = (thread: Pick<ThreadRow, "status" | "result_json">): boolean =>
   agentStanding(recordedAgentFacts({ status: thread.status, resultJson: thread.result_json })).state === "waiting";
 
-export const reportHeldForHelpers = (
-  db: OwnerDbReader,
-  thread: Pick<ThreadRow, "thread_id" | "attempt_generation" | "status" | "result_json" | "origin_delivery_ack_at">,
-): boolean =>
-  thread.status === "completed" &&
-  !endedWaiting(thread) &&
-  thread.origin_delivery_ack_at === null &&
-  !readOutbox(db, agentReportId(thread.thread_id, thread.attempt_generation)) &&
-  liveDescendants(db, thread.thread_id).length > 0;
-
-export const heldAncestorIds = (
-  db: OwnerDbReader,
-  threads: readonly Pick<ThreadRow, "thread_id" | "parent_thread_id">[],
-): string[] => {
-  const seen = new Set(threads.map((thread) => thread.thread_id));
-  const held: string[] = [];
-  for (const thread of threads) {
-    let parentId = thread.parent_thread_id;
-    for (let depth = 0; parentId && !seen.has(parentId) && depth < TREE_DEPTH_MAX; depth += 1) {
-      seen.add(parentId);
-      const parent = readThread(db, parentId);
-      if (!parent) break;
-      if (reportHeldForHelpers(db, parent)) held.push(parent.thread_id);
-      parentId = parent.parent_thread_id;
-    }
-  }
-  return held;
-};
-
-export const carryReport = (db: OwnerDb, threadId: string, text: string): void => {
-  const trimmed = text.trim();
-  if (!trimmed) return;
-  const carried = db.one<{ carried_report: string | null }>("SELECT carried_report FROM agent_threads WHERE thread_id = ?", threadId)?.carried_report;
-  if (carried && saidAlready(carried, trimmed)) return;
-  db.run(
-    `UPDATE agent_threads SET carried_report = CASE
-        WHEN carried_report IS NULL OR carried_report = '' THEN ?
-        ELSE carried_report || char(10) || char(10) || ? END
-      WHERE thread_id = ?`,
-    trimmed,
-    trimmed,
-    threadId,
-  );
-};
-
-const saidAlready = (carried: string, text: string): boolean => {
-  const said = carried.trim();
-  const next = text.trim();
-  return said === next || said.endsWith(`\n\n${next}`) || said.startsWith(`${next}\n\n`) || said.includes(`\n\n${next}\n\n`);
-};
-
-const withCarried = (thread: ThreadRow, text: string): string => {
-  const carried = thread.carried_report?.trim();
-  if (!carried) return text;
-  return saidAlready(carried, text) ? carried : `${carried}\n\n${text}`;
-};
-
-const EARLIER_TURN_WAIT_MS = 45_000;
-
-const EARLIER_TURN_ENDS = [
-  "completed",
-  "failed",
-  "canceled",
-  "paused",
-  "attempt_ended",
-  "waiting_for_user",
-  "report",
-  "report_deferred",
-  "terminal_ignored",
-];
-
-const earlierTurnOnItsWay = (db: OwnerDbReader, thread: ThreadRow): boolean => {
-  const earlier = thread.attempt_generation - 1;
-  if (earlier < 1) return false;
-  const started = db.one(
-    `SELECT 1 AS found FROM agent_events WHERE thread_id = ? AND attempt_generation = ?
-       AND kind IN ('spawned', 'attempt_started', 'resumed', 'attempt_dispatched') LIMIT 1`,
-    thread.thread_id,
-    earlier,
-  );
-  if (!started) return false;
-  return !db.one(
-    `SELECT 1 AS found FROM agent_events WHERE thread_id = ? AND attempt_generation = ?
-       AND kind IN (${EARLIER_TURN_ENDS.map(() => "?").join(", ")}) LIMIT 1`,
-    thread.thread_id,
-    earlier,
-    ...EARLIER_TURN_ENDS,
-  );
-};
-
 export const deriveAgentReport = (
   db: OwnerDb,
   threadId: string,
@@ -405,134 +294,27 @@ export const deriveAgentReport = (
   const thread = readThread(db, threadId);
   if (!thread || !REPORTABLE.has(thread.status)) return;
   if (thread.origin_delivery_ack_at !== null) return;
+  if (endedWaiting(thread)) return;
+  if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
-  if (
-    db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", reportId)
-  ) {
-    return;
-  }
-  const waiting = endedWaiting(thread);
-  const stopped = thread.status === "canceled" && isAgentStopReason(thread.error_message);
-  if (waiting || stopped) {
-    if (!thread.carried_report?.trim()) return;
-    const handedOn = waiting && resultWaitingFor(thread.result_json) === HANDED_ON_WAITING_FOR;
-    const tail = handedOn
-      ? ""
-      : waiting
-        ? `(It is waiting now: ${resultWaitingForText(thread.result_json)}.)`
-        : "(It was stopped after this.)";
-    fileReport(db, thread, reportId, "completed", boundReportText([thread.carried_report.trim(), tail].filter(Boolean).join("\n\n"), thread.thread_id), now);
-    return;
-  }
+  if (db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", reportId)) return;
   scheduleAudit(db, thread, now + REPORT_AUDIT_FIRST_MS, 0, false);
   const outcome = thread.status as AgentReportOutcome;
-  const done = outcome === "completed" && resultDone(thread.result_json);
-  const queued = !done && queuedInput(db, thread);
-  const helpers =
-    !done && !queued && outcome === "completed"
-      ? liveDescendants(db, thread.thread_id)
-      : [];
-  if (queued || helpers.length > 0) {
-    const deferred = appendAgentEvent(db, {
-      key: `report_deferred:${thread.thread_id}:${thread.attempt_generation}`,
-      kind: "report_deferred",
-      source: "ledger",
-      threadId: thread.thread_id,
-      conversationId: thread.conversation_id,
-      attemptGeneration: thread.attempt_generation,
-      status: thread.status,
-      detail: queued ? { queuedInput: true, carried: true } : { helpers },
-      createdAt: now,
-    });
-    if (deferred && queued) carryReport(db, thread.thread_id, reportText(thread, outcome));
-    return;
-  }
-  if (!done && earlierTurnOnItsWay(db, thread)) {
-    const held = appendAgentEvent(db, {
-      key: `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`,
-      kind: "report_deferred",
-      source: "ledger",
-      threadId: thread.thread_id,
-      conversationId: thread.conversation_id,
-      attemptGeneration: thread.attempt_generation,
-      status: thread.status,
-      detail: { earlierTurn: thread.attempt_generation - 1 },
-      createdAt: now,
-    });
-    const since = held
-      ? now
-      : (db.one<{ created_at: number }>("SELECT created_at FROM agent_events WHERE event_key = ?", `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`)?.created_at ?? now);
-    if (now - since < EARLIER_TURN_WAIT_MS) {
-      scheduleAudit(db, thread, since + EARLIER_TURN_WAIT_MS, 0, true);
-      return;
-    }
-  }
-  fileReport(db, thread, reportId, outcome, boundReportText(withCarried(thread, reportText(thread, outcome)), thread.thread_id), now);
+  fileReport(db, thread, reportId, outcome, reportText(thread, outcome), now);
 };
 
-export const fileLateTurn = (
+export const fileEarlierAttemptReport = (
   db: OwnerDb,
   threadId: string,
   attemptGeneration: number,
   text: string,
   now: number,
-  waiting = false,
-  done = false,
-): boolean => {
+): void => {
   const thread = readThread(db, threadId);
-  if (!thread || attemptGeneration >= thread.attempt_generation) return false;
-  if (waiting || !text.trim()) {
-    const noted = appendAgentEvent(db, {
-      key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
-      kind: "report_deferred",
-      source: "ledger",
-      threadId: thread.thread_id,
-      conversationId: thread.conversation_id,
-      attemptGeneration,
-      status: "completed",
-      detail: { late: true, ...(waiting ? { waiting: true } : { empty: true }) },
-      createdAt: now,
-    });
-    if (noted) deriveAgentReport(db, thread.thread_id, now);
-    return false;
-  }
-  const lateId = agentReportId(thread.thread_id, attemptGeneration);
-  const known = (key: string) => db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", key) !== null;
-  if (known(lateId) || known(`report_deferred:${thread.thread_id}:${attemptGeneration}`)) return false;
-  if (done) {
-    fileReport(
-      db,
-      { ...thread, attempt_generation: attemptGeneration, status: "completed" },
-      lateId,
-      "completed",
-      boundReportText(withCarried(thread, text.trim()), thread.thread_id),
-      now,
-    );
-    deriveAgentReport(db, thread.thread_id, now);
-    return true;
-  }
-  const kept = appendAgentEvent(db, {
-    key: `report_deferred:${thread.thread_id}:${attemptGeneration}`,
-    kind: "report_deferred",
-    source: "ledger",
-    threadId: thread.thread_id,
-    conversationId: thread.conversation_id,
-    attemptGeneration,
-    status: "completed",
-    detail: { late: true, carried: true },
-    createdAt: now,
-  });
-  if (!kept) return false;
-  carryReport(db, thread.thread_id, text);
-  const settledAndReported =
-    !LIVE_STATUSES.has(thread.status) && known(agentReportId(thread.thread_id, thread.attempt_generation));
-  if (settledAndReported) {
-    const now_ = readThread(db, threadId)!;
-    fileReport(db, now_, lateId, "completed", boundReportText(now_.carried_report ?? text, thread.thread_id), now);
-  } else {
-    deriveAgentReport(db, thread.thread_id, now);
-  }
-  return true;
+  if (!thread || attemptGeneration >= thread.attempt_generation || !text.trim()) return;
+  const reportId = agentReportId(thread.thread_id, attemptGeneration);
+  if (db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", reportId)) return;
+  fileReport(db, { ...thread, attempt_generation: attemptGeneration, status: "completed" }, reportId, "completed", boundReportText(text.trim(), thread.thread_id), now);
 };
 
 const fileReport = (
@@ -591,30 +373,10 @@ const fileReport = (
     now,
     now,
   );
-  db.run("UPDATE agent_threads SET carried_report = NULL WHERE thread_id = ?", thread.thread_id);
   scheduleDelivery(db, reportId, now);
 };
 
-const ancestorsOf = (db: OwnerDbReader, threadId: string): string[] => {
-  const ancestors: string[] = [];
-  const seen = new Set([threadId]);
-  let cursor = readThread(db, threadId)?.parent_thread_id ?? null;
-  while (cursor && !seen.has(cursor) && ancestors.length < TREE_DEPTH_MAX) {
-    seen.add(cursor);
-    ancestors.push(cursor);
-    cursor = readThread(db, cursor)?.parent_thread_id ?? null;
-  }
-  return ancestors;
-};
-
-const deriveJobReports = (db: OwnerDb, threadId: string, now: number): void => {
-  deriveAgentReport(db, threadId, now);
-  for (const ancestor of ancestorsOf(db, threadId)) {
-    deriveAgentReport(db, ancestor, now);
-  }
-};
-
-agentChangeHooks.push(deriveJobReports);
+agentChangeHooks.push(deriveAgentReport);
 
 /**
  * Which runtime runs a task's turns: a computer's own (its local tasks, and tasks placed on it), or
@@ -776,9 +538,6 @@ const settle = (
       row.thread_id,
       row.attempt_generation,
     );
-  }
-  if (state === "dropped" && row.requester_kind === "agent") {
-    deriveJobReports(ctx.db, row.requester_id, ctx.now);
   }
   if (state === "dropped" && row.kind === "report") {
     scheduleAudit(ctx.db, { thread_id: row.thread_id, attempt_generation: row.attempt_generation }, ctx.now, REPORT_AUDIT_CHECKS_MAX - 1, true);
@@ -977,6 +736,7 @@ const deliver = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
 const missingReportNote = (
   ctx: OwnerContext,
   thread: ThreadRow,
+  report: OutboxRow,
   reason: string,
 ): void => {
   const requester = requesterOf(ctx.db, thread);
@@ -992,7 +752,6 @@ const missingReportNote = (
     createdAt: ctx.now,
   });
   if (requester.kind !== "conversation" || !conversationExists(ctx.db, requester.conversationId)) return;
-  const outcome = thread.status as AgentReportOutcome;
   queueStellaNote(ctx, {
     noteId: `missing:${agentReportReceipt(agentReportId(thread.thread_id, thread.attempt_generation))}`,
     conversationId: requester.conversationId,
@@ -1004,7 +763,7 @@ const missingReportNote = (
       `thread_id: ${thread.thread_id}`,
       `status: ${thread.status}`,
       `problem: it finished, but its report could not be delivered (${reason}).`,
-      `${outcome === "completed" ? "result" : "error"}: ${reportText(thread, outcome)}`,
+      `${report.outcome === "completed" ? "result" : "error"}: ${report.text}`,
     ].join("\n"),
   });
 };
@@ -1014,55 +773,11 @@ const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> =
   if (typeof args?.threadId !== "string" || typeof args.attemptGeneration !== "number") return;
   const checks = typeof args.checks === "number" ? args.checks : 0;
   const thread = readThread(ctx.db, args.threadId);
-  if (!thread || thread.attempt_generation !== args.attemptGeneration || !REPORTABLE.has(thread.status) || endedWaiting(thread)) return;
-  if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
+  if (!thread || thread.attempt_generation !== args.attemptGeneration) return;
   if (thread.origin_delivery_ack_at !== null) return;
-  const again = () => {
-    if (checks + 1 >= REPORT_AUDIT_CHECKS_MAX) return;
-    scheduleAudit(
-      ctx.db,
-      thread,
-      ctx.now + Math.min(REPORT_AUDIT_MAX_MS, REPORT_AUDIT_FIRST_MS * 2 ** (checks + 1)),
-      checks + 1,
-      true,
-    );
-  };
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
-  let row = readOutbox(ctx.db, reportId);
-  if (!row) {
-    const heldForEarlier = ctx.db.one(
-      "SELECT 1 AS found FROM agent_events WHERE event_key = ?",
-      `report_deferred:earlier:${thread.thread_id}:${thread.attempt_generation}`,
-    );
-    deriveAgentReport(ctx.db, thread.thread_id, ctx.now);
-    row = readOutbox(ctx.db, reportId);
-    if (row && heldForEarlier) {
-      again();
-      return;
-    }
-    if (row) {
-      appendAgentEvent(ctx.db, {
-        key: `report_missing:${reportId}:derived`,
-        kind: "report_missing",
-        source: "owner:report-audit",
-        threadId: thread.thread_id,
-        conversationId: thread.conversation_id,
-        attemptGeneration: thread.attempt_generation,
-        status: thread.status,
-        detail: { recovered: "derived" },
-        createdAt: ctx.now,
-      });
-      again();
-      return;
-    }
-    if (queuedInput(ctx.db, thread) || liveDescendants(ctx.db, thread.thread_id).length > 0) {
-      again();
-      return;
-    }
-    missingReportNote(ctx, thread, "no report was ever recorded for it");
-    return;
-  }
-  if (row.state === "delivered") return;
+  const row = readOutbox(ctx.db, reportId);
+  if (!row || row.state === "delivered") return;
   if (row.state === "dropped") {
     const dropped = ctx.db.one<{ detail: string | null }>(
       "SELECT detail FROM agent_events WHERE event_key = ?",
@@ -1074,13 +789,20 @@ const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> =
       if (typeof detail.reason === "string" && detail.reason.trim()) reason = detail.reason.trim().slice(0, 300);
     } catch {
     }
-    if (reason !== "conversation_gone") missingReportNote(ctx, thread, reason);
+    if (reason !== "conversation_gone") missingReportNote(ctx, thread, row, reason);
     return;
   }
   if (!ctx.db.one("SELECT 1 AS found FROM owner_jobs WHERE id = ?", deliveryJobId(reportId))) {
     scheduleDelivery(ctx.db, reportId, ctx.now);
   }
-  again();
+  if (checks + 1 >= REPORT_AUDIT_CHECKS_MAX) return;
+  scheduleAudit(
+    ctx.db,
+    thread,
+    ctx.now + Math.min(REPORT_AUDIT_MAX_MS, REPORT_AUDIT_FIRST_MS * 2 ** (checks + 1)),
+    checks + 1,
+    true,
+  );
 };
 
 export const queueStellaNote = (

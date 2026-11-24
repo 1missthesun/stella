@@ -4,13 +4,23 @@ import { loadTailwindTools } from "./tools.js";
 
 const port = parentPort;
 if (!port) throw new Error("The Tailwind worker needs a parent port.");
-const { root, cacheDir } = workerData as { root: string; cacheDir: string };
+const { root, cacheDir, fallbackCacheDir } = workerData as {
+  root: string;
+  cacheDir: string;
+  fallbackCacheDir?: string;
+};
 const builds = new Map<string, TailwindBuild>();
 
 port.on("message", (message: { id: number; file: string; source: string }) => {
   let build = builds.get(message.file);
   if (!build) {
-    build = createTailwindBuild({ loadTools: loadTailwindTools, file: message.file, root, cacheDir });
+    build = createTailwindBuild({
+      loadTools: loadTailwindTools,
+      file: message.file,
+      root,
+      cacheDir,
+      fallbackCacheDir,
+    });
     builds.set(message.file, build);
   }
   build.build(message.source).then(

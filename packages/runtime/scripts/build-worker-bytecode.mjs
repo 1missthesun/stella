@@ -30,9 +30,6 @@ export const computeRuntimeBytecodeSourceStamp = () =>
 
 const readJsonSafe = () => readRuntimeBytecodeFingerprint(workerOutDir);
 
-// Modules holding process-wide mutable singleton state shared across worker
-// entry and lazy chunks. Externalizing each into its own tiny shared CJS
-// module guarantees a single Node/Bun module cache instance across all chunks.
 const SHARED_SINGLETONS = [
   { name: "file-logger", source: "packages/node-shared/observability/file-logger.ts" },
   { name: "local-preferences", source: "packages/node-shared/preferences/local-preferences.ts" },
@@ -47,8 +44,6 @@ const SHARED_SINGLETONS = [
   { name: "model-runtime", source: "packages/runtime/kernel/model-runtime.ts" },
 ];
 
-// Heavy dynamic-import boundaries split into their own precompiled bytecode
-// chunks so the boot shell (entry.js + entry.jsc) loads only what boot needs.
 const LAZY_CHUNKS = [
   { name: "runner", source: "packages/runtime/kernel/runner.ts" },
   { name: "host", source: "packages/runtime/host/index.ts" },
@@ -76,7 +71,6 @@ const LAZY_CHUNKS = [
   { name: "effect-lazy", source: "packages/runtime/worker/effect-lazy.ts" },
 ];
 
-// Native / optional / runtime-resolved externals that must not be inlined.
 const NATIVE_EXTERNALS = [
   "electron",
   "undici",
@@ -86,10 +80,6 @@ const NATIVE_EXTERNALS = [
   "uiohook-napi",
 ];
 
-// Per-provider pi-ai API modules and provider modules stay external (resolved
-// lazily from packages/runtime/node_modules at runtime) so unused provider SDKs
-// (@anthropic-ai/sdk, openai, @google/genai, google-auth-library) are neither
-// compiled into runner/desktop-chats bytecode nor parsed unless invoked.
 const PI_AI_DIST = path.join(
   runtimeDir,
   "node_modules",
@@ -172,14 +162,10 @@ const makeBoundaryPlugin = (selfSourceAbs, selfOutAbs) => {
   return {
     name: "stella-runtime-bytecode-boundaries",
     setup(build) {
-      // Rewrite lazy @earendil-works/pi-ai/providers/<id> dynamic imports to
-      // external runtime paths so only the active provider is loaded.
       build.onResolve(
         { filter: /^@earendil-works\/pi-ai\/providers\/[^/]+$/ },
         (args) => {
           const name = args.path.slice("@earendil-works/pi-ai/providers/".length);
-          // Keep *.models bundled inside model-runtime/account-byok/chatgpt,
-          // while full provider modules (which pull provider APIs/OAuth) stay lazy.
           if (name.endsWith(".models") || name === "all") return null;
           const target = path.join(PI_AI_DIST, "providers", `${name}.js`);
           if (!existsSync(target)) return null;
@@ -187,8 +173,6 @@ const makeBoundaryPlugin = (selfSourceAbs, selfOutAbs) => {
         },
       );
 
-      // Keep pi-ai's lazy API SDK modules external so @anthropic-ai/sdk,
-      // openai, @google/genai, and google-auth-library load on first stream.
       build.onResolve({ filter: /^\.\/.*\.js$/ }, (args) => {
         if (!args.importer || !args.importer.includes("@earendil-works")) return null;
         const base = path.basename(args.path);
@@ -201,8 +185,6 @@ const makeBoundaryPlugin = (selfSourceAbs, selfOutAbs) => {
         return { path: relFromOut(resolved), external: true };
       });
 
-      // Keep dynamically imported `effect` external so `entry.js` stays small
-      // and Effect only loads if/when a lazy timer/retry/maintenance fiber runs.
       build.onResolve({ filter: /^effect$/ }, (args) => {
         if (args.kind !== "dynamic-import") return null;
         for (const candidate of [
@@ -216,7 +198,6 @@ const makeBoundaryPlugin = (selfSourceAbs, selfOutAbs) => {
         return { path: "effect", external: true };
       });
 
-      // Keep native addons resolved from packages/runtime/node_modules if needed.
       build.onResolve({ filter: /^@silvia-odwyer\/photon-node$/ }, () => {
         const pkg = path.join(runtimeDir, "node_modules", "@silvia-odwyer", "photon-node");
         if (existsSync(pkg)) {
@@ -225,7 +206,6 @@ const makeBoundaryPlugin = (selfSourceAbs, selfOutAbs) => {
         return { path: "@silvia-odwyer/photon-node", external: true };
       });
 
-      // Rewrite shared singleton & lazy chunk boundaries to their output paths.
       build.onResolve({ filter: /.*/ }, (args) => {
         if (args.kind === "entry-point-build" || !args.importer) return null;
         const matchedSource = resolveSourceCandidate(args.importer, args.path);
@@ -330,7 +310,6 @@ export const buildRuntimeWorkerBytecode = async ({ force = false, log } = {}) =>
   try {
     bunBinStat = statSync(bunBinPath);
   } catch {
-    // Best-effort stat of Bun binary.
   }
 
   writeFileSync(

@@ -58,11 +58,15 @@ const formatRaw = (input: unknown): string => {
     return String(input);
   }
   if (input instanceof Date) return input.toISOString();
-  try {
-    return JSON.stringify(input);
-  } catch {
-    return inspect(input, { breakLength: Infinity, compact: true });
+  if (input instanceof Error) return `${input.name}: ${input.message}`;
+  if (Array.isArray(input) || isPlainObject(input)) {
+    try {
+      return JSON.stringify(input);
+    } catch {
+      // Circular: inspect marks the cycle.
+    }
   }
+  return inspect(input, { breakLength: Infinity, compact: true });
 };
 
 const formatValue = (input: unknown): string => {

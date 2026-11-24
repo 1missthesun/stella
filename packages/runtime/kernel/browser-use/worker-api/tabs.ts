@@ -535,8 +535,6 @@ export const createTabs = (
           }
           return data;
         },
-        // Raw text insertion at the current focus (Input.insertText): no
-        // per-character key events, works for emoji/CJK.
         type: async (text: string) =>
           await boundCommand("inserttext", {
             tabId: currentTabId(state),

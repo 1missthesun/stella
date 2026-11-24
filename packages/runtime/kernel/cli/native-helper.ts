@@ -17,13 +17,6 @@ import {
 import { forkTimeoutFiber } from "./effect-runtime.js";
 import { signalOwnChild } from "@stella/node-shared/shared/process-identity.js";
 
-// NOT named `__dirname`: the CLI/electron esbuild bundles prepend a banner
-// that already declares a top-level `const __dirname`, and esbuild cannot
-// rename identifiers it does not see — a module-level `__dirname` here made
-// the bundled stella-computer CLI throw "Identifier '__dirname' has already
-// been declared" at load. `import.meta.dirname` resolves to this module's
-// directory unbundled and to the bundle's directory when bundled, exactly
-// like the old shadowed constant.
 const moduleDirname = import.meta.dirname;
 
 const platformDir =
@@ -40,7 +33,6 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
   const fileName = `${baseName}${ext}`;
   const cliPath = getComputerExecutionCliPath();
   const cliDir = cliPath ? path.dirname(path.resolve(cliPath)) : null;
-  // Set only inside a packaged Electron app.
   const resourcesPath = (process as { resourcesPath?: unknown }).resourcesPath;
   const candidates = [
     typeof resourcesPath === "string"
@@ -97,7 +89,6 @@ const cleanupTempDir = (tempDir: string) => {
   try {
     rmSync(tempDir, { recursive: true, force: true });
   } catch {
-    // ignore cleanup failures
   }
 };
 

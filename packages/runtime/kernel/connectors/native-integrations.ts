@@ -250,7 +250,6 @@ const readState = async (
     const parsed = readPrivateJsonValueSync(statePath(stellaAppDir)) as NativeConnectorStateFile | undefined;
     if (parsed?.version === 1 && parsed.integrations) return parsed;
   } catch {
-    // Empty state is valid.
   }
   return { version: 1, integrations: {} };
 };

@@ -10,9 +10,6 @@ import {
   type BundledSyncReport,
 } from "./bundled-sync.js";
 
-// Live re-export (not a top-level binding read): this module sits inside the
-// home facade/service import cycle, and reading the binding at evaluation
-// time would hit the temporal dead zone depending on entry order.
 export { summarizeBundledSync as summarizeSkillsSync } from "./bundled-sync.js";
 
 const USER_PROFILE_SKILL_ID = "user-profile";
@@ -42,7 +39,6 @@ const isBundledSkillIncludedForPlatform = (
   return PLATFORM_SKILL_IDS[platform]?.includes(skillId) === true;
 };
 
-/** Written beside `skills/` by the app-source publish (scripts/shipped-skill-hashes.ts); absent in a dev checkout. */
 export const SHIPPED_SKILL_HASHES_FILENAME = "shipped-skill-hashes.json";
 
 const readShippedSkillHashes = async (
@@ -102,8 +98,6 @@ export const reconcileBundledSkillsEffect = (
         {
           includeBundledId: (id) =>
             isBundledSkillIncludedForPlatform(id, platform),
-          // Manifests seeded before the generic rename stored hashes under
-          // `skills`; read them so already-installed users still get updates.
           legacyEntriesKey: "skills",
           previouslyShipped,
         },

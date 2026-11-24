@@ -173,7 +173,6 @@ export const resolveMapArtifact = async (
     try {
       payload = await response.json();
     } catch {
-      // Non-JSON error body; fall through to the status message.
     }
     return mapOutcomeFromResolver(response.status, payload);
   } catch (error) {

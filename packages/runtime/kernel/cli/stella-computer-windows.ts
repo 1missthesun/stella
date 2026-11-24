@@ -80,11 +80,9 @@ export type WinSnapshot = {
   capture?: {
     method?: string;
     occluded?: boolean;
-    /** No usable pixels (black, minimized, off-screen); screenshot omitted. */
     blank?: boolean;
     warning?: string;
   };
-  /** What the window is made of; absent from helpers older than 2026-11-13. */
   surface?: {
     kind?: "chromium" | "opaque" | "native";
     contentElements?: number;
@@ -120,7 +118,6 @@ export type WinHelperObservationPrecondition = {
   window_id?: number;
   revision: number;
   materialized_revision: number;
-  /** "window": only process and window identity must match (pixel-checked coordinate actions). */
   scope?: "window";
 };
 
@@ -178,7 +175,6 @@ export type WinHelperResponse = {
     session?: string;
     reason?: string;
     dispatch?: string;
-    /** "background" (posted messages), "foreground" (real input) or "uia". */
     delivery?: string;
     delivery_reason?: string;
     settle?: {
@@ -1261,11 +1257,6 @@ const formatScreenshotMarker = (
   });
 };
 
-/**
- * What the agent needs to know about a window that exposes no usable UI
- * elements, so it goes straight to screenshots and coordinates instead of
- * hunting for element indices that will never appear.
- */
 export const windowsSurfaceNotes = (snapshot: WinSnapshot): string[] => {
   const notes: string[] = [];
   const surface = snapshot.surface;

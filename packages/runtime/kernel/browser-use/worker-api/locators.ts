@@ -225,12 +225,6 @@ export const createLocators = (context: BrowserWorkerContext) => {
     );
   };
 
-  /**
-   * Acts on the element a filtered locator matched. The element is kept in
-   * Stella's isolated world (`stella-mark=<id>`), which the page can't see;
-   * browser services and extensions from before that existed don't know the
-   * form, so they get an attribute on the element instead.
-   */
   const makeMarkerChain = async (
     state: LocatorState,
     action: BrowserProtocolAction,
@@ -495,7 +489,6 @@ export const createLocators = (context: BrowserWorkerContext) => {
         );
         diagnostic = ` Diagnostics: ${JSON.stringify(fieldOrSelf(data, "result"))}`;
       } catch {
-        // Keep the original action failure if diagnostics cannot be collected.
       }
       const message =
         lastError instanceof Error ? lastError.message : String(lastError);

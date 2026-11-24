@@ -287,30 +287,6 @@ export const preserveModelVisibleToolText = async (
   };
 };
 
-// Inline-image attach contract used by diagnostic tool output and other
-// runtime emitters: when tool output contains a substring of the form
-//
-//     [stella-attach-image][ <WxH>][ <N>KB][ inline=image/png] <PATH>
-//     [stella-attach-image] ... path="<JSON-escaped absolute path>"
-//
-// the runtime reads the file at <PATH> and emits an image content block
-// alongside the text result, so the model sees the screenshot on its very
-// next turn without having to call a separate Read.
-//
-// The marker is stripped from the text we forward to the model so the
-// model doesn't waste tokens describing a path it doesn't need to see.
-//
-// This is a local-runtime compatibility parser only. Tool output such as an
-// `Bash` stdout stream is model-controlled and therefore cannot grant
-// a privileged Cloud adapter permission to reopen a path. Cloud callers use
-// `neutralizeLegacyAttachImageMarkers` and accept only symbol-carried bytes
-// from a descriptor-authorized read. The marker can appear anywhere in local
-// tool result text, including inside a JSON-stringified `output` field where
-// real newlines are escaped as `\n` — that's why this regex is
-// position-agnostic. New local emitters should use
-// `path=${JSON.stringify(path)}` so spaces, quotes, non-ASCII, and Windows
-// separators survive transport. Legacy whitespace-delimited paths remain
-// supported locally.
 const STELLA_ATTACH_IMAGE_MARKER = "[stella-attach-image]";
 const ATTACH_IMAGE_EXTENSION_RE = /\.(?:png|jpg|jpeg|gif|webp)$/i;
 const ABSOLUTE_IMAGE_PATH_RE = /^(?:\/|[A-Za-z]:[\\/])/;
@@ -551,12 +527,6 @@ export const extractAttachImageBlocks = async (
   const markerReplacements: Array<{ full: string; replacement: string }> = [];
   for (const { full, path: imgPath, detailOriginal } of matches) {
     try {
-      // Settle the read against the capture -> read race: a screenshot the
-      // agent just captured can still be mid-flush when its path reaches us,
-      // and reading it early yields a truncated PNG that 400s Anthropic
-      // fatally. `readImageFileSettled` re-reads until the bytes complete (or
-      // the file stops growing / the budget is spent); the completeness gate
-      // below stays as defense-in-depth for genuinely corrupt files.
       const buf = await readImageFileSettled(imgPath);
       const mimeType = resolveImageMimeType(imgPath, buf);
       if (!mimeType) {
@@ -601,14 +571,6 @@ export const extractAttachImageBlocks = async (
         });
         continue;
       }
-      // We already prefer resizing-to-fit above: `resizeImage` shrinks any
-      // large image well under the ceiling, so this raw-attach fallback is
-      // only reached when resize is unavailable (Photon missing) or returned
-      // null. Guard it against the *shared* per-image ceiling
-      // (`MAX_IMAGE_BASE64_BYTES`, the same value the Anthropic send boundary
-      // enforces): swap the marker for a note rather than inline an over-cap
-      // image. Using the shared constant means an image can't pass here and
-      // then be silently dropped at the wire.
       if (base64Length(buf.length) > MAX_IMAGE_BASE64_BYTES) {
         markerReplacements.push({
           full,
@@ -737,8 +699,6 @@ export const extractCodeImageBlocks = async (
         sourcePath: item.path,
       });
     } catch {
-      // A vanished or invalid typed image is omitted without degrading
-      // sibling items; its path remains available in tool details.
     }
   }
   return images;
@@ -963,9 +923,6 @@ export const executeModelToolCall = async (
       : undefined,
   });
   const formatted = formatToolResult(toolResult, toolName);
-  // Device tools retain their legacy path-marker bridge. Sandbox tool
-  // output is model-controlled and must never authorize the host adapter
-  // to reopen a pathname, so neutralize it without I/O there.
   const { text: forwardedText, images: legacyImages } =
     opts.executionHost === "sandbox"
       ? {

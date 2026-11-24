@@ -1,34 +1,3 @@
-/**
- * One-time migrations out of the two retired home layouts.
- *
- * The original layout materialized shipped content directly into the
- * user-facing directories (`agents/`, `prompts/`, `skills/`,
- * `PERSONALITY.md`) and used `.bundled-manifest.json` files recording the hash
- * of the last synced copy to decide whether the user had modified each entry.
- * A later layout moved shipped skills into a `system/` mirror and reserved the
- * user-facing directories for customizations. Both are gone: shipped skills
- * now share the canonical `skills/` root with user-created skills and are
- * reconciled there by content hash (`skills-sync.ts`).
- *
- * `migrateLegacyHomeLayout` is the only place the original hashes are ever
- * consulted again:
- * - unmodified entries (hash matches the manifest) are deleted so the current
- *   reconciler installs the latest shipped copy;
- * - modified agent prompts become `<id>.replace.md` (full replacement,
- *   opts out of updates);
- * - modified prompts / skills / PERSONALITY.md stay where they are and win
- *   the shared-root collision policy;
- * - manifests are removed only when their entry shape proves they belong to
- *   the retired layout. Current v2 prompt/personality manifests use the same
- *   filenames and must survive every seed.
- *
- * Entries with no manifest record were always user-owned and are untouched.
- *
- * `migrateLegacySystemSkillRoot` retires the `system/` mirror: mirrored skills
- * the bundle no longer ships are carried into the canonical root without
- * replacing collisions, then the whole mirror is moved to `.trash/`.
- */
-
 import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -71,8 +40,6 @@ const readLegacyManifest = async (
     return null;
   }
   const rawEntryPairs = Object.entries(rawEntries as Record<string, unknown>);
-  // An empty v2 manifest is ambiguous. Preserve it rather than deleting live
-  // reconciliation state under a legacy filename.
   if (rawEntryPairs.length === 0) return null;
   const entries: LegacyManifestEntries = {};
   for (const [id, value] of rawEntryPairs) {
@@ -89,8 +56,6 @@ const readLegacyManifest = async (
         lastSyncedHash: (value as { lastSyncedHash: string }).lastSyncedHash,
       };
     } else {
-      // Current v2 entries include sourceRevision and customized. Unknown or
-      // mixed schemas fail closed so a seed can never consume live state.
       return null;
     }
   }
@@ -191,8 +156,6 @@ const migratePersonality = async (stellaDataDir: string): Promise<void> => {
       Object.keys(entry).length !== 1 ||
       !isSha256((entry as { lastSyncedHash?: unknown }).lastSyncedHash)
     ) {
-      // Current v2 metadata adds sourceRevision + customized. Preserve it and
-      // PERSONALITY.md; this function is only for the one-field legacy shape.
       return;
     }
     recorded = (entry as { lastSyncedHash: string }).lastSyncedHash;
@@ -253,19 +216,6 @@ const trashPath = (stellaDataDir: string, label: string): string =>
     `${label}-${new Date().toISOString().replace(/[:.]/gu, "-")}-${randomUUID()}`,
   );
 
-/**
- * Retire `~/.stella/system/`, the mirror root that once held shipped skills.
- *
- * The mirror was swapped by rename, so a crash could leave the tree as staging
- * (`.system.next-*`) or as a backup with no `system/` (`.system.old-*`). Both
- * are resolved first so the migration sees the same shape as an uninterrupted
- * install. Mirrored skills the bundle still ships are skipped: the reconciler
- * installs the current copy and records it as Stella-owned, whereas copying
- * the stale mirror in would pin it as a user fork forever.
- *
- * @param bundledSkillIds ids the current bundle ships, from `skills-sync.ts`.
- * @returns the ids carried into the canonical root.
- */
 export const migrateLegacySystemSkillRoot = async (
   stellaDataDir: string,
   bundledSkillIds: ReadonlySet<string>,

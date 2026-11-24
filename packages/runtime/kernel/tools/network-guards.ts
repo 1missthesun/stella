@@ -12,7 +12,6 @@ import {
 
 const MAX_PUBLIC_REDIRECTS = 5;
 
-/** Split-DNS escape hatch: hostnames that may resolve to private addresses. */
 const allowedPrivateHosts = (): Set<string> =>
   new Set(
     (process.env.STELLA_ALLOW_PRIVATE_HOSTS ?? "")
@@ -29,7 +28,6 @@ const privateTargetError = (detail: string) =>
     { code: "ESTELLAPRIVATE" },
   );
 
-/** http(s) only, no credentials, no local or private literal target; http becomes https. */
 export const normalizeSafeExternalUrl = (inputUrl: string): string => {
   let parsed: URL | null = null;
   try {
@@ -58,11 +56,6 @@ export const normalizeSafeExternalUrl = (inputUrl: string): string => {
   }
 };
 
-/**
- * The lookup every public request dials with: the addresses it resolves are
- * the ones connected to, so a name cannot pass a check and then resolve
- * somewhere private for the connection itself.
- */
 const publicLookup: LookupFunction = (hostname, options, callback) => {
   dns.lookup(hostname, { ...options, all: true }, (error, addresses) => {
     if (error) {
@@ -110,7 +103,6 @@ const decodedBody = (response: import("node:http").IncomingMessage): Readable =>
   }
 };
 
-/** One request to an already-normalized public URL; never follows redirects. */
 export const requestPublicUrl = (
   url: string,
   init: { headers?: Record<string, string>; signal?: AbortSignal } = {},
@@ -150,7 +142,6 @@ export const requestPublicUrl = (
     request.end();
   });
 
-/** GET a model- or user-supplied URL, re-checking every redirect hop at dial time. */
 export const fetchPublicUrl = async (
   inputUrl: string,
   init: { headers?: Record<string, string>; signal?: AbortSignal } = {},

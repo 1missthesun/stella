@@ -63,7 +63,6 @@ export type BrowserWorkerApiOptions = Readonly<{
   maxExpectNewTabTimeoutMs?: number;
 }>;
 
-/** A file a page downloaded in Stella's browser, saved without a dialog. */
 export type BrowserWorkerDownload = Readonly<{
   id: string;
   path: string;

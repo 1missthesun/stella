@@ -57,14 +57,6 @@ const TURN_REPLIES_IN_CONVERSATION_SINCE_MS = Date.UTC(2026, 9, 11, 5)
 
 const schedulerRuntime = ManagedRuntime.make(Layer.empty)
 
-/**
- * Bound on how long `stop()` waits (in the background) for an in-flight
- * tick before closing the service scope anyway. Past the bound the tick's
- * supervising fiber is interrupted at its promise seam; the underlying job
- * keeps running to completion in promise land and persists its own
- * bookkeeping, exactly as pre-Effect `stop()` behaved (which never waited
- * at all).
- */
 const STOP_JOIN_TIMEOUT_MS = 30_000
 
 type LocalSchedulerState = {
@@ -115,7 +107,6 @@ type LocalSchedulerRunner = ReturnType<StellaHostRunnerTarget['getRunner']>
 const ORPHAN_SCRIPT_MIN_AGE_MS = 7 * 24 * 60 * 60_000
 const ORPHANED_SCRIPT_KEEP_MS = 30 * 24 * 60 * 60_000
 
-/** Every `scriptPath` string anywhere in a parsed state file, resolved. */
 const scriptPathsNamedIn = (value: unknown): Set<string> => {
   const found = new Set<string>()
   const visit = (node: unknown, depth: number) => {
@@ -167,7 +158,6 @@ const cloneGeneratedEvent = (
   payload: { ...event.payload },
 })
 
-/** A stable id for a message about one run, so a resent one lands once. */
 const scheduleNoteId = (jobId: string, what: 'run' | 'failed', atMs: number): string =>
   `local-${what}:${crypto.createHash('sha256').update(`${jobId}\0${atMs}`).digest('hex').slice(0, 40)}`
 
@@ -711,13 +701,7 @@ export class LocalSchedulerService {
   private tickFiber: Fiber.Fiber<void, unknown> | null = null
   private started = false
   private tickInFlight = false
-  /**
-   * Script paths named anywhere in the state file as last read whole, even by
-   * entries this build drops; null when it was not read whole (missing,
-   * unreadable or damaged), and then no script counts as orphaned.
-   */
   private scriptsNamedInFile: Set<string> | null = null
-  /** Set when this start found the state file damaged: what came back, and from where. */
   private damage: {
     damagedCopy: string | null
     from: 'file' | 'last-good' | null
@@ -760,13 +744,6 @@ export class LocalSchedulerService {
     if (!scope) {
       return
     }
-    // stop() stays synchronous (signature parity), but the service scope
-    // now accounts for in-flight work: an in-flight tick is joined with a
-    // bound before the scope is closed. Closing interrupts the pending
-    // delay fiber immediately and any tick fiber that outlived the bound
-    // at its promise seam — the underlying job keeps running to completion
-    // and persists its own bookkeeping, exactly as the pre-Effect stop()
-    // (which cleared the timer and abandoned the tick) behaved.
     void schedulerRuntime
       .runPromise(
         Effect.gen(function* () {
@@ -1037,12 +1014,6 @@ export class LocalSchedulerService {
     return `${this.statePath}.last-good`
   }
 
-  /**
-   * A damaged state file is never taken for an empty one (two schedules
-   * silently stopped for two weeks that way): the damaged file is kept beside
-   * it, the newest whole state at its start comes back (else the copy last
-   * read whole at a start), and the user and Stella are told.
-   */
   private readState(): LocalSchedulerState {
     this.damage = null
     this.scriptsNamedInFile = null
@@ -1072,7 +1043,6 @@ export class LocalSchedulerService {
           from = 'last-good'
         }
       } catch {
-        // No usable last-good copy: what was lost is reported as lost.
       }
     }
     const conversationIds = new Set(state.cronJobs.map((job) => job.conversationId))
@@ -1083,7 +1053,6 @@ export class LocalSchedulerService {
           conversationIds.add(match[1]!)
         }
       } catch {
-        // The copy is only used to find who to tell.
       }
     }
     this.damage = { damagedCopy: read.damagedCopy, from, conversationIds: [...conversationIds] }
@@ -1095,7 +1064,6 @@ export class LocalSchedulerService {
     return state
   }
 
-  /** The state as last read whole at a start: what a damaged file falls back to when nothing at its start parses. */
   private keepLastGood(value: unknown) {
     try {
       const body = JSON.stringify(value)
@@ -1121,8 +1089,6 @@ export class LocalSchedulerService {
     for (const conversationId of damage.conversationIds) {
       this.appendGeneratedAssistantMessage(conversationId, { text, source: 'cron' })
     }
-    // The notification reaches the user even when the file named no
-    // conversation to tell (nothing in it could be read).
     this.fireOsNotification({
       title: damage.from ? 'Schedules recovered' : 'Schedules lost',
       body: damage.from
@@ -1136,13 +1102,6 @@ export class LocalSchedulerService {
     this.emitChange()
   }
 
-  /**
-   * Moves aside scripts no schedule uses. Only after a start that read the
-   * state file whole (a missing, unreadable or damaged file made every script
-   * look orphaned: the Mac lost a watch's script that way), only scripts
-   * untouched for a week (a fresh ScriptDraft script is registered moments
-   * later), and into `.orphaned/` (emptied after 30 days), never deleted.
-   */
   private collectOrphanScripts() {
     const named = this.scriptsNamedInFile
     if (!named) return
@@ -1177,10 +1136,8 @@ export class LocalSchedulerService {
         fs.mkdirSync(orphanedDir, { recursive: true })
         const kept = path.join(orphanedDir, entry)
         fs.renameSync(abs, kept)
-        // Its 30 days start now, not at its last edit.
         fs.utimesSync(kept, new Date(now), new Date(now))
       } catch {
-        // Best effort: a script that can't be moved stays where it is.
       }
     }
     try {
@@ -1191,7 +1148,6 @@ export class LocalSchedulerService {
         }
       }
     } catch {
-      // No orphans kept yet.
     }
   }
 
@@ -1208,12 +1164,10 @@ export class LocalSchedulerService {
     try {
       fs.rmSync(scriptPath, { force: true })
     } catch {
-      // Ignore — script may already be gone.
     }
     try {
       fs.rmSync(`${scriptPath}.state.json`, { force: true })
     } catch {
-      // Ignore — sidecar is optional.
     }
   }
 
@@ -1454,7 +1408,6 @@ export class LocalSchedulerService {
     try {
       this.options.showNotification(params)
     } catch {
-      // Best-effort: never let a notifier failure break the scheduler tick.
     }
   }
 
@@ -1504,9 +1457,6 @@ export class LocalSchedulerService {
     this.persistState()
     this.emitChange()
 
-    // Runner-dependent payloads share one busy guard. Shouldn't trigger —
-    // `requiresRunner` gates this — but if the runner went away mid-tick
-    // treat it as busy and retry.
     const markBusyWithoutRunner = (): 'busy' => {
       active.runningAtMs = undefined
       active.updatedAt = Date.now()
@@ -1638,11 +1588,6 @@ export class LocalSchedulerService {
     return 'done'
   }
 
-  /**
-   * A task or watch with a target thread messages that agent, which resumes
-   * with its own context and reports where it always does. A thread this
-   * computer no longer has falls back to an orchestrator turn with a note.
-   */
   private async deliverToThread(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,
@@ -1707,11 +1652,6 @@ export class LocalSchedulerService {
     this.emitChange()
   }
 
-  /**
-   * A turn for Stella from this computer's schedule. When Stella runs on
-   * another computer or in the cloud this computer can't run it (nothing
-   * ran), so the prompt goes to her there through the cloud instead.
-   */
   private async runForStella(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,
@@ -1742,10 +1682,6 @@ export class LocalSchedulerService {
     }
   }
 
-  /**
-   * A run that failed here is told to Stella (wherever she runs), once per
-   * failing streak: the next run that works clears it.
-   */
   private tellRunFailed(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,
@@ -1845,21 +1781,6 @@ export class LocalSchedulerService {
     return 'done'
   }
 
-  /**
-   * Watch (sensor) trigger. Runs the verified check script with NO LLM:
-   *
-   *  - exit 0, empty stdout — no change. Nothing happens: no message, no
-   *    notification, just book-keeping and the next tick.
-   *  - exit 0, non-empty stdout — the sensor saw a change. Escalate to an
-   *    orchestrator turn carrying the change details, which notifies/acts.
-   *  - non-zero exit — the sensor itself broke (site changed, auth died).
-   *    Escalate to an orchestrator turn flagging the failure so the sensor
-   *    gets investigated and repaired instead of dying silently.
-   *
-   * A busy worker parks the escalation on `pendingEscalation` and retries
-   * WITHOUT re-running the script — the script may have already advanced
-   * its baseline sidecar, so re-running would swallow the diff.
-   */
   private async executeCronWatch(
     active: LocalCronJobRecord,
     runner: NonNullable<LocalSchedulerRunner>,

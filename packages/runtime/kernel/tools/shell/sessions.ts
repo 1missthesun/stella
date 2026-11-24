@@ -57,7 +57,6 @@ export type ShellState = {
   cliBridgeSocketPath?: string;
   shellsEndWithTurn: boolean;
   lastDeferredDeleteSweepAt: number;
-  /** A task's command started or ended (what `listRunningTaskShells` returns changed). */
   onTaskShellsChanged?: () => void;
 };
 
@@ -107,9 +106,7 @@ export type ManagedShellRecord = ShellRecord & {
   pendingInteractions: number;
   interactionTail: Promise<void>;
   acceptedWriteIds: Map<string, { fingerprint: string; acceptedAt: number }>;
-  /** Left running in the background, and its owner has not been told that it ended. */
   untold?: boolean;
-  /** Ended because the task that ran it was stopped. */
   stoppedWithTask?: boolean;
 };
 
@@ -301,7 +298,6 @@ const notifyShellExit = (record: ManagedShellRecord) => {
     try {
       watcher();
     } catch {
-      // A listener must never break the process teardown path.
     }
   }
 };
@@ -348,7 +344,6 @@ export const watchShellExit = (
   };
 };
 
-/** A task's background commands it has not been told the end of: still running, or ended. */
 export type UntoldTaskShell = {
   sessionId: string;
   command: string;
@@ -365,12 +360,10 @@ export const listUntoldTaskShells = (
     .map((shell) => ({
       sessionId: shell.id,
       command: shell.command,
-      // One whose owner is reading it right now is told by that call.
       ended: !shell.running && shell.pendingInteractions === 0,
       ...(shell.stoppedWithTask ? { stoppedWithTask: true } : {}),
     }));
 
-/** Takes the end of a background command to tell its owner; whoever takes it is the one to tell. */
 export const claimShellExit = (
   state: ShellState,
   sessionId: string,
@@ -382,7 +375,6 @@ export const claimShellExit = (
   return snapshot;
 };
 
-/** Puts back an end that was taken but reached no one. */
 export const releaseShellExit = (
   state: ShellState,
   sessionId: string,
@@ -391,7 +383,6 @@ export const releaseShellExit = (
   if (record) record.untold = true;
 };
 
-/** Background commands a task started that are still running (what a quit would stop). */
 export type RunningTaskShell = {
   sessionId: string;
   command: string;
@@ -399,7 +390,6 @@ export type RunningTaskShell = {
   startedAt: number;
   conversationId: string;
   agentId: string;
-  /** The shell's process, leading its own process group (POSIX). */
   pid?: number;
 };
 
@@ -698,7 +688,6 @@ export const startShell = (
     onActivity?.(record, delta);
   };
 
-  // Armed once the shell has started (a launch that fails never runs).
   let cancelLifetime = () => {};
 
   const finish = (exitCode: number | null) => {
@@ -829,9 +818,6 @@ export const startShell = (
     record.stdinOpen = Boolean(child.stdin);
     record.kill = () => terminateShellProcess(child);
 
-    // stdout/stderr are decoded independently because their byte chunks can
-    // end in the middle of a UTF-8 scalar. StringDecoder retains that suffix
-    // for the next chunk instead of emitting U+FFFD into output and cursors.
     const stdoutDecoder = new StringDecoder("utf8");
     const stderrDecoder = new StringDecoder("utf8");
     const appendPipe = (decoder: StringDecoder, data: Buffer) =>

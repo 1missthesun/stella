@@ -8,10 +8,6 @@ import {
   LEGACY_EXEC_COMMAND_TOOL_NAME,
 } from "../tools/defs/exec-command-def.js";
 
-/**
- * Tool names that were renamed. Agent definitions live in user home dirs and
- * forks, so an old spelling keeps resolving to the current tool.
- */
 const LEGACY_TOOL_NAME_ALIASES: Readonly<Record<string, string>> = {
   [LEGACY_EXEC_COMMAND_TOOL_NAME]: EXEC_COMMAND_TOOL_NAME,
 };

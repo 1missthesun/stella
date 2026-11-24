@@ -26,12 +26,10 @@ type ComputerAgentTerminalPayload = {
   error?: string;
   waitingFor?: string;
   wakers?: string[];
-  /** Its finished report (explicit messaging): the cloud files it at once. */
   done?: true;
   fallback?: UnrecordedReport;
 };
 
-/** The report a root agent's terminal stands for, delivered from here when the cloud cannot record it. */
 export type UnrecordedReport = {
   conversationId: string;
   report: string;
@@ -93,7 +91,6 @@ export type ComputerAgentCloudRecords = {
   ) => Promise<{ canceled: boolean }>;
   pending: () => number;
   hasPending: (threadId: string) => boolean;
-  /** A stop heard here: starts of the task queued before it began without knowing, and the stop ended them. */
   dropQueuedStarts: (threadId: string) => number;
   resume: () => void;
   stop: () => void;
@@ -321,9 +318,6 @@ export const createComputerAgentCloudRecords = (
       : null;
   };
 
-  // The cloud has no thread to end for this terminal (an agent it knows only
-  // as a placement, or one whose binding here is gone), so the ledger will
-  // never report it: its report goes to Stella from here instead.
   const unrecorded = (entry: { kind: string; threadId: string; attemptGeneration: number; payloadJson: string }): void => {
     if (entry.kind !== "terminal" || !options.onTerminalUnrecorded) return;
     let fallback: UnrecordedReport | undefined;
@@ -574,8 +568,6 @@ export const createComputerAgentCloudRecords = (
           settleStartAdmission(entry.id, "rejected", rejected);
           continue;
         }
-        // A backend from before end_turn_waiting refuses the field: the
-        // cloud keeps the attempt running, which also sends no report.
         if (entry.kind === "terminal" && asRecord(error)?.code === "BAD_REQUEST" && waitingTerminal(entry.payloadJson)) {
           options.store.deleteSentComputerAgentCloudOutbox(entry.id, entry.payloadJson);
           continue;
@@ -624,8 +616,6 @@ export const createComputerAgentCloudRecords = (
     ownerGeneration: string;
     payload: unknown;
   }): Promise<void> => {
-    // A terminal may bind a thread whose start never reached this store (a
-    // restart between the two); dropping it would lose the agent's report.
     const authority = authorityForThread(
       args.threadId,
       args.ownerGeneration,

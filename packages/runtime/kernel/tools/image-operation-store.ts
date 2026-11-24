@@ -5,20 +5,6 @@ import path from "node:path";
 
 import type { ManagedImageTerminalResult } from "./managed-image-job.js";
 
-/**
- * Runtime-portable synchronous SQLite driver resolution, module-local so
- * this file stays runnable as raw TS under both plain Node
- * (`--experimental-strip-types`, which cannot resolve cross-file value
- * imports) and Bun — the same reason other home modules carry their
- * own copy. The detached worker runs
- * under Bun, which does NOT expose the Node sqlite builtin (the
- * desktop-v0.0.409 outage): a static top-level import of it crashes the
- * lazily loaded runner, which the check-boundary node:sqlite rule guards.
- * Both drivers are
- * SQLite over the same file format with compatible
- * `prepare/run/get/all/exec/close` surfaces, so persistence behavior and
- * the DB file are identical either way.
- */
 type PortableSqliteStatement = {
   run: (...params: ReadonlyArray<string | number | null>) => {
     changes: number | bigint;
@@ -67,7 +53,6 @@ const loadSqliteDatabaseCtorSync = (): PortableSqliteDatabaseCtor => {
         return cachedSqliteCtor;
       }
     } catch {
-      // Fall through to the unsupported-runtime error below.
     }
   }
   throw new Error(
@@ -128,11 +113,6 @@ const tableColumns = (db: PortableSqliteDatabase, table: string): Set<string> =>
 
 const openDatabase = (stellaDataDir: string): PortableSqliteDatabase => {
   fs.mkdirSync(stellaDataDir, { recursive: true });
-  // Runtime-portable driver (bun:sqlite under the detached worker,
-  // node:sqlite under Node/Electron): a static node:sqlite import here
-  // crashed the runner chunk under Bun at load. The busy handler comes
-  // from the PRAGMA below (identical to the old ctor `timeout` option —
-  // both call sqlite3_busy_timeout).
   const Database = loadSqliteDatabaseCtorSync();
   const db = new Database(path.join(stellaDataDir, DATABASE_FILE));
   // Install the busy handler before asking SQLite to switch journal modes.
@@ -207,7 +187,6 @@ const openDatabase = (stellaDataDir: string): PortableSqliteDatabase => {
     try {
       db.exec("ROLLBACK");
     } catch {
-      // BEGIN may not have completed.
     }
     db.close();
     throw error;
@@ -314,7 +293,6 @@ export const reserveDurableImageOperation = (args: {
     try {
       db.exec("ROLLBACK");
     } catch {
-      // The transaction may have failed before BEGIN completed.
     }
     throw error;
   } finally {
@@ -441,7 +419,6 @@ export const pruneImageOperationLedger = (args: {
     try {
       db.exec("ROLLBACK");
     } catch {
-      // Transaction may not have started.
     }
     throw error;
   } finally {

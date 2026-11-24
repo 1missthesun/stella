@@ -58,11 +58,6 @@ const pageSettleSource = `async ({ kind, quietMs, graceMs, capMs }) => {
   }
 }`;
 
-/**
- * Best effort: waits until the page has loaded and stopped changing (DOM,
- * finished resource loads, visible loading indicators), bounded by a short
- * cap. Never throws; a page that cannot be evaluated is left as is.
- */
 export const createPageSettle =
   (command: BrowserWorkerContext["command"]) =>
   async (

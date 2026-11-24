@@ -24,7 +24,6 @@ export const CODE_TOOL_CLOUD_AGENT_DESCRIPTION =
 export const CODE_TOOL_PROMPT_SNIPPET =
   "Run persistent JavaScript, orchestrate allowed Stella tools and connected services' actions, and control apps through the sky/browser globals";
 
-/** Longest one `code` call waits on a cell before handing back its cell_id. */
 export const CODE_MAX_WAIT_MS = 600_000;
 
 export const CODE_TOOL_PARAMETERS: Record<string, unknown> = {

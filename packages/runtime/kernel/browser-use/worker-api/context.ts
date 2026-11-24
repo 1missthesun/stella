@@ -150,8 +150,6 @@ export type BrowserWorkerContext = ReturnType<
 >;
 
 export const createBrowserWorkerContext = (callBrowser: BrowserWorkerCall) => {
-  // Until browser.use() or the first browser call, the backend is unresolved;
-  // ensureBackend() asks the host, which prefers the connected extension.
   let selectedBackend: BrowserWorkerBackend = "in-app";
   let backendResolved = false;
   let resolvingBackend: Promise<BrowserWorkerBackend> | undefined;

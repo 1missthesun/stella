@@ -21,7 +21,6 @@ export const readOrSeedPersonality = (stellaDataDir: string): string => {
       return existing;
     }
   } catch {
-    // Missing or unreadable file falls through to the bundled prompt.
   }
 
   return bundledPersonality();

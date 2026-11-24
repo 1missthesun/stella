@@ -35,17 +35,8 @@ export type BundledEntryAdapter = {
 export type BundledSyncOptions = {
   manifestFilename?: string;
   includeBundledId?: (id: string) => boolean;
-  /**
-   * Legacy alias for the manifest's hash map, read once for installs seeded
-   * before `entries` became the canonical key (skills-sync originally wrote
-   * `skills`). Without it, an old manifest reads as `null` and every shipped
-   * update to an untouched entry is misclassified as user-modified and
-   * skipped. The next write always emits `entries`, so this self-heals after
-   * the first boot.
-   */
   legacyEntriesKey?: string;
   sourceRevision?: string;
-  /** Hashes of every earlier version Stella shipped for each entry; a home copy equal to one of them is untouched. */
   previouslyShipped?: Readonly<Record<string, readonly Sha256Hex[]>>;
   seedMissingOnly?: boolean;
   removeObsolete?: boolean;
@@ -84,8 +75,6 @@ const readManifest = async (
       if (record.version !== 1 && record.version !== MANIFEST_VERSION) {
         return null;
       }
-      // Prefer the canonical `entries` map, falling back to a caller-declared
-      // legacy key so manifests written before the rename still apply updates.
       const rawEntries =
         record.entries ??
         (legacyEntriesKey ? record[legacyEntriesKey] : undefined);
@@ -122,7 +111,6 @@ const readManifest = async (
       }
     }
   } catch {
-    // Corrupt manifest — fall through to null and rebuild conservatively.
   }
   return null;
 };

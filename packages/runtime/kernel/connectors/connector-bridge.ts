@@ -123,7 +123,6 @@ class StdioConnectorBridgeSession {
     try {
       child.kill();
     } catch {
-      // The connector already exited.
     }
   }
 
@@ -172,7 +171,6 @@ class StdioConnectorBridgeSession {
         })
       : Promise.resolve(null);
     this.child.stderr.on("data", () => {
-      // Drain diagnostics so verbose connector commands cannot block on a full pipe.
     });
     this.child.on("exit", () => {
       this.failChild(child, new Error(`${this.server.displayName} exited.`));

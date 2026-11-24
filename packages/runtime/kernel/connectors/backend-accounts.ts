@@ -90,7 +90,6 @@ const backendRequest = async (
   return payload;
 };
 
-/** The signed-in account's Store connections, with each multi-account integration's accounts. */
 export const fetchBackendConnections = (
   auth: BackendSiteAuth,
   options: { fresh?: boolean; fetchImpl?: typeof fetch } = {},
@@ -175,7 +174,6 @@ const googleProviderCache = new Map<
   { at: number; state: Promise<GoogleProviderState> }
 >();
 
-/** Whether this user connects Google through Stella's own app (default) or Composio. */
 export const fetchGoogleProviderState = (
   auth: BackendSiteAuth,
   options: { fresh?: boolean; fetchImpl?: typeof fetch } = {},
@@ -214,7 +212,6 @@ export const setGoogleProvider = async (
   return state;
 };
 
-/** Redeems a Google connect code for the signed-in Stella user (the cloud keeps the account). */
 export const finishBackendConnect = async (
   auth: BackendSiteAuth,
   connectCode: string,

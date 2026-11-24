@@ -447,7 +447,6 @@ export class ModelRuntime {
         });
       }
     } catch {
-      // Missing/corrupt cache falls back to the built-in catalog.
     }
     const checkedAts = [...this.dynamicCatalogs.values()]
       .map((entry) => entry.checkedAt)
@@ -501,11 +500,6 @@ export class ModelRuntime {
     }
   }
 
-  /**
-   * Reads each provider's own model list. A provider that is unreachable or
-   * rejects the key keeps the list it had: the picker never loses models
-   * because a list request failed.
-   */
   private async refreshLiveCatalogs(options: {
     force?: boolean;
     signal?: AbortSignal;
@@ -698,8 +692,6 @@ export class ModelRuntime {
       try {
         listener(published);
       } catch {
-        // Registry writes must not fail because a detached host cannot receive
-        // its best-effort picker notification.
       }
     }
   }
@@ -1157,10 +1149,6 @@ export class ModelRuntime {
     return headers;
   }
 
-  /**
-   * Snapshot view of a composed model: headers stripped (they can carry
-   * static credentials), frozen, and memoized per composed model.
-   */
   private toSnapshotModel(model: Model<Api>): Model<Api> {
     let view = this.snapshotModels.get(model);
     if (!view) {

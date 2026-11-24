@@ -107,11 +107,6 @@ const mkdirUnlessExists = async (directory: string): Promise<boolean> => {
 
 const directorySteps = new Map<string, Promise<unknown>>();
 
-/**
- * Directory creation is mkdir then chown, so another writer could otherwise
- * see the directory still owned by this process and refuse it. Steps on the
- * same directory path run one at a time; unrelated paths are not serialized.
- */
 const withDirectoryStep = async <T>(directory: string, step: () => Promise<T>): Promise<T> => {
   const previous = directorySteps.get(directory) ?? Promise.resolve();
   const run = previous.then(step, step);

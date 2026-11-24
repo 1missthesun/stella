@@ -142,7 +142,6 @@ export type BrowserChainOptions = BrowserCommandOptions &
     waitTimeoutMs?: number;
     returnSnapshot?: boolean;
     returnScreenshot?: boolean;
-    /** @internal Routes a worker handle without changing the session default. */
     __stellaBrowserBackend?: BrowserBackend;
   }>;
 
@@ -203,12 +202,9 @@ export interface BrowserSessionClient {
   selectBackend?(
     backend: BrowserBackend,
   ): Promise<Readonly<{ backend: BrowserBackend }>>;
-  /** The backend used until one is selected: "external" while the Stella
-   * Browser extension is connected, else "in-app". */
   resolveDefaultBackend?(): Promise<Readonly<{ backend: BrowserBackend }>>;
   beginTurn?(turnId: string): void;
   endTurn?(turnId: string, behavior: BrowserTurnEndBehavior): Promise<void>;
-  /** Closes the owner's tabs on these backends, remembering them for a later turn; returns the backends it reached. */
   retireTabs?(backends: readonly BrowserBackend[]): Promise<readonly BrowserBackend[]>;
   dispose(): Promise<void>;
 }
@@ -227,13 +223,6 @@ type OwnerRoute = Readonly<{
   config: ResolvedExecutionConfig;
 }>;
 
-/**
- * The per-owner daemon this session's in-app commands go to. `detached`: the
- * socket dropped, so the next command re-initializes with the same lease.
- * `suspect`: a command failed in a way that may have wedged the daemon, so the
- * next command probes `route` and keeps it if it answers, else asks desktop to
- * replace the daemon (which drops the in-app tabs it owns).
- */
 type OwnerRouteState =
   | Readonly<{ kind: "unbound" }>
   | Readonly<{ kind: "bound"; route: OwnerRoute }>
@@ -343,14 +332,9 @@ const BROWSER_OWNER_LIFECYCLE_ACTIONS = new Set<string>([
   "close_owner",
   "release_owner_lease",
 ]);
-// Budget for the external backend's "is an extension actually attached?"
-// preflight. It is one local round trip to Stella, so it must be short
-// enough that paying it is never worse than the hang it prevents.
 const EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS = 2_000;
 const OWNER_DAEMON_PROBE_TIMEOUT_MS = 2_000;
 const NAVIGATION_ACTIONS = new Set(["navigate", "back", "forward", "reload"]);
-// How long a positive answer is trusted, so a burst of commands in one turn
-// does not pay for the probe every time.
 const EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS = 5_000;
 const EXTERNAL_ATTACH_GRACE_MS = 6_000;
 const EXTERNAL_ATTACH_GRACE_POLL_MS = 750;
@@ -1088,11 +1072,6 @@ const getChainTimeoutMs = (
 const leaseFingerprint = (leaseId: string): string =>
   createHash("sha256").update(leaseId).digest("hex").slice(0, 12);
 
-/**
- * A page load can outlast the command budget. The backend gets a deadline
- * inside the budget so it answers with what happened (committed, still
- * loading) before this client gives up with an unknown outcome.
- */
 const withBackendNavigationTimeout = (
   action: string,
   params: BrowserCommandParams,
@@ -1126,10 +1105,6 @@ const getCommandDeadline = (
     });
   }
 
-  // The daemon/action timeout is an inner deadline. Leave a small transport
-  // grace period so a caller asking waitForURL(..., { timeout: 120_000 }) does
-  // not get cut off by the client's historical 30-second default (or race the
-  // response at exactly 120 seconds).
   const timeoutMs = Math.max(
     commandTimeoutMs,
     requestedTimeout + BROWSER_COMMAND_TIMEOUT_GRACE_MS,
@@ -1621,12 +1596,6 @@ export class BrowserSession implements BrowserSessionClient {
     });
   }
 
-  /**
-   * Picks the session's backend on first use when none was selected: the
-   * user's own browser while the extension is connected (it carries their
-   * logins), else Stella's browser. The choice sticks for the session so
-   * handles keep routing to one browser.
-   */
   async resolveDefaultBackend(): Promise<
     Readonly<{ backend: BrowserBackend }>
   > {
@@ -1658,8 +1627,6 @@ export class BrowserSession implements BrowserSessionClient {
         try {
           await this.cleanupTurn(turn, true, false);
         } catch {
-          // Stale disposal and unavailable transports are best-effort. Rust
-          // lease fencing prevents this cleanup from touching a newer turn.
         } finally {
           if (this.activeTurn === turn) this.activeTurn = undefined;
           this.activeTurnBackends.clear();
@@ -2219,26 +2186,6 @@ export class BrowserSession implements BrowserSessionClient {
     return receipt as BrowserCommandReceipt<TData>;
   }
 
-  /**
-   * The external backend drives the user's real browser through the Stella
-   * browser extension, so it only works while an extension is attached to
-   * this bridge daemon. Nothing used to check: the command was written to the
-   * daemon, the daemon had nothing to forward it to, and the call sat until
-   * the whole command budget expired and was reported as
-   * `dispatched=true outcome=unknown`. That is the honest description of what
-   * had happened, but it left the caller unable to tell a no-op from a
-   * completed side effect — harmless for tab_new, not harmless for anything
-   * that writes.
-   *
-   * Ask first, over the connection we already hold, and refuse before
-   * dispatching. The command then provably never ran (`outcome=not-started`)
-   * and the error names the real condition instead of timing out.
-   *
-   * Only an explicit "not connected" blocks. An older daemon that does not
-   * know the action, a transport error, or any other shape of answer is
-   * inconclusive and falls through to the normal dispatch path, so this can
-   * never turn a working setup into a refused one.
-   */
   private async assertExternalBrowserAttached(
     env: NodeJS.ProcessEnv,
     signal: AbortSignal | undefined,
@@ -2412,10 +2359,6 @@ export class BrowserSession implements BrowserSessionClient {
     ) {
       return;
     }
-    // A timed-out command may leave the per-owner daemon wedged in page
-    // evaluation, and every follow-up would queue behind it on that process.
-    // The next command asks the daemon first and replaces it only when it does
-    // not answer: replacing it drops the in-app tabs it owns.
     this.transitionRoute({ type: "command-failed" });
   }
 

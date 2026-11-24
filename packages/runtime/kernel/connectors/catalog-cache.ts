@@ -207,11 +207,6 @@ export const buildMergedConnectorCatalog = (
 ): NativeConnectorCatalogEntry[] =>
   buildNativeConnectorCatalog(serverEntries ? [...serverEntries] : undefined);
 
-/**
- * Google connects through Stella's own Google app by default: a Composio entry
- * for a Google integration that Stella also ships first-party is dropped,
- * unless the user chose Composio or is already connected through it.
- */
 const preferFirstPartyGoogle = async (
   liveEntries: NativeConnectorCatalogEntry[],
   auth: { baseUrl: string; authToken: string },

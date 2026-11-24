@@ -116,8 +116,6 @@ const publishCatalogToModelRuntime = async (
   catalog: StellaModelCatalog,
   site: StellaSiteConfig,
 ): Promise<void> => {
-  // Every served catalog (memory, disk, network) re-asserts the gateway
-  // origin so routes built outside this module can find it.
   if (site.baseUrl) {
     rememberStellaGatewayOrigin(site.baseUrl, catalog.gateway.origin);
   }
@@ -568,9 +566,6 @@ export const withStellaModelCatalogMetadata = (args: {
             ),
           );
         }
-        // Offline fallback: the alias resolved locally, but the route still
-        // has to relay through a known gateway. Rebuild it so a provisional
-        // (pre-catalog) baseUrl never reaches a provider adapter.
         const gatewayOrigin = yield* requireGatewayOrigin(args.site);
         return (
           createStellaRoute({

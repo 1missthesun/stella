@@ -188,16 +188,6 @@ const renderToolBlock = (tool: DemotedToolCatalogEntry): CatalogBlock => {
   return { tool, text, cost: estimateTokens(`${text}\n`) };
 };
 
-/**
- * Token-budgeted catalog section for code's description.
- *
- * Tools are grouped by namespace (`demoted.requiredConnectorProvider`,
- * falling back to the `<prefix>` of `<prefix>_rest` names). Within each
- * namespace the cheapest signatures are preferred; namespaces are drained
- * round-robin against one shared budget so a single verbose namespace cannot
- * starve the rest. Every namespace stub line is always shown and charged
- * first; tool blocks share what is left. Only the header is uncharged.
- */
 export const buildCatalogSection = (
   demoted: readonly DemotedToolCatalogEntry[],
   budgetTokens = DEFAULT_CATALOG_TOKEN_BUDGET,

@@ -8,11 +8,6 @@ import {
   memorySyncTooLargeMessage,
 } from "@stella/node-shared/memory/memory-client.js";
 
-/**
- * What a task that just wrote a file should know when that file is a memory
- * file too big to sync: it would otherwise stay on this computer with nothing
- * but a log line saying so. Undefined for every other file.
- */
 export const memorySyncNoteForFile = async (
   absolutePath: string,
   stellaDataDir?: string,

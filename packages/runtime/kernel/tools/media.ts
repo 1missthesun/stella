@@ -71,7 +71,6 @@ const createImageGenHandler =
           limit: 50,
         });
       } catch {
-        // Retention cleanup must never block a current generation.
       }
     }
 

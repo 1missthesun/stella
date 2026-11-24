@@ -45,7 +45,6 @@ export type PiToolCall = {
   conversationId: string;
   agentId?: string;
   cwd?: string;
-  /** Tools the caller's engine replaces with its own; `code` can't reach them. */
   withheld?: readonly string[];
   signal?: AbortSignal;
 };
@@ -60,10 +59,6 @@ export type RunnerPiTools = {
   cliBridgeSocketPath?: string;
 };
 
-/**
- * A general agent's `Read` is pi's text reader; the runtime's `Read` is not
- * offered to it but runs the images that one hands over (`runnable`).
- */
 const offeredTools = (
   context: RunnerContext,
   agentType: PiToolAgentType,

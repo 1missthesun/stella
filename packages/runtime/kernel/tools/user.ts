@@ -52,7 +52,6 @@ export type SecureInputRequest = {
   detail?: string;
   fields: readonly UserAskField[];
   save?: SecureInputSaveRequest;
-  /** Only reuse a value saved on this computer: resolve null instead of showing a card. */
   savedOnly?: true;
   urgency: UserAskUrgencyLevel;
   conversationId?: string;
@@ -153,8 +152,6 @@ const fillBrowserField = async (
       outcome,
       ...(revealed.expiresAt ? { usableUntil: clockTime(revealed.expiresAt) } : {}),
     });
-    // Page labels and ids are the page's own text, but never let the value
-    // itself through if a page echoes it into one.
     return receipt(
       written.ok,
       scrubFilledSecret(written.detail, revealed.value).slice(0, 2000),
@@ -269,7 +266,6 @@ const normalizeFields = (input: unknown): readonly UserAskField[] => {
   return fields;
 };
 
-/** A preset's fields first, in order; an explicit field with a preset field's id refines that one, any other is added after. */
 const mergePresetFields = (
   presetFields: readonly UserAskField[],
   explicit: unknown,
@@ -284,11 +280,6 @@ const mergePresetFields = (
   return rows;
 };
 
-/**
- * Internal argument (the public one is `saved_only`): reuse a saved value if
- * this computer has one, and otherwise return `{ outcome: "not_saved" }`
- * without showing a card.
- */
 export const SECURE_INPUT_SAVED_ONLY_ARG = "__savedOnly";
 
 const cloudNotSavedNote = (service: string, found: SecureInputNotSaved): string => {

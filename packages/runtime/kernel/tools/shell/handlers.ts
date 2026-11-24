@@ -292,7 +292,6 @@ export const handleExecCommand = async (
         modelOutputTokens,
       });
     } catch {
-      // Progress consumers must not break process I/O or teardown.
     }
   };
   const emitUpdate = (record: ManagedShellRecord, delta?: ShellOutputDelta) => {
@@ -334,7 +333,6 @@ export const handleExecCommand = async (
       try {
         record.kill();
       } catch {
-        // Best effort; the process may already be exiting.
       }
     }
     return { error: toolErrorMessage(error) };
@@ -350,7 +348,6 @@ export const handleExecCommand = async (
                   try {
                     record.kill();
                   } catch {
-                    // Best effort; the process may already be exiting.
                   }
                 }
               }),

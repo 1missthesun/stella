@@ -76,12 +76,6 @@ const stopWindowsProcessTree = async (pid: number) => {
   });
 };
 
-/**
- * Stop a connector bridge: SIGTERM, then SIGKILL. `ownChild` for a bridge
- * this process spawned and still holds; otherwise the start time read when
- * its stored record was checked, so neither signal reaches a pid that has
- * been handed to another process since.
- */
 export const stopConnectorBridgeProcess = async (
   target: { pid: number | undefined; ownChild: true } | RecordedProcess,
   options: { processGroup?: boolean; reason: string },

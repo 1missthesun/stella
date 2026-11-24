@@ -1,13 +1,3 @@
-/**
- * The desktop's memory: `memory.read` / `memory.write` / `memory.list` over
- * the memory files under `~/.stella` on disk. The path rules, redaction and
- * caps are the shared ones (`memory-client.ts`); this module only owns the
- * files. A write lands through a temporary sibling and a rename, so a reader
- * never sees half a file, and this process's writes run one at a time so the
- * `expectSha` comparison and the write cannot interleave with each other.
- * While the user has memory off, every call is refused.
- */
-
 import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";

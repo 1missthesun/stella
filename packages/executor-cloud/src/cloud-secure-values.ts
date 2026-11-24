@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomInt, randomUUID } from "node:crypto";
 import path from "node:path";
+import { Effect } from "effect";
 import { toolStateEnvironment } from "@stella/contracts/cloud-tool-home";
 import {
   SECRET_REDACTION_MARK,
@@ -28,6 +29,7 @@ import {
   type SecureValueTarget,
   type SecureValueUseReceipt,
 } from "@stella/contracts/user-ask";
+import { forkAbortTimer, runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
 import {
   invalidateSecureValueFingerprints,
@@ -211,18 +213,18 @@ const runSecureCommand = async (args: {
     const finish = (result: { ok: boolean; status: number | null; output: string; timedOut: boolean }) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cancelTimer();
       resolve(result);
     };
-    const timer = setTimeout(() => {
+    const cancelTimer = forkAbortTimer(COMMAND_TIMEOUT_MS, () => {
+      if (settled) return;
       try {
         if (child.pid) process.kill(-child.pid, "SIGKILL");
       } catch {
         child.kill("SIGKILL");
       }
       finish({ ok: false, status: null, output, timedOut: true });
-    }, COMMAND_TIMEOUT_MS);
-    timer.unref?.();
+    });
     child.on("error", (error) =>
       finish({ ok: false, status: null, output: error.message, timedOut: false }),
     );
@@ -258,8 +260,7 @@ const fillCloudBrowserField = async (args: {
   browser: CloudBrowserBridge;
   target: Extract<SecureValueTarget, { kind: "browser_field" }>;
   value: string;
-}): Promise<SecureFillOutcome> => {
-  const signal = new AbortController().signal;
+}, signal: AbortSignal): Promise<SecureFillOutcome> => {
   if (args.target.tabId) {
     await args.browser.call("focusTab", [args.target.tabId], signal);
   }
@@ -368,7 +369,13 @@ export const useCloudSecureValue = async (args: {
   }
   const mode: SecureFillMode = args.target.mode ?? "fill";
   try {
-    const outcome = await fillCloudBrowserField({ browser: args.browser, target: args.target, value });
+    const { browser, target } = args;
+    const outcome = await runToolEffect(
+      Effect.tryPromise({
+        try: (signal) => fillCloudBrowserField({ browser, target, value }, signal),
+        catch: (error) => error,
+      }),
+    );
     const written = secureFillReceipt({
       label: resolved.label,
       selector: args.target.selector,

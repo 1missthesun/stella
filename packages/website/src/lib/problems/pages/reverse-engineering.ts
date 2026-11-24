@@ -2315,6 +2315,117 @@ export const REVERSE_ENGINEERING_PAGES: ProblemPage[] = [
     ],
   },
   {
+    slug: "decode-network-protocol-from-pcap",
+    niche: "reverse-engineering",
+    searchPhrases: [
+      "reverse engineer protocol",
+      "wireshark decode",
+      "reverse engineer smart device protocol",
+      "how to reverse engineer a network protocol",
+      "pcap to python",
+      "control smart bulb without app",
+    ],
+    title: "Reverse engineer a device protocol from a pcap capture",
+    description:
+      "Decode a smart device's network protocol from a Wireshark capture: framing, checksum, session key and commands, then write a Python controller that drives it.",
+    h1: "How to reverse engineer a device's protocol from a capture",
+    short: "Decode a protocol from a pcap",
+    lede: "From a capture of the app and the device to a script that controls it.",
+    answer:
+      "Open the capture in Wireshark, use Follow › TCP Stream on the device's connection and line up each message with what the app did at that moment: the bytes that change with the brightness or colour you set are the command, the fixed bytes at the start are the framing, and the last byte is often a checksum. If messages differ between sessions for the same setting, they're scrambled with a per-session key. Write it down as a small Python socket script. Stella (stella.sh) does it end to end on your computer: it decodes the capture, writes the controller and uses it on the device.",
+    stellaSteps: [
+      "Reads the capture with a small parser of its own and pulls out both app sessions with the lamp on port 5577",
+      "Works out the frame layout (start bytes, sequence, command, length, payload) and the 8-bit sum at the end",
+      "Notices the two sessions send the same settings as different bytes, and finds the key the lamp hands out on each connection",
+      "Writes `lumio.py`, plain Python with switches for on, off, colour, white temperature and brightness, and a status read-out",
+      "Sets the test lamp to 40% orange with it, reads the state back to confirm, and lists what the capture couldn't prove",
+    ],
+    prompt:
+      "I have a capture of the Lumio phone app talking to my smart lamp in Documents/lumio-capture.pcap. Can you work out how it talks to the lamp, write me a small Python controller, and use it to set the lamp to 40% brightness in orange (#FF8C00)? A test lamp is listening on 127.0.0.1 port 5577.",
+    proof: {
+      kind: "video",
+      recordedOn: "2026-11-23",
+      platform: "macOS 15",
+      model: "Claude Code with Opus, on a Claude plan",
+      result:
+        "The test lamp ended on, at 40% brightness and colour FF8C00, set through valid sessions with no checksum or key errors, and `lumio.py`, run again later on its own, opened a fresh session and read the lamp's state correctly.",
+      note: "Lumio, its capture and the lamp simulator are made up for this guide. The quiet stretch is sped up 30×.",
+      video: {
+        src: `${PROOFS}/reverse-engineering/decode-network-protocol-from-pcap/proof.mp4`,
+        cuts: webCuts("reverse-engineering/decode-network-protocol-from-pcap"),
+        poster: `${PROOFS}/reverse-engineering/decode-network-protocol-from-pcap/poster.jpg`,
+        width: 1280,
+        height: 860,
+        duration: 30.8,
+        speed: 30,
+        realDuration: 153,
+      },
+      moments: [
+        { at: 0, text: "Stella on a Mac, with a capture of the Lumio app in Documents and a test lamp listening on port 5577." },
+        { at: 4, text: "The request: work out the protocol, write a Python controller, set the lamp to 40% orange." },
+        { at: 10.9, text: "Stella starts a task for it and says it will check the lamp's reply." },
+        { at: 15.6, text: "About 80 seconds of work, sped up 30×: parsing the capture, decoding the frames and the session key, writing and testing the controller." },
+        { at: 19.2, text: "Done: the lamp is on at 40% in orange, and its state read back confirms it." },
+        { at: 23, text: "How the protocol works in plain words, the controller's commands, and what the capture didn't settle." },
+      ],
+    },
+    manualTitle: "Do it yourself (an hour or two)",
+    manualSteps: [
+      {
+        title: "Capture the app with notes",
+        body: "Record while you use the app, one action at a time, and write down the time of each: on, off, brightness 80, red. Capture on the computer the app runs on with [Wireshark](https://www.wireshark.org/download.html) (Windows, Mac, Linux), or capture a phone's traffic from your router or a hotspot on the computer.",
+      },
+      {
+        title: "Isolate the conversation",
+        body: "Filter to the device, for example `ip.addr == 192.168.1.50`, find its port, then right-click a packet and choose Follow › TCP Stream (or UDP Stream). Switch the view to Hex Dump or Raw to see the bytes each side sent. From the command line, `tshark -r capture.pcap -Y \"tcp.port==5577 && tcp.len>0\" -T fields -e ip.src -e tcp.payload` prints every payload as hex.",
+      },
+      {
+        title: "Find the framing and the checksum",
+        body: "Bytes that are the same at the start of every message are a header (here `AA 55`). Look for a byte that counts up (a sequence number), one that differs by action (the command), and a two-byte number equal to the rest of the message's length. For the last byte, try the sum of all earlier bytes modulo 256, then XOR of all bytes, then CRC-8.",
+      },
+      {
+        title: "Match commands to your notes",
+        body: "Line up each message with the action you wrote down. Brightness 80 should show up as `50` hex somewhere; a colour as three bytes such as `FF 00 00`. If the same action sends different bytes in two sessions, look at the first exchange after connecting: a value the device sends there is usually a key that later payloads are XORed with.",
+      },
+      {
+        title: "Write the controller and test it",
+        body: "In Python, open a socket with `socket.create_connection((host, port))`, repeat the opening exchange, then build each frame with the header, sequence, command, length, payload and checksum. Send a status request first and check the reply decodes to what the device shows, then send real commands.",
+      },
+      {
+        title: "Optional: teach Wireshark the protocol",
+        body: "A short [Lua dissector](https://www.wireshark.org/docs/wsdg_html_chunked/wsluarm.html) in your Wireshark plugins folder labels every field by name in future captures, which makes the remaining unknown bytes stand out.",
+      },
+    ],
+    platforms: ["windows", "mac", "linux"],
+    faq: [
+      {
+        q: "How do I decode a TCP payload in Wireshark?",
+        a: "Use Follow › TCP Stream to see one conversation's bytes in order. If Wireshark guessed the wrong protocol for a port, right-click a packet, choose Decode As… and pick the right one, or none to see raw data.",
+      },
+      {
+        q: "Can I see what my phone app sends to a smart device?",
+        a: "Yes. Share the computer's Wi-Fi as a hotspot and capture on that interface, or capture on a router that supports it. Local traffic between app and device is often unencrypted, as with this lamp; cloud traffic is usually TLS and needs mitmproxy instead.",
+      },
+      {
+        q: "What if the traffic is encrypted?",
+        a: "If it's TLS to a cloud server, use mitmproxy with its certificate trusted on the phone. If it's a custom scheme like this one, look for the key exchange at the start of each connection, or for the key in the app's code.",
+      },
+      {
+        q: "How do I read a pcap file in Python?",
+        a: "[Scapy](https://scapy.readthedocs.io/en/latest/) reads it with `rdpcap(\"capture.pcap\")`; check `pkt.haslayer(TCP)` and read `bytes(pkt[TCP].payload)`. For a quick look, tshark's `-T fields -e tcp.payload` output is easy to parse too.",
+      },
+    ],
+    related: ["reverse-engineering/inspect-app-traffic-with-mitmproxy", "reverse-engineering/reverse-engineer-website-api", "reverse-engineering/reverse-engineer-a-file-format"],
+    lastChecked: "2026-11-23",
+    sources: [
+      { label: "Wireshark: Follow Stream", href: "https://www.wireshark.org/docs/wsug_html_chunked/ChAdvFollowStreamSection.html" },
+      { label: "tshark manual", href: "https://www.wireshark.org/docs/man-pages/tshark.html" },
+      { label: "Wireshark Lua API", href: "https://www.wireshark.org/docs/wsdg_html_chunked/wsluarm.html" },
+      { label: "Scapy", href: "https://scapy.readthedocs.io/en/latest/" },
+      { label: "Python socket", href: "https://docs.python.org/3/library/socket.html" },
+    ],
+  },
+  {
     slug: "extract-firmware",
     niche: "reverse-engineering",
     searchPhrases: [

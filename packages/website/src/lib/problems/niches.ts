@@ -250,7 +250,7 @@ export const NICHES: Niche[] = [
       },
       { title: "Android, Java and scripts.", slugs: ["decompile-apk", "edit-apk", "decompile-jar-file", "deobfuscate-javascript", "extract-electron-asar", "decompile-lua"] },
       { title: "Games.", slugs: ["edit-save-file", "extract-unity-game-assets", "decompile-unity-game", "decompile-godot-game", "extract-renpy-rpa", "extract-pak-files"] },
-      { title: "Formats, networks and devices.", slugs: ["reverse-engineer-a-file-format", "reverse-engineer-website-api", "inspect-app-traffic-with-mitmproxy", "extract-firmware"] },
+      { title: "Formats, networks and devices.", slugs: ["reverse-engineer-a-file-format", "decode-network-protocol-from-pcap", "reverse-engineer-website-api", "inspect-app-traffic-with-mitmproxy", "extract-firmware"] },
     ],
   },
   {

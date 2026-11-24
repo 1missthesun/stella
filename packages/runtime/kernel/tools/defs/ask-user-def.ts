@@ -174,7 +174,7 @@ const cloudSavedValueNote = (saved: UserAskSavedValueNote, under: string, replac
   if (saved.remembered) {
     return saved.replaced
       ? `The user gave a replacement; the device they answered on overwrites the saved value for "${saved.label}".`
-      : `The user chose to remember this as "${saved.label}"; it is saved on their devices, and later requests with the same service and account get it without asking while one of their computers is online.`;
+      : `The user chose to remember this as "${saved.label}"; it is saved on their devices, and later requests with the same service and account get it without asking while one of their computers is online, or with one tap on their phone otherwise.`;
   }
   return "The user chose not to remember this.";
 };
@@ -200,7 +200,7 @@ const savedValueNote = (saved: UserAskSavedValueNote, cloud = false): string => 
     return saved.replaced
       ? `The user gave a replacement; it overwrote the saved value for "${saved.label}".`
       : saved.synced
-        ? `The user chose to remember this as "${saved.label}"; it is saved on their devices, so later requests with the same service and account reuse it without asking, here, on their other devices, and in cloud tasks while one of their computers is online.`
+        ? `The user chose to remember this as "${saved.label}"; it is saved on their devices, so later requests with the same service and account reuse it without asking here and on their other devices; a cloud task gets it without asking while one of their computers is online, or with one tap on their phone otherwise.`
         : `The user chose to remember this on this computer as "${saved.label}"; later requests with the same service and account reuse it without asking.`;
   }
   return "The user chose not to remember this on this computer.";

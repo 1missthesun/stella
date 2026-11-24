@@ -33,9 +33,7 @@ export const parseMediaApiErrorMessage = (raw: string): string => {
     if (typeof parsed.message === 'string' && parsed.message.trim()) {
       return parsed.message.trim()
     }
-  } catch {
-    // fall through
-  }
+  } catch {}
   return trimmed
 }
 

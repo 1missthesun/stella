@@ -50,21 +50,10 @@ export function resolveChatGptModelSelection(
 
 export type ChatGptModelResolution =
   | { kind: "available"; modelId: string }
-  /**
-   * Saved model is registry-routable but momentarily absent from the live
-   * model/list (flaky CLI / partial page). Keep it rather than permanently
-   * switching the user; it resolves normally once the live list returns.
-   */
   | { kind: "transient-gap"; modelId: string }
   | { kind: "rerouted"; modelId: string; savedModel: string }
   | { kind: "unavailable" };
 
-/**
- * Classify how a ChatGPT model selection should resolve. A saved model that is
- * only missing from the live list (but still in the static registry) is treated
- * as a transient gap and preserved — we only permanently reroute when the saved
- * id is genuinely gone from BOTH sources, and then only with a surfaced notice.
- */
 export function resolveChatGptEngineModel(
   savedModel: string | undefined,
   liveIds: readonly string[],

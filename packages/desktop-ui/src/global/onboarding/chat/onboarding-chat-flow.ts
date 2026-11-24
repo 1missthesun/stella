@@ -24,7 +24,6 @@ export const nextOnboardingChatStep = (
 
 const PROGRESS_KEY = "stella-onboarding-chat-progress";
 
-/** Steps of the earlier, longer setup, mapped to where someone part-way through it picks up. */
 const RETIRED_STEPS: Record<string, OnboardingChatStep> = {
   capabilities: "signin",
   selfmod: "signin",

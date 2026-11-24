@@ -136,10 +136,8 @@ export const useDesktopPermissions = ({
       }
     };
     const handleFocus = () => {
-      // Returning from System Settings often doesn't fire a visibilitychange
-      // (the window was never occluded), so refresh on window focus too. This
-      // is what makes a freshly granted microphone flip to "granted" without a
-      // restart.
+      // Returning from System Settings often fires no visibilitychange (the window
+      // was never occluded), so refresh on window focus too.
       if (document.visibilityState === "hidden") return;
       void load();
       startPolling();

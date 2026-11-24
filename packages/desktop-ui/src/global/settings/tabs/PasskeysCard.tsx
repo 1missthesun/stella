@@ -22,11 +22,6 @@ type PasskeyFetch = (
 const passkeyFetch = (): PasskeyFetch =>
   (authClient as unknown as { $fetch: PasskeyFetch }).$fetch;
 
-/**
- * Passkeys bind to the auth domain, so enrollment and sign-in run in the
- * web shell on that origin; the desktop app keeps its existing sign-in.
- * This card only renders there.
- */
 export function PasskeysCard() {
   const t = useT();
   const [passkeys, setPasskeys] = useState<PasskeyRow[] | null>(null);

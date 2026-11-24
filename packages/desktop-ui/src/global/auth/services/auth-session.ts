@@ -427,9 +427,6 @@ const redeemPendingBrowserAuthHandoff =
       }
       return "redeemed";
     } catch {
-      // The credential has already been removed from the URL. Do not log it,
-      // or retry it implicitly: an ambiguous POST failure may still have
-      // redeemed it server-side.
       console.error("Failed to finish browser sign-in.");
       return "failed";
     }

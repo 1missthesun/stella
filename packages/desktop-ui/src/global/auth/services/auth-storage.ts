@@ -11,9 +11,7 @@ const purgeLegacyStorage = (): void => {
   for (const key of LEGACY_STORAGE_KEYS) {
     try {
       window.localStorage?.removeItem(key);
-    } catch {
-      // Best effort migration cleanup.
-    }
+    } catch {}
   }
 };
 
@@ -38,9 +36,7 @@ export const writeBrowserSessionToken = (token: string): void => {
   }
   try {
     window.localStorage.setItem(BROWSER_SESSION_TOKEN_KEY, normalized);
-  } catch {
-    // Storage denial leaves the browser session non-persistent.
-  }
+  } catch {}
 };
 
 export const clearBrowserSessionToken = (): void => {
@@ -48,9 +44,7 @@ export const clearBrowserSessionToken = (): void => {
   if (window.electronAPI) return;
   try {
     window.localStorage.removeItem(BROWSER_SESSION_TOKEN_KEY);
-  } catch {
-    // Best effort.
-  }
+  } catch {}
 };
 
 export const readBrowserIdentityIntent = ():
@@ -72,9 +66,7 @@ export const writeBrowserIdentityIntent = (
   if (window.electronAPI) return;
   try {
     window.localStorage.setItem(BROWSER_IDENTITY_INTENT_KEY, intent);
-  } catch {
-    // Identity intent is also retained in memory for this browser lifetime.
-  }
+  } catch {}
 };
 
 export const readBrowserCachedSession = (): unknown | null => {
@@ -98,9 +90,7 @@ export const writeBrowserCachedSession = (session: unknown | null): void => {
     } else {
       window.localStorage.removeItem(BROWSER_CACHED_SESSION_KEY);
     }
-  } catch {
-    // Cached display identity is a best-effort stale-while-revalidate aid.
-  }
+  } catch {}
 };
 
 /**

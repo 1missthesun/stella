@@ -71,7 +71,6 @@ const ENGINE_TO_OPTION: Record<ModelPickerEngine, OptionId> = {
 
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
 
-// Set once the card has offered its default, so a later pick of Stella survives a remount.
 const ENGINE_DEFAULT_DECIDED_KEY = "stella-onboarding-engine-default-decided";
 
 const hostOf = (origin: string): string => {
@@ -273,8 +272,6 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
     },
   });
   const { start: startClaudeLogin } = claudeLogin;
-  // Claude Code is missing: install it with Anthropic's installer, then go
-  // straight on to signing in to the person's Claude plan.
   const cliInstall = useClaudeInstallThenSignIn({
     reload: reloadClaudeLocal,
     signIn: () => void startClaudeLogin({ place: "local", configId: "default" }),

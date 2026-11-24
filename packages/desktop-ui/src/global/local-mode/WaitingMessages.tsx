@@ -6,7 +6,6 @@ import {
 } from "@/features/cloud/paused-account";
 import "./local-mode.css";
 
-/** Messages written while the account was signed out; they send once it signs back in. */
 export function WaitingMessages() {
   const t = useT();
   const { accountScope, isCloudConversationReady } = useCloudConversationSession();

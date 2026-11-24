@@ -107,7 +107,6 @@ export interface ProviderModelPanelProps {
   onRequestSearchClose?: () => void;
   collapsibleGroups?: boolean;
   activeSectionKey?: string | null;
-  /** Opens this provider's group (and its connect form when it needs a key) and scrolls to it, once per `seq`. */
   focusSection?: { section: string; seq: number } | null;
   extraSections?: readonly ProviderModelExtraSection[];
   sectionOrder?: readonly string[] | null;
@@ -116,7 +115,6 @@ export interface ProviderModelPanelProps {
   refreshing?: boolean;
   catalogError?: string | null;
   selectedRowExtra?: ReactNode;
-  /** Where the chat runs: a provider set up only on this computer can't be picked for another place. */
   destination?: ModelDestination;
 }
 
@@ -370,9 +368,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                 await credentials.logoutOAuth(providerKey);
             }
         }
-        catch {
-            // Failures surface via the credentials hook's `error` state.
-        }
+        catch {}
         finally {
             setSigningOut(null);
         }

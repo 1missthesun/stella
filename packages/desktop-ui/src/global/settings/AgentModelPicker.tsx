@@ -62,7 +62,6 @@ interface AgentModelPickerProps {
     onSelected?: () => void;
     className?: string;
     surface?: "sidebar" | "settings";
-    /** A request to show one provider's group open, e.g. from "Use my OpenRouter key". */
     focusSection?: {
         section: string;
         seq: number;
@@ -249,9 +248,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             label: model.name || model.modelId,
             description: model.modelId,
         })), [chatGptAccountModels, chatGptCatalogModels]);
-    // Every chatgpt id known to the static registry (independent of the
-    // live model/list) so we can tell a genuinely-removed model from a
-    // transient live-list gap.
     const chatGptRegistryIds = useMemo(() => listChatGptCatalogModels(allModels).map((model) => model.modelId), [allModels]);
     const savedChatGptOverride = preferences
         ? fromChatGptModelId(preferences.modelOverrides.orchestrator ??
@@ -345,7 +341,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         }
         setActiveAgent(configurableAgents[0].key);
     }, [activeAgent, configurableAgents, surface, voiceVisible]);
-    // Provider groups live on the assistant tab, so a focus request lands there.
     const focusSeq = focusSection?.seq ?? 0;
     useEffect(() => {
         if (focusSeq && surface !== "settings")
@@ -448,7 +443,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         try {
             if (engine === "codex_cli") {
                 const selectedModel = modelId?.trim() || preferences.codexModel;
-                // Elsewhere it runs on the sign-in there, not on one here.
                 if (chatGptConnection !== "connected" && !runsElsewhere) {
                     setOauthPendingProvider(CHATGPT_PROVIDER);
                     const profile = await signInChatGpt().finally(() => setOauthPendingProvider(null));
@@ -465,9 +459,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                 if (resolution.kind === "unavailable") {
                     throw new Error(t("settings.agentModelPicker.errors.chatGptNoModels"));
                 }
-                // transient-gap keeps the saved (registry-routable) model rather than
-                // silently switching on a flaky live-list miss; rerouted surfaces a
-                // notice so a genuine switch is never silent.
                 effectiveModelId = resolution.modelId;
                 if (resolution.kind === "rerouted") {
                     setChatGptRoutedNotice(t("settings.agentModelPicker.chatGptRouted", {
@@ -788,7 +779,6 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
         (committedEngine === "codex_cli" &&
             chatGptConnection !== "connected" &&
             !planSignedInAt(destination, "chatgpt"));
-    // The place falls back to a model of its own for a pick it never holds.
     const currentBlock = modelBlockedAt(destination, current);
     const currentAnsweredElsewhere = currentBlock === "only-here" ||
         (currentBlock !== undefined && destination.kind === "cloud" && current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`));

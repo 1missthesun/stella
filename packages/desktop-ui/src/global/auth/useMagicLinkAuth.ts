@@ -225,9 +225,7 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
             setRequestId(null);
             return;
           }
-        } catch {
-          // Retry silently on network errors.
-        }
+        } catch {}
       }
     };
 

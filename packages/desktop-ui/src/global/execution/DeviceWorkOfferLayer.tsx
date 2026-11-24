@@ -44,12 +44,6 @@ const markAsked = (deviceId: string): void => {
   if (!list.includes(deviceId)) uiState.setItem(ASKED_KEY, JSON.stringify([...list, deviceId]));
 };
 
-/**
- * Asks once whether the user's other devices may start work on this computer, as soon as the
- * account has another computer: right after sign-in on a new one, or at a calm moment on the
- * first one when a second appears. "Not now" leaves it unconfigured, so starting a task here
- * still asks on this screen.
- */
 export const DeviceWorkOfferLayer = () => {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();

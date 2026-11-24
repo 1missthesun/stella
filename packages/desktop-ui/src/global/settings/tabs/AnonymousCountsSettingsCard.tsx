@@ -3,7 +3,6 @@ import { ANONYMOUS_COUNTS_ENABLED } from "@stella/contracts/telemetry/anonymous-
 import { useT } from "@/shared/i18n";
 import { SettingsToggleCard } from "./settings-toggle-card";
 
-/** "Send anonymous usage counts": local to this computer, on by default. */
 export function AnonymousCountsSettingsCard() {
   const t = useT();
   const [available, setAvailable] = useState(false);

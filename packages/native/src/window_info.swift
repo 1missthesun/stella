@@ -98,6 +98,16 @@ func escapeJson(_ s: String) -> String {
 /// `--points` mode so a single `CGWindowListCopyWindowInfo` answers many
 /// points instead of one process spawn per point.
 func windowJson(at point: CGPoint, in windowList: [[String: Any]], excludedPids: Set<Int>) -> String? {
+    windowMatch(at: point, in: windowList, excludedPids: excludedPids)?.json
+}
+
+/// The window `windowJson` describes, with its window-server id and size so
+/// the serve loop can screenshot it.
+func windowMatch(
+    at point: CGPoint,
+    in windowList: [[String: Any]],
+    excludedPids: Set<Int>
+) -> (json: String, windowID: CGWindowID, size: CGSize)? {
     for window in windowList {
         guard let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
               let wx = boundsDict["X"],
@@ -115,9 +125,60 @@ func windowJson(at point: CGPoint, in windowList: [[String: Any]], excludedPids:
         let pid = (window[kCGWindowOwnerPID as String] as? Int) ?? 0
         if excludedPids.contains(pid) { continue }
 
-        return "{\"title\":\"\(escapeJson(title))\",\"process\":\"\(escapeJson(ownerName))\",\"pid\":\(pid),\"bounds\":{\"x\":\(Int(rect.origin.x.rounded())),\"y\":\(Int(rect.origin.y.rounded())),\"width\":\(Int(rect.size.width.rounded())),\"height\":\(Int(rect.size.height.rounded()))}}"
+        let json = "{\"title\":\"\(escapeJson(title))\",\"process\":\"\(escapeJson(ownerName))\",\"pid\":\(pid),\"bounds\":{\"x\":\(Int(rect.origin.x.rounded())),\"y\":\(Int(rect.origin.y.rounded())),\"width\":\(Int(rect.size.width.rounded())),\"height\":\(Int(rect.size.height.rounded()))}}"
+        let windowID = (window[kCGWindowNumber as String] as? CGWindowID) ?? 0
+        return (json, windowID, rect.size)
     }
     return nil
+}
+
+private final class WindowScreenshotResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private var written = false
+    func markWritten() { lock.lock(); written = true; lock.unlock() }
+    var wasWritten: Bool { lock.lock(); defer { lock.unlock() }; return written }
+}
+
+/// Writes a PNG of one window, isolated from whatever overlaps it, using
+/// ScreenCaptureKit in this process. The desktop asks the long-lived
+/// `--serve` daemon for these rather than spawning a capture process per
+/// screenshot: macOS attributes every screen capture to the capturing
+/// process, and systemstatusd keeps failing to resolve capture clients that
+/// have already exited. Returns false when the capture failed or missed its
+/// deadline (replayd not answering).
+func writeWindowScreenshot(windowID: CGWindowID, size: CGSize, to path: String) -> Bool {
+    guard windowID != 0 else { return false }
+    let result = WindowScreenshotResult()
+    let semaphore = DispatchSemaphore(value: 0)
+    let task = Task.detached {
+        defer { semaphore.signal() }
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(
+                false, onScreenWindowsOnly: true
+            )
+            guard let scWindow = content.windows.first(where: { $0.windowID == windowID })
+            else { return }
+
+            let filter = SCContentFilter(desktopIndependentWindow: scWindow)
+            let config = SCStreamConfiguration()
+            config.width = max(1, Int(size.width))
+            config.height = max(1, Int(size.height))
+
+            let cgImage = try await SCScreenshotManager.captureImage(
+                contentFilter: filter, configuration: config
+            )
+            let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+            if let pngData = bitmapRep.representation(using: .png, properties: [:]),
+               (try? pngData.write(to: URL(fileURLWithPath: path))) != nil {
+                result.markWritten()
+            }
+        } catch {}
+    }
+    if semaphore.wait(timeout: .now() + 4.0) == .timedOut {
+        task.cancel()
+        return false
+    }
+    return result.wasWritten
 }
 
 func axCopy(_ element: AXUIElement, _ attribute: String) -> AnyObject? {
@@ -246,8 +307,10 @@ func setAXWindowBounds(pid: Int, title: String, oldBounds: CGRect, newBounds: CG
 
 // Persistent daemon: `window_info --serve` answers point/batch queries over
 // stdin/stdout so the desktop avoids a process spawn (Swift + framework load,
-// ~40ms each) per hover/morph probe. Read-only only — screenshots and
-// --set-bounds stay one-shot (they need ScreenCaptureKit / AX side effects).
+// ~40ms each) per hover/morph probe. `<x> <y> --screenshot=<path>` also works
+// here, so window screenshots come from this long-lived process instead of a
+// short-lived one per capture (see writeWindowScreenshot). --set-bounds stays
+// one-shot.
 // Protocol mirrors the Windows daemon:
 //   request:  <id>\t<token>\t<token>...   (tokens mirror the one-shot CLI)
 //   response: <id>\t<json>\n
@@ -284,11 +347,18 @@ func serveResponse(forTokens tokens: [String]) -> String {
     ) as? [[String: Any]] else {
         return "{\"error\":\"failed to get window list\"}"
     }
-    return windowJson(
+    guard let match = windowMatch(
         at: CGPoint(x: coords[0], y: coords[1]),
         in: windowList,
         excludedPids: excludedPids
-    ) ?? "null"
+    ) else {
+        return "null"
+    }
+    if let screenshotPath = parseScreenshotPath(slice),
+       !writeWindowScreenshot(windowID: match.windowID, size: match.size, to: screenshotPath) {
+        return "{\"error\":\"screenshot failed\"}"
+    }
+    return match.json
 }
 
 if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "--serve" {
@@ -394,33 +464,7 @@ for window in windowList {
 
     // Capture screenshot if requested (ScreenCaptureKit replaces deprecated CGWindowListCreateImage)
     if let ssPath = screenshotPath, windowID != 0 {
-        let captureWidth = Int(ww)
-        let captureHeight = Int(wh)
-        let semaphore = DispatchSemaphore(value: 0)
-        Task.detached {
-            defer { semaphore.signal() }
-            do {
-                let content = try await SCShareableContent.excludingDesktopWindows(
-                    false, onScreenWindowsOnly: true
-                )
-                guard let scWindow = content.windows.first(where: { $0.windowID == windowID })
-                else { return }
-
-                let filter = SCContentFilter(desktopIndependentWindow: scWindow)
-                let config = SCStreamConfiguration()
-                config.width = captureWidth
-                config.height = captureHeight
-
-                let cgImage = try await SCScreenshotManager.captureImage(
-                    contentFilter: filter, configuration: config
-                )
-                let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-                if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
-                    try? pngData.write(to: URL(fileURLWithPath: ssPath))
-                }
-            } catch {}
-        }
-        semaphore.wait()
+        _ = writeWindowScreenshot(windowID: windowID, size: CGSize(width: ww, height: wh), to: ssPath)
     }
 
     exit(0)

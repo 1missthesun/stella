@@ -4298,13 +4298,23 @@ func encodePNGViaImageIO(_ image: CGImage) -> Data? {
     return data as Data
 }
 
-// ScreenCaptureKit-backed window capture. Falls back to /usr/sbin/screencapture
-// when SCK is unavailable, or when an SCK call fails (which can happen if
-// the user has not granted the bundle screen recording permission).
+// Every screenshot is taken in this process with ScreenCaptureKit's
+// SCScreenshotManager. The helper never spawns /usr/sbin/screencapture:
+// screencapture goes through the legacy display-stream path, and replayd
+// reports each of those short-lived processes to systemstatusd only after the
+// process has exited. replayd then logs "SecTaskLoadEntitlements: failed to
+// get cs_flags, error=3" for the dead PID, systemstatusd keeps re-resolving it
+// ("Failed to find any name for executable"), and over days of computer use
+// that backlog pins systemstatusd at 100% CPU and over a gigabyte of memory.
+// A capture made by this long-lived helper is attributed to a live process,
+// uses the Screen Recording grant Stella already has (no other prompt), and
+// is a one-frame screenshot, so nothing keeps recording while idle.
 //
-// When `pid` is provided we filter by the target app's frontmost window so
-// the capture is window-isolated even when other apps overlap. When pid is
-// nil we fall back to the screencapture shell-out (full screen / rect).
+// With a `pid`, the capture is isolated to the target app's window (plus its
+// own child windows above it), so other apps overlapping it never leak into
+// what the model sees. When no window of `pid` can be captured, `rect` is
+// captured from the screen instead, also in process, and flagged
+// `occludedRectFallback` because it shows whatever covers that rect.
 //
 // Returns `(screenshot, warning)`: when `screenshot` is non-nil the capture
 // succeeded and the file was written; when `warning` is non-nil something
@@ -4330,279 +4340,305 @@ func captureScreenshot(
         return (nil, "Failed to write screenshot: \(error.localizedDescription)")
     }
 
-    // Try SCK first when we have a target pid.
-    if let pid,
-       #available(macOS 14.0, *),
-       CGPreflightScreenCaptureAccess(),
-       !screenCaptureKitDisabledForProcess {
-        let (screenshot, warning) = captureViaScreenCaptureKit(
-            pid: pid,
-            outputPath: outputPath,
-            expectedTitle: expectedTitle,
-            expectedFrame: rect,
-            includeBase64: includeBase64
-        )
-        if let screenshot {
-            return (screenshot, nil)
-        }
-        if let warning {
-            // SCK explicitly failed; fall through to screencapture shell-out.
-            trace("screenshot:sck-failed reason=\(warning)")
-        }
-    } else if pid != nil {
-        trace("screenshot:sck-skipped unavailable-for-process")
-    }
-
-    // Fallback: /usr/sbin/screencapture with -l<windowID>. Captures ONLY
-    // the targeted window's content even if other windows overlap it on
-    // screen — critical for computer-use, where the model must see the
-    // targeted app and not whatever happens to be on top of it on the
-    // user's real desktop. We only fall back to -R<rect> as a last
-    // resort, and even then prefer to fail loudly: a screen-rect capture
-    // would mislead the model about what it's clicking on.
-    if let pid,
-       let window = resolveOnScreenWindow(
-           pid: pid,
-           expectedTitle: expectedTitle,
-           expectedFrame: rect
-       ) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-x", "-o", "-l", String(window.windowID), outputPath]
-        do {
-            try process.run()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                return (
-                    screenshotFromOnDiskPNG(
-                        path: outputPath,
-                        includeBase64: includeBase64,
-                        captureMethod: "screencapture-window-id",
-                        exactWindowMatch: true,
-                        occludedRectFallback: false
-                    ),
-                    nil
-                )
-            }
-            trace("screenshot:screencapture-l failed exit=\(process.terminationStatus) windowID=\(window.windowID)")
-        } catch {
-            trace("screenshot:screencapture-l threw \(error.localizedDescription)")
-        }
-    }
-
-    // Last resort: /usr/sbin/screencapture -R<rect>. This DOES include
-    // overlapping windows because it's a pure screen-rect capture; we
-    // only reach here when SCK and the windowID-targeted shell-out both
-    // failed, which is rare enough that returning a possibly-confusing
-    // image is preferable to returning no image at all.
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-    var arguments = ["-x"]
-    if let rect {
-        arguments.append(
-            "-R\(Int(rect.x)),\(Int(rect.y)),\(Int(rect.width)),\(Int(rect.height))"
-        )
-    }
-    arguments.append(outputPath)
-    process.arguments = arguments
-    do {
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            return (nil, "Failed to capture screenshot (screencapture exit \(process.terminationStatus)).")
-        }
+    guard CGPreflightScreenCaptureAccess() else {
         return (
-            screenshotFromOnDiskPNG(
-                path: outputPath,
-                includeBase64: includeBase64,
-                captureMethod: "screencapture-rect",
-                exactWindowMatch: false,
-                occludedRectFallback: true
-            ),
-            nil
+            nil,
+            "Screen Recording permission is not granted to Stella, so no screenshot was taken. Allow Stella in System Settings > Privacy & Security > Screen & System Audio Recording."
         )
-    } catch {
-        return (nil, "Failed to capture screenshot: \(error.localizedDescription)")
+    }
+
+    var windowFailure: String? = nil
+    if let pid {
+        switch captureWindowImage(pid: pid, expectedTitle: expectedTitle, expectedFrame: rect) {
+        case .image(let image):
+            return finishScreenshot(
+                image,
+                outputPath: outputPath,
+                includeBase64: includeBase64,
+                captureMethod: "screen-capture-kit-window",
+                exactWindowMatch: true,
+                occludedRectFallback: false
+            )
+        case .failed(let reason):
+            trace("screenshot:window-capture-failed reason=\(reason)")
+            windowFailure = reason
+        case .unavailable(let reason):
+            // ScreenCaptureKit itself is not answering; a rect capture would
+            // wait on the same service, so report instead of waiting twice.
+            trace("screenshot:sck-unavailable reason=\(reason)")
+            return (nil, "Screenshot failed: \(reason)")
+        }
+    }
+
+    guard let rect, rect.width >= 1, rect.height >= 1 else {
+        return (nil, "Screenshot failed: \(windowFailure ?? "no window or screen area to capture")")
+    }
+    switch captureScreenRectImage(rect) {
+    case .image(let image):
+        return finishScreenshot(
+            image,
+            outputPath: outputPath,
+            includeBase64: includeBase64,
+            captureMethod: "screen-capture-kit-rect",
+            exactWindowMatch: false,
+            occludedRectFallback: true
+        )
+    case .failed(let reason), .unavailable(let reason):
+        let reasons = [windowFailure, reason].compactMap { $0 }.joined(separator: "; ")
+        return (nil, "Screenshot failed: \(reasons)")
     }
 }
 
-// `resolveOnScreenWindow(...)` now owns Stella's window-selection policy for
-// both screenshot capture and overlay targeting: prefer an exact AX title
-// match when we have one, then maximize frame overlap with the expected AX
-// window frame, then fall back to largest area.
+enum ScreenCaptureOutcome {
+    case image(CGImage)
+    /// This capture could not be made (no such window, display gone...).
+    case failed(String)
+    /// ScreenCaptureKit did not answer in time, or is cooling down after it
+    /// stopped answering; any other capture now would wait on it too.
+    case unavailable(String)
+}
 
-// Read a PNG that was just written by /usr/sbin/screencapture and turn it
-// into a Screenshot value. Failure here is non-fatal: callers fall back to
-// returning a Screenshot with only the path populated. `nil` is returned
-// only if the file genuinely cannot be opened.
-//
-// Apply the same SCREENSHOT_MAX_LONG_EDGE cap the SCK path uses so the
-// fallback shell-out doesn't ship a 5 MB retina PNG into the prompt.
-func screenshotFromOnDiskPNG(
-    path: String,
+private struct ScreenCaptureFailure: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+private final class ScreenCaptureResultBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Result<CGImage, Error>?
+    func set(_ result: Result<CGImage, Error>) {
+        lock.lock(); defer { lock.unlock() }
+        if value == nil { value = result }
+    }
+    func get() -> Result<CGImage, Error>? {
+        lock.lock(); defer { lock.unlock() }
+        return value
+    }
+}
+
+// Runs one ScreenCaptureKit request with a deadline. The first request in a
+// helper gets a longer budget because it may have to wait for replayd to
+// launch; later ones normally finish in well under 150 ms. A request that
+// misses its deadline fails only that capture: after two in a row the gate
+// pauses briefly so a wedged replayd costs one quick error per call rather
+// than a full wait, and it always tries again afterwards. (The old code
+// disabled ScreenCaptureKit for the helper's whole life after one slow call
+// and shelled out to /usr/sbin/screencapture for every capture after that.)
+private final class ScreenCaptureKitGate: @unchecked Sendable {
+    static let shared = ScreenCaptureKitGate()
+
+    private let lock = NSLock()
+    private var hasAnswered = false
+    private var consecutiveTimeouts = 0
+    private var pausedUntil: Date?
+
+    private let firstDeadline: TimeInterval = 4.0
+    private let deadline: TimeInterval = 2.0
+    private let pauseAfterTimeouts = 2
+    private let pauseDuration: TimeInterval = 15.0
+
+    func run(
+        _ label: String,
+        _ body: @escaping @Sendable () async throws -> CGImage
+    ) -> ScreenCaptureOutcome {
+        lock.lock()
+        if let pausedUntil, pausedUntil > Date() {
+            lock.unlock()
+            return .unavailable("ScreenCaptureKit stopped responding; screenshots resume within \(Int(pauseDuration)) seconds")
+        }
+        let budget = hasAnswered ? deadline : firstDeadline
+        lock.unlock()
+
+        let box = ScreenCaptureResultBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        let task = Task.detached {
+            do {
+                box.set(.success(try await body()))
+            } catch {
+                box.set(.failure(error))
+            }
+            semaphore.signal()
+        }
+        let started = Date()
+        if semaphore.wait(timeout: .now() + budget) == .timedOut {
+            task.cancel()
+            lock.lock()
+            consecutiveTimeouts += 1
+            if consecutiveTimeouts >= pauseAfterTimeouts {
+                pausedUntil = Date().addingTimeInterval(pauseDuration)
+                consecutiveTimeouts = 0
+            }
+            lock.unlock()
+            return .unavailable("ScreenCaptureKit did not answer \(label) within \(Int(budget * 1000)) ms")
+        }
+        lock.lock()
+        hasAnswered = true
+        consecutiveTimeouts = 0
+        pausedUntil = nil
+        lock.unlock()
+        trace("screenshot:sck \(label) answered in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
+
+        switch box.get() {
+        case .success(let image):
+            return .image(image)
+        case .failure(let error):
+            return .failed("ScreenCaptureKit \(label) failed: \(error.localizedDescription)")
+        case nil:
+            return .failed("ScreenCaptureKit \(label) returned no image")
+        }
+    }
+}
+
+private func captureWindowImage(
+    pid: Int32,
+    expectedTitle: String?,
+    expectedFrame: Rect?
+) -> ScreenCaptureOutcome {
+    guard let preferred = resolveOnScreenWindow(
+        pid: pid,
+        expectedTitle: expectedTitle,
+        expectedFrame: expectedFrame
+    ) else {
+        return .failed("no on-screen window for pid \(pid)")
+    }
+    let windowID = preferred.windowID
+    return ScreenCaptureKitGate.shared.run("window capture") {
+        var content = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: true
+        )
+        var match = content.windows.first {
+            $0.windowID == windowID && $0.owningApplication?.processID == pid
+        }
+        if match == nil {
+            // ScreenCaptureKit's list can trail the window server for a
+            // window that just opened or changed Space; the full list has it.
+            content = try await SCShareableContent.excludingDesktopWindows(
+                false,
+                onScreenWindowsOnly: false
+            )
+            match = content.windows.first {
+                $0.windowID == windowID && $0.owningApplication?.processID == pid
+            }
+        }
+        guard let window = match else {
+            throw ScreenCaptureFailure(
+                message: "ScreenCaptureKit could not find window \(windowID) for pid \(pid)"
+            )
+        }
+        let overlays = content.windows.filter {
+            $0.owningApplication?.processID == pid &&
+                $0.isOnScreen &&
+                $0.windowID != window.windowID &&
+                $0.windowLayer > window.windowLayer &&
+                $0.frame.intersects(window.frame)
+        }
+        let display = overlays.isEmpty ? nil : content.displays.first(where: {
+            $0.frame.contains(CGPoint(x: window.frame.midX, y: window.frame.midY))
+        })
+        let filter: SCContentFilter
+        let cfg = SCStreamConfiguration()
+        if let display {
+            filter = SCContentFilter(display: display, including: [window] + overlays)
+            cfg.sourceRect = CGRect(
+                x: window.frame.minX - display.frame.minX,
+                y: window.frame.minY - display.frame.minY,
+                width: window.frame.width,
+                height: window.frame.height
+            )
+            trace("screenshot:sck composited \(overlays.count) overlay window(s) over \(window.windowID)")
+        } else {
+            filter = SCContentFilter(desktopIndependentWindow: window)
+        }
+        cfg.width = max(1, Int(window.frame.width))
+        cfg.height = max(1, Int(window.frame.height))
+        return try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: cfg
+        )
+    }
+}
+
+// Screen-area capture for when no window of the target can be captured.
+// Leaves out this helper's own windows (the action overlay), like the
+// screen a user would see without Stella's cursor drawn on it.
+private func captureScreenRectImage(_ rect: Rect) -> ScreenCaptureOutcome {
+    let target = rectToCGRect(rect)
+    let ownPid = getpid()
+    return ScreenCaptureKitGate.shared.run("screen-area capture") {
+        let content = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: true
+        )
+        let center = CGPoint(x: target.midX, y: target.midY)
+        guard let display = content.displays.first(where: { $0.frame.contains(center) })
+            ?? content.displays.max(by: {
+                $0.frame.intersection(target).width * $0.frame.intersection(target).height <
+                    $1.frame.intersection(target).width * $1.frame.intersection(target).height
+            }),
+            !display.frame.intersection(target).isNull else {
+            throw ScreenCaptureFailure(message: "no display shows \(Int(target.minX)),\(Int(target.minY)) \(Int(target.width))x\(Int(target.height))")
+        }
+        let area = display.frame.intersection(target)
+        guard area.width >= 1, area.height >= 1 else {
+            throw ScreenCaptureFailure(message: "the screen area is off every display")
+        }
+        let ownWindows = content.windows.filter { $0.owningApplication?.processID == ownPid }
+        let filter = SCContentFilter(display: display, excludingWindows: ownWindows)
+        let cfg = SCStreamConfiguration()
+        cfg.sourceRect = CGRect(
+            x: area.minX - display.frame.minX,
+            y: area.minY - display.frame.minY,
+            width: area.width,
+            height: area.height
+        )
+        cfg.width = max(1, Int(area.width.rounded()))
+        cfg.height = max(1, Int(area.height.rounded()))
+        cfg.showsCursor = false
+        return try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: cfg
+        )
+    }
+}
+
+// Cap screenshots at SCREENSHOT_MAX_LONG_EDGE on the longer side before
+// PNG-encoding. ScreenCaptureKit can hand back native retina pixels, which
+// encode to 2-5 MB and overflow downstream prompt budgets on multi-step tool
+// runs. Stella ships PNGs straight to the model, so resize in-process.
+private func finishScreenshot(
+    _ cgImage: CGImage,
+    outputPath: String,
     includeBase64: Bool,
     captureMethod: String,
     exactWindowMatch: Bool,
     occludedRectFallback: Bool
-) -> Screenshot? {
-    guard let originalData = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
-        return Screenshot(
-            mimeType: "image/png",
-            data: "",
-            path: path,
-            widthPx: nil,
-            heightPx: nil,
-            byteCount: 0,
-            captureMethod: captureMethod,
-            exactWindowMatch: exactWindowMatch,
-            occludedRectFallback: occludedRectFallback
-        )
-    }
-
-    var pngData = originalData
-    var widthPx: Int? = nil
-    var heightPx: Int? = nil
-    if let imageSource = CGImageSourceCreateWithData(originalData as CFData, nil),
-       let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
-        let resized = resizeCGImageIfLargerThan(cgImage, maxLongEdge: SCREENSHOT_MAX_LONG_EDGE)
-        if resized.width != cgImage.width || resized.height != cgImage.height {
-            if let encoded = encodePNGViaImageIO(resized) {
-                pngData = encoded
-                try? encoded.write(to: URL(fileURLWithPath: path), options: .atomic)
-            }
-        }
-        widthPx = resized.width
-        heightPx = resized.height
-    } else if let properties = CGImageSourceCreateWithData(originalData as CFData, nil)
-        .flatMap({ CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }) {
-        widthPx = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
-        heightPx = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
-    }
-    return Screenshot(
-        mimeType: "image/png",
-        data: includeBase64 ? pngData.base64EncodedString() : "",
-        path: path,
-        widthPx: widthPx,
-        heightPx: heightPx,
-        byteCount: pngData.count,
-        captureMethod: captureMethod,
-        exactWindowMatch: exactWindowMatch,
-        occludedRectFallback: occludedRectFallback
-    )
-}
-
-@available(macOS 14.0, *)
-private func captureViaScreenCaptureKit(
-    pid: Int32,
-    outputPath: String,
-    expectedTitle: String?,
-    expectedFrame: Rect?,
-    includeBase64: Bool
 ) -> (Screenshot?, String?) {
-    let semaphore = DispatchSemaphore(value: 0)
-    var capturedImage: CGImage? = nil
-    var captureError: String? = nil
-
-    let captureTask = Task.detached {
-        defer { semaphore.signal() }
-        do {
-            let content = try await SCShareableContent.excludingDesktopWindows(
-                false,
-                onScreenWindowsOnly: true
-            )
-            guard let preferredWindow = resolveOnScreenWindow(
-                pid: pid,
-                expectedTitle: expectedTitle,
-                expectedFrame: expectedFrame
-            ) else {
-                captureError = "no on-screen window for pid \(pid)"
-                return
-            }
-            guard let window = content.windows.first(where: {
-                $0.windowID == preferredWindow.windowID &&
-                    $0.owningApplication?.processID == pid &&
-                    $0.isOnScreen
-            }) else {
-                captureError = "ScreenCaptureKit could not find preferred window \(preferredWindow.windowID) for pid \(pid)"
-                return
-            }
-            let overlays = content.windows.filter {
-                $0.owningApplication?.processID == pid &&
-                    $0.isOnScreen &&
-                    $0.windowID != window.windowID &&
-                    $0.windowLayer > window.windowLayer &&
-                    $0.frame.intersects(window.frame)
-            }
-            let display = overlays.isEmpty ? nil : content.displays.first(where: {
-                $0.frame.contains(CGPoint(x: window.frame.midX, y: window.frame.midY))
-            })
-            let filter: SCContentFilter
-            let cfg = SCStreamConfiguration()
-            if let display {
-                filter = SCContentFilter(display: display, including: [window] + overlays)
-                cfg.sourceRect = CGRect(
-                    x: window.frame.minX - display.frame.minX,
-                    y: window.frame.minY - display.frame.minY,
-                    width: window.frame.width,
-                    height: window.frame.height
-                )
-                trace("screenshot:sck composited \(overlays.count) overlay window(s) over \(window.windowID)")
-            } else {
-                filter = SCContentFilter(desktopIndependentWindow: window)
-            }
-            cfg.width = Int(window.frame.width)
-            cfg.height = Int(window.frame.height)
-            capturedImage = try await SCScreenshotManager.captureImage(
-                contentFilter: filter,
-                configuration: cfg
-            )
-        } catch {
-            captureError = "ScreenCaptureKit failed: \(error.localizedDescription)"
-        }
-    }
-    if semaphore.wait(timeout: .now() + .milliseconds(750)) == .timedOut {
-        captureTask.cancel()
-        screenCaptureKitDisabledForProcess = true
-        return (nil, "ScreenCaptureKit timed out after 750ms")
-    }
-
-    if let captureError {
-        return (nil, captureError)
-    }
-    guard let cgImage = capturedImage else {
-        return (nil, "captureImage returned no image")
-    }
-
-    // Cap screenshots at SCREENSHOT_MAX_LONG_EDGE on the longer side before
-    // PNG-encoding. ScreenCaptureKit hands us native retina pixels — a
-    // 1700x1000-point window comes back as 3400x2000, which encodes to 2-5
-    // MB and overflows downstream prompt budgets on multi-step tool runs.
-    // Stella ships PNGs straight to the model, so resize in-process.
     let resized = resizeCGImageIfLargerThan(cgImage, maxLongEdge: SCREENSHOT_MAX_LONG_EDGE)
     guard let png = encodePNGViaImageIO(resized) else {
-        return (nil, "PNG encoding failed")
+        return (nil, "Screenshot failed: PNG encoding failed")
     }
     do {
         try png.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
-        trace("screenshot:sck wrote \(png.count) bytes to \(outputPath) (\(resized.width)x\(resized.height))")
-        let screenshot = Screenshot(
+    } catch {
+        return (nil, "Failed to write screenshot: \(error.localizedDescription)")
+    }
+    trace("screenshot:\(captureMethod) wrote \(png.count) bytes to \(outputPath) (\(resized.width)x\(resized.height))")
+    return (
+        Screenshot(
             mimeType: "image/png",
             data: includeBase64 ? png.base64EncodedString() : "",
             path: outputPath,
             widthPx: resized.width,
             heightPx: resized.height,
             byteCount: png.count,
-            captureMethod: "screen-capture-kit-window",
-            exactWindowMatch: true,
-            occludedRectFallback: false
-        )
-        return (screenshot, nil)
-    } catch {
-        return (nil, "PNG write failed: \(error.localizedDescription)")
-    }
+            captureMethod: captureMethod,
+            exactWindowMatch: exactWindowMatch,
+            occludedRectFallback: occludedRectFallback
+        ),
+        nil
+    )
 }
-
-private var screenCaptureKitDisabledForProcess = false
 
 private let SCREENSHOT_MAX_LONG_EDGE: Int = {
     if let raw = ProcessInfo.processInfo.environment["STELLA_COMPUTER_SCREENSHOT_MAX_LONG_EDGE"],

@@ -21,13 +21,7 @@ const assertLimit = (maxBytes: number): void => {
   }
 };
 
-/**
- * Read a request body without trusting Content-Length as the only bound.
- *
- * Workers have considerably less isolate memory than the largest accepted
- * HTTP request. Every caller that intends to buffer a body must therefore
- * stop the stream as soon as its own route limit is crossed.
- */
+// Workers have considerably less isolate memory than the largest accepted HTTP request.
 export const readBoundedRequestBytes = async (
   request: Request,
   maxBytes: number,

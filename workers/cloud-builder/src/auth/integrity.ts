@@ -1,21 +1,3 @@
-/**
- * Mobile app integrity and web Turnstile proofs for the sign-in endpoints.
- *
- * Native apps run no CAPTCHA: iOS App Attest or Android Play Integrity vouch
- * for an unmodified app on a real device, bound to a one-time nonce from
- * `POST /api/auth/integrity/challenge`. Web clients answer Turnstile instead.
- *
- * `STELLA_APP_INTEGRITY_MODE=off` (dev, and production until App Attest and
- * Play Integrity are configured) cannot tell a real app from a script, so it
- * passes native requests unverified. With `TURNSTILE_SECRET_KEY` set, browser
- * requests (website, web chat, and the desktop app, whose requests carry a
- * browser-style origin) must still answer Turnstile; an unverified proof does
- * not stand in for it.
- *
- * App Attest is verified with `@peculiar/x509` and WebCrypto: `node-app-attest`
- * depends on Node streams (through `cbor`) that do not load in workerd.
- */
-
 import {
   APP_INTEGRITY_HEADER,
   APP_INTEGRITY_NONCE_TTL_MS,

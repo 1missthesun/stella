@@ -1,11 +1,3 @@
-/**
- * Whether a signed-in session was signed out, for every door that accepts a
- * Stella JWT or a socket ticket minted from one. The owner's OwnerGate holds
- * the state (`account` domain); other objects and the worker read it through
- * a per-isolate cache, so a revoked JWT is refused everywhere within
- * REVOCATION_CACHE_MS of the sign-out.
- */
-
 import type { VerifiedToken, VerifyResult } from "./auth-jwt.js";
 import { log, withInfrastructureDeadline } from "./build-session/shared/keys.js";
 import { ownerGateStub } from "./rpc-release.js";
@@ -33,14 +25,7 @@ export const sessionRevokedBy = (
 };
 
 const REVOCATION_CACHE_MS = 5_000;
-// An OwnerGate that has to start up first (it sleeps when idle) takes 3-6 s to
-// answer; clients wait 10 s for a socket ticket, so the lookup waits for it
-// rather than refusing every request that arrives while it wakes.
 const REVOCATION_LOOKUP_TIMEOUT_MS = 8_000;
-// When the OwnerGate can't answer in time, the revocations this isolate read
-// within this window still stand in for them. A sign-out made in this isolate
-// clears its copy, the OwnerGate closes the sockets of a signed-out session
-// itself, and owner calls are still checked there.
 const REVOCATION_STALE_FALLBACK_MS = 10 * 60_000;
 const CACHE_MAX = 10_000;
 const cache = new Map<string, { revocations: SessionRevocations; fetchedAtMs: number }>();
@@ -70,9 +55,6 @@ const ownerSessionRevocations = async (
       "session revocation lookup timed out",
     );
   } catch (error) {
-    // For a few minutes after a deploy, an OwnerGate still running code from
-    // before sign-out revocation existed answers without this method. That
-    // code never recorded a revocation, so it has none to report.
     if (isMissingRevocationMethod(error)) return NO_REVOCATIONS;
     const known = cache.get(ownerId);
     if (known && Date.now() - known.fetchedAtMs < REVOCATION_STALE_FALLBACK_MS) {
@@ -97,7 +79,6 @@ export const ownerGateRevocations =
   (ownerId) =>
     ownerSessionRevocations(env, ownerId);
 
-/** Refuses a verified token, or a ticket minted from one, whose session was signed out. */
 export const admitSession = async (
   token: VerifiedToken,
   revocations: RevocationSource,
@@ -117,7 +98,6 @@ export const admitSession = async (
     : { ok: true, token };
 };
 
-/** Records a sign-out at the owner object, which also closes the sockets it reaches. */
 export const revokeOwnerSessions = async (
   env: Pick<Cloudflare.Env, "OWNER_GATES">,
   ownerId: string,

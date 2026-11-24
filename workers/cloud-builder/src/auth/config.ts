@@ -20,7 +20,6 @@ const localDevOriginsEnabled = (env: unknown): boolean => configured(env, "STELL
 export const websiteUrl = (env: unknown): string =>
   (configured(env, "STELLA_WEBSITE_URL") ?? DEFAULT_WEBSITE_URL).replace(/\/+$/, "");
 
-/** Origins of Stella's own browser-hosted clients; both auth and CORS trust exactly these. */
 export const browserClientOrigins = (env: unknown): string[] => [
   websiteUrl(env),
   DEFAULT_WEBSITE_URL,
@@ -32,18 +31,11 @@ export const browserClientOrigins = (env: unknown): string[] => [
 export const testAccountsEnabled = (env: unknown): boolean => configured(env, "STELLA_TEST_ACCOUNTS") === "1";
 
 const DAY_SECONDS = 24 * 60 * 60;
-/** Session lifetime and sliding-refresh age; `fast-token.ts` mirrors Better Auth's refresh rule with these. */
 export const SESSION_EXPIRES_IN_SECONDS = 7 * DAY_SECONDS;
 export const SESSION_UPDATE_AGE_SECONDS = DAY_SECONDS;
 export const STELLA_JWT_AUDIENCE = "stella";
-/** Better Auth's `jwt.expirationTime` ("15m"), in seconds for the fast path. */
 export const STELLA_JWT_TTL_SECONDS = 15 * 60;
 
-/**
- * Stella's own claims in a user JWT. Better Auth's jwt() plugin and the
- * `/api/auth/token` fast path (fast-token.ts) both build them here, so the two
- * can never mint different tokens for the same session.
- */
 export const stellaJwtClaims = (
   env: unknown,
   user: { isAnonymous?: unknown; identityLevel?: unknown; email?: string | null },
@@ -88,7 +80,6 @@ export type OutgoingEmail = {
   replyTo?: string;
 };
 
-/** Sends through the Cloudflare Email Service binding, falling back to Resend. */
 export const sendEmail = async (env: AuthEnv, message: OutgoingEmail): Promise<"cloudflare" | "resend"> => {
   const binding = (env as { EMAIL?: SendEmail }).EMAIL;
   const cloudflareFrom = binding ? configured(env, "STELLA_EMAIL_FROM") : undefined;

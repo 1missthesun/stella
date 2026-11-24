@@ -29,11 +29,6 @@ export const verifyCaller = async (env: CallerEnv, token: string): Promise<Verif
 export const requireCaller = (request: Request, env: CallerEnv): Promise<VerifiedCaller> =>
   verifyCaller(env, bearerCredential(request.headers.get("authorization")) ?? "");
 
-/**
- * Verifies the JWT signature and claims locally without a remote revocation
- * lookup. Use only when the very next hop is the caller's own OwnerGate DO,
- * which enforces `callerSessionRevoked` authoritatively against local SQLite.
- */
 export const verifySignedCaller = async (env: CallerEnv, token: string): Promise<VerifiedCaller> => {
   if (!token) {
     return { ok: false, error: new RpcError("UNAUTHENTICATED", "Sign in to continue.") };

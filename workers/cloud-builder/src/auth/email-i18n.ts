@@ -1,14 +1,3 @@
-/**
- * Email-only translation strings. Kept separate from the desktop
- * renderer's i18n catalogs because the backend can't import from
- * `desktop/src/`. Mirrors the same supported-locale set so the user's
- * stored locale (BCP-47) maps to a copy bundle here.
- *
- * Keys are intentionally minimal — only what the email templates
- * actually render. New surfaces should add their own bundle next to
- * this one, not extend the magic-link strings.
- */
-
 type EmailStrings = {
   signInTitle: string;
   signInDescription: string;

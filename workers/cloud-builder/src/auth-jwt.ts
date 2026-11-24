@@ -1,23 +1,3 @@
-/**
- * Verifying a user's Stella JWT inside workerd.
- *
- * This is the user-authenticated door into this worker, so the rules it
- * enforces are written out rather than implied:
- *
- * - RS256 only, under this worker's own Better Auth keys (src/auth/), read
- *   in process with `auth.api.getJwks()`.
- * - `iss` must equal this worker's public URL (CLOUD_BUILDER_PUBLIC_URL) and
- *   `aud` must be "stella". A token minted for some other audience is not a
- *   login here.
- * - The owner id is `sub`, the Better Auth user id.
- *
- * An unknown `kid` refetches the keys at most once per JWKS_MIN_REFETCH_MS,
- * so a key rotation does not lock out every signed-in user. Each request loads
- * the keys itself under a deadline: a load promise shared across requests is
- * bound to the request that started it, and never settles for the others once
- * that request is cancelled.
- */
-
 import type { IdentityLevel } from "@stella/contracts/gateway/api";
 import { CLOCK_SKEW_S, JWKS_MIN_REFETCH_MS } from "./conversation-types.js";
 import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
@@ -187,11 +167,6 @@ const userKey = async (env: Cloudflare.Env, kid: string): Promise<CryptoKey | nu
   return (await loadUserKeys(env)).keys.get(kid) ?? null;
 };
 
-/**
- * A token whose session was signed out is refused like an invalid one.
- * `revocations` defaults to the owner object's state through the isolate
- * cache; code running inside the owner object passes its own store.
- */
 export const verifyUserToken = async (
   token: string,
   env: Cloudflare.Env,

@@ -43,9 +43,6 @@ for (const argument of process.argv.slice(2)) {
 }
 
 // Bun 1.4 discovers parent workspaces before creating a missing nested lock.
-// Refresh outside the monorepo so the image lock is generated from only the
-// staged production workspace rather than accidentally rewriting the root
-// lock. Ordinary image preparation still targets .image for Docker.
 if (refreshLock && !customOutput) {
   imageRoot = await mkdtemp(path.join(tmpdir(), "stella-image-lock-refresh-"));
   customOutput = true;
@@ -263,13 +260,8 @@ const runBunLockCommand = ({ frozen }) => {
 
 const stagedLockPath = path.join(imageRoot, "bun.lock");
 if (refreshLock) {
-  // Refresh is intentionally explicit: ordinary builds never consult registry
-  // state to choose a dependency version. The generated lock is scoped to the
-  // staged manifest rather than copying the monorepo's lockfile, and starts
-  // from the checked-in one so only what the manifest changed moves. Bun 1.4
-  // does not emit a new lockfile when --production and --lockfile-only are
-  // combined, so the lock records every staged dependency while the Docker
-  // install still uses --production.
+  // Bun 1.4 does not emit a new lockfile when --production and --lockfile-only
+  // are combined.
   await cp(sourceLockPath, stagedLockPath);
   runBunLockCommand({ frozen: false });
   await cp(stagedLockPath, sourceLockPath);

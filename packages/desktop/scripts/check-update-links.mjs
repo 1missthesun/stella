@@ -19,13 +19,6 @@
 //                     planned and merged the way Get does
 //   --apply           finally fast-forward the checkout to the merged change
 //                     (throwaway installs only: it moves the checkout's HEAD)
-//
-// Steps: the update check's build on a scratch copy (packages linked in), the
-// background merge on a scratch worktree (linked, typechecked, removed), a
-// leftover scratch with live links cleared, linking refused (the check falls
-// back to a task), and with --draft / --apply the rest. After each, the
-// checkout's packages must all still be there: on Windows a junction followed
-// by `git worktree remove` or fs.rmSync deletes them. Exit code 0 = all passed.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -49,7 +42,6 @@ const report = (step, ok, data = {}) => {
   console.log(JSON.stringify({ step, ok, ...data }));
 };
 
-// The app's own modules, bundled from the checkout under test.
 const { build } = await import(pathToFileURL(path.join(app, "node_modules", "esbuild", "lib", "main.js")).href);
 const source = path.join(app, "packages", "desktop", "electron", "services", "app-source");
 // Never fs.rmSync here: on Windows it follows a junction a failed run left
@@ -89,8 +81,6 @@ await build({
 });
 m = await import(pathToFileURL(bundle).href);
 
-// What has to survive every step: the checkout's packages and the sources its
-// workspace links point at.
 const sentinels = [
   "node_modules/typescript-7/package.json",
   "node_modules/esbuild/package.json",
@@ -118,9 +108,6 @@ const intact = () => {
 const git = (args, cwd = app) => m.git(cwd, args).then((out) => out.trim());
 const head = await git(["rev-parse", "HEAD"]);
 
-// Whether this process could make the plain directory symlink that used to
-// fail (needs admin rights or Developer Mode on Windows), and the link Stella
-// makes now.
 const probeDir = path.join(scratchBase, "probe");
 fs.mkdirSync(path.join(probeDir, "target"), { recursive: true });
 let plainSymlink;
@@ -146,8 +133,6 @@ if (!intact().intact) {
   process.exit(1);
 }
 
-// A change the way another computer's arrives: a commit on top of HEAD
-// (or the one --change names).
 const identity = ["-c", "user.name=Stella", "-c", "user.email=contact@fromyou.ai"];
 const makeChange = () => {
   const index = path.join(scratchBase, "change.index");
@@ -171,8 +156,6 @@ const makeChange = () => {
 };
 const change = changeRef ? await git(["rev-parse", "--verify", `${changeRef}^{commit}`]) : makeChange();
 
-// What Get does first: plan it, and for a clean merge make the merge commit
-// the check then builds.
 const plan = await m.classifyUpdate(app, head, change);
 let target = plan.kind === "fast-forward" ? plan.tip : null;
 if (plan.kind === "clean") {
@@ -185,8 +168,6 @@ report("change planned", plan.kind !== "none", {
   ...(plan.kind === "conflict" ? { conflicts: plan.conflicts } : {}),
 });
 
-// 1. The update check: build main and preload on a scratch copy with the
-//    packages linked in, then remove it.
 {
   const scratch = path.join(scratchBase, "update-merge");
   const startedAt = Date.now();
@@ -207,8 +188,6 @@ report("change planned", plan.kind !== "none", {
   });
 }
 
-// 2. The merge prepared before a change is offered: a scratch git worktree,
-//    packages linked, typechecked, then removed links first.
 let merged = target;
 {
   const dir = path.join(scratchBase, "update-merge-prepare-merge");
@@ -242,8 +221,6 @@ let merged = target;
   });
 }
 
-// 3. A scratch copy left with live links (Stella quit mid-check) is cleared
-//    without touching what the links point at.
 {
   const dir = path.join(scratchBase, "update-merge-leftover");
   const target = path.join(scratchBase, "leftover-target");
@@ -257,8 +234,6 @@ let merged = target;
   report("leftover links removed, never followed", kept && !fs.existsSync(dir), { kept, scratchLeft: fs.existsSync(dir) });
 }
 
-// 4. Linking refused (another drive, a policy, antivirus): the check says so
-//    and the change goes to a task instead of failing with EPERM.
 {
   const scratch = path.join(scratchBase, "update-merge-refused");
   const symlink = fs.promises.symlink;
@@ -281,8 +256,6 @@ let merged = target;
   });
 }
 
-// 5. A draft as a task makes one: worktree, packages prepared (linked where
-//    that is safe, its own install on Windows), removed the way Stella does.
 if (withDraft) {
   const draft = path.join(scratchBase, "draft-links-check");
   const startedAt = Date.now();
@@ -311,7 +284,6 @@ if (withDraft) {
   });
 }
 
-// 6. Apply: the checkout moves to the merged change (throwaway installs only).
 if (withApply && merged) {
   await git(["merge", "--ff-only", "-q", merged]);
   const now = await git(["rev-parse", "HEAD"]);

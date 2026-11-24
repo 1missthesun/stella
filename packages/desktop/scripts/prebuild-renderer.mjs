@@ -10,8 +10,6 @@ const bestEffort = args.includes("--best-effort");
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..", "..", "..");
 
-// Re-exec under Bun when invoked via Node (e.g. `node prepare-install.mjs`),
-// since the source modules are TypeScript and installed launchers already run Bun.
 if (typeof globalThis.Bun === "undefined") {
   const bunBin = process.env.STELLA_BUN_PATH?.trim() || "bun";
   const result = spawnSync(bunBin, [scriptPath, ...args], {

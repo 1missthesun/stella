@@ -123,9 +123,7 @@ if (!force && existsSync(binaryPath)) {
       );
       process.exit(0);
     }
-  } catch {
-    // Missing/stale local metadata falls through to a verified refresh.
-  }
+  } catch {}
 }
 
 const artifactResponse = await fetch(asset.url);

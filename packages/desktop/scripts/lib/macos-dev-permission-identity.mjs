@@ -9,9 +9,6 @@ import {
 import path from "node:path";
 
 const DEV_APP_NAME = "Stella";
-// Development runs under a distinct bundle id so dev TCC/LaunchServices grants
-// never pollute the installed app's com.stella.app row; only the ad-hoc dev
-// bundle diverges.
 const DEV_BUNDLE_ID = "com.stella.app.dev";
 const SPEECH_RECOGNITION_USAGE_DESCRIPTION =
   "Stella turns your dictation into text on this Mac.";

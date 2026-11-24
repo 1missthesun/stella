@@ -412,11 +412,6 @@ if (manifest.schemaVersion !== 1) {
 const asset = manifest.assets?.[platformKey];
 if (!asset) {
   if (platformKey.startsWith("linux-")) {
-    // No native helpers are built for Linux yet (computer use, dictation
-    // bridge, meeting capture are darwin/win-only). Produce an empty install
-    // marker so packaging steps that expect native/out/<dir> to exist and
-    // carry .stella-native-helpers.json still work; the app resolves absent
-    // helpers to null at runtime.
     await mkdir(outDir, { recursive: true });
     writeFileSync(
       installManifestPath,

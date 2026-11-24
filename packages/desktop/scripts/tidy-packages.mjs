@@ -19,7 +19,6 @@ import { isEntryPoint } from "../../../scripts/lib/entry-point.mjs";
 
 const lstat = (file) => fs.lstatSync(file, { throwIfNoEntry: false });
 
-/** A copy the launcher installed: its root holds the launcher's lock and runtimes. */
 export const isLauncherInstall = (appRoot) => {
   let dir = path.resolve(appRoot);
   for (let up = 0; up < 3; up += 1) {
@@ -29,11 +28,6 @@ export const isLauncherInstall = (appRoot) => {
   return false;
 };
 
-/**
- * On a Mac the launcher runs Stella from its own signed Stella.app, so the
- * Electron binary in node_modules is never used (unless a developer asked
- * the launcher for a local unsigned copy, which is built from it).
- */
 export const usesSignedElectron = (appRoot) =>
   process.platform === "darwin" &&
   process.env.STELLA_LAUNCHER_UNSIGNED_ELECTRON?.trim() !== "1" &&
@@ -64,7 +58,6 @@ const workspaceDirs = (root, manifest) => {
   return dirs.filter((dir) => fs.existsSync(path.join(root, dir, "package.json")));
 };
 
-/** bunfig's `[install] dev = false` (or production = true): the install left devDependencies out. */
 const installsDev = (root) => {
   let text = "";
   try {
@@ -86,7 +79,6 @@ const wantedNames = (manifest, withDev) =>
     ...(withDev ? Object.keys(manifest.devDependencies ?? {}) : []),
   ]);
 
-/** Top-level entries of a node_modules folder, scoped names included. */
 const entriesOf = (modules) => {
   const out = [];
   let names;
@@ -118,7 +110,6 @@ const unlinkLink = (file) => {
   }
 };
 
-/** Deletes a folder without ever following a link out of it (Windows junctions included). */
 const removeWalk = (entry) => {
   const stat = lstat(entry);
   if (!stat) return;
@@ -140,7 +131,6 @@ const removeWalk = (entry) => {
   fs.rmdirSync(entry);
 };
 
-/** Scope folders (`@scope`) a removal left empty. */
 const removeEmptyScopes = (modules) => {
   let names = [];
   try {
@@ -193,13 +183,10 @@ export const tidyPackages = (appRoot, { dryRun = false, force = false } = {}) =>
   if (!force && !dryRun) {
     try {
       if (fs.readFileSync(stamp, "utf8").trim() === print) return { ...result, skipped: "already tidy" };
-    } catch {
-      // Never tidied.
-    }
+    } catch {}
   }
   const withDev = installsDev(root);
 
-  // 1. Top-level links no manifest asks for.
   const roots = [];
   for (const dir of ["", ...dirs]) {
     const own = dir ? readJson(path.join(root, dir, "package.json")) : manifest;
@@ -215,7 +202,6 @@ export const tidyPackages = (appRoot, { dryRun = false, force = false } = {}) =>
     }
   }
 
-  // 2. Every package in the store those links reach.
   const storeReal = fs.realpathSync(store);
   const all = fs.readdirSync(store).filter((name) => name !== "node_modules" && !name.startsWith("."));
   const known = new Set(all);
@@ -241,12 +227,10 @@ export const tidyPackages = (appRoot, { dryRun = false, force = false } = {}) =>
     for (const dep of entriesOf(path.join(store, entry, "node_modules"))) if (dep.link) visit(dep.file);
   }
   const orphans = all.filter((name) => !reached.has(name));
-  // A layout this doesn't understand would show almost everything unreached.
   if (reached.size === 0 || orphans.length > all.length * 0.8) {
     return { ...result, skipped: `unexpected layout (${reached.size} of ${all.length} reached)` };
   }
 
-  // 3. Remove them, and the hoisting links that pointed at them.
   for (const name of orphans) {
     const dir = path.join(store, name);
     result.packages += 1;
@@ -254,9 +238,7 @@ export const tidyPackages = (appRoot, { dryRun = false, force = false } = {}) =>
     if (!dryRun) {
       try {
         removeWalk(dir);
-      } catch {
-        // In use (Windows) or already gone: the next tidy tries again.
-      }
+      } catch {}
     }
   }
   if (!dryRun) {
@@ -267,7 +249,6 @@ export const tidyPackages = (appRoot, { dryRun = false, force = false } = {}) =>
     removeEmptyScopes(path.join(store, "node_modules"));
   }
 
-  // 4. Electron's own binary, when the launcher's signed app runs Stella.
   if (usesSignedElectron(root)) {
     try {
       const electron = fs.realpathSync(path.join(root, "node_modules", "electron"));
@@ -279,17 +260,13 @@ export const tidyPackages = (appRoot, { dryRun = false, force = false } = {}) =>
           fs.rmSync(path.join(electron, "path.txt"), { force: true });
         }
       }
-    } catch {
-      // No Electron package.
-    }
+    } catch {}
   }
 
   if (!dryRun) {
     try {
       fs.writeFileSync(stamp, print);
-    } catch {
-      // No git folder: tidy again next time.
-    }
+    } catch {}
   }
   return result;
 };

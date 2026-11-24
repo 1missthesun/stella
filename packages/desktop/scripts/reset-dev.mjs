@@ -26,9 +26,7 @@ const resetMacPermissions = () => {
       try {
         execFileSync('tccutil', ['reset', service], { stdio: 'ignore' });
         resetPairs.push(`${service}:ALL_APPS`);
-      } catch {
-        // No-op if the reset fails on this machine.
-      }
+      } catch {}
       continue;
     }
 
@@ -36,9 +34,7 @@ const resetMacPermissions = () => {
       try {
         execFileSync('tccutil', ['reset', service, bundleId], { stdio: 'ignore' });
         resetPairs.push(`${service}:${bundleId}`);
-      } catch {
-        // Some services may be unsupported or absent for a given identity.
-      }
+      } catch {}
     }
   }
 

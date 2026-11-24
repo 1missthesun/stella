@@ -138,6 +138,35 @@ const parseSealed = (value: unknown): Record<string, SavedValueSeal> => {
   return value as Record<string, SavedValueSeal>;
 };
 
+/**
+ * A device that comes back with a new key (a phone restored from a backup, a
+ * reinstall) can't open what was sealed to its old one. Its seals are dropped,
+ * so every record now lacks it as a recipient and the next device that holds
+ * the record seals it again, at the same version, to the new key.
+ */
+const dropSealsFor = (ctx: OwnerContext, deviceId: string) => {
+  const rows = ctx.db.all<RecordRow>(
+    "SELECT * FROM saved_value_records WHERE deleted = 0 AND recipients LIKE ?",
+    `%${JSON.stringify(deviceId)}%`,
+  );
+  for (const row of rows) {
+    const recipients = (JSON.parse(row.recipients) as string[]).filter((id) => id !== deviceId);
+    let sealed: Record<string, SavedValueSeal> = {};
+    try {
+      sealed = row.sealed ? (JSON.parse(row.sealed) as Record<string, SavedValueSeal>) : {};
+    } catch {
+      sealed = {};
+    }
+    delete sealed[deviceId];
+    ctx.db.run(
+      "UPDATE saved_value_records SET recipients = ?, sealed = ? WHERE id = ?",
+      JSON.stringify(recipients),
+      JSON.stringify(sealed),
+      row.id,
+    );
+  }
+};
+
 const putDevice = (
   ctx: OwnerContext,
   args: SavedValueCalls["savedValues.putDevice"]["args"],
@@ -147,6 +176,11 @@ const putDevice = (
   if (!BASE64URL.test(args.publicKey) || args.publicKey.length !== 43) {
     throw new RpcError("BAD_REQUEST", "publicKey must be a raw X25519 key, base64url.");
   }
+  const known = ctx.db.one<{ public_key: string }>(
+    "SELECT public_key FROM saved_value_devices WHERE device_id = ?",
+    args.deviceId,
+  );
+  if (known && known.public_key !== args.publicKey) dropSealsFor(ctx, args.deviceId);
   const existing = ctx.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM saved_value_devices WHERE device_id != ?", args.deviceId);
   if ((existing?.n ?? 0) >= SAVED_VALUES_MAX_DEVICES) {
     // The device seen longest ago makes room; it gets values again when it comes back.

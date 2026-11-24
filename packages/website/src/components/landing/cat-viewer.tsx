@@ -66,12 +66,21 @@ export function CatViewer({ active, className }: { active: boolean; className?: 
     let disposed = false;
     let raf = 0;
     let inView = false;
-    const renderer = new Renderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-      dpr: Math.min(window.devicePixelRatio || 1, 2),
-    });
+    // Without WebGL (blocklisted GPU, disabled in settings) ogl's constructor throws; an uncaught
+    // throw here takes the whole page down, so keep the poster instead.
+    let renderer: Renderer;
+    try {
+      renderer = new Renderer({
+        canvas,
+        alpha: true,
+        antialias: true,
+        dpr: Math.min(window.devicePixelRatio || 1, 2),
+      });
+      if (!renderer.gl) throw new Error("no webgl");
+    } catch {
+      canvas.dataset.failed = "1";
+      return;
+    }
     const gl = renderer.gl;
     gl.clearColor(0, 0, 0, 0);
     const camera = new Camera(gl, { fov: 30 });

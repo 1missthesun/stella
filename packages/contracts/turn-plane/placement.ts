@@ -298,6 +298,8 @@ export const DEVICE_TERMINAL_RESULT_MAX_BYTES = 1_000_000;
 export type DeviceAvailability = {
   ready: boolean;
   capabilities: ExecutionCapability[];
+  /** Signed in to Google Antigravity, the Gemini models its account has, once known. */
+  antigravityModels?: string[];
 };
 
 export type AgentMessageDeviceOutcome =

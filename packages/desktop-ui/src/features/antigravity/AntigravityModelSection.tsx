@@ -25,12 +25,13 @@ export function AntigravityModelSection({
   destination: ModelDestination;
   computers: readonly OtherComputer[];
   selected: boolean;
-  children: ReactNode;
+  /** Draws the models, given the ones its account reports, if it has. */
+  children: (models: readonly string[] | undefined) => ReactNode;
 }) {
   if (destination.kind !== "here") {
     return (
       <EnginePlace destination={destination} plan="antigravity" selected={selected}>
-        {children}
+        {children(destination.antigravityModels)}
       </EnginePlace>
     );
   }
@@ -42,12 +43,12 @@ function AntigravityHere({
   children,
 }: {
   computers: readonly OtherComputer[];
-  children: ReactNode;
+  children: (models: readonly string[] | undefined) => ReactNode;
 }) {
   const t = useT();
   const antigravity = useAntigravity();
   const { status, signIn, start } = antigravity;
-  if (!status || status.signedIn) return <>{children}</>;
+  if (!status || status.signedIn) return <>{children(status?.models)}</>;
   if (signIn.state !== "idle") {
     return (
       <div className="antigravity-picker-prompt">

@@ -1,3 +1,4 @@
+import { antigravityModelsOf } from "@stella/contracts/engine-model-catalog";
 import {
   DEVICE_PRESENCE_PROOF_PREFIX,
   type DeviceAvailability,
@@ -100,6 +101,13 @@ export const withReleasedClientSelectability = (
   return { ...availability, chatSlots: selectable, agentSlots: selectable };
 };
 
+const antigravityModelsField = (
+  reported: unknown,
+): Pick<DeviceAvailability, "antigravityModels"> => {
+  const antigravityModels = antigravityModelsOf(reported);
+  return antigravityModels.length > 0 ? { antigravityModels } : {};
+};
+
 export const parseAvailability = (
   value: unknown,
 ): DeviceAvailability | null => {
@@ -111,6 +119,7 @@ export const parseAvailability = (
   return {
     ready: value.ready,
     capabilities: knownExecutionCapabilities(value.capabilities),
+    ...antigravityModelsField(value.antigravityModels),
   };
 };
 
@@ -121,6 +130,7 @@ export type PresenceRow = {
   connected: number;
   ready: number;
   capabilities: string;
+  antigravity_models?: string | null;
   protocol_version: number;
   last_seen_at: number;
 };
@@ -131,6 +141,9 @@ export const presenceState = (row: PresenceRow): DevicePresenceState => ({
   connected: row.connected === 1,
   ready: row.ready === 1,
   capabilities: JSON.parse(row.capabilities) as ExecutionCapability[],
+  ...antigravityModelsField(
+    row.antigravity_models ? JSON.parse(row.antigravity_models) : undefined,
+  ),
   protocolVersion: row.protocol_version,
   lastSeenAt: row.last_seen_at,
 });
@@ -157,6 +170,7 @@ export const deviceDestination = (
           availability: withReleasedClientSelectability({
             ready: online && presence.ready,
             capabilities: presence.capabilities,
+            ...antigravityModelsField(presence.antigravityModels),
           }),
           lastSeenAt: presence.lastSeenAt,
         }

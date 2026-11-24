@@ -144,6 +144,7 @@ const transportFor = (session: OpenSession, runtime: ReturnType<typeof createAnt
         onEvent: (event) => spec.onEvent(event),
         onNativeToolEnd: ({ toolCallId, result, isError }) => spec.onNativeToolEnd({ toolUseId: toolCallId, result, isError }),
         onSessionId: (sessionId) => spec.onSessionId(sessionId),
+        onModelFallback: (text) => spec.onStatus({ state: "model-fallback", text }),
       });
     },
     close: (ref) => runtime.close(ref.sessionKey),

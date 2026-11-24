@@ -2,7 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Alert } from "react-native";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
-  ANTIGRAVITY_ENGINE_MODELS,
+  ANTIGRAVITY_MODEL_IDS,
+  antigravityModelInUse,
+  antigravityModelName,
+  antigravityModelOptions,
   ENGINE_MODEL_CATALOG,
   type EngineModelCatalog,
   type EngineModelOption,
@@ -93,15 +96,11 @@ const ENGINE_OWNED_PROVIDERS = new Set(["stella", "chatgpt"]);
 const COMPUTER_BRAINS: ReadonlyArray<{
   provider: ComputerOnlyProviderId;
   label: string;
-  models: readonly EngineModelOption[];
-}> = [{ provider: "antigravity", label: "Google Antigravity", models: ANTIGRAVITY_ENGINE_MODELS }];
-
-const computerModels = (provider: string): readonly EngineModelOption[] =>
-  COMPUTER_BRAINS.find((brain) => brain.provider === provider)?.models ?? [];
+}> = [{ provider: "antigravity", label: "Google Antigravity" }];
 
 /** The model a computer-only plan starts on when it is picked. */
-export const computerDefaultModel = (provider: string): string | undefined =>
-  computerModels(provider)[0]?.id;
+const computerDefaultModel = (reported: readonly string[]): string =>
+  antigravityModelOptions(reported)[0]?.id ?? ANTIGRAVITY_MODEL_IDS[0]!;
 
 type ProviderModelsState =
   | { status: "loading" }
@@ -233,6 +232,16 @@ export function useCloudModelSettings(active: boolean) {
     }
     return signedIn;
   }, [devices]);
+  // The Gemini models those computers' own accounts have, once they say.
+  const antigravityModels = useMemo(
+    () =>
+      (devices?.devices ?? []).flatMap((device) =>
+        device.online && device.availability?.capabilities.includes("antigravity")
+          ? (device.availability.antigravityModels ?? [])
+          : [],
+      ),
+    [devices],
+  );
   useEffect(() => {
     if (!liveEngines || writePending.current) return;
     const liveExecution = liveEngines.selection ?? liveEngines.execution;
@@ -419,8 +428,10 @@ export function useCloudModelSettings(active: boolean) {
       if (target.startsWith("provider:") && isComputerOnlyProviderId(target.slice("provider:".length))) {
         const provider = target.slice("provider:".length);
         const selectedId =
-          execution?.engine === "provider" && execution.provider === provider ? execution.model : null;
-        return computerModels(provider).map((model) => ({
+          execution?.engine === "provider" && execution.provider === provider
+            ? antigravityModelInUse(execution.model, antigravityModels)
+            : null;
+        return antigravityModelOptions(antigravityModels).map((model) => ({
           id: model.id,
           label: model.name,
           description: model.description,
@@ -471,13 +482,13 @@ export function useCloudModelSettings(active: boolean) {
         available: true,
       }));
     },
-    [catalog.models, engineModels, execution, providerModels],
+    [antigravityModels, catalog.models, engineModels, execution, providerModels],
   );
 
   const label = useMemo(() => {
     if (!execution) return "Stella";
     if (execution.engine === "provider" && isComputerOnlyProviderId(execution.provider)) {
-      return computerModels(execution.provider).find((model) => model.id === execution.model)?.name ?? execution.model;
+      return antigravityModelName(antigravityModelInUse(execution.model, antigravityModels));
     }
     if (execution.engine === "provider") {
       const state = providerModels[execution.provider];
@@ -492,7 +503,7 @@ export function useCloudModelSettings(active: boolean) {
       engineModelList(engineModels, execution.engine).find((model) => model.id === execution.model)
         ?.name ?? execution.model;
     return execution.engine === "anthropic" ? `Claude Code · ${name}` : name;
-  }, [catalog, engineModels, execution, providerModels]);
+  }, [antigravityModels, catalog, engineModels, execution, providerModels]);
 
   const models = useMemo(
     () => modelsFor(brainId).filter((model) => model.available),
@@ -530,6 +541,7 @@ export function useCloudModelSettings(active: boolean) {
       supportsEffortSelection,
       connectedProviders,
       computerSignIns,
+      computerDefaultModel: computerDefaultModel(antigravityModels),
       models,
       modelsFor,
       selectModel: (model: string) =>
@@ -550,6 +562,7 @@ export function useCloudModelSettings(active: boolean) {
       supportsEffortSelection,
       connectedProviders,
       computerSignIns,
+      antigravityModels,
       effort,
       engine,
       execution,

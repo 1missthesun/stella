@@ -1,3 +1,4 @@
+import { currentModelReference } from "@stella/contracts/engine-model-catalog";
 import { uiState } from "@/platform/ui-state";
 
 const STORAGE_KEY = "stella:recent-models";
@@ -9,10 +10,16 @@ export const readRecentModels = (): string[] => {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry): entry is string =>
-        typeof entry === "string" && entry.trim().length > 0,
-    );
+    return [
+      ...new Set(
+        parsed
+          .filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry.trim().length > 0,
+          )
+          .map(currentModelReference),
+      ),
+    ];
   } catch {
     return [];
   }

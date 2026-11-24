@@ -518,9 +518,8 @@ const devicesList = (db: OwnerDbReader): DevicesResponse => {
   const presence = new Map(
     db
       .all<PresenceRow>(
-        `SELECT device_id, presence_session_id, connection_id, connected, ready,
-                chat_slots, agent_slots, capabilities, protocol_version, last_seen_at
-           FROM device_presence`,
+        // Every column: the gate adds a new one only when it next wakes for a computer.
+        `SELECT * FROM device_presence`,
       )
       .map((row) => [row.device_id, presenceState(row)] as const),
   );

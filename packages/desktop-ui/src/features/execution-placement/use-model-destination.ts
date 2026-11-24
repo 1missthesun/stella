@@ -42,6 +42,8 @@ export type ModelDestination =
       place: string;
       /** The plans it can run; undefined until known (an older Stella doesn't say). */
       signedIn: readonly DeviceEngine[] | undefined;
+      /** The Gemini models its Google Antigravity account has; undefined until it says. */
+      antigravityModels?: readonly string[];
       /** Providers whose key or sign-in the account holds, so every place can use them; undefined until known. */
       accountProviders: ReadonlySet<string> | undefined;
     };
@@ -51,6 +53,7 @@ export function useOtherComputers(): {
   computers: OtherComputer[];
   labelOf: (deviceId: string) => string;
   signInsOf: (deviceId: string) => readonly DeviceEngine[] | undefined;
+  antigravityModelsOf: (deviceId: string) => readonly string[] | undefined;
 } {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
@@ -85,6 +88,8 @@ export function useOtherComputers(): {
       labelOf,
       signInsOf: (deviceId: string) =>
         deviceEngineSignIns(find(deviceId)?.availability?.capabilities),
+      antigravityModelsOf: (deviceId: string) =>
+        find(deviceId)?.availability?.antigravityModels,
     };
   }, [list, t, thisDeviceId]);
 }
@@ -98,7 +103,7 @@ export function useModelDestination(): {
   const { isCloudConversationReady } = useCloudConversationSession();
   const { hasConnectedAccount } = useAuthSessionState();
   const { state: uiState } = useUiState();
-  const { computers, labelOf, signInsOf } = useOtherComputers();
+  const { computers, labelOf, signInsOf, antigravityModelsOf } = useOtherComputers();
   const { brain } = useConversationBrain(
     conversationBrainAvailable() &&
       !isPrivate &&
@@ -139,9 +144,10 @@ export function useModelDestination(): {
       placeStart: label,
       place: label,
       signedIn: signInsOf(target.deviceId),
+      antigravityModels: antigravityModelsOf(target.deviceId),
       accountProviders,
     };
-  }, [brainLabel, engines, labelOf, providers, signInsOf, t, target]);
+  }, [antigravityModelsOf, brainLabel, engines, labelOf, providers, signInsOf, t, target]);
   return { destination, computers };
 }
 

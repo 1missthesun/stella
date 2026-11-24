@@ -85,6 +85,7 @@ export const DDL = [
      chat_slots          INTEGER NOT NULL,
      agent_slots         INTEGER NOT NULL,
      capabilities        TEXT    NOT NULL,
+     antigravity_models  TEXT,
      protocol_version    INTEGER NOT NULL,
      last_seen_at        INTEGER NOT NULL,
      updated_at          INTEGER NOT NULL

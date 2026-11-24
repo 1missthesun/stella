@@ -1,3 +1,4 @@
+import { currentModelReference } from "@stella/contracts/engine-model-catalog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Lightbulb, SlidersHorizontal } from "@/ui/icons";
 import { BrandIcon } from "@/ui/brand-icon";
@@ -99,7 +100,7 @@ export function MiniModelPicker() {
     }, [preferences]);
     const committedEngine = preferences?.agentRuntimeEngine ?? "default";
     const currentId = getActiveEngineModelId(preferences) ??
-        (overrides.orchestrator ?? overrides.general ?? "");
+        currentModelReference(overrides.orchestrator ?? overrides.general ?? "");
     const defaultModelId = useMemo(() => buildResolvedModelDefaultsMap(modelDefaults).orchestrator ??
         buildModelDefaultsMap(modelDefaults).orchestrator ??
         "", [modelDefaults]);

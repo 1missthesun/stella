@@ -1,4 +1,4 @@
-import { ANTIGRAVITY_ENGINE_MODELS } from "@stella/contracts/engine-model-catalog";
+import { antigravityModelName } from "@stella/contracts/engine-model-catalog";
 import { MODEL_SETTINGS_AGENTS } from "@stella/contracts/agent-runtime";
 import { STELLA_DEFAULT_MODEL } from "@/shared/stella-api";
 
@@ -126,8 +126,7 @@ export function getModelPickerDisplayLabel(
     return `ChatGPT · ${modelId.slice("codex-cli/".length)}`;
   }
   if (modelId.startsWith("antigravity/")) {
-    const planModel = modelId.slice("antigravity/".length);
-    return ANTIGRAVITY_ENGINE_MODELS.find((model) => model.id === planModel)?.name ?? planModel;
+    return antigravityModelName(modelId.slice("antigravity/".length));
   }
   if (modelId.startsWith("local/")) {
     const localId = modelId.slice("local/".length);

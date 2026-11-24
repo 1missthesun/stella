@@ -57,36 +57,91 @@ export const CHATGPT_ENGINE_MODELS: readonly EngineModelOption[] = [
 
 /**
  * Gemini on the user's Google Antigravity plan, run inside Google's own
- * Antigravity CLI on a computer signed in to it. Keep in step with
- * `ANTIGRAVITY_MODEL_ALIASES` in `agent/src/engine/claude-code.ts`.
+ * Antigravity CLI (`agy`) on a computer signed in to it. The models are the
+ * ones `agy` reports for that account (`antigravityModelsOf`); these stand in
+ * until it has.
  */
-export const ANTIGRAVITY_ENGINE_MODELS: readonly EngineModelOption[] = [
-  {
-    id: "gemini-4-neon",
-    name: "Gemini 4 Neon",
-    description: "Most capable · Google AI Pro or Ultra",
-  },
-  {
-    id: "gemini-4-hydrogen",
-    name: "Gemini 4 Hydrogen",
-    description: "Google AI Pro or Ultra",
-  },
-  {
-    id: "gemini-4-carbon",
-    name: "Gemini 4 Carbon",
-    description: "Google AI Ultra",
-  },
-  {
-    id: "gemini-4-argon",
-    name: "Gemini 4 Argon",
-    description: "Google AI Pro or Ultra",
-  },
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    description: "Fast · every plan",
-  },
+export const ANTIGRAVITY_MODEL_IDS: readonly string[] = [
+  "gemini-4-neon",
+  "gemini-4-carbon",
+  "gemini-4-hydrogen",
 ];
+
+/** Models Google removes from Antigravity on 2026-11-30, and what runs instead. */
+const ANTIGRAVITY_REPLACED_MODELS: Readonly<Record<string, string>> = {
+  "gemini-4-argon": "gemini-4-neon",
+  "gemini-3.8-flash": "gemini-4-hydrogen",
+};
+
+const ANTIGRAVITY_MODEL_NOTES: Readonly<Record<string, string>> = {
+  "gemini-4-neon": "Most capable",
+  "gemini-4-hydrogen": "Fast",
+};
+
+const MAX_ANTIGRAVITY_MODELS = 12;
+const ANTIGRAVITY_MODEL_ID = /^gemini-[a-z0-9][a-z0-9.-]{0,47}$/u;
+
+/** `gemini-4-neon-high` → `gemini-4-neon`: the thinking level is chosen on its own. */
+export const antigravityModelBase = (id: string): string =>
+  id.replace(/-(?:minimal|low|medium|high|xhigh|max)$/u, "");
+
+/**
+ * The Gemini models among the ones `agy` reports, in its order. Orchestrator is
+ * a pair of models (a planner handing work to another), not one.
+ */
+export const antigravityModelsOf = (reported: unknown): string[] =>
+  Array.isArray(reported)
+    ? [
+        ...new Set(
+          reported
+            .filter((id): id is string => typeof id === "string")
+            .map(antigravityModelBase)
+            .filter(
+              (id) =>
+                ANTIGRAVITY_MODEL_ID.test(id) &&
+                !id.includes("orchestrator") &&
+                !Object.hasOwn(ANTIGRAVITY_REPLACED_MODELS, id),
+            ),
+        ),
+      ].slice(0, MAX_ANTIGRAVITY_MODELS)
+    : [];
+
+/** "Gemini 4 Neon" for `gemini-4-neon`. */
+export const antigravityModelName = (id: string): string =>
+  id
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+/** The models to offer, given the ones a signed-in computer's `agy` reports. */
+export const antigravityModelOptions = (reported?: readonly string[]): EngineModelOption[] => {
+  const listed = antigravityModelsOf(reported);
+  return (listed.length > 0 ? listed : ANTIGRAVITY_MODEL_IDS).map((id) => ({
+    id,
+    name: antigravityModelName(id),
+    ...(ANTIGRAVITY_MODEL_NOTES[id] ? { description: ANTIGRAVITY_MODEL_NOTES[id] } : {}),
+  }));
+};
+
+/** The model that runs for a pick: itself, or what replaces one Google removed. */
+export const antigravityModelInUse = (model: string, reported?: readonly string[]): string => {
+  const base = antigravityModelBase(model);
+  const successor = Object.hasOwn(ANTIGRAVITY_REPLACED_MODELS, base)
+    ? ANTIGRAVITY_REPLACED_MODELS[base]!
+    : model;
+  const listed = antigravityModelsOf(reported);
+  return listed.length === 0 || listed.includes(antigravityModelBase(successor))
+    ? successor
+    : listed[0]!;
+};
+
+const ANTIGRAVITY_REF = "antigravity/";
+
+/** A whole model reference, with a removed Antigravity model read as what replaces it. */
+export const currentModelReference = (reference: string): string =>
+  reference.startsWith(ANTIGRAVITY_REF)
+    ? `${ANTIGRAVITY_REF}${antigravityModelInUse(reference.slice(ANTIGRAVITY_REF.length))}`
+    : reference;
 
 export type EngineModelCatalog = {
   claude: EngineModelOption[];

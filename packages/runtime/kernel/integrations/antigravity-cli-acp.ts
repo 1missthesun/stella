@@ -6,6 +6,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+import { antigravityModelInUse, antigravityModelName, antigravityModelsOf } from "@stella/contracts/engine-model-catalog";
 import type { ImageContent, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import {
   createClaudeCodeToolMcpHost,
@@ -21,8 +22,10 @@ import {
   antigravityCliEnv,
   antigravitySignedOutSince,
   antigravitySignInRecordFile,
+  claimAntigravityRemovalNotice,
   currentAntigravitySignIn,
   isAntigravityAuthRequired,
+  noteAntigravityModels,
   noteAntigravitySignIn,
   refreshAntigravitySignIn,
 } from "./antigravity-cli-status.js";
@@ -82,6 +85,8 @@ export type AntigravityTurnRequest = {
   onEvent(event: Record<string, unknown>): void;
   onNativeToolEnd(end: { toolCallId: string; result: string; isError: boolean }): void;
   onSessionId(sessionId: string): void;
+  /** The picked model is gone from the account, and another runs. */
+  onModelFallback(text: string): void;
 };
 
 export type AntigravityCliConfig = {
@@ -171,6 +176,22 @@ const thinkingTier = (level: ModelThinkingLevel): string => {
     default:
       return "xhigh";
   }
+};
+
+/**
+ * The model to run for a pick, and whether the pick itself is gone. Never the
+ * CLI's own current choice, which may be another company's model.
+ */
+const resolveModel = (available: readonly string[], model: string, level: ModelThinkingLevel): { wire?: string; replaced?: string } => {
+  if (!model || model === "default") {
+    const first = antigravityModelsOf(available)[0];
+    return first ? { wire: antigravityWireModel(available, first, level) } : {};
+  }
+  const successor = antigravityModelInUse(model);
+  const direct = antigravityWireModel(available, successor, level);
+  if (direct) return { wire: direct, ...(successor === model ? {} : { replaced: successor }) };
+  const listed = antigravityModelsOf(available)[0];
+  return listed ? { wire: antigravityWireModel(available, listed, level), replaced: listed } : {};
 };
 
 /** `gemini-4-neon` at `high` → `gemini-4-neon-high`, falling back to the nearest tier the account offers. */
@@ -591,7 +612,10 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const noteModels = (proc: Proc, result: any) => {
     const available = result?.models?.availableModels;
-    if (Array.isArray(available)) proc.models = available.map((model: any) => String(model?.modelId ?? "")).filter(Boolean);
+    if (Array.isArray(available)) {
+      proc.models = available.map((model: any) => String(model?.modelId ?? "")).filter(Boolean);
+      noteAntigravityModels(config.home(), proc.models);
+    }
     if (typeof result?.models?.currentModelId === "string") proc.currentModel = result.models.currentModelId;
   };
 
@@ -657,7 +681,12 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     noteAntigravitySignIn(config.home(), true);
     const sessionId = proc.sessionId!;
     request.onSessionId(sessionId);
-    const wire = antigravityWireModel(proc.models, request.model, request.thinkingLevel);
+    const { wire, replaced } = resolveModel(proc.models, request.model, request.thinkingLevel);
+    if (replaced && request.ref.role === "orchestrator" && claimAntigravityRemovalNotice(config.home(), request.model)) {
+      request.onModelFallback(
+        `Google Antigravity no longer has ${antigravityModelName(request.model)}, so Stella now uses ${antigravityModelName(replaced)} instead.`,
+      );
+    }
     if (wire && wire !== proc.currentModel) {
       await proc.rpc.request("session/set_model", { sessionId, modelId: wire });
       proc.currentModel = wire;

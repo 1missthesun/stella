@@ -17,7 +17,6 @@ import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { useT } from "../../i18n";
 import { REASONING_OPTIONS } from "../../lib/stella-model-catalog";
 import {
-  computerDefaultModel,
   type Brain,
   type ModelSettings,
 } from "../../lib/use-cloud-model-settings";
@@ -97,8 +96,7 @@ export function BrainSection({
       return;
     }
     if (brain.kind === "computer") {
-      const model = computerDefaultModel(brain.provider);
-      if (model) settings.selectProviderModel(brain.provider, model);
+      settings.selectProviderModel(brain.provider, settings.computerDefaultModel);
       return;
     }
     void settings.loadProviderModels(brain.provider.id).then((list) => {

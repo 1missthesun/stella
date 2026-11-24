@@ -821,7 +821,7 @@ export class StellaRuntimeHost {
         const [claudeCode, chatGpt, antigravity] = await Promise.all([
           this.claudeCodeSignedIn(),
           this.chatGptSignedIn(),
-          this.antigravitySignedIn(),
+          this.antigravityHere(),
         ]);
         return {
           ready: Boolean(
@@ -842,6 +842,7 @@ export class StellaRuntimeHost {
             ...(chatGpt ? (["chatgpt"] as const) : []),
             ...(antigravity ? (["antigravity"] as const) : []),
           ],
+          ...(antigravity && antigravity.models.length > 0 ? { antigravityModels: antigravity.models } : {}),
         };
       },
       runExecution: async ({ dispatch, payload, ownerGeneration }) => {
@@ -1359,13 +1360,13 @@ export class StellaRuntimeHost {
     return await this.oauthSignedIn("chatgpt");
   }
 
-  /** Whether Stella is signed in to Google Antigravity here. */
-  private async antigravitySignedIn(): Promise<boolean> {
-    const { antigravityHomeFor, knownAntigravitySignIn } = await import(
+  /** Google Antigravity here, when Stella is signed in to it, and the account's models once known. */
+  private async antigravityHere(): Promise<{ models: string[] } | null> {
+    const { antigravityHomeFor, knownAntigravityModels, knownAntigravitySignIn } = await import(
       "../kernel/integrations/antigravity-cli-status.js"
     );
-    const dataDir = this.options.initializeParams.stellaDataDirPath;
-    return knownAntigravitySignIn(antigravityHomeFor(dataDir));
+    const home = antigravityHomeFor(this.options.initializeParams.stellaDataDirPath);
+    return knownAntigravitySignIn(home) ? { models: knownAntigravityModels(home) } : null;
   }
 
   /** Which plan sign-ins this computer holds, read at most once a minute. */

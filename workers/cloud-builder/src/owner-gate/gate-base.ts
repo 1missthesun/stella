@@ -416,6 +416,14 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
         "ALTER TABLE dispatches ADD COLUMN result_json TEXT",
       );
     }
+    const presenceColumns = this.ctx.storage.sql
+      .exec<{ name: string }>("PRAGMA table_info(device_presence)")
+      .toArray();
+    if (!presenceColumns.some((column) => column.name === "antigravity_models")) {
+      this.ctx.storage.sql.exec(
+        "ALTER TABLE device_presence ADD COLUMN antigravity_models TEXT",
+      );
+    }
     this.migrateDispatchStateCheck();
     this.schemaReady = true;
     const schemaMs = Math.round(performance.now() - startedAt);

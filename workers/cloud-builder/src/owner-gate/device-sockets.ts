@@ -555,9 +555,9 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     this.ctx.storage.sql.exec(
       `INSERT INTO device_presence (
          device_id, presence_session_id, connection_id, connected, ready,
-         chat_slots, agent_slots, capabilities, protocol_version,
-         last_seen_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         chat_slots, agent_slots, capabilities, antigravity_models,
+         protocol_version, last_seen_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(device_id) DO UPDATE SET
          presence_session_id = excluded.presence_session_id,
          connection_id = excluded.connection_id,
@@ -566,6 +566,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
          chat_slots = excluded.chat_slots,
          agent_slots = excluded.agent_slots,
          capabilities = excluded.capabilities,
+         antigravity_models = excluded.antigravity_models,
          protocol_version = excluded.protocol_version,
          last_seen_at = excluded.last_seen_at,
          updated_at = excluded.updated_at`,
@@ -578,6 +579,9 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       0,
       0,
       JSON.stringify(availability.capabilities),
+      availability.antigravityModels
+        ? JSON.stringify(availability.antigravityModels)
+        : null,
       DEVICE_PRESENCE_PROTOCOL_VERSION,
       now,
       now,
@@ -622,7 +626,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     const row = this.ctx.storage.sql
       .exec<PresenceRow>(
         `SELECT device_id, presence_session_id, connection_id, connected, ready,
-                chat_slots, agent_slots, capabilities, protocol_version, last_seen_at
+                chat_slots, agent_slots, capabilities, antigravity_models, protocol_version, last_seen_at
            FROM device_presence WHERE device_id = ?`,
         deviceId,
       )

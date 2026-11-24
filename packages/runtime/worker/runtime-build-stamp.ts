@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { readRuntimeBytecodeFingerprint } from "../kernel/shared/runtime-bytecode-stamp.js";
+import {
+  computeRuntimeSourceStamp,
+  runningRuntimeBytecodeStamp,
+  stellaRootOfWorkerEntry,
+} from "../kernel/shared/runtime-bytecode.js";
 
 /**
  * Runtime code-identity stamp used by the staleness handshake between the
@@ -27,8 +31,11 @@ import { readRuntimeBytecodeFingerprint } from "../kernel/shared/runtime-bytecod
  * copies with identical sizes are the only blind spot and don't occur in
  * the desktop-update path.
  *
- * A source tree (the runtime running as TypeScript) stamps `packages/runtime`
- * and `packages/contracts`, minus tests and scripts the runtime never loads.
+ * A Stella checkout, whether its worker runs the TypeScript or the bytecode
+ * build of it (`kernel/shared/runtime-bytecode.ts`), stamps every input of
+ * the worker graph with `computeRuntimeSourceStamp`, so both kinds of worker
+ * of one tree agree and either goes stale when any input changes. Any other
+ * layout (a packaged bundle) stamps the bundle's own folder.
  */
 
 export const RUNTIME_BUILD_STAMP_UNAVAILABLE = "unavailable";
@@ -93,14 +100,13 @@ const collectStampLines = (
   }
 };
 
+/** Stamp of the runtime code on disk now, for the worker at this entry. */
 export const computeRuntimeBuildStamp = (workerEntryPath: string): string => {
   const trimmedEntry = workerEntryPath?.trim();
   if (!trimmedEntry) return RUNTIME_BUILD_STAMP_UNAVAILABLE;
   try {
-    const bytecodeFp = readRuntimeBytecodeFingerprint(path.dirname(trimmedEntry));
-    if (bytecodeFp) {
-      return bytecodeFp.stamp.slice(0, 32);
-    }
+    const stellaRoot = stellaRootOfWorkerEntry(trimmedEntry);
+    if (stellaRoot) return computeRuntimeSourceStamp(stellaRoot).slice(0, 32);
     const lines: string[] = [];
     for (const rootDir of resolveRuntimeCodeRoots(trimmedEntry)) {
       collectStampLines(rootDir, rootDir, lines);
@@ -116,3 +122,11 @@ export const computeRuntimeBuildStamp = (workerEntryPath: string): string => {
     return RUNTIME_BUILD_STAMP_UNAVAILABLE;
   }
 };
+
+/**
+ * Stamp of the code this worker process loaded: a bytecode worker reports
+ * the build it runs (the tree may have moved on since it was built); a
+ * source worker stamps the tree as it boots.
+ */
+export const computeLoadedRuntimeBuildStamp = (workerEntryPath: string): string =>
+  runningRuntimeBytecodeStamp()?.slice(0, 32) ?? computeRuntimeBuildStamp(workerEntryPath);

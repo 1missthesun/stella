@@ -12,7 +12,12 @@ import {
   STELLA_RUNTIME_CLIENT_PROTOCOL_VERSION,
   type RuntimeClientAttachParams,
 } from "@stella/contracts/protocol/runtime-client";
-import { resolveBundledRuntimeFile } from "../kernel/shared/runtime-paths.js";
+import {
+  getStellaAppDir,
+  resolveRuntimeWorkerEntry,
+} from "../kernel/shared/runtime-paths.js";
+import { requestRuntimeBytecodeBuild } from "./runtime-bytecode-build.js";
+import { resolveBunBinaryPath } from "./lifecycle/spawn.js";
 import {
   isRuntimeHostHandler,
   RUNTIME_ATTACHMENT_STALE,
@@ -207,9 +212,7 @@ export class RemoteRuntimeHost {
     const stellaAppDir = this.options.initializeParams.stellaAppDir;
     const attached = await startOrAttachWorker({
       stellaAppDir,
-      workerEntryPath:
-        this.options.workerEntryPath ??
-        resolveBundledRuntimeFile("worker/entry.js"),
+      workerEntryPath: this.options.workerEntryPath ?? this.resolveWorkerEntry(),
       ...(this.bunBinaryPath() ? { bunBinaryPath: this.bunBinaryPath() } : {}),
       expectedProtocolVersion: STELLA_RUNTIME_CLIENT_PROTOCOL_VERSION,
       // Under Electron, the runtime's child processes use this binary as
@@ -337,6 +340,20 @@ export class RemoteRuntimeHost {
     console.warn(
       `[runtime-client] Dropped stale runtime frame (${reason}): ${label} attachment=${String(attachmentId)} connection=${connection.attachmentId} server=${String(connection.serverId)} totalDropped=${this.fenceDrops}`,
     );
+  }
+
+  /** Bytecode build of the worker when it matches the tree, else source. */
+  private resolveWorkerEntry(): string {
+    const bunBinaryPath = this.bunBinaryPath() ?? resolveBunBinaryPath();
+    const entry = resolveRuntimeWorkerEntry({ bunBinaryPath });
+    if (entry.bytecode && !entry.bytecode.usable) {
+      requestRuntimeBytecodeBuild({
+        stellaRoot: getStellaAppDir(),
+        bunBinaryPath,
+        reason: entry.bytecode.reason,
+      });
+    }
+    return entry.path;
   }
 
   private bunBinaryPath(): string | undefined {

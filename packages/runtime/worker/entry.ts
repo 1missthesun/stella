@@ -22,7 +22,7 @@ import {
 import { WorkerPeerBroker } from "./peer-broker.js";
 import { createRuntimeWorkerServer } from "./server/index.js";
 import {
-  computeRuntimeBuildStamp,
+  computeLoadedRuntimeBuildStamp,
   RUNTIME_BUILD_STAMP_UNAVAILABLE,
 } from "./runtime-build-stamp.js";
 import {
@@ -133,7 +133,7 @@ const main = async () => {
       killAgentProcessesSync();
     });
     logger.process("worker.starting", { pid: process.pid });
-    const runtimeBuildStamp = computeRuntimeBuildStamp(process.argv[1] ?? "");
+    const runtimeBuildStamp = computeLoadedRuntimeBuildStamp(process.argv[1] ?? "");
     lifecycle = new WorkerLifecycleServer({
       stellaAppDir: cliArgs.stellaAppDir,
       ...(runtimeBuildStamp !== RUNTIME_BUILD_STAMP_UNAVAILABLE

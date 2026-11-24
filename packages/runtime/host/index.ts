@@ -19,7 +19,7 @@ import {
   leaseBackendClient,
   type BackendClientLease,
 } from "@stella/contracts/backend/shared-client";
-import { resolveBundledRuntimeFile } from "../kernel/shared/runtime-paths.js";
+import { resolveRuntimeWorkerEntry } from "../kernel/shared/runtime-paths.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import { LocalSchedulerService } from "../kernel/local-scheduler-service.js";
 import {
@@ -2741,5 +2741,7 @@ const resolveDefaultWorkerEntryPath = (
   if (options.workerEntryPath) {
     return options.workerEntryPath;
   }
-  return resolveBundledRuntimeFile("worker/entry.js");
+  return resolveRuntimeWorkerEntry({
+    bunBinaryPath: process.env.STELLA_BUN_PATH?.trim() || undefined,
+  }).path;
 };

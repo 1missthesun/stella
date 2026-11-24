@@ -87,10 +87,10 @@ Spawn `bun <entry>` in stdio mode, write a probe request immediately, then
 | breakdown | `execToProcessStartMs` (spawn → worker `performance.timeOrigin`), `processStartToPreloadMs`, `preloadMs`, `entryGraphToTransportMs` |
 
 Configurations: `--entry source` (`packages/runtime/worker/entry.ts`) and
-`--entry bundle` (`packages/desktop/dist-electron/runtime/worker/entry.js`,
+`--entry bundle` (the bytecode build's loader `packages/desktop/dist-electron/runtime-bytecode/entry.js`, built by `bun packages/runtime/scripts/build-worker-bytecode.mjs`,
 run with `STELLA_APP_RESOURCES_PATH` pointed at `dist-electron` so assets
-resolve as in a packaged app; the app runs the worker from source and no
-longer builds this bundle, so it is skipped when absent), each with
+resolve as in a packaged app; the app builds it in the background and runs
+it when it matches the source tree; skipped when absent), each with
 `--cache warm` (shared transpiler cache, primed by a discarded run) and
 `--cache cold` (fresh empty cache dir per run). The OS page cache is always
 warm; true first-launch-after-install is not simulated.

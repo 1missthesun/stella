@@ -6,6 +6,7 @@ import {
   type RecordedProcess,
   signalRecordedProcess,
 } from "@stella/node-shared/shared/process-identity.js";
+import { runtimeWorkerEntryVariants } from "../../kernel/shared/runtime-bytecode.js";
 
 const ALIVE_POLL_INTERVAL_MS = 50;
 const SIGKILL_CONFIRM_BUDGET_MS = 1_000;
@@ -93,15 +94,27 @@ export const workerCommandTags = (workerEntryPath: string, stellaAppDir: string)
   stellaAppDir,
 ];
 
+/**
+ * Workers of this Stella root, whichever entry they were started from: a
+ * checkout's worker runs either its TypeScript source or the loader of its
+ * bytecode build, and a spawn may pick the other one than the last did.
+ */
 export const findSameRootWorkerPids = async (
   workerEntryPath: string,
   stellaAppDir: string,
-): Promise<RecordedProcess[]> =>
-  (await listSameRootWorkerPids(workerEntryPath, stellaAppDir)).map((pid) => ({
+): Promise<RecordedProcess[]> => {
+  const found = new Map<number, string>();
+  for (const entry of runtimeWorkerEntryVariants(workerEntryPath)) {
+    for (const pid of await listSameRootWorkerPids(entry, stellaAppDir)) {
+      if (!found.has(pid)) found.set(pid, entry);
+    }
+  }
+  return [...found].map(([pid, entry]) => ({
     pid,
     identity: readProcessIdentity(pid),
-    commandIncludes: workerCommandTags(workerEntryPath, stellaAppDir),
+    commandIncludes: workerCommandTags(entry, stellaAppDir),
   }));
+};
 
 const listSameRootWorkerPids = async (
   workerEntryPath: string,

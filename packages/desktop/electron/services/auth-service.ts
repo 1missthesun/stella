@@ -1709,6 +1709,16 @@ export class AuthService {
       this.scheduleHostAuthTokenRefresh(cached);
       return;
     }
+    // The startup prefetch may still be minting (a fast first paint gets here
+    // before it lands). A mint that succeeds schedules its own refresh, so
+    // arm only once it has settled, instead of minting a second token now.
+    const inflight = this.hostAuthTokenMintPromise;
+    if (inflight) {
+      void inflight
+        .catch(() => null)
+        .then(() => this.ensureHostAuthTokenRefreshArmed());
+      return;
+    }
     this.armHostAuthTokenRefresh(0);
   }
 

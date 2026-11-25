@@ -94,7 +94,7 @@ export type IconProps = PendingBoxProps & {
 export type ImageProps = PendingBoxProps & {
   id?: string;
   src: string;
-  fit?: "cover" | "contain" | "fill";
+  fit?: "cover" | "contain" | "stretch";
   w?: number | "full" | `${number}%`;
   h?: number | "full" | `${number}%`;
   maxW?: number | `${number}%`;
@@ -109,7 +109,7 @@ export type MarkdownProps = {
   id?: string;
   src: string;
   streaming?: boolean;
-  styleJson?: Record<string, unknown>;
+  mdStyle?: Record<string, unknown>;
   onLink?: (url: string) => void;
   w?: number | "full" | `${number}%`;
   key?: React.Key;

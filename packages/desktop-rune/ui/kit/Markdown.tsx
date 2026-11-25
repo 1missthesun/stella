@@ -1,6 +1,6 @@
-import { derive, fontSize, mix, radius, type Tokens, useTokens } from "../theme";
+import { derive, font, fontSize, mix, radius, type Tokens, useTokens } from "../theme";
 
-type Font = { size: number; weight: number; lineHeight: number; tracking?: number; family?: string; mono?: boolean };
+type Font = { size: number; weight: number; lineHeight: number; tracking?: number; family?: string };
 
 /** Chat text metrics (`--chat-text-*` in desktop-ui's full-shell and compact conversation CSS). */
 export type ChatText = { size: number; weight: number; strongWeight: number; lineHeight: number; color?: string };
@@ -14,8 +14,8 @@ const GITHUB = {
 };
 
 /**
- * desktop-ui's `.markdown` look (app/chat/markdown.css with the assistant overrides in
- * full-shell.chat.css) as the engine Markdown's style: builder name → arguments.
+ * desktop-ui's `.markdown` look (app/chat/markdown.css with the `.event-item.assistant` overrides in
+ * full-shell.chat.css) as the engine Markdown's `mdStyle`: rune-kit `MarkdownStyle` builder → arguments.
  */
 export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT) {
   const c = t.c;
@@ -23,8 +23,10 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT) {
   const lh = (size: number, k: number) => Math.round(size * k * 100) / 100;
   const body: Font = { size: chat.size, weight: chat.weight, lineHeight: lh(chat.size, chat.lineHeight), tracking: 0 };
   const heading = (size: number): Font => ({ size, weight: 600, lineHeight: lh(size, 1.3) });
-  const code: Font = { size: fontSize.sm, weight: 400, lineHeight: lh(fontSize.sm, 1.5), mono: true };
+  const code: Font = { size: fontSize.sm, weight: 400, lineHeight: lh(fontSize.sm, 1.5), family: font.mono };
+  const rule = mix(text, 12, "transparent");
   return {
+    dark: t.dark,
     text,
     muted: c.textWeak,
     link: c.textInteractive,
@@ -34,37 +36,40 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT) {
     inlineCodeText: c.textStrong,
     inlineCodeFont: [fontSize.sm / chat.size, 500],
     inlineCodePad: 4,
-    codeBlock: [c.surfaceInset, c.borderWeak],
+    codeBlockFill: c.surfaceInset,
+    codeBlockBorder: c.borderWeak,
     codeBlockPadding: [12, 10],
     codeBlockRadius: radius.md,
     codeBlockFont: code,
     codeBlockText: text,
+    quoteRule: c.borderWeak,
     quote: [c.borderWeak, 2, 12, c.textWeak],
     rule: c.borderWeak,
-    bodyFont: body,
-    headingFont: { 1: heading(26), 2: heading(21), 3: heading(18), 4: heading(16), 5: heading(fontSize.lg), 6: heading(fontSize.lg) },
+    body,
+    headings: [heading(26), heading(21), heading(18), heading(16)],
     strongWeight: chat.strongWeight,
     list: [24, 4],
     listNestedIndent: [16, 16],
     listMarkersOutside: true,
     paragraphMargin: [0, 12],
-    headingMargin: { 1: [16, 6.4], 2: [16, 6.4], 3: [16, 6.4], 4: [16, 6.4] },
-    imageMargin: [16, 16],
+    headingMargins: [[16, 6.4], [16, 6.4], [16, 6.4], [16, 6.4]],
     codeMargin: [0, 12],
-    blockMargin: [[4, 12], [16, 16], [24, 24]],
-    table: [mix(text, 12, "transparent"), "#00000000"],
+    listMargin: [4, 12],
+    quoteMargin: [16, 16],
+    ruleMargin: [24, 24],
+    imageMargin: [16, 16],
+    table: [rule, "#00000000"],
+    tableOutline: null,
+    tableRules: rule,
     tableHeaderRule: mix(text, 32, "transparent"),
-    tableRules: mix(text, 12, "transparent"),
     tableHeaderText: c.textStrong,
     tableHeaderWeight: chat.strongWeight,
-    tableOutline: null,
     tableCellPadding: [24, 10],
     tableHeaderPad: [24, 8],
     tableFlushLeft: true,
     tableFont: body,
-    imageRadius: 6,
     selection: mix(c.primary, 30, "transparent"),
-    syntaxTheme: t.dark ? GITHUB.dark : GITHUB.light,
+    syntax: t.dark ? GITHUB.dark : GITHUB.light,
   };
 }
 
@@ -85,5 +90,5 @@ const openExternal = (url: string) => (globalThis as { electronAPI?: { system?: 
 export function Markdown({ id, text, streaming = false, chat = CHAT_TEXT, onLink = openExternal }: MarkdownProps) {
   const t = useTokens();
   const style = derive(t, `markdown:${chat.size}:${chat.color ?? ""}`, (t) => markdownStyle(t, chat));
-  return <markdown id={id} src={text} streaming={streaming} styleJson={style} onLink={onLink} w="full" />;
+  return <markdown id={id} src={text} streaming={streaming} mdStyle={style} onLink={onLink} w="full" />;
 }

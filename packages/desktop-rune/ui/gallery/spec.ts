@@ -3,9 +3,9 @@ export type GalleryPage = "buttons" | "controls" | "overlays" | "dialog" | "icon
 export const GALLERY_PAGES: GalleryPage[] = ["buttons", "controls", "overlays", "dialog", "icons", "markdown", "empty"];
 
 export const GALLERY_THEMES = {
-  light: { themeId: "custom", mode: "light" },
-  dark: { themeId: "custom", mode: "dark" },
-  gradient: { themeId: "aura", mode: "dark" },
+  light: { themeId: "custom", base: "default", mode: "light" },
+  dark: { themeId: "custom", base: "default", mode: "dark" },
+  gradient: { themeId: "custom", base: "aura", mode: "dark" },
 } as const;
 
 export const GALLERY_MARKDOWN = `## Your Lisbon weekend

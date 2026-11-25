@@ -297,7 +297,7 @@ const PAGES: Record<GalleryPage, () => ReactNode> = {
   empty: EmptyPage,
 };
 
-function Page({ page }: { page: GalleryPage }) {
+function Page({ page, themeKey }: { page: GalleryPage; themeKey: string }) {
   const t = useTokens();
   const Body = PAGES[page];
   return (
@@ -308,7 +308,7 @@ function Page({ page }: { page: GalleryPage }) {
           <row gap={10} align="center">
             <StellaMark size={20} />
             <text {...look(fontSize.xl, 600)} color={t.c.textStrong}>{`Kit · ${page}`}</text>
-            <text {...look(fontSize.sm, 500)} color={t.c.textWeaker}>{`${t.themeId} · ${t.dark ? "dark" : "light"}`}</text>
+            <text {...look(fontSize.sm, 500)} color={t.c.textWeaker}>{themeKey}</text>
           </row>
           <Body />
         </col>
@@ -320,11 +320,12 @@ function Page({ page }: { page: GalleryPage }) {
 /** The kit gallery: one page of components in one theme, chosen by STELLA_RUNE_GALLERY ("page" or "page@theme"). */
 export function Gallery() {
   const [page, themeKey] = (process.env.STELLA_RUNE_GALLERY ?? "buttons").split("@") as [GalleryPage, string | undefined];
-  const theme = GALLERY_THEMES[(themeKey ?? "light") as keyof typeof GALLERY_THEMES] ?? GALLERY_THEMES.light;
+  const key = (themeKey && themeKey in GALLERY_THEMES ? themeKey : "light") as keyof typeof GALLERY_THEMES;
+  const theme = GALLERY_THEMES[key];
   return (
     <I18nProvider>
-      <ThemeScope themeId={theme.themeId} mode={theme.mode}>
-        <Page page={page} />
+      <ThemeScope themeId={theme.themeId} mode={theme.mode} customBase={theme.base}>
+        <Page page={page} themeKey={key} />
       </ThemeScope>
     </I18nProvider>
   );

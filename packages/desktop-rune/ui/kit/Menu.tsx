@@ -143,11 +143,17 @@ export function MenuItem({ icon, destructive, ...rest }: MenuItemProps) {
   return <ItemRow {...rest} role="menuitem" destructive={destructive} lead={lead} />;
 }
 
+const MENU_CHECK: IconData = {
+  name: "menu/check",
+  view: 24,
+  body: '<path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+};
+
 export function MenuCheckboxItem({ checked, onCheckedChange, ...rest }: ItemBase & { checked: boolean; onCheckedChange: (checked: boolean) => void }) {
   const t = useTokens();
   const lead = (
     <box w={16} h={16} center>
-      {checked ? <Icon icon={Icons.stella.Check} size={12} strokeWidth={3} color={t.c.textStrong} /> : null}
+      {checked ? <Icon icon={MENU_CHECK} size={12} color={t.c.textStrong} /> : null}
     </box>
   );
   return <ItemRow {...rest} role="menuitemcheckbox" checked={checked} lead={lead} onSelect={() => onCheckedChange(!checked)} />;
@@ -155,11 +161,11 @@ export function MenuCheckboxItem({ checked, onCheckedChange, ...rest }: ItemBase
 
 export function MenuRadioItem({ checked, onSelect, ...rest }: ItemBase & { checked: boolean; onSelect: () => void }) {
   const t = useTokens();
-  const lead = (
+  const lead = checked ? (
     <box w={16} h={16} center>
-      {checked ? <box w={6} h={6} radius={3} fill={t.c.textBase} /> : null}
+      <box w={6} h={6} radius={3} fill={t.c.textBase} />
     </box>
-  );
+  ) : undefined;
   return <ItemRow {...rest} role="menuitemradio" checked={checked} lead={lead} onSelect={onSelect} />;
 }
 

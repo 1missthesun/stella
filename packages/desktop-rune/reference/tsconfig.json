@@ -1,0 +1,13 @@
+{
+  "extends": "../../desktop-ui/tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": null,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "react/jsx-runtime": ["../../../node_modules/@types/react/jsx-runtime.d.ts"],
+      "react/jsx-dev-runtime": ["../../../node_modules/@types/react/jsx-dev-runtime.d.ts"],
+      "@/*": ["../../desktop-ui/src/*"]
+    }
+  },
+  "include": ["*.ts", "*.tsx", "../../desktop-ui/src/shared/types/*.d.ts"]
+}

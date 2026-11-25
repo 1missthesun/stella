@@ -61,7 +61,7 @@ export function ThemeBackdrop({ id = "theme-backdrop", mode = "soft", colorMode 
         if (!measured && r.w > 0 && r.h > 0) setMeasured(true);
       }}
     >
-      {!flat && image ? <image id={`${id}-image`} src={image} fit="fill" w="full" h="full" enter={{ opacity: 0, dur: 0.25 }} /> : null}
+      {!flat && image ? <image id={`${id}-image`} src={image} fit="stretch" w="full" h="full" enter={{ opacity: 0, dur: 0.25 }} /> : null}
     </box>
   );
 }

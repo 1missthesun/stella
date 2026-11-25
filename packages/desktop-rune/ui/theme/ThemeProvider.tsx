@@ -10,11 +10,10 @@ const TokensContext = createContext<Tokens | null>(null);
 /** Seconds a theme or colour-mode switch springs its colours over. */
 export const THEME_SPRING = 0.3;
 
-function useSpringOnChange(tokens: Tokens, windowRoot: boolean) {
+function useSpringOnChange(tokens: Tokens) {
   const last = useRef<Tokens | null>(null);
   if (last.current !== tokens) {
     if (last.current) engine.colorMotion(THEME_SPRING);
-    if (windowRoot) engine.windowBackground(tokens.c.background);
     last.current = tokens;
   }
 }
@@ -23,7 +22,7 @@ function TokensFromTheme({ children }: { children: ReactNode }) {
   const { theme, colors, resolvedColorMode, flat } = useTheme();
   const dark = resolvedColorMode === "dark";
   const tokens = useMemo(() => buildTokens({ themeId: theme.id, colors, dark, flat }), [theme.id, colors, dark, flat]);
-  useSpringOnChange(tokens, true);
+  useSpringOnChange(tokens);
   return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
 }
 
@@ -42,15 +41,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 /** Tokens for a fixed theme and mode, independent of the user's choice (previews, gallery). */
 export function tokensFor(themeId: string, mode: "light" | "dark", customBase = "default"): Tokens {
-  const theme = getThemeById(themeId) ?? defaultTheme;
+  const requested = getThemeById(themeId) ?? defaultTheme;
+  const theme = requested.id === "custom" && !requested.populated ? (getThemeById(customBase) ?? requested) : requested;
   const resolved = resolveThemeColors(theme, mode === "dark", theme.id === "custom" ? customBase : undefined);
   const dark = (resolved.forcedMode ?? mode) === "dark";
   return buildTokens({ themeId: theme.id, colors: resolved.colors, dark, flat: resolved.flat });
 }
 
-export function ThemeScope({ themeId, mode, children }: { themeId: string; mode: "light" | "dark"; children: ReactNode }) {
-  const tokens = useMemo(() => tokensFor(themeId, mode), [themeId, mode]);
-  useSpringOnChange(tokens, false);
+export function ThemeScope({ themeId, mode, customBase, children }: { themeId: string; mode: "light" | "dark"; customBase?: string; children: ReactNode }) {
+  const tokens = useMemo(() => tokensFor(themeId, mode, customBase), [themeId, mode, customBase]);
+  useSpringOnChange(tokens);
   return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
 }
 

@@ -6,5 +6,5 @@ export { Markdown, markdownStyle, CHAT_TEXT, CHAT_TEXT_COMPACT, type ChatText } 
 export { Switch, type SwitchProps } from "./Switch";
 export { TextField, type TextFieldProps } from "./TextField";
 export { ToastItem, ToastRegion, dismissToast, showToast, type ToastOptions } from "./Toast";
-export { showContextMenu, type NativeMenuItem } from "./contextMenu";
+export { showContextMenu, type ContextMenuItem } from "./contextMenu";
 export { Icon, Icons, withStroke, type IconData } from "./icons";

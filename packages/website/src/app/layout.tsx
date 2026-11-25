@@ -87,6 +87,10 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    // Full snippets and large image previews for every crawler (Bing and AI answer engines read this tag, not googlebot's).
+    "max-snippet": -1,
+    "max-image-preview": "large",
+    "max-video-preview": -1,
     googleBot: {
       index: true,
       follow: true,

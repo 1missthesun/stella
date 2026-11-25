@@ -1,4 +1,4 @@
-import type { Tokens } from "./theme";
+import type { Tokens } from "./poc-theme";
 import { chats } from "./data";
 
 const W = 264;

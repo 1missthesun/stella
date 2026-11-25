@@ -125,6 +125,8 @@
       "name": "@stella/desktop-rune",
       "version": "0.0.0",
       "dependencies": {
+        "@stella/contracts": "workspace:*",
+        "@stella/theme": "workspace:*",
         "react": "^19.3.0",
         "react-reconciler": "0.34.0",
       },

@@ -6,9 +6,13 @@
   "scripts": {
     "engine:build": "cd engine && cargo build --release",
     "start": "./scripts/launch.sh",
-    "typecheck": "node ../../node_modules/typescript-7/bin/tsc -p . --noEmit"
+    "typecheck": "node ../../node_modules/typescript-7/bin/tsc -p . --noEmit",
+    "icons": "bun --tsconfig-override=../desktop-ui/tsconfig.app.json scripts/gen-icons.ts",
+    "icons:check": "bun --tsconfig-override=../desktop-ui/tsconfig.app.json scripts/gen-icons.ts --check"
   },
   "dependencies": {
+    "@stella/contracts": "workspace:*",
+    "@stella/theme": "workspace:*",
     "react": "^19.3.0",
     "react-reconciler": "0.34.0"
   },

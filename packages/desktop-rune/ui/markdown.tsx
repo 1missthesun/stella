@@ -1,7 +1,7 @@
 // A small Markdown renderer for chat messages: headings, paragraphs, lists, quotes, fenced code,
 // and inline **bold**, *italic* and `code`, drawn with Rune text runs.
 
-import type { Tokens } from "./theme";
+import type { Tokens } from "./poc-theme";
 
 type Run = { t: string; w?: number; c?: string; m?: boolean; bg?: string; i?: boolean };
 

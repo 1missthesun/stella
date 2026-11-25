@@ -3,7 +3,8 @@ import type { AppState, Message, Store } from "../host/store";
 import { initialMessages } from "./data";
 import { Markdown } from "./markdown";
 import { Sidebar } from "./Sidebar";
-import { tokens, type Tokens } from "./theme";
+import { tokens, type Tokens } from "./poc-theme";
+import { Gallery } from "./gallery/Gallery";
 
 export function initialState(): AppState {
   return {
@@ -171,6 +172,10 @@ function ErrorBar({ t }: { t: Tokens }) {
 }
 
 export function App() {
+  return process.env.STELLA_RUNE_GALLERY ? <Gallery /> : <PocApp />;
+}
+
+function PocApp() {
   const dark = stella.useStore((s) => s.dark);
   const open = stella.useStore((s) => s.sidebarOpen);
   const t = tokens(dark);

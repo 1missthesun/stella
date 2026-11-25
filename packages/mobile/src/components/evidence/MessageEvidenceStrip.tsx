@@ -45,17 +45,20 @@ const ImageThumb = memo(function ImageThumb({
   width,
   height,
   label,
+  page = false,
 }: {
   uri: string;
   width: number;
   height: number;
   label: string;
+  page?: boolean;
 }) {
   return (
     <Image
       source={{ uri }}
-      style={{ width, height }}
+      style={{ width, height, backgroundColor: page ? "#ffffff" : undefined }}
       contentFit="cover"
+      contentPosition={page ? "top" : "center"}
       cachePolicy="memory-disk"
       accessibilityLabel={label}
       recyclingKey={uri}
@@ -217,6 +220,7 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
                 width={width}
                 height={EVIDENCE_MEDIA_CARD_HEIGHT}
                 label={card.title}
+                page={card.kind === "page"}
               />
             ) : (
               <PendingThumb

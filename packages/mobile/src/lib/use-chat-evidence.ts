@@ -5,7 +5,7 @@ import {
   EVIDENCE_TILE_WIDTH,
   type EvidenceCard,
 } from "@stella/contracts/chat-evidence";
-import { isReplyMediaKind } from "@stella/contracts/reply-attachments";
+import { isReplyMediaSource } from "@stella/contracts/reply-attachments";
 import {
   describeEvidenceSources,
   evidencePlaybackMimeType,
@@ -85,9 +85,23 @@ const audioCard = (
     : {}),
 });
 
+const pageCard = (
+  source: EvidenceSource,
+  preview: Extract<EvidencePreview, { kind: "page" }>,
+): EvidenceCard => ({
+  id: `page:${source.filePath}`,
+  kind: "page",
+  title: evidenceTitleFor(source),
+  sourcePaths: [source.filePath],
+  thumbnail: preview.uri,
+});
+
 const placeholderCard = (source: EvidenceSource): EvidenceCard => ({
   id: `loading:${source.filePath}`,
-  kind: source.kind === "audio" ? "audio" : source.kind === "video" ? "video" : "image",
+  kind:
+    source.kind === "audio" || source.kind === "video" || source.kind === "page"
+      ? source.kind
+      : "image",
   title: evidenceTitleFor(source),
   sourcePaths: [source.filePath],
 });
@@ -107,7 +121,7 @@ export const useChatEvidence = (args: {
     [pathKey],
   );
   const mediaSources = useMemo(
-    () => sources.filter((source) => isReplyMediaKind(source.kind)),
+    () => sources.filter((source) => isReplyMediaSource(source.filePath, source.kind)),
     [sources],
   );
   const drivePaths = useMemo(
@@ -165,7 +179,7 @@ export const useChatEvidence = (args: {
     let overflowCount = 0;
 
     for (const source of sources) {
-      if (!isReplyMediaKind(source.kind)) {
+      if (!isReplyMediaSource(source.filePath, source.kind)) {
         if (pills.length >= EVIDENCE_PILL_CAP) {
           overflowCount += 1;
           continue;
@@ -192,6 +206,7 @@ export const useChatEvidence = (args: {
       }
       const preview = state.preview;
       if (preview.kind === "image") media.push(imageCard(source, preview));
+      else if (preview.kind === "page") media.push(pageCard(source, preview));
       else if (preview.kind === "video") media.push(videoCard(source, preview));
       else media.push(audioCard(source, preview));
     }

@@ -1,0 +1,28 @@
+import { mixOklch, sheet } from "../../theme";
+
+export const useAiAccounts = sheet((c) => ({
+  aiProviderHead: { mb: 10, align: "center", justify: "between", gap: 12 },
+  aiPrimary: { align: "center", gap: 16, minH: 36 },
+  aiPrimaryText: { grow: 1, shrink: true, minW: 0 },
+  aiPrimaryName: { size: 13, weight: 600, color: c.textStrong, truncate: true, nowrap: true },
+  aiPrimaryNameEmpty: { weight: 500, color: mixOklch(c.textBase, 70, c.textWeak) },
+  aiPrimaryMeta: { mt: 3, wrap: true, align: "center", rowGap: 2, gap: 12, size: 12, lh: 1.45, color: mixOklch(c.textBase, 70, c.textWeak) },
+  aiPrimaryStatus: { align: "center", gap: 8 },
+  aiInUse: { align: "center", gap: 6, size: 12, weight: 500, color: c.textStrong, nowrap: true },
+  aiInUseDot: { w: 6, h: 6, radius: 9999, fill: c.primary },
+  aiNote: { mt: 10, align: "center", gap: 12, size: 12, lh: 1.45, color: c.textBase },
+  aiNoteText: { grow: 1, shrink: true, minW: 0 },
+  aiLink: { pad: 0, align: "center", gap: 4, size: 12, color: mixOklch(c.textBase, 70, c.textWeak), underline: true, cursor: "pointer", hoverColor: c.textStrong },
+  aiProviderMore: { pad: 0, mt: 14, align: "center", gap: 6, size: 12, weight: 500, color: mixOklch(c.textBase, 70, c.textWeak), cursor: "pointer", hoverColor: c.textStrong },
+  aiProviderChevron: { motion: { dur: 0.15 } },
+  aiProviderDetails: { pl: 20, mt: 12, gap: 18 },
+  aiDetailsGroupLabel: { mb: 2, size: 11, weight: 500, color: c.textWeak },
+  aiRow: { py: 4, align: "center", gap: 12, minH: 40 },
+  aiRowText: { grow: 1, shrink: true, minW: 0 },
+  aiRowName: { size: 12, weight: 500, color: c.textStrong, truncate: true, nowrap: true },
+  aiRowMeta: { mt: 1, size: 11, color: mixOklch(c.textBase, 70, c.textWeak) },
+  aiRowControls: { align: "center", gap: 8 },
+  aiDetailsAdd: { mt: 6, gap: 8, align: "center" },
+  aiLegal: { gap: 16, size: 12 },
+  aiProviderPlain_aiPrimaryName: { size: 13 },
+}));

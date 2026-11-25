@@ -197,18 +197,21 @@ export type SelectProps<T extends string = string> = {
   placeholder?: string;
   label?: string;
   hideLabel?: boolean;
-  w?: number | "full";
+  w?: number | "full" | "fit";
+  minW?: number;
+  maxW?: number;
+  radius?: number;
 };
 
 /** desktop-ui's `Select`: a 32pt field-like trigger with a chevron, opening a radio menu at least as wide as itself. */
-export function Select<T extends string = string>({ id, value, onValueChange, options, open = false, onOpenChange, disabled = false, placeholder, label, hideLabel, w = "full" }: SelectProps<T>) {
+export function Select<T extends string = string>({ id, value, onValueChange, options, open = false, onOpenChange, disabled = false, placeholder, label, hideLabel, w = "full", minW, maxW, radius: triggerRadius = radius.md }: SelectProps<T>) {
   const t = useTokens();
   const c = t.c;
   const sel = derive(t, "select", (t) => ({ hover: mix(t.c.foreground, 7, t.c.background), open: mix(t.c.foreground, 9, t.c.background) }));
   const selected = options.find((o) => o.value === value);
   const text = look(fontSize.sm, font.emphasisWeight, { lh: 1.5 });
   return (
-    <col w={w} gap={4}>
+    <col w={w} minW={minW} maxW={maxW} gap={4}>
       {label && !hideLabel ? (
         <text {...text} color={c.mutedForeground}>
           {label}
@@ -230,13 +233,15 @@ export function Select<T extends string = string>({ id, value, onValueChange, op
             disabled={disabled}
             focusable={!disabled}
             focusRing={{ width: 2, offset: 2, color: c.ring }}
-            w="full"
+            w={w === "fit" ? "fit" : "full"}
+            minW={w === "fit" ? minW : undefined}
+            maxW={w === "fit" ? maxW : undefined}
             h={32}
             px={10 + 1}
             gap={8}
             align="center"
             justify="between"
-            radius={radius.md}
+            radius={triggerRadius}
             border={c.border}
             fill={trig.open ? sel.open : c.background}
             hover={disabled ? undefined : sel.hover}
@@ -244,7 +249,7 @@ export function Select<T extends string = string>({ id, value, onValueChange, op
             motion={{ dur: 0.12 }}
             onPress={disabled ? undefined : trig.toggle}
           >
-            <text {...text} color={c.foreground} grow={1} shrink truncate>
+            <text {...text} color={c.foreground} grow={1} shrink={w !== "fit"} truncate={w !== "fit"} nowrap>
               {selected?.label ?? placeholder ?? ""}
             </text>
             <Icon icon={Icons.stella.ChevronDown} size={14} color={c.mutedForeground} />

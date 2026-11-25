@@ -191,6 +191,7 @@ const config: any = {
   maySuspendCommitInSyncRender: () => false,
   preloadInstance: () => true,
   startSuspendingCommit() {},
+  suspendOnActiveViewTransition() {},
   suspendInstance() {},
   waitForCommitToBeReady: () => null,
   getSuspendedCommitReason: () => null,

@@ -1,0 +1,926 @@
+import { Lightbulb, Press, Switch, T, showToast, tx } from "../kit/compat";
+import { useAgentModelPicker } from "./AgentModelPicker.styles";
+import { useEnginePlace } from "../global/execution-placement/engine-place.styles";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ProviderModelPanel } from "./ProviderModelPanel";
+import { EngineScopedModelList } from "./EngineScopedModelList";
+import { ProviderOnlyPicker, type ProviderOption, } from "./ProviderOnlyPicker";
+import { VoiceCatalogPicker } from "./VoiceCatalogPicker";
+import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
+import { coerceRealtimeVoiceProvider, resolveReadAloudProvider, type ReadAloudVoiceProvider, type RealtimeVoicePreferences, type RealtimeVoiceUnderlyingProvider, } from "@stella/contracts/local-preferences";
+import { useStellaModelsSignIn } from "@/global/auth/hooks/use-stella-models-sign-in";
+import { saveModelSelection } from "@/global/settings/lib/save-model-selection";
+import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
+import { useClaudeCodeModelCatalog } from "@/global/settings/hooks/use-claude-code-model-catalog";
+import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
+import { buildModelDefaultsMap, buildResolvedModelDefaultsMap, getConfigurableAgents, getDefaultModelOptionLabel, getModelPickerDisplayLabel, getLocalModelDefaults, normalizeModelOverrides, } from "@/global/settings/lib/model-defaults";
+import { listReasoningEffortOptions, type ReasoningEffortOptionId, } from "@/global/settings/lib/reasoning-effort-options";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+import { recordRecentModel } from "@/global/settings/lib/recent-models";
+import { getPlanLabel, isRestrictedModelOverrideAudience, } from "@/global/billing/audience";
+import { EnginePlace, enginePlaceBadge } from "../global/execution-placement/EnginePlace";
+import { modelBlockedAt, planSignedInAt, useModelDestination } from "@/features/execution-placement/use-model-destination";
+import { AntigravityModelSection } from "../global/antigravity/AntigravityModelSection";
+import { antigravityModelInUse, antigravityModelOptions, currentModelReference } from "@stella/contracts/engine-model-catalog";
+import { announceChatGptPlanUse, ChatGptPlanInUse } from "../global/chatgpt/ChatGptBrand";
+import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
+import { useT } from "@/shared/i18n";
+import { buildEngineReasoningPatch, buildEngineRoutingPatch, buildEngineTransitionReasoningPatch, buildModelSelectionPatch, DEFAULT_CHATGPT_MODEL, DEFAULT_CLAUDE_CODE_MODEL, formatRecentEngineModelId, fromChatGptModelId, getActiveEngineModelId, isStellaModelId, listChatGptCatalogModels, CHATGPT_PROVIDER, resolveChatGptEngineModel, type ModelPickerEngine, } from "@/global/settings/lib/engine-model-routing";
+import { isWebsiteHost } from "@/platform/capabilities";
+import { WebsiteModelPicker } from "./WebsiteModelPicker";
+import { settingsPlace } from "@/global/settings/settings-place";
+
+type ImageGenerationProvider = "stella" | "openai" | "openrouter" | "fal";
+type ImageGenerationPreferences = {
+    provider: ImageGenerationProvider;
+    model?: string;
+};
+type ReasoningEffort = ReasoningEffortOptionId;
+type LocalModelPreferences = {
+    defaultModels: Record<string, string>;
+    modelOverrides: Record<string, string>;
+    assistantPropagatedAgents: string[];
+    reasoningEfforts: Record<string, ReasoningEffort>;
+    stellaConversationModelOverrides: Record<string, string>;
+    stellaConversationReasoningEfforts: Record<string, ReasoningEffort>;
+    agentRuntimeEngine: ModelPickerEngine;
+    codexModel: string;
+    codexModelExplicit: boolean;
+    codexReasoningEffort: ReasoningEffort;
+    codexServiceTier: "standard" | "fast";
+    claudeCodeModel: string;
+    claudeCodeReasoningEffort: ReasoningEffort;
+    useNativeClaudeCodeRuntime?: boolean;
+    maxAgentConcurrency: number;
+    imageGeneration: ImageGenerationPreferences;
+    realtimeVoice: RealtimeVoicePreferences;
+};
+
+interface AgentModelPickerProps {
+    active?: boolean;
+    onSelected?: () => void;
+    className?: string;
+    surface?: "sidebar" | "settings";
+    focusSection?: {
+        section: string;
+        seq: number;
+    } | null;
+}
+const ASSISTANT_TARGET = "__assistant__";
+const IMAGE_TARGET = "__image__";
+const VOICE_TARGET = "__voice__";
+const ENGINE_PENDING_TARGET = "__engine__";
+const NATIVE_CLAUDE_CODE_RUNTIME_PENDING_TARGET = "__native_claude_code_runtime__";
+const CHATGPT_SECTION_KEY = "chatgpt-engine";
+const CLAUDE_CODE_SECTION_KEY = "claude-code-engine";
+const ANTIGRAVITY_SECTION_KEY = "antigravity";
+const antigravityRows = (models: readonly string[] | undefined) => antigravityModelOptions(models).map((model) => ({ id: model.id, label: model.name, description: model.description }));
+const HIDDEN_CATALOG_PROVIDERS = ["chatgpt", ANTIGRAVITY_SECTION_KEY];
+const SECTION_ORDER = [
+    "stella",
+    CLAUDE_CODE_SECTION_KEY,
+    CHATGPT_SECTION_KEY,
+    ANTIGRAVITY_SECTION_KEY,
+    "xai",
+    "meta",
+    "openrouter",
+];
+function sectionOfModelValue(value: string): string {
+    if (!value || value.startsWith("stella/"))
+        return "stella";
+    if (value.startsWith("codex-cli/") || value.startsWith("chatgpt/")) {
+        return CHATGPT_SECTION_KEY;
+    }
+    if (value.startsWith("claude-code/"))
+        return CLAUDE_CODE_SECTION_KEY;
+    const slash = value.indexOf("/");
+    return slash > 0 ? value.slice(0, slash) : "stella";
+}
+const ASSISTANT_AGENT_KEYS: readonly string[] = ["orchestrator", "general"];
+const DEFAULT_IMAGE_GENERATION: ImageGenerationPreferences = {
+    provider: "stella",
+};
+const DEFAULT_REALTIME_VOICE: RealtimeVoicePreferences = {
+    provider: "stella",
+};
+export const IMAGE_PROVIDER_OPTIONS: readonly ProviderOption[] = [
+    { key: "stella", label: "Stella" },
+    { key: "openai", label: "OpenAI" },
+    { key: "openrouter", label: "OpenRouter" },
+    { key: "fal", label: "fal" },
+];
+const VOICE_PROVIDER_OPTIONS: readonly ProviderOption[] = [
+    { key: "stella", label: "Stella" },
+    { key: "openai", label: "OpenAI" },
+    { key: "xai", label: "xAI" },
+];
+// @reloadable the preferences are a cache of what the host holds
+let cachedLocalPreferences: LocalModelPreferences | null = null;
+export function warmAgentModelPickerCache() {
+    if (cachedLocalPreferences)
+        return;
+    void window.electronAPI?.system
+        ?.getLocalModelPreferences?.()
+        .then((next) => {
+        if (next)
+            cachedLocalPreferences = next;
+    })
+        .catch(() => undefined);
+}
+function useByokProviderOptions(options: readonly ProviderOption[]): ProviderOption[] {
+    const t = useT();
+    return useMemo(() => options.map((option) => option.key === "stella"
+        ? option
+        : {
+            ...option,
+            description: t("settings.agentModelPicker.byokDescription", {
+                provider: option.label,
+            }),
+        }), [options, t]);
+}
+export function AgentModelPicker(props: AgentModelPickerProps) {
+    return isWebsiteHost() ? <WebsiteModelPicker {...props} /> : <DesktopAgentModelPicker {...props} />;
+}
+
+function DesktopAgentModelPicker({ active = true, onSelected, className, surface = "sidebar", focusSection = null, }: AgentModelPickerProps) {
+  const s = useAgentModelPicker();
+  const sEnginePlace = useEnginePlace();
+    const t = useT();
+    const { destination, computers } = useModelDestination();
+    const runsElsewhere = destination.kind !== "here";
+    const askToSignInForStella = useStellaModelsSignIn();
+    const imageProviderOptions = useByokProviderOptions(IMAGE_PROVIDER_OPTIONS);
+    const voiceProviderOptions = useByokProviderOptions(VOICE_PROVIDER_OPTIONS);
+    const voiceVisible = useRealtimeVoiceVisible();
+    const { allModels, defaults: stellaDefaultModels, groups, refresh, refreshing, audience, error: catalogError, } = useModelCatalog();
+    const [preferences, setPreferencesRaw] = useState<LocalModelPreferences | null>(() => cachedLocalPreferences);
+    const [pendingAgent, setPendingAgent] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [claudeCodeSectionOpen, setClaudeCodeSectionOpen] = useState(false);
+    const committedEngine = preferences?.agentRuntimeEngine ?? "default";
+    const chatGptProfiles = useChatGptProfiles();
+    const { signIn: signInChatGpt, cancelSignIn: cancelChatGptSignIn } = chatGptProfiles;
+    const chatGptConnection: "checking" | "connected" | "disconnected" = !chatGptProfiles.loaded
+        ? "checking"
+        : chatGptProfiles.usable
+            ? "connected"
+            : "disconnected";
+    const [chatGptAccountModels, setChatGptAccountModels] = useState<Array<{ id: string; name: string }> | null>(null);
+    const activeChatGptProfileId = chatGptProfiles.profiles.find((profile) => profile.active)?.id ?? null;
+    useEffect(() => {
+        setChatGptAccountModels(null);
+        if (chatGptConnection !== "connected")
+            return;
+        let cancelled = false;
+        void window.electronAPI?.system?.listChatGptModels?.()
+            .then((result) => {
+                if (!cancelled && result.source === "account")
+                    setChatGptAccountModels(result.models);
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [activeChatGptProfileId, chatGptConnection]);
+    const [chatGptRoutedNotice, setChatGptRoutedNotice] = useState<string | null>(null);
+    const setPreferences = useCallback((updater: LocalModelPreferences | null | ((previous: LocalModelPreferences | null) => LocalModelPreferences | null)) => {
+        setPreferencesRaw((current) => {
+            const next = typeof updater === "function" ? updater(current) : updater;
+            if (next)
+                cachedLocalPreferences = next;
+            return next;
+        });
+    }, []);
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const next = await window.electronAPI?.system?.getLocalModelPreferences?.();
+                if (!cancelled && next) {
+                    cachedLocalPreferences = next;
+                    setPreferences(next);
+                    setError(null);
+                }
+            }
+            catch (caught) {
+                if (!cancelled) {
+                    setError(caught instanceof Error
+                        ? caught.message
+                        : t("settings.agentModelPicker.errors.loadPreferences"));
+                }
+            }
+        };
+        void load();
+        const onExternalChange = () => {
+            void load();
+        };
+        window.addEventListener("stella:local-model-preferences-changed", onExternalChange);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("stella:local-model-preferences-changed", onExternalChange);
+        };
+    }, [setPreferences, t]);
+    const modelDefaults = useMemo(() => {
+        if (!preferences)
+            return undefined;
+        return getLocalModelDefaults(preferences.defaultModels, stellaDefaultModels);
+    }, [preferences, stellaDefaultModels]);
+    const modelNamesById = useMemo(() => {
+        const next = new Map<string, string>();
+        for (const model of allModels) {
+            const label = model.provider === "stella"
+                ? getStellaResolvedModelName(model)
+                : model.name;
+            next.set(model.id, label);
+            if (model.upstreamModel)
+                next.set(model.upstreamModel, label);
+        }
+        return next;
+    }, [allModels]);
+    const chatGptCatalogModels = useMemo(() => listChatGptCatalogModels(allModels), [allModels]);
+    const chatGptModels = useMemo(() => chatGptAccountModels
+        ? chatGptAccountModels.map((model) => ({
+            id: model.id,
+            label: model.name || model.id,
+            description: model.id,
+        }))
+        : chatGptCatalogModels.map((model) => ({
+            id: model.modelId,
+            label: model.name || model.modelId,
+            description: model.modelId,
+        })), [chatGptAccountModels, chatGptCatalogModels]);
+    const chatGptRegistryIds = useMemo(() => listChatGptCatalogModels(allModels).map((model) => model.modelId), [allModels]);
+    const savedChatGptOverride = preferences
+        ? fromChatGptModelId(preferences.modelOverrides.orchestrator ??
+            preferences.modelOverrides.general ??
+            "")
+        : null;
+    const selectedChatGptModel = savedChatGptOverride ?? preferences?.codexModel ?? DEFAULT_CHATGPT_MODEL;
+    const chatGptRegistryOptions = useMemo(() => listChatGptCatalogModels(allModels).map((model) => ({
+        id: model.modelId,
+        label: model.name || model.modelId,
+        description: model.modelId,
+    })), [allModels]);
+    const chatGptDisplayModels = chatGptModels.length > 0
+        ? chatGptModels
+        : chatGptRegistryOptions;
+    const selectedClaudeCodeModel = preferences?.claudeCodeModel || DEFAULT_CLAUDE_CODE_MODEL;
+    const [oauthPendingProvider, setOauthPendingProvider] = useState<string | null>(null);
+    const migrationAttemptedRef = useRef<string | null>(null);
+    const cancelPendingOAuth = useCallback(async () => {
+        setOauthPendingProvider(null);
+        cancelChatGptSignIn();
+    }, [cancelChatGptSignIn]);
+    useEffect(() => {
+        if (!preferences ||
+            pendingAgent !== null ||
+            preferences.agentRuntimeEngine !== "codex_cli" ||
+            chatGptConnection !== "connected" ||
+            !chatGptModels.some((model) => model.id === selectedChatGptModel)) {
+            return;
+        }
+        const route = `${CHATGPT_PROVIDER}/${selectedChatGptModel}`;
+        if (preferences.modelOverrides.orchestrator === route &&
+            preferences.modelOverrides.general === route) {
+            return;
+        }
+        const migrationKey = `${selectedChatGptModel}:${preferences.modelOverrides.orchestrator ?? ""}:${preferences.modelOverrides.general ?? ""}`;
+        if (migrationAttemptedRef.current === migrationKey)
+            return;
+        migrationAttemptedRef.current = migrationKey;
+        setPendingAgent(ENGINE_PENDING_TARGET);
+        const patch = {
+            ...buildEngineRoutingPatch(preferences, "codex_cli", selectedChatGptModel),
+            ...buildEngineTransitionReasoningPatch(preferences, "codex_cli"),
+        };
+        void (async () => {
+            try {
+                const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+                if (saved)
+                    setPreferences(saved);
+                window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
+            }
+            catch (caught) {
+                setError(caught instanceof Error
+                    ? caught.message
+                    : t("settings.agentModelPicker.errors.chatGptMigration"));
+            }
+            finally {
+                setPendingAgent(null);
+            }
+        })();
+    }, [
+        chatGptConnection,
+        chatGptModels,
+        pendingAgent,
+        preferences,
+        selectedChatGptModel,
+        setPreferences,
+        t,
+    ]);
+    const defaultModelMap = useMemo(() => buildModelDefaultsMap(modelDefaults), [modelDefaults]);
+    const resolvedDefaultModelMap = useMemo(() => buildResolvedModelDefaultsMap(modelDefaults), [modelDefaults]);
+    const overrides = useMemo(() => {
+        if (!preferences)
+            return {};
+        return normalizeModelOverrides(preferences.modelOverrides);
+    }, [preferences]);
+    const configurableAgents = useMemo(() => getConfigurableAgents(modelDefaults), [modelDefaults]);
+    const initialActiveAgent = surface === "settings"
+        ? (configurableAgents[0]?.key ?? "orchestrator")
+        : ASSISTANT_TARGET;
+    const [activeAgent, setActiveAgent] = useState(initialActiveAgent);
+    useEffect(() => {
+        if (surface !== "settings")
+            return;
+        if (configurableAgents.length === 0)
+            return;
+        if (activeAgent === IMAGE_TARGET ||
+            (activeAgent === VOICE_TARGET && voiceVisible) ||
+            configurableAgents.some((entry) => entry.key === activeAgent)) {
+            return;
+        }
+        setActiveAgent(configurableAgents[0].key);
+    }, [activeAgent, configurableAgents, surface, voiceVisible]);
+    const focusSeq = focusSection?.seq ?? 0;
+    useEffect(() => {
+        if (focusSeq && surface !== "settings")
+            setActiveAgent(ASSISTANT_TARGET);
+    }, [focusSeq, surface]);
+    const activeAssistant = activeAgent === ASSISTANT_TARGET;
+    const activeImage = activeAgent === IMAGE_TARGET;
+    const activeVoice = activeAgent === VOICE_TARGET && voiceVisible;
+    const activeProviderSetting = activeImage || activeVoice;
+    const activeModelValue = activeAssistant
+        ? (overrides.orchestrator ?? overrides.general ?? "")
+        : (overrides[activeAgent] ?? "");
+    const activeSectionKey = committedEngine === "codex_cli"
+        ? CHATGPT_SECTION_KEY
+        : committedEngine === "claude_code_local"
+            ? CLAUDE_CODE_SECTION_KEY
+            : sectionOfModelValue(activeModelValue);
+    const claudeCodeCatalog = useClaudeCodeModelCatalog(active && (claudeCodeSectionOpen || committedEngine === "claude_code_local"));
+    const claudeCodeModels = useMemo(() => claudeCodeCatalog.models?.map((model) => ({
+        id: model.id,
+        label: model.displayName || model.id,
+        description: model.description,
+    })) ?? null, [claudeCodeCatalog.models]);
+    const claudeCodeModelsLoading = claudeCodeCatalog.loading;
+    const lastToastedErrorRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!error) {
+            lastToastedErrorRef.current = null;
+            return;
+        }
+        if (!active || lastToastedErrorRef.current === error)
+            return;
+        lastToastedErrorRef.current = error;
+        showToast({
+            title: t("settings.agentModelPicker.errors.updateTitle"),
+            description: error,
+            variant: "error",
+        });
+    }, [active, error, t]);
+    const assistantWriteKeys = ASSISTANT_AGENT_KEYS;
+    const canonicalAgentKey = activeAssistant
+        ? ASSISTANT_AGENT_KEYS[0]
+        : activeAgent;
+    const handleSelect = useCallback(async (value: string) => {
+        if (!preferences || pendingAgent)
+            return;
+        const selectionTarget = activeAssistant
+            ? {
+                assistant: true as const,
+                configurableAgentKeys: configurableAgents.map((agent) => agent.key),
+            }
+            : { agentKey: activeAgent };
+        if (isStellaModelId(value) && askToSignInForStella(() => void saveModelSelection(value, selectionTarget)))
+            return;
+        if (preferences.agentRuntimeEngine !== "default")
+            migrationAttemptedRef.current = null;
+        const patch = buildModelSelectionPatch(preferences, value, selectionTarget);
+        setPendingAgent(activeAgent);
+        setPreferences({ ...preferences, ...patch });
+        try {
+            const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+            if (saved)
+                setPreferences(saved);
+            window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
+            if (value)
+                recordRecentModel(value);
+            setError(null);
+            onSelected?.();
+        }
+        catch (caught) {
+            setPreferences(preferences);
+            setError(caught instanceof Error
+                ? caught.message
+                : t("settings.agentModelPicker.errors.updateModel"));
+        }
+        finally {
+            setPendingAgent(null);
+        }
+    }, [
+        activeAgent,
+        activeAssistant,
+        askToSignInForStella,
+        configurableAgents,
+        onSelected,
+        pendingAgent,
+        preferences,
+        setPreferences,
+        t,
+    ]);
+    const commitEngineSelection = useCallback(async (engine: ModelPickerEngine, modelId?: string, options?: { explicit?: boolean }): Promise<boolean> => {
+        if (!preferences || pendingAgent)
+            return false;
+        migrationAttemptedRef.current = null;
+        const previous = preferences;
+        setPendingAgent(ENGINE_PENDING_TARGET);
+        setError(null);
+        setChatGptRoutedNotice(null);
+        let effectiveModelId = modelId;
+        let connectCancelled = false;
+        try {
+            if (engine === "codex_cli") {
+                const selectedModel = modelId?.trim() || preferences.codexModel;
+                if (chatGptConnection !== "connected" && !runsElsewhere) {
+                    setOauthPendingProvider(CHATGPT_PROVIDER);
+                    const profile = await signInChatGpt().finally(() => setOauthPendingProvider(null));
+                    if (!profile) {
+                        connectCancelled = true;
+                        throw new Error(t("settings.agentModelPicker.errors.chatGptNotConnected"));
+                    }
+                    if (!profile.planUsage) {
+                        throw new Error(t("settings.agentModelPicker.errors.chatGptPlanUsageOff", { place: settingsPlace(t, "settings.tabs.ai") }));
+                    }
+                    announceChatGptPlanUse();
+                }
+                const resolution = resolveChatGptEngineModel(selectedModel, chatGptModels.map((model) => model.id), chatGptRegistryIds, DEFAULT_CHATGPT_MODEL);
+                if (resolution.kind === "unavailable") {
+                    throw new Error(t("settings.agentModelPicker.errors.chatGptNoModels"));
+                }
+                effectiveModelId = resolution.modelId;
+                if (resolution.kind === "rerouted") {
+                    setChatGptRoutedNotice(t("settings.agentModelPicker.chatGptRouted", {
+                        model: resolution.modelId,
+                    }));
+                }
+            }
+            const patch: Partial<LocalModelPreferences> = {
+                ...buildEngineRoutingPatch(preferences, engine, effectiveModelId),
+                ...buildEngineTransitionReasoningPatch(preferences, engine),
+                ...(engine === "codex_cli" && options?.explicit
+                    ? { codexModelExplicit: true }
+                    : {}),
+            };
+            const optimistic = { ...preferences, ...patch };
+            setPreferences(optimistic);
+            const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+            if (saved)
+                setPreferences(saved);
+            window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
+            const committed = saved ?? optimistic;
+            const recentEngineId = formatRecentEngineModelId(engine, engine === "codex_cli"
+                ? effectiveModelId || committed.codexModel
+                : effectiveModelId || committed.claudeCodeModel);
+            if (recentEngineId)
+                recordRecentModel(recentEngineId);
+            return true;
+        }
+        catch (caught) {
+            setPreferences(previous);
+            if (!connectCancelled) {
+                setError(caught instanceof Error && caught.message.trim()
+                    ? caught.message
+                    : engine === "codex_cli"
+                        ? t("settings.agentModelPicker.errors.connectChatGpt")
+                        : t("settings.agentModelPicker.errors.updateEngine"));
+            }
+            return false;
+        }
+        finally {
+            setPendingAgent(null);
+        }
+    }, [
+        chatGptConnection,
+        chatGptModels,
+        chatGptRegistryIds,
+        signInChatGpt,
+        pendingAgent,
+        preferences,
+        runsElsewhere,
+        setPreferences,
+        t,
+    ]);
+    const handleEngineModelSelect = useCallback(async (engine: ModelPickerEngine, modelId: string) => {
+        if (!preferences)
+            return;
+        const saved = await commitEngineSelection(engine, modelId, {
+            explicit: true,
+        });
+        if (saved)
+            onSelected?.();
+    }, [commitEngineSelection, onSelected, preferences]);
+    const handleImageProviderSelect = useCallback(async (providerKey: string) => {
+        if (!preferences || pendingAgent)
+            return;
+        const previousImageGeneration = preferences.imageGeneration ?? DEFAULT_IMAGE_GENERATION;
+        const nextImageGeneration: ImageGenerationPreferences = providerKey === "openai"
+            ? { provider: "openai" }
+            : providerKey === "openrouter"
+                ? { provider: "openrouter" }
+                : providerKey === "fal"
+                    ? { provider: "fal" }
+                    : { provider: "stella" };
+        if (nextImageGeneration.provider === "stella" &&
+            askToSignInForStella(() => void window.electronAPI?.system?.setLocalModelPreferences?.({ imageGeneration: nextImageGeneration })))
+            return;
+        setPendingAgent(IMAGE_TARGET);
+        setPreferences({
+            ...preferences,
+            imageGeneration: nextImageGeneration,
+        });
+        try {
+            const saved = await window.electronAPI?.system?.setLocalModelPreferences?.({
+                imageGeneration: nextImageGeneration,
+            });
+            if (saved)
+                setPreferences(saved);
+            setError(null);
+            onSelected?.();
+        }
+        catch (caught) {
+            setPreferences((current) => current
+                ? { ...current, imageGeneration: previousImageGeneration }
+                : current);
+            setError(caught instanceof Error
+                ? caught.message
+                : t("settings.agentModelPicker.errors.updateImage"));
+        }
+        finally {
+            setPendingAgent(null);
+        }
+    }, [askToSignInForStella, onSelected, pendingAgent, preferences, setPreferences, t]);
+    const patchRealtimeVoice = useCallback(async (next: RealtimeVoicePreferences, errorLabel: string) => {
+        if (!preferences)
+            return;
+        const previous = preferences.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
+        setPreferences({ ...preferences, realtimeVoice: next });
+        try {
+            await window.electronAPI?.system?.setLocalModelPreferences?.({
+                realtimeVoice: next,
+            });
+            setError(null);
+        }
+        catch (caught) {
+            setPreferences((current) => current ? { ...current, realtimeVoice: previous } : current);
+            setError(caught instanceof Error ? caught.message : errorLabel);
+        }
+    }, [preferences, setPreferences]);
+    const handleVoiceSelect = useCallback((underlyingProvider: RealtimeVoiceUnderlyingProvider, voiceId: string) => {
+        const previous = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
+        void patchRealtimeVoice({
+            ...previous,
+            voices: { ...(previous.voices ?? {}), [underlyingProvider]: voiceId },
+        }, t("settings.agentModelPicker.errors.updateVoice"));
+    }, [patchRealtimeVoice, preferences, t]);
+    const handleReadAloudProviderSelect = useCallback((provider: ReadAloudVoiceProvider) => {
+        const previous = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
+        if (resolveReadAloudProvider(previous) === provider)
+            return;
+        void patchRealtimeVoice({ ...previous, readAloudProvider: provider }, t("settings.agentModelPicker.errors.updateReadAloud"));
+    }, [patchRealtimeVoice, preferences, t]);
+    const handleReadAloudVoiceSelect = useCallback((voiceId: string) => {
+        const previous = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
+        if (previous.voices?.stella === voiceId)
+            return;
+        void patchRealtimeVoice({
+            ...previous,
+            voices: { ...(previous.voices ?? {}), stella: voiceId },
+        }, t("settings.agentModelPicker.errors.updateVoice"));
+    }, [patchRealtimeVoice, preferences, t]);
+    const handleVoiceProviderSelect = useCallback(async (providerKey: string) => {
+        if (!preferences || pendingAgent)
+            return;
+        const previous = preferences.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
+        const next = {
+            provider: coerceRealtimeVoiceProvider(providerKey),
+            ...(previous.voices ? { voices: previous.voices } : {}),
+            ...(previous.enabled !== undefined
+                ? { enabled: previous.enabled }
+                : {}),
+            ...(previous.readAloudProvider
+                ? { readAloudProvider: previous.readAloudProvider }
+                : {}),
+        };
+        if (next.provider === "stella" &&
+            askToSignInForStella(() => void window.electronAPI?.system?.setLocalModelPreferences?.({ realtimeVoice: next })))
+            return;
+        setPendingAgent(VOICE_TARGET);
+        setPreferences({ ...preferences, realtimeVoice: next });
+        try {
+            const saved = await window.electronAPI?.system?.setLocalModelPreferences?.({
+                realtimeVoice: next,
+            });
+            if (saved)
+                setPreferences(saved);
+            setError(null);
+            onSelected?.();
+        }
+        catch (caught) {
+            setPreferences((current) => current ? { ...current, realtimeVoice: previous } : current);
+            setError(caught instanceof Error
+                ? caught.message
+                : t("settings.agentModelPicker.errors.updateVoice"));
+        }
+        finally {
+            setPendingAgent(null);
+        }
+    }, [askToSignInForStella, onSelected, pendingAgent, preferences, setPreferences, t]);
+    const handleReasoningEffortSelect = useCallback(async (effort: ReasoningEffort) => {
+        if (!preferences || pendingAgent)
+            return;
+        migrationAttemptedRef.current = null;
+        const selectedEngine = preferences.agentRuntimeEngine;
+        const writeKeys = activeAssistant ? assistantWriteKeys : [activeAgent];
+        const previousReasoningEfforts = {
+            ...(preferences.reasoningEfforts ?? {}),
+        };
+        const patch = buildEngineReasoningPatch(preferences, selectedEngine, effort, writeKeys);
+        setPendingAgent(activeAgent);
+        setPreferences({
+            ...preferences,
+            ...patch,
+        });
+        try {
+            const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+            if (saved)
+                setPreferences(saved);
+            window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
+            setError(null);
+            onSelected?.();
+        }
+        catch (caught) {
+            setPreferences((current) => current
+                ? {
+                    ...current,
+                    reasoningEfforts: previousReasoningEfforts,
+                    codexReasoningEffort: preferences.codexReasoningEffort,
+                    claudeCodeReasoningEffort: preferences.claudeCodeReasoningEffort,
+                }
+                : current);
+            setError(caught instanceof Error
+                ? caught.message
+                : t("settings.agentModelPicker.errors.updateReasoning"));
+        }
+        finally {
+            setPendingAgent(null);
+        }
+    }, [
+        activeAgent,
+        activeAssistant,
+        assistantWriteKeys,
+        onSelected,
+        pendingAgent,
+        preferences,
+        setPreferences,
+        t,
+    ]);
+    const handleNativeClaudeCodeRuntimeChange = useCallback(async (enabled: boolean) => {
+        if (!preferences || pendingAgent)
+            return;
+        const previous = preferences.useNativeClaudeCodeRuntime === true;
+        setPendingAgent(NATIVE_CLAUDE_CODE_RUNTIME_PENDING_TARGET);
+        setError(null);
+        const patch = { useNativeClaudeCodeRuntime: enabled };
+        setPreferences({ ...preferences, ...patch });
+        try {
+            const saved = await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+            if (saved)
+                setPreferences(saved);
+            window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
+        }
+        catch (caught) {
+            setPreferences((current) => current ? { ...current, useNativeClaudeCodeRuntime: previous } : current);
+            setError(caught instanceof Error
+                ? caught.message
+                : t("settings.agentModelPicker.errors.updateDirectRuntime", {
+                    runtime: "Claude Code",
+                }));
+        }
+        finally {
+            setPendingAgent(null);
+        }
+    }, [pendingAgent, preferences, setPreferences, t]);
+    const ready = preferences !== null &&
+        (activeProviderSetting || modelDefaults !== undefined);
+    const imagePreferences = preferences?.imageGeneration ?? DEFAULT_IMAGE_GENERATION;
+    const voicePreferences = preferences?.realtimeVoice ?? DEFAULT_REALTIME_VOICE;
+    const engineGovernsActiveTab = activeAssistant ||
+        ASSISTANT_AGENT_KEYS.some((key) => key === activeAgent);
+    const activeEngineModelId = getActiveEngineModelId(preferences);
+    const current = activeImage
+        ? imagePreferences.provider
+        : activeVoice
+            ? voicePreferences.provider
+            : engineGovernsActiveTab && activeEngineModelId
+                ? activeEngineModelId
+                : activeAssistant
+                    ? currentModelReference(overrides.orchestrator ?? overrides.general ?? "")
+                    : currentModelReference(overrides[activeAgent] ?? "");
+    const defaultLabel = activeProviderSetting
+        ? "Stella"
+        : !ready
+            ? t("settings.agentModelPicker.default")
+            : activeAssistant
+                ? t("settings.agentModelPicker.stellaDefault")
+                : getDefaultModelOptionLabel(canonicalAgentKey, defaultModelMap, resolvedDefaultModelMap, modelNamesById);
+    const defaultModelId = resolvedDefaultModelMap[canonicalAgentKey] ??
+        defaultModelMap[canonicalAgentKey] ??
+        "";
+    const currentLabel = activeProviderSetting
+        ? (IMAGE_PROVIDER_OPTIONS.find((entry) => entry.key === current)?.label ??
+            VOICE_PROVIDER_OPTIONS.find((entry) => entry.key === current)?.label ??
+            "Stella")
+        : ready
+            ? current
+                ? getModelPickerDisplayLabel(current, modelNamesById)
+                : activeAssistant
+                    ? getModelPickerDisplayLabel(defaultModelId, modelNamesById)
+                    : defaultLabel
+            : t("common.loading");
+    const claudeCodeModelsWithCurrent = useMemo(() => {
+        const models = claudeCodeModels ?? [];
+        if (claudeCodeModels === null ||
+            !selectedClaudeCodeModel ||
+            models.some((model) => model.id === selectedClaudeCodeModel)) {
+            return models;
+        }
+        return [
+            ...models,
+            {
+                id: selectedClaudeCodeModel,
+                label: selectedClaudeCodeModel,
+                description: t("settings.compactModelList.unavailable"),
+                unavailable: true,
+            },
+        ];
+    }, [claudeCodeModels, selectedClaudeCodeModel, t]);
+    const currentReasoningEffort = normalizeReasoningEffortLevel(committedEngine === "codex_cli"
+        ? preferences?.codexReasoningEffort
+        : committedEngine === "claude_code_local"
+            ? preferences?.claudeCodeReasoningEffort
+            : activeAssistant
+                ? (preferences?.reasoningEfforts?.orchestrator ??
+                    preferences?.reasoningEfforts?.general)
+                : preferences?.reasoningEfforts?.[activeAgent]);
+    const reasoningEffortOptions = listReasoningEffortOptions();
+    const reasoningDisabled = pendingAgent !== null ||
+        (committedEngine === "codex_cli" &&
+            chatGptConnection !== "connected" &&
+            !planSignedInAt(destination, "chatgpt"));
+    const currentBlock = modelBlockedAt(destination, current);
+    const currentAnsweredElsewhere = currentBlock === "only-here" ||
+        (currentBlock !== undefined && destination.kind === "cloud" && current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`));
+    const reasoningControl = (<row {...s.agentModelPickerReasoning}>
+        <Lightbulb size={14} strokeWidth={1.75} {...s.agentModelPickerReasoningIcon} color={s.agentModelPickerReasoningIcon.color} />
+        <row {...s.agentModelPickerReasoningOptions} role="radiogroup" label={t("settings.modelPicker.reasoning.label")}>
+          {reasoningEffortOptions.map((option) => (<Press {...s.agentModelPickerReasoningOptions_button} {...(currentReasoningEffort === option.id ? s.agentModelPickerReasoningOptions_buttonActive : null)} {...(reasoningDisabled ? s.agentModelPickerReasoningOptions_buttonDisabled : null)} text={tx(s.agentModelPickerReasoning)} key={option.id} role="radio" checked={currentReasoningEffort === option.id} disabled={reasoningDisabled} onPress={() => void handleReasoningEffortSelect(option.id)}>
+              {t(option.labelKey)}
+            </Press>))}
+        </row>
+      </row>);
+    const claudeCodeSelectionControls = (<col {...s.agentModelPickerSelectedControls}>
+        {reasoningControl}
+        <row {...s.agentModelPickerEngineOptions}>
+          <Switch {...s.agentModelPickerEngineOption} labelStyle={s.agentModelPickerEngineOption_switchLabel} label="Use Claude Code instead" title="Uses your installed Claude Code configuration, skills, and MCP servers instead of Stella's harness." checked={preferences?.useNativeClaudeCodeRuntime === true} disabled={!preferences || pendingAgent !== null} onCheckedChange={(checked) => void handleNativeClaudeCodeRuntimeChange(checked)} />
+        </row>
+      </col>);
+    const chatGptSelectionControls = (<col {...s.agentModelPickerSelectedControls}>
+        {reasoningControl}
+        {chatGptConnection === "connected" && !runsElsewhere ? (<ChatGptPlanInUse label={t("settings.agentModelPicker.chatGptPlanInUse")} manageLabel={t("settings.agentModelPicker.chatGptManageUsage")} />) : null}
+      </col>);
+    const handleExtraSectionExpanded = useCallback((key: string, expanded: boolean) => {
+        if (key === CHATGPT_SECTION_KEY) {
+            if (!expanded && oauthPendingProvider)
+                void cancelPendingOAuth();
+        }
+        else if (key === CLAUDE_CODE_SECTION_KEY) {
+            setClaudeCodeSectionOpen(expanded);
+        }
+    }, [cancelPendingOAuth, oauthPendingProvider]);
+    const handleCatalogRefresh = useCallback(() => {
+        migrationAttemptedRef.current = null;
+        const jobs: Promise<unknown>[] = [refresh()];
+        if (claudeCodeSectionOpen || committedEngine === "claude_code_local")
+            jobs.push(claudeCodeCatalog.refresh());
+        void Promise.all(jobs);
+    }, [claudeCodeCatalog, claudeCodeSectionOpen, committedEngine, refresh]);
+    const restrictedStellaPicks = isRestrictedModelOverrideAudience(audience);
+    const restrictedPlanLabel = audience ? getPlanLabel(audience) : null;
+    const tabButton = (key: string, label: string, title: string, isActive: boolean) => (<Press {...s.agentModelPickerToggleBtn} key={key} role="tab" selected={isActive} onPress={() => {
+            if (oauthPendingProvider) {
+                void cancelPendingOAuth();
+            }
+            setActiveAgent(key);
+        }} disabled={pendingAgent !== null && !oauthPendingProvider} title={title} {...((isActive || undefined) ? s.agentModelPickerToggleBtnActive : null)} {...((pendingAgent !== null && !oauthPendingProvider) ? s.agentModelPickerToggleBtnDisabled : null)}>
+      {label}
+    </Press>);
+    const engineCatalogError = (onRetry: () => void) => (<row w="full" {...s.agentModelPickerLoadError} role="status">
+        <T {...tx(s.agentModelPickerLoadError)}>{t("settings.modelPicker.loadFailed")}</T>
+        <Press text={tx(s.agentModelPickerLoadError)} {...s.agentModelPickerLoadErrorRetry} onPress={onRetry} disabled={pendingAgent !== null} {...((pendingAgent !== null) ? s.agentModelPickerLoadErrorRetryDisabled : null)}>
+          {t("settings.modelPicker.retry")}
+        </Press>
+      </row>);
+    return (<col {...s.agentModelPicker}>
+      <row {...s.agentModelPickerHeader}>
+          <T {...s.agentModelPickerToggle} role="tablist" label={t("settings.agentModelPicker.surfaceAriaLabel")} /* VARIANT data-surface=surface: SurfaceSettings→s.agentModelPickerToggleSurfaceSettings */>
+            {surface === "settings"
+            ? [
+                ...configurableAgents.map((agent) => tabButton(agent.key, agent.label, agent.desc, agent.key === activeAgent)),
+                tabButton(IMAGE_TARGET, t("settings.agentModelPicker.tabs.image"), t("settings.agentModelPicker.tabs.imageTitle"), activeImage),
+                ...(voiceVisible
+                    ? [tabButton(VOICE_TARGET, t("settings.agentModelPicker.tabs.voice"), t("settings.agentModelPicker.tabs.voiceTitle"), activeVoice)]
+                    : []),
+            ]
+            : [
+                tabButton(ASSISTANT_TARGET, t("settings.agentModelPicker.tabs.assistant"), t("settings.agentModelPicker.tabs.assistantTitle"), activeAssistant),
+                tabButton(IMAGE_TARGET, t("settings.agentModelPicker.tabs.image"), t("settings.agentModelPicker.tabs.imageTitle"), activeImage),
+                ...(voiceVisible
+                    ? [tabButton(VOICE_TARGET, t("settings.agentModelPicker.tabs.voice"), t("settings.agentModelPicker.tabs.voiceTitle"), activeVoice)]
+                    : []),
+            ]}
+          </T>
+        </row>
+
+      <col {...s.agentModelPickerBody}>
+        {pendingAgent === ENGINE_PENDING_TARGET && oauthPendingProvider ? (<T w="full" {...s.agentModelPickerConnection} role="status">
+            {t("settings.agentModelPicker.waitingForChatGpt")}{" "}
+            <Press text={tx(s.agentModelPickerConnection)} onPress={() => void cancelPendingOAuth()}>
+              {t("common.cancel")}
+            </Press>
+          </T>) : null}
+
+        {activeImage ? (<ProviderOnlyPicker providers={imageProviderOptions} value={current || "stella"} onSelect={(key) => void handleImageProviderSelect(key)} disabled={!preferences || pendingAgent !== null} ariaLabel={t("settings.agentModelPicker.imageProviderAriaLabel")} />) : activeVoice ? (<>
+            <ProviderOnlyPicker providers={voiceProviderOptions} value={current || "stella"} onSelect={(key) => void handleVoiceProviderSelect(key)} disabled={!preferences || pendingAgent !== null} ariaLabel={t("settings.agentModelPicker.voiceProviderAriaLabel")} />
+            <VoiceCatalogPicker voiceProvider={voicePreferences.provider} selectedVoices={voicePreferences.voices} readAloudProvider={voicePreferences.readAloudProvider} onSelectVoice={(underlyingProvider, voiceId) => void handleVoiceSelect(underlyingProvider, voiceId)} onSelectReadAloudProvider={(provider) => void handleReadAloudProviderSelect(provider)} onSelectReadAloudVoice={(voiceId) => void handleReadAloudVoiceSelect(voiceId)} disabled={!preferences || pendingAgent !== null} />
+          </>) : (<>
+            {destination.kind === "here" ? null : (<T w="full" {...sEnginePlace.enginePlaceLine} role="note">
+                {destination.kind === "cloud"
+                    ? t("settings.modelPlace.runsInCloud")
+                    : t("settings.modelPlace.runsOn", { place: destination.place })}
+                {currentAnsweredElsewhere
+                    ? ` ${t("settings.modelPlace.currentElsewhere", { place: destination.placeStart })}`
+                    : ""}
+              </T>)}
+            <ProviderModelPanel destination={destination} value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={reasoningControl} collapsibleGroups activeSectionKey={activeSectionKey} focusSection={focusSection} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
+                ((claudeCodeSectionOpen || committedEngine === "claude_code_local") &&
+                    claudeCodeModelsLoading)} extraSections={[
+                {
+                    key: CLAUDE_CODE_SECTION_KEY,
+                    label: "Claude Code",
+                    brandKey: "anthropic",
+                    badge: enginePlaceBadge(t, destination, "claude-code"),
+                    selected: committedEngine === "claude_code_local",
+                    content: () => (<EnginePlace destination={destination} plan="claude-code" selected={committedEngine === "claude_code_local"}>{claudeCodeCatalog.error && !claudeCodeModelsLoading
+                        ? engineCatalogError(() => void claudeCodeCatalog.refresh())
+                        : (<>
+                        <EngineScopedModelList engineLabel="Claude Code" hideHead selectedRowExtra={claudeCodeSelectionControls} models={claudeCodeModelsWithCurrent} value={committedEngine === "claude_code_local"
+                                ? selectedClaudeCodeModel
+                                : ""} onSelect={(modelId) => void handleEngineModelSelect("claude_code_local", modelId)} loading={claudeCodeModelsLoading} disabled={!preferences || pendingAgent !== null}/>
+                      </>)}</EnginePlace>),
+                },
+                {
+                    key: ANTIGRAVITY_SECTION_KEY,
+                    label: "Google Antigravity",
+                    brandKey: "antigravity",
+                    badge: enginePlaceBadge(t, destination, "antigravity"),
+                    selected: current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`),
+                    content: () => (<AntigravityModelSection destination={destination} computers={computers} selected={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`)}>
+                        {(models) => (<EngineScopedModelList engineLabel="Google Antigravity" hideHead selectedRowExtra={reasoningControl} models={antigravityRows(models)} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? antigravityModelInUse(current.slice(ANTIGRAVITY_SECTION_KEY.length + 1), models) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>)}
+                      </AntigravityModelSection>),
+                },
+                {
+                    key: CHATGPT_SECTION_KEY,
+                    label: "ChatGPT",
+                    brandKey: "openai",
+                    badge: enginePlaceBadge(t, destination, "chatgpt"),
+                    selected: committedEngine === "codex_cli",
+                    content: () => (<EnginePlace destination={destination} plan="chatgpt" selected={committedEngine === "codex_cli"}>
+                        {chatGptDisplayModels.length === 0 ? (<T w="full" {...s.agentModelPickerConnection} role="status">
+                            {t("settings.agentModelPicker.noChatGptModels")}
+                          </T>) : chatGptRoutedNotice ? (<T w="full" {...s.agentModelPickerConnection} role="status">
+                            {chatGptRoutedNotice}
+                          </T>) : null}
+                        <EngineScopedModelList engineLabel="ChatGPT" hideHead selectedRowExtra={chatGptSelectionControls} models={chatGptDisplayModels} value={committedEngine === "codex_cli" ? selectedChatGptModel : ""} onSelect={(modelId) => void handleEngineModelSelect("codex_cli", modelId)} emptyMessage={null} disabled={!preferences ||
+                            pendingAgent !== null}/>
+                      </EnginePlace>),
+                },
+            ]} />
+          </>)}
+
+      </col>
+
+    </col>);
+}

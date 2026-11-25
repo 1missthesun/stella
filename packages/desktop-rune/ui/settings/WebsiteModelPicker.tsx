@@ -1,0 +1,76 @@
+import { T } from "../kit/compat";
+import { useAgentModelPicker } from "./AgentModelPicker.styles";
+import { useState, useSyncExternalStore } from "react";
+import { useAuthState } from "@/global/auth/BackendAuthProvider";
+import {
+  cloudEnginesApi,
+  useCloudEngines,
+} from "@/features/cloud/cloud-engines-api";
+import {
+  getCloudExecutionSelectionSnapshot,
+  publishCloudExecutionSelection,
+  subscribeCloudExecutionSelection,
+} from "@/features/cloud/cloud-execution-store";
+import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
+import { ProviderModelPanel } from "./ProviderModelPanel";
+import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
+import { useT } from "@/shared/i18n";
+import {
+  normalizeReasoningEffortLevel,
+  type ReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
+
+export function WebsiteModelPicker({
+  active = true,
+  onSelected,
+  className,
+}: {
+  active?: boolean;
+  onSelected?: () => void;
+  className?: string;
+}) {
+  const s = useAgentModelPicker();
+  const t = useT();
+  const { isAuthenticated } = useAuthState();
+  const connections = useCloudEngines(isAuthenticated);
+  const localExecution = useSyncExternalStore(
+    subscribeCloudExecutionSelection,
+    getCloudExecutionSelectionSnapshot,
+    () => null,
+  );
+  const execution = localExecution ?? connections?.execution;
+  const { groups, models, refresh, refreshing, error: catalogError } = useModelCatalog();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const current = execution?.engine === "stella" ? execution.model : "";
+  const selected = models.find((model) => model.id === current);
+  const reasoningEffort = normalizeReasoningEffortLevel(execution?.reasoningEffort);
+
+  const select = async (model: string, effort: ReasoningEffortLevel = reasoningEffort) => {
+    if (pending || !isAuthenticated || !model) return;
+    setPending(true);
+    setError(null);
+    try {
+      const next = {
+        engine: "stella" as const,
+        provider: "stella" as const,
+        model,
+        reasoningEffort: effort,
+      };
+      await cloudEnginesApi.setExecution(next);
+      publishCloudExecutionSelection(next);
+      onSelected?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <col {...s.agentModelPicker}>
+      <ProviderModelPanel value={current} defaultLabel="Stella" currentLabel={selected ? getStellaResolvedModelName(selected) : execution?.model ?? "Stella"} groups={groups} visibleProviders={["stella"]} disabled={!active || !isAuthenticated || !connections || pending} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={(model) => void select(model)} reasoningEffort={reasoningEffort} onSelectReasoning={(model, effort) => void select(model, effort)} hideDefaultRow hideSelectedTitle onRefresh={() => void refresh()} catalogError={catalogError} refreshing={refreshing} />
+      {error ? <T w="full" role="alert">{error}</T> : null}
+    </col>
+  );
+}

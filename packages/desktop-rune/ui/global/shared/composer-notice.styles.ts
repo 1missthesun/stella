@@ -1,0 +1,27 @@
+import { mixOklch, sheet } from "../../theme";
+
+export const useComposerNotice = sheet((c) => ({
+  composerNotice: { py: 13, pr: 41, pl: 15, mb: 10, align: "center", gap: 12, selfAlign: "center", border: c.border, radius: 14, fill: c.surfaceInset },
+  composerNoticeIcon: { pad: 1, align: "center", justify: "center", w: 34, h: 34, radius: 10, border: c.border, fill: mixOklch(c.foreground, 5, "transparent"), color: c.textWeak },
+  composerNoticeLimit_composerNoticeIcon: { color: c.warning },
+  composerNoticeBody: { grow: 1, shrink: true, minW: 0 },
+  composerNoticeTitle: { size: 13, weight: 600, color: c.textStrong },
+  composerNoticeSub: { mt: 2, size: 12.5, lh: 1.35, color: c.textWeak, maxLines: 3 },
+  composerNoticeActions: { align: "center", gap: 8 },
+  composerNoticeDismiss: { pad: 0, absolute: { top: 8, right: 8 }, align: "center", justify: "center", w: 24, h: 24, radius: 999, color: c.textWeak, cursor: "pointer", hover: mixOklch(c.foreground, 8, "transparent"), hoverColor: c.textStrong },
+  composerNoticeCompact: { py: 9, pr: 32, pl: 10, mb: 8, w: "full", gap: 9, radius: 12, wrap: true },
+  composerNoticeCompact_composerNoticeIcon: { w: 28, h: 28, radius: 8 },
+  composerNoticeCompact_composerNoticeTitle: { size: 12.5 },
+  composerNoticeCompact_composerNoticeSub: { size: 11.5 },
+  composerNoticeCompact_composerNoticeActions: { w: "full", justify: "end" },
+  composerNoticeLimit: { py: 9, align: "start" },
+  composerNoticeLimitComposerNoticeCompact: { py: 7 },
+  composerNoticeRow: { mt: 2, align: "center", gap: 10 },
+  composerNoticeRow_composerNoticeSub: { grow: 1, shrink: true, minW: 0 },
+  composerNoticeLimit_composerNoticeTitle: { lineHeight: 18 },
+  composerNoticeLimit_composerNoticeRow: { mt: 8, mr: -29 },
+  composerNoticeLimitComposerNoticeCompact_composerNoticeTitle: { lineHeight: 17 },
+  composerNoticeLimitComposerNoticeCompact_composerNoticeRow: { mt: 6, mr: -23 },
+  composerNoticePrimaryPillBtn: { h: 28 },
+  composerNoticeSecondaryPillBtn: { h: 28 },
+}));

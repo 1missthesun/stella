@@ -166,7 +166,8 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/bun.zip" "$url"
           unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
           echo "BUN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
-          ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$RUNNER_TEMP/bun-linux-x64/bun" install --frozen-lockfile --filter @stella/desktop-rune
+          ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$RUNNER_TEMP/bun-linux-x64/bun" install --frozen-lockfile \
+            --filter ./ --filter @stella/desktop --filter @stella/desktop-ui --filter @stella/desktop-rune
 
       - name: Launch and screenshot
         env:
@@ -192,7 +193,7 @@ jobs:
             kill -0 "$engine_pid" 2>/dev/null || { cat "$out/engine.log"; exit 1; }
             sleep 0.1
           done
-          grep -m1 '"first_content_frame"' "$out/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY"
+          grep -m1 '"first_content_frame"' "$out/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY" || { echo "no first_content_frame in 30 s"; tail -n 60 "$out/engine.log"; exit 1; }
           sleep 2
           kill -0 "$engine_pid" || { cat "$out/engine.log"; exit 1; }
           DISPLAY=:93 import -window root "$out/screen.png"

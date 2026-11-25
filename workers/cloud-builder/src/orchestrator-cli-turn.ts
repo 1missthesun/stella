@@ -367,6 +367,33 @@ export const dispatchOrchestratorCliTurn = async (args: {
   }
 };
 
+export const steerOrchestratorCliTurn = async (args: {
+  env: BuildSessionEnv;
+  ownerId: string;
+  ownerGeneration: string;
+  identity: CloudCliTurnIdentity;
+  messageId: string;
+  text: string;
+}): Promise<boolean> => {
+  const response = await buildSession(args.env, args.identity.threadId).fetch(
+    "https://build-session/steer",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ownerId: args.ownerId,
+        ownerGeneration: args.ownerGeneration,
+        turnId: args.identity.turnId,
+        attemptGeneration: args.identity.attemptGeneration,
+        messageId: args.messageId,
+        text: args.text,
+      }),
+    },
+  );
+  const body = (await response.json().catch(() => null)) as { accepted?: unknown } | null;
+  return response.ok && body?.accepted === true;
+};
+
 export const cancelOrchestratorCliTurn = async (args: {
   env: BuildSessionEnv;
   ownerId: string;

@@ -44,6 +44,7 @@ import {
   runNativeAgentTurn,
   type ClaudeStreamJsonEvent,
 } from "./native-agent-turn.js";
+import { openAgentInbox, type AgentInbox } from "./agent-inbox.js";
 import { createNativeTurnCancellation } from "./turn-cancellation.js";
 import type { TurnCredentialBrokerClient } from "./turn-credential-broker.js";
 
@@ -600,6 +601,7 @@ const failed = (error: string): AgentTurnResult => ({
 export const runOrchestratorTurn = async (args: {
   input: OrchestratorTurnInput;
   broker: TurnCredentialBrokerClient;
+  inbox?: string;
 }): Promise<AgentTurnResult> => {
   const { input, broker } = args;
   const spec = parseCloudOrchestratorCliTurnSpec({
@@ -721,6 +723,18 @@ export const runOrchestratorTurn = async (args: {
     );
   }
 
+  let inbox: AgentInbox | undefined;
+  if (args.inbox && !spec.compact) {
+    try {
+      inbox = await openAgentInbox(args.inbox);
+    } catch (inboxError) {
+      await mcpHost.close().catch(() => undefined);
+      return failed(
+        `Stella couldn't open this chat turn's message inbox: ${asError(inboxError).message}`,
+      );
+    }
+  }
+
   let finalText = "";
   let error: string | undefined;
   let usage: Usage = EMPTY_USAGE;
@@ -771,6 +785,7 @@ export const runOrchestratorTurn = async (args: {
           : {}),
         claudeToolHost: mcpHost,
         cancellation: turnCancellation,
+        ...(inbox ? { inbox } : {}),
         ...(spec.quiet ? { quiet: true } : {}),
         onStreamEvent: (event) => {
           correlator.observeStreamEvent(event);
@@ -825,6 +840,7 @@ export const runOrchestratorTurn = async (args: {
       payloadJson: JSON.stringify(message),
     }));
   } finally {
+    await inbox?.close().catch(() => []);
     await mcpHost.close().catch((closeError) => {
       console.error(
         `orchestrator MCP close failed: ${asError(closeError).message}`,

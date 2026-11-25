@@ -343,7 +343,7 @@ export const runAgentTurn = (
       markTurnStep("brokerReady");
       if (input.role === "orchestrator") {
         return yield* Effect.promise(() =>
-          runOrchestratorTurn({ input, broker }),
+          runOrchestratorTurn({ input, broker, inbox: attempt.inbox }),
         );
       }
       const promptBody = parseCloudAgentSystemPrompt(input.systemPrompt);

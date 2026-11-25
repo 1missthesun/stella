@@ -377,6 +377,7 @@ export const steerContainerAgent = async (
   ) {
     return json({ error: "Invalid agent message." }, 400);
   }
+  const exact = body.turnId !== undefined || body.attemptGeneration !== undefined;
   const [turn, terminal] = await Promise.all([
     host.ctx.storage.get<TurnRequest>("turn"),
     host.ctx.storage.get<boolean>("terminal"),
@@ -384,7 +385,8 @@ export const steerContainerAgent = async (
   if (
     !turn ||
     turn.kind !== "agent" ||
-    turn.agentRole === "orchestrator" ||
+    (turn.agentRole === "orchestrator" && !exact) ||
+    (exact && (body.turnId !== turn.turnId || body.attemptGeneration !== turn.attemptGeneration)) ||
     !turn.threadId ||
     terminal !== false ||
     !Number.isSafeInteger(turn.attemptGeneration) ||

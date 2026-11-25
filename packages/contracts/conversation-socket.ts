@@ -1,4 +1,5 @@
 import { REQUEST_BUDGET_MS, withDeadline } from "./request-deadline.js";
+import { noteServerTime } from "./server-clock.js";
 import { socketCredentialProtocol } from "./socket-ticket.js";
 import {
   BACKFILL_BATCH_RECORDS,
@@ -624,6 +625,7 @@ export class ConversationSocket {
 
   private handleReady(ready: ReadyFrame): void {
     this.options.onReadiness?.("socket-ready");
+    noteServerTime(ready.serverTimeMs);
     if (this.openTimer) clearTimeout(this.openTimer);
     this.openTimer = null;
     this.liveSinceMs = Date.now();

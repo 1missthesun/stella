@@ -6,6 +6,8 @@ import {
 } from "./conversation-protocol.js";
 import type { AgentAttemptOutcome } from "./agent-status.js";
 import { wakePromptOf } from "./agent-wake-prompt.js";
+import { EMAIL_CARD_TYPE } from "./email-card.js";
+import { REMINDER_CARD_TYPE } from "./reminders.js";
 import {
   splitMessageReplyRefs,
   toReplyPreview,
@@ -13,6 +15,8 @@ import {
   type RawReplyRef,
   type ReplyRef,
 } from "./reply-refs.js";
+import { SAFEGUARD_CARD_TYPE } from "./safeguard-block.js";
+import { SCHEDULE_NOTICE_CARD_TYPE } from "./schedule-notice.js";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -62,13 +66,40 @@ export const journalUserReactions = (
   return reactions;
 };
 
+const WRITER_CLOCK_TOLERANCE_MS = 5 * 60_000;
+
 export const journalMessageTimestamp = (
   record: JournalMessageRecord,
-): number =>
-  typeof record.payload.timestamp === "number" &&
-  Number.isFinite(record.payload.timestamp)
-    ? record.payload.timestamp
-    : record.createdAtMs;
+  prompt?: JournalMessageRecord,
+): number => {
+  const written = record.payload.timestamp;
+  if (typeof written !== "number" || !Number.isFinite(written)) return record.createdAtMs;
+  if (record.createdAtMs <= 0) return written;
+  if (written > record.createdAtMs + WRITER_CLOCK_TOLERANCE_MS) return record.createdAtMs;
+  if (record.turnId.startsWith("import:")) return written;
+  const earliest =
+    record.role === "user"
+      ? record.createdAtMs
+      : prompt && prompt !== record
+        ? prompt.createdAtMs
+        : undefined;
+  return earliest === undefined || written >= earliest - WRITER_CLOCK_TOLERANCE_MS
+    ? written
+    : earliest;
+};
+
+const SHOWN_CARD_TYPES: ReadonlySet<string> = new Set([
+  REMINDER_CARD_TYPE,
+  SCHEDULE_NOTICE_CARD_TYPE,
+  SAFEGUARD_CARD_TYPE,
+  EMAIL_CARD_TYPE,
+]);
+
+const showsInChat = (record: JournalRecord): boolean =>
+  record.kind === "message" || (record.kind === "card" && SHOWN_CARD_TYPES.has(record.card.type));
+
+export const journalTurnSeq = (turnRecords: readonly JournalRecord[]): number =>
+  (turnRecords.find(showsInChat) ?? turnRecords[0]!).seq;
 
 export type JournalMirroredWake = {
   record: JournalMessageRecord;

@@ -109,7 +109,7 @@ export const WebThumbnail = memo(function WebThumbnail(
           javaScriptEnabled={uri === null}
           javaScriptCanOpenWindowsAutomatically={false}
           injectedJavaScriptBeforeContentLoaded={STILL_AFTER_SETTLING}
-          incognito
+          incognito={uri === null}
           cacheEnabled={false}
           allowFileAccess={uri !== null}
           allowFileAccessFromFileURLs={false}

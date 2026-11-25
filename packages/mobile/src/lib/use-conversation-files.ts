@@ -34,6 +34,26 @@ export type ConversationFilesState = {
   deviceNames: ReadonlyMap<string, string>;
 };
 
+type Remembered = {
+  files: ConversationFile[];
+  cursor: Cursor;
+  headSeq: number;
+};
+
+const MAX_REMEMBERED = 4;
+const remembered = new Map<string, Remembered>();
+let rememberedDeviceNames: ReadonlyMap<string, string> = new Map();
+
+const remember = (id: string, entry: Remembered): void => {
+  remembered.delete(id);
+  remembered.set(id, entry);
+  while (remembered.size > MAX_REMEMBERED) {
+    const oldest = remembered.keys().next().value;
+    if (oldest === undefined) return;
+    remembered.delete(oldest);
+  }
+};
+
 const mergeNewer = (
   current: readonly ConversationFile[],
   newer: readonly ConversationFile[],
@@ -57,15 +77,26 @@ export function useConversationFiles(
   conversationId: string | null,
   revision: string | null,
 ): ConversationFilesState {
-  const [files, setFiles] = useState<ConversationFile[]>([]);
-  const [loading, setLoading] = useState(Boolean(conversationId));
+  const [files, setFiles] = useState<ConversationFile[]>(
+    () => (conversationId ? remembered.get(conversationId)?.files : undefined) ?? [],
+  );
+  const [loading, setLoading] = useState(
+    Boolean(conversationId) && !remembered.has(conversationId ?? ""),
+  );
   const [available, setAvailable] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [cursor, setCursor] = useState<Cursor>({ phase: "done" });
-  const [deviceNames, setDeviceNames] = useState<ReadonlyMap<string, string>>(
-    () => new Map(),
+  const [cursor, setCursor] = useState<Cursor>(
+    () =>
+      (conversationId ? remembered.get(conversationId)?.cursor : undefined) ?? {
+        phase: "done",
+      },
   );
-  const headSeq = useRef(-1);
+  const [deviceNames, setDeviceNames] = useState<ReadonlyMap<string, string>>(
+    () => rememberedDeviceNames,
+  );
+  const headSeq = useRef(
+    (conversationId ? remembered.get(conversationId)?.headSeq : undefined) ?? -1,
+  );
   const busy = useRef(false);
   const generation = useRef(0);
   const located = useRef(new Set<string>());
@@ -80,6 +111,7 @@ export function useConversationFiles(
           const label = device.label?.trim();
           if (label) names.set(device.deviceId, label);
         }
+        rememberedDeviceNames = names;
         setDeviceNames(names);
       })
       .catch(() => undefined);
@@ -91,11 +123,19 @@ export function useConversationFiles(
   useEffect(() => {
     const id = conversationId;
     const run = ++generation.current;
+    const known = id ? remembered.get(id) : undefined;
+    setAvailable(true);
+    located.current = new Set();
+    if (known) {
+      setFiles(known.files);
+      setCursor(known.cursor);
+      headSeq.current = known.headSeq;
+      setLoading(false);
+      return;
+    }
     setFiles([]);
     setCursor({ phase: "done" });
-    setAvailable(true);
     headSeq.current = -1;
-    located.current = new Set();
     if (!id) {
       setLoading(false);
       return;
@@ -145,7 +185,7 @@ export function useConversationFiles(
 
   useEffect(() => {
     const id = conversationId;
-    if (!id || !revision) return;
+    if (!id) return;
     const run = generation.current;
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -165,12 +205,17 @@ export function useConversationFiles(
           setFiles((current) => mergeNewer(current, newer));
         } catch {}
       })();
-    }, REFRESH_DEBOUNCE_MS);
+    }, revision ? REFRESH_DEBOUNCE_MS : 0);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
   }, [conversationId, revision]);
+
+  useEffect(() => {
+    if (!conversationId || loading || headSeq.current < 0) return;
+    remember(conversationId, { files, cursor, headSeq: headSeq.current });
+  }, [conversationId, cursor, files, loading]);
 
   const loadMore = useCallback(() => {
     const id = conversationId;

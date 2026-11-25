@@ -14,7 +14,9 @@ import type { EvidenceSourceKind } from "@stella/contracts/chat-evidence-naming"
 import {
   isHtmlPagePath,
   PAGE_PREVIEW_MAX_BYTES,
+  type PagePreviewShape,
 } from "@stella/contracts/page-preview";
+import { BackendRequestError } from "@stella/contracts/backend/client";
 import { getBackendClient } from "./backend";
 import { resolveCloudDriveFile } from "./use-cloud-drive-file-uri";
 import { driveFileVersions } from "./drive-file-versions";
@@ -255,9 +257,33 @@ const deviceThumbnailFor = async (
   return { kind: "image", uri: target.uri };
 };
 
-const drivePagePreviewFor = async (drivePath: string): Promise<EvidencePreview> => {
-  const preview = await getBackendClient().call("drive.pagePreview", { path: drivePath });
-  const identity = `${CACHE_SCHEMA}:page:${preview.path}:${preview.version}`;
+const callPagePreview = async (drivePath: string, shape: PagePreviewShape) => {
+  const client = getBackendClient();
+  if (shape === "card") {
+    return { shape, preview: await client.call("drive.pagePreview", { path: drivePath }) };
+  }
+  try {
+    return {
+      shape,
+      preview: await client.call("drive.pagePreview", { path: drivePath, shape }),
+    };
+  } catch (error) {
+    if (!(error instanceof BackendRequestError) || error.code !== "BAD_REQUEST") {
+      throw error;
+    }
+    return {
+      shape: "card" as const,
+      preview: await client.call("drive.pagePreview", { path: drivePath }),
+    };
+  }
+};
+
+const drivePagePreviewFor = async (
+  drivePath: string,
+  wanted: PagePreviewShape = "card",
+): Promise<EvidencePreview> => {
+  const { shape, preview } = await callPagePreview(drivePath, wanted);
+  const identity = `${CACHE_SCHEMA}:page:${shape === "card" ? "" : `${shape}:`}${preview.path}:${preview.version}`;
   const cached = readManifest(identity);
   if (cached?.kind === "page") return cached;
   const target = new File(directoryFor("page"), `${stableKey(identity)}.jpg`);
@@ -271,10 +297,11 @@ const drivePagePreviewFor = async (drivePath: string): Promise<EvidencePreview> 
 
 const devicePagePreviewFor = async (
   request: EvidencePreviewRequest,
+  shape: PagePreviewShape,
 ): Promise<EvidencePreview> => {
   const location = await locateDeviceFile(request.filePath);
   if (location?.drivePath) {
-    const copy = await drivePagePreviewFor(location.drivePath).catch(() => null);
+    const copy = await drivePagePreviewFor(location.drivePath, shape).catch(() => null);
     if (copy) return copy;
   }
   const source = await resolveLinkedFile(
@@ -302,11 +329,14 @@ const devicePagePreviewFor = async (
   return { kind: "page", uri: target.uri };
 };
 
-const pagePreviewFor = async (request: EvidencePreviewRequest): Promise<EvidencePreview> => {
+const pagePreviewFor = async (
+  request: EvidencePreviewRequest,
+  shape: PagePreviewShape = "card",
+): Promise<EvidencePreview> => {
   const drivePath = evidenceDrivePath(request.filePath);
   return drivePath
-    ? await drivePagePreviewFor(drivePath)
-    : await devicePagePreviewFor(request);
+    ? await drivePagePreviewFor(drivePath, shape)
+    : await devicePagePreviewFor(request, shape);
 };
 
 const imagePreviewFor = async (
@@ -443,6 +473,56 @@ export const requestEvidencePreview = (
   inFlight.set(key, work);
   return work;
 };
+
+const versionedKey = (prefix: string, filePath: string): string => {
+  const drivePath = evidenceDrivePath(filePath);
+  const version = drivePath ? (driveFileVersions.version(drivePath) ?? "") : "";
+  return `${prefix}:${filePath}:${version}`;
+};
+
+const once = (
+  key: string,
+  work: () => Promise<EvidencePreview>,
+): Promise<EvidencePreview> => {
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+  const started = withSlot(work).catch((error: unknown) => {
+    if (inFlight.get(key) === started) inFlight.delete(key);
+    throw error;
+  });
+  inFlight.set(key, started);
+  return started;
+};
+
+export const requestPagePreview = (
+  request: EvidencePreviewRequest,
+  shape: PagePreviewShape,
+): Promise<EvidencePreview> =>
+  once(versionedKey(`page-${shape}`, request.filePath), async () => {
+    if (!isHtmlPagePath(request.filePath)) throw new Error("This file is not a page.");
+    return await pagePreviewFor(request, shape);
+  });
+
+/** An image file for a thumbnail: the Drive thumbnail when there is one, else the original, never decoded here. */
+export const evidenceImageFile = (request: EvidencePreviewRequest): Promise<string> =>
+  once(versionedKey("image-file", request.filePath), async () => {
+    const drivePath = evidenceDrivePath(request.filePath);
+    if (isEvidenceThumbnailSource(request.filePath)) {
+      const thumbnail = await (
+        drivePath ? driveThumbnailFor(drivePath) : deviceThumbnailFor(request)
+      ).catch(() => null);
+      if (thumbnail?.kind === "image") return thumbnail;
+    }
+    const remote = await remoteSourceFor(request.filePath);
+    if (remote && remote.sizeBytes > MAX_IMAGE_BYTES) {
+      throw new Error("Image is too large to preview.");
+    }
+    const local = await localSourceFor(request, remote);
+    return { kind: "image", uri: local.uri };
+  }).then((preview) => {
+    if (preview.kind !== "image") throw new Error("No image for this file.");
+    return preview.uri;
+  });
 
 export const clearEvidencePreviews = (): void => {
   inFlight.clear();

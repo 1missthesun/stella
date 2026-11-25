@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { fonts } from "../../theme/fonts";
 import { Text } from "../Text";
@@ -80,6 +80,48 @@ const splitDelimited = (line: string, delimiter: string): string[] => {
 
 const isFigure = (cell: string): boolean => /^[-+$€£¥]?[\d.,]+%?$/.test(cell.trim());
 
+type Cell = { text: string; figure: boolean };
+type Parsed = { blocks: Block[]; rows: Cell[][] };
+
+const MAX_PARSED = 240;
+const parsedByText = new Map<string, Parsed>();
+
+const parse = (text: string, extension: string, prose: boolean, table: boolean): Parsed => {
+  const key = `${extension}\u0000${text}`;
+  const known = parsedByText.get(key);
+  if (known) return known;
+  const parsed: Parsed = {
+    blocks: prose ? markdownBlocks(text) : [],
+    rows: table
+      ? text
+          .trim()
+          .split(/\r?\n/)
+          .slice(0, MAX_ROWS)
+          .map((line) =>
+            splitDelimited(line, extension === "tsv" ? "\t" : ",")
+              .slice(0, MAX_COLUMNS)
+              .map((cell) => ({ text: cell, figure: isFigure(cell) })),
+          )
+      : [],
+  };
+  parsedByText.set(key, parsed);
+  if (parsedByText.size > MAX_PARSED) {
+    const oldest = parsedByText.keys().next().value;
+    if (oldest !== undefined) parsedByText.delete(oldest);
+  }
+  return parsed;
+};
+
+const stylesByScale = new Map<number, ReturnType<typeof makeStyles>>();
+const scaledStyles = (scale: number) => {
+  let styles = stylesByScale.get(scale);
+  if (!styles) {
+    styles = makeStyles(scale);
+    stylesByScale.set(scale, styles);
+  }
+  return styles;
+};
+
 export const TextThumbnail = memo(function TextThumbnail({
   text,
   extension,
@@ -89,31 +131,11 @@ export const TextThumbnail = memo(function TextThumbnail({
   extension: string;
   width: number;
 }) {
-  const scale = width / DESIGN_WIDTH;
-  const styles = useMemo(() => makeStyles(scale), [scale]);
+  const styles = scaledStyles(Math.round((width / DESIGN_WIDTH) * 1000) / 1000);
   const prose =
     extension === "md" || extension === "markdown" || extension === "txt";
   const table = extension === "csv" || extension === "tsv";
-  const blocks = useMemo(
-    () => (prose ? markdownBlocks(text) : []),
-    [prose, text],
-  );
-  const rows = useMemo(
-    () =>
-      table
-        ? text
-            .trim()
-            .split(/\r?\n/)
-            .slice(0, MAX_ROWS)
-            .map((line) =>
-              splitDelimited(line, extension === "tsv" ? "\t" : ",").slice(
-                0,
-                MAX_COLUMNS,
-              ),
-            )
-        : [],
-    [extension, table, text],
-  );
+  const { blocks, rows } = parse(text, extension, prose, table);
 
   if (table) {
     return (
@@ -128,10 +150,10 @@ export const TextThumbnail = memo(function TextThumbnail({
                 style={[
                   styles.cell,
                   rowIndex === 0 && styles.headCell,
-                  isFigure(cell) && styles.figure,
+                  cell.figure && styles.figure,
                 ]}
               >
-                {cell}
+                {cell.text}
               </Text>
             ))}
           </View>

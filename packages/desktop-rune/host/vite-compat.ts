@@ -5,6 +5,7 @@ import type { BunPlugin } from "bun";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { uiBuildMode } from "./services/ui-env";
 
 const DESKTOP_UI_SRC = resolve(import.meta.dir, "../../desktop-ui/src");
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"];
@@ -29,7 +30,8 @@ function resolveSpecifier(spec: string, importer: string): string | undefined {
 }
 
 function viteEnv(): Record<string, unknown> {
-  const env: Record<string, unknown> = { MODE: "production", DEV: false, PROD: true, SSR: false, BASE_URL: "/" };
+  const mode = uiBuildMode();
+  const env: Record<string, unknown> = { MODE: mode, DEV: mode === "development", PROD: mode === "production", SSR: false, BASE_URL: "/" };
   for (const [k, v] of Object.entries(process.env)) if (k.startsWith("VITE_")) env[k] = v;
   return env;
 }

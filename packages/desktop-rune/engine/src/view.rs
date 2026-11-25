@@ -17,16 +17,18 @@ pub fn rune_key(n: u32, p: &Props) -> String {
 
 pub fn build(s: &Win, eng: &Engine, id: u32) -> El {
     let Some(n) = eng.tree.get(id) else { return el() };
-    // Inputs read their edit from the window state, so they never memoize.
-    if n.props.id.is_some() && !matches!(n.kind, Kind::Input | Kind::Webview) {
+    if n.props.id.is_some() && !eng.tree.live_above.contains(&id) && !matches!(n.kind, Kind::Input | Kind::Video | Kind::Webview) {
         let key = rune_key(id, &n.props);
         return rune::memo::memo_with_hash(key, n.ver, || build_node(s, eng, id, n));
     }
     build_node(s, eng, id, n)
 }
 
-fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
+pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
     for c in &n.children {
+        if eng.tree.get(*c).is_some_and(|c| c.props.lifted()) {
+            continue;
+        }
         e = e.child(build(s, eng, *c));
     }
     e

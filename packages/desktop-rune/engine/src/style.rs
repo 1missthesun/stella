@@ -24,16 +24,16 @@ pub fn layout(mut e: El, p: &Props) -> El {
         Some(Size::Str(s)) if s.ends_with('%') => e = e.h_frac(s.trim_end_matches('%').parse::<f32>().unwrap_or(100.0) / 100.0),
         _ => {}
     }
-    if let Some(v) = p.min_w {
+    if let Some(Size::Pt(v)) = p.min_w {
         e = e.min_w(v);
     }
-    if let Some(v) = p.max_w {
+    if let Some(Size::Pt(v)) = p.max_w {
         e = e.max_w(v);
     }
-    if let Some(v) = p.min_h {
+    if let Some(Size::Pt(v)) = p.min_h {
         e = e.min_h(v);
     }
-    if let Some(v) = p.max_h {
+    if let Some(Size::Pt(v)) = p.max_h {
         e = e.max_h(v);
     }
     if let Some(v) = p.grow {
@@ -131,6 +131,17 @@ pub fn layout(mut e: El, p: &Props) -> El {
     }
     if let Some(a) = p.absolute {
         e = e.pin(a.left, a.top, a.right, a.bottom);
+    }
+    if p.fixed && p.absolute.is_none() && p.inset.is_none() {
+        e = e.pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0));
+    }
+    if p.fixed {
+        e = e.raise();
+    }
+    match p.dir.as_deref() {
+        Some("rtl") => e = e.dir(rune::Direction::Rtl),
+        Some("ltr") => e = e.dir(rune::Direction::Ltr),
+        _ => {}
     }
     match p.raise {
         Some(RaiseP::On(true)) => e = e.raise(),
@@ -319,9 +330,16 @@ pub fn motion(mut e: El, p: &Props) -> El {
     }
     if let Some(l) = &p.loop_ {
         let period = l.period.max(0.01) as f64;
+        if l.kind == "sequence" {
+            e = sequence(e, l);
+            if let Some([x, y]) = l.origin {
+                e = e.origin(x, y);
+            }
+            return e;
+        }
         let spec = match l.kind.as_str() {
             "rotation" => LoopSpec::rotation(period),
-            "slide" => LoopSpec::slide(period, [l.from.unwrap_or(0.0), 0.0], [l.to.unwrap_or(0.0), 0.0]),
+            "slide" => LoopSpec::slide(period, l.from.map_or([0.0, 0.0], |o| o.xy()), l.to.map_or([0.0, 0.0], |o| o.xy())),
             _ => LoopSpec::opacity(period, 0.0, l.low.unwrap_or(0.35), l.high.unwrap_or(1.0)),
         };
         e = e.looping(spec);
@@ -333,6 +351,55 @@ pub fn motion(mut e: El, p: &Props) -> El {
         e = e.instant_changes();
     }
     e
+}
+
+thread_local! {
+    static SEQUENCES: std::cell::RefCell<std::collections::HashMap<u64, &'static [rune::Beat]>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// A keyframed loop. `at` is a fraction of `period` (0..1), or seconds when any exceeds 1.
+/// Rune scales uniformly: `scale`, else the mean of `scaleX`/`scaleY`.
+fn sequence(e: El, l: &crate::props::LoopP) -> El {
+    if l.frames.len() < 2 {
+        return e;
+    }
+    let fractions = l.frames.iter().all(|f| f.at <= 1.0);
+    let period = l.period.max(0.01);
+    let beats: Vec<rune::Beat> = l
+        .frames
+        .iter()
+        .map(|f| {
+            let at = if fractions { f.at * period } else { f.at };
+            let scale = f.scale.or(match (f.scale_x, f.scale_y) {
+                (Some(x), Some(y)) => Some((x + y) * 0.5),
+                (x, y) => x.or(y),
+            });
+            rune::Beat::new(at as f64)
+                .opacity(f.opacity.unwrap_or(1.0))
+                .scale(scale.unwrap_or(1.0))
+                .translate(f.x.unwrap_or(0.0), f.y.unwrap_or(0.0))
+                .rotate(f.rotate.unwrap_or(0.0))
+        })
+        .collect();
+    let h = {
+        use std::hash::{Hash, Hasher};
+        let mut s = std::collections::hash_map::DefaultHasher::new();
+        for b in &beats {
+            b.at.to_bits().hash(&mut s);
+            b.opacity.to_bits().hash(&mut s);
+            b.scale.to_bits().hash(&mut s);
+            b.translate[0].to_bits().hash(&mut s);
+            b.translate[1].to_bits().hash(&mut s);
+            b.rotate.to_bits().hash(&mut s);
+        }
+        s.finish()
+    };
+    let frames: &'static [rune::Beat] = SEQUENCES.with(|m| *m.borrow_mut().entry(h).or_insert_with(|| Box::leak(beats.into_boxed_slice())));
+    let mut seq = rune::Sequence::new(frames).repeating();
+    if let Some(d) = l.delay {
+        seq = seq.delay(d as f64);
+    }
+    e.sequence(seq)
 }
 
 fn cursor(name: &str) -> Option<Cursor> {
@@ -457,8 +524,11 @@ pub fn a11y(mut e: El, p: &Props) -> El {
     if let Some(x) = p.expanded {
         e = e.expanded(x);
     }
-    if p.hidden {
+    if p.a11y_hidden || p.hidden {
         e = e.a11y_hidden();
+    }
+    if p.hidden {
+        e = e.opacity(0.0).inert();
     }
     e
 }

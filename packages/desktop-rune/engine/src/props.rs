@@ -205,6 +205,23 @@ pub struct EffectP {
     pub bounce: Option<f32>,
 }
 
+/// A slide end: an x offset, or `[x, y]`.
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Offset {
+    X(f32),
+    Xy([f32; 2]),
+}
+
+impl Offset {
+    pub fn xy(self) -> [f32; 2] {
+        match self {
+            Offset::X(x) => [x, 0.0],
+            Offset::Xy(p) => p,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct LoopP {
     pub kind: String,
@@ -215,11 +232,30 @@ pub struct LoopP {
     #[serde(default)]
     pub high: Option<f32>,
     #[serde(default)]
-    pub from: Option<f32>,
+    pub from: Option<Offset>,
     #[serde(default)]
-    pub to: Option<f32>,
+    pub to: Option<Offset>,
     #[serde(default)]
     pub times: Option<u32>,
+    #[serde(default)]
+    pub delay: Option<f32>,
+    #[serde(default)]
+    pub frames: Vec<FrameP>,
+    #[serde(default)]
+    pub origin: Option<[f32; 2]>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FrameP {
+    pub at: f32,
+    pub x: Option<f32>,
+    pub y: Option<f32>,
+    pub scale: Option<f32>,
+    pub scale_x: Option<f32>,
+    pub scale_y: Option<f32>,
+    pub opacity: Option<f32>,
+    pub rotate: Option<f32>,
 }
 fn one() -> f32 {
     1.0
@@ -271,10 +307,10 @@ pub struct Props {
     // Layout
     pub w: Option<Size>,
     pub h: Option<Size>,
-    pub min_w: Option<f32>,
-    pub max_w: Option<f32>,
-    pub min_h: Option<f32>,
-    pub max_h: Option<f32>,
+    pub min_w: Option<Size>,
+    pub max_w: Option<Size>,
+    pub min_h: Option<Size>,
+    pub max_h: Option<Size>,
     pub grow: Option<f32>,
     pub shrink: bool,
     pub pad: Option<f32>,
@@ -303,6 +339,9 @@ pub struct Props {
     pub absolute: Option<Insets>,
     pub inset: Option<f32>,
     pub raise: Option<RaiseP>,
+    /// position:fixed: placed against the window and painted in its top layer.
+    pub fixed: bool,
+    pub dir: Option<String>,
 
     // Paint
     pub fill: Option<C>,
@@ -383,7 +422,9 @@ pub struct Props {
     pub checked: Option<bool>,
     pub expanded: Option<bool>,
     pub selected: Option<bool>,
+    /// Laid out but not drawn, hit-tested or announced (visibility:hidden).
     pub hidden: bool,
+    pub a11y_hidden: bool,
 
     // Overlays
     pub anchor: Option<AnchorP>,
@@ -419,6 +460,7 @@ pub struct Props {
     pub secure: bool,
     pub spellcheck: Option<bool>,
     pub read_only: bool,
+    pub select_on_focus: bool,
     pub caret_color: Option<C>,
 
     // Image, icon, video
@@ -469,6 +511,11 @@ pub struct Props {
 }
 
 impl Props {
+    /// Built at the window root rather than in place: fixed layers and anchored overlays.
+    pub fn lifted(&self) -> bool {
+        self.fixed || self.anchor.is_some()
+    }
+
     pub fn listens(&self, name: &str) -> bool {
         self.on.iter().any(|n| n == name)
     }

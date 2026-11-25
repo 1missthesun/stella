@@ -1,5 +1,5 @@
 // Rune's own JSX namespace: only Rune host elements, no DOM. Runtime is React's jsx-runtime.
-import type { BoxProps, InputProps, TextProps } from "../../ui/rune";
+import type { BoxProps, IconProps, ImageProps, InputProps, ListProps, MarkdownProps, MediaProps, TextProps, WebviewProps, WindowProps } from "./props";
 export { Fragment, jsx, jsxs } from "react/jsx-runtime";
 export namespace JSX {
   type ElementType = React.JSX.ElementType;
@@ -10,11 +10,20 @@ export namespace JSX {
   type LibraryManagedAttributes<C, P> = React.JSX.LibraryManagedAttributes<C, P>;
   interface IntrinsicAttributes extends React.JSX.IntrinsicAttributes {}
   interface IntrinsicClassAttributes<T> extends React.JSX.IntrinsicClassAttributes<T> {}
+  type K = { key?: React.Key };
   interface IntrinsicElements {
-    row: BoxProps & { key?: React.Key };
-    col: BoxProps & { key?: React.Key };
-    box: BoxProps & { key?: React.Key };
-    text: TextProps & { key?: React.Key };
-    input: InputProps & { key?: React.Key };
+    window: WindowProps & K;
+    row: BoxProps & K;
+    col: BoxProps & K;
+    box: BoxProps & K;
+    text: TextProps & K;
+    input: InputProps & K;
+    image: ImageProps & K;
+    icon: IconProps & K;
+    markdown: MarkdownProps & K;
+    video: MediaProps & K;
+    audio: MediaProps & K;
+    list: ListProps & K;
+    webview: WebviewProps & K;
   }
 }

@@ -1,7 +1,7 @@
 //! The retained mirror of the TS element tree. Root children are `<window>` nodes; every
 //! mutation bumps versions up to the root and marks the owning window dirty.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::props::{Kind, Props};
 use crate::protocol::Op;
@@ -24,6 +24,13 @@ pub struct Tree {
     pub dirty: HashSet<u32>,
     /// Nodes removed since the last take (webviews and inputs drop their native state).
     pub removed: Vec<u32>,
+    /// Nodes built at their window's root (fixed layers, anchored overlays), in creation order.
+    pub lifted: BTreeSet<u32>,
+    /// Nodes whose element carries state the window keeps (inputs, media, webviews).
+    live: HashSet<u32>,
+    /// Ancestors of live nodes: never memoized, since a cached subtree would hold stale state.
+    pub live_above: HashSet<u32>,
+    live_moved: bool,
 }
 
 impl Tree {
@@ -49,9 +56,31 @@ impl Tree {
         None
     }
 
+    /// Lifted nodes shown in `window`.
+    pub fn lifted_in(&self, window: u32) -> Vec<u32> {
+        self.lifted.iter().copied().filter(|n| self.window_of(*n) == Some(window)).collect()
+    }
+
     /// The node whose `id` prop is `key`.
     pub fn find_key(&self, key: &str) -> Option<u32> {
         self.nodes.iter().find(|(_, n)| n.props.id.as_deref() == Some(key)).map(|(id, _)| *id)
+    }
+
+    /// Recomputes `live_above` after the tree's shape changed.
+    pub fn settle(&mut self) {
+        if !std::mem::take(&mut self.live_moved) {
+            return;
+        }
+        self.live_above.clear();
+        for &l in &self.live {
+            let mut id = self.nodes.get(&l).map_or(0, |n| n.parent);
+            for _ in 0..4096 {
+                if id == 0 || !self.live_above.insert(id) {
+                    break;
+                }
+                id = self.nodes.get(&id).map_or(0, |n| n.parent);
+            }
+        }
     }
 
     fn touch(&mut self, mut id: u32) {
@@ -80,6 +109,10 @@ impl Tree {
     fn destroy(&mut self, id: u32) {
         if let Some(n) = self.nodes.remove(&id) {
             self.removed.push(id);
+            self.lifted.remove(&id);
+            if self.live.remove(&id) {
+                self.live_moved = true;
+            }
             for c in n.children {
                 self.destroy(c);
             }
@@ -98,15 +131,24 @@ impl Tree {
     pub fn apply(&mut self, op: Op) {
         match op {
             Op::Create { id, kind } => {
+                if matches!(kind, Kind::Input | Kind::Video | Kind::Webview) {
+                    self.live.insert(id);
+                }
                 self.nodes.insert(id, Node { kind, ..Default::default() });
             }
             Op::Props { id, props } => {
+                if props.lifted() {
+                    self.lifted.insert(id);
+                } else {
+                    self.lifted.remove(&id);
+                }
                 if let Some(n) = self.nodes.get_mut(&id) {
                     n.props = props;
                 }
                 self.touch(id);
             }
             Op::Append { parent, child } => {
+                self.live_moved = true;
                 self.detach_from_old(child);
                 if let Some(p) = self.nodes.get_mut(&parent) {
                     p.children.push(child);
@@ -117,6 +159,7 @@ impl Tree {
                 self.touch(child);
             }
             Op::Insert { parent, child, before } => {
+                self.live_moved = true;
                 self.detach_from_old(child);
                 if let Some(p) = self.nodes.get_mut(&parent) {
                     let at = p.children.iter().position(|c| *c == before).unwrap_or(p.children.len());
@@ -128,6 +171,7 @@ impl Tree {
                 self.touch(child);
             }
             Op::Remove { parent, child } => {
+                self.live_moved = true;
                 if parent == 0 {
                     self.dirty.insert(child);
                 }

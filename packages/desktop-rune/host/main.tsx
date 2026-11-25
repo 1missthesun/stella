@@ -1,13 +1,14 @@
-// Entry of the TS UI host. Spawned by the compiled Rune engine; stdout is the bridge, so all
-// logging goes to stderr. Watches ui/app/ and hot-swaps it into the running engine.
+// Entry of the TS UI host. Spawned by the compiled Rune engine, which owns the bridge fds
+// (host/ELEMENTS.md); all logging goes to stderr. Builds the app entry (STELLA_RUNE_APP, default
+// ui/App.tsx), renders it and hot-swaps it on edits.
 
 import "./services/stdio";
 import { watch, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createElement } from "react";
 import * as bridge from "./bridge";
-import { command, commitCtx, listen, now, stats, type EngineEvent } from "./bridge";
-import { batched, handlers, render } from "./reconciler";
+import { command, commitCtx, engine, listen, now, onEngineEvent, stats } from "./bridge";
+import { batched, render } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
@@ -16,12 +17,13 @@ import type { ControlContext } from "./services/control";
 
 const t_boot = now();
 const ROOT = join(import.meta.dir, "..");
-const APP_DIR = join(ROOT, "ui");
+const APP_ENTRY = resolve(ROOT, process.env.STELLA_RUNE_APP ?? "ui/App.tsx");
+const APP_DIR = dirname(APP_ENTRY);
 const SERVICES = process.env.STELLA_RUNE_SERVICES === "1";
 
 applyUiEnv();
 const ui = createUiLoader({
-  entry: join(APP_DIR, "App.tsx"),
+  entry: APP_ENTRY,
   tsconfig: join(ROOT, "tsconfig.build.json"),
   external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
 });
@@ -46,12 +48,14 @@ if (SERVICES) {
 }
 
 let app = await loadApp();
-const store = createStore(app.initialState());
+const store = createStore(app.initialState?.() ?? {});
 const g = globalThis as any;
-g.stella = { store, useStore: makeUseStore(store), command, now };
+g.stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent };
 
+/** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */
+const root = () => app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App));
 const t_loaded = now();
-render(createElement(app.App), { t0: t_boot });
+render(root(), { t0: t_boot });
 console.error(`[ui] boot ${(t_loaded - t_boot).toFixed(1)} ms load+bundle, first commit ${(now() - t_loaded).toFixed(1)} ms, ${stats.ops} ops / ${stats.bytes} bytes`);
 
 // ---------------------------------------------------------------- hot swap
@@ -79,7 +83,7 @@ async function applySwap(label: string, t0: number, mtime = t0): Promise<boolean
     const t_built = now();
     app = next;
     store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
-    render(createElement(app.App), { t0, kind: 1 });
+    render(root(), { t0, kind: 1 });
     const t_committed = now();
     store.set({ lastSwapMs: Math.round(t_committed - t0) });
     console.error(`[ui] hot swap #${swapN} ${label}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render+send ${(t_committed - t_built).toFixed(1)} ms`);
@@ -95,19 +99,13 @@ async function applySwap(label: string, t0: number, mtime = t0): Promise<boolean
 // ---------------------------------------------------------------- engine events
 const waiters = new Map<string, (v: unknown) => void>();
 let lastInput = now();
-listen((e: EngineEvent) => {
-  if (e.t === "press" || e.t === "input" || e.t === "submit" || e.t === "key") lastInput = now();
-  if (e.t === "rec") { waiters.get("rec")?.(e.result); waiters.delete("rec"); return; }
-  const h = handlers.get(e.key);
-  batched(() => {
-    commitCtx.ack = e.seq;
-    commitCtx.t0 = e.at;
-    if (e.t === "press") h?.onPress?.();
-    else if (e.t === "input") h?.onInput?.(e.value ?? "");
-    else if (e.t === "submit") h?.onSubmit?.(e.value ?? "");
-    else if (e.t === "key") app.onKey?.(e.key, store);
-  });
+onEngineEvent("rec", (e) => { waiters.get("rec")?.(e.result); waiters.delete("rec"); });
+onEngineEvent("ev", (e) => {
+  if (e.input) lastInput = now();
+  if (e.e === "key" && app.onKey) batched(() => { commitCtx.ack = e.seq; commitCtx.t0 = e.at; app.onKey(e.chord, store); });
 });
+process.on("unhandledRejection", (err) => console.error("[ui] unhandled rejection:", err));
+void listen();
 
 
 // ---------------------------------------------------------------- services
@@ -146,9 +144,9 @@ const bench: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
     const glide = Number(q.get("glide") ?? 0.5);
     return rec("scroll", async () => {
       for (let i = 0; i < cycles; i++) {
-        command({ cmd: "scrollTo", key: "chat-scroll", y: 0, spring: glide });
+        command({ cmd: "scrollTo", target: "chat-scroll", y: 0, spring: glide });
         await sleep(glide * 1000 + 150);
-        command({ cmd: "scrollTo", key: "chat-scroll", y: "end", spring: glide });
+        command({ cmd: "scrollTo", target: "chat-scroll", y: "end", spring: glide });
         await sleep(glide * 1000 + 150);
       }
     });
@@ -156,7 +154,7 @@ const bench: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
   async wheel(q) {
     const dur = Number(q.get("dur") ?? 5);
     return rec("wheel", async () => {
-      command({ cmd: "scrollRun", key: "chat-scroll", speed: Number(q.get("speed") ?? 4000), dur });
+      command({ cmd: "scrollRun", target: "chat-scroll", speed: Number(q.get("speed") ?? 4000), dur });
       await sleep(dur * 1000 + 100);
     });
   },
@@ -198,7 +196,7 @@ const bench: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
     return store.get().dark;
   },
   async scrollto(q) {
-    command({ cmd: "scrollTo", key: "chat-scroll", y: Number(q.get("y") ?? 0), spring: Number(q.get("spring") ?? 0) });
+    command({ cmd: "scrollTo", target: "chat-scroll", y: Number(q.get("y") ?? 0), spring: Number(q.get("spring") ?? 0) });
     return true;
   },
   async stats() { return { ...stats, swaps: swapN, rss_mb: process.memoryUsage().rss / 1048576, heap_mb: process.memoryUsage().heapUsed / 1048576 }; },
@@ -229,6 +227,17 @@ if (port) {
         if (handled) return handled;
       }
       const u = new URL(req.url);
+      if (u.pathname === "/control/input") {
+        const body = await req.json() as { events: unknown[]; window?: string };
+        return Response.json(await engine.control.input(body.events as any, body.window ?? u.searchParams.get("window") ?? undefined));
+      }
+      if (u.pathname === "/control/elements") {
+        return Response.json(await engine.control.elements(u.searchParams.get("window") ?? undefined, u.searchParams.get("key") ?? undefined));
+      }
+      if (u.pathname === "/control/request") {
+        const body = await req.json() as { cmd: string } & Record<string, unknown>;
+        return Response.json(await engine.request(body.cmd, body).catch((e: Error) => ({ error: e.message })));
+      }
       const fn = bench[u.pathname.slice(1)];
       if (!fn) return new Response("unknown", { status: 404 });
       return Response.json(await fn(u.searchParams));

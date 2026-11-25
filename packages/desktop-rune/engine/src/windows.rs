@@ -66,8 +66,9 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
             inner.h = None;
             inner.id = None;
             root = crate::style::paint(root, &inner);
-            for c in &n.children {
-                root = root.child(build(s, eng, *c));
+            root = crate::view::children(s, eng, n, root);
+            for l in eng.tree.lifted_in(node) {
+                root = root.child(build(s, eng, l));
             }
         }
         root
@@ -336,6 +337,7 @@ fn drain() {
             }
         });
     }
+    engine::with(|e| e.tree.settle());
     windows_changed(added, gone);
     let removed = engine::with(|e| std::mem::take(&mut e.tree.removed));
     for n in &removed {

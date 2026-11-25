@@ -150,6 +150,15 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
     if let Some(c) = p.color {
         e = e.color(c.0);
     }
+    if p.select_on_focus {
+        let key = rune_key(n, p);
+        e = e.on_focus_change(move |_s: &mut Win, focused: bool, tx: &mut Tx| {
+            if focused {
+                tx.select_all_text(key.clone());
+            }
+            element_event(n, "focus", json!({ "focused": focused, "visible": tx.focus_visible() }), Some(tx));
+        });
+    }
     if p.auto_focus {
         e = e.autofocus();
     }

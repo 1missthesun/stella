@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use rune::El;
 use rune::tok::TextStyle;
+use rune_kit::syntax::Syntax;
 use rune_kit::{Markdown, MarkdownStyle};
 use serde_json::Value;
 
@@ -44,89 +45,152 @@ fn font(v: &Value, base: TextStyle) -> TextStyle {
     s
 }
 
+type Set<T> = fn(MarkdownStyle, T) -> MarkdownStyle;
+type SetPair = fn(MarkdownStyle, f32, f32) -> MarkdownStyle;
+
+fn levels<'a>(v: &'a Value, k: &str) -> Vec<(u8, &'a Value)> {
+    match v.get(k) {
+        Some(Value::Array(a)) => a.iter().enumerate().map(|(i, x)| (i as u8 + 1, x)).collect(),
+        Some(Value::Object(o)) => o.iter().filter_map(|(l, x)| Some((l.parse().ok()?, x))).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn syntax_kind(name: &str) -> Option<Syntax> {
+    Some(match name {
+        "keyword" => Syntax::Keyword,
+        "string" => Syntax::String,
+        "number" => Syntax::Number,
+        "comment" => Syntax::Comment,
+        "type" => Syntax::Type,
+        "function" => Syntax::Function,
+        "property" => Syntax::Property,
+        "punctuation" => Syntax::Punctuation,
+        "operator" => Syntax::Operator,
+        "inserted" => Syntax::Inserted,
+        "deleted" => Syntax::Deleted,
+        _ => return None,
+    })
+}
+
 fn style(v: &Value) -> MarkdownStyle {
     let dark = v.get("dark").and_then(|d| d.as_bool()).unwrap_or(true);
     let mut s = MarkdownStyle::neutral(dark);
     let body = rune::tok::type_::BODY;
-    if let Some(c) = col(v, "text") {
-        s = s.text(c);
+    let colors: [(&str, Set<rune::Color>); 12] = [
+        ("text", MarkdownStyle::text),
+        ("muted", MarkdownStyle::muted),
+        ("link", MarkdownStyle::link),
+        ("linkUnderline", MarkdownStyle::link_underline),
+        ("linkHover", MarkdownStyle::link_hover),
+        ("inlineCodeBg", MarkdownStyle::inline_code_bg),
+        ("inlineCodeText", MarkdownStyle::inline_code_text),
+        ("codeBlockText", MarkdownStyle::code_block_text),
+        ("quoteRule", MarkdownStyle::quote_rule),
+        ("rule", MarkdownStyle::rule),
+        ("selection", MarkdownStyle::selection),
+        ("tableRules", MarkdownStyle::table_rules),
+    ];
+    for (k, f) in colors {
+        if let Some(c) = col(v, k) {
+            s = f(s, c);
+        }
     }
-    if let Some(c) = col(v, "muted") {
-        s = s.muted(c);
+    for (k, f) in [("tableHeaderRule", MarkdownStyle::table_header_rule as Set<rune::Color>), ("tableHeaderText", MarkdownStyle::table_header_text)] {
+        if let Some(c) = col(v, k) {
+            s = f(s, c);
+        }
     }
-    if let Some(c) = col(v, "link") {
-        s = s.link(c);
+    let pairs: [(&str, SetPair); 12] = [
+        ("codeBlockPadding", MarkdownStyle::code_block_padding),
+        ("list", MarkdownStyle::list),
+        ("listNestedIndent", MarkdownStyle::list_nested_indent),
+        ("inlineCodeFont", MarkdownStyle::inline_code_font),
+        ("paragraphMargin", MarkdownStyle::paragraph_margin),
+        ("codeMargin", MarkdownStyle::code_margin),
+        ("imageMargin", MarkdownStyle::image_margin),
+        ("listMargin", MarkdownStyle::list_margin),
+        ("quoteMargin", MarkdownStyle::quote_margin),
+        ("ruleMargin", MarkdownStyle::rule_margin),
+        ("tableMargin", MarkdownStyle::table_margin),
+        ("tableCellPadding", MarkdownStyle::table_cell_padding),
+    ];
+    for (k, f) in pairs {
+        if let Some([a, b]) = pair(v, k) {
+            s = f(s, a, b);
+        }
     }
-    if let Some(c) = col(v, "linkUnderline") {
-        s = s.link_underline(c);
+    if let Some([x, y]) = pair(v, "tableHeaderPad") {
+        s = s.table_header_pad(x, y);
     }
-    if let Some(c) = col(v, "linkHover") {
-        s = s.link_hover(c);
+    let nums: [(&str, Set<f32>); 5] = [
+        ("codeBlockRadius", MarkdownStyle::code_block_radius),
+        ("inlineCodePad", MarkdownStyle::inline_code_pad),
+        ("strongWeight", MarkdownStyle::strong_weight),
+        ("textWidth", MarkdownStyle::text_width),
+        ("tableHeaderWeight", MarkdownStyle::table_header_weight),
+    ];
+    for (k, f) in nums {
+        if let Some(x) = num(v, k) {
+            s = f(s, x);
+        }
     }
-    if let Some(c) = col(v, "inlineCodeBg") {
-        s = s.inline_code_bg(c);
+    for (k, f) in [("listMarkersOutside", MarkdownStyle::list_markers_outside as Set<bool>), ("tableFlushLeft", MarkdownStyle::table_flush_left)] {
+        if let Some(on) = v.get(k).and_then(|b| b.as_bool()) {
+            s = f(s, on);
+        }
     }
-    if let Some(c) = col(v, "inlineCodeText") {
-        s = s.inline_code_text(c);
-    }
-    if let (Some(f), Some(b)) = (col(v, "codeBlockFill"), col(v, "codeBlockBorder")) {
+    let code_block = v.get("codeBlock").and_then(|a| a.as_array()).map(|a| (a.first().and_then(|c| c.as_str()).and_then(parse_color), a.get(1).and_then(|c| c.as_str()).and_then(parse_color)));
+    if let Some((Some(f), Some(b))) = code_block.or(Some((col(v, "codeBlockFill"), col(v, "codeBlockBorder")))) {
         s = s.code_block(f, b);
     }
-    if let Some(c) = col(v, "codeBlockText") {
-        s = s.code_block_text(c);
+    if let Some(q) = v.get("quote").and_then(|a| a.as_array())
+        && let (Some(rule), Some(w), Some(pad), Some(text)) = (
+            q.first().and_then(|c| c.as_str()).and_then(parse_color),
+            q.get(1).and_then(|x| x.as_f64()),
+            q.get(2).and_then(|x| x.as_f64()),
+            q.get(3).and_then(|c| c.as_str()).and_then(parse_color),
+        )
+    {
+        s = s.quote(rule, w as f32, pad as f32, text);
     }
-    if let Some([x, y]) = pair(v, "codeBlockPadding") {
-        s = s.code_block_padding(x, y);
+    if let Some(t) = v.get("table").and_then(|a| a.as_array())
+        && let (Some(border), Some(head)) = (t.first().and_then(|c| c.as_str()).and_then(parse_color), t.get(1).and_then(|c| c.as_str()).and_then(parse_color))
+    {
+        s = s.table(border, head);
     }
-    if let Some(r) = num(v, "codeBlockRadius") {
-        s = s.code_block_radius(r);
+    if let Some(o) = v.get("tableOutline") {
+        s = s.table_outline(o.as_str().and_then(parse_color));
     }
-    if let Some([i, g]) = pair(v, "list") {
-        s = s.list(i, g);
-    }
-    if let Some(c) = col(v, "quoteRule") {
-        s = s.quote_rule(c);
-    }
-    if let Some(c) = col(v, "rule") {
-        s = s.rule(c);
-    }
-    if let Some(f) = v.get("body") {
+    if let Some(f) = v.get("body").or_else(|| v.get("bodyFont")) {
         s = s.body_font(font(f, body));
     }
-    if let Some(hs) = v.get("headings").and_then(|h| h.as_array()) {
-        for (i, h) in hs.iter().enumerate().take(4) {
-            s = s.heading_font(i as u8 + 1, font(h, body));
+    for key in ["headings", "headingFont"] {
+        for (level, h) in levels(v, key) {
+            s = s.heading_font(level, font(h, body));
+        }
+    }
+    for key in ["headingMargins", "headingMargin"] {
+        for (level, h) in levels(v, key) {
+            if let Some(a) = h.as_array()
+                && let (Some(t), Some(b)) = (a.first().and_then(|x| x.as_f64()), a.get(1).and_then(|x| x.as_f64()))
+            {
+                s = s.heading_margin(level, t as f32, b as f32);
+            }
         }
     }
     if let Some(f) = v.get("codeBlockFont") {
         s = s.code_block_font(font(f, body));
     }
-    if let Some([sc, w]) = pair(v, "inlineCodeFont") {
-        s = s.inline_code_font(sc, w);
+    if let Some(f) = v.get("tableFont") {
+        s = s.table_font(font(f, body));
     }
-    if let Some(w) = num(v, "strongWeight") {
-        s = s.strong_weight(w);
-    }
-    if let Some([t, b]) = pair(v, "paragraphMargin") {
-        s = s.paragraph_margin(t, b);
-    }
-    if let Some(hs) = v.get("headingMargins").and_then(|h| h.as_array()) {
-        for (i, h) in hs.iter().enumerate().take(4) {
-            if let Some(a) = h.as_array()
-                && let (Some(t), Some(b)) = (a.first().and_then(|x| x.as_f64()), a.get(1).and_then(|x| x.as_f64()))
-            {
-                s = s.heading_margin(i as u8 + 1, t as f32, b as f32);
+    if let Some(Value::Object(m)) = v.get("syntax").or_else(|| v.get("syntaxTheme")) {
+        for (k, c) in m {
+            if let (Some(kind), Some(c)) = (syntax_kind(k), c.as_str().and_then(parse_color)) {
+                s = s.syntax(kind, c);
             }
         }
-    }
-    if let Some([t, b]) = pair(v, "codeMargin") {
-        s = s.code_margin(t, b);
-    }
-    if let Some(c) = col(v, "selection") {
-        s = s.selection(c);
-    }
-    if let Some(w) = num(v, "textWidth") {
-        s = s.text_width(w);
     }
     s
 }
@@ -148,7 +212,13 @@ fn style_for(v: Option<&Value>) -> MarkdownStyle {
     })
 }
 
-pub fn build(_n: u32, p: &Props) -> El {
+pub fn build(n: u32, p: &Props) -> El {
     let src = p.src.clone().unwrap_or_default();
-    Markdown::new(src).streaming(p.streaming).selectable(p.selectable || p.selection_group).render(&style_for(p.md_style.as_ref()))
+    let mut md = Markdown::new(src).streaming(p.streaming).selectable(p.selectable || p.selection_group);
+    if p.listens("link") {
+        md = md.on_link_tx(move |_s: &mut crate::windows::Win, href: &str, tx: &mut rune::Tx| {
+            crate::engine::element_event(n, "link", serde_json::json!({ "href": href }), Some(tx));
+        });
+    }
+    md.render(&style_for(p.md_style.as_ref()))
 }

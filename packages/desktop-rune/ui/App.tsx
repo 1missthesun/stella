@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import type { AppState, Message, Store } from "../host/store";
 import { initialMessages } from "./data";
 import { Markdown } from "./markdown";
@@ -67,7 +66,7 @@ function Preview({ t }: { t: Tokens }) {
           <text size={12.5} color={t.textWeak}>Close</text>
         </box>
       </row>
-      <box id="preview-slot" w="full" grow={1} minH={0} webview={url} fill={t.raised} />
+      <webview id="preview-slot" w="full" grow={1} minH={0} url={url} fill={t.raised} />
     </col>
   );
 }
@@ -146,7 +145,7 @@ function Composer({ t }: { t: Tokens }) {
           placeholderColor={t.textWeaker}
           autoFocus
           onInput={(v) => { if ((v.trim().length > 0) !== hasDraft) stella.store.set({ draft: v }); }}
-          onSubmit={(v) => { if (v.trim()) send(v.trim()); }}
+          onSubmit={(v) => { if (v.trim()) { send(v.trim()); void stella.engine.input.set("composer", ""); } }}
         />
         <row w="full" align="center" justify="between">
           <row gap={4}>
@@ -184,7 +183,6 @@ function PocApp() {
   const dark = stella.useStore((s) => s.dark);
   const open = stella.useStore((s) => s.sidebarOpen);
   const t = tokens(dark);
-  useEffect(() => { stella.command({ cmd: "bg", color: t.bg }); }, [dark]);
   return (
     <col id="app" w="full" h="full" fill={t.bg}>
       <TopBar t={t} />

@@ -23,6 +23,7 @@ export type PendingBoxProps = {
   gradient?: { angle: number; stops: [number, string][] };
   absolute?: { left?: number; top?: number; right?: number; bottom?: number };
   inset?: number;
+  inert?: boolean;
   raise?: number;
   anchor?: { to: string; side: "top" | "bottom" | "left" | "right"; align: "start" | "center" | "end"; gap?: number; fit?: boolean };
   modal?: { clickOutside: boolean };

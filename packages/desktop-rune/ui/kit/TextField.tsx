@@ -58,7 +58,7 @@ export function TextField({ id, value, placeholder, label, hideLabel, descriptio
       <row
         id={`${id}-wrapper`}
         w="full"
-        minH={32}
+        minH={32 + 2}
         pl={12 + 1}
         pr={12 + 4 + 1}
         py={multiline ? 6 + 1 : 0}

@@ -10,24 +10,22 @@ export type SwitchProps = {
   disabled?: boolean;
 };
 
-/** desktop-ui's `Switch` (`[data-component="switch"]`): a 28×16 square-ish track with a sliding thumb. */
+/** desktop-ui's `Switch` (`[data-component="switch"]`): label, description and a 28×16 track with a sliding thumb, in one row; disabled only stops it. */
 export function Switch({ id, checked, onCheckedChange, label, hideLabel, description, disabled = false }: SwitchProps) {
   const t = useTokens();
   const c = t.c;
   const toggle = disabled ? undefined : () => onCheckedChange?.(!checked);
   return (
-    <row id={`${id}-row`} gap={8} align="center" opacity={disabled ? 0.5 : undefined}>
+    <row id={`${id}-row`} gap={8} align="center">
       {label && !hideLabel ? (
-        <col gap={0} shrink>
-          <text {...look(fontSize.sm, font.sansWeight, { lh: 1.67 })} color={c.foreground} onPress={toggle}>
-            {label}
-          </text>
-          {description ? (
-            <text {...look(fontSize.sm, font.sansWeight, { lh: 1.5 })} color={c.mutedForeground}>
-              {description}
-            </text>
-          ) : null}
-        </col>
+        <text {...look(fontSize.sm, font.sansWeight, { lh: 1.67 })} color={c.foreground} onPress={toggle}>
+          {label}
+        </text>
+      ) : null}
+      {description ? (
+        <text {...look(fontSize.sm, font.sansWeight)} color={c.mutedForeground} shrink>
+          {description}
+        </text>
       ) : null}
       <box
         id={id}

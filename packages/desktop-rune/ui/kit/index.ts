@@ -1,6 +1,7 @@
 export { Button, IconButton, Pill, type ButtonProps, type ButtonSize, type ButtonVariant, type IconButtonProps, type PillProps } from "./Button";
 export { Dialog, DialogBody, DialogCloseButton, DialogDescription, DialogHeader, DialogTitle, ImageLightbox, Scrim, type DialogProps, type DialogSize } from "./Dialog";
 export { DropdownMenu, MenuCheckboxItem, MenuItem, MenuLabel, MenuRadioItem, MenuSeparator, Popover, Select, menuSurface, useMenuClose, type MenuTrigger, type SelectOption } from "./Menu";
+export { type EmptyStateMotif } from "./empty-state/MotifArt";
 export { Avatar, EmptyState, Keybind, ManualCopyField, RetainedSurface, StellaMark, Tabs, WorkingDots, useRetainedSurfaceActive, type EmptyStateAction, type TabItem } from "./Misc";
 export { Markdown, markdownStyle, CHAT_TEXT, CHAT_TEXT_COMPACT, type ChatText } from "./Markdown";
 export { Switch, type SwitchProps } from "./Switch";

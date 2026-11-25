@@ -3,7 +3,8 @@ import { sampleWorkingDots, WORKING_DOTS_CYCLE_MS, WORKING_DOTS_STAGGER, working
 import { derive, font, fontSize, look, mix, mixOklch, radius, useTokens } from "../theme";
 import { Pill } from "./Button";
 import { Icon, Icons, type IconData } from "./icons";
-import type { KitFrame } from "./pending-props";
+import type { KitFrame, KitLoop } from "./pending-props";
+import { MotifArt, type EmptyStateMotif } from "./empty-state/MotifArt";
 
 export type TabItem<T extends string = string> = { value: T; label: string; icon?: IconData; disabled?: boolean };
 
@@ -54,7 +55,7 @@ export function Keybind({ keys }: { keys: string | string[] }) {
             </text>
           </box>
           {i < list.length - 1 ? (
-            <text size={fontSize["2xs"]} color={t.c.mutedForeground}>
+            <text size={fontSize["2xs"]} lineHeight={15} color={t.c.mutedForeground}>
               +
             </text>
           ) : null}
@@ -137,17 +138,49 @@ export function StellaMark({ id, size = 16, label }: { id?: string; size?: numbe
   return <Icon id={id} icon={size <= 20 ? Icons.mark.stellaSmall : Icons.mark.stella} size={size} title={label} />;
 }
 
+const MARK_SPOT: Partial<Record<EmptyStateMotif, [number, number]>> = {
+  files: [0, 15],
+  mail: [0, 15],
+  unavailable: [17, 16],
+  preview: [17, 16],
+  blank: [17, 16],
+  changes: [17, 16],
+  trash: [0, 6],
+};
+
+const MARK_SWEEP: KitLoop = {
+  kind: "sequence",
+  period: 7,
+  frames: Array.from({ length: 25 }, (_, i) => {
+    const p = (1 - Math.cos((2 * Math.PI * i) / 24)) / 2;
+    return { at: i / 24, x: 148 * (-0.04 + 0.08 * p), y: -148 * 0.02 * p };
+  }),
+};
+
 export type EmptyStateAction = { label: string; onClick: () => void; icon?: IconData };
 
-/** desktop-ui's `EmptyState` copy and actions under Stella's mark. */
-export function EmptyState({ id, title, body, detail, action, secondaryAction, size = "regular" }: { id?: string; title: string; body?: string; detail?: string; action?: EmptyStateAction; secondaryAction?: EmptyStateAction; size?: "regular" | "compact" }) {
+/** desktop-ui's `EmptyState`: the motif's art around Stella's mark, then the copy and actions. */
+export function EmptyState({ id = "empty-state", motif, title, body, detail, action, secondaryAction, size = "regular", live = true }: { id?: string; motif: EmptyStateMotif; title: string; body?: string; detail?: string; action?: EmptyStateAction; secondaryAction?: EmptyStateAction; size?: "regular" | "compact"; live?: boolean }) {
   const t = useTokens();
   const compact = size === "compact";
+  const art = compact ? 104 : 148;
+  const mark = (compact ? 40 : 58) * (motif === "search" ? 0.8 : 1);
+  const spot = MARK_SPOT[motif] ?? [0, 0];
   const detailFill = derive(t, "empty-detail", (t) => mixOklch(t.c.foreground, 5, "transparent"));
   return (
     <col id={id} role="status" grow={1} minH={0} align="center" justify="center" pt={compact ? 20 : 32} px={compact ? 16 : 24} pb={compact ? 24 : 40} enter={{ opacity: 0, y: 6, dur: 0.42 }}>
-      <box w={compact ? 104 : 148} h={compact ? 104 : 148} center>
-        <StellaMark size={compact ? 40 : 58} />
+      <box w={art} h={art} shrink={false}>
+        <MotifArt id={`${id}-back`} motif={motif} layer="back" art={art} live={live} />
+        <box
+          absolute={{ left: (art * spot[0]) / 100, top: (art * spot[1]) / 100 }}
+          w={art}
+          h={art}
+          center
+          loop={live && motif === "search" ? MARK_SWEEP : undefined}
+        >
+          <StellaMark size={mark} />
+        </box>
+        <MotifArt id={`${id}-front`} motif={motif} layer="front" art={art} live={live} />
       </box>
       <col align="center" gap={compact ? 4 : 6} maxW="100%" mt={compact ? 12 : 18}>
         <text {...look(compact ? fontSize.lg : fontSize.xl, 600, { lh: 1.25, em: -0.015 })} color={t.c.textStrong} textAlign="center">
@@ -161,7 +194,7 @@ export function EmptyState({ id, title, body, detail, action, secondaryAction, s
           </box>
         ) : null}
         {body ? (
-          <text {...look(compact ? fontSize.sm : fontSize.base, font.sansWeight, { lh: 1.45 })} color={t.c.textWeak} maxW={compact ? 230 : 300} textAlign="center">
+          <text {...look(compact ? fontSize.sm : fontSize.base, font.sansWeight, { lh: 1.45 })} color={t.c.textWeak} maxW={compact ? 228 : 248} textAlign="center">
             {body}
           </text>
         ) : null}
@@ -169,7 +202,7 @@ export function EmptyState({ id, title, body, detail, action, secondaryAction, s
       {action || secondaryAction ? (
         <row gap={8} mt={18} wrap justify="center">
           {[action, secondaryAction].filter(Boolean).map((a, i) => (
-            <Pill key={i} large icon={a!.icon} onPress={a!.onClick}>
+            <Pill key={i} large gap={6} textColor={t.c.textBase} iconColor={t.c.textWeak} icon={a!.icon} onPress={a!.onClick}>
               {a!.label}
             </Pill>
           ))}

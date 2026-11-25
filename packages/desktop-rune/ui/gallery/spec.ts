@@ -1,6 +1,6 @@
-export type GalleryPage = "buttons" | "controls" | "overlays" | "dialog" | "icons" | "markdown" | "empty";
+export type GalleryPage = "type" | "buttons" | "controls" | "overlays" | "dialog" | "icons" | "markdown" | "empty";
 
-export const GALLERY_PAGES: GalleryPage[] = ["buttons", "controls", "overlays", "dialog", "icons", "markdown", "empty"];
+export const GALLERY_PAGES: GalleryPage[] = ["type", "buttons", "controls", "overlays", "dialog", "icons", "markdown", "empty"];
 
 export const GALLERY_THEMES = {
   light: { themeId: "custom", base: "default", mode: "light" },
@@ -34,3 +34,13 @@ const total = days.reduce((sum, d) => sum + d.budget, 0); // 365
 ---
 
 Want me to book the Sintra train too?`;
+
+export const TYPE_WEIGHTS = [200, 300, 400, 500, 600, 700, 800] as const;
+export const TYPE_FAMILIES = [
+  { family: "Manrope", sizes: [13, 15, 20], weights: TYPE_WEIGHTS },
+  { family: "Mona Sans", sizes: [20], weights: [400, 600, 800] },
+  { family: "IBM Plex Mono", sizes: [12], weights: [400, 500, 700] },
+] as const;
+export const TYPE_SAMPLE = "Stella plans your Lisbon weekend 0123";
+
+export const GALLERY_MOTIFS = ["unavailable", "preview", "blank", "changes", "apps", "trash", "updates", "mail"] as const;

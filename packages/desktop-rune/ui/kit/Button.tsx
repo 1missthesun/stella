@@ -136,13 +136,16 @@ export type PillProps = {
   tone?: "default" | "primary" | "danger";
   disabled?: boolean;
   icon?: IconData;
+  gap?: number;
+  textColor?: string;
+  iconColor?: string;
   title?: string;
   onPress?: () => void;
   children?: ReactNode;
 };
 
 /** desktop-ui's `.pill-btn` (and `--lg`, `--active`, `--primary`, `--danger`). */
-export function Pill({ id, large = false, active = false, tone = "default", disabled = false, icon, title, onPress, children }: PillProps) {
+export function Pill({ id, large = false, active = false, tone = "default", disabled = false, icon, gap = 0, textColor, iconColor, title, onPress, children }: PillProps) {
   const t = useTokens();
   const c = t.c;
   const p = derive(t, `pill:${tone}:${active}`, () => {
@@ -167,7 +170,7 @@ export function Pill({ id, large = false, active = false, tone = "default", disa
       minH={large ? 32 : 24}
       px={(large ? 16 : 12) + 1}
       py={(large ? 6 : 5) + 1}
-      gap={6}
+      gap={gap}
       align="center"
       justify="center"
       radius={radius.full}
@@ -181,9 +184,9 @@ export function Pill({ id, large = false, active = false, tone = "default", disa
       motion={{ dur: 0.15 }}
       onPress={disabled ? undefined : onPress}
     >
-      {icon ? <Icon icon={icon} size={14} color={p.text} /> : null}
+      {icon ? <Icon icon={icon} size={14} color={iconColor ?? p.text} /> : null}
       {children != null ? (
-        <text {...text} color={p.text}>
+        <text {...text} color={textColor ?? p.text}>
           {children}
         </text>
       ) : null}

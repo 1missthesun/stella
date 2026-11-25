@@ -31,7 +31,7 @@ import { WorkingDots } from "@/ui/working-dots";
 import { Markdown } from "@/app/chat/Markdown";
 import { useTheme } from "@/context/theme-context";
 import * as Icons from "../ui/kit/icons/catalog.gen";
-import { GALLERY_MARKDOWN } from "../ui/gallery/spec";
+import { GALLERY_MARKDOWN, GALLERY_MOTIFS, TYPE_FAMILIES, TYPE_SAMPLE } from "../ui/gallery/spec";
 
 type IconData = { name: string; view: number; body: string; color?: string };
 
@@ -206,9 +206,12 @@ function Overlays() {
   const [checked, setChecked] = useState(true);
   const [mode, setMode] = useState("dark");
   useEffect(() => {
-    showToast({ title: "Update ready", description: "Stella 18.2 is ready to install.", duration: 0, action: { label: "Restart", onClick: () => {} }, secondaryAction: { label: "Later", onClick: () => {} } });
-    showToast({ description: "Copied to clipboard", variant: "success", duration: 0 });
-    showToast({ title: "Couldn't send", description: "Check your connection and try again.", variant: "error", duration: 0 });
+    const timer = setTimeout(() => {
+      showToast({ title: "Update ready", description: "Stella 18.2 is ready to install.", duration: 0, action: { label: "Restart", onClick: () => {} }, secondaryAction: { label: "Later", onClick: () => {} } });
+      showToast({ description: "Copied to clipboard", variant: "success", duration: 0 });
+      showToast({ title: "Couldn't send", description: "Check your connection and try again.", variant: "error", duration: 0 });
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
   return (
     <div style={{ display: "flex", gap: 48, alignItems: "flex-start" }}>
@@ -349,14 +352,42 @@ function MarkdownPage() {
 
 function EmptyPage() {
   return (
-    <div style={{ display: "flex", gap: 24, height: 420 }}>
-      <EmptyState motif="files" title="No files yet" body="Files Stella makes or you drop here show up in this list." action={{ label: "Add files", onClick: () => {}, icon: Plus }} live={false} />
-      <EmptyState motif="search" size="compact" title="Nothing matches" detail="“quarterly report”" body="Try another word." live={false} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", gap: 24, height: 360 }}>
+        <EmptyState motif="files" title="No files yet" body="Files Stella makes or you drop here show up in this list." action={{ label: "Add files", onClick: () => {}, icon: Plus }} live={false} />
+        <EmptyState motif="search" size="compact" title="Nothing matches" detail="“quarterly report”" body="Try another word." live={false} />
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap" }}>
+        {GALLERY_MOTIFS.map((m) => (
+          <div key={m} style={{ width: 150, height: 200, display: "flex", flexDirection: "column" }}>
+            <EmptyState motif={m} size="compact" title={m} live={false} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TypePage() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {TYPE_FAMILIES.map((f) => (
+        <Section key={f.family} title={f.family}>
+          {f.sizes.map((size) =>
+            f.weights.map((w) => (
+              <div key={`${size}-${w}`} style={{ fontFamily: `"${f.family}"`, fontSize: size, fontWeight: w, lineHeight: `${Math.round(size * 1.4)}px`, color: "var(--text-strong)", letterSpacing: 0 }}>
+                {`${size}/${w} ${TYPE_SAMPLE}`}
+              </div>
+            )),
+          )}
+        </Section>
+      ))}
     </div>
   );
 }
 
 const PAGES: Record<string, () => ReactNode> = {
+  type: TypePage,
   buttons: Buttons,
   controls: Controls,
   overlays: Overlays,
@@ -370,16 +401,18 @@ function Page({ page, themeKey }: { page: string; themeKey: string }) {
   const { gradientMode, gradientColor } = useTheme();
   const Body = PAGES[page] ?? Buttons;
   return (
-    <div className="window-shell full" style={{ position: "fixed", inset: 0 }}>
-      <ShiftingGradient mode={gradientMode} colorMode={gradientColor} lightweight={false} />
-      <div style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 24, padding: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <StellaMark size={20} />
-            <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text-strong)" }}>{`Kit · ${page}`}</div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-weaker)" }}>{themeKey}</div>
+    <div className="app" style={{ position: "fixed", inset: 0 }}>
+      <div className="window-shell full" style={{ position: "absolute", inset: 0 }}>
+        <ShiftingGradient mode={gradientMode} colorMode={gradientColor} lightweight={false} />
+        <div style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24, padding: 32 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <StellaMark size={20} />
+              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text-strong)" }}>{`Kit · ${page}`}</div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-weaker)" }}>{themeKey}</div>
+            </div>
+            <Body />
           </div>
-          <Body />
         </div>
       </div>
     </div>

@@ -35,7 +35,7 @@ import {
   type IconData,
 } from "../kit";
 import { I18nProvider } from "../i18n";
-import { GALLERY_MARKDOWN, GALLERY_THEMES, type GalleryPage } from "./spec";
+import { GALLERY_MARKDOWN, GALLERY_MOTIFS, GALLERY_THEMES, TYPE_FAMILIES, TYPE_SAMPLE, type GalleryPage } from "./spec";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const t = useTokens();
@@ -216,7 +216,7 @@ function DialogPage() {
   const [open, setOpen] = useState(true);
   const t = useTokens();
   return (
-    <col gap={16} w="full">
+    <col gap={16} w="full" align="start">
       <Button id="open-dialog" variant="primary" size="large" onPress={() => setOpen(true)}>Open dialog</Button>
       <Dialog id="dlg" open={open} onOpenChange={setOpen} label="Sign out">
         <DialogHeader>
@@ -231,7 +231,7 @@ function DialogPage() {
             <text {...look(fontSize.sm, 400, { lh: 1.5 })} color={t.c.textWeak}>Signing out stops background agents on this computer.</text>
           </col>
         </DialogBody>
-        <row w="full" justify="end" gap={8} px={24} pb={20}>
+        <row justify="end" gap={8} px={24} pb={20}>
           <Button id="dlg-cancel" size="large" onPress={() => setOpen(false)}>Cancel</Button>
           <Button id="dlg-ok" variant="primary" size="large" onPress={() => setOpen(false)}>Sign out</Button>
         </row>
@@ -248,7 +248,7 @@ function IconGrid({ group, icons }: { group: string; icons: Record<string, IconD
         {Object.entries(icons).map(([name, icon]) => (
           <col key={name} w={64} h={56} gap={4} align="center" justify="center" radius={8} hover={t.c.ghostHover} title={name}>
             <Icon icon={icon} size={20} color={t.c.textBase} />
-            <text size={9} color={t.c.textWeaker} truncate maxW={60}>{name}</text>
+            <text size={9} lineHeight={13.5} color={t.c.textWeaker} truncate maxW={60}>{name}</text>
           </col>
         ))}
       </row>
@@ -280,14 +280,43 @@ function MarkdownPage() {
 
 function EmptyPage() {
   return (
-    <row gap={24} w="full" h={420}>
-      <EmptyState id="es-1" title="No files yet" body="Files Stella makes or you drop here show up in this list." action={{ label: "Add files", onClick: () => {}, icon: Icons.stella.Plus }} />
-      <EmptyState id="es-2" size="compact" title="Nothing matches" detail="“quarterly report”" body="Try another word." />
-    </row>
+    <col gap={8} w="full">
+      <row gap={24} w="full" h={360}>
+        <EmptyState id="es-1" motif="files" live={false} title="No files yet" body="Files Stella makes or you drop here show up in this list." action={{ label: "Add files", onClick: () => {}, icon: Icons.stella.Plus }} />
+        <EmptyState id="es-2" motif="search" live={false} size="compact" title="Nothing matches" detail="“quarterly report”" body="Try another word." />
+      </row>
+      <row gap={0} w="full" wrap>
+        {GALLERY_MOTIFS.map((m) => (
+          <col key={m} w={150} h={200}>
+            <EmptyState id={`es-${m}`} motif={m} live={false} size="compact" title={m} />
+          </col>
+        ))}
+      </row>
+    </col>
+  );
+}
+
+function TypePage() {
+  const t = useTokens();
+  return (
+    <col gap={20} w="full">
+      {TYPE_FAMILIES.map((f) => (
+        <Section key={f.family} title={f.family}>
+          {f.sizes.map((size) =>
+            f.weights.map((w) => (
+              <text key={`${size}-${w}`} family={f.family} size={size} weight={w} lineHeight={Math.round(size * 1.4)} color={t.c.textStrong}>
+                {`${size}/${w} ${TYPE_SAMPLE}`}
+              </text>
+            )),
+          )}
+        </Section>
+      ))}
+    </col>
   );
 }
 
 const PAGES: Record<GalleryPage, () => ReactNode> = {
+  type: TypePage,
   buttons: Buttons,
   controls: Controls,
   overlays: Overlays,

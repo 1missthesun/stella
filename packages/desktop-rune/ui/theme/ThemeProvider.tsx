@@ -49,6 +49,7 @@ export function tokensFor(themeId: string, mode: "light" | "dark", customBase = 
 }
 
 export function ThemeScope({ themeId, mode, customBase, children }: { themeId: string; mode: "light" | "dark"; customBase?: string; children: ReactNode }) {
+  loadFonts();
   const tokens = useMemo(() => tokensFor(themeId, mode, customBase), [themeId, mode, customBase]);
   useSpringOnChange(tokens);
   return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;

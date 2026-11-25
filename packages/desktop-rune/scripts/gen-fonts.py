@@ -2,7 +2,8 @@
 
 Rune reads TTF/OTF only, and these files carry other family names (Nerd Font builds, a variable
 font named after its default instance), so the families are renamed to what desktop-ui's
-fonts.css calls them. Needs fontTools + brotli: `python -m pip install fonttools brotli`.
+fonts.css calls them. A variable face reports the top of its weight axis: Rune adds synthetic
+bold to weights more than 200 above a face's weight class, which the axis already covers. Needs fontTools + brotli: `python -m pip install fonttools brotli`.
 """
 import pathlib
 import sys
@@ -40,6 +41,9 @@ def main() -> None:
         font = TTFont(SRC / f"{stem}.woff2")
         font.flavor = None
         rename(font, family, style)
+        if "fvar" in font:
+            wght = next(a for a in font["fvar"].axes if a.axisTag == "wght")
+            font["OS/2"].usWeightClass = int(wght.maxValue)
         if weight is not None:
             font["OS/2"].usWeightClass = weight
             bold = weight >= 700

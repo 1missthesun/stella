@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { derive, font, fontSize, look, mix, radius, type Tokens, useTokens } from "../theme";
+import { derive, font, fontSize, layer, look, mix, radius, type Tokens, useTokens } from "../theme";
 import { Icon, Icons, type IconData } from "./icons";
 
 type Side = "top" | "bottom" | "left" | "right";
@@ -53,6 +53,7 @@ export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom",
             id={`${id}-content`}
             role="menu"
             anchor={{ to: triggerId, side, align, gap: sideOffset, fit: matchTriggerWidth }}
+            raise={layer.menu}
             modal={{ clickOutside: true }}
             onDismiss={close}
             focusGroup
@@ -287,6 +288,7 @@ export function Popover({ id, open, onOpenChange, trigger, side = "bottom", alig
             id={`${id}-content`}
             role="dialog"
             anchor={{ to: triggerId, side, align, gap: sideOffset }}
+            raise={layer.popover}
             modal={{ clickOutside: true }}
             onDismiss={close}
             w={width}

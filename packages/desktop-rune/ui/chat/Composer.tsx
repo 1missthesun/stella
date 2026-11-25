@@ -10,8 +10,9 @@ import { attachFilesToContext } from "@/features/chat/lib/file-attach";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { useDictationPaste } from "@/features/dictation/hooks/use-dictation-paste";
 import { DictationCancelButton, DictationRecordingBar } from "@/features/dictation/components/DictationRecordingBar";
-import { applyComposerModelMention, ComposerModelMentionMenu, findComposerModelMentionTrigger, type ComposerModelMentionMenuHandle, type ComposerModelMentionOption, type ComposerModelMentionTrigger } from "@/app/chat/ComposerModelMentionMenu";
-import { MiniModelPicker } from "@/app/chat/MiniModelPicker";
+import { applyComposerModelMention, findComposerModelMentionTrigger, type ComposerModelMentionMenuHandle, type ComposerModelMentionOption, type ComposerModelMentionTrigger } from "@/app/chat/ComposerModelMentionMenu";
+import { ComposerModelMentionMenu } from "./ComposerModelMentionMenu";
+import { MiniModelPicker } from "./MiniModelPicker";
 import { useUiState } from "@/context/ui-state";
 import { useStellaModelsSignIn } from "@/global/auth/hooks/use-stella-models-sign-in";
 import { platformCapabilities } from "@/platform/capabilities";
@@ -334,7 +335,7 @@ function ComposerImpl({
       </col>
       {previewScreenshot && previewScreenshotIndex !== null ? <ScreenshotPreviewOverlay screenshot={previewScreenshot} index={previewScreenshotIndex} onClose={() => setPreviewScreenshotIndex(null)} /> : null}
       {modelMentionTrigger && suggestionsActive ? (
-        <ComposerModelMentionMenu ref={modelMentionMenuRef} trigger={modelMentionTrigger} textarea={null} onSelect={selectModelMention} onDismiss={() => setModelMentionTrigger(null)} />
+        <ComposerModelMentionMenu ref={modelMentionMenuRef} trigger={modelMentionTrigger} anchorTo={inputId} onSelect={selectModelMention} onDismiss={() => setModelMentionTrigger(null)} />
       ) : null}
     </col>
   );

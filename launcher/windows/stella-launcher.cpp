@@ -3425,6 +3425,7 @@ static void requestShutdown() {
 static void refreshInstallInfo();
 
 static Outcome supervise(const wstring &electron) {
+    const char *child = isEngine(electron) ? "stella-engine" : "Electron";
     string spawnedHead;
     try { spawnedHead = gGit->run({"rev-parse", "HEAD"}, P.app()); } catch (const LauncherError &) {}
     std::unique_ptr<ElectronProcess> process;
@@ -3466,11 +3467,11 @@ static Outcome supervise(const wstring &electron) {
                 mj_get_number(message, "code", &code);
                 announced = true;
                 announcedCode = (DWORD)code;
-                LOG("supervisor: Electron is exiting with %lu", announcedCode);
+                LOG("supervisor: %s is exiting with %lu", child, announcedCode);
                 process->events.after(10, "exit-grace");
             } else if (op && !strcmp(op, "failed")) {
                 const char *reason = mj_get_string(message, "reason");
-                LOG("supervisor: Electron reported failure: %s", reason ? reason : "unknown");
+                LOG("supervisor: %s reported failure: %s", child, reason ? reason : "unknown");
                 if (!pending) {
                     pending = true;
                     pendingReason = string("Stella reported a problem: ") + (reason ? reason : "unknown");
@@ -3496,15 +3497,15 @@ static Outcome supervise(const wstring &electron) {
                     LOG("supervisor: could not mark known-good: %s", e.message.c_str());
                 }
             } else if ((name == "self-test-quit" || name == "shutdown") && !quitRequested) {
-                LOG("supervisor: %s asks Electron to quit", name == "shutdown" ? "Shut down" : "self-test");
+                LOG("supervisor: %s asks %s to quit", name == "shutdown" ? "Shut down" : "self-test", child);
                 quitRequested = true;
                 process->send("{\"op\":\"quit\"}");
                 process->events.after(30, "quit-timeout");
             } else if (name == "quit-timeout" && !announced) {
-                LOG("supervisor: Electron did not quit in time; terminating");
+                LOG("supervisor: %s did not quit in time; terminating", child);
                 process->terminate();
             } else if (name == "exit-grace") {
-                LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                LOG("supervisor: %s's teardown is still running 10s after it announced its exit; terminating", child);
                 teardownForced = true;
                 process->forceKill();
             }
@@ -3512,11 +3513,11 @@ static Outcome supervise(const wstring &electron) {
             Sleep(300);
             vector<string> output = process->output->lastLines();
             string detail = format("exit %lu", event.code);
-            LOG("supervisor: Electron exited (%s)", detail.c_str());
+            LOG("supervisor: %s exited (%s)", child, detail.c_str());
             if (pending) return {OutcomeKind::Failed, 0, detail, pendingReason, output};
             if (announced && teardownForced)
-                LOG("supervisor: Electron's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
-                    announcedCode);
+                LOG("supervisor: %s's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
+                    child, announcedCode);
             DWORD code = announced ? announcedCode : event.code;
             if (code == kRelaunchExitCode) return {OutcomeKind::Relaunch, 0, detail, string(), output};
             if (quitRequested && code != 0)

@@ -409,6 +409,7 @@ final class Launcher {
     private func supervise(electronApp: URL) -> Outcome {
         guard let git, let signer else { return .failed("The launcher is not set up.", []) }
         let spawnedHead = (try? git.run(["rev-parse", "HEAD"], cwd: paths.app)) ?? ""
+        let child = engine == nil ? "Electron" : "stella-engine"
         let process: ElectronProcess
         do {
             if let engine {
@@ -478,11 +479,11 @@ final class Launcher {
                 case "exiting":
                     let code = (message["code"] as? NSNumber)?.int32Value ?? 0
                     announcedExit = code
-                    log("supervisor: Electron is exiting with \(code)")
+                    log("supervisor: \(child) is exiting with \(code)")
                     process.after(10, "exit-grace")
                 case "failed":
                     let reason = (message["reason"] as? String) ?? "unknown"
-                    log("supervisor: Electron reported failure: \(reason)")
+                    log("supervisor: \(child) reported failure: \(reason)")
                     if pending == nil {
                         pending = ("Stella reported a problem: \(reason)", process.output.lastLines)
                         process.terminate()
@@ -504,15 +505,15 @@ final class Launcher {
                         log("supervisor: could not mark known-good: \(error)")
                     }
                 case "self-test-quit", "shutdown":
-                    log("supervisor: \(name == "shutdown" ? "Shut down" : "self-test") asks Electron to quit")
+                    log("supervisor: \(name == "shutdown" ? "Shut down" : "self-test") asks \(child) to quit")
                     quitRequested = true
                     process.send(["op": "quit"])
                     process.after(30, "quit-timeout")
                 case "quit-timeout" where announcedExit == nil:
-                    log("supervisor: Electron did not quit in time; terminating")
+                    log("supervisor: \(child) did not quit in time; terminating")
                     process.terminate()
                 case "exit-grace":
-                    log("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating")
+                    log("supervisor: \(child)'s teardown is still running 10s after it announced its exit; terminating")
                     teardownForced = true
                     process.terminate()
                 default:
@@ -520,14 +521,14 @@ final class Launcher {
                 }
             case let .exited(code, signal):
                 if !process.drainOutputAfterExit() {
-                    log("supervisor: Electron's output pipe is still held open by processes it started")
+                    log("supervisor: \(child)'s output pipe is still held open by processes it started")
                 }
                 let output = process.output.lastLines
                 let detail = signal != 0 ? "signal \(signal)" : "exit \(code)"
-                log("supervisor: Electron exited (\(detail))")
+                log("supervisor: \(child) exited (\(detail))")
                 if let pending { return .failed(pending.0, output) }
                 if let announcedExit, teardownForced {
-                    log("supervisor: Electron's teardown did not finish; its announced exit \(announcedExit) stands but cleanup is incomplete")
+                    log("supervisor: \(child)'s teardown did not finish; its announced exit \(announcedExit) stands but cleanup is incomplete")
                 }
                 let code = announcedExit ?? (signal == 0 ? code : -1)
                 let signal = announcedExit != nil ? 0 : signal

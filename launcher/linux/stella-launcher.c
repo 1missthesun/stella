@@ -2718,6 +2718,7 @@ static Outcome supervise(const char *electron_bin) {
     int quit_requested = 0, announced = 0, announced_code = 0, exited = 0;
 
     memset(&result, 0, sizeof(result));
+    const char *child = g_engine_bin && !strcmp(electron_bin, g_engine_bin) ? "stella-engine" : "Electron";
     spawned_head = GIT("rev-parse", "HEAD");
     if (!spawned_head) spawned_head = xstrdup("");
     e = electron_spawn(electron_bin, &err);
@@ -2785,11 +2786,11 @@ static Outcome supervise(const char *electron_bin) {
                         mj_get_number(msg, "code", &code);
                         announced = 1;
                         announced_code = (int)code;
-                        LOG("supervisor: Electron is exiting with %d", announced_code);
+                        LOG("supervisor: %s is exiting with %d", child, announced_code);
                         timers[T_EXIT_GRACE] = now_seconds() + 10;
                     } else if (op && !strcmp(op, "failed")) {
                         const char *reason = mj_get_string(msg, "reason");
-                        LOG("supervisor: Electron reported failure: %s", reason ? reason : "unknown");
+                        LOG("supervisor: %s reported failure: %s", child, reason ? reason : "unknown");
                         if (!pending_reason) {
                             pending_reason = xasprintf("Stella reported a problem: %s", reason ? reason : "unknown");
                             electron_terminate(e);
@@ -2831,19 +2832,19 @@ static Outcome supervise(const char *electron_bin) {
                 }
                 break;
             case T_SELF_TEST_QUIT:
-                LOG("supervisor: self-test asks Electron to quit");
+                LOG("supervisor: self-test asks %s to quit", child);
                 quit_requested = 1;
                 electron_send(e, "{\"op\":\"quit\"}\n");
                 timers[T_QUIT_TIMEOUT] = now + 30;
                 break;
             case T_QUIT_TIMEOUT:
                 if (!announced) {
-                    LOG("supervisor: Electron did not quit in time; terminating");
+                    LOG("supervisor: %s did not quit in time; terminating", child);
                     electron_terminate(e);
                 }
                 break;
             case T_EXIT_GRACE:
-                LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                LOG("supervisor: %s's teardown is still running 10s after it announced its exit; terminating", child);
                 result.teardown_forced = 1;
                 electron_terminate(e);
                 break;
@@ -2864,7 +2865,7 @@ static Outcome supervise(const char *electron_bin) {
                 fcntl(e->out, F_SETFL, O_NONBLOCK);
                 while ((n = read(e->out, buf, sizeof(buf))) > 0 || (n < 0 && errno == EINTR))
                     if (n > 0) output_append(e, buf, (size_t)n);
-                if (n < 0) LOG("supervisor: Electron's output pipe is still held open by processes it started");
+                if (n < 0) LOG("supervisor: %s's output pipe is still held open by processes it started", child);
             }
         }
     }
@@ -2874,7 +2875,7 @@ static Outcome supervise(const char *electron_bin) {
         int sig = WIFSIGNALED(e->status) ? WTERMSIG(e->status) : 0;
         char *detail = sig ? xasprintf("signal %d", sig) : xasprintf("exit %d", code);
         StrList output = output_last_lines(e);
-        LOG("supervisor: Electron exited (%s)", detail);
+        LOG("supervisor: %s exited (%s)", child, detail);
         g_current = NULL;
         electron_free(e);
         result.output = output;
@@ -2885,7 +2886,7 @@ static Outcome supervise(const char *electron_bin) {
             goto done;
         }
         if (announced && result.teardown_forced) {
-            LOG("supervisor: Electron's teardown did not finish; its announced exit %d stands but cleanup is incomplete",
+            LOG("supervisor: %s's teardown did not finish; its announced exit %d stands but cleanup is incomplete", child,
                 announced_code);
         }
         if (announced) { code = announced_code; sig = 0; }

@@ -17,7 +17,7 @@ export function applyRuneProcessEnv() {
     decryptString: (ciphertext) => { requireAvailable(); return safeStorage.decryptString(ciphertext); },
   });
 
-  process.env.STELLA_HOST_EXECUTABLE_PATH ??= process.execPath;
+  process.env.STELLA_HOST_EXECUTABLE_PATH = process.execPath;
 
   const isolatedData = process.env.STELLA_LAUNCHER_USER_DATA_DIR?.trim() ? process.env.STELLA_DATA_DIR?.trim() : undefined;
   if (isolatedData) {

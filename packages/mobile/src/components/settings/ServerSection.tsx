@@ -3,6 +3,7 @@ import { Alert, Pressable, View } from "react-native";
 import { Text } from "../Text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Icon } from "../Icon";
+import { Dot, Hairline, SectionLabel, TextAction } from "../chat-settings/kit";
 import type { SettingsStyles } from "./settings-styles";
 import type { Colors } from "../../theme/colors";
 import { tapLight } from "../../lib/haptics";
@@ -86,18 +87,13 @@ export function ServerSection({
   return (
     <View style={embedded ? styles.sectionFirst : styles.section}>
       {embedded ? null : (
-        <Text style={styles.sectionLabel}>
-          {t("mobile.selfHost.serverSection")}
-        </Text>
+        <SectionLabel>{t("mobile.selfHost.serverSection")}</SectionLabel>
       )}
       <View style={styles.group}>
-        {servers.map((entry, index) => {
+        {servers.map((entry) => {
           const active = entry.id === launchServer.id;
           return (
-            <View
-              key={entry.id}
-              style={[styles.row, index > 0 && styles.rowDivider]}
-            >
+            <View key={entry.id} style={styles.row}>
               <Pressable
                 testID={`server-row-${entry.id}`}
                 accessibilityRole="button"
@@ -118,14 +114,23 @@ export function ServerSection({
               >
                 <Icon
                   name={entry.kind === "hosted" ? "cloud" : "monitor"}
-                  size={17}
+                  size={20}
                   color={colors.textMuted}
                   style={styles.rowIcon}
                 />
                 <View style={styles.rowCopy}>
-                  <Text style={styles.rowLabel} numberOfLines={1}>
-                    {nameOf(entry)}
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={styles.rowLabel} numberOfLines={1}>
+                      {nameOf(entry)}
+                    </Text>
+                    {active ? <Dot size={6} /> : null}
+                  </View>
                   <Text style={styles.rowSub} numberOfLines={1}>
                     {entry.kind === "hosted"
                       ? t("mobile.selfHost.hostedSub")
@@ -134,9 +139,6 @@ export function ServerSection({
                         })}
                   </Text>
                 </View>
-                {active ? (
-                  <Icon name="check" size={15} color={colors.accent} />
-                ) : null}
               </Pressable>
               {entry.kind === "self-hosted" ? (
                 <Pressable
@@ -152,37 +154,26 @@ export function ServerSection({
                     pressed && styles.rowPressed,
                   ]}
                 >
-                  <Icon name="trash" size={15} color={colors.textMuted} />
+                  <Icon name="trash" size={16} color={colors.textMuted} />
                 </Pressable>
               ) : null}
             </View>
           );
         })}
-        <Pressable
-          testID="server-add"
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.selfHost.addServer")}
+      </View>
+
+      <Hairline space={18} />
+
+      <View testID="server-add">
+        <TextAction
+          label={t("mobile.selfHost.addServer")}
+          icon="plus"
           disabled={busy}
           onPress={() => {
             tapLight();
             router.push("/connect-server");
           }}
-          style={({ pressed }) => [
-            styles.row,
-            styles.rowDivider,
-            pressed && styles.rowPressed,
-          ]}
-        >
-          <Icon
-            name="plus"
-            size={17}
-            color={colors.accent}
-            style={styles.rowIcon}
-          />
-          <Text style={[styles.rowLabel, { flex: 1, color: colors.accent }]}>
-            {t("mobile.selfHost.addServer")}
-          </Text>
-        </Pressable>
+        />
       </View>
     </View>
   );

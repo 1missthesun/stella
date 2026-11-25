@@ -15,11 +15,11 @@ import {
 import { useLocale, useT } from "../../i18n";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
-import { useColors, useTheme } from "../../theme/theme-context";
+import { useColors } from "../../theme/theme-context";
 import { GlassToggle } from "../glass";
 import { Icon } from "../Icon";
-import { SegmentedControl } from "../SegmentedControl";
-import { settingsSurfaceFills, type SettingsStyles } from "./settings-styles";
+import { Dot, Hairline, SectionLabel } from "../chat-settings/kit";
+import type { SettingsStyles } from "./settings-styles";
 
 const QUIET_HOURS_STEP_MINUTES = 30;
 
@@ -52,17 +52,16 @@ export function UserAskEscalationSection({
   view?: UserAskPolicyView;
 }) {
   const colors = useColors();
-  const { isDark } = useTheme();
   const locale = useLocale();
   const t = useT();
-  const local = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const local = useMemo(() => makeStyles(colors), [colors]);
   const owned = useUserAskEscalationPolicy(enabled && !view, active);
   const { policy, loaded, available, failed, update } = view ?? owned;
 
   const levelOptions = useMemo(
     () =>
       USER_ASK_URGENCY_LEVELS.map((level) => ({
-        value: String(level),
+        value: level,
         label: t(
           `mobile.settings.userAsk.level.${USER_ASK_URGENCY_NAMES[level - 1]}`,
         ),
@@ -73,18 +72,17 @@ export function UserAskEscalationSection({
   if (!enabled) return null;
 
   return (
-    <View style={embedded ? styles.section : styles.section}>
-      <Text style={styles.sectionLabel}>
-        {t("mobile.settings.userAsk.section")}
-      </Text>
-      <View style={styles.group}>
+    <View style={embedded ? local.embeddedSection : styles.section}>
+      {embedded ? <Hairline space={20} /> : null}
+      <SectionLabel>{t("mobile.settings.userAsk.section")}</SectionLabel>
+      <View style={local.stack}>
         {!available && loaded ? (
           <Text style={styles.hint}>
             {t("mobile.settings.userAsk.unavailable")}
           </Text>
         ) : (
           <>
-            <View style={[styles.row, local.stackedRow]}>
+            <View style={local.stackedRow}>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowLabel}>
                   {t("mobile.settings.userAsk.ceiling")}
@@ -93,22 +91,20 @@ export function UserAskEscalationSection({
                   {t("mobile.settings.userAsk.ceilingSub")}
                 </Text>
               </View>
-              <SegmentedControl
+              <LevelPicker
                 accessibilityLabel={t("mobile.settings.userAsk.ceiling")}
                 disabled={!available}
+                local={local}
+                options={levelOptions}
+                value={policy.ceiling}
                 onChange={(next) => {
                   tapLight();
-                  update({
-                    ...policy,
-                    ceiling: Number(next) as UserAskUrgencyLevel,
-                  });
+                  update({ ...policy, ceiling: next });
                 }}
-                options={levelOptions}
-                value={String(policy.ceiling)}
               />
             </View>
 
-            <View style={[styles.row, styles.rowDivider]}>
+            <View style={styles.row}>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowLabel}>
                   {t("mobile.settings.userAsk.sound")}
@@ -128,7 +124,7 @@ export function UserAskEscalationSection({
               />
             </View>
 
-            <View style={[styles.row, styles.rowDivider]}>
+            <View style={styles.row}>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowLabel}>
                   {t("mobile.settings.userAsk.quietHours")}
@@ -155,7 +151,7 @@ export function UserAskEscalationSection({
             </View>
 
             {policy.quietHours.enabled ? (
-              <>
+              <View style={local.quietBlock}>
                 <StepperRow
                   colors={colors}
                   label={t("mobile.settings.userAsk.quietStart")}
@@ -196,29 +192,25 @@ export function UserAskEscalationSection({
                   t={t}
                   value={formatMinute(locale, policy.quietHours.endMinute)}
                 />
-                <View style={[styles.row, local.stackedRow, styles.rowDivider]}>
-                  <View style={styles.rowCopy}>
-                    <Text style={styles.rowLabel}>
-                      {t("mobile.settings.userAsk.quietCeiling")}
-                    </Text>
-                  </View>
-                  <SegmentedControl
+                <View style={local.stackedRow}>
+                  <Text style={styles.rowLabel}>
+                    {t("mobile.settings.userAsk.quietCeiling")}
+                  </Text>
+                  <LevelPicker
                     accessibilityLabel={t(
                       "mobile.settings.userAsk.quietCeiling",
                     )}
                     disabled={!available}
+                    local={local}
+                    options={levelOptions}
+                    value={policy.quietHoursCeiling}
                     onChange={(next) => {
                       tapLight();
-                      update({
-                        ...policy,
-                        quietHoursCeiling: Number(next) as UserAskUrgencyLevel,
-                      });
+                      update({ ...policy, quietHoursCeiling: next });
                     }}
-                    options={levelOptions}
-                    value={String(policy.quietHoursCeiling)}
                   />
                 </View>
-              </>
+              </View>
             ) : null}
 
             <StepperRow
@@ -248,6 +240,62 @@ export function UserAskEscalationSection({
   );
 }
 
+function LevelPicker({
+  accessibilityLabel,
+  disabled,
+  local,
+  options,
+  value,
+  onChange,
+}: {
+  accessibilityLabel: string;
+  disabled: boolean;
+  local: ReturnType<typeof makeStyles>;
+  options: ReadonlyArray<{ value: UserAskUrgencyLevel; label: string }>;
+  value: UserAskUrgencyLevel;
+  onChange: (next: UserAskUrgencyLevel) => void;
+}) {
+  return (
+    <View
+      style={[local.levels, disabled && local.disabled]}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {options.map((option) => {
+        const picked = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            disabled={disabled}
+            onPress={() => {
+              if (!picked) onChange(option.value);
+            }}
+            hitSlop={{ top: 8, bottom: 8 }}
+            accessibilityRole="radio"
+            accessibilityLabel={option.label}
+            accessibilityState={{ checked: picked, disabled }}
+            style={({ pressed }) => [
+              local.levelItem,
+              pressed && !picked && local.pressed,
+            ]}
+          >
+            <Text
+              style={[local.levelLabel, picked && local.levelPicked]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+            >
+              {option.label}
+            </Text>
+            <View style={local.levelMark}>
+              {picked ? <Dot size={6} /> : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function StepperRow({
   colors,
   label,
@@ -268,7 +316,7 @@ function StepperRow({
   value: string;
 }) {
   return (
-    <View style={[styles.row, styles.rowDivider]}>
+    <View style={styles.row}>
       <View style={styles.rowCopy}>
         <Text style={styles.rowLabel}>{label}</Text>
         {sub ? <Text style={styles.rowSub}>{sub}</Text> : null}
@@ -277,63 +325,108 @@ function StepperRow({
         <Pressable
           accessibilityLabel={t("mobile.settings.userAsk.stepDown", { label })}
           accessibilityRole="button"
+          hitSlop={6}
           onPress={() => {
             tapLight();
             onStep(-1);
           }}
           style={({ pressed }) => [local.stepButton, pressed && local.pressed]}
         >
-          <Icon color={colors.textMuted} name="chevron-left" size={14} />
+          <Icon
+            color={colors.textMuted}
+            name="chevron-left"
+            size={15}
+            weight="semibold"
+          />
         </Pressable>
         <Text style={local.stepperValue}>{value}</Text>
         <Pressable
           accessibilityLabel={t("mobile.settings.userAsk.stepUp", { label })}
           accessibilityRole="button"
+          hitSlop={6}
           onPress={() => {
             tapLight();
             onStep(1);
           }}
           style={({ pressed }) => [local.stepButton, pressed && local.pressed]}
         >
-          <Icon color={colors.textMuted} name="chevron-right" size={14} />
+          <Icon
+            color={colors.textMuted}
+            name="chevron-right"
+            size={15}
+            weight="semibold"
+          />
         </Pressable>
       </View>
     </View>
   );
 }
 
-const makeStyles = (colors: Colors, isDark: boolean) => {
-  const { tonalFill } = settingsSurfaceFills(isDark);
-  return StyleSheet.create({
-    pressed: {
-      opacity: 0.55,
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+    embeddedSection: {
+      marginTop: 0,
+    },
+    stack: {
+      gap: 14,
+      marginTop: 8,
+    },
+    quietBlock: {
+      gap: 12,
+      paddingTop: 2,
     },
     stackedRow: {
-      alignItems: "stretch",
-      flexDirection: "column",
       gap: 10,
-      paddingVertical: 13,
+      paddingVertical: 4,
+    },
+    levels: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingRight: 4,
+    },
+    levelItem: {
+      alignItems: "center",
+      gap: 4,
+      justifyContent: "center",
+      minHeight: 40,
+      minWidth: 38,
+    },
+    levelLabel: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15.5,
+      letterSpacing: -0.3,
+    },
+    levelPicked: {
+      color: colors.text,
+    },
+    levelMark: {
+      height: 6,
+      width: 6,
     },
     stepButton: {
       alignItems: "center",
-      height: 32,
+      height: 36,
       justifyContent: "center",
       width: 28,
     },
     stepper: {
       alignItems: "center",
-      backgroundColor: tonalFill,
-      borderRadius: 9,
       flexDirection: "row",
-      paddingHorizontal: 2,
+      gap: 2,
     },
     stepperValue: {
-      color: colors.textStrong,
-      fontFamily: fonts.sans.medium,
-      fontSize: 13,
+      color: colors.text,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15.5,
       fontVariant: ["tabular-nums"],
-      minWidth: 58,
+      minWidth: 64,
       textAlign: "center",
     },
+    disabled: {
+      opacity: 0.4,
+    },
+    pressed: {
+      opacity: 0.55,
+    },
   });
-};

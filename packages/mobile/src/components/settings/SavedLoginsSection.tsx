@@ -7,6 +7,7 @@ import { tapLight } from "../../lib/haptics";
 import { useLocale, useT } from "../../i18n";
 import { useColors } from "../../theme/theme-context";
 import { Icon } from "../Icon";
+import { SectionLabel } from "../chat-settings/kit";
 import {
   SavedLoginsProblemCard,
   SavedLoginsRequestCard,
@@ -46,9 +47,7 @@ export function SavedLoginsSection({
   return (
     <View style={embedded ? styles.sectionFirst : styles.section}>
       {embedded ? null : (
-        <Text style={styles.sectionLabel}>
-          {t("mobile.savedLogins.section")}
-        </Text>
+        <SectionLabel>{t("mobile.savedLogins.section")}</SectionLabel>
       )}
       {trust.standing === "waiting" ? (
         <SavedLoginsWaitingCard waiting={trust} />
@@ -65,11 +64,10 @@ export function SavedLoginsSection({
               trust.requests.length > 0 && styles.groupGap,
             ]}
           >
-            {trust.devices.map((device, index) => (
+            {trust.devices.map((device) => (
               <DeviceRow
                 key={device.deviceId}
                 device={device}
-                divided={index > 0}
                 sameName={trust.devices.some(
                   (other) => other !== device && other.name === device.name,
                 )}
@@ -87,14 +85,12 @@ export function SavedLoginsSection({
 
 function DeviceRow({
   device,
-  divided,
   sameName,
   busy,
   onRemove,
   styles,
 }: {
   device: SavedValuesListedDevice;
-  divided: boolean;
   sameName: boolean;
   busy: boolean;
   onRemove: () => void;
@@ -123,10 +119,10 @@ function DeviceRow({
     .filter(Boolean)
     .join(" · ");
   return (
-    <View style={[styles.row, divided && styles.rowDivider]}>
+    <View style={styles.row}>
       <Icon
         name={device.kind === "phone" ? "smartphone" : "monitor"}
-        size={17}
+        size={20}
         color={colors.textMuted}
         style={styles.rowIcon}
       />

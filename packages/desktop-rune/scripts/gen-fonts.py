@@ -38,7 +38,7 @@ def rename(font: TTFont, family: str, style: str) -> None:
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     for stem, family, style, weight in FONTS:
-        font = TTFont(SRC / f"{stem}.woff2")
+        font = TTFont(SRC / f"{stem}.woff2", recalcTimestamp=False)
         font.flavor = None
         rename(font, family, style)
         if "fvar" in font:

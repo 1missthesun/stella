@@ -36,7 +36,7 @@ const useFormatters = (locale: string) =>
     const whole = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" });
     const weekday = new Intl.DateTimeFormat(locale, { weekday: "long", hour: "numeric", minute: "2-digit" });
-    const day = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" });
+    const day = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
     const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
     return {
       percent: (used: number, limit: number) => percent.format(usedShare(used, limit) / 100),
@@ -105,37 +105,37 @@ function Row({ label, hint, children }: { label: string; hint?: ReactNode; child
   );
 }
 
-function Meter({
+function MeterTrack({
   used,
   limit,
   reserved = 0,
   label,
-  caption,
-  large = false,
+  compact = false,
 }: {
   used: number;
   limit: number;
   reserved?: number;
   label: string;
-  caption: ReactNode;
-  large?: boolean;
+  compact?: boolean;
 }) {
   const usedPct = pct(used, limit);
   const heldPct = Math.min(100 - usedPct, pct(reserved, limit));
   return (
-    <div className="billing-meter" data-large={large || undefined}>
-      <div
-        className="billing-meter-track"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(usedPct)}
-      >
-        <span className="billing-meter-used" data-full={(limit > 0 && used >= limit) || undefined} style={{ width: `${usedPct}%` }} />
-        {heldPct > 0 ? <span className="billing-meter-held" style={{ width: `${heldPct}%` }} /> : null}
-      </div>
-      <div className="billing-meter-caption">{caption}</div>
+    <div
+      className="billing-meter-track"
+      data-compact={compact || undefined}
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(usedPct)}
+    >
+      <span
+        className="billing-meter-used"
+        data-full={(limit > 0 && used >= limit) || undefined}
+        style={{ width: `${usedPct}%` }}
+      />
+      {heldPct > 0 ? <span className="billing-meter-held" style={{ width: `${heldPct}%` }} /> : null}
     </div>
   );
 }
@@ -228,7 +228,18 @@ export function BillingPanel() {
   }
 
   if (!status) {
-    return <div className="billing-panel billing-panel--loading" aria-busy="true" />;
+    return (
+      <div className="billing-panel billing-panel--loading" aria-busy="true">
+        <div className="billing-skeleton-head" />
+        <div className="billing-skeleton-bar" />
+        <div className="billing-skeleton-grid">
+          <div className="billing-skeleton-col" />
+          <div className="billing-skeleton-col" />
+          <div className="billing-skeleton-col" />
+          <div className="billing-skeleton-col" />
+        </div>
+      </div>
+    );
   }
 
   const plan = normalizeBillingPlan(status.plan);
@@ -293,45 +304,40 @@ function UsageSection({
   const next = nextPlanUp(plan);
   const resets = (at: number | undefined) =>
     typeof at === "number" && at > 0 ? t("billing.v3.usage.resets", { date: f.when(at, now) }) : "";
-  const windowCaption = (used: number, limit: number, at: number) => (
-    <>
-      <span>{t("billing.v3.usage.percentUsed", { percent: f.percent(used, limit) })}</span>
-      <span className="billing-muted">{used > 0 ? resets(at) : t("billing.v3.usage.startsNext")}</span>
-    </>
-  );
+  const resetText = oneTime ? t("billing.v3.usage.oneTimeNote") : resets(usage.monthlyResetsAt);
 
   return (
-    <Section title={t("billing.v3.usage.title")} lede={t("billing.v3.usage.lede")}>
-      <div className="billing-total">
-        <div className="billing-total-head">
-          <span className="billing-total-amount">{f.percent(mainUsed, mainLimit)}</span>
-          <span className="billing-muted">
-            {oneTime ? t("billing.v3.usage.usedOneTime") : t("billing.v3.usage.usedMonth")}
+    <section className="billing-section billing-section--usage">
+      <div className="billing-usage-header">
+        <div className="billing-usage-identity">
+          <h2 className="billing-usage-title">Stella {def.label}</h2>
+          <span className="billing-usage-summary">
+            <strong className="billing-usage-pct">{f.percent(mainUsed, mainLimit)}</strong>
+            <span className="billing-muted">
+              {oneTime ? t("billing.v3.usage.usedOneTime") : t("billing.v3.usage.usedMonth")}
+            </span>
           </span>
         </div>
-        <Meter
-          large
-          label={t("billing.v3.usage.title")}
-          used={mainUsed}
-          limit={mainLimit}
-          reserved={reserved}
-          caption={
-            <>
-              <span className="billing-legend">
-                <i className="billing-legend-used" aria-hidden="true" />
-                <span>{t("billing.v3.usage.used")}</span>
-                {reserved > 0 ? (
-                  <>
-                    <i className="billing-legend-held" aria-hidden="true" />
-                    <span>{t("billing.v3.usage.held")}</span>
-                  </>
-                ) : null}
-              </span>
-              <span className="billing-muted">{oneTime ? t("billing.v3.usage.oneTimeNote") : resets(usage.monthlyResetsAt)}</span>
-            </>
-          }
-        />
+        {resetText ? <span className="billing-usage-reset">{resetText}</span> : null}
       </div>
+
+      <MeterTrack
+        label={t("billing.v3.usage.title")}
+        used={mainUsed}
+        limit={mainLimit}
+        reserved={reserved}
+      />
+
+      {reserved > 0 ? (
+        <div className="billing-meter-caption">
+          <span className="billing-legend">
+            <i className="billing-legend-used" aria-hidden="true" />
+            <span>{t("billing.v3.usage.used")}</span>
+            <i className="billing-legend-held" aria-hidden="true" />
+            <span>{t("billing.v3.usage.held")}</span>
+          </span>
+        </div>
+      ) : null}
 
       {blocked ? (
         <div className="billing-callout" data-tone="warning" role="status">
@@ -347,30 +353,32 @@ function UsageSection({
                   : t("billing.v3.usage.outBodyNoDate")}
             </span>
           </div>
-          {oneTime && connectPlanOfferEnabled() ? (
-            <button
-              type="button"
-              className="billing-btn billing-btn--primary"
-              onClick={() => {
-                planUsageDialog.close();
-                openConnectPlan({ conversationId: null, reason: "allowance", choose: true });
-              }}
-            >
-              {connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect}
-            </button>
-          ) : null}
-          {next ? (
-            <button
-              type="button"
-              className={
-                oneTime && connectPlanOfferEnabled() ? "billing-btn" : "billing-btn billing-btn--primary"
-              }
-              disabled={busy !== null}
-              onClick={() => (plan === "free" ? onCheckout(next) : onPortal())}
-            >
-              {t("billing.v3.usage.upgradeTo", { plan: PLAN_CATALOG[next].label })}
-            </button>
-          ) : null}
+          <div className="billing-callout-actions">
+            {oneTime && connectPlanOfferEnabled() ? (
+              <button
+                type="button"
+                className="billing-btn billing-btn--primary"
+                onClick={() => {
+                  planUsageDialog.close();
+                  openConnectPlan({ conversationId: null, reason: "allowance", choose: true });
+                }}
+              >
+                {connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect}
+              </button>
+            ) : null}
+            {next ? (
+              <button
+                type="button"
+                className={
+                  oneTime && connectPlanOfferEnabled() ? "billing-btn" : "billing-btn billing-btn--primary"
+                }
+                disabled={busy !== null}
+                onClick={() => (plan === "free" ? onCheckout(next) : onPortal())}
+              >
+                {t("billing.v3.usage.upgradeTo", { plan: PLAN_CATALOG[next].label })}
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : resumesAt !== null && credit > 0 ? (
         <div className="billing-callout" role="status">
@@ -382,29 +390,46 @@ function UsageSection({
       ) : null}
 
       {oneTime ? null : (
-        <div className="billing-rows">
-          <Row
-            label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
-            hint={t("billing.v3.usage.rollingNote", { hours: def.budget.rollingWindowHours })}
-          >
-            <Meter
+        <div className="billing-windows">
+          <div className="billing-window">
+            <div className="billing-window-head">
+              <span className="billing-window-label">
+                {t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
+              </span>
+              <span className="billing-window-meta">
+                <span>{t("billing.v3.usage.percentUsed", { percent: f.percent(usage.rollingUsedUsd, usage.rollingLimitUsd) })}</span>
+                <span className="billing-muted">
+                  {usage.rollingUsedUsd > 0 ? resets(usage.rollingResetsAt) : t("billing.v3.usage.startsNext")}
+                </span>
+              </span>
+            </div>
+            <MeterTrack
+              compact
               label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
               used={usage.rollingUsedUsd}
               limit={usage.rollingLimitUsd}
-              caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
             />
-          </Row>
-          <Row label={t("billing.v3.usage.weekly")} hint={t("billing.v3.usage.weeklyNote")}>
-            <Meter
+          </div>
+          <div className="billing-window">
+            <div className="billing-window-head">
+              <span className="billing-window-label">{t("billing.v3.usage.weekly")}</span>
+              <span className="billing-window-meta">
+                <span>{t("billing.v3.usage.percentUsed", { percent: f.percent(usage.weeklyUsedUsd, usage.weeklyLimitUsd) })}</span>
+                <span className="billing-muted">
+                  {usage.weeklyUsedUsd > 0 ? resets(usage.weeklyResetsAt) : t("billing.v3.usage.startsNext")}
+                </span>
+              </span>
+            </div>
+            <MeterTrack
+              compact
               label={t("billing.v3.usage.weekly")}
               used={usage.weeklyUsedUsd}
               limit={usage.weeklyLimitUsd}
-              caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
             />
-          </Row>
+          </div>
         </div>
       )}
-    </Section>
+    </section>
   );
 }
 
@@ -446,16 +471,12 @@ function PlanSection({
   };
 
   return (
-    <Section id="billing-plans">
-      <div className="billing-plans-head">
-        <h2 className="billing-plans-heading">{t("billing.v3.plan.heading")}</h2>
-        <p className="billing-plans-lede">{t("billing.v3.plan.lede")}</p>
-      </div>
+    <Section id="billing-plans" title={t("billing.v3.plan.heading")} lede={t("billing.v3.plan.lede")}>
       <div className="billing-plans" role="list">
         {PLAN_ORDER.map((id) => {
           const def = PLAN_CATALOG[id];
           const current = id === plan;
-          const recommended = id === RECOMMENDED_PLAN;
+          const recommended = id === RECOMMENDED_PLAN && !current;
           const action = actionFor(id);
           return (
             <div
@@ -465,29 +486,34 @@ function PlanSection({
               data-current={current || undefined}
               data-recommended={recommended || undefined}
             >
-              <span className="billing-plan-flag">
-                {current ? t("billing.v3.plan.currentPlan") : recommended ? t("billing.v3.plan.recommended") : ""}
-              </span>
-              <span className="billing-plan-name">{def.label}</span>
+              <div className="billing-plan-top">
+                <span className="billing-plan-name">{def.label}</span>
+                {recommended ? (
+                  <span className="billing-plan-tag">{t("billing.v3.plan.recommended")}</span>
+                ) : null}
+              </div>
               <span className="billing-plan-tagline">{planTagline(id, t)}</span>
-              <span className="billing-plan-price">
+              <div className="billing-plan-price">
                 <span className="billing-plan-amount">{f.amount(def.monthlyPriceCents / 100)}</span>
                 <span className="billing-plan-per">{def.interval ? t("billing.v3.plan.month") : t("billing.v3.plan.noCard")}</span>
-              </span>
-              {action ? (
-                <button
-                  type="button"
-                  className={`billing-btn billing-plan-btn${action.primary ? " billing-btn--primary" : ""}`}
-                  disabled={busy !== null}
-                  onClick={action.onClick}
-                >
-                  {action.label}
-                </button>
-              ) : (
-                <span className="billing-btn billing-plan-btn billing-plan-btn--current" aria-disabled="true">
-                  {t("billing.v3.plan.currentPlan")}
-                </span>
-              )}
+              </div>
+              <div className="billing-plan-cta">
+                {action ? (
+                  <button
+                    type="button"
+                    className={`billing-btn billing-plan-btn${action.primary ? " billing-btn--primary" : ""}`}
+                    disabled={busy !== null}
+                    onClick={action.onClick}
+                  >
+                    {action.label}
+                  </button>
+                ) : (
+                  <span className="billing-plan-current" aria-current="true">
+                    <i className="billing-plan-current-dot" aria-hidden="true" />
+                    {t("billing.v3.plan.currentPlan")}
+                  </span>
+                )}
+              </div>
               <ul className="billing-plan-features">
                 {planIncludesLines(id, t).map((line) => (
                   <li key={line}>{line}</li>
@@ -517,7 +543,7 @@ function PlanSection({
             <span className="billing-value">{periodEnd ?? "—"}</span>
           </Row>
           <Row label={t("billing.v3.plan.manage")} hint={t("billing.v3.plan.manageHint")}>
-            <button type="button" className="billing-btn" disabled={busy !== null} onClick={onPortal}>
+            <button type="button" className="billing-text-action" disabled={busy !== null} onClick={onPortal}>
               {busy === "portal" ? t("billing.v3.opening") : t("billing.v3.plan.manageButton")}
             </button>
           </Row>
@@ -562,66 +588,71 @@ function CreditSection({
   };
 
   return (
-    <Section title={t("billing.v3.credit.title")} lede={t("billing.v3.credit.lede")}>
-      <div className="billing-balance">
-        <span className="billing-balance-amount">{f.usd(status.credits.balanceUsd)}</span>
-        <span className="billing-muted">{t("billing.v3.credit.balance")}</span>
-      </div>
-      <div className="billing-topup">
-        <div className="billing-credit">
-          <div className="billing-segmented" role="radiogroup" aria-label={t("billing.v3.credit.add")}>
-            {options.presetAmountCents.map((cents) => {
-              const on = !custom.trim() && preset === cents;
-              return (
-                <button
-                  key={cents}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  data-on={on || undefined}
-                  onClick={() => {
-                    setPreset(cents);
-                    setCustom("");
-                    setInputError(null);
-                  }}
-                >
-                  {f.amount(cents / 100)}
-                </button>
-              );
-            })}
+    <section className="billing-section billing-section--credit">
+      <div className="billing-credit-layout">
+        <div className="billing-credit-copy">
+          <div className="billing-credit-head">
+            <h2 className="billing-section-title">{t("billing.v3.credit.title")}</h2>
+            <span className="billing-balance-inline">{f.usd(status.credits.balanceUsd)}</span>
           </div>
-          <label className="billing-input-wrap">
-            <span aria-hidden="true">$</span>
-            <input
-              className="billing-input"
-              inputMode="decimal"
-              placeholder={t("billing.v3.credit.other")}
-              aria-label={t("billing.v3.credit.other")}
-              aria-invalid={inputError ? true : undefined}
-              value={custom}
-              onChange={(event) => {
-                setCustom(event.target.value);
-                setInputError(null);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="billing-btn billing-btn--primary"
-            disabled={busy !== null || amountCents === null}
-            onClick={submit}
-          >
-            {busy === "credit"
-              ? t("billing.v3.opening")
-              : amountCents
-                ? t("billing.v3.credit.addAmount", { amount: f.usd(amountCents / 100) })
-                : t("billing.v3.credit.add")}
-          </button>
+          <p className="billing-section-lede">{t("billing.v3.credit.lede")}</p>
         </div>
-        {inputError ? <span className="billing-field-error">{inputError}</span> : null}
-        <p className="billing-centered-hint">{t("billing.v3.credit.addHint")}</p>
+        <div className="billing-topup">
+          <div className="billing-credit">
+            <div className="billing-word-picker" role="radiogroup" aria-label={t("billing.v3.credit.add")}>
+              {options.presetAmountCents.map((cents) => {
+                const on = !custom.trim() && preset === cents;
+                return (
+                  <button
+                    key={cents}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    data-on={on || undefined}
+                    onClick={() => {
+                      setPreset(cents);
+                      setCustom("");
+                      setInputError(null);
+                    }}
+                  >
+                    {f.amount(cents / 100)}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="billing-input-wrap">
+              <span aria-hidden="true">$</span>
+              <input
+                className="billing-input"
+                inputMode="decimal"
+                placeholder={t("billing.v3.credit.other")}
+                aria-label={t("billing.v3.credit.other")}
+                aria-invalid={inputError ? true : undefined}
+                value={custom}
+                onChange={(event) => {
+                  setCustom(event.target.value);
+                  setInputError(null);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="billing-btn billing-btn--primary"
+              disabled={busy !== null || amountCents === null}
+              onClick={submit}
+            >
+              {busy === "credit"
+                ? t("billing.v3.opening")
+                : amountCents
+                  ? t("billing.v3.credit.addAmount", { amount: f.usd(amountCents / 100) })
+                  : t("billing.v3.credit.add")}
+            </button>
+          </div>
+          {inputError ? <span className="billing-field-error">{inputError}</span> : null}
+          <p className="billing-credit-hint">{t("billing.v3.credit.addHint")}</p>
+        </div>
       </div>
-    </Section>
+    </section>
   );
 }
 

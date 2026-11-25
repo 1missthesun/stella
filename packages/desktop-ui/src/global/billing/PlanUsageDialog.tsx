@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { preloadUsageSurface } from "@/app/usage/usage-cache";
 import {
   Dialog,
   DialogBody,
@@ -36,15 +37,23 @@ type PlanUsageDialogProps = {
 export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
   const [tab, setTab] = useState<PlanUsageTab>("plan");
 
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => preloadUsageSurface("7d"), 120);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="xl"
         className="plan-usage-dialog"
         aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement).focus();
+        }}
       >
-        {/* The tabs name the surface, so the title would only repeat them.
-            Keep it for the accessible name and give the row to the tabs. */}
         <DialogHeader className="plan-usage-dialog__header">
           <VisuallyHidden asChild>
             <DialogTitle>Plan &amp; usage</DialogTitle>
@@ -64,6 +73,8 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
                 aria-controls={`plan-usage-panel-${key}`}
                 className="plan-usage-tabs__item"
                 data-active={tab === key || undefined}
+                onMouseEnter={key === "usage" ? () => preloadUsageSurface("7d") : undefined}
+                onFocus={key === "usage" ? () => preloadUsageSurface("7d") : undefined}
                 onClick={() => setTab(key)}
               >
                 {label}
@@ -78,7 +89,7 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
           id={`plan-usage-panel-${tab}`}
           aria-labelledby={`plan-usage-tab-${tab}`}
         >
-          <Suspense fallback={null}>
+          <Suspense fallback={<div className="billing-panel billing-panel--loading" aria-busy="true" />}>
             {tab === "plan" ? <BillingPanel /> : <UsagePanel />}
           </Suspense>
         </DialogBody>

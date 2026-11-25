@@ -38,11 +38,20 @@ function payload(e: ElementEvent): unknown[] {
   return [rest];
 }
 
-const BYTES_SRC = /^(data:|https?:)/;
+const BYTES_SRC = /^(data:|https?:|blob:[0-9a-f]{8}-)/i;
+const APP_SCHEME_SRC = /^(?!file:|blob:)[a-z][a-z0-9+.-]*:\/\//i;
 
-/** `<image src>` that the engine can't read itself (data: and http(s) URLs) goes over as a blob. */
+async function fetchSrc(src: string): Promise<Response> {
+  if (!APP_SCHEME_SRC.test(src) || /^(https?|blob):/i.test(src)) return fetch(src);
+  const { fetchProtocol } = await import("./electron/session");
+  const response = await fetchProtocol("", new Request(src));
+  if (!response) throw new Error(`no protocol handler for ${src}`);
+  return response;
+}
+
+/** `<image src>` that the engine can't read itself (data:, http(s), object URLs and app-scheme URLs like stella-media:) goes over as a blob. */
 function resolveSrc(inst: Instance, src: string): string {
-  if (!BYTES_SRC.test(src)) return src;
+  if (!BYTES_SRC.test(src) && !APP_SCHEME_SRC.test(src)) return src;
   if (inst.blob?.src === src) return `blob:${inst.blob.id}`;
   if (src.startsWith("data:")) {
     const comma = src.indexOf(",");
@@ -52,7 +61,7 @@ function resolveSrc(inst: Instance, src: string): string {
     inst.blob = { src, id: blob(data) };
     return `blob:${inst.blob.id}`;
   }
-  void fetch(src).then(async (r) => {
+  void fetchSrc(src).then(async (r) => {
     if (!r.ok || !instances.has(inst.id)) return;
     inst.blob = { src, id: blob(new Uint8Array(await r.arrayBuffer())) };
     const json = JSON.parse(inst.json);

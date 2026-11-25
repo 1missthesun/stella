@@ -284,7 +284,7 @@ export function useChatScrollManagement({
       },
       scrollToKey: (key: string, viewPosition = 0.2) => {
         markProgrammatic();
-        void engine().request("scrollKeyTo", { target: scrollId, key, at: viewPosition });
+        void engine().scroll.toKey(scrollId, key, (metricsRef.current?.viewport ?? 0) * viewPosition);
       },
       getScrollableNode: () => null,
     } as unknown as ChatListRef;

@@ -18,7 +18,8 @@ import {
   removeComposerScreenshotContext,
   truncateChipLabel,
 } from "@/features/chat/composer-context";
-import { contextMenu, copyImage, fileMenu } from "@/platform/context-menu";
+import { copyImage, fileMenu } from "@/platform/context-menu";
+import { contextMenu } from "./context-menu";
 import { Icon, Icons, ImageLightbox, type IconData } from "../kit";
 import { derive, fontSize, mixOklch, radius, useTokens } from "../theme";
 import { PastedTextTile, TILE_SIZE, tileLook } from "./AttachmentTiles";

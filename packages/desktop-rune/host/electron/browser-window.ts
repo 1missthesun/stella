@@ -43,7 +43,11 @@ export type WindowSnapshot = {
   openerId: string | null;
   frameName: string | null;
   modal: boolean;
-  views: Array<{ contentsId: number; url: string; bounds: Rectangle; visible: boolean }>;
+  views: Array<{ contentsId: number; url: string; bounds: Rectangle; visible: boolean; browser: boolean }>;
+  /** The window's own page is a Chromium page (a popup from the in-app browser): drawn from its frames. */
+  browser: boolean;
+  /** Renders offscreen or has never loaded anything (a drawable host): there is nothing to show. */
+  drawsNothing: boolean;
 };
 
 type Listener = () => void;
@@ -153,11 +157,17 @@ export class View extends EventEmitter {
 
 export class WebContentsView extends View {
   readonly webContents: WebContents;
-  constructor(options: { webPreferences?: { partition?: string; session?: any; offscreen?: boolean } } = {}) {
+  constructor(options: { webPreferences?: { partition?: string; session?: any; offscreen?: boolean | object } } = {}) {
     super(options);
-    this.webContents = new WebContents({ partition: options.webPreferences?.partition, session: options.webPreferences?.session });
+    this.webContents = new WebContents({
+      partition: options.webPreferences?.partition,
+      session: options.webPreferences?.session,
+      offscreen: Boolean(options.webPreferences?.offscreen),
+      browser: true,
+    });
     this.webContents.owner = this as unknown as { id: number };
     this.webContents.on("did-start-loading", () => viewChanged());
+    this.on("bounds-changed", () => this.webContents.setPageSize(this.bounds.width, this.bounds.height));
   }
 }
 
@@ -185,7 +195,9 @@ type WindowOptions = {
   fullscreen?: boolean;
   opacity?: number;
   titleBarStyle?: string;
-  webPreferences?: { partition?: string; session?: any; offscreen?: boolean; preload?: string };
+  webPreferences?: { partition?: string; session?: any; offscreen?: boolean | object; preload?: string };
+  /** A page Chromium already opened (a popup) that this window shows. */
+  adoptTarget?: string;
 };
 
 type PreventableEvent = { preventDefault(): void; defaultPrevented: boolean; sender?: unknown };
@@ -252,7 +264,14 @@ export class BrowserWindow extends BaseWindow {
     super();
     this.setMaxListeners(0);
     this.options = options;
-    this.webContents = new WebContents({ partition: options.webPreferences?.partition, session: options.webPreferences?.session });
+    const offscreen = Boolean(options.webPreferences?.offscreen);
+    this.webContents = new WebContents({
+      partition: options.webPreferences?.partition,
+      session: options.webPreferences?.session,
+      offscreen,
+      browser: offscreen || options.adoptTarget !== undefined,
+      adoptTarget: options.adoptTarget,
+    });
     this.webContents.owner = this;
     this.parent = options.parent ?? null;
     const work = primaryDisplaySync().workArea;
@@ -293,6 +312,10 @@ export class BrowserWindow extends BaseWindow {
       }
     });
     this.webContents.on("page-title-updated", (_e: unknown, title: string) => { this.state.title = title; hostWindows.changed(); });
+    if (this.webContents.isOffscreen() || options.adoptTarget) {
+      this.webContents.setPageSize(width, height);
+      this.on("resize", () => this.webContents.setPageSize(this.state.bounds.width, this.state.bounds.height));
+    }
     hostWindows.add(this);
     app.emit("web-contents-created", {}, this.webContents);
     app.emit("browser-window-created", {}, this);
@@ -307,7 +330,7 @@ export class BrowserWindow extends BaseWindow {
     const walk = (view: View) => {
       for (const child of view.children) {
         if (child instanceof WebContentsView && !child.webContents.isDestroyed()) {
-          views.push({ contentsId: child.webContents.id, url: child.webContents.getURL(), bounds: child.getBounds(), visible: child.getVisible() });
+          views.push({ contentsId: child.webContents.id, url: child.webContents.getURL(), bounds: child.getBounds(), visible: child.getVisible(), browser: child.webContents.isBrowserBacked });
         }
         walk(child);
       }
@@ -344,6 +367,8 @@ export class BrowserWindow extends BaseWindow {
       frameName: this.opener?.frameName ?? null,
       modal: o.modal === true,
       views,
+      browser: this.webContents.isBrowserBacked,
+      drawsNothing: this.webContents.isOffscreen() || (url === "" && !this.opener),
     };
   }
 
@@ -590,6 +615,25 @@ type WindowOpenResponse = { action: "allow" | "deny"; overrideBrowserWindowOptio
  * window.open from a page: main's window-open handler decides, as in Electron. An allowed window
  * becomes a BrowserWindow whose opener is `openerWindow` ("did-create-window" fires on the opener).
  */
+/** A page in the on-demand Chromium opened a window; main's handler on the opener decides, as in Electron. */
+export function openChromiumPopup(opener: WebContents, targetId: string, url: string) {
+  const handler = opener.getWindowOpenHandler() as ((details: unknown) => WindowOpenResponse) | null;
+  const details = { url, frameName: "", features: "", disposition: "foreground-tab", referrer: { url: opener.getURL(), policy: "strict-origin-when-cross-origin" }, postBody: undefined };
+  const decision: WindowOpenResponse = handler ? handler(details) ?? { action: "deny" } : { action: "allow" };
+  if (decision.action !== "allow") {
+    void opener.chromiumPage().then((page) => page.proc.send("Target.closeTarget", { targetId })).catch(() => {});
+    return null;
+  }
+  const options = decision.overrideBrowserWindowOptions ?? {};
+  const win = new BrowserWindow({ ...options, webPreferences: { session: opener.session, ...options.webPreferences }, adoptTarget: targetId });
+  const openerWindow = BrowserWindow.fromWebContents(opener);
+  if (openerWindow) win.opener = { window: openerWindow, frameName: "" };
+  opener.emit("did-create-window", win, { url, frameName: "", options, disposition: "foreground-tab" });
+  void win.webContents.chromiumPage();
+  hostWindows.changed();
+  return win;
+}
+
 export function openWindowFrom(openerWindow: BrowserWindow, url: string, frameName = "", features = ""): BrowserWindow | null {
   const opener = openerWindow.webContents;
   const handler = opener.getWindowOpenHandler() as ((details: unknown) => WindowOpenResponse) | null;
@@ -608,6 +652,7 @@ onEngine("window", (event) => {
   hostWindows.get(event.id)?.handleEngineEvent(event.kind, event.bounds, event);
 });
 
+WebContents.host.onPopup = (opener, targetId, url) => { openChromiumPopup(opener, targetId, url); };
 WebContents.host.onReload = (contents) => {
   const owner = BrowserWindow.getAllWindows().find((w) => w.webContents === contents);
   owner?.bumpReload();

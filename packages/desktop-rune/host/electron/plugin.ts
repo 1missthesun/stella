@@ -12,17 +12,22 @@ const ELECTRON_DIR = path.join(REPO_ROOT, "packages/desktop/electron");
 const BROWSER_SCRIPT = /["']browser-script:([^"']+)["']/g;
 /** Electron main runs from an esbuild bundle in this folder; its path math assumes it. */
 const BUNDLE_DIR = path.join(REPO_ROOT, "packages/desktop/dist-electron/electron");
-/** Electron main exports Rune replaces: Chromium-only machinery with a Rune counterpart. */
+/**
+ * Electron main exports Rune replaces: Chromium-only machinery with a Rune counterpart. The
+ * original stays exported as `__electron_<name>` for a replacement that wraps it.
+ */
 const OVERRIDES: Array<{ file: string; name: string; from: string }> = [
   { file: "source/renderer-protocol.ts", name: "serveRendererSource", from: path.resolve(import.meta.dir, "../services/renderer-source.ts") },
+  { file: "services/in-app-browser/offscreen-tabs.ts", name: "OffscreenTabs", from: path.resolve(import.meta.dir, "../services/offscreen-tabs.ts") },
+  { file: "bootstrap/context.js", name: "createBootstrapContext", from: path.resolve(import.meta.dir, "../services/main-context.ts") },
 ];
 
 const applyOverrides = (file: string, source: string) => {
   for (const o of OVERRIDES) {
     if (path.join(ELECTRON_DIR, o.file) !== file) continue;
-    const declaration = `export const ${o.name} =`;
-    if (!source.includes(declaration)) throw new Error(`Rune override: ${o.file} no longer declares \`${declaration}\``);
-    source = source.replace(declaration, `const __electron_${o.name} =`);
+    const declaration = new RegExp(`export (const|let|class|function|async function) ${o.name}\\b`);
+    if (!declaration.test(source)) throw new Error(`Rune override: ${o.file} no longer exports ${o.name}`);
+    source = source.replace(declaration, (_m, kind: string) => `export ${kind} __electron_${o.name}`);
     source += `\nexport { ${o.name} } from ${JSON.stringify(o.from)};\n`;
   }
   return source;

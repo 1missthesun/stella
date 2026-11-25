@@ -2,6 +2,7 @@
 // verify harness's CDP Runtime.evaluate): POST /eval runs an async function body with `api`
 // (the main window's electronAPI), `windows` and `electron` in scope and returns its JSON result.
 
+import { mainContext } from "./main-context";
 import { hostWindows } from "../electron/browser-window";
 import { electronModule } from "../electron";
 import type { ElectronApi } from "./renderer-api";
@@ -22,8 +23,8 @@ export async function handleControl(req: Request, context: ControlContext): Prom
   if (url.pathname === "/eval" && req.method === "POST") {
     const body = await req.text();
     try {
-      const fn = new AsyncFunction("api", "windows", "electron", "extra", body);
-      const value = await fn(context.api, hostWindows, electronModule, (context.extra ??= {}));
+      const fn = new AsyncFunction("api", "windows", "electron", "extra", "main", body);
+      const value = await fn(context.api, hostWindows, electronModule, (context.extra ??= {}), mainContext());
       return Response.json({ ok: true, value: value ?? null });
     } catch (error) {
       return Response.json({ ok: false, error: error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error) }, { status: 500 });

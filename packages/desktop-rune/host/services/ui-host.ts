@@ -2,6 +2,7 @@
 // registry, each window's electronAPI, the message-box queue main raises, and the plumbing of web
 // windows' `<webview>`s (custom schemes, navigation, executeJavaScript).
 
+import { blob, freeBlob } from "../bridge";
 import { BrowserWindow, hostWindows, openWindowFrom, type WindowSnapshot } from "../electron/browser-window";
 import { engine } from "../electron/engine";
 import { hostDialogs, type HostDialogRequest } from "../electron/native";
@@ -38,14 +39,59 @@ export type UiHost = {
     loaded(contentsId: number, phase: string): void;
     message(contentsId: number, data: unknown): void;
   };
+  browser: {
+    /**
+     * The frames of a Chromium-backed contents (an in-app browser tab, a popup) as `blob:N` image
+     * sources while the UI shows it; returns the stop.
+     */
+    frames(contentsId: number, listener: (src: string) => void, maxSize?: { width: number; height: number }): () => void;
+    /** Electron input events (sendInputEvent shapes) for the page. */
+    input(contentsId: number, event: Record<string, unknown>): void;
+    insertText(contentsId: number, text: string): void;
+    focus(contentsId: number): void;
+  };
 };
+
+const FRAME_INTERVAL_MS = 1000 / 30;
+const BLOB_RETIRE_MS = 500;
 
 const STANDARD_SCHEMES = new Set(["http", "https", "file", "data", "blob", "about", "javascript", "ws", "wss"]);
 
 const contentsById = (id: number) => {
   for (const win of BrowserWindow.getAllWindows()) if (win.webContents.id === id) return win.webContents;
-  return null;
+  return WebContents.fromId(id);
 };
+
+function streamFrames(contentsId: number, listener: (src: string) => void, maxSize?: { width: number; height: number }) {
+  const contents = WebContents.fromId(contentsId);
+  if (!contents?.isBrowserBacked) return () => {};
+  let latest: Uint8Array | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastPush = 0;
+  let current = 0;
+  let stopped = false;
+  const push = () => {
+    timer = null;
+    if (stopped || !latest) return;
+    const previous = current;
+    current = blob(latest);
+    latest = null;
+    lastPush = performance.now();
+    listener(`blob:${current}`);
+    if (previous) setTimeout(() => freeBlob(previous), BLOB_RETIRE_MS);
+  };
+  const stop = contents.streamFrames((frame) => {
+    latest = frame.jpeg;
+    if (timer) return;
+    timer = setTimeout(push, Math.max(0, FRAME_INTERVAL_MS - (performance.now() - lastPush)));
+  }, maxSize);
+  return () => {
+    stopped = true;
+    stop();
+    if (timer) clearTimeout(timer);
+    if (current) setTimeout(() => freeBlob(current), BLOB_RETIRE_MS);
+  };
+}
 
 const elementId = (contentsId: number) => `web-${contentsId}`;
 
@@ -157,6 +203,12 @@ export function createUiHost(): UiHost {
         if (m.ok) waiter?.resolve(m.value);
         else waiter?.reject(new Error(m.error ?? "Script failed"));
       },
+    },
+    browser: {
+      frames: streamFrames,
+      input(contentsId, event) { WebContents.fromId(contentsId)?.sendInputEvent(event); },
+      insertText(contentsId, text) { void WebContents.fromId(contentsId)?.insertText(text).catch(() => {}); },
+      focus(contentsId) { WebContents.fromId(contentsId)?.focus(); },
     },
   };
 }

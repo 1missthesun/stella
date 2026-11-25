@@ -5,6 +5,7 @@
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
+import { chromeUserAgent } from "./chromium";
 
 type ProtocolHandler = (request: Request) => Response | Promise<Response>;
 
@@ -107,7 +108,7 @@ export class Session extends EventEmitter {
   displayMediaRequestHandler: ((...args: any[]) => void) | null = null;
   spellCheckerLanguages: string[] = [];
   readonly customDictionary = new Set<string>();
-  private userAgent = `Mozilla/5.0 Stella (Rune)`;
+  private userAgent: string | null = null;
   private preloads: string[] = [];
   private proxy: unknown = null;
 
@@ -118,6 +119,12 @@ export class Session extends EventEmitter {
 
   get storagePath() { return this.partition.startsWith("persist:") ? path.join(defaultStorageRoot(), "Partitions", this.partition.slice(8)) : null; }
   getStoragePath() { return this.storagePath; }
+  /** Where this session's pages keep their Chromium profile; null for an in-memory session. */
+  get chromiumProfileDir() {
+    if (this.partition.startsWith("path:")) return path.join(this.partition.slice(5), "RuneChromium");
+    if (this.partition === "") return path.join(defaultStorageRoot(), "RuneChromium");
+    return this.storagePath ? path.join(this.storagePath, "RuneChromium") : null;
+  }
   isPersistent() { return this.partition === "" || this.partition.startsWith("persist:"); }
 
   setPermissionRequestHandler(h: Session["permissionRequestHandler"]) { this.permissionRequestHandler = h; }
@@ -137,7 +144,7 @@ export class Session extends EventEmitter {
   removeWordFromSpellCheckerDictionary(word: string) { return this.customDictionary.delete(word); }
   listWordsInSpellCheckerDictionary() { return Promise.resolve([...this.customDictionary]); }
   setUserAgent(ua: string) { this.userAgent = ua; }
-  getUserAgent() { return this.userAgent; }
+  getUserAgent() { return this.userAgent ?? chromeUserAgent(); }
   setPreloads(p: string[]) { this.preloads = [...p]; }
   getPreloads() { return this.preloads; }
   registerPreloadScript(script: { filePath?: string }) { if (script.filePath) this.preloads.push(script.filePath); return String(this.preloads.length); }

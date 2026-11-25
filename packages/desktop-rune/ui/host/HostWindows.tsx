@@ -1,8 +1,9 @@
 // Electron main's windows as engine `<window>`s. The app root renders `<HostWindows>` and decides
 // what an app window shows for its mode; web windows get a `<webview>` on the window's session,
-// and every window draws the message boxes main raises for it.
+// Chromium pages (in-app browser tabs in a WebContentsView, popups they open) are drawn from their
+// frames where main placed them, and every window draws the message boxes main raises for it.
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { WindowSnapshot } from "../../host/electron/browser-window";
 import { MessageBoxes } from "./MessageBoxes";
 
@@ -29,9 +30,9 @@ export function HostWindows({ renderApp, skip, chrome }: HostWindowsProps) {
   const windows = useHostWindows();
   return (
     <>
-      {windows.filter((w) => !skip?.(w)).map((w) => (
+      {windows.filter((w) => !w.drawsNothing && !skip?.(w)).map((w) => (
         <HostWindow key={w.id} window={w} chrome={w.kind === "app" ? chrome?.(w) : undefined}>
-          {w.kind === "app" ? renderApp(w) : <HostWebView window={w} />}
+          {w.browser ? <HostBrowserView contentsId={w.contentsId} w="full" h="full" /> : w.kind === "app" ? renderApp(w) : <HostWebView window={w} />}
         </HostWindow>
       ))}
     </>
@@ -64,6 +65,16 @@ export function HostWindow({ window: w, chrome, children }: { window: WindowSnap
       {...chrome}
     >
       {children}
+      {w.views.filter((v) => v.browser && v.visible && v.bounds.width > 0 && v.bounds.height > 0).map((v) => (
+        <HostBrowserView
+          key={v.contentsId}
+          contentsId={v.contentsId}
+          fixed
+          absolute={{ left: v.bounds.x, top: v.bounds.y }}
+          w={v.bounds.width}
+          h={v.bounds.height}
+        />
+      ))}
       <MessageBoxes windowId={w.id} isMain={w.engineId === "main"} />
     </window>
   );
@@ -87,4 +98,13 @@ export function HostWebView({ window: w }: { window: WindowSnapshot }) {
       onMessage={(m) => web.message(w.contentsId, m.data)}
     />
   );
+}
+
+type BrowserViewLayout = { w: number | "full"; h: number | "full"; fixed?: boolean; absolute?: { left: number; top: number } };
+
+/** A Chromium page drawn from its frames. */
+export function HostBrowserView({ contentsId, ...layout }: { contentsId: number } & BrowserViewLayout) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => stella.host?.browser.frames(contentsId, setSrc), [contentsId]);
+  return src ? <image src={src} fit="stretch" {...layout} /> : <box fill="#ffffff" {...layout} />;
 }

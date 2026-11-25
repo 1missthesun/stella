@@ -24,7 +24,10 @@ process.on("message", async (request: UiBuildRequest) => {
     if (!result.success) return send({ id: request.id, ok: false, error: result.logs.map(String).join("\n"), rssMb });
     send({ id: request.id, ok: true, code: await result.outputs[0]!.text(), rssMb });
   } catch (error) {
-    send({ id: request.id, ok: false, error: error instanceof Error ? error.stack ?? error.message : String(error), rssMb: process.memoryUsage().rss / 1048576 });
+    const inner = (error as { errors?: Array<{ message?: string; position?: { file?: string; line?: number } }> }).errors ?? [];
+    const detail = inner.map((e) => `${e.message ?? String(e)}${e.position?.file ? ` (${e.position.file}:${e.position.line})` : ""}`).join("\n");
+    const message = detail || (error instanceof Error ? error.stack ?? error.message : String(error));
+    send({ id: request.id, ok: false, error: message, rssMb: process.memoryUsage().rss / 1048576 });
   }
 });
 

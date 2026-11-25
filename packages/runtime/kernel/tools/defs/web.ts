@@ -4,7 +4,6 @@ import {
   WEB_TOOL_DESCRIPTION,
   WEB_TOOL_NAME,
   WEB_TOOL_PARAMETERS,
-  WEB_TOOL_PROMPT_SNIPPET,
   type WebSearchCapability,
   WEB_TOOL_REPLAY,
 } from "./web-def.js";
@@ -17,7 +16,6 @@ export const createWebTool = (options: WebToolOptions = {}): ToolDefinition => (
   name: WEB_TOOL_NAME,
   replay: WEB_TOOL_REPLAY,
   description: WEB_TOOL_DESCRIPTION,
-  promptSnippet: WEB_TOOL_PROMPT_SNIPPET,
   parameters: WEB_TOOL_PARAMETERS,
   execute: async (args, _context, extras) => {
     const query = typeof args.query === "string" ? args.query.trim() : "";

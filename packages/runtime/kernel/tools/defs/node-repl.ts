@@ -11,7 +11,6 @@ import {
   CODE_MAX_WAIT_MS,
   CODE_TOOL_DESCRIPTION,
   CODE_TOOL_PARAMETERS,
-  CODE_TOOL_PROMPT_SNIPPET,
   CODE_TOOL_REPLAY,
 } from "./code-def.js";
 
@@ -118,7 +117,6 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
     replay: CODE_TOOL_REPLAY,
     agentTypes: [AGENT_IDS.ORCHESTRATOR, AGENT_IDS.GENERAL],
     description: CODE_TOOL_DESCRIPTION,
-    promptSnippet: CODE_TOOL_PROMPT_SNIPPET,
     parameters: CODE_TOOL_PARAMETERS,
     execute: async (args, context, extras) => {
       const hasCode = typeof args.code === "string" && args.code.trim() !== "";

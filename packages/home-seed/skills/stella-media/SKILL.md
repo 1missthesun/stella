@@ -15,24 +15,11 @@ description: Generate images, video, music, speech and 3D models, or transcribe 
 stella-media models
 ```
 
-The canonical overview is https://stella.sh/docs/media (not the retired
-`/docs/media/images`, `/video`, `/audio`, `/music` or `/3d` pages). The overview
-and `stella-media models` are generated from `packages/contracts/media-models.ts`;
-use that live list rather than a copied model or operation table. The HTTP list is
-`GET <stella-api>/api/media/v1/models` on the user's signed-in Stella backend.
+That live list (also at https://stella.sh/docs/media) is the source of truth; don't rely on a copied model table.
 
 Each line is a model id, what it does, and its docs page. Read the docs page (fetch it) before the first call to a model: it is the model's own input and output schema, and Stella passes your input to the model untouched.
 
-For video, pick the model for text, image animation, references or extension
-from that list. Reference-to-video takes `reference_image_urls`,
-`reference_video_urls` and `reference_audio_urls` (or an ordered
-`reference_conditions` list); extend-video continues a `video_url`. There is
-no general prompt-driven video editing model. These are separate models, not
-Stella operations named `video_extend` or `video_to_video`.
-The cloud `video_gen` convenience tool only supports text-to-video and
-image-to-video; it does not expose references or extension.
-Use a computer with `stella-media` for those requests; do not substitute
-`video_gen` or a direct provider call.
+For video, text, image animation, references and extension are separate models in that list (there is no general prompt-driven video editing model). The cloud `video_gen` tool does only text-to-video and image-to-video; for references or extension use a computer with `stella-media`, not `video_gen` or a direct provider call.
 
 ## 2. Run it
 

@@ -1,10 +1,8 @@
 export const WRITE_STDIN_TOOL_NAME = "write_stdin";
 
 export const WRITE_STDIN_TOOL_DESCRIPTION =
-  "Interact with a still-running Bash session owned by the current conversation/agent thread: send input, wait for more output, or stop it. Same-session interactions are serialized; different sessions remain parallel. Omit operation to write when chars is nonempty or poll when empty. Optional write_id makes retried writes idempotent within the session's bounded receipt window. Explicit operations also support terminate, pipe-only close_stdin, and PTY-only resize. Result details include stable interaction/chunk receipts and retain shell_session_id after completion. Required: session_id.";
+  "Interact with a still-running Bash session of yours: send input, wait for more output, or stop it.";
 
-export const WRITE_STDIN_TOOL_PROMPT_SNIPPET =
-  "Continue or poll a long-running Bash session";
 
 export const WRITE_STDIN_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
@@ -12,7 +10,7 @@ export const WRITE_STDIN_TOOL_PARAMETERS: Record<string, unknown> = {
     session_id: {
       type: "string",
       description:
-        "Identifier returned by Bash. Completed results keep it as shell_session_id provenance even when session_id becomes null.",
+        "The session_id Bash returned.",
     },
     chars: {
       type: "string",
@@ -22,7 +20,7 @@ export const WRITE_STDIN_TOOL_PARAMETERS: Record<string, unknown> = {
     write_id: {
       type: "string",
       description:
-        "Optional idempotency key for a write operation. Retrying the same id with identical chars skips duplicate input; reusing it with different chars is an error.",
+        "Optional idempotency key: retrying the same id with the same chars doesn't send them twice.",
     },
     operation: {
       type: "string",

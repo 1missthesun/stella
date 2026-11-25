@@ -29,10 +29,7 @@ hyprctl dispatch 'hl.dsp.exec_cmd("env QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 someqt
 ## Observe
 
 ```js
-var state = await sky.get_app_state({
-  app: "org.gnome.Nautilus",
-  screenshot_policy: "auto",
-});
+var state = await sky.get_app_state({ app: "org.gnome.Nautilus", screenshot_policy: "auto" });
 codeRuntime.write(state.text);
 if (state.screenshot) await codeRuntime.emitImage(state.screenshot.url);
 ```
@@ -52,43 +49,13 @@ The state ends with the element that typing goes to. In an inactive window that 
 Every action needs the `state_id` of the fresh state it came from; stale ones are refused with `stale_observation` before anything is sent. Observe again after each action (or use `batch` for ordered actions from one observation).
 
 ```js
-await sky.click({
-  app: "org.gnome.Nautilus",
-  element_index: 40,
-  state_id: state.state_id,
-});
-await sky.set_value({
-  app: "gedit",
-  element_index: 7,
-  value: "Hello",
-  state_id: state.state_id,
-});
-await sky.click({ app: "gedit", element_index: 7, state_id: state.state_id }); // field takes typing
-await sky.type_text({ app: "gedit", text: " world", state_id: state.state_id });
-await sky.press_key({
-  app: "gedit",
-  key: "BackSpace",
-  state_id: state.state_id,
-});
-await sky.select_text({
-  app: "gedit",
-  element_index: 7,
-  text: "world",
-  state_id: state.state_id,
-});
-await sky.scroll({
-  app: "gedit",
-  element_index: 7,
-  direction: "down",
-  pages: 2,
-  state_id: state.state_id,
-});
-await sky.perform_secondary_action({
-  app: "org.gnome.Nautilus",
-  element_index: 3,
-  action: "slot.reload",
-  state_id: state.state_id,
-});
+sky.click({ app, element_index, state_id })              // a text field it clicks becomes the typing target
+sky.set_value({ app, element_index, value, state_id })
+sky.type_text({ app, text, state_id })
+sky.press_key({ app, key: "BackSpace", state_id })
+sky.select_text({ app, element_index, text, state_id })
+sky.scroll({ app, element_index, direction: "down", pages: 2, state_id })
+sky.perform_secondary_action({ app, element_index, action: "slot.reload", state_id })
 ```
 
 What works in the background:

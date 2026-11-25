@@ -1,10 +1,8 @@
 export const MAP_TOOL_NAME = "map";
 
 export const MAP_TOOL_DESCRIPTION =
-  "Show the user an interactive map card inline in the chat — pinned places and/or a route with turn-by-turn-ready directions. Use when the user asks where something is, for places to go (restaurants, coffee, sights), or how to get somewhere. Provide natural inputs: `places` (up to 8 names/addresses) and/or `origin` + `destination` (+ `mode`). Resolution (geocoding, place ratings, route distance/duration) happens automatically; the result summary comes back for you to answer with, and the card includes an 'Open in Apple Maps' handoff. Don't use for abstract geography questions that need no map.";
+  "Show an interactive map card in the chat: pinned places and/or a route, for where something is, places to go, or how to get somewhere. Geocoding, ratings and route times are resolved for you and come back as a summary to answer with; the card opens in Apple Maps.";
 
-export const MAP_TOOL_PROMPT_SNIPPET =
-  "Show an inline interactive map (pins and/or a route) in the chat";
 
 export const MAP_TOOL_WORKING_TEXT = "Mapping";
 

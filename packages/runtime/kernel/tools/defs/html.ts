@@ -11,7 +11,6 @@ import {
   HTML_TOOL_DESCRIPTION,
   HTML_TOOL_NAME,
   HTML_TOOL_PARAMETERS,
-  HTML_TOOL_PROMPT_SNIPPET,
   htmlCanvasSlug,
 } from "./html-def.js";
 import {
@@ -57,7 +56,6 @@ export const createHtmlTool = (options: HtmlToolOptions): ToolDefinition => {
     replay: "unsafe",
     agentTypes: [AGENT_IDS.ORCHESTRATOR],
     description: HTML_TOOL_DESCRIPTION,
-    promptSnippet: HTML_TOOL_PROMPT_SNIPPET,
     parameters: HTML_TOOL_PARAMETERS,
     execute: async (args) => {
       const rawSlug = asTrimmedString(args.slug);

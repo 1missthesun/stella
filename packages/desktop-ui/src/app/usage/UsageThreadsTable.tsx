@@ -24,7 +24,6 @@ export const UsageThreadsTable = memo(function UsageThreadsTable({
       <div className="usage-panel-heading">
         <div>
           <h2>{t("app.usage.threads.title")}</h2>
-          <p>{t("app.usage.threads.description")}</p>
         </div>
       </div>
       <div className="usage-table-scroll">

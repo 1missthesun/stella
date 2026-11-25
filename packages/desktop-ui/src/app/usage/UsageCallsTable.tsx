@@ -1,8 +1,11 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import type { LocalModelUsageRecord } from "@stella/contracts/local-chat";
 import { useT } from "@/shared/i18n";
 import { executionLabel } from "./usage-data";
 import { formatCallTime, formatCost, formatTokens } from "./format";
+
+const INITIAL_CALLS = 100;
+const MAX_VISIBLE_CALLS = 500;
 
 type UsageCallsTableProps = {
   records: LocalModelUsageRecord[];
@@ -14,6 +17,15 @@ export const UsageCallsTable = memo(function UsageCallsTable({
   onSelectThread,
 }: UsageCallsTableProps) {
   const t = useT();
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_CALLS);
+
+  useEffect(() => {
+    setVisibleLimit(INITIAL_CALLS);
+  }, [records]);
+
+  const cappedTotal = Math.min(records.length, MAX_VISIBLE_CALLS);
+  const shown = records.slice(0, visibleLimit);
+
   return (
     <section className="usage-panel">
       <div className="usage-panel-heading">
@@ -38,7 +50,7 @@ export const UsageCallsTable = memo(function UsageCallsTable({
             </tr>
           </thead>
           <tbody>
-            {records.slice(0, 500).map((record) => (
+            {shown.map((record) => (
               <tr key={record.id}>
                 <td title={new Date(record.timestamp).toISOString()}>
                   {formatCallTime(record.timestamp)}
@@ -85,7 +97,18 @@ export const UsageCallsTable = memo(function UsageCallsTable({
           </tbody>
         </table>
       </div>
-      {records.length > 500 ? (
+      {shown.length < cappedTotal ? (
+        <div className="usage-table-more">
+          <button
+            type="button"
+            className="usage-text-action"
+            onClick={() => setVisibleLimit(MAX_VISIBLE_CALLS)}
+          >
+            {t("settings.nav.more")} ({cappedTotal - shown.length})
+          </button>
+        </div>
+      ) : null}
+      {records.length > MAX_VISIBLE_CALLS ? (
         <p className="usage-table-note">
           {t("app.usage.calls.truncatedNote", {
             count: records.length.toLocaleString(),

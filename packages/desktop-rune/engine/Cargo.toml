@@ -22,10 +22,11 @@ libc = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.19", optional = true }
+webkit2gtk = { version = "3", optional = true, features = ["v2_40"] }
 
 [features]
 default = ["webview"]
-webview = ["dep:wry", "dep:gtk"]
+webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk"]
 
 [patch.crates-io]
 wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "2accce7dd59887845f7fbc824d75311d61b6c41d" }

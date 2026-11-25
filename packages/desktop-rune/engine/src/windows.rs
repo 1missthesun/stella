@@ -215,6 +215,9 @@ pub fn app_spec(p: &Props) -> AppSpec<Win> {
 
 pub fn decorate(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
     let mut app = app.on_close_request(close_request);
+    if p.visible == Some(false) {
+        app = app.windowless();
+    }
     if let Some(h) = p.titlebar {
         app = app.titlebar(rune::Titlebar::new(h));
     }

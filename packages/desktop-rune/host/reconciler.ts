@@ -27,7 +27,7 @@ const ARGS: Record<string, (e: ElementEvent) => unknown[]> = {
   press: () => [], doublePress: () => [], dismiss: () => [], ready: () => [],
   hover: (e) => [e.inside], focus: (e) => [e.focused, e.visible], focusWithin: (e) => [e.within],
   input: (e) => [e.value], submit: (e) => [e.value], link: (e) => [e.href], dropFiles: (e) => [e.paths],
-  dropHover: (e) => [e.over], atBottom: (e) => [e.atBottom], title: (e) => [e.title], error: (e) => [e.error],
+  dropHover: (e) => [e.over], atBottom: (e) => [e.atBottom], farFromBottom: (e) => [e.far], title: (e) => [e.title], error: (e) => [e.error],
   layout: (e) => [{ x: e.x, y: e.y, w: e.w, h: e.h }],
 };
 
@@ -64,13 +64,16 @@ function resolveSrc(inst: Instance, src: string): string {
   return "";
 }
 
+/** Props where `false` differs from leaving them out. */
+const KEEPS_FALSE = new Set(["visible", "resizable", "spellcheck", "dark", "checked", "expanded", "selected", "growth"]);
+
 function serialize(inst: Instance, props: Record<string, any>): string {
   const out: Record<string, unknown> = {};
   const on: string[] = [];
   inst.handlers = {};
   for (const k in props) {
     const v = props[k];
-    if (k === "children" || v === undefined || v === null || v === false) continue;
+    if (k === "children" || v === undefined || v === null || (v === false && !KEEPS_FALSE.has(k))) continue;
     if (typeof v === "function" && k.length > 2 && k.startsWith("on") && k[2] === k[2].toUpperCase()) {
       const name = eventName(k);
       inst.handlers[name] = v;

@@ -16,7 +16,10 @@ the element tree and draws it.
 | engine → host | fd 5 (`STELLA_RUNE_BRIDGE_IN_FD`) | stdin | JSON lines |
 
 The host's own stdout goes to the engine's stderr, so `console.log` never corrupts the bridge.
-Fd 3 is left for the launcher socket.
+Fd 3 is left for the launcher socket. The engine's own arguments after the binary are passed on
+(`bun host/main.tsx <args…>`), so a launch's `stella://` link reaches the host. The host runs in
+its own process group (Linux: it also dies with the engine); SIGTERM, SIGINT or SIGHUP to the
+engine ends that whole group.
 
 Host → engine ops: `1 create(id, kind)`, `2 props(id, json)`, `4 append`, `5 insert`, `6 remove`,
 `9 commit(gen, ack, t0, kind)`, `10 cmd(json)`, `11 blob(id, bytes)`, `12 freeBlob(id)`.
@@ -28,7 +31,10 @@ Engine → host lines (`onEngineEvent(t, fn)` in `bridge.ts`):
 - `reply` → resolves `request()`
 - `window` → `{id, kind}`, where kind is one of: close-requested, closed, focus, blur, resize (w, h),
   maximize, unmaximize, enter-full-screen, leave-full-screen
-- `menu`, `tray`, `shortcut`, `notification`, `appearance` (`{dark}`), `rec`
+- `menu`, `tray`, `shortcut`, `notification`, `appearance` (`{dark, accentColor}`), `rec`
+- `open-url` → `{url}`: a link the system opened with the app. On macOS this is the Apple Event.
+  On Windows and Linux it is the launch's own links on the schemes in `STELLA_RUNE_URL_SCHEMES`
+  (default `stella`). Later launches' links come through the host's single-instance lock.
 
 Commands: `engine.*` in `bridge.ts` (typed). `request(cmd, args)` returns a Promise; window-bound
 commands take `window` (a `<window id>`), or find the window from `target` (an element `id`).
@@ -44,6 +50,9 @@ unmounted. Render windows from anywhere with `windowPortal(<window …/>, key)` 
 `visible`, `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
 its controls over it), `trafficLights` (macOS inset), `dark` (native chrome scheme), `dir`, `keys` +
 `onKey` (window-level chords).
+
+`visible={false}` at mount creates no native window until it turns true; turning it false later
+hides (unmaps) the window and keeps its state.
 
 Close: the OS close button sends `window close-requested`; the window stays until TS unmounts it
 or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark drag regions and
@@ -64,6 +73,10 @@ or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark d
 | `webview` | lazy OS webview (wry) in this element's rect |
 
 ### Common props (every element)
+
+A prop set to `false` is the same as leaving it out, except where `false` means something
+different: `visible`, `resizable`, `spellcheck`, `dark`, `checked`, `expanded`, `selected` and
+`growth`.
 
 **Identity.** `id` is the Rune key and the target for commands, anchors and the `control`
 dumps. An element with an `id` is memoized: it rebuilds only when it or something under it changed.
@@ -113,6 +126,13 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 - `scrollY`, `scrollX`.
 - `stickBottom`: follows the end as content grows (chat).
 - `edgeFade`.
+- `scrollFade={{top?, bottom?}}`: per-edge fades. Each edge is `{size, stops?, linear?, feather?, fullAt?}`.
+  `stops` is up to three `[position, alpha]` pairs (CSS mask stops), and every fade in a window
+  shares one stop curve. An edge you leave out doesn't fade.
+- `noScrollAnchor`: opts a viewport, list or row out of scroll anchoring. `scrollY` boxes anchor
+  by default, like CSS `overflow-anchor: auto`.
+- `farFromBottom` (default 180) with `onFarFromBottom(far)`: fires when the viewport crosses that
+  distance from its end.
 - `sticky` (`"top"` | `"bottom"`) with `stickyInset`.
 - `selectionGroup`: one selection across the texts inside.
 
@@ -216,6 +236,16 @@ and `codeBlockPadding: [0, y]`.
 Children are rows. `estimate` is the row height guess and `overscan` is `[before, after]` in rows.
 Only rows near the viewport are built. The list must sit inside a `scrollY` box.
 
+- `growth`: rows ease their height changes, on by default. `false` turns it off. Or pass
+  `{dur, bounce, edge, clip}`, where `edge` is how a streaming row's bottom reveals: `feather`,
+  `fastFeather`, `none` or `wordFade`.
+- `arrivesWhole` on a row (a sent message): its height glides on the growth spring alone,
+  without the streaming speed limits.
+- `onVisibleRows({first, last, end})`: the visible indices (`last` is inclusive), on first layout
+  and on every change.
+- `engine.scroll.toKey(viewport, rowId, at)` lands a row `at` points below the viewport's top,
+  whether or not it is mounted. `"row/mark"` lands a mark inside a row.
+
 ### webview
 
 **Props.**
@@ -230,7 +260,10 @@ Only rows near the viewport are built. The list must sit inside a `scrollY` box.
   deliverables and Cloud Apps keep working unchanged.
 - `onRequest({rid, scheme, url, method, headers, body})`: answer with
   `engine.webview.respond(rid, {status, headers, body})`, where `body` is a string or bytes.
-- `onNavigate({url})`, `onTitle(title)`, `onLoad({phase, url})`, `onReady()`, `onError(error)`.
+- `onNavigate({url, mainFrame})`: main-frame navigations only on Linux (from the document
+  response) and Windows (NavigationStarting). On macOS `mainFrame` is absent and frame
+  navigations can arrive too.
+- `onTitle(title)`, `onLoad({phase, url})`, `onReady()`, `onError(error)`.
 
 **Commands.** `engine.webview.post(id, data)` delivers a `MessageEvent` to the page (as
 `window.postMessage` would). The rest: `eval load loadHtml reload back forward focus blur zoom
@@ -263,7 +296,8 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
 - `appearance.get()`
 - `shell.*`: openExternal, openPath, showItemInFolder
 - `fonts({files, sans, mono})`, `background(color, window?)`, `colorMotion(dur)`
-- `scroll.*`: to (`"end"` or y), intoView, page, stop
+- `scroll.*`: to (`"end"` or y), intoView, page, stop, toKey (`viewport, key, at`),
+  keepOnScreen (`key`, across the next commit)
 - `focus(id)`, `blur()`
 - `input.*`, `media.*`, `webview.*`
 - `control.*`, `quit()`

@@ -63,13 +63,51 @@ fn spawn_host(cmd: &mut Command) -> (Child, Box<dyn std::io::Read + Send>, Box<d
             }
             libc::close(hi_out);
             libc::close(hi_in);
+            libc::setpgid(0, 0);
+            #[cfg(target_os = "linux")]
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
             Ok(())
         });
     }
     let child = cmd.spawn().unwrap_or_else(|e| panic!("could not start the TS host: {e}"));
+    HOST_GROUP.store(child.id() as i32, std::sync::atomic::Ordering::Relaxed);
+    end_host_on_signals();
     drop(host_out);
     drop(host_in);
     (child, Box::new(from_host), Box::new(to_host))
+}
+
+/// The host's process group: the host and everything it starts (Bun workers, build children).
+#[cfg(unix)]
+static HOST_GROUP: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+#[cfg(unix)]
+pub fn end_host_group() {
+    let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
+    if g > 0 {
+        // SAFETY: signals a process group this process created.
+        unsafe { libc::killpg(g, libc::SIGTERM) };
+    }
+}
+
+/// A launcher's terminate (SIGTERM), Ctrl+C or a closed terminal ends the host's whole group
+/// with the engine; `on_quit` runs only on a graceful quit.
+#[cfg(unix)]
+fn end_host_on_signals() {
+    extern "C" fn on_signal(sig: libc::c_int) {
+        let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
+        // SAFETY: killpg and _exit are async-signal-safe.
+        unsafe {
+            if g > 0 {
+                libc::killpg(g, libc::SIGTERM);
+            }
+            libc::_exit(128 + sig);
+        }
+    }
+    for sig in [libc::SIGTERM, libc::SIGINT, libc::SIGHUP] {
+        // SAFETY: installs a handler that only calls async-signal-safe functions.
+        unsafe { libc::signal(sig, on_signal as *const () as libc::sighandler_t) };
+    }
 }
 
 #[cfg(not(unix))]
@@ -89,7 +127,7 @@ fn spawn_ts() -> Boot {
     let bun = std::env::var("STELLA_RUNE_BUN").unwrap_or_else(|_| "bun".into());
     let host = format!("{root}/host/main.tsx");
     let mut cmd = Command::new(&bun);
-    cmd.arg(&host).current_dir(&root).stderr(Stdio::inherit());
+    cmd.arg(&host).args(std::env::args_os().skip(1)).current_dir(&root).stderr(Stdio::inherit());
     let (child, from_host, to_host) = spawn_host(&mut cmd);
     let (tx, rx) = mpsc::channel();
     let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
@@ -139,6 +177,9 @@ fn main() {
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
     let app = windows::decorate(app, &p).window_options(windows::options(&p));
+    let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
+    rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
+    let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
     let _ = services::APP.set(app.handle());
     app.on_ready(|h| {
         let h = h.clone();
@@ -155,6 +196,8 @@ fn main() {
     .on_quit(|_s: &mut Win, _| {
         let child = engine::with(|e| e.child.take());
         if let Some(mut c) = child {
+            #[cfg(unix)]
+            end_host_group();
             let _ = c.kill();
             let _ = c.wait();
         }

@@ -25,7 +25,7 @@ case "${1:-}" in
       STELLA_RUNE_T0="$(date +%s%3N)" STELLA_RUNE_ROOT="$ROOT" STELLA_RUNE_BUN="$BUN" \
       STELLA_RUNE_METRICS="$RUN/metrics.jsonl" STELLA_RUNE_CTL_PORT="${PORT:-0}" \
       STELLA_RUNE_W="$W" STELLA_RUNE_H="$H" GDK_SCALE=1 ${EXTRA_ENV:-} \
-      "$BIN" > "$RUN/engine.log" 2>&1 &
+      "$BIN" ${ARGS:-} > "$RUN/engine.log" 2>&1 &
     echo $! > "$RUN/engine.pid"
     echo "display $DISP xvfb $(cat "$RUN/xvfb.pid") engine $(cat "$RUN/engine.pid")"
     ;;

@@ -64,7 +64,13 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
 fn list(id: u32, n: &Node) -> El {
     let count = n.children.len();
     let est = n.props.estimate.unwrap_or(64.0);
-    let mut e = col().growth(GrowthSpec::default()).virtual_rows(
+    let mut e = col();
+    match &n.props.growth {
+        Some(crate::props::GrowthP::On(false)) => {}
+        Some(crate::props::GrowthP::Spec(g)) => e = e.growth(growth_spec(g)),
+        _ => e = e.growth(GrowthSpec::default()),
+    }
+    let mut e = e.virtual_rows(
         count,
         est,
         move |_s: &Win, i| -> Cow<'_, str> {
@@ -84,7 +90,36 @@ fn list(id: u32, n: &Node) -> El {
     if let Some((o, edge)) = n.props.overscan {
         e = e.virtual_overscan(o, edge);
     }
+    if n.props.listens("visibleRows") {
+        e = e.on_visible_rows(move |_s: &mut Win, r: std::ops::Range<usize>| {
+            element_event(id, "visibleRows", json!({ "first": r.start, "last": r.end.saturating_sub(1), "end": r.end }), None);
+            false
+        });
+    }
     e.virtual_rows_version(n.ver)
+}
+
+fn growth_spec(g: &crate::props::GrowthSpecP) -> GrowthSpec {
+    let mut spec = GrowthSpec::default();
+    if g.dur.is_some() || g.bounce.is_some() {
+        spec.spring = rune::Spring::new(g.dur.unwrap_or(0.3).max(0.0), g.bounce.unwrap_or(0.0).clamp(-1.0, 1.0));
+    }
+    let edges = rune::edge::ALL;
+    if let Some(name) = g.edge.as_deref() {
+        let want = match name {
+            "fastFeather" => "fast-feather",
+            "none" => "no-mask",
+            "wordFade" => "word-fade",
+            n => n,
+        };
+        if let Some(e) = edges.iter().find(|e| e.name == want) {
+            spec.edge = *e;
+        }
+    }
+    if let Some(clip) = g.clip {
+        spec.edge.clip = clip;
+    }
+    spec
 }
 
 /// Wires every handler the element listens to (`props.on`).
@@ -104,6 +139,10 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
                 element_event(n, "focusWithin", json!({ "within": within }), Some(tx))
             }),
             "layout" => e.on_layout(move |_s: &mut Win, r: [f32; 4]| element_event(n, "layout", json!({ "x": r[0], "y": r[1], "w": r[2], "h": r[3] }), None)),
+            "farFromBottom" => {
+                let min = p.far_from_bottom.unwrap_or(180.0);
+                e.on_far_from_bottom(min, move |_s: &mut Win, far: bool| element_event(n, "farFromBottom", json!({ "far": far }), None))
+            }
             "atBottom" => e
                 .on_at_bottom(move |_s: &mut Win, at: bool| element_event(n, "atBottom", json!({ "atBottom": at }), None)),
             "dropFiles" => e.on_drop_files(move |_s: &mut Win, paths: &[std::path::PathBuf], tx: &mut Tx| {

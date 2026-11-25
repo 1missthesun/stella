@@ -119,6 +119,8 @@ export type EngineEvent =
   | { t: "shortcut"; accelerator: string; accel: string }
   | { t: "notification"; id: string | null; action: string; reply?: string | null }
   | { t: "appearance"; dark: boolean; accentColor?: string }
+  /** A link the system opened with the app (macOS Apple Event; Windows/Linux the launch's own `stella://` arguments). Later launches' links come through the host's single-instance lock. */
+  | { t: "open-url"; url: string }
   | { t: "rec"; result: unknown };
 
 type EventOf<T extends EngineEvent["t"]> = Extract<EngineEvent, { t: T }>;
@@ -286,6 +288,10 @@ export const engine = {
     intoView: (target: string) => request("scrollIntoView", { target }),
     page: (target: string, pages: number) => request("scrollPage", { target, pages }),
     stop: (target: string) => request("stopScroll", { target }),
+    /** Lands the element keyed `key` (`"row/mark"` for a mark inside a row, mounted or not) `at` points below the top of `target`'s viewport. Instant. */
+    toKey: (target: string, key: string, at = 0) => request("scrollKeyTo", { target, key, at }),
+    /** Holds `key` where it shows on screen across the next commit (a header that collapses its section). */
+    keepOnScreen: (key: string) => request("keepOnScreen", { target: key, key }),
   },
   focus: (target: string, ring = false) => request("focus", { target, ring }),
   blur: (window?: string) => request("blur", { window }),

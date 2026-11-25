@@ -108,6 +108,14 @@ export type BoxProps = {
   /** Follow the end as content grows (chat). */
   stickBottom?: boolean;
   edgeFade?: number;
+  /** Per-edge fades with the content hidden under them; `stops` are `[position, alpha]` pairs (CSS mask stops). */
+  scrollFade?: { top?: FadeEdge; bottom?: FadeEdge };
+  /** Opts a viewport, list or row out of scroll anchoring (CSS `overflow-anchor: none`). */
+  noScrollAnchor?: boolean;
+  /** Distance from the bottom past which `onFarFromBottom(true)` fires (default 180). */
+  farFromBottom?: number;
+  /** A list row whose content arrives complete (a sent message): its height glides on the growth spring alone. */
+  arrivesWhole?: boolean;
   sticky?: "top" | "bottom"; stickyInset?: number;
   /** Selectable texts inside select as one (drag across paragraphs, Cmd+A). */
   selectionGroup?: boolean;
@@ -127,6 +135,7 @@ export type BoxProps = {
   onLayout?: (r: Layout) => void;
   onScroll?: (p: ScrollPos) => void;
   onAtBottom?: (atBottom: boolean) => void;
+  onFarFromBottom?: (far: boolean) => void;
   onKey?: (e: KeyEvent) => void;
   onDismiss?: () => void;
   onDropFiles?: (paths: string[]) => void;
@@ -191,9 +200,15 @@ export type MarkdownProps = BoxProps & {
 
 export type MediaProps = BoxProps & { src: string; fit?: "cover" | "contain"; autoplay?: boolean; muted?: boolean; loopMedia?: boolean };
 
+export type FadeEdge = { size: number; stops?: [number, number][]; linear?: boolean; feather?: boolean; fullAt?: number };
+
 export type ListProps = BoxProps & {
   /** Estimated row height; only rows near the viewport are built. Must sit inside a scrollY box. */
   estimate?: number; overscan?: [number, number];
+  /** Rows ease their height changes (default on). `edge` is how a streaming row's bottom reveals. */
+  growth?: boolean | { dur?: number; bounce?: number; edge?: "feather" | "fastFeather" | "none" | "wordFade"; clip?: boolean };
+  /** Visible row indices (inclusive), on first layout and whenever they change. */
+  onVisibleRows?: (r: { first: number; last: number; end: number }) => void;
 };
 
 export type WebviewMessage = { data: unknown; targetOrigin: string };
@@ -206,7 +221,8 @@ export type WebviewProps = BoxProps & {
   /** Custom schemes answered by `onRequest` + `engine.webview.respond`. */
   protocols?: string[];
   onMessage?: (m: WebviewMessage) => void;
-  onNavigate?: (e: { url: string }) => void;
+  /** Main-frame navigations only (Linux, Windows); on macOS `mainFrame` is absent and frames may arrive too. */
+  onNavigate?: (e: { url: string; mainFrame?: boolean }) => void;
   onTitle?: (title: string) => void;
   onLoad?: (e: { phase: "started" | "finished"; url: string }) => void;
   onRequest?: (r: WebviewRequest) => void;

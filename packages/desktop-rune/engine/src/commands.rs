@@ -257,6 +257,8 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
             "scrollIntoView" => tx.scroll_into_view(tkey.clone().ok_or("scrollIntoView: no target")?),
             "scrollPage" => tx.scroll_page(tkey.clone().ok_or("no target")?, f(&v, "pages").unwrap_or(1.0) as i32),
             "stopScroll" => tx.stop_scroll(tkey.clone().ok_or("no target")?),
+            "scrollKeyTo" => tx.scroll_key_to(v.get("key").and_then(|k| k.as_str()).ok_or("scrollKeyTo: needs a key")?, f(&v, "at").unwrap_or(0.0)),
+            "keepOnScreen" => tx.keep_on_screen(v.get("key").and_then(|k| k.as_str()).ok_or("keepOnScreen: needs a key")?),
             "focus" => tx.focus(tkey.clone().ok_or("focus: no target")?, v.get("ring").and_then(|r| r.as_bool()).unwrap_or(false)),
             "blur" => tx.blur(),
             "selectText" => {

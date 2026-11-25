@@ -1,6 +1,6 @@
 //! Box props → Rune builders: layout, paint, state styles, motion, interaction, accessibility.
 
-use rune::{Align, Anim, Cursor, El, ResizeEdge, ScrollSpec, Shadow, Side, Spring, Transition};
+use rune::{Align, Anim, Cursor, El, ResizeEdge, ScrollFade, ScrollSpec, Shadow, Side, Spring, Transition};
 use rune::LoopSpec;
 
 use crate::props::{EffectP, PresenceP, Props, RaiseP, Size};
@@ -503,12 +503,46 @@ pub fn scroll(mut e: El, p: &Props) -> El {
     {
         e = e.scroll_edge_fade(f);
     }
+    if (p.scroll_x || p.scroll_y)
+        && let Some(f) = &p.scroll_fade
+    {
+        e = e.scroll_fade(scroll_fade(f));
+    }
+    if p.no_scroll_anchor {
+        e = e.no_scroll_anchor();
+    }
+    if p.arrives_whole {
+        e = e.arrives_whole();
+    }
     match p.sticky.as_deref() {
         Some("top") => e = e.sticky_top(p.sticky_inset.unwrap_or(0.0)),
         Some("bottom") => e = e.sticky_bottom(p.sticky_inset.unwrap_or(0.0)),
         _ => {}
     }
     e
+}
+
+fn fade_edge(f: &crate::props::FadeEdgeP) -> ScrollFade {
+    let mut fade = if f.feather { ScrollFade::feather(f.size) } else { ScrollFade::strength(f.size) };
+    if let Some(at) = f.full_at {
+        fade = fade.full_at(at);
+    }
+    if let Some(stops) = &f.stops {
+        let stops: Vec<(f32, f32)> = stops.iter().map(|[t, a]| (*t, *a)).collect();
+        fade = fade.stops(&stops);
+    } else if f.linear {
+        fade = fade.linear();
+    }
+    fade
+}
+
+fn scroll_fade(f: &crate::props::ScrollFadeP) -> ScrollFade {
+    let none = crate::props::FadeEdgeP::default();
+    let top = fade_edge(f.top.as_ref().unwrap_or(&none));
+    match &f.bottom {
+        Some(b) => top.with_end(fade_edge(b)),
+        None => top.with_end(ScrollFade::strength(0.0)),
+    }
 }
 
 pub fn a11y(mut e: El, p: &Props) -> El {

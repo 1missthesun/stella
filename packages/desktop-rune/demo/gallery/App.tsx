@@ -114,7 +114,7 @@ function Visuals() {
   );
 }
 
-function Overlays({ togglePanel }: { togglePanel: () => void }) {
+function Overlays({ togglePanel, mountHidden }: { togglePanel: () => void; mountHidden: () => void }) {
   const [menu, setMenu] = useState(false);
   const [dialog, setDialog] = useState(false);
   const [picked, setPicked] = useState("nothing yet");
@@ -128,6 +128,7 @@ function Overlays({ togglePanel }: { togglePanel: () => void }) {
           setPicked(`native menu: ${id ?? "dismissed"}`);
         }}>Native menu</Button>
         <Button id="g-panel" onPress={togglePanel}>Toggle panel window</Button>
+        <Button id="g-panel-hidden" onPress={mountHidden}>Mount panel hidden</Button>
         <box id="g-tip" px={10} h={30} radius={8} center fill={c.inset} title="A native tooltip" titleSide="top">
           <text size={13} color={c.weak}>Hover me</text>
         </box>
@@ -180,18 +181,26 @@ function Docs() {
 const ROWS = Array.from({ length: 1000 }, (_, i) => i);
 
 function Rows() {
+  const [seen, setSeen] = useState("");
+  const [far, setFar] = useState(false);
   return (
     <Section title="Virtual list · 1,000 rows">
-      <col id="g-list-scroll" w="full" h={180} scrollY radius={8} fill={c.inset} edgeFade={16}>
-        <list id="g-list" estimate={28}>
+      <col id="g-list-scroll" w="full" h={180} scrollY radius={8} fill={c.inset} farFromBottom={400} onFarFromBottom={setFar}
+        scrollFade={{ top: { size: 24, stops: [[0.25, 0.16], [0.5, 0.5], [0.75, 0.84]] }, bottom: { size: 32, linear: true } }}>
+        <list id="g-list" estimate={28} growth={{ dur: 0.35, edge: "none" }} onVisibleRows={(r) => setSeen(`rows ${r.first + 1}–${r.last + 1}`)}>
           {ROWS.map((i) => (
-            <row key={i} h={28} px={12} align="center" justify="between" hover={c.hover}>
+            <row key={i} id={`g-row-${i}`} h={28} px={12} align="center" justify="between" hover={c.hover}>
               <text size={13} color={c.text}>{`Row ${i + 1}`}</text>
               <text size={12} color={c.weaker} mono>{(i * 2654435761 % 4294967296).toString(16).padStart(8, "0")}</text>
             </row>
           ))}
         </list>
       </col>
+      <row gap={8} align="center">
+        <Button id="g-row-jump" onPress={() => void stella.engine.scroll.toKey("g-list-scroll", "g-row-499", 8)}>Row 500</Button>
+        <Button id="g-row-top" onPress={() => void stella.engine.scroll.to("g-list-scroll", 0)}>Top</Button>
+        <text id="g-rows-seen" size={12} color={c.weaker}>{`${seen}${far ? " · far from bottom" : ""}`}</text>
+      </row>
     </Section>
   );
 }
@@ -218,13 +227,14 @@ function Web() {
   );
 }
 
-function Panel({ close }: { close: () => void }) {
+function Panel({ close, shown }: { close: () => void; shown: boolean }) {
   const [bounds, setBounds] = useState("");
+  const [nav, setNav] = useState<string[]>([]);
   useEffect(() => stella.on("window", (e) => {
     if (e.id === "panel" && e.kind === "close-requested") close();
   }), [close]);
   return (
-    <window id="panel" kind="panel" title="Gallery panel" w={360} h={220} minSize={[280, 160]} bg={c.raised}>
+    <window id="panel" kind="panel" title="Gallery panel" w={380} h={330} minSize={[280, 160]} bg={c.raised} visible={shown}>
       <col w="full" h="full" pad={18} gap={10}>
         <text size={16} weight={700} color={c.text}>Second window</text>
         <text size={13} color={c.weak} lineHeight={19}>Its own native window, rendered from the same React tree and closed by unmounting it.</text>
@@ -233,12 +243,18 @@ function Panel({ close }: { close: () => void }) {
           <Button id="p-close" primary onPress={close}>Close</Button>
         </row>
         <text size={12} color={c.weaker}>{bounds}</text>
+        <webview id="p-web" w="full" h={64} radius={8} onNavigate={(e) => setNav((l) => [...l.slice(-2), `${e.mainFrame === false ? "frame" : "main"} ${e.url}`])}
+          html={`<body style="margin:0;background:#20242c;color:#ececf1;font:13px sans-serif;display:flex;gap:8px;align-items:center;height:100vh">webview in the panel<iframe src="https://example.com/" width="120" height="50"></iframe></body>`} />
+        <row gap={8} align="center">
+          <Button id="p-load" onPress={() => void stella.engine.webview.load("p-web", "https://example.org/")}>Load page</Button>
+          <text id="p-nav" size={11} color={c.weaker}>{nav.join(" · ") || "no navigations"}</text>
+        </row>
       </col>
     </window>
   );
 }
 
-function Main({ togglePanel }: { togglePanel: () => void }) {
+function Main({ togglePanel, mountHidden }: { togglePanel: () => void; mountHidden: () => void }) {
   return (
     <col id="g-root" w="full" h="full" fill={c.bg}>
       <row id="g-titlebar" w="full" h={44} px={16} align="center" justify="between" borderSides={[0, 0, 1, 0]} border={c.border} windowDrag>
@@ -248,7 +264,7 @@ function Main({ togglePanel }: { togglePanel: () => void }) {
       <col id="g-scroll" w="full" grow={1} scrollY>
         <col w="full" maxW={880} pad={20} gap={14} selfAlign="center">
           <Inputs />
-          <Overlays togglePanel={togglePanel} />
+          <Overlays togglePanel={togglePanel} mountHidden={mountHidden} />
           <Visuals />
           <Web />
           <Docs />
@@ -260,14 +276,15 @@ function Main({ togglePanel }: { togglePanel: () => void }) {
 }
 
 export function Root() {
-  const [panel, setPanel] = useState(false);
-  const close = useCallback(() => setPanel(false), []);
+  const [panel, setPanel] = useState<"off" | "shown" | "hidden">("off");
+  const close = useCallback(() => setPanel("off"), []);
+  useEffect(() => stella.on("open-url", (e) => console.error(`[gallery] open-url ${e.url} argv ${process.argv.slice(2).join(" ")}`)), []);
   return (
     <>
       <window id="main" title="Rune engine gallery" bg={c.bg}>
-        <Main togglePanel={() => setPanel((p) => !p)} />
+        <Main togglePanel={() => setPanel((p) => (p === "shown" ? "hidden" : "shown"))} mountHidden={() => setPanel("hidden")} />
       </window>
-      {panel ? <Panel close={close} /> : null}
+      {panel !== "off" ? <Panel close={close} shown={panel === "shown"} /> : null}
     </>
   );
 }

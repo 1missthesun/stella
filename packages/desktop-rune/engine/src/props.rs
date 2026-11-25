@@ -291,6 +291,40 @@ pub enum RaiseP {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+pub struct GrowthSpecP {
+    pub dur: Option<f32>,
+    pub bounce: Option<f32>,
+    /// `feather` (default), `fastFeather`, `none`, `wordFade`.
+    pub edge: Option<String>,
+    pub clip: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum GrowthP {
+    On(bool),
+    Spec(GrowthSpecP),
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FadeEdgeP {
+    pub size: f32,
+    pub stops: Option<Vec<[f32; 2]>>,
+    pub linear: bool,
+    pub feather: bool,
+    pub full_at: Option<f32>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct ScrollFadeP {
+    pub top: Option<FadeEdgeP>,
+    pub bottom: Option<FadeEdgeP>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DragOutP {
     pub paths: Vec<String>,
     pub text: Option<String>,
@@ -413,6 +447,9 @@ pub struct Props {
     pub scroll_x: bool,
     pub stick_bottom: bool,
     pub edge_fade: Option<f32>,
+    pub scroll_fade: Option<ScrollFadeP>,
+    pub no_scroll_anchor: bool,
+    pub far_from_bottom: Option<f32>,
     pub sticky: Option<String>,
     pub sticky_inset: Option<f32>,
 
@@ -481,6 +518,8 @@ pub struct Props {
     // List
     pub estimate: Option<f32>,
     pub overscan: Option<(f32, f32)>,
+    pub growth: Option<GrowthP>,
+    pub arrives_whole: bool,
 
     // Markdown
     pub streaming: bool,

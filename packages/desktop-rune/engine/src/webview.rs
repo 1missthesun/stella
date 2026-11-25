@@ -124,10 +124,6 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
             let body: serde_json::Value = serde_json::from_str(req.body()).unwrap_or(serde_json::Value::Null);
             element_event(n, "message", json!({ "data": body.get("data"), "targetOrigin": body.get("targetOrigin") }), None);
         })
-        .with_navigation_handler(move |url: String| {
-            element_event(n, "navigate", json!({ "url": url }), None);
-            true
-        })
         .with_document_title_changed_handler(move |title: String| element_event(n, "title", json!({ "title": title }), None))
         .with_on_page_load_handler(move |ev: PageLoadEvent, url: String| {
             let phase = match ev {
@@ -136,6 +132,17 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
             };
             element_event(n, "load", json!({ "phase": phase, "url": url }), None)
         });
+    #[cfg(not(target_os = "linux"))]
+    {
+        b = b.with_navigation_handler(move |url: String| {
+            let mut ev = json!({ "url": url });
+            if let Some(main) = main_frame_only() {
+                ev["mainFrame"] = json!(main);
+            }
+            element_event(n, "navigate", ev, None);
+            true
+        });
+    }
     if let Some(ua) = &p.user_agent {
         b = b.with_user_agent(ua.clone());
     }
@@ -167,7 +174,37 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
         (None, None) => b.with_url("about:blank"),
     };
     let handle = handle_of(window).ok_or("the webview's window isn't open")?;
-    handle.with_raw_handle(|raw| b.build_as_child(&raw).map_err(|e| e.to_string()))?
+    let view = handle.with_raw_handle(|raw| b.build_as_child(&raw).map_err(|e| e.to_string()))??;
+    #[cfg(target_os = "linux")]
+    main_frame_navigations(n, &view);
+    Ok(view)
+}
+
+/// WebView2's NavigationStarting is main-frame only; WKWebView's policy also asks for subframes
+/// and wry doesn't say which, so the flag is left out there.
+#[cfg(not(target_os = "linux"))]
+fn main_frame_only() -> Option<bool> {
+    cfg!(target_os = "windows").then_some(true)
+}
+
+/// WebKitGTK asks navigation policy for subframes too without saying which frame; the response
+/// policy does, so `navigate` comes from a main frame's document response.
+#[cfg(target_os = "linux")]
+fn main_frame_navigations(n: u32, view: &WebView) {
+    use webkit2gtk::{PolicyDecisionType, ResponsePolicyDecision, ResponsePolicyDecisionExt, URIResponseExt, WebViewExt};
+    use wry::WebViewExtUnix;
+    use gtk::prelude::Cast;
+    view.webview().connect_decide_policy(move |_, decision, kind| {
+        if kind != PolicyDecisionType::Response {
+            return false;
+        }
+        let Some(r) = decision.downcast_ref::<ResponsePolicyDecision>() else { return false };
+        if r.is_main_frame_main_resource() {
+            let url = r.response().and_then(|res| res.uri()).map(|u| u.to_string()).unwrap_or_default();
+            element_event(n, "navigate", json!({ "url": url, "mainFrame": true }), None);
+        }
+        false
+    });
 }
 
 /// Places (creating on first use) the WebView for node `n` at its slot's drawn rect.
@@ -231,16 +268,41 @@ pub fn active() -> bool {
 
 /// Drops the WebView (and its web process) of a removed node.
 pub fn close(n: u32) {
-    VIEWS.with(|v| {
-        if v.borrow_mut().remove(&n).is_some() {
-            eprintln!("stella-engine: webview {n} closed");
-        }
-    });
+    let gone = VIEWS.with(|v| v.borrow_mut().remove(&n));
+    if gone.is_some() {
+        destroy(gone.into_iter().collect());
+        eprintln!("stella-engine: webview {n} closed");
+    }
 }
 
-/// Hides every view of a window that stopped drawing (closed, hidden).
+/// Drops every view of a window that is closing, before its native window goes.
 pub fn close_window(window: u32) {
-    VIEWS.with(|v| v.borrow_mut().retain(|_, view| view.window != window));
+    let gone: Vec<View> = VIEWS.with(|v| {
+        let mut v = v.borrow_mut();
+        let ids: Vec<u32> = v.iter().filter(|(_, view)| view.window == window).map(|(n, _)| *n).collect();
+        ids.into_iter().filter_map(|n| v.remove(&n)).collect()
+    });
+    destroy(gone);
+}
+
+/// wry's X11 teardown destroys its container before GTK unmaps it, which GDK would treat as a
+/// fatal X error; ignore the errors of the teardown's requests.
+fn destroy(views: Vec<View>) {
+    if views.is_empty() {
+        return;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        gtk::gdk::error_trap_push();
+        drop(views);
+        pump();
+        if let Some(d) = gtk::gdk::Display::default() {
+            d.sync();
+        }
+        gtk::gdk::error_trap_pop_ignored();
+    }
+    #[cfg(not(target_os = "linux"))]
+    drop(views);
 }
 
 /// GTK needs its loop turned on Linux; Rune owns the loop, so turn it from poll.

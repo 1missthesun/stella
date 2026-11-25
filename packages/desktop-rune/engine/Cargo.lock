@@ -3981,6 +3981,7 @@ dependencies = [
  "rune-notify",
  "serde",
  "serde_json",
+ "webkit2gtk",
  "wry",
 ]
 

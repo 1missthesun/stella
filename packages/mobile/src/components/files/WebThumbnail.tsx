@@ -56,7 +56,7 @@ type WebThumbnailProps =
   | { html: string }
   | { uri: string; crop: DocumentCrop };
 
-/** How far the page is enlarged past its frame: WebKit draws a grey surround around PDFs and slides, and lays sheets out far wider than their cells. */
+/** How far the page runs past its frame: WebKit draws a grey surround around PDFs and slides, lays sheets out far wider than their cells, and stops zooming out before a whole slide fits a tile. */
 export type DocumentCrop = {
   zoom: number;
   from: "center" | "start";
@@ -64,7 +64,6 @@ export type DocumentCrop = {
   /** WebKit lays its own page counter over a PDF for this long after loading. */
   revealAfterMs?: number;
 };
-
 
 export const WebThumbnail = memo(function WebThumbnail(
   props: WebThumbnailProps,
@@ -81,12 +80,13 @@ export const WebThumbnail = memo(function WebThumbnail(
   );
   const crop = "uri" in props ? props.crop : null;
   const spare = crop ? (crop.zoom - 1) * 100 : 0;
+  const bleed = crop ? (crop.zoom * (crop.enlarge ?? 1) - 1) * 100 : 0;
   const overscan: ViewStyle = crop
     ? {
         height: `${100 + spare}%`,
-        left: crop.from === "center" ? `${-spare / 2}%` : 0,
+        left: crop.from === "center" ? `${-bleed / 2}%` : 0,
         position: "absolute",
-        top: crop.from === "center" ? `${-spare / 3}%` : 0,
+        top: crop.from === "center" ? `${-bleed / 3}%` : 0,
         transform: [{ scale: crop.enlarge ?? 1 }],
         transformOrigin: "top left",
         width: `${100 + spare}%`,

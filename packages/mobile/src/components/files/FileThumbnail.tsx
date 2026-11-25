@@ -29,7 +29,7 @@ const documentCrop = (extension: string): DocumentCrop => {
       return { zoom: 1.16, from: "center" };
     case "ppt":
     case "pptx":
-      return { zoom: 1.05, from: "center" };
+      return { zoom: 2.2, from: "center", enlarge: 0.48 };
     default:
       return { zoom: 1.07, from: "center", revealAfterMs: 2_600 };
   }

@@ -15,6 +15,8 @@ thread_local! {
     static IMAGES: RefCell<HashMap<String, rune::image::Image>> = RefCell::new(HashMap::new());
     static ICONS: RefCell<HashMap<(String, u64), &'static Icon>> = RefCell::new(HashMap::new());
     static PLAYERS: RefCell<HashMap<u32, (String, Player)>> = RefCell::new(HashMap::new());
+    /// `<vector svg>` rasters by node, with the hash of what they show.
+    static RASTERS: RefCell<HashMap<u32, (u64, rune::Pixels)>> = RefCell::new(HashMap::new());
 }
 
 const MAX_IMAGES: usize = 512;
@@ -105,8 +107,43 @@ pub fn icon(p: &Props) -> El {
     e
 }
 
+/// `<vector svg>`: a whole SVG document rasterized into the node's own pixels on each change
+/// (gradients, clip paths, transforms), replaced in place.
+fn vector_svg(n: u32, svg: &str, p: &Props) -> El {
+    let side = |s: &Option<crate::props::Size>| match s {
+        Some(crate::props::Size::Pt(v)) => *v,
+        _ => 0.0,
+    };
+    let px = (side(&p.w).max(side(&p.h)).max(16.0) * VECTOR_SCALE).round() as u32;
+    let h = {
+        use std::hash::{Hash, Hasher};
+        let mut s = std::collections::hash_map::DefaultHasher::new();
+        svg.hash(&mut s);
+        px.hash(&mut s);
+        s.finish()
+    };
+    let pixels = RASTERS.with(|m| {
+        let mut m = m.borrow_mut();
+        let entry = m.entry(n).or_insert_with(|| (0, rune::Pixels::new()));
+        if entry.0 != h {
+            entry.0 = h;
+            match rune::image::svg_rgba(svg.as_bytes(), px) {
+                Ok((w, h, rgba)) => entry.1.set(w, h, rgba),
+                Err(e) => eprintln!("stella-engine: vector {n}: {}", e.0),
+            }
+        }
+        entry.1.clone()
+    });
+    el().pixels(&pixels)
+}
+
+const VECTOR_SCALE: f32 = 2.0;
+
 /// `<vector>`: SVG paths drawn as Rune shapes, rebuilt whenever they change and never cached.
-pub fn vector(p: &Props) -> El {
+pub fn vector(n: u32, p: &Props) -> El {
+    if let Some(svg) = p.svg.as_deref() {
+        return vector_svg(n, svg, p);
+    }
     let mut shape = rune::Shape::new();
     for path in p.paths.iter().flatten() {
         let alpha = path.opacity.unwrap_or(1.0).clamp(0.0, 1.0);
@@ -152,6 +189,7 @@ pub fn player(n: u32) -> Option<Player> {
 
 pub fn forget(n: u32) {
     PLAYERS.with(|m| m.borrow_mut().remove(&n));
+    RASTERS.with(|m| m.borrow_mut().remove(&n));
 }
 
 pub fn markdown(n: u32, p: &Props) -> El {

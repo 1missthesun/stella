@@ -186,7 +186,11 @@ export type ImageProps = BoxProps & {
 export type VectorPath = { d: string; fill?: string; stroke?: string; strokeWidth?: number; cap?: "round" | "butt"; opacity?: number; evenOdd?: boolean };
 
 /** SVG paths drawn as shapes, for drawing that changes every frame (nothing is cached per body). */
-export type VectorProps = BoxProps & { viewBox?: [number, number]; paths: VectorPath[] };
+export type VectorProps = BoxProps & {
+  viewBox?: [number, number]; paths?: VectorPath[];
+  /** A whole `<svg>` document (gradients, clipPath, transforms), rasterized at 2x into this element on each change, replaced in place. Takes precedence over `paths`. */
+  svg?: string;
+};
 
 export type IconProps = BoxProps & {
   /** SVG body (paths inside the root <svg>, `currentColor` tinted by `color`). */

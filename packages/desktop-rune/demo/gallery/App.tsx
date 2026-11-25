@@ -110,6 +110,7 @@ function Visuals() {
         <image src={SVG_IMAGE} w={160} h={96} radius={14} />
         <image src={PNG} w={72} h={72} radius={16} fit="cover" border={c.border} borderWidth={1} />
         <Morph />
+        <Rig />
       </row>
     </Section>
   );
@@ -125,6 +126,38 @@ function blob(t: number): string {
     const [nx, ny] = pts[(i + 1) % pts.length];
     return `${i ? "" : `M${(x + nx) / 2} ${(y + ny) / 2} `}Q${nx} ${ny} ${(nx + pts[(i + 2) % pts.length][0]) / 2} ${(ny + pts[(i + 2) % pts.length][1]) / 2}`;
   }).join(" ") + "Z";
+}
+
+function rigSvg(t: number): string {
+  const d = blob(t);
+  const sweep = 64 * ((t * 0.6) % 1.4) - 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<defs>
+<linearGradient id="ink" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7aa7ff"/><stop offset="0.5" stop-color="#4f6cff"/><stop offset="1" stop-color="#9b4dff"/></linearGradient>
+<linearGradient id="sweep" x1="0" y1="${sweep}" x2="0" y2="${sweep + 16}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.4"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<radialGradient id="glow" cx="32" cy="32" r="32" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4878db" stop-opacity="0.26"/><stop offset="0.5" stop-color="#00aad8" stop-opacity="0.1"/><stop offset="1" stop-color="#00aad8" stop-opacity="0"/></radialGradient>
+<clipPath id="body"><path d="${d}"/></clipPath>
+</defs>
+<circle cx="32" cy="32" r="32" fill="url(#glow)"/>
+<path d="${d}" fill="url(#ink)"/>
+<g clip-path="url(#body)"><rect x="0" y="0" width="64" height="64" fill="url(#sweep)"/><g transform="translate(0 ${Math.sin(t * 4)})"><rect x="22" y="27" width="5" height="9" rx="2.5" fill="#fff"/><rect x="37" y="27" width="5" height="9" rx="2.5" fill="#fff"/></g></g>
+</svg>`;
+}
+
+function Rig() {
+  const [t, setT] = useState(0.4);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const start = performance.now();
+    const id = setInterval(() => {
+      const now = (performance.now() - start) / 1000;
+      setT(0.4 + now);
+      if (now > 3) setOn(false);
+    }, 16);
+    return () => clearInterval(id);
+  }, [on]);
+  return <vector id="g-rig" w={72} h={72} svg={rigSvg(t)} onPress={() => setOn(true)} />;
 }
 
 function Morph() {

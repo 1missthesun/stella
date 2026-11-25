@@ -5,81 +5,17 @@ description: Create or update Stella skills. Use when the user asks to add, revi
 
 # Skill Creator
 
-Use this skill to create or update skills for Stella agents.
+Skills live in `~/.stella/skills/<name>/` (lowercase, hyphenated, under 64 characters). Stella's shipped defaults come from `packages/home-seed/skills/<name>/` in its source; edit those only when changing what future builds ship.
 
-## Stella Skill Shape
+A skill is a `SKILL.md` whose frontmatter holds exactly `name` and `description`, plus a short body. The description is the only part every agent always sees, so it says in a line or two what the skill does and when to reach for it; the body loads only once it triggers.
 
-All installed skills, whether shipped by Stella or created by the user, live
-under the active Stella home at `~/.stella/skills/<skill-name>/`. The desktop
-package's source copies live at `packages/home-seed/skills/<skill-name>/` and
-are materialized into that same runtime root during bootstrap.
+Write for a capable agent: only what it couldn't reliably infer (team conventions, required checks, current CLI or API facts, gotchas), as principles rather than a script for every edge case, and without examples that a slightly different task would copy wrongly. When a skill grows long, move detail into files linked from `SKILL.md` (`references/`, `scripts/` for deterministic helpers, `templates/`, `assets/`) so the agent reads only the part it needs. No README or changelog unless asked.
 
-Required:
-
-- `SKILL.md` with YAML frontmatter containing only `name` and `description`.
-- A concise Markdown body with the instructions another Stella agent should follow.
-
-Optional:
-
-- `scripts/` for deterministic helpers.
-- `references/` for larger docs the agent should load only when needed.
-- `templates/` for reusable starting points.
-- `assets/` for files used in final outputs.
-- `input.schema.json` or `output.schema.json` when schemas make the skill easier to use correctly.
-
-Do not add auxiliary docs such as `README.md`, `CHANGELOG.md`, or installation guides unless the user explicitly asks for them.
-
-## Principles
-
-- Keep the skill small. Add only procedural knowledge, repo-specific facts, helper commands, or references that a capable agent would not reliably infer.
-- Put trigger conditions in the frontmatter `description`; the body is loaded only after the skill triggers.
-- Prefer one-level references linked directly from `SKILL.md`.
-- Use scripts when repeated code would otherwise be rewritten often or when correctness depends on a fragile sequence.
-- Use product-aligned language. Stella skills are for Stella agents, not generic agent packaging.
-
-## Creating a Skill
-
-1. Clarify the real use cases with concrete examples when the request is vague.
-2. Choose a lowercase hyphenated name under 64 characters.
-3. Create or edit `~/.stella/skills/<name>/SKILL.md`. Only when working in the Stella source repository to change the default shipped in future builds, edit `packages/home-seed/skills/<name>/` instead.
-4. Add only the resource folders that are actually useful.
-5. Validate frontmatter and folder shape.
-
-When initializing from this skill's helper script, target Stella's skill root:
+When updating, read the skill and its files first, keep what is still true, and delete what is stale or duplicated.
 
 ```bash
-python3 ~/.stella/skills/skill-creator/scripts/init_skill.py <skill-name> --path ~/.stella/skills
+python3 ~/.stella/skills/skill-creator/scripts/init_skill.py <name> --path ~/.stella/skills   # scaffold
+python3 ~/.stella/skills/skill-creator/scripts/quick_validate.py ~/.stella/skills/<name>      # check frontmatter and naming
 ```
 
-The upstream helper also creates `agents/openai.yaml`. Stella does not require that file for skill discovery; remove it unless the UI explicitly needs it.
-
-## Updating a Skill
-
-1. Read the existing `SKILL.md` and any referenced resources.
-2. Preserve useful instructions and delete stale or duplicative content.
-3. Keep frontmatter to exactly:
-
-```yaml
----
-name: skill-name
-description: Clear trigger and capability description.
----
-```
-
-4. Keep detailed reference material in `references/` instead of expanding `SKILL.md` indefinitely.
-5. Validate scripts by running representative commands when they are changed.
-
-## Validation
-
-Run the bundled validator for basic frontmatter and naming checks:
-
-```bash
-python3 ~/.stella/skills/skill-creator/scripts/quick_validate.py ~/.stella/skills/<skill-name>
-```
-
-Also verify Stella's current catalog expectations in `runtime/kernel/shared/skill-catalog.ts` if discovery behavior is relevant to the task.
-
-## Bundled References
-
-- `references/openai_yaml.md` documents OpenAI UI metadata. Read it only if the user explicitly needs OpenAI-style skill metadata.
-- `scripts/init_skill.py`, `scripts/quick_validate.py`, and `scripts/generate_openai_yaml.py` are copied from an upstream skill-creator sample and may need Stella-specific cleanup when used for a strict Stella-only skill.
+`init_skill.py` also writes `agents/openai.yaml`, which Stella doesn't use: delete it unless the user wants OpenAI-style metadata (`references/openai_yaml.md`). Discovery rules are in `runtime/kernel/shared/skill-catalog.ts` in Stella's source.

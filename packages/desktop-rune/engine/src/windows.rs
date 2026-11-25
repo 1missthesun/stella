@@ -61,7 +61,11 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         let mut root = col().key("stella-root").w_full().h_full().fill(s.bg.unwrap_or_else(|| bg(eng, node)));
         if let Some(n) = eng.tree.get(node).filter(|_| node != 0) {
             if let Some(h) = n.props.titlebar {
-                cx.titlebar_height(h);
+                let mut t = rune::Titlebar::new(h);
+                if let Some([x, y]) = n.props.traffic_lights {
+                    t = t.traffic_lights(x, y);
+                }
+                cx.set_titlebar(t);
             }
             let p = &*n.props;
             let mut inner = Props { fill: None, bg: None, ..p.clone() };
@@ -76,6 +80,13 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         }
         root
     });
+    let root = match default_band(s, cx) {
+        Some(band) => {
+            let fill = s.bg.unwrap_or_else(|| engine::read(|eng| bg(eng, node)));
+            col().key("stella-frame").w_full().h_full().fill(fill).child(rune::el().key("stella-band").w_full().h(band).window_drag()).child(root.grow(1.0).min_h(0.0))
+        }
+        None => root,
+    };
     note_state(node, dark, maximized, full, accent);
     root.on_window_focus(move |s: &mut Win, focused: bool, _tx: &mut Tx| {
         if s.node != 0 {
@@ -211,6 +222,28 @@ pub fn app_spec(p: &Props) -> AppSpec<Win> {
     spec.poll = Some(poll);
     spec.on_key = Some(on_key);
     spec
+}
+
+/// The band the main window opens with, before the tree says what titlebar it wants: a
+/// titlebar fixed at open can only be changed later, never added.
+const DEFAULT_BAND: f32 = if cfg!(target_os = "macos") { 28.0 } else { 32.0 };
+
+pub fn decorate_main(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
+    let app = decorate(app, p);
+    if p.titlebar.is_none() && !p.frameless && p.kind.as_deref() != Some("overlay") {
+        app.titlebar(rune::Titlebar::new(DEFAULT_BAND))
+    } else {
+        app
+    }
+}
+
+/// The default band's height on a main window whose tree asks for no titlebar: its content
+/// stays below the band and moves the window by it, as under a native title bar.
+fn default_band(s: &Win, cx: &Cx<Win>) -> Option<f32> {
+    if !s.main || engine::read(|e| e.tree.get(s.node).filter(|_| s.node != 0).and_then(|n| n.props.titlebar)).is_some() {
+        return None;
+    }
+    Some(cx.chrome_insets().height).filter(|h| *h > 0.0)
 }
 
 pub fn decorate(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
@@ -564,6 +597,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     crate::control::tick(s, tx);
     #[cfg(feature = "webview")]
     if crate::webview::active() {
+        crate::webview::retry_waiting();
         crate::webview::pump();
         tx.wake_after(Duration::from_millis(8));
     }

@@ -237,6 +237,11 @@ function Docs() {
   const [action, setAction] = useState("");
   return (
     <Section title="Markdown">
+      <row id="g-bubble-row" w="full" justify="end">
+        <col id="g-bubble" maxW="85%" pad={10} radius={14} fill={c.inset}>
+          <text size={13} color={c.text}>A user bubble stops at 85% of its column (maxW="85%"), so a long message wraps well before the far edge at any window width.</text>
+        </col>
+      </row>
       <col id="g-selgroup" gap={4} selectionGroup>
         <text id="g-sel-1" size={13} color={c.weak} selectable>Select across these two paragraphs; selection.get reads the group.</text>
         <text id="g-sel-2" size={13} color={c.weak} selectable>The second paragraph joins the same selection.</text>

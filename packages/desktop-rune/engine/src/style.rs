@@ -15,6 +15,15 @@ pub fn spring(dur: f32, bounce: f32) -> Spring {
 
 const INSTANT: f32 = 0.001;
 
+/// `"N%"` or `"full"` as a fraction of the parent.
+fn frac(s: &Option<Size>) -> Option<f32> {
+    match s {
+        Some(Size::Str(s)) if s == "full" => Some(1.0),
+        Some(Size::Str(s)) if s.ends_with('%') => s.trim_end_matches('%').trim().parse::<f32>().ok().map(|v| v / 100.0),
+        _ => None,
+    }
+}
+
 pub fn layout(mut e: El, p: &Props) -> El {
     match &p.w {
         Some(Size::Pt(v)) => e = e.w(*v),
@@ -30,16 +39,24 @@ pub fn layout(mut e: El, p: &Props) -> El {
         Some(Size::Str(s)) if s.ends_with('%') => e = e.h_frac(s.trim_end_matches('%').parse::<f32>().unwrap_or(100.0) / 100.0),
         _ => {}
     }
-    if let Some(Size::Pt(v)) = p.min_w {
+    if let Some(f) = frac(&p.min_w) {
+        e = e.min_w_frac(f);
+    } else if let Some(Size::Pt(v)) = p.min_w {
         e = e.min_w(v);
     }
-    if let Some(Size::Pt(v)) = p.max_w {
+    if let Some(f) = frac(&p.max_w) {
+        e = e.max_w_frac(f);
+    } else if let Some(Size::Pt(v)) = p.max_w {
         e = e.max_w(v);
     }
-    if let Some(Size::Pt(v)) = p.min_h {
+    if let Some(f) = frac(&p.min_h) {
+        e = e.min_h_frac(f);
+    } else if let Some(Size::Pt(v)) = p.min_h {
         e = e.min_h(v);
     }
-    if let Some(Size::Pt(v)) = p.max_h {
+    if let Some(f) = frac(&p.max_h) {
+        e = e.max_h_frac(f);
+    } else if let Some(Size::Pt(v)) = p.max_h {
         e = e.max_h(v);
     }
     if let Some(v) = p.grow {

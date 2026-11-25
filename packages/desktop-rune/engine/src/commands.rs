@@ -92,10 +92,8 @@ pub fn route(v: Value) {
 }
 
 pub fn quit() {
-    let child = engine::with(|e| e.child.take());
-    if let Some(mut c) = child {
-        let _ = c.kill();
-        let _ = c.wait();
+    if let Some(c) = engine::with(|e| e.child.take()) {
+        crate::end_host(c);
     }
     std::process::exit(0);
 }

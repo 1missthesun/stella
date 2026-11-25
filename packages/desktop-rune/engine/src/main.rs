@@ -91,6 +91,25 @@ pub fn end_host_group() {
     }
 }
 
+/// The host runs main's own quit on SIGTERM (before-quit cleanups, the runtime told to quit);
+/// it is killed only if that outlasts `HOST_QUIT_GRACE`.
+pub fn end_host(mut c: std::process::Child) {
+    const HOST_QUIT_GRACE: std::time::Duration = std::time::Duration::from_secs(8);
+    #[cfg(unix)]
+    {
+        end_host_group();
+        let until = std::time::Instant::now() + HOST_QUIT_GRACE;
+        while std::time::Instant::now() < until {
+            if !matches!(c.try_wait(), Ok(None)) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    let _ = c.kill();
+    let _ = c.wait();
+}
+
 /// A launcher's terminate (SIGTERM), Ctrl+C or a closed terminal ends the host's whole group
 /// with the engine; `on_quit` runs only on a graceful quit.
 #[cfg(unix)]
@@ -177,7 +196,7 @@ fn main() {
     let mut spec = windows::app_spec(&p);
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
-    let app = windows::decorate(app, &p).window_options(windows::options(&p));
+    let app = windows::decorate_main(app, &p).window_options(windows::options(&p));
     let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
@@ -195,12 +214,8 @@ fn main() {
     })
     .on_frame_encoded(|f| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_frame(f))
     .on_quit(|_s: &mut Win, _| {
-        let child = engine::with(|e| e.child.take());
-        if let Some(mut c) = child {
-            #[cfg(unix)]
-            end_host_group();
-            let _ = c.kill();
-            let _ = c.wait();
+        if let Some(c) = engine::with(|e| e.child.take()) {
+            end_host(c);
         }
     })
     .run();

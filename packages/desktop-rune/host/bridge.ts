@@ -334,7 +334,7 @@ export const engine = {
     /** Answers a custom-scheme `request` event. */
     respond: (rid: number, r: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array }) => {
       const b = r.body instanceof Uint8Array ? blob(r.body) : undefined;
-      const p = request("webview.respond", { rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
+      const p = request("webview.respond", { req: rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
       return b ? p.finally(() => freeBlob(b)) : p;
     },
   },

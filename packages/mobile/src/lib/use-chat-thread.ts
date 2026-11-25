@@ -1,9 +1,11 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import { chatHead } from "@stella/contracts/chat-head";
 import {
   chatSendParts,
   normalizePastedText,
   toPastedTextDescriptor,
 } from "@stella/contracts/pasted-text";
+import { serverNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, LayoutAnimation } from "react-native";
 import type { TurnStatusWake } from "./turn-status-wake";
@@ -223,6 +225,7 @@ type QueuedSend = {
   displayText?: string;
   pastedTexts?: string[];
   createdAt?: number;
+  sentAfterSequence?: number;
   promptText?: string;
   selectedText?: string;
   attachments: DesktopChatOutboxAttachment[];
@@ -263,6 +266,9 @@ const queuedSendFromRecord = (
   displayText: record.displayText,
   ...(record.pastedTexts?.length ? { pastedTexts: record.pastedTexts } : {}),
   createdAt: record.createdAt,
+  ...(record.sentAfterSequence !== undefined
+    ? { sentAfterSequence: record.sentAfterSequence }
+    : {}),
   attachments: record.attachments,
   executionTarget: record.executionTarget ?? AUTOMATIC_EXECUTION_TARGET,
   ...(record.execution ? { execution: record.execution } : {}),
@@ -769,7 +775,10 @@ export function useChatThread(opts: {
         text: item.text,
         displayText: item.displayText ?? row?.text ?? item.text,
         ...(item.pastedTexts?.length ? { pastedTexts: item.pastedTexts } : {}),
-        createdAt: item.createdAt ?? row?.createdAt ?? Date.now(),
+        createdAt: item.createdAt ?? row?.createdAt ?? serverNow(),
+        ...(item.sentAfterSequence !== undefined
+          ? { sentAfterSequence: item.sentAfterSequence }
+          : {}),
         attachments: item.attachments,
         ...(item.executionTarget
           ? { executionTarget: item.executionTarget }
@@ -1113,7 +1122,7 @@ export function useChatThread(opts: {
       };
       entry.run = run;
       setWorkingActivity(IDLE_WORKING_ACTIVITY);
-      const dispatchedAt = Date.now();
+      const dispatchedAt = serverNow();
       const bumpCreatedAt = entry.waited === true;
       updateMessages((m) => {
         const next = [
@@ -1361,12 +1370,14 @@ export function useChatThread(opts: {
         ? rawQuotes.slice(0, QUOTED_TEXT_PREVIEW_MAX_CHARS)
         : undefined;
       const thumbs = images.slice(0, 3).map((entry) => entry.uri);
-      const createdAt = Date.now();
+      const createdAt = serverNow();
+      const sentAfterSequence = chatHead(canonicalConversationId);
       const userMsg: ChatMessage = {
         id: userMessageId,
         role: "user",
         text: displayText,
         createdAt,
+        ...(sentAfterSequence !== undefined ? { sentAfterSequence } : {}),
         hasImage: images.length > 0,
         ...(sentPastedTexts.length
           ? { pastedTexts: sentPastedTexts.map(toPastedTextDescriptor) }
@@ -1410,6 +1421,7 @@ export function useChatThread(opts: {
         displayText,
         ...(sentPastedTexts.length ? { pastedTexts: sentPastedTexts } : {}),
         createdAt,
+        ...(sentAfterSequence !== undefined ? { sentAfterSequence } : {}),
         ...(decoupleQuotes && !typedMovedToPaste
           ? { promptText, selectedText: rawQuotes }
           : {}),

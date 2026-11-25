@@ -173,6 +173,7 @@ export type ChatMessage = {
   sourceMessageId?: string;
   sourceTimestamp?: number;
   sequence?: number;
+  sentAfterSequence?: number;
   role: "assistant" | "user";
   text: string;
   artifacts?: ChatArtifact[];

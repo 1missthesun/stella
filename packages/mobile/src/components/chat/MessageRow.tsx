@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { canvasActionDisplay } from "@stella/contracts/canvas-actions";
 import { EMAIL_PAGE_CANVAS } from "@stella/contracts/email-page";
 import {
@@ -1050,7 +1051,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
                     emoji={item.reaction}
                     fresh={
                       item.reactionAt !== undefined &&
-                      Date.now() - item.reactionAt < 10_000
+                      serverNow() - item.reactionAt < 10_000
                     }
                     styles={styles}
                   />

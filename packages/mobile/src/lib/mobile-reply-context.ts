@@ -406,7 +406,7 @@ function buildLifecycle(
       else byTurn.set(record.turnId, [record]);
     }
     return [...byTurn].sort(
-      (a, b) => (index.turn(a[0])?.firstSeq ?? 0) - (index.turn(b[0])?.firstSeq ?? 0),
+      (a, b) => (index.turn(a[0])?.seq ?? 0) - (index.turn(b[0])?.seq ?? 0),
     );
   };
 

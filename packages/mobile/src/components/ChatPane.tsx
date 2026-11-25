@@ -1,3 +1,4 @@
+import { ChatRowAnchors } from "@stella/contracts/chat-placement";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { isAgentScheduleNotice } from "@stella/contracts/schedule-notice-group";
 import { agentIdsOf, type AgentLabelRow } from "@stella/contracts/agent-labels";
@@ -371,6 +372,8 @@ const NO_PASTED_TEXTS: ChatPanePastedTexts = {};
 const NO_REALTIME_VOICE: ChatPaneRealtimeVoice = {};
 
 
+const askRecordAnchors = new ChatRowAnchors();
+
 const askRecordSignature = (record: UserAskRecord): string =>
   record.answers.map((answer) => answer.question).join("\u0000");
 
@@ -386,7 +389,7 @@ const withInlineAskRecords = (
       shown.add(askRecordSignature(record));
     }
   }
-  const out = [...messages];
+  const rows: ChatMessage[] = [];
   for (const record of sessionRecords) {
     if (shown.has(record.toolCallId ?? record.id) || shown.has(askRecordSignature(record))) {
       continue;
@@ -398,15 +401,9 @@ const withInlineAskRecords = (
       createdAt: record.createdAt,
       askRecords: [record],
     };
-    const before = out.findIndex(
-      (message) =>
-        (message.canonicalCreatedAt ?? message.createdAt ?? Number.POSITIVE_INFINITY) >
-        record.createdAt,
-    );
-    if (before < 0) out.push(item);
-    else out.splice(before, 0, item);
+    rows.push(item);
   }
-  return out;
+  return askRecordAnchors.insert(messages, rows, (message) => message.id);
 };
 
 const REPLY_PLACEMENT_PIN_SUPPRESS_MS = 1500;

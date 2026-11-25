@@ -1,9 +1,10 @@
+import { journalTurnSeq } from "@stella/contracts/conversation-journal-projection";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 
 export type JournalTurn = {
   readonly turnId: string;
   readonly records: readonly JournalRecord[];
-  readonly firstSeq: number;
+  readonly seq: number;
   readonly memo: Record<string, unknown>;
 };
 
@@ -43,7 +44,7 @@ const makeTurn = (
     delete prior.memo.prior;
     memo.prior = prior.memo;
   }
-  return { turnId, records, firstSeq: records[0]!.seq, memo };
+  return { turnId, records, seq: journalTurnSeq(records), memo };
 };
 
 const sameRecords = (
@@ -151,6 +152,7 @@ const build = (
     byId.set(turnId, turn);
     turns.push(turn);
   }
+  turns.sort((a, b) => a.seq - b.seq);
   return new Index(records, turns, byId, null);
 };
 
@@ -258,23 +260,26 @@ const derive = (
       }
       continue;
     }
-    const turn = makeTurn(turnId, list, byId.get(turnId));
+    const prior = byId.get(turnId);
+    const turn = makeTurn(turnId, list, prior);
     byId.set(turnId, turn);
     if (reorder || freshSet.has(turnId)) {
       placed.push(turn);
       continue;
     }
-    for (let at = turns.length - 1; at >= 0; at -= 1) {
-      if (turns[at]!.turnId === turnId) {
-        turns[at] = turn;
-        break;
-      }
+    const at = turns.findLastIndex((candidate) => candidate.turnId === turnId);
+    if (at < 0) continue;
+    if (prior?.seq === turn.seq) {
+      turns[at] = turn;
+    } else {
+      turns.splice(at, 1);
+      placed.push(turn);
     }
   }
   if (placed.length) {
-    placed.sort((a, b) => a.firstSeq - b.firstSeq);
+    placed.sort((a, b) => a.seq - b.seq);
     if (reorder) {
-      turns = mergeByFirstSeq(turns, placed);
+      turns = mergeBySeq(turns, placed);
     } else {
       turns.push(...placed);
     }
@@ -282,7 +287,7 @@ const derive = (
   return new Index(records, turns, byId, { index: previous, dropped, prepended });
 };
 
-const mergeByFirstSeq = (
+const mergeBySeq = (
   sorted: readonly JournalTurn[],
   extra: readonly JournalTurn[],
 ): JournalTurn[] => {
@@ -292,7 +297,7 @@ const mergeByFirstSeq = (
   while (i < sorted.length || j < extra.length) {
     if (
       j >= extra.length ||
-      (i < sorted.length && sorted[i]!.firstSeq < extra[j]!.firstSeq)
+      (i < sorted.length && sorted[i]!.seq < extra[j]!.seq)
     ) {
       merged.push(sorted[i++]!);
     } else {

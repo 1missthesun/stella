@@ -481,6 +481,10 @@ function parseRow(row: unknown): ChatMessage | null {
     ...(typeof o.sequence === "number" && Number.isFinite(o.sequence)
       ? { sequence: o.sequence }
       : {}),
+    ...(typeof o.sentAfterSequence === "number" &&
+    Number.isFinite(o.sentAfterSequence)
+      ? { sentAfterSequence: o.sentAfterSequence }
+      : {}),
     role: o.role,
     text: o.text,
     ...(artifacts.length > 0 ? { artifacts } : {}),

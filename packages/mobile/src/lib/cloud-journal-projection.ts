@@ -37,7 +37,7 @@ import {
   journalUserMessage,
   type JournalUserMessage,
 } from "@stella/contracts/journal-user-message";
-import type { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
+import { placeUnrecordedRows, type ChatRowPlace } from "@stella/contracts/chat-placement";
 import { replaceEqualDeep } from "./structural-sharing";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -242,9 +242,7 @@ export const latestDestinationSwitch = (
       const at = results.get(call.id);
       const destination = call.args?.destination?.trim();
       if (at === undefined || !destination) continue;
-      if (!latest || at >= latest.at) {
-        latest = { toolCallId: call.id, destination, at };
-      }
+      latest = { toolCallId: call.id, destination, at };
     }
   }
   return latest;
@@ -333,7 +331,7 @@ const projectTurn = (
 
   for (const record of turn) {
     if (record.kind !== "message") continue;
-    const createdAt = timestampOf(record);
+    const createdAt = timestampOf(record, turnUserRecord);
     if (record.role === "user") {
       turnUserRecord = record;
       userMessageId = projectedMessageId(record);
@@ -585,14 +583,13 @@ const leadingTurnLacksPrompt = (turn: JournalTurn): boolean =>
           record.card.type === EMAIL_CARD_TYPE)),
   );
 
-export const displayedJournalTurns = (
+const cutLeadingTurn = (
   index: JournalIndex,
   hasOlder: boolean,
-): readonly JournalTurn[] => {
-  const first = index.turns[0];
-  return hasOlder && first && leadingTurnLacksPrompt(first)
-    ? index.turns.slice(1)
-    : index.turns;
+): JournalTurn | undefined => {
+  const first = index.records[0];
+  const turn = hasOlder && first ? index.turn(first.turnId) : undefined;
+  return turn && leadingTurnLacksPrompt(turn) ? turn : undefined;
 };
 
 const projectionOf = (
@@ -659,8 +656,10 @@ export const projectCloudConversationMessages = (args: {
     shown,
   );
   const reactions = windowReactions(index);
-  const displayed = displayedJournalTurns(index, args.hasOlder === true);
-  const dropped = displayed === index.turns ? undefined : index.turns[0];
+  const dropped = cutLeadingTurn(index, args.hasOlder === true);
+  const displayed = dropped
+    ? index.turns.filter((turn) => turn !== dropped)
+    : index.turns;
   const turns: ProjectedTurn[] = displayed.map((turn) =>
     projectionOf(turn, index, args.conversationId, reactions));
   const messages = projectMobileLifecycle(turns, index, args.conversationId ?? "", (turnId) => {
@@ -787,15 +786,8 @@ export const mergeCanonicalCloudMessages = (args: {
   local: readonly ChatMessage[];
   dispatchBindings: ReadonlyMap<string, string | null>;
   acknowledgedDispatchIds: ReadonlySet<string>;
-  sentAnchors?: SentMessageAnchors;
 }): ChatMessage[] => {
-  if (
-    args.local.length === 0 &&
-    !args.sentAnchors?.size &&
-    ownersPrecede(args.canonical)
-  ) {
-    return args.canonical as ChatMessage[];
-  }
+  if (args.local.length === 0) return args.canonical as ChatMessage[];
   const canonicalIds = new Set(args.canonical.map((message) => message.id));
   const canonicalAssistantOwners = new Set(
     args.canonical.flatMap((message) =>
@@ -841,75 +833,17 @@ export const mergeCanonicalCloudMessages = (args: {
       ...(!message.quotedText && local.quotedText ? { quotedText: local.quotedText } : {}),
     };
   });
-  const anchors = args.sentAnchors;
-  for (const message of optimistic) {
-    if (message.role === "user") anchors?.note(message.id, message.createdAt);
-  }
-  const anchorOf = (message: ChatMessage) =>
-    message.role === "user" ? anchors?.anchorOf(message.id) : undefined;
-  const timestamp = (message: ChatMessage) =>
-    anchorOf(message) ?? message.createdAt ?? Infinity;
-  const anchoredIds = new Set(
-    canonical.flatMap((message) =>
-      anchorOf(message) === undefined ? [] : [message.id],
-    ),
-  );
-  const fixed = anchoredIds.size
-    ? canonical.filter((message) => !anchoredIds.has(message.id))
-    : canonical;
-  const pending = [
-    ...optimistic,
-    ...canonical.filter((message) => anchoredIds.has(message.id)),
-  ].sort((a, b) => timestamp(a) - timestamp(b));
-  const upcoming = new Set([...canonicalIds, ...pending.map((message) => message.id)]);
-  const merged: ChatMessage[] = [];
-  const placed = new Set<string>();
-  const waiting = new Map<string, ChatMessage[]>();
-  const place = (message: ChatMessage) => {
-    const owner = message.requestId;
-    if (owner && upcoming.has(owner) && !placed.has(owner)) {
-      const queue = waiting.get(owner);
-      if (queue) queue.push(message);
-      else waiting.set(owner, [message]);
-      return;
-    }
-    merged.push(message);
-    placed.add(message.id);
-    const followers = waiting.get(message.id);
-    if (!followers) return;
-    waiting.delete(message.id);
-    for (const follower of followers) place(follower);
-  };
-  let index = 0;
-  for (const message of fixed) {
-    while (index < pending.length) {
-      const next = pending[index]!;
-      if (timestamp(next) > timestamp(message)) break;
-      place(next);
-      index += 1;
-    }
-    place(message);
-  }
-  for (const message of pending.slice(index)) place(message);
-  for (const followers of waiting.values()) {
-    for (const follower of followers) {
-      merged.push(follower);
-      placed.add(follower.id);
-    }
-  }
-  return merged;
+  return placeUnrecordedRows(canonical, optimistic, placeOfMessage);
 };
 
-const ownersPrecede = (messages: readonly ChatMessage[]): boolean => {
-  const positions = new Map<string, number>();
-  messages.forEach((message, at) => positions.set(message.id, at));
-  return messages.every((message, at) => {
-    const owner = message.requestId;
-    if (!owner) return true;
-    const ownerAt = positions.get(owner);
-    return ownerAt === undefined || ownerAt < at;
-  });
-};
+const placeOfMessage = (message: ChatMessage): ChatRowPlace => ({
+  id: message.id,
+  ...(message.requestId ? { ownerId: message.requestId } : {}),
+  ...(message.sequence !== undefined ? { sequence: message.sequence } : {}),
+  ...(message.send === "not_sent" && message.sentAfterSequence !== undefined
+    ? { afterSequence: message.sentAfterSequence }
+    : {}),
+});
 
 export const rebindCanonicalCloudMessages = (
   canonical: readonly ChatMessage[],

@@ -57,6 +57,7 @@ export type DesktopChatOutboxRecord = {
   displayText: string;
   pastedTexts?: string[];
   createdAt: number;
+  sentAfterSequence?: number;
   sequence: number;
   attachments: DesktopChatOutboxAttachment[];
   executionTarget?: AutomaticExecutionTarget;
@@ -270,6 +271,7 @@ export const parseDesktopChatOutbox = (
     const displayText =
       typeof record.displayText === "string" ? record.displayText : text;
     const createdAt = finiteNumber(record.createdAt);
+    const sentAfterSequence = finiteNumber(record.sentAfterSequence);
     const sequence = finiteNumber(record.sequence);
     if (!sendId || !userMessageId || createdAt === null || sequence === null) {
       continue;
@@ -296,6 +298,7 @@ export const parseDesktopChatOutbox = (
       displayText,
       ...(pastedTexts.length ? { pastedTexts } : {}),
       createdAt,
+      ...(sentAfterSequence !== null ? { sentAfterSequence } : {}),
       sequence,
       attachments,
       ...(executionTarget ? { executionTarget } : {}),
@@ -406,6 +409,9 @@ export const restoreOutboxMessages = (
       role: "user",
       text: record.displayText,
       createdAt: record.createdAt,
+      ...(record.sentAfterSequence !== undefined
+        ? { sentAfterSequence: record.sentAfterSequence }
+        : {}),
       ...(record.pastedTexts?.length
         ? { pastedTexts: record.pastedTexts.map(toPastedTextDescriptor) }
         : {}),

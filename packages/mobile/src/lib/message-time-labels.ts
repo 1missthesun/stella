@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import type { ChatMessage } from "../types";
 
 export const TIMESTAMP_GAP_MS = 60 * 60_000;
@@ -19,7 +20,7 @@ const timeOfDay = (ms: number): string =>
 const daysAgo = (ms: number, now: number): number =>
   Math.round((startOfDay(now) - startOfDay(ms)) / DAY_MS);
 
-export function formatTimestampHeader(ms: number, now = Date.now()): string {
+export function formatTimestampHeader(ms: number, now = serverNow()): string {
   const days = daysAgo(ms, now);
   const time = timeOfDay(ms);
   if (days <= 0) return `Today ${time}`;
@@ -65,7 +66,7 @@ const showsContent = (message: ChatMessage): boolean =>
 
 export function readReceipt(
   messages: readonly ChatMessage[],
-  now = Date.now(),
+  now = serverNow(),
 ): { id: string; label: string } | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]!;

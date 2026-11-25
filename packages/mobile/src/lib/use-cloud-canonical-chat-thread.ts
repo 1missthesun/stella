@@ -95,7 +95,7 @@ import { useSafeguardNotice } from "./safeguard-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
 import type { ChatMessage } from "../types";
-import { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
+import { noteChatHead } from "@stella/contracts/chat-head";
 import type { ChatThreadId } from "./offline-chat-storage";
 import type { StoredPhoneAccess } from "./phone-access";
 import { useIsOffline } from "./use-network-status";
@@ -546,6 +546,10 @@ export const useCloudCanonicalChatThread = (
       statusWake,
     ],
   );
+  const newestSeq = state.records.at(-1)?.seq;
+  useEffect(() => {
+    if (newestSeq !== undefined) noteChatHead(authority.conversationId, newestSeq);
+  }, [authority.conversationId, newestSeq]);
   const local = useChatThread({ threadId, transport });
   const clientAuthorityReady = authorityReady && !local.authorityIssue;
 
@@ -679,14 +683,6 @@ export const useCloudCanonicalChatThread = (
     () => rebindCanonicalCloudMessages(displayedProjection, dispatchBindings),
     [dispatchBindings, displayedProjection],
   );
-  const sentAnchorsRef = useRef<{
-    store: ConversationStore;
-    anchors: SentMessageAnchors;
-  }>({ store, anchors: new SentMessageAnchors() });
-  if (sentAnchorsRef.current.store !== store) {
-    sentAnchorsRef.current = { store, anchors: new SentMessageAnchors() };
-  }
-  const sentAnchors = sentAnchorsRef.current.anchors;
   const localMessages = useMemo(() => {
     const removed = safeguardRemovedClientMsgIds(state.records);
     if (removed.size === 0) return local.messages;
@@ -705,14 +701,12 @@ export const useCloudCanonicalChatThread = (
         local: localMessages,
         dispatchBindings,
         acknowledgedDispatchIds,
-        sentAnchors,
       }),
     [
       acknowledgedDispatchIds,
       canonical,
       dispatchBindings,
       localMessages,
-      sentAnchors,
     ],
   );
   const messages = useStableChatMessages(

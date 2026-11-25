@@ -15,6 +15,7 @@ import { TextThumbnail } from "./TextThumbnail";
 import { WebThumbnail, type DocumentCrop } from "./WebThumbnail";
 
 const BARS = 26;
+const FADE_IN = 140;
 
 const SLIDES = new Set(["ppt", "pptx"]);
 const SLIDE_ASPECT = 9 / 16;
@@ -46,6 +47,18 @@ const cropFor = (extension: string): DocumentCrop => {
 
 export type FileThumbnailSize = "tile" | "row";
 
+type Styles = ReturnType<typeof makeStyles>;
+const stylesByTheme = new WeakMap<Colors, { dark?: Styles; light?: Styles }>();
+const themedStyles = (colors: Colors, isDark: boolean): Styles => {
+  let byMode = stylesByTheme.get(colors);
+  if (!byMode) {
+    byMode = {};
+    stylesByTheme.set(colors, byMode);
+  }
+  const mode = isDark ? "dark" : "light";
+  return (byMode[mode] ??= makeStyles(colors, isDark));
+};
+
 export const FileThumbnail = memo(function FileThumbnail({
   source,
   extension,
@@ -61,37 +74,37 @@ export const FileThumbnail = memo(function FileThumbnail({
 }) {
   const colors = useColors();
   const { isDark } = useTheme();
-  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const styles = themedStyles(colors, isDark);
   const row = size === "row";
   const state = useFileThumbnail(source);
   const { kind } = source;
-  const frame = {
-    borderRadius: row ? 10 : 18,
-    height,
-    width,
-  };
+  const frame = useMemo(
+    () => ({ borderRadius: row ? 10 : 18, height, width }),
+    [height, row, width],
+  );
 
   if (kind === "image" || kind === "video") {
-    const uri =
+    const still =
       state.status === "ready" && state.thumbnail.kind === "image"
-        ? state.thumbnail.uri
+        ? state.thumbnail
         : null;
     return (
       <View style={[styles.frame, frame]}>
-        {uri ? (
+        {still ? (
           <Image
-            source={{ uri }}
+            source={{ uri: still.uri }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             contentPosition="top"
-            cachePolicy="memory-disk"
-            recyclingKey={uri}
-            transition={160}
+            cachePolicy={still.uri.startsWith("file:") ? "memory" : "memory-disk"}
+            allowDownscaling={!still.sized}
+            recyclingKey={still.uri}
+            transition={FADE_IN}
           />
         ) : state.status === "none" ? (
           <Extension styles={styles} extension={extension} row={row} />
         ) : null}
-        {kind === "video" && uri ? (
+        {kind === "video" && still ? (
           <View style={[styles.play, row && styles.playSmall]}>
             <Icon name="play" size={row ? 9 : 13} color="#ffffff" />
           </View>
@@ -122,7 +135,12 @@ export const FileThumbnail = memo(function FileThumbnail({
   const thumbnail = state.status === "ready" ? state.thumbnail : null;
   const live =
     !row && (thumbnail?.kind === "html" || thumbnail?.kind === "document");
-  const blank = kind === "none" || state.status === "none" || (row && !live);
+  const still =
+    thumbnail?.kind === "page" || thumbnail?.kind === "pdf" ? thumbnail : null;
+  const blank =
+    kind === "none" ||
+    state.status === "none" ||
+    (row && thumbnail !== null && !still && thumbnail.kind !== "text");
   const slide = SLIDES.has(extension);
   const sheetWidth = slide && !row ? width - inset : pageWidth;
   const slideTop = (height - sheetWidth * SLIDE_ASPECT) / 2;
@@ -132,6 +150,7 @@ export const FileThumbnail = memo(function FileThumbnail({
         style={[
           styles.sheet,
           row ? styles.sheetSmall : null,
+          slide ? styles.sheetWhole : null,
           { left: inset, right: inset, top: row ? 6 : inset },
           slide && {
             bottom: slideTop,
@@ -153,6 +172,18 @@ export const FileThumbnail = memo(function FileThumbnail({
               text={thumbnail.text}
               extension={extension}
               width={pageWidth}
+            />
+          ) : still ? (
+            <Image
+              source={{ uri: still.uri }}
+              style={StyleSheet.absoluteFill}
+              contentFit={still.kind === "pdf" ? "contain" : "cover"}
+              contentPosition="top"
+              cachePolicy="memory"
+              allowDownscaling={still.kind !== "page"}
+              enforceEarlyResizing={still.kind === "pdf"}
+              recyclingKey={still.uri}
+              transition={FADE_IN}
             />
           ) : live && thumbnail.kind === "html" ? (
             <WebThumbnail html={thumbnail.html} />
@@ -176,7 +207,7 @@ function Extension({
   row,
   onPage = false,
 }: {
-  styles: ReturnType<typeof makeStyles>;
+  styles: Styles;
   extension: string;
   row: boolean;
   onPage?: boolean;
@@ -257,6 +288,10 @@ const makeStyles = (colors: Colors, isDark: boolean) =>
       overflow: "hidden",
     },
     sheet: {
+      backgroundColor: "#ffffff",
+      borderCurve: "continuous",
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
       bottom: 0,
       position: "absolute",
       shadowColor: "#000000",
@@ -264,7 +299,13 @@ const makeStyles = (colors: Colors, isDark: boolean) =>
       shadowOpacity: isDark ? 0.4 : 0.1,
       shadowRadius: 10,
     },
-    sheetSmall: { bottom: 6, shadowRadius: 4, shadowOpacity: 0.06 },
+    sheetSmall: {
+      borderRadius: 4,
+      bottom: 6,
+      shadowRadius: 4,
+      shadowOpacity: 0.06,
+    },
+    sheetWhole: { borderRadius: 6 },
     page: {
       backgroundColor: "#ffffff",
       borderCurve: "continuous",

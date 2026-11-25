@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { useTPlural } from "../../i18n";
@@ -33,6 +33,18 @@ const TILE_WIDTH = 152;
 const TILE_HEIGHT = 112;
 const SHEET_WIDTH = 62;
 const SHEET_HEIGHT = 76;
+
+type Styles = ReturnType<typeof makeStyles>;
+const stylesByTheme = new WeakMap<Colors, { dark?: Styles; light?: Styles }>();
+const themedStyles = (colors: Colors, isDark: boolean): Styles => {
+  let byMode = stylesByTheme.get(colors);
+  if (!byMode) {
+    byMode = {};
+    stylesByTheme.set(colors, byMode);
+  }
+  const mode = isDark ? "dark" : "light";
+  return (byMode[mode] ??= makeStyles(colors, isDark));
+};
 
 const FAN = [
   { rotate: "-9deg", left: 16, top: 30 },
@@ -70,7 +82,7 @@ const FolderTile = memo(function FolderTile({
   const colors = useColors();
   const { isDark } = useTheme();
   const tPlural = useTPlural();
-  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const styles = themedStyles(colors, isDark);
   const count = tPlural("shell.appSource.files", folder.count);
   const peeks = folder.peeks.slice(0, FAN.length);
   return (
@@ -129,20 +141,28 @@ function Peek({
 }: {
   peek: FolderPeek;
   front: boolean;
-  styles: ReturnType<typeof makeStyles>;
+  styles: Styles;
 }) {
   const state = useFileThumbnail(peek.source);
   const thumbnail = state.status === "ready" ? state.thumbnail : null;
   return (
     <View style={styles.page}>
-      {thumbnail?.kind === "image" ? (
+      {thumbnail?.kind === "image" ||
+      thumbnail?.kind === "page" ||
+      thumbnail?.kind === "pdf" ? (
         <Image
           source={{ uri: thumbnail.uri }}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="memory-disk"
+          contentFit={thumbnail.kind === "pdf" ? "contain" : "cover"}
+          contentPosition={thumbnail.kind === "image" ? "center" : "top"}
+          cachePolicy={thumbnail.uri.startsWith("file:") ? "memory" : "memory-disk"}
+          allowDownscaling={
+            thumbnail.kind === "pdf" ||
+            (thumbnail.kind === "image" && !thumbnail.sized)
+          }
+          enforceEarlyResizing={thumbnail.kind === "pdf"}
           recyclingKey={thumbnail.uri}
-          transition={160}
+          transition={140}
         />
       ) : thumbnail?.kind === "text" ? (
         <TextThumbnail
@@ -180,6 +200,9 @@ const makeStyles = (colors: Colors, isDark: boolean) =>
       width: TILE_WIDTH,
     },
     sheet: {
+      backgroundColor: isDark ? "#f4f4f5" : "#ffffff",
+      borderCurve: "continuous",
+      borderRadius: 7,
       height: SHEET_HEIGHT,
       position: "absolute",
       shadowColor: "#000000",

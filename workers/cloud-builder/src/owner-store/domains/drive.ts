@@ -11,7 +11,9 @@ import {
 } from "@stella/contracts/backend/drive";
 import {
   isHtmlPagePath,
+  PAGE_PREVIEW_SHAPES,
   PAGE_PREVIEW_SOURCE_MAX_BYTES,
+  type PagePreviewShape,
 } from "@stella/contracts/page-preview";
 import { renderDrivePagePreview } from "../../drive-page-preview.js";
 import { DEVICE_FILE_COPY_LIMITS } from "@stella/contracts/device-files";
@@ -24,7 +26,7 @@ import { copyR2Object, presignR2Url, r2Signer, type R2Signer } from "../../r2-pr
 import { R2_PROXY_MAX_PUT_BYTES } from "../../r2-proxy.js";
 import { sha256Hex } from "../../hash.js";
 import { attachmentImageKey, prepareAttachmentImage } from "../../attachment-images.js";
-import { array, number, object, optional, string } from "../args.js";
+import { array, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -348,8 +350,12 @@ const signerOf = (ctx: Pick<OwnerContext, "env">): R2Signer => {
 export const driveOwnerPrefix = async (ownerId: string): Promise<string> =>
   `drive/${await sha256Hex(ownerId)}/`;
 
-const pagePreviewKey = async (ownerId: string, r2Key: string): Promise<string> =>
-  `${await driveOwnerPrefix(ownerId)}.page-previews/${await sha256Hex(r2Key)}`;
+const pagePreviewKey = async (
+  ownerId: string,
+  r2Key: string,
+  shape: PagePreviewShape,
+): Promise<string> =>
+  `${await driveOwnerPrefix(ownerId)}.page-previews/${await sha256Hex(r2Key)}${shape === "card" ? "" : `-${shape}`}`;
 
 const attachmentDisposition = (name: string): string => {
   const fallback = name.replace(/[^\x20-\x7e]|["\\]/g, "_") || "download";
@@ -742,6 +748,7 @@ const renderPagePreviewOnce = (
   ctx: OwnerContext,
   row: FileRow,
   key: string,
+  shape: PagePreviewShape,
 ): Promise<void> => {
   const pending = pagePreviewsRendering.get(key);
   if (pending) return pending;
@@ -753,7 +760,7 @@ const renderPagePreviewOnce = (
     "Too many page previews at once. Try again in a few minutes.",
   );
   const work = (async () => {
-    const rendered = await renderDrivePagePreview(ctx.env, ctx.ownerId, row.r2_key);
+    const rendered = await renderDrivePagePreview(ctx.env, ctx.ownerId, row.r2_key, shape);
     if (!rendered.ok) {
       throw rendered.reason === "budget"
         ? new RpcError("FORBIDDEN", rendered.message, { reason: "budget" })
@@ -769,8 +776,9 @@ const renderPagePreviewOnce = (
 
 const pagePreview = async (
   ctx: OwnerContext,
-  args: { path: string },
+  args: { path: string; shape?: PagePreviewShape },
 ): Promise<DrivePagePreview> => {
+  const shape = args.shape ?? "card";
   const path = normalizeDrivePath(args.path);
   if (!isHtmlPagePath(path)) throw invalid("Only web pages have a page preview.");
   const row = getFile(ctx.db, spaceOf(ctx), path);
@@ -778,8 +786,8 @@ const pagePreview = async (
   if (row.size_bytes > PAGE_PREVIEW_SOURCE_MAX_BYTES) {
     throw invalid("This page is too large to preview.");
   }
-  const key = await pagePreviewKey(ctx.ownerId, row.r2_key);
-  if (!(await bucketOf(ctx).head(key))) await renderPagePreviewOnce(ctx, row, key);
+  const key = await pagePreviewKey(ctx.ownerId, row.r2_key, shape);
+  if (!(await bucketOf(ctx).head(key))) await renderPagePreviewOnce(ctx, row, key, shape);
   const now = Date.now();
   return {
     path,
@@ -1796,7 +1804,7 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
       const prepared = await Promise.all(
         keys.flatMap((key) => [
           attachmentImageKey(ctx.ownerId, key),
-          pagePreviewKey(ctx.ownerId, key),
+          ...PAGE_PREVIEW_SHAPES.map((shape) => pagePreviewKey(ctx.ownerId, key, shape)),
         ]),
       );
       const doomedKeys = [...keys, ...prepared];
@@ -1888,7 +1896,7 @@ export const driveDomain = {
     },
     "drive.pagePreview": {
       scope: "owner",
-      parse: object({ path: pathArg }),
+      parse: object({ path: pathArg, shape: optional(literal(...PAGE_PREVIEW_SHAPES)) }),
       handler: pagePreview,
     },
     "drive.list": {

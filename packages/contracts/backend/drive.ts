@@ -1,3 +1,5 @@
+import type { PagePreviewShape } from "../page-preview.js";
+
 export type DriveFile = {
   path: string;
   name: string;
@@ -69,7 +71,7 @@ export type DriveCalls = {
     result: DriveFileUrl;
   };
   "drive.pagePreview": {
-    args: { path: string };
+    args: { path: string; shape?: PagePreviewShape };
     result: DrivePagePreview;
   };
   "drive.delete": {

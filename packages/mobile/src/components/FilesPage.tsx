@@ -55,6 +55,7 @@ import {
   type FileThumbnailKind,
   type FileThumbnailSource,
 } from "../lib/file-thumbnails";
+import { noteFilesScrolling } from "../lib/files-scroll-activity";
 import { useFilesViewMode } from "../lib/files-view-mode";
 import { useConversationFiles } from "../lib/use-conversation-files";
 import type { Colors } from "../theme/colors";
@@ -78,6 +79,12 @@ const EMPTY_ARTIFACTS: ChatArtifact[] = [];
 const DRIVE_VIEW_ARGS = { limit: 200 };
 const EMPTY_PAIRED: StoredPhoneAccess[] = [];
 const SEARCH_HEIGHT = 48;
+const DRAW_DISTANCE = 600;
+
+type DriveFilesValue = NonNullable<
+  ReturnType<typeof useBackendView<"drive.files">>["value"]
+>;
+const lastDriveFiles = new Map<string, DriveFilesValue>();
 
 type SortOrder = "newest" | "oldest" | "name";
 type SourceFilter = "all" | "cloud" | "upload" | `computer:${string}`;
@@ -134,8 +141,8 @@ type FileRow = ConversationFile & {
 type ListItem =
   | { kind: "section"; key: string; label: string; first: boolean }
   | { kind: "folders"; key: string; folders: FolderEntry[] }
-  | { kind: "tiles"; key: string; rows: FileRow[] }
-  | { kind: "row"; key: string; row: FileRow };
+  | { kind: "tiles"; key: string; rows: FileRow[]; details: string[] }
+  | { kind: "row"; key: string; row: FileRow; detail: string };
 
 const TILE_MIN = 150;
 const TILE_MAX_COLUMNS = 5;
@@ -293,12 +300,13 @@ const titledArtifact = (artifact: ChatArtifact, title: string): ChatArtifact => 
 export function FilesPage() {
   const colors = useColors();
   const t = useT();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = pageStyles(colors);
   const bottomInset = useTabBottomInset();
   const hub = useActivityHub();
   const computer = useComputerControl();
   const session = authClient.useSession();
   const signedIn = Boolean(session.data?.user);
+  const owner = session.data?.user?.id ?? null;
   const hubArtifacts = hub?.artifacts ?? EMPTY_ARTIFACTS;
   const preferredAccess = hub?.access ?? null;
   const pairedDesktops = computer?.pairedDesktops ?? EMPTY_PAIRED;
@@ -306,10 +314,17 @@ export function FilesPage() {
     signedIn ? (hub?.conversationId ?? null) : null,
     hub?.revision ?? null,
   );
-  const driveFiles = useBackendView(
+  const liveDriveFiles = useBackendView(
     "drive.files",
     signedIn ? DRIVE_VIEW_ARGS : "skip",
   ).value;
+  useEffect(() => {
+    if (!liveDriveFiles || !owner) return;
+    lastDriveFiles.clear();
+    lastDriveFiles.set(owner, liveDriveFiles);
+  }, [liveDriveFiles, owner]);
+  const driveFiles =
+    liveDriveFiles ?? (owner ? lastDriveFiles.get(owner) : undefined);
   const driveRows = useMemo(
     () =>
       driveFiles
@@ -514,7 +529,6 @@ export function FilesPage() {
   const tileWidth = Math.floor(
     (contentWidth - TILE_GAP * (columns - 1)) / columns,
   );
-  const now = Date.now();
   const items = useMemo<ListItem[]>(() => {
     const at = Date.now();
     const out: ListItem[] = [];
@@ -523,12 +537,34 @@ export function FilesPage() {
     }
     const add = (group: FileRow[]) => {
       if (mode === "list") {
-        for (const row of group) out.push({ kind: "row", key: row.key, row });
+        for (const row of group) {
+          out.push({
+            kind: "row",
+            key: row.key,
+            row,
+            detail: [
+              row.extension.toUpperCase(),
+              folder ? null : row.inFolder,
+              fileTime(row.createdAt, at),
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          });
+        }
         return;
       }
       for (let index = 0; index < group.length; index += columns) {
         const cells = group.slice(index, index + columns);
-        out.push({ kind: "tiles", key: `tiles:${cells[0]!.key}`, rows: cells });
+        out.push({
+          kind: "tiles",
+          key: `tiles:${cells[0]!.key}`,
+          rows: cells,
+          details: cells.map((row) =>
+            [row.extension.toUpperCase(), fileTime(row.createdAt, at)]
+              .filter(Boolean)
+              .join(" · "),
+          ),
+        });
       }
     };
     if (sortOrder === "name") {
@@ -583,6 +619,8 @@ export function FilesPage() {
     (artifact: ChatArtifact) => deviceById.get(artifact.id) ?? null,
     [deviceById],
   );
+
+  useEffect(() => () => noteFilesScrolling(false), []);
 
   const openArtifact = useCallback((artifact: ChatArtifact) => {
     tapLight();
@@ -692,56 +730,50 @@ export function FilesPage() {
     }, [hasAnything]),
   );
 
-  const renderItem = ({ item }: LegendListRenderItemProps<ListItem>) => {
-    switch (item.kind) {
-      case "section":
-        return (
-          <Text
-            style={[airy.section, styles.section, item.first && airy.sectionFirst]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            accessibilityRole="header"
-          >
-            {item.label}
-          </Text>
-        );
-      case "folders":
-        return <FolderShelf folders={item.folders} onOpen={openFolder} />;
-      case "tiles":
-        return (
-          <View style={styles.tiles}>
-            {item.rows.map((row) => (
-              <FileTile
-                key={row.key}
-                row={row}
-                source={thumbnailSourceOf(row)}
-                width={tileWidth}
-                detail={[row.extension.toUpperCase(), fileTime(row.createdAt, now)]
-                  .filter(Boolean)
-                  .join(" · ")}
-                onOpen={openArtifact}
-              />
-            ))}
-          </View>
-        );
-      case "row":
-        return (
-          <FileListRow
-            key={item.row.key}
-            row={item.row}
-            source={thumbnailSourceOf(item.row)}
-            detail={[
-              item.row.extension.toUpperCase(),
-              folder ? null : item.row.inFolder,
-              fileTime(item.row.createdAt, now),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-            onOpen={openArtifact}
-          />
-        );
-    }
-  };
+  const renderItem = useCallback(
+    ({ item }: LegendListRenderItemProps<ListItem>) => {
+      switch (item.kind) {
+        case "section":
+          return (
+            <Text
+              style={[airy.section, styles.section, item.first && airy.sectionFirst]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              accessibilityRole="header"
+            >
+              {item.label}
+            </Text>
+          );
+        case "folders":
+          return <FolderShelf folders={item.folders} onOpen={openFolder} />;
+        case "tiles":
+          return (
+            <View style={styles.tiles}>
+              {item.rows.map((row, column) => (
+                <FileTile
+                  key={column}
+                  row={row}
+                  source={thumbnailSourceOf(row)}
+                  width={tileWidth}
+                  detail={item.details[column] ?? ""}
+                  onOpen={openArtifact}
+                />
+              ))}
+            </View>
+          );
+        case "row":
+          return (
+            <FileListRow
+              row={item.row}
+              source={thumbnailSourceOf(item.row)}
+              detail={item.detail}
+              onOpen={openArtifact}
+            />
+          );
+      }
+    },
+    [airy, openArtifact, openFolder, styles, thumbnailSourceOf, tileWidth],
+  );
 
   const typeOptions = useMemo<FileTypeOption<TypeFilter>[]>(
     () => [
@@ -795,7 +827,6 @@ export function FilesPage() {
         keyExtractor={(item) => item.key}
         getItemType={(item) => item.kind}
         renderItem={renderItem}
-        extraData={tileWidth}
         onEndReached={journal.hasMore ? journal.loadMore : undefined}
         onEndReachedThreshold={0.6}
         ListHeaderComponent={
@@ -827,8 +858,13 @@ export function FilesPage() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        estimatedItemSize={mode === "grid" ? tileWidth + 66 : 78}
+        estimatedItemSize={mode === "grid" ? Math.round(tileWidth * 1.06) + 71 : 78}
+        drawDistance={DRAW_DISTANCE}
         recycleItems
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollBegin={onScrollBeginDrag}
+        onMomentumScrollEnd={onScrollEndDrag}
       />
 
       <KeyboardStickyView
@@ -913,6 +949,9 @@ type FileCellProps = {
   onOpen: (artifact: ChatArtifact) => void;
 };
 
+const onScrollBeginDrag = () => noteFilesScrolling(true);
+const onScrollEndDrag = () => noteFilesScrolling(false);
+
 const FileTile = memo(function FileTile({
   row,
   source,
@@ -920,8 +959,7 @@ const FileTile = memo(function FileTile({
   detail,
   onOpen,
 }: FileCellProps & { width: number }) {
-  const colors = useColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = pageStyles(useColors());
   return (
     <Pressable
       accessibilityRole="button"
@@ -995,6 +1033,16 @@ const FileListRow = memo(function FileListRow({
     </Pressable>
   );
 });
+
+const stylesByColors = new WeakMap<Colors, ReturnType<typeof makeStyles>>();
+const pageStyles = (colors: Colors) => {
+  let styles = stylesByColors.get(colors);
+  if (!styles) {
+    styles = makeStyles(colors);
+    stylesByColors.set(colors, styles);
+  }
+  return styles;
+};
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({

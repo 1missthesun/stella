@@ -1,11 +1,11 @@
 import { canvasPolicyDirectives } from "@stella/contracts/canvas-host";
 import {
   PAGE_PREVIEW_CONTENT_TYPE,
-  PAGE_PREVIEW_IMAGE,
   PAGE_PREVIEW_JPEG_QUALITY,
+  PAGE_PREVIEW_LAYOUTS,
   PAGE_PREVIEW_MAX_BYTES,
   PAGE_PREVIEW_SOURCE_MAX_BYTES,
-  PAGE_PREVIEW_VIEWPORT,
+  type PagePreviewShape,
 } from "@stella/contracts/page-preview";
 import { meteredCapture } from "./browser-billing.js";
 import { builderServiceSecret, builderServiceSecrets } from "./secret-rotation.js";
@@ -145,11 +145,12 @@ const shotBytes = async (response: Response): Promise<Uint8Array | null> => {
 const fitShot = async (
   env: PagePreviewEnv,
   png: Uint8Array,
+  image: { width: number; height: number },
 ): Promise<{ bytes: Uint8Array; contentType: string }> => {
   if (!env.IMAGES) return { bytes: png, contentType: "image/png" };
   try {
     const result = await env.IMAGES.input(new Response(png).body as ReadableStream<Uint8Array>)
-      .transform({ width: PAGE_PREVIEW_IMAGE.width, height: PAGE_PREVIEW_IMAGE.height, fit: "cover" })
+      .transform({ width: image.width, height: image.height, fit: "cover" })
       .output({ format: PAGE_PREVIEW_CONTENT_TYPE, quality: PAGE_PREVIEW_JPEG_QUALITY });
     const bytes = new Uint8Array(await result.response().arrayBuffer());
     if (bytes.byteLength > 0) return { bytes, contentType: PAGE_PREVIEW_CONTENT_TYPE };
@@ -161,7 +162,9 @@ export const renderDrivePagePreview = async (
   env: PagePreviewEnv,
   ownerId: string,
   r2Key: string,
+  shape: PagePreviewShape,
 ): Promise<RenderedPagePreview> => {
+  const layout = PAGE_PREVIEW_LAYOUTS[shape];
   const gateway = env.BROWSER_GATEWAY;
   const unavailable = {
     ok: false as const,
@@ -178,7 +181,7 @@ export const renderDrivePagePreview = async (
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           url,
-          views: [{ name: "preview", ...PAGE_PREVIEW_VIEWPORT, scale: 1 }],
+          views: [{ name: "preview", ...layout.viewport, scale: layout.scale }],
         }),
         signal: AbortSignal.timeout(CAPTURE_TIMEOUT_MS),
       }),
@@ -189,7 +192,7 @@ export const renderDrivePagePreview = async (
   if (!metered.ok) return { ok: false, reason: "budget", message: metered.message };
   const png = await shotBytes(metered.response);
   if (!png) return unavailable;
-  const fitted = await fitShot(env, png);
+  const fitted = await fitShot(env, png, layout.image);
   const limit = PAGE_PREVIEW_MAX_BYTES * (fitted.contentType === "image/png" ? 4 : 1);
   if (fitted.bytes.byteLength > limit) return unavailable;
   return { ok: true, ...fitted };

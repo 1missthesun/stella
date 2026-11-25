@@ -139,6 +139,8 @@ async function start() {
 
   const env: Record<string, string> = {};
   for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR"]) if (process.env[key]) env[key] = process.env[key]!;
+  env.MIMALLOC_PURGE_DELAY = "0";
+  for (const [key, value] of Object.entries(process.env)) if (key.startsWith("MIMALLOC_") && value) env[key] = value;
   const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();
   if (launcherChannel) env.STELLA_LAUNCHER = "1";
   env.PATH = (env.PATH ?? "").split(path.delimiter).filter((p) => path.basename(p) !== "shell-shims").join(path.delimiter);

@@ -3177,6 +3177,7 @@ public:
             env[L"STELLA_RUNE_SERVICES"] = L"1";
             env[L"STELLA_RUNE_ROOT"] = app + L"\\packages\\desktop-rune";
             env.erase(L"BUN_RUNTIME_TRANSPILER_CACHE_PATH");
+            env[L"MIMALLOC_PURGE_DELAY"] = L"0";
             if (!gBunBin.empty()) env[L"STELLA_RUNE_BUN"] = gBunBin;
         }
         bool ok = createProcess(exe, engine_ ? commandLine({exe}) : commandLine({exe, app}), app, env, nul, outWrite, outWrite,

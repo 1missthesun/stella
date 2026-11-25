@@ -207,14 +207,16 @@ async function stop() {
     await fetch(`http://127.0.0.1:${run.ctlPort}/eval`, { method: "POST", body: "setTimeout(() => electron.app.quit(), 10); return true;" }).catch(() => {});
     for (let i = 0; i < 80 && alive(app); i++) await Bun.sleep(100);
   }
+  const marker: Record<string, string | undefined> = { host: "host/services/headless.ts", engine: ENGINE, xvfb: run.display };
+  const ours = (name: string, pid: number) => alive(pid) && !!marker[name] && cmdline(pid).join(" ").includes(marker[name]!);
   const signal = (sig: NodeJS.Signals) => {
     for (const name of ["host", "engine", "xvfb"]) {
       const pid = run.pids[name];
-      if (!pid || !alive(pid)) continue;
+      if (!pid || !ours(name, pid)) continue;
       try { process.kill(-pid, sig); } catch { try { process.kill(pid, sig); } catch {} }
     }
   };
-  const pids = Object.values(run.pids);
+  const pids = Object.entries(run.pids).filter(([name, pid]) => ours(name, pid)).map(([, pid]) => pid);
   signal("SIGTERM");
   for (let i = 0; i < 50 && pids.some(alive); i++) await Bun.sleep(100);
   if (pids.some(alive)) signal("SIGKILL");

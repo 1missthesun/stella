@@ -829,8 +829,11 @@ export function EmailPage() {
   const t = useT();
   const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
   const bottomInset = useTabBottomInset();
-  const signedIn = Boolean(authClient.useSession().data?.user);
-  const feed = useBackendView("email.page", signedIn ? {} : "skip");
+  const owner = authClient.useSession().data?.user.id;
+  const signedIn = Boolean(owner);
+  const feed = useBackendView("email.page", owner ? {} : "skip", {
+    rememberFor: owner,
+  });
   const value = feed.value;
   const [waiting, setWaiting] = useState(false);
 

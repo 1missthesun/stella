@@ -36,9 +36,11 @@ const subscribeSeen = (listener: () => void) => {
 };
 
 export function useEmailPageView() {
-  const signedIn = Boolean(authClient.useSession().data?.user);
+  const owner = authClient.useSession().data?.user.id;
   const on = useEmailFeature();
-  return useBackendView("email.page", signedIn && on ? {} : "skip");
+  return useBackendView("email.page", owner && on ? {} : "skip", {
+    rememberFor: owner,
+  });
 }
 
 export function useEmailUnseenCount(): number {

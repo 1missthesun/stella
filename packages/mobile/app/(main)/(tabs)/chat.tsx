@@ -6,77 +6,77 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Text } from "../../src/components/Text";
+import { Text } from "../../../src/components/Text";
 import { useIsFocused } from "expo-router";
-import { authClient } from "../../src/lib/auth-client";
+import { authClient } from "../../../src/lib/auth-client";
 import {
   followDesktopDeviceIdSuccession,
   getPreferredPhoneAccess,
   listStoredPairedPhoneAccess,
   setPreferredDesktopDeviceId,
   type StoredPhoneAccess,
-} from "../../src/lib/phone-access";
+} from "../../../src/lib/phone-access";
 import {
   CLOUD_EXECUTION_TARGET,
   getMobileExecutionTarget,
   getMobileExecutionTargetSetAt,
   setMobileExecutionTarget,
-} from "../../src/lib/execution-target";
+} from "../../../src/lib/execution-target";
 import {
   listExecutionDevices,
   type AutomaticExecutionTarget,
-} from "../../src/lib/execution-placement";
-import { updateStellaWidget } from "../../src/lib/home-widget";
-import { notifySuccess } from "../../src/lib/haptics";
+} from "../../../src/lib/execution-placement";
+import { updateStellaWidget } from "../../../src/lib/home-widget";
+import { notifySuccess } from "../../../src/lib/haptics";
 import {
   consumePendingShare,
   subscribePendingShare,
-} from "../../src/lib/pending-share";
+} from "../../../src/lib/pending-share";
 import {
   clearPendingComposerDraft,
   peekPendingComposerDraft,
-} from "../../src/lib/onboarding-handoff";
-import { hasAiConsent } from "../../src/lib/ai-consent";
-import { type ChatThread } from "../../src/lib/use-chat-thread";
+} from "../../../src/lib/onboarding-handoff";
+import { hasAiConsent } from "../../../src/lib/ai-consent";
+import { type ChatThread } from "../../../src/lib/use-chat-thread";
 import {
   useCloudCanonicalChatThread,
   useCloudConversationAuthority,
-} from "../../src/lib/use-cloud-canonical-chat-thread";
+} from "../../../src/lib/use-cloud-canonical-chat-thread";
 import {
   setComposerModelPinned,
   useComposerModelPinned,
-} from "../../src/lib/composer-model-pin";
-import { useCloudModelSettings } from "../../src/lib/use-cloud-model-settings";
-import { usesCloudModelSettings } from "../../src/lib/cloud-model-selection";
-import { resolveRealtimeVoiceRoute } from "../../src/lib/realtime-voice-routing";
+} from "../../../src/lib/composer-model-pin";
+import { useCloudModelSettings } from "../../../src/lib/use-cloud-model-settings";
+import { usesCloudModelSettings } from "../../../src/lib/cloud-model-selection";
+import { resolveRealtimeVoiceRoute } from "../../../src/lib/realtime-voice-routing";
 import {
   REASONING_OPTIONS,
   type ReasoningEffort,
-} from "../../src/lib/stella-model-catalog";
-import { useIsOffline } from "../../src/lib/use-network-status";
+} from "../../../src/lib/stella-model-catalog";
+import { useIsOffline } from "../../../src/lib/use-network-status";
 import {
   publishActivityHub,
   publishComputerControl,
-} from "../../src/lib/main-shell-store";
-import { useColors } from "../../src/theme/theme-context";
-import { fonts } from "../../src/theme/fonts";
-import { ChatPane } from "../../src/components/ChatPane";
+} from "../../../src/lib/main-shell-store";
+import { useColors } from "../../../src/theme/theme-context";
+import { fonts } from "../../../src/theme/fonts";
+import { ChatPane } from "../../../src/components/ChatPane";
 import {
   mainContentStyles,
   useShellTopInset,
-} from "../../src/components/MainScreenSurface";
-import { ArtifactViewer } from "../../src/components/ArtifactViewer";
-import { useChatSendQueue } from "../../src/lib/chat-send-queue";
-import { CloudBrowserInterventionCard } from "../../src/components/CloudBrowserInterventionCard";
-import { CloudConnectorConnectCard } from "../../src/components/CloudConnectorConnectCard";
-import { SavedLoginsChatCards } from "../../src/components/SavedLoginsCards";
-import { UserAskCard } from "../../src/components/UserAskCard";
-import { ChatIssueNotice } from "../../src/components/ChatIssueNotice";
-import { ComposerNotice } from "../../src/components/ComposerNotice";
-import { CloudBoundary } from "../../src/components/CloudBoundary";
-import type { ChatArtifact } from "../../src/types";
-import { useT } from "../../src/i18n";
-import { useConnectPlanResend } from "../../src/lib/connect-plan";
+} from "../../../src/components/MainScreenSurface";
+import { ArtifactViewer } from "../../../src/components/ArtifactViewer";
+import { useChatSendQueue } from "../../../src/lib/chat-send-queue";
+import { CloudBrowserInterventionCard } from "../../../src/components/CloudBrowserInterventionCard";
+import { CloudConnectorConnectCard } from "../../../src/components/CloudConnectorConnectCard";
+import { SavedLoginsChatCards } from "../../../src/components/SavedLoginsCards";
+import { UserAskCard } from "../../../src/components/UserAskCard";
+import { ChatIssueNotice } from "../../../src/components/ChatIssueNotice";
+import { ComposerNotice } from "../../../src/components/ComposerNotice";
+import { CloudBoundary } from "../../../src/components/CloudBoundary";
+import type { ChatArtifact } from "../../../src/types";
+import { useT } from "../../../src/i18n";
+import { useConnectPlanResend } from "../../../src/lib/connect-plan";
 
 const STATUS_POLL_MS = 20_000;
 const HANDOFF_SEND_RETRY_MS = 400;

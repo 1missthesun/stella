@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import type {
   ViewArgs,
@@ -59,27 +60,109 @@ export function readBackendView<K extends ViewName>(
   return getBackendClient().read(view, args, { timeoutMs: REQUEST_BUDGET_MS.call });
 }
 
+const rememberedViews = new Map<string, unknown>();
+const persistedViewText = new Map<string, string>();
+const VIEW_STORAGE_PREFIX = "stella-mobile:view:v2:";
+
+function rememberView(memoryKey: string, value: unknown, persist: boolean): void {
+  rememberedViews.set(memoryKey, value);
+  if (!persist) return;
+  const text = JSON.stringify(value);
+  if (persistedViewText.get(memoryKey) === text) return;
+  persistedViewText.set(memoryKey, text);
+  void AsyncStorage.setItem(VIEW_STORAGE_PREFIX + memoryKey, text).catch(() => {
+    persistedViewText.delete(memoryKey);
+  });
+}
+
+const rememberedScope = (owner: string) =>
+  `${encodeURIComponent(env.backendUrl)}:${encodeURIComponent(owner)}:`;
+
+const warmedOwners = new Set<string>();
+
+export async function warmRememberedViews(owner: string): Promise<void> {
+  if (warmedOwners.has(owner)) return;
+  warmedOwners.add(owner);
+  const prefix = VIEW_STORAGE_PREFIX + rememberedScope(owner);
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) =>
+      key.startsWith(prefix),
+    );
+    for (const [storageKey, text] of await AsyncStorage.multiGet(keys)) {
+      const memoryKey = storageKey.slice(VIEW_STORAGE_PREFIX.length);
+      if (text === null || rememberedViews.has(memoryKey)) continue;
+      rememberedViews.set(memoryKey, JSON.parse(text));
+      persistedViewText.set(memoryKey, text);
+    }
+  } catch {
+    warmedOwners.delete(owner);
+  }
+}
+
+type ViewState<K extends ViewName> = {
+  key: string | null;
+  hasValue: boolean;
+  value?: ViewResult<K>;
+  error?: BackendRequestError;
+};
+
+/**
+ * `rememberFor` (the signed-in owner id) keeps the view's last value for the
+ * session, and `persist` also across launches (loaded by
+ * `warmRememberedViews`), so a screen that mounts again shows it at once while
+ * the live subscription refreshes it.
+ */
 export function useBackendView<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",
+  options: { rememberFor?: string | null; persist?: boolean } = {},
 ): { value: ViewResult<K> | undefined; error: BackendRequestError | undefined } {
   const argsJson = args === "skip" ? null : stableStringify(args);
   const key = argsJson === null ? null : `${view}\u0000${argsJson}`;
-  const [state, setState] = useState<{
-    key: string | null;
-    value?: ViewResult<K>;
-    error?: BackendRequestError;
-  }>({ key: null });
+  const memoryKey =
+    argsJson !== null && options.rememberFor
+      ? `${rememberedScope(options.rememberFor)}${view}:${encodeURIComponent(argsJson)}`
+      : null;
+  const identity = memoryKey ?? key;
+  const persist = options.persist === true;
+  const [state, setState] = useState<ViewState<K>>(() =>
+    initialViewState<K>(identity, memoryKey),
+  );
   useEffect(() => {
-    setState({ key });
+    setState((previous) =>
+      previous.key === identity
+        ? previous
+        : initialViewState<K>(identity, memoryKey),
+    );
     if (key === null || argsJson === null) return;
     return getBackendClient().watch(
       view,
       JSON.parse(argsJson) as ViewArgs<K>,
-      (value) => setState({ key, value }),
-      (error) => setState((previous) => ({ ...previous, key, error })),
+      (value) => {
+        if (memoryKey) rememberView(memoryKey, value, persist);
+        setState({ key: identity, hasValue: true, value });
+      },
+      (error) =>
+        setState((previous) => ({ ...previous, key: identity, error })),
     );
-  }, [key, view, argsJson]);
-  const current = state.key === key ? state : { key };
+  }, [identity, key, view, argsJson, memoryKey, persist]);
+  const current =
+    state.key === identity
+      ? state
+      : initialViewState<K>(identity, memoryKey);
   return { value: current.value, error: current.error };
+}
+
+function initialViewState<K extends ViewName>(
+  key: string | null,
+  memoryKey: string | null,
+): ViewState<K> {
+  if (memoryKey && rememberedViews.has(memoryKey)) {
+    return {
+      key,
+      hasValue: true,
+      value: rememberedViews.get(memoryKey) as ViewResult<K>,
+    };
+  }
+  return { key, hasValue: false };
 }

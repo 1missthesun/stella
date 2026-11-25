@@ -1,7 +1,7 @@
 import { Redirect } from "expo-router";
-import { EmailPage } from "../../src/components/EmailPage";
-import { MainDetailSurface } from "../../src/components/MainScreenSurface";
-import { useEmailFeatureState } from "../../src/lib/email-feature";
+import { EmailPage } from "../../../../src/components/EmailPage";
+import { MainDetailSurface } from "../../../../src/components/MainScreenSurface";
+import { useEmailFeatureState } from "../../../../src/lib/email-feature";
 
 export default function EmailScreen() {
   const { on, known } = useEmailFeatureState();

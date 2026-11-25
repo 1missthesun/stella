@@ -9,6 +9,8 @@ import {
 import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { buildPayloadFromBarePath } from "@/features/chat/lib/derive-turn-resource";
+import { displayPayloadForStellaFile } from "@/features/chat/lib/stella-file-links";
+import { isHtmlPagePath } from "@stella/contracts/page-preview";
 import { WaveformTile } from "./WaveformTile";
 import { contextMenu, fileMenu } from "@/platform/context-menu";
 import { translateNow } from "@/shared/i18n";
@@ -34,7 +36,9 @@ export const openEvidenceSource = (filePath: string) => {
     openDisplayPayloadTab({ ...entry.payload, cloudDrivePath: drivePath });
     return;
   }
-  const payload = buildPayloadFromBarePath(filePath, Date.now());
+  const payload = isHtmlPagePath(filePath)
+    ? displayPayloadForStellaFile(filePath, Date.now())
+    : buildPayloadFromBarePath(filePath, Date.now());
   if (payload) openDisplayPayloadTab(payload);
 };
 

@@ -171,6 +171,7 @@ export const MessageAttachments = ({
     for (const card of expandStacks(cards)) {
       if (isEvidenceMediaKind(card.kind) && card.kind !== "audio") media.push(card);
       else if (card.kind === "audio" && card.peaks) media.push(card);
+      else if (card.kind === "page" && card.thumbnail) media.push(card);
       else documents.push(card);
     }
     media.push(...driveCards);

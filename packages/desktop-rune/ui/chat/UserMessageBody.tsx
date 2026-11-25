@@ -30,10 +30,10 @@ export function UserMessageBody({ text }: { text: string }) {
   const look = { ...CHAT_TEXT_LOOK, color: tokens.c.chatUserBubbleText, features: BUBBLE_FEATURES };
   return (
     <col w="full" minW={0}>
-      <box w="full" minW={0}>
+      <col w="full" minW={0} align="stretch">
         <text {...look} spans={runs} selectable maxLines={expanded ? undefined : CLAMP_LINES} truncate={expanded ? undefined : "end"} onLayout={(r) => setClampedH(r.h)} />
         {expanded ? null : <text {...look} spans={runs} absolute={{ left: 0, top: 0, right: -1 }} hidden inert onLayout={(r) => setFullH(r.h)} />}
-      </box>
+      </col>
       {showToggle ? (
         <box selfAlign="end" mt={6} py={2} radius={radius.sm} hoverFill={c.toggleHover} hoverGroup role="button" focusable label={expanded ? t("app.chat.userMessage.showLess") : t("app.chat.userMessage.showMore")} expanded={expanded} onPress={() => setExpanded((v) => !v)}>
           <text size={fontSize.sm} weight={500} lineHeight={fontSize.sm} color={c.toggle} hoverColor={tokens.c.chatUserBubbleText}>

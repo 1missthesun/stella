@@ -1152,7 +1152,6 @@
       }
     },
     "apps": {
-      "emailHint": "Halaman Stella untuk kotak masuk Anda",
       "empty": "Aplikasi yang dibuat Stella untukmu akan ada di sini.",
       "emptyAction": "Buat aplikasi",
       "emptyActionPrompt": "Buatkan aku aplikasi yang "

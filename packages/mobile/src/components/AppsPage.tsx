@@ -173,13 +173,6 @@ function EmailEntry({ onPress }: { onPress: () => void }) {
           </Text>
           {unseen > 0 ? <Dot /> : null}
         </View>
-        <Text
-          style={styles.detail}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {t("mobile.apps.emailHint")}
-        </Text>
       </View>
       {unseen > 0 ? (
         <Text style={styles.trailing} maxFontSizeMultiplier={1.2}>

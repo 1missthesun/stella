@@ -1,12 +1,21 @@
 import { memo } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import type { MobileSchedule } from "../lib/schedules";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 import type { AiryListStyles } from "./airy-list";
+import { Icon, type IconName } from "./Icon";
 import { Text } from "./Text";
+
+const scheduleIcon = (schedule: MobileSchedule): IconName => {
+  if (schedule.kind === "heartbeat") return "waveform";
+  if (schedule.scheduleKind === "watch") return "eye";
+  if (schedule.scheduleKind === "task") return "checklist";
+  if (schedule.scheduleKind === "reminder") return "bell";
+  return "clock";
+};
 
 export const ScheduleRow = memo(function ScheduleRow({
   schedule,
@@ -57,6 +66,12 @@ export const ScheduleRow = memo(function ScheduleRow({
           }}
         />
       ) : null}
+      <Icon
+        name={scheduleIcon(schedule)}
+        size={23}
+        color={schedule.enabled ? colors.accent : colors.textMuted}
+        style={local.icon}
+      />
       <View style={styles.copy}>
         <Text
           style={[styles.title, !schedule.enabled && styles.quiet]}
@@ -80,4 +95,8 @@ export const ScheduleRow = memo(function ScheduleRow({
       </View>
     </Pressable>
   );
+});
+
+const local = StyleSheet.create({
+  icon: { width: 28 },
 });

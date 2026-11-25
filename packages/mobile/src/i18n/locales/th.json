@@ -266,7 +266,6 @@
       }
     },
     "apps": {
-      "emailHint": "หน้าของ Stella สำหรับกล่องจดหมายของคุณ",
       "empty": "แอปที่ Stella สร้างให้คุณจะแสดงที่นี่",
       "emptyAction": "สร้างแอป",
       "emptyActionPrompt": "สร้างแอปที่"

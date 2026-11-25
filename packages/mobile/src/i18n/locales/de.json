@@ -267,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stellas Seite für deinen Posteingang",
       "empty": "Apps, die Stella für dich baut, erscheinen hier.",
       "emptyAction": "App bauen",
       "emptyActionPrompt": "Bau mir eine App, die "

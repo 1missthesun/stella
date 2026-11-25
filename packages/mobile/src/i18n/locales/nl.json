@@ -267,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella's pagina voor je inbox",
       "empty": "Apps die Stella voor je bouwt, verschijnen hier.",
       "emptyAction": "Een app bouwen",
       "emptyActionPrompt": "Bouw een app voor me die "

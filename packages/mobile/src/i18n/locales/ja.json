@@ -266,7 +266,6 @@
       }
     },
     "apps": {
-      "emailHint": "受信トレイのためのStellaのページ",
       "empty": "Stella があなたのために作ったアプリはここに表示されます。",
       "emptyAction": "アプリを作成",
       "emptyActionPrompt": "こんなアプリを作って: "

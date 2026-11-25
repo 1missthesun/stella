@@ -1162,7 +1162,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella's page for your inbox",
       "empty": "Apps Stella builds for you live here.",
       "emptyAction": "Build an app",
       "emptyActionPrompt": "Build me an app that "

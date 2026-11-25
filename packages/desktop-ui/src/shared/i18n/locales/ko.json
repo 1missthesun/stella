@@ -1152,7 +1152,6 @@
       }
     },
     "apps": {
-      "emailHint": "받은편지함을 위한 Stella 페이지",
       "empty": "Stella가 만들어 준 앱이 여기에 표시됩니다.",
       "emptyAction": "앱 만들기",
       "emptyActionPrompt": "이런 앱을 만들어 줘: "

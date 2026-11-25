@@ -1162,7 +1162,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella'nın gelen kutunuz için sayfası",
       "empty": "Stella’nın senin için oluşturduğu uygulamalar burada olacak.",
       "emptyAction": "Uygulama oluştur",
       "emptyActionPrompt": "Bana şunu yapan bir uygulama oluştur: "

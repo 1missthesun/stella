@@ -1152,7 +1152,6 @@
       }
     },
     "apps": {
-      "emailHint": "Trang của Stella cho hộp thư đến của bạn",
       "empty": "Các ứng dụng Stella tạo cho bạn sẽ hiển thị ở đây.",
       "emptyAction": "Tạo ứng dụng",
       "emptyActionPrompt": "Tạo cho tôi một ứng dụng "

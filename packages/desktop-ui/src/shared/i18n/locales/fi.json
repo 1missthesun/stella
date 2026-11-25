@@ -1162,7 +1162,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stellan sivu postilaatikollesi",
       "empty": "Stellan sinulle rakentamat sovellukset näkyvät täällä.",
       "emptyAction": "Rakenna sovellus",
       "emptyActionPrompt": "Rakenna minulle sovellus, joka "

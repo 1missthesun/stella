@@ -268,7 +268,6 @@
       }
     },
     "apps": {
-      "emailHint": "La pagina di Stella per la tua posta in arrivo",
       "empty": "Qui troverai le app che Stella crea per te.",
       "emptyAction": "Crea un’app",
       "emptyActionPrompt": "Creami un’app che "

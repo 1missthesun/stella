@@ -1162,7 +1162,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stellas sida för din inkorg",
       "empty": "Appar som Stella bygger åt dig visas här.",
       "emptyAction": "Bygg en app",
       "emptyActionPrompt": "Bygg en app åt mig som "

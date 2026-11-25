@@ -267,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella oldala a beérkező leveleidhez",
       "empty": "Itt lesznek az alkalmazások, amelyeket Stella neked készít.",
       "emptyAction": "Alkalmazás készítése",
       "emptyActionPrompt": "Készíts nekem egy alkalmazást, amely "

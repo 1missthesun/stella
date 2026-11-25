@@ -1152,7 +1152,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella 的收件匣頁面",
       "empty": "Stella 為你打造的 App 會顯示在這裡。",
       "emptyAction": "打造 App",
       "emptyActionPrompt": "幫我做一個 App，"

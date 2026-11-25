@@ -1,15 +1,15 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useScheduledEvents } from "@/features/chat/hooks/use-scheduled-events";
 import type { EventRecord } from "@/features/chat/lib/event-transforms";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
-import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
+import { assistantOwnerId, placeInConversation } from "@/features/chat/lib/message-order";
+import { scheduledEventAnchors } from "@/features/chat/lib/scheduled-event-anchors";
 import {
   createLifecycleRoutingState,
   routeLifecycleEvents,
   type LifecycleRoutingState,
 } from "@/features/chat/lib/route-lifecycle-events";
 import type { MessageRecord } from "@stella/contracts/local-chat";
-import { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 
 const SCHEDULED_EVENTS_OVERLAY_MAX = 200;
 
@@ -17,122 +17,6 @@ type UseConversationDisplayMessagesOptions = {
   conversationId: string | null;
   persistedMessages: MessageRecord[];
   optimisticEvents: EventRecord[];
-  streamingAssistants: StreamingAssistantOverlay[];
-};
-
-export type SortTimestampResolver = (message: MessageRecord) => number;
-
-export const getMessageChronologicalTimestamp: SortTimestampResolver = (
-  message,
-) => {
-  if (message.type === "assistant_message") {
-    const payload = message.payload as
-      | { metadata?: { runtime?: { streamStartedAtMs?: unknown } } }
-      | undefined;
-    const streamStartedAtMs = payload?.metadata?.runtime?.streamStartedAtMs;
-    if (
-      typeof streamStartedAtMs === "number" &&
-      Number.isFinite(streamStartedAtMs)
-    ) {
-      return streamStartedAtMs;
-    }
-  }
-  return message.timestamp;
-};
-
-const defaultSortTimestamp: SortTimestampResolver =
-  getMessageChronologicalTimestamp;
-
-export const createOwningUserClampedSortTimestampResolver = (
-  messages: readonly MessageRecord[],
-  baseResolver: SortTimestampResolver = defaultSortTimestamp,
-): SortTimestampResolver => {
-  const userTimestampById = new Map<string, number>();
-  for (const message of messages) {
-    if (message.type === "user_message") {
-      userTimestampById.set(message._id, baseResolver(message));
-    }
-  }
-
-  let needsClamp = false;
-  for (const message of messages) {
-    const ownerId = getAssistantUserMessageId(message);
-    if (!ownerId) continue;
-    const ownerTimestamp = userTimestampById.get(ownerId);
-    if (
-      ownerTimestamp !== undefined &&
-      baseResolver(message) <= ownerTimestamp
-    ) {
-      needsClamp = true;
-      break;
-    }
-  }
-  if (!needsClamp) return baseResolver;
-
-  return (message) => {
-    const timestamp = baseResolver(message);
-    const ownerId = getAssistantUserMessageId(message);
-    if (!ownerId) return timestamp;
-    const ownerTimestamp = userTimestampById.get(ownerId);
-    return ownerTimestamp === undefined
-      ? timestamp
-      : Math.max(timestamp, ownerTimestamp + 1);
-  };
-};
-
-export const createDisplayOrderComparator = (
-  messages: readonly MessageRecord[],
-  getSortTimestamp: SortTimestampResolver = defaultSortTimestamp,
-) => {
-  const inputOrderById = new Map<string, number>();
-  for (let index = 0; index < messages.length; index += 1) {
-    const id = messages[index]!._id;
-    if (!inputOrderById.has(id)) inputOrderById.set(id, index);
-  }
-
-  return (a: MessageRecord, b: MessageRecord): number => {
-    const ta = getSortTimestamp(a);
-    const tb = getSortTimestamp(b);
-    if (ta !== tb) return ta - tb;
-    const inputOrder =
-      (inputOrderById.get(a._id) ?? Number.MAX_SAFE_INTEGER) -
-      (inputOrderById.get(b._id) ?? Number.MAX_SAFE_INTEGER);
-    return inputOrder !== 0 ? inputOrder : a._id.localeCompare(b._id);
-  };
-};
-
-const getAssistantUserMessageId = (
-  message: MessageRecord,
-): string | undefined => {
-  if (message.type !== "assistant_message") return undefined;
-  const payload = message.payload as { userMessageId?: string } | undefined;
-  const userMessageId = payload?.userMessageId;
-  return typeof userMessageId === "string" && userMessageId.length > 0
-    ? userMessageId
-    : undefined;
-};
-
-const collectLiveUserMessageIds = (
-  persistedMessages: MessageRecord[],
-  overlayMessages: MessageRecord[],
-): Set<string> => {
-  const ids = new Set<string>();
-  for (const message of persistedMessages) {
-    if (message.type === "user_message") ids.add(message._id);
-  }
-  for (const message of overlayMessages) {
-    if (message.type === "user_message") ids.add(message._id);
-  }
-  return ids;
-};
-
-const assistantBelongsToLiveUser = (
-  message: MessageRecord,
-  liveUserIds: Set<string>,
-): boolean => {
-  const ownerId = getAssistantUserMessageId(message);
-  if (ownerId === undefined) return true;
-  return liveUserIds.has(ownerId);
 };
 
 const isUserTurnAssistant = (message: MessageRecord): boolean => {
@@ -147,7 +31,7 @@ const isUserTurnAssistant = (message: MessageRecord): boolean => {
   return targetType === undefined || targetType === "user_turn";
 };
 
-export const keepAssistantTurnsContiguous = (
+const keepAssistantTurnsContiguous = (
   messages: MessageRecord[],
 ): MessageRecord[] => {
   const userIndexById = new Map<string, number>();
@@ -167,7 +51,7 @@ export const keepAssistantTurnsContiguous = (
   const insertBefore = new Map<number, MessageRecord[]>();
   for (let index = 0; index < messages.length; index += 1) {
     const message = messages[index]!;
-    const anchorId = getAssistantUserMessageId(message);
+    const anchorId = assistantOwnerId(message);
     if (!anchorId || !isUserTurnAssistant(message)) continue;
     const anchorIndex = userIndexById.get(anchorId);
     if (anchorIndex === undefined) continue;
@@ -192,187 +76,28 @@ export const keepAssistantTurnsContiguous = (
   return result;
 };
 
-const orderByResolver = (
-  messages: MessageRecord[],
-  getSortTimestamp: SortTimestampResolver,
+const unrecordedOverlays = (
+  persistedMessages: readonly MessageRecord[],
+  overlayMessages: readonly MessageRecord[],
 ): MessageRecord[] => {
-  const compareDisplayOrder = createDisplayOrderComparator(
-    messages,
-    getSortTimestamp,
-  );
-
-  let ordered = messages;
-  for (let i = 1; i < messages.length; i += 1) {
-    if (compareDisplayOrder(messages[i - 1]!, messages[i]!) > 0) {
-      ordered = messages.slice();
-      ordered.sort(compareDisplayOrder);
-      break;
-    }
-  }
-  return keepAssistantTurnsContiguous(ordered);
-};
-
-const mergeMessageSources = (
-  getSortTimestamp: SortTimestampResolver,
-  ...sources: MessageRecord[][]
-): MessageRecord[] => {
-  const seen = new Map<string, MessageRecord>();
-  for (const source of sources) {
-    for (const message of source) {
-      if (!seen.has(message._id)) {
-        seen.set(message._id, message);
-      }
-    }
-  }
-  const merged = [...seen.values()];
-  return orderByResolver(merged, getSortTimestamp);
-};
-
-export const getPersistedAssistantSlots = (
-  persistedMessages: MessageRecord[],
-): Map<string, MessageRecord[]> => {
-  const slots = new Map<string, MessageRecord[]>();
+  const recordedIds = new Set<string>();
   for (const message of persistedMessages) {
-    const userMessageId = getAssistantUserMessageId(message);
-    if (!userMessageId) continue;
-    const current = slots.get(userMessageId);
-    if (current) {
-      current.push(message);
-    } else {
-      slots.set(userMessageId, [message]);
-    }
+    recordedIds.add(message._id);
+    const origin =
+      message.type === "user_message" ? message.payload?.originUserMessageId : undefined;
+    if (typeof origin === "string") recordedIds.add(origin);
   }
-  return slots;
-};
-
-export const overlayToMessageRecord = (
-  overlay: StreamingAssistantOverlay,
-  persisted?: MessageRecord,
-): MessageRecord => {
-  return {
-    ...(persisted ?? {}),
-    _id: overlay._id,
-    timestamp: overlay.timestamp,
-    type: "assistant_message",
-    payload: {
-      ...(persisted?.payload ?? {}),
-      text:
-        typeof persisted?.payload?.text === "string"
-          ? persisted.payload.text
-          : overlay.text,
-      userMessageId: overlay.userMessageId,
-      metadata: {
-        ...((
-          persisted?.payload as
-            | { metadata?: Record<string, unknown> }
-            | undefined
-        )?.metadata ?? {}),
-        runtime: {
-          ...((
-            persisted?.payload as
-              | { metadata?: { runtime?: Record<string, unknown> } }
-              | undefined
-          )?.metadata?.runtime ?? {}),
-          ...(overlay.responseTarget
-            ? { responseTarget: overlay.responseTarget }
-            : {}),
-          ...(overlay.replyRefs && overlay.replyRefs.length > 0
-            ? { replyRefs: overlay.replyRefs }
-            : {}),
-        },
-      },
-    },
-    toolEvents: persisted?.toolEvents ?? [],
-  };
-};
-
-export const mergeConversationDisplayMessageSources = (args: {
-  persistedMessages: MessageRecord[];
-  overlayMessages: MessageRecord[];
-  streamingAssistants: StreamingAssistantOverlay[];
-  persistedAssistantSlots: Map<string, MessageRecord[]>;
-  getSortTimestamp?: SortTimestampResolver;
-}): MessageRecord[] => {
-  const {
-    persistedMessages,
-    overlayMessages: overlayMessagesInput,
-    streamingAssistants: streamingAssistantsInput,
-    persistedAssistantSlots,
-    getSortTimestamp = defaultSortTimestamp,
-  } = args;
-  const liveUserIds = collectLiveUserMessageIds(
-    persistedMessages,
-    overlayMessagesInput,
-  );
-  const acceptedEchoIds = new Set(persistedMessages.flatMap((message) => {
-    const origin = message.type === "user_message" ? message.payload?.originUserMessageId : undefined;
-    return typeof origin === "string" ? [origin] : [];
-  }));
-  const overlayMessages = overlayMessagesInput.filter((message) =>
-    !(message.type === "user_message" && acceptedEchoIds.has(message._id)) &&
-    assistantBelongsToLiveUser(message, liveUserIds),
-  );
-  const streamingAssistants = streamingAssistantsInput.filter((slot) =>
-    liveUserIds.has(slot.userMessageId),
-  );
-  const effectiveSortTimestamp =
-    createOwningUserClampedSortTimestampResolver(
-      overlayMessages.length > 0
-        ? [...persistedMessages, ...overlayMessages]
-        : persistedMessages,
-      getSortTimestamp,
-    );
-  const resolverActive = effectiveSortTimestamp !== defaultSortTimestamp;
-  const persistedById = new Map(
-    persistedMessages.map((message) => [message._id, message]),
-  );
-  if (streamingAssistants.length === 0) {
-    if (overlayMessages.length === 0) {
-      return orderByResolver(persistedMessages, effectiveSortTimestamp);
-    }
-    return mergeMessageSources(
-      effectiveSortTimestamp,
-      persistedMessages,
-      overlayMessages,
-    );
-  }
-
-  const maskedPersistedIds = new Set<string>();
-  for (const slot of streamingAssistants) {
-    const persisted = slot.canonicalMessageId
-      ? persistedById.get(slot.canonicalMessageId)
-      : persistedAssistantSlots.get(slot.userMessageId)?.[
-          slot.indexInTurn - 1
-        ];
-    if (persisted) {
-      maskedPersistedIds.add(persisted._id);
-    }
-  }
-
-  const persistedMessagesForDisplay =
-    maskedPersistedIds.size === 0
-      ? persistedMessages
-      : persistedMessages.filter(
-          (message) => !maskedPersistedIds.has(message._id),
-        );
-
-  if (overlayMessages.length === 0) {
-    return resolverActive
-      ? orderByResolver(persistedMessagesForDisplay, effectiveSortTimestamp)
-      : persistedMessagesForDisplay;
-  }
-  return mergeMessageSources(
-    effectiveSortTimestamp,
-    persistedMessagesForDisplay,
-    overlayMessages,
-  );
+  return overlayMessages.filter((message) => {
+    if (recordedIds.has(message._id)) return false;
+    recordedIds.add(message._id);
+    return true;
+  });
 };
 
 export const useConversationDisplayMessages = ({
   conversationId,
   persistedMessages,
   optimisticEvents,
-  streamingAssistants,
 }: UseConversationDisplayMessagesOptions): MessageRecord[] => {
   const scheduledEvents = useScheduledEvents({
     conversationId: conversationId ?? undefined,
@@ -380,122 +105,41 @@ export const useConversationDisplayMessages = ({
     maxItems: SCHEDULED_EVENTS_OVERLAY_MAX,
   });
 
-  const persistedAssistantSlots = useMemo(
-    () => getPersistedAssistantSlots(persistedMessages),
-    [persistedMessages],
+  const scheduledAnchors = useMemo(
+    () =>
+      conversationId && scheduledEvents.length > 0
+        ? scheduledEventAnchors.resolve(conversationId, scheduledEvents, persistedMessages)
+        : null,
+    [conversationId, persistedMessages, scheduledEvents],
   );
-  const persistedMessagesById = useMemo(
-    () => new Map(persistedMessages.map((message) => [message._id, message])),
-    [persistedMessages],
-  );
-
-  const frozenSlotSortTsRef = useRef<Map<string, number>>(new Map());
-  const sentAnchorsRef = useRef(new SentMessageAnchors());
-  const frozenConversationIdRef = useRef<string | null>(conversationId);
-  if (frozenConversationIdRef.current !== conversationId) {
-    frozenConversationIdRef.current = conversationId;
-    frozenSlotSortTsRef.current = new Map();
-    sentAnchorsRef.current = new SentMessageAnchors();
-  }
-  for (const event of optimisticEvents) {
-    if (event.type === "user_message") {
-      sentAnchorsRef.current.note(event._id, event.timestamp);
+  useEffect(() => {
+    if (conversationId && scheduledAnchors) {
+      scheduledEventAnchors.keep(conversationId, scheduledAnchors);
     }
-  }
-  for (const slot of streamingAssistants) {
-    const slotKey = `${slot.userMessageId}:${slot.indexInTurn}`;
-    if (!frozenSlotSortTsRef.current.has(slotKey)) {
-      frozenSlotSortTsRef.current.set(slotKey, slot.timestamp);
-    }
-  }
-
-  const sortTimestampByMessageId = useMemo(() => {
-    const map = new Map<string, number>();
-    const frozen = frozenSlotSortTsRef.current;
-    if (frozen.size === 0) return map;
-    for (const [userMessageId, slotMessages] of persistedAssistantSlots) {
-      for (let i = 0; i < slotMessages.length; i += 1) {
-        const frozenTs = frozen.get(`${userMessageId}:${i + 1}`);
-        if (frozenTs !== undefined) {
-          map.set(slotMessages[i]!._id, frozenTs);
-        }
-      }
-    }
-    for (const slot of streamingAssistants) {
-      if (slot.canonicalMessageId) {
-        map.set(slot.canonicalMessageId, slot.timestamp);
-      }
-    }
-    return map;
-  }, [persistedAssistantSlots, streamingAssistants]);
-
-  const sentAnchors = sentAnchorsRef.current;
-  const sentAnchorCount = sentAnchors.size;
-  const getSortTimestamp = useMemo<SortTimestampResolver | undefined>(() => {
-    if (sortTimestampByMessageId.size === 0 && sentAnchorCount === 0) {
-      return undefined;
-    }
-    return (message) =>
-      (message.type === "user_message"
-        ? sentAnchors.anchorOf(
-            message._id,
-            message.payload?.originUserMessageId,
-          )
-        : undefined) ??
-      sortTimestampByMessageId.get(message._id) ??
-      getMessageChronologicalTimestamp(message);
-  }, [sentAnchorCount, sentAnchors, sortTimestampByMessageId]);
+  }, [conversationId, scheduledAnchors]);
 
   const overlayMessages = useMemo(() => {
     const overlayEvents: EventRecord[] = [];
-    for (const event of optimisticEvents) overlayEvents.push(event);
     for (const event of scheduledEvents) {
-      if (event.type !== "user_message" && event.type !== "assistant_message") {
-        continue;
-      }
-      if (overlayEvents.some((other) => other._id === event._id)) continue;
-      overlayEvents.push(event);
+      const sentAfterSequence = scheduledAnchors?.get(event._id);
+      overlayEvents.push(
+        sentAfterSequence === undefined
+          ? event
+          : { ...event, payload: { ...event.payload, sentAfterSequence } },
+      );
     }
-    const fromEvents =
-      overlayEvents.length > 0 ? groupEventsIntoMessages(overlayEvents) : [];
-
-    const streamingOverlay: MessageRecord[] = [];
-    for (const slot of streamingAssistants) {
-      const persisted = slot.canonicalMessageId
-        ? persistedMessagesById.get(slot.canonicalMessageId)
-        : persistedAssistantSlots.get(slot.userMessageId)?.[
-            slot.indexInTurn - 1
-          ];
-      streamingOverlay.push(overlayToMessageRecord(slot, persisted));
-    }
-
-    if (fromEvents.length === 0 && streamingOverlay.length === 0) {
-      return [] as MessageRecord[];
-    }
-    return [...fromEvents, ...streamingOverlay];
-  }, [
-    optimisticEvents,
-    persistedAssistantSlots,
-    persistedMessagesById,
-    scheduledEvents,
-    streamingAssistants,
-  ]);
+    overlayEvents.push(...optimisticEvents);
+    return overlayEvents.length > 0 ? groupEventsIntoMessages(overlayEvents) : [];
+  }, [optimisticEvents, scheduledAnchors, scheduledEvents]);
 
   const merged = useMemo(() => {
-    return mergeConversationDisplayMessageSources({
-      persistedMessages,
-      overlayMessages,
-      streamingAssistants,
-      persistedAssistantSlots,
-      ...(getSortTimestamp ? { getSortTimestamp } : {}),
-    });
-  }, [
-    getSortTimestamp,
-    overlayMessages,
-    persistedAssistantSlots,
-    persistedMessages,
-    streamingAssistants,
-  ]);
+    const overlays = unrecordedOverlays(persistedMessages, overlayMessages);
+    return keepAssistantTurnsContiguous(
+      overlays.length > 0
+        ? placeInConversation(persistedMessages, overlays)
+        : persistedMessages,
+    );
+  }, [overlayMessages, persistedMessages]);
 
   const lifecycleRoutingRef = useRef<LifecycleRoutingState>(
     createLifecycleRoutingState(),

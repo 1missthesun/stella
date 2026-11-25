@@ -16,6 +16,7 @@ const isTurnDecorationEvent = (event: EventRecord): boolean =>
 const toMessageRecord = (event: EventRecord): MessageRecord => ({
   _id: event._id,
   timestamp: event.timestamp,
+  ...(event.sequence !== undefined ? { sequence: event.sequence } : {}),
   type: event.type,
   ...(event.deviceId ? { deviceId: event.deviceId } : {}),
   ...(event.requestId ? { requestId: event.requestId } : {}),

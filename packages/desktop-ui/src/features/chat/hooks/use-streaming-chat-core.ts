@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { serverNow } from "@stella/contracts/server-clock";
 import { getPlatform } from "@/platform/electron/platform";
 import { useChatStore } from "@/context/chat-store-context";
 import { getOrCreateDeviceId } from "@/platform/electron/device-id";
@@ -283,7 +284,7 @@ export function useStreamingChatCore({
       const optimisticUserMessageId = createLocalMessageId();
       const optimisticText = visibleUserMessageText(cleanedText);
 
-      const messageTimestamp = Date.now();
+      const messageTimestamp = serverNow();
       const optimisticEvent = buildOptimisticUserEvent({
         id: optimisticUserMessageId,
         text: optimisticText,

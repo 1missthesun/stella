@@ -167,7 +167,7 @@ const applyProvidedSource = (entry: Entry, source: LineageSource) => {
   const lineage = deriveLineage(source, entry.root);
   const hasOlder = source.hasOlder && !lineage.startLoaded;
   setSnapshot(entry, {
-    messages: sortMessages(lineage.messages),
+    messages: lineage.messages,
     hasLoaded: true,
     hasOlder,
     isLoadingOlder: hasOlder && Boolean(source.isLoadingOlder),

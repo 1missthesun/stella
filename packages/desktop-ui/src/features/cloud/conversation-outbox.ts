@@ -1,3 +1,5 @@
+import { chatHead } from "@stella/contracts/chat-head";
+import { serverNow } from "@stella/contracts/server-clock";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   parseCloudTurnContext,
@@ -39,6 +41,8 @@ export type PendingPrompt = {
   clientMsgId: string;
   text: string;
   createdAtMs: number;
+  order?: number;
+  sentAfterSequence?: number;
   conversationId: string | null;
   turnId: string | null;
   dispatchId: string | null;
@@ -259,6 +263,7 @@ const parseEnvelope = (raw: string): PendingPrompt | null => {
     clientMsgId: candidate.clientMsgId,
     text: candidate.text,
     createdAtMs: candidate.createdAtMs,
+    ...optionalSequences(candidate),
     conversationId: candidate.conversationId,
     turnId: candidate.turnId,
     dispatchId: candidate.dispatchId,
@@ -268,12 +273,26 @@ const parseEnvelope = (raw: string): PendingPrompt | null => {
   };
 };
 
+const optionalSequences = (entry: {
+  order?: unknown;
+  sentAfterSequence?: unknown;
+}): Pick<PendingPrompt, "order" | "sentAfterSequence"> => ({
+  ...(Number.isSafeInteger(entry.order) ? { order: entry.order as number } : {}),
+  ...(Number.isSafeInteger(entry.sentAfterSequence)
+    ? { sentAfterSequence: entry.sentAfterSequence as number }
+    : {}),
+});
+
+const inSendOrder = (a: PendingPrompt, b: PendingPrompt): number =>
+  (a.order ?? 0) - (b.order ?? 0) || a.createdAtMs - b.createdAtMs;
+
 const persistedEntry = (entry: PendingPrompt): PersistedPendingPrompt => ({
   accountScope: entry.accountScope,
   ownerGeneration: entry.ownerGeneration,
   clientMsgId: entry.clientMsgId,
   text: entry.text,
   createdAtMs: entry.createdAtMs,
+  ...optionalSequences(entry),
   conversationId: entry.conversationId,
   turnId: entry.turnId,
   dispatchId: entry.dispatchId,
@@ -405,7 +424,7 @@ export const createCloudConversationOutbox = (
           storage.removeItem(cloudConversationOutboxStorageKey(entry));
         }
       }
-      return current.sort((a, b) => a.createdAtMs - b.createdAtMs);
+      return current.sort(inSendOrder);
     },
 
     clear(): void {
@@ -440,7 +459,7 @@ export const createCloudConversationOutbox = (
       }
       const conversation = all
         .filter((candidate) => sameConversation(candidate, entry))
-        .sort((a, b) => a.createdAtMs - b.createdAtMs);
+        .sort(inSendOrder);
       const failed = conversation.filter(
         (candidate) => candidate.send.kind === "not_sent",
       );
@@ -494,7 +513,7 @@ export const createCloudConversationOutbox = (
     },
 
     list(): PendingPrompt[] {
-      return readAll().sort((a, b) => a.createdAtMs - b.createdAtMs);
+      return readAll().sort(inSendOrder);
     },
   };
 };
@@ -591,11 +610,14 @@ export const pendingPrompts = {
     conversationId: string | null,
     submission: PendingCloudTurnSubmission,
   ): PendingPrompt {
+    const sentAfterSequence = chatHead(conversationId);
     const base: PendingPrompt = {
       ...authority,
       clientMsgId,
       text,
-      createdAtMs: Date.now(),
+      createdAtMs: serverNow(),
+      order: pending.reduce((latest, queued) => Math.max(latest, queued.order ?? 0), 0) + 1,
+      ...(sentAfterSequence !== undefined ? { sentAfterSequence } : {}),
       conversationId,
       turnId: null,
       dispatchId: null,
@@ -801,7 +823,7 @@ export const pendingPrompts = {
           !stored.has(entry.clientMsgId),
       );
       emitPending(
-        [...hydrated, ...inMemoryOnly].sort((a, b) => a.createdAtMs - b.createdAtMs),
+        [...hydrated, ...inMemoryOnly].sort(inSendOrder),
       );
       return true;
     } catch {

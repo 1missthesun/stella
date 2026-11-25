@@ -18,6 +18,7 @@ import {
   agentToolResultThreadId,
   bareToolName,
 } from "@stella/contracts/conversation-agent-activity";
+import { assistantOwnerId, placeInConversation } from "@/features/chat/lib/message-order";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
 import {
   journalUserMessage,
@@ -33,6 +34,7 @@ import {
   journalMessageTimestamp,
   journalTerminalNotice,
   journalMirroredWake,
+  journalTurnSeq,
   journalUserReactions,
   resolveJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
@@ -131,9 +133,13 @@ const mirroredLifecycleEvents = (
             },
           };
   }
+  const prompt = turnRecords.find(
+    (record): record is JournalMessageRecord =>
+      record.kind === "message" && record.role === "user",
+  );
   for (const record of turnRecords) {
     if (record.kind !== "message") continue;
-    const timestamp = journalMessageTimestamp(record);
+    const timestamp = journalMessageTimestamp(record, prompt);
     if (record.role === "user" && record.hidden) continue;
     const threadId = spawnResultThreadId(record);
     if (!threadId || carded.has(threadId)) continue;
@@ -271,6 +277,7 @@ const terminalNoticeEvent = (
   return {
     _id: `cloud:${turnId}:notice:${terminal.seq}`,
     timestamp: terminal.createdAtMs,
+    sequence: terminal.seq,
     type: "assistant_message",
     payload: {
       text: terminal.notice,
@@ -297,7 +304,10 @@ export const journalRecordsToMessageRecords = (
   const startCarded = startCardedAgentIds(byTurn);
 
   const messages: MessageRecord[] = [];
-  for (const [turnId, turnRecords] of byTurn) {
+  const turnsInOrder = [...byTurn].sort(
+    ([, left], [, right]) => journalTurnSeq(left) - journalTurnSeq(right),
+  );
+  for (const [turnId, turnRecords] of turnsInOrder) {
     const events: EventRecord[] = [];
     let userMessageId: string | undefined;
     let turnUserRecord: JournalMessageRecord | undefined;
@@ -320,6 +330,7 @@ export const journalRecordsToMessageRecords = (
         events.push({
           _id: `cloud:${turnId}:reminder:${record.seq}`,
           timestamp: record.createdAtMs,
+          sequence: record.seq,
           type: "assistant_message",
           payload: {
             text: reminder.text,
@@ -333,6 +344,7 @@ export const journalRecordsToMessageRecords = (
         events.push({
           _id: `cloud:${turnId}:schedule-notice:${record.seq}`,
           timestamp: record.createdAtMs,
+          sequence: record.seq,
           type: "assistant_message",
           payload: { text: "", metadata: { scheduleNotice } },
         });
@@ -345,13 +357,14 @@ export const journalRecordsToMessageRecords = (
         events.push({
           _id: `cloud:${turnId}:safeguard:${record.seq}`,
           timestamp: record.createdAtMs,
+          sequence: record.seq,
           type: "assistant_message",
           payload: { text: safeguardLabel, source: "cloud-turn-notice" },
         });
         continue;
       }
       if (record.kind !== "message") continue;
-      const timestamp = journalMessageTimestamp(record);
+      const timestamp = journalMessageTimestamp(record, turnUserRecord);
       if (record.role === "user") {
         turnUserRecord = record;
         userMessageId =
@@ -366,6 +379,7 @@ export const journalRecordsToMessageRecords = (
         events.push({
           _id: userMessageId,
           timestamp,
+          sequence: record.seq,
           type: "user_message",
           payload: {
             ...textPayload(
@@ -391,6 +405,7 @@ export const journalRecordsToMessageRecords = (
           events.push({
             _id: `cloud:${turnId}:message:${record.seq}`,
             timestamp,
+            sequence: record.seq,
             type: "assistant_message",
             payload: textPayload(
               record,
@@ -467,11 +482,10 @@ export const journalRecordsToMessageRecords = (
   return messages;
 };
 
-const assistantOwner = (message: MessageRecord): string | null => {
-  if (message.type !== "assistant_message") return null;
-  const value = message.payload?.userMessageId;
-  return typeof value === "string" && value ? value : null;
-};
+export const withoutSequence = ({
+  sequence: _otherLogSequence,
+  ...message
+}: MessageRecord): MessageRecord => message;
 
 export const mergeCanonicalMessagesWithLocalCache = (
   canonical: readonly MessageRecord[],
@@ -483,7 +497,7 @@ export const mergeCanonicalMessagesWithLocalCache = (
   const canonicalIds = new Set(canonical.map((message) => message._id));
   const canonicalAssistantCounts = new Map<string, number>();
   for (const message of canonical) {
-    const owner = assistantOwner(message);
+    const owner = assistantOwnerId(message);
     if (!owner) continue;
     canonicalAssistantCounts.set(
       owner,
@@ -494,13 +508,10 @@ export const mergeCanonicalMessagesWithLocalCache = (
   const localAssistantOrdinals = new Map<string, number>();
   const unacknowledged = local.filter((message) => {
     if (canonicalIds.has(message._id)) return false;
-    if (
-      message.type === "assistant_message" &&
-      message.payload?.source === "cloud-sync-error"
-    ) {
-      return true;
+    const owner = assistantOwnerId(message);
+    if (message.payload?.source === "cloud-sync-error") {
+      return owner !== undefined && canonicalIds.has(owner);
     }
-    const owner = assistantOwner(message);
     if (!owner) return activeUserMessageIds.has(message._id);
     if (!activeUserMessageIds.has(owner)) return false;
     const ordinal = (localAssistantOrdinals.get(owner) ?? 0) + 1;
@@ -508,5 +519,5 @@ export const mergeCanonicalMessagesWithLocalCache = (
     return ordinal > (canonicalAssistantCounts.get(owner) ?? 0);
   });
 
-  return [...canonical, ...unacknowledged];
+  return placeInConversation(canonical, unacknowledged.map(withoutSequence));
 };

@@ -6,6 +6,8 @@ export type QueuedSend = {
   text: string;
   send?: PiChatSend;
   createdAtMs: number;
+  order?: number;
+  sentAfterSequence?: number;
   failed?: string;
 };
 
@@ -72,8 +74,14 @@ const load = () => {
     const entry = parse(store.getItem(key));
     if (entry && key === PREFIX + entry.requestId) found.push(entry);
   }
-  entries = found.sort((a, b) => a.createdAtMs - b.createdAtMs);
+  entries = found.sort(inSendOrder);
 };
+
+const inSendOrder = (a: QueuedSend, b: QueuedSend): number =>
+  (a.order ?? 0) - (b.order ?? 0) || a.createdAtMs - b.createdAtMs;
+
+const nextOrder = (): number =>
+  entries.reduce((latest, entry) => Math.max(latest, entry.order ?? 0), 0) + 1;
 
 const write = (entry: QueuedSend): boolean => {
   const store = storage();
@@ -134,9 +142,10 @@ export const desktopSendOutbox = {
   wasRemoved(requestId: string): boolean {
     return removed.has(requestId);
   },
-  keep(entry: QueuedSend): boolean {
+  keep(send: Omit<QueuedSend, "order">): boolean {
     load();
-    if (entries.some((queued) => queued.requestId === entry.requestId)) return true;
+    if (entries.some((queued) => queued.requestId === send.requestId)) return true;
+    const entry = { ...send, order: nextOrder() };
     if (entries.length >= MAX_QUEUED || !write(entry)) return false;
     emit([...entries, entry]);
     return true;

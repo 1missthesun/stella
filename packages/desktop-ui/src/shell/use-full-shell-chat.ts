@@ -9,6 +9,7 @@ import {
 import { deriveComposerState } from "@/features/chat/composer-context";
 import { conversationTabs } from "@/features/chat/services/conversation-tabs-store";
 import { useConversationActivity } from "@/features/chat/hooks/use-conversation-activity";
+import { newestSequence, placeInConversation } from "@/features/chat/lib/message-order";
 import { useConversationDisplayMessages } from "@/features/chat/hooks/use-conversation-display-messages";
 import { useConversationFiles } from "@/features/chat/hooks/use-conversation-files";
 import { useConversationMessages } from "@/features/chat/hooks/use-conversation-messages";
@@ -71,18 +72,18 @@ import {
 } from "./composer-tab-memory";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
+import { noteChatHead } from "@stella/contracts/chat-head";
 import type { EventRecord } from "@stella/contracts/local-chat";
 import { isSilentAssistantChatEvent } from "@stella/contracts/chat-event-visibility";
-import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
 
 const composerOwner = viewAtom("composer.owner", "");
 const NO_NEWER_CLOUD_MESSAGES = () => false;
 const EMPTY_EVENTS: EventRecord[] = [];
-const NO_STREAMING_ASSISTANTS: StreamingAssistantOverlay[] = [];
 const NO_JOURNALED_TURNS: ReturnType<typeof journaledPiTurns> = new Map();
 const NO_PI_PENDING_ROWS: ReturnType<typeof piPendingRows> = {
   messages: [],
   journalUserIds: new Map(),
+  beforeIds: new Map(),
 };
 const useOwnDeviceId = (enabled: boolean) => {
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -266,27 +267,23 @@ export function useFullShellChat({
   const recordHasOlder = cloudChatShown
     ? journalState.hasOlder
     : localMessageFeed.hasOlderMessages;
-  const recordStartMs = cloudChatShown
-    ? (cloudChat.records[0]?.createdAtMs ?? null)
-    : (cloudChat.persistedMessages[0]?.timestamp ?? null);
+  const recordStartSeq = cloudChat.records[0]?.seq ?? null;
   const piPending = useMemo(() => {
     if (!activeConversationId || !recordLoaded) {
       return NO_PI_PENDING_ROWS;
     }
-    if (recordHasOlder && recordStartMs === null) return NO_PI_PENDING_ROWS;
-    const sinceMs = recordHasOlder ? recordStartMs : null;
     return cloudChatShown
       ? piPendingRows({
           projection: piChat.projection,
           journaled: journaledTurns,
           canonical: cloudChat.persistedMessages,
-          sinceMs,
+          window: { hasOlder: recordHasOlder, startSeq: recordStartSeq },
         })
       : piPendingLogRows({
           projection: piChat.projection,
           log: cloudChat.persistedMessages,
           conversationId: activeConversationId,
-          sinceMs,
+          hasOlder: recordHasOlder,
         });
   }, [
     activeConversationId,
@@ -296,20 +293,32 @@ export function useFullShellChat({
     piChat.projection,
     recordHasOlder,
     recordLoaded,
-    recordStartMs,
+    recordStartSeq,
   ]);
   const persistedMessages = useMemo(() => {
     const all =
       piPending.messages.length > 0
-        ? [...cloudChat.persistedMessages, ...piPending.messages]
+        ? placeInConversation(
+            cloudChat.persistedMessages,
+            piPending.messages,
+            piPending.beforeIds,
+          )
         : cloudChat.persistedMessages;
     return all.some(isSilentAssistantChatEvent)
       ? all.filter((message) => !isSilentAssistantChatEvent(message))
       : all;
-  }, [cloudChat.persistedMessages, piPending.messages]);
+  }, [cloudChat.persistedMessages, piPending]);
   useEffect(() => {
     acknowledgeLocalMessages(persistedMessages);
   }, [acknowledgeLocalMessages, persistedMessages, localOptimisticEvents]);
+  const newestRecordedSequence = cloudChatShown
+    ? cloudChat.records.at(-1)?.seq
+    : newestSequence(cloudChat.persistedMessages);
+  useEffect(() => {
+    if (activeConversationId && newestRecordedSequence !== undefined) {
+      noteChatHead(activeConversationId, newestRecordedSequence);
+    }
+  }, [activeConversationId, newestRecordedSequence]);
   const awaitingLocalAdmission = useMemo(() => {
     const persistedIds = acceptedUserMessageIds(persistedMessages);
     return localOptimisticEvents.some(
@@ -523,7 +532,6 @@ export function useFullShellChat({
     conversationId: activeConversationId,
     persistedMessages,
     optimisticEvents,
-    streamingAssistants: NO_STREAMING_ASSISTANTS,
   });
   const hasMessages = displayMessages.length > 0;
   const conversationAsks = useConversationUserAsks(activeConversationId);

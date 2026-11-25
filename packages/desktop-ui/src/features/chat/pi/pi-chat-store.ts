@@ -1,3 +1,5 @@
+import { chatHead } from "@stella/contracts/chat-head";
+import { serverNow } from "@stella/contracts/server-clock";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
 import { dismissClaudeLoginHeld, presentClaudeLoginHeld } from "@/features/claude/claude-login-notice";
@@ -236,12 +238,14 @@ export const submitPiChat = async (
   const chat = api();
   if (!chat) throw new Error("Stella's runtime is not available.");
   clearStaleNotices(conversationId);
+  const sentAfterSequence = chatHead(conversationId);
   const kept = desktopSendOutbox.keep({
     conversationId,
     requestId,
     text,
     ...(send ? { send } : {}),
-    createdAtMs: Date.now(),
+    ...(sentAfterSequence !== undefined ? { sentAfterSequence } : {}),
+    createdAtMs: serverNow(),
   });
   if (kept && desktopSendOutbox.behind(conversationId, requestId)) {
     void desktopSendOutbox.flush(conversationId);

@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import {
   browserAttachmentUploads,
   useBrowserAttachmentUploads,
@@ -80,11 +81,11 @@ export function SendPendingMark({
   sinceMs: number | null;
 }) {
   const [shown, setShown] = useState(
-    () => sinceMs === null || Date.now() - sinceMs >= PENDING_MARK_DELAY_MS,
+    () => sinceMs === null || serverNow() - sinceMs >= PENDING_MARK_DELAY_MS,
   );
   useEffect(() => {
     if (shown) return;
-    const wait = PENDING_MARK_DELAY_MS - (Date.now() - (sinceMs ?? 0));
+    const wait = PENDING_MARK_DELAY_MS - (serverNow() - (sinceMs ?? 0));
     const timer = window.setTimeout(() => setShown(true), Math.max(0, wait));
     return () => window.clearTimeout(timer);
   }, [shown, sinceMs]);

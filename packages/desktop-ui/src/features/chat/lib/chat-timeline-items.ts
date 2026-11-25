@@ -1,3 +1,4 @@
+import { ChatRowAnchors } from "@stella/contracts/chat-placement";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
 import { eventRowRendersContent } from "@/features/chat/lib/assistant-row-content";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
@@ -18,6 +19,8 @@ export type ChatTimelineItem =
       record: UserAskRecord;
     }
 ;
+
+const askRecordAnchors = new ChatRowAnchors();
 
 const askRecordSignature = (record: UserAskRecord): string =>
   record.answers.map((answer) => answer.question).join("\u0000");
@@ -43,6 +46,7 @@ export const buildChatTimelineItems = (args: {
     }
   }
 
+  const recordItems: ChatTimelineItem[] = [];
   for (const record of args.askRecords ?? []) {
     if (
       shownRecords.has(record.toolCallId ?? record.id) ||
@@ -50,27 +54,20 @@ export const buildChatTimelineItems = (args: {
     ) {
       continue;
     }
-    const before = items.findIndex(
-      (item) =>
-        item.type === "message" &&
-        (item.row.timestampMs ?? Number.POSITIVE_INFINITY) > record.createdAt,
-    );
-    const recordItem: ChatTimelineItem = {
+    recordItems.push({
       id: `chat-timeline:ask-record:${record.id}`,
       type: "ask-record",
       record,
-    };
-    if (before < 0) items.push(recordItem);
-    else items.splice(before, 0, recordItem);
+    });
   }
-
+  const placed = askRecordAnchors.insert(items, recordItems, (item) => item.id);
 
   if (args.includeWorkingIndicator) {
-    items.push({
+    placed.push({
       id: "chat-timeline:working-indicator",
       type: "working-indicator",
     });
   }
 
-  return items;
+  return placed;
 };

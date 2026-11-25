@@ -127,6 +127,9 @@ export const cloudPendingPromptsToEvents = (
           ? { metadata: { context: entry.submission.context.display } }
           : {}),
         ...(entry.send.kind === "not_sent" ? { sendFailed: entry.send.message } : {}),
+        ...(entry.sentAfterSequence !== undefined
+          ? { sentAfterSequence: entry.sentAfterSequence }
+          : {}),
       },
     };
   });

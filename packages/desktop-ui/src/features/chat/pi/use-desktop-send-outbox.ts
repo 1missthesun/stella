@@ -5,8 +5,12 @@ import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-messag
 import { provideCloudSendRecovery } from "@/features/cloud/cloud-send-recovery";
 import { desktopSendOutbox, type QueuedSend } from "./desktop-send-outbox";
 
-const markOf = (entry: QueuedSend) =>
-  entry.failed ? { sendFailed: entry.failed } : { sendPending: "sending" as const };
+const markOf = (entry: QueuedSend) => ({
+  ...(entry.failed ? { sendFailed: entry.failed } : { sendPending: "sending" as const }),
+  ...(entry.sentAfterSequence !== undefined
+    ? { sentAfterSequence: entry.sentAfterSequence }
+    : {}),
+});
 
 export function useDesktopSendOutbox(args: {
   conversationId: string | null;

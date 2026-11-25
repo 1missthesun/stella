@@ -4,6 +4,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react";
+import { toDeviceTime } from "@stella/contracts/server-clock";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import type {
   CompanionMessagePreview,
@@ -66,7 +67,7 @@ const latestUserPreview = (
     return {
       id: message._id,
       text: plain,
-      at: message.timestamp,
+      at: toDeviceTime(message.timestamp),
       ...(originId ? { originId } : {}),
     };
   }
@@ -90,7 +91,7 @@ const latestAssistantPreview = (
     return {
       id: message._id,
       text: text ? toPlainPreview(text, ASSISTANT_PREVIEW_MAX_CHARS) : "",
-      at: message.timestamp,
+      at: toDeviceTime(message.timestamp),
       streaming,
       ...(replyTo ? { replyTo } : {}),
     };

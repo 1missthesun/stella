@@ -1,3 +1,5 @@
+import { serverNow } from "@stella/contracts/server-clock";
+
 export const TIMESTAMP_GAP_MS = 60 * 60_000;
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -31,7 +33,7 @@ const relativeDayLabel = (days: number, locale?: string): string =>
 export function formatTimestampHeader(
   ms: number,
   locale?: string,
-  now = Date.now(),
+  now = serverNow(),
 ): string {
   const days = daysAgo(ms, now);
   const time = timeOfDay(ms, locale);

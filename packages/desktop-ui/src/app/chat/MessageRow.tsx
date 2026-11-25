@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { EMAIL_PAGE_CANVAS } from "@stella/contracts/email-page";
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
 import {
@@ -589,7 +590,7 @@ export const UserMessageRow = memo(
                 {row.reaction ? (
                   <span
                     key={row.reaction}
-                    className={`event-item__reaction${row.reactionAt && Date.now() - row.reactionAt < 10_000 ? " event-item__reaction--fresh" : ""}`}
+                    className={`event-item__reaction${row.reactionAt && serverNow() - row.reactionAt < 10_000 ? " event-item__reaction--fresh" : ""}`}
                     role="img"
                     aria-label={t("app.chat.messageRow.stellaReaction", {
                       emoji: row.reaction,

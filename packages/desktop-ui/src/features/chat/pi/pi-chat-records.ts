@@ -11,7 +11,8 @@ import {
 import type { EventRecord, MessageRecord } from "@stella/contracts/local-chat";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
-import { journalRecordsToMessageRecords } from "@/features/cloud/journal-message-records";
+import { toServerTime } from "@stella/contracts/server-clock";
+import { journalRecordsToMessageRecords, withoutSequence } from "@/features/cloud/journal-message-records";
 
 type Turn = {
   userMessageId?: string;
@@ -23,8 +24,9 @@ type Turn = {
 export type PiTurnIndex = {
   entryId: number;
   userMessageId: string;
-  timestamp: number;
   own: boolean;
+  journalSeq?: number;
+  logId?: string;
 };
 
 export type PiChatProjection = {
@@ -35,9 +37,12 @@ export type PiChatProjection = {
   rootId: number | null;
 };
 
-const writtenIn = (entry: PiEntry): boolean => {
+const writtenIn = (entry: PiEntry): { journalSeq?: number; logId?: string } => {
   const data = entry.data as { journalSeq?: unknown; localLog?: unknown } | undefined;
-  return typeof data?.journalSeq === "number" || typeof data?.localLog === "string";
+  return {
+    ...(typeof data?.journalSeq === "number" ? { journalSeq: data.journalSeq } : {}),
+    ...(typeof data?.localLog === "string" ? { logId: data.localLog } : {}),
+  };
 };
 
 export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" | "running">): PiChatProjection => {
@@ -56,7 +61,8 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" 
   for (const entry of state.entries) {
     const message = entry.model?.[0];
     if (!message || message.role === "system" || removed.has(entry.id) || entry.kind === "stella.safeguard") continue;
-    const base = { seq: entry.id, turnId, createdAtMs: message.timestamp, kind: "message" as const };
+    const createdAtMs = toServerTime(message.timestamp);
+    const base = { seq: entry.id, turnId, createdAtMs, kind: "message" as const };
     if (entry.kind === "pi.user" && message.role === "user") {
       if (ending) records.push(ending);
       ending = undefined;
@@ -76,11 +82,12 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" 
         assistantMessages: 0,
         ...(automation ? { hidden: true as const } : {}),
       };
+      const written = writtenIn(entry);
       turns.push({
         entryId: entry.id,
         userMessageId: turn.userMessageId!,
-        timestamp: message.timestamp,
-        own: !writtenIn(entry),
+        own: written.journalSeq === undefined && written.logId === undefined,
+        ...written,
       });
       records.push({
         ...base,
@@ -101,7 +108,7 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" 
       if (piMessageText(message).trim()) turn.assistantMessages += 1;
       const terminal = piTerminalNotice(message);
       ending = terminal
-        ? { seq: entry.id, turnId, createdAtMs: message.timestamp, kind: "turn", phase: terminal.phase, notice: terminal.notice }
+        ? { seq: entry.id, turnId, createdAtMs, kind: "turn", phase: terminal.phase, notice: terminal.notice }
         : undefined;
     } else if (entry.kind === "pi.tool-result" && message.role === "toolResult") {
       records.push({ ...base, role: "toolResult", hidden: false, payload: message as unknown as Record<string, unknown> });
@@ -110,7 +117,7 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" 
   if (ending && !state.running) records.push(ending);
   return {
     records,
-    messages: journalRecordsToMessageRecords(records),
+    messages: journalRecordsToMessageRecords(records).map(withoutSequence),
     turn,
     turns,
     rootId: state.entries[0]?.conversationId ?? null,
@@ -157,32 +164,79 @@ export const journaledPiTurns = (
 export type PiPendingRows = {
   messages: MessageRecord[];
   journalUserIds: ReadonlyMap<string, string>;
+  beforeIds: ReadonlyMap<string, string>;
 };
 
-const NO_PENDING_ROWS: PiPendingRows = { messages: [], journalUserIds: new Map() };
+const NO_PENDING_ROWS: PiPendingRows = { messages: [], journalUserIds: new Map(), beforeIds: new Map() };
+
+type RecordWindow = {
+  hasOlder: boolean;
+  startSeq: number | null;
+};
+
+const firstEntryInWindow = (
+  turns: readonly PiTurnIndex[],
+  recordedRowOf: (turn: PiTurnIndex) => string | undefined,
+  isBeforeWindow: (turn: PiTurnIndex) => boolean,
+): number => {
+  const afterOlder = turns.slice(turns.findLastIndex(isBeforeWindow) + 1);
+  return afterOlder.find((turn) => recordedRowOf(turn) !== undefined)?.entryId ?? Number.POSITIVE_INFINITY;
+};
+
+const nextRecordedRow = (
+  turns: readonly PiTurnIndex[],
+  turn: PiTurnIndex,
+  recordedRowOf: (turn: PiTurnIndex) => string | undefined,
+): string | undefined => {
+  for (const later of turns) {
+    if (later.entryId <= turn.entryId) continue;
+    const row = recordedRowOf(later);
+    if (row !== undefined) return row;
+  }
+  return undefined;
+};
 
 export const piPendingRows = (args: {
   projection: PiChatProjection;
   journaled: ReadonlyMap<number, JournaledPiTurn>;
   canonical: readonly MessageRecord[];
-  sinceMs: number | null;
+  window: RecordWindow;
 }): PiPendingRows => {
-  const { projection, journaled, canonical, sinceMs } = args;
-  const pending = projection.turns.filter((turn) => {
-    if (!turn.own || (sinceMs !== null && turn.timestamp < sinceMs)) return false;
-    return journaled.get(turn.entryId)?.settled !== true;
-  });
-  const opening = sinceMs === null;
+  const { projection, journaled, canonical, window } = args;
+  const opening = !window.hasOlder;
+  const userIds = new Set<string>();
+  const userIdsBySeq = new Map<number, string>();
+  for (const message of canonical) {
+    if (message.type !== "user_message") continue;
+    userIds.add(message._id);
+    if (message.sequence !== undefined) userIdsBySeq.set(message.sequence, message._id);
+  }
+  const recordedRowOf = (turn: PiTurnIndex): string | undefined => {
+    if (turn.journalSeq !== undefined) return userIdsBySeq.get(turn.journalSeq);
+    const id = journaled.get(turn.entryId)?.userMessageId || turn.userMessageId;
+    return userIds.has(id) ? id : undefined;
+  };
+  const fromEntry = opening
+    ? Number.NEGATIVE_INFINITY
+    : firstEntryInWindow(
+        projection.turns,
+        recordedRowOf,
+        (turn) =>
+          turn.journalSeq !== undefined && window.startSeq !== null && turn.journalSeq < window.startSeq,
+      );
+  const pending = projection.turns.filter(
+    (turn) => turn.own && turn.entryId >= fromEntry && journaled.get(turn.entryId)?.settled !== true,
+  );
   if (pending.length === 0 && !opening) return NO_PENDING_ROWS;
   const canonicalReplies = new Map<string, number>();
-  const canonicalUsers = new Set<string>();
   for (const message of canonical) {
-    if (message.type === "user_message") canonicalUsers.add(message._id);
     const owner = message.type === "assistant_message" ? message.payload?.userMessageId : undefined;
     if (typeof owner === "string") canonicalReplies.set(owner, (canonicalReplies.get(owner) ?? 0) + 1);
   }
   const byUser = new Map(pending.map((turn) => [turn.userMessageId, turn]));
   const journalUserIds = new Map<string, string>();
+  const beforeIds = new Map<string, string>();
+  const firstRow = canonical[0]?._id;
   const replies = new Map<string, number>();
   const messages: MessageRecord[] = [];
   for (const message of projection.messages) {
@@ -193,15 +247,20 @@ export const piPendingRows = (args: {
           ? message.payload.userMessageId
           : undefined;
     if (!owner) {
-      if (opening && message.type === "assistant_message") messages.push(message);
+      if (opening && message.type === "assistant_message") {
+        messages.push(message);
+        if (firstRow) beforeIds.set(message._id, firstRow);
+      }
       continue;
     }
     const turn = byUser.get(owner);
     if (!turn) continue;
     const journal =
       journaled.get(turn.entryId) ??
-      (canonicalUsers.has(turn.userMessageId) ? { userMessageId: turn.userMessageId, settled: false } : undefined);
+      (userIds.has(turn.userMessageId) ? { userMessageId: turn.userMessageId, settled: false } : undefined);
     if (!journal) {
+      const before = nextRecordedRow(projection.turns, turn, recordedRowOf);
+      if (before) beforeIds.set(message._id, before);
       messages.push(
         message.type === "user_message"
           ? { ...message, payload: { ...message.payload, sendPending: "unsynced" } }
@@ -223,7 +282,9 @@ export const piPendingRows = (args: {
         : { ...message, payload: { ...message.payload, userMessageId: target } },
     );
   }
-  return messages.length === 0 && journalUserIds.size === 0 ? NO_PENDING_ROWS : { messages, journalUserIds };
+  return messages.length === 0 && journalUserIds.size === 0
+    ? NO_PENDING_ROWS
+    : { messages, journalUserIds, beforeIds };
 };
 
 export const piAgentActivityEvents = (records: readonly DesktopThreadActivityRecord[]): EventRecord[] => {
@@ -268,9 +329,9 @@ export const piPendingLogRows = (args: {
   projection: PiChatProjection;
   log: readonly MessageRecord[];
   conversationId: string;
-  sinceMs: number | null;
+  hasOlder: boolean;
 }): PiPendingRows => {
-  const { projection, log, conversationId, sinceMs } = args;
+  const { projection, log, conversationId, hasOlder } = args;
   if (projection.messages.length === 0) return NO_PENDING_ROWS;
   const prefix = `pi:${conversationId}:${projection.rootId ?? ""}:`;
   const written = new Set<number>();
@@ -286,7 +347,16 @@ export const piPendingLogRows = (args: {
     for (const event of message.toolEvents) note(event._id);
   }
   const turns = new Map(projection.turns.map((turn) => [turn.userMessageId, turn]));
+  const recordedRowOf = (turn: PiTurnIndex): string | undefined =>
+    [turn.logId, turn.userMessageId, `${prefix}${turn.entryId}`].find(
+      (id) => id !== undefined && logIds.has(id),
+    );
+  const fromEntry = hasOlder
+    ? firstEntryInWindow(projection.turns, recordedRowOf, () => false)
+    : Number.NEGATIVE_INFINITY;
   const journalUserIds = new Map<string, string>();
+  const beforeIds = new Map<string, string>();
+  const firstRow = log[0]?._id;
   const messages: MessageRecord[] = [];
   for (const message of projection.messages) {
     const owner =
@@ -297,8 +367,7 @@ export const piPendingLogRows = (args: {
           : undefined;
     const turn = owner ? turns.get(owner) : undefined;
     if (owner && (!turn || !turn.own)) continue;
-    if (turn && sinceMs !== null && turn.timestamp < sinceMs) continue;
-    if (!turn && sinceMs !== null) continue;
+    if (turn ? turn.entryId < fromEntry : hasOlder) continue;
     const entryId = rowEntryId(message, turns);
     if (entryId === undefined || written.has(entryId) || logIds.has(message._id)) continue;
     const logUserId = turn && !logIds.has(turn.userMessageId) ? `${prefix}${turn.entryId}` : undefined;
@@ -308,7 +377,13 @@ export const piPendingLogRows = (args: {
       messages.push({ ...message, payload: { ...message.payload, userMessageId: logUserId } });
       continue;
     }
+    const before = turn
+      ? nextRecordedRow(projection.turns, turn, recordedRowOf)
+      : firstRow;
+    if (before) beforeIds.set(message._id, before);
     messages.push(message);
   }
-  return messages.length === 0 && journalUserIds.size === 0 ? NO_PENDING_ROWS : { messages, journalUserIds };
+  return messages.length === 0 && journalUserIds.size === 0
+    ? NO_PENDING_ROWS
+    : { messages, journalUserIds, beforeIds };
 };

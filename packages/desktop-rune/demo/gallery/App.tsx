@@ -232,6 +232,10 @@ function Docs() {
   const [action, setAction] = useState("");
   return (
     <Section title="Markdown">
+      <col id="g-selgroup" gap={4} selectionGroup>
+        <text id="g-sel-1" size={13} color={c.weak} selectable>Select across these two paragraphs; selection.get reads the group.</text>
+        <text id="g-sel-2" size={13} color={c.weak} selectable>The second paragraph joins the same selection.</text>
+      </col>
       <markdown id="g-md" src={MD} selectable onLink={(href) => setAction(`link ${href}`)}
         onLinkContextMenu={(e) => setAction(`context menu on ${e.href} at ${Math.round(e.x)},${Math.round(e.y)}`)}
         linkStyles={[{ prefix: "stella://", color: c.text, weight: 600, bg: "#4f8cff33", pad: 4, ring: ["#4f8cff66", 1], hover: { bg: "#4f8cff55" }, help: "Open the connector" }]}

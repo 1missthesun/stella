@@ -293,6 +293,19 @@ export const engine = {
     /** Holds `key` where it shows on screen across the next commit (a header that collapses its section). */
     keepOnScreen: (key: string) => request("keepOnScreen", { target: key, key }),
   },
+  selection: {
+    /** The text selected in a window (its `selectionGroup` or selectable texts), as copying takes it; null when nothing is. */
+    get: (window?: string) => request<{ text: string } | null>("selection.get", { window }),
+    /** Copies the window's selection; false when nothing is selected. */
+    copy: async (window?: string) => {
+      const s = await request<{ text: string } | null>("selection.get", { window });
+      if (!s) return false;
+      await request("clipboard.writeText", { text: s.text, window });
+      return true;
+    },
+    /** macOS dictionary look-up of the selection; false where the platform has none (it isn't wired on macOS yet either). */
+    lookUp: (window?: string) => request<boolean>("selection.lookUp", { window }),
+  },
   focus: (target: string, ring = false) => request("focus", { target, ring }),
   blur: (window?: string) => request("blur", { window }),
   input: {

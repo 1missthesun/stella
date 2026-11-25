@@ -68,6 +68,12 @@ pub fn route(v: Value) {
         }
         "screen.displays" => reply(rid, Ok(displays())),
         "appearance.get" => reply(rid, Ok(windows::appearance())),
+        "selection.get" => {
+            let w = window_named(&v).or_else(windows::first_window);
+            let text = w.and_then(windows::selected_text);
+            reply(rid, Ok(text.map_or(Value::Null, |t| json!({ "text": t }))));
+        }
+        "selection.lookUp" => reply(rid, Ok(json!(false))),
         "window.isFocused" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(|w| engine::read(|e| e.windows.get(&w).is_some_and(|s| s.focused)))))),
         "menu.setApplicationMenu" => reply(rid, crate::services::app_menu(&v)),
         "screen.cursorPoint" => reply(rid, Err("screen.cursorPoint: Rune doesn't report the pointer outside its windows".into())),

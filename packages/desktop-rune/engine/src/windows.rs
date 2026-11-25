@@ -367,6 +367,7 @@ fn drain() {
         #[cfg(feature = "webview")]
         crate::webview::close(*n);
         crate::media::forget(*n);
+        forget_selection(*n);
     }
     for v in cmds {
         crate::commands::route(v);
@@ -597,6 +598,37 @@ pub fn queue(window: u32, rid: Option<u64>, v: serde_json::Value) -> bool {
         engine::wake(window);
     }
     ok
+}
+
+thread_local! {
+    /// The text selected in each window, by the selectable element or group holding it.
+    static SELECTIONS: std::cell::RefCell<HashMap<u32, HashMap<u32, String>>> = std::cell::RefCell::new(HashMap::new());
+}
+
+pub fn note_selection(window: u32, element: u32, text: Option<String>) {
+    SELECTIONS.with(|m| {
+        let mut m = m.borrow_mut();
+        let w = m.entry(window).or_default();
+        match text.filter(|t| !t.is_empty()) {
+            Some(t) => {
+                w.insert(element, t);
+            }
+            None => {
+                w.remove(&element);
+            }
+        }
+    });
+}
+
+pub fn forget_selection(element: u32) {
+    SELECTIONS.with(|m| m.borrow_mut().values_mut().for_each(|w| {
+        w.remove(&element);
+    }));
+}
+
+/// The selected text in `window`, as copying takes it.
+pub fn selected_text(window: u32) -> Option<String> {
+    SELECTIONS.with(|m| m.borrow().get(&window).and_then(|w| w.values().max_by_key(|t| t.len()).cloned()))
 }
 
 pub fn first_window() -> Option<u32> {

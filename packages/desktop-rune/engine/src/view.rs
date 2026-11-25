@@ -163,6 +163,14 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
             _ => e,
         };
     }
+    if p.selection_group {
+        e = e.selection_group(true);
+    }
+    if (p.selection_group || p.selectable) && !is_input {
+        e = e.on_selection_change(move |s: &mut Win, change: &rune::SelectionChange, _tx: &mut Tx| {
+            crate::windows::note_selection(s.node, n, change.selection().map(|t| t.text().to_owned()));
+        });
+    }
     if p.scroll_x || p.scroll_y {
         let listens = p.listens("scroll");
         let key = rune_key(n, p);

@@ -135,7 +135,7 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 - `farFromBottom` (default 180) with `onFarFromBottom(far)`: fires when the viewport crosses that
   distance from its end.
 - `sticky` (`"top"` | `"bottom"`) with `stickyInset`.
-- `selectionGroup`: one selection across the texts inside.
+- `selectionGroup`: one selection across the texts inside. Read it with `engine.selection.get()`.
 
 **Accessibility (AccessKit).** `role`, `label`, `checked`, `expanded`, `selected`. A `text` is
 its own label.
@@ -318,6 +318,11 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
 - `scroll.*`: to (`"end"` or y), intoView, page, stop, toKey (`viewport, key, at`),
   keepOnScreen (`key`, across the next commit)
 - `focus(id)`, `blur()`
+- `selection.*`:
+  - `get(window?)` → `{text}` or null: the window's selected text, as copying takes it, from a
+    `selectionGroup` or selectable `text`/`markdown`.
+  - `copy(window?)`.
+  - `lookUp(window?)`: macOS dictionary. Not wired yet; it returns false.
 - `input.*`, `media.*`, `webview.*`
 - `control.*`, `quit()`
 

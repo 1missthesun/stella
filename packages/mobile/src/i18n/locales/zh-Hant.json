@@ -220,7 +220,9 @@
           "code": "程式碼",
           "pages": "網頁",
           "other": "其他"
-        }
+        },
+        "viewGrid": "格狀檢視",
+        "viewList": "列表檢視"
       },
       "schedule": {
         "actionFailed": "操作未成功。",
@@ -955,6 +957,11 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "other": "{count} 個檔案"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

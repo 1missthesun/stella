@@ -1106,7 +1106,9 @@
           "code": "代码",
           "pages": "网页",
           "other": "其他"
-        }
+        },
+        "viewGrid": "网格视图",
+        "viewList": "列表视图"
       },
       "schedule": {
         "actionFailed": "操作未成功。",

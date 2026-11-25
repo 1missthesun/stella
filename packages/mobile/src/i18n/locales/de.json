@@ -221,7 +221,9 @@
           "code": "Code",
           "pages": "Seiten",
           "other": "Sonstiges"
-        }
+        },
+        "viewGrid": "Rasteransicht",
+        "viewList": "Listenansicht"
       },
       "schedule": {
         "actionFailed": "Das hat nicht geklappt.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} Datei",
+        "other": "{count} Dateien"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

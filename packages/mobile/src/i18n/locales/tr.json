@@ -221,7 +221,9 @@
           "code": "Kod",
           "pages": "Sayfalar",
           "other": "Diğer"
-        }
+        },
+        "viewGrid": "Izgara görünümü",
+        "viewList": "Liste görünümü"
       },
       "schedule": {
         "actionFailed": "Bu işlem gerçekleşemedi.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} dosya",
+        "other": "{count} dosya"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

@@ -220,7 +220,9 @@
           "code": "Kode",
           "pages": "Halaman",
           "other": "Lainnya"
-        }
+        },
+        "viewGrid": "Tampilan kisi",
+        "viewList": "Tampilan daftar"
       },
       "schedule": {
         "actionFailed": "Tidak berhasil.",
@@ -955,6 +957,11 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "other": "{count} file"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

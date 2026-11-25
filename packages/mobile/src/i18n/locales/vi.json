@@ -220,7 +220,9 @@
           "code": "Mã",
           "pages": "Trang",
           "other": "Khác"
-        }
+        },
+        "viewGrid": "Dạng lưới",
+        "viewList": "Dạng danh sách"
       },
       "schedule": {
         "actionFailed": "Không thực hiện được.",
@@ -955,6 +957,11 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "other": "{count} tệp"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

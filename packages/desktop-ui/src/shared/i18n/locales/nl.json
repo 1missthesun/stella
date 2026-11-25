@@ -1116,7 +1116,9 @@
           "code": "Code",
           "pages": "Pagina’s",
           "other": "Overig"
-        }
+        },
+        "viewGrid": "Rasterweergave",
+        "viewList": "Lijstweergave"
       },
       "schedule": {
         "actionFailed": "Dat is niet gelukt.",

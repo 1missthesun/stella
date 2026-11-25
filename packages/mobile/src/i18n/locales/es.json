@@ -222,7 +222,9 @@
           "code": "Código",
           "pages": "Páginas",
           "other": "Otros"
-        }
+        },
+        "viewGrid": "Vista de cuadrícula",
+        "viewList": "Vista de lista"
       },
       "schedule": {
         "actionFailed": "No se pudo completar.",
@@ -957,6 +959,13 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "many": "{count} archivos",
+        "one": "{count} archivo",
+        "other": "{count} archivos"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

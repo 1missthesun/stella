@@ -19,6 +19,7 @@ import { useEffect } from "react";
 import { authClient } from "../src/lib/auth-client";
 import { reconnectBackend } from "../src/lib/backend";
 import { clearEvidencePreviews } from "../src/lib/chat-evidence-previews";
+import { clearFileThumbnails } from "../src/lib/file-thumbnails";
 import { clearCloudDriveFileUris } from "../src/lib/use-cloud-drive-file-uri";
 import { hasMobileConfig } from "../src/config/env";
 import {
@@ -176,6 +177,7 @@ function useBackendFollowsAccount(
     if (before !== undefined && before !== account) {
       clearCloudDriveFileUris();
       clearEvidencePreviews();
+      clearFileThumbnails();
       reconnectBackend();
     }
   }, [account, session.isPending]);

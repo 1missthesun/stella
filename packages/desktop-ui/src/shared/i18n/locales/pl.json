@@ -1136,7 +1136,9 @@
           "code": "Kod",
           "pages": "Strony",
           "other": "Inne"
-        }
+        },
+        "viewGrid": "Widok siatki",
+        "viewList": "Widok listy"
       },
       "schedule": {
         "actionFailed": "Nie udało się.",

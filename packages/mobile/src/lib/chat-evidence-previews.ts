@@ -47,6 +47,7 @@ export type EvidencePreviewRequest = {
   kind: EvidenceSourceKind;
   conversationId: string;
   access: StoredPhoneAccess | null;
+  maxDeviceBytes?: number;
 };
 
 const stableKey = (value: string): string => {
@@ -160,6 +161,10 @@ const localSourceFor = async (
     });
     if (linkedSourceIsFolder(source)) throw new Error("A folder has no preview.");
     const expected = linkedSourceSize(source);
+    const maxBytes = request.maxDeviceBytes ?? MAX_DEVICE_READ_BYTES;
+    if (expected !== null && expected > maxBytes) {
+      throw new Error("File is too large to preview.");
+    }
     const reusable =
       expected !== null && expected > 0 && target.exists && target.size === expected;
     if (!reusable) {
@@ -168,7 +173,7 @@ const localSourceFor = async (
         request.conversationId,
         request.filePath,
         target,
-        { maxBytes: MAX_DEVICE_READ_BYTES },
+        { maxBytes },
       );
     }
   }
@@ -379,6 +384,18 @@ export const requestEvidencePreview = (
 export const clearEvidencePreviews = (): void => {
   inFlight.clear();
 };
+
+export const evidenceSourceFile = async (
+  request: EvidencePreviewRequest,
+  maxBytes: number,
+): Promise<{ uri: string; sizeBytes: number; identity: string }> =>
+  await withSlot(async () => {
+    const remote = await remoteSourceFor(request.filePath);
+    if (remote && remote.sizeBytes > maxBytes) {
+      throw new Error("File is too large to preview.");
+    }
+    return await localSourceFor({ ...request, maxDeviceBytes: maxBytes }, remote);
+  });
 
 export const evidenceAudioFileUri = async (
   request: EvidencePreviewRequest,

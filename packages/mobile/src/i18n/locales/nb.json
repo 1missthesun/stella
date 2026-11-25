@@ -221,7 +221,9 @@
           "code": "Kode",
           "pages": "Sider",
           "other": "Annet"
-        }
+        },
+        "viewGrid": "Rutenettvisning",
+        "viewList": "Listevisning"
       },
       "schedule": {
         "actionFailed": "Det gikk ikke.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} fil",
+        "other": "{count} filer"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

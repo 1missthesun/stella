@@ -1126,7 +1126,9 @@
           "code": "Código",
           "pages": "Páginas",
           "other": "Otros"
-        }
+        },
+        "viewGrid": "Vista de cuadrícula",
+        "viewList": "Vista de lista"
       },
       "schedule": {
         "actionFailed": "No se pudo completar.",

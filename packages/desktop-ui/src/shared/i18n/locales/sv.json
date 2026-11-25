@@ -1116,7 +1116,9 @@
           "code": "Kod",
           "pages": "Sidor",
           "other": "Övrigt"
-        }
+        },
+        "viewGrid": "Rutnätsvy",
+        "viewList": "Listvy"
       },
       "schedule": {
         "actionFailed": "Det gick inte.",

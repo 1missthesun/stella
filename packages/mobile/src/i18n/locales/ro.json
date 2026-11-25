@@ -222,7 +222,9 @@
           "code": "Cod",
           "pages": "Pagini",
           "other": "Altele"
-        }
+        },
+        "viewGrid": "Vizualizare grilă",
+        "viewList": "Vizualizare listă"
       },
       "schedule": {
         "actionFailed": "Nu a reușit.",
@@ -957,6 +959,13 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} fișiere",
+        "one": "{count} fișier",
+        "other": "{count} de fișiere"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

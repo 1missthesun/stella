@@ -433,38 +433,6 @@ export const artifactSubtitle = (payload: MobileDisplayPayload): string => {
   }
 };
 
-export const artifactIconName = (payload: MobileDisplayPayload) => {
-  switch (payload.kind) {
-    case "canvas-html":
-    case "url":
-      return "panel-top";
-    case "markdown":
-    case "office":
-    case "file-artifact":
-    case "pdf":
-      return "file-text";
-    case "source-diff":
-      return "git-branch";
-    case "media":
-      switch (payload.asset.kind) {
-        case "image":
-          return "image";
-        case "video":
-          return "video";
-        case "audio":
-          return "volume-2";
-        case "model3d":
-          return "box";
-        default:
-          return "file";
-      }
-    case "agent-work":
-      return payload.state === "done" ? "check" : "cpu";
-    case "map-route":
-      return "globe";
-  }
-};
-
 export const agentWorkArtifactId = (agentIds: readonly string[]): string => {
   const key = agentIds
     .map((id) => id.trim())

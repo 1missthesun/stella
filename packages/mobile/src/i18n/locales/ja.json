@@ -220,7 +220,9 @@
           "code": "コード",
           "pages": "ページ",
           "other": "その他"
-        }
+        },
+        "viewGrid": "グリッド表示",
+        "viewList": "リスト表示"
       },
       "schedule": {
         "actionFailed": "実行できませんでした。",
@@ -955,6 +957,11 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "other": "{count} ファイル"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

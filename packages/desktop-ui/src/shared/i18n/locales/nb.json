@@ -1116,7 +1116,9 @@
           "code": "Kode",
           "pages": "Sider",
           "other": "Annet"
-        }
+        },
+        "viewGrid": "Rutenettvisning",
+        "viewList": "Listevisning"
       },
       "schedule": {
         "actionFailed": "Det gikk ikke.",

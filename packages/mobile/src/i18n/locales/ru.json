@@ -223,7 +223,9 @@
           "code": "Код",
           "pages": "Страницы",
           "other": "Другое"
-        }
+        },
+        "viewGrid": "Вид сеткой",
+        "viewList": "Вид списком"
       },
       "schedule": {
         "actionFailed": "Не получилось.",
@@ -958,6 +960,14 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} файла",
+        "many": "{count} файлов",
+        "one": "{count} файл",
+        "other": "{count} файла"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

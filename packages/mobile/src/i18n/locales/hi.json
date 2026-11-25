@@ -221,7 +221,9 @@
           "code": "कोड",
           "pages": "पेज",
           "other": "अन्य"
-        }
+        },
+        "viewGrid": "ग्रिड दृश्य",
+        "viewList": "सूची दृश्य"
       },
       "schedule": {
         "actionFailed": "यह पूरा नहीं हो सका।",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} फ़ाइल",
+        "other": "{count} फ़ाइलें"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

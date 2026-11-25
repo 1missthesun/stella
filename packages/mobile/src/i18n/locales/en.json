@@ -221,7 +221,9 @@
           "code": "Code",
           "pages": "Pages",
           "other": "Other"
-        }
+        },
+        "viewGrid": "Grid view",
+        "viewList": "List view"
       },
       "schedule": {
         "actionFailed": "That didn’t go through.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} file",
+        "other": "{count} files"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

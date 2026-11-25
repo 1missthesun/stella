@@ -1116,7 +1116,9 @@
           "code": "कोड",
           "pages": "पेज",
           "other": "अन्य"
-        }
+        },
+        "viewGrid": "ग्रिड दृश्य",
+        "viewList": "सूची दृश्य"
       },
       "schedule": {
         "actionFailed": "यह पूरा नहीं हो सका।",

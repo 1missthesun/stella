@@ -221,7 +221,9 @@
           "code": "Κώδικας",
           "pages": "Σελίδες",
           "other": "Άλλα"
-        }
+        },
+        "viewGrid": "Προβολή πλέγματος",
+        "viewList": "Προβολή λίστας"
       },
       "schedule": {
         "actionFailed": "Δεν ολοκληρώθηκε.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} αρχείο",
+        "other": "{count} αρχεία"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

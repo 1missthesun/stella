@@ -5,22 +5,24 @@ import {
 import { isCloudWorldAppPath } from "@stella/contracts/cloud-world-paths";
 import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import {
-  type ComponentRef,
+  memo,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Pressable,
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { Text } from "./Text";
+import { useFocusEffect } from "expo-router";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useTabBottomInset } from "../lib/bottom-bar";
 import { useT } from "../i18n";
@@ -34,19 +36,26 @@ import {
 import { useBackendView } from "../lib/backend";
 import { tapLight } from "../lib/haptics";
 import {
+  publishBackOverride,
   publishTopBarAccessory,
   useActivityHub,
   useComputerControl,
 } from "../lib/main-shell-store";
 import { GlassSurface } from "./glass";
-import { pastSection } from "../lib/list-sections";
+import { pastSection, timeOfDay } from "../lib/list-sections";
 import {
-  artifactIconName,
   artifactPrimaryFilePath,
   artifactTitle,
 } from "../lib/mobile-artifacts";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
+import {
+  fileExtension,
+  fileThumbnailKind,
+  type FileThumbnailKind,
+  type FileThumbnailSource,
+} from "../lib/file-thumbnails";
+import { useFilesViewMode } from "../lib/files-view-mode";
 import { useConversationFiles } from "../lib/use-conversation-files";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
@@ -54,8 +63,14 @@ import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 import type { ChatArtifact } from "../types";
 import { ArtifactViewer } from "./ArtifactViewer";
+import { KIT } from "./chat-settings/kit";
 import { EmptyState } from "./EmptyState";
-import { Icon, type IconName } from "./Icon";
+import { useAiryList } from "./airy-list";
+import { FilesViewToggle } from "./files/FilesViewToggle";
+import { FileThumbnail } from "./files/FileThumbnail";
+import { FileTypeStrip, type FileTypeOption } from "./files/FileTypeStrip";
+import { FolderShelf, type FolderEntry } from "./files/FolderShelf";
+import { Icon } from "./Icon";
 import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 
@@ -63,23 +78,11 @@ const EMPTY_ARTIFACTS: ChatArtifact[] = [];
 const DRIVE_VIEW_ARGS = { limit: 200 };
 const EMPTY_PAIRED: StoredPhoneAccess[] = [];
 const SEARCH_HEIGHT = 48;
-const CONTROL_HEIGHT = 44;
-const STACK_GAP = 10;
 
 type SortOrder = "newest" | "oldest" | "name";
 type SourceFilter = "all" | "cloud" | "upload" | `computer:${string}`;
 
 const UNKNOWN_COMPUTER = "computer:unknown";
-
-const TYPE_SYMBOLS: Record<FileType, NativeMenuItem["systemImage"]> = {
-  images: "photo",
-  videos: "video",
-  audio: "waveform",
-  documents: "doc.text",
-  pages: "globe",
-  code: "chevron.left.forwardslash.chevron.right",
-  other: "doc",
-};
 
 type FileType =
   | "images"
@@ -122,11 +125,117 @@ type FileRow = ConversationFile & {
   title: string;
   bucket: SourceFilter;
   type: FileType;
+  path: string;
+  extension: string;
+  thumbnail: FileThumbnailKind;
+  inFolder: string | null;
 };
 
 type ListItem =
-  | { kind: "section"; key: string; label: string }
-  | { kind: "file"; key: string; row: FileRow };
+  | { kind: "section"; key: string; label: string; first: boolean }
+  | { kind: "folders"; key: string; folders: FolderEntry[] }
+  | { kind: "tiles"; key: string; rows: FileRow[] }
+  | { kind: "row"; key: string; row: FileRow };
+
+const TILE_MIN = 150;
+const TILE_MAX_COLUMNS = 5;
+const TILE_GAP = 18;
+const ROW_THUMBNAIL = { width: 52, height: 60 };
+
+const columnsFor = (width: number): number =>
+  Math.min(
+    TILE_MAX_COLUMNS,
+    Math.max(2, Math.floor((width + TILE_GAP) / (TILE_MIN + TILE_GAP))),
+  );
+
+const filePathOf = (key: string): string =>
+  key.startsWith("drive:")
+    ? key.slice("drive:".length)
+    : key.startsWith("path:")
+      ? key.slice("path:".length)
+      : "";
+
+const driveFolder = (file: ConversationFile): string | null => {
+  if (!file.key.startsWith("drive:") || file.source.kind === "upload") return null;
+  const path = filePathOf(file.key);
+  return path.slice(0, Math.max(0, path.lastIndexOf("/")));
+};
+
+const PEEK_ORDER: FileThumbnailKind[] = [
+  "image",
+  "video",
+  "text",
+  "html",
+  "document",
+  "audio",
+  "none",
+];
+
+const folderEntries = (
+  rows: readonly FileRow[],
+  parent: string,
+  sourceOf: (row: FileRow) => FileThumbnailSource,
+): FolderEntry[] => {
+  const prefix = parent ? `${parent}/` : "";
+  const byPath = new Map<string, FileRow[]>();
+  for (const row of rows) {
+    if (!row.inFolder || !`${row.inFolder}/`.startsWith(prefix)) continue;
+    const name = row.inFolder.slice(prefix.length).split("/")[0];
+    if (!name) continue;
+    const path = `${prefix}${name}`;
+    const held = byPath.get(path);
+    if (held) held.push(row);
+    else byPath.set(path, [row]);
+  }
+  return [...byPath]
+    .map(([path, held]) => ({
+      path,
+      name: path.slice(prefix.length),
+      count: held.length,
+      newest: Math.max(...held.map((row) => row.createdAt)),
+      peeks: [...held]
+        .sort(
+          (a, b) =>
+            PEEK_ORDER.indexOf(a.thumbnail) - PEEK_ORDER.indexOf(b.thumbnail) ||
+            b.createdAt - a.createdAt,
+        )
+        .slice(0, 3)
+        .reverse()
+        .map((row) => ({
+          key: row.key,
+          source: sourceOf(row),
+          extension: row.extension,
+        })),
+    }))
+    .sort((a, b) => b.newest - a.newest)
+    .map(({ path, name, count, peeks }) => ({ path, name, count, peeks }));
+};
+
+const shownName = (row: { title: string; extension: string }): string => {
+  const suffix = `.${row.extension}`;
+  return row.extension &&
+    row.title.length > suffix.length &&
+    row.title.toLowerCase().endsWith(suffix)
+    ? row.title.slice(0, -suffix.length)
+    : row.title;
+};
+
+const fileTime = (ms: number, now: number): string => {
+  if (ms <= 0) return "";
+  const date = new Date(ms);
+  if (now - ms < 6 * 24 * 60 * 60_000) {
+    return date.toDateString() === new Date(now).toDateString()
+      ? timeOfDay(ms)
+      : `${date.toLocaleDateString(undefined, { weekday: "short" })} ${timeOfDay(ms)}`;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(date.getFullYear() === new Date(now).getFullYear()
+      ? {}
+      : { year: "numeric" }),
+  });
+};
 
 const fileType = (title: string, artifact: ChatArtifact): FileType => {
   const ext = /\.([A-Za-z0-9]{1,8})$/.exec(title)?.[1]?.toLowerCase();
@@ -208,6 +317,13 @@ export function FilesPage() {
         : [],
     [driveFiles, hub?.conversationId],
   );
+  const airy = useAiryList();
+  const mode = useFilesViewMode();
+  const windowWidth = useWindowDimensions().width;
+  const [contentWidth, setContentWidth] = useState(
+    windowWidth - KIT.gutter * 2,
+  );
+  const [folder, setFolder] = useState("");
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -262,12 +378,18 @@ export function FilesPage() {
             : UNKNOWN_COMPUTER
           : file.source.kind;
       const title = fileName(file);
+      const path = filePathOf(file.key);
+      const extension = fileExtension(path) || fileExtension(title);
       return {
         ...file,
         artifact: titledArtifact(file.artifact, title),
         title,
         bucket,
         type: fileType(title, file.artifact),
+        path,
+        extension,
+        thumbnail: path ? fileThumbnailKind(extension) : "none",
+        inFolder: driveFolder(file),
       };
     });
   }, [driveRows, hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
@@ -321,6 +443,9 @@ export function FilesPage() {
     const needle = query.trim().toLowerCase();
     const filtered = rows.filter(
       (row) =>
+        (!folder ||
+          row.inFolder === folder ||
+          (needle !== "" && `${row.inFolder ?? ""}/`.startsWith(`${folder}/`))) &&
         (sourceFilter === "all" || row.bucket === sourceFilter) &&
         (activeType === "all" || row.type === activeType) &&
         (!needle ||
@@ -335,29 +460,101 @@ export function FilesPage() {
       );
     }
     return [...filtered].sort((a, b) => b.createdAt - a.createdAt);
-  }, [activeType, query, rows, sortOrder, sourceFilter]);
+  }, [activeType, folder, query, rows, sortOrder, sourceFilter]);
 
+  const thumbnailSources = useRef(new Map<string, FileThumbnailSource>());
+  const thumbnailSourceOf = useCallback(
+    (row: FileRow): FileThumbnailSource => {
+      const deviceId =
+        row.source.kind === "computer"
+          ? row.bucket.slice("computer:".length)
+          : null;
+      const access =
+        (deviceId
+          ? pairedDesktops.find((entry) => entry.desktopDeviceId === deviceId)
+          : undefined) ?? preferredAccess;
+      const conversationId = row.artifact.conversationId;
+      const known = thumbnailSources.current.get(row.key);
+      if (
+        known &&
+        known.kind === row.thumbnail &&
+        known.access === access &&
+        known.conversationId === conversationId
+      ) {
+        return known;
+      }
+      const next = {
+        filePath: row.path,
+        kind: row.thumbnail,
+        conversationId,
+        access,
+      };
+      thumbnailSources.current.set(row.key, next);
+      return next;
+    },
+    [pairedDesktops, preferredAccess],
+  );
+
+  const searching = query.trim().length > 0;
+  const folders = useMemo(
+    () =>
+      searching || activeType !== "all" || sourceFilter === "upload"
+        ? []
+        : folderEntries(
+            sourceFilter === "all"
+              ? rows
+              : rows.filter((row) => row.bucket === sourceFilter),
+            folder,
+            thumbnailSourceOf,
+          ),
+    [activeType, folder, rows, searching, sourceFilter, thumbnailSourceOf],
+  );
+
+  const columns = columnsFor(contentWidth);
+  const tileWidth = Math.floor(
+    (contentWidth - TILE_GAP * (columns - 1)) / columns,
+  );
+  const now = Date.now();
   const items = useMemo<ListItem[]>(() => {
-    if (sortOrder === "name") {
-      return shown.map((row) => ({ kind: "file", key: row.key, row }));
-    }
-    const now = Date.now();
+    const at = Date.now();
     const out: ListItem[] = [];
+    if (folders.length > 0) {
+      out.push({ kind: "folders", key: `folders:${folder}`, folders });
+    }
+    const add = (group: FileRow[]) => {
+      if (mode === "list") {
+        for (const row of group) out.push({ kind: "row", key: row.key, row });
+        return;
+      }
+      for (let index = 0; index < group.length; index += columns) {
+        const cells = group.slice(index, index + columns);
+        out.push({ kind: "tiles", key: `tiles:${cells[0]!.key}`, rows: cells });
+      }
+    };
+    if (sortOrder === "name") {
+      add(shown);
+      return out;
+    }
+    let group: FileRow[] = [];
     let previous: string | null = null;
     for (const row of shown) {
-      const section = pastSection(row.createdAt, now, t);
+      const section = pastSection(row.createdAt, at, t);
       if (section.key !== previous) {
+        add(group);
+        group = [];
         out.push({
           kind: "section",
           key: `section:${section.key}`,
           label: section.label,
+          first: out.length === 0,
         });
         previous = section.key;
       }
-      out.push({ kind: "file", key: row.key, row });
+      group.push(row);
     }
+    add(group);
     return out;
-  }, [shown, sortOrder, t]);
+  }, [columns, folder, folders, mode, shown, sortOrder, t]);
 
   const siblings = useMemo(() => shown.map((row) => row.artifact), [shown]);
   const accessById = useMemo(() => {
@@ -391,6 +588,40 @@ export function FilesPage() {
     tapLight();
     setViewerArtifact(artifact);
   }, []);
+
+  const openFolder = useCallback((path: string) => {
+    tapLight();
+    setFolder(path);
+  }, []);
+  const folderGone =
+    folder !== "" &&
+    !journal.loading &&
+    !rows.some((row) => `${row.inFolder ?? ""}/`.startsWith(`${folder}/`));
+  useEffect(() => {
+    if (folderGone) setFolder("");
+  }, [folderGone]);
+  const allFilesLabel = t("mobile.activityHub.files.filterAll");
+  useFocusEffect(
+    useCallback(() => {
+      if (!folder) return;
+      const parent = folder.slice(0, Math.max(0, folder.lastIndexOf("/")));
+      const up = () => setFolder(parent);
+      publishBackOverride({
+        label: parent.split("/").pop() || allFilesLabel,
+        onPress: up,
+        onReset: () => setFolder(""),
+        title: folder.split("/").pop(),
+      });
+      const hardware = BackHandler.addEventListener("hardwareBackPress", () => {
+        up();
+        return true;
+      });
+      return () => {
+        hardware.remove();
+        publishBackOverride(null);
+      };
+    }, [allFilesLabel, folder]),
+  );
 
   const filtering =
     query.trim().length > 0 || sourceFilter !== "all" || activeType !== "all";
@@ -453,84 +684,76 @@ export function FilesPage() {
 
   const narrowed = sourceFilter !== "all" || sortOrder !== "newest";
 
-  useEffect(() => {
-    publishTopBarAccessory(null);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasAnything) return;
+      publishTopBarAccessory(<FilesViewToggle />);
+      return () => publishTopBarAccessory(null);
+    }, [hasAnything]),
+  );
 
-  const renderRow = useCallback(
-    ({ item }: LegendListRenderItemProps<ListItem>) =>
-      item.kind === "section" ? (
-        <Text
-          style={styles.section}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          accessibilityRole="header"
-        >
-          {item.label}
-        </Text>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={item.row.title}
-          onPress={() => openArtifact(item.row.artifact)}
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-        >
-          <Icon
-            name={artifactIconName(item.row.artifact.payload) as IconName}
-            size={20}
-            color={colors.textMuted}
-            style={styles.rowIcon}
-          />
+  const renderItem = ({ item }: LegendListRenderItemProps<ListItem>) => {
+    switch (item.kind) {
+      case "section":
+        return (
           <Text
-            style={styles.rowTitle}
+            style={[airy.section, styles.section, item.first && airy.sectionFirst]}
             numberOfLines={1}
             maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            accessibilityRole="header"
           >
-            {item.row.title}
+            {item.label}
           </Text>
-        </Pressable>
-      ),
-    [colors.textMuted, openArtifact, styles],
-  );
+        );
+      case "folders":
+        return <FolderShelf folders={item.folders} onOpen={openFolder} />;
+      case "tiles":
+        return (
+          <View style={styles.tiles}>
+            {item.rows.map((row) => (
+              <FileTile
+                key={row.key}
+                row={row}
+                source={thumbnailSourceOf(row)}
+                width={tileWidth}
+                detail={[row.extension.toUpperCase(), fileTime(row.createdAt, now)]
+                  .filter(Boolean)
+                  .join(" · ")}
+                onOpen={openArtifact}
+              />
+            ))}
+          </View>
+        );
+      case "row":
+        return (
+          <FileListRow
+            key={item.row.key}
+            row={item.row}
+            source={thumbnailSourceOf(item.row)}
+            detail={[
+              item.row.extension.toUpperCase(),
+              folder ? null : item.row.inFolder,
+              fileTime(item.row.createdAt, now),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            onOpen={openArtifact}
+          />
+        );
+    }
+  };
 
-  const typeLabel = (type: TypeFilter) =>
-    type === "all"
-      ? t("mobile.activityHub.files.filterAll")
-      : t(`mobile.activityHub.files.types.${type}`);
-  const typeMenuItems = useMemo<NativeMenuItem[]>(
+  const typeOptions = useMemo<FileTypeOption<TypeFilter>[]>(
     () => [
-      {
-        id: "type:all",
-        title: t("mobile.activityHub.files.filterAll"),
-        selected: activeType === "all",
-        onPress: () => setTypeFilter("all"),
-      },
+      { value: "all", label: t("mobile.activityHub.files.types.all") },
       ...presentTypes.map((type) => ({
-        id: `type:${type}`,
-        title: t(`mobile.activityHub.files.types.${type}`),
-        selected: activeType === type,
-        systemImage: TYPE_SYMBOLS[type],
-        onPress: () => setTypeFilter(type),
+        value: type,
+        label: t(`mobile.activityHub.files.types.${type}`),
       })),
     ],
-    [activeType, presentTypes, t],
+    [presentTypes, t],
   );
-  const cycleType = useCallback(() => {
-    const order: TypeFilter[] = ["all", ...presentTypes];
-    setTypeFilter(order[(order.indexOf(activeType) + 1) % order.length] ?? "all");
-  }, [activeType, presentTypes]);
-  const [typeLabelWidth, setTypeLabelWidth] = useState(0);
-  const typeMeasureRef = useRef<ComponentRef<typeof Text>>(null);
-  const currentTypeLabel = typeLabel(activeType);
-  useLayoutEffect(() => {
-    const node = typeMeasureRef.current;
-    node?.measureLayout(node, (_x, _y, width) => {
-      if (width > 0) setTypeLabelWidth(Math.ceil(width));
-    });
-  }, [currentTypeLabel, hasAnything, firstLoad]);
-  const [stackHeight, setStackHeight] = useState(
-    SEARCH_HEIGHT + CONTROL_HEIGHT + STACK_GAP,
-  );
+  const [stackHeight, setStackHeight] = useState(SEARCH_HEIGHT);
 
   if (!signedIn && !hasAnything) {
     return (
@@ -557,18 +780,33 @@ export function FilesPage() {
   }
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
+    >
       <LegendList<ListItem>
+        key={`${mode}:${columns}:${folder}`}
         style={styles.list}
         contentContainerStyle={{
-          paddingBottom: stackHeight + bottomInset + 16,
+          paddingBottom: stackHeight + bottomInset + 28,
+          paddingHorizontal: KIT.gutter,
         }}
         data={items}
         keyExtractor={(item) => item.key}
         getItemType={(item) => item.kind}
-        renderItem={renderRow}
+        renderItem={renderItem}
+        extraData={tileWidth}
         onEndReached={journal.hasMore ? journal.loadMore : undefined}
         onEndReachedThreshold={0.6}
+        ListHeaderComponent={
+          folder === "" && presentTypes.length > 1 ? (
+            <FileTypeStrip
+              options={typeOptions}
+              value={activeType}
+              onChange={setTypeFilter}
+            />
+          ) : null
+        }
         ListFooterComponent={
           journal.loadingMore ? (
             <View style={styles.footer}>
@@ -589,68 +827,20 @@ export function FilesPage() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        estimatedItemSize={48}
+        estimatedItemSize={mode === "grid" ? tileWidth + 66 : 78}
         recycleItems
       />
 
       <KeyboardStickyView
-        style={[styles.stack, { paddingBottom: bottomInset + 6 }]}
+        style={[styles.stack, { paddingBottom: bottomInset + 4 }]}
         offset={{ closed: 0, opened: bottomInset }}
         pointerEvents="box-none"
       >
         <View
+          style={styles.controls}
           pointerEvents="box-none"
           onLayout={(event) => setStackHeight(event.nativeEvent.layout.height)}
         >
-          <View style={styles.controls} pointerEvents="box-none">
-            <Text
-              ref={typeMeasureRef}
-              style={[styles.typeLabel, styles.measure]}
-              onLayout={(event) =>
-                setTypeLabelWidth(Math.ceil(event.nativeEvent.layout.width))
-              }
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            >
-              {currentTypeLabel}
-            </Text>
-            {typeLabelWidth > 0 ? (
-              <NativeMenu
-                label={
-                  <View style={styles.typeControl}>
-                    <Text
-                      style={styles.typeLabel}
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                    >
-                      {currentTypeLabel}
-                    </Text>
-                    <Icon name="chevrons-up-down" size={12} color={colors.textMuted} />
-                  </View>
-                }
-                accessibilityLabel={currentTypeLabel}
-                items={typeMenuItems}
-                width={typeLabelWidth + 12 + 6 + 36}
-                height={CONTROL_HEIGHT}
-                radius={CONTROL_HEIGHT / 2}
-                onFallbackPress={cycleType}
-              />
-            ) : null}
-            <NativeMenu
-              label={
-                <Icon
-                  name="filter"
-                  size={18}
-                  color={narrowed ? colors.accent : colors.text}
-                />
-              }
-              accessibilityLabel={t("mobile.activityHub.files.filterLabel")}
-              items={menuItems}
-              width={CONTROL_HEIGHT}
-              height={CONTROL_HEIGHT}
-              circular
-              onFallbackPress={cycleFilter}
-            />
-          </View>
           <GlassSurface
             legible
             ringed
@@ -682,6 +872,21 @@ export function FilesPage() {
               </Pressable>
             ) : null}
           </GlassSurface>
+          <NativeMenu
+            label={
+              <Icon
+                name="filter"
+                size={18}
+                color={narrowed ? colors.accent : colors.text}
+              />
+            }
+            accessibilityLabel={t("mobile.activityHub.files.filterLabel")}
+            items={menuItems}
+            width={SEARCH_HEIGHT}
+            height={SEARCH_HEIGHT}
+            circular
+            onFallbackPress={cycleFilter}
+          />
         </View>
       </KeyboardStickyView>
 
@@ -700,6 +905,96 @@ export function FilesPage() {
     </View>
   );
 }
+
+type FileCellProps = {
+  row: FileRow;
+  source: FileThumbnailSource;
+  detail: string;
+  onOpen: (artifact: ChatArtifact) => void;
+};
+
+const FileTile = memo(function FileTile({
+  row,
+  source,
+  width,
+  detail,
+  onOpen,
+}: FileCellProps & { width: number }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[row.title, detail].filter(Boolean).join(", ")}
+      onPress={() => onOpen(row.artifact)}
+      style={({ pressed }) => [{ width }, pressed && styles.pressed]}
+    >
+      <FileThumbnail
+        source={source}
+        extension={row.extension}
+        size="tile"
+        width={width}
+        height={Math.round(width * 1.06)}
+      />
+      <Text
+        style={styles.tileTitle}
+        numberOfLines={1}
+        maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+      >
+        {shownName(row)}
+      </Text>
+      <Text
+        style={styles.tileDetail}
+        numberOfLines={1}
+        maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+      >
+        {detail}
+      </Text>
+    </Pressable>
+  );
+});
+
+const FileListRow = memo(function FileListRow({
+  row,
+  source,
+  detail,
+  onOpen,
+}: FileCellProps) {
+  const airy = useAiryList();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[row.title, detail].filter(Boolean).join(", ")}
+      onPress={() => onOpen(row.artifact)}
+      style={({ pressed }) => [airy.row, pressed && airy.pressed]}
+    >
+      <FileThumbnail
+        source={source}
+        extension={row.extension}
+        size="row"
+        {...ROW_THUMBNAIL}
+      />
+      <View style={airy.copy}>
+        <Text
+          style={airy.title}
+          numberOfLines={1}
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+        >
+          {shownName(row)}
+        </Text>
+        {detail ? (
+          <Text
+            style={airy.detail}
+            numberOfLines={1}
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          >
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+});
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
@@ -720,28 +1015,11 @@ const makeStyles = (colors: Colors) =>
     controls: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 8,
-      justifyContent: "flex-end",
-      marginBottom: STACK_GAP,
-    },
-    measure: {
-      opacity: 0,
-      position: "absolute",
-    },
-    typeControl: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 6,
-      justifyContent: "center",
-    },
-    typeLabel: {
-      color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 15,
-      letterSpacing: -0.2,
+      gap: 10,
     },
     search: {
       alignItems: "center",
+      flex: 1,
       flexDirection: "row",
       gap: 10,
       height: SEARCH_HEIGHT,
@@ -750,57 +1028,51 @@ const makeStyles = (colors: Colors) =>
     searchInput: {
       color: colors.text,
       flex: 1,
-      fontFamily: fonts.sans.regular,
+      fontFamily: fonts.sans.medium,
       fontSize: 16,
       letterSpacing: -0.2,
       padding: 0,
     },
     list: {
       flex: 1,
+      marginHorizontal: -KIT.gutter,
     },
     section: {
-      alignSelf: "center",
+      paddingBottom: 12,
+    },
+    tiles: {
+      flexDirection: "row",
+      gap: TILE_GAP,
+      paddingBottom: 22,
+    },
+    pressed: {
+      opacity: 0.6,
+      transform: [{ scale: 0.985 }],
+    },
+    tileTitle: {
+      color: colors.text,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 16,
+      letterSpacing: -0.3,
+      lineHeight: 21,
+      marginTop: 10,
+    },
+    tileDetail: {
       color: colors.textMuted,
       fontFamily: fonts.sans.medium,
-      fontSize: 12,
-      letterSpacing: -0.1,
-      paddingBottom: 6,
-      paddingTop: 16,
-    },
-    row: {
-      alignItems: "center",
-      borderRadius: 12,
-      flexDirection: "row",
-      gap: 14,
-      marginHorizontal: -8,
-      minHeight: 48,
-      paddingHorizontal: 8,
-      paddingVertical: 10,
-    },
-    rowPressed: {
-      backgroundColor: colors.surfaceInset,
-    },
-    rowIcon: {
-      width: 24,
-    },
-    rowTitle: {
-      color: colors.text,
-      flex: 1,
-      fontFamily: fonts.sans.regular,
-      fontSize: 17,
-      letterSpacing: -0.3,
-      minWidth: 0,
+      fontSize: 13.5,
+      fontVariant: ["tabular-nums"],
+      lineHeight: 18,
     },
     footer: {
       paddingVertical: 18,
     },
     emptyFiltered: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 14,
-      lineHeight: 20,
-      paddingHorizontal: 20,
-      paddingVertical: 36,
+      fontFamily: fonts.sans.medium,
+      fontSize: 15,
+      lineHeight: 21,
+      paddingVertical: 48,
       textAlign: "center",
     },
   });

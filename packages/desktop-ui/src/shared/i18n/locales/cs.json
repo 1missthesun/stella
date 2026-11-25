@@ -1136,7 +1136,9 @@
           "code": "Kód",
           "pages": "Stránky",
           "other": "Ostatní"
-        }
+        },
+        "viewGrid": "Zobrazit jako mřížku",
+        "viewList": "Zobrazit jako seznam"
       },
       "schedule": {
         "actionFailed": "Nepovedlo se to.",

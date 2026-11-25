@@ -1126,7 +1126,9 @@
           "code": "Codice",
           "pages": "Pagine",
           "other": "Altro"
-        }
+        },
+        "viewGrid": "Vista griglia",
+        "viewList": "Vista elenco"
       },
       "schedule": {
         "actionFailed": "Non è andata a buon fine.",

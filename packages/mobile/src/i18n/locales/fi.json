@@ -221,7 +221,9 @@
           "code": "Koodi",
           "pages": "Sivut",
           "other": "Muut"
-        }
+        },
+        "viewGrid": "Ruudukkonäkymä",
+        "viewList": "Luettelonäkymä"
       },
       "schedule": {
         "actionFailed": "Se ei onnistunut.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} tiedosto",
+        "other": "{count} tiedostoa"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

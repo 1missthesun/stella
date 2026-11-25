@@ -222,7 +222,9 @@
           "code": "Codice",
           "pages": "Pagine",
           "other": "Altro"
-        }
+        },
+        "viewGrid": "Vista griglia",
+        "viewList": "Vista elenco"
       },
       "schedule": {
         "actionFailed": "Non è andata a buon fine.",
@@ -957,6 +959,13 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "many": "{count} file",
+        "one": "{count} file",
+        "other": "{count} file"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

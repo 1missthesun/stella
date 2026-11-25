@@ -221,7 +221,9 @@
           "code": "Kód",
           "pages": "Oldalak",
           "other": "Egyéb"
-        }
+        },
+        "viewGrid": "Rácsnézet",
+        "viewList": "Listanézet"
       },
       "schedule": {
         "actionFailed": "Nem sikerült.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} fájl",
+        "other": "{count} fájl"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

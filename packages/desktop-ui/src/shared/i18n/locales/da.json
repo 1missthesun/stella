@@ -1116,7 +1116,9 @@
           "code": "Kode",
           "pages": "Sider",
           "other": "Andet"
-        }
+        },
+        "viewGrid": "Gittervisning",
+        "viewList": "Listevisning"
       },
       "schedule": {
         "actionFailed": "Det lykkedes ikke.",

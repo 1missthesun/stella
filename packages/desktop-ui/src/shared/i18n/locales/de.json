@@ -1116,7 +1116,9 @@
           "code": "Code",
           "pages": "Seiten",
           "other": "Sonstiges"
-        }
+        },
+        "viewGrid": "Rasteransicht",
+        "viewList": "Listenansicht"
       },
       "schedule": {
         "actionFailed": "Das hat nicht geklappt.",

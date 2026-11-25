@@ -1126,7 +1126,9 @@
           "code": "Code",
           "pages": "Pages",
           "other": "Autres"
-        }
+        },
+        "viewGrid": "Affichage en grille",
+        "viewList": "Affichage en liste"
       },
       "schedule": {
         "actionFailed": "Ça n’a pas fonctionné.",

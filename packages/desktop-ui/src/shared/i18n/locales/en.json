@@ -1116,7 +1116,9 @@
           "code": "Code",
           "pages": "Pages",
           "other": "Other"
-        }
+        },
+        "viewGrid": "Grid view",
+        "viewList": "List view"
       },
       "schedule": {
         "actionFailed": "That didn’t go through.",

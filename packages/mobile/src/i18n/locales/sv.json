@@ -221,7 +221,9 @@
           "code": "Kod",
           "pages": "Sidor",
           "other": "Övrigt"
-        }
+        },
+        "viewGrid": "Rutnätsvy",
+        "viewList": "Listvy"
       },
       "schedule": {
         "actionFailed": "Det gick inte.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} fil",
+        "other": "{count} filer"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

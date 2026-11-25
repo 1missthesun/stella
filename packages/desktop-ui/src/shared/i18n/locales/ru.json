@@ -1136,7 +1136,9 @@
           "code": "Код",
           "pages": "Страницы",
           "other": "Другое"
-        }
+        },
+        "viewGrid": "Вид сеткой",
+        "viewList": "Вид списком"
       },
       "schedule": {
         "actionFailed": "Не получилось.",

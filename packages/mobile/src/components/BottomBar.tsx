@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -12,8 +12,6 @@ import Animated, {
   Extrapolation,
   interpolate,
   useAnimatedStyle,
-  useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../i18n";
@@ -40,16 +38,12 @@ const ICON_SIZE = 21;
 const TOP_EDGE_FADE = 10;
 const KEYBOARD_SINK = 24;
 const KEYBOARD_GONE_AT = 0.35;
-const LEAVE_MS = 120;
-const RETURN_MS = 220;
 
 export function BottomBar({
   active,
-  visible,
   onSelect,
 }: {
   active: BottomBarTab | null;
-  visible: boolean;
   onSelect: (tab: BottomBarTab) => void;
 }) {
   const colors = useColors();
@@ -61,22 +55,13 @@ export function BottomBar({
   const [selected, setSelected] = useState(active);
   if (active && active !== selected) setSelected(active);
 
-  const shown = useSharedValue(visible ? 1 : 0);
-  useEffect(() => {
-    shown.value = withTiming(visible ? 1 : 0, {
-      duration: visible ? RETURN_MS : LEAVE_MS,
-    });
-  }, [shown, visible]);
-
   const presence = useAnimatedStyle(() => ({
-    opacity:
-      shown.value *
-      interpolate(
-        keyboard.value,
-        [0, KEYBOARD_GONE_AT],
-        [1, 0],
-        Extrapolation.CLAMP,
-      ),
+    opacity: interpolate(
+      keyboard.value,
+      [0, KEYBOARD_GONE_AT],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
     transform: [
       {
         translateY: interpolate(
@@ -93,9 +78,7 @@ export function BottomBar({
 
   return (
     <Animated.View
-      pointerEvents={visible ? "box-none" : "none"}
-      accessibilityElementsHidden={!visible}
-      importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+      pointerEvents="box-none"
       style={[styles.dock, { paddingBottom: padding }, presence]}
     >
       <Backdrop height={BOTTOM_BAR_ROW_HEIGHT + padding} />

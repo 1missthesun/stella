@@ -225,7 +225,9 @@
           "code": "الكود",
           "pages": "الصفحات",
           "other": "أخرى"
-        }
+        },
+        "viewGrid": "عرض شبكي",
+        "viewList": "عرض القائمة"
       },
       "schedule": {
         "actionFailed": "لم تنجح العملية.",
@@ -960,6 +962,16 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} ملفات",
+        "many": "{count} ملفًا",
+        "one": "ملف واحد",
+        "other": "{count} ملف",
+        "two": "ملفان",
+        "zero": "{count} ملف"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

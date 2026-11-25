@@ -1126,7 +1126,9 @@
           "code": "קוד",
           "pages": "דפים",
           "other": "אחר"
-        }
+        },
+        "viewGrid": "תצוגת רשת",
+        "viewList": "תצוגת רשימה"
       },
       "schedule": {
         "actionFailed": "זה לא הצליח.",

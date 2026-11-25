@@ -12,8 +12,8 @@ import {
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBackdrop } from "./AppBackdrop";
+import { useBottomBarHeight } from "../lib/bottom-bar";
 import { publishAppsPage } from "../lib/apps-page-store";
 import { publishBackOverride } from "../lib/main-shell-store";
 import { useT } from "../i18n";
@@ -84,7 +84,7 @@ function AppsHost({
   origin: string;
   visible: boolean;
 }) {
-  const insets = useSafeAreaInsets();
+  const barHeight = useBottomBarHeight();
   const topInset = useShellTopInset();
   const t = useT();
   const [apps, setApps] = useState<WorkspaceApp[] | null>(null);
@@ -101,11 +101,12 @@ function AppsHost({
   const cacheKey = appListCacheKey(owner, origin);
   const frame = frames.find((entry) => entry.slug === selected);
   const frameOpen = visible && frame !== undefined;
+  const frameTitle = frame?.title;
   const backLabel = t("mobile.nav.backToApps");
   useEffect(() => {
     if (!frameOpen) return;
     const close = () => setSelected(null);
-    publishBackOverride({ label: backLabel, onPress: close });
+    publishBackOverride({ label: backLabel, onPress: close, title: frameTitle });
     const hardware = BackHandler.addEventListener("hardwareBackPress", () => {
       close();
       return true;
@@ -114,7 +115,7 @@ function AppsHost({
       hardware.remove();
       publishBackOverride(null);
     };
-  }, [frameOpen, backLabel]);
+  }, [frameOpen, frameTitle, backLabel]);
 
   useEffect(() => {
     mounted.current = true;
@@ -333,7 +334,7 @@ function AppsHost({
             flex: 1,
             display: selected === entry.slug ? "flex" : "none",
             paddingTop: topInset,
-            paddingBottom: insets.bottom,
+            paddingBottom: barHeight,
           }}
           accessibilityElementsHidden={selected !== entry.slug}
           importantForAccessibility={

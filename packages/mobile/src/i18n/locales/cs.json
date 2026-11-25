@@ -223,7 +223,9 @@
           "code": "Kód",
           "pages": "Stránky",
           "other": "Ostatní"
-        }
+        },
+        "viewGrid": "Zobrazit jako mřížku",
+        "viewList": "Zobrazit jako seznam"
       },
       "schedule": {
         "actionFailed": "Nepovedlo se to.",
@@ -958,6 +960,14 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} soubory",
+        "many": "{count} souboru",
+        "one": "{count} soubor",
+        "other": "{count} souborů"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

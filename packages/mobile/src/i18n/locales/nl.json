@@ -221,7 +221,9 @@
           "code": "Code",
           "pages": "Pagina’s",
           "other": "Overig"
-        }
+        },
+        "viewGrid": "Rasterweergave",
+        "viewList": "Lijstweergave"
       },
       "schedule": {
         "actionFailed": "Dat is niet gelukt.",
@@ -956,6 +958,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} bestand",
+        "other": "{count} bestanden"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

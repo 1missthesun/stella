@@ -1116,7 +1116,9 @@
           "code": "Koodi",
           "pages": "Sivut",
           "other": "Muut"
-        }
+        },
+        "viewGrid": "Ruudukkonäkymä",
+        "viewList": "Luettelonäkymä"
       },
       "schedule": {
         "actionFailed": "Se ei onnistunut.",

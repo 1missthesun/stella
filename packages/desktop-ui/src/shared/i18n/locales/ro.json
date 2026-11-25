@@ -1126,7 +1126,9 @@
           "code": "Cod",
           "pages": "Pagini",
           "other": "Altele"
-        }
+        },
+        "viewGrid": "Vizualizare grilă",
+        "viewList": "Vizualizare listă"
       },
       "schedule": {
         "actionFailed": "Nu a reușit.",

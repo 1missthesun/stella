@@ -1106,7 +1106,9 @@
           "code": "Mã",
           "pages": "Trang",
           "other": "Khác"
-        }
+        },
+        "viewGrid": "Dạng lưới",
+        "viewList": "Dạng danh sách"
       },
       "schedule": {
         "actionFailed": "Không thực hiện được.",

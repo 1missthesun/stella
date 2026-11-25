@@ -1156,7 +1156,9 @@
           "code": "الكود",
           "pages": "الصفحات",
           "other": "أخرى"
-        }
+        },
+        "viewGrid": "عرض شبكي",
+        "viewList": "عرض القائمة"
       },
       "schedule": {
         "actionFailed": "لم تنجح العملية.",

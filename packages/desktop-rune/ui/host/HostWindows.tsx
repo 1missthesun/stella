@@ -19,14 +19,18 @@ export type HostWindowsProps = {
   renderApp(window: WindowSnapshot): ReactNode;
   /** Windows to leave out (for example ones the app draws itself). */
   skip?(window: WindowSnapshot): boolean;
+  /** Extra `<window>` props for an app window (custom titlebar, traffic-light inset, chrome scheme). */
+  chrome?(window: WindowSnapshot): WindowChrome | undefined;
 };
 
-export function HostWindows({ renderApp, skip }: HostWindowsProps) {
+export type WindowChrome = { titlebar?: number; trafficLights?: [number, number]; dark?: boolean };
+
+export function HostWindows({ renderApp, skip, chrome }: HostWindowsProps) {
   const windows = useHostWindows();
   return (
     <>
       {windows.filter((w) => !skip?.(w)).map((w) => (
-        <HostWindow key={w.id} window={w}>
+        <HostWindow key={w.id} window={w} chrome={w.kind === "app" ? chrome?.(w) : undefined}>
           {w.kind === "app" ? renderApp(w) : <HostWebView window={w} />}
         </HostWindow>
       ))}
@@ -34,7 +38,7 @@ export function HostWindows({ renderApp, skip }: HostWindowsProps) {
   );
 }
 
-export function HostWindow({ window: w, children }: { window: WindowSnapshot; children?: ReactNode }) {
+export function HostWindow({ window: w, chrome, children }: { window: WindowSnapshot; chrome?: WindowChrome; children?: ReactNode }) {
   useEffect(() => {
     stella.host?.mounted(w.engineId);
     return () => stella.host?.unmounted(w.engineId);
@@ -57,6 +61,7 @@ export function HostWindow({ window: w, children }: { window: WindowSnapshot; ch
       clickThrough={w.ignoreMouseEvents}
       visible={w.visible}
       bg={w.transparent ? "#00000000" : w.backgroundColor}
+      {...chrome}
     >
       {children}
       <MessageBoxes windowId={w.id} isMain={w.engineId === "main"} />

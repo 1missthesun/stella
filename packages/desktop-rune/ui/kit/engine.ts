@@ -12,8 +12,9 @@ export const engine = {
   fonts(files: string[], sans: string, mono: string) {
     void api()?.fonts({ files, sans, mono });
   },
+  /** After the commit that mounts the window, so the engine has a window to paint. */
   background(color: string) {
-    void api()?.background(color);
+    setTimeout(() => void api()?.background(color).catch(() => {}), 0);
   },
   popupMenu(items: NativeMenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }): Promise<string | null> {
     return api()?.menu.popup(items, at) ?? Promise.resolve(null);

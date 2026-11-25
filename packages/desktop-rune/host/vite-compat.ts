@@ -77,7 +77,9 @@ function expandGlob(file: string, patterns: string[]): Map<string, string> {
   const exclude = patterns.filter((p) => p.startsWith("!")).map((p) => new Bun.Glob(p.slice(1)));
   for (const pattern of include) {
     const absolute = pattern.startsWith("/") ? join(DESKTOP_UI_SRC, "..", pattern) : resolve(dir, pattern.startsWith("@/") ? join(DESKTOP_UI_SRC, pattern.slice(2)) : pattern);
-    const root = absolute.slice(0, absolute.search(/[*{[?]/)).replace(/[^/]*$/, "");
+    const wildcard = absolute.search(/[*{[?]/);
+    const root = (wildcard < 0 ? absolute : absolute.slice(0, wildcard)).replace(/[^/]*$/, "");
+    if (!existsSync(root)) continue;
     const glob = new Bun.Glob(relative(root, absolute));
     for (const match of glob.scanSync({ cwd: root, onlyFiles: true })) {
       const path = join(root, match);

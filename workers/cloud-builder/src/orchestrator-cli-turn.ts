@@ -336,7 +336,10 @@ export const dispatchOrchestratorCliTurn = async (args: {
         reason?: unknown;
       })
     | null;
-  if (response.status === 409 && body?.reason === "previous_turn_recovering") {
+  if (
+    response.status === 409 &&
+    (body?.reason === "previous_turn_recovering" || body?.reason === "cancellation_join_pending")
+  ) {
     throw new OrchestratorCliPreviousTurnBusy(
       "The previous Claude Code turn is still finishing.",
     );

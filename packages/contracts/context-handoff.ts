@@ -42,12 +42,16 @@ export const isContextHandoffText = (text: string): boolean => text.startsWith(C
 
 const kilo = (tokens: number): string => `${Math.round(tokens / 1000)}k`;
 
+const NUDGE_MARK = "Stella hands work to a fresh context at";
+
+export const isContextHandoffNudge = (text: string): boolean => text.includes(NUDGE_MARK);
+
 export const contextHandoffNudge = (args: { tokens: number; threshold: number; blocked?: string }): string => {
   const step = Math.max(1, Math.floor(args.threshold * NUDGE_STEP_FRACTION));
   const shown = Math.floor(args.tokens / step) * step;
   return [
     "<system-reminder>",
-    `Your context is about ${kilo(shown)} tokens; Stella hands work to a fresh context at ${kilo(args.threshold)}.`,
+    `Your context is about ${kilo(shown)} tokens; ${NUDGE_MARK} ${kilo(args.threshold)}.`,
     args.blocked
       ? `Before you can, ${args.blocked} Then call \`${CONTEXT_HANDOFF_TOOL}\`.`
       : `Call \`${CONTEXT_HANDOFF_TOOL}\` now, before anything else, then carry on in the fresh context.`,

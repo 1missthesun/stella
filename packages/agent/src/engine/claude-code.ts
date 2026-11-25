@@ -42,7 +42,12 @@ import {
 import { ANTIGRAVITY_MODEL_IDS } from "@stella/contracts/engine-model-catalog";
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
-import { CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW, CONTEXT_HANDOFF_TOOL, CONTEXT_SIZE_DIAGNOSTIC } from "@stella/contracts/context-handoff";
+import {
+  CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
+  CONTEXT_HANDOFF_TOOL,
+  CONTEXT_SIZE_DIAGNOSTIC,
+  isContextHandoffNudge,
+} from "@stella/contracts/context-handoff";
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
 import { stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
 import { createHash } from "node:crypto";
@@ -1334,10 +1339,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             return;
           }
           const request = turn.session.request;
-          if (turn.unsent.length > 0 && request) {
-            const steer = userPrompt(turn.unsent);
+          const owed = turn.unsent.filter((message) => !isContextHandoffNudge(textOf(message.content)));
+          if (owed.length > 0 && request) {
+            const steer = userPrompt(owed);
             try {
-              turn = await startTurn(turn.session, { ...request, prompt: steer, steered: turn.unsent });
+              turn = await startTurn(turn.session, { ...request, prompt: steer, steered: owed });
             } catch (error) {
               fail("error", markedError(error));
               return;

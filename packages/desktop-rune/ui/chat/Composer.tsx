@@ -129,6 +129,8 @@ function ComposerImpl({
   const [focused, setFocused] = useState(false);
   const [composerW, setComposerW] = useState(0);
   const caretRef = useRef<number | null>(null);
+  const valueRef = useRef(message);
+  valueRef.current = message;
   const { canStop, requestStop } = useOptimisticStop(isStreaming, onStop);
   const { screenshot: previewScreenshot, previewIndex: previewScreenshotIndex, setPreviewIndex: setPreviewScreenshotIndex } = useScreenshotPreview(chatContext);
   const pill = usePillExpansion(message);
@@ -240,12 +242,13 @@ function ComposerImpl({
         keys={modelMentionTrigger ? MENU_KEYS : ["Escape"]}
         onKey={onKey}
         onInput={(value) => {
+          valueRef.current = value;
           setMessage(value);
           refreshModelMentionTrigger(value, caretRef.current ?? value.length);
         }}
         onSelection={(sel) => {
           caretRef.current = sel.start;
-          refreshModelMentionTrigger(message, sel.start);
+          refreshModelMentionTrigger(valueRef.current, sel.start);
         }}
         onSubmit={() => {
           if (modelMentionTrigger) return;
@@ -335,7 +338,7 @@ function ComposerImpl({
       </col>
       {previewScreenshot && previewScreenshotIndex !== null ? <ScreenshotPreviewOverlay screenshot={previewScreenshot} index={previewScreenshotIndex} onClose={() => setPreviewScreenshotIndex(null)} /> : null}
       {modelMentionTrigger && suggestionsActive ? (
-        <ComposerModelMentionMenu ref={modelMentionMenuRef} trigger={modelMentionTrigger} anchorTo={inputId} onSelect={selectModelMention} onDismiss={() => setModelMentionTrigger(null)} />
+        <ComposerModelMentionMenu ref={modelMentionMenuRef} trigger={modelMentionTrigger} anchorTo={`${inputId}-box`} onSelect={selectModelMention} onDismiss={() => setModelMentionTrigger(null)} />
       ) : null}
     </col>
   );

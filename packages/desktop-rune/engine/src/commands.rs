@@ -92,8 +92,7 @@ pub fn route(v: Value) {
 }
 
 pub fn quit() {
-    let child = engine::with(|e| e.child.take());
-    if let Some(mut c) = child {
+    if let Some(mut c) = engine::with(|e| e.child.take()) {
         let _ = c.kill();
         let _ = c.wait();
     }

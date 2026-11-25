@@ -33,6 +33,8 @@ struct View {
 
 thread_local! {
     static VIEWS: RefCell<HashMap<u32, View>> = RefCell::new(HashMap::new());
+    /// Views placed before their window had a native handle, with where they go.
+    static WAITING: RefCell<HashMap<u32, (u32, [f32; 4])>> = RefCell::new(HashMap::new());
 }
 
 static PENDING: Mutex<Option<HashMap<u64, RequestAsyncResponder>>> = Mutex::new(None);
@@ -225,6 +227,10 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
     let props = engine::read(|e| e.tree.get(n).map(|node| (*node.props).clone()));
     let Some(p) = props else { return };
     let exists = VIEWS.with(|v| v.borrow().contains_key(&n));
+    if !exists && handle_of(window).is_none() {
+        WAITING.with(|w| w.borrow_mut().insert(n, (window, r)));
+        return;
+    }
     if !exists {
         let t0 = std::time::Instant::now();
         match create(n, window, &p, r) {
@@ -276,7 +282,18 @@ pub fn sync(n: u32, p: &Props) {
 }
 
 pub fn active() -> bool {
-    VIEWS.with(|v| !v.borrow().is_empty())
+    VIEWS.with(|v| !v.borrow().is_empty()) || WAITING.with(|w| !w.borrow().is_empty())
+}
+
+/// Creates the views whose window had no native handle yet when they were first placed (a
+/// launch window's handle arrives with its first frame on macOS).
+pub fn retry_waiting() {
+    let waiting: Vec<(u32, (u32, [f32; 4]))> = WAITING.with(|w| w.borrow_mut().drain().collect());
+    for (n, (window, r)) in waiting {
+        if engine::read(|e| e.tree.get(n).is_some()) {
+            place(n, window, r);
+        }
+    }
 }
 
 /// Drops the WebView (and its web process) of a removed node.
@@ -352,7 +369,7 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
         "webview.zoom" => with_view(n, |w| w.view.zoom(v.get("factor").and_then(|f| f.as_f64()).unwrap_or(1.0)).map_err(|e| e.to_string()))??,
         "webview.url" => return with_view(n, |w| json!(w.view.url().ok())),
         "webview.respond" => {
-            let rid = v.get("rid").and_then(|r| r.as_u64()).unwrap_or(0);
+            let rid = v.get("req").and_then(|r| r.as_u64()).ok_or("webview.respond: needs req")?;
             let responder = PENDING.lock().unwrap_or_else(|e| e.into_inner()).as_mut().and_then(|m| m.remove(&rid)).ok_or("no such request")?;
             let body: Vec<u8> = match v.get("blob").and_then(|b| b.as_u64()) {
                 Some(id) => blobs.get(&(id as u32)).map(|b| b.to_vec()).unwrap_or_default(),

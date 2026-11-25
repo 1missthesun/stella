@@ -223,7 +223,7 @@ For a page screencast or any frames produced elsewhere (an in-app browser tab st
 - Pointer: `onPointer({kind, x, y, button, buttons, clicks, mods})` in the element's own points.
   `kind` is `move`, `down`, `up` or `leave`; `button` is `left`, `right`, `middle`, `back`,
   `forward` or `other`. All buttons reach it, and no press semantics are applied.
-- `onWheel({x, y, dx, dy, mode, mods})`: wheels over a surface never scroll what's around it.
+- `onWheel({x, y, dx, dy, mode, mods})`: wheels over a surface never scroll what's around it. `mode: "line"` is a mouse wheel: `dx`/`dy` are its steps, ±1 per notch (fractions for a free-spinning wheel, more with macOS acceleration). `mode: "pixel"` is a trackpad, in points. Positive moves content right/down (the wheel turned up), the opposite sign of DOM `deltaY`.
 - Keyboard: `onKeyRaw({type: "down" | "up", key, text, mods})` fires for every key while it's
   focused (a press focuses it). Chords the `<window keys>` take pass to the window.
 - `cursor` sets the pointer shape.
@@ -368,6 +368,12 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
   - `POST /control/input {events, window}`
   - `GET /control/elements?window=&key=`
   - `POST /control/request {cmd, ...args}`, for any engine command
+  - `GET /control/screenshot?path=&window=` and `GET /control/record?dir=&fps=&seconds=&window=`
+- `engine.control.screenshot(path, window?)` draws a frame and writes what the window presents
+  to `path` as a PNG, in physical pixels (`{path, width, height, scale}`). It reads the GPU's
+  drawable, so native WebViews (drawn by the OS over the window) are not in it.
+- `engine.control.record(dir, {fps, seconds, window})` writes the presented frames to
+  `dir/frame-NNNNN.png` and replies `{frames, asked, errors}` once all are written.
 - `STELLA_RUNE_APP=<path.tsx>` swaps the app entry (`demo/gallery/App.tsx` exercises everything
   here). An entry that exports `Root` renders its own `<window>`s; one that exports `App` is
   wrapped in `<window id="main">`.

@@ -91,16 +91,44 @@ pub fn end_host_group() {
     }
 }
 
-/// A launcher's terminate (SIGTERM), Ctrl+C or a closed terminal ends the host's whole group
-/// with the engine; `on_quit` runs only on a graceful quit.
+/// The host's own deadline for main's quit on a signal (`SIGNAL_QUIT_DEADLINE_MS`).
+const HOST_QUIT_GRACE: std::time::Duration = std::time::Duration::from_secs(8);
+
+/// The host runs main's own quit on SIGTERM (before-quit cleanups, the runtime told to quit);
+/// it is killed only if that outlasts `HOST_QUIT_GRACE`.
+pub fn end_host(mut c: std::process::Child) {
+    #[cfg(unix)]
+    {
+        end_host_group();
+        let until = std::time::Instant::now() + HOST_QUIT_GRACE;
+        while std::time::Instant::now() < until {
+            if !matches!(c.try_wait(), Ok(None)) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    let _ = c.kill();
+    let _ = c.wait();
+}
+
+/// A launcher's terminate (SIGTERM), Ctrl+C or a closed terminal gives the host's whole group
+/// the same grace as a quit (`HOST_QUIT_GRACE`), then kills what is left and exits.
 #[cfg(unix)]
 fn end_host_on_signals() {
     extern "C" fn on_signal(sig: libc::c_int) {
         let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
-        // SAFETY: killpg and _exit are async-signal-safe.
+        // SAFETY: killpg, nanosleep and _exit are async-signal-safe.
         unsafe {
             if g > 0 {
                 libc::killpg(g, libc::SIGTERM);
+                let step = libc::timespec { tv_sec: 0, tv_nsec: 20_000_000 };
+                let mut waited = std::time::Duration::ZERO;
+                while waited < HOST_QUIT_GRACE && libc::killpg(g, 0) == 0 {
+                    libc::nanosleep(&step, std::ptr::null_mut());
+                    waited += std::time::Duration::from_millis(20);
+                }
+                libc::killpg(g, libc::SIGKILL);
             }
             libc::_exit(128 + sig);
         }
@@ -177,7 +205,7 @@ fn main() {
     let mut spec = windows::app_spec(&p);
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
-    let app = windows::decorate(app, &p).window_options(windows::options(&p));
+    let app = windows::decorate_main(app, &p).window_options(windows::options(&p));
     let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
@@ -195,12 +223,8 @@ fn main() {
     })
     .on_frame_encoded(|f| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_frame(f))
     .on_quit(|_s: &mut Win, _| {
-        let child = engine::with(|e| e.child.take());
-        if let Some(mut c) = child {
-            #[cfg(unix)]
-            end_host_group();
-            let _ = c.kill();
-            let _ = c.wait();
+        if let Some(c) = engine::with(|e| e.child.take()) {
+            end_host(c);
         }
     })
     .run();

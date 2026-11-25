@@ -244,6 +244,15 @@ if (port) {
       if (u.pathname === "/control/elements") {
         return Response.json(await engine.control.elements(u.searchParams.get("window") ?? undefined, u.searchParams.get("key") ?? undefined));
       }
+      if (u.pathname === "/control/screenshot") {
+        const q = (k: string) => u.searchParams.get(k) ?? undefined;
+        return Response.json(await engine.control.screenshot(q("path") ?? "", q("window")).catch((e: Error) => ({ error: e.message })));
+      }
+      if (u.pathname === "/control/record") {
+        const q = (k: string) => u.searchParams.get(k) ?? undefined;
+        const n = (k: string) => (q(k) === undefined ? undefined : Number(q(k)));
+        return Response.json(await engine.control.record(q("dir") ?? "", { fps: n("fps"), seconds: n("seconds"), window: q("window") }).catch((e: Error) => ({ error: e.message })));
+      }
       if (u.pathname === "/control/request") {
         const body = await req.json() as { cmd: string } & Record<string, unknown>;
         return Response.json(await engine.request(body.cmd, body).catch((e: Error) => ({ error: e.message })));

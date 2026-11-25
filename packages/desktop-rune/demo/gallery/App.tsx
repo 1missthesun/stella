@@ -45,8 +45,11 @@ const PAGE = `<!doctype html><html><body style="margin:0;font:14px system-ui;bac
 let n = 0;
 window.addEventListener("message", (e) => { document.getElementById("log").textContent = "from TS: " + JSON.stringify(e.data); });
 document.getElementById("b").onclick = () => window.parent.postMessage({ hello: "from page", n: ++n }, "*");
-fetch("gallery://data/info.json").then((r) => r.json()).then((j) => { document.getElementById("log").textContent += " · protocol: " + j.answer; });
-document.getElementById("img").src = "gallery://data/dot.svg";
+fetch("gallery://data/info.json").then((r) => r.json()).then((j) => { document.getElementById("log").textContent += " · protocol: " + j.answer; window.parent.postMessage({ protocol: j.answer }, "*"); }, (e) => window.parent.postMessage({ protocol: "failed: " + e }, "*"));
+const img = document.getElementById("img");
+img.onload = () => window.parent.postMessage({ image: img.naturalWidth + "x" + img.naturalHeight }, "*");
+img.onerror = () => window.parent.postMessage({ image: "failed" }, "*");
+img.src = "gallery://data/dot.svg";
 </script></body></html>`;
 
 function Button({ id, children, onPress, primary }: { id: string; children: ReactNode; onPress?: () => void; primary?: boolean }) {
@@ -237,6 +240,11 @@ function Docs() {
   const [action, setAction] = useState("");
   return (
     <Section title="Markdown">
+      <row id="g-bubble-row" w="full" justify="end">
+        <col id="g-bubble" maxW="85%" pad={10} radius={14} fill={c.inset}>
+          <text size={13} color={c.text}>A user bubble stops at 85% of its column (maxW="85%"), so a long message wraps well before the far edge at any window width.</text>
+        </col>
+      </row>
       <col id="g-selgroup" gap={4} selectionGroup>
         <text id="g-sel-1" size={13} color={c.weak} selectable>Select across these two paragraphs; selection.get reads the group.</text>
         <text id="g-sel-2" size={13} color={c.weak} selectable>The second paragraph joins the same selection.</text>
@@ -325,7 +333,7 @@ function Web() {
   return (
     <Section title="WebView">
       <webview id="g-web" w="full" h={170} radius={10} html={PAGE} protocols={["gallery"]}
-        onMessage={(m) => setGot(JSON.stringify(m.data))}
+        onMessage={(m) => setGot((g) => `${g === "" ? "" : `${g} `}${JSON.stringify(m.data)}`)}
         onRequest={(r) => {
           if (r.url.endsWith("dot.svg")) {
             void stella.engine.webview.respond(r.rid, { headers: { "content-type": "image/svg+xml" }, body: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><circle cx="24" cy="24" r="20" fill="#3ccf8e"/></svg>` });
@@ -335,7 +343,7 @@ function Web() {
         }} />
       <row gap={8} align="center">
         <Button id="g-web-post" onPress={() => { setN(n + 1); void stella.engine.webview.post("g-web", { ping: n + 1 }); }}>Post to page</Button>
-        <text size={12} color={c.weak}>{`from page: ${got}`}</text>
+        <text id="g-web-got" size={12} color={c.weak}>{`from page: ${got}`}</text>
       </row>
     </Section>
   );

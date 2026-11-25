@@ -144,6 +144,16 @@ pub fn element_event(node: u32, name: &str, extra: serde_json::Value, tx: Option
 }
 
 /// A reply to a request: `{t:"reply", rid, ok, value | error}`.
+/// `reply` from a thread other than the UI thread: the next poll writes it.
+pub fn reply_any_thread(rid: Option<u64>, result: Result<serde_json::Value, String>) {
+    match (rid, result) {
+        (Some(rid), Ok(value)) => crate::windows::send_any_thread(serde_json::json!({ "t": "reply", "rid": rid, "ok": true, "value": value })),
+        (Some(rid), Err(error)) => crate::windows::send_any_thread(serde_json::json!({ "t": "reply", "rid": rid, "ok": false, "error": error })),
+        (None, Err(e)) => eprintln!("stella-engine: command failed: {e}"),
+        (None, Ok(_)) => {}
+    }
+}
+
 pub fn reply(rid: Option<u64>, result: Result<serde_json::Value, String>) {
     let Some(rid) = rid else {
         if let Err(e) = result {

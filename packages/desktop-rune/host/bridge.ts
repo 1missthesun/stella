@@ -184,6 +184,8 @@ export type DialogOptions = { title?: string; defaultPath?: string; filters?: Fi
 export type ClipboardRead = { text: string; html: string | null; files: string[]; image: string | null; formats: string[] };
 export type WindowBounds = { x: number; y: number; width: number; height: number; scaleFactor: number; maximized: boolean; minimized: boolean; fullScreen: boolean };
 export type ElementInfo = { key: string | null; path: string; role: string; label: string | null; text: string | null; rect: [number, number, number, number]; opacity: number; focused: boolean; focusable: boolean; inert: boolean; exiting: boolean; fill: string; textColor: string | null };
+export type FrameShot = { path: string; width: number; height: number; scale: number };
+export type FrameRecording = { dir: string; frames: number; asked: number; fps: number; errors: string[] };
 /** A Rune script event (`--script` format): move/down/up/tap/double-click/drag/scroll/wheel/key/type/paste/ime/drop_files… */
 export type InputEvent = Record<string, unknown> & { type?: string; t?: number };
 
@@ -334,7 +336,7 @@ export const engine = {
     /** Answers a custom-scheme `request` event. */
     respond: (rid: number, r: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array }) => {
       const b = r.body instanceof Uint8Array ? blob(r.body) : undefined;
-      const p = request("webview.respond", { rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
+      const p = request("webview.respond", { req: rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
       return b ? p.finally(() => freeBlob(b)) : p;
     },
   },
@@ -343,6 +345,10 @@ export const engine = {
     input: (events: InputEvent[], window?: string) => request("control.input", { events, window }),
     /** Every element Rune drew in a window: keys, roles, labels, text, rects, focus. */
     elements: (window?: string, key?: string) => request<ElementInfo[]>("control.elements", { window, key }),
+    /** Writes the window's next presented frame to `path` as a PNG, in physical pixels. */
+    screenshot: (path: string, window?: string) => request<FrameShot>("control.screenshot", { path, window }),
+    /** Writes the window's presented frames to `dir/frame-NNNNN.png` at `fps` for `seconds`. */
+    record: (dir: string, o: { fps?: number; seconds?: number; window?: string } = {}) => request<FrameRecording>("control.record", { dir, ...o }),
   },
   quit: () => command({ cmd: "quit" }),
 };

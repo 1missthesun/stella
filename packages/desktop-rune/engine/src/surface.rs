@@ -160,7 +160,10 @@ pub fn build(eng: &Engine, n: u32, p: &Props) -> El {
     }
     if p.listens("wheel") {
         e = e.on_wheel(move |_s: &mut Win, w: rune::WheelEvent, tx: &mut Tx| {
-            let ev = json!({ "x": w.x, "y": w.y, "dx": w.dx, "dy": w.dy, "mode": if w.precise { "pixel" } else { "line" }, "mods": mods_json(w.mods) });
+            let ev = match w.lines.filter(|_| !w.precise) {
+                Some((lx, ly)) => json!({ "x": w.x, "y": w.y, "dx": lx, "dy": ly, "mode": "line", "mods": mods_json(w.mods) }),
+                None => json!({ "x": w.x, "y": w.y, "dx": w.dx, "dy": w.dy, "mode": "pixel", "mods": mods_json(w.mods) }),
+            };
             element_event(n, "wheel", ev, Some(tx));
             true
         });

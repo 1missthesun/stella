@@ -132,7 +132,10 @@ export function SavedLoginsWaitingCard({
   }
 
   return (
-    <Card title={<CodeLine id="compare" name={name} code={waiting.code} />}>
+    <Card
+      title={t("mobile.savedLogins.waitingTitle")}
+      line={<CodeLine id="compare" name={name} code={waiting.code} />}
+    >
       <UseAnother disabled={busy} run={run} />
       <Action
         primary

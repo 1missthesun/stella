@@ -122,6 +122,7 @@ type Answered = Pick<SavedValuesJoin, "joinId" | "device" | "commit"> & {
 
 const ACTIVE_ANSWER_MS = 15 * 60_000;
 const POSTED_VISIBLE_MS = 30_000;
+const EXPIRY_SLACK_MS = 250;
 
 const computerName = () =>
   hostname().trim().replace(/\.(local|localdomain|lan|home)$/i, "").slice(0, 120) || "Computer";
@@ -203,6 +204,7 @@ export class SavedValuesSync {
   private posted: SavedValuesJoin | null = null;
   private answered = new Map<string, Answered>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private expiry: ReturnType<typeof setTimeout> | null = null;
   private retry: ReturnType<typeof setInterval> | null = null;
   private userCheck: ReturnType<typeof setInterval> | null = null;
   private running: Promise<void> | null = null;
@@ -363,8 +365,25 @@ export class SavedValuesSync {
     this.retry = null;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.stopWaitingForExpiry();
     this.stopWaitingForUser();
     this.setStatus({ active: false });
+  }
+
+  private waitForExpiry(joins: readonly SavedValuesJoin[], now: number): void {
+    this.stopWaitingForExpiry();
+    const ends = joins.flatMap((join) => (join.state === "open" && join.expiresAt > now ? [join.expiresAt - now] : []));
+    if (ends.length === 0) return;
+    this.expiry = setTimeout(() => {
+      this.expiry = null;
+      this.schedule(0);
+    }, Math.min(...ends) + EXPIRY_SLACK_MS);
+    this.expiry.unref?.();
+  }
+
+  private stopWaitingForExpiry(): void {
+    if (this.expiry) clearTimeout(this.expiry);
+    this.expiry = null;
   }
 
   private waitForUser(): void {
@@ -622,6 +641,7 @@ export class SavedValuesSync {
     }
 
     this.stopWaitingForUser();
+    this.waitForExpiry(remote.joins, now);
     let check = checkRoster(remote.roster, state.pin);
     if (!check.ok && check.reason === "reset") {
       delete state.pin;
@@ -814,7 +834,11 @@ export class SavedValuesSync {
     }
     const unanswered = remote.joins.filter(
       (join) =>
-        join.state === "open" && !join.listedNonce && join.device.deviceId !== state.deviceId && join.expiresAt > now,
+        join.state === "open" &&
+        !join.listedNonce &&
+        !this.answered.has(join.joinId) &&
+        join.device.deviceId !== state.deviceId &&
+        join.expiresAt > now,
     );
     if (unanswered.length === 0) return;
     if (this.options.isUserActive?.() === false) {

@@ -320,10 +320,10 @@ function SyncDevices({
             ? { label: t("settings.secureValues.waitingFor", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") }) }
             : standing === "waiting" && waiting?.code
               ? {
-                  label: t("global.savedValuesDevices.matchTitle", {
+                  label: t("global.savedValuesDevices.getTitle"),
+                  sub: `${t("global.savedValuesDevices.matchTitle", {
                     name: waiting.approver || t("global.savedValuesDevices.otherDevice"),
-                  }),
-                  sub: formatJoinCode(waiting.code),
+                  })}: ${formatJoinCode(waiting.code)}`,
                   action: "confirm" as const,
                   button: t("global.savedValuesDevices.matches"),
                 }

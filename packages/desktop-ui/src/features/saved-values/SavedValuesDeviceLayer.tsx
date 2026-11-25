@@ -147,12 +147,13 @@ export const SavedValuesDeviceLayer = () => {
     <Dialog open onOpenChange={(next) => !next && !busy && dismiss(matchKey)}>
       <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-match="">
         <DialogHeader>
-          <DialogTitle>
-            {t("global.savedValuesDevices.matchTitle", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") })}
-          </DialogTitle>
+          <DialogTitle>{t("global.savedValuesDevices.getTitle")}</DialogTitle>
           <DialogCloseButton aria-label={t("common.close")} />
         </DialogHeader>
         <DialogBody className="remote-execution-consent-body">
+          <DialogDescription className="remote-execution-consent-text">
+            {t("global.savedValuesDevices.matchTitle", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") })}
+          </DialogDescription>
           <div className="saved-values-device-code" data-saved-values-code="">
             {formatJoinCode(waiting.code)}
           </div>

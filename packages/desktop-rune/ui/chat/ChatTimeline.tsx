@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
+import type { ChatListBinding } from "./use-chat-scroll-management";
 import { buildChatTimelineItems, type ChatTimelineItem } from "@/features/chat/lib/chat-timeline-items";
 import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
@@ -58,6 +58,12 @@ const USER_RUN_GAP = 8;
 const CARD_RUN_GAP = 8;
 const EXTRA_TAIL_GAP = 14;
 const CONTENT_MAX_W = 800;
+const SESSION_TOP_FADE = 24;
+const SESSION_END_FADE_STOPS: [number, number][] = [
+  [0.4, 0.86],
+  [0.72, 0.62],
+  [1, 0.4],
+];
 
 const isCardRow = (row: EventRowViewModel): boolean =>
   row.kind === "assistant" &&
@@ -263,7 +269,7 @@ export const ChatTimeline = memo(function ChatTimeline({
       scrollY
       stickBottom={list?.follow ?? true}
       selectionGroup
-      scrollFade={padding.pb > 0 ? { bottom: { size: padding.pb } } : undefined}
+      scrollFade={{ top: { size: SESSION_TOP_FADE, linear: true }, ...(padding.pb > 0 ? { bottom: { size: padding.pb, stops: SESSION_END_FADE_STOPS } } : {}) }}
       onScroll={list?.onScroll}
       onLayout={() => {
         if (readyRef.current) return;

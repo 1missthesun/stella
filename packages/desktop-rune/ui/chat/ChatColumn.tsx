@@ -1,0 +1,314 @@
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
+import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
+import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
+import { ComposerNotice } from "@/app/chat/ComposerNotice";
+import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
+import { CloudConnectorConnectCard } from "@/features/cloud/CloudConnectorConnectCard";
+import { UserAskList } from "@/features/user-ask/UserAskList";
+import { ConversationEvents } from "@/app/chat/ConversationEvents";
+import { MessageReplyContext } from "@/app/chat/message-reply-context";
+import { ConversationFocusOverlay } from "@/app/chat/ConversationFocusOverlay";
+import { useConversationFocus } from "@/features/chat/services/conversation-focus-store";
+import { useChatMessages } from "@/context/use-chat-messages";
+import { Composer } from "@/app/chat/Composer";
+import { HomeContent } from "../shell/home/HomeContent";
+import { buildInlineWorkingIndicatorProps } from "@/features/chat/working-indicator-state";
+import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-aloud";
+import type { ChatColumnProps } from "@/features/chat/chat-column-types";
+import { useOverdueStop } from "@/features/chat/hooks/use-overdue-stop";
+import { useAssistantReplyPeek } from "@/features/chat/hooks/use-assistant-reply-peek";
+import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat-messages";
+import { useComposerMessage, type ComposerMessageStore } from "@/features/chat/hooks/use-composer-message-state";
+import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
+import { useT } from "@/shared/i18n";
+import { useTabStageVisible } from "@/features/workspace-display/tab-stage-visible";
+import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
+import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
+import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
+import { Icon, Icons, withStroke } from "../kit";
+import { derive, mix, useTokens } from "../theme";
+import type { LegendContentStyle } from "./ChatTimeline";
+import { useFileDrop } from "./use-file-drop";
+import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
+import { panelSurface } from "./surfaces";
+
+export type { ChatColumnProps };
+
+const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
+  maxWidth: "min(50rem, 100%)",
+  marginLeft: "auto",
+  marginRight: "auto",
+  paddingLeft: 24,
+  paddingRight: 24,
+  paddingTop: 112,
+  paddingBottom: 28,
+};
+
+const HOME_LEAVE_MS = 280;
+const COMPOSER_OVERLAP = 12;
+const SCROLL_BUTTON_SIZE = 32;
+const SCROLL_BUTTON_BOTTOM = 28;
+const SCROLLBAR_W = 10;
+
+type StoreBackedComposerProps = Omit<ComponentProps<typeof Composer>, "message"> & { messageStore: ComposerMessageStore };
+
+const StoreBackedComposer = memo(function StoreBackedComposer({ messageStore, ...props }: StoreBackedComposerProps) {
+  const message = useComposerMessage(messageStore);
+  return <Composer {...props} message={message} />;
+});
+
+const AboveComposerCards = memo(function AboveComposerCards({ conversationId }: { conversationId: string | null }) {
+  return (
+    <>
+      <ConnectorConnectCard conversationId={conversationId} />
+      <CloudConnectorConnectCard conversationId={conversationId} />
+      <CloudBrowserInterventionCard conversationId={conversationId} />
+      <UserAskList conversationId={conversationId} />
+      <ComposerNotice conversationId={conversationId} />
+    </>
+  );
+});
+
+function ScrollToBottomButton({ onPress }: { onPress: () => void }) {
+  const t = useT();
+  const tokens = useTokens();
+  const surface = panelSurface(tokens);
+  return (
+    <box absolute={{ bottom: SCROLL_BUTTON_BOTTOM + COMPOSER_OVERLAP, left: 0, right: 0 }} h={SCROLL_BUTTON_SIZE} center inert={false}>
+      <box
+        role="button"
+        focusable
+        label={t("app.chat.column.scrollToBottom")}
+        w={SCROLL_BUTTON_SIZE}
+        h={SCROLL_BUTTON_SIZE}
+        center
+        radius={SCROLL_BUTTON_SIZE / 2}
+        gradient={surface.gradient}
+        border={surface.border}
+        hoverBorder={tokens.c.panelSurfaceBorderHover}
+        shadows={[...tokens.shadow.sm, ...surface.shadows]}
+        pressScale={0.95}
+        hoverGroup
+        focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
+        onPress={onPress}
+        enter="fade"
+        exit="fade"
+      >
+        <box hoverColor={tokens.c.textStrong}>
+          <Icon icon={withStroke(Icons.stella.ChevronDown, 2.5)} size={16} color={tokens.c.textWeak} />
+        </box>
+      </box>
+    </box>
+  );
+}
+
+/** `.chat-scrollbar`: the overlay thumb the scroll hook drives, draggable, at the layer's right edge. */
+function ChatScrollbar({ bind, onDrag }: { bind: (handle: ChatScrollThumbHandle | null) => void; onDrag: (dy: number, phase: "start" | "move" | "end") => void }) {
+  const tokens = useTokens();
+  const [thumb, setThumb] = useState<ChatScrollThumb>({ top: 0, height: 0, visible: false });
+  const [hovered, setHovered] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    bind((next) => setThumb((prev) => (prev.top === next.top && prev.height === next.height && prev.visible === next.visible ? prev : next)));
+    return () => bind(null);
+  }, [bind]);
+  const look = derive(tokens, "chat-scrollbar", (k) => ({ rest: mix(k.c.foreground, 28, "transparent"), active: mix(k.c.foreground, 35, "transparent") }));
+  const wide = hovered || dragging;
+  return (
+    <box absolute={{ top: 0, right: 0, bottom: 0 }} w={SCROLLBAR_W} raise={15} onHover={setHovered}>
+      {thumb.height > 0 ? (
+        <box
+          absolute={{ top: thumb.top, right: wide ? 1 : 2 }}
+          w={wide ? 8 : 6}
+          h={thumb.height}
+          radius={999}
+          fill={dragging ? look.active : look.rest}
+          opacity={thumb.visible || wide ? 1 : 0}
+          motion={{ dur: 0.2, bounce: 0 }}
+          cursor={dragging ? "grabbing" : "grab"}
+          onDrag={(d) => {
+            if (d.phase === "start") setDragging(true);
+            if (d.phase === "end") setDragging(false);
+            onDrag(d.dy, d.phase);
+          }}
+        />
+      ) : null}
+    </box>
+  );
+}
+
+export const ChatColumn = memo(function ChatColumn({ conversation, composer, scroll, composerEntering, conversationId, showHomeContent: homeSurface }: ChatColumnProps) {
+  const tabStageVisible = useTabStageVisible();
+  const showHomeContent = Boolean(homeSurface) && !tabStageVisible;
+  const focus = useConversationFocus(conversationId);
+  const homeObscuresChat = showHomeContent && !focus;
+  const { noteManualScroll, showScrollButton, scrollToBottom, list, isFollowingLatest, isNearBottom, isUserScrolling } = scroll;
+  const bindThumb = scroll.thumbRef as unknown as (handle: ChatScrollThumbHandle | null) => void;
+
+  const dragStartRef = useRef<number | null>(null);
+  const handleThumbDrag = useCallback(
+    (dy: number, phase: "start" | "move" | "end") => {
+      const ref = list.ref.current;
+      if (!ref) return;
+      const state = ref.getState();
+      if (phase === "start") dragStartRef.current = state.scroll;
+      if (phase === "end") {
+        dragStartRef.current = null;
+        return;
+      }
+      if (dragStartRef.current === null) return;
+      noteManualScroll();
+      const range = Math.max(1, state.contentLength - state.scrollLength);
+      const next = Math.max(0, Math.min(range, dragStartRef.current + (dy / Math.max(1, state.scrollLength)) * range));
+      void ref.scrollToOffset({ offset: next, animated: false });
+    },
+    [list.ref, noteManualScroll],
+  );
+
+  const liveMessages = useChatMessages();
+  const messages = useDeferredChatMessages(liveMessages, isUserScrolling, conversationId);
+  const assistantReplyPeek = useAssistantReplyPeek({ messages, isFollowingLatest, isNearBottom });
+
+  const [homeVisible, setHomeVisible] = useState(Boolean(showHomeContent));
+  if (showHomeContent && !homeVisible) setHomeVisible(true);
+  const homeLeaving = homeVisible && !showHomeContent;
+  useEffect(() => {
+    if (!homeLeaving) return;
+    const timer = setTimeout(() => setHomeVisible(false), HOME_LEAVE_MS);
+    return () => clearTimeout(timer);
+  }, [homeLeaving]);
+
+  useReadAloud(messages);
+
+  const overdueStop = useOverdueStop({ working: Boolean(conversation.streaming.isStreaming), messageId: conversation.streaming.pendingUserMessageId, stop: composer.onStop });
+  const indicatorProps = useMemo(
+    () =>
+      buildInlineWorkingIndicatorProps({
+        isStreaming: Boolean(conversation.streaming.isStreaming),
+        isToolActive: Boolean(conversation.streaming.isToolActive),
+        answerLanded: Boolean(conversation.streaming.answerLanded),
+        activeToolName: conversation.streaming.activeToolName,
+        activeToolCallId: conversation.streaming.activeToolCallId,
+        runtimeStatusText: conversation.streaming.runtimeStatusText,
+        isCompacting: Boolean(conversation.streaming.isCompacting),
+        onStop: overdueStop,
+      }),
+    [
+      conversation.streaming.isStreaming,
+      conversation.streaming.isToolActive,
+      conversation.streaming.answerLanded,
+      conversation.streaming.activeToolName,
+      conversation.streaming.activeToolCallId,
+      conversation.streaming.runtimeStatusText,
+      conversation.streaming.isCompacting,
+      overdueStop,
+    ],
+  );
+  const { isDragOver, dropHandlers } = useFileDrop({ setChatContext: composer.setChatContext });
+
+  const replyComposerRef = useRef(composer);
+  replyComposerRef.current = composer;
+  const handleReplyToMessage = useCallback((text: string) => {
+    const quoted = text.trim();
+    if (!quoted) return;
+    const current = replyComposerRef.current;
+    current.setSelectedText(quoted);
+    current.requestFocus?.();
+  }, []);
+
+  const renderComposer = (surface: "chat" | "home", replyPeek: ComponentProps<typeof Composer>["replyPeek"]) => {
+    const isActiveSurface = surface === "home" ? showHomeContent : !showHomeContent;
+    return (
+      <StoreBackedComposer
+        messageStore={composer.messageStore}
+        setMessage={composer.setMessage}
+        chatContext={composer.chatContext}
+        setChatContext={composer.setChatContext}
+        selectedText={composer.selectedText}
+        setSelectedText={composer.setSelectedText}
+        isStreaming={conversation.streaming.isStreaming}
+        canSubmit={composer.canSubmit}
+        focusRequestId={isActiveSurface ? composer.focusRequestId : undefined}
+        conversationId={conversationId}
+        onSend={composer.onSend}
+        onStop={composer.onStop}
+        isDragOver={isDragOver}
+        replyPeek={replyPeek}
+        catchUp={CATCH_UP_ENABLED && surface === "chat"}
+        suggestionsActive={isActiveSurface}
+      />
+    );
+  };
+
+  const { visible: replyPeekVisible, previewText: replyPeekText, dismiss: dismissReplyPeek } = assistantReplyPeek;
+  const chatReplyPeek = useMemo(
+    () => (replyPeekVisible ? { text: replyPeekText, onJumpToBottom: () => scrollToBottom("smooth"), onDismiss: dismissReplyPeek } : null),
+    [dismissReplyPeek, replyPeekText, replyPeekVisible, scrollToBottom],
+  );
+
+  const extraTail = conversation.extraTail;
+  const replying = Boolean(conversation.streaming.isStreaming);
+  const chatTail = useMemo(
+    () => (
+      <>
+        {extraTail}
+        <UsageLimitChatCard conversationId={conversationId} />
+        <SafeguardChatCard conversationId={conversationId} replying={replying} />
+        <WaitingMessages />
+      </>
+    ),
+    [conversationId, extraTail, replying],
+  );
+
+  return (
+    <row w="full" h="full" grow={1} minW={0} minH={0} align="stretch">
+      <row grow={1} minW={0} minH={0} align="stretch" opacity={homeObscuresChat ? 0 : 1} motion={{ dur: 0.22, bounce: 0 }} inert={homeObscuresChat}>
+        <col grow={1} minW={0} minH={0} {...dropHandlers}>
+          <SignedOutBanner />
+          <SessionPausedBanner />
+          <box grow={1} minH={0} w="full" clip={0} mb={-COMPOSER_OVERLAP}>
+            <box w="full" h="full" hidden={scroll.isOpeningScroll} inert={Boolean(focus)}>
+              <MessageReplyContext.Provider value={handleReplyToMessage}>
+                <ConversationEvents
+                  messages={messages}
+                  conversationId={conversationId}
+                  pendingUserMessageId={conversation.streaming.pendingUserMessageId}
+                  indicator={indicatorProps}
+                  hasOlderMessages={conversation.history.hasOlderMessages}
+                  isLoadingOlder={conversation.history.isLoadingOlder}
+                  isLoadingHistory={conversation.history.isInitialLoading}
+                  list={list}
+                  className="session-content"
+                  contentContainerStyle={FULL_CHAT_CONTENT_STYLE}
+                  estimatedItemSize={140}
+                  extraTail={chatTail}
+                  takesMessageJumps
+                  onLoadOlder={conversation.history.loadOlder}
+                />
+              </MessageReplyContext.Provider>
+              {showScrollButton && !assistantReplyPeek.visible ? <ScrollToBottomButton onPress={() => scrollToBottom("smooth")} /> : null}
+            </box>
+            <ConversationFocusOverlay conversationId={conversationId} />
+          </box>
+          <AboveComposerCards conversationId={conversationId} />
+          <col w="full" enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
+            {renderComposer("chat", chatReplyPeek)}
+          </col>
+        </col>
+        <ChatScrollbar bind={bindThumb} onDrag={handleThumbDrag} />
+      </row>
+      {homeVisible && !focus ? (
+        <col absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} raise={10} inert={homeLeaving} {...dropHandlers}>
+          <HomeContent leaving={homeLeaving}>
+            {conversation.extraTail ? <col inert={!showHomeContent}>{conversation.extraTail}</col> : null}
+            <col w="full" inert={!showHomeContent}>
+              {showHomeContent ? <ComposerNotice conversationId={conversationId} /> : null}
+              {renderComposer("home", null)}
+            </col>
+          </HomeContent>
+        </col>
+      ) : null}
+    </row>
+  );
+});

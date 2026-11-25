@@ -8,7 +8,7 @@ import { showSibling, useViewerSiblings, type StripEntry, type StripSet } from "
 import { DisplayTabIcon } from "../../features/workspace-display/icons";
 import { Icon, Icons } from "../../kit";
 import { look, mixOklch, derive, useTokens, type Tokens } from "../../theme";
-import { popupMenuBuilder } from "../menu-sections";
+import { addContextMenu } from "../../replace/platform/context-menu/context-menu";
 import { registerSiblingNav } from "./sibling-nav";
 
 const stripLook = (t: Tokens) =>
@@ -85,12 +85,12 @@ function StripItem({ entry, current, fromId, tooltip, size }: { entry: FileEntry
       focusRing={{ width: 2, offset: 0, color: t.c.ring, radius: 8 }}
       motion={{ dur: 0.12 }}
       onPress={current ? undefined : () => showSibling(fromId, entry)}
-      onContextMenu={(at) => void popupMenuBuilder(async () => {
+      onContextMenu={(at) => addContextMenu(at, async () => {
         const open = () => showSibling(fromId, entry);
         const path = drivePath ? null : (source?.filePath ?? entry.filePath);
         if (!path) return [[{ label: translateNow("contextMenu.open"), run: open }]];
         return await fileMenu(path, { open, image: source?.kind === "image" })();
-      }, at)}
+      }, { claims: ["image"] })}
     >
       {image ? (
         <image src={image} fit="cover" w="full" h="full" />

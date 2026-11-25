@@ -310,7 +310,8 @@ export function ShellTopBarTabs({ room }: { room: number }) {
               hoverGroup
               raise={active || dragging ? 2 : undefined}
               x={shiftFor(index)}
-              motion={drag && !(dragging && !drag.settling) ? { dur: 0.16 } : { dur: 0 }}
+              motion={{ dur: 0.16 }}
+              instant={!(drag && !(dragging && !drag.settling))}
               onLayout={(r) => {
                 widths.current.set(tab.id, { x: r.x, w: r.w });
                 if (tab.id === shownTabId) syncNotch();

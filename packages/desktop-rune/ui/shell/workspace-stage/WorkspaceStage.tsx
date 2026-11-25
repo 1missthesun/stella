@@ -27,7 +27,7 @@ import { look, mixOklch, useTokens, derive, type Tokens } from "../../theme";
 import { useHostWindows, HostWindow } from "../../host/HostWindows";
 import { SHELL_TOPBAR_HEIGHT } from "../metrics";
 import { useWindowKeys } from "../window-keys";
-import { popupMenuBuilder } from "../menu-sections";
+import { addContextMenu } from "../../replace/platform/context-menu/context-menu";
 import { useOpenTabNotch } from "../topbar/open-tab-notch";
 import { SidebarSectionBody } from "../sidebar-sections/SidebarSectionBody";
 import { DeferredDisplayContent } from "../sidebar-sections/DeferredDisplayContent";
@@ -504,7 +504,7 @@ const IMMEDIATE_KINDS: ReadonlySet<DisplayTab["kind"]> = new Set(["image", "vide
 
 const itemMenu = (id: string, at: { x: number; y: number }, windowId?: string) => {
   const menu = viewerItems.menu(id);
-  if (menu) void popupMenuBuilder(menu, { ...at, window: windowId });
+  if (menu) addContextMenu({ ...at, window: windowId }, menu, { claims: viewerItems.get(id).actions?.copy ? ["image"] : [] });
 };
 
 function ViewerBody({ item, surface, active }: { item: DisplayTab; surface: ViewerSurface; active: boolean }) {
@@ -655,7 +655,8 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
       hidden={hidden}
       inert={hidden}
       enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
-      motion={held || live ? { dur: 0 } : { dur: 0.26 }}
+      motion={{ dur: 0.26 }}
+      instant={Boolean(held || live)}
       onContextMenu={item ? (at) => itemMenu(item.id, at) : undefined}
     >
       {item ? (

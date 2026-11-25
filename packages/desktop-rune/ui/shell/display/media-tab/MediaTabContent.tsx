@@ -1,0 +1,343 @@
+import { useCallback, useContext, useMemo, useState } from "react";
+import type { MediaAsset } from "@stella/contracts/desktop/display-payload";
+import { displayTabs } from "@/features/workspace-display/tab-store";
+import { fileViewer } from "@/features/workspace-display/file-viewer-store";
+import type { DisplayTabKind } from "@/features/workspace-display/types";
+import { showSibling, useViewerSiblings } from "@/shell/workspace-stage/viewer-siblings";
+import { removeGeneratedMediaItem } from "@/shell/display/payload-to-tab-spec";
+import type { MediaTabItem } from "@/shell/display/media-tab/media-item";
+import { useDisplayFileBlobs, type DisplayFileBlob } from "@/shared/hooks/use-display-file-data";
+import { useMediaStream } from "@/shared/hooks/use-media-stream-url";
+import { copyImageBlob } from "@/shell/media-clipboard";
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
+import { useT } from "@/shared/i18n";
+import { ViewerItemContext, useRegisterViewerActions } from "@/shell/workspace-stage/viewer-item-context";
+import { Button, EmptyState } from "../../../kit";
+import { look, useTokens } from "../../../theme";
+
+const filenameOf = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
+
+const mediaKindOf = (item: MediaTabItem): DisplayTabKind => {
+  switch (item.asset.kind) {
+    case "image":
+    case "video":
+    case "audio":
+      return item.asset.kind;
+    default:
+      return "media";
+  }
+};
+
+const LONG_PROMPT_CHARS = 100;
+
+function HeroPrompt({ text, viewer }: { text: string; viewer: boolean }) {
+  const t = useTokens();
+  const [expanded, setExpanded] = useState(false);
+  const long = text.length > LONG_PROMPT_CHARS;
+  return (
+    <text
+      {...look(viewer ? 11 : 13, 400)}
+      color={viewer ? t.c.textWeak : t.c.textStrong}
+      textAlign={viewer ? "center" : "start"}
+      maxLines={expanded ? undefined : 2}
+      truncate={expanded ? undefined : true}
+      title={long && !expanded ? text : undefined}
+      onPress={long ? () => setExpanded((open) => !open) : undefined}
+    >
+      {text}
+    </text>
+  );
+}
+
+function MediaActions({ filePath, copyText, copyImage, extra }: { filePath?: string; copyText?: string; copyImage?: DisplayFileBlob | null; extra?: { label: string; run: () => void }[] }) {
+  const t = useTokens();
+  const [message, setMessage] = useState<string | null>(null);
+  const save = useCallback(async () => {
+    if (!filePath) return;
+    const result = await window.electronAPI?.system?.saveFileAs?.(filePath, filenameOf(filePath));
+    if (!result || result.canceled) return;
+    setMessage(result.ok ? "Saved" : (result.error ?? "Could not save"));
+  }, [filePath]);
+  const copy = useCallback(async () => {
+    try {
+      if (copyImage) {
+        await copyImageBlob(copyImage.blob);
+        setMessage("Copied");
+        return;
+      }
+      if (copyText != null) setMessage((await copyTextToClipboard(copyText)) ? "Copied" : "Could not copy");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not copy");
+    }
+  }, [copyImage, copyText]);
+  const canSave = Boolean(filePath && window.electronAPI?.system?.saveFileAs);
+  const canCopy = Boolean(copyText != null || copyImage);
+  if (!canSave && !canCopy && !extra?.length) return null;
+  return (
+    <row gap={6} align="center" wrap>
+      {canSave ? <Button size="small" variant="secondary" onPress={() => void save()}>Save</Button> : null}
+      {canCopy ? <Button size="small" variant="secondary" onPress={() => void copy()}>Copy</Button> : null}
+      {extra?.map((action) => (
+        <Button key={action.label} size="small" variant="secondary" onPress={action.run}>
+          {action.label}
+        </Button>
+      ))}
+      {message ? (
+        <text {...look(11, 400)} color={t.c.textWeak} enter="fade">
+          {message}
+        </text>
+      ) : null}
+    </row>
+  );
+}
+
+function ImageView({ filePaths, viewer, prompt, onSwipe }: { filePaths: string[]; viewer: boolean; prompt?: string; onSwipe: (direction: "next" | "previous") => void }) {
+  const t = useT();
+  const tk = useTokens();
+  const { files, error, missing, missingMessages } = useDisplayFileBlobs(filePaths, "Media preview requires the Electron host runtime.");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
+  const safeIndex = Math.max(0, Math.min(activeIndex, files.length - 1));
+  const active = files[safeIndex];
+  const path = filePaths[safeIndex] ?? "";
+  return (
+    <col grow={1} minH={0} w="full" gap={viewer ? 0 : 10} align="center">
+      {!viewer ? <MediaActions filePath={path} copyImage={active} extra={[{ label: t("shell.display.media.expand"), run: () => fileViewer.expand() }]} /> : null}
+      {active ? (
+        <box
+          id={`media-image-${path}`}
+          role="img"
+          label={prompt ?? filenameOf(path)}
+          title={viewer ? t("shell.display.media.zoom") : undefined}
+          grow={1}
+          minH={0}
+          w="full"
+          clip={6}
+          center
+          cursor={zoomed ? "grab" : "default"}
+          onDoublePress={() => setZoomed((z) => !z)}
+          onDrag={(d) => {
+            if (zoomed || d.phase !== "end" || Math.abs(d.dx) < 80 || Math.abs(d.dx) < Math.abs(d.dy)) return;
+            onSwipe(d.dx < 0 ? "next" : "previous");
+          }}
+        >
+          <image src={active.url} fit="contain" w="full" h="full" radius={6} scale={zoomed ? 2 : 1} motion={{ dur: 0.22 }} />
+        </box>
+      ) : missing[safeIndex] ? (
+        <EmptyState motif="unavailable" title={t("shell.display.media.imageUnavailable")} body={missingMessages[safeIndex] ?? `${filenameOf(path)} was moved or deleted.`} />
+      ) : error ? (
+        <EmptyState motif="preview" title={t("shell.display.preview.failedTitle")} body={error} />
+      ) : (
+        <text {...look(12, 400)} color={tk.c.textWeak}>
+          Loading…
+        </text>
+      )}
+      {!viewer && files.length > 1 ? (
+        <row gap={6} role="tablist">
+          {files.map((file, i) => (
+            <box
+              key={filePaths[i]}
+              role="tab"
+              selected={i === safeIndex}
+              title={filenameOf(filePaths[i] ?? "")}
+              w={44}
+              h={44}
+              radius={6}
+              clip={6}
+              border={i === safeIndex ? tk.c.textStrong : tk.c.borderWeak}
+              onPress={() => setActiveIndex(i)}
+            >
+              {file ? <image src={file.url} fit="cover" w="full" h="full" /> : null}
+            </box>
+          ))}
+        </row>
+      ) : null}
+    </col>
+  );
+}
+
+function VideoView({ filePath, viewer }: { filePath: string; viewer: boolean }) {
+  const t = useT();
+  const tk = useTokens();
+  const { url, failure } = useMediaStream(filePath, "video");
+  const remote = url && !url.startsWith("stella-media:") ? url : null;
+  return (
+    <col grow={1} minH={0} w="full" gap={10}>
+      {failure ? (
+        <EmptyState motif="unavailable" title={t("shell.display.media.videoUnavailable")} body={failure} />
+      ) : (
+        <video id={`media-video-${filePath}`} src={remote ?? filePath} fit="contain" loopMedia grow={1} minH={0} w="full" radius={6} />
+      )}
+      {!viewer ? (
+        <>
+          <MediaActions filePath={filePath} copyText={filePath} extra={[{ label: t("shell.display.media.expand"), run: () => fileViewer.expand() }]} />
+          <text {...look(11, 400)} color={tk.c.textWeak}>
+            {filenameOf(filePath)}
+          </text>
+        </>
+      ) : null}
+    </col>
+  );
+}
+
+function AudioView({ filePath, viewer }: { filePath: string; viewer: boolean }) {
+  const t = useT();
+  const tk = useTokens();
+  const { url, failure } = useMediaStream(filePath, "audio file");
+  const remote = url && !url.startsWith("stella-media:") ? url : null;
+  return (
+    <col w="full" maxW={560} gap={8} py={4} px={2}>
+      {failure ? (
+        <EmptyState motif="unavailable" size="compact" title={t("shell.display.media.audioUnavailable")} body={failure} />
+      ) : (
+        <audio id={`media-audio-${filePath}`} src={remote ?? filePath} w="full" h={48} />
+      )}
+      <text {...look(12, 500)} color={tk.c.textBase} truncate>
+        {filenameOf(filePath)}
+      </text>
+      {!viewer ? <MediaActions filePath={filePath} copyText={filePath} extra={[{ label: t("shell.display.media.expand"), run: () => fileViewer.expand() }]} /> : null}
+    </col>
+  );
+}
+
+function DownloadView({ filePath, label, variant, viewer }: { filePath: string; label: string; variant: "model3d" | "download"; viewer: boolean }) {
+  const t = useT();
+  const tk = useTokens();
+  return (
+    <row gap={12} py={14} px={4} align="start">
+      <box w={48} h={48} radius={12} center fill={tk.c.surfaceBase} border={tk.c.borderWeak}>
+        <text {...look(20, 500)} color={tk.c.textWeak}>
+          {variant === "model3d" ? "◆" : "↓"}
+        </text>
+      </box>
+      <col gap={6} minW={0} shrink>
+        <text {...look(14, 600)} color={tk.c.textStrong}>
+          {label}
+        </text>
+        <text {...look(11, 400)} color={tk.c.textWeak} truncate>
+          {filenameOf(filePath)}
+        </text>
+        <MediaActions
+          filePath={filePath}
+          copyText={filePath}
+          extra={[
+            ...(!viewer ? [{ label: t("shell.display.media.expand"), run: () => fileViewer.expand() }] : []),
+            { label: t("shell.display.media.revealInFinder"), run: () => window.electronAPI?.system?.showItemInFolder?.(filePath) },
+          ]}
+        />
+      </col>
+    </row>
+  );
+}
+
+function TextView({ text, viewer }: { text: string; viewer: boolean }) {
+  const tk = useTokens();
+  return (
+    <col grow={1} minH={0} w="full" gap={10}>
+      {!viewer ? <MediaActions copyText={text} /> : null}
+      <col grow={1} minH={0} scrollY py={14} px={4}>
+        <text {...look(13, 400, { lh: 1.55 })} color={tk.c.textBase} selectable>
+          {text}
+        </text>
+      </col>
+    </col>
+  );
+}
+
+function MediaPreview({ asset, viewer, prompt, onSwipe }: { asset: MediaAsset; viewer: boolean; prompt?: string; onSwipe: (direction: "next" | "previous") => void }) {
+  switch (asset.kind) {
+    case "image":
+      return <ImageView filePaths={asset.filePaths} viewer={viewer} prompt={prompt} onSwipe={onSwipe} />;
+    case "video":
+      return <VideoView filePath={asset.filePath} viewer={viewer} />;
+    case "audio":
+      return <AudioView filePath={asset.filePath} viewer={viewer} />;
+    case "model3d":
+      return <DownloadView filePath={asset.filePath} label={asset.label ?? "3D model"} variant="model3d" viewer={viewer} />;
+    case "download":
+      return <DownloadView filePath={asset.filePath} label={asset.label} variant="download" viewer={viewer} />;
+    case "text":
+      return <TextView text={asset.text} viewer={viewer} />;
+  }
+}
+
+const useViewerMediaActions = (item: MediaTabItem, onDelete: () => void) => {
+  const imagePath = item.asset.kind === "image" ? (item.asset.filePaths[0] ?? null) : null;
+  const { files } = useDisplayFileBlobs(imagePath ? [imagePath] : []);
+  const blob = files[0]?.blob ?? null;
+  const text = item.asset.kind === "text" ? item.asset.text : null;
+  useRegisterViewerActions({
+    ...(imagePath && blob
+      ? { copyLabel: "Copy image", copy: () => copyImageBlob(blob) }
+      : text !== null
+        ? {
+            copyLabel: "Copy text",
+            copy: async () => {
+              if (!(await copyTextToClipboard(text))) throw new Error("Couldn't copy");
+            },
+          }
+        : {}),
+    remove: onDelete,
+  });
+};
+
+/** desktop-ui's `MediaTabContent`: one generated or opened image, video, sound, model or text, in the viewer or a tab. */
+export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
+  const t = useT();
+  const tk = useTokens();
+  const { items, index } = useViewerSiblings(item.id, mediaKindOf(item));
+  const neighbours = useMemo(() => (index === -1 ? { previous: null, next: null } : { previous: items[index - 1] ?? null, next: items[index + 1] ?? null }), [index, items]);
+  const step = useCallback(
+    (direction: "next" | "previous") => {
+      const target = direction === "next" ? neighbours.next : neighbours.previous;
+      if (target) showSibling(item.id, target);
+    },
+    [item.id, neighbours],
+  );
+  const remove = useCallback(() => {
+    removeGeneratedMediaItem(item.id);
+    displayTabs.closeTab(item.id);
+    fileViewer.closeItem(item.id);
+  }, [item.id]);
+  const inViewer = useContext(ViewerItemContext) === item.id;
+  useViewerMediaActions(item, remove);
+
+  if (inViewer) {
+    return (
+      <col id={`media-tab-${item.id}`} grow={1} minH={0} w="full">
+        <col grow={1} minH={0} pt={4} pr={10} pb={8} pl={10} align="center" justify="center">
+          <MediaPreview asset={item.asset} viewer prompt={item.prompt} onSwipe={step} />
+        </col>
+        {item.prompt ? (
+          <col maxW={72 * 7} selfAlign="center" px={16} pb={8}>
+            <HeroPrompt text={item.prompt} viewer />
+          </col>
+        ) : null}
+      </col>
+    );
+  }
+
+  return (
+    <col id={`media-tab-${item.id}`} grow={1} minH={0} w="full" pad={12} gap={12}>
+      <col gap={8}>
+        <row align="center" gap={8}>
+          {item.madeBy ? (
+            <text {...look(11, 500)} color={tk.c.textWeak}>
+              {item.madeBy}
+            </text>
+          ) : null}
+          <box grow={1} />
+          <row role="group" label={t("shell.display.media.itemActions")} gap={6}>
+            <Button size="small" variant="ghost" onPress={remove}>
+              Delete
+            </Button>
+          </row>
+        </row>
+        {item.prompt ? <HeroPrompt text={item.prompt} viewer={false} /> : null}
+      </col>
+      <col grow={1} minH={0} align="center" justify="center" pad={12}>
+        <MediaPreview asset={item.asset} viewer={false} prompt={item.prompt} onSwipe={step} />
+      </col>
+    </col>
+  );
+};

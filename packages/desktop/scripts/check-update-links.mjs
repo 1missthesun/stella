@@ -75,6 +75,7 @@ await build({
   bundle: true,
   platform: "node",
   format: "esm",
+  alias: { "@stella/contracts": path.join(app, "packages", "contracts") },
   packages: "external",
   outfile: bundle,
   logLevel: "error",

@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { resolveThemeColors } from "@stella/theme";
 import { Text } from "../Text";
-import { SegmentedControl } from "../SegmentedControl";
+import { Dot, Hairline } from "../chat-settings/kit";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { tapLight } from "../../lib/haptics";
 import { useT } from "../../i18n";
 import type { Colors } from "../../theme/colors";
@@ -14,7 +15,7 @@ import {
   type GradientMode,
   type ThemePreference,
 } from "../../theme/theme-context";
-import { settingsSurfaceFills, type SettingsStyles } from "./settings-styles";
+import type { SettingsStyles } from "./settings-styles";
 
 const APPEARANCE_OPTIONS: { value: ThemePreference; labelKey: string }[] = [
   { value: "system", labelKey: "mobile.settings.appearance.system" },
@@ -34,7 +35,7 @@ const GRADIENT_COLOR_OPTIONS: { value: GradientColor; labelKey: string }[] = [
 
 const COLUMNS = 4;
 
-export function AppearanceSubView({ styles }: { styles: SettingsStyles }) {
+export function AppearanceSubView({ styles: _styles }: { styles: SettingsStyles }) {
   const colors = useColors();
   const t = useT();
   const {
@@ -50,7 +51,7 @@ export function AppearanceSubView({ styles }: { styles: SettingsStyles }) {
     gradientColor,
     setGradientColor,
   } = useTheme();
-  const local = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const local = useMemo(() => makeStyles(colors), [colors]);
   const gradientLocked = flat;
   const surfaceColorDisabled = gradientLocked || gradientPreference === "flat";
 
@@ -64,45 +65,50 @@ export function AppearanceSubView({ styles }: { styles: SettingsStyles }) {
 
   return (
     <View style={local.container}>
-      <View style={local.block}>
-        <SegmentedControl<ThemePreference>
-          accessibilityLabel={t("mobile.settings.appearanceSection")}
-          value={preference}
-          onChange={(next) => {
-            tapLight();
-            setPreference(next);
-          }}
-          options={APPEARANCE_OPTIONS.map((opt) => ({
-            value: opt.value,
-            label: t(opt.labelKey),
-          }))}
-        />
-      </View>
+      <InlineWordPicker<ThemePreference>
+        accessibilityLabel={t("mobile.settings.appearanceSection")}
+        value={preference}
+        onChange={(next) => {
+          tapLight();
+          setPreference(next);
+        }}
+        options={APPEARANCE_OPTIONS.map((opt) => ({
+          value: opt.value,
+          label: t(opt.labelKey),
+        }))}
+        local={local}
+      />
 
-      <View style={styles.section}>
-        <View style={local.paletteGrid}>
-          {themeRows.map((row, rowIndex) => (
-            <View key={rowIndex} style={local.paletteRow}>
-              {row.map((th) => {
-                const preview = resolveThemeColors(th, isDark).colors;
-                const isActive = th.id === selectedThemeId;
-                return (
-                  <Pressable
-                    key={th.id}
-                    testID={`appearance-theme-${th.id}`}
-                    onPress={() => {
-                      tapLight();
-                      setThemeId(th.id);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("mobile.settings.useThemeLabel", {
-                      name: th.name,
-                    })}
-                    accessibilityState={{ selected: isActive }}
-                    style={({ pressed }) => [
-                      local.swatchTile,
-                      isActive && local.swatchTileActive,
-                      pressed && local.pressed,
+      <Hairline space={20} />
+
+      <View style={local.paletteGrid}>
+        {themeRows.map((row, rowIndex) => (
+          <View key={rowIndex} style={local.paletteRow}>
+            {row.map((th) => {
+              const preview = resolveThemeColors(th, isDark).colors;
+              const isActive = th.id === selectedThemeId;
+              return (
+                <Pressable
+                  key={th.id}
+                  testID={`appearance-theme-${th.id}`}
+                  onPress={() => {
+                    tapLight();
+                    setThemeId(th.id);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("mobile.settings.useThemeLabel", {
+                    name: th.name,
+                  })}
+                  accessibilityState={{ selected: isActive }}
+                  style={({ pressed }) => [
+                    local.swatchItem,
+                    pressed && local.pressed,
+                  ]}
+                >
+                  <View
+                    style={[
+                      local.swatchRing,
+                      isActive && { borderColor: colors.text },
                     ]}
                   >
                     <View
@@ -121,147 +127,222 @@ export function AppearanceSubView({ styles }: { styles: SettingsStyles }) {
                         ]}
                       />
                     </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        local.swatchName,
-                        isActive && local.swatchNameActive,
-                      ]}
-                    >
-                      {th.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              {row.length < COLUMNS
-                ? Array.from({ length: COLUMNS - row.length }).map((_, idx) => (
-                    <View key={`pad-${idx}`} style={local.swatchSpacer} />
-                  ))
-                : null}
-            </View>
-          ))}
-        </View>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                    style={[
+                      local.swatchName,
+                      isActive && local.swatchNameActive,
+                    ]}
+                  >
+                    {th.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {row.length < COLUMNS
+              ? Array.from({ length: COLUMNS - row.length }).map((_, idx) => (
+                  <View key={`pad-${idx}`} style={local.swatchSpacer} />
+                ))
+              : null}
+          </View>
+        ))}
       </View>
 
-      <View style={[styles.section, local.surfaceSection]}>
-        <View style={local.surfaceStack}>
-          <SegmentedControl<GradientMode>
-            accessibilityLabel={t("mobile.settings.useBackgroundLabel", {
-              name: t(
-                gradientPreference === "soft"
-                  ? "mobile.settings.background.soft"
-                  : "mobile.settings.background.flat",
-              ),
-            })}
-            disabled={gradientLocked}
-            value={gradientLocked ? "flat" : gradientPreference}
-            onChange={(next) => {
-              tapLight();
-              setGradientPreference(next);
-            }}
-            options={GRADIENT_OPTIONS.map((opt) => ({
-              value: opt.value,
-              label: t(opt.labelKey),
-            }))}
-          />
-          <SegmentedControl<GradientColor>
-            accessibilityLabel={t("mobile.settings.useBackgroundColorLabel", {
-              name: t(
-                gradientColor === "relative"
-                  ? "mobile.settings.backgroundColor.relative"
-                  : "mobile.settings.backgroundColor.strong",
-              ),
-            })}
-            disabled={surfaceColorDisabled}
-            value={gradientColor}
-            onChange={(next) => {
-              tapLight();
-              setGradientColor(next);
-            }}
-            options={GRADIENT_COLOR_OPTIONS.map((opt) => ({
-              value: opt.value,
-              label: t(opt.labelKey),
-            }))}
-          />
-        </View>
+      <Hairline space={20} />
+
+      <View style={local.surfaceStack}>
+        <InlineWordPicker<GradientMode>
+          accessibilityLabel={t("mobile.settings.useBackgroundLabel", {
+            name: t(
+              gradientPreference === "soft"
+                ? "mobile.settings.background.soft"
+                : "mobile.settings.background.flat",
+            ),
+          })}
+          disabled={gradientLocked}
+          value={gradientLocked ? "flat" : gradientPreference}
+          onChange={(next) => {
+            tapLight();
+            setGradientPreference(next);
+          }}
+          options={GRADIENT_OPTIONS.map((opt) => ({
+            value: opt.value,
+            label: t(opt.labelKey),
+          }))}
+          local={local}
+        />
+
+        <InlineWordPicker<GradientColor>
+          accessibilityLabel={t("mobile.settings.useBackgroundColorLabel", {
+            name: t(
+              gradientColor === "relative"
+                ? "mobile.settings.backgroundColor.relative"
+                : "mobile.settings.backgroundColor.strong",
+            ),
+          })}
+          disabled={surfaceColorDisabled}
+          value={gradientColor}
+          onChange={(next) => {
+            tapLight();
+            setGradientColor(next);
+          }}
+          options={GRADIENT_COLOR_OPTIONS.map((opt) => ({
+            value: opt.value,
+            label: t(opt.labelKey),
+          }))}
+          local={local}
+        />
       </View>
     </View>
   );
 }
 
-const makeStyles = (colors: Colors, isDark: boolean) => {
-  const { subtleFill, tonalFill } = settingsSurfaceFills(isDark);
-  const activeBorder = isDark
-    ? "rgba(255, 255, 255, 0.34)"
-    : "rgba(0, 0, 0, 0.28)";
-  return StyleSheet.create({
+function InlineWordPicker<T extends string>({
+  accessibilityLabel,
+  disabled = false,
+  options,
+  value,
+  onChange,
+  local,
+}: {
+  accessibilityLabel: string;
+  disabled?: boolean;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  value: T;
+  onChange: (next: T) => void;
+  local: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <View
+      style={[local.wordRow, disabled && local.disabled]}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {options.map((option) => {
+        const picked = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            disabled={disabled}
+            onPress={() => {
+              if (!picked) onChange(option.value);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            accessibilityRole="radio"
+            accessibilityLabel={option.label}
+            accessibilityState={{ checked: picked, disabled }}
+            style={({ pressed }) => [
+              local.wordChoice,
+              pressed && !picked && local.pressed,
+            ]}
+          >
+            <Text
+              style={[local.wordLabel, picked && local.wordLabelPicked]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
+            >
+              {option.label}
+            </Text>
+            <View style={local.wordMark}>
+              {picked ? <Dot size={6} /> : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
     container: {
-      paddingTop: 4,
+      paddingTop: 2,
     },
-    block: {
-      marginTop: 12,
+    wordRow: {
+      flexDirection: "row",
+      gap: 24,
+      alignItems: "center",
+    },
+    wordChoice: {
+      alignItems: "center",
+      gap: 5,
+      justifyContent: "center",
+      minHeight: 42,
+      minWidth: 44,
+    },
+    wordLabel: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 18,
+      letterSpacing: -0.35,
+    },
+    wordLabelPicked: {
+      color: colors.text,
+    },
+    wordMark: {
+      height: 6,
+      width: 6,
     },
     paletteGrid: {
-      gap: 8,
+      gap: 14,
     },
     paletteRow: {
       flexDirection: "row",
-      gap: 8,
+      gap: 6,
     },
-    swatchTile: {
+    swatchItem: {
       alignItems: "center",
-      backgroundColor: subtleFill,
-      borderColor: colors.borderWeak,
-      borderRadius: 11,
-      borderWidth: StyleSheet.hairlineWidth,
       flex: 1,
       gap: 6,
       minWidth: 0,
-      paddingHorizontal: 4,
-      paddingVertical: 10,
-    },
-    swatchTileActive: {
-      backgroundColor: tonalFill,
-      borderColor: activeBorder,
-      borderWidth: 1,
-      paddingVertical: 9.5,
+      paddingVertical: 4,
     },
     swatchSpacer: {
       flex: 1,
     },
+    swatchRing: {
+      alignItems: "center",
+      borderColor: "transparent",
+      borderRadius: 21,
+      borderWidth: 2,
+      height: 42,
+      justifyContent: "center",
+      width: 42,
+    },
     swatchDisc: {
       alignItems: "center",
-      borderRadius: 13,
+      borderRadius: 17,
       borderWidth: StyleSheet.hairlineWidth,
-      height: 26,
+      height: 34,
       justifyContent: "center",
       overflow: "hidden",
-      width: 26,
+      width: 34,
     },
     swatchCore: {
-      borderRadius: 6,
-      height: 12,
-      width: 12,
+      borderRadius: 7.5,
+      height: 15,
+      width: 15,
     },
     swatchName: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 11,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 12,
       letterSpacing: -0.1,
       textAlign: "center",
     },
     swatchNameActive: {
-      color: colors.textStrong,
-      fontFamily: fonts.sans.semiBold,
-    },
-    surfaceSection: {
-      marginTop: 22,
+      color: colors.text,
     },
     surfaceStack: {
-      gap: 10,
+      gap: 12,
+    },
+    disabled: {
+      opacity: 0.36,
     },
     pressed: {
-      opacity: 0.68,
+      opacity: 0.55,
+      transform: [{ scale: 0.97 }],
     },
   });
-};

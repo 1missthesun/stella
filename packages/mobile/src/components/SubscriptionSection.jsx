@@ -2,6 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { Icon } from "./Icon";
+import {
+  Dot,
+  Hairline,
+  PrimaryButton as KitPrimaryButton,
+  SectionLabel,
+  TextAction,
+} from "./chat-settings/kit";
 import { useBackendView } from "../lib/backend";
 import {
   setDebugStorefrontOverride,
@@ -10,6 +17,8 @@ import {
 import { useMobileCheckout } from "../lib/use-mobile-checkout";
 import { useColors, useTheme } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
+import { fadeHex } from "../theme/oklch";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { useLocale, useT } from "../i18n";
 import {
   PLAN_CATALOG,
@@ -19,7 +28,6 @@ import {
   planLabel as catalogPlanLabel,
 } from "@stella/contracts/billing-plans";
 import { tapLight } from "../lib/haptics";
-import { settingsSurfaceFills } from "./settings/settings-styles";
 
 function formatAmount(dollars) {
   if (typeof dollars !== "number" || !Number.isFinite(dollars)) return "";
@@ -141,75 +149,84 @@ export function SubscriptionSummaryCard({ onPress }) {
         percent: `${usedPercent(metrics.used, metrics.limit)}%`,
       })
     : "";
+  const metaLine = [
+    percentText,
+    resetText,
+    metrics && metrics.credit > 0
+      ? `${t("billing.v3.usage.credit")}: ${formatUsd(metrics.credit)}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <Pressable
-      testID="account-subscription-row"
-      onPress={() => {
-        tapLight();
-        onPress();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={
-        percentText ? `${t("billing.mobile.sectionTitle")}, ${planTitle}, ${percentText}` : `${t("billing.mobile.sectionTitle")}, ${planTitle}`
-      }
-      style={({ pressed }) => [styles.summaryCard, pressed && styles.rowPressed]}
-    >
-      <View style={styles.summaryTop}>
-        <Text style={styles.summaryPlan} numberOfLines={1}>
-          {planTitle}
-        </Text>
-        <View style={styles.summaryRight}>
-          {percentText ? (
-            <Text style={styles.summaryPercent} numberOfLines={1}>
-              {percentText}
-            </Text>
-          ) : null}
-          <Icon name="chevron-right" size={14} color={colors.textWeaker} />
-        </View>
-      </View>
-
-      {metrics ? (
-        <View
-          style={styles.summaryTrack}
-          accessibilityRole="progressbar"
-          accessibilityValue={{ min: 0, max: 100, now: Math.round(metrics.percent) }}
-        >
-          <View
-            style={[
-              styles.fill,
-              (metrics.percent >= 100 || metrics.blocked) && styles.fillFull,
-              { width: `${metrics.percent}%` },
-            ]}
+    <View>
+      <SectionLabel>{t("billing.mobile.sectionTitle")}</SectionLabel>
+      <Pressable
+        testID="account-subscription-row"
+        onPress={() => {
+          tapLight();
+          onPress();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={
+          percentText
+            ? `${t("billing.mobile.sectionTitle")}, ${planTitle}, ${percentText}`
+            : `${t("billing.mobile.sectionTitle")}, ${planTitle}`
+        }
+        style={({ pressed }) => [styles.heroRow, pressed && styles.rowPressed]}
+      >
+        <View style={styles.heroHead}>
+          <Text
+            style={styles.heroPlan}
+            numberOfLines={1}
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          >
+            {planTitle}
+          </Text>
+          <Icon
+            name="chevron-right"
+            size={15}
+            color={colors.textMuted}
+            weight="semibold"
           />
-          {metrics.heldPercent > 0 ? (
-            <View style={[styles.held, { width: `${metrics.heldPercent}%` }]} />
-          ) : null}
         </View>
-      ) : null}
 
-      <View style={styles.summaryFoot}>
+        {metrics ? (
+          <View
+            style={styles.heroTrack}
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(metrics.percent) }}
+          >
+            <View
+              style={[
+                styles.fill,
+                (metrics.percent >= 100 || metrics.blocked) && styles.fillFull,
+                { width: `${metrics.percent}%` },
+              ]}
+            />
+            {metrics.heldPercent > 0 ? (
+              <View style={[styles.held, { width: `${metrics.heldPercent}%` }]} />
+            ) : null}
+          </View>
+        ) : null}
+
         {metrics && metrics.blocked ? (
           <View style={styles.statusInline}>
             <View style={[styles.statusDot, { backgroundColor: colors.danger }]} />
-            <Text style={styles.summaryMetaDanger} numberOfLines={1}>
+            <Text style={styles.heroMetaDanger} numberOfLines={1}>
               {metrics.oneTime
                 ? t("billing.v3.usage.freeOutTitle")
                 : t("billing.v3.usage.outTitle")}
             </Text>
           </View>
-        ) : resetText ? (
-          <Text style={styles.summaryMeta} numberOfLines={1}>
-            {resetText}
+        ) : metaLine ? (
+          <Text style={styles.heroMeta} numberOfLines={2}>
+            {metaLine}
           </Text>
         ) : null}
-        {metrics && metrics.credit > 0 ? (
-          <Text style={styles.summaryMeta} numberOfLines={1}>
-            {t("billing.v3.usage.credit")}: {formatUsd(metrics.credit)}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -279,26 +296,18 @@ export function SubscriptionSection({ embedded = false } = {}) {
     <View style={embedded ? styles.embeddedRoot : styles.section}>
       {!embedded ? (
         <Pressable onPress={onDebugCycle} disabled={!__DEV__}>
-          <Text style={styles.sectionLabel}>{t("billing.mobile.sectionTitle")}</Text>
+          <SectionLabel>{t("billing.mobile.sectionTitle")}</SectionLabel>
         </Pressable>
       ) : null}
 
-      <View style={styles.overviewBox}>
-        <Pressable
-          onPress={onDebugCycle}
-          disabled={!__DEV__}
-          style={styles.overviewTop}
-        >
-          <View style={styles.overviewPlanCol}>
-            <Text style={styles.overviewLabel}>
-              {t("billing.mobile.currentPlanLabel")}
-            </Text>
-            <Text style={styles.overviewPlanValue}>
-              {t("billing.mobile.planValue", { plan: catalogPlanLabel(plan) })}
-            </Text>
-          </View>
+      <View style={styles.overview}>
+        <Pressable onPress={onDebugCycle} disabled={!__DEV__}>
+          <SectionLabel>{t("billing.mobile.currentPlanLabel")}</SectionLabel>
+          <Text style={styles.overviewPlanValue}>
+            {t("billing.mobile.planValue", { plan: catalogPlanLabel(plan) })}
+          </Text>
           {renewalDate ? (
-            <Text style={styles.overviewRenewal} numberOfLines={2}>
+            <Text style={styles.overviewRenewal}>
               {status.cancelAtPeriodEnd
                 ? t("billing.mobile.accessEnds", { date: renewalDate })
                 : t("billing.mobile.renews", { date: renewalDate })}
@@ -376,7 +385,7 @@ export function SubscriptionSection({ embedded = false } = {}) {
         ) : metrics && metrics.resumesAt && metrics.credit > 0 ? (
           <View style={styles.notice}>
             <View style={styles.noticeHead}>
-              <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
+              <Dot size={6} />
               <Text style={styles.noticeTitle}>{t("billing.v3.usage.creditTitle")}</Text>
             </View>
             <Text style={styles.noticeBody}>
@@ -390,6 +399,7 @@ export function SubscriptionSection({ embedded = false } = {}) {
         {justSubscribedPlan ? renderSuccess() : null}
       </View>
 
+      <Hairline space={22} />
       {renderPurchase()}
       {isPaid ? renderManage() : null}
     </View>
@@ -407,16 +417,13 @@ export function SubscriptionSection({ embedded = false } = {}) {
           </Text>
         </View>
         <Text style={styles.noticeBody}>{t("billing.mobile.successBody")}</Text>
-        <Pressable
+        <TextAction
+          label={t("mobile.common.done")}
           onPress={() => {
             tapLight();
             setJustSubscribedPlan(null);
           }}
-          accessibilityRole="button"
-          style={styles.linkRow}
-        >
-          <Text style={styles.link}>{t("mobile.common.done")}</Text>
-        </Pressable>
+        />
       </View>
     );
   }
@@ -425,7 +432,8 @@ export function SubscriptionSection({ embedded = false } = {}) {
     if (storefront.status === "loading") return null;
     if (eligible) {
       return (
-        <View style={styles.manageBlock}>
+        <View>
+          <Hairline space={20} />
           {checkout.error ? (
             <Text style={styles.errorText}>{checkout.error.message}</Text>
           ) : null}
@@ -439,7 +447,7 @@ export function SubscriptionSection({ embedded = false } = {}) {
             style={({ pressed }) => [styles.manageRow, pressed && styles.rowPressed]}
           >
             <Text style={styles.manageText}>{t("billing.mobile.manage")}</Text>
-            <Icon name="chevron-right" size={14} color={colors.textWeaker} />
+            <Icon name="chevron-right" size={15} color={colors.textMuted} weight="semibold" />
           </Pressable>
         </View>
       );
@@ -451,54 +459,50 @@ export function SubscriptionSection({ embedded = false } = {}) {
     if (justSubscribedPlan) return null;
     if (checkoutPhase === "pending") {
       return (
-        <View style={styles.pendingBox}>
+        <View style={styles.notice}>
           <View style={styles.pendingHeader}>
             <ActivityIndicator size="small" color={colors.text} />
             <Text style={styles.noticeTitle}>{t("billing.mobile.pendingTitle")}</Text>
           </View>
           <Text style={styles.noticeBody}>{t("billing.mobile.pendingBody")}</Text>
-          <Pressable
+          <TextAction
+            label={t("billing.mobile.pendingDismiss")}
+            tone="muted"
             onPress={() => {
               tapLight();
               checkout.reset();
             }}
-            accessibilityRole="button"
-            style={styles.linkRow}
-          >
-            <Text style={styles.link}>{t("billing.mobile.pendingDismiss")}</Text>
-          </Pressable>
+          />
         </View>
       );
     }
     return (
-      <View style={styles.plansSection}>
-        <View style={styles.plansHead}>
-          <Text style={styles.plansHeading}>{t("billing.v3.plan.heading")}</Text>
-          <Text style={styles.plansLede}>{t("billing.v3.plan.lede")}</Text>
-        </View>
+      <View>
+        <SectionLabel>{t("billing.v3.plan.heading")}</SectionLabel>
+        <Text style={styles.plansLede}>{t("billing.v3.plan.lede")}</Text>
+
         {checkoutPhase === "error" && checkout.error ? (
-          <View style={styles.errorBox}>
+          <View style={styles.notice}>
             <Text style={styles.noticeTitle}>
               {checkout.error.code === "CONFLICT"
                 ? t("billing.mobile.alreadySubscribedTitle")
                 : t("errors.generic")}
             </Text>
             <Text style={styles.noticeBody}>{checkout.error.message}</Text>
-            <Pressable
+            <TextAction
+              label={t("billing.mobile.errorRetry")}
               onPress={() => {
                 tapLight();
                 checkout.reset();
               }}
-              accessibilityRole="button"
-              style={styles.linkRow}
-            >
-              <Text style={styles.link}>{t("billing.mobile.errorRetry")}</Text>
-            </Pressable>
+            />
           </View>
         ) : null}
+
         <View style={styles.plansList}>
-          {PLAN_ORDER.map((key, index) => renderPlanRow(key, index === 0))}
+          {PLAN_ORDER.map((key) => renderPlanRow(key))}
         </View>
+
         {!isPaid && eligible ? (
           <Text style={styles.footnote}>{t("billing.mobile.footnote")}</Text>
         ) : null}
@@ -506,7 +510,7 @@ export function SubscriptionSection({ embedded = false } = {}) {
     );
   }
 
-  function renderPlanRow(key, isFirst) {
+  function renderPlanRow(key) {
     const def = PLAN_CATALOG[key];
     const starting = checkoutPhase === "starting";
     const isCurrent = key === plan;
@@ -538,19 +542,13 @@ export function SubscriptionSection({ embedded = false } = {}) {
     const details = [t(`billing.v3.tagline.${key}`), ...includes].join(" · ");
 
     return (
-      <View
-        key={key}
-        style={[
-          styles.planRow,
-          !isFirst && styles.planRowDivider,
-        ]}
-      >
+      <View key={key} style={styles.planRow}>
         <View style={styles.planTop}>
           <View style={styles.planNameWrap}>
             <Text style={styles.planName}>{catalogPlanLabel(key)}</Text>
             {isCurrent ? (
               <View style={styles.planTagInline}>
-                <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
+                <Dot size={6} />
                 <Text style={styles.planCurrentText}>
                   {t("billing.v3.plan.currentPlan")}
                 </Text>
@@ -574,24 +572,23 @@ export function SubscriptionSection({ embedded = false } = {}) {
         <Text style={styles.planDetails}>{details}</Text>
 
         {subscribe || change ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={actionLabel}
-            disabled={starting}
-            onPress={onAction}
-            style={({ pressed }) => [
-              primary ? styles.planPrimaryBtn : styles.planSecondaryBtn,
-              (pressed || starting) && styles.rowPressed,
-            ]}
-          >
-            <Text
-              style={
-                primary ? styles.planPrimaryBtnText : styles.planSecondaryBtnText
-              }
-            >
-              {actionLabel}
-            </Text>
-          </Pressable>
+          primary ? (
+            <View style={styles.planActionWrap}>
+              <KitPrimaryButton
+                label={actionLabel}
+                disabled={starting}
+                onPress={onAction}
+              />
+            </View>
+          ) : (
+            <View style={styles.planActionWrap}>
+              <TextAction
+                label={actionLabel}
+                disabled={starting}
+                onPress={onAction}
+              />
+            </View>
+          )
         ) : null}
       </View>
     );
@@ -599,69 +596,49 @@ export function SubscriptionSection({ embedded = false } = {}) {
 }
 
 const makeStyles = (colors, isDark) => {
-  const { subtleFill, tonalFill } = settingsSurfaceFills(isDark);
+  const trackBg = fadeHex(colors.text, isDark ? 0.14 : 0.09);
   return StyleSheet.create({
-    summaryCard: {
-      backgroundColor: subtleFill,
-      borderColor: colors.borderWeak,
-      borderRadius: 13,
-      borderWidth: StyleSheet.hairlineWidth,
-      gap: 9,
-      marginTop: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
+    heroRow: {
+      gap: 8,
+      paddingVertical: 4,
     },
-    summaryTop: {
+    heroHead: {
       alignItems: "center",
       flexDirection: "row",
       gap: 10,
       justifyContent: "space-between",
     },
-    summaryPlan: {
-      color: colors.textStrong,
+    heroPlan: {
+      color: colors.text,
       flex: 1,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 15,
-      letterSpacing: -0.25,
+      fontFamily: fonts.sans.bold,
+      fontSize: 28,
+      letterSpacing: -1,
+      lineHeight: 34,
     },
-    summaryRight: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 5,
-    },
-    summaryPercent: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 13,
-      fontVariant: ["tabular-nums"],
-    },
-    summaryTrack: {
-      backgroundColor: tonalFill,
+    heroTrack: {
+      backgroundColor: trackBg,
       borderRadius: 2,
       flexDirection: "row",
       height: 4,
       overflow: "hidden",
     },
-    summaryFoot: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
-      justifyContent: "space-between",
+    heroMeta: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 14,
+      fontVariant: ["tabular-nums"],
+      lineHeight: 19,
     },
-    summaryMeta: {
-      color: colors.textWeaker,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12,
-    },
-    summaryMetaDanger: {
+    heroMetaDanger: {
       color: colors.danger,
-      fontFamily: fonts.sans.medium,
-      fontSize: 12,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 14,
     },
     statusInline: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 6,
+      gap: 7,
     },
     statusDot: {
       borderRadius: 3,
@@ -669,57 +646,30 @@ const makeStyles = (colors, isDark) => {
       width: 6,
     },
     section: {
-      marginTop: 20,
+      marginTop: 22,
     },
     embeddedRoot: {
-      paddingTop: 10,
+      paddingTop: 2,
     },
-    sectionLabel: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 12.5,
-      marginBottom: 8,
-    },
-    overviewBox: {
-      backgroundColor: subtleFill,
-      borderColor: colors.borderWeak,
-      borderRadius: 13,
-      borderWidth: StyleSheet.hairlineWidth,
-      gap: 14,
-      padding: 15,
-    },
-    overviewTop: {
-      alignItems: "flex-start",
-      flexDirection: "row",
-      gap: 12,
-      justifyContent: "space-between",
-    },
-    overviewPlanCol: {
-      flex: 1,
-      gap: 2,
-      minWidth: 0,
-    },
-    overviewLabel: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
+    overview: {
+      gap: 16,
     },
     overviewPlanValue: {
-      color: colors.textStrong,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 17,
-      letterSpacing: -0.3,
+      color: colors.text,
+      fontFamily: fonts.sans.bold,
+      fontSize: 28,
+      letterSpacing: -1,
+      lineHeight: 34,
+      marginTop: 2,
     },
     overviewRenewal: {
       color: colors.textMuted,
-      flexShrink: 1,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
-      marginTop: 2,
-      textAlign: "right",
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 14,
+      marginTop: 3,
     },
     usage: {
-      gap: 7,
+      gap: 8,
     },
     usageHead: {
       alignItems: "baseline",
@@ -728,35 +678,35 @@ const makeStyles = (colors, isDark) => {
     },
     usageLabel: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 13,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15,
     },
     usageValue: {
-      color: colors.textStrong,
+      color: colors.text,
       fontFamily: fonts.sans.semiBold,
-      fontSize: 14.5,
+      fontSize: 16,
       fontVariant: ["tabular-nums"],
     },
     usageFoot: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
+      gap: 10,
       justifyContent: "space-between",
     },
     usageMuted: {
-      color: colors.textWeaker,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13.5,
     },
     track: {
-      backgroundColor: tonalFill,
-      borderRadius: 3,
+      backgroundColor: trackBg,
+      borderRadius: 2.5,
       flexDirection: "row",
-      height: 6,
+      height: 5,
       overflow: "hidden",
     },
     fill: {
-      backgroundColor: colors.textStrong,
+      backgroundColor: colors.text,
       height: "100%",
     },
     fillFull: {
@@ -768,81 +718,43 @@ const makeStyles = (colors, isDark) => {
       opacity: 0.45,
     },
     notice: {
-      borderTopColor: colors.borderWeak,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      gap: 4,
-      paddingTop: 12,
+      gap: 6,
+      marginTop: 4,
     },
     noticeHead: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 7,
+      gap: 8,
     },
     noticeTitle: {
-      color: colors.textStrong,
+      color: colors.text,
       fontFamily: fonts.sans.semiBold,
-      fontSize: 14,
+      fontSize: 16,
     },
     noticeBody: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 13,
-      lineHeight: 18.5,
-    },
-    pendingBox: {
-      backgroundColor: subtleFill,
-      borderColor: colors.borderWeak,
-      borderRadius: 13,
-      borderWidth: StyleSheet.hairlineWidth,
-      gap: 6,
-      marginTop: 16,
-      padding: 15,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14,
+      lineHeight: 20,
     },
     pendingHeader: {
       alignItems: "center",
       flexDirection: "row",
       gap: 8,
     },
-    errorBox: {
-      backgroundColor: subtleFill,
-      borderColor: colors.borderWeak,
-      borderRadius: 11,
-      borderWidth: StyleSheet.hairlineWidth,
-      gap: 4,
-      marginBottom: 10,
-      padding: 13,
-    },
-    plansSection: {
-      marginTop: 24,
-    },
-    plansHead: {
-      gap: 3,
-      marginBottom: 12,
-    },
-    plansHeading: {
+    plansLede: {
       color: colors.textMuted,
       fontFamily: fonts.sans.medium,
-      fontSize: 12.5,
-    },
-    plansLede: {
-      color: colors.textWeaker,
-      fontFamily: fonts.sans.regular,
-      fontSize: 13,
-      lineHeight: 18.5,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 2,
     },
     plansList: {
-      borderBottomColor: colors.borderWeak,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.borderWeak,
-      borderTopWidth: StyleSheet.hairlineWidth,
+      gap: 24,
+      marginTop: 20,
     },
     planRow: {
       gap: 6,
-      paddingVertical: 14,
-    },
-    planRowDivider: {
-      borderTopColor: colors.borderWeak,
-      borderTopWidth: StyleSheet.hairlineWidth,
     },
     planTop: {
       alignItems: "baseline",
@@ -859,123 +771,80 @@ const makeStyles = (colors, isDark) => {
       minWidth: 0,
     },
     planName: {
-      color: colors.textStrong,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 16,
-      letterSpacing: -0.25,
+      color: colors.text,
+      fontFamily: fonts.sans.bold,
+      fontSize: 22,
+      letterSpacing: -0.6,
     },
     planTagInline: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 5,
+      gap: 6,
     },
     planCurrentText: {
       color: colors.accent,
-      fontFamily: fonts.sans.medium,
-      fontSize: 12,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 13.5,
     },
     planRecommendedText: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 12,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 13.5,
     },
     planPriceBox: {
       alignItems: "baseline",
       flexDirection: "row",
-      gap: 3,
+      gap: 4,
     },
     planAmount: {
-      color: colors.textStrong,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 16.5,
+      color: colors.text,
+      fontFamily: fonts.sans.bold,
+      fontSize: 20,
       fontVariant: ["tabular-nums"],
-      letterSpacing: -0.3,
+      letterSpacing: -0.5,
     },
     planPer: {
-      color: colors.textWeaker,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12,
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13,
     },
     planDetails: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 13,
-      lineHeight: 18.5,
-    },
-    planPrimaryBtn: {
-      alignItems: "center",
-      backgroundColor: colors.accent,
-      borderRadius: 9,
-      justifyContent: "center",
-      marginTop: 6,
-      minHeight: 38,
-      paddingHorizontal: 14,
-    },
-    planPrimaryBtnText: {
-      color: colors.accentForeground,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 13.5,
-      letterSpacing: -0.1,
-    },
-    planSecondaryBtn: {
-      alignItems: "center",
-      backgroundColor: tonalFill,
-      borderRadius: 9,
-      justifyContent: "center",
-      marginTop: 6,
-      minHeight: 38,
-      paddingHorizontal: 14,
-    },
-    planSecondaryBtnText: {
-      color: colors.textStrong,
       fontFamily: fonts.sans.medium,
-      fontSize: 13.5,
-      letterSpacing: -0.1,
+      fontSize: 14,
+      lineHeight: 20,
     },
-    manageBlock: {
-      marginTop: 22,
+    planActionWrap: {
+      marginTop: 8,
     },
     manageRow: {
       alignItems: "center",
-      borderBottomColor: colors.borderWeak,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.borderWeak,
-      borderTopWidth: StyleSheet.hairlineWidth,
       flexDirection: "row",
       justifyContent: "space-between",
-      minHeight: 48,
-      paddingVertical: 11,
+      minHeight: 50,
     },
     manageText: {
-      color: colors.textStrong,
-      fontFamily: fonts.sans.medium,
-      fontSize: 15,
-      letterSpacing: -0.2,
+      color: colors.text,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 19,
+      letterSpacing: -0.4,
     },
     rowPressed: {
-      opacity: 0.6,
+      opacity: 0.55,
+      transform: [{ scale: 0.985 }],
     },
     errorText: {
       color: colors.danger,
-      fontFamily: fonts.sans.regular,
-      fontSize: 13,
-      marginBottom: 8,
-    },
-    linkRow: {
-      alignSelf: "flex-start",
-      paddingVertical: 4,
-    },
-    link: {
-      color: colors.accent,
       fontFamily: fonts.sans.medium,
-      fontSize: 13.5,
+      fontSize: 14,
+      marginBottom: 8,
     },
     footnote: {
       color: colors.textWeaker,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
-      lineHeight: 18,
-      marginTop: 14,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13.5,
+      lineHeight: 19,
+      marginTop: 22,
     },
   });
 };

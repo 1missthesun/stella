@@ -248,6 +248,25 @@ export class WebContents extends EventEmitter {
     return this.loadURL(url.toString());
   }
 
+  /** The page navigated on its own (a link, a redirect): record it without loading it again. */
+  markNavigated(url: string) {
+    if (this.destroyed || url === this.url) return;
+    let prevented = false;
+    const event = { url, isMainFrame: true, frame: this.mainFrame, preventDefault() { prevented = true; }, get defaultPrevented() { return prevented; } };
+    this.emit("will-navigate", event, url);
+    if (!prevented && !this.destroyed) this.emit("will-redirect", event, url, false, true);
+    if (prevented || this.destroyed) return;
+    this.url = url;
+    this.navigationHistory.push(url);
+    this.emit("did-navigate", { url }, url, 200, "OK");
+  }
+
+  /** The page's own load finished (web contents). */
+  markLoaded() {
+    if (this.destroyed) return;
+    this.emit("did-finish-load");
+  }
+
   private finishLoad() {
     this.loading = false;
     this.emit("did-navigate", { url: this.url }, this.url, 200, "OK");

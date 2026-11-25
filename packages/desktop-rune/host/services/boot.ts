@@ -3,7 +3,7 @@
 // size, OS appearance), as preload.ts and Chromium provide them in Electron.
 
 import { installDom, type DomHost } from "../dom";
-import type { BrowserWindow } from "../electron/browser-window";
+import { hostWindows, openWindowFrom, type BrowserWindow } from "../electron/browser-window";
 import { engine } from "../electron/engine";
 import { clipboard, nativeTheme, shell } from "../electron/native";
 import { nativeImage } from "../electron/native-image";
@@ -24,6 +24,7 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
   scopeDisposerMethod(RendererIpc.prototype, "on");
   await bootElectronMain(options);
   const win = await firstAppWindow();
+  if (engine()) hostWindows.bindMain(win);
   const contents = win.webContents;
   const api = rendererApiFor(contents);
 
@@ -47,6 +48,7 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
       writeImagePng: async (png) => clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(png))),
     },
     openExternal: (url) => void shell.openExternal(url),
+    open: (url, target, features) => { openWindowFrom(win, url, target, features); return null; },
     reload: () => contents.reload(),
   });
 

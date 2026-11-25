@@ -198,8 +198,12 @@ export const defaultSession = () => sessionFor("");
 
 /** Answers a WebView request to a custom scheme (stella-app, stella-media, canvas, ...). */
 export async function fetchProtocol(partition: string, request: Request): Promise<Response | null> {
+  return await fetchProtocolIn(sessionFor(partition), request);
+}
+
+export async function fetchProtocolIn(session: Session, request: Request): Promise<Response | null> {
   const scheme = new URL(request.url).protocol.slice(0, -1).toLowerCase();
-  const handler = sessionFor(partition).protocol.handlers.get(scheme) ?? defaultSession().protocol.handlers.get(scheme);
+  const handler = session.protocol.handlers.get(scheme) ?? defaultSession().protocol.handlers.get(scheme);
   return handler ? await handler(request) : null;
 }
 

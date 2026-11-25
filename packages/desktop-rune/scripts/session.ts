@@ -167,6 +167,7 @@ async function start() {
       STELLA_RUNE_H: String(h),
       STELLA_RUNE_THEME: process.env.THEME ?? "dark",
       STELLA_RUNE_SERVICES: "1",
+      ...(process.env.STELLA_RUNE_APP ? { STELLA_RUNE_APP: process.env.STELLA_RUNE_APP } : {}),
       STELLA_RUNE_SCREEN_W: String(w + 40),
       STELLA_RUNE_SCREEN_H: String(h + 40),
     });

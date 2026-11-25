@@ -41,6 +41,9 @@ const quit = (code: number) => {
   setTimeout(() => process.exit(code), 1000).unref();
 };
 
+process.on("unhandledRejection", (err) => console.error("[ui] unhandled rejection:", err));
+void listen();
+
 let services: RuneServices | null = null;
 if (SERVICES) {
   const { bootRuneServices } = await import("./services/boot");
@@ -51,6 +54,7 @@ let app = await loadApp();
 const store = createStore(app.initialState?.() ?? {});
 const g = globalThis as any;
 g.stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent };
+if (services) g.stella.host = (await import("./services/ui-host")).createUiHost();
 
 /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */
 const root = () => app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App));
@@ -104,8 +108,6 @@ onEngineEvent("ev", (e) => {
   if (e.input) lastInput = now();
   if (e.e === "key" && app.onKey) batched(() => { commitCtx.ack = e.seq; commitCtx.t0 = e.at; app.onKey(e.chord, store); });
 });
-process.on("unhandledRejection", (err) => console.error("[ui] unhandled rejection:", err));
-void listen();
 
 
 // ---------------------------------------------------------------- services

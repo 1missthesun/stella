@@ -16,6 +16,8 @@ export type DomHostOptions = {
   uiState?: UiStateBackend;
   clipboard?: DomClipboard;
   openExternal?: (url: string) => void;
+  /** window.open; returns null like a blocked popup when absent or refused. */
+  open?: (url: string, target: string, features: string) => unknown;
   playSound?: (src: string, volume: number) => Promise<void>;
   reload?: () => void;
 };
@@ -65,7 +67,11 @@ export function installDom(options: DomHostOptions): DomHost {
   g.history = createHistory(() => fire(g as any, "popstate"));
   g.getComputedStyle = (el: DomElement) => el?.style ?? document.documentElement.style;
   g.getSelection = () => document.getSelection();
-  g.open = (url?: string) => { if (url) options.openExternal?.(String(url)); return null; };
+  g.open = (url?: string | URL, target?: string, features?: string) => {
+    if (options.open) return options.open(url === undefined ? "about:blank" : String(url), target ?? "", features ?? "");
+    if (url) options.openExternal?.(String(url));
+    return null;
+  };
   g.focus = () => {};
   g.blur = () => {};
   g.scrollTo = () => {};

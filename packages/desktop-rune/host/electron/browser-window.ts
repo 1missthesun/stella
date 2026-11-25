@@ -13,6 +13,8 @@ export type Rectangle = { x: number; y: number; width: number; height: number };
 
 export type WindowSnapshot = {
   id: string;
+  /** The `<window id>` to render: "main" for the app window bound to the engine's launch window. */
+  engineId: string;
   contentsId: number;
   kind: ContentsKind;
   mode: string | null;
@@ -37,6 +39,9 @@ export type WindowSnapshot = {
   fullscreen: boolean;
   reloadToken: number;
   parentId: string | null;
+  /** The window whose page opened this one with window.open, and the name it gave. */
+  openerId: string | null;
+  frameName: string | null;
   modal: boolean;
   views: Array<{ contentsId: number; url: string; bounds: Rectangle; visible: boolean }>;
 };
@@ -48,9 +53,44 @@ class HostWindows {
   private readonly listeners = new Set<Listener>();
   private cached: WindowSnapshot[] | null = null;
 
+  private mainId: string | null = null;
+  private readonly mountedIds = new Set<string>();
+  private readonly deferred = new Map<string, Map<string, () => void>>();
+
   add(win: BrowserWindow) { this.byId.set(win.hostId, win); this.changed(); }
-  remove(win: BrowserWindow) { this.byId.delete(win.hostId); this.changed(); }
-  get(id: string) { return this.byId.get(id) ?? null; }
+  remove(win: BrowserWindow) {
+    this.byId.delete(win.hostId);
+    this.deferred.delete(win.engineId);
+    this.mountedIds.delete(win.engineId);
+    if (this.mainId === win.hostId) this.mainId = null;
+    this.changed();
+  }
+  get(id: string) { return this.byId.get(id === "main" && this.mainId ? this.mainId : id) ?? null; }
+
+  /** Binds `win` to the native window the engine opened at launch (`<window id="main">`). */
+  bindMain(win: BrowserWindow) {
+    this.mainId = win.hostId;
+    this.mounted("main");
+    this.changed();
+  }
+  isMain(win: BrowserWindow) { return this.mainId === win.hostId; }
+
+  /** The UI reports a `<window>` it mounted; window commands issued before then run now. */
+  mounted(engineId: string) {
+    this.mountedIds.add(engineId);
+    const calls = this.deferred.get(engineId);
+    this.deferred.delete(engineId);
+    for (const run of calls?.values() ?? []) run();
+  }
+  unmounted(engineId: string) { this.mountedIds.delete(engineId); }
+
+  /** Runs `run` now when the window's element exists, else once it mounts (latest call per name). */
+  whenMounted(engineId: string, name: string, run: () => void) {
+    if (this.mountedIds.has(engineId)) return run();
+    let calls = this.deferred.get(engineId);
+    if (!calls) this.deferred.set(engineId, (calls = new Map()));
+    calls.set(name, run);
+  }
   all() { return [...this.byId.values()]; }
 
   changed() {
@@ -163,6 +203,8 @@ export class BaseWindow extends EventEmitter {
 export class BrowserWindow extends BaseWindow {
   readonly id = nextWindow++;
   readonly hostId = `w${this.id}`;
+  opener: { window: BrowserWindow; frameName: string } | null = null;
+  get engineId() { return hostWindows.isMain(this) ? "main" : this.hostId; }
   readonly webContents: WebContents;
   readonly contentView = new View();
   private readonly options: WindowOptions;
@@ -273,8 +315,9 @@ export class BrowserWindow extends BaseWindow {
     walk(this.contentView);
     return {
       id: this.hostId,
+      engineId: this.engineId,
       contentsId: this.webContents.id,
-      kind: contentsKindOf(url),
+      kind: this.opener && (url === "about:blank" || url === "") ? this.opener.window.snapshot().kind : contentsKindOf(url),
       mode,
       url,
       title: this.state.title,
@@ -297,6 +340,8 @@ export class BrowserWindow extends BaseWindow {
       fullscreen: this.state.fullscreen,
       reloadToken: this.state.reloadToken,
       parentId: this.parent?.hostId ?? null,
+      openerId: this.opener?.window.hostId ?? null,
+      frameName: this.opener?.frameName ?? null,
       modal: o.modal === true,
       views,
     };
@@ -312,14 +357,17 @@ export class BrowserWindow extends BaseWindow {
     hostWindows.changed();
   }
 
-  private engineCall(name: string, call: (e: NonNullable<ReturnType<typeof engine>>) => Promise<unknown>) {
+  private engineCall(name: string, call: (e: NonNullable<ReturnType<typeof engine>>, id: string) => Promise<unknown>) {
     const e = engine();
     if (!e) return;
-    call(e).catch((error) => warnOnce(`window-${name}`, `engine.window.${name} failed: ${error instanceof Error ? error.message : String(error)}`));
+    hostWindows.whenMounted(this.engineId, name, () => {
+      call(e, this.engineId).catch((error) => warnOnce(`window-${name}`, `engine.window.${name} failed: ${error instanceof Error ? error.message : String(error)}`));
+    });
   }
 
-  handleEngineEvent(kind: string, bounds?: EngineBounds) {
+  handleEngineEvent(kind: string, bounds?: EngineBounds, size?: { w?: number; h?: number }) {
     if (bounds) this.state.bounds = { ...bounds };
+    if (size?.w !== undefined && size.h !== undefined) this.state.bounds = { ...this.state.bounds, width: size.w, height: size.h };
     switch (kind) {
       case "close-requested": this.close(); return;
       case "closed": this.destroy(); return;
@@ -331,7 +379,8 @@ export class BrowserWindow extends BaseWindow {
       case "unmaximize": this.state.maximized = false; this.emit("unmaximize"); break;
       case "minimize": this.state.minimized = true; this.emit("minimize"); break;
       case "restore": this.state.minimized = false; this.emit("restore"); break;
-      case "fullscreen": this.state.fullscreen = !this.state.fullscreen; this.emit(this.state.fullscreen ? "enter-full-screen" : "leave-full-screen"); break;
+      case "enter-full-screen": this.state.fullscreen = true; this.emit("enter-full-screen"); break;
+      case "leave-full-screen": this.state.fullscreen = false; this.emit("leave-full-screen"); break;
       case "show": this.state.visible = true; this.emit("show"); break;
       case "hide": this.state.visible = false; this.emit("hide"); break;
     }
@@ -455,7 +504,7 @@ export class BrowserWindow extends BaseWindow {
 
   setBounds(bounds: Partial<Rectangle>, _animate?: boolean) {
     this.set({ bounds: { ...this.state.bounds, ...bounds } });
-    this.engineCall("setBounds", (e) => e.window.setBounds(this.hostId, bounds));
+    this.engineCall("setBounds", (e, id) => e.window.setBounds(id, bounds));
     this.emit("resize");
     this.emit("move");
   }
@@ -463,13 +512,13 @@ export class BrowserWindow extends BaseWindow {
   setSize(width: number, height: number) { this.setBounds({ width, height }); }
   setContentSize(width: number, height: number) { this.setBounds({ width, height }); }
   setPosition(x: number, y: number) { this.setBounds({ x, y }); }
-  center() { this.engineCall("center", (e) => e.window.center(this.hostId)); }
+  center() { this.engineCall("center", (e, id) => e.window.center(id)); }
 
   show() {
     if (this.destroyed) return;
     const wasVisible = this.state.visible;
     this.set({ visible: true, minimized: false });
-    this.engineCall("show", (e) => e.window.show(this.hostId));
+    this.engineCall("show", (e, id) => e.window.show(id));
     if (this.state.focusable) this.focus();
     if (!wasVisible) this.emit("show");
   }
@@ -482,7 +531,7 @@ export class BrowserWindow extends BaseWindow {
   hide() {
     if (this.destroyed || !this.state.visible) return;
     this.set({ visible: false, focused: false });
-    this.engineCall("hide", (e) => e.window.hide(this.hostId));
+    this.engineCall("hide", (e, id) => e.window.hide(id));
     this.emit("hide");
   }
   focus() {
@@ -493,16 +542,16 @@ export class BrowserWindow extends BaseWindow {
       this.webContents.markFocused(true);
       this.emit("focus");
     }
-    this.engineCall("focus", (e) => e.window.focus(this.hostId));
+    this.engineCall("focus", (e, id) => e.window.focus(id));
   }
   blur() { if (this.state.focused) this.handleEngineEvent("blur"); }
   moveTop() { this.focus(); }
   moveAbove() {}
-  minimize() { this.set({ minimized: true }); this.engineCall("minimize", (e) => e.window.minimize(this.hostId)); this.emit("minimize"); }
-  restore() { this.set({ minimized: false }); this.engineCall("show", (e) => e.window.show(this.hostId)); this.emit("restore"); }
-  maximize() { this.set({ maximized: true }); this.engineCall("maximize", (e) => e.window.maximize(this.hostId)); this.emit("maximize"); }
-  unmaximize() { this.set({ maximized: false }); this.engineCall("unmaximize", (e) => e.window.unmaximize(this.hostId)); this.emit("unmaximize"); }
-  setFullScreen(on: boolean) { this.set({ fullscreen: on }); this.engineCall("setFullScreen", (e) => e.window.setFullScreen(this.hostId, on)); this.emit(on ? "enter-full-screen" : "leave-full-screen"); }
+  minimize() { this.set({ minimized: true }); this.engineCall("minimize", (e, id) => e.window.minimize(id)); this.emit("minimize"); }
+  restore() { this.set({ minimized: false }); this.engineCall("show", (e, id) => e.window.show(id)); this.emit("restore"); }
+  maximize() { this.set({ maximized: true }); this.engineCall("maximize", (e, id) => e.window.maximize(id)); this.emit("maximize"); }
+  unmaximize() { this.set({ maximized: false }); this.engineCall("unmaximize", (e, id) => e.window.unmaximize(id)); this.emit("unmaximize"); }
+  setFullScreen(on: boolean) { this.set({ fullscreen: on }); this.engineCall("setFullScreen", (e, id) => e.window.setFullScreen(id, on)); this.emit(on ? "enter-full-screen" : "leave-full-screen"); }
   setSimpleFullScreen(on: boolean) { this.setFullScreen(on); }
 
   bumpReload() { this.set({ reloadToken: this.state.reloadToken + 1 }); }
@@ -535,8 +584,28 @@ export function onWindowsAllClosed(handler: () => void) {
   windowsAllClosed = handler;
 }
 
+type WindowOpenResponse = { action: "allow" | "deny"; overrideBrowserWindowOptions?: WindowOptions; outlivesOpener?: boolean };
+
+/**
+ * window.open from a page: main's window-open handler decides, as in Electron. An allowed window
+ * becomes a BrowserWindow whose opener is `openerWindow` ("did-create-window" fires on the opener).
+ */
+export function openWindowFrom(openerWindow: BrowserWindow, url: string, frameName = "", features = ""): BrowserWindow | null {
+  const opener = openerWindow.webContents;
+  const handler = opener.getWindowOpenHandler() as ((details: unknown) => WindowOpenResponse) | null;
+  const details = { url, frameName, features, disposition: "new-window", referrer: { url: opener.getURL(), policy: "default" }, postBody: undefined };
+  const decision: WindowOpenResponse = handler ? handler(details) ?? { action: "deny" } : { action: "allow" };
+  if (decision.action !== "allow") return null;
+  const win = new BrowserWindow({ ...(decision.overrideBrowserWindowOptions ?? {}) });
+  win.opener = { window: openerWindow, frameName };
+  opener.emit("did-create-window", win, { url, frameName, options: decision.overrideBrowserWindowOptions ?? {}, disposition: "new-window" });
+  void win.webContents.loadURL(url || "about:blank");
+  hostWindows.changed();
+  return win;
+}
+
 onEngine("window", (event) => {
-  hostWindows.get(event.id)?.handleEngineEvent(event.kind, event.bounds);
+  hostWindows.get(event.id)?.handleEngineEvent(event.kind, event.bounds, event);
 });
 
 WebContents.host.onReload = (contents) => {

@@ -35,74 +35,10 @@ export type EngineMenuItem = {
 
 export type EngineBounds = { x: number; y: number; width: number; height: number };
 
-export type EngineApi = {
-  window: {
-    focus(id: string): Promise<void>;
-    show(id: string): Promise<void>;
-    hide(id: string): Promise<void>;
-    minimize(id: string): Promise<void>;
-    maximize(id: string): Promise<void>;
-    unmaximize(id: string): Promise<void>;
-    setFullScreen(id: string, on: boolean): Promise<void>;
-    close(id: string): Promise<void>;
-    center(id: string): Promise<void>;
-    getBounds(id: string): Promise<EngineBounds>;
-    setBounds(id: string, bounds: Partial<EngineBounds>): Promise<void>;
-    isMaximized(id: string): Promise<boolean>;
-    isFocused(id: string): Promise<boolean>;
-  };
-  clipboard: {
-    readText(): Promise<string>;
-    writeText(text: string): Promise<void>;
-    readHTML(): Promise<string>;
-    writeHTML(html: string, text?: string): Promise<void>;
-    readImage(): Promise<Uint8Array | null>;
-    writeImage(png: Uint8Array): Promise<void>;
-    readFiles(): Promise<string[]>;
-    availableFormats(): Promise<string[]>;
-  };
-  dialog: {
-    openFile(opts: {
-      title?: string;
-      defaultPath?: string;
-      filters?: Array<{ name: string; extensions: string[] }>;
-      multi?: boolean;
-      directory?: boolean;
-    }): Promise<string[] | null>;
-    saveFile(opts: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
-  };
-  notify(n: { id: string; title: string; body?: string; icon?: string; silent?: boolean }): Promise<void>;
-  menu: {
-    popup(items: EngineMenuItem[], at: { window?: string; x?: number; y?: number }): Promise<string | null>;
-    setApplicationMenu(items: EngineMenuItem[] | null): Promise<void>;
-  };
-  tray: {
-    create(opts: { icon: string | Uint8Array; tooltip?: string; menu?: EngineMenuItem[] }): Promise<string>;
-    setMenu(id: string, menu: EngineMenuItem[] | null): Promise<void>;
-    setTooltip(id: string, tooltip: string): Promise<void>;
-    setIcon(id: string, icon: string | Uint8Array): Promise<void>;
-    destroy(id: string): Promise<void>;
-  };
-  shortcut: {
-    register(accelerator: string): Promise<boolean>;
-    unregister(accelerator: string): Promise<void>;
-    unregisterAll(): Promise<void>;
-  };
-  screen: {
-    displays(): Promise<EngineDisplay[]>;
-    primary(): Promise<EngineDisplay>;
-    cursorPoint(): Promise<{ x: number; y: number }>;
-  };
-  appearance: { get(): Promise<{ dark: boolean; accentColor?: string; reducedMotion?: boolean }> };
-  shell?: {
-    openExternal(url: string): Promise<void>;
-    openPath(path: string): Promise<string>;
-    showItemInFolder(path: string): Promise<void>;
-  };
-};
+export type EngineApi = typeof import("../bridge").engine;
 
 export type EngineEventOf = {
-  window: { t: "window"; id: string; kind: string; bounds?: EngineBounds };
+  window: { t: "window"; id: string; kind: string; bounds?: EngineBounds; w?: number; h?: number };
   notification: { t: "notification"; id: string; action: "click" | "close" };
   menu: { t: "menu"; id: string };
   tray: { t: "tray"; id: string; kind: "click" | "menu" | "double-click" | "right-click"; item?: string };

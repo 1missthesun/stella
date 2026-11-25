@@ -1,0 +1,162 @@
+// `globalThis.stella.host`: what the UI's root needs to render Electron main's windows. The window
+// registry, each window's electronAPI, the message-box queue main raises, and the plumbing of web
+// windows' `<webview>`s (custom schemes, navigation, executeJavaScript).
+
+import { BrowserWindow, hostWindows, openWindowFrom, type WindowSnapshot } from "../electron/browser-window";
+import { engine } from "../electron/engine";
+import { hostDialogs, type HostDialogRequest } from "../electron/native";
+import { defaultSession, fetchProtocolIn } from "../electron/session";
+import { WebContents } from "../electron/web-contents";
+import { rendererApiFor, type ElectronApi } from "./renderer-api";
+
+export type HostMessageBox = Omit<HostDialogRequest, "resolve">;
+
+export type WebviewRequest = { rid: number; scheme: string; url: string; method: string; headers: Record<string, string>; body?: string | null };
+
+export type UiHost = {
+  windows: { subscribe(listener: () => void): () => void; snapshot(): WindowSnapshot[] };
+  apiFor(windowId: string): ElectronApi | null;
+  /** window.open from the page in `openerId` (a viewer window, an auth popup); main's open handler decides. */
+  open(openerId: string, url: string, frameName?: string, features?: string): string | null;
+  /** The UI mounted / unmounted the `<window>` with this engine id. */
+  mounted(engineId: string): void;
+  unmounted(engineId: string): void;
+  dialogs: {
+    subscribe(listener: () => void): () => void;
+    pending(): HostMessageBox[];
+    answer(id: number, response: number, checkboxChecked?: boolean): void;
+  };
+  web: {
+    /** The `<webview id>` of a web window's contents. */
+    elementId(contentsId: number): string;
+    /** Custom schemes the window's session serves. */
+    schemes(contentsId: number): string[];
+    request(contentsId: number, request: WebviewRequest): void;
+    /** A navigation the page made; `mainFrame: false` (an iframe) is ignored, as in Electron. */
+    navigated(contentsId: number, url: string, mainFrame?: boolean): void;
+    titled(contentsId: number, title: string): void;
+    loaded(contentsId: number, phase: string): void;
+    message(contentsId: number, data: unknown): void;
+  };
+};
+
+const STANDARD_SCHEMES = new Set(["http", "https", "file", "data", "blob", "about", "javascript", "ws", "wss"]);
+
+const contentsById = (id: number) => {
+  for (const win of BrowserWindow.getAllWindows()) if (win.webContents.id === id) return win.webContents;
+  return null;
+};
+
+const elementId = (contentsId: number) => `web-${contentsId}`;
+
+const pendingEvals = new Map<string, { resolve(value: unknown): void; reject(error: Error): void }>();
+let nextEval = 1;
+
+export function createUiHost(): UiHost {
+  let dialogCache: HostMessageBox[] | null = null;
+  const dialogListeners = new Set<() => void>();
+  const dialogsChanged = () => {
+    dialogCache = null;
+    for (const listener of [...dialogListeners]) listener();
+  };
+  const onRequest = () => dialogsChanged();
+
+  WebContents.host.onNavigate = () => hostWindows.changed();
+  WebContents.host.evaluateWeb = (contents, code) => {
+    const e = engine();
+    if (!e) return Promise.reject(new Error("No engine to run page scripts in."));
+    const id = `e${nextEval++}`;
+    const wrapped = `(async () => { let m; try { m = { __runeEval: ${JSON.stringify(id)}, ok: true, value: await (0, eval)(${JSON.stringify(code)}) }; } catch (error) { m = { __runeEval: ${JSON.stringify(id)}, ok: false, error: String(error && error.message || error) }; } try { window.ipc.postMessage(JSON.stringify(m)); } catch (_) { m.value = null; window.ipc.postMessage(JSON.stringify(m)); } })();`;
+    return new Promise((resolve, reject) => {
+      pendingEvals.set(id, { resolve, reject });
+      e.webview.eval(elementId(contents.id), wrapped).catch((error: Error) => {
+        pendingEvals.delete(id);
+        reject(error);
+      });
+    });
+  };
+
+  return {
+    windows: { subscribe: hostWindows.subscribe, snapshot: hostWindows.snapshot },
+    apiFor(windowId) {
+      const win = hostWindows.get(windowId);
+      return win ? rendererApiFor(win.webContents) : null;
+    },
+    open(openerId, url, frameName = "", features = "") {
+      const opener = hostWindows.get(openerId);
+      return opener ? openWindowFrom(opener, url, frameName, features)?.hostId ?? null : null;
+    },
+    mounted: (id) => hostWindows.mounted(id),
+    unmounted: (id) => hostWindows.unmounted(id),
+    dialogs: {
+      subscribe(listener) {
+        if (dialogListeners.size === 0) {
+          hostDialogs.on("request", onRequest);
+          hostDialogs.on("resolved", onRequest);
+        }
+        dialogListeners.add(listener);
+        return () => {
+          dialogListeners.delete(listener);
+          if (dialogListeners.size === 0) {
+            hostDialogs.off("request", onRequest);
+            hostDialogs.off("resolved", onRequest);
+          }
+        };
+      },
+      pending() {
+        dialogCache ??= [...hostDialogs.pending.values()].map(({ resolve: _resolve, ...view }) => view);
+        return dialogCache;
+      },
+      answer(id, response, checkboxChecked = false) {
+        hostDialogs.pending.get(id)?.resolve({ response, checkboxChecked });
+      },
+    },
+    web: {
+      elementId,
+      schemes(contentsId) {
+        const contents = contentsById(contentsId);
+        const schemes = new Set<string>();
+        for (const session of [contents?.session, defaultSession()]) {
+          for (const scheme of session?.protocol.handlers.keys() ?? []) if (!STANDARD_SCHEMES.has(scheme)) schemes.add(scheme);
+        }
+        return [...schemes];
+      },
+      request(contentsId, req) {
+        const e = engine();
+        const contents = contentsById(contentsId);
+        if (!e) return;
+        const respond = (status: number, headers: Record<string, string>, body: string | Uint8Array) => void e.webview.respond(req.rid, { status, headers, body }).catch(() => {});
+        if (!contents) return respond(404, {}, "");
+        const hasBody = req.body !== undefined && req.method !== "GET" && req.method !== "HEAD";
+        fetchProtocolIn(contents.session, new Request(req.url, { method: req.method, headers: req.headers, body: hasBody ? req.body ?? undefined : undefined }))
+          .then(async (response) => {
+            if (!response) return respond(404, { "content-type": "text/plain" }, "Not found");
+            const headers: Record<string, string> = {};
+            response.headers.forEach((value, key) => { headers[key] = value; });
+            respond(response.status, headers, new Uint8Array(await response.arrayBuffer()));
+          })
+          .catch((error) => respond(500, { "content-type": "text/plain" }, String(error)));
+      },
+      navigated(contentsId, url, mainFrame = true) {
+        if (mainFrame) contentsById(contentsId)?.markNavigated(url);
+      },
+      titled(contentsId, title) {
+        contentsById(contentsId)?.setTitle(title);
+        hostWindows.changed();
+      },
+      loaded(contentsId, phase) {
+        if (phase === "finished") contentsById(contentsId)?.markLoaded();
+      },
+      message(_contentsId, data) {
+        let parsed: unknown = data;
+        if (typeof data === "string") { try { parsed = JSON.parse(data); } catch {} }
+        const m = parsed as { __runeEval?: string; ok?: boolean; value?: unknown; error?: string } | null;
+        if (!m?.__runeEval) return;
+        const waiter = pendingEvals.get(m.__runeEval);
+        pendingEvals.delete(m.__runeEval);
+        if (m.ok) waiter?.resolve(m.value);
+        else waiter?.reject(new Error(m.error ?? "Script failed"));
+      },
+    },
+  };
+}

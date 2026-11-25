@@ -14,5 +14,7 @@ declare global {
     now: () => number;
     /** The runtime's default conversation, when the host runs Stella's services. */
     chat?: { conversationId: string; send(text: string): Promise<void> };
+    /** Electron main's windows, their electronAPI and message boxes, when the host runs Stella's services. */
+    host?: import("../host/services/ui-host").UiHost;
   };
 }

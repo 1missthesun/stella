@@ -34,10 +34,12 @@ export async function bootElectronMain(options: ElectronMainOptions): Promise<vo
 
   const live = engine();
   if (live) {
-    await Promise.all([
+    const settled = Promise.all([
       refreshDisplays(),
       live.appearance.get().then((a) => nativeTheme.setSystemAppearance(a.dark)).catch(() => {}),
     ]);
+    const timedOut = await Promise.race([settled.then(() => false), Bun.sleep(3000).then(() => true)]);
+    if (timedOut) console.error("[host] the engine did not answer displays/appearance within 3 s; booting with defaults");
   }
   onEngine("appearance", (a) => nativeTheme.setSystemAppearance(a.dark));
 

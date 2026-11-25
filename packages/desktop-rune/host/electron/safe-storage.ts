@@ -15,7 +15,7 @@ const LIBSECRET_SCHEMA = "chrome_libsecret_os_crypt_password_v2";
 type Backend = { prefix: string; encrypt(plain: Buffer): Buffer; decrypt(data: Buffer): Buffer };
 
 const run = (cmd: string[], stdin?: string) => {
-  const result = Bun.spawnSync(cmd, { stdin: stdin === undefined ? "ignore" : Buffer.from(stdin), stdout: "pipe", stderr: "ignore" });
+  const result = Bun.spawnSync(cmd, { stdin: stdin === undefined ? "ignore" : Buffer.from(stdin), stdout: "pipe", stderr: "ignore", env: process.env });
   return { ok: result.exitCode === 0, out: result.stdout.toString() };
 };
 

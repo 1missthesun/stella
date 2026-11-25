@@ -45,7 +45,7 @@ export const shell = {
       : process.platform === "win32"
         ? ["powershell.exe", "-NoProfile", "-Command", `Add-Type -AssemblyName Microsoft.VisualBasic; $p=${JSON.stringify(path.resolve(target))}; if (Test-Path -PathType Container $p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($p,'OnlyErrorDialogs','SendToRecycleBin') } else { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p,'OnlyErrorDialogs','SendToRecycleBin') }`]
         : ["gio", "trash", path.resolve(target)];
-    const result = Bun.spawnSync(cmd, { stdout: "ignore", stderr: "pipe" });
+    const result = Bun.spawnSync(cmd, { stdout: "ignore", stderr: "pipe", env: process.env });
     if (result.exitCode !== 0) throw new Error(`Failed to move ${target} to the trash: ${result.stderr.toString().trim()}`);
   },
   beep() {},

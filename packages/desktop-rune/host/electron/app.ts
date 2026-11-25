@@ -198,7 +198,7 @@ class App extends EventEmitter {
       s.on("connect", () => { s.end(${JSON.stringify(message)}); setTimeout(() => process.exit(0), 50); });
       s.on("error", () => process.exit(1));
       setTimeout(() => process.exit(1), 1500);
-    `], { stdout: "ignore", stderr: "ignore" });
+    `], { stdout: "ignore", stderr: "ignore", env: process.env });
     if (probe.exitCode === 0) return false;
     const server = net.createServer((socket) => {
       let body = "";

@@ -40,6 +40,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     const c: Child = { proc: null!, ready: new Promise((r) => (resolveReady = r)), builds: 0, pending: new Map() };
     c.proc = Bun.spawn([process.execPath, CHILD], {
       cwd: path.dirname(options.entry),
+      env: process.env,
       stdio: ["ignore", "ignore", "inherit"],
       ipc(reply: UiBuildReply) {
         if (reply.id === 0) return resolveReady();

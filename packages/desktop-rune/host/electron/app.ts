@@ -3,12 +3,13 @@
 
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { warnOnce } from "./engine";
 import { nativeImage } from "./native-image";
+import { ProcessSingleton } from "./process-singleton";
 
 const home = os.homedir();
 
@@ -69,7 +70,7 @@ class App extends EventEmitter {
   private quitting = false;
   private relaunchRequest: { args?: string[]; execPath?: string } | null = null;
   private lockServer: net.Server | null = null;
-  private lockPath: string | null = null;
+  private singleton: ProcessSingleton | null = null;
   private appPath = process.cwd();
   private version = "0.0.0";
 
@@ -177,22 +178,28 @@ class App extends EventEmitter {
   isActive() { return true; }
 
   requestSingleInstanceLock(additionalData?: unknown): boolean {
+    if (this.singleton?.held || this.lockServer) return true;
     const userData = this.getPath("userData");
     mkdirSync(userData, { recursive: true });
-    const lockPath = process.platform === "win32"
-      ? `\\\\.\\pipe\\stella-rune-${Buffer.from(userData).toString("hex").slice(-40)}`
-      : path.join(userData, "RuneSingleton.sock");
-    const message = JSON.stringify({ argv: process.argv, cwd: process.cwd(), data: additionalData ?? null });
-    if (process.platform !== "win32" && existsSync(lockPath)) {
-      const probe = Bun.spawnSync([process.execPath, "-e", `
-        const s = require("node:net").connect(${JSON.stringify(lockPath)});
-        s.on("connect", () => { s.end(${JSON.stringify(message)}); setTimeout(() => process.exit(0), 50); });
-        s.on("error", () => process.exit(1));
-        setTimeout(() => process.exit(1), 1500);
-      `], { stdout: "ignore", stderr: "ignore" });
-      if (probe.exitCode === 0) return false;
-      rmSync(lockPath, { force: true });
+    if (process.platform !== "win32") {
+      const singleton = new ProcessSingleton(userData, (m) => {
+        this.emit("second-instance", preventable(), m.argv, m.cwd, m.data);
+        return true;
+      });
+      const lockPid = process.env.STELLA_RUNE_BRIDGE_OUT_FD ? process.ppid : process.pid;
+      if (!singleton.acquire(process.argv, process.cwd(), additionalData, lockPid)) return false;
+      this.singleton = singleton;
+      return true;
     }
+    const lockPath = `\\\\.\\pipe\\stella-rune-${Buffer.from(userData).toString("hex").slice(-40)}`;
+    const message = JSON.stringify({ argv: process.argv, cwd: process.cwd(), data: additionalData ?? null });
+    const probe = Bun.spawnSync([process.execPath, "-e", `
+      const s = require("node:net").connect(${JSON.stringify(lockPath)});
+      s.on("connect", () => { s.end(${JSON.stringify(message)}); setTimeout(() => process.exit(0), 50); });
+      s.on("error", () => process.exit(1));
+      setTimeout(() => process.exit(1), 1500);
+    `], { stdout: "ignore", stderr: "ignore" });
+    if (probe.exitCode === 0) return false;
     const server = net.createServer((socket) => {
       let body = "";
       socket.setEncoding("utf8");
@@ -209,17 +216,16 @@ class App extends EventEmitter {
     server.listen(lockPath);
     server.unref();
     this.lockServer = server;
-    this.lockPath = lockPath;
     return true;
   }
 
-  hasSingleInstanceLock() { return this.lockServer !== null; }
+  hasSingleInstanceLock() { return this.singleton?.held === true || this.lockServer !== null; }
 
   releaseSingleInstanceLock() {
+    this.singleton?.release();
+    this.singleton = null;
     this.lockServer?.close();
     this.lockServer = null;
-    if (this.lockPath && process.platform !== "win32") rmSync(this.lockPath, { force: true });
-    this.lockPath = null;
   }
 
   setAsDefaultProtocolClient(_protocol: string) { return true; }

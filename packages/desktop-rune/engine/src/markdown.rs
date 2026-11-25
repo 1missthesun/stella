@@ -136,7 +136,11 @@ fn style(v: &Value) -> MarkdownStyle {
             s = f(s, x);
         }
     }
-    for (k, f) in [("listMarkersOutside", MarkdownStyle::list_markers_outside as Set<bool>), ("tableFlushLeft", MarkdownStyle::table_flush_left)] {
+    for (k, f) in [
+        ("listMarkersOutside", MarkdownStyle::list_markers_outside as Set<bool>),
+        ("tableFlushLeft", MarkdownStyle::table_flush_left),
+        ("syntaxHighlight", MarkdownStyle::syntax_highlight),
+    ] {
         if let Some(on) = v.get(k).and_then(|b| b.as_bool()) {
             s = f(s, on);
         }
@@ -226,6 +230,18 @@ struct CodeFrameP {
     action_color: Option<crate::props::C>,
     action_hover: Option<crate::props::C>,
     actions_on_hover: Option<bool>,
+    /// Draw the block's frame here, the label row inside it (streamdown's layout).
+    inside: Option<InsideP>,
+}
+
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct InsideP {
+    fill: Option<crate::props::C>,
+    border: Option<crate::props::C>,
+    radius: Option<f32>,
+    /// `[x, top, bottom]` around the label row and code.
+    pad: Option<[f32; 3]>,
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -275,7 +291,18 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
             actions = actions.group_opacity(0.0, 1.0);
         }
         head = head.child(actions);
-        rune::col().key(format!("code-{}", c.index)).w_full().gap(f.label_gap.unwrap_or(4.0)).hover_group().child(head).child(card)
+        let mut frame = rune::col().key(format!("code-{}", c.index)).w_full().gap(f.label_gap.unwrap_or(4.0)).hover_group();
+        if let Some(i) = &f.inside {
+            let [x, top, bottom] = i.pad.unwrap_or([12.0, 6.0, 0.0]);
+            frame = frame.pl(x).pr(6.0).pt(top).pb(bottom).radius(i.radius.unwrap_or(0.0));
+            if let Some(c) = i.fill {
+                frame = frame.fill(c.0);
+            }
+            if let Some(c) = i.border {
+                frame = frame.border(1.0, c.0);
+            }
+        }
+        frame.child(head).child(card)
     })
 }
 

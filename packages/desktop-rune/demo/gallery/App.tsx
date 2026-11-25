@@ -165,9 +165,12 @@ function Docs() {
       <markdown id="g-md" src={MD} selectable onLink={(href) => setAction(`link ${href}`)}
         onCodeAction={(a) => { void stella.engine.clipboard.writeText(a.source); setAction(`${a.action} ${a.language} block ${a.index}`); }}
         mdStyle={{
-          dark: true, text: c.text, muted: c.weak, link: c.accent, inlineCodeBg: "#ffffff14", codeBlock: [c.inset, c.border],
-          codeBlockPadding: [14, 12], codeBlockRadius: 10, body: { size: 14, lineHeight: 21 }, tableFullWidth: true, tableFlushLeft: true,
-          codeFrame: { label: c.weak, labelSize: 12, actionColor: c.weak, actionHover: c.hover, actions: [{ id: "copy", label: "Copy", svg: COPY }] },
+          dark: true, text: c.text, muted: c.weak, link: c.accent, inlineCodeBg: "#ffffff14", codeBlock: ["transparent", "transparent"],
+          codeBlockPadding: [0, 10], body: { size: 14, lineHeight: 21 }, tableFullWidth: true, tableFlushLeft: true,
+          codeFrame: {
+            label: c.weak, labelSize: 12, labelGap: 0, actionColor: c.weak, actionHover: c.hover, actions: [{ id: "copy", label: "Copy", svg: COPY }],
+            inside: { fill: c.inset, border: c.border, radius: 10, pad: [14, 6, 2] },
+          },
         }} />
       <text size={12} color={c.weaker}>{action || "Hover the code block for Copy"}</text>
     </Section>

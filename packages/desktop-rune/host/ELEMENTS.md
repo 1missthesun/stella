@@ -201,13 +201,15 @@ tableHeaderWeight`; booleans `listMarkersOutside tableFlushLeft tableFullWidth`.
 `codeBlockFont`, `tableFont`, and headings via `headings` (array, level 1 first) or `headingFont`
 (`{"1": …}`). Heading margins use `headingMargins` / `headingMargin` in the same two shapes.
 
-**`syntax`.** `{keyword, string, number, comment, type, function, property, punctuation,
+**`syntaxHighlight`** (boolean) turns colouring off. **`syntax`.** `{keyword, string, number, comment, type, function, property, punctuation,
 operator, inserted, deleted}` colours. `dark` picks the neutral base.
 
 **`codeFrame`.** `{label, labelSize, labelGap, actions: [{id, label?, svg?, view?}], actionColor,
 actionHover, actionsOnHover}` adds a language row above each code block, with actions at its top
 right. Pressing an action fires `onCodeAction({action, index, language, source})`; TS does the
-copy or download.
+copy or download. `inside: {fill, border, radius, pad: [x, top, bottom]}` draws the block's frame itself with
+the label row inside it (streamdown's layout): pair it with `codeBlock: ["transparent", "transparent"]`
+and `codeBlockPadding: [0, y]`.
 
 ### list
 

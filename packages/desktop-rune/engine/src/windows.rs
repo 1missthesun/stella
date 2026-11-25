@@ -548,6 +548,9 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             changed = true;
         }
         apply_fonts(node, tx);
+        if !cmds.is_empty() && !first_commit {
+            tx.animated();
+        }
         for WinCmd::Req(rid, v) in cmds {
             crate::commands::run(s, tx, rid, v);
             changed = true;

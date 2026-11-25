@@ -141,6 +141,8 @@ export type TextProps = BoxProps & {
   mono?: boolean;
   /** A registered or installed family ("Manrope", "IBM Plex Mono"), or "sans" / "mono" / "system-mono". */
   family?: string;
+  /** CSS `font-feature-settings`, e.g. `"'ss01' 1, 'tnum' 1"`. */
+  features?: string;
   italic?: boolean; underline?: boolean; strike?: boolean;
   selectable?: boolean;
   selectionColor?: Color;

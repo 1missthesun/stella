@@ -32,6 +32,7 @@ fn pair(v: &Value, k: &str) -> Option<[f32; 2]> {
 fn font(v: &Value, base: TextStyle) -> TextStyle {
     let mut p = Props { size: num(v, "size"), weight: num(v, "weight"), line_height: num(v, "lineHeight"), tracking: num(v, "tracking"), ..Default::default() };
     p.family = v.get("family").and_then(|f| f.as_str()).map(str::to_owned);
+    p.features = v.get("features").and_then(|f| f.as_str()).map(str::to_owned);
     let mut s = crate::text::style_of(&p);
     if p.size.is_none() {
         s.size = base.size;

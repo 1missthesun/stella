@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use rune::{AppHandle, Shortcut, ShortcutId, Tray, TrayEvent, TrayIcon, TrayItem, TraySpec};
+use rune::{AppHandle, MenuItem, Shortcut, ShortcutId, Tray, TrayEvent, TrayIcon, TrayItem, TraySpec};
 use serde_json::{Value, json};
 
 use crate::windows::{Win, send_any_thread};
@@ -64,7 +64,12 @@ fn tray_menu(v: &Value) -> Vec<TrayItem> {
 }
 
 pub fn tray(cmd: &str, v: &Value) -> Result<Value, String> {
-    let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("tray").to_owned();
+    static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+    let id = match v.get("id").and_then(|x| x.as_str()) {
+        Some(id) => id.to_owned(),
+        None if cmd == "tray.create" => format!("tray-{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)),
+        None => "tray-1".to_owned(),
+    };
     match cmd {
         "tray.create" => {
             let spec = TraySpec::new(id.clone(), s(v, "title"), icon(v)?).tooltip(s(v, "tooltip")).menu(tray_menu(v));
@@ -78,7 +83,8 @@ pub fn tray(cmd: &str, v: &Value) -> Result<Value, String> {
                 send_any_thread(e);
             })
             .map_err(|e| format!("{e:?}"))?;
-            TRAYS.with(|t| t.borrow_mut().insert(id, tray));
+            TRAYS.with(|t| t.borrow_mut().insert(id.clone(), tray));
+            return Ok(json!(id));
         }
         "tray.destroy" => {
             TRAYS.with(|t| t.borrow_mut().remove(&id));
@@ -99,6 +105,56 @@ pub fn tray(cmd: &str, v: &Value) -> Result<Value, String> {
         }
     }
     Ok(Value::Null)
+}
+
+fn menu_items(items: &[Value]) -> Vec<MenuItem<Win>> {
+    items
+        .iter()
+        .filter(|it| it.get("visible").and_then(|v| v.as_bool()) != Some(false))
+        .map(|it| {
+            if s(it, "type") == "separator" {
+                return MenuItem::separator();
+            }
+            let label = s(it, "label").to_owned();
+            let id = match s(it, "id") {
+                "" => label.clone(),
+                id => id.to_owned(),
+            };
+            let item = match it.get("submenu").and_then(|m| m.as_array()) {
+                Some(sub) => MenuItem::submenu(label, menu_items(sub)),
+                None => {
+                    let picked = id.clone();
+                    let mut item = MenuItem::with_action(label, move |_s: &mut Win, _tx: &mut rune::Tx| crate::engine::send(json!({ "t": "menu", "id": picked })));
+                    if let Some(sc) = it.get("accelerator").and_then(|a| a.as_str()).and_then(|a| accelerator(a).parse::<Shortcut>().ok()) {
+                        item = item.key_equivalent(sc);
+                    }
+                    item
+                }
+            };
+            item.id(id)
+                .enabled(it.get("enabled").and_then(|e| e.as_bool()).unwrap_or(true))
+                .checked(it.get("checked").and_then(|c| c.as_bool()).unwrap_or(false))
+        })
+        .collect()
+}
+
+/// `menu.setApplicationMenu`: Electron's template, each top-level submenu becoming a menu-bar
+/// menu (`role: "appMenu"` is the app menu). macOS only; elsewhere the app draws its menus.
+pub fn app_menu(v: &Value) -> Result<Value, String> {
+    let app = APP.get().ok_or("no app")?;
+    let top = v.get("items").and_then(|m| m.as_array()).cloned().unwrap_or_default();
+    let mut items = Vec::new();
+    for t in &top {
+        let app_menu = s(t, "role") == "appMenu";
+        for item in menu_items(t.get("submenu").and_then(|m| m.as_array()).map(Vec::as_slice).unwrap_or(&[])) {
+            items.push(if app_menu { item } else { item.menu(s(t, "label").to_owned()) });
+        }
+    }
+    match app.set_menu(items) {
+        Ok(()) => Ok(json!(true)),
+        Err(rune::MenuError::Unsupported) => Ok(json!(false)),
+        Err(e) => Err(format!("{e:?}")),
+    }
 }
 
 /// Electron accelerators (`CommandOrControl+Shift+K`) in Rune's chord syntax.
@@ -127,7 +183,7 @@ pub fn shortcut(cmd: &str, v: &Value) -> Result<Value, String> {
             }
             let sc: Shortcut = accelerator(&accel).parse().map_err(|e| format!("{e:?}"))?;
             let name = accel.clone();
-            match app.register_shortcut(sc, move |_s: &mut Win, _tx| crate::engine::send(json!({ "t": "shortcut", "accelerator": name }))) {
+            match app.register_shortcut(sc, move |_s: &mut Win, _tx| crate::engine::send(json!({ "t": "shortcut", "accelerator": name, "accel": name }))) {
                 Ok(id) => {
                     map.insert(accel, id);
                     Ok(json!(true))

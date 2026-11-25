@@ -79,7 +79,7 @@ let nextRid = 1;
 const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
 
 /** Sends a command and resolves with the engine's reply. */
-export function request<T = unknown>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
+export function request<T = void>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   const rid = nextRid++;
   return new Promise<T>((resolve, reject) => {
     pending.set(rid, { resolve, reject });
@@ -101,7 +101,7 @@ export function freeBlob(id: number) { ops.freeBlob(id); flushFrame(false); }
 
 export type Mods = { mod: boolean; shift: boolean; alt: boolean; ctrl: boolean; meta: boolean };
 export type Rect = { x: number; y: number; width: number; height: number };
-export type Display = { id: string; name?: string; primary: boolean; scaleFactor: number; bounds: Rect; workArea: Rect };
+export type Display = { id: number; label?: string; primary: boolean; scaleFactor: number; bounds: Rect; workArea: Rect };
 
 /** An element event, delivered to the element's `on*` prop by the reconciler. */
 export type ElementEvent = { t: "ev"; n: number; e: string; seq: number; at: number; input?: number; [k: string]: unknown };
@@ -116,9 +116,9 @@ export type EngineEvent =
   | { t: "window"; id: string | null; n: number; kind: WindowEventKind; w?: number; h?: number }
   | { t: "menu"; id: string }
   | { t: "tray"; id: string; kind: "click" | "menu"; item?: string }
-  | { t: "shortcut"; accelerator: string }
+  | { t: "shortcut"; accelerator: string; accel: string }
   | { t: "notification"; id: string | null; action: string; reply?: string | null }
-  | { t: "appearance"; dark: boolean }
+  | { t: "appearance"; dark: boolean; accentColor?: string }
   | { t: "rec"; result: unknown };
 
 type EventOf<T extends EngineEvent["t"]> = Extract<EngineEvent, { t: T }>;
@@ -174,18 +174,18 @@ export async function listen(extra?: (e: EngineEvent) => void) {
 // ---------------------------------------------------------------- typed engine API
 
 export type MenuItem = {
-  id?: string; label?: string; type?: "normal" | "separator" | "checkbox" | "submenu";
-  enabled?: boolean; checked?: boolean; accelerator?: string; submenu?: MenuItem[];
+  id?: string; label?: string; type?: "normal" | "separator" | "checkbox" | "radio" | "submenu";
+  enabled?: boolean; checked?: boolean; visible?: boolean; accelerator?: string; role?: string; submenu?: MenuItem[];
 };
 export type FileFilter = { name: string; extensions: string[] };
 export type DialogOptions = { title?: string; defaultPath?: string; filters?: FileFilter[]; window?: string };
-export type ClipboardRead = { text: string; html: string | null; files: string[]; image: string | null };
+export type ClipboardRead = { text: string; html: string | null; files: string[]; image: string | null; formats: string[] };
 export type WindowBounds = { x: number; y: number; width: number; height: number; scaleFactor: number; maximized: boolean; minimized: boolean; fullScreen: boolean };
 export type ElementInfo = { key: string | null; path: string; role: string; label: string | null; text: string | null; rect: [number, number, number, number]; opacity: number; focused: boolean; focusable: boolean; inert: boolean; exiting: boolean; fill: string; textColor: string | null };
 /** A Rune script event (`--script` format): move/down/up/tap/double-click/drag/scroll/wheel/key/type/paste/ime/drop_files… */
 export type InputEvent = Record<string, unknown> & { type?: string; t?: number };
 
-const win = (id: string, cmd: string, args: Record<string, unknown> = {}) => request(`window.${cmd}`, { ...args, window: id });
+const win = <T = void>(id: string, cmd: string, args: Record<string, unknown> = {}) => request<T>(`window.${cmd}`, { ...args, window: id });
 
 export const engine = {
   request, command, blob, freeBlob,
@@ -203,14 +203,17 @@ export const engine = {
     setTitle: (id: string, title: string) => win(id, "setTitle", { title }),
     setAlwaysOnTop: (id: string, on: boolean) => win(id, "setAlwaysOnTop", { on }),
     setBounds: (id: string, b: Partial<Rect>) => win(id, "setBounds", b),
-    getBounds: (id: string) => win(id, "getBounds") as Promise<WindowBounds>,
-    isMaximized: async (id: string) => ((await win(id, "getBounds")) as WindowBounds).maximized,
+    getBounds: (id: string) => win<WindowBounds>(id, "getBounds"),
+    isMaximized: async (id: string) => (await win<WindowBounds>(id, "getBounds")).maximized,
+    isFocused: (id: string) => request<boolean>("window.isFocused", { window: id }),
   },
   clipboard: {
     read: (window?: string) => request<ClipboardRead>("clipboard.read", { window }),
     readText: async () => (await request<ClipboardRead>("clipboard.read")).text,
     readHTML: async () => (await request<ClipboardRead>("clipboard.read")).html ?? "",
     readFiles: async () => (await request<ClipboardRead>("clipboard.read")).files,
+    /** MIME types on the clipboard: text/plain, text/html, text/uri-list (files), image/png. */
+    availableFormats: async () => (await request<ClipboardRead>("clipboard.read")).formats,
     /** The clipboard image as PNG bytes, or null. */
     readImage: async (): Promise<Uint8Array | null> => {
       const { image } = await request<ClipboardRead>("clipboard.read");
@@ -221,24 +224,32 @@ export const engine = {
     writeImage: (png: Uint8Array) => { const id = blob(png); return request("clipboard.writeImage", { blob: id }).finally(() => freeBlob(id)); },
   },
   dialog: {
-    openFile: (o: DialogOptions & { multi?: boolean } = {}) => request<string[] | null>("dialog.openFile", o),
+    openFile: (o: DialogOptions & { multi?: boolean; directory?: boolean } = {}) => request<string[] | null>("dialog.openFile", o),
     openFolder: (o: DialogOptions = {}) => request<string[] | null>("dialog.openFolder", o),
     saveFile: (o: DialogOptions = {}) => request<string | null>("dialog.saveFile", o),
   },
-  notify: (n: { id: string; title: string; body?: string; actions?: { id: string; label: string }[] }) => request<boolean>("notify", n),
+  notify: (n: { id: string; title: string; body?: string; icon?: string; silent?: boolean; actions?: { id: string; label: string }[] }) => request("notify", n),
   menu: {
     /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */
     popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) =>
       request<string | null>("menu.popup", { items, window: at.window, x: at.x, y: at.y, target: at.anchor }),
+    /** The macOS menu bar from an Electron-style template (top-level submenus; `role: "appMenu"` is the app menu). Picks arrive as `menu` events. A no-op off macOS. */
+    setApplicationMenu: (items: MenuItem[] | null) => request("menu.setApplicationMenu", { items: items ?? [] }),
   },
   tray: {
-    create: (t: { id: string; title?: string; icon?: string; iconPng?: Uint8Array; tooltip?: string; template?: boolean; menu?: MenuItem[] }) => {
-      const b = t.iconPng ? blob(t.iconPng) : undefined;
-      return request("tray.create", { ...t, iconPng: undefined, blob: b });
+    /** Resolves with the tray's id (`id`, or a generated one). `icon` is a PNG path or PNG bytes. */
+    create: (t: { id?: string; title?: string; icon: string | Uint8Array; tooltip?: string; template?: boolean; menu?: MenuItem[] | null }) => {
+      const b = typeof t.icon === "string" ? undefined : blob(t.icon);
+      const p = request<string>("tray.create", { ...t, menu: t.menu ?? [], icon: typeof t.icon === "string" ? t.icon : undefined, blob: b });
+      return b ? p.finally(() => freeBlob(b)) : p;
     },
-    setMenu: (id: string, menu: MenuItem[]) => request("tray.setMenu", { id, menu }),
+    setMenu: (id: string, menu: MenuItem[] | null) => request("tray.setMenu", { id, menu: menu ?? [] }),
     setTooltip: (id: string, tooltip: string) => request("tray.setTooltip", { id, tooltip }),
-    setIcon: (id: string, icon: string) => request("tray.setIcon", { id, icon }),
+    setIcon: (id: string, icon: string | Uint8Array) => {
+      const b = typeof icon === "string" ? undefined : blob(icon);
+      const p = request("tray.setIcon", { id, icon: typeof icon === "string" ? icon : undefined, blob: b });
+      return b ? p.finally(() => freeBlob(b)) : p;
+    },
     destroy: (id: string) => request("tray.destroy", { id }),
   },
   shortcut: {
@@ -248,12 +259,21 @@ export const engine = {
   },
   screen: {
     displays: () => request<Display[]>("screen.displays"),
-    primary: async () => (await request<Display[]>("screen.displays")).find((d) => d.primary) ?? null,
+    /** The primary display (the first one when none says primary). */
+    primary: async () => {
+      const all = await request<Display[]>("screen.displays");
+      const d = all.find((x) => x.primary) ?? all[0];
+      if (!d) throw new Error("no displays");
+      return d;
+    },
+    /** Rejects: Rune reports the pointer only inside its own windows. */
+    cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
   },
-  appearance: { get: () => request<{ dark: boolean | null }>("appearance.get") },
+  appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
   shell: {
     openExternal: (url: string) => request("shell.openExternal", { url }),
-    openPath: (path: string) => request("shell.openPath", { path }),
+    /** Resolves "" on success, else the error (Electron's contract). */
+    openPath: (path: string) => request("shell.openPath", { path }).then(() => "", (e: Error) => e.message),
     showItemInFolder: (path: string) => request("shell.showItemInFolder", { path }),
   },
   fonts: (f: { files: string[]; sans?: string; mono?: string }) => request<{ loaded: number; errors: string[] }>("fonts", f),

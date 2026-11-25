@@ -31,6 +31,9 @@ pub fn style_of(p: &Props) -> TextStyle {
     if let Some(v) = p.tracking {
         s.tracking = v;
     }
+    if let Some(f) = &p.features {
+        s.features = family_name(f);
+    }
     if p.mono {
         s.family = Family::Mono;
     } else if let Some(f) = &p.family {

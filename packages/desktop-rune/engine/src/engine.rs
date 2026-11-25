@@ -32,6 +32,7 @@ pub struct WinSlot {
     pub fonts_applied: usize,
     pub families_applied: u64,
     pub size: Option<(f32, f32)>,
+    pub focused: bool,
 }
 
 #[derive(Default, PartialEq, Clone)]

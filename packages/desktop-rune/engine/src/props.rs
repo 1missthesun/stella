@@ -440,6 +440,8 @@ pub struct Props {
     pub color: Option<C>,
     pub mono: bool,
     pub family: Option<String>,
+    /// CSS `font-feature-settings`, e.g. `"'ss01' 1, 'tnum' 1"`.
+    pub features: Option<String>,
     pub italic: bool,
     pub underline: bool,
     pub strike: bool,

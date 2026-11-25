@@ -53,6 +53,7 @@ fn bg(eng: &Engine, node: u32) -> rune::Color {
 
 pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
     let dark = cx.system_dark();
+    let accent = cx.accent().hex();
     let maximized = cx.is_maximized();
     let full = cx.is_full_screen();
     let node = s.node;
@@ -75,9 +76,10 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         }
         root
     });
-    note_state(node, dark, maximized, full);
+    note_state(node, dark, maximized, full, accent);
     root.on_window_focus(move |s: &mut Win, focused: bool, _tx: &mut Tx| {
         if s.node != 0 {
+            engine::with(|e| e.windows.entry(s.node).or_default().focused = focused);
             window_event(s.node, if focused { "focus" } else { "blur" }, json!({}));
         }
     })
@@ -101,15 +103,31 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
 thread_local! {
     static SEEN: std::cell::RefCell<HashMap<u32, (bool, bool, bool)>> = std::cell::RefCell::new(HashMap::new());
     static SYSTEM_DARK: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    static ACCENT: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
 }
 
 pub fn system_dark() -> Option<bool> {
     SYSTEM_DARK.with(|d| d.get())
 }
 
-fn note_state(node: u32, dark: bool, maximized: bool, full: bool) {
-    if SYSTEM_DARK.with(|d| d.replace(Some(dark))) != Some(dark) {
-        engine::send(json!({ "t": "appearance", "dark": dark }));
+/// What `appearance.get` answers and `appearance` events carry.
+pub fn appearance() -> serde_json::Value {
+    let accent = ACCENT.with(|a| a.borrow().clone());
+    json!({ "dark": system_dark().unwrap_or(false), "accentColor": (!accent.is_empty()).then_some(accent) })
+}
+
+fn note_state(node: u32, dark: bool, maximized: bool, full: bool, accent: String) {
+    let accent_changed = ACCENT.with(|a| {
+        let changed = *a.borrow() != accent;
+        if changed {
+            *a.borrow_mut() = accent;
+        }
+        changed
+    });
+    if SYSTEM_DARK.with(|d| d.replace(Some(dark))) != Some(dark) || accent_changed {
+        let mut ev = appearance();
+        ev["t"] = json!("appearance");
+        engine::send(ev);
     }
     if node == 0 {
         return;

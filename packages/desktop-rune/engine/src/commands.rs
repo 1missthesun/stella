@@ -67,7 +67,10 @@ pub fn route(v: Value) {
             crate::metrics::METRICS.lock().unwrap_or_else(|e| e.into_inner()).log(json!({ "mark": v.get("name"), "at": crate::metrics::epoch_ms() }));
         }
         "screen.displays" => reply(rid, Ok(displays())),
-        "appearance.get" => reply(rid, Ok(json!({ "dark": windows::system_dark() }))),
+        "appearance.get" => reply(rid, Ok(windows::appearance())),
+        "window.isFocused" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(|w| engine::read(|e| e.windows.get(&w).is_some_and(|s| s.focused)))))),
+        "menu.setApplicationMenu" => reply(rid, crate::services::app_menu(&v)),
+        "screen.cursorPoint" => reply(rid, Err("screen.cursorPoint: Rune doesn't report the pointer outside its windows".into())),
         "notify" => reply(rid, crate::services::notify(&v)),
         "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" => reply(rid, crate::services::tray(&cmd, &v)),
         "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" => reply(rid, crate::services::shortcut(&cmd, &v)),
@@ -127,6 +130,14 @@ fn fonts(v: &Value) -> Result<Value, String> {
     Ok(json!({ "loaded": count, "errors": errors, "families": families }))
 }
 
+/// Electron display ids are numbers; this one is stable for a monitor name and position.
+fn display_id(name: &str, at: (i32, i32)) -> u32 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (name, at).hash(&mut h);
+    h.finish() as u32
+}
+
 fn displays() -> Value {
     let list: Vec<Value> = rune::displays()
         .into_iter()
@@ -135,8 +146,8 @@ fn displays() -> Value {
             let k = if d.scale > 0.0 { d.scale } else { 1.0 };
             let pt = |v: f64| (v / k).round();
             json!({
-                "id": d.name.clone().unwrap_or_default(),
-                "name": d.name,
+                "id": display_id(d.name.as_deref().unwrap_or(""), d.position),
+                "label": d.name,
                 "primary": d.primary,
                 "scaleFactor": d.scale,
                 "bounds": { "x": pt(d.position.0 as f64), "y": pt(d.position.1 as f64), "width": pt(d.size.0 as f64), "height": pt(d.size.1 as f64) },
@@ -334,7 +345,20 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                 tx.read_clipboard(move |_s: &mut Win, c: &rune::ClipboardContent, _tx: &mut Tx| {
                     let files: Vec<String> = c.files().iter().map(|p| p.to_string_lossy().into_owned()).collect();
                     let image = c.image().and_then(|i| save_png(i.png()));
-                    reply(rid, Ok(json!({ "text": c.text(), "html": c.html(), "files": files, "image": image })));
+                    let mut formats = Vec::new();
+                    if !c.text().is_empty() {
+                        formats.push("text/plain");
+                    }
+                    if c.html().is_some() {
+                        formats.push("text/html");
+                    }
+                    if !files.is_empty() {
+                        formats.push("text/uri-list");
+                    }
+                    if image.is_some() {
+                        formats.push("image/png");
+                    }
+                    reply(rid, Ok(json!({ "text": c.text(), "html": c.html(), "files": files, "image": image, "formats": formats })));
                 });
                 return Err(String::from("\u{0}pending"));
             }
@@ -349,6 +373,7 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                         reply(rid, r.map(|p| json!(p.map(|p| p.to_string_lossy().into_owned()))).map_err(|e| e.to_string()))
                     }),
                     "dialog.openFolder" => tx.open_folder(o, one),
+                    _ if v.get("directory").and_then(|d| d.as_bool()) == Some(true) => tx.open_folder(o, one),
                     _ if multi || cmd == "dialog.openFiles" => tx.open_files(o, move |_s: &mut Win, r: rune::FileDialogFilesResult, _tx: &mut Tx| {
                         reply(rid, r.map(|p| json!(p.map(|ps| ps.iter().map(|p| p.to_string_lossy().into_owned()).collect::<Vec<_>>()))).map_err(|e| e.to_string()))
                     }),

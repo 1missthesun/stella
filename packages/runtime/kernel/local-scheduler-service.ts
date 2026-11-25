@@ -534,42 +534,6 @@ const isWithinActiveHours = (
   return currentMin >= startMin || currentMin < endMin
 }
 
-const sortEventsAscending = (events: ScheduledConversationEvent[]) =>
-  [...events].sort((a, b) => {
-    if (a.timestamp !== b.timestamp) {
-      return a.timestamp - b.timestamp
-    }
-    return a._id.localeCompare(b._id)
-  })
-
-const insertEventAscending = (
-  events: ScheduledConversationEvent[],
-  event: ScheduledConversationEvent,
-) => {
-  const last = events.at(-1)
-  if (
-    !last ||
-    last.timestamp < event.timestamp ||
-    (last.timestamp === event.timestamp &&
-      last._id.localeCompare(event._id) <= 0)
-  ) {
-    events.push(event)
-    return
-  }
-
-  const index = events.findIndex(
-    (existing) =>
-      existing.timestamp > event.timestamp ||
-      (existing.timestamp === event.timestamp &&
-        existing._id.localeCompare(event._id) > 0),
-  )
-  if (index === -1) {
-    events.push(event)
-    return
-  }
-  events.splice(index, 0, event)
-}
-
 const sortByUpdatedDesc = <T extends { updatedAt: number; createdAt: number }>(
   rows: T[],
 ) =>
@@ -677,7 +641,7 @@ const sanitizeState = (
       .filter((event) => !isCopyOfTurnReply(event))
       .map(cloneGeneratedEvent)
     if (validEvents.length > 0) {
-      generatedEvents[conversationId] = sortEventsAscending(validEvents).slice(
+      generatedEvents[conversationId] = validEvents.slice(
         -MAX_GENERATED_EVENTS_PER_CONVERSATION,
       )
     }
@@ -1384,7 +1348,7 @@ export class LocalSchedulerService {
     payload: Record<string, unknown>,
   ) {
     const bucket = this.state.generatedEvents[conversationId] ?? []
-    insertEventAscending(bucket, {
+    bucket.push({
       _id: `schedule:${crypto.randomUUID()}`,
       conversationId,
       timestamp: Date.now(),

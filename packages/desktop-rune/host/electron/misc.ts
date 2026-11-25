@@ -7,6 +7,7 @@ import { fork, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import { warnOnce } from "./engine";
 import { nativeImage } from "./native-image";
+import { mediaAccessStatus } from "./macos-media";
 
 const PARENT_PORT_PRELOAD = path.join(import.meta.dir, "utility-child.ts");
 
@@ -39,8 +40,8 @@ export const utilityProcess = {
 };
 
 class SystemPreferences extends EventEmitter {
-  getMediaAccessStatus(_type: string) { return "granted"; }
-  async askForMediaAccess(_type: string) { return true; }
+  getMediaAccessStatus(type: string) { return mediaAccessStatus(type); }
+  async askForMediaAccess(type: string) { return mediaAccessStatus(type) === "granted"; }
   isTrustedAccessibilityClient(_prompt: boolean) { return process.platform !== "darwin"; }
   getAccentColor() { return "0a84ffff"; }
   getColor() { return "#000000"; }

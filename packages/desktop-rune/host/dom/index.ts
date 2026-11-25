@@ -5,6 +5,7 @@
 import { createDomDocument, DomElement, type DomDocument } from "./document";
 import { createMatchMedia, type MediaEnvironment } from "./media";
 import { MemoryStorage, UiStateStorage, type UiStateBackend } from "./storage";
+import { audioDevices } from "../electron/macos-media";
 
 export type DomAppearance = { dark: boolean; reducedMotion?: boolean; highContrast?: boolean };
 export type DomViewport = { width: number; height: number; devicePixelRatio: number; x?: number; y?: number };
@@ -258,7 +259,7 @@ function installNavigator(g: Record<string, any>, options: DomHostOptions) {
   });
   define("permissions", { query: async () => ({ state: "prompt", addEventListener() {}, removeEventListener() {} }) });
   define("mediaDevices", {
-    enumerateDevices: async () => [],
+    enumerateDevices: async () => audioDevices().map((device) => ({ ...device, toJSON: () => device })),
     getUserMedia: async () => { throw new DOMException("Media capture runs in the on-demand media WebView.", "NotSupportedError"); },
     getDisplayMedia: async () => { throw new DOMException("Screen capture runs in the on-demand media WebView.", "NotSupportedError"); },
     addEventListener() {},

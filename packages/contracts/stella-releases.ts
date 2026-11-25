@@ -57,6 +57,21 @@ export const releaseDateLabel = (
 export const stellaReleases: readonly StellaRelease[] = [
   {
     date: "2026-11-25",
+    title: "The bell remembers your notifications",
+    summary: "The bell now keeps your past notifications, so you can look back at anything you missed.",
+    tags: ["New"],
+    highlights: [
+      "Notifications stay in the bell after you read them or act on them, and they’re still there after Stella restarts.",
+      "Opening the bell marks what’s new since you last looked. Everything older is listed under Earlier, with its time or date.",
+      "You can still open What’s new, Email, Plans or Models from an older notification.",
+    ],
+    more: [
+      "Hover over a notification to remove just that one. Clear all asks once more before it empties the list.",
+      "The bell keeps your last 200 notifications. Anyone who signs in with another account sees only their own.",
+    ],
+  },
+  {
+    date: "2026-11-25",
     title: "Stella keeps itself up to date",
     summary: "Stella now installs new versions by itself, and tells you what changed.",
     tags: ["New"],

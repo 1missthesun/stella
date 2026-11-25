@@ -48,6 +48,14 @@ let services: RuneServices | null = null;
 if (SERVICES) {
   const { bootRuneServices } = await import("./services/boot");
   services = await bootRuneServices({ bridge, exit: quit });
+} else {
+  const { installDom } = await import("./dom");
+  const dark = await engine.appearance.get().then((a) => a.dark, () => true);
+  installDom({
+    url: "stella-app://desktop/index.html?window=full",
+    appearance: { dark },
+    viewport: { width: Number(process.env.STELLA_RUNE_W ?? 1400), height: Number(process.env.STELLA_RUNE_H ?? 940), devicePixelRatio: 1 },
+  });
 }
 
 let app = await loadApp();

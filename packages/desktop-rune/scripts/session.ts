@@ -20,7 +20,9 @@ const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] ?? "") : undefined; };
 const has = (name: string) => args.includes(name);
 const runName = flag("--name") ?? process.env.STELLA_RUNE_RUN ?? "default";
-const RUN_DIR = path.join(os.tmpdir(), `stella-rune-${process.getuid?.() ?? "u"}-${runName}`);
+/** macOS's tmpdir (/var/folders/…) pushes the runtime's sockets past the 104-byte sun_path limit. */
+const RUN_ROOT = process.platform === "darwin" ? "/tmp" : os.tmpdir();
+const RUN_DIR = path.join(RUN_ROOT, `stella-rune-${process.getuid?.() ?? "u"}-${runName}`);
 const POINTER = path.join(RUN_DIR, "run.json");
 const DEV_BACKEND = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
 const XVFB = process.env.XVFB ?? path.join(os.homedir(), ".cache/stella-verify/xvfb/usr/bin/Xvfb");
@@ -166,7 +168,7 @@ async function start() {
       STELLA_RUNE_W: String(w),
       STELLA_RUNE_H: String(h),
       STELLA_RUNE_THEME: process.env.THEME ?? "dark",
-      STELLA_RUNE_SERVICES: "1",
+      STELLA_RUNE_SERVICES: has("--no-services") ? "0" : "1",
       ...(process.env.STELLA_RUNE_APP ? { STELLA_RUNE_APP: process.env.STELLA_RUNE_APP } : {}),
       STELLA_RUNE_SCREEN_W: String(w + 40),
       STELLA_RUNE_SCREEN_H: String(h + 40),

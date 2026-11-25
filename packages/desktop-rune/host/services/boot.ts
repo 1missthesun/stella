@@ -9,6 +9,7 @@ import { clipboard, nativeTheme, shell } from "../electron/native";
 import { nativeImage } from "../electron/native-image";
 import { primaryDisplaySync } from "../electron/screen";
 import { RendererIpc } from "../electron/ipc";
+import { installQuitHandling } from "./quit";
 import { bootElectronMain, type ElectronMainOptions } from "./electron-main";
 import { scopeDisposerMethod } from "./ui-scope";
 import { firstAppWindow, rendererApiFor, uiStateSnapshot, type ElectronApi } from "./renderer-api";
@@ -23,6 +24,7 @@ const viewportOf = (win: BrowserWindow) => {
 export async function bootRuneServices(options: ElectronMainOptions): Promise<RuneServices> {
   scopeDisposerMethod(RendererIpc.prototype, "on");
   await bootElectronMain(options);
+  installQuitHandling();
   const win = await firstAppWindow();
   if (engine()) hostWindows.bindMain(win);
   const contents = win.webContents;

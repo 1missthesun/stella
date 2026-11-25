@@ -177,7 +177,7 @@ final class ElectronProcess {
             throw LauncherError("posix_spawn \(executable.path): \(String(cString: strerror(status)))")
         }
         pid = child
-        log("supervisor: spawned Electron pid \(child)")
+        log("supervisor: spawned \(executable.lastPathComponent == "stella-engine" ? "stella-engine" : "Electron") pid \(child)")
 
         let outputPipe = OutputPipe(fd: pipeFds[0], output: output)
         self.outputPipe = outputPipe

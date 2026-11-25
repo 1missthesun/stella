@@ -10,6 +10,7 @@ import { refreshDisplays } from "../electron/screen";
 import { attachEngine, engine, onEngine } from "../electron/engine";
 import { nativeTheme } from "../electron/native";
 import { applyUiEnv } from "./ui-env";
+import { applyRuneProcessEnv } from "./process-env";
 
 export const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const ELECTRON_ENTRY = path.join(REPO_ROOT, "packages/desktop/electron/main.ts");
@@ -29,6 +30,7 @@ export async function bootElectronMain(options: ElectronMainOptions): Promise<vo
   app.hooks.exit = options.exit;
   (process as { resourcesPath?: string }).resourcesPath ??= path.join(REPO_ROOT, "packages/desktop/resources");
   applyUiEnv();
+  applyRuneProcessEnv();
   installFdSockets();
   installElectronPlugin();
 

@@ -1084,7 +1084,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "לאפשר את {name}?",
-      "allowCheck": "ודא שמוצג הקוד הזה.",
       "notNow": "לא עכשיו",
       "allow": "לאפשר",
       "failed": "זה לא עבר. נסה שוב.",
@@ -1093,7 +1092,7 @@
       "useAnother": "מכשיר אחר",
       "matches": "תואם",
       "getTitle": "קבל לכאן את הכניסות שלך",
-      "getBody": "יש לעבור אל {names}.",
+      "getBody": "יש לאשר ב-{names}.",
       "cloudUsed": "משימת ענן השתמשה ב-{label}"
     }
   },
@@ -1755,11 +1754,10 @@
     },
     "savedLogins": {
       "allowTitle": "לאשר את {name}?",
-      "allowCheck": "כדאי לוודא שמופיע שם {code}",
       "notNow": "לא עכשיו",
       "allow": "אישור",
       "waitingTitle": "קבלת פרטי הכניסה שלך כאן",
-      "waitingBody": "יש לעבור אל {names}",
+      "waitingBody": "יש לאשר ב-{names}",
       "startOver": "התחלה מחדש",
       "compare": "כדאי לוודא שב-{name} מופיע {code}",
       "matches": "זה תואם",
@@ -2658,7 +2656,7 @@
       "removedHere": "הוסר מהמכשירים שלך",
       "declined": "לא אושר",
       "askAgain": "לבקש שוב",
-      "asked": "נשלחה בקשה ב-{time}. יש להשתמש ב-{names}: קוד יופיע שם וכאן.",
+      "asked": "נשלחה בקשה ב-{time}. יש לאשר ב-{names}.",
       "askFailed": "לא ניתן לשלוח בקשה. Stella ממשיכה לנסות.",
       "askedNow": "נשלחה בקשה",
       "waitingFor": "ממתין ל-{name}…",

@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "Να επιτραπεί το {name};",
-      "allowCheck": "Έλεγξε ότι δείχνει {code}",
       "notNow": "Όχι τώρα",
       "allow": "Να επιτραπεί",
       "waitingTitle": "Πάρε εδώ τις συνδέσεις σου",
-      "waitingBody": "Πήγαινε στο {names}",
+      "waitingBody": "Επίτρεψέ το στο {names}",
       "startOver": "Ξεκίνα από την αρχή",
       "compare": "Έλεγξε ότι το {name} δείχνει {code}",
       "matches": "Ταιριάζει",

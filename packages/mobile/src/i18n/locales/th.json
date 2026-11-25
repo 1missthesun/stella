@@ -849,11 +849,10 @@
     },
     "savedLogins": {
       "allowTitle": "อนุญาต {name} ไหม",
-      "allowCheck": "ตรวจดูว่าแสดง {code}",
       "notNow": "ไว้ก่อน",
       "allow": "อนุญาต",
       "waitingTitle": "ใช้ข้อมูลเข้าสู่ระบบของคุณที่นี่",
-      "waitingBody": "ไปที่ {names}",
+      "waitingBody": "อนุญาตบน {names}",
       "startOver": "เริ่มใหม่",
       "compare": "ตรวจดูว่า {name} แสดง {code}",
       "matches": "ตรงกัน",

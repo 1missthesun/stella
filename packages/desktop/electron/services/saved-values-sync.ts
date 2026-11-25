@@ -67,7 +67,6 @@ const PKCS8_SCOPE = `${PROTECT_SCOPE}:device-key`;
 const SIGN_SCOPE = `${PROTECT_SCOPE}:sign-key`;
 const RECONCILE_DEBOUNCE_MS = 1_500;
 const RETRY_MS = 60_000;
-const USER_CHECK_MS = 3_000;
 const MAX_APPROVER_NAMES = 3;
 const GET_BATCH = 50;
 
@@ -99,7 +98,6 @@ export type SavedValuesSyncOptions = {
   log?: (event: string, detail?: Record<string, unknown>) => void;
   onSyncedChange?: () => void;
   onStatus?: (status: SavedValuesSyncStatus) => void;
-  isUserActive?: () => boolean;
   getReleaseLog?: () => readonly SavedValueReleaseLogEntry[];
 };
 
@@ -117,10 +115,8 @@ type OwnJoin = {
 type Answered = Pick<SavedValuesJoin, "joinId" | "device" | "commit"> & {
   listedNonce: string;
   pin: SavedValuesRosterPin;
-  at: number;
 };
 
-const ACTIVE_ANSWER_MS = 15 * 60_000;
 const POSTED_VISIBLE_MS = 30_000;
 const EXPIRY_SLACK_MS = 250;
 
@@ -203,10 +199,10 @@ export class SavedValuesSync {
   private roster: SavedValuesRoster | null = null;
   private posted: SavedValuesJoin | null = null;
   private answered = new Map<string, Answered>();
+  private decided = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private retry: ReturnType<typeof setInterval> | null = null;
-  private userCheck: ReturnType<typeof setInterval> | null = null;
   private running: Promise<void> | null = null;
   private again = false;
   private status: SavedValuesSyncStatus = {
@@ -366,7 +362,6 @@ export class SavedValuesSync {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.stopWaitingForExpiry();
-    this.stopWaitingForUser();
     this.setStatus({ active: false });
   }
 
@@ -384,21 +379,6 @@ export class SavedValuesSync {
   private stopWaitingForExpiry(): void {
     if (this.expiry) clearTimeout(this.expiry);
     this.expiry = null;
-  }
-
-  private waitForUser(): void {
-    if (this.userCheck) return;
-    this.userCheck = setInterval(() => {
-      if (this.options.isUserActive?.() === false) return;
-      this.stopWaitingForUser();
-      this.schedule(0);
-    }, USER_CHECK_MS);
-    this.userCheck.unref?.();
-  }
-
-  private stopWaitingForUser(): void {
-    if (this.userCheck) clearInterval(this.userCheck);
-    this.userCheck = null;
   }
 
   noteAuthToken(token: string | null | undefined): void {
@@ -447,20 +427,48 @@ export class SavedValuesSync {
     return this.getStatus();
   }
 
+  async answerJoin(joinId: string): Promise<{ ok: boolean; error?: string }> {
+    const state = this.loadState();
+    const client = this.client();
+    const roster = this.roster;
+    const join = this.latest?.joins.find((candidate) => candidate.joinId === joinId);
+    if (!state || !client || !roster || !join) return { ok: false, error: "That request isn't there any more." };
+    if (this.answered.has(joinId)) return { ok: true };
+    const listedNonce = randomNonce();
+    const { device, commit } = join;
+    this.answered.set(joinId, { joinId, device, commit, listedNonce, pin: roster.head });
+    try {
+      const result = await client.call("savedValues.joinAnswer", {
+        joinId,
+        by: state.deviceId,
+        listedNonce,
+        pin: roster.head,
+      });
+      if (result.listedNonce !== listedNonce) this.answered.delete(joinId);
+    } catch (error) {
+      this.answered.delete(joinId);
+      throw error;
+    } finally {
+      this.schedule(0);
+    }
+    return { ok: true };
+  }
+
   async decideJoin(joinId: string, allow: boolean): Promise<{ ok: boolean; error?: string }> {
     const state = this.loadState();
     const client = this.client();
-    const answered = this.answered.get(joinId);
     const join = this.latest?.joins.find((candidate) => candidate.joinId === joinId);
-    if (!state || !client || !this.signing || !this.roster || !answered || !join) {
+    if (!state || !client || !this.signing || !this.roster || !join) {
       return { ok: false, error: "That request isn't there any more." };
     }
     if (!allow) {
-      this.answered.delete(joinId);
       await client.call("savedValues.joinDecide", { joinId, by: state.deviceId, state: "declined" });
+      this.decided.add(joinId);
       this.schedule(0);
       return { ok: true };
     }
+    const answered = this.answered.get(joinId);
+    if (!answered) return { ok: false, error: "That request isn't there any more." };
     if (!joinCode({ ...answered, joinerNonce: join.joinerNonce })) return { ok: false, error: "That request isn't ready yet." };
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const fresh = this.latest ? checkRoster(this.latest.roster, state.pin) : null;
@@ -472,7 +480,7 @@ export class SavedValuesSync {
           });
         }
         await client.call("savedValues.joinDecide", { joinId, by: state.deviceId, state: "allowed" });
-        this.answered.delete(joinId);
+        this.decided.add(joinId);
         this.schedule(0);
         return { ok: true };
       } catch (error) {
@@ -624,6 +632,7 @@ export class SavedValuesSync {
       delete state.joinPaused;
       delete state.ownJoin;
       this.answered.clear();
+      this.decided.clear();
       this.saveState();
     }
     const now = serverNow();
@@ -640,7 +649,6 @@ export class SavedValuesSync {
       if (!card || card.publicKey !== state.publicKey) return;
     }
 
-    this.stopWaitingForUser();
     this.waitForExpiry(remote.joins, now);
     let check = checkRoster(remote.roster, state.pin);
     if (!check.ok && check.reason === "reset") {
@@ -685,8 +693,8 @@ export class SavedValuesSync {
     }
     this.roster = roster;
     this.saveState();
-    await this.answerJoins(state, remote, roster, now);
     this.showListed(state, roster, remote, now);
+    await this.releaseLostAnswers(state, remote);
     await this.syncRecords(state, roster, remote, ownerId, now);
   }
 
@@ -825,40 +833,14 @@ export class SavedValuesSync {
     return !card || card.publicKey !== member.sealKey || now - card.updatedAt >= SAVED_VALUES_QUIET_MS;
   }
 
-  private async answerJoins(state: SyncState, remote: SavedValuesState, roster: SavedValuesRoster, now: number) {
-    const client = this.client()!;
-    for (const [joinId, answered] of this.answered) {
-      if (now - answered.at > ACTIVE_ANSWER_MS || !remote.joins.some((join) => join.joinId === joinId && join.state === "open")) {
-        this.answered.delete(joinId);
-      }
+  private async releaseLostAnswers(state: SyncState, remote: SavedValuesState) {
+    const open = remote.joins.filter((join) => join.state === "open");
+    for (const joinId of this.answered.keys()) {
+      if (!open.some((join) => join.joinId === joinId)) this.answered.delete(joinId);
     }
-    const unanswered = remote.joins.filter(
-      (join) =>
-        join.state === "open" &&
-        !join.listedNonce &&
-        !this.answered.has(join.joinId) &&
-        join.device.deviceId !== state.deviceId &&
-        join.expiresAt > now,
-    );
-    if (unanswered.length === 0) return;
-    if (this.options.isUserActive?.() === false) {
-      this.waitForUser();
-      return;
-    }
-    for (const join of unanswered) {
-      const listedNonce = randomNonce();
-      const answered: Answered = {
-        joinId: join.joinId,
-        device: join.device,
-        commit: join.commit,
-        listedNonce,
-        pin: roster.head,
-        at: now,
-      };
-      const result = await client
-        .call("savedValues.joinAnswer", { joinId: join.joinId, by: state.deviceId, listedNonce, pin: roster.head })
-        .catch(() => null);
-      if (result?.answeredBy === state.deviceId && result.listedNonce === listedNonce) this.answered.set(join.joinId, answered);
+    for (const join of open) {
+      if (join.answeredBy !== state.deviceId || this.answered.has(join.joinId) || this.decided.has(join.joinId)) continue;
+      await this.client()!.call("savedValues.joinCancel", { joinId: join.joinId });
     }
   }
 
@@ -879,14 +861,23 @@ export class SavedValuesSync {
         };
       })
       .sort((left, right) => Number(right.thisDevice) - Number(left.thisDevice) || left.name.localeCompare(right.name) || left.addedAt - right.addedAt);
-    const requests: SavedValuesJoinRequest[] = remote.joins.flatMap((join) => {
-      const answered = this.answered.get(join.joinId);
-      if (!answered || join.state !== "open" || join.expiresAt <= now) return [];
-      const code = joinCode({ ...answered, joinerNonce: join.joinerNonce });
-      return code
-        ? [{ joinId: join.joinId, name: answered.device.name, kind: answered.device.kind, code, createdAt: join.createdAt }]
-        : [];
-    });
+    const requests: SavedValuesJoinRequest[] = remote.joins
+      .flatMap((join) => {
+        const answered = this.answered.get(join.joinId);
+        if (join.state !== "open" || this.decided.has(join.joinId)) return [];
+        if (join.expiresAt <= now || join.device.deviceId === state.deviceId) return [];
+        if (!answered && join.listedNonce) return [];
+        const { name, kind } = answered?.device ?? join.device;
+        return [{
+          joinId: join.joinId,
+          name,
+          kind,
+          answered: answered !== undefined,
+          code: answered ? joinCode({ ...answered, joinerNonce: join.joinerNonce }) : null,
+          createdAt: join.createdAt,
+        }];
+      })
+      .sort((left, right) => Number(right.answered) - Number(left.answered) || left.createdAt - right.createdAt);
     this.setStatus({ standing: "member", waiting: undefined, problem: undefined, devices, requests });
   }
 

@@ -849,11 +849,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name}を許可しますか？",
-      "allowCheck": "{code} と表示されているか確認",
       "notNow": "今はしない",
       "allow": "許可",
       "waitingTitle": "ログイン情報をここでも使う",
-      "waitingBody": "{names} を使ってください",
+      "waitingBody": "{names} で許可してください",
       "startOver": "最初からやり直す",
       "compare": "{name}に {code} と表示されているか確認",
       "matches": "一致している",

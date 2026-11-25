@@ -267,12 +267,13 @@ export const savedValueRecipients = (args: {
  * A device asking to join. The cloud relays it; the devices check it.
  *
  * 1. The new device posts its keys and a commitment to a random number.
- * 2. A device on the list that the user is using adds its own random number
- *    and where it stands on the list (its pin).
+ * 2. Every device on the list offers it. The one where the user taps Allow
+ *    adds its own random number and where it stands on the list (its pin);
+ *    the first such answer is the only one, so the others stop offering.
  * 3. The new device reveals its number.
- * 4. Both screens show the code made from all of that. The user allows it on
- *    the device that answered, which adds it, signed, and confirms on the new
- *    device, which then takes only a list that extends that pin.
+ * 4. Both screens show the code made from all of that. The user says it
+ *    matches on the device that answered, which adds the new one, signed, and
+ *    on the new device, which then takes only a list that extends that pin.
  *
  * Each side computes the code only from what it sent itself plus the first
  * answer it saw, never from what the cloud shows later. The cloud would have

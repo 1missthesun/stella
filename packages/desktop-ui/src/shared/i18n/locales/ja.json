@@ -1064,7 +1064,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "{name} を許可しますか？",
-      "allowCheck": "このコードが表示されているか確認してください。",
       "notNow": "今はしない",
       "allow": "許可",
       "failed": "うまくいきませんでした。もう一度お試しください。",
@@ -1073,7 +1072,7 @@
       "useAnother": "別のデバイス",
       "matches": "一致しています",
       "getTitle": "ログイン情報をここで使う",
-      "getBody": "{names} を使ってください。",
+      "getBody": "{names} で許可してください。",
       "cloudUsed": "クラウドタスクが {label} を使用"
     }
   },
@@ -1735,11 +1734,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name}を許可しますか？",
-      "allowCheck": "{code} と表示されているか確認",
       "notNow": "今はしない",
       "allow": "許可",
       "waitingTitle": "ログイン情報をここでも使う",
-      "waitingBody": "{names} を使ってください",
+      "waitingBody": "{names} で許可してください",
       "startOver": "最初からやり直す",
       "compare": "{name}に {code} と表示されているか確認",
       "matches": "一致している",
@@ -2638,7 +2636,7 @@
       "removedHere": "デバイスから削除されました",
       "declined": "許可されませんでした",
       "askAgain": "もう一度依頼",
-      "asked": "{time} に依頼しました。{names} を使うと、両方にコードが表示されます。",
+      "asked": "{time} に依頼しました。{names} で許可してください。",
       "askFailed": "依頼できませんでした。Stella が引き続き試します。",
       "askedNow": "依頼しました",
       "waitingFor": "{name} を待っています…",

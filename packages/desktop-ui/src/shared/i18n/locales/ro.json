@@ -1084,7 +1084,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Permiți {name}?",
-      "allowCheck": "Verifică dacă apare acest cod.",
       "notNow": "Nu acum",
       "allow": "Permite",
       "failed": "Nu a mers. Încearcă din nou.",
@@ -1093,7 +1092,7 @@
       "useAnother": "Alt dispozitiv",
       "matches": "Se potrivește",
       "getTitle": "Adu-ți autentificările aici",
-      "getBody": "Mergi la {names}.",
+      "getBody": "Permite pe {names}.",
       "cloudUsed": "O sarcină din cloud a folosit {label}"
     }
   },
@@ -1755,11 +1754,10 @@
     },
     "savedLogins": {
       "allowTitle": "Permiți {name}?",
-      "allowCheck": "Verifică dacă arată {code}",
       "notNow": "Nu acum",
       "allow": "Permite",
       "waitingTitle": "Adu-ți aici conectările",
-      "waitingBody": "Mergi la {names}",
+      "waitingBody": "Permite pe {names}",
       "startOver": "Ia-o de la capăt",
       "compare": "Verifică dacă {name} arată {code}",
       "matches": "Se potrivește",
@@ -2658,7 +2656,7 @@
       "removedHere": "Eliminat din dispozitivele tale",
       "declined": "Nepermis",
       "askAgain": "Cere din nou",
-      "asked": "Cerere trimisă la {time}. Folosește {names}: un cod va apărea acolo și aici.",
+      "asked": "Cerere trimisă la {time}. Permite pe {names}.",
       "askFailed": "Cererea nu a putut fi trimisă. Stella încearcă în continuare.",
       "askedNow": "Trimisă",
       "waitingFor": "Se așteaptă {name}…",

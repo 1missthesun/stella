@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Sallitaanko {name}?",
-      "allowCheck": "Tarkista, että siinä näkyy tämä koodi.",
       "notNow": "Ei nyt",
       "allow": "Salli",
       "failed": "Se ei onnistunut. Yritä uudelleen.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Toinen laite",
       "matches": "Täsmää",
       "getTitle": "Hae kirjautumisesi tänne",
-      "getBody": "Siirry laitteelle {names}.",
+      "getBody": "Salli se laitteella {names}.",
       "cloudUsed": "Pilvitehtävä käytti: {label}"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "Sallitaanko {name}?",
-      "allowCheck": "Tarkista, että siinä näkyy {code}",
       "notNow": "Ei nyt",
       "allow": "Salli",
       "waitingTitle": "Hae kirjautumisesi tänne",
-      "waitingBody": "Siirry laitteelle {names}",
+      "waitingBody": "Salli se laitteella {names}",
       "startOver": "Aloita alusta",
       "compare": "Tarkista, että laitteessa {name} näkyy {code}",
       "matches": "Täsmää",
@@ -2648,7 +2646,7 @@
       "removedHere": "Poistettu laitteistasi",
       "declined": "Ei sallittu",
       "askAgain": "Pyydä uudelleen",
-      "asked": "Pyydetty klo {time}. Käytä laitetta {names}: koodi näkyy siellä ja täällä.",
+      "asked": "Pyydetty klo {time}. Salli se laitteella {names}.",
       "askFailed": "Pyyntö ei onnistunut. Stella yrittää edelleen.",
       "askedNow": "Pyydetty",
       "waitingFor": "Odotetaan: {name}…",

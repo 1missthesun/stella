@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "Sallitaanko {name}?",
-      "allowCheck": "Tarkista, että siinä näkyy {code}",
       "notNow": "Ei nyt",
       "allow": "Salli",
       "waitingTitle": "Hae kirjautumisesi tänne",
-      "waitingBody": "Siirry laitteelle {names}",
+      "waitingBody": "Salli se laitteella {names}",
       "startOver": "Aloita alusta",
       "compare": "Tarkista, että laitteessa {name} näkyy {code}",
       "matches": "Täsmää",

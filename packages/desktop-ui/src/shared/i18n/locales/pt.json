@@ -1084,7 +1084,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Permitir {name}?",
-      "allowCheck": "Confira se aparece este código.",
       "notNow": "Agora não",
       "allow": "Permitir",
       "failed": "Não deu certo. Tente de novo.",
@@ -1093,7 +1092,7 @@
       "useAnother": "Usar outro dispositivo",
       "matches": "Confere",
       "getTitle": "Traga seus logins para cá",
-      "getBody": "Vá até {names}.",
+      "getBody": "Permita em {names}.",
       "cloudUsed": "Uma tarefa na nuvem usou {label}"
     }
   },
@@ -1755,11 +1754,10 @@
     },
     "savedLogins": {
       "allowTitle": "Permitir {name}?",
-      "allowCheck": "Confira se aparece {code}",
       "notNow": "Agora não",
       "allow": "Permitir",
       "waitingTitle": "Traga seus logins para cá",
-      "waitingBody": "Vá até {names}",
+      "waitingBody": "Permita em {names}",
       "startOver": "Começar de novo",
       "compare": "Confira se {name} mostra {code}",
       "matches": "Está igual",
@@ -2658,7 +2656,7 @@
       "removedHere": "Removido dos seus dispositivos",
       "declined": "Não permitido",
       "askAgain": "Pedir de novo",
-      "asked": "Pedido às {time}. Use {names}: um código aparecerá lá e aqui.",
+      "asked": "Pedido às {time}. Permita em {names}.",
       "askFailed": "Não foi possível pedir. A Stella continua tentando.",
       "askedNow": "Pedido",
       "waitingFor": "Aguardando {name}…",

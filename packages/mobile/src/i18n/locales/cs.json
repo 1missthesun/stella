@@ -852,11 +852,10 @@
     },
     "savedLogins": {
       "allowTitle": "Povolit {name}?",
-      "allowCheck": "Zkontroluj, že ukazuje {code}",
       "notNow": "Teď ne",
       "allow": "Povolit",
       "waitingTitle": "Získej tu svá přihlášení",
-      "waitingBody": "Přejděte k {names}",
+      "waitingBody": "Povolte ho na {names}",
       "startOver": "Začít znovu",
       "compare": "Zkontroluj, že {name} ukazuje {code}",
       "matches": "Shoduje se",

@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "Tillad {name}?",
-      "allowCheck": "Tjek, at den viser {code}",
       "notNow": "Ikke nu",
       "allow": "Tillad",
       "waitingTitle": "Få dine logins her",
-      "waitingBody": "Gå til {names}",
+      "waitingBody": "Tillad den på {names}",
       "startOver": "Start forfra",
       "compare": "Tjek, at {name} viser {code}",
       "matches": "De er ens",

@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "{name} को अनुमति दें?",
-      "allowCheck": "जाँचें कि यही कोड दिख रहा है।",
       "notNow": "अभी नहीं",
       "allow": "अनुमति दें",
       "failed": "यह पूरा नहीं हुआ। फिर से कोशिश करें।",
@@ -1083,7 +1082,7 @@
       "useAnother": "दूसरा डिवाइस",
       "matches": "मेल खाता है",
       "getTitle": "अपने लॉगिन यहाँ लाएँ",
-      "getBody": "{names} पर जाएँ।",
+      "getBody": "{names} पर इसकी अनुमति दें।",
       "cloudUsed": "क्लाउड कार्य ने {label} इस्तेमाल किया"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name} को अनुमति दें?",
-      "allowCheck": "देखें कि उस पर {code} दिख रहा है",
       "notNow": "अभी नहीं",
       "allow": "अनुमति दें",
       "waitingTitle": "अपने लॉगिन यहाँ पाएँ",
-      "waitingBody": "{names} पर जाएँ",
+      "waitingBody": "{names} पर इसकी अनुमति दें",
       "startOver": "फिर से शुरू करें",
       "compare": "देखें कि {name} पर {code} दिख रहा है",
       "matches": "मेल खाता है",
@@ -2648,7 +2646,7 @@
       "removedHere": "आपके डिवाइस से हटाया गया",
       "declined": "अनुमति नहीं मिली",
       "askAgain": "फिर से माँगें",
-      "asked": "{time} पर माँगा गया। {names} इस्तेमाल करें: वहाँ और यहाँ एक कोड दिखेगा।",
+      "asked": "{time} पर माँगा गया। {names} पर इसकी अनुमति दें।",
       "askFailed": "माँग नहीं भेजी जा सकी। Stella कोशिश करती रहेगी।",
       "askedNow": "माँगा गया",
       "waitingFor": "{name} की प्रतीक्षा…",

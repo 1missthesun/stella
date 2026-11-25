@@ -849,11 +849,10 @@
     },
     "savedLogins": {
       "allowTitle": "Izinkan {name}?",
-      "allowCheck": "Pastikan di sana tampil {code}",
       "notNow": "Nanti saja",
       "allow": "Izinkan",
       "waitingTitle": "Dapatkan login Anda di sini",
-      "waitingBody": "Buka {names}",
+      "waitingBody": "Izinkan di {names}",
       "startOver": "Mulai ulang",
       "compare": "Pastikan {name} menampilkan {code}",
       "matches": "Cocok",

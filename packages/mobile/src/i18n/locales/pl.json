@@ -852,11 +852,10 @@
     },
     "savedLogins": {
       "allowTitle": "Zezwolić na {name}?",
-      "allowCheck": "Sprawdź, czy pokazuje {code}",
       "notNow": "Nie teraz",
       "allow": "Zezwól",
       "waitingTitle": "Pobierz tu swoje loginy",
-      "waitingBody": "Przejdź do {names}",
+      "waitingBody": "Zezwól na {names}",
       "startOver": "Zacznij od nowa",
       "compare": "Sprawdź, czy {name} pokazuje {code}",
       "matches": "Zgadza się",

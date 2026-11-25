@@ -1064,7 +1064,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Cho phép {name}?",
-      "allowCheck": "Kiểm tra xem có hiện mã này không.",
       "notNow": "Để sau",
       "allow": "Cho phép",
       "failed": "Chưa thực hiện được. Hãy thử lại.",
@@ -1073,7 +1072,7 @@
       "useAnother": "Thiết bị khác",
       "matches": "Khớp",
       "getTitle": "Đưa thông tin đăng nhập về đây",
-      "getBody": "Hãy dùng {names}.",
+      "getBody": "Hãy cho phép trên {names}.",
       "cloudUsed": "Tác vụ đám mây đã dùng {label}"
     }
   },
@@ -1735,11 +1734,10 @@
     },
     "savedLogins": {
       "allowTitle": "Cho phép {name}?",
-      "allowCheck": "Kiểm tra xem có hiện {code} không",
       "notNow": "Để sau",
       "allow": "Cho phép",
       "waitingTitle": "Dùng thông tin đăng nhập tại đây",
-      "waitingBody": "Hãy dùng {names}",
+      "waitingBody": "Hãy cho phép trên {names}",
       "startOver": "Bắt đầu lại",
       "compare": "Kiểm tra xem {name} có hiện {code} không",
       "matches": "Khớp rồi",
@@ -2638,7 +2636,7 @@
       "removedHere": "Đã gỡ khỏi thiết bị của bạn",
       "declined": "Không được phép",
       "askAgain": "Hỏi lại",
-      "asked": "Đã hỏi lúc {time}. Hãy dùng {names}: mã sẽ hiện ở đó và ở đây.",
+      "asked": "Đã hỏi lúc {time}. Hãy cho phép trên {names}.",
       "askFailed": "Không hỏi được. Stella vẫn đang thử lại.",
       "askedNow": "Đã hỏi",
       "waitingFor": "Đang chờ {name}…",

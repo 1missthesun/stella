@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name} erlauben?",
-      "allowCheck": "Prüfe, ob dort {code} steht",
       "notNow": "Nicht jetzt",
       "allow": "Erlauben",
       "waitingTitle": "Hol dir deine Logins hierher",
-      "waitingBody": "Geh zu {names}",
+      "waitingBody": "Erlaube es auf {names}",
       "startOver": "Neu anfangen",
       "compare": "Prüfe, ob {name} {code} zeigt",
       "matches": "Stimmt überein",

@@ -1064,7 +1064,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "允許 {name}？",
-      "allowCheck": "確認它顯示的是這個代碼。",
       "notNow": "暫不",
       "allow": "允許",
       "failed": "沒有成功，請再試一次。",
@@ -1073,7 +1072,7 @@
       "useAnother": "換一台裝置",
       "matches": "一致",
       "getTitle": "在這裡取得登入資訊",
-      "getBody": "請使用 {names}。",
+      "getBody": "請在 {names} 上允許。",
       "cloudUsed": "雲端任務使用了 {label}"
     }
   },
@@ -1735,11 +1734,10 @@
     },
     "savedLogins": {
       "allowTitle": "允許 {name}？",
-      "allowCheck": "請確認它顯示 {code}",
       "notNow": "暫時不要",
       "allow": "允許",
       "waitingTitle": "在這裡使用你的登入資訊",
-      "waitingBody": "請使用 {names}",
+      "waitingBody": "請在 {names} 上允許",
       "startOver": "重新開始",
       "compare": "請確認 {name} 顯示 {code}",
       "matches": "一致",
@@ -2638,7 +2636,7 @@
       "removedHere": "已從你的裝置中移除",
       "declined": "未獲允許",
       "askAgain": "再次請求",
-      "asked": "已於 {time} 請求。請使用 {names}：那裡和這裡都會顯示驗證碼。",
+      "asked": "已於 {time} 請求。請在 {names} 上允許。",
       "askFailed": "請求未能送出。Stella 會繼續嘗試。",
       "askedNow": "已請求",
       "waitingFor": "正在等待 {name}…",

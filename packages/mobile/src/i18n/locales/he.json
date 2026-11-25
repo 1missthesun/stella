@@ -851,11 +851,10 @@
     },
     "savedLogins": {
       "allowTitle": "לאשר את {name}?",
-      "allowCheck": "כדאי לוודא שמופיע שם {code}",
       "notNow": "לא עכשיו",
       "allow": "אישור",
       "waitingTitle": "קבלת פרטי הכניסה שלך כאן",
-      "waitingBody": "יש לעבור אל {names}",
+      "waitingBody": "יש לאשר ב-{names}",
       "startOver": "התחלה מחדש",
       "compare": "כדאי לוודא שב-{name} מופיע {code}",
       "matches": "זה תואם",

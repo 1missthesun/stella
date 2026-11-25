@@ -1094,7 +1094,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Povolit {name}?",
-      "allowCheck": "Zkontrolujte, že ukazuje tento kód.",
       "notNow": "Teď ne",
       "allow": "Povolit",
       "failed": "Nepodařilo se to. Zkuste to znovu.",
@@ -1103,7 +1102,7 @@
       "useAnother": "Jiné zařízení",
       "matches": "Shoduje se",
       "getTitle": "Získat přihlášení sem",
-      "getBody": "Přejděte k {names}.",
+      "getBody": "Povolte ho na {names}.",
       "cloudUsed": "Úloha v cloudu použila {label}"
     }
   },
@@ -1765,11 +1764,10 @@
     },
     "savedLogins": {
       "allowTitle": "Povolit {name}?",
-      "allowCheck": "Zkontroluj, že ukazuje {code}",
       "notNow": "Teď ne",
       "allow": "Povolit",
       "waitingTitle": "Získej tu svá přihlášení",
-      "waitingBody": "Přejděte k {names}",
+      "waitingBody": "Povolte ho na {names}",
       "startOver": "Začít znovu",
       "compare": "Zkontroluj, že {name} ukazuje {code}",
       "matches": "Shoduje se",
@@ -2668,7 +2666,7 @@
       "removedHere": "Odebráno z vašich zařízení",
       "declined": "Nepovoleno",
       "askAgain": "Zeptat se znovu",
-      "asked": "Požádáno v {time}. Použijte {names}: kód se zobrazí tam i tady.",
+      "asked": "Požádáno v {time}. Povolte ho na {names}.",
       "askFailed": "Žádost se nepodařilo odeslat. Stella to zkouší dál.",
       "askedNow": "Požádáno",
       "waitingFor": "Čeká se na {name}…",

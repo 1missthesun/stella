@@ -852,11 +852,10 @@
     },
     "savedLogins": {
       "allowTitle": "Разрешить {name}?",
-      "allowCheck": "Проверьте, что там {code}",
       "notNow": "Не сейчас",
       "allow": "Разрешить",
       "waitingTitle": "Ваши логины — и здесь",
-      "waitingBody": "Перейдите к {names}",
+      "waitingBody": "Разрешите на {names}",
       "startOver": "Начать заново",
       "compare": "Проверьте, что {name} показывает {code}",
       "matches": "Совпадает",

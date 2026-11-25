@@ -1064,7 +1064,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "{name}을(를) 허용할까요?",
-      "allowCheck": "이 코드가 표시되는지 확인하세요.",
       "notNow": "나중에",
       "allow": "허용",
       "failed": "처리되지 않았습니다. 다시 시도해 주세요.",
@@ -1073,7 +1072,7 @@
       "useAnother": "다른 기기 사용",
       "matches": "일치함",
       "getTitle": "여기로 로그인 가져오기",
-      "getBody": "{names}(으)로 이동하세요.",
+      "getBody": "{names}에서 허용하세요.",
       "cloudUsed": "클라우드 작업이 {label} 사용"
     }
   },
@@ -1735,11 +1734,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name}을(를) 허용할까요?",
-      "allowCheck": "{code}이(가) 표시되는지 확인하세요",
       "notNow": "나중에",
       "allow": "허용",
       "waitingTitle": "여기서도 로그인 정보 사용하기",
-      "waitingBody": "{names}(으)로 이동하세요",
+      "waitingBody": "{names}에서 허용하세요",
       "startOver": "처음부터 다시",
       "compare": "{name}에 {code}이(가) 표시되는지 확인하세요",
       "matches": "일치해요",
@@ -2638,7 +2636,7 @@
       "removedHere": "내 기기에서 제거됨",
       "declined": "허용되지 않음",
       "askAgain": "다시 요청",
-      "asked": "{time}에 요청했습니다. {names}을(를) 사용하면 양쪽에 코드가 표시됩니다.",
+      "asked": "{time}에 요청했습니다. {names}에서 허용하세요.",
       "askFailed": "요청하지 못했습니다. Stella가 계속 시도합니다.",
       "askedNow": "요청함",
       "waitingFor": "{name} 기다리는 중…",

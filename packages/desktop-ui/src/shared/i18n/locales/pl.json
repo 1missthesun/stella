@@ -1094,7 +1094,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Zezwolić na {name}?",
-      "allowCheck": "Sprawdź, czy pokazuje ten kod.",
       "notNow": "Nie teraz",
       "allow": "Zezwól",
       "failed": "Nie udało się. Spróbuj ponownie.",
@@ -1103,7 +1102,7 @@
       "useAnother": "Inne urządzenie",
       "matches": "Zgadza się",
       "getTitle": "Pobierz tu swoje loginy",
-      "getBody": "Przejdź do {names}.",
+      "getBody": "Zezwól na {names}.",
       "cloudUsed": "Zadanie w chmurze użyło {label}"
     }
   },
@@ -1765,11 +1764,10 @@
     },
     "savedLogins": {
       "allowTitle": "Zezwolić na {name}?",
-      "allowCheck": "Sprawdź, czy pokazuje {code}",
       "notNow": "Nie teraz",
       "allow": "Zezwól",
       "waitingTitle": "Pobierz tu swoje loginy",
-      "waitingBody": "Przejdź do {names}",
+      "waitingBody": "Zezwól na {names}",
       "startOver": "Zacznij od nowa",
       "compare": "Sprawdź, czy {name} pokazuje {code}",
       "matches": "Zgadza się",
@@ -2668,7 +2666,7 @@
       "removedHere": "Usunięto z Twoich urządzeń",
       "declined": "Brak zgody",
       "askAgain": "Zapytaj ponownie",
-      "asked": "Wysłano prośbę o {time}. Użyj {names}: kod pojawi się tam i tutaj.",
+      "asked": "Wysłano prośbę o {time}. Zezwól na {names}.",
       "askFailed": "Nie udało się wysłać prośby. Stella próbuje dalej.",
       "askedNow": "Wysłano",
       "waitingFor": "Czekam na {name}…",

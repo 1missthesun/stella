@@ -854,11 +854,10 @@
     },
     "savedLogins": {
       "allowTitle": "هل تسمح لـ {name}؟",
-      "allowCheck": "تأكد من أنه يعرض {code}",
       "notNow": "ليس الآن",
       "allow": "سماح",
       "waitingTitle": "احصل على بيانات دخولك هنا",
-      "waitingBody": "انتقل إلى {names}",
+      "waitingBody": "اسمح به على {names}",
       "startOver": "البدء من جديد",
       "compare": "تأكد من أن {name} يعرض {code}",
       "matches": "متطابق",

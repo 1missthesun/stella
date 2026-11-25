@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Tillåta {name}?",
-      "allowCheck": "Kontrollera att den visar den här koden.",
       "notNow": "Inte nu",
       "allow": "Tillåt",
       "failed": "Det gick inte. Försök igen.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Annan enhet",
       "matches": "Det stämmer",
       "getTitle": "Hämta dina inloggningar hit",
-      "getBody": "Gå till {names}.",
+      "getBody": "Tillåt den på {names}.",
       "cloudUsed": "Molnuppgift använde {label}"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "Tillåt {name}?",
-      "allowCheck": "Kontrollera att den visar {code}",
       "notNow": "Inte nu",
       "allow": "Tillåt",
       "waitingTitle": "Få dina inloggningar här",
-      "waitingBody": "Gå till {names}",
+      "waitingBody": "Tillåt den på {names}",
       "startOver": "Börja om",
       "compare": "Kontrollera att {name} visar {code}",
       "matches": "Det stämmer",
@@ -2648,7 +2646,7 @@
       "removedHere": "Borttagen från dina enheter",
       "declined": "Inte tillåten",
       "askAgain": "Fråga igen",
-      "asked": "Frågade kl. {time}. Använd {names}: en kod visas både där och här.",
+      "asked": "Frågade kl. {time}. Tillåt den på {names}.",
       "askFailed": "Det gick inte att fråga. Stella fortsätter försöka.",
       "askedNow": "Frågat",
       "waitingFor": "Väntar på {name}…",

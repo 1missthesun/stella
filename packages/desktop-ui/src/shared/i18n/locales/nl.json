@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "{name} toestaan?",
-      "allowCheck": "Controleer of deze code daar staat.",
       "notNow": "Niet nu",
       "allow": "Toestaan",
       "failed": "Dat is niet gelukt. Probeer het opnieuw.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Ander apparaat",
       "matches": "Klopt",
       "getTitle": "Haal je logins hierheen",
-      "getBody": "Ga naar {names}.",
+      "getBody": "Sta het toe op {names}.",
       "cloudUsed": "Cloudtaak gebruikte {label}"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name} toestaan?",
-      "allowCheck": "Controleer of daar {code} staat",
       "notNow": "Niet nu",
       "allow": "Toestaan",
       "waitingTitle": "Haal je logins hierheen",
-      "waitingBody": "Ga naar {names}",
+      "waitingBody": "Sta het toe op {names}",
       "startOver": "Opnieuw beginnen",
       "compare": "Controleer of {name} {code} toont",
       "matches": "Het klopt",
@@ -2648,7 +2646,7 @@
       "removedHere": "Verwijderd uit je apparaten",
       "declined": "Niet toegestaan",
       "askAgain": "Opnieuw vragen",
-      "asked": "Gevraagd om {time}. Gebruik {names}: daar en hier verschijnt een code.",
+      "asked": "Gevraagd om {time}. Sta het toe op {names}.",
       "askFailed": "Vragen is niet gelukt. Stella blijft het proberen.",
       "askedNow": "Gevraagd",
       "waitingFor": "Wachten op {name}…",

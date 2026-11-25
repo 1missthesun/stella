@@ -849,11 +849,10 @@
     },
     "savedLogins": {
       "allowTitle": "允許 {name}？",
-      "allowCheck": "請確認它顯示 {code}",
       "notNow": "暫時不要",
       "allow": "允許",
       "waitingTitle": "在這裡使用你的登入資訊",
-      "waitingBody": "請使用 {names}",
+      "waitingBody": "請在 {names} 上允許",
       "startOver": "重新開始",
       "compare": "請確認 {name} 顯示 {code}",
       "matches": "一致",

@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Tillad {name}?",
-      "allowCheck": "Tjek, at den viser denne kode.",
       "notNow": "Ikke nu",
       "allow": "Tillad",
       "failed": "Det gik ikke igennem. Prøv igen.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Anden enhed",
       "matches": "Det passer",
       "getTitle": "Hent dine logins hertil",
-      "getBody": "Gå til {names}.",
+      "getBody": "Tillad den på {names}.",
       "cloudUsed": "Cloudopgave brugte {label}"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "Tillad {name}?",
-      "allowCheck": "Tjek, at den viser {code}",
       "notNow": "Ikke nu",
       "allow": "Tillad",
       "waitingTitle": "Få dine logins her",
-      "waitingBody": "Gå til {names}",
+      "waitingBody": "Tillad den på {names}",
       "startOver": "Start forfra",
       "compare": "Tjek, at {name} viser {code}",
       "matches": "De er ens",
@@ -2648,7 +2646,7 @@
       "removedHere": "Fjernet fra dine enheder",
       "declined": "Ikke tilladt",
       "askAgain": "Spørg igen",
-      "asked": "Spurgt kl. {time}. Brug {names}: der vises en kode både der og her.",
+      "asked": "Spurgt kl. {time}. Tillad den på {names}.",
       "askFailed": "Kunne ikke spørge. Stella prøver igen.",
       "askedNow": "Spurgt",
       "waitingFor": "Venter på {name}…",

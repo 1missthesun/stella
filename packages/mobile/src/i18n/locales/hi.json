@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name} को अनुमति दें?",
-      "allowCheck": "देखें कि उस पर {code} दिख रहा है",
       "notNow": "अभी नहीं",
       "allow": "अनुमति दें",
       "waitingTitle": "अपने लॉगिन यहाँ पाएँ",
-      "waitingBody": "{names} पर जाएँ",
+      "waitingBody": "{names} पर इसकी अनुमति दें",
       "startOver": "फिर से शुरू करें",
       "compare": "देखें कि {name} पर {code} दिख रहा है",
       "matches": "मेल खाता है",

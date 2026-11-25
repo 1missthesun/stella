@@ -2,7 +2,6 @@ import { randomInt, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { spawn } from "node:child_process";
-import { powerMonitor } from "electron";
 import {
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_OPENED,
@@ -74,7 +73,6 @@ const SAVED_SUMMARY_LIMIT = 60;
 const RELEASES_PER_HOUR = 20;
 const RELEASE_LOG_FILE = "saved-value-releases.json";
 const RELEASE_LOG_LIMIT = 50;
-const USER_ACTIVE_IDLE_SECONDS = 120;
 const KEYCHAIN_SCOPE_PREFIX = "user-ask-keychain";
 const COMMAND_PLACEHOLDER = "{{secret}}";
 const sharedHandles = (handles) => {
@@ -349,14 +347,6 @@ export class UserAskService {
                 this.fingerprintCache = null;
             },
             onStatus: (status) => this.broadcast(IPC_USER_ASK_SECURE_VALUES_SYNC_CHANGED, status),
-            isUserActive: () => {
-                try {
-                    return powerMonitor.getSystemIdleTime() < USER_ACTIVE_IDLE_SECONDS;
-                }
-                catch {
-                    return true;
-                }
-            },
             getReleaseLog: () => this.releaseLog(),
         });
         this.escalation = new UserAskEscalationEngine({
@@ -1373,6 +1363,10 @@ export class UserAskService {
     }
     async savedValuesSyncAction(payload) {
         switch (payload?.action) {
+            case "answer":
+                return typeof payload.joinId === "string"
+                    ? await this.sync.answerJoin(payload.joinId)
+                    : { ok: false, error: "No request named." };
             case "allow":
             case "decline":
                 return typeof payload.joinId === "string"

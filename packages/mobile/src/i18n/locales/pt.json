@@ -851,11 +851,10 @@
     },
     "savedLogins": {
       "allowTitle": "Permitir {name}?",
-      "allowCheck": "Confira se aparece {code}",
       "notNow": "Agora não",
       "allow": "Permitir",
       "waitingTitle": "Traga seus logins para cá",
-      "waitingBody": "Vá até {names}",
+      "waitingBody": "Permita em {names}",
       "startOver": "Começar de novo",
       "compare": "Confira se {name} mostra {code}",
       "matches": "Está igual",

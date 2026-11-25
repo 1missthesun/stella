@@ -1084,7 +1084,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Autoriser {name} ?",
-      "allowCheck": "Vérifiez qu’il affiche ce code.",
       "notNow": "Pas maintenant",
       "allow": "Autoriser",
       "failed": "Ça n'a pas abouti. Réessayez.",
@@ -1093,7 +1092,7 @@
       "useAnother": "Autre appareil",
       "matches": "Ça correspond",
       "getTitle": "Récupérer vos identifiants ici",
-      "getBody": "Allez sur {names}.",
+      "getBody": "Autorisez-le sur {names}.",
       "cloudUsed": "Une tâche cloud a utilisé {label}"
     }
   },
@@ -1755,11 +1754,10 @@
     },
     "savedLogins": {
       "allowTitle": "Autoriser {name} ?",
-      "allowCheck": "Vérifie qu’il affiche {code}",
       "notNow": "Pas maintenant",
       "allow": "Autoriser",
       "waitingTitle": "Récupère tes identifiants ici",
-      "waitingBody": "Allez sur {names}",
+      "waitingBody": "Autorisez-le sur {names}",
       "startOver": "Recommencer",
       "compare": "Vérifie que {name} affiche {code}",
       "matches": "C’est pareil",
@@ -2658,7 +2656,7 @@
       "removedHere": "Retiré de vos appareils",
       "declined": "Non autorisé",
       "askAgain": "Redemander",
-      "asked": "Demandé à {time}. Utilisez {names} : un code s’affichera là-bas et ici.",
+      "asked": "Demandé à {time}. Autorisez-le sur {names}.",
       "askFailed": "La demande n’est pas partie. Stella continue d’essayer.",
       "askedNow": "Demandé",
       "waitingFor": "En attente de {name}…",

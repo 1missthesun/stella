@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Engedélyezed: {name}?",
-      "allowCheck": "Nézd meg, hogy ezt a kódot mutatja-e.",
       "notNow": "Most nem",
       "allow": "Engedélyezés",
       "failed": "Ez nem sikerült. Próbáld újra.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Másik eszköz",
       "matches": "Egyezik",
       "getTitle": "Hozd ide a belépéseidet",
-      "getBody": "Menj ide: {names}.",
+      "getBody": "Engedélyezd itt: {names}.",
       "cloudUsed": "Felhőfeladat használta: {label}"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "Engedélyezed: {name}?",
-      "allowCheck": "Nézd meg, hogy ezt mutatja-e: {code}",
       "notNow": "Most nem",
       "allow": "Engedélyezés",
       "waitingTitle": "Hozd ide a belépéseidet",
-      "waitingBody": "Menj ide: {names}",
+      "waitingBody": "Engedélyezd itt: {names}",
       "startOver": "Újrakezdés",
       "compare": "Nézd meg, hogy a(z) {name} ezt mutatja-e: {code}",
       "matches": "Egyezik",
@@ -2648,7 +2646,7 @@
       "removedHere": "Eltávolítva az eszközeid közül",
       "declined": "Nem engedélyezett",
       "askAgain": "Újrakérés",
-      "asked": "Kérés elküldve: {time}. Használd ezt: {names}. Ott és itt is megjelenik egy kód.",
+      "asked": "Kérés elküldve: {time}. Engedélyezd itt: {names}.",
       "askFailed": "Nem sikerült elküldeni a kérést. A Stella tovább próbálkozik.",
       "askedNow": "Elküldve",
       "waitingFor": "Várakozás erre: {name}…",

@@ -440,6 +440,7 @@ const joinAnswer = (
   if (join.state !== "open" || join.listedNonce) return join;
   return saveJoin(ctx, {
     ...join,
+    expiresAt: ctx.now + SAVED_VALUES_JOIN_TTL_MS,
     answeredBy: args.by,
     answeredByName: member.name,
     listedNonce: args.listedNonce,
@@ -463,7 +464,7 @@ const joinDecide = (
 ): SavedValuesJoin => {
   const join = loadJoin(ctx, args.joinId);
   listedDevice(ctx, args.by);
-  if (join.state !== "open") return join;
+  if (join.state !== "open" || (join.answeredBy && join.answeredBy !== args.by)) return join;
   return saveJoin(ctx, { ...join, state: args.state, decidedBy: args.by }, ctx.now + DECIDED_JOIN_VISIBLE_MS);
 };
 

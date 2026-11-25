@@ -47,7 +47,8 @@ export type SavedValuesRequestView = Readonly<{
   joinId: string;
   name: string;
   kind: SavedValuesMember["kind"];
-  code: string;
+  answered: boolean;
+  code: string | null;
 }>;
 
 export type SavedValuesTrustView =
@@ -84,6 +85,7 @@ type MyJoin = {
   revealed: boolean;
   confirmed: boolean;
   allowed: boolean;
+  seen: boolean;
 };
 
 type MyAnswer = {
@@ -102,6 +104,7 @@ let roster: SavedValuesRoster | null = null;
 let view: SavedValuesTrustView = OFF;
 let myJoin: MyJoin | null = null;
 const myAnswers = new Map<string, MyAnswer>();
+const decided = new Set<string>();
 let nextJoinAt = 0;
 let behindSince: number | null = null;
 let session = 0;
@@ -246,6 +249,7 @@ export const resetSavedValuesTrust = () => {
   roster = null;
   myJoin = null;
   myAnswers.clear();
+  decided.clear();
   nextJoinAt = 0;
   behindSince = null;
   lastCheck = null;
@@ -398,6 +402,7 @@ const openJoins = (deviceId: string, now: number): SavedValuesJoin[] =>
   (state?.joins ?? []).filter(
     (join) =>
       join.state === "open" &&
+      !decided.has(join.joinId) &&
       join.expiresAt > now &&
       join.device.deviceId !== deviceId,
   );
@@ -406,7 +411,18 @@ const openRequests = (deviceId: string, now: number): SavedValuesRequestView[] =
   const requests: SavedValuesRequestView[] = [];
   for (const join of openJoins(deviceId, now)) {
     const answer = myAnswers.get(join.joinId);
-    if (!answer) continue;
+    if (!answer) {
+      if (!join.listedNonce) {
+        requests.push({
+          joinId: join.joinId,
+          name: join.device.name,
+          kind: join.device.kind,
+          answered: false,
+          code: null,
+        });
+      }
+      continue;
+    }
     if (
       !answer.joinerNonce &&
       join.joinerNonce &&
@@ -415,44 +431,26 @@ const openRequests = (deviceId: string, now: number): SavedValuesRequestView[] =
       answer.joinerNonce = join.joinerNonce;
     }
     const code = codeFor(answer);
-    if (!code) continue;
-    requests.push({
+    requests.unshift({
       joinId: answer.join.joinId,
       name: answer.join.device.name,
       kind: answer.join.device.kind,
-      code: formatJoinCode(code),
+      answered: true,
+      code: code ? formatJoinCode(code) : null,
     });
   }
   return requests;
 };
 
-const answerJoins = async (
+const releaseLostAnswers = async (
   open: readonly SavedValuesJoin[],
-  list: SavedValuesRoster,
-  keys: SavedValuesDeviceKeys,
+  deviceId: string,
 ): Promise<void> => {
-  if (!appIsOpen()) return;
   for (const join of open) {
-    if (join.listedNonce || myAnswers.has(join.joinId)) continue;
-    const answer: MyAnswer = {
-      join,
-      nonce: randomNonce(),
-      pin: list.head,
-      joinerNonce: null,
-    };
-    myAnswers.set(join.joinId, answer);
-    try {
-      const result = await getBackendClient().call("savedValues.joinAnswer", {
-        joinId: join.joinId,
-        by: keys.deviceId,
-        listedNonce: answer.nonce,
-        pin: answer.pin,
-      });
-      if (result.listedNonce !== answer.nonce) myAnswers.delete(join.joinId);
-    } catch (error) {
-      myAnswers.delete(join.joinId);
-      throw error;
-    }
+    if (join.answeredBy !== deviceId || myAnswers.has(join.joinId)) continue;
+    await getBackendClient().call("savedValues.joinCancel", {
+      joinId: join.joinId,
+    });
   }
 };
 
@@ -478,7 +476,7 @@ const stayMember = async (
     requests,
   });
   if (grew) notify();
-  await answerJoins(open, list, keys);
+  await releaseLostAnswers(open, keys.deviceId);
 };
 
 export const savedValuesMembership = async (): Promise<{
@@ -513,6 +511,35 @@ const append = async (
   }
 };
 
+export const answerSavedValuesJoin = async (joinId: string): Promise<void> => {
+  const membership = await savedValuesMembership();
+  const join = membership?.state.joins.find(
+    (candidate) => candidate.joinId === joinId,
+  );
+  if (!membership || !join || myAnswers.has(joinId)) return;
+  const answer: MyAnswer = {
+    join,
+    nonce: randomNonce(),
+    pin: membership.roster.head,
+    joinerNonce: null,
+  };
+  myAnswers.set(joinId, answer);
+  try {
+    const result = await getBackendClient().call("savedValues.joinAnswer", {
+      joinId,
+      by: membership.keys.deviceId,
+      listedNonce: answer.nonce,
+      pin: answer.pin,
+    });
+    if (result.listedNonce !== answer.nonce) myAnswers.delete(joinId);
+  } catch (error) {
+    myAnswers.delete(joinId);
+    throw error;
+  } finally {
+    void settle();
+  }
+};
+
 export const allowSavedValuesJoin = async (joinId: string): Promise<void> => {
   const answer = myAnswers.get(joinId);
   if (!answer || !codeFor(answer)) return;
@@ -544,7 +571,7 @@ const decide = async (
     by: deviceId,
     state: decision,
   });
-  myAnswers.delete(joinId);
+  decided.add(joinId);
   await settle();
 };
 
@@ -580,6 +607,13 @@ const ask = async (
     ? state?.joins.find((join) => join.joinId === myJoin?.joinId)
     : undefined;
 
+  if (myJoin && posted) {
+    myJoin.seen = true;
+    myJoin.expiresAt = posted.expiresAt;
+  } else if (myJoin?.seen && !myJoin.allowed) {
+    myJoin = null;
+    nextJoinAt = 0;
+  }
   if (myJoin && posted?.state === "declined") {
     myJoin = null;
     await updateTrust({ stopped: "declined" });
@@ -632,6 +666,7 @@ const ask = async (
       revealed: false,
       confirmed: false,
       allowed: false,
+      seen: false,
     };
     nextJoinAt = now + JOIN_RETRY_MS;
     const join = await getBackendClient().call("savedValues.joinStart", {

@@ -1094,7 +1094,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Разрешить {name}?",
-      "allowCheck": "Проверьте, что там этот код.",
       "notNow": "Не сейчас",
       "allow": "Разрешить",
       "failed": "Не получилось. Попробуйте ещё раз.",
@@ -1103,7 +1102,7 @@
       "useAnother": "Другое устройство",
       "matches": "Совпадает",
       "getTitle": "Получить логины здесь",
-      "getBody": "Перейдите к {names}.",
+      "getBody": "Разрешите на {names}.",
       "cloudUsed": "Облачная задача использовала {label}"
     }
   },
@@ -1765,11 +1764,10 @@
     },
     "savedLogins": {
       "allowTitle": "Разрешить {name}?",
-      "allowCheck": "Проверьте, что там {code}",
       "notNow": "Не сейчас",
       "allow": "Разрешить",
       "waitingTitle": "Ваши логины — и здесь",
-      "waitingBody": "Перейдите к {names}",
+      "waitingBody": "Разрешите на {names}",
       "startOver": "Начать заново",
       "compare": "Проверьте, что {name} показывает {code}",
       "matches": "Совпадает",
@@ -2668,7 +2666,7 @@
       "removedHere": "Удалено из ваших устройств",
       "declined": "Не разрешено",
       "askAgain": "Спросить снова",
-      "asked": "Запрос отправлен в {time}. Воспользуйтесь {names}: код появится там и здесь.",
+      "asked": "Запрос отправлен в {time}. Разрешите на {names}.",
       "askFailed": "Не удалось отправить запрос. Stella продолжает пытаться.",
       "askedNow": "Отправлено",
       "waitingFor": "Ждём {name}…",

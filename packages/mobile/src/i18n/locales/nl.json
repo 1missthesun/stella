@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name} toestaan?",
-      "allowCheck": "Controleer of daar {code} staat",
       "notNow": "Niet nu",
       "allow": "Toestaan",
       "waitingTitle": "Haal je logins hierheen",
-      "waitingBody": "Ga naar {names}",
+      "waitingBody": "Sta het toe op {names}",
       "startOver": "Opnieuw beginnen",
       "compare": "Controleer of {name} {code} toont",
       "matches": "Het klopt",

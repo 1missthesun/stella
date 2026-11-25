@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "Tillåt {name}?",
-      "allowCheck": "Kontrollera att den visar {code}",
       "notNow": "Inte nu",
       "allow": "Tillåt",
       "waitingTitle": "Få dina inloggningar här",
-      "waitingBody": "Gå till {names}",
+      "waitingBody": "Tillåt den på {names}",
       "startOver": "Börja om",
       "compare": "Kontrollera att {name} visar {code}",
       "matches": "Det stämmer",

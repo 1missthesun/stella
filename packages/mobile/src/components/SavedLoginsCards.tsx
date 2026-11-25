@@ -4,6 +4,7 @@ import { Text } from "./Text";
 import { tapLight } from "../lib/haptics";
 import {
   allowSavedValuesJoin,
+  answerSavedValuesJoin,
   askSavedValuesAgain,
   confirmSavedValuesCode,
   declineSavedValuesJoin,
@@ -62,20 +63,39 @@ export function SavedLoginsRequestCard({
   const { busy, run } = useSavedLoginsAction();
   return (
     <Card
-      title={t("mobile.savedLogins.allowTitle", { name: request.name })}
-      line={<CodeLine id="allowCheck" code={request.code} />}
+      title={
+        request.code ? (
+          <CodeLine name={request.name} code={request.code} />
+        ) : (
+          t("mobile.savedLogins.allowTitle", { name: request.name })
+        )
+      }
+      line={
+        request.answered && !request.code
+          ? t("mobile.savedLogins.confirmed", { name: request.name })
+          : undefined
+      }
     >
       <Action
         label={t("mobile.savedLogins.notNow")}
         disabled={busy}
         onPress={() => run(() => declineSavedValuesJoin(request.joinId))}
       />
-      <Action
-        primary
-        label={t("mobile.savedLogins.allow")}
-        disabled={busy}
-        onPress={() => run(() => allowSavedValuesJoin(request.joinId))}
-      />
+      {request.code ? (
+        <Action
+          primary
+          label={t("mobile.savedLogins.matches")}
+          disabled={busy}
+          onPress={() => run(() => allowSavedValuesJoin(request.joinId))}
+        />
+      ) : request.answered ? null : (
+        <Action
+          primary
+          label={t("mobile.savedLogins.allow")}
+          disabled={busy}
+          onPress={() => run(() => answerSavedValuesJoin(request.joinId))}
+        />
+      )}
     </Card>
   );
 }
@@ -124,7 +144,7 @@ export function SavedLoginsWaitingCard({
     return (
       <Card
         title={t("mobile.savedLogins.confirmed", { name })}
-        line={<CodeLine id="compare" name={name} code={waiting.code} />}
+        line={<CodeLine name={name} code={waiting.code} />}
       >
         <UseAnother disabled={busy} run={run} />
       </Card>
@@ -134,7 +154,7 @@ export function SavedLoginsWaitingCard({
   return (
     <Card
       title={t("mobile.savedLogins.waitingTitle")}
-      line={<CodeLine id="compare" name={name} code={waiting.code} />}
+      line={<CodeLine name={name} code={waiting.code} />}
     >
       <UseAnother disabled={busy} run={run} />
       <Action
@@ -197,23 +217,21 @@ function LinkAction({
 const CODE_MARK = "\u2063";
 
 function CodeLine({
-  id,
-  name = "",
+  name,
   code,
 }: {
-  id: "allowCheck" | "compare";
-  name?: string;
+  name: string;
   code: string;
 }) {
   const t = useT();
   const styles = useStyles();
-  const [before = "", after = ""] = t(`mobile.savedLogins.${id}`, {
+  const [before = "", after = ""] = t("mobile.savedLogins.compare", {
     name,
     code: CODE_MARK,
   }).split(CODE_MARK);
   return (
     <Text
-      accessibilityLabel={t(`mobile.savedLogins.${id}`, {
+      accessibilityLabel={t("mobile.savedLogins.compare", {
         name,
         code: code.replace(/\D/g, "").split("").join(" "),
       })}

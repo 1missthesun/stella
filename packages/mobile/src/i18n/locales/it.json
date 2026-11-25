@@ -851,11 +851,10 @@
     },
     "savedLogins": {
       "allowTitle": "Consentire {name}?",
-      "allowCheck": "Controlla che mostri {code}",
       "notNow": "Non ora",
       "allow": "Consenti",
       "waitingTitle": "Porta qui i tuoi accessi",
-      "waitingBody": "Vai su {names}",
+      "waitingBody": "Consentila su {names}",
       "startOver": "Ricomincia",
       "compare": "Controlla che {name} mostri {code}",
       "matches": "Corrisponde",

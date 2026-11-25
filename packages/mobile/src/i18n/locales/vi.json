@@ -849,11 +849,10 @@
     },
     "savedLogins": {
       "allowTitle": "Cho phép {name}?",
-      "allowCheck": "Kiểm tra xem có hiện {code} không",
       "notNow": "Để sau",
       "allow": "Cho phép",
       "waitingTitle": "Dùng thông tin đăng nhập tại đây",
-      "waitingBody": "Hãy dùng {names}",
+      "waitingBody": "Hãy cho phép trên {names}",
       "startOver": "Bắt đầu lại",
       "compare": "Kiểm tra xem {name} có hiện {code} không",
       "matches": "Khớp rồi",

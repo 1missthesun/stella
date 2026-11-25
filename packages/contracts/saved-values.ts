@@ -152,6 +152,7 @@ export type SavedValuesJoinRequest = Readonly<{
   joinId: string;
   name: string;
   kind: SavedValueDeviceKind;
+  answered: boolean;
   code: string | null;
   createdAt: number;
 }>;
@@ -188,7 +189,7 @@ export type SavedValuesSyncStatus = Readonly<{
 }>;
 
 export type SavedValuesSyncAction =
-  | Readonly<{ action: "allow" | "decline"; joinId: string }>
+  | Readonly<{ action: "answer" | "allow" | "decline"; joinId: string }>
   | Readonly<{ action: "confirm" | "askAgain" | "startOver" }>
   | Readonly<{ action: "remove"; deviceId: string }>;
 

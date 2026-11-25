@@ -1084,7 +1084,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Consentire {name}?",
-      "allowCheck": "Controlla che mostri questo codice.",
       "notNow": "Non ora",
       "allow": "Consenti",
       "failed": "Non è andato a buon fine. Riprova.",
@@ -1093,7 +1092,7 @@
       "useAnother": "Usa un altro dispositivo",
       "matches": "Corrisponde",
       "getTitle": "Porta qui i tuoi accessi",
-      "getBody": "Vai su {names}.",
+      "getBody": "Consentila su {names}.",
       "cloudUsed": "Un'attività cloud ha usato {label}"
     }
   },
@@ -1755,11 +1754,10 @@
     },
     "savedLogins": {
       "allowTitle": "Consentire {name}?",
-      "allowCheck": "Controlla che mostri {code}",
       "notNow": "Non ora",
       "allow": "Consenti",
       "waitingTitle": "Porta qui i tuoi accessi",
-      "waitingBody": "Vai su {names}",
+      "waitingBody": "Consentila su {names}",
       "startOver": "Ricomincia",
       "compare": "Controlla che {name} mostri {code}",
       "matches": "Corrisponde",
@@ -2658,7 +2656,7 @@
       "removedHere": "Rimosso dai tuoi dispositivi",
       "declined": "Non consentito",
       "askAgain": "Chiedi di nuovo",
-      "asked": "Richiesta inviata alle {time}. Usa {names}: comparirà un codice lì e qui.",
+      "asked": "Richiesta inviata alle {time}. Consentila su {names}.",
       "askFailed": "Impossibile inviare la richiesta. Stella continua a provare.",
       "askedNow": "Richiesta inviata",
       "waitingFor": "In attesa di {name}…",

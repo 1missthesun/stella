@@ -850,11 +850,10 @@
     },
     "savedLogins": {
       "allowTitle": "Allow {name}?",
-      "allowCheck": "Check it shows {code}",
       "notNow": "Not now",
       "allow": "Allow",
       "waitingTitle": "Get your logins here",
-      "waitingBody": "Go to {names}",
+      "waitingBody": "Allow it on {names}",
       "startOver": "Start over",
       "compare": "Check {name} shows {code}",
       "matches": "It matches",

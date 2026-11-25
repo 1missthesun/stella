@@ -1114,7 +1114,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "السماح لـ {name}؟",
-      "allowCheck": "تأكد من أنه يعرض هذا الرمز.",
       "notNow": "ليس الآن",
       "allow": "السماح",
       "failed": "لم يتم ذلك. حاول مرة أخرى.",
@@ -1123,7 +1122,7 @@
       "useAnother": "جهاز آخر",
       "matches": "متطابق",
       "getTitle": "احصل على تسجيلات دخولك هنا",
-      "getBody": "انتقل إلى {names}.",
+      "getBody": "اسمح به على {names}.",
       "cloudUsed": "استخدمت مهمة سحابية {label}"
     }
   },
@@ -1785,11 +1784,10 @@
     },
     "savedLogins": {
       "allowTitle": "هل تسمح لـ {name}؟",
-      "allowCheck": "تأكد من أنه يعرض {code}",
       "notNow": "ليس الآن",
       "allow": "سماح",
       "waitingTitle": "احصل على بيانات دخولك هنا",
-      "waitingBody": "انتقل إلى {names}",
+      "waitingBody": "اسمح به على {names}",
       "startOver": "البدء من جديد",
       "compare": "تأكد من أن {name} يعرض {code}",
       "matches": "متطابق",
@@ -2688,7 +2686,7 @@
       "removedHere": "أُزيل من أجهزتك",
       "declined": "غير مسموح",
       "askAgain": "اطلب مجددًا",
-      "asked": "أُرسل الطلب في {time}. استخدم {names}: سيظهر رمز هناك وهنا.",
+      "asked": "أُرسل الطلب في {time}. اسمح به على {names}.",
       "askFailed": "تعذّر إرسال الطلب. تواصل Stella المحاولة.",
       "askedNow": "أُرسل الطلب",
       "waitingFor": "بانتظار {name}…",

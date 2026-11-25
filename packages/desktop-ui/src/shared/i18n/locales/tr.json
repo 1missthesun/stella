@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "{name} izin verilsin mi?",
-      "allowCheck": "Bu kodu gösterdiğini kontrol edin.",
       "notNow": "Şimdi değil",
       "allow": "İzin ver",
       "failed": "Olmadı. Tekrar deneyin.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Başka cihaz",
       "matches": "Eşleşiyor",
       "getTitle": "Girişlerinizi buraya alın",
-      "getBody": "{names} cihazına geçin.",
+      "getBody": "{names} cihazında izin verin.",
       "cloudUsed": "Bulut görevi {label} kullandı"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "{name} için izin verilsin mi?",
-      "allowCheck": "{code} gösterdiğini kontrol et",
       "notNow": "Şimdi değil",
       "allow": "İzin ver",
       "waitingTitle": "Girişlerini buraya al",
-      "waitingBody": "{names} cihazına geçin",
+      "waitingBody": "{names} cihazında izin verin",
       "startOver": "Baştan başla",
       "compare": "{name} cihazının {code} gösterdiğini kontrol et",
       "matches": "Eşleşiyor",
@@ -2648,7 +2646,7 @@
       "removedHere": "Cihazlarınızdan kaldırıldı",
       "declined": "İzin verilmedi",
       "askAgain": "Tekrar sor",
-      "asked": "{time} itibarıyla istendi. {names} cihazını kullanın: orada ve burada bir kod görünecek.",
+      "asked": "{time} itibarıyla istendi. {names} cihazında izin verin.",
       "askFailed": "İstenemedi. Stella denemeye devam ediyor.",
       "askedNow": "İstendi",
       "waitingFor": "{name} bekleniyor…",

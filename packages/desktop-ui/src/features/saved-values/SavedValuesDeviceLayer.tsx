@@ -68,7 +68,7 @@ export const SavedValuesDeviceLayer = () => {
   const matchKey = waiting?.code && !waiting.confirmed ? `match:${waiting.code}` : null;
   const showMatch = matchKey !== null && !dismissed.has(matchKey);
   const ready = onboarding.hydrated && onboarding.completed;
-  const free = useScreenFree(ready && (Boolean(request?.code) || showMatch));
+  const free = useScreenFree(ready && (Boolean(request) || showMatch));
 
   const dismiss = (key: string) => {
     setDismissed((current) => new Set([...current, key]));
@@ -89,7 +89,7 @@ export const SavedValuesDeviceLayer = () => {
 
   if (!ready || !free) return null;
 
-  if (request?.code) {
+  if (request) {
     const allow = async () => {
       const result = await act({ action: "allow", joinId: request.joinId });
       const self = devices?.find((device) => device.deviceId === deviceId);
@@ -104,16 +104,23 @@ export const SavedValuesDeviceLayer = () => {
       <Dialog open onOpenChange={(next) => !next && !busy && decline()}>
         <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-allow="">
           <DialogHeader>
-            <DialogTitle>{t("global.savedValuesDevices.allowTitle", { name: request.name })}</DialogTitle>
+            <DialogTitle>
+              {request.code
+                ? t("global.savedValuesDevices.matchTitle", { name: request.name })
+                : t("global.savedValuesDevices.allowTitle", { name: request.name })}
+            </DialogTitle>
             <DialogCloseButton aria-label={t("common.close")} />
           </DialogHeader>
           <DialogBody className="remote-execution-consent-body">
-            <DialogDescription className="remote-execution-consent-text">
-              {t("global.savedValuesDevices.allowCheck")}
-            </DialogDescription>
-            <div className="saved-values-device-code" data-saved-values-code="">
-              {formatJoinCode(request.code)}
-            </div>
+            {request.code ? (
+              <div className="saved-values-device-code" data-saved-values-code="">
+                {formatJoinCode(request.code)}
+              </div>
+            ) : request.answered ? (
+              <DialogDescription className="remote-execution-consent-text">
+                {t("settings.secureValues.waitingFor", { name: request.name })}
+              </DialogDescription>
+            ) : null}
             {failed ? <div className="remote-execution-consent-error">{t("global.savedValuesDevices.failed")}</div> : null}
             <div className="remote-execution-consent-actions">
               <Button
@@ -125,15 +132,27 @@ export const SavedValuesDeviceLayer = () => {
               >
                 {t("global.savedValuesDevices.notNow")}
               </Button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={busy}
-                className="pill-btn pill-btn--primary pill-btn--lg"
-                onClick={() => void run(allow, () => dismiss(request.joinId))}
-              >
-                {t("global.savedValuesDevices.allow")}
-              </Button>
+              {request.code ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={busy}
+                  className="pill-btn pill-btn--primary pill-btn--lg"
+                  onClick={() => void run(allow, () => dismiss(request.joinId))}
+                >
+                  {t("global.savedValuesDevices.matches")}
+                </Button>
+              ) : request.answered ? null : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={busy}
+                  className="pill-btn pill-btn--primary pill-btn--lg"
+                  onClick={() => void run(() => act({ action: "answer", joinId: request.joinId }))}
+                >
+                  {t("global.savedValuesDevices.allow")}
+                </Button>
+              )}
             </div>
           </DialogBody>
         </DialogContent>

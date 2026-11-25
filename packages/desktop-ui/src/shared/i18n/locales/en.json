@@ -1074,7 +1074,6 @@
     },
     "savedValuesDevices": {
       "allowTitle": "Allow {name}?",
-      "allowCheck": "Check it shows this code.",
       "notNow": "Not now",
       "allow": "Allow",
       "failed": "That didn't go through. Try again.",
@@ -1083,7 +1082,7 @@
       "useAnother": "Use another device",
       "matches": "It matches",
       "getTitle": "Get your logins here",
-      "getBody": "Go to {names}.",
+      "getBody": "Allow it on {names}.",
       "cloudUsed": "Cloud task used {label}"
     }
   },
@@ -1745,11 +1744,10 @@
     },
     "savedLogins": {
       "allowTitle": "Allow {name}?",
-      "allowCheck": "Check it shows {code}",
       "notNow": "Not now",
       "allow": "Allow",
       "waitingTitle": "Get your logins here",
-      "waitingBody": "Go to {names}",
+      "waitingBody": "Allow it on {names}",
       "startOver": "Start over",
       "compare": "Check {name} shows {code}",
       "matches": "It matches",
@@ -2648,7 +2646,7 @@
       "removedHere": "Removed from your devices",
       "declined": "Not allowed",
       "askAgain": "Ask again",
-      "asked": "Asked at {time}. Use {names}: a code will show there and here.",
+      "asked": "Asked at {time}. Allow it on {names}.",
       "askFailed": "Couldn't ask. Stella keeps trying.",
       "askedNow": "Asked",
       "waitingFor": "Waiting for {name}…",

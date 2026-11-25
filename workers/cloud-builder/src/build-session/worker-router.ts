@@ -923,7 +923,9 @@ app.use(async (c, next) => {
       method: c.req.method,
       path: c.req.path.startsWith("/workspace-apps/")
         ? "/workspace-apps/[session]"
-        : new URL(c.req.url).pathname,
+        : c.req.path.startsWith("/drive-pages/")
+          ? "/drive-pages/[session]"
+          : new URL(c.req.url).pathname,
       status: c.res.status,
       ms: Date.now() - startedAt,
     });
@@ -997,6 +999,11 @@ app.all(`/internal/worlds/:world{${WORLD_KEY}}/blob/:sha256{[0-9a-f]{64}}`, asyn
     kind: "blob",
     sha256: c.req.param("sha256"),
   });
+});
+
+app.get("/drive-pages/:rest{.*}", async (c) => {
+  const { serveDrivePage } = await import("../drive-page-preview.js");
+  return await serveDrivePage(c.req.raw, c.env);
 });
 
 app.all("/workspace-apps/:rest{.*}", async (c) => {

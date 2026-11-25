@@ -139,8 +139,8 @@ export const FeedbackDialog = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent fit {...s.sidebarFeedbackDialog}>
-        <DialogHeader>
-          <DialogTitle>{t("shell.sidebar.feedback.title")}</DialogTitle>
+        <DialogHeader {...s.sidebarFeedbackDialog_dialogHeader}>
+          <DialogTitle {...s.sidebarFeedbackDialog_dialogTitle}>{t("shell.sidebar.feedback.title")}</DialogTitle>
           <DialogCloseButton />
         </DialogHeader>
         <FeedbackForm onCancel={handleClose} onSubmitted={onSubmitted} />

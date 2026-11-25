@@ -17,7 +17,7 @@ export const useLocalMode = sheet((c, t) => ({
   waitingMessagesRemove: { pad: 0, underline: true, cursor: "pointer" },
   signOutChoice: { maxW: 420 },
   signOutChoiceBody: { pt: 4, pb: 24, px: 24, gap: 16, align: "stretch" },
-  signOutChoice_signOutChoiceText: { pad: 0, color: c.textBase, size: 14, lh: 1.5 },
+  signOutChoice_signOutChoiceText: { pad: 0, pl: 0, pr: 0, pb: 0, mt: 0, color: c.textBase, size: 14, lh: 1.5 },
   signOutChoiceCheck: { py: 12, px: 13, gap: 10, align: "start", border: c.border, radius: 8, color: c.textBase, size: 13, lh: 1.45, cursor: "pointer" },
   signOutChoiceCheck_input: { mt: 2 },
   signOutChoiceCheck_small: { mt: 2, color: c.mutedForeground, size: 12 },

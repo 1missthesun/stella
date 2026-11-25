@@ -68,7 +68,7 @@ export function DialogContent({ size = "md", fit = false, children, onEscapeKeyD
     <>
       <Scrim id={`dlg${id}-scrim`} color={t.c.scrim} />
       <col id={`dlg${id}-layer`} fixed inset={0} raise={layer.dialog + 1} center pad={8} modal={{ clickOutside: false }} onDismiss={() => dismiss(false)} onPress={() => dismiss(true)}>
-        <col w={s.w} maxW="100%" h={fit ? undefined : s.h} maxH="100%" align="center" justify="start">
+        <col w={s.w} maxW="100%" h={fit ? undefined : s.h} maxH="100%" align="start" justify="start">
           <col
             id={`dlg${id}`}
             role="dialog"

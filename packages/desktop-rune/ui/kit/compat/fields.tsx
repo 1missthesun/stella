@@ -171,7 +171,7 @@ export type InputProps = Style & {
 const KEYS = ["Escape", "ArrowUp", "ArrowDown", "Tab"];
 
 /** An `<input>` / `<textarea>` with the DOM handler shapes desktop-ui passes (`onChange(e)`, `onKeyDown(e)`); Enter submits the enclosing form. */
-export function Input({ field = false, value, defaultValue, type, disabled, readOnly, autoFocus, multiline, onChange, onInput, onKeyDown, onFocus, onBlur, placeholder, placeholderColor, spellCheck, id, "aria-label": aria, className: _c, rows: _r, maxLength, name: _n, autoComplete: _a, autoCorrect: _ac, autoCapitalize: _ap, inputMode: _im, min: _min, max: _max, step: _s, "aria-invalid": _ai, onPaste: _p, ...style }: InputProps) {
+export function Input({ field = false, value, defaultValue, type, disabled, readOnly, autoFocus, multiline, onChange, onInput, onKeyDown, onFocus, onBlur, placeholder, placeholderColor, spellCheck, id, "aria-label": aria, className: _c, rows, maxLength, name: _n, autoComplete: _a, autoCorrect: _ac, autoCapitalize: _ap, inputMode: _im, min: _min, max: _max, step: _s, "aria-invalid": _ai, onPaste: _p, ...style }: InputProps) {
   const t = useTokens();
   const base = useTextBase();
   const ink = useInk();
@@ -182,6 +182,8 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
   const text = field
     ? look(size ?? fontSize.md, weight ?? font.sansWeight, { lh: lh ?? 1.43, em: em ?? font.sansTrackingEm, family: family ?? "sans" })
     : look(size ?? base.size, weight ?? base.weight, { lh: lh ?? base.lh, em: em ?? base.em, family: family ?? base.family ?? font.sans });
+  const edge = (side: number | undefined) => (typeof side === "number" ? side : 0);
+  const rowsHeight = multiline && rows && box.h === undefined ? rows * text.lineHeight + edge(box.pt ?? box.py ?? box.pad) + edge(box.pb ?? box.py ?? box.pad) : undefined;
   if (type === "time")
     return (
       <TimeInput
@@ -212,6 +214,7 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
       color={field ? t.c.foreground : (ink ?? t.c.foreground)}
       {...text}
       {...box}
+      {...(rowsHeight === undefined ? null : { h: rowsHeight })}
       opacity={disabled ? 0.5 : style.opacity}
       keys={onKeyDown ? KEYS : undefined}
       onKey={(k) => onKeyDown?.(domEvent(current, { key: k.key, metaKey: k.mods?.meta, ctrlKey: k.mods?.ctrl, shiftKey: k.mods?.shift, altKey: k.mods?.alt }))}

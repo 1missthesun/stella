@@ -54,7 +54,7 @@ export const ShellTopBarAccount = ({ onSignIn }: { onSignIn?: () => void }) => {
   const selfHosted = useSelfHostedServer();
   const [open, setOpen] = useState(false);
   const pendingSignOutRef = useRef(false);
-  const { destinations, connectHint, applyPendingPopover, popovers } = useSettingsMenu("shell-topbar-account-trigger");
+  const { destinations, connectHint, applyPendingPopover, popovers } = useSettingsMenu("shell-topbar-account");
   const user = { email: accountUser?.email ?? sessionUser?.email ?? undefined, name: accountUser?.name ?? sessionUser?.name ?? undefined };
 
   if (!hasConnectedAccount) {

@@ -56,7 +56,7 @@ export const releaseDateLabel = (
 
 export const stellaReleases: readonly StellaRelease[] = [
   {
-    date: "2026-11-26",
+    date: "2026-11-25",
     title: "Stella keeps itself up to date",
     summary: "Stella now installs new versions by itself, and tells you what changed.",
     tags: ["New"],
@@ -69,6 +69,7 @@ export const stellaReleases: readonly StellaRelease[] = [
       "Turn Automatic updates off or on from the arrow next to the Update button, or in the Updates tab. The Update button still installs a version right away.",
       "If a new version can’t be installed or merged, Stella stays on the one you have, tries only once, and leaves the Update button for you.",
       "After a restart in the background, Stella reopens behind the app you’re using instead of jumping in front of it.",
+      "Stella’s built-in instructions and skills are shorter and clearer, leaving more room in each conversation for your work.",
     ],
   },
   {

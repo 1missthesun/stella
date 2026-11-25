@@ -28,6 +28,7 @@ import { Switch } from "@/ui/switch";
 import { TextField } from "@/ui/text-field";
 import { showToast, ToastProvider } from "@/ui/toast";
 import { WorkingDots } from "@/ui/working-dots";
+import { ChatReference } from "./ChatReference";
 import { Markdown } from "@/app/chat/Markdown";
 import { useTheme } from "@/context/theme-context";
 import * as Icons from "../ui/kit/icons/catalog.gen";
@@ -400,6 +401,16 @@ const PAGES: Record<string, () => ReactNode> = {
 function Page({ page, themeKey }: { page: string; themeKey: string }) {
   const { gradientMode, gradientColor } = useTheme();
   const Body = PAGES[page] ?? Buttons;
+  if (page === "chat") {
+    return (
+      <div className="app" style={{ position: "fixed", inset: 0 }}>
+        <div className="window-shell full" style={{ position: "absolute", inset: 0 }}>
+          <ShiftingGradient mode={gradientMode} colorMode={gradientColor} lightweight={false} />
+          <ChatReference />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="app" style={{ position: "fixed", inset: 0 }}>
       <div className="window-shell full" style={{ position: "absolute", inset: 0 }}>

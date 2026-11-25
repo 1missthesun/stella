@@ -4,6 +4,8 @@ import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store
 import { useOptimisticStop } from "@/features/chat/hooks/use-optimistic-stop";
 import { deriveComposerState, hasAttachedComposerChips } from "@/features/chat/composer-context";
 import { attachPastedText, shouldAttachPastedText } from "@/features/chat/lib/paste-context";
+import { PASTE_AS_ATTACHMENT_MIN_CHARS, PASTE_AS_ATTACHMENT_MIN_LINES } from "@stella/contracts/pasted-text";
+import { findDelegatedModelMentions } from "@stella/contracts/model-mentions";
 import { attachFilesToContext } from "@/features/chat/lib/file-attach";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { useDictationPaste } from "@/features/dictation/hooks/use-dictation-paste";
@@ -39,6 +41,14 @@ const LINE = fontSize.md * 1.5;
 const PILL_INPUT_PAD_X = 4;
 const NARROW_W = 600;
 const MENU_KEYS = ["ArrowUp", "ArrowDown", "Tab", "Escape", "Enter"];
+const INPUT_MAX_H = 200;
+const PASTE_AS_ATTACHMENT = { minChars: PASTE_AS_ATTACHMENT_MIN_CHARS, minLines: PASTE_AS_ATTACHMENT_MIN_LINES };
+
+/** `.model-mention-inline` in the field: primary text on a 14% primary wash, 3pt corners. */
+const useMentionMarks = (message: string, tokens: ReturnType<typeof useTokens>) => {
+  const look = derive(tokens, "model-mention-inline", (k) => ({ color: k.c.primary, bg: mixOklch(k.c.primary, 14, "transparent") }));
+  return findDelegatedModelMentions(message).map((mention) => ({ start: mention.start, end: mention.end, color: look.color, bg: look.bg, radius: 3 }));
+};
 
 type ComposerProps = {
   message: string;
@@ -206,6 +216,7 @@ function ComposerImpl({
   };
 
   const look = composerShellLook(tokens);
+  const mentionMarks = useMentionMarks(message, tokens);
   const narrow = composerW > 0 && composerW < NARROW_W;
   const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2;
   const addMenu = <ComposerAddMenu title={t("app.chat.composer.add")} setChatContext={setChatContext} />;
@@ -221,6 +232,9 @@ function ComposerImpl({
         pt={isExpanded ? 10 : 3.5}
         pb={isExpanded ? 2 : 3.5}
         px={isExpanded ? 16 : PILL_INPUT_PAD_X}
+        maxH={INPUT_MAX_H}
+        marks={mentionMarks}
+        pasteAsEvent={PASTE_AS_ATTACHMENT}
         keys={modelMentionTrigger ? MENU_KEYS : ["Escape"]}
         onKey={onKey}
         onInput={(value) => {

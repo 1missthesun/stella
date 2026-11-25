@@ -142,6 +142,9 @@ export type ComposerTextareaProps = {
   px?: number;
   py?: number;
   color?: string;
+  maxH?: number;
+  marks?: { start: number; end: number; bg?: string; color?: string; radius?: number; pad?: number }[];
+  pasteAsEvent?: { minChars?: number; minLines?: number };
   keys?: string[];
   onInput?: (value: string) => void;
   onSubmit?: (value: string) => void;

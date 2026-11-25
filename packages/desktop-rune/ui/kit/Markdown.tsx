@@ -40,9 +40,9 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     inlineCodeText: c.textStrong,
     inlineCodeFont: [fontSize.sm / chat.size, 500],
     inlineCodePad: 4,
-    codeBlockFill: c.surfaceInset,
-    codeBlockBorder: c.borderWeak,
-    codeBlockPadding: [12, 10],
+    codeBlockFill: "#00000000",
+    codeBlockBorder: "#00000000",
+    codeBlockPadding: [0, 0],
     codeBlockRadius: radiusUnset,
     codeBlockFont: code,
     codeBlockText: text,
@@ -83,6 +83,8 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
       actionColor: c.textWeak,
       actionHover: c.textStrong,
       actionsOnHover: true,
+      actionsAt: [6, 6],
+      inside: { fill: c.surfaceInset, border: c.borderWeak, radius: 8, pad: [12, 10, 10] },
     },
   };
 }

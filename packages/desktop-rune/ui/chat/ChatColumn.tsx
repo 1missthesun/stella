@@ -30,6 +30,9 @@ import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
 import type { LegendContentStyle } from "./ChatTimeline";
 import { useFileDrop } from "./use-file-drop";
+import { COMPOSER_MAX_W, COMPOSER_NARROW_W, COMPOSER_PAD_TOP } from "./Composer";
+import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
+import type { Layout } from "../../host/rune-jsx/props";
 import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
 import { panelSurface } from "./surfaces";
 
@@ -58,17 +61,46 @@ const StoreBackedComposer = memo(function StoreBackedComposer({ messageStore, ..
   return <Composer {...props} message={message} />;
 });
 
-const AboveComposerCards = memo(function AboveComposerCards({ conversationId }: { conversationId: string | null }) {
+const AboveComposerCards = memo(function AboveComposerCards({ conversationId, onLayout }: { conversationId: string | null; onLayout: (r: Layout) => void }) {
   return (
-    <>
+    <col w="full" onLayout={onLayout}>
       <ConnectorConnectCard conversationId={conversationId} />
       <CloudConnectorConnectCard conversationId={conversationId} />
       <CloudBrowserInterventionCard conversationId={conversationId} />
       <UserAskList conversationId={conversationId} />
       <ComposerNotice conversationId={conversationId} />
-    </>
+    </col>
   );
 });
+
+type ComposerSurface = "chat" | "home";
+type ComposerAreaParts = { above: Layout | null; composer: Layout | null };
+
+function useComposerAreaReport(active: ComposerSurface | null) {
+  const parts = useRef<Record<ComposerSurface, ComposerAreaParts>>({ chat: { above: null, composer: null }, home: { above: null, composer: null } });
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const report = useCallback(() => {
+    const surface = activeRef.current;
+    const area = surface ? parts.current[surface] : null;
+    const composer = area?.composer;
+    if (!composer || composer.w <= 0) return reportComposerArea(null);
+    const narrow = composer.w < COMPOSER_NARROW_W;
+    const width = narrow ? composer.w - 16 : Math.min(COMPOSER_MAX_W, composer.w - 48);
+    const shellTop = composer.y + COMPOSER_PAD_TOP;
+    const top = area.above && area.above.h > 0 ? Math.min(area.above.y, shellTop) : shellTop;
+    reportComposerArea({ top, left: composer.x + (composer.w - width) / 2, width });
+  }, []);
+  useEffect(() => report(), [active, report]);
+  useEffect(() => () => reportComposerArea(null), []);
+  return useMemo(() => {
+    const on = (surface: ComposerSurface, part: keyof ComposerAreaParts) => (r: Layout) => {
+      parts.current[surface][part] = r;
+      if (activeRef.current === surface) report();
+    };
+    return { chatAbove: on("chat", "above"), chatComposer: on("chat", "composer"), homeAbove: on("home", "above"), homeComposer: on("home", "composer") };
+  }, [report]);
+}
 
 function ScrollToBottomButton({ onPress }: { onPress: () => void }) {
   const t = useT();
@@ -205,6 +237,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
       overdueStop,
     ],
   );
+  const composerArea = useComposerAreaReport(homeObscuresChat ? "home" : "chat");
   const { isDragOver, dropHandlers } = useFileDrop({ setChatContext: composer.setChatContext });
 
   const replyComposerRef = useRef(composer);
@@ -291,8 +324,8 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
             </box>
             <ConversationFocusOverlay conversationId={conversationId} />
           </box>
-          <AboveComposerCards conversationId={conversationId} />
-          <col w="full" enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
+          <AboveComposerCards conversationId={conversationId} onLayout={composerArea.chatAbove} />
+          <col w="full" onLayout={composerArea.chatComposer} enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
             {renderComposer("chat", chatReplyPeek)}
           </col>
         </col>
@@ -303,8 +336,14 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
           <HomeContent leaving={homeLeaving}>
             {conversation.extraTail ? <col inert={!showHomeContent}>{conversation.extraTail}</col> : null}
             <col w="full" inert={!showHomeContent}>
-              {showHomeContent ? <ComposerNotice conversationId={conversationId} /> : null}
-              {renderComposer("home", null)}
+              {showHomeContent ? (
+                <col w="full" onLayout={composerArea.homeAbove}>
+                  <ComposerNotice conversationId={conversationId} />
+                </col>
+              ) : null}
+              <col w="full" onLayout={composerArea.homeComposer}>
+                {renderComposer("home", null)}
+              </col>
             </col>
           </HomeContent>
         </col>

@@ -39,7 +39,8 @@ const EXPANDED_RADIUS = 20;
 const SHELL_SPRING = { dur: 0.35, bounce: 0 };
 const LINE = fontSize.md * 1.5;
 const PILL_INPUT_PAD_X = 4;
-const NARROW_W = 600;
+export const COMPOSER_NARROW_W = 600;
+export const COMPOSER_PAD_TOP = 4;
 const MENU_KEYS = ["ArrowUp", "ArrowDown", "Tab", "Escape", "Enter"];
 const INPUT_MAX_H = 200;
 const PASTE_AS_ATTACHMENT = { minChars: PASTE_AS_ATTACHMENT_MIN_CHARS, minLines: PASTE_AS_ATTACHMENT_MIN_LINES };
@@ -217,7 +218,7 @@ function ComposerImpl({
 
   const look = composerShellLook(tokens);
   const mentionMarks = useMentionMarks(message, tokens);
-  const narrow = composerW > 0 && composerW < NARROW_W;
+  const narrow = composerW > 0 && composerW < COMPOSER_NARROW_W;
   const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2;
   const addMenu = <ComposerAddMenu title={t("app.chat.composer.add")} setChatContext={setChatContext} />;
   const field = (
@@ -282,7 +283,7 @@ function ComposerImpl({
   );
 
   return (
-    <col w="full" shrink={false} align="center" justify="end" gap={8} pt={4} px={narrow ? 8 : 24} pb={10} onLayout={(r) => setComposerW(r.w)}>
+    <col w="full" shrink={false} align="center" justify="end" gap={8} pt={COMPOSER_PAD_TOP} px={narrow ? 8 : 24} pb={10} onLayout={(r) => setComposerW(r.w)}>
       <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp ? conversationId : null} />
       <col
         w="full"

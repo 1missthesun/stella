@@ -30,6 +30,7 @@ import { derive, fontSize, radius, useTokens } from "../theme";
 import { ContextPill, FileAttachmentChip, ImageAttachmentChip, fileAttachmentTypeLabelKey } from "./ComposerContextChips";
 import { AttachmentTileRow, PastedTextTile, type AttachmentTileItem } from "./AttachmentTiles";
 import { ChipPreview, useHoverPreview } from "./HoverPreview";
+import { ChatTextColor } from "./chat-text";
 import { Markdown } from "./Markdown";
 import { MessageActions } from "./MessageActions";
 import { UserMessageBody } from "./UserMessageBody";
@@ -358,7 +359,9 @@ export const UserMessageRow = memo(
                     </text>
                   </box>
                 ) : null}
-                <UserMessageBody text={text} />
+                <ChatTextColor.Provider value={tokens.c.chatUserBubbleText}>
+                  <UserMessageBody text={text} />
+                </ChatTextColor.Provider>
               </col>
             ) : null}
           </row>
@@ -479,9 +482,11 @@ export const AssistantMessageRow = memo(
           {hasBody ? (
             <row w="full" minW={0} align="start" gap={4}>
               <col w="fit" maxW="85%" minW={0} gap={PART_GAP} py={8} px={14} radius={radius["3xl"]} fill={tokens.c.chatAssistantBubbleFillTop} gradient={tokens.gradient.assistantBubble}>
-                <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules hiddenFilePaths={hiddenFileKeys} onContextMenu={menu} />
-                {evidencePaths.length > 0 ? <MessageAttachments filePaths={evidencePaths} part="documents" /> : null}
-                {replyFiles.length > 0 ? <FilePills files={replyFiles} variant="bubble" /> : null}
+                <ChatTextColor.Provider value={tokens.c.chatAssistantBubbleText}>
+                  <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules hiddenFilePaths={hiddenFileKeys} onContextMenu={menu} />
+                  {evidencePaths.length > 0 ? <MessageAttachments filePaths={evidencePaths} part="documents" /> : null}
+                  {replyFiles.length > 0 ? <FilePills files={replyFiles} variant="bubble" /> : null}
+                </ChatTextColor.Provider>
               </col>
               {!row.isIntraTurn ? <MessageActions text={text} messageKey={row.id} showReadAloud align="start" timestampMs={row.timestampMs} onReply={reply ?? undefined} /> : null}
             </row>

@@ -1,6 +1,7 @@
 import { withAttachmentPreamble } from "@stella/contracts/chat-attachments";
 import { PASTED_TEXT_ONLY_PROMPT } from "@stella/contracts/pasted-text";
 import { putSignedUpload } from "@stella/contracts/request-deadline";
+import { noteServerDate } from "@stella/contracts/server-clock";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { DesktopJournal, JournalReadRecord, RelayedMessage } from "@stella/agent/host/desktop-journal";
@@ -188,6 +189,7 @@ export const cloudJournalFor = (
           signal: AbortSignal.timeout(READ_TIMEOUT_MS),
         },
       );
+      noteServerDate(response);
       const body = (await response.json().catch(() => null)) as {
         records?: JournalReadRecord[];
         complete?: boolean;

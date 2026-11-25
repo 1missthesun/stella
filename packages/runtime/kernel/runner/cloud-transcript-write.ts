@@ -5,6 +5,7 @@ import type {
 } from "../storage/runtime-store.js";
 import { forkDelayedCall, interruptibleCall } from "./cloud-effect-runtime.js";
 import { parseJournalCheckpoint, type JournalCheckpoint } from "@stella/contracts/journal-checkpoint";
+import { noteServerDate, serverNow } from "@stella/contracts/server-clock";
 import type { SafeguardBlockInfo } from "@stella/contracts/safeguard-block";
 import {
   parsePiBrainRecord,
@@ -318,8 +319,7 @@ const parseBeginAck = (value: unknown): CloudTranscriptBeginAck | null => {
     typeof candidate.leaseToken === "string" &&
     candidate.leaseToken &&
     typeof candidate.expiresAt === "number" &&
-    Number.isFinite(candidate.expiresAt) &&
-    candidate.expiresAt > Date.now()
+    Number.isFinite(candidate.expiresAt)
   ) {
     return {
       turnId: candidate.turnId,
@@ -338,7 +338,6 @@ const parseBeginAck = (value: unknown): CloudTranscriptBeginAck | null => {
     !candidate.leaseToken ||
     typeof candidate.expiresAt !== "number" ||
     !Number.isFinite(candidate.expiresAt) ||
-    candidate.expiresAt <= Date.now() ||
     !Array.isArray(candidate.history) ||
     !candidate.history.every((entry) => typeof entry === "string") ||
     typeof candidate.contextStartSeq !== "number" ||
@@ -688,6 +687,7 @@ export const createCloudTranscriptWriter = (
       };
     }
 
+    noteServerDate(response);
     if (response.ok) {
       if (entry.kind === "finish") return { kind: "ack" };
       const ack = parseBeginAck(await response.json().catch(() => null));
@@ -1007,7 +1007,7 @@ export const createCloudTranscriptWriter = (
         localTurnId: active.entry.localTurnId,
         reason: result.reason,
         failures: failures.count,
-        leaseExpiresInMs: active.ack.expiresAt - Date.now(),
+        leaseExpiresInMs: active.ack.expiresAt - serverNow(),
       });
     }
     return Math.min(heartbeatIntervalMs, renewalRetryDelay(failures.count));

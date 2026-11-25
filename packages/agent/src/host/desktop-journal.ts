@@ -8,6 +8,7 @@ import {
   type SafeguardCard,
   type SafeguardEvent,
 } from "@stella/contracts/safeguard-block";
+import { serverNow } from "@stella/contracts/server-clock";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord/context";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
@@ -294,7 +295,7 @@ export async function journalMirror(args: {
   const remoteTurns = (): PiRemoteTurn[] =>
     [...remote].flatMap(([turnId, at]) => {
       const clientMsgId = prompts.get(turnId);
-      if (Date.now() - at >= REMOTE_TURN_STALE_MS || AGENT_OPERATION.test(clientMsgId ?? "")) return [];
+      if (serverNow() - at >= REMOTE_TURN_STALE_MS || AGENT_OPERATION.test(clientMsgId ?? "")) return [];
       return [{ turnId, ...(clientMsgId ? { clientMsgId } : {}) }];
     });
   let remoteSeen = "[]";
@@ -508,7 +509,7 @@ export async function journalMirror(args: {
           continue;
         }
         if (record.kind === "turn") {
-          if (record.phase === "started") remote.set(record.turnId, record.createdAtMs ?? Date.now());
+          if (record.phase === "started") remote.set(record.turnId, record.createdAtMs ?? serverNow());
           else remote.delete(record.turnId);
           continue;
         }

@@ -6,17 +6,26 @@ import { chromium } from "playwright";
 import { vertex, fragment } from "./store-aura-shader";
 
 const source = await readFile(path.resolve("scripts/store-aura-shader.ts"), "utf8");
-const width = 6144, height = 1600;
-const domainStart = 0.4, domainEnd = 1;
-const uniforms = { uTime: 8, uAspect: width / height / (domainEnd - domainStart),
-  uStrength: 1, uScale: height / 900 };
+const targets = {
+  // Feature graphic and Chrome Web Store.
+  panorama: { file: "store-aura-panorama", width: 6144, height: 1600, domain: [0.4, 1], liftWhite: false,
+    uniforms: { uTime: 8, uAspect: 6144 / 1600 / 0.6, uStrength: 1, uScale: 1600 / 900 } },
+  // Mobile store set: one continuous strip behind all eight slides. Curtains stay at full
+  // strength; only the flat wash between them is lifted toward white.
+  set: { file: "store-aura-set", width: 8192, height: 2224, domain: [0.75, 1.75], liftWhite: true,
+    uniforms: { uTime: 8, uAspect: 10, uStrength: 1, uScale: 1 } },
+} as const;
+const target = targets[(process.argv[2] ?? "set") as keyof typeof targets];
+if (!target) throw new Error("Use: render-store-aura.ts [set|panorama]");
+const { width, height, uniforms, liftWhite } = target;
+const [domainStart, domainEnd] = target.domain;
 const directory = path.resolve("public/brand");
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: "chrome",
   args: ["--enable-webgl", "--enable-unsafe-swiftshader"] });
 try {
   const page = await browser.newPage({ viewport: { width: 1024, height: 500 } });
-  const result = await page.evaluate(({ vertex, fragment, width, height, domainStart, domainEnd, uniforms }) => {
+  const result = await page.evaluate(({ vertex, fragment, width, height, domainStart, domainEnd, uniforms, liftWhite }) => {
     const canvas = document.createElement("canvas");
     canvas.width = width; canvas.height = height;
     const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: false,
@@ -45,21 +54,34 @@ try {
     gl.viewport(0, 0, width, height); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.disable(gl.BLEND); gl.drawArrays(gl.TRIANGLES, 0, 6); gl.finish();
     const error = gl.getError(); if (error !== gl.NO_ERROR) throw new Error(`WebGL error ${error}`);
-    return { png: canvas.toDataURL("image/png").split(",")[1], renderer: gl.getParameter(gl.RENDERER) as string };
-  }, { vertex, fragment, width, height, domainStart, domainEnd, uniforms });
-  const bytes = Buffer.from(result.png, "base64");
-  const output = path.join(directory, "store-aura-panorama.png");
+    const flat = document.createElement("canvas");
+    flat.width = width; flat.height = height;
+    const context = flat.getContext("2d")!;
+    context.drawImage(canvas, 0, 0);
+    if (liftWhite) {
+      const image = context.getImageData(0, 0, width, height);
+      for (let i = 3; i < image.data.length; i += 4) {
+        const alpha = image.data[i] / 255;
+        image.data[i] = Math.round(255 * (alpha < 0.34 ? (alpha / 0.34) * 0.15 : 0.15 + ((alpha - 0.34) / 0.66) * 0.85));
+      }
+      context.putImageData(image, 0, 0);
+    }
+    return { bytes: (liftWhite ? flat.toDataURL("image/webp", 0.95) : canvas.toDataURL("image/png")).split(",")[1], renderer: gl.getParameter(gl.RENDERER) as string };
+  }, { vertex, fragment, width, height, domainStart, domainEnd, uniforms, liftWhite });
+  const bytes = Buffer.from(result.bytes, "base64");
+  const output = path.join(directory, `${target.file}.${liftWhite ? "webp" : "png"}`);
   await writeFile(output, bytes);
-  await writeFile(path.join(directory, "store-aura-provenance.json"), JSON.stringify({
+  await writeFile(path.join(directory, target.file === "store-aura-set" ? "store-aura-set-provenance.json" : "store-aura-provenance.json"), JSON.stringify({
     source: "packages/mobile-screenshots/scripts/store-aura-shader.ts",
     sourceSha256: createHash("sha256").update(source).digest("hex"),
     vertexSha256: createHash("sha256").update(vertex).digest("hex"),
     fragmentSha256: createHash("sha256").update(fragment).digest("hex"),
     shaderChanged: false, frozenTime: "Website reduced-motion still:8seconds",
     width, height, domain: { x: [domainStart, domainEnd], y: [0,1] }, uniforms,
+    washLiftedTowardWhite: liftWhite,
     alpha: "Transparent straight-alpha shader output, composited over white by store layout",
     continuity: "One shared panorama; adjacent index/count segments, no per-slide shader reset",
-    renderer: result.renderer, pngSha256: createHash("sha256").update(bytes).digest("hex"),
+    renderer: result.renderer, outputSha256: createHash("sha256").update(bytes).digest("hex"),
   }, null, 2) + "\n");
-  console.log(`Rendered exact website aura: ${output}`);
+  console.log(`Rendered aura: ${output}`);
 } finally { await browser.close(); }

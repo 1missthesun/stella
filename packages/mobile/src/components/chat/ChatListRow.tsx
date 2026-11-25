@@ -11,6 +11,7 @@ import {
   type StyleProp,
   type TextStyle,
 } from "react-native";
+import { onServerClockMove } from "@stella/contracts/server-clock";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ChatMessage } from "../../types";
 import type { Colors } from "../../theme/colors";
@@ -199,6 +200,17 @@ export const ChatListRow = memo(function ChatListRow({
   return <ChatMessageListRow key={item.id} item={item} store={store} />;
 });
 
+function TimeHeader({ at, style }: { at: number; style: StyleProp<TextStyle> }) {
+  const label = useSyncExternalStore(onServerClockMove, () =>
+    formatTimestampHeader(at),
+  );
+  return (
+    <Text style={style} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+      {label}
+    </Text>
+  );
+}
+
 function ChatMessageListRow({
   item,
   store,
@@ -232,12 +244,7 @@ function ChatMessageListRow({
       onLayout={onRowLayout}
     >
       {view.timeHeader !== undefined ? (
-        <Text
-          style={env.timestampHeaderStyle}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {formatTimestampHeader(view.timeHeader)}
-        </Text>
+        <TimeHeader at={view.timeHeader} style={env.timestampHeaderStyle} />
       ) : null}
       <ChatMessageRow
         item={item}

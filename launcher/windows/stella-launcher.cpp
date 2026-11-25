@@ -1208,7 +1208,7 @@ static Env baseEnvironment() {
           L"STELLA_APP_DIR", L"STELLA_RUNTIME_STATE_DIR", L"STELLA_DEV_RESTART_REQUEST_FILE",
           L"STELLA_DEV_USER_QUIT_REQUEST_FILE", L"STELLA_ELECTRON_DEV_RUNNER_PID", L"STELLA_ELECTRON_READY_FILE",
           L"NODE_OPTIONS", L"STELLA_LAUNCHER_PIPE", L"STELLA_LAUNCHER_ENGINE", L"STELLA_LAUNCHER_ENGINE_BIN",
-          L"STELLA_RUNE_ROOT", L"STELLA_RUNE_BUN"})
+          L"STELLA_RUNE_ROOT", L"STELLA_RUNE_BUN", L"STELLA_RUNE_SERVICES"})
         env.erase(key);
     if (!(P.isolated && usesTestKey))
         for (const wchar_t *key : {L"STELLA_DEV_HARNESS", L"STELLA_DEV_HARNESS_STORAGE_KEY", L"STELLA_V2_DEV_USER_DATA_DIR",
@@ -3174,6 +3174,7 @@ public:
         Env env = electronEnvironment(pipeName_);
         if (engine_) {
             env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
+            env[L"STELLA_RUNE_SERVICES"] = L"1";
             env[L"STELLA_RUNE_ROOT"] = app + L"\\packages\\desktop-rune";
             if (!gBunBin.empty()) env[L"STELLA_RUNE_BUN"] = gBunBin;
         }

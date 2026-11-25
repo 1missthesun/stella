@@ -352,7 +352,8 @@ final class Launcher {
                         "STELLA_V2_DEV_DATA_DIR", "STELLA_APP_DIR", "STELLA_RUNTIME_STATE_DIR",
                         "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
                         "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
-                        "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN"]
+                        "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN",
+                        "STELLA_RUNE_SERVICES"]
         let harness = ["STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                        "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN"]
         if !(paths.isolated && usesTestKey) { stripped += harness }
@@ -413,6 +414,7 @@ final class Launcher {
             if let engine {
                 var env = electronEnvironment()
                 env["STELLA_LAUNCHER_ENGINE"] = "rune"
+                env["STELLA_RUNE_SERVICES"] = "1"
                 env["STELLA_RUNE_ROOT"] = paths.app.appendingPathComponent("packages/desktop-rune").path
                 if let runtimes { env["STELLA_RUNE_BUN"] = runtimes.bunBin.path }
                 process = try ElectronProcess(

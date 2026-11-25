@@ -1878,6 +1878,7 @@ static StrList base_environment(void) {
                               "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
                               "WEBKIT_DISABLE_DMABUF_RENDERER", "STELLA_LAUNCHER_RTTIME_RELAUNCHED",
                               "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN",
+                              "STELLA_RUNE_SERVICES",
                               NULL};
     const char *harness[] = {"STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                              "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN", NULL};
@@ -2560,6 +2561,7 @@ static Electron *electron_spawn(const char *executable, char **err) {
     if (g_engine_bin && !strcmp(executable, g_engine_bin)) {
         char *rune_root = xasprintf("%s/packages/desktop-rune", P.app);
         env_set(&env, "STELLA_LAUNCHER_ENGINE", "rune");
+        env_set(&env, "STELLA_RUNE_SERVICES", "1");
         env_set(&env, "STELLA_RUNE_ROOT", rune_root);
         if (g_bun_bin) env_set(&env, "STELLA_RUNE_BUN", g_bun_bin);
         free(rune_root);

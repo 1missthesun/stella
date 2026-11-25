@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import type { ChatListBinding } from "./use-chat-scroll-management";
 import { buildChatTimelineItems, type ChatTimelineItem } from "@/features/chat/lib/chat-timeline-items";
 import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
@@ -231,8 +231,16 @@ export const ChatTimeline = memo(function ChatTimeline({
     return () => clearTimeout(timer);
   }, [flashItemId]);
 
-  const readyRef = useRef(false);
+  const laidOutRef = useRef(false);
+  const readyKeyRef = useRef<string | undefined | null>(null);
   const onReady = list?.onReady;
+  const dataKey = list?.dataKey;
+  const markReady = useCallback(() => {
+    if (!laidOutRef.current || readyKeyRef.current === dataKey) return;
+    readyKeyRef.current = dataKey;
+    onReady?.();
+  }, [dataKey, onReady]);
+  useEffect(markReady, [markReady]);
   const padding = contentPadding(contentContainerStyle);
   const maxW = contentMaxWidth(contentContainerStyle);
   const scrollId = list?.scrollId;
@@ -272,9 +280,8 @@ export const ChatTimeline = memo(function ChatTimeline({
       scrollFade={{ top: { size: SESSION_TOP_FADE, linear: true }, ...(padding.pb > 0 ? { bottom: { size: padding.pb, stops: SESSION_END_FADE_STOPS } } : {}) }}
       onScroll={list?.onScroll}
       onLayout={() => {
-        if (readyRef.current) return;
-        readyRef.current = true;
-        onReady?.();
+        laidOutRef.current = true;
+        markReady();
       }}
     >
       <col w="full" maxW={maxW} selfAlign="center" minH={centered ? "full" : undefined} justify={centered ? "center" : undefined} align={centered ? "center" : undefined} {...padding}>

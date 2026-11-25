@@ -5,6 +5,7 @@ on:
     branches: ["rune/**"]
     paths:
       - "packages/desktop-rune/**"
+      - "launcher/**"
       - ".github/workflows/build-rune-engine.yml"
   workflow_dispatch:
     inputs:
@@ -205,3 +206,52 @@ jobs:
           name: stella-engine-linux-x64-launch
           path: ${{ runner.temp }}/launch/
           if-no-files-found: ignore
+
+  launchers:
+    name: launcher compiles (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-24.04
+          - os: windows
+            runner: ubuntu-24.04
+          - os: macos
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            launcher
+            packages/desktop/build
+
+      - name: Linux
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libssl-dev libsecret-1-dev
+          launcher/linux/build.sh
+          launcher/linux/build/stella-launcher --help | grep -- --engine
+
+      - name: Windows (MinGW-w64)
+        if: matrix.os == 'windows'
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 curl unzip
+          launcher/windows/build.sh
+
+      - name: macOS
+        if: matrix.os == 'macos'
+        run: launcher/macos/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-rune-optin-${{ matrix.os }}
+          path: |
+            launcher/linux/build/stella-launcher
+            launcher/windows/build/Stella.exe
+            launcher/macos/build/Stella.app
+          if-no-files-found: error

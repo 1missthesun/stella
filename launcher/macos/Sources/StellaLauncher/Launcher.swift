@@ -14,8 +14,15 @@ struct Options {
     var recoveryChoice: RecoveryChoice?
     var captureDir: URL?
     var localBun: String?
+    var engine: String? = Options.nonEmpty("STELLA_LAUNCHER_ENGINE")
+    var engineBin: String? = Options.nonEmpty("STELLA_LAUNCHER_ENGINE_BIN")
     var readyTimeout: TimeInterval = Options.seconds("STELLA_LAUNCHER_READY_TIMEOUT_SECONDS", 90)
     var stableSeconds: TimeInterval = Options.seconds("STELLA_LAUNCHER_STABLE_SECONDS", 60)
+
+    static func nonEmpty(_ name: String) -> String? {
+        guard let value = ProcessInfo.processInfo.environment[name], !value.isEmpty else { return nil }
+        return value
+    }
 
     static func seconds(_ name: String, _ fallback: TimeInterval) -> TimeInterval {
         guard let raw = ProcessInfo.processInfo.environment[name], let value = TimeInterval(raw), value > 0 else {
@@ -47,6 +54,7 @@ final class Launcher {
     private var git: GitTool?
     private var signer: TreeSigner?
     private var runtimes: Runtimes?
+    private var engine: (bin: URL, version: String)?
     private var recoveryCount = 0
     private var identityRetry: String?
     private var crashTimes: [Date] = []
@@ -292,8 +300,21 @@ final class Launcher {
             paths: paths, baseEnv: env, localBun: options.localBun, progress: status)
         let runtimes = Runtimes(bunBin: bun, bunVersion: bunVersion, git: git)
         self.runtimes = runtimes
-        return try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(),
-                               state: &state, progress: status)
+        let electron = try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(),
+                                       state: &state, progress: status)
+        engine = nil
+        if engineRequested {
+            let engine = try Install.ensureEngine(paths: paths, localBin: options.engineBin, progress: status)
+            log("launcher: starting stella-engine \(engine.version) (\(engine.bin.path)) instead of Electron")
+            self.engine = engine
+        }
+        return electron
+    }
+
+    private var engineRequested: Bool {
+        if let engine = options.engine { return engine == "rune" }
+        if options.engineBin != nil { return true }
+        return FileManager.default.fileExists(atPath: paths.root.appendingPathComponent("rune-engine").path)
     }
 
     private func tools() throws -> (GitTool, TreeSigner) {
@@ -330,7 +351,8 @@ final class Launcher {
         var stripped = ["STELLA_LAUNCHER_KEY_FILE", "STELLA_LAUNCHER_ROOT", "ELECTRON_RUN_AS_NODE",
                         "STELLA_V2_DEV_DATA_DIR", "STELLA_APP_DIR", "STELLA_RUNTIME_STATE_DIR",
                         "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
-                        "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS"]
+                        "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
+                        "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN"]
         let harness = ["STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                        "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN"]
         if !(paths.isolated && usesTestKey) { stripped += harness }
@@ -388,15 +410,24 @@ final class Launcher {
         let spawnedHead = (try? git.run(["rev-parse", "HEAD"], cwd: paths.app)) ?? ""
         let process: ElectronProcess
         do {
-            process = try ElectronProcess(
-                executable: electronApp.appendingPathComponent("Contents/MacOS/Electron"),
-                // Stella doesn't use AppKit window restoration. Skipping it
-                // keeps launch independent of the persistent-UI service, whose
-                // XPC call at launch can block Electron's main thread forever.
-                args: [paths.app.path, "-ApplePersistenceIgnoreState", "YES"],
-                cwd: paths.app,
-                env: electronEnvironment(),
-                logFile: paths.electronLog)
+            if let engine {
+                var env = electronEnvironment()
+                env["STELLA_LAUNCHER_ENGINE"] = "rune"
+                env["STELLA_RUNE_ROOT"] = paths.app.appendingPathComponent("packages/desktop-rune").path
+                if let runtimes { env["STELLA_RUNE_BUN"] = runtimes.bunBin.path }
+                process = try ElectronProcess(
+                    executable: engine.bin, args: [], cwd: paths.app, env: env, logFile: paths.electronLog)
+            } else {
+                process = try ElectronProcess(
+                    executable: electronApp.appendingPathComponent("Contents/MacOS/Electron"),
+                    // Stella doesn't use AppKit window restoration. Skipping it
+                    // keeps launch independent of the persistent-UI service, whose
+                    // XPC call at launch can block Electron's main thread forever.
+                    args: [paths.app.path, "-ApplePersistenceIgnoreState", "YES"],
+                    cwd: paths.app,
+                    env: electronEnvironment(),
+                    logFile: paths.electronLog)
+            }
         } catch {
             return .failed("Stella could not be started: \(error)", [])
         }

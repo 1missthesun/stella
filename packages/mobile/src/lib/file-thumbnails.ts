@@ -80,7 +80,9 @@ const load = async (source: FileThumbnailSource): Promise<FileThumbnail> => {
       access,
       maxDeviceBytes: MAX_DEVICE_MEDIA_BYTES,
     });
-    if (preview.kind === "image") return { kind: "image", uri: preview.uri };
+    if (preview.kind === "image" || preview.kind === "page") {
+      return { kind: "image", uri: preview.uri };
+    }
     if (preview.kind === "video") return { kind: "image", uri: preview.posterUri };
     return { kind: "audio", peaks: preview.peaks };
   }

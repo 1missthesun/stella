@@ -13,6 +13,24 @@
   letter-spacing: 0.02em;
 }
 
+.updates-section--empty {
+  height: 100%;
+}
+
+.updates-section--empty .empty-state {
+  flex: 1;
+  min-height: 0;
+}
+
+.updates-section__auto {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+}
+
 .updates-section__heading:first-child {
   margin-top: 0;
 }
@@ -174,4 +192,8 @@
 .updates-section__list[data-testid="updates-skipped"] .updates-section__title {
   color: var(--text-base);
   font-weight: var(--weight-regular, 400);
+}
+
+.updates-section__auto .updates-section__detail {
+  white-space: normal;
 }

@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Ångrad nyss",
       "update": "Uppdatera",
       "updateAvailable": "Uppdatering tillgänglig",
+      "updateOptions": "Uppdateringsalternativ",
       "updatedAgo": "Uppdaterad {ago}",
       "updatedJustNow": "Uppdaterad nyss",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Efter din inspelning",
       "afterReply": "När Stella har svarat klart",
       "devices": {
-        "choose": "Välj datorer",
         "thisComputer": "Den här datorn",
         "offline": "Får den när den är på igen",
         "updateThisOnly": "Uppdatera bara den här datorn",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Uppdaterad från {device} nyss",
         "fromAgo": "Uppdaterad från {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatiska uppdateringar",
+        "detail": "Stella installerar nya versioner själv. De som startar om Stella väntar tills du byter till en annan app."
       }
     },
     "audioPlayer": {

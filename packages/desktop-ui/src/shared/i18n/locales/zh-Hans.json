@@ -2701,6 +2701,7 @@
       "undoneJustNow": "刚刚撤销",
       "update": "更新",
       "updateAvailable": "有可用更新",
+      "updateOptions": "更新选项",
       "updatedAgo": "{ago}更新",
       "updatedJustNow": "刚刚更新",
       "updates": {
@@ -2731,7 +2732,6 @@
       "afterRecording": "录制结束后",
       "afterReply": "等 Stella 回复完",
       "devices": {
-        "choose": "选择电脑",
         "thisComputer": "这台电脑",
         "offline": "重新开机后就会更新",
         "updateThisOnly": "只更新这台电脑",
@@ -2745,6 +2745,10 @@
       "arrived": {
         "fromJustNow": "刚刚从 {device} 更新",
         "fromAgo": "{ago}从 {device} 更新"
+      },
+      "autoUpdate": {
+        "label": "自动更新",
+        "detail": "Stella 会自行安装新版本。需要重启 Stella 的更新会等你切换到其他应用后再安装。"
       }
     },
     "audioPlayer": {

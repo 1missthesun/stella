@@ -2734,6 +2734,7 @@
       "undoneJustNow": "Только что отменено",
       "update": "Обновить",
       "updateAvailable": "Доступно обновление",
+      "updateOptions": "Параметры обновления",
       "updatedAgo": "Обновлено {ago}",
       "updatedJustNow": "Только что обновлено",
       "updates": {
@@ -2764,7 +2765,6 @@
       "afterRecording": "После записи",
       "afterReply": "Когда Stella закончит ответ",
       "devices": {
-        "choose": "Выбрать компьютеры",
         "thisComputer": "Этот компьютер",
         "offline": "Получит, когда снова включится",
         "updateThisOnly": "Обновить только этот компьютер",
@@ -2778,6 +2778,10 @@
       "arrived": {
         "fromJustNow": "Обновлено с {device} только что",
         "fromAgo": "Обновлено с {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Автоматические обновления",
+        "detail": "Stella сама устанавливает новые версии. Обновления, которые перезапускают Stella, ждут, пока вы не переключитесь в другое приложение."
       }
     },
     "audioPlayer": {

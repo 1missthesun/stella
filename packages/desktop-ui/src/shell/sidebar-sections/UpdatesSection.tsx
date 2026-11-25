@@ -6,6 +6,7 @@ import { useLocale, useT } from "@/shared/i18n";
 import {
   appSourceApi,
   useAppSourceState,
+  useAutoUpdate,
 } from "@/features/app-source/app-source-store";
 import {
   addOffer,
@@ -17,8 +18,29 @@ import {
 } from "@/features/app-source/AppSourceCards";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Check } from "@/ui/icons";
+import { Switch } from "@/ui/switch";
 import { whatsNewDialog } from "@/features/whats-new/whats-new-store";
 import "./updates-section.css";
+
+const AutoUpdateRow = () => {
+  const t = useT();
+  const auto = useAutoUpdate();
+  return (
+    <div className="updates-section__auto" data-testid="updates-auto-update">
+      <div className="updates-section__text">
+        <div className="updates-section__title">{t("shell.appSource.autoUpdate.label")}</div>
+        <div className="updates-section__detail">{t("shell.appSource.autoUpdate.detail")}</div>
+      </div>
+      <Switch
+        checked={auto.on}
+        onCheckedChange={auto.set}
+        label={t("shell.appSource.autoUpdate.label")}
+        hideLabel
+        data-testid="updates-auto-update-switch"
+      />
+    </div>
+  );
+};
 
 const WaitingItem = ({
   offer,
@@ -162,12 +184,19 @@ export function UpdatesSection() {
       state.skipped.length === 0 &&
       state.recent.length === 0)
   ) {
-    return (
+    const empty = (
       <EmptyState
         motif="updates"
         title={t("shell.appSource.updates.upToDateTitle")}
         body={t("shell.appSource.updates.upToDateBody")}
       />
+    );
+    if (!state || !api || state.developerCheckout) return empty;
+    return (
+      <div className="updates-section updates-section--empty" data-testid="updates-section">
+        {empty}
+        <AutoUpdateRow />
+      </div>
     );
   }
   const blocked =
@@ -180,6 +209,7 @@ export function UpdatesSection() {
         </p>
       ) : (
         <>
+          <AutoUpdateRow />
           <h2 className="updates-section__heading">{t("shell.appSource.updates.waiting")}</h2>
           {state.waiting.length === 0 ? (
             <div className="updates-section__quiet">

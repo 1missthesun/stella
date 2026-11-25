@@ -67,6 +67,7 @@ export type AppSourceState = {
   waiting: AppSourceWaiting[];
   skipped: AppSourceWaiting[];
   busy: boolean;
+  autoUpdate: boolean;
   heldForRecording?: boolean;
   heldForReply?: boolean;
   arrived?: {

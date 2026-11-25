@@ -2701,6 +2701,7 @@
       "undoneJustNow": "방금 되돌림",
       "update": "업데이트",
       "updateAvailable": "업데이트 가능",
+      "updateOptions": "업데이트 옵션",
       "updatedAgo": "{ago} 업데이트됨",
       "updatedJustNow": "방금 업데이트됨",
       "updates": {
@@ -2731,7 +2732,6 @@
       "afterRecording": "녹화가 끝나면",
       "afterReply": "Stella의 답장이 끝나면",
       "devices": {
-        "choose": "컴퓨터 선택",
         "thisComputer": "이 컴퓨터",
         "offline": "다시 켜지면 받습니다",
         "updateThisOnly": "이 컴퓨터만 업데이트",
@@ -2745,6 +2745,10 @@
       "arrived": {
         "fromJustNow": "방금 {device}에서 업데이트됨",
         "fromAgo": "{ago} {device}에서 업데이트됨"
+      },
+      "autoUpdate": {
+        "label": "자동 업데이트",
+        "detail": "Stella가 새 버전을 알아서 설치합니다. Stella를 다시 시작해야 하는 업데이트는 다른 앱으로 전환할 때까지 기다립니다."
       }
     },
     "audioPlayer": {

@@ -2734,6 +2734,7 @@
       "undoneJustNow": "Vráceno právě teď",
       "update": "Aktualizovat",
       "updateAvailable": "K dispozici je aktualizace",
+      "updateOptions": "Možnosti aktualizace",
       "updatedAgo": "Aktualizováno {ago}",
       "updatedJustNow": "Aktualizováno právě teď",
       "updates": {
@@ -2764,7 +2765,6 @@
       "afterRecording": "Po dokončení záznamu",
       "afterReply": "Až Stella dokončí odpověď",
       "devices": {
-        "choose": "Vybrat počítače",
         "thisComputer": "Tento počítač",
         "offline": "Dostane ji, až bude zase zapnutý",
         "updateThisOnly": "Aktualizovat jen tento počítač",
@@ -2778,6 +2778,10 @@
       "arrived": {
         "fromJustNow": "Aktualizováno z {device} právě teď",
         "fromAgo": "Aktualizováno z {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatické aktualizace",
+        "detail": "Stella instaluje nové verze sama. Ty, které Stellu restartují, počkají, až přepnete do jiné aplikace."
       }
     },
     "audioPlayer": {

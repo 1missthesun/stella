@@ -8,6 +8,7 @@ export type Wanted =
       from: { deviceId: string; device: string } | null;
       at: number;
       task?: true;
+      auto?: true;
     }
   | { kind: "draft"; name: string; at: number };
 
@@ -24,6 +25,7 @@ export type UpdateIntent = {
   arrived: Arrived | null;
   handled: string[];
   autoTried: string[];
+  autoUpdate: boolean;
 };
 
 const FILE = "stella-update-intent.json";
@@ -55,9 +57,10 @@ export const readIntent = async (commonDir: string): Promise<UpdateIntent> => {
           : null,
       handled: strings(value.handled),
       autoTried: strings(value.autoTried),
+      autoUpdate: value.autoUpdate !== false,
     };
   } catch {
-    return { wanted: [], arrived: null, handled: [], autoTried: [] };
+    return { wanted: [], arrived: null, handled: [], autoTried: [], autoUpdate: true };
   }
 };
 

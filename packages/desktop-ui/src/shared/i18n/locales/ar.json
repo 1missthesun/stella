@@ -2756,6 +2756,7 @@
       "undoneJustNow": "تم التراجع للتو",
       "update": "تحديث",
       "updateAvailable": "يتوفر تحديث",
+      "updateOptions": "خيارات التحديث",
       "updatedAgo": "تم التحديث {ago}",
       "updatedJustNow": "تم التحديث للتو",
       "updates": {
@@ -2786,7 +2787,6 @@
       "afterRecording": "بعد انتهاء التسجيل",
       "afterReply": "بعد أن تُنهي Stella ردها",
       "devices": {
-        "choose": "اختر الأجهزة",
         "thisComputer": "هذا الجهاز",
         "offline": "سيحصل عليه عند تشغيله",
         "updateThisOnly": "تحديث هذا الجهاز فقط",
@@ -2800,6 +2800,10 @@
       "arrived": {
         "fromJustNow": "تم التحديث من {device} للتو",
         "fromAgo": "تم التحديث من {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "التحديثات التلقائية",
+        "detail": "يثبّت Stella الإصدارات الجديدة بنفسه. وتنتظر التحديثات التي تعيد تشغيل Stella حتى تنتقل إلى تطبيق آخر."
       }
     },
     "audioPlayer": {

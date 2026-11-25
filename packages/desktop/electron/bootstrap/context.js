@@ -58,6 +58,7 @@ export const createBootstrapContext = (config) => {
         appSourceService: null,
         updateTransition: null,
         pendingUpdateHold: null,
+        relaunchWindow: null,
         pendingRemoteExecutionRequest: null,
         keepRuntimeAcrossRelaunch: false,
         deferredStartupSequence: null,

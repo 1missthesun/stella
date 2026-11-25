@@ -2701,6 +2701,7 @@
       "undoneJustNow": "Baru saja dibatalkan",
       "update": "Perbarui",
       "updateAvailable": "Pembaruan tersedia",
+      "updateOptions": "Opsi pembaruan",
       "updatedAgo": "Diperbarui {ago}",
       "updatedJustNow": "Baru saja diperbarui",
       "updates": {
@@ -2731,7 +2732,6 @@
       "afterRecording": "Setelah rekaman Anda",
       "afterReply": "Setelah Stella selesai membalas",
       "devices": {
-        "choose": "Pilih komputer",
         "thisComputer": "Komputer ini",
         "offline": "Akan mendapatkannya saat menyala lagi",
         "updateThisOnly": "Perbarui komputer ini saja",
@@ -2745,6 +2745,10 @@
       "arrived": {
         "fromJustNow": "Diperbarui dari {device} baru saja",
         "fromAgo": "Diperbarui dari {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Pembaruan otomatis",
+        "detail": "Stella memasang versi baru dengan sendirinya. Pembaruan yang memulai ulang Stella menunggu sampai Anda beralih ke aplikasi lain."
       }
     },
     "audioPlayer": {

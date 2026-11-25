@@ -2712,6 +2712,7 @@
       "undoneJustNow": "अभी पूर्ववत हुआ",
       "update": "अपडेट करें",
       "updateAvailable": "अपडेट उपलब्ध है",
+      "updateOptions": "अपडेट विकल्प",
       "updatedAgo": "{ago} अपडेट हुआ",
       "updatedJustNow": "अभी अपडेट हुआ",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "आपकी रिकॉर्डिंग के बाद",
       "afterReply": "Stella का जवाब पूरा होने के बाद",
       "devices": {
-        "choose": "कंप्यूटर चुनें",
         "thisComputer": "यह कंप्यूटर",
         "offline": "फिर से चालू होने पर मिलेगा",
         "updateThisOnly": "सिर्फ़ इस कंप्यूटर को अपडेट करें",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "अभी {device} से अपडेट हुआ",
         "fromAgo": "{device} से {ago} अपडेट हुआ"
+      },
+      "autoUpdate": {
+        "label": "अपने-आप अपडेट",
+        "detail": "Stella नए संस्करण खुद इंस्टॉल करती है। जिन अपडेट से Stella फिर से शुरू होती है, वे तब तक रुकते हैं जब तक आप किसी दूसरे ऐप पर नहीं जाते।"
       }
     },
     "audioPlayer": {

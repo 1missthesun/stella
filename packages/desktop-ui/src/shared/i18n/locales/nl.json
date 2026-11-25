@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Zojuist ongedaan gemaakt",
       "update": "Bijwerken",
       "updateAvailable": "Update beschikbaar",
+      "updateOptions": "Update-opties",
       "updatedAgo": "Bijgewerkt {ago}",
       "updatedJustNow": "Zojuist bijgewerkt",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Na je opname",
       "afterReply": "Zodra Stella klaar is met antwoorden",
       "devices": {
-        "choose": "Computers kiezen",
         "thisComputer": "Deze computer",
         "offline": "Krijgt het zodra hij weer aan staat",
         "updateThisOnly": "Alleen deze computer bijwerken",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Zojuist bijgewerkt vanaf {device}",
         "fromAgo": "{ago} bijgewerkt vanaf {device}"
+      },
+      "autoUpdate": {
+        "label": "Automatische updates",
+        "detail": "Stella installeert nieuwe versies zelf. Updates die Stella herstarten, wachten tot je naar een andere app overschakelt."
       }
     },
     "audioPlayer": {

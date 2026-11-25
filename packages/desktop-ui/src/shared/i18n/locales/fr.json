@@ -2723,6 +2723,7 @@
       "undoneJustNow": "Annulé à l'instant",
       "update": "Mettre à jour",
       "updateAvailable": "Mise à jour disponible",
+      "updateOptions": "Options de mise à jour",
       "updatedAgo": "Mis à jour {ago}",
       "updatedJustNow": "Mis à jour à l'instant",
       "updates": {
@@ -2753,7 +2754,6 @@
       "afterRecording": "Après votre enregistrement",
       "afterReply": "Quand Stella aura fini de répondre",
       "devices": {
-        "choose": "Choisir les ordinateurs",
         "thisComputer": "Cet ordinateur",
         "offline": "La recevra une fois rallumé",
         "updateThisOnly": "Mettre à jour cet ordinateur seulement",
@@ -2767,6 +2767,10 @@
       "arrived": {
         "fromJustNow": "Mis à jour depuis {device} à l'instant",
         "fromAgo": "Mis à jour depuis {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Mises à jour automatiques",
+        "detail": "Stella installe les nouvelles versions toute seule. Celles qui redémarrent Stella attendent que vous passiez à une autre app."
       }
     },
     "audioPlayer": {

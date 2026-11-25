@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Fortrudt lige nu",
       "update": "Opdater",
       "updateAvailable": "Opdatering tilgængelig",
+      "updateOptions": "Opdateringsindstillinger",
       "updatedAgo": "Opdateret {ago}",
       "updatedJustNow": "Opdateret lige nu",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Efter din optagelse",
       "afterReply": "Når Stella har svaret færdigt",
       "devices": {
-        "choose": "Vælg computere",
         "thisComputer": "Denne computer",
         "offline": "Får den, når den er tændt igen",
         "updateThisOnly": "Opdater kun denne computer",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Opdateret fra {device} lige nu",
         "fromAgo": "Opdateret fra {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatiske opdateringer",
+        "detail": "Stella installerer selv nye versioner. Dem, der genstarter Stella, venter, til du skifter til en anden app."
       }
     },
     "audioPlayer": {

@@ -2723,6 +2723,7 @@
       "undoneJustNow": "בוטל הרגע",
       "update": "עדכן",
       "updateAvailable": "עדכון זמין",
+      "updateOptions": "אפשרויות עדכון",
       "updatedAgo": "עודכן {ago}",
       "updatedJustNow": "עודכן הרגע",
       "updates": {
@@ -2753,7 +2754,6 @@
       "afterRecording": "אחרי ההקלטה",
       "afterReply": "אחרי ש-Stella תסיים לענות",
       "devices": {
-        "choose": "בחירת מחשבים",
         "thisComputer": "המחשב הזה",
         "offline": "יקבל את זה כשיופעל שוב",
         "updateThisOnly": "לעדכן רק את המחשב הזה",
@@ -2767,6 +2767,10 @@
       "arrived": {
         "fromJustNow": "עודכן מ-{device} עכשיו",
         "fromAgo": "עודכן מ-{device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "עדכונים אוטומטיים",
+        "detail": "Stella מתקינה גרסאות חדשות בעצמה. עדכונים שמפעילים מחדש את Stella ממתינים עד שתעבור לאפליקציה אחרת."
       }
     },
     "audioPlayer": {

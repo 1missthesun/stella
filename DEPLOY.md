@@ -137,7 +137,7 @@ secrets only reach Previews created afterwards.
 
 | You changed | Ship it with | Users get it |
 |---|---|---|
-| Desktop UI, Electron shell, runtime (`packages/desktop*`, `packages/runtime`, …) | `app-source:publish` to `stella-app-dev` / `stella-app-prod` | Update pill; applies itself at a quiet moment (or on Update) |
+| Desktop UI, Electron shell, runtime (`packages/desktop*`, `packages/runtime`, …) | `app-source:publish` to `stella-app-dev` / `stella-app-prod` | Update pill; applies itself (restarts only while Stella is unfocused) or on Update |
 | Backend, including prompts (`workers/cloud-builder`) | cloud-builder deploy | Immediately (desktops refetch prompts on their next turn) |
 | Other workers | That worker's deploy | Immediately |
 | Mobile JS/TS | OTA (`publish-ota.sh`) | Downloaded on launch, applied on the next cold start |
@@ -614,15 +614,21 @@ app-source publish is needed. Desktops from before explicit messaging read
 The desktop app is a git checkout of the app-source `upstream` repo, run from
 source by the native launchers (no electron-builder, no electron-updater, no
 CI-built app). A publish shows as the Update pill and in the Updates sidebar.
-Installs apply it by themselves once it is prepared, merges cleanly with the
-user's own changes and builds: at once when the window is hidden or the user
-has been idle two minutes, otherwise after 20 s without input in the focused
-window (90 s, or only when away, if it relaunches), never during a reply or a
-recording. A version that clashes with their changes waits for Update. Each
-version is tried automatically once (`autoTried` in
-`.git/stella-update-intent.json`); after a failure only Update applies it.
-After an update the bell shows "Stella updated" with the newest release note
-and More, which opens What's new.
+Installs apply it by themselves once it is prepared and builds, unless the
+user turned off Automatic updates (the Update pill's arrow menu or the
+Updates tab; `autoUpdate` in `.git/stella-update-intent.json`, on by
+default). A version that only changes the interface in place goes in after
+1.5 s without input, focused or not; one that relaunches, restarts the
+runtime or reloads the window goes in only while no Stella window is focused
+(another app in front, minimized or hidden), and the relaunched window comes
+back where it was (behind, minimized or hidden) without taking focus. Neither
+goes in during a reply or a recording. A version that clashes with the user's
+changes starts the same merge as Update (rerere, the model, then a merge
+task with the build check) and applies on the same rule when it succeeds.
+Each version is tried automatically once (`autoTried`); after a failed
+install or merge only Update applies it. After an update the bell shows
+"Stella updated" with the newest release note and More, which opens What's
+new.
 
 **Release notes, every user-facing release:** add the entry before you
 publish anything. `packages/contracts/stella-releases.ts` is the one changelog:

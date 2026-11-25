@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Undone just now",
       "update": "Update",
       "updateAvailable": "Update available",
+      "updateOptions": "Update options",
       "updatedAgo": "Updated {ago}",
       "updatedJustNow": "Updated just now",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "After your recording",
       "afterReply": "After Stella's reply",
       "devices": {
-        "choose": "Choose computers",
         "thisComputer": "This computer",
         "offline": "Gets it when it's back on",
         "updateThisOnly": "Update this computer only",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Updated from {device} just now",
         "fromAgo": "Updated from {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatic updates",
+        "detail": "Stella installs new versions by itself. Ones that restart Stella wait until you switch to another app."
       }
     },
     "audioPlayer": {

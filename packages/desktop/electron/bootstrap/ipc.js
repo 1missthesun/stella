@@ -54,7 +54,7 @@ import { registerAppSourceHandlers } from "../ipc/app-source-handlers.js";
 import { registerBackendLiveHandlers } from "../ipc/backend-live-handlers.js";
 import { registerSelfHostHandlers } from "../ipc/self-host-handlers.js";
 import { AppSourceService } from "../services/app-source/app-source-service.js";
-import { UpdateTransition } from "../services/app-source/update-transition.js";
+import { noteRelaunchWindow, UpdateTransition } from "../services/app-source/update-transition.js";
 import { t } from "../services/i18n-service.js";
 import { buildAndUploadWebRenderer } from "../services/app-source/web-renderer.js";
 import { assertHeadSigned, signHead } from "../launcher-client.js";
@@ -431,6 +431,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     if (!state.appSourceService) {
+        const stellaWindowFocused = () => BrowserWindow.getAllWindows().some((window) => !window.isDestroyed() && window.isVisible() && window.isFocused());
         const updateTransition = state.updateTransition ?? new UpdateTransition({
             getWindow: () => state.windowManager?.getFullWindow() ?? null,
             partition: config.sessionPartition,
@@ -467,6 +468,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             },
             recordingOpen: () => Boolean(state.showStella?.isActive()),
             replying: async () => (await state.stellaHostRunner?.replying?.()) === true,
+            stellaFocused: () => Boolean(state.showStella?.isActive()) || stellaWindowFocused(),
             isUserAway: () => {
                 if (state.showStella?.isActive()) return false;
                 const window = state.windowManager?.getFullWindow() ?? null;
@@ -479,6 +481,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             reportPrepared,
             relaunch: (options) => {
                 state.keepRuntimeAcrossRelaunch = options?.keepRuntime === true;
+                noteRelaunchWindow(app.getPath("userData"), state.windowManager?.getFullWindow() ?? null, stellaWindowFocused());
                 relaunchApp();
             },
             updateScratchDir: path.join(app.getPath("userData"), "update-merge"),

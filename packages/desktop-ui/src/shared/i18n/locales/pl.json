@@ -2734,6 +2734,7 @@
       "undoneJustNow": "Cofnięto przed chwilą",
       "update": "Aktualizuj",
       "updateAvailable": "Dostępna aktualizacja",
+      "updateOptions": "Opcje aktualizacji",
       "updatedAgo": "Zaktualizowano {ago}",
       "updatedJustNow": "Zaktualizowano przed chwilą",
       "updates": {
@@ -2764,7 +2765,6 @@
       "afterRecording": "Po nagraniu",
       "afterReply": "Gdy Stella skończy odpowiadać",
       "devices": {
-        "choose": "Wybierz komputery",
         "thisComputer": "Ten komputer",
         "offline": "Otrzyma ją po ponownym włączeniu",
         "updateThisOnly": "Zaktualizuj tylko ten komputer",
@@ -2778,6 +2778,10 @@
       "arrived": {
         "fromJustNow": "Zaktualizowano z {device} przed chwilą",
         "fromAgo": "Zaktualizowano z {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatyczne aktualizacje",
+        "detail": "Stella sama instaluje nowe wersje. Te, które uruchamiają Stellę ponownie, czekają, aż przełączysz się do innej aplikacji."
       }
     },
     "audioPlayer": {

@@ -58,15 +58,17 @@ export const stellaReleases: readonly StellaRelease[] = [
   {
     date: "2026-11-26",
     title: "Stella keeps itself up to date",
-    summary: "Stella now installs new versions by itself at a quiet moment, and tells you what changed.",
+    summary: "Stella now installs new versions by itself, and tells you what changed.",
     tags: ["New"],
     highlights: [
-      "Stella installs new versions on its own at a quiet moment: when you step away, or after a short pause, and never in the middle of a reply. The Update button is still there if you want a version right away.",
+      "Stella installs new versions on its own. Small ones go in after a short pause. Ones that restart Stella wait until you switch to another app or minimize it. Neither interrupts a reply or a recording.",
+      "If a new version clashes with changes you made to your own Stella, Stella merges the two by itself, checks the result still starts, and then installs it.",
       "After an update, the bell tells you what changed. Click More to see every release, newest first.",
     ],
     more: [
-      "If a new version clashes with changes you made to your own Stella, it waits for you to press Update instead of installing itself.",
-      "If a new version can’t be installed, Stella stays on the one you have and doesn’t keep trying.",
+      "Turn Automatic updates off or on from the arrow next to the Update button, or in the Updates tab. The Update button still installs a version right away.",
+      "If a new version can’t be installed or merged, Stella stays on the one you have, tries only once, and leaves the Update button for you.",
+      "After a restart in the background, Stella reopens behind the app you’re using instead of jumping in front of it.",
     ],
   },
   {

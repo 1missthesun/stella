@@ -1,7 +1,29 @@
 export const CONTEXT_HANDOFF_TOOL = "handoff";
 
-export const CONTEXT_HANDOFF_DESCRIPTION =
-  "Hand your work to a fresh context in this same conversation. Call it when a Stella reminder says your context is large, or when a long task moves to a clearly new phase. `notes` is the brief you'd give yourself to carry on: the goal and what done looks like, decisions and why, exact paths, commands, ids, numbers and errors that still matter, what is finished, what is in progress, and the next steps. Stella adds your task, this turn's messages and the work still running. Afterwards only these notes and what follows are in your context; the conversation's history stays searchable.";
+const NOTES_CONTENT =
+  "the goal and what done looks like; rules and instructions from the user, Stella or your lead that still bind, in their words and with who gave them; decisions and why; exact paths, commands, ids, numbers and errors that still matter, with the file or command each came from; what is finished, what is in progress, and what failed and must not be retried; and your very next action, concrete enough to run.";
+
+const NUDGE_NOTES_CONTENT =
+  "the goal and what done looks like; rules and instructions that still bind, in their words and with who gave them; decisions and why; exact paths, commands, ids, numbers and errors that still matter, with where each came from; what is finished, in progress, or failed and must not be retried; and your very next action.";
+
+const ATTACHED =
+  "Stella adds your original task, this turn's messages and the work still running; say which parts of the original task are done or superseded.";
+
+const BE_COMPLETE =
+  "Be complete rather than brief: the notes replace everything you have read, so copy exactly every value the remaining work will use (ids, refs, sizes, ports, patterns, commands, line ranges) and your own observations not yet written down anywhere; long notes are fine.";
+
+const description = (agent: boolean): string =>
+  [
+    "Hand your work to a fresh context in this same conversation. Call it when a Stella reminder says your context is large, or when a long task moves to a clearly new phase.",
+    `\`notes\` is the brief you'd give yourself to carry on: ${NOTES_CONTENT}`,
+    ATTACHED,
+    ...(agent ? [BE_COMPLETE] : []),
+    "Afterwards only these notes and what follows are in your context; the conversation's history stays searchable.",
+  ].join(" ");
+
+export const CONTEXT_HANDOFF_DESCRIPTION = description(false);
+
+export const CONTEXT_HANDOFF_AGENT_DESCRIPTION = description(true);
 
 export const CONTEXT_HANDOFF_NOTES_DESCRIPTION = "Your handoff notes, plain text or markdown.";
 
@@ -17,7 +39,8 @@ const NUDGE_STEP_FRACTION = 0.05;
 export const CONTEXT_HANDOFF_NOTES_MAX_CHARS = 60_000;
 export const CONTEXT_HANDOFFS_PER_TURN = 2;
 
-const ATTACHED_TASK_MAX_CHARS = 16_000;
+const ATTACHED_TASK_MAX_CHARS = 4_000;
+const ATTACHED_TASK_LABEL = "Your original brief, as first given. Your notes above say what is done or superseded.";
 const ATTACHED_TURN_MAX_CHARS = 24_000;
 const ATTACHED_RUNNING_MAX = 40;
 
@@ -46,7 +69,7 @@ const NUDGE_MARK = "Stella hands work to a fresh context at";
 
 export const isContextHandoffNudge = (text: string): boolean => text.includes(NUDGE_MARK);
 
-export const contextHandoffNudge = (args: { tokens: number; threshold: number; blocked?: string }): string => {
+export const contextHandoffNudge = (args: { tokens: number; threshold: number; agent: boolean; blocked?: string }): string => {
   const step = Math.max(1, Math.floor(args.threshold * NUDGE_STEP_FRACTION));
   const shown = Math.floor(args.tokens / step) * step;
   return [
@@ -55,7 +78,7 @@ export const contextHandoffNudge = (args: { tokens: number; threshold: number; b
     args.blocked
       ? `Before you can, ${args.blocked} Then call \`${CONTEXT_HANDOFF_TOOL}\`.`
       : `Call \`${CONTEXT_HANDOFF_TOOL}\` now, before anything else, then carry on in the fresh context.`,
-    "Write the notes as the brief you'd give yourself to continue: the goal and what done looks like, decisions and why, exact paths, commands, ids, numbers and errors that still matter, what is finished, what is in progress, and the next steps. Stella adds your task, this turn's messages and the work still running.",
+    [`Write the notes as the brief you'd give yourself to continue: ${NUDGE_NOTES_CONTENT}`, ATTACHED, ...(args.agent ? [BE_COMPLETE] : [])].join(" "),
     "</system-reminder>",
   ].join("\n");
 };
@@ -64,6 +87,13 @@ const bounded = (text: string, max: number, keep: "head" | "tail"): string => {
   if (text.length <= max) return text;
   const note = `[… ${text.length - max} characters left out …]`;
   return keep === "head" ? `${text.slice(0, max)}\n${note}` : `${note}\n${text.slice(text.length - max)}`;
+};
+
+export const contextHandoffTaskOf = (handoff: string): string | undefined => {
+  const open = `<your_task>\n${ATTACHED_TASK_LABEL}\n\n`;
+  const start = handoff.indexOf(open);
+  const end = start < 0 ? -1 : handoff.indexOf("\n</your_task>", start);
+  return start < 0 || end < 0 ? undefined : handoff.slice(start + open.length, end);
 };
 
 export type ContextHandoffRunning = { kind: "helper" | "command"; id: string; description: string };
@@ -76,7 +106,7 @@ export const contextHandoffText = (args: {
 }): string => {
   const parts = [CONTEXT_HANDOFF_PREFIX, "", "<handoff_notes>", args.notes.trim(), "</handoff_notes>"];
   const task = args.task?.trim();
-  if (task) parts.push("", "<your_task>", bounded(task, ATTACHED_TASK_MAX_CHARS, "head"), "</your_task>");
+  if (task) parts.push("", "<your_task>", ATTACHED_TASK_LABEL, "", bounded(task, ATTACHED_TASK_MAX_CHARS, "head"), "</your_task>");
   const turn = args.turn.map((text) => text.trim()).filter((text) => text && text !== task);
   if (turn.length > 0) {
     parts.push("", "<this_turn_messages>", bounded(turn.join("\n\n---\n\n"), ATTACHED_TURN_MAX_CHARS, "tail"), "</this_turn_messages>");

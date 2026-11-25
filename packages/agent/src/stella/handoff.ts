@@ -125,10 +125,11 @@ export const stellaHandoffExtension = (host: StellaHandoffHost) => {
       if (sized.tokens < sized.threshold) return undefined;
       if (!sinceLastHandoff(messages).some((message) => message.role === "assistant")) return undefined;
       if ((await handoffsThisTurn(api, context)) >= CONTEXT_HANDOFFS_PER_TURN) return undefined;
+      const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
       const last = messages.at(-1);
       const nudge: TextContent & { stella: { hidden: true } } = {
         type: "text",
-        text: contextHandoffNudge(sized),
+        text: contextHandoffNudge({ ...sized, agent: role !== undefined && role.agentType !== "orchestrator" }),
         stella: { hidden: true },
       };
       return { messages: [...messages, { role: "user", content: [nudge], timestamp: (last?.timestamp ?? 0) + 1 }] };

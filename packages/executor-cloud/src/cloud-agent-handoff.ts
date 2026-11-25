@@ -1,12 +1,13 @@
 import {
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
-  CONTEXT_HANDOFF_DESCRIPTION,
+  CONTEXT_HANDOFF_AGENT_DESCRIPTION,
   CONTEXT_HANDOFF_NOTES_DESCRIPTION,
   CONTEXT_HANDOFF_NOTES_MAX_CHARS,
   CONTEXT_HANDOFF_TOOL,
   CONTEXT_HANDOFFS_PER_TURN,
   contextHandoffNudge,
   contextHandoffOffered,
+  contextHandoffTaskOf,
   contextHandoffText,
   contextHandoffThreshold,
   isContextHandoffText,
@@ -16,7 +17,7 @@ import type { ToolMetadata, ToolResult } from "@stella/runtime/kernel/tools/type
 
 export const cloudAgentHandoffTool: ToolMetadata = {
   name: CONTEXT_HANDOFF_TOOL,
-  description: CONTEXT_HANDOFF_DESCRIPTION,
+  description: CONTEXT_HANDOFF_AGENT_DESCRIPTION,
   parameters: {
     type: "object",
     properties: { notes: { type: "string", description: CONTEXT_HANDOFF_NOTES_DESCRIPTION } },
@@ -70,6 +71,7 @@ export const createCloudAgentHandoff = (args: { model: string; atTokens?: string
       const text = contextHandoffNudge({
         tokens,
         threshold: at,
+        agent: true,
         ...(background.length > 0
           ? {
               blocked: `your own background work has to finish or be stopped with TaskStop (${background.slice(0, 5).join("; ")}), since it can't follow you into a fresh context.`,
@@ -133,9 +135,6 @@ const userTextOf = (payloadJson: string): string => {
   }
 };
 
-const TASK_OPEN = "<your_task>\n";
-const TASK_CLOSE = "\n</your_task>";
-
 export const cloudAgentBrief = (
   history: readonly { role: string; payloadJson: string }[],
   prompt: string,
@@ -143,11 +142,7 @@ export const cloudAgentBrief = (
 ): string | undefined => {
   const users = history.filter((row) => row.role === "user").map((row) => userTextOf(row.payloadJson));
   const handedOff = users.findLast((text) => isContextHandoffText(text));
-  if (handedOff !== undefined) {
-    const start = handedOff.indexOf(TASK_OPEN);
-    const end = start < 0 ? -1 : handedOff.indexOf(TASK_CLOSE, start);
-    return start < 0 || end < 0 ? undefined : handedOff.slice(start + TASK_OPEN.length, end);
-  }
+  if (handedOff !== undefined) return contextHandoffTaskOf(handedOff);
   if (users.length === 0) return history.length === 0 ? prompt : undefined;
   return complete ? users[0] : undefined;
 };

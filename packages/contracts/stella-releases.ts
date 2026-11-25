@@ -57,6 +57,20 @@ export const releaseDateLabel = (
 export const stellaReleases: readonly StellaRelease[] = [
   {
     date: "2026-11-25",
+    title: "Long conversations and tasks stay on track",
+    summary: "Stella now keeps the details that matter when a long conversation or task carries on, so it picks up right where it left off.",
+    tags: ["Polish"],
+    highlights: [
+      "When a conversation or task gets long, Stella writes itself clear notes before it carries on: what you asked for, what’s done, what didn’t work, and exactly what comes next.",
+      "Your instructions stay in your own words, along with the names, numbers and files the rest of the work needs, so nothing important gets lost partway through.",
+      "It works the same with every AI you use, on your computer and in the cloud.",
+    ],
+    more: [
+      "Anything still running, like a task Stella handed off or a long command, carries over too, and Stella can still look back through the whole conversation when it needs to.",
+    ],
+  },
+  {
+    date: "2026-11-25",
     title: "The bell remembers your notifications",
     summary: "The bell now keeps your past notifications, so you can look back at anything you missed.",
     tags: ["New"],

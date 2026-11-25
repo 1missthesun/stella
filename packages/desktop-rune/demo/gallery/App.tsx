@@ -289,6 +289,36 @@ function Rows() {
   );
 }
 
+const FRAMES = process.env.STELLA_GALLERY_FRAMES;
+
+function Surface() {
+  const [src, setSrc] = useState<string>();
+  const [last, setLast] = useState("no input yet");
+  useEffect(() => {
+    if (!FRAMES) return;
+    const files = Array.from({ length: 30 }, (_, i) => `${FRAMES}/f${String(i).padStart(2, "0")}.jpg`);
+    let i = 0;
+    let prev: number | undefined;
+    const id = setInterval(async () => {
+      const bytes = new Uint8Array(await Bun.file(files[i++ % files.length]).arrayBuffer());
+      const blob = stella.engine.blob(bytes);
+      setSrc(`blob:${blob}`);
+      if (prev !== undefined) stella.engine.freeBlob(prev);
+      prev = blob;
+    }, 33);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <Section title="Surface · streamed frames">
+      <surface id="g-surface" w={320} h={180} radius={10} src={src} fill={c.inset}
+        onPointer={(e) => { if (e.kind !== "move") setLast(`${e.kind} ${e.button ?? ""} ${Math.round(e.x)},${Math.round(e.y)} clicks ${e.clicks}`); }}
+        onWheel={(e) => setLast(`wheel ${Math.round(e.dx)},${Math.round(e.dy)} ${e.mode}`)}
+        onKeyRaw={(e) => setLast(`key ${e.type} ${e.key}${e.text ? ` "${e.text}"` : ""}`)} />
+      <text id="g-surface-last" size={12} color={c.weaker}>{FRAMES ? last : "Set STELLA_GALLERY_FRAMES to a folder of f00..f29.jpg to stream"}</text>
+    </Section>
+  );
+}
+
 function Web() {
   const [got, setGot] = useState("nothing yet");
   const [n, setN] = useState(0);
@@ -350,6 +380,7 @@ function Main({ togglePanel, mountHidden }: { togglePanel: () => void; mountHidd
           <Inputs />
           <Overlays togglePanel={togglePanel} mountHidden={mountHidden} />
           <Visuals />
+          <Surface />
           <Web />
           <Docs />
           <Rows />

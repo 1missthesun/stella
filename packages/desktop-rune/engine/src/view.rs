@@ -45,6 +45,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         Kind::Image => media::image(eng, p),
         Kind::Icon => media::icon(p),
         Kind::Vector => media::vector(id, p),
+        Kind::Surface => crate::surface::build(eng, id, p),
         Kind::Video => media::video(id, p),
         Kind::Markdown => media::markdown(id, p),
         #[cfg(feature = "webview")]

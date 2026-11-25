@@ -367,6 +367,7 @@ fn drain() {
         #[cfg(feature = "webview")]
         crate::webview::close(*n);
         crate::media::forget(*n);
+        crate::surface::forget(*n);
         forget_selection(*n);
     }
     for v in cmds {

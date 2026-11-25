@@ -200,6 +200,20 @@ export type VectorProps = BoxProps & {
   svg?: string;
 };
 
+export type SurfacePointer = { kind: "move" | "down" | "up" | "leave"; x: number; y: number; button: "left" | "right" | "middle" | "back" | "forward" | "other" | null; buttons: number; clicks: number; mods: Mods };
+export type SurfaceWheel = { x: number; y: number; dx: number; dy: number; mode: "pixel" | "line"; mods: Mods };
+export type SurfaceKey = { type: "down" | "up"; key: string; text: string | null; mods: Mods };
+
+/** Streamed frames (`src="blob:N"`, JPEG/PNG/WebP), decoded off the UI thread and swapped in place, with raw input in its own points. */
+export type SurfaceProps = BoxProps & {
+  src?: string; fit?: "stretch" | "contain";
+  onPointer?: (e: SurfacePointer) => void;
+  /** Wheels over the surface never scroll what's around it. */
+  onWheel?: (e: SurfaceWheel) => void;
+  /** Every key while focused (a press focuses it), except chords the `<window keys>` take. */
+  onKeyRaw?: (e: SurfaceKey) => void;
+};
+
 export type IconProps = BoxProps & {
   /** SVG body (paths inside the root <svg>, `currentColor` tinted by `color`). */
   svg: string; name?: string; view?: number; size?: number; color?: Color;

@@ -15,6 +15,7 @@ rune-kit = { git = "https://github.com/1missthesun/rune", rev = "bbcc08d8d466e2b
 rune-notify = { git = "https://github.com/1missthesun/rune", rev = "bbcc08d8d466e2b02d3ade694616f5d400dcb0c3" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 wry = { version = "0.58", optional = true }
 
 [target.'cfg(unix)'.dependencies]

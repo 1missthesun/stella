@@ -20,6 +20,7 @@ pub enum Kind {
     Markdown,
     Video,
     Vector,
+    Surface,
 }
 
 impl Kind {
@@ -37,6 +38,7 @@ impl Kind {
             "markdown" => Kind::Markdown,
             "video" | "audio" => Kind::Video,
             "vector" => Kind::Vector,
+            "surface" => Kind::Surface,
             _ => Kind::Col,
         }
     }

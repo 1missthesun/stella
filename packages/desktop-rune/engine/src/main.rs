@@ -18,6 +18,7 @@ mod props;
 mod protocol;
 mod services;
 mod style;
+mod surface;
 mod text;
 mod tree;
 mod view;

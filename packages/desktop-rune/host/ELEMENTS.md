@@ -68,6 +68,7 @@ or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark d
 | `image` | path, `file://`, `blob:N`, `data:`, `http(s)` (fetched by the host), SVG |
 | `icon` | SVG body tinted through `currentColor` |
 | `vector` | SVG paths drawn as shapes, for drawing that changes every frame |
+| `surface` | streamed frames (a page screencast) with raw pointer, wheel and key input |
 | `markdown` | rune-kit Markdown: streaming, selection, syntax, tables, mermaid |
 | `video` `audio` | native player |
 | `list` | virtualized column (only rows near the viewport are built); inside a `scrollY` box |
@@ -210,6 +211,25 @@ its own label.
   72 pt rig at 60 Hz costs about 2 ms of frame CPU at p95.
 - `video` / `audio`: `src`, `fit`, `autoplay`, `muted`, `loopMedia`. Commands:
   `engine.media.play / pause / seek / state`.
+
+### surface
+
+For a page screencast or any frames produced elsewhere (an in-app browser tab streamed over CDP).
+
+- `src="blob:N"` takes a JPEG, PNG or WebP. Each new blob decodes on the engine's decode thread
+  into the node's own pixels and swaps in place, with no layout or fade. A frame superseded
+  before its turn is skipped. Free the previous blob as soon as you send the next.
+- `fit`: `stretch` (default) or `contain`.
+- Pointer: `onPointer({kind, x, y, button, buttons, clicks, mods})` in the element's own points.
+  `kind` is `move`, `down`, `up` or `leave`; `button` is `left`, `right`, `middle`, `back`,
+  `forward` or `other`. All buttons reach it, and no press semantics are applied.
+- `onWheel({x, y, dx, dy, mode, mods})`: wheels over a surface never scroll what's around it.
+- Keyboard: `onKeyRaw({type: "down" | "up", key, text, mods})` fires for every key while it's
+  focused (a press focuses it). Chords the `<window keys>` take pass to the window.
+- `cursor` sets the pointer shape.
+- Not yet: IME composition and physical key codes.
+- Cost on a 240 Hz display: 30 fps of 640×360 JPEG frames costs p95 1.4 ms of frame CPU, with
+  memory flat.
 
 ### markdown
 

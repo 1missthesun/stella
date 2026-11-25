@@ -3147,7 +3147,19 @@
         "retrying": "Stella spróbuje ponownie za chwilę.",
         "stopped": "Przestano próbować. Otwórz ten czat ponownie, aby spróbować jeszcze raz."
       },
-      "modelNotOnPlan": "Model niedostępny w Twoim planie"
+      "modelNotOnPlan": "Model niedostępny w Twoim planie",
+      "stellaUpdated": "Stella została zaktualizowana",
+      "more": "Więcej"
+    },
+    "whatsNew": {
+      "title": "Co nowego",
+      "releases": "Wersje",
+      "moreInRelease": "Więcej w tej wersji",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Instalator",
+        "backend": "Chmura"
+      }
     }
   },
   "sidebar": {

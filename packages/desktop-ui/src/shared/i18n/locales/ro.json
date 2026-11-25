@@ -3129,7 +3129,19 @@
         "retrying": "Stella va încerca din nou imediat.",
         "stopped": "S-a oprit din încercat. Redeschide acest chat pentru a încerca din nou."
       },
-      "modelNotOnPlan": "Modelul nu este disponibil în planul tău"
+      "modelNotOnPlan": "Modelul nu este disponibil în planul tău",
+      "stellaUpdated": "Stella a fost actualizată",
+      "more": "Mai mult"
+    },
+    "whatsNew": {
+      "title": "Noutăți",
+      "releases": "Versiuni",
+      "moreInRelease": "Mai multe în această versiune",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Program de instalare",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

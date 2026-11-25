@@ -3129,7 +3129,19 @@
         "retrying": "Stella riproverà tra un momento.",
         "stopped": "Tentativi interrotti. Riapri questa chat per riprovare."
       },
-      "modelNotOnPlan": "Modello non disponibile nel tuo piano"
+      "modelNotOnPlan": "Modello non disponibile nel tuo piano",
+      "stellaUpdated": "Stella è stata aggiornata",
+      "more": "Altro"
+    },
+    "whatsNew": {
+      "title": "Novità",
+      "releases": "Versioni",
+      "moreInRelease": "Altro in questa versione",
+      "product": {
+        "mobile": "Telefono",
+        "launcher": "Programma di installazione",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

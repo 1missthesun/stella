@@ -3111,7 +3111,19 @@
         "retrying": "Stella will try again in a moment.",
         "stopped": "Stopped trying. Reopen this chat to try again."
       },
-      "modelNotOnPlan": "Model not available on your plan"
+      "modelNotOnPlan": "Model not available on your plan",
+      "stellaUpdated": "Stella updated",
+      "more": "More"
+    },
+    "whatsNew": {
+      "title": "What’s new",
+      "releases": "Releases",
+      "moreInRelease": "More in this release",
+      "product": {
+        "mobile": "Phone",
+        "launcher": "Installer",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

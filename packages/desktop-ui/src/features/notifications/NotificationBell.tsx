@@ -67,7 +67,8 @@ const NotificationRow = ({
   const running = useNotificationRunning().has(item.id);
   const busy = running || item.busy === true;
   const Icon = KIND_ICON[item.kind];
-  const actions = item.actions ?? [];
+  const actions = (item.actions ?? []).filter((action) => variant === "panel" || !action.panelOnly);
+  const more = item.more;
   return (
     <div className="notification-row" data-kind={item.kind} data-variant={variant}>
       <span className="notification-row__icon" aria-hidden>
@@ -75,39 +76,59 @@ const NotificationRow = ({
       </span>
       <div className="notification-row__body">
         <p className="notification-row__title">{item.title}</p>
-        {item.detail ? <p className="notification-row__detail">{item.detail}</p> : null}
-        <div className="notification-row__foot">
-          {variant === "panel" ? (
-            <span className="notification-row__time">{whenText(t, locale, item.createdAt, now)}</span>
-          ) : null}
-          <span className="notification-row__actions">
+        {more ? (
+          <div className="notification-row__line">
+            {item.detail ? <p className="notification-row__summary">{item.detail}</p> : null}
+            <button
+              type="button"
+              className="notification-row__more"
+              onClick={() => {
+                if (variant === "toast") onClose?.();
+                else setNotificationPanelOpen(false);
+                more.run();
+              }}
+              data-testid="notification-more"
+            >
+              {more.label}
+            </button>
+          </div>
+        ) : item.detail ? (
+          <p className="notification-row__detail">{item.detail}</p>
+        ) : null}
+        {variant === "panel" || actions.length > 0 ? (
+          <div className="notification-row__foot">
             {variant === "panel" ? (
-              <button
-                type="button"
-                className="notification-row__button"
-                onClick={() => dismissNotification(item.id)}
-                data-testid="notification-dismiss"
-              >
-                {t("shell.notifications.dismiss")}
-              </button>
+              <span className="notification-row__time">{whenText(t, locale, item.createdAt, now)}</span>
             ) : null}
-            {actions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className={`notification-row__button${action.primary ? " notification-row__button--primary" : ""}`}
-                disabled={busy || action.disabled}
-                onClick={() => {
-                  if (variant === "toast") onClose?.();
-                  void runNotificationAction(item.id, action);
-                }}
-                data-testid="notification-action"
-              >
-                {busy && action.primary && item.busyLabel ? item.busyLabel : action.label}
-              </button>
-            ))}
-          </span>
-        </div>
+            <span className="notification-row__actions">
+              {variant === "panel" ? (
+                <button
+                  type="button"
+                  className="notification-row__button"
+                  onClick={() => dismissNotification(item.id)}
+                  data-testid="notification-dismiss"
+                >
+                  {t("shell.notifications.dismiss")}
+                </button>
+              ) : null}
+              {actions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className={`notification-row__button${action.primary ? " notification-row__button--primary" : ""}`}
+                  disabled={busy || action.disabled}
+                  onClick={() => {
+                    if (variant === "toast") onClose?.();
+                    void runNotificationAction(item.id, action);
+                  }}
+                  data-testid="notification-action"
+                >
+                  {busy && action.primary && item.busyLabel ? item.busyLabel : action.label}
+                </button>
+              ))}
+            </span>
+          </div>
+        ) : null}
       </div>
       {variant === "toast" ? (
         <button

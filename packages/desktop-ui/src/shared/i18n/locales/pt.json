@@ -3129,7 +3129,19 @@
         "retrying": "A Stella vai tentar de novo em instantes.",
         "stopped": "Parou de tentar. Reabra este chat para tentar de novo."
       },
-      "modelNotOnPlan": "Modelo indisponível no seu plano"
+      "modelNotOnPlan": "Modelo indisponível no seu plano",
+      "stellaUpdated": "O Stella foi atualizado",
+      "more": "Mais"
+    },
+    "whatsNew": {
+      "title": "Novidades",
+      "releases": "Versões",
+      "moreInRelease": "Mais nesta versão",
+      "product": {
+        "mobile": "Telemóvel",
+        "launcher": "Instalador",
+        "backend": "Nuvem"
+      }
     }
   },
   "sidebar": {

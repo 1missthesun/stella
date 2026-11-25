@@ -147,6 +147,7 @@ type TakeSource = {
   pendingDraftExists: boolean;
   settle?: (to: string) => Promise<void>;
   wanted?: Wanted;
+  auto?: boolean;
 };
 
 type ForkAccess = {
@@ -165,6 +166,10 @@ type SourceAccess = {
 const STATE_POLL_MS = 10_000;
 const AUTO_APPLY_QUIET_MS = 1_500;
 const AUTO_APPLY_RETRY_MS = 500;
+const AUTO_UPDATE_POLL_MS = 5_000;
+const AUTO_UPDATE_QUIET_MS = 20_000;
+const AUTO_UPDATE_RESTART_QUIET_MS = 90_000;
+const RELAUNCH_STATE_HOLD_MS = 60_000;
 const SWAPS_BEFORE_RELOAD = 12;
 const RELOAD_WHEN_AWAY_POLL_MS = 30_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
@@ -224,6 +229,14 @@ class PlainFailure extends Error {
     super(message);
   }
 }
+
+const installsItself = (record: PreparedUpdate | null) =>
+  Boolean(
+    record?.to &&
+      (record.plan?.kind === "fast-forward" || record.plan?.kind === "clean") &&
+      !record.resolvedBy &&
+      (record.gate === null || record.gate.ok),
+  );
 
 const checkoutRefusal = () =>
   new PlainFailure(
@@ -299,6 +312,7 @@ export class AppSourceService {
   private publishedState = JSON.stringify(EMPTY_STATE);
   private queue: Promise<unknown> = Promise.resolve();
   private busy = false;
+  private relaunching = false;
   private heldForRecording = false;
   private heldForReply = false;
   private refreshing: Promise<void> | null = null;
@@ -343,6 +357,9 @@ export class AppSourceService {
   private readonly autoTried = new Set<string>();
   private readonly toldTasks = new Set<string>();
   private autoTimer: NodeJS.Timeout | null = null;
+  private autoVersion: string | null = null;
+  private autoUpdateTimer: NodeJS.Timeout | null = null;
+  private readonly autoRestarts = new Map<string, boolean>();
   private reloadTimer: NodeJS.Timeout | null = null;
   private readonly preparer: UpdatePreparer;
   private update: AppSourceUpdate | null = null;
@@ -450,6 +467,8 @@ export class AppSourceService {
     this.syncTimer = null;
     if (this.autoTimer) clearTimeout(this.autoTimer);
     this.autoTimer = null;
+    if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
+    this.autoUpdateTimer = null;
     if (this.wantTimer) clearTimeout(this.wantTimer);
     this.wantTimer = null;
     this.updateWatch?.stop();
@@ -469,7 +488,9 @@ export class AppSourceService {
   }
 
   applyDraft(name: string) {
-    return this.exclusive((cwd) => this.takeDraft(cwd, name));
+    return this.exclusive((cwd) =>
+      this.takeDraft(cwd, name, isUpdateDraft(name) ? (to) => this.noteVersionIn(cwd, to) : undefined),
+    );
   }
 
   private async takeDraft(cwd: string, name: string, after?: (to: string) => Promise<void>) {
@@ -706,17 +727,17 @@ export class AppSourceService {
     });
     if (plan.kind === "none") throw new PlainFailure("nothing", source.emptyMessage);
     let to = plan.kind === "fast-forward" ? plan.tip : "";
+    const handOff = (brief: AgentBrief) => {
+      if (source.auto) throw new PlainFailure("not-ready", "This update waits for you to press Update.");
+      return this.dispatchMerge(cwd, source, brief);
+    };
     if (plan.kind === "conflict" && !prepared?.to) {
-      return await this.dispatchMerge(cwd, source, source.brief(plan, head));
+      return await handOff(source.brief(plan, head));
     }
     if (plan.kind !== "fast-forward" && prepared?.to) {
       to = prepared.to;
       if (prepared.gate && !prepared.gate.ok) {
-        return await this.dispatchMerge(
-          cwd,
-          source,
-          source.brief(plan, head, prepared.gate.output),
-        );
+        return await handOff(source.brief(plan, head, prepared.gate.output));
       }
     } else if (plan.kind === "clean") {
       to = await git(
@@ -742,11 +763,7 @@ export class AppSourceService {
         );
         this.mark("gate");
         if (!gate.ok) {
-          return await this.dispatchMerge(
-            cwd,
-            source,
-            source.brief(plan, head, gate.output),
-          );
+          return await handOff(source.brief(plan, head, gate.output));
         }
       }
     }
@@ -1055,6 +1072,7 @@ export class AppSourceService {
         this.mark("hold");
         phase = "relaunching";
         this.logTimeline("relaunch");
+        this.holdStateForRelaunch();
         this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
         return;
       }
@@ -1288,8 +1306,18 @@ export class AppSourceService {
     this.publish({ ...this.state, busy });
   }
 
+  private holdStateForRelaunch() {
+    this.relaunching = true;
+    const timer = setTimeout(() => {
+      this.relaunching = false;
+      void this.refresh();
+    }, RELAUNCH_STATE_HOLD_MS);
+    timer.unref?.();
+  }
+
   private publish(next: AppSourceState) {
     this.state = next;
+    if (this.relaunching) return;
     const json = JSON.stringify(next);
     if (json === this.publishedState) return;
     this.publishedState = json;
@@ -1315,6 +1343,7 @@ export class AppSourceService {
           });
           this.considerAutoApply(this.state);
           this.considerWanted(this.state);
+          this.considerAutoUpdate(this.state);
         } catch (error) {
           this.options.log("app-source.refresh-failed", {
             message: errorMessage(error),
@@ -1420,6 +1449,7 @@ export class AppSourceService {
     let conflicts: AppSourceConflicts | undefined;
     this.versionReady = null;
     this.versionConflicts = null;
+    this.autoVersion = null;
     const version = upstreamOffer?.real ? upstreamOffer.tip : null;
     if (version) {
       const target = await this.updateTarget(cwd, head, version);
@@ -1443,6 +1473,7 @@ export class AppSourceService {
       } else {
         upstreamShown = ready;
         if (ready && record?.to) this.versionReady = version;
+        if (ready && target.ref === UPSTREAM_REF && installsItself(record)) this.autoVersion = version;
       }
     }
     const wantedVersion =
@@ -1557,7 +1588,7 @@ export class AppSourceService {
     const skipped = skippedNow;
     await this.pruneWanted(cwd, head, intent, drafts, worktrees);
     const arrived =
-      intent.arrived && (intent.arrived.revert ?? intent.arrived.sha) === head
+      intent.arrived && (await isAncestor(cwd, intent.arrived.revert ?? intent.arrived.sha, head))
         ? intent.arrived
         : null;
     return {
@@ -2037,11 +2068,88 @@ export class AppSourceService {
     });
   }
 
+  private async noteVersionIn(cwd: string, to: string) {
+    const version = (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${UPSTREAM_REF}^{commit}`])).stdout.trim();
+    if (!version || !(await isAncestor(cwd, version, to))) return;
+    await this.noteArrived({ kind: "version", version, from: null, at: Date.now() }, to);
+  }
+
+  private considerAutoUpdate(state: AppSourceState) {
+    const version = this.autoVersion;
+    if (!version || this.autoUpdateTimer || this.disposed || state.busy || state.merging) return;
+    const offer = state.waiting.find(
+      (entry): entry is Extract<AppSourceWaiting, { kind: "version" }> =>
+        entry.kind === "version" && entry.key === `version:${version}`,
+    );
+    if (!offer || offer.adding || offer.draft || offer.conflicts) return;
+    const intent = this.intent;
+    if (!intent || intent.wanted.length > 0 || intent.autoTried.includes(version)) return;
+    this.autoUpdateTimer = setTimeout(() => void this.attemptAutoUpdate(version), 0);
+    this.autoUpdateTimer.unref?.();
+  }
+
+  private async attemptAutoUpdate(version: string) {
+    this.autoUpdateTimer = null;
+    if (this.disposed || this.autoVersion !== version) return;
+    const intent = this.intent;
+    if (this.busy || this.state.merging || !intent || intent.wanted.length > 0 || intent.autoTried.includes(version)) {
+      return;
+    }
+    const restart = await this.autoUpdateRestarts(version).catch(() => null);
+    const moment = restart === null ? null : await this.quietMoment(restart);
+    if (!moment) {
+      this.autoUpdateTimer = setTimeout(() => void this.attemptAutoUpdate(version), AUTO_UPDATE_POLL_MS);
+      this.autoUpdateTimer.unref?.();
+      return;
+    }
+    await this.saveIntent((current) => {
+      current.autoTried = [...current.autoTried.filter((tried) => tried !== version), version];
+    });
+    this.options.log("app-source.auto-update", { version: version.slice(0, 12), restart, moment });
+    const key = `version:${version}`;
+    this.publish({
+      ...this.state,
+      waiting: this.state.waiting.map((offer) => (offer.key === key ? { ...offer, adding: true } : offer)),
+    });
+    const result = await this.exclusive((cwd) =>
+      this.takeUpstream(cwd, { kind: "version", version, from: null, at: Date.now() }, true),
+    );
+    this.options.log("app-source.auto-update-done", {
+      version: version.slice(0, 12),
+      ok: result.ok,
+      ...(result.ok ? {} : { reason: result.reason, error: result.error }),
+    });
+  }
+
+  private async autoUpdateRestarts(version: string) {
+    const cwd = this.options.stellaAppDir;
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const key = `${head}:${version}`;
+    const known = this.autoRestarts.get(key);
+    if (known !== undefined) return known;
+    const record = await this.preparer.peek(head, version);
+    if (!record?.to) return null;
+    const paths = (await git(cwd, ["diff", "--name-only", head, record.to])).split("\n").filter(Boolean);
+    const restart = relaunches(paths) || (await changesMainBundle(cwd, paths));
+    this.autoRestarts.set(key, restart);
+    return restart;
+  }
+
+  private async quietMoment(restart: boolean): Promise<"away" | "unfocused" | "quiet" | null> {
+    if (this.options.recordingOpen?.()) return null;
+    if (await this.options.replying?.().catch(() => true)) return null;
+    if (this.options.isUserAway?.()) return "away";
+    if (!this.options.userQuietFor) return "quiet";
+    const quiet = await this.options.userQuietFor().catch(() => 0);
+    if (quiet === null) return restart ? null : "unfocused";
+    return quiet >= (restart ? AUTO_UPDATE_RESTART_QUIET_MS : AUTO_UPDATE_QUIET_MS) ? "quiet" : null;
+  }
+
   private applyDraftFor(name: string, entry: Wanted) {
     return this.exclusive((cwd) => this.takeDraft(cwd, name, (to) => this.noteArrived(entry, to)));
   }
 
-  private async takeUpstream(cwd: string, wanted?: Wanted) {
+  private async takeUpstream(cwd: string, wanted?: Wanted, auto = false) {
     if (!this.upstreamTracked) throw new PlainFailure("nothing", "No update is available.");
     const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
     const head = await git(cwd, ["rev-parse", "HEAD"]);
@@ -2057,8 +2165,9 @@ export class AppSourceService {
       brief: upstreamMergeBrief,
       pendingDraft: mergeDraftName(version),
       pendingDraftExists: false,
-      ...(wanted ? { settle: (to: string) => this.noteArrived(entry, to) } : {}),
+      settle: (to: string) => this.noteArrived(entry, to),
       wanted: { ...entry, task: true },
+      auto,
     });
   }
 

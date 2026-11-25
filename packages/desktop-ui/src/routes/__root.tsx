@@ -74,6 +74,7 @@ import {
 } from "@/shell/display/default-tabs";
 import { FullShellDialogs } from "@/shell/full-shell-dialogs";
 import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
+import { WhatsNewDialogHost } from "@/features/whats-new/WhatsNewDialog";
 import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
@@ -730,6 +731,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
       />
 
       <SettingsDialogHost />
+      <WhatsNewDialogHost />
 
       <FeedbackDialogHost />
 

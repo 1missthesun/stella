@@ -3111,7 +3111,19 @@
         "retrying": "Stella egy pillanat múlva újra megpróbálja.",
         "stopped": "A próbálkozás leállt. Nyisd meg újra ezt a csevegést az újabb próbához."
       },
-      "modelNotOnPlan": "A modell nem érhető el a csomagodban"
+      "modelNotOnPlan": "A modell nem érhető el a csomagodban",
+      "stellaUpdated": "A Stella frissült",
+      "more": "Továbbiak"
+    },
+    "whatsNew": {
+      "title": "Újdonságok",
+      "releases": "Kiadások",
+      "moreInRelease": "További újdonságok ebben a kiadásban",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Telepítő",
+        "backend": "Felhő"
+      }
     }
   },
   "sidebar": {

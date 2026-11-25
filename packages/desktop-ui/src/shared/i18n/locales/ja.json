@@ -3091,7 +3091,19 @@
         "retrying": "Stella はまもなく再試行します。",
         "stopped": "再試行を停止しました。もう一度試すには、このチャットを開き直してください。"
       },
-      "modelNotOnPlan": "このモデルはご利用のプランでは使えません"
+      "modelNotOnPlan": "このモデルはご利用のプランでは使えません",
+      "stellaUpdated": "Stella をアップデートしました",
+      "more": "詳細"
+    },
+    "whatsNew": {
+      "title": "新機能",
+      "releases": "リリース",
+      "moreInRelease": "このリリースのその他の変更",
+      "product": {
+        "mobile": "スマートフォン",
+        "launcher": "インストーラ",
+        "backend": "クラウド"
+      }
     }
   },
   "sidebar": {

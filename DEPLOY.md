@@ -137,7 +137,7 @@ secrets only reach Previews created afterwards.
 
 | You changed | Ship it with | Users get it |
 |---|---|---|
-| Desktop UI, Electron shell, runtime (`packages/desktop*`, `packages/runtime`, …) | `app-source:publish` to `stella-app-dev` / `stella-app-prod` | "N updates" pill → Update |
+| Desktop UI, Electron shell, runtime (`packages/desktop*`, `packages/runtime`, …) | `app-source:publish` to `stella-app-dev` / `stella-app-prod` | Update pill; applies itself at a quiet moment (or on Update) |
 | Backend, including prompts (`workers/cloud-builder`) | cloud-builder deploy | Immediately (desktops refetch prompts on their next turn) |
 | Other workers | That worker's deploy | Immediately |
 | Mobile JS/TS | OTA (`publish-ota.sh`) | Downloaded on launch, applied on the next cold start |
@@ -613,8 +613,27 @@ app-source publish is needed. Desktops from before explicit messaging read
 
 The desktop app is a git checkout of the app-source `upstream` repo, run from
 source by the native launchers (no electron-builder, no electron-updater, no
-CI-built app). A publish appears in each install's Updates sidebar; nothing
-applies until the user clicks Update.
+CI-built app). A publish shows as the Update pill and in the Updates sidebar.
+Installs apply it by themselves once it is prepared, merges cleanly with the
+user's own changes and builds: at once when the window is hidden or the user
+has been idle two minutes, otherwise after 20 s without input in the focused
+window (90 s, or only when away, if it relaunches), never during a reply or a
+recording. A version that clashes with their changes waits for Update. Each
+version is tried automatically once (`autoTried` in
+`.git/stella-update-intent.json`); after a failure only Update applies it.
+After an update the bell shows "Stella updated" with the newest release note
+and More, which opens What's new.
+
+**Release notes, every user-facing release:** add the entry before you
+publish anything. `packages/contracts/stella-releases.ts` is the one changelog:
+stella.sh's What's New page (`/learn-more/whats-new`, its `.md` copy and the
+Learn More teaser) and the desktop's post-update bell line and What's new
+window all read it. Put a new entry at the top (or add a line to today's
+entry): `date` (ISO, `from` for a range), `title`, `summary` (one plain line,
+the bell shows it truncated), `highlights` and `more` (`{ text, product:
+"Mobile" }` for phone-only notes). Plain words a user would say: no internal
+names, commit hashes, branch names or people's names. The desktop shows it
+after the app-source publish; stella.sh after the website deploy.
 
 1. **App source** (any desktop/runtime change):
    `env -u CLOUDFLARE_API_TOKEN bun run app-source:publish -- --namespace stella-app-dev`

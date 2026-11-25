@@ -3111,7 +3111,19 @@
         "retrying": "Stella yrittää hetken kuluttua uudelleen.",
         "stopped": "Yrittäminen lopetettiin. Avaa tämä keskustelu uudelleen yrittääksesi uudelleen."
       },
-      "modelNotOnPlan": "Malli ei ole käytettävissä tilauksessasi"
+      "modelNotOnPlan": "Malli ei ole käytettävissä tilauksessasi",
+      "stellaUpdated": "Stella päivitettiin",
+      "more": "Lisää"
+    },
+    "whatsNew": {
+      "title": "Uutta",
+      "releases": "Versiot",
+      "moreInRelease": "Lisää tässä versiossa",
+      "product": {
+        "mobile": "Puhelin",
+        "launcher": "Asennusohjelma",
+        "backend": "Pilvi"
+      }
     }
   },
   "sidebar": {

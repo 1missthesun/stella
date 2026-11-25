@@ -3147,7 +3147,19 @@
         "retrying": "Stella to za chvíli zkusí znovu.",
         "stopped": "Pokusy byly zastaveny. Znovu otevřete tento chat a zkuste to znovu."
       },
-      "modelNotOnPlan": "Model není ve vašem tarifu k dispozici"
+      "modelNotOnPlan": "Model není ve vašem tarifu k dispozici",
+      "stellaUpdated": "Stella je aktualizovaná",
+      "more": "Více"
+    },
+    "whatsNew": {
+      "title": "Co je nového",
+      "releases": "Verze",
+      "moreInRelease": "Další novinky v této verzi",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Instalátor",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

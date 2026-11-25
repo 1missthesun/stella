@@ -3111,7 +3111,19 @@
         "retrying": "Stella versucht es gleich noch einmal.",
         "stopped": "Keine weiteren Versuche. Öffne diesen Chat erneut, um es noch einmal zu versuchen."
       },
-      "modelNotOnPlan": "Modell in deinem Tarif nicht verfügbar"
+      "modelNotOnPlan": "Modell in deinem Tarif nicht verfügbar",
+      "stellaUpdated": "Stella wurde aktualisiert",
+      "more": "Mehr"
+    },
+    "whatsNew": {
+      "title": "Neuigkeiten",
+      "releases": "Versionen",
+      "moreInRelease": "Mehr in dieser Version",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Installationsprogramm",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

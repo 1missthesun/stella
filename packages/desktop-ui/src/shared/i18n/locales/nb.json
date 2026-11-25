@@ -3111,7 +3111,19 @@
         "retrying": "Stella prøver igjen om et øyeblikk.",
         "stopped": "Sluttet å prøve. Åpne denne chatten på nytt for å prøve igjen."
       },
-      "modelNotOnPlan": "Modellen er ikke tilgjengelig i abonnementet ditt"
+      "modelNotOnPlan": "Modellen er ikke tilgjengelig i abonnementet ditt",
+      "stellaUpdated": "Stella er oppdatert",
+      "more": "Mer"
+    },
+    "whatsNew": {
+      "title": "Nyheter",
+      "releases": "Utgivelser",
+      "moreInRelease": "Mer i denne utgivelsen",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Installasjonsprogram",
+        "backend": "Sky"
+      }
     }
   },
   "sidebar": {

@@ -1,4 +1,10 @@
-import { changelogEntries } from "@/app/learn-more/changelog-entries";
+import {
+  noteProduct,
+  noteText,
+  releaseDateLabel,
+  stellaReleases,
+  type StellaReleaseNote,
+} from "@stella/contracts/stella-releases";
 import { ANSWER_GROUPS, ANSWER_PAGES, FAQ, PAID_LINE, PRICE_LINE, TRIAL_LINE, answerTitle, plainText, type AnswerPage } from "@/lib/answers";
 import {
   LEGAL_TITLES,
@@ -237,16 +243,15 @@ function renderWhatsNew(): string {
     ),
   ];
 
-  const formatItem = (
-    item: string | { text: string; product: string },
-  ): string => {
-    if (typeof item === "string") return `- ${item}`;
-    return `- [${item.product}] ${item.text}`;
+  const formatItem = (item: StellaReleaseNote): string => {
+    const product = noteProduct(item);
+    return product ? `- [${product}] ${noteText(item)}` : `- ${noteText(item)}`;
   };
 
-  for (const entry of changelogEntries) {
-    const headline = entry.release ?? entry.era ?? entry.date;
-    const secondary = entry.release ? ` (${entry.date})` : "";
+  for (const entry of stellaReleases) {
+    const date = releaseDateLabel(entry);
+    const headline = entry.title ?? entry.era ?? date;
+    const secondary = entry.title || entry.era ? ` (${date})` : "";
     const tags = entry.tags?.length ? ` — ${entry.tags.join(", ")}` : "";
     lines.push(`## ${headline}${secondary}${tags}`, "");
 

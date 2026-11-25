@@ -3111,7 +3111,19 @@
         "retrying": "Stella probeert het zo opnieuw.",
         "stopped": "Gestopt met proberen. Open deze chat opnieuw om het nog eens te proberen."
       },
-      "modelNotOnPlan": "Model niet beschikbaar in je abonnement"
+      "modelNotOnPlan": "Model niet beschikbaar in je abonnement",
+      "stellaUpdated": "Stella is bijgewerkt",
+      "more": "Meer"
+    },
+    "whatsNew": {
+      "title": "Nieuw",
+      "releases": "Releases",
+      "moreInRelease": "Meer in deze release",
+      "product": {
+        "mobile": "Telefoon",
+        "launcher": "Installatieprogramma",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

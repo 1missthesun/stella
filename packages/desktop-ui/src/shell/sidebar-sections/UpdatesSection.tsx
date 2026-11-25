@@ -17,6 +17,7 @@ import {
 } from "@/features/app-source/AppSourceCards";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Check } from "@/ui/icons";
+import { whatsNewDialog } from "@/features/whats-new/whats-new-store";
 import "./updates-section.css";
 
 const WaitingItem = ({
@@ -226,7 +227,17 @@ export function UpdatesSection() {
       ) : null}
       {state.recent.length > 0 ? (
         <>
-          <h2 className="updates-section__heading">{t("shell.appSource.updates.history")}</h2>
+          <div className="updates-section__heading-row">
+            <h2 className="updates-section__heading">{t("shell.appSource.updates.history")}</h2>
+            <button
+              type="button"
+              className="updates-section__whats-new"
+              onClick={() => whatsNewDialog.open()}
+              data-testid="updates-whats-new"
+            >
+              {t("shell.whatsNew.title")}
+            </button>
+          </div>
           <ul className="updates-section__list" data-testid="updates-history">
             {state.recent.map((commit) => (
               <HistoryItem

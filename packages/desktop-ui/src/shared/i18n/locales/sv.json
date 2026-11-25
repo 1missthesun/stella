@@ -3111,7 +3111,19 @@
         "retrying": "Stella försöker igen om en stund.",
         "stopped": "Slutade försöka. Öppna chatten igen för att försöka på nytt."
       },
-      "modelNotOnPlan": "Modellen ingår inte i din plan"
+      "modelNotOnPlan": "Modellen ingår inte i din plan",
+      "stellaUpdated": "Stella har uppdaterats",
+      "more": "Mer"
+    },
+    "whatsNew": {
+      "title": "Nyheter",
+      "releases": "Versioner",
+      "moreInRelease": "Mer i den här versionen",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Installationsprogram",
+        "backend": "Moln"
+      }
     }
   },
   "sidebar": {

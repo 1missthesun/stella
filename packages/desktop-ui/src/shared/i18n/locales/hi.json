@@ -3111,7 +3111,19 @@
         "retrying": "Stella थोड़ी देर में फिर कोशिश करेगी।",
         "stopped": "कोशिश करना बंद कर दिया। फिर से कोशिश करने के लिए यह चैट दोबारा खोलें।"
       },
-      "modelNotOnPlan": "मॉडल आपके प्लान में उपलब्ध नहीं है"
+      "modelNotOnPlan": "मॉडल आपके प्लान में उपलब्ध नहीं है",
+      "stellaUpdated": "Stella अपडेट हो गई",
+      "more": "और"
+    },
+    "whatsNew": {
+      "title": "नया क्या है",
+      "releases": "रिलीज़",
+      "moreInRelease": "इस रिलीज़ में और",
+      "product": {
+        "mobile": "फ़ोन",
+        "launcher": "इंस्टॉलर",
+        "backend": "क्लाउड"
+      }
     }
   },
   "sidebar": {

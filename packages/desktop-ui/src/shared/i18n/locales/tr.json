@@ -3111,7 +3111,19 @@
         "retrying": "Stella birazdan yeniden deneyecek.",
         "stopped": "Denemeler durduruldu. Yeniden denemek için bu sohbeti tekrar aç."
       },
-      "modelNotOnPlan": "Model planında kullanılamıyor"
+      "modelNotOnPlan": "Model planında kullanılamıyor",
+      "stellaUpdated": "Stella güncellendi",
+      "more": "Daha fazla"
+    },
+    "whatsNew": {
+      "title": "Yenilikler",
+      "releases": "Sürümler",
+      "moreInRelease": "Bu sürümde daha fazlası",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Yükleyici",
+        "backend": "Bulut"
+      }
     }
   },
   "sidebar": {

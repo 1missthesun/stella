@@ -1,118 +1,203 @@
-export type Product = "Launcher" | "Mobile" | "Backend";
+export type StellaReleaseProduct = "Launcher" | "Mobile" | "Backend";
 
-export type ChangeItem = string | { text: string; product: Product };
+export type StellaReleaseNote = string | { text: string; product: StellaReleaseProduct };
 
-export type ChangelogEntry = {
-  release?: string;
+export type StellaRelease = {
   date: string;
+  from?: string;
+  title?: string;
   era?: string;
+  summary?: string;
   tags?: string[];
-  highlights?: ChangeItem[];
-  more?: ChangeItem[];
+  highlights?: StellaReleaseNote[];
+  more?: StellaReleaseNote[];
 };
 
-export const changelogEntries: ChangelogEntry[] = [
+export const releaseKey = (release: StellaRelease): string =>
+  `${release.from ? `${release.from}..` : ""}${release.date}:${release.title ?? release.era ?? ""}`;
+
+export const releaseHeadline = (release: StellaRelease): string =>
+  release.title ?? release.era ?? release.date;
+
+export const releaseSummary = (release: StellaRelease): string =>
+  release.summary ?? noteText(release.highlights?.[0] ?? release.more?.[0] ?? releaseHeadline(release));
+
+export const noteText = (note: StellaReleaseNote): string =>
+  typeof note === "string" ? note : note.text;
+
+export const noteProduct = (note: StellaReleaseNote): StellaReleaseProduct | null =>
+  typeof note === "string" ? null : note.product;
+
+const utcDate = (iso: string) => {
+  const [year = 1970, month = 1, day = 1] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+export const releaseDateLabel = (
+  release: StellaRelease,
+  locale = "en-US",
+  month: "long" | "short" = "long",
+): string => {
+  if (release.date.length === 7) {
+    return new Intl.DateTimeFormat(locale, { month, year: "numeric", timeZone: "UTC" }).format(
+      utcDate(release.date),
+    );
+  }
+  const format = new Intl.DateTimeFormat(locale, {
+    month,
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return release.from
+    ? format.formatRange(utcDate(release.from), utcDate(release.date))
+    : format.format(utcDate(release.date));
+};
+
+export const stellaReleases: readonly StellaRelease[] = [
   {
-    "release": "A two-step setup and a lighter install",
-    "date": "November 22, 2026",
-    "tags": [
-      "New",
-      "Polish"
+    date: "2026-11-26",
+    title: "Stella keeps itself up to date",
+    summary: "Stella now installs new versions by itself at a quiet moment, and tells you what changed.",
+    tags: ["New"],
+    highlights: [
+      "Stella installs new versions on its own at a quiet moment: when you step away, or after a short pause, and never in the middle of a reply. The Update button is still there if you want a version right away.",
+      "After an update, the bell tells you what changed. Click More to see every release, newest first.",
     ],
-    "highlights": [
-      "Setting up Stella takes two steps: choose your AI, then turn on any extras you want, like Gmail, the Chrome extension, and the Mac permissions for seeing and using your screen. Then you’re in the chat.",
-      "Stella takes up less room on your computer: installs are roughly half a gigabyte to 1.3 GB smaller. The tools Stella uses to change its own code arrive the first time you ask for a change.",
-      "Changing Stella on Windows is much faster. After the first change, the next ones start almost at once instead of reinstalling every time."
+    more: [
+      "If a new version clashes with changes you made to your own Stella, it waits for you to press Update instead of installing itself.",
+      "If a new version can’t be installed, Stella stays on the one you have and doesn’t keep trying.",
     ],
-    "more": [
-      "New installs follow your system’s light or dark mode.",
-      "“How did you find Stella?” and the suggestion to get the phone app now show once, after you’ve used Stella for a while, instead of during setup.",
-      "A Claude Code task in the cloud that leaves a long command running now reports back when the command finishes."
-    ]
   },
   {
-    "release": "Gemini on your Google plan, and a faster start",
-    "date": "November 21, 2026",
-    "tags": [
-      "New",
-      "Polish"
+    date: "2026-11-25",
+    title: "A viewer you can resize and pull out",
+    summary: "Files, pages and apps open in one viewer you can resize or pull out into its own window.",
+    tags: ["New", "Polish"],
+    highlights: [
+      "Files, pages and apps all open in one viewer. Drag its edge to make it wider, or pull it out into a window of its own.",
+      "Reports Stella writes as web pages show a preview card under the reply, on your computer and on your phone.",
+      "Saved logins are simpler to approve: Allow on any of your trusted devices answers for all of them, and Ask again responds right away.",
     ],
-    "highlights": [
+    more: [
+      "Chat keeps the order things happened in, even when a computer’s clock is wrong or jumps after sleep.",
+      "The Email page is available in all 28 languages.",
+      { text: "“Scroll to latest” no longer gets stuck in a short chat.", product: "Mobile" },
+      { text: "Switching tabs in the bottom bar is instant, and the Files grid scrolls smoothly.", product: "Mobile" },
+      { text: "The Account drawer has a lighter, roomier look.", product: "Mobile" },
+    ],
+  },
+  {
+    date: "2026-11-24",
+    from: "2026-11-23",
+    title: "Talk over Stella, and saved logins on every device",
+    summary: "Send a message while Stella is working and she switches to it. Saved logins now sync between your devices.",
+    tags: ["New", "Polish"],
+    highlights: [
+      "Send a message while Stella is working and she switches to it, instead of finishing the old reply first. The Stop button is gone from the composer; a quiet Stop appears next to the working indicator if a reply runs long.",
+      "Saved logins sync between your computers and your phone, and tasks running in the cloud can use them too. A new device joins with a code shown on both screens.",
+      "The Email page has a new look on your computer, on the web and on your phone.",
+    ],
+    more: [
+      "Google Antigravity signs in and installs just like Claude Code.",
+      "The model picker follows where the chat runs, so it only shows models that place can use.",
+      "Stella opens faster and uses less power while it sits idle.",
+      "You never have to sign in to use Stella on your computer.",
+      "Your computer no longer shows a system notification every time a task finishes.",
+      "Signing out of every device ends every session at once.",
+      "Dictation keeps your first words.",
+      "A reply keeps going on your computer when the internet connection drops for a moment.",
+      "When Stella uses a website for you, she types and clicks at a natural pace, and passwords never appear in what her tasks read.",
+      { text: "A new bottom bar with an icon for each page, and Account opens as a drawer from the left.", product: "Mobile" },
+      { text: "You can send a new message while the last one is still being worked on.", product: "Mobile" },
+      { text: "Tables, code and media in a message scroll sideways again, and the last line of a message is no longer cut off.", product: "Mobile" },
+    ],
+  },
+  {
+    date: "2026-11-22",
+    title: "A two-step setup and a lighter install",
+    summary: "Setting up Stella takes two steps, and installs are up to 1.3 GB smaller.",
+    tags: ["New", "Polish"],
+    highlights: [
+      "Setting up Stella takes two steps: choose your AI, then turn on any extras you want, like Gmail, the Chrome extension, and the Mac permissions for seeing and using your screen. Then you’re in the chat.",
+      "Stella takes up less room on your computer: installs are roughly half a gigabyte to 1.3 GB smaller. The tools Stella uses to change its own code arrive the first time you ask for a change.",
+      "Changing Stella on Windows is much faster. After the first change, the next ones start almost at once instead of reinstalling every time.",
+    ],
+    more: [
+      "New installs follow your system’s light or dark mode.",
+      "“How did you find Stella?” and the suggestion to get the phone app now show once, after you’ve used Stella for a while, instead of during setup.",
+      "A Claude Code task in the cloud that leaves a long command running now reports back when the command finishes.",
+    ],
+  },
+  {
+    date: "2026-11-21",
+    title: "Gemini on your Google plan, and a faster start",
+    summary: "Use Gemini on your own Google plan, and Stella’s window opens up to twice as fast.",
+    tags: ["New", "Polish"],
+    highlights: [
       "Sign in to Google Antigravity in Settings, next to Claude and ChatGPT, to use Gemini models on your own Google plan. They appear in the model picker on your computer and your phone, and run on the computer you signed in on.",
       "Stella’s window opens up to twice as fast, and new installs download less.",
-      "Scrolling on Windows is smooth, keeping up with high-refresh screens instead of dropping frames."
+      "Scrolling on Windows is smooth, keeping up with high-refresh screens instead of dropping frames.",
     ],
-    "more": [
+    more: [
       "After you sign in to a service, your browser shows a Stella page that says plainly whether it worked.",
       "A computer whose clock is wrong can still use Stella’s models.",
       "Fresh installs on some Windows PCs that stopped at launch start again.",
       "The composer has a clean bottom edge, with no dark shadow and nothing cut off.",
-      "Claude Code conversations sync between your devices with fewer, smaller uploads."
-    ]
+      "Claude Code conversations sync between your devices with fewer, smaller uploads.",
+    ],
   },
   {
-    "release": "Email moves into Stella",
-    "date": "November 18–20, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-11-20",
+    from: "2026-11-18",
+    title: "Email moves into Stella",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Stella reads your Gmail at set times (three times a day on paid plans, once a day on Free) and keeps one Email page on desktop, web, and phone: what needs you, with her suggestion and a drafted reply, what she handled, with undo, and what’s waiting on someone else.",
       "Replies stay drafts until you say yes. Tell Stella an email doesn’t matter and she leaves mail like it alone; anything she marks urgent reaches your phone.",
-      "Canvases can talk back: buttons and forms in a canvas Stella made send your choice straight to the chat."
+      "Canvases can talk back: buttons and forms in a canvas Stella made send your choice straight to the chat.",
     ],
-    "more": [
+    more: [
       "Drafts Stella replaced, sent, or dropped leave your Gmail Drafts folder.",
       "Check now picks up new mail even before Gmail has passed it on.",
       "The Email page shows when each item’s newest email arrived.",
       "Background tasks are steadier: a report is never lost when another reply arrives, a task you stopped stays stopped, and each report covers every answer since the last one.",
       "Stella no longer flashes console windows on Windows.",
-      {
-        "text": "Long pastes send as “Pasted text” instead of failing.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Typing in the Email page’s Tell Stella box no longer zooms the page on iPhone.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Long pastes send as “Pasted text” instead of failing.", product: "Mobile" },
+      { text: "Typing in the Email page’s Tell Stella box no longer zooms the page on iPhone.", product: "Mobile" },
+    ],
   },
   {
-    "release": "A new reading voice and self-repairing Claude Code",
-    "date": "November 16–17, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-11-17",
+    from: "2026-11-16",
+    title: "A new reading voice and self-repairing Claude Code",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Read aloud has a new, more natural voice.",
       "Send feedback from the app straight to the Stella team, even when you’re not signed in. The dialog says exactly what it sends.",
-      "Claude Code repairs itself: Stella only starts a copy that works, falls back to the last one that did, and fixes a broken install."
+      "Claude Code repairs itself: Stella only starts a copy that works, falls back to the last one that did, and fixes a broken install.",
     ],
-    "more": [
+    more: [
       "Scheduled tasks are more dependable: a run that fails is retried or reported, never quietly counted as done, and each run reaches the right computer.",
       "When a task fails, it shows the real reason, whichever AI it runs on.",
       "Links inside a canvas open the same way chat links do, on desktop, web, and phone.",
       "Copy and Share work reliably, including for files in Stella Drive.",
       "Files open faster in the viewer, its thumbnail strip stays put when you click it, and a reply’s Drive files show real thumbnails right away.",
       "When a model runs into a problem, the message opens the model picker instead of pointing to a Settings page that doesn’t exist.",
-      "On Linux, Stella starts even when the system sets a zero real-time CPU limit."
-    ]
+      "On Linux, Stella starts even when the system sets a zero real-time CPU limit.",
+    ],
   },
   {
-    "release": "Linux computer use and clearer task status",
-    "date": "November 13–15, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-11-15",
+    from: "2026-11-13",
+    title: "Linux computer use and clearer task status",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Stella can use apps on Linux (Hyprland) in the background. On Windows, it now stays in the background unless you ask it to take over.",
       "Tasks that are waiting show a clock and “Waiting”, tasks on hold sit in their own quiet Paused group, and a task stuck on one step is flagged as possibly stuck.",
-      "Settings has a new Claude and ChatGPT tab for your AI sign-ins, and a shorter Account tab where you can see your signed-in devices, delete your data, or delete your account."
+      "Settings has a new Claude and ChatGPT tab for your AI sign-ins, and a shorter Account tab where you can see your signed-in devices, delete your data, or delete your account.",
     ],
-    "more": [
+    more: [
       "Claude Code tasks cut off by an update, restart, or crash continue where they left off.",
       "If work on a computer is waiting for a Claude sign-in, your phone tells you, and the task says so instead of looking busy.",
       "Stella stays quiet when a background check has nothing to say, instead of posting an empty message.",
@@ -122,29 +207,21 @@ export const changelogEntries: ChangelogEntry[] = [
       "Schedule notices that arrive together share one card, and deleting a schedule asks once, in place.",
       "Browser tasks wait for pages to settle before they click or read, and computer use on Mac is quicker.",
       "“Show in composer” for the model picker stays on after a restart.",
-      {
-        "text": "Dictation keeps every word when you switch apps mid-recording, and keeps recording in the background on iPhone.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Send securely stays in view while you type into a secure card.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Dictation keeps every word when you switch apps mid-recording, and keeps recording in the background on iPhone.", product: "Mobile" },
+      { text: "Send securely stays in view while you type into a secure card.", product: "Mobile" },
+    ],
   },
   {
-    "release": "Email, a notification bell, and one Update for every computer",
-    "date": "November 11–12, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-11-12",
+    from: "2026-11-11",
+    title: "Email, a notification bell, and one Update for every computer",
+    tags: ["New", "Polish"],
+    highlights: [
       "Email arrives: turn it on and Stella sorts your new Gmail, keeps a list of what needs you, and prepares replies. (It became the Email page a week later.)",
       "Notifications live in a bell in the top bar instead of piling up above the composer.",
-      "Changes you’ve asked Stella to make to itself reach all your computers with one Update. They’re merged before they’re offered, and you choose which computers get them."
+      "Changes you’ve asked Stella to make to itself reach all your computers with one Update. They’re merged before they’re offered, and you choose which computers get them.",
     ],
-    "more": [
+    more: [
       "Tell Stella a rule once and every task follows it.",
       "When a task has a question, Stella answers it herself when she can and only asks you what she can’t settle.",
       "Tasks pause when you quit and continue by themselves when Stella starts again. Stella can also move a task from an offline computer to the cloud or another computer.",
@@ -155,22 +232,20 @@ export const changelogEntries: ChangelogEntry[] = [
       "Install Claude Code in one click wherever Stella says it’s missing.",
       "A tidier top bar: icons first, then Models beside Account.",
       "On Windows, Stella has its own window icon and can apply changes to itself without admin rights.",
-      "Your own OpenRouter key can power Email."
-    ]
+      "Your own OpenRouter key can power Email.",
+    ],
   },
   {
-    "release": "Record your screen, and new models right away",
-    "date": "November 9–10, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-11-10",
+    from: "2026-11-09",
+    title: "Record your screen, and new models right away",
+    tags: ["New", "Polish"],
+    highlights: [
       "Record screen: press ⌥⇧S (Alt+Shift+S) or pick it from the + menu, then talk and draw on your screen to show Stella what you mean. It works from any app, on Mac and Windows.",
       "New models from your providers show up in the model picker as soon as they’re released, without waiting for a Stella update.",
-      "Stella’s app icon shows an unread badge, and a soft sound plays when Stella messages you."
+      "Stella’s app icon shows an unread badge, and a soft sound plays when Stella messages you.",
     ],
-    "more": [
+    more: [
       "Right-click menus throughout the app.",
       "If a model blocks a reply for safety reasons, a card lets you remove those messages or carry on with another model.",
       "Changes to Stella’s look apply in place, and undo themselves if they break something.",
@@ -180,29 +255,21 @@ export const changelogEntries: ChangelogEntry[] = [
       "When your free trial of Stella’s models runs out, Stella offers to connect your ChatGPT or Claude plan first.",
       "Drag top-bar tabs to reorder them; they stay usable in narrow windows.",
       "Stella says “tasks” instead of “agents” everywhere.",
-      {
-        "text": "Wide tables, code, and media scroll sideways, and you can select text inside a message.",
-        "product": "Mobile"
-      },
-      {
-        "text": "The composer’s mic button is easier to tap.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Wide tables, code, and media scroll sideways, and you can select text inside a message.", product: "Mobile" },
+      { text: "The composer’s mic button is easier to tap.", product: "Mobile" },
+    ],
   },
   {
-    "release": "A floating file viewer and tabs in the top bar",
-    "date": "November 3–8, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-11-08",
+    from: "2026-11-03",
+    title: "A floating file viewer and tabs in the top bar",
+    tags: ["New", "Polish"],
+    highlights: [
       "The right sidebar is gone. Files open in a floating viewer you can move and resize, and the browser, apps, and canvases open as tabs in the top bar (⌘T for a new one, ⌘1–9 to switch).",
       "Connect more than one Google account, and connect Google through Stella’s own sign-in.",
-      "If your session ends, your chat stays on screen and new messages wait until you sign back in, instead of signing you out."
+      "If your session ends, your chat stays on screen and new messages wait until you sign back in, instead of signing you out.",
     ],
-    "more": [
+    more: [
       "The top bar’s + opens a quick menu with search and everything you can open.",
       "The viewer puts your media first, with its actions in the top bar and one thumbnail strip for every kind of file.",
       "Attach files of any size.",
@@ -215,25 +282,20 @@ export const changelogEntries: ChangelogEntry[] = [
       "Saved private values have their own page in Settings.",
       "Stopping dictation while the mic is still opening works, and a crash no longer leaves your Mac muted.",
       "On Windows, the window no longer opens blank, and the pet takes clicks and drags again.",
-      {
-        "text": "Attachments send right away, and the composer follows a model you pick on another device.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Attachments send right away, and the composer follows a model you pick on another device.", product: "Mobile" },
+    ],
   },
   {
-    "release": "Use Stella without an account",
-    "date": "October 16–23, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-10-23",
+    from: "2026-10-16",
+    title: "Use Stella without an account",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Use the desktop app without an account, with Claude Code, ChatGPT, your own API keys, or local models. Your chats stay on your computer until you sign in and choose to add them to your account.",
       "Setup picks Claude Code for you when it’s already installed and signed in.",
-      "On the Free plan, scheduled tasks run on your computer, and wait for it if it’s off or asleep."
+      "On the Free plan, scheduled tasks run on your computer, and wait for it if it’s off or asleep.",
     ],
-    "more": [
+    more: [
       "Long answers from Stella’s models are no longer cut short, and long thinking doesn’t time out.",
       "Images are prepared as soon as you attach them, so sending is quicker.",
       "Video generation uses a newer model that always includes sound.",
@@ -241,427 +303,295 @@ export const changelogEntries: ChangelogEntry[] = [
       "Secure cards ask for a whole login or card at once, with the right keyboard and autofill.",
       "Shared video links play on iPhone.",
       "Files Stella downloads in its browser are there for her tasks to use.",
-      {
-        "text": "Dictation keeps recording when you switch apps.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Dictation keeps recording when you switch apps.", product: "Mobile" },
+    ],
   },
   {
-    "release": "New plans and clearer task updates",
-    "date": "October 15, 2026",
-    "tags": [
-      "New",
-      "Billing"
-    ],
-    "highlights": [
+    date: "2026-10-15",
+    title: "New plans and clearer task updates",
+    tags: ["New", "Billing"],
+    highlights: [
       "New Free, Plus, Pro, and Max plans: start free, then choose more usage as you need it.",
       "See your usage as percentages, compare plans, and upgrade from the plan picker.",
-      "On desktop, scheduled tasks leave a card in chat when you create or change them. Click the card to open Schedule with that task highlighted."
+      "On desktop, scheduled tasks leave a card in chat when you create or change them. Click the card to open Schedule with that task highlighted.",
     ],
-    "more": [
+    more: [
       "When Claude Code reaches a usage limit, a chat card shows what paused and offers a Resume button.",
       "Sending a message and following a long reply scroll more smoothly on desktop.",
-      "Saved servers are easier to find in Settings → Account → Server."
-    ]
+      "Saved servers are easier to find in Settings → Account → Server.",
+    ],
   },
   {
-    "release": "Sign-in and everyday reliability",
-    "date": "October 14, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-10-14",
+    title: "Sign-in and everyday reliability",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Sign in with Google, or use an email link, to bring your account across devices.",
       "Request account deletion from Settings → Account → Delete account.",
-      "Finished background tasks bring their results back more reliably, including when work runs on another computer."
+      "Finished background tasks bring their results back more reliably, including when work runs on another computer.",
     ],
-    "more": [
+    more: [
       "Stella now asks you to sign in before you start chatting.",
       "Desktop dictation gets ready sooner so the first word is less likely to be missed.",
       "Desktop updates arrive without a manual check, and a failed update is caught before replacing the working app.",
-      {
-        "text": "Find files with search and type filters.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Find files with search and type filters.", product: "Mobile" },
+    ],
   },
   {
-    "release": "More control over your account and files",
-    "date": "October 12–13, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-10-13",
+    from: "2026-10-12",
+    title: "More control over your account and files",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Connect Claude Code accounts from Settings, see where they are in use, and sign in on another computer from the same place.",
       "Custom MCP connections now belong to your account and work when Stella runs in the cloud.",
       "Add a passkey, manage signed-in sessions, and receive an alert when a new device signs in.",
-      "Linked files open from the computer or Drive where they live, with previews for plain-text and log files."
+      "Linked files open from the computer or Drive where they live, with previews for plain-text and log files.",
     ],
-    "more": [
+    more: [
       "Export your data from Settings and choose whether to share optional diagnostics.",
       "Reminders offer Done and Snooze, and schedules handle time zones more reliably.",
       "Images linked from Markdown files appear in file previews.",
       "Scheduled check-ins and watch results appear once instead of repeating.",
       "Long conversations and task reports are easier to scroll through without losing your place.",
-      "Claude Code conversations keep more of their context when work moves between the cloud and a computer."
-    ]
+      "Claude Code conversations keep more of their context when work moves between the cloud and a computer.",
+    ],
   },
   {
-    "release": "Your files across devices",
-    "date": "October 10–11, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-10-11",
+    from: "2026-10-10",
+    title: "Your files across devices",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Stella Drive links open across your devices, with images, audio, and video available in the file viewer.",
       "Canvas links are private by default. Use Share when you want to make a file public.",
-      "Connect your own AI provider keys to your account and use them for work in the cloud."
+      "Connect your own AI provider keys to your account and use them for work in the cloud.",
     ],
-    "more": [
+    more: [
       "Stella Browser remembers website sign-ins between sessions.",
       "Claude Code sessions recover more reliably after interrupted work.",
       "Scheduled tasks keep their setup instructions out of chat and show Stella’s answer instead.",
-      {
-        "text": "Files, Schedule, and Apps have clearer navigation and more consistent empty states.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Files, Schedule, and Apps have clearer navigation and more consistent empty states.", product: "Mobile" },
+    ],
   },
   {
-    "release": "Richer replies on your phone",
-    "date": "October 8, 2026",
-    "tags": [
-      "New",
-      "Polish"
+    date: "2026-10-08",
+    title: "Richer replies on your phone",
+    tags: ["New", "Polish"],
+    highlights: [
+      { text: "Replies bring images and other attachments together in a preview strip, with file links underneath.", product: "Mobile" },
+      { text: "Answer Stella’s questions and secure-input requests from your phone, even when the work is happening elsewhere.", product: "Mobile" },
+      { text: "Interactive canvases open with their own titles and can load the images, fonts, and libraries they need.", product: "Mobile" },
     ],
-    "highlights": [
-      {
-        "text": "Replies bring images and other attachments together in a preview strip, with file links underneath.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Answer Stella’s questions and secure-input requests from your phone, even when the work is happening elsewhere.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Interactive canvases open with their own titles and can load the images, fonts, and libraries they need.",
-        "product": "Mobile"
-      }
+    more: [
+      { text: "Task activity shows clearer status icons and no longer brings finished tasks back as running.", product: "Mobile" },
+      { text: "Clearer voice-call errors and more reliable push-notification registration after changing accounts.", product: "Mobile" },
     ],
-    "more": [
-      {
-        "text": "Task activity shows clearer status icons and no longer brings finished tasks back as running.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Clearer voice-call errors and more reliable push-notification registration after changing accounts.",
-        "product": "Mobile"
-      }
-    ]
   },
   {
-    "release": "Make Stella your own",
-    "date": "October 5, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-10-05",
+    title: "Make Stella your own",
+    tags: ["New", "Polish"],
+    highlights: [
       "Ask Stella to change the desktop app, then apply or undo the changes. Bring a change to another computer when you want it there too.",
       "Connect multiple Claude Code and ChatGPT accounts and switch between them.",
-      "A rebuilt first-run walkthrough makes it easier to set up Stella and choose how you want to work."
-    ]
+      "A rebuilt first-run walkthrough makes it easier to set up Stella and choose how you want to work.",
+    ],
   },
   {
-    "release": "v0.1.104 – v0.1.105",
-    "date": "September 26–27, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-09-27",
+    from: "2026-09-26",
+    title: "v0.1.104 – v0.1.105",
+    tags: ["New", "Polish"],
+    highlights: [
       "See background tasks in the chat top bar and adjust your conversation from Chat settings.",
       "The composer’s plus button opens a dedicated attachment sheet.",
-      "Stella starts faster, and typing no longer makes the rest of the window work as hard."
+      "Stella starts faster, and typing no longer makes the rest of the window work as hard.",
     ],
-    "more": [
+    more: [
       "Queued messages look like sent messages, making the conversation easier to follow.",
       "Dictation starts listening while the connection gets ready.",
-      "Model choices stay in sync with your account."
-    ]
+      "Model choices stay in sync with your account.",
+    ],
   },
   {
-    "release": "v0.1.103",
-    "date": "September 12, 2026",
-    "tags": [
-      "Polish"
+    date: "2026-09-12",
+    title: "v0.1.103",
+    tags: ["Polish"],
+    highlights: [
+      { text: "Workspace apps open edge to edge, with one back control to return to Stella.", product: "Mobile" },
     ],
-    "highlights": [
-      {
-        "text": "Workspace apps open edge to edge, with one back control to return to Stella.",
-        "product": "Mobile"
-      }
-    ],
-    "more": [
-      {
-        "text": "The app library loads faster and keeps recently opened apps ready.",
-        "product": "Mobile"
-      },
+    more: [
+      { text: "The app library loads faster and keeps recently opened apps ready.", product: "Mobile" },
       "Install Stella on Linux with a single command.",
-      "Improved keyboard access in dialogs and filled in missing translations."
-    ]
+      "Improved keyboard access in dialogs and filled in missing translations.",
+    ],
   },
   {
-    "release": "v0.1.102",
-    "date": "September 11, 2026",
-    "tags": [
-      "New"
+    date: "2026-09-11",
+    title: "v0.1.102",
+    tags: ["New"],
+    highlights: [
+      "Apps Stella builds in the cloud are available across desktop, browser, and phone.",
     ],
-    "highlights": [
-      "Apps Stella builds in the cloud are available across desktop, browser, and phone."
-    ]
   },
   {
-    "release": "v0.1.101",
-    "date": "September 10, 2026",
-    "tags": [
-      "Polish",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-09-10",
+    title: "v0.1.101",
+    tags: ["Polish", "Fixes"],
+    highlights: [
       "Files and connected-app actions appear as compact pills above Stella's replies, with fewer duplicate links and cards.",
       "Open files from Stella Drive directly in the workspace panel.",
-      "Reply navigation and focused conversations are easier to follow across desktop and mobile."
+      "Reply navigation and focused conversations are easier to follow across desktop and mobile.",
     ],
-    "more": [
+    more: [
       "New chats enter your history after you send the first message, keeping unused empty chats out of the list.",
-      {
-        "text": "Scrolling stays steadier when you drag through a conversation while a reply arrives.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Read-aloud starts and recovers from interrupted playback more reliably.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Settings stays accessible while your computer connects, and activity lists show fewer duplicate file entries.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Scrolling stays steadier when you drag through a conversation while a reply arrives.", product: "Mobile" },
+      { text: "Read-aloud starts and recovers from interrupted playback more reliably.", product: "Mobile" },
+      { text: "Settings stays accessible while your computer connects, and activity lists show fewer duplicate file entries.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.94 – v0.1.100",
-    "date": "September 7–8, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-09-08",
+    from: "2026-09-07",
+    title: "v0.1.94 – v0.1.100",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Replies to earlier messages now include a quote you can follow back to the original ask. Open a focused conversation to read the exchange together.",
       "When a background task finishes, its reply brings the task reference and produced files together.",
-      "Create a new chat from Conversation history. Empty chats show Home automatically."
+      "Create a new chat from Conversation history. Empty chats show Home automatically.",
     ],
-    "more": [
+    more: [
       "Brief connection interruptions no longer immediately show an offline notice.",
       "ChatGPT connections recover expired sessions more reliably and show a reconnect notice when sign-in is needed.",
       "Background tasks with similar descriptions keep their own identities and results.",
-      {
-        "text": "Conversation text stays visible while messages sync, and replies from your paired computer arrive in the right order.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Realtime voice starts more reliably and has updated character animations for each stage of the conversation.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Refined the composer, theme controls, and file links in completed task replies.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Conversation text stays visible while messages sync, and replies from your paired computer arrive in the right order.", product: "Mobile" },
+      { text: "Realtime voice starts more reliably and has updated character animations for each stage of the conversation.", product: "Mobile" },
+      { text: "Refined the composer, theme controls, and file links in completed task replies.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.86 – v0.1.93",
-    "date": "September 5–7, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-09-07",
+    from: "2026-09-05",
+    title: "v0.1.86 – v0.1.93",
+    tags: ["New", "Polish"],
+    highlights: [
       "Use Stella across desktop, browser, and phone, with conversation history available across clients.",
       "Background agents can work through hosted services as well as your computer, then bring their results back into your conversation.",
-      "Dictation shows listening feedback as you speak and handles interrupted recordings more reliably."
+      "Dictation shows listening feedback as you speak and handles interrupted recordings more reliably.",
     ],
-    "more": [
+    more: [
       "Stella responds with working feedback sooner, and the indicator settles when the response is complete even if background tasks are still running.",
       "File attachments keep the references agents need to read them, while internal attachment details stay out of your visible message.",
       "Browser chat supports attachments and remembers your model choices.",
       "Improved recovery for interrupted agent work and access to completed task reports.",
       "Large conversation histories load in smaller portions to keep navigation responsive.",
-      {
-        "text": "Create chats, switch conversations, and choose a model without connecting to a computer.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Photos and files remain available in conversation history, and previews recover after your computer reconnects.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Updated menus, settings sheets, text selection, and screen spacing, with fixes for Android touch controls and guest sessions.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Create chats, switch conversations, and choose a model without connecting to a computer.", product: "Mobile" },
+      { text: "Photos and files remain available in conversation history, and previews recover after your computer reconnects.", product: "Mobile" },
+      { text: "Updated menus, settings sheets, text selection, and screen spacing, with fixes for Android touch controls and guest sessions.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.82 – v0.1.85",
-    "date": "August 28–29, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-08-29",
+    from: "2026-08-28",
+    title: "v0.1.82 – v0.1.85",
+    tags: ["New", "Polish"],
+    highlights: [
       "Desktop updates download in the background so they're ready for a one-click install.",
       "Stella can run apps made of multiple processes, including projects with a separate frontend and server.",
-      "Connect a Link wallet from Stella and manage the connection in Settings."
+      "Connect a Link wallet from Stella and manage the connection in Settings.",
     ],
-    "more": [
+    more: [
       "Working feedback now sits in a chat bubble with a cleaner transition into Stella's reply.",
       "Model controls are available without enabling Developer mode.",
       "Rewinding a conversation also clears leftover reply overlays.",
       "Links in chat open in Stella's browser.",
       "Improved Claude Code startup and delivery of follow-up instructions while an agent is working.",
-      {
-        "text": "Long chats load in portions and keep your reading position more reliably.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Animations pause while the app is in the background, and the onboarding character has a new face.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Long chats load in portions and keep your reading position more reliably.", product: "Mobile" },
+      { text: "Animations pause while the app is in the background, and the onboarding character has a new face.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.72 – v0.1.81",
-    "date": "August 24–27, 2026",
-    "tags": [
-      "Polish",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-08-27",
+    from: "2026-08-24",
+    title: "v0.1.72 – v0.1.81",
+    tags: ["Polish", "Fixes"],
+    highlights: [
       "Long conversations use less work to load and update, and large CSV previews are capped to keep the interface responsive.",
       "Scheduling tools now handle recurring check-ins and edits alongside other scheduled work.",
-      "Windows releases are signed and verified, with fixes for dragging the desktop window."
+      "Windows releases are signed and verified, with fixes for dragging the desktop window.",
     ],
-    "more": [
+    more: [
       "Working messages better follow the task Stella is performing.",
       "Improved sign-in handoffs and session handling across the app.",
       "The phone connection screen includes an Android download QR code.",
       "Improved command-output handling so large or repeated output does not overwhelm a task.",
-      {
-        "text": "Selected assistant text keeps its formatting, and active agents take priority in the activity list.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Updated dictation and improved generated-image model selection.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Selected assistant text keeps its formatting, and active agents take priority in the activity list.", product: "Mobile" },
+      { text: "Updated dictation and improved generated-image model selection.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.62 – v0.1.71",
-    "date": "August 20–22, 2026",
-    "tags": [
-      "New",
-      "Polish"
-    ],
-    "highlights": [
+    date: "2026-08-22",
+    from: "2026-08-20",
+    title: "v0.1.62 – v0.1.71",
+    tags: ["New", "Polish"],
+    highlights: [
       "Agent activity is easier to scan, with simpler status rows and file pills for completed work.",
       "Long chats load older messages as you need them, while long user messages collapse to a short preview.",
-      "Rewind now removes the later conversation from the timeline and shows a visible confirmation."
+      "Rewind now removes the later conversation from the timeline and shows a visible confirmation.",
     ],
-    "more": [
+    more: [
       "Improved recall of earlier conversations and custom OpenRouter model selection.",
       "Stella can check on a background agent without interrupting its work.",
       "Scheduled scripts can use your signed-in session more reliably.",
       "Updated text-selection contrast and Linux onboarding layout.",
-      {
-        "text": "An activity hub brings agents and schedules together, with schedule changes appearing as they happen.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Fixed chat-sync and voice freezes, post-send scrolling jumps, and replies redrawing when they finish.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Starting dictation stops read-aloud immediately.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "An activity hub brings agents and schedules together, with schedule changes appearing as they happen.", product: "Mobile" },
+      { text: "Fixed chat-sync and voice freezes, post-send scrolling jumps, and replies redrawing when they finish.", product: "Mobile" },
+      { text: "Starting dictation stops read-aloud immediately.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.50 – v0.1.61",
-    "date": "August 17–19, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-08-19",
+    from: "2026-08-17",
+    title: "v0.1.50 – v0.1.61",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Read-aloud begins playing before the full audio is ready, on desktop and mobile.",
       "Each conversation remembers its model choice, and opening a chat from history restores its setup.",
-      "Windows updates use a Stella progress screen and handle the browser connection more reliably during restart."
+      "Windows updates use a Stella progress screen and handle the browser connection more reliably during restart.",
     ],
-    "more": [
+    more: [
       "Long tasks better preserve your latest instruction when older context is condensed.",
       "Cleaner working indicators hide raw command payloads and avoid blank space left by replaced replies.",
       "Sidebar tabs recover when their underlying item is removed, and tab labels stay visible.",
       "Browser extension setup has clearer connection states.",
-      {
-        "text": "Generated images are easier to share, with fixes for duplicate results and canceled jobs.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Read-aloud recovers from playback stalls, and dictation finishes without competing audio sessions.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Restored richer tool activity and separate cards for agent tasks.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Generated images are easier to share, with fixes for duplicate results and canceled jobs.", product: "Mobile" },
+      { text: "Read-aloud recovers from playback stalls, and dictation finishes without competing audio sessions.", product: "Mobile" },
+      { text: "Restored richer tool activity and separate cards for agent tasks.", product: "Mobile" },
+    ],
   },
   {
-    "release": "v0.1.43 – v0.1.49",
-    "date": "August 15–17, 2026",
-    "tags": [
-      "New",
-      "Fixes"
-    ],
-    "highlights": [
+    date: "2026-08-17",
+    from: "2026-08-15",
+    title: "v0.1.43 – v0.1.49",
+    tags: ["New", "Fixes"],
+    highlights: [
       "Linux packaging now supports Arch and Omarchy.",
       "The workspace panel has separate tabs for files, browser pages, and quick chats, with titles based on what you open.",
-      "Stella's browser keeps signed-in website sessions in sync more reliably."
+      "Stella's browser keeps signed-in website sessions in sync more reliably.",
     ],
-    "more": [
+    more: [
       "Switching models during a long conversation handles context limits more reliably.",
       "Sending a message no longer clips its top or leaves it stranded halfway down the chat.",
       "Agent rows open their transcripts, with a separate control for task details.",
       "The phone connection dialog opens directly to pairing.",
-      {
-        "text": "Background task results appear as they finish, and activity cards stay in place while updates arrive.",
-        "product": "Mobile"
-      },
-      {
-        "text": "Improved message ordering and recovery when conversation sync falls behind.",
-        "product": "Mobile"
-      }
-    ]
+      { text: "Background task results appear as they finish, and activity cards stay in place while updates arrive.", product: "Mobile" },
+      { text: "Improved message ordering and recovery when conversation sync falls behind.", product: "Mobile" },
+    ],
   },
   {
-    release: "v0.1.37 – v0.1.42",
-    date: "August 14, 2026",
+    date: "2026-08-14",
+    title: "v0.1.37 – v0.1.42",
     tags: ["New", "Polish"],
     highlights: [
       "Stella now runs on Linux, with a native AppImage build that installs cleanly and opens Stella links just like it does on macOS and Windows.",
@@ -680,8 +610,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.1.33 – v0.1.36",
-    date: "August 12, 2026",
+    date: "2026-08-12",
+    title: "v0.1.33 – v0.1.36",
     tags: ["New", "Polish"],
     highlights: [
       "Fork a conversation from any of your messages, or rewind safely to an earlier point and take the chat in a different direction.",
@@ -698,8 +628,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.1.29 – v0.1.32",
-    date: "August 11, 2026",
+    date: "2026-08-11",
+    title: "v0.1.29 – v0.1.32",
     tags: ["New", "Polish"],
     highlights: [
       "Sign in inside Stella's browser more naturally, including popup flows, security-key prompts, and sites that check the browser they are running in.",
@@ -716,8 +646,9 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.1.25 – v0.1.28",
-    date: "August 10–11, 2026",
+    date: "2026-08-11",
+    from: "2026-08-10",
+    title: "v0.1.25 – v0.1.28",
     tags: ["New", "Polish"],
     highlights: [
       "New chats now start in Orchestrator mode, so Stella can coordinate longer work and helper agents by default.",
@@ -733,8 +664,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.1.21 – v0.1.24",
-    date: "August 10, 2026",
+    date: "2026-08-10",
+    title: "v0.1.21 – v0.1.24",
     tags: ["New", "Polish"],
     highlights: [
       "Dictation now sets up its local speech model quietly in the background, with cloud transcription ready while the download finishes.",
@@ -748,8 +679,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.1.13 – v0.1.20",
-    date: "August 9, 2026",
+    date: "2026-08-09",
+    title: "v0.1.13 – v0.1.20",
     tags: ["New", "Polish"],
     highlights: [
       "A new aurora crescent-S identity now carries across the desktop, mobile app, browser extension, and animated shell.",
@@ -768,8 +699,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.1.0 – v0.1.12",
-    date: "August 6, 2026",
+    date: "2026-08-06",
+    title: "v0.1.0 – v0.1.12",
     tags: ["New"],
     highlights: [
       "Stella v2 introduces a redesigned desktop app with a new agent runtime and workspace.",
@@ -788,8 +719,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.447 – v0.0.448",
-    date: "July 28, 2026",
+    date: "2026-07-28",
+    title: "v0.0.447 – v0.0.448",
     tags: ["New", "Polish"],
     highlights: [
       "A new shell layout — the left sidebar is gone, the top bar spans the main window, and the right panel is now the home for Tasks, Search, Files, and Apps.",
@@ -807,8 +738,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.440 – v0.0.446",
-    date: "July 24, 2026",
+    date: "2026-07-24",
+    title: "v0.0.440 – v0.0.446",
     tags: ["New", "Polish"],
     highlights: [
       "Select multiple areas of your screen — each one becomes its own chip on your message.",
@@ -825,8 +756,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.431 – v0.0.439",
-    date: "July 17, 2026",
+    date: "2026-07-17",
+    title: "v0.0.431 – v0.0.439",
     tags: ["New", "Polish"],
     highlights: [
       "Stella can spin up helper agents that report back — Activity shows them nested under the work that started them.",
@@ -842,8 +773,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.398 – v0.0.430",
-    date: "July 11, 2026",
+    date: "2026-07-11",
+    title: "v0.0.398 – v0.0.430",
     tags: ["New", "Polish"],
     highlights: [
       "The model picker got a brand-icon rail, so finding OpenAI, Anthropic, Grok, and friends is faster.",
@@ -859,8 +790,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.385 – v0.0.397",
-    date: "July 6, 2026",
+    date: "2026-07-06",
+    title: "v0.0.385 – v0.0.397",
     tags: ["New", "Polish"],
     highlights: [
       "Connect apps right from the chat — when Stella needs Gmail, Slack, Notion and more, she offers a one-click connect card and keeps working in the meantime.",
@@ -877,8 +808,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.373 – v0.0.384",
-    date: "July 2, 2026",
+    date: "2026-07-02",
+    title: "v0.0.373 – v0.0.384",
     tags: ["New", "Polish"],
     highlights: [
       "The Activity area is now an expandable per-task tray — see each task's live files and progress as it works.",
@@ -894,8 +825,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.362 – v0.0.372",
-    date: "June 30, 2026",
+    date: "2026-06-30",
+    title: "v0.0.362 – v0.0.372",
     tags: ["New", "Polish"],
     highlights: [
       "Assistant messages now have a collapsible activity trace, so you can peek at the tools Stella used.",
@@ -912,8 +843,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.355 – v0.0.361",
-    date: "June 28, 2026",
+    date: "2026-06-28",
+    title: "v0.0.355 – v0.0.361",
     tags: ["New", "Polish"],
     highlights: [
       "When Stella keeps working in the background, you now see a live card in the chat (and a small activity pill in the composer) so you always know what's running.",
@@ -932,8 +863,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.351 – v0.0.354",
-    date: "June 25, 2026",
+    date: "2026-06-25",
+    title: "v0.0.351 – v0.0.354",
     tags: ["New", "Polish"],
     highlights: [
       "A redesigned workspace — the full window is now a cleaner main-and-side layout, with a collapsible left sidebar and a single floating display panel.",
@@ -951,8 +882,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.348 – v0.0.350",
-    date: "June 13, 2026",
+    date: "2026-06-13",
+    title: "v0.0.348 – v0.0.350",
     tags: ["New", "Polish"],
     highlights: [
       "Canvas library — a home for all the pages Stella builds for you.",
@@ -968,8 +899,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.345 – v0.0.347",
-    date: "June 10, 2026",
+    date: "2026-06-10",
+    title: "v0.0.345 – v0.0.347",
     tags: ["New", "Polish"],
     highlights: [
       "Paste images straight into the composer, or attach them by path.",
@@ -982,8 +913,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.343 – v0.0.344",
-    date: "June 10, 2026",
+    date: "2026-06-10",
+    title: "v0.0.343 – v0.0.344",
     tags: ["New", "Polish"],
     highlights: [
       "Onboarding is now a guided, interactive five-act walkthrough that shows Stella in action.",
@@ -996,8 +927,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.341 – v0.0.342",
-    date: "June 9, 2026",
+    date: "2026-06-09",
+    title: "v0.0.341 – v0.0.342",
     tags: ["Polish"],
     highlights: [
       "Stella's replies now sweep in with a smooth left-to-right reveal as she writes.",
@@ -1013,8 +944,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.334 – v0.0.340",
-    date: "June 8, 2026",
+    date: "2026-06-08",
+    title: "v0.0.334 – v0.0.340",
     tags: ["New", "Polish"],
     highlights: [
       "A fresh coat of paint — Stella's desktop moved to a flat, Mac-native look, with new Light and Dark themes joining the gradient and colorful ones.",
@@ -1034,8 +965,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.325 – v0.0.333",
-    date: "June 7, 2026",
+    date: "2026-06-07",
+    title: "v0.0.325 – v0.0.333",
     tags: ["New", "Polish"],
     highlights: [
       "Updating Stella is friendlier — changes show up as a pending card you can apply when you're ready.",
@@ -1052,8 +983,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.323 – v0.0.324",
-    date: "June 6, 2026",
+    date: "2026-06-06",
+    title: "v0.0.323 – v0.0.324",
     tags: ["Polish"],
     highlights: [
       "The Connect screen and app list are now left-aligned and easier to scan.",
@@ -1069,8 +1000,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.321 – v0.0.322",
-    date: "June 5, 2026",
+    date: "2026-06-05",
+    title: "v0.0.321 – v0.0.322",
     tags: ["New", "Polish"],
     highlights: [
       "Meeting recording — Stella can capture and summarize your meetings.",
@@ -1094,8 +1025,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.314 – v0.0.320",
-    date: "June 4, 2026",
+    date: "2026-06-04",
+    title: "v0.0.314 – v0.0.320",
     tags: ["New", "Polish"],
     highlights: [
       "Point at part of your screen and leave a note for Stella right where it matters.",
@@ -1118,8 +1049,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.313",
-    date: "June 3, 2026",
+    date: "2026-06-03",
+    title: "v0.0.313",
     tags: ["New", "Polish"],
     highlights: [
       "Mini window got a dedicated lean entry point for faster, lighter launches.",
@@ -1137,8 +1068,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.295 – v0.0.312",
-    date: "June 2, 2026",
+    date: "2026-06-02",
+    title: "v0.0.295 – v0.0.312",
     tags: ["New", "Polish"],
     highlights: [
       "Custom overlay theme — Stella redesigns can now apply live to a Custom theme.",
@@ -1160,8 +1091,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.287 – v0.0.294",
-    date: "June 1, 2026",
+    date: "2026-06-01",
+    title: "v0.0.287 – v0.0.294",
     tags: ["New", "Polish"],
     highlights: [
       "Managed image generation waits for results and surfaces failures more clearly.",
@@ -1185,12 +1116,12 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.282 – v0.0.286",
-    date: "May 31, 2026",
+    date: "2026-05-31",
+    title: "v0.0.282 – v0.0.286",
     tags: ["Polish"],
     highlights: [
       "Settings are now translated across all supported languages.",
-      'The composer placeholder now simply says "Do anything."',
+      "The composer placeholder now simply says \"Do anything.\"",
     ],
     more: [
       "User-message context chips and chat typography were tightened up.",
@@ -1208,8 +1139,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.272 – v0.0.281",
-    date: "May 30, 2026",
+    date: "2026-05-30",
+    title: "v0.0.272 – v0.0.281",
     tags: ["New", "Polish"],
     highlights: [
       "App creation can now start from the Apps empty state with a prefilled prompt.",
@@ -1231,8 +1162,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.267 – v0.0.271",
-    date: "May 29, 2026",
+    date: "2026-05-29",
+    title: "v0.0.267 – v0.0.271",
     tags: ["New", "Polish"],
     highlights: [
       "Store releases can now be published from selected source changes.",
@@ -1252,8 +1183,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.258 – v0.0.266",
-    date: "May 28, 2026",
+    date: "2026-05-28",
+    title: "v0.0.258 – v0.0.266",
     tags: ["New", "Polish"],
     highlights: [
       "Mobile can now sync computer-chat artifacts from the desktop.",
@@ -1279,8 +1210,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.254 – v0.0.257",
-    date: "May 27, 2026",
+    date: "2026-05-27",
+    title: "v0.0.254 – v0.0.257",
     tags: ["New", "Polish"],
     highlights: [
       "Model controls moved into the display sidebar, with a wider and cleaner engine picker.",
@@ -1301,8 +1232,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.250 – v0.0.253",
-    date: "May 26, 2026",
+    date: "2026-05-26",
+    title: "v0.0.250 – v0.0.253",
     tags: ["New", "Polish"],
     highlights: [
       "Cadence reports now appear as chat artifacts.",
@@ -1324,8 +1255,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.245 – v0.0.249",
-    date: "May 25, 2026",
+    date: "2026-05-25",
+    title: "v0.0.245 – v0.0.249",
     tags: ["New", "Polish"],
     highlights: [
       "Codex and Claude Code engine paths landed.",
@@ -1347,8 +1278,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.237 – v0.0.244",
-    date: "May 24, 2026",
+    date: "2026-05-24",
+    title: "v0.0.237 – v0.0.244",
     tags: ["New", "Polish"],
     highlights: [
       "Low-resource desktop launch mode added.",
@@ -1370,8 +1301,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.232 – v0.0.236",
-    date: "May 23, 2026",
+    date: "2026-05-23",
+    title: "v0.0.232 – v0.0.236",
     tags: ["New", "Polish"],
     highlights: [
       "Locked computer use — Stella can now keep computer-control work more contained when needed.",
@@ -1392,8 +1323,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.211 – v0.0.231",
-    date: "May 22, 2026",
+    date: "2026-05-22",
+    title: "v0.0.211 – v0.0.231",
     tags: ["New", "Polish"],
     highlights: [
       "Composer now has a New Chat action.",
@@ -1415,8 +1346,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.192 – v0.0.210",
-    date: "May 21, 2026",
+    date: "2026-05-21",
+    title: "v0.0.192 – v0.0.210",
     tags: ["New", "Polish"],
     highlights: [
       "New Engine onboarding phase for technical users.",
@@ -1439,8 +1370,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.178 – v0.0.191",
-    date: "May 20, 2026",
+    date: "2026-05-20",
+    title: "v0.0.178 – v0.0.191",
     tags: ["New", "Polish"],
     highlights: [
       "Settings → Models and the composer model picker got a cleaner redesign, with the real model name shown on every Stella tier row.",
@@ -1479,8 +1410,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.169 – v0.0.177",
-    date: "May 19, 2026",
+    date: "2026-05-19",
+    title: "v0.0.169 – v0.0.177",
     tags: ["New", "Polish"],
     highlights: [
       "Sign in with Google is now available in the desktop app.",
@@ -1506,8 +1437,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.164 – v0.0.168",
-    date: "May 18, 2026",
+    date: "2026-05-18",
+    title: "v0.0.164 – v0.0.168",
     tags: ["Polish"],
     highlights: [
       "Stella's replies now appear more smoothly as she writes, with less jitter.",
@@ -1530,8 +1461,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.153 – v0.0.163",
-    date: "May 17, 2026",
+    date: "2026-05-17",
+    title: "v0.0.153 – v0.0.163",
     tags: ["New", "Polish"],
     highlights: [
       "More integrations now connect through Stella Connect, including Store add-ons and Google Workspace.",
@@ -1552,8 +1483,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.150 – v0.0.152",
-    date: "May 16, 2026",
+    date: "2026-05-16",
+    title: "v0.0.150 – v0.0.152",
     tags: ["New", "Polish"],
     highlights: [
       "Sidebar chat now loads older messages when you scroll to the top.",
@@ -1576,8 +1507,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.141 – v0.0.149",
-    date: "May 15, 2026",
+    date: "2026-05-15",
+    title: "v0.0.141 – v0.0.149",
     tags: ["New", "Polish"],
     highlights: [
       "Chat home overview redesigned around an Activity layout, with a paginated, virtualized \"See all\" history dialog.",
@@ -1605,8 +1536,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.139 – v0.0.140",
-    date: "May 14, 2026",
+    date: "2026-05-14",
+    title: "v0.0.139 – v0.0.140",
     tags: ["Polish"],
     highlights: [
       "Model picker opens instantly, and unavailable choices are checked reliably.",
@@ -1619,8 +1550,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.135 – v0.0.138",
-    date: "May 13, 2026",
+    date: "2026-05-13",
+    title: "v0.0.135 – v0.0.138",
     tags: ["New", "Polish"],
     highlights: [
       "Inline undo for self-mod commits, with thread-aware reminders so you can roll back a change Stella just made.",
@@ -1640,8 +1571,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.132 – v0.0.134",
-    date: "May 12, 2026",
+    date: "2026-05-12",
+    title: "v0.0.132 – v0.0.134",
     tags: ["New", "Polish"],
     highlights: [
       "Read aloud: Stella can speak her replies, with a play button on each message and a menu toggle for auto-play.",
@@ -1661,8 +1592,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.127 – v0.0.131",
-    date: "May 11, 2026",
+    date: "2026-05-11",
+    title: "v0.0.127 – v0.0.131",
     tags: ["New", "Billing"],
     highlights: [
       "Buy extra usage credit on the billing page when you run low: no need to wait for the monthly reset.",
@@ -1685,10 +1616,9 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.115 – v0.0.126",
-    date: "May 10, 2026",
+    date: "2026-05-10",
+    title: "v0.0.115 – v0.0.126",
     tags: ["Polish", "Under the hood"],
-    highlights: [],
     more: [
       "Store side panel and Publish dialog got a UX pass.",
       "Stella applies self-changes with fewer restarts and less visual flashing.",
@@ -1699,8 +1629,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.109 – v0.0.114",
-    date: "May 9, 2026",
+    date: "2026-05-09",
+    title: "v0.0.109 – v0.0.114",
     tags: ["New", "Billing"],
     highlights: [
       "Billing moved to a Stripe-hosted Checkout with managed payments, and the screen was redesigned to match the Stella aesthetic.",
@@ -1717,8 +1647,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.105 – v0.0.108",
-    date: "May 8, 2026",
+    date: "2026-05-08",
+    title: "v0.0.105 – v0.0.108",
     tags: ["New", "Polish"],
     highlights: [
       "Canvas tab: Stella can answer with a richer visual view when a chart, layout, or interactive page fits better than plain text.",
@@ -1736,8 +1666,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.104",
-    date: "May 7, 2026",
+    date: "2026-05-07",
+    title: "v0.0.104",
     tags: ["New", "Polish"],
     highlights: [
       "Connect integrations got a cleaner setup path.",
@@ -1752,8 +1682,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.104",
-    date: "May 6, 2026",
+    date: "2026-05-06",
+    title: "v0.0.104",
     tags: ["Under the hood", "Polish"],
     highlights: [
       "Hosted Store now runs embedded in the desktop, replacing the legacy native Store UI.",
@@ -1767,8 +1697,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.94 – v0.0.103",
-    date: "May 5, 2026",
+    date: "2026-05-05",
+    title: "v0.0.94 – v0.0.103",
     tags: ["New", "Polish"],
     highlights: [
       "\"Hey Stella\" voice activation has fewer false starts.",
@@ -1784,8 +1714,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.94 – v0.0.103",
-    date: "May 4, 2026",
+    date: "2026-05-04",
+    title: "v0.0.94 – v0.0.103",
     tags: ["Polish"],
     highlights: [
       "Music generation added.",
@@ -1798,8 +1728,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.91 – v0.0.93",
-    date: "May 3, 2026",
+    date: "2026-05-03",
+    title: "v0.0.91 – v0.0.93",
     tags: ["New", "Polish"],
     highlights: [
       "Wake-word voice activation is back: say \"Hey Stella\" to start a voice session, with a bundled prebuilt listener for macOS and Windows. (Off by default; turn it on in settings.)",
@@ -1819,8 +1749,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.91 – v0.0.93",
-    date: "May 2, 2026",
+    date: "2026-05-02",
+    title: "v0.0.91 – v0.0.93",
     tags: ["New"],
     highlights: [
       "Floating pet companion in its own window: hatch one with the new pet skill. The pet drives voice mode (replacing the old voice creature overlay) and surfaces status updates.",
@@ -1840,8 +1770,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.90",
-    date: "May 1, 2026",
+    date: "2026-05-01",
+    title: "v0.0.90",
     tags: ["New", "Onboarding"],
     highlights: [
       "Personalized app recommendations during onboarding (with badges prefixed \"Stella may:\").",
@@ -1865,8 +1795,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.80 – v0.0.89",
-    date: "April 30, 2026",
+    date: "2026-04-30",
+    title: "v0.0.80 – v0.0.89",
     tags: ["New", "Polish"],
     highlights: [
       "Click-to-update launcher: Stella can now check for and install updates on demand, with a manual update check, reinstall option, and a native uninstall confirmation.",
@@ -1887,8 +1817,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.70 – v0.0.79",
-    date: "April 29, 2026",
+    date: "2026-04-29",
+    title: "v0.0.70 – v0.0.79",
     tags: ["New", "Polish"],
     highlights: [
       "Universal macOS desktop builds: one download works on both Apple Silicon and Intel Macs.",
@@ -1911,8 +1841,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.66 – v0.0.69",
-    date: "April 28, 2026",
+    date: "2026-04-28",
+    title: "v0.0.66 – v0.0.69",
     tags: ["New", "Polish"],
     highlights: [
       "New setting to keep Stella awake so background work isn't interrupted.",
@@ -1928,8 +1858,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.61 – v0.0.65",
-    date: "April 27, 2026",
+    date: "2026-04-27",
+    title: "v0.0.61 – v0.0.65",
     tags: ["New"],
     highlights: [
       "Voice and dictation are now part of the onboarding tour.",
@@ -1944,13 +1874,13 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.60",
-    date: "April 26, 2026",
+    date: "2026-04-26",
+    title: "v0.0.60",
     tags: ["New", "Windows"],
     highlights: [
       "Stella Connect: connect external services to Stella.",
       "Computer-use comes to Windows: Stella can now click and type on your screen on Windows machines.",
-      'New "+" menu in the chat composer to attach files, capture your screen, or grab recents.',
+      "New \"+\" menu in the chat composer to attach files, capture your screen, or grab recents.",
       "Markdown and developer-file previews in the side panel.",
       "Shortcuts settings tab.",
       "Cloud backups are now part of the paid plan.",
@@ -1961,8 +1891,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.58 – v0.0.59",
-    date: "April 25, 2026",
+    date: "2026-04-25",
+    title: "v0.0.58 – v0.0.59",
     tags: ["New"],
     highlights: [
       "Local Parakeet dictation: fast, private, runs on your device.",
@@ -1976,8 +1906,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.57",
-    date: "April 24, 2026",
+    date: "2026-04-24",
+    title: "v0.0.57",
     tags: ["New", "Polish"],
     highlights: [
       "File-artifact previews in the display sidebar (Codex-style chrome).",
@@ -1990,11 +1920,11 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.57",
-    date: "April 23, 2026",
+    date: "2026-04-23",
+    title: "v0.0.57",
     tags: ["New", "Polish"],
     highlights: [
-      'New "Ask Stella" pill that appears above text you select: works in Stella and across other apps.',
+      "New \"Ask Stella\" pill that appears above text you select: works in Stella and across other apps.",
       "Display panel is now resizable and can expand to fill the window, even taking over the mini window.",
       "Radial dial restored, replacing the cmd+right-click native menu.",
       "New Inworld dictation option in the composer.",
@@ -2008,8 +1938,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.57",
-    date: "April 22, 2026",
+    date: "2026-04-22",
+    title: "v0.0.57",
     tags: ["New"],
     highlights: [
       "Agents can now ask you a question inline in chat (askQuestion).",
@@ -2019,19 +1949,19 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
     more: [
       "Big computer-use reliability pass: clicks now actually deliver to backgrounded apps, with overlay continuity fixed.",
-      'Show more / show less for long user messages.',
+      "Show more / show less for long user messages.",
       "Settings and Theme moved to the sidebar title bar.",
       "Backend protections now cover every public entry point.",
     ],
   },
   {
-    release: "v0.0.57",
-    date: "April 21, 2026",
+    date: "2026-04-21",
+    title: "v0.0.57",
     tags: ["New"],
     highlights: [
       "Auto-display generated images in the display sidebar.",
       "Live Memory phase added to onboarding (with sign-in resume).",
-      'New "Cozy" theme.',
+      "New \"Cozy\" theme.",
     ],
     more: [
       "Sidebar app discovery became more reliable.",
@@ -2039,10 +1969,9 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.53 – v0.0.56",
-    date: "April 20, 2026",
+    date: "2026-04-20",
+    title: "v0.0.53 – v0.0.56",
     tags: ["Under the hood"],
-    highlights: [],
     more: [
       "Major internal reliability upgrade for how agents run.",
       "Stella's instructions were reorganized for clearer behavior.",
@@ -2050,16 +1979,16 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 19, 2026",
+    date: "2026-04-19",
+    title: "v0.0.53",
     tags: ["New"],
     highlights: [
       "Display sidebar now renders Word, Excel, PowerPoint, PDF, and HTML files.",
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 18, 2026",
+    date: "2026-04-18",
+    title: "v0.0.53",
     tags: ["New"],
     highlights: [
       "Suggestion chips above the full chat composer.",
@@ -2068,20 +1997,20 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 17, 2026",
+    date: "2026-04-17",
+    title: "v0.0.53",
     tags: ["New"],
     highlights: [
       "Cmd+right-click context menu replaces the radial gesture overlay.",
       "Action overlay with a breathing lens and software cursor when Stella controls your computer.",
     ],
     more: [
-      'Onboarding creation mock rebuilt with section-transformation pills.',
+      "Onboarding creation mock rebuilt with section-transformation pills.",
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 16, 2026",
+    date: "2026-04-16",
+    title: "v0.0.53",
     tags: ["New"],
     highlights: [
       "macOS desktop automation engine with auto-attached screenshots.",
@@ -2093,20 +2022,20 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 15, 2026",
+    date: "2026-04-15",
+    title: "v0.0.53",
     highlights: [
       "Stella can write and edit files more directly.",
     ],
     more: [
       "Onboarding reveals theme options in steps.",
-      'Refreshed emote bundle.',
-      'Pause self-mod hot reload while shell or code-mode writes are happening (less flicker).',
+      "Refreshed emote bundle.",
+      "Pause self-mod hot reload while shell or code-mode writes are happening (less flicker).",
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 14, 2026",
+    date: "2026-04-14",
+    title: "v0.0.53",
     tags: ["New"],
     highlights: [
       "Stella shows short thinking summaries while she works, so you can see what she's doing.",
@@ -2117,8 +2046,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 13, 2026",
+    date: "2026-04-13",
+    title: "v0.0.53",
     more: [
       "Smoother live replies, especially after resuming hidden work.",
       "Exponential backoff retry for OpenAI completions.",
@@ -2126,8 +2055,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.53",
-    date: "April 12, 2026",
+    date: "2026-04-12",
+    title: "v0.0.53",
     tags: ["New"],
     highlights: [
       "New deeper coding mode for technical tasks.",
@@ -2139,11 +2068,11 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.43 – v0.0.52",
-    date: "April 11, 2026",
+    date: "2026-04-11",
+    title: "v0.0.43 – v0.0.52",
     tags: ["New", "Polish"],
     highlights: [
-      'Radial dial redesign: the "Full" wedge becomes "Add", and chat persists across workspaces.',
+      "Radial dial redesign: the \"Full\" wedge becomes \"Add\", and chat persists across workspaces.",
       "Display overlay replaced with a sidebar on the home page.",
     ],
     more: [
@@ -2152,8 +2081,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.34 – v0.0.42",
-    date: "April 10, 2026",
+    date: "2026-04-10",
+    title: "v0.0.34 – v0.0.42",
     tags: ["New", "Polish"],
     highlights: [
       "ChatGPT-style turn-anchored scrolling in chat.",
@@ -2167,8 +2096,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.34",
-    date: "April 9, 2026",
+    date: "2026-04-09",
+    title: "v0.0.34",
     tags: ["New"],
     highlights: [
       "Mini chat split into its own dedicated window.",
@@ -2176,8 +2105,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.33",
-    date: "April 8, 2026",
+    date: "2026-04-08",
+    title: "v0.0.33",
     tags: ["New"],
     highlights: [
       "Cloud backups, with settings integration.",
@@ -2190,12 +2119,12 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.27 – v0.0.32",
-    date: "April 7, 2026",
+    date: "2026-04-07",
+    title: "v0.0.27 – v0.0.32",
     tags: ["New", "Mobile"],
     highlights: [
       "Mobile app: dark mode, 17 themes, haptics, voice input, and push notifications.",
-      'Voice "look at screen": Stella can highlight things in real time.',
+      "Voice \"look at screen\": Stella can highlight things in real time.",
       "Voice screen viewing and guidance overlays improved.",
       "Compact mode replaces the overlay mini shell.",
       "Suggestion chips in chat with shared screenshot preview.",
@@ -2206,8 +2135,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.24 – v0.0.26",
-    date: "April 6, 2026",
+    date: "2026-04-06",
+    title: "v0.0.24 – v0.0.26",
     tags: ["New"],
     highlights: [
       "Inline previews for Word, Excel, and PowerPoint files.",
@@ -2220,13 +2149,13 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.23",
-    date: "April 5, 2026",
+    date: "2026-04-05",
+    title: "v0.0.23",
     tags: ["New"],
     highlights: [
-      'Home merged into chat, with a shifting gradient on the mini shell.',
-      'Radial dial reworked to four wedges with opt-in window context.',
-      'New "View messages" button on home when you have chat history.',
+      "Home merged into chat, with a shifting gradient on the mini shell.",
+      "Radial dial reworked to four wedges with opt-in window context.",
+      "New \"View messages\" button on home when you have chat history.",
     ],
     more: [
       "File-system-based skill environment replaces LoadTools/ActivateSkill.",
@@ -2234,8 +2163,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.23",
-    date: "April 4, 2026",
+    date: "2026-04-04",
+    title: "v0.0.23",
     tags: ["Polish"],
     more: [
       "Onboarding UX polish: better button visibility, top-down layout, gradient settings fixes.",
@@ -2246,8 +2175,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.18 – v0.0.22",
-    date: "April 3, 2026",
+    date: "2026-04-03",
+    title: "v0.0.18 – v0.0.22",
     tags: ["New"],
     highlights: [
       "Right-click chat sidebar replaces the floating orb and context menu.",
@@ -2260,8 +2189,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.12 – v0.0.17",
-    date: "April 2, 2026",
+    date: "2026-04-02",
+    title: "v0.0.12 – v0.0.17",
     tags: ["New", "macOS"],
     highlights: [
       "Custom DMG installer with a mesh-gradient background and icon layout.",
@@ -2273,8 +2202,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.12",
-    date: "April 1, 2026",
+    date: "2026-04-01",
+    title: "v0.0.12",
     more: [
       "Smoother floating chat indicator (prewarmed animation).",
       "Frame-rate-independent Stella animation using real delta time.",
@@ -2282,8 +2211,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.10 – v0.0.11",
-    date: "March 30, 2026",
+    date: "2026-03-30",
+    title: "v0.0.10 – v0.0.11",
     tags: ["New"],
     highlights: [
       "Multi-desktop per account: device-scoped registration, bridge, and phone pairing.",
@@ -2294,8 +2223,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.8 – v0.0.9",
-    date: "March 28, 2026",
+    date: "2026-03-28",
+    title: "v0.0.8 – v0.0.9",
     tags: ["New", "Mobile"],
     highlights: [
       "Phone pairing.",
@@ -2308,22 +2237,22 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.6 – v0.0.7",
-    date: "March 26, 2026",
+    date: "2026-03-26",
+    title: "v0.0.6 – v0.0.7",
     tags: ["New"],
     highlights: [
-      'Linq remote-turn execution: Stella routes messages to your desktop and falls back to an offline responder.',
+      "Linq remote-turn execution: Stella routes messages to your desktop and falls back to an offline responder.",
     ],
     more: [
       "Polling-based magic-link auth, deep-link protocol fix, and migration to cloud.stella.sh.",
       "Smoother first-message replies.",
       "Region capture fixes.",
-      'Message timestamps reformatted as system reminders, with timezone correctness and 10-min dedup.',
+      "Message timestamps reformatted as system reminders, with timezone correctness and 10-min dedup.",
     ],
   },
   {
-    release: "v0.0.3 – v0.0.5",
-    date: "March 25, 2026",
+    date: "2026-03-25",
+    title: "v0.0.3 – v0.0.5",
     tags: ["New"],
     highlights: [
       "Music generation upgraded.",
@@ -2335,8 +2264,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.2",
-    date: "March 24, 2026",
+    date: "2026-03-24",
+    title: "v0.0.2",
     tags: ["New"],
     highlights: [
       "New voice model.",
@@ -2348,8 +2277,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.2",
-    date: "March 23, 2026",
+    date: "2026-03-23",
+    title: "v0.0.2",
     tags: ["New"],
     highlights: [
       "New Media Studio app.",
@@ -2363,8 +2292,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.2",
-    date: "March 22, 2026",
+    date: "2026-03-22",
+    title: "v0.0.2",
     tags: ["New"],
     highlights: [
       "Drag-and-drop file attachments across all three composers.",
@@ -2377,8 +2306,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.2",
-    date: "March 21, 2026",
+    date: "2026-03-21",
+    title: "v0.0.2",
     tags: ["Under the hood"],
     more: [
       "Stella's agent work now runs in a separate process for better stability.",
@@ -2386,8 +2315,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.2",
-    date: "March 20, 2026",
+    date: "2026-03-20",
+    title: "v0.0.2",
     highlights: [
       "First version of Stella's developer tools.",
     ],
@@ -2397,16 +2326,16 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
-    release: "v0.0.2",
-    date: "March 19, 2026",
+    date: "2026-03-19",
+    title: "v0.0.2",
     more: [
       "Switched to Manrope as the default font.",
       "Mobile bridge wired up.",
     ],
   },
   {
-    release: "v0.0.1",
-    date: "March 18, 2026",
+    date: "2026-03-18",
+    title: "v0.0.1",
     tags: ["New", "Mobile"],
     highlights: [
       "Mobile app initial commit.",
@@ -2417,8 +2346,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-17",
     era: "Pre-release",
-    date: "March 17, 2026",
     tags: ["Under the hood"],
     highlights: [
       "Desktop, mobile, cloud, and launcher code were brought together into one project.",
@@ -2429,21 +2358,21 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-16",
     era: "Pre-release",
-    date: "March 16, 2026",
     tags: ["New"],
     highlights: [
       "Plans now get the right managed models automatically.",
       "Realtime transcription.",
-      'Friend v1: first cut of the social layer.',
+      "Friend v1: first cut of the social layer.",
     ],
     more: [
       "Realtime voice usage now reported for billing.",
     ],
   },
   {
+    date: "2026-03-15",
     era: "Pre-release",
-    date: "March 15, 2026",
     highlights: [
       "Launcher's first commit.",
     ],
@@ -2453,8 +2382,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-14",
     era: "Pre-release",
-    date: "March 14, 2026",
     tags: ["New"],
     highlights: [
       "Multiplayer skill (game).",
@@ -2465,8 +2394,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-13",
     era: "Pre-release",
-    date: "March 13, 2026",
     tags: ["New"],
     highlights: [
       "Blueprint-based Store self-mod flow (v1).",
@@ -2475,12 +2404,12 @@ export const changelogEntries: ChangelogEntry[] = [
     more: [
       "Voice: hard VAD gate, adaptive noise floor, echo handling on speakers.",
       "Stripe billing fixes.",
-      'Floating orb, chat panel, and input bar now scale with viewport.',
+      "Floating orb, chat panel, and input bar now scale with viewport.",
     ],
   },
   {
+    date: "2026-03-12",
     era: "Pre-release",
-    date: "March 12, 2026",
     tags: ["New"],
     highlights: [
       "Floating orb v1 chat.",
@@ -2491,20 +2420,20 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-11",
     era: "Pre-release",
-    date: "March 11, 2026",
     tags: ["New"],
     highlights: [
       "New wake-word model (fp16) and voice handoff.",
       "Stella's own model endpoints became the desktop default.",
     ],
     more: [
-      'Clearer "connected account" vs "logged in" semantics.',
+      "Clearer \"connected account\" vs \"logged in\" semantics.",
     ],
   },
   {
+    date: "2026-03-10",
     era: "Pre-release",
-    date: "March 10, 2026",
     highlights: [
       "You can now keep messaging while a task runs in the background.",
     ],
@@ -2513,8 +2442,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-09",
     era: "Pre-release",
-    date: "March 9, 2026",
     highlights: [
       "Audio ducking: music and other sounds dim while Stella speaks.",
     ],
@@ -2524,13 +2453,13 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-08",
     era: "Pre-release",
-    date: "March 8, 2026",
     tags: ["New"],
     highlights: [
       "Extension system: Stella can discover new abilities, model options, and prompts.",
-      'Native text selection inside Stella.',
-      'New "auto" radial dial feature.',
+      "Native text selection inside Stella.",
+      "New \"auto\" radial dial feature.",
       "Search canvas (and the news side trimmed down).",
     ],
     more: [
@@ -2538,8 +2467,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-07",
     era: "Pre-release",
-    date: "March 7, 2026",
     tags: ["New"],
     highlights: [
       "Synthesis onboarding flow.",
@@ -2551,30 +2480,31 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-03-06",
     era: "Pre-release",
-    date: "March 6, 2026",
     more: [
       "Editing fixes and local scheduling improvements.",
       "Home view and music adjustments.",
     ],
   },
   {
+    date: "2026-03-05",
+    from: "2026-03-01",
     era: "Pre-release",
-    date: "March 1–5, 2026",
     more: [
       "Ongoing polish and internal cleanup.",
       "Search canvas iteration, animation polish on live reply pills, dashboard fixes.",
     ],
   },
   {
+    date: "2026-02",
     era: "Foundation",
-    date: "February 2026",
     tags: ["Foundation"],
     highlights: [
-      'Stella renamed and reorganized around agents, helper agents, actions, and skills.',
+      "Stella renamed and reorganized around agents, helper agents, actions, and skills.",
       "Discovery rewrite: selectable categories, signal collection, and seeded ephemeral memories.",
       "App Store / blueprints groundwork: first cut of how Stella publishes apps.",
-      'Connect dialog initial setup; opens links in your browser instead of a tiny Electron window.',
+      "Connect dialog initial setup; opens links in your browser instead of a tiny Electron window.",
       "Slack, Teams, Signal, Telegram, and Discord channel work.",
       "Multi-monitor and Windows native window-title detection.",
       "Scheduled-task support, health checks, and better interrupt / queue controls.",
@@ -2585,8 +2515,8 @@ export const changelogEntries: ChangelogEntry[] = [
     ],
   },
   {
+    date: "2026-01",
     era: "Genesis",
-    date: "January 2026",
     tags: ["Genesis"],
     highlights: [
       "First commits: shadcn UI scaffolding and the floating Stella surface.",
@@ -2596,5 +2526,4 @@ export const changelogEntries: ChangelogEntry[] = [
       "First pass at memory search and cloud data structure.",
       "Wake-up of the discovery + onboarding flow.",
     ],
-  },
-];
+  },];

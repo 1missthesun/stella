@@ -3111,7 +3111,19 @@
         "retrying": "Stella prøver igen om et øjeblik.",
         "stopped": "Holdt op med at prøve. Åbn denne chat igen for at prøve igen."
       },
-      "modelNotOnPlan": "Modellen er ikke tilgængelig i din plan"
+      "modelNotOnPlan": "Modellen er ikke tilgængelig i din plan",
+      "stellaUpdated": "Stella er opdateret",
+      "more": "Mere"
+    },
+    "whatsNew": {
+      "title": "Nyheder",
+      "releases": "Udgivelser",
+      "moreInRelease": "Mere i denne udgivelse",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Installationsprogram",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

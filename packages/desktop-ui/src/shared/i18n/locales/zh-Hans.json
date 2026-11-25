@@ -3091,7 +3091,19 @@
         "retrying": "Stella 稍后会重试。",
         "stopped": "已停止重试。重新打开此聊天即可再试一次。"
       },
-      "modelNotOnPlan": "你的套餐不支持此模型"
+      "modelNotOnPlan": "你的套餐不支持此模型",
+      "stellaUpdated": "Stella 已更新",
+      "more": "更多"
+    },
+    "whatsNew": {
+      "title": "新功能",
+      "releases": "版本",
+      "moreInRelease": "此版本的更多内容",
+      "product": {
+        "mobile": "手机",
+        "launcher": "安装程序",
+        "backend": "云端"
+      }
     }
   },
   "sidebar": {

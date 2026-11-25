@@ -3183,7 +3183,19 @@
         "retrying": "ستحاول Stella مرة أخرى بعد قليل.",
         "stopped": "توقفت المحاولات. أعد فتح هذه الدردشة للمحاولة مرة أخرى."
       },
-      "modelNotOnPlan": "النموذج غير متاح في خطتك"
+      "modelNotOnPlan": "النموذج غير متاح في خطتك",
+      "stellaUpdated": "تم تحديث Stella",
+      "more": "المزيد"
+    },
+    "whatsNew": {
+      "title": "ما الجديد",
+      "releases": "الإصدارات",
+      "moreInRelease": "المزيد في هذا الإصدار",
+      "product": {
+        "mobile": "الهاتف",
+        "launcher": "برنامج التثبيت",
+        "backend": "السحابة"
+      }
     }
   },
   "sidebar": {

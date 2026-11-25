@@ -3091,7 +3091,19 @@
         "retrying": "Stella akan mencoba lagi sebentar lagi.",
         "stopped": "Berhenti mencoba. Buka lagi chat ini untuk mencoba lagi."
       },
-      "modelNotOnPlan": "Model tidak tersedia di paketmu"
+      "modelNotOnPlan": "Model tidak tersedia di paketmu",
+      "stellaUpdated": "Stella diperbarui",
+      "more": "Selengkapnya"
+    },
+    "whatsNew": {
+      "title": "Yang baru",
+      "releases": "Rilis",
+      "moreInRelease": "Lainnya di rilis ini",
+      "product": {
+        "mobile": "Ponsel",
+        "launcher": "Penginstal",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

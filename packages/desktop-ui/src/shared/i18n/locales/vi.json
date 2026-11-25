@@ -3091,7 +3091,19 @@
         "retrying": "Stella sẽ thử lại sau giây lát.",
         "stopped": "Đã ngừng thử. Mở lại cuộc trò chuyện này để thử lại."
       },
-      "modelNotOnPlan": "Mô hình không có trong gói của bạn"
+      "modelNotOnPlan": "Mô hình không có trong gói của bạn",
+      "stellaUpdated": "Stella đã được cập nhật",
+      "more": "Thêm"
+    },
+    "whatsNew": {
+      "title": "Có gì mới",
+      "releases": "Bản phát hành",
+      "moreInRelease": "Thêm trong bản này",
+      "product": {
+        "mobile": "Điện thoại",
+        "launcher": "Trình cài đặt",
+        "backend": "Đám mây"
+      }
     }
   },
   "sidebar": {

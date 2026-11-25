@@ -3129,7 +3129,19 @@
         "retrying": "Stella תנסה שוב בעוד רגע.",
         "stopped": "הניסיונות הופסקו. יש לפתוח מחדש את הצ׳אט כדי לנסות שוב."
       },
-      "modelNotOnPlan": "המודל לא זמין בתוכנית שלך"
+      "modelNotOnPlan": "המודל לא זמין בתוכנית שלך",
+      "stellaUpdated": "Stella עודכנה",
+      "more": "עוד"
+    },
+    "whatsNew": {
+      "title": "מה חדש",
+      "releases": "גרסאות",
+      "moreInRelease": "עוד בגרסה הזו",
+      "product": {
+        "mobile": "טלפון",
+        "launcher": "תוכנת התקנה",
+        "backend": "ענן"
+      }
     }
   },
   "sidebar": {

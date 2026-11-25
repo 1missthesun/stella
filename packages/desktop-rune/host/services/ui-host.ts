@@ -31,9 +31,9 @@ export type UiHost = {
   web: {
     /** The `<webview id>` of a web window's contents. */
     elementId(contentsId: number): string;
-    /** Custom schemes the window's session serves. */
-    schemes(contentsId: number): string[];
-    request(contentsId: number, request: WebviewRequest): void;
+    /** Custom schemes the contents' session serves; without a contents (a UI-owned `<webview>`), the default session's. */
+    schemes(contentsId?: number): string[];
+    request(contentsId: number | undefined, request: WebviewRequest): void;
     /** A navigation the page made; `mainFrame: false` (an iframe) is ignored, as in Electron. */
     navigated(contentsId: number, url: string, mainFrame?: boolean): void;
     titled(contentsId: number, title: string): void;
@@ -162,7 +162,7 @@ export function createUiHost(): UiHost {
     web: {
       elementId,
       schemes(contentsId) {
-        const contents = contentsById(contentsId);
+        const contents = contentsId === undefined ? undefined : contentsById(contentsId);
         const schemes = new Set<string>();
         for (const session of [contents?.session, defaultSession()]) {
           for (const scheme of session?.protocol.handlers.keys() ?? []) if (!STANDARD_SCHEMES.has(scheme)) schemes.add(scheme);
@@ -171,12 +171,12 @@ export function createUiHost(): UiHost {
       },
       request(contentsId, req) {
         const e = engine();
-        const contents = contentsById(contentsId);
         if (!e) return;
         const respond = (status: number, headers: Record<string, string>, body: string | Uint8Array) => void e.webview.respond(req.rid, { status, headers, body }).catch(() => {});
-        if (!contents) return respond(404, {}, "");
+        const session = contentsId === undefined ? defaultSession() : contentsById(contentsId)?.session;
+        if (!session) return respond(404, {}, "");
         const hasBody = req.body !== undefined && req.method !== "GET" && req.method !== "HEAD";
-        fetchProtocolIn(contents.session, new Request(req.url, { method: req.method, headers: req.headers, body: hasBody ? req.body ?? undefined : undefined }))
+        fetchProtocolIn(session, new Request(req.url, { method: req.method, headers: req.headers, body: hasBody ? req.body ?? undefined : undefined }))
           .then(async (response) => {
             if (!response) return respond(404, { "content-type": "text/plain" }, "Not found");
             const headers: Record<string, string> = {};

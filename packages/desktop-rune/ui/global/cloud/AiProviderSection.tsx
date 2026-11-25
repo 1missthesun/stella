@@ -1,5 +1,5 @@
 import { SettingsCard } from "../../settings/parts";
-import { Button, ChevronRight, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, ExternalLink, MoreHorizontal, Press, T } from "../../kit/compat";
+import { Button, ChevronRight, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, ExternalLink, Flow, MoreHorizontal, Press, T, tx } from "../../kit/compat";
 import { useAiAccounts } from "./ai-accounts.styles";
 import { usePill } from "../shared/pill.styles";
 import type { ReactNode } from "react";
@@ -32,8 +32,8 @@ export function AiProviderSection({
   return (
     <SettingsCard>
       <row {...s.aiProviderHead}>
-        <SettingsCardTitle titleKey={titleKey} />
-        {action ? <T>{action}</T> : null}
+        <SettingsCardTitle titleKey={titleKey} flush />
+        {action ? <Flow shrink={false} minH={25} align="center">{action}</Flow> : null}
       </row>
       {children}
       {notes}
@@ -43,7 +43,7 @@ export function AiProviderSection({
             <ChevronRight size={14} {...s.aiProviderChevron} color={s.aiProviderMore.color} />
             {detailsLabel}
           </Press>
-          {open ? <T w="full" {...s.aiProviderDetails}>{details}</T> : null}
+          {open ? <Flow vertical w="full" {...s.aiProviderDetails}>{details}</Flow> : null}
         </>
       ) : null}
     </SettingsCard>
@@ -66,9 +66,9 @@ export function AiPrimaryAccount({
     <row {...s.aiPrimary}>
       <col {...s.aiPrimaryText}>
         <T w="full" {...s.aiPrimaryName}>{name}</T>
-        {meta ? <T w="full" {...s.aiPrimaryMeta}>{meta}</T> : null}
+        {meta ? <Flow w="full" {...s.aiPrimaryMeta}>{meta}</Flow> : null}
       </col>
-      {status ? <T {...s.aiPrimaryStatus}>{status}</T> : null}
+      {status ? <Flow shrink={false} {...s.aiPrimaryStatus}>{status}</Flow> : null}
       {trailing}
     </row>
   );
@@ -77,20 +77,20 @@ export function AiPrimaryAccount({
 export function AiInUse({ label }: { label: string }) {
   const s = useAiAccounts();
   return (
-    <row {...s.aiInUse}>
-      <row {...s.aiInUseDot} />
+    <Flow shrink={false} {...s.aiInUse}>
+      <box {...s.aiInUseDot} />
       {label}
-    </row>
+    </Flow>
   );
 }
 
 export function AiNote({ children, action }: { children: ReactNode; action?: ReactNode }) {
   const s = useAiAccounts();
   return (
-    <row {...s.aiNote} role="note">
-      <row {...s.aiNoteText}>{children}</row>
+    <Flow {...s.aiNote} role="note">
+      <T {...tx(s.aiNote)} {...s.aiNoteText}>{children}</T>
       {action}
-    </row>
+    </Flow>
   );
 }
 
@@ -155,7 +155,7 @@ export function AiRow({
     <row {...s.aiRow}>
       <col {...s.aiRowText}>
         <T w="full" {...s.aiRowName} title={name}>{name}</T>
-        {meta ? <T w="full" {...s.aiRowMeta}>{meta}</T> : null}
+        {meta ? <Flow w="full" {...s.aiRowMeta}>{meta}</Flow> : null}
         {extra}
       </col>
       <row {...s.aiRowControls}>

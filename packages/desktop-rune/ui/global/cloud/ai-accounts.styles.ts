@@ -13,7 +13,7 @@ export const useAiAccounts = sheet((c) => ({
   aiNote: { mt: 10, align: "center", gap: 12, size: 12, lh: 1.45, color: c.textBase },
   aiNoteText: { grow: 1, shrink: true, minW: 0 },
   aiLink: { pad: 0, align: "center", gap: 4, size: 12, color: mixOklch(c.textBase, 70, c.textWeak), underline: true, cursor: "pointer", hoverColor: c.textStrong },
-  aiProviderMore: { pad: 0, mt: 14, align: "center", gap: 6, size: 12, weight: 500, color: mixOklch(c.textBase, 70, c.textWeak), cursor: "pointer", hoverColor: c.textStrong },
+  aiProviderMore: { pad: 0, mt: 14, mb: 5, align: "center", gap: 6, size: 12, weight: 500, color: mixOklch(c.textBase, 70, c.textWeak), cursor: "pointer", hoverColor: c.textStrong },
   aiProviderChevron: { motion: { dur: 0.15 } },
   aiProviderDetails: { pl: 20, mt: 12, gap: 18 },
   aiDetailsGroupLabel: { mb: 2, size: 11, weight: 500, color: c.textWeak },

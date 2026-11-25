@@ -1,0 +1,207 @@
+name: Build Rune Engine
+
+on:
+  push:
+    branches: ["rune/**"]
+    paths:
+      - "packages/desktop-rune/**"
+      - ".github/workflows/build-rune-engine.yml"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Cargo profile"
+        type: choice
+        options: [dist, release]
+        default: dist
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-rune-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  PROFILE: ${{ inputs.profile || 'dist' }}
+
+jobs:
+  engine:
+    name: engine (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - platform: darwin-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - platform: darwin-x64
+            runner: macos-15
+            target: x86_64-apple-darwin
+          - platform: win-x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            exe: .exe
+          - platform: win-arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            exe: .exe
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/desktop-rune/engine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: packages/desktop-rune
+
+      # Rune is a git dependency on a private repo; RUNE_DEPLOY_KEY is a read-only deploy key on it.
+      - name: Rune access
+        env:
+          RUNE_DEPLOY_KEY: ${{ secrets.RUNE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          temp="${RUNNER_TEMP//\\//}"
+          key="$temp/rune_deploy_key"
+          (umask 077 && printf '%s\n' "$RUNE_DEPLOY_KEY" > "$key")
+          echo "GIT_SSH_COMMAND=ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          git config --global url."ssh://git@github.com/1missthesun/rune".insteadOf "https://github.com/1missthesun/rune"
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libfontconfig-dev libxkbcommon-dev libwayland-dev
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup target add ${{ matrix.target }}
+          rustc --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/desktop-rune/engine
+          key: ${{ matrix.target }}-${{ env.PROFILE }}
+          cache-on-failure: true
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          cargo build --locked --profile "$PROFILE" --target ${{ matrix.target }}
+          echo "BUILD_SECONDS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Name and measure the binary
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/engine"
+          mkdir -p "$out"
+          name="stella-engine-${{ matrix.platform }}${{ matrix.exe }}"
+          cp "target/${{ matrix.target }}/$PROFILE/stella-engine${{ matrix.exe }}" "$out/$name"
+          cd "$out"
+          if command -v sha256sum >/dev/null; then sha256sum "$name" > "$name.sha256"; else shasum -a 256 "$name" > "$name.sha256"; fi
+          bytes=$(wc -c < "$name" | tr -d ' ')
+          gzipped=$(gzip -9 -c "$name" | wc -c | tr -d ' ')
+          echo "{\"platform\":\"${{ matrix.platform }}\",\"profile\":\"$PROFILE\",\"bytes\":$bytes,\"gzip\":$gzipped,\"buildSeconds\":$BUILD_SECONDS,\"sha\":\"$GITHUB_SHA\"}" > "$name.json"
+          cat "$name.json"
+          {
+            echo "### stella-engine ${{ matrix.platform }} ($PROFILE)"
+            echo "| bytes | MiB | gzip MiB | build s |"
+            echo "|---:|---:|---:|---:|"
+            echo "| $bytes | $(awk "BEGIN{printf \"%.1f\", $bytes/1048576}") | $(awk "BEGIN{printf \"%.1f\", $gzipped/1048576}") | $BUILD_SECONDS |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Linux shared libraries
+        if: runner.os == 'Linux'
+        run: ldd "$RUNNER_TEMP/engine/stella-engine-${{ matrix.platform }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stella-engine-${{ matrix.platform }}
+          path: ${{ runner.temp }}/engine/
+          if-no-files-found: error
+
+      - name: Remove the Rune key
+        if: always()
+        run: rm -f "${RUNNER_TEMP//\\//}/rune_deploy_key"
+
+  linux-launch:
+    name: launch (linux-x64, Xvfb + lavapipe)
+    needs: engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stella-engine-linux-x64
+          path: ${{ runner.temp }}/engine
+
+      - name: Runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth imagemagick mesa-vulkan-drivers \
+            libvulkan1 libgtk-3-0t64 libwebkit2gtk-4.1-0 libxkbcommon-x11-0 unzip
+
+      - name: Bun
+        run: |
+          set -euo pipefail
+          url=$(jq -r '.bun.assets["linux-x64"].url' packages/desktop/launcher.json)
+          curl -fsSL -o "$RUNNER_TEMP/bun.zip" "$url"
+          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
+          echo "BUN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
+          ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$RUNNER_TEMP/bun-linux-x64/bun" install --frozen-lockfile --filter @stella/desktop-rune
+
+      - name: Launch and screenshot
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
+        run: |
+          set -euo pipefail
+          engine="$RUNNER_TEMP/engine/stella-engine-linux-x64"
+          chmod +x "$engine"
+          out="$RUNNER_TEMP/launch"
+          mkdir -p "$out"
+          engine_pid=""
+          Xvfb :93 -screen 0 1320x860x24 -nolisten tcp &
+          xvfb=$!
+          trap 'kill $engine_pid $xvfb 2>/dev/null || true' EXIT
+          for _ in $(seq 100); do [ -e /tmp/.X11-unix/X93 ] && break; sleep 0.05; done
+          t0=$(date +%s%3N)
+          DISPLAY=:93 STELLA_RUNE_T0="$t0" STELLA_RUNE_ROOT="$GITHUB_WORKSPACE/packages/desktop-rune" STELLA_RUNE_BUN="$BUN" \
+            STELLA_RUNE_METRICS="$out/metrics.jsonl" STELLA_RUNE_W=1280 STELLA_RUNE_H=820 \
+            "$engine" > "$out/engine.log" 2>&1 &
+          engine_pid=$!
+          for _ in $(seq 300); do
+            grep -q '"first_content_frame"' "$out/metrics.jsonl" 2>/dev/null && break
+            kill -0 "$engine_pid" 2>/dev/null || { cat "$out/engine.log"; exit 1; }
+            sleep 0.1
+          done
+          grep -m1 '"first_content_frame"' "$out/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY"
+          sleep 2
+          kill -0 "$engine_pid" || { cat "$out/engine.log"; exit 1; }
+          DISPLAY=:93 import -window root "$out/screen.png"
+          ps -o rss=,vsz= -p "$engine_pid" | awk '{print "engine RSS MiB:", $1/1024}' | tee -a "$GITHUB_STEP_SUMMARY"
+          head -c 4000 "$out/metrics.jsonl" || true
+          tail -n 40 "$out/engine.log"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stella-engine-linux-x64-launch
+          path: ${{ runner.temp }}/launch/
+          if-no-files-found: ignore

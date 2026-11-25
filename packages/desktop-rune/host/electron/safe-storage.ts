@@ -38,15 +38,19 @@ const linuxBackend = (name: string): Backend | null => {
   return { prefix: "v11", ...cbc(pbkdf2Sync(password, SALT, 1, 16, "sha1")) };
 };
 
+/** `STELLA_RUNE_KEYCHAIN`: a keychain file of its own for test roots, so proofs never read the user's "<app> Safe Storage". */
 const macBackend = (name: string): Backend | null => {
   const service = `${name} Safe Storage`;
   const account = `${name} Key`;
-  let found = run(["/usr/bin/security", "find-generic-password", "-w", "-s", service, "-a", account]);
+  const keychain = process.env.STELLA_RUNE_KEYCHAIN?.trim();
+  const inKeychain = keychain ? [keychain] : [];
+  const find = () => run(["/usr/bin/security", "find-generic-password", "-w", "-s", service, "-a", account, ...inKeychain]);
+  let found = find();
   let password = found.ok ? found.out.replace(/\n$/, "") : "";
   if (!password) {
-    password = randomBytes(16).toString("base64");
-    if (!run(["/usr/bin/security", "add-generic-password", "-s", service, "-a", account, "-w", password]).ok) return null;
-    found = run(["/usr/bin/security", "find-generic-password", "-w", "-s", service, "-a", account]);
+    password = randomBytes(12).toString("base64");
+    if (!run(["/usr/bin/security", "add-generic-password", "-s", service, "-a", account, "-w", password, ...inKeychain]).ok) return null;
+    found = find();
     if (!found.ok) return null;
   }
   return { prefix: "v10", ...cbc(pbkdf2Sync(password, SALT, 1003, 16, "sha1")) };

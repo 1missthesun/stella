@@ -121,7 +121,7 @@ final class ElectronProcess {
     private var reaped = false
     private let outputPipe: OutputPipe
 
-    init(executable: URL, args: [String], cwd: URL, env: [String: String], logFile: URL) throws {
+    init(executable: URL, args: [String], cwd: URL, env: [String: String], logFile: URL, isEngine: Bool = false) throws {
         output = OutputCapture(logFile: logFile)
         output.append(Data("\n===== launch \(Date()) =====\n".utf8))
 
@@ -177,7 +177,7 @@ final class ElectronProcess {
             throw LauncherError("posix_spawn \(executable.path): \(String(cString: strerror(status)))")
         }
         pid = child
-        log("supervisor: spawned \(executable.lastPathComponent == "stella-engine" ? "stella-engine" : "Electron") pid \(child)")
+        log("supervisor: spawned \(isEngine ? "stella-engine" : "Electron") pid \(child)")
 
         let outputPipe = OutputPipe(fd: pipeFds[0], output: output)
         self.outputPipe = outputPipe

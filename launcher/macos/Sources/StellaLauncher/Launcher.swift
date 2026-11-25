@@ -418,7 +418,7 @@ final class Launcher {
                 env["STELLA_RUNE_ROOT"] = paths.app.appendingPathComponent("packages/desktop-rune").path
                 if let runtimes { env["STELLA_RUNE_BUN"] = runtimes.bunBin.path }
                 process = try ElectronProcess(
-                    executable: engine.bin, args: [], cwd: paths.app, env: env, logFile: paths.electronLog)
+                    executable: engine.bin, args: [], cwd: paths.app, env: env, logFile: paths.electronLog, isEngine: true)
             } else {
                 process = try ElectronProcess(
                     executable: electronApp.appendingPathComponent("Contents/MacOS/Electron"),

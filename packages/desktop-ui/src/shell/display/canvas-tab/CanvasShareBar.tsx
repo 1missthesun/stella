@@ -83,6 +83,7 @@ const drivePathOf = (
   source: DisplayFileSource | null,
 ): string | null => {
   const path =
+    item.cloudDrivePath ??
     source?.drivePath ??
     (item.driveBacked ? item.filePath.replace(/^\/+/u, "") : null);
   return path && /\.html?$/iu.test(path) ? path : null;

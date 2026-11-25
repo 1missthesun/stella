@@ -948,8 +948,8 @@ export type IpcInvokeContract = {
     { url: string }
   >;
   [IPC_DISPLAY_CANVAS_DRIVE_URL]: Invoke<
-    [payload: { drivePath: string }],
-    { url: string; actions?: import("../canvas-actions.js").CanvasAction[] }
+    [payload: { drivePath: string; version?: string; forceRefresh?: boolean }],
+    { url: string; actions?: import("../canvas-actions.js").CanvasAction[]; version?: string }
   >;
   [IPC_DISPLAY_TRASH_LIST]: Invoke<
     [],

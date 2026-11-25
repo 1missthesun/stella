@@ -13,6 +13,7 @@ export type CanvasHtmlItem = {
   slug?: string;
   createdAt: number;
   driveBacked?: boolean;
+  cloudDrivePath?: string;
 };
 
 export const canvasDisplayTabId = (filePath: string): string =>
@@ -122,7 +123,6 @@ export const addCanvasHtmlItem = (
   const existing = itemsByPath.get(payload.filePath);
   if (existing) {
     existing.title = next.title;
-    existing.createdAt = next.createdAt;
     if (next.slug) existing.slug = next.slug;
   } else {
     items.push(next);

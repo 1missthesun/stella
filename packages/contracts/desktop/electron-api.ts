@@ -488,8 +488,15 @@ export const createElectronApi = (
           html,
           ...(options?.drivePath ? { drivePath: options.drivePath } : {}),
         }),
-      canvasDriveUrl: (drivePath: string) =>
-        ipc.invoke(IPC_DISPLAY_CANVAS_DRIVE_URL, { drivePath }),
+      canvasDriveUrl: (
+        drivePath: string,
+        options?: { version?: string; forceRefresh?: boolean },
+      ) =>
+        ipc.invoke(IPC_DISPLAY_CANVAS_DRIVE_URL, {
+          drivePath,
+          ...(options?.version ? { version: options.version } : {}),
+          ...(options?.forceRefresh ? { forceRefresh: true } : {}),
+        }),
       listTrash: invoker(IPC_DISPLAY_TRASH_LIST),
       forceDeleteTrash: invoker(IPC_DISPLAY_TRASH_FORCE_DELETE),
     },

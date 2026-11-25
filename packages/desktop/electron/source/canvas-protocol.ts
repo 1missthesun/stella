@@ -82,6 +82,19 @@ const canvasResponse = (
 export const isCanvasUrl = (url: string): boolean =>
   url.startsWith(`${CANVAS_SCHEME}:`);
 
+export const isRegisteredCanvasUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== `${CANVAS_SCHEME}:` || parsed.host !== MEMORY_HOST) {
+      return false;
+    }
+    const id = parsed.pathname.split("/")[1];
+    return Boolean(id && registered.has(id));
+  } catch {
+    return false;
+  }
+};
+
 export type CanvasDocumentAssetSource = "device" | "drive";
 
 const registered = new Map<

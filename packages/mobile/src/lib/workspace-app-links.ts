@@ -98,7 +98,7 @@ export function refreshLinkedWorkspaceApps() {
 export function requestOpenApp(slug: string) {
   pendingOpen = slug;
   notify();
-  router.push("/apps");
+  router.dismissTo("/apps");
 }
 
 export function usePendingAppOpen(): string | null {

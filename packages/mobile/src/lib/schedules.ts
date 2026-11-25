@@ -60,9 +60,12 @@ export const toMobileSchedule = (row: CloudScheduleRow): MobileSchedule => ({
 });
 
 export function useMobileSchedules(
-  enabled: boolean,
+  owner: string | null | undefined,
 ): MobileSchedule[] | undefined {
-  const rows = useBackendView("schedules.list", enabled ? {} : "skip").value;
+  const rows = useBackendView("schedules.list", owner ? {} : "skip", {
+    rememberFor: owner,
+    persist: true,
+  }).value;
   return useMemo(() => rows?.map(toMobileSchedule), [rows]);
 }
 

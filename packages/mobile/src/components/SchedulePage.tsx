@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "./Text";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { describeScheduleTiming } from "@stella/contracts/schedule-format";
 import { scheduleTimingText } from "@stella/contracts/schedule-notice";
 import { useLocale, useT, useTPlural } from "../i18n";
@@ -51,9 +51,10 @@ export function SchedulePage() {
   const rowStyles = useAiryList();
   const bottomInset = useTabBottomInset();
   const session = authClient.useSession();
-  const signedIn = Boolean(session.data?.user);
+  const owner = session.data?.user.id;
+  const signedIn = Boolean(owner);
 
-  const loaded = useMobileSchedules(signedIn);
+  const loaded = useMobileSchedules(owner);
   const schedules = loaded ?? EMPTY;
   const loading = signedIn && loaded === undefined;
   const runAction = useScheduleAction();
@@ -109,6 +110,11 @@ export function SchedulePage() {
   useEffect(() => {
     setNowMs(Date.now());
   }, [schedules]);
+  useFocusEffect(
+    useCallback(() => {
+      setNowMs(Date.now());
+    }, []),
+  );
 
   const whenOf = useCallback(
     (schedule: MobileSchedule): string => {
@@ -178,18 +184,23 @@ export function SchedulePage() {
   }, [nowMs, schedules, t, whenOf]);
 
   useEffect(() => {
-    if (!focus || focusedRef.current === focus) return;
+    if (!focus) {
+      focusedRef.current = null;
+      return;
+    }
+    if (focusedRef.current === focus) return;
     const index = items.findIndex(
       (item) => item.kind === "schedule" && item.schedule.id === focus,
     );
     if (index < 0) return;
     focusedRef.current = focus;
+    router.setParams({ focus: undefined });
     const key = items[index]!.key;
     setHighlightKey(key);
     setTimeout(() => {
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
     }, 50);
-  }, [focus, items]);
+  }, [focus, items, router]);
 
   useEffect(() => {
     if (!highlightKey) return;

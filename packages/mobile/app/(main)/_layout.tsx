@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator";
 import {
@@ -16,6 +16,7 @@ import {
   subscribeAiConsentRequested,
 } from "../../src/lib/ai-consent";
 import { authClient } from "../../src/lib/auth-client";
+import { warmRememberedViews } from "../../src/lib/backend";
 import { tearDownPushNotifications } from "../../src/lib/notifications";
 import { useReportTimeZone } from "../../src/lib/schedule-zone";
 import {
@@ -73,7 +74,6 @@ import { useChatSearch } from "../../src/lib/chat-search";
 import { tapLight } from "../../src/lib/haptics";
 import {
   MAIN_TAB_HREFS,
-  queueMainTab,
   readMainTabFromPath,
   saveLastMainTab,
   takePendingMainTab,
@@ -87,11 +87,12 @@ import {
   bottomBarTabFor,
   isBottomBarTab,
   useWideLayout,
+  type BottomBarTab,
 } from "../../src/lib/bottom-bar";
 import { useT } from "../../src/i18n";
 import { topBarCover, useTopBarCovered } from "../../src/lib/top-bar-cover";
 
-export const unstable_settings = { anchor: "chat" };
+export const unstable_settings = { anchor: "(tabs)" };
 
 const SIDEBAR_WIDTH = 320;
 const TOP_BAR_BUTTON = DRAWER_CHEVRON_SIZE;
@@ -127,7 +128,11 @@ export default function MainLayout() {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
-  useReportTimeZone(Boolean(session.data?.user));
+  const ownerId = session.data?.user.id;
+  useReportTimeZone(Boolean(ownerId));
+  useEffect(() => {
+    if (ownerId) void warmRememberedViews(ownerId);
+  }, [ownerId]);
 
   useEffect(() => {
     if (!hasAiConsent()) {
@@ -181,44 +186,49 @@ export default function MainLayout() {
     }
   }, [activeTab, wide]);
 
-  useEffect(() => {
-    if (!onChatSurface) return;
-    const pending = takePendingMainTab();
-    if (!pending) return;
-    if (pending === "settings" && !wide) openDrawer("start");
-    else router.push(MAIN_TAB_HREFS[pending]);
-  }, [onChatSurface, router, wide]);
-
   const onPlace = onChatSurface || (onTabRoot && !backOverride);
   const barTab = bottomBarTabFor(activeTab);
   const onBarPlace = onPlace && isBottomBarTab(activeTab);
   const backVisible = wide ? !onPlace : !onBarPlace;
 
+  const barTabPaths = useRef<Partial<Record<BottomBarTab, string>>>({});
+  useEffect(() => {
+    if (barTab && onTabRoot) barTabPaths.current[barTab] = pathname;
+  }, [barTab, onTabRoot, pathname]);
+
+  const showTab = useCallback(
+    (tab: MainTabId, from: MainTabId | null) => {
+      const destination = MAIN_TAB_HREFS[tab];
+      if (tab === "settings") {
+        if (from === "settings") router.dismissTo(destination);
+        else router.push(destination);
+        return;
+      }
+      const resumed =
+        !wide && isBottomBarTab(tab) && bottomBarTabFor(from) !== tab
+          ? barTabPaths.current[tab]
+          : undefined;
+      router.dismissTo(resumed ?? destination, { withAnchor: true });
+    },
+    [router, wide],
+  );
+
+  useEffect(() => {
+    if (!onChatSurface) return;
+    const pending = takePendingMainTab();
+    if (!pending) return;
+    if (pending === "settings" && !wide) openDrawer("start");
+    else showTab(pending, "chat");
+  }, [onChatSurface, showTab, wide]);
+
   const selectTab = (tab: MainTabId) => {
-    const destination = MAIN_TAB_HREFS[tab];
     tapLight();
-    if (destination === pathname) {
+    if (MAIN_TAB_HREFS[tab] === pathname) {
       if (backOverride) (backOverride.onReset ?? backOverride.onPress)();
       return;
     }
     Keyboard.dismiss();
-    if (destination === "/chat") {
-      router.dismissTo("/chat");
-    } else if (onChatSurface) {
-      router.push(destination);
-    } else if (!wide && barTab === tab) {
-      router.dismissTo(destination);
-    } else if (!wide && activeTab !== barTab) {
-      queueMainTab(tab);
-      router.dismissTo("/chat");
-    } else if (onTabRoot) {
-      router.replace(destination);
-    } else if (activeTab === tab) {
-      router.dismissTo(destination);
-    } else {
-      queueMainTab(tab);
-      router.dismissTo("/chat");
-    }
+    showTab(tab, activeTab);
   };
 
   const onPressTopLeft = () => {
@@ -282,7 +292,7 @@ export default function MainLayout() {
             />
             <View style={styles.content}>
               <View style={styles.contentSlot}>
-                <MainStack wide />
+                <MainStack />
               </View>
               <View
                 pointerEvents="box-none"
@@ -355,7 +365,7 @@ export default function MainLayout() {
         >
           <AppBackdrop />
           <View style={styles.content}>
-            <MainStack wide={false} />
+            <MainStack />
           </View>
           <BottomBar active={barTab} onSelect={selectTab} />
 
@@ -485,9 +495,8 @@ export default function MainLayout() {
   );
 }
 
-function MainStack({ wide }: { wide: boolean }) {
+function MainStack() {
   const pathname = usePathname();
-  const sidePageOptions = wide ? TAB_SCREEN_OPTIONS : PUSHED_SCREEN_OPTIONS;
   return (
     <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
       <View style={{ flex: 1 }}>
@@ -499,10 +508,7 @@ function MainStack({ wide }: { wide: boolean }) {
             gestureEnabled: false,
           }}
         >
-          <Stack.Screen name="schedule" options={TAB_SCREEN_OPTIONS} />
-          <Stack.Screen name="email" options={sidePageOptions} />
-          <Stack.Screen name="apps" options={TAB_SCREEN_OPTIONS} />
-          <Stack.Screen name="files" options={TAB_SCREEN_OPTIONS} />
+          <Stack.Screen name="(tabs)" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="settings" options={TAB_SCREEN_OPTIONS} />
         </Stack>
         <PersistentAppsHost visible={pathname === "/apps"} />
@@ -512,7 +518,6 @@ function MainStack({ wide }: { wide: boolean }) {
 }
 
 const TAB_SCREEN_OPTIONS = { animation: "none" } as const;
-const PUSHED_SCREEN_OPTIONS = { animation: "slide_from_right" } as const;
 
 const TRANSPARENT_NAVIGATION_THEME = {
   ...DefaultTheme,

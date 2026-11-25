@@ -290,7 +290,9 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     const openMainChat = () => {
       if (!takeMainChatRequest()) return false;
       takePendingMainTab();
-      router.dismissTo(MAIN_TAB_HREFS[requestedMainTab()]);
+      router.dismissTo(MAIN_TAB_HREFS[requestedMainTab()], {
+        withAnchor: true,
+      });
       return true;
     };
 

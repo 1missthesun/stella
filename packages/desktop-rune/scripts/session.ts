@@ -2,11 +2,14 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--headless] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--headless] [--offscreen] [--name <run>]
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png>
 //   bun scripts/session.ts stop
 // With STELLA_LAUNCHER=1 and a socket on fd 3, the app gets that launcher channel, as from a launcher.
+// Linux runs the engine on a private Xvfb. macOS opens a real window that never takes focus: on
+// screen under a shared window slot (~/projects/rune-window-slot.sh), or with --offscreen beyond
+// every display, which needs no slot.
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -20,19 +23,44 @@ const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(name); return i >= 0 ? (args[i + 1] ?? "") : undefined; };
 const has = (name: string) => args.includes(name);
 const runName = flag("--name") ?? process.env.STELLA_RUNE_RUN ?? "default";
-/** macOS's tmpdir (/var/folders/…) pushes the runtime's sockets past the 104-byte sun_path limit. */
-const RUN_ROOT = process.platform === "darwin" ? "/tmp" : os.tmpdir();
-const RUN_DIR = path.join(RUN_ROOT, `stella-rune-${process.getuid?.() ?? "u"}-${runName}`);
+const MAC = process.platform === "darwin";
+/** Runtime and bridge sockets live under the run folder: macOS caps socket paths at 104 bytes. */
+const RUN_DIR = path.join("/tmp", `sr-${runName}`);
+if (RUN_DIR.length > 30) throw new Error(`Run folder ${RUN_DIR} is too long for runtime sockets; use a shorter --name.`);
 const POINTER = path.join(RUN_DIR, "run.json");
 const DEV_BACKEND = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
 const XVFB = process.env.XVFB ?? path.join(os.homedir(), ".cache/stella-verify/xvfb/usr/bin/Xvfb");
-const ENGINE = process.env.BIN ?? path.join(ROOT, "engine/target/release/stella-engine");
+const ENGINE = process.env.BIN ?? [path.join(os.homedir(), "projects/.rune-target/release/stella-engine"), path.join(ROOT, "engine/target/release/stella-engine")].find(existsSync) ?? "stella-engine";
+const SLOTS = path.join(os.homedir(), "projects/rune-window-slot.sh");
 
-type Run = { runDir: string; dataDir: string; userDataDir: string; homeDir: string; ctlPort: number; display?: string; pids: Record<string, number>; account?: { email: string; plan?: string }; headless: boolean; startedAt: string };
+type Run = { runDir: string; dataDir: string; userDataDir: string; homeDir: string; ctlPort: number; display?: string; slot?: string; offscreen?: boolean; pids: Record<string, number>; account?: { email: string; plan?: string }; headless: boolean; startedAt: string };
+
+/** Beyond every display: AppKit keeps a window placed there and still draws it. */
+const OFFSCREEN: [number, number] = [-30000, 200];
+
+/** AppKit keeps 40 pt of a window on a display; window captures (ScreenCaptureKit) still get all of it. */
+const park = (ctlPort: number) => fetch(`http://127.0.0.1:${ctlPort}/eval`, {
+  method: "POST",
+  body: `for (const w of electron.BrowserWindow.getAllWindows()) if (w.isVisible()) w.setPosition(${OFFSCREEN[0]}, ${OFFSCREEN[1]}); return true;`,
+}).catch(() => {});
+
+const acquireSlot = () => {
+  const r = spawnSync(SLOTS, ["acquire", `rune-session-${runName}`], { encoding: "utf8", timeout: 600_000 });
+  const slot = r.stdout?.trim();
+  if (r.status !== 0 || !slot) throw new Error(`No window slot (${SLOTS}): ${r.stderr}`);
+  return slot;
+};
+const releaseSlot = (slot?: string) => { if (slot) spawnSync(SLOTS, ["release", slot]); };
 
 const readRun = (): Run => JSON.parse(readFileSync(POINTER, "utf8"));
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-const cmdline = (pid: number) => { try { return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0"); } catch { return []; } };
+const cmdline = (pid: number): string[] => {
+  if (MAC) {
+    const ps = spawnSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8" });
+    return ps.status === 0 ? ps.stdout.trim().split(/\s+/) : [];
+  }
+  try { return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0"); } catch { return []; }
+};
 
 /** A display no other X server (the verify harness's, another agent's) holds, outside the harness's range. */
 const freeDisplay = () => {
@@ -143,6 +171,8 @@ async function start() {
   const pids: Record<string, number> = {};
   const log = openSync(path.join(RUN_DIR, "host.log"), "a");
   let display: string | undefined;
+  let slot: string | undefined;
+  const offscreen = has("--offscreen");
   if (headless) {
     const stdoutLog = openSync(path.join(RUN_DIR, "host.stdout"), "a");
     const child = spawn(BUN, [path.join(ROOT, "host/services/headless.ts")], { cwd: REPO, env, stdio: ["ignore", stdoutLog, log, ...(launcherChannel ? [3] : [])], detached: true });
@@ -150,17 +180,27 @@ async function start() {
     pids.host = child.pid!;
     child.unref();
   } else {
-    display = flag("--display") ?? freeDisplay();
     const w = Number(process.env.W ?? 1400);
     const h = Number(process.env.H ?? 940);
-    const xvfb = spawn(XVFB, [display, "-screen", "0", `${w + 40}x${h + 40}x24`, "-nolisten", "tcp"], { stdio: ["ignore", log, log], detached: true });
-    pids.xvfb = xvfb.pid!;
-    xvfb.unref();
-    for (let i = 0; i < 100 && alive(xvfb.pid!) && !existsSync(`/tmp/.X11-unix/X${display.slice(1)}`); i++) await Bun.sleep(50);
-    if (!alive(xvfb.pid!)) throw new Error(`Xvfb could not start on ${display}; see ${path.join(RUN_DIR, "host.log")}.`);
+    if (MAC) {
+      env.RUNE_OPEN_INACTIVE = "1";
+      if (offscreen) env.STELLA_RUNE_WINDOW = JSON.stringify({ position: OFFSCREEN });
+      else slot = acquireSlot();
+    } else {
+      display = flag("--display") ?? freeDisplay();
+      const xvfb = spawn(XVFB, [display, "-screen", "0", `${w + 40}x${h + 40}x24`, "-nolisten", "tcp"], { stdio: ["ignore", log, log], detached: true });
+      pids.xvfb = xvfb.pid!;
+      xvfb.unref();
+      for (let i = 0; i < 100 && alive(xvfb.pid!) && !existsSync(`/tmp/.X11-unix/X${display.slice(1)}`); i++) await Bun.sleep(50);
+      if (!alive(xvfb.pid!)) throw new Error(`Xvfb could not start on ${display}; see ${path.join(RUN_DIR, "host.log")}.`);
+      Object.assign(env, {
+        DISPLAY: display,
+        VK_ICD_FILENAMES: "/usr/share/vulkan/icd.d/lvp_icd.json",
+        STELLA_RUNE_SCREEN_W: String(w + 40),
+        STELLA_RUNE_SCREEN_H: String(h + 40),
+      });
+    }
     Object.assign(env, {
-      DISPLAY: display,
-      VK_ICD_FILENAMES: "/usr/share/vulkan/icd.d/lvp_icd.json",
       STELLA_RUNE_ROOT: ROOT,
       STELLA_RUNE_BUN: BUN,
       STELLA_RUNE_T0: String(Date.now()),
@@ -170,15 +210,13 @@ async function start() {
       STELLA_RUNE_THEME: process.env.THEME ?? "dark",
       STELLA_RUNE_SERVICES: has("--no-services") ? "0" : "1",
       ...(process.env.STELLA_RUNE_APP ? { STELLA_RUNE_APP: process.env.STELLA_RUNE_APP } : {}),
-      STELLA_RUNE_SCREEN_W: String(w + 40),
-      STELLA_RUNE_SCREEN_H: String(h + 40),
     });
     const engine = spawn(ENGINE, [], { cwd: REPO, env, stdio: ["ignore", log, log, ...(launcherChannel ? [3] : [])], detached: true });
     pids.engine = engine.pid!;
     engine.unref();
   }
   closeSync(log);
-  const run: Run = { runDir: RUN_DIR, dataDir, userDataDir, homeDir, ctlPort, display, pids, headless, account: minted ? { email: minted.email, plan: minted.plan } : undefined, startedAt: new Date().toISOString() };
+  const run: Run = { runDir: RUN_DIR, dataDir, userDataDir, homeDir, ctlPort, display, slot, offscreen: offscreen || undefined, pids, headless, account: minted ? { email: minted.email, plan: minted.plan } : undefined, startedAt: new Date().toISOString() };
   writeFileSync(POINTER, JSON.stringify(run, null, 1));
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
@@ -186,7 +224,9 @@ async function start() {
     try { if ((await fetch(`http://127.0.0.1:${ctlPort}/health`)).ok) break; } catch {}
     await Bun.sleep(300);
   }
-  console.log(JSON.stringify({ ...run, ready: await fetch(`http://127.0.0.1:${ctlPort}/health`).then((r) => r.ok).catch(() => false), log: path.join(RUN_DIR, "host.log") }, null, 1));
+  const ready = await fetch(`http://127.0.0.1:${ctlPort}/health`).then((r) => r.ok).catch(() => false);
+  if (ready && offscreen && MAC) await park(ctlPort);
+  console.log(JSON.stringify({ ...run, ready, log: path.join(RUN_DIR, "host.log") }, null, 1));
 }
 
 async function evaluate(body: string) {
@@ -197,36 +237,58 @@ async function evaluate(body: string) {
 
 function shot(file: string) {
   const run = readRun();
+  if (MAC) throw new Error("macOS: take a Stella computer-use screenshot of the window (never /usr/sbin/screencapture).");
   const r = spawnSync("import", ["-window", "root", file], { env: { ...process.env, DISPLAY: ownDisplay(run) }, stdio: "inherit" });
   if (r.status !== 0) throw new Error("screenshot failed");
   console.log(file);
 }
 
+/** Every live process under `root`, from `ps` (pid → command); all were started by this run. */
+const descendants = (root: number) => {
+  const ps = spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" });
+  const children = new Map<number, number[]>();
+  for (const line of ps.stdout.split("\n")) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (pid && ppid) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  }
+  const out: number[] = [];
+  const walk = (pid: number) => { for (const c of children.get(pid) ?? []) { out.push(c); walk(c); } };
+  walk(root);
+  return out;
+};
+
 async function stop() {
   if (!existsSync(POINTER)) { console.log("no run"); return; }
   const run = readRun();
   const app = run.pids.host ?? run.pids.engine;
+  const marker: Record<string, string | undefined> = { host: "host/services/headless.ts", engine: ENGINE, xvfb: run.display };
+  const ours = (name: string, pid: number) => alive(pid) && !!marker[name] && cmdline(pid).join(" ").includes(marker[name]!);
+  const tree = app && ours(run.pids.host ? "host" : "engine", app) ? descendants(app) : [];
+  const quitAt = Date.now();
   if (app && alive(app)) {
     await fetch(`http://127.0.0.1:${run.ctlPort}/eval`, { method: "POST", body: "setTimeout(() => electron.app.quit(), 10); return true;" }).catch(() => {});
     for (let i = 0; i < 80 && alive(app); i++) await Bun.sleep(100);
   }
-  const marker: Record<string, string | undefined> = { host: "host/services/headless.ts", engine: ENGINE, xvfb: run.display };
-  const ours = (name: string, pid: number) => alive(pid) && !!marker[name] && cmdline(pid).join(" ").includes(marker[name]!);
+  const appExitMs = app && !alive(app) ? Date.now() - quitAt : null;
+  for (let i = 0; i < 30 && tree.some(alive); i++) await Bun.sleep(100);
+  const lingering = tree.filter(alive).map((pid) => ({ pid, command: cmdline(pid).slice(0, 3).join(" ") }));
   const signal = (sig: NodeJS.Signals) => {
     for (const name of ["host", "engine", "xvfb"]) {
       const pid = run.pids[name];
       if (!pid || !ours(name, pid)) continue;
       try { process.kill(-pid, sig); } catch { try { process.kill(pid, sig); } catch {} }
     }
+    for (const pid of tree) if (alive(pid)) { try { process.kill(pid, sig); } catch {} }
   };
-  const pids = Object.entries(run.pids).filter(([name, pid]) => ours(name, pid)).map(([, pid]) => pid);
+  const pids = [...Object.entries(run.pids).filter(([name, pid]) => ours(name, pid)).map(([, pid]) => pid), ...tree.filter(alive)];
   signal("SIGTERM");
   for (let i = 0; i < 50 && pids.some(alive); i++) await Bun.sleep(100);
   if (pids.some(alive)) signal("SIGKILL");
   for (let i = 0; i < 20 && pids.some(alive); i++) await Bun.sleep(100);
+  releaseSlot(run.slot);
   if (pids.some(alive)) throw new Error(`Run ${runName} did not stop: ${pids.filter(alive).join(", ")}`);
   rmSync(POINTER, { force: true });
-  console.log(`stopped ${JSON.stringify(run.pids)}`);
+  console.log(JSON.stringify({ stopped: run.pids, appExitMs, lingeringAfterQuit: lingering }));
 }
 
 const [command, ...rest] = args;

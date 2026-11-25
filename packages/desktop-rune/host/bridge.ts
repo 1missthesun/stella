@@ -257,6 +257,8 @@ export const engine = {
     showItemInFolder: (path: string) => request("shell.showItemInFolder", { path }),
   },
   fonts: (f: { files: string[]; sans?: string; mono?: string }) => request<{ loaded: number; errors: string[] }>("fonts", f),
+  /** Overrides a window's background (default: the first window). */
+  background: (color: string, window?: string) => request("bg", { color, window }),
   /** Makes the next commits' colour changes spring over `dur` seconds (theme switches); 0 turns it off. */
   colorMotion: (dur: number) => request("colorMotion", { dur }),
   scroll: {

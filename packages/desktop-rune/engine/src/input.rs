@@ -72,7 +72,19 @@ fn state(s: &mut Win, n: u32) -> &mut InputState {
     s.inputs.entry(n).or_insert_with(|| InputState::new(""))
 }
 
+/// A single-line field of fixed height centres its line, as a browser's does.
+fn centred(p: &Props) -> Option<Props> {
+    let Some(crate::props::Size::Pt(h)) = p.h else { return None };
+    if p.multiline || p.py.is_some() || p.pt.is_some() || p.pb.is_some() || p.pad.is_some() {
+        return None;
+    }
+    let pad = ((h - text::style_of(p).line_px()) / 2.0).max(0.0);
+    Some(Props { py: Some(pad), ..p.clone() })
+}
+
 pub fn build(s: &Win, n: u32, p: &Props) -> El {
+    let centred = centred(p);
+    let p = centred.as_ref().unwrap_or(p);
     let blank;
     let edit = match s.inputs.get(&n) {
         Some(st) => &st.edit,

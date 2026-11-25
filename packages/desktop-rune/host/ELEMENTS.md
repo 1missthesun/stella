@@ -1,0 +1,285 @@
+# Rune elements and engine protocol (v1)
+
+What the TS host can render and call. Prop types are `host/rune-jsx/props.ts` (the source of
+truth for names); the engine side is `engine/src/` (`props.rs` parses, `style.rs` / `text.rs` /
+`input.rs` / `media.rs` / `markdown.rs` / `webview.rs` / `windows.rs` build).
+
+## Processes and the bridge
+
+`stella-engine` (Rust, Rune) starts first, opens the main window, then spawns the TS host
+(`bun host/main.tsx`). One Bun process holds the whole app; the engine keeps a retained mirror of
+the element tree and draws it.
+
+| Direction | Unix | Windows | Format |
+|---|---|---|---|
+| host → engine | fd 4 (`STELLA_RUNE_BRIDGE_OUT_FD`) | stdout | binary frames: `u32 len` + ops |
+| engine → host | fd 5 (`STELLA_RUNE_BRIDGE_IN_FD`) | stdin | JSON lines |
+
+The host's own stdout goes to the engine's stderr, so `console.log` never corrupts the bridge.
+Fd 3 is left for the launcher socket.
+
+Host → engine ops: `1 create(id, kind)`, `2 props(id, json)`, `4 append`, `5 insert`, `6 remove`,
+`9 commit(gen, ack, t0, kind)`, `10 cmd(json)`, `11 blob(id, bytes)`, `12 freeBlob(id)`.
+The reconciler (`host/reconciler.ts`) emits these; app code never does.
+
+Engine → host lines (`onEngineEvent(t, fn)` in `bridge.ts`):
+
+- `ev` → routed to `on*` props: `{t:"ev", n, e, seq, at, input, ...payload}`
+- `reply` → resolves `request()`
+- `window` → `{id, kind}`, where kind is one of: close-requested, closed, focus, blur, resize (w, h),
+  maximize, unmaximize, enter-full-screen, leave-full-screen
+- `menu`, `tray`, `shortcut`, `notification`, `appearance` (`{dark}`), `rec`
+
+Commands: `engine.*` in `bridge.ts` (typed). `request(cmd, args)` returns a Promise; window-bound
+commands take `window` (a `<window id>`), or find the window from `target` (an element `id`).
+
+## Windows
+
+Root children are `<window id>` elements. The first `main` (or kind-less) window binds to the
+native window the engine opened at launch; every other window opens when mounted and closes when
+unmounted. Render windows from anywhere with `windowPortal(<window …/>, key)` (keeps context).
+
+`<window>` props: `id`, `kind` (`main` | `panel` | `overlay`), `title`, `w`, `h`, `minSize`,
+`maxSize`, `position`, `resizable`, `frameless`, `transparent`, `alwaysOnTop`, `clickThrough`,
+`visible`, `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
+its controls over it), `trafficLights` (macOS inset), `dark` (native chrome scheme), `dir`, `keys` +
+`onKey` (window-level chords).
+
+Close: the OS close button sends `window close-requested`; the window stays until TS unmounts it
+or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark drag regions and
+`windowResize="se"` (etc.) makes an element a resize edge for frameless windows.
+
+## Elements
+
+| Element | What it is |
+|---|---|
+| `col` `row` `box` | flex containers; `box` is Rune's `el()`, a row (`center` centres both axes) |
+| `text` | text; string children or `spans` (rich runs) |
+| `input` | native text field (single or `multiline`) |
+| `image` | path, `file://`, `blob:N`, `data:`, `http(s)` (fetched by the host), SVG |
+| `icon` | SVG body tinted through `currentColor` |
+| `markdown` | rune-kit Markdown: streaming, selection, syntax, tables, mermaid |
+| `video` `audio` | native player |
+| `list` | virtualized column (only rows near the viewport are built); inside a `scrollY` box |
+| `webview` | lazy OS webview (wry) in this element's rect |
+
+### Common props (every element)
+
+**Identity.** `id` is the Rune key and the target for commands, anchors and the `control`
+dumps. An element with an `id` is memoized: it rebuilds only when it or something under it changed.
+
+**Layout.**
+- Sizes: `w h minW maxW minH maxH`, each a number, `"full"`, `"fit"` or `"N%"`.
+- Flex: `grow`, `shrink`, `aspect`, `pad px py pt pr pb pl`, margins `mt mb ml mr mx my`, `gap`,
+  `rowGap`, `align`, `justify` (incl. `between around evenly`), `selfAlign`, `center`, `wrap`.
+- Grid: `columns` on the container, `column` on the child.
+- Position: `absolute={{left,top,right,bottom}}` or `inset`. `fixed` pins to the window and paints
+  in its top layer, keeping React context (scrims, dialogs, toasts). `raise` paints above later
+  siblings. `dir`.
+
+**Paint.** `fill`, `gradient {angle, stops}`, `radial`, `border`, `borderWidth`, `borderSides
+[top, right, bottom, left]`, `borderDash`, `radius`, `corners [tl, tr, br, bl]` (both in CSS order), `clip` (overflow hidden, rounded),
+`shadow [y, blur, color]` or `shadows [{x,y,blur,spread,color,inset}]`, `opacity`, `blur`,
+`backdropBlur`.
+
+**States.**
+- Pointer: `hover`, `press` (fills), `hoverFill`, `pressFill`, `hoverBorder`, `pressBorder`,
+  `pressScale`.
+- Hover groups: `hoverGroup` on the parent; on children, `hoverColor` and `hoverOpacity
+  [rest, hovered]`.
+- Focus: `focusRing {width, offset, color, radius}`, `focusFill`, `focusBorder`.
+- `disabled`. `hidden` keeps the element's space but doesn't draw it, hit-test it or announce it.
+
+**Motion.**
+- Transforms: `x y scale rotate origin`.
+- `motion {dur, bounce}` is the spring every prop change rides. `layout` (s) animates layout
+  changes. `instant` makes changes land without motion.
+- `enter` / `exit`: a preset (`fade rise drop blur scale pop slide`) or `{opacity, scale, x, y,
+  blur, dur, bounce}`.
+- `loop`: `opacity`, `rotation`, `slide`, or `sequence {period, delay, frames:[{at, x, y, scale,
+  opacity, rotate}]}`. `at` ≤ 1 is a fraction of the period. `scaleX` / `scaleY` are averaged,
+  since Rune scales uniformly.
+
+**Interaction.**
+- Pointer and focus: `cursor`, `inert` (pointer-events none for the subtree), `focusable`,
+  `tabIndex`, `autoFocus`, `focusGroup` (arrow-key roving and type-select).
+- `keys: ["mod+k", "Escape", "shift+Enter"]`: chords this element takes while focus is inside;
+  each fires `onKey`. `mod` is ⌘ on macOS and Ctrl elsewhere; names are DOM key names.
+- `title` + `titleSide`: a tooltip.
+- Drag and drop: `dragOut {paths | text}` drags files or text out to other apps. `onDropFiles` and
+  `onDropHover` take drops; `dropExts` filters them.
+
+**Scroll.**
+- `scrollY`, `scrollX`.
+- `stickBottom`: follows the end as content grows (chat).
+- `edgeFade`.
+- `sticky` (`"top"` | `"bottom"`) with `stickyInset`.
+- `selectionGroup`: one selection across the texts inside.
+
+**Accessibility (AccessKit).** `role`, `label`, `checked`, `expanded`, `selected`. A `text` is
+its own label.
+
+**Overlays.**
+- `anchor {to: "<id>", side, align, gap, fit}` places the element against another element, in
+  the window's top layer (popovers, menus).
+- `modal {clickOutside, wheelOutside}` traps focus and makes the rest of the window inert.
+  Escape, or a press outside when `clickOutside` is set, fires `onDismiss`.
+
+**Events.** Every `on*` function prop is wired only when present.
+
+| Prop | Payload |
+|---|---|
+| `onPress()`, `onDoublePress()` | none |
+| `onContextMenu({x,y})` | point |
+| `onHover(inside)` | boolean |
+| `onFocus(focused, keyboard)` | booleans |
+| `onFocusWithin(within)` | boolean |
+| `onLayout({x,y,w,h})` | window rect |
+| `onScroll({x,y,maxX,maxY,viewport})` | scroll position |
+| `onAtBottom(atBottom)` | boolean |
+| `onKey({key, chord, mods})` | key |
+| `onDismiss()` | none |
+| `onDropFiles(paths)`, `onDropHover(over)` | paths, boolean |
+| `onDrag({phase, dx, dy, x, y})` | drag |
+
+### text
+
+- Content: `spans: [{t, w, c, m, bg, i, u, s, st, href}]`. The run fields are: text, weight,
+  colour, mono, background, italic, underline colour, size, strike, and a link (`onLink(href)`).
+- Style: `size weight lineHeight tracking color mono family` (a registered font family, `sans`,
+  `mono` or `system-mono`), `italic underline strike`.
+- Selection: `selectable`, `selectionColor`.
+- Wrapping: `maxLines`, `truncate` (`true` | `end` | `middle` | `head` | `fade`), `nowrap`,
+  `textAlign`, `textCase`.
+
+### input
+
+- Value: `value` is controlled. The engine recognises echoes of values it reported, so typing
+  never races a re-render. `placeholder`, `placeholderColor`.
+- Options: `multiline secure spellcheck readOnly selectOnFocus caretColor`, plus every text style
+  prop. IME, undo, selection and spellcheck are native.
+- Events:
+  - `onInput(value)`
+  - `onSubmit(value)`: Enter; Shift+Enter is a newline when `multiline`
+  - `onSelection({start,end})`: UTF-16 offsets
+  - `onPaste({files, image, text})`: fires for file and image pastes; `image` is a temp PNG path
+  - `onKey({key, chord, mods, value, start, end, length})`: for `keys` chords
+- Commands: `engine.input.get / set / select`, `engine.focus(id)`, `engine.blur()`.
+
+### image, icon, video
+
+- `image`: `src`, `fit` (`cover` | `contain` | `stretch`), `tint`, and any box paint (border,
+  radius, shadows).
+- `icon`: `svg` (the inner body of an `<svg>`, `currentColor` allowed), `view` (viewBox size,
+  default 24), `size`, `color`, `spin` (period in seconds).
+- `video` / `audio`: `src`, `fit`, `autoplay`, `muted`, `loopMedia`. Commands:
+  `engine.media.play / pause / seek / state`.
+
+### markdown
+
+`src`, `streaming`, `selectable`, `onLink(href)`, `onCodeAction(...)`, and `mdStyle`, an object
+whose keys are rune-kit `MarkdownStyle` builders in camelCase.
+
+**Colours.** `text muted link linkUnderline linkHover inlineCodeBg inlineCodeText codeBlockText
+quoteRule rule selection tableRules tableHeaderRule tableHeaderText`, `tableOutline` (a colour or
+null).
+
+**`[a, b]` pairs.** `codeBlockPadding`, `list [indent, gap]`, `listNestedIndent`,
+`inlineCodeFont [scale, weight]`, and the `[top, bottom]` margins: `paragraphMargin codeMargin
+imageMargin listMargin quoteMargin ruleMargin tableMargin`. Also `tableCellPadding`,
+`tableHeaderPad`.
+
+**Numbers and switches.** `codeBlockRadius inlineCodePad strongWeight textWidth
+tableHeaderWeight`; booleans `listMarkersOutside tableFlushLeft tableFullWidth`.
+
+**Compound values.**
+- `codeBlock [fill, border]` (or `codeBlockFill` + `codeBlockBorder`)
+- `quote [rule, width, pad, textColor]`
+- `table [border, headerFill]`
+
+**Fonts.** Each takes `{size, weight, lineHeight, tracking, family}`: `body` (alias `bodyFont`),
+`codeBlockFont`, `tableFont`, and headings via `headings` (array, level 1 first) or `headingFont`
+(`{"1": …}`). Heading margins use `headingMargins` / `headingMargin` in the same two shapes.
+
+**`syntax`.** `{keyword, string, number, comment, type, function, property, punctuation,
+operator, inserted, deleted}` colours. `dark` picks the neutral base.
+
+**`codeFrame`.** `{label, labelSize, labelGap, actions: [{id, label?, svg?, view?}], actionColor,
+actionHover, actionsOnHover}` adds a language row above each code block, with actions at its top
+right. Pressing an action fires `onCodeAction({action, index, language, source})`; TS does the
+copy or download.
+
+### list
+
+Children are rows. `estimate` is the row height guess and `overscan` is `[before, after]` in rows.
+Only rows near the viewport are built. The list must sit inside a `scrollY` box.
+
+### webview
+
+**Props.**
+- `url` or `html`
+- `transparent`, `devtools`, `userAgent`
+- `preload`: JS run before the page's own scripts
+- `protocols`: custom schemes
+
+**Events.**
+- `onMessage({data, targetOrigin})`: the page calls `window.ipc.postMessage(json)`, or
+  `window.parent.postMessage(data, origin)` / `window.top.postMessage(…)`. Iframe-style
+  deliverables and Cloud Apps keep working unchanged.
+- `onRequest({rid, scheme, url, method, headers, body})`: answer with
+  `engine.webview.respond(rid, {status, headers, body})`, where `body` is a string or bytes.
+- `onNavigate({url})`, `onTitle(title)`, `onLoad({phase, url})`, `onReady()`, `onError(error)`.
+
+**Commands.** `engine.webview.post(id, data)` delivers a `MessageEvent` to the page (as
+`window.postMessage` would). The rest: `eval load loadHtml reload back forward focus blur zoom
+url`.
+
+The view is created on first layout, follows the element's rect and visibility, and is destroyed
+on unmount. A native view can't be clipped or rounded: inside a scroll box it shows only while it
+lies wholly in the viewport, so give webviews a panel of their own rather than scrolling content.
+WebKitGTK keeps one handler per scheme for the whole process; the engine routes each request to
+the view that asked, so any number of views can share a scheme.
+
+**Platform.** On Linux the engine runs on X11 (XWayland under Wayland) while the webview feature
+is built in, because WebKitGTK children need an X11 parent; `STELLA_RUNE_BACKEND=wayland` opts
+out. macOS uses WKWebView and Windows uses WebView2 as child views.
+
+## Engine API (`engine` in `host/bridge.ts`)
+
+- `window.*`: focus, show, hide, close, minimize, maximize, unmaximize, toggleMaximize,
+  setFullScreen, center, setTitle, setAlwaysOnTop, setBounds, getBounds, isMaximized
+- `clipboard.*`: read, readText, readHTML, readFiles, readImage (PNG bytes), writeText,
+  writeHTML, writeImage
+- `dialog.*`: openFile (`multi`), openFolder, saveFile, all with filters and defaultPath.
+  Message boxes are drawn by the UI.
+- `notify({id, title, body, actions})`; clicks come back as `notification` events
+- `menu.popup(items, {window, x, y, anchor})` resolves with the picked id
+- `tray.*`: create, setMenu, setTooltip, setIcon, destroy
+- `shortcut.*`: register, unregister, unregisterAll. These are global and take Electron
+  accelerators.
+- `screen.displays()`, `screen.primary()`
+- `appearance.get()`
+- `shell.*`: openExternal, openPath, showItemInFolder
+- `fonts({files, sans, mono})`, `background(color, window?)`, `colorMotion(dur)`
+- `scroll.*`: to (`"end"` or y), intoView, page, stop
+- `focus(id)`, `blur()`
+- `input.*`, `media.*`, `webview.*`
+- `control.*`, `quit()`
+
+## Verification hooks
+
+- `engine.control.input(events, window?)` replays real input through Rune's own input paths
+  (`WindowHandle::inject_script`). The events use the Rune `--script` format:
+  - `{type:"tap", key:"send"}`, `{type:"tap", x, y}`
+  - `{type:"type", text}`, `{type:"key", name:"k", cmd:true}` (flags `shift ctrl alt logo cmd`; `cmd` is the primary modifier, Ctrl off macOS, and matches `mod+…` chords)
+  - `{type:"drag", key, dx, dy}`, `{type:"wheel", …}`, `{paste:"text"}`, `{focus:true}`
+  - `t` is seconds from now
+- `engine.control.elements(window?, key?)` lists every drawn element: key, path, role, label,
+  text, rect, opacity, focused, focusable, inert, fill, textColor.
+- With `STELLA_RUNE_CTL_PORT=<port>`, the host serves the same over loopback HTTP:
+  - `POST /control/input {events, window}`
+  - `GET /control/elements?window=&key=`
+  - `POST /control/request {cmd, ...args}`, for any engine command
+- `STELLA_RUNE_APP=<path.tsx>` swaps the app entry (`demo/gallery/App.tsx` exercises everything
+  here). An entry that exports `Root` renders its own `<window>`s; one that exports `App` is
+  wrapped in `<window id="main">`.

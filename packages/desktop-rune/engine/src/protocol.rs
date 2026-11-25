@@ -135,6 +135,9 @@ fn decode(frame: &[u8]) -> Vec<Op> {
     ops
 }
 
+/// Largest frame the host sends (blobs included); anything bigger is a corrupted stream.
+const MAX_FRAME: usize = 256 << 20;
+
 pub fn read_loop(mut out: impl Read, tx: mpsc::Sender<Msg>, waker: Arc<Mutex<Option<Waker>>>) {
     let mut len = [0u8; 4];
     let mut buf = Vec::new();
@@ -143,6 +146,10 @@ pub fn read_loop(mut out: impl Read, tx: mpsc::Sender<Msg>, waker: Arc<Mutex<Opt
             break;
         }
         let n = u32::from_le_bytes(len) as usize;
+        if n > MAX_FRAME {
+            eprintln!("stella-engine: bridge frame of {n} bytes; something other than the host wrote to the bridge. Closing it.");
+            break;
+        }
         buf.resize(n, 0);
         if out.read_exact(&mut buf).is_err() {
             break;

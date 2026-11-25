@@ -22,6 +22,8 @@ pub struct Win {
     pub node: u32,
     pub main: bool,
     pub inputs: HashMap<u32, InputState>,
+    /// Set by the `bg` command; wins over the `<window>`'s own `bg`.
+    pub bg: Option<rune::Color>,
 }
 
 /// Every window's waker, for work that lands off the UI thread (images, tray, notifications).
@@ -55,7 +57,7 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
     let full = cx.is_full_screen();
     let node = s.node;
     let root = engine::read(|eng| {
-        let mut root = col().key("stella-root").w_full().h_full().fill(bg(eng, node));
+        let mut root = col().key("stella-root").w_full().h_full().fill(s.bg.unwrap_or_else(|| bg(eng, node)));
         if let Some(n) = eng.tree.get(node).filter(|_| node != 0) {
             if let Some(h) = n.props.titlebar {
                 cx.titlebar_height(h);
@@ -208,7 +210,7 @@ fn open(node: u32, p: &Props) {
     let props = p.clone();
     let spec = WindowSpec::new(format!("w{node}"), app_spec(p))
         .options(options(p))
-        .state(Win { node, main: false, inputs: HashMap::new() })
+        .state(Win { node, main: false, inputs: HashMap::new(), bg: None })
         .map_app(move |a| decorate(a, &props));
     let handle = rune::open_window(spec);
     engine::with(|e| {

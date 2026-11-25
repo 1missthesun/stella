@@ -185,6 +185,9 @@ fn style(v: &Value) -> MarkdownStyle {
     if let Some(f) = v.get("tableFont") {
         s = s.table_font(font(f, body));
     }
+    if let Some(on) = v.get("tableFullWidth").and_then(|b| b.as_bool()) {
+        s = s.table_full_width(on);
+    }
     if let Some(Value::Object(m)) = v.get("syntax").or_else(|| v.get("syntaxTheme")) {
         for (k, c) in m {
             if let (Some(kind), Some(c)) = (syntax_kind(k), c.as_str().and_then(parse_color)) {
@@ -212,9 +215,75 @@ fn style_for(v: Option<&Value>) -> MarkdownStyle {
     })
 }
 
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct CodeFrameP {
+    label: Option<crate::props::C>,
+    label_size: Option<f32>,
+    label_gap: Option<f32>,
+    actions: Vec<ActionP>,
+    action_color: Option<crate::props::C>,
+    action_hover: Option<crate::props::C>,
+    actions_on_hover: Option<bool>,
+}
+
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct ActionP {
+    id: String,
+    label: Option<String>,
+    svg: Option<String>,
+    view: Option<f32>,
+}
+
+fn label(t: &str, size: f32, color: rune::Color) -> El {
+    crate::text::build(&Props { content: Some(t.to_owned()), size: Some(size), color: Some(crate::props::C(color)), ..Default::default() })
+}
+
+/// `mdStyle.codeFrame`: a language label row above each code block and actions at its top
+/// right (shown on hover unless `actionsOnHover: false`); pressing one fires `codeAction`.
+fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
+    let Ok(f) = serde_json::from_value::<CodeFrameP>(v.clone()) else { return md };
+    md.code_frame(move |card, c| {
+        let weak = f.label.map(|c| c.0).unwrap_or(parse_color("#8a8a8e").unwrap_or(rune::Color::TRANSPARENT));
+        let size = f.label_size.unwrap_or(12.0);
+        let mut head = rune::row().w_full().items_center().justify_between().h(22.0);
+        head = head.child(label(c.language.unwrap_or(""), size, weak));
+        let mut actions = rune::row().gap(2.0).items_center();
+        for a in &f.actions {
+            let color = f.action_color.map(|c| c.0).unwrap_or(weak);
+            let mut b = rune::el().key(a.id.clone()).h(22.0).px(4.0).radius(6.0).center().cursor(rune::Cursor::Pointer).role("button");
+            if let Some(h) = f.action_hover {
+                b = b.hover(h.0);
+            }
+            b = match (&a.svg, &a.label) {
+                (Some(svg), _) => {
+                    let ip = Props { svg: Some(svg.clone()), view: a.view, size: Some(14.0), color: Some(crate::props::C(color)), ..Default::default() };
+                    b.child(crate::media::icon(&ip)).label(a.label.clone().unwrap_or_else(|| a.id.clone()))
+                }
+                (None, Some(l)) => b.child(label(l, size, color)),
+                (None, None) => b.child(label(&a.id, size, color)),
+            };
+            let (id, index, language, source) = (a.id.clone(), c.index, c.language.map(str::to_owned), c.source.to_owned());
+            b = b.on_press_tx(move |_s: &mut crate::windows::Win, tx: &mut rune::Tx| {
+                crate::engine::element_event(n, "codeAction", serde_json::json!({ "action": id, "index": index, "language": language, "source": source }), Some(tx));
+            });
+            actions = actions.child(b);
+        }
+        if f.actions_on_hover.unwrap_or(true) {
+            actions = actions.group_opacity(0.0, 1.0);
+        }
+        head = head.child(actions);
+        rune::col().key(format!("code-{}", c.index)).w_full().gap(f.label_gap.unwrap_or(4.0)).hover_group().child(head).child(card)
+    })
+}
+
 pub fn build(n: u32, p: &Props) -> El {
     let src = p.src.clone().unwrap_or_default();
     let mut md = Markdown::new(src).streaming(p.streaming).selectable(p.selectable || p.selection_group);
+    if let Some(f) = p.md_style.as_ref().and_then(|v| v.get("codeFrame")) {
+        md = code_frame(n, md, f);
+    }
     if p.listens("link") {
         md = md.on_link_tx(move |_s: &mut crate::windows::Win, href: &str, tx: &mut rune::Tx| {
             crate::engine::element_event(n, "link", serde_json::json!({ "href": href }), Some(tx));

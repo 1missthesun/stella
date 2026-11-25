@@ -48,6 +48,8 @@ pub fn route(v: Value) {
     let rid = rid_of(&v);
     match cmd.as_str() {
         "fonts" => reply(rid, fonts(&v)),
+        #[cfg(feature = "webview")]
+        "webview.respond" => reply(rid, engine::read(|e| crate::webview::command(&cmd, 0, &v, &e.blobs))),
         "colorMotion" => {
             engine::with(|e| e.color_motion = f(&v, "dur").filter(|d| *d > 0.0));
             reply(rid, Ok(Value::Null));
@@ -220,6 +222,9 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
     let tkey = target(&v).and_then(key_of);
     let r: Result<Value, String> = (|| {
         match cmd.as_str() {
+            "bg" => {
+                st.bg = Some(v.get("color").and_then(|c| c.as_str()).and_then(crate::props::parse_color).ok_or("bg: needs a color")?);
+            }
             "scrollTo" => {
                 let key = tkey.clone().ok_or("scrollTo: no target")?;
                 let x = f(&v, "x").unwrap_or(0.0);

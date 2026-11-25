@@ -23,6 +23,8 @@
     "host/**/*.tsx",
     "ui/**/*.ts",
     "ui/**/*.tsx",
+    "demo/**/*.ts",
+    "demo/**/*.tsx",
     "scripts/**/*.ts",
     "../desktop-ui/src/shared/types/electron.d.ts"
   ],

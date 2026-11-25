@@ -10,6 +10,7 @@ declare global {
     useStore: <T>(sel: (s: import("../host/store").AppState) => T) => T;
     command: (v: Record<string, unknown>) => void;
     engine: typeof import("../host/bridge").engine;
+    on: typeof import("../host/bridge").onEngineEvent;
     now: () => number;
     /** The runtime's default conversation, when the host runs Stella's services. */
     chat?: { conversationId: string; send(text: string): Promise<void> };

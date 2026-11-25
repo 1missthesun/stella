@@ -57,7 +57,10 @@ export type BoxProps = {
   dir?: "ltr" | "rtl";
   // Paint
   fill?: Color; gradient?: Gradient; radial?: Radial;
-  border?: Color; borderWidth?: number; borderSides?: [number, number, number, number]; borderDash?: number;
+  border?: Color; borderWidth?: number;
+  /** Per-side widths in CSS order: top, right, bottom, left. */
+  borderSides?: [number, number, number, number]; borderDash?: number;
+  /** Per-corner radii in CSS order: top-left, top-right, bottom-right, bottom-left. */
   radius?: number; corners?: [number, number, number, number];
   /** Clip children to the rounded box (overflow:hidden). */
   clip?: number;
@@ -177,9 +180,11 @@ export type IconProps = BoxProps & {
 
 export type MarkdownProps = BoxProps & {
   src: string; streaming?: boolean; selectable?: boolean;
-  /** MarkdownStyle builders by camelCase name (host/ELEMENTS.md). */
+  /** MarkdownStyle builders by camelCase name, plus `codeFrame` (host/ELEMENTS.md). */
   mdStyle?: Record<string, unknown>;
   onLink?: (href: string) => void;
+  /** A `mdStyle.codeFrame.actions` button was pressed on a code block. */
+  onCodeAction?: (a: { action: string; index: number; language: string | null; source: string }) => void;
 };
 
 export type MediaProps = BoxProps & { src: string; fit?: "cover" | "contain"; autoplay?: boolean; muted?: boolean; loopMedia?: boolean };

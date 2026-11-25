@@ -137,7 +137,7 @@ fn main() {
     }
     let mut spec = windows::app_spec(&p);
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
-    let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default() }).keep_running();
+    let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
     let app = windows::decorate(app, &p).window_options(windows::options(&p));
     let _ = services::APP.set(app.handle());
     app.on_ready(|h| {

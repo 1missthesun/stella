@@ -49,11 +49,40 @@ const PARENT_SHIM: &str = r#"(() => {
   }
 })();"#;
 
+thread_local! {
+    /// Drawn rects of the scroll viewports webviews sit in.
+    static CLIPS: RefCell<HashMap<u32, [f32; 4]>> = RefCell::new(HashMap::new());
+}
+
 /// The slot element: an empty box whose drawn rect the WebView follows.
-pub fn slot(n: u32, p: &Props) -> El {
-    let e = el().on_drawn_layout(move |s: &mut Win, r: [f32; 4]| place(n, s.node, r));
-    let e = crate::style::apply(e, p);
-    crate::view::handlers(e, n, p, false).key(crate::view::rune_key(n, p))
+pub fn slot(n: u32) -> El {
+    el().on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+        tx.live_only();
+        place(n, s.node, r);
+    })
+}
+
+/// Records a scroll viewport's drawn rect and re-places the webviews inside it.
+pub fn clipper(e: El, id: u32) -> El {
+    e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+        tx.live_only();
+        CLIPS.with(|c| c.borrow_mut().insert(id, r));
+        let inside: Vec<(u32, [f32; 4])> = engine::read(|e| e.tree.clip_of.iter().filter(|(_, c)| **c == id).map(|(w, _)| *w).collect::<Vec<_>>())
+            .into_iter()
+            .filter_map(|w| VIEWS.with(|v| v.borrow().get(&w).map(|view| (w, view.rect))))
+            .collect();
+        for (w, rect) in inside {
+            place(w, s.node, rect);
+        }
+    })
+}
+
+/// A native view can't be clipped: it shows only while wholly inside its scroll viewport.
+fn fits(n: u32, r: [f32; 4]) -> bool {
+    let Some(c) = engine::read(|e| e.tree.clip_of.get(&n).copied()) else { return true };
+    let Some(c) = CLIPS.with(|m| m.borrow().get(&c).copied()) else { return true };
+    let eps = 0.5;
+    r[0] >= c[0] - eps && r[1] >= c[1] - eps && r[0] + r[2] <= c[0] + c[2] + eps && r[1] + r[3] <= c[1] + c[3] + eps
 }
 
 fn rect(window: u32, r: [f32; 4]) -> Rect {
@@ -84,7 +113,9 @@ fn ensure_gtk() {
 fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String> {
     #[cfg(target_os = "linux")]
     ensure_gtk();
+    let id = format!("stella-{n}");
     let mut b = WebViewBuilder::new()
+        .with_id(&id)
         .with_bounds(rect(window, r))
         .with_transparent(p.transparent)
         .with_devtools(p.devtools || cfg!(debug_assertions))
@@ -114,7 +145,9 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
     for scheme in &p.protocols {
         let scheme = scheme.clone();
         let name = scheme.clone();
-        b = b.with_asynchronous_custom_protocol(name, move |_id, req: Request<Vec<u8>>, responder: RequestAsyncResponder| {
+        // WebKitGTK keeps a scheme's first handler for the whole process, so route by the asking view.
+        b = b.with_asynchronous_custom_protocol(name, move |id, req: Request<Vec<u8>>, responder: RequestAsyncResponder| {
+            let n = id.strip_prefix("stella-").and_then(|v| v.parse().ok()).unwrap_or(n);
             let rid = NEXT_RID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             PENDING.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).insert(rid, responder);
             let headers: serde_json::Map<String, serde_json::Value> =
@@ -146,6 +179,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         let t0 = std::time::Instant::now();
         match create(n, window, &p, r) {
             Ok(view) => {
+                let _ = view.set_bounds(rect(window, r));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, url: p.url.clone(), html: p.html.clone(), rect: r, visible: true }));
                 element_event(n, "ready", json!({}), None);
@@ -153,9 +187,9 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             Err(e) => {
                 eprintln!("stella-engine: webview failed: {e}");
                 element_event(n, "error", json!({ "error": e }), None);
+                return;
             }
         }
-        return;
     }
     VIEWS.with(|v| {
         let mut v = v.borrow_mut();
@@ -164,7 +198,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             let _ = view.view.set_bounds(rect(window, r));
             view.rect = r;
         }
-        let hidden = r[2] < 1.0 || r[3] < 1.0;
+        let hidden = r[2] < 1.0 || r[3] < 1.0 || !fits(n, r);
         if view.visible == hidden {
             let _ = view.view.set_visible(!hidden);
             view.visible = !hidden;

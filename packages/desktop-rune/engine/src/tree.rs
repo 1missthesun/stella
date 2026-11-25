@@ -30,6 +30,9 @@ pub struct Tree {
     live: HashSet<u32>,
     /// Ancestors of live nodes: never memoized, since a cached subtree would hold stale state.
     pub live_above: HashSet<u32>,
+    /// Each webview's nearest scrolling or clipping ancestor, which its native view must stay inside.
+    pub clip_of: HashMap<u32, u32>,
+    pub clippers: HashSet<u32>,
     live_moved: bool,
 }
 
@@ -72,7 +75,15 @@ impl Tree {
             return;
         }
         self.live_above.clear();
+        self.clip_of.clear();
+        self.clippers.clear();
         for &l in &self.live {
+            if self.nodes.get(&l).is_some_and(|n| n.kind == Kind::Webview)
+                && let Some(c) = self.clipper_above(l)
+            {
+                self.clip_of.insert(l, c);
+                self.clippers.insert(c);
+            }
             let mut id = self.nodes.get(&l).map_or(0, |n| n.parent);
             for _ in 0..4096 {
                 if id == 0 || !self.live_above.insert(id) {
@@ -81,6 +92,21 @@ impl Tree {
                 id = self.nodes.get(&id).map_or(0, |n| n.parent);
             }
         }
+    }
+
+    fn clipper_above(&self, id: u32) -> Option<u32> {
+        let mut id = self.nodes.get(&id)?.parent;
+        for _ in 0..4096 {
+            let n = self.nodes.get(&id)?;
+            if id == 0 || n.kind == Kind::Window {
+                return None;
+            }
+            if n.props.scroll_y || n.props.scroll_x || n.props.clip.is_some() {
+                return Some(id);
+            }
+            id = n.parent;
+        }
+        None
     }
 
     fn touch(&mut self, mut id: u32) {
@@ -137,6 +163,9 @@ impl Tree {
                 self.nodes.insert(id, Node { kind, ..Default::default() });
             }
             Op::Props { id, props } => {
+                if self.live_above.contains(&id) {
+                    self.live_moved = true;
+                }
                 if props.lifted() {
                     self.lifted.insert(id);
                 } else {

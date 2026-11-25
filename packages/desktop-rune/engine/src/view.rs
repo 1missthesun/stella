@@ -46,11 +46,18 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         Kind::Icon => media::icon(p),
         Kind::Video => media::video(id, p),
         Kind::Markdown => media::markdown(id, p),
-        Kind::Webview => crate::webview::slot(id, p),
+        #[cfg(feature = "webview")]
+        Kind::Webview => crate::webview::slot(id),
+        #[cfg(not(feature = "webview"))]
+        Kind::Webview => el(),
         Kind::List => list(id, n),
     };
     let e = style::apply(e, p);
-    let e = handlers(e, id, p, false);
+    let mut e = handlers(e, id, p, false);
+    #[cfg(feature = "webview")]
+    if eng.tree.clippers.contains(&id) {
+        e = crate::webview::clipper(e, id);
+    }
     e.key(rune_key(id, p))
 }
 

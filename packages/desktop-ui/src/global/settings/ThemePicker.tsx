@@ -11,6 +11,7 @@ import { isHiddenOverlay } from "@stella/theme";
 import { Popover, PopoverContent, PopoverTrigger, PopoverBody } from "@/ui/popover";
 import { Button } from "@/ui/button";
 import { ThemeOrb } from "@/ui/theme-orb";
+import { AiryWordPicker } from "@/global/settings/AiryControls";
 import "./ThemePicker.css";
 
 type ColorScheme = "light" | "dark" | "system";
@@ -130,19 +131,16 @@ export function ThemePicker({
     >
       <div data-slot="theme-picker-section" data-bordered>
         <div data-slot="theme-picker-label">Appearance</div>
-        <div data-slot="theme-picker-button-row">
-          {COLOR_SCHEMES.map((scheme) => (
-            <Button
-              key={scheme.id}
-              size="small"
-              variant={colorMode === scheme.id ? "secondary" : "ghost"}
-              data-slot="theme-picker-option-button"
-              onClick={() => setColorMode(scheme.id)}
-            >
-              {scheme.label}
-            </Button>
-          ))}
-        </div>
+        <AiryWordPicker
+          className="theme-picker-word-picker"
+          value={colorMode}
+          ariaLabel="Appearance"
+          onChange={setColorMode}
+          options={COLOR_SCHEMES.map((scheme) => ({
+            value: scheme.id,
+            label: scheme.label,
+          }))}
+        />
       </div>
 
       {/* Flat themes (the stock Default, plus any forcedMode-pinned
@@ -158,38 +156,30 @@ export function ThemePicker({
         aria-disabled={flat || undefined}
       >
         <div data-slot="theme-picker-label">Gradient Style</div>
-        <div data-slot="theme-picker-button-row">
-          {(["soft", "flat"] as const).map((value) => (
-            <Button
-              key={value}
-              size="small"
-              variant={gradientMode === value ? "secondary" : "ghost"}
-              data-slot="theme-picker-option-button"
-              onClick={() => setGradientMode(value)}
-              disabled={flat}
-              aria-disabled={flat || undefined}
-            >
-              {value === "soft" ? "Soft" : "Flat"}
-            </Button>
-          ))}
-        </div>
+        <AiryWordPicker
+          className="theme-picker-word-picker"
+          value={gradientMode}
+          ariaLabel="Gradient Style"
+          disabled={flat}
+          onChange={setGradientMode}
+          options={[
+            { value: "soft", label: "Soft" },
+            { value: "flat", label: "Flat" },
+          ]}
+        />
 
         <div data-slot="theme-picker-label">Gradient Color</div>
-        <div data-slot="theme-picker-button-row">
-          {(["relative", "strong"] as const).map((value) => (
-            <Button
-              key={value}
-              size="small"
-              variant={gradientColor === value ? "secondary" : "ghost"}
-              data-slot="theme-picker-option-button"
-              onClick={() => setGradientColor(value)}
-              disabled={flat}
-              aria-disabled={flat || undefined}
-            >
-              {value === "relative" ? "Relative" : "Strong"}
-            </Button>
-          ))}
-        </div>
+        <AiryWordPicker
+          className="theme-picker-word-picker"
+          value={gradientColor}
+          ariaLabel="Gradient Color"
+          disabled={flat}
+          onChange={setGradientColor}
+          options={[
+            { value: "relative", label: "Relative" },
+            { value: "strong", label: "Strong" },
+          ]}
+        />
       </div>
 
       <div data-slot="theme-picker-section">

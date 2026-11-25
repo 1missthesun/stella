@@ -26,7 +26,7 @@ export function SettingsToggleCard({
   return (
     <div className="settings-card">
       <div className="settings-card-header">
-        <SettingsCardTitle titleKey={titleKey} />
+        <SettingsCardTitle titleKey={titleKey} variant="row" />
         <Switch
           aria-label={t(titleKey)}
           checked={checked}

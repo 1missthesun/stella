@@ -32,6 +32,10 @@ export const SettingsDialogHost = memo(function SettingsDialogHost() {
         size="page"
         className="shell-settings-dialog"
         aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement).focus();
+        }}
       >
         {/* The settings screen renders its own visible title; keep the
             dialog's accessible name without doubling it on screen. */}

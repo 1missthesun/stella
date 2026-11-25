@@ -122,7 +122,7 @@ export function YourDataCard() {
           <div className="settings-row-label">
             {t("settings.yourData.supportLabel")}
           </div>
-          <div className="settings-card-desc">
+          <div className="settings-row-sublabel">
             {until
               ? `${t("settings.yourData.supportActive")} ${new Date(until).toLocaleString()}`
               : t("settings.yourData.supportOff")}

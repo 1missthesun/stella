@@ -1,4 +1,5 @@
 import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
+import { SettingsTabHeader } from "@/global/settings/AiryControls";
 import {
   lazy,
   Suspense,
@@ -181,9 +182,6 @@ export function AudioTab() {
             <div className="settings-row-label">
               {t("settings.audio.microphone.deviceLabel")}
             </div>
-            <div className="settings-row-sublabel">
-              {t("settings.audio.microphone.deviceDescription")}
-            </div>
           </div>
           <div className="settings-row-control">
             <Select
@@ -229,6 +227,7 @@ export function AudioTab() {
   );
   return (
     <div className="settings-tab-content">
+      <SettingsTabHeader titleKey="settings.tabs.audio" />
       <div className="settings-card">
         <SettingsCardTitle titleKey="settings.audio.microphone.title" />
         {permissionError ? (
@@ -276,9 +275,6 @@ export function AudioTab() {
               <div className="settings-row-info">
                 <div className="settings-row-label">
                   {t("settings.audio.speaker.outputLabel")}
-                </div>
-                <div className="settings-row-sublabel">
-                  {t("settings.audio.speaker.outputDescription")}
                 </div>
               </div>
               <div className="settings-row-control">

@@ -19,7 +19,7 @@ export function OnboardingReplayCard() {
   return (
     <div className="settings-card">
       <div className="settings-card-header">
-        <SettingsCardTitle titleKey="settings.onboardingReplay.title" />
+        <SettingsCardTitle titleKey="settings.onboardingReplay.title" variant="row" />
         <Button
           type="button"
           variant="ghost"

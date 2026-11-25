@@ -64,7 +64,10 @@ export function SettingsRailNav({
                   onClick={() => onSelect(key)}
                 >
                   <Icon size={16} strokeWidth={1.75} />
-                  <span>{t(labelKey)}</span>
+                  <span className="settings-rail-item-label">{t(labelKey)}</span>
+                  {isActive ? (
+                    <span className="settings-rail-dot" aria-hidden="true" />
+                  ) : null}
                 </button>
               );
             })}

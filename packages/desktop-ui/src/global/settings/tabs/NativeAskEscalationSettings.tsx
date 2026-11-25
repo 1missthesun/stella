@@ -11,6 +11,7 @@ import {
   isWithinQuietHours,
   normalizeUserAskEscalationPolicy,
 } from "@stella/contracts/user-ask";
+import { AiryWordPicker } from "@/global/settings/AiryControls";
 import { Select } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 import { TextField } from "@/ui/text-field";
@@ -122,7 +123,7 @@ export function NativeAskEscalationSettings() {
   const disabled = !loaded || saving;
   const levelOptions = USER_ASK_URGENCY_NAMES.map((name, index) => ({
     value: String(index + 1),
-    label: t(`settings.escalation.levels.${name}`),
+    label: t(`mobile.settings.userAsk.level.${name}`),
   }));
   const now = new Date();
   const quietNow = isWithinQuietHours(
@@ -140,36 +141,27 @@ export function NativeAskEscalationSettings() {
         {t("settings.escalation.description")}
       </p>
 
-      <div className="settings-row">
+      <div className="settings-row settings-row--stacked">
         <div className="settings-row-info">
           <div className="settings-row-label">
-            {t("settings.escalation.ceiling.label")}
-          </div>
-          <div className="settings-row-sublabel">
-            {t("settings.escalation.ceiling.sublabel")}
+            {t("mobile.settings.userAsk.ceiling")}
           </div>
         </div>
-        <div className="settings-row-control">
-          <Select
-            className="settings-runtime-select"
-            value={String(policy.ceiling)}
-            aria-label={t("settings.escalation.ceiling.label")}
-            disabled={disabled}
-            options={levelOptions}
-            onValueChange={(value) =>
-              void commit({ ceiling: Number(value) as UserAskUrgencyLevel })
-            }
-          />
-        </div>
+        <AiryWordPicker
+          value={String(policy.ceiling)}
+          ariaLabel={t("mobile.settings.userAsk.ceiling")}
+          disabled={disabled}
+          options={levelOptions}
+          onChange={(value) =>
+            void commit({ ceiling: Number(value) as UserAskUrgencyLevel })
+          }
+        />
       </div>
 
       <div className="settings-row">
         <div className="settings-row-info">
           <div className="settings-row-label">
             {t("settings.escalation.sound.label")}
-          </div>
-          <div className="settings-row-sublabel">
-            {t("settings.escalation.sound.sublabel")}
           </div>
         </div>
         <div className="settings-row-control">
@@ -189,9 +181,6 @@ export function NativeAskEscalationSettings() {
         <div className="settings-row-info">
           <div className="settings-row-label">
             {t("settings.escalation.rateLimit.label")}
-          </div>
-          <div className="settings-row-sublabel">
-            {t("settings.escalation.rateLimit.sublabel")}
           </div>
         </div>
         <div className="settings-row-control">
@@ -295,29 +284,23 @@ export function NativeAskEscalationSettings() {
             </div>
           </div>
 
-          <div className="settings-row">
+          <div className="settings-row settings-row--stacked">
             <div className="settings-row-info">
               <div className="settings-row-label">
-                {t("settings.escalation.quietHours.ceilingLabel")}
-              </div>
-              <div className="settings-row-sublabel">
-                {t("settings.escalation.quietHours.ceilingSublabel")}
+                {t("mobile.settings.userAsk.quietCeiling")}
               </div>
             </div>
-            <div className="settings-row-control">
-              <Select
-                className="settings-runtime-select"
-                value={String(policy.quietHoursCeiling)}
-                aria-label={t("settings.escalation.quietHours.ceilingLabel")}
-                disabled={disabled}
-                options={levelOptions}
-                onValueChange={(value) =>
-                  void commit({
-                    quietHoursCeiling: Number(value) as UserAskUrgencyLevel,
-                  })
-                }
-              />
-            </div>
+            <AiryWordPicker
+              value={String(policy.quietHoursCeiling)}
+              ariaLabel={t("mobile.settings.userAsk.quietCeiling")}
+              disabled={disabled}
+              options={levelOptions}
+              onChange={(value) =>
+                void commit({
+                  quietHoursCeiling: Number(value) as UserAskUrgencyLevel,
+                })
+              }
+            />
           </div>
         </>
       ) : null}

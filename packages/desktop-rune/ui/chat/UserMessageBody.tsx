@@ -32,7 +32,7 @@ export function UserMessageBody({ text }: { text: string }) {
     <col w="full" minW={0}>
       <box w="full" minW={0}>
         <text {...look} spans={runs} selectable maxLines={expanded ? undefined : CLAMP_LINES} truncate={expanded ? undefined : "end"} onLayout={(r) => setClampedH(r.h)} />
-        {expanded ? null : <text {...look} spans={runs} absolute={{ left: 0, top: 0, right: 0 }} hidden inert onLayout={(r) => setFullH(r.h)} />}
+        {expanded ? null : <text {...look} spans={runs} absolute={{ left: 0, top: 0, right: -1 }} hidden inert onLayout={(r) => setFullH(r.h)} />}
       </box>
       {showToggle ? (
         <box selfAlign="end" mt={6} py={2} radius={radius.sm} hoverFill={c.toggleHover} hoverGroup role="button" focusable label={expanded ? t("app.chat.userMessage.showLess") : t("app.chat.userMessage.showMore")} expanded={expanded} onPress={() => setExpanded((v) => !v)}>

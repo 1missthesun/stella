@@ -162,6 +162,17 @@ const parseCliEvent = (value: unknown): CloudOrchestratorEvent | null => {
             ...(value.isError === true ? { isError: true as const } : {}),
           }
         : null;
+    case "background_tasks":
+      return Array.isArray(value.tasks) && value.tasks.length <= 64
+        ? {
+            type: "background_tasks",
+            tasks: value.tasks.flatMap((task) => {
+              const id = isRecord(task) ? boundedString(task.id, 200) : undefined;
+              const description = isRecord(task) ? (boundedString(task.description, 400) ?? "") : "";
+              return id ? [{ id, description }] : [];
+            }),
+          }
+        : null;
     case "usage":
       return nonNegativeInteger(value.inputTokens) &&
         nonNegativeInteger(value.outputTokens) &&

@@ -42,6 +42,7 @@ import {
 import { ANTIGRAVITY_MODEL_IDS } from "@stella/contracts/engine-model-catalog";
 import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
+import { CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW, CONTEXT_HANDOFF_TOOL, CONTEXT_SIZE_DIAGNOSTIC } from "@stella/contracts/context-handoff";
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
 import { stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
 import { createHash } from "node:crypto";
@@ -200,6 +201,7 @@ export type ClaudeCodeTurnSpec = {
   }): void;
   toolSetAfterStep(): { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[]; prompt: string } | undefined;
   onBackgroundWake(wake: ClaudeCodeBackgroundWake): void;
+  onBackgroundTasks?(tasks: readonly { id: string; description: string }[]): void;
   backgroundWake: boolean;
   quiet: boolean;
   compact?: true;
@@ -293,6 +295,7 @@ type Session = {
   closing?: true;
   lastSignAt?: number;
   hold?: "compacting" | "user";
+  background?: readonly string[];
 };
 
 const ZERO_USAGE = (): Usage => ({
@@ -621,6 +624,16 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       contextWindow: CLAUDE_CODE_CONTEXT_WINDOW,
       maxTokens: CLAUDE_CODE_MAX_TOKENS,
     }) as Model<Api>;
+
+  const windowOf = (id: string): number => {
+    const resolved = options.resolveModel?.(id) ?? id;
+    return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(id) ?? flavor.contextWindow(resolved);
+  };
+
+  const compactionWindowOf = (session: ClaudeCodeSessionRef, id: string): number => {
+    const window = windowOf(id);
+    return flavor === CLAUDE_CODE_FLAVOR && session.role === "worker" ? Math.min(window, CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW) : window;
+  };
 
   const settleNative = (toolUseId: string, result: NativeResult) => {
     const waiters = nativeWaiters.get(toolUseId);
@@ -1084,6 +1097,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         signal: abort.signal,
         backgroundWake,
         quiet: !conversation.slice(lastReplyAt + 1).some(userWrote),
+        onBackgroundTasks: (tasks) => {
+          session.background = tasks.map((task) => task.description.trim() || task.id);
+        },
         onBackgroundWake: (wake) => {
           const text = backgroundWakeText(wake);
           (session.wakes ??= new Set()).add(text.trim());
@@ -1221,7 +1237,25 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       usage.totalTokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
     };
     const roundUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+    let contextTokens: number | undefined;
+    let reportedWindow: number | undefined;
+    const noteContext = (raw: Record<string, any> | undefined) => {
+      const used = raw?.used;
+      const size = raw?.size;
+      if (typeof used === "number" && used > 0) contextTokens = used;
+      if (typeof size === "number" && size > 0) reportedWindow = size;
+    };
+    const markContext = () => {
+      if (contextTokens === undefined) return;
+      const window = reportedWindow ?? compactionWindowOf(turn.session.binding.session, modelInfo.id);
+      output.diagnostics = [
+        ...(output.diagnostics ?? []).filter((diagnostic) => diagnostic.type !== CONTEXT_SIZE_DIAGNOSTIC),
+        { type: CONTEXT_SIZE_DIAGNOSTIC, timestamp: Date.now(), details: { tokens: contextTokens, window } },
+      ];
+    };
     const closeMessageUsage = () => {
+      const sent = usage.input + usage.cacheRead + usage.cacheWrite;
+      if (sent > 0 && reportedWindow === undefined) contextTokens = sent + usage.output;
       roundUsage.input += usage.input;
       roundUsage.output += usage.output;
       roundUsage.cacheRead += usage.cacheRead;
@@ -1232,6 +1266,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     };
     const fail = (reason: "aborted" | "error", message: string) => {
       finalUsage();
+      markContext();
       output.stopReason = reason;
       output.errorMessage = message;
       if (reason === "error" && isSafeguardBlockText(message)) output.rawStopReason = "refusal";
@@ -1240,6 +1275,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     };
     const stop = (reason: "stop" | "toolUse") => {
       finalUsage();
+      markContext();
       output.stopReason = reason;
       out.push({ type: "done", reason, message: output });
       out.end(output);
@@ -1408,6 +1444,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             const delta = asRecord(source.delta);
             if (typeof delta?.stop_reason === "string") messageStop = delta.stop_reason;
             addUsage(asRecord(source.usage));
+            noteContext(asRecord(source.context));
             break;
           }
           case "message_stop": {
@@ -1698,10 +1735,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       return { provider: flavor.providerId, modelId };
     },
-    contextWindow(model: string): number {
-      const resolved = options.resolveModel?.(model) ?? model;
-      return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(model) ?? flavor.contextWindow(resolved);
-    },
+    contextWindow: windowOf,
     extension(conversationId: string): Extension {
       return defineExtension({
         name: flavor.extensionName,
@@ -1748,7 +1782,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
                 return { block: `${flavor.label} did not run ${record.name} as a Stella tool; it answered: ${result.text || "(no output)"}` };
               }
               const refused = await cliRuns(record.turn, call.id, record.name, context);
-              return refused === undefined ? undefined : { block: refused };
+              if (refused !== undefined) return { block: refused };
+              const background = record.name === CONTEXT_HANDOFF_TOOL ? (record.turn.session.background ?? []) : [];
+              if (background.length > 0) {
+                return {
+                  block: `Your own background work is still running in ${flavor.label} (${background.slice(0, 5).join("; ")}), and it can't follow you into a fresh context. Wait for it to finish, or stop what you no longer need with TaskStop, then call ${CONTEXT_HANDOFF_TOOL} again.`,
+                };
+              }
+              return undefined;
             },
             afterTool: (call, result) => {
               const record = calls.get(call.id);

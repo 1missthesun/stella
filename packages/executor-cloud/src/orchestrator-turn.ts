@@ -14,6 +14,7 @@ import {
   type CloudOrchestratorToolResult,
 } from "@stella/contracts/cloud-orchestrator-cli";
 import {
+  backgroundTaskListOf,
   buildClaudeCodeNativeToolRuntimePrompt,
   createClaudeNativeToolUseCorrelator,
   getClaudeCodeStatusChangeFromStreamEvent,
@@ -299,6 +300,13 @@ export class CliAssistantAssembler {
         }),
       );
       if (Object.keys(windows).length > 0) this.emit({ type: "models", windows });
+    }
+    const background = backgroundTaskListOf(event as never);
+    if (background) {
+      this.emit({
+        type: "background_tasks",
+        tasks: background.slice(0, 64).map((task) => ({ id: task.id.slice(0, 200), description: task.description })),
+      });
     }
     const compaction = this.#compaction(event as Record<string, unknown>);
     if (compaction) {

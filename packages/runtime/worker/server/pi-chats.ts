@@ -1,4 +1,5 @@
 import { steadyNow } from "@stella/contracts/server-clock";
+import { parseHandoffTokens } from "@stella/contracts/context-handoff";
 import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
@@ -259,6 +260,9 @@ const deviceAgentThreadsFor = (
     stop: async (threadId) => await threads().stop({ conversationId, threadId, requestId: requestId(`stop:${threadId}:${Date.now()}`) }),
   };
 };
+
+const HANDOFF_COMMAND_MAX_CHARS = 300;
+const handoffAtTokens = parseHandoffTokens(process.env.STELLA_HANDOFF_AT_TOKENS);
 
 const chatsBySession = new WeakMap<OpenSession, Promise<DesktopChats>>();
 const loadedBySession = new WeakMap<OpenSession, DesktopChats>();
@@ -556,6 +560,7 @@ export const piChatsFor = (
         await runner.signInAlert(args);
       },
       simulateSafeguardBlocks: process.env.STELLA_DEV_HARNESS === "1",
+      ...(handoffAtTokens !== undefined ? { handoffAtTokens } : {}),
       safeguards: {
         resolve: async (args) => {
           const runner = session.runnerCell.get();
@@ -620,6 +625,10 @@ export const piChatsFor = (
       endAgentShells: async (threadId) =>
         (await session.runnerCell.get()?.backgroundExits.endAgentSessions(threadId)) ?? 0,
       endedCommands: async (threadId) => await session.runnerCell.get()?.backgroundExits.takeEnded(threadId),
+      runningCommands: async (threadId) =>
+        (session.runnerCell.get()?.runningTaskShells() ?? [])
+          .filter((shell) => shell.agentId === threadId)
+          .map((shell) => ({ id: shell.sessionId, command: shell.command.slice(0, HANDOFF_COMMAND_MAX_CHARS) })),
       wakeSources: (threadId) => taskWakeSources(session, hostBus, threadId),
       agentStarted: (agent) => {
         session.runnerCell.get()?.backgroundExits.disarm({ conversationId: agent.conversationId, agentId: agent.threadId });

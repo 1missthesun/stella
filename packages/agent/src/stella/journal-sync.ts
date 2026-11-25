@@ -9,7 +9,9 @@ import {
   type EntryId,
   type EntryRecord,
   type Harness,
+  ResetEntry,
 } from "@earendil-works/pi-durable";
+import { isContextHandoffText } from "@stella/contracts/context-handoff";
 import type { JournalCheckpoint, JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 import { boundedReplay } from "./doc-checkpoint.ts";
 
@@ -175,6 +177,9 @@ const messageText = (message: Message | undefined): string => {
   return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
 };
 
+export const isSummaryMarker = (entry: Pick<EntryRecord, "kind" | "model">): boolean =>
+  entry.kind === CompactionEntry.kind || (entry.kind === ResetEntry.kind && isContextHandoffText(messageText(entry.model?.[0])));
+
 export async function checkpointToPublish(
   harness: Harness,
   root: Conversation,
@@ -188,8 +193,9 @@ export async function checkpointToPublish(
     const marker = await tx.latestHeadMarker(root.id);
     if (
       !marker ||
-      marker.kind !== CompactionEntry.kind ||
+      !isSummaryMarker(marker) ||
       journalCheckpointOf(marker) !== undefined ||
+      journalSeqOf(marker) !== undefined ||
       (doc.publishedCheckpoint ?? 0) >= marker.id
     ) {
       return undefined;
@@ -425,7 +431,10 @@ export async function importJournal(
       {
         type: "write",
         requestId: requestId(record.seq),
-        entry: { kind: ENTRY_KIND[record.role], model: [asWritten(record)], data: { journalSeq: record.seq } },
+        entry:
+          record.role === "user" && isContextHandoffText(messageText(record.message))
+            ? { kind: ResetEntry.kind, head: "self", model: [asWritten(record)], data: { journalSeq: record.seq } }
+            : { kind: ENTRY_KIND[record.role], model: [asWritten(record)], data: { journalSeq: record.seq } },
       },
       context,
     );

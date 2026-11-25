@@ -1,7 +1,6 @@
 import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import {
-  CompactionEntry,
   defineDoc,
   defineExtension,
   GenerationTask,
@@ -21,7 +20,7 @@ import {
   type AgentLogRecordDraft,
 } from "@stella/contracts/backend/agent-logs";
 import { StellaAgentDoc } from "./agent-doc.ts";
-import { importJournal, journalSeqOf, JournalSyncDoc, type JournalMessage, type JournalSeed } from "./journal-sync.ts";
+import { importJournal, isSummaryMarker, journalSeqOf, JournalSyncDoc, type JournalMessage, type JournalSeed } from "./journal-sync.ts";
 import { boundedReplay } from "./doc-checkpoint.ts";
 
 export type AgentLogState = {
@@ -241,7 +240,7 @@ const draftOf = async (
     const ready = prepare ? await prepare(message) : message;
     return { key: recordKey(syncId, entry.id), role, payloadJson: boundedMessageJson(ready) };
   }
-  if (entry.kind !== CompactionEntry.kind || !message || message.role !== "user") return undefined;
+  if (!isSummaryMarker(entry) || !message || message.role !== "user") return undefined;
   if ((entry.data as { journalCheckpoint?: unknown } | undefined)?.journalCheckpoint !== undefined) return undefined;
   const summary = typeof message.content === "string" ? message.content : message.content.map((part) => (part.type === "text" ? part.text : "")).join("\n");
   if (!summary.trim() || entry.head === undefined) return undefined;

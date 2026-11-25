@@ -208,7 +208,7 @@ export type ClaudeCodeToolSetChange = {
 };
 const MAX_TOOL_SET_CHANGES_PER_TURN = 4;
 
-export const CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW = 433_000;
+export { CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } from "@stella/contracts/context-handoff";
 type ClaudeCodeInjection = {
   consumed: boolean;
   answered?: boolean;
@@ -280,7 +280,7 @@ type ClaudeCodeProcessState = {
 type BackgroundTask = ClaudeCodeBackgroundWake["tasks"][number] & {
   id?: string;
 };
-const backgroundTaskListOf = (line: ClaudeStreamEvent): ClaudeCodeBackgroundTaskInfo[] | undefined => {
+export const backgroundTaskListOf = (line: ClaudeStreamEvent): ClaudeCodeBackgroundTaskInfo[] | undefined => {
   if (line.type !== "system" || line.subtype !== "background_tasks_changed") return undefined;
   if (!Array.isArray(line.tasks)) return [];
   const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : undefined);

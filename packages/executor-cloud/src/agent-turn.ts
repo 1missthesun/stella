@@ -57,6 +57,8 @@ import {
   USE_SECURE_VALUE_CLOUD_PARAMETERS,
 } from "@stella/runtime/kernel/tools/defs/secure-input.js";
 import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
+import { cloudAgentBrief, cloudAgentHandoffTool, createCloudAgentHandoff } from "./cloud-agent-handoff.js";
+import { CONTEXT_HANDOFF_TOOL } from "@stella/contracts/context-handoff";
 import {
   CLOUD_AGENT_MESSAGE_TOOL,
   cloudAgentMessageTool,
@@ -130,6 +132,7 @@ export type AgentTurnInput = CloudCliTurnRoleInput & {
   turnBroker: TurnBrokerInput;
   world: WorldSyncAccess;
   claudeAccount?: CloudClaudeAccountInput;
+  handoffAtTokens?: number;
   history?: AgentHistoryRow[];
   execution: CloudExecutionSelection;
   skills?: GeneralAgentPromptSkills;
@@ -614,6 +617,12 @@ export const runAgentTurn = (
       const turnInputs: string[] = [input.prompt];
       const messenger = createCloudAgentMessenger(postJson, input.turnId);
       let nudged = false;
+      const handoff = createCloudAgentHandoff({
+        model: nativeExecution.model,
+        atTokens: input.handoffAtTokens ?? process.env.STELLA_HANDOFF_AT_TOKENS,
+      });
+      const history = input.history ?? [];
+      const brief = cloudAgentBrief(history, input.prompt, history[0]?.seq === 1);
       const cloudToolMetadata = [
         ...claudeToolSet.tools.map((tool) =>
           tool.name === "code"
@@ -630,6 +639,7 @@ export const runAgentTurn = (
         ),
         cloudAgentMoveTool,
         cloudAgentMessageTool,
+        cloudAgentHandoffTool,
       ];
       const executeCloudTool = async (
         toolCallId: string,
@@ -639,6 +649,10 @@ export const runAgentTurn = (
         onUpdate?: ToolUpdateCallback,
       ): Promise<ToolResult> => {
         markTurnStep("firstToolCall");
+        if (name === CONTEXT_HANDOFF_TOOL) return handoff.run(params);
+        if (handoff.pending()) {
+          return { error: "You handed off, so nothing more runs in this context; end this turn now with no reply." };
+        }
         if (name === CLOUD_AGENT_MOVE_TOOL) {
           return await runCloudAgentMove(postJson, input.turnId, params);
         }
@@ -760,6 +774,11 @@ export const runAgentTurn = (
                   nudged = true;
                   return IDLE_STOP_NUDGE;
                 },
+              },
+              handoff: {
+                controller: handoff,
+                ...(brief ? { task: brief } : {}),
+                turn: () => turnInputs.filter((text) => text !== brief),
               },
               ...(await claudeKeeper.then((client) =>
                 client

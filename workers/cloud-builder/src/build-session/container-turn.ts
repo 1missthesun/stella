@@ -1,4 +1,5 @@
 import { agentIdentityText } from "@stella/contracts/agent-messaging";
+import { parseHandoffTokens } from "@stella/contracts/context-handoff";
 import {
   agentContainerSize,
   materializeAgentWorld,
@@ -1415,6 +1416,9 @@ export const runAgentAttempt = async (
     host.env,
     turn,
   );
+  const handoffAtTokens = parseHandoffTokens(
+    (host.env as { STELLA_HANDOFF_AT_TOKENS?: string }).STELLA_HANDOFF_AT_TOKENS,
+  );
   const nativeStatePreviousIntegrityKeys = (
     await nativeStateIntegrityKeysFor(host.env, turn)
   ).filter((key) => key !== nativeStateIntegrityKey);
@@ -1564,6 +1568,7 @@ export const runAgentAttempt = async (
           }),
         },
         ...(claudeAccount ? { claudeAccount } : {}),
+        ...(handoffAtTokens !== undefined ? { handoffAtTokens } : {}),
         history: args.history,
         ...(cloudSkills ? { skills: cloudSkills } : {}),
         ...(turn.execution ? { execution: turn.execution } : {}),

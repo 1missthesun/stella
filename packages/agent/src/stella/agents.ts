@@ -416,6 +416,7 @@ export type StellaAgentsHost = {
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
   endAgentProcesses?(threadId: string): Promise<number>;
   endedCommands?(threadId: string): Promise<string | undefined>;
+  runningCommands?(threadId: string): Promise<{ id: string; command: string }[]>;
   wakeSources?(threadId: string): Promise<string[]>;
   directory?: AgentDirectoryHost;
   agentDirectory?(threadId: string): string;
@@ -736,6 +737,28 @@ const busyReader = (
   running: async (id) => (await store.snapshot(LiveDoc, id, context))?.run !== undefined,
   reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
 });
+
+export const runningHelpers = async (
+  store: Pick<ToolExecutionApi, "snapshot" | "commit">,
+  conversationId: ConversationId,
+  context: Context,
+): Promise<{ threadId: string; description: string }[]> => {
+  const read = busyReader(store, context);
+  const agents = Object.entries((await read.agents(conversationId))?.agents ?? {});
+  if (agents.length === 0) return [];
+  const carrying = new Set((await read.reporters(conversationId)).map((reporter) => reporter.input.threadId));
+  const running: { threadId: string; description: string }[] = [];
+  for (const [threadId, agent] of agents) {
+    if (wasStopped(agent)) continue;
+    const working = runsElsewhere(agent)
+      ? agent.outcome === undefined
+      : carrying.has(threadId) ||
+        agent.waiting !== undefined ||
+        (agent.conversationId >= 0 && (await read.running(agent.conversationId as ConversationId)));
+    if (working) running.push({ threadId, description: agent.description });
+  }
+  return running;
+};
 
 const localView = async (
   store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },

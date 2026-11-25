@@ -419,6 +419,8 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
           attempt.spec.onNativeToolEnd({ toolUseId: event.toolUseId, result: event.text, isError: event.isError === true });
         } else if (event.type === "models") {
           noteModels(event);
+        } else if (event.type === "background_tasks") {
+          attempt.spec.onBackgroundTasks?.(event.tasks);
         } else if (event.type === "compaction") {
           host.log("claude_code_compaction", { turnId: attempt.turn.turnId, summaryChars: event.summary.length });
           attempt.spec.onCompaction({

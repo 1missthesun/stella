@@ -37,6 +37,7 @@ export function desktopAgentsHost(
     dataDir?: string;
     endAgentShells?: (threadId: string) => Promise<number>;
     endedCommands?: StellaAgentsHost["endedCommands"];
+    runningCommands?: StellaAgentsHost["runningCommands"];
     wakeSources?: StellaAgentsHost["wakeSources"];
     execution?: StellaAgentsHost["execution"];
     agentLog?: StellaAgentsHost["agentLog"];
@@ -66,6 +67,7 @@ export function desktopAgentsHost(
       : {}),
     ...(options.execution ? { execution: options.execution } : {}),
     ...(options.endedCommands ? { endedCommands: options.endedCommands } : {}),
+    ...(options.runningCommands ? { runningCommands: options.runningCommands } : {}),
     ...(options.wakeSources ? { wakeSources: options.wakeSources } : {}),
     ...(options.agentLog ? { agentLog: options.agentLog } : {}),
     directoryProblem: async (directory) => {

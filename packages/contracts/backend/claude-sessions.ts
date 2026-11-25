@@ -2,6 +2,7 @@ export const CLAUDE_SESSION_CHUNK_MAX_BYTES = 512 * 1024;
 export const CLAUDE_SESSION_APPEND_MAX_BODY_BYTES = 1024 * 1024;
 export const CLAUDE_SESSION_CHAIN_GENESIS = "0".repeat(64);
 export const CLAUDE_SESSION_MAX_FILES = 512;
+export const CLAUDE_SESSION_SUPERSEDES_MAX = 16;
 
 export type ClaudeSessionEngine =
   | "claude_code_local"
@@ -62,6 +63,10 @@ export type ClaudeSessionCalls = {
   };
   "claudeSessions.tag": {
     args: ClaudeSessionSyncTag;
+    result: null;
+  };
+  "claudeSessions.supersede": {
+    args: { threadId: string; sessionId: string; supersedes: string[] };
     result: null;
   };
   "claudeSessions.latest": {

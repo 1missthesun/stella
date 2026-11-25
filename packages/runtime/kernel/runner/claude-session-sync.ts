@@ -8,6 +8,7 @@ import {
   CLAUDE_SESSION_CHUNK_MAX_BYTES,
   CLAUDE_SESSION_CONFLICT_REASON,
   CLAUDE_SESSION_STALE_LEASE_REASON,
+  CLAUDE_SESSION_SUPERSEDES_MAX,
   claudeSessionChainInput,
   claudeSessionFileMode,
   isClaudeSessionFilePath,
@@ -53,6 +54,7 @@ const RESUME_RESTORE_TIMEOUT_MS = 20_000;
 export type ClaudeSessionSyncBackend = {
   append(args: ClaudeSessionAppendArgs): Promise<ClaudeSessionFileHead>;
   tag(args: ClaudeSessionSyncTag): Promise<unknown>;
+  supersede?(args: ClaudeSessionCalls["claudeSessions.supersede"]["args"]): Promise<unknown>;
   latest(args: { threadId: string }): Promise<ClaudeSessionManifest | null>;
   readChunk(
     args: ClaudeSessionCalls["claudeSessions.readChunk"]["args"],
@@ -220,6 +222,22 @@ class ClaudeSessionSyncRepo {
         )
         .all(ownerScope, limit) as SessionRow[]
     ).map((row) => ({ ...row, engine: asEngine(row.engine) }));
+  }
+
+  olderSessions(threadId: string, sessionId: string, limit: number): string[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT older.session_id AS sessionId FROM claude_session_sync_sessions older
+             JOIN claude_session_sync_sessions current
+               ON current.thread_id = older.thread_id AND current.session_id = ?
+            WHERE older.thread_id = ? AND older.session_id <> current.session_id
+              AND older.created_at < current.created_at
+            ORDER BY older.created_at DESC
+            LIMIT ?`,
+        )
+        .all(sessionId, threadId, limit) as { sessionId: string }[]
+    ).map((older) => older.sessionId);
   }
 
   countPending(): number {
@@ -707,6 +725,12 @@ export const createClaudeSessionSync = (options: {
     }
     if (row.tagDirty > 0 && !stopped) {
       await withTimeout(backend.tag(tag));
+      const supersedes = repo.olderSessions(row.threadId, row.sessionId, CLAUDE_SESSION_SUPERSEDES_MAX).filter(isClaudeSessionId);
+      if (supersedes.length > 0 && backend.supersede) {
+        await withTimeout(backend.supersede({ threadId: row.threadId, sessionId: row.sessionId, supersedes })).catch((error: unknown) => {
+          logger.warn("claude-session-sync.supersede-failed", { error: String(error) });
+        });
+      }
     }
   };
 

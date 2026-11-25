@@ -226,6 +226,7 @@ export type CloudOrchestratorEvent =
   | { type: "assistant_message"; message: CloudCliAssistantMessage }
   | { type: "models"; alias?: string; resolved?: string; windows?: Record<string, number> }
   | { type: "native_tool_result"; toolUseId: string; text: string; isError?: true }
+  | { type: "background_tasks"; tasks: { id: string; description: string }[] }
   | {
       type: "usage";
       inputTokens: number;

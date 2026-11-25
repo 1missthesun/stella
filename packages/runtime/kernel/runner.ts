@@ -245,6 +245,7 @@ export const createStellaHostRunner = (
       return {
         append: async (args) => await client.call("claudeSessions.append", args),
         tag: async (args) => await client.call("claudeSessions.tag", args),
+        supersede: async (args) => await client.call("claudeSessions.supersede", args),
         latest: async (args) => await client.call("claudeSessions.latest", args),
         readChunk: async (args) =>
           await client.call("claudeSessions.readChunk", args),

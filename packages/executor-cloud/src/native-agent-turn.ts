@@ -53,6 +53,7 @@ import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-i
 import type { ToolProcessIdentity } from "@stella/runtime/kernel/tools/types.js";
 import {
   backgroundTaskListOf,
+  buildClaudeCodeInterruptRequest,
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   claudeCodeNativeToolMatcher,
   ClaudeCodeCompactionLoopError,
@@ -1040,6 +1041,7 @@ export const runCloudClaude = async (options: {
     let quietResumeAt: string | undefined;
     let initVerdict: string | undefined;
     let initCount = 0;
+    let handoffInterrupted = false;
     const judgeInit = (): void => {
       const unavailable = initVerdict;
       initVerdict = undefined;
@@ -1203,6 +1205,11 @@ export const runCloudClaude = async (options: {
             injected.delete(event.uuid as string);
             if (!options.handoff?.isNudge(text)) steered.push(text);
           }
+          if (options.handoff?.pending() && !handoffInterrupted && event.isReplay !== true) {
+            handoffInterrupted = true;
+            markTurnStep("claudeHandoffInterrupted");
+            stdin?.write(`${buildClaudeCodeInterruptRequest()}\n`);
+          }
           return;
         }
         const status = getClaudeCodeStatusChangeFromStreamEvent(event);
@@ -1281,7 +1288,7 @@ export const runCloudClaude = async (options: {
             reportedTurns += event.num_turns;
             llmCalls = reportedTurns;
           }
-          if (event.is_error === true) {
+          if (event.is_error === true && !options.handoff?.pending()) {
             const reported = Array.isArray(event.errors)
               ? event.errors
                   .map((entry) =>

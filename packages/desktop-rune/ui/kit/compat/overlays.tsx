@@ -39,6 +39,8 @@ export type DialogContentProps = Omit<Style, "size"> & {
   /** A dialog size; a number is a spread stylesheet's text size and is ignored. */
   size?: keyof typeof SIZES | number;
   fit?: boolean;
+  /** desktop-ui's `--dialog-width` / `--dialog-height` overrides for this dialog. */
+  frame?: { w?: number; h?: number };
   className?: string;
   children?: ReactNode;
   onOpenAutoFocus?: (e: DomEvent) => void;
@@ -50,12 +52,12 @@ export type DialogContentProps = Omit<Style, "size"> & {
 };
 
 /** desktop-ui's `DialogContent`: scrim, and an overlay-surface panel 480×512 (md), 720 (lg), 860×640 (xl) or 1120×820 (page), its text in the portal's body face. */
-export function DialogContent({ size = "md", fit = false, children, onEscapeKeyDown, onPointerDownOutside, onInteractOutside, className: _c, onOpenAutoFocus: _f, "aria-describedby": _d, "aria-label": label, ...panel }: DialogContentProps) {
+export function DialogContent({ size = "md", fit = false, frame, children, onEscapeKeyDown, onPointerDownOutside, onInteractOutside, className: _c, onOpenAutoFocus: _f, "aria-describedby": _d, "aria-label": label, ...panel }: DialogContentProps) {
   const t = useTokens();
   const { open, setOpen, id } = useContext(DialogState);
   if (!open) return null;
   const sized = typeof size === "number" ? "md" : size;
-  const s = SIZES[sized];
+  const s = { ...SIZES[sized], ...frame };
   const dismiss = (outside: boolean) => {
     const e = { defaultPrevented: false, preventDefault() { e.defaultPrevented = true; } } as DomEvent;
     if (outside) {

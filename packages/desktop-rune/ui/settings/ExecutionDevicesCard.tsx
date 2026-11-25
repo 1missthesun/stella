@@ -56,15 +56,11 @@ export function ExecutionDevicesCard() {
                 ) : null}
               </row>
               <T {...s.connectDeviceMeta}>
-                {t(
+                {`${t(
                   device.online
                     ? "settings.executionDevices.online"
                     : "settings.executionDevices.offline",
-                )}
-                {" · "}
-                <T {...tx(s.connectDeviceMeta)}>
-                  {t(CONSENT_KEYS[device.remoteExecution])}
-                </T>
+                )} · ${t(CONSENT_KEYS[device.remoteExecution])}`}
               </T>
             </col>
             <Switch checked={device.remoteExecutionEnabled} disabled={pendingDeviceId !== null} data-device-action={

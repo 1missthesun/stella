@@ -1,7 +1,7 @@
-import { Press, RefreshCw, T, tx } from "../kit/compat";
-import { useUsage } from "./usage.styles";
+import { Ink, Press, RefreshCw, T, TextScope, tx, useTextBase } from "../kit/compat";
+import { usageLayout, useUsage, type UsageLayout } from "./usage.styles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LocalModelUsagePage } from "@stella/contracts/local-chat";
+import type { LocalModelUsagePage, LocalModelUsageRecord } from "@stella/contracts/local-chat";
 import { useT } from "@/shared/i18n";
 import {
   buildUsageTimeline,
@@ -41,6 +41,8 @@ export function UsagePanel() {
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [width, setWidth] = useState(0);
+  const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
   const fetchingRef = useRef(false);
   const isActive = true;
   const isActiveRef = useRef(isActive);
@@ -192,62 +194,94 @@ export function UsagePanel() {
       records.find((record) => record.threadId === filters.thread))
     : undefined;
 
+  const usage = usageLayout(width);
+  const base = useTextBase();
+  const retry = (
+    <Press {...s.usageStateButton} onPress={() => void load()}>
+      <T {...tx(s.usageStateButton)}>{t("app.usage.tryAgain")}</T>
+    </Press>
+  );
+
   return (
-    <col w="full" {...s.usageScreen} aria-busy={phase === "loading" || undefined}>
-      <row {...s.usageHeader}>
-        <T {...tx(s.usageScreen)}>{t("app.usage.intro")}</T>
-        <Press text={tx(s.usageScreen)} {...s.usageRefresh} onPress={() => setRefreshKey((value) => value + 1)} label={t("app.usage.refreshLabel")} title={t("app.usage.refreshLabel")}>
-          <RefreshCw size={16} color={s.usageRefresh.color} />
-          {t("app.usage.refresh")}
-        </Press>
+    <TextScope base={{ ...base, family: s.usageScreenText.family, em: s.usageScreenText.em as number }}>
+      <Ink.Provider value={s.usageScreenText.color}>
+        <col {...s.usageScreen} aria-busy={phase === "loading" || undefined} onLayout={(r) => setWidth(r.w)}>
+          {usage.narrow ? (
+            <col {...s.usageHeader} {...s.usageHeaderNarrow}>
+              <T {...s.usageHeaderText}>{t("app.usage.intro")}</T>
+              <RefreshButton onPress={refresh} narrow />
+            </col>
+          ) : (
+            <row {...s.usageHeader}>
+              <T {...s.usageHeaderText}>{t("app.usage.intro")}</T>
+              <RefreshButton onPress={refresh} />
+            </row>
+          )}
+
+          <UsageFiltersBar layout={usage} range={range} conversation={filters.conversation} thread={filters.thread} agent={filters.agent} model={filters.model} records={baseRecords} onSearchChange={updateSearch} />
+
+          {selectedThread ? <UsageSelection layout={usage} record={selectedThread} onViewAll={() => updateSearch({ thread: undefined })} /> : null}
+
+          {phase === "loading" ? (
+            <col {...s.usageState} role="status">
+              <T {...s.usageStateText}>{t("app.usage.loading")}</T>
+            </col>
+          ) : phase === "error" ? (
+            <col {...s.usageState} role="alert">
+              <T {...s.usageStateTitle}>{t("app.usage.loadError")}</T>
+              <T {...s.usageStateText}>{error}</T>
+              {retry}
+            </col>
+          ) : records.length === 0 ? (
+            <col {...s.usageState} role="status">
+              <T {...s.usageStateTitle}>{t("app.usage.emptyTitle")}</T>
+              <T {...s.usageStateText}>{t("app.usage.emptyBody")}</T>
+            </col>
+          ) : (
+            <>
+              {activePage.truncated ? (
+                <row {...s.usageWarning} role="status">
+                  <T {...tx(s.usageWarning)}>{t("app.usage.truncatedWarning")}</T>
+                </row>
+              ) : null}
+
+              <UsageSummaryCards layout={usage} summary={summary} />
+              <UsageTimelineChart timeline={timeline} height={usage.wide ? 260 : 220} />
+              <UsageThreadsTable threads={threads} onSelectThread={selectThread} />
+              <UsageCallsTable records={records} onSelectThread={selectThread} />
+            </>
+          )}
+        </col>
+      </Ink.Provider>
+    </TextScope>
+  );
+}
+
+function RefreshButton({ onPress, narrow = false }: { onPress: () => void; narrow?: boolean }) {
+  const s = useUsage();
+  const t = useT();
+  return (
+    <Press {...s.usageRefresh} {...(narrow ? s.usageRefreshNarrow : null)} onPress={onPress} label={t("app.usage.refreshLabel")} title={t("app.usage.refreshLabel")}>
+      <RefreshCw size={16} color={s.usageRefresh.color} />
+      <T {...tx(s.usageRefresh)}>{t("app.usage.refresh")}</T>
+    </Press>
+  );
+}
+
+function UsageSelection({ layout, record, onViewAll }: { layout: UsageLayout; record: LocalModelUsageRecord; onViewAll: () => void }) {
+  const s = useUsage();
+  const t = useT();
+  const Box = layout.wide ? "row" : "col";
+  return (
+    <Box {...s.usageSelection} {...(layout.wide ? s.usageSelectionWide : null)} label={t("app.usage.selectedThread")}>
+      <row {...s.usageSelectionInfo} {...(layout.wide ? s.usageSelectionInfoWide : null)}>
+        <T {...s.usagePill}>{executionLabel(record)}</T>
+        <T {...s.usageSelectionName}>{threadLabel(record)}</T>
+        <T {...s.usageSelectionId} {...(layout.wide ? s.usageSelectionIdWide : null)}>{record.threadId}</T>
       </row>
-
-      <UsageFiltersBar range={range} conversation={filters.conversation} thread={filters.thread} agent={filters.agent} model={filters.model} records={baseRecords} onSearchChange={updateSearch} />
-
-      {selectedThread ? (
-        <col {...s.usageSelection} label={t("app.usage.selectedThread")}>
-          <col>
-            <T {...tx(s.usageScreen)}>{executionLabel(selectedThread)}</T>
-            <T {...tx(s.usageScreen)} weight={700}>{threadLabel(selectedThread)}</T>
-            <T {...tx(s.usageScreen)}>{selectedThread.threadId}</T>
-          </col>
-          <Press text={tx(s.usageScreen)} onPress={() => updateSearch({ thread: undefined })}>
-            {t("app.usage.viewAllThreads")}
-          </Press>
-        </col>
-      ) : null}
-
-      {phase === "loading" ? (
-        <T {...tx(s.usageScreen)} w="full" {...s.usageState} role="status">
-          {t("app.usage.loading")}
-        </T>
-      ) : phase === "error" ? (
-        <col {...s.usageState} role="alert">
-          <T {...tx(s.usageScreen, s.usageState)} weight={700}>{t("app.usage.loadError")}</T>
-          <T {...tx(s.usageScreen, s.usageState)}>{error}</T>
-          <Press text={tx(s.usageScreen, s.usageState)} onPress={() => void load()}>
-            {t("app.usage.tryAgain")}
-          </Press>
-        </col>
-      ) : records.length === 0 ? (
-        <col {...s.usageState} role="status">
-          <T {...tx(s.usageScreen, s.usageState)} weight={700}>{t("app.usage.emptyTitle")}</T>
-          <T {...tx(s.usageScreen, s.usageState)}>{t("app.usage.emptyBody")}</T>
-        </col>
-      ) : (
-        <>
-          {activePage.truncated ? (
-            <T {...tx(s.usageScreen)} w="full" {...s.usageWarning} role="status">
-              {t("app.usage.truncatedWarning")}
-            </T>
-          ) : null}
-
-          <UsageSummaryCards summary={summary} />
-          <UsageTimelineChart timeline={timeline} />
-          <UsageThreadsTable threads={threads} onSelectThread={selectThread} />
-          <UsageCallsTable records={records} onSelectThread={selectThread} />
-        </>
-      )}
-    </col>
+      <Press {...s.usageSelectionButton} onPress={onViewAll}>
+        <T {...tx(s.usageSelectionButton)}>{t("app.usage.viewAllThreads")}</T>
+      </Press>
+    </Box>
   );
 }

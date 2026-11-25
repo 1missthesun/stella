@@ -1,6 +1,5 @@
-import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogDescription, DialogTitle, T, tx } from "../../kit/compat";
+import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogDescription, DialogTitle, T, tx, VisuallyHidden } from "../../kit/compat";
 import { useLegalDialog } from "./legal-dialog.styles";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   TERMS_OF_SERVICE,
   PRIVACY_POLICY,

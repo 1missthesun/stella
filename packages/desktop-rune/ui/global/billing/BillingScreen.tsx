@@ -1,7 +1,6 @@
-import { Input, Press, T, tx } from "../../kit/compat";
+import { Ink, Input, Press, T, TextScope, tx, useInk, useTextBase } from "../../kit/compat";
 import { useBillingScreen } from "./BillingScreen.styles";
-import { mixOklch, useTokens } from "../../theme";
-import { useFullShellLayout } from "../shared/full-shell.layout.styles";
+import { mixOklch, useTokens, type Style } from "../../theme";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillingStatus } from "@stella/contracts/backend/billing";
 import {
@@ -96,16 +95,38 @@ export const planIncludesLines = (plan: BillingPlan, t: Translate): string[] => 
   ];
 };
 
-function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+type Layout = { cols: number; stacked: boolean };
+
+function Inherit({ size, color, children }: { size?: number; color?: string; children: ReactNode }) {
+  const base = useTextBase();
+  const ink = useInk();
+  return (
+    <TextScope base={size === undefined ? base : { ...base, size }}>
+      <Ink.Provider value={color ?? ink}>{children}</Ink.Provider>
+    </TextScope>
+  );
+}
+
+function BillingButton({ primary = false, disabled = false, onPress, children, ...style }: { primary?: boolean; disabled?: boolean; onPress: () => void; children: ReactNode } & Style) {
   const s = useBillingScreen();
   return (
-    <box {...s.billingRow}>
-      <box {...s.billingRowText}>
+    <Press {...s.billingBtn} {...(primary ? s.billingBtnPrimary : null)} {...style} {...(disabled ? s.billingBtnDisabled : null)} disabled={disabled} onPress={onPress}>
+      {children}
+    </Press>
+  );
+}
+
+function Row({ label, hint, last = false, layout, children }: { label: string; hint?: ReactNode; last?: boolean; layout: Layout; children: ReactNode }) {
+  const s = useBillingScreen();
+  const Box = layout.stacked ? "col" : "row";
+  return (
+    <Box {...s.billingRow} {...(layout.stacked ? s.billingRowStacked : null)} {...(last ? s.billingRowLast : null)}>
+      <col {...s.billingRowText} {...(layout.stacked ? s.billingRowTextStacked : null)}>
         <T {...s.billingRowLabel}>{label}</T>
         {hint ? <T {...s.billingRowHint}>{hint}</T> : null}
-      </box>
-      <box {...s.billingRowControl}>{children}</box>
-    </box>
+      </col>
+      <col {...s.billingRowControl} {...(layout.stacked ? s.billingRowControlStacked : null)}>{children}</col>
+    </Box>
   );
 }
 
@@ -143,32 +164,34 @@ function Meter({
   const usedPct = pct(used, limit);
   const heldPct = Math.min(100 - usedPct, pct(reserved, limit));
   return (
-    <box {...s.billingMeter}>
-      <row {...s.billingMeterTrack} role="progressbar" label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(usedPct)}>
-        <row {...s.billingMeterUsed} w={`${usedPct}%`} {...(((limit > 0 && used >= limit) || undefined) ? s.billingMeterUsedFull : null)} />
+    <col {...s.billingMeter}>
+      <row {...s.billingMeterTrack} {...(large ? s.billingMeterTrackLarge : null)} role="progressbar" label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(usedPct)}>
+        <row {...s.billingMeterUsed} w={`${usedPct}%`} {...(limit > 0 && used >= limit ? s.billingMeterUsedFull : null)} />
         {heldPct > 0 ? (
-          <row {...s.billingMeterHeld} w={`${heldPct}%`} clip={0}>
+          <row {...s.billingMeterHeld} w={`${heldPct}%`}>
             <HeldStripes band={3} size={720} />
           </row>
         ) : null}
       </row>
-      <row w="full" {...s.billingMeterCaption}>{caption}</row>
-    </box>
+      <row {...s.billingMeterCaption}>
+        <Inherit size={s.billingMeterCaptionText.size}>{caption}</Inherit>
+      </row>
+    </col>
   );
 }
 
-function Section({ id, title, lede, children }: { id?: string; title?: string; lede?: string; children: ReactNode }) {
+function Section({ id, title, lede, first = false, children }: { id?: string; title?: string; lede?: string; first?: boolean; children: ReactNode }) {
   const s = useBillingScreen();
   return (
-    <T {...s.billingSection} id={id}>
+    <col {...s.billingSection} {...(first ? s.billingSectionFirst : null)} id={id}>
       {title ? (
-        <box {...s.billingSectionHead}>
-          <T {...tx(s.billingSectionHead)} role="heading" {...s.billingSectionTitle}>{title}</T>
-          {lede ? <T {...tx(s.billingSectionHead)} w="full" {...s.billingSectionLede}>{lede}</T> : null}
-        </box>
+        <col {...s.billingSectionHead}>
+          <T role="heading" {...s.billingSectionTitle}>{title}</T>
+          {lede ? <T {...s.billingSectionLede}>{lede}</T> : null}
+        </col>
       ) : null}
       {children}
-    </T>
+    </col>
   );
 }
 
@@ -182,6 +205,8 @@ export function BillingPanel() {
   const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [width, setWidth] = useState(0);
+  const layout: Layout = { cols: width > 0 && width <= 600 ? 2 : 4, stacked: width > 0 && width <= 520 };
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -232,41 +257,48 @@ export function BillingPanel() {
     [run],
   );
 
+  const measure = (r: { w: number }) => setWidth((prev) => (Math.abs(prev - r.w) < 0.5 ? prev : r.w));
+
   if (!hasConnectedAccount) {
     return (
-      <col {...s.billingPanel}>
-        <box {...s.billingEmpty} role="status">
-          <T {...tx(s.billingPanel)} weight={700}>{t("billing.v3.signIn.title")}</T>
-          <T {...tx(s.billingPanel)}>{t("billing.v3.signIn.body")}</T>
-          <Press text={tx(s.billingPanel)} {...s.billingBtn} {...s.billingBtnPrimary} onPress={openSignInDialog}>
-            {t("common.signIn")}
-          </Press>
-        </box>
+      <col {...s.billingPanel} onLayout={measure}>
+        <Inherit size={s.billingPanelText.size} color={s.billingPanelText.color}>
+          <col {...s.billingEmpty} role="status">
+            <T {...s.billingEmptyTitle}>{t("billing.v3.signIn.title")}</T>
+            <T {...s.billingEmptyBody}>{t("billing.v3.signIn.body")}</T>
+            <BillingButton primary onPress={openSignInDialog}>
+              {t("common.signIn")}
+            </BillingButton>
+          </col>
+        </Inherit>
       </col>
     );
   }
 
   if (!status) {
-    return <col {...s.billingPanel} {...s.billingPanelLoading} aria-busy="true" />;
+    return <col {...s.billingPanel} {...s.billingPanelLoading} aria-busy="true" onLayout={measure} />;
   }
 
   const plan = normalizeBillingPlan(status.plan);
+  const usageShown = Boolean(status.usage) && status.usagePolicy.kind === "managed_cost";
 
   return (
-    <col {...s.billingPanel}>
-      {error ? (
-        <T {...tx(s.billingPanel)} w="full" {...s.billingBanner} {...s.billingBannerError} role="alert">
-          {error}
-        </T>
-      ) : null}
-      {notice ? (
-        <T {...tx(s.billingPanel)} w="full" {...s.billingBanner} role="status">
-          {notice}
-        </T>
-      ) : null}
-      <UsageSection status={status} plan={plan} now={now} f={f} t={t} busy={busy} onCheckout={checkout} onPortal={portal} />
-      <PlanSection status={status} plan={plan} f={f} t={t} busy={busy} onCheckout={checkout} onPortal={portal} />
-      <CreditSection status={status} f={f} t={t} busy={busy} onBuy={buyCredit} />
+    <col {...s.billingPanel} onLayout={measure}>
+      <Inherit size={s.billingPanelText.size} color={s.billingPanelText.color}>
+        {error ? (
+          <T {...s.billingBanner} {...s.billingBannerError} role="alert">
+            {error}
+          </T>
+        ) : null}
+        {notice ? (
+          <T {...s.billingBanner} role="status">
+            {notice}
+          </T>
+        ) : null}
+        <UsageSection status={status} plan={plan} now={now} f={f} t={t} busy={busy} layout={layout} onCheckout={checkout} onPortal={portal} />
+        <PlanSection status={status} plan={plan} f={f} t={t} busy={busy} layout={layout} first={!usageShown} onCheckout={checkout} onPortal={portal} />
+        <CreditSection status={status} f={f} t={t} busy={busy} onBuy={buyCredit} />
+      </Inherit>
     </col>
   );
 }
@@ -278,6 +310,7 @@ function UsageSection({
   f,
   t,
   busy,
+  layout,
   onCheckout,
   onPortal,
 }: {
@@ -287,6 +320,7 @@ function UsageSection({
   f: Formatters;
   t: Translate;
   busy: Busy;
+  layout: Layout;
   onCheckout: (plan: PaidBillingPlan) => void;
   onPortal: () => void;
 }) {
@@ -315,44 +349,52 @@ function UsageSection({
     typeof at === "number" && at > 0 ? t("billing.v3.usage.resets", { date: f.when(at, now) }) : "";
   const windowCaption = (used: number, limit: number, at: number) => (
     <>
-      <T>{t("billing.v3.usage.percentUsed", { percent: f.percent(used, limit) })}</T>
-      <T {...s.billingMuted}>{used > 0 ? resets(at) : t("billing.v3.usage.startsNext")}</T>
+      <T features={s.billingMeterCaptionText.features}>{t("billing.v3.usage.percentUsed", { percent: f.percent(used, limit) })}</T>
+      <T features={s.billingMeterCaptionText.features} {...s.billingMuted}>{used > 0 ? resets(at) : t("billing.v3.usage.startsNext")}</T>
     </>
   );
+  const offerConnect = oneTime && connectPlanOfferEnabled();
 
   return (
-    <Section title={t("billing.v3.usage.title")} lede={t("billing.v3.usage.lede")}>
-      <box {...s.billingTotal}>
-        <box {...s.billingTotalHead}>
+    <Section first title={t("billing.v3.usage.title")} lede={t("billing.v3.usage.lede")}>
+      <col {...s.billingTotal}>
+        <col {...s.billingTotalHead}>
           <T {...s.billingTotalAmount}>{f.percent(mainUsed, mainLimit)}</T>
           <T {...s.billingMuted}>
             {oneTime ? t("billing.v3.usage.usedOneTime") : t("billing.v3.usage.usedMonth")}
           </T>
-        </box>
-        <Meter large label={t("billing.v3.usage.title")} used={mainUsed} limit={mainLimit} reserved={reserved} caption={
+        </col>
+        <Meter
+          large
+          label={t("billing.v3.usage.title")}
+          used={mainUsed}
+          limit={mainLimit}
+          reserved={reserved}
+          caption={
             <>
               <row {...s.billingLegend}>
-                <box {...s.billingLegend_i} {...s.billingLegendUsed} />
-                <T {...tx(s.billingMeterCaption)} {...tx(s.billingLegend)}>{t("billing.v3.usage.used")}</T>
+                <row {...s.billingLegendSwatch} {...s.billingLegendUsed} />
+                <T {...s.billingLegendText}>{t("billing.v3.usage.used")}</T>
                 {reserved > 0 ? (
                   <>
-                    <box {...s.billingLegend_i} {...s.billingLegendHeld} clip={2}>
+                    <row {...s.billingLegendSwatch} {...s.billingLegendHeld}>
                       <HeldStripes band={2} size={9} />
-                    </box>
-                    <T {...tx(s.billingMeterCaption)} {...tx(s.billingLegend)}>{t("billing.v3.usage.held")}</T>
+                    </row>
+                    <T {...s.billingLegendText}>{t("billing.v3.usage.held")}</T>
                   </>
                 ) : null}
               </row>
-              <T {...tx(s.billingMeterCaption)} {...s.billingMuted}>{oneTime ? t("billing.v3.usage.oneTimeNote") : resets(usage.monthlyResetsAt)}</T>
+              <T features={s.billingMeterCaptionText.features} {...s.billingMuted}>{oneTime ? t("billing.v3.usage.oneTimeNote") : resets(usage.monthlyResetsAt)}</T>
             </>
-          } />
-      </box>
+          }
+        />
+      </col>
 
       {blocked ? (
-        <box {...s.billingCallout} role="status">
-          <col>
-            <T {...tx(s.billingCallout)} weight={700}>{oneTime ? t("billing.v3.usage.freeOutTitle") : t("billing.v3.usage.outTitle")}</T>
-            <T {...tx(s.billingCallout)}>
+        <col {...s.billingCallout} role="status">
+          <col {...s.billingCalloutText}>
+            <T {...s.billingCalloutTitle} {...s.billingCalloutTitleWarning}>{oneTime ? t("billing.v3.usage.freeOutTitle") : t("billing.v3.usage.outTitle")}</T>
+            <T {...s.billingCalloutBody}>
               {oneTime
                 ? connectPlanOfferEnabled()
                   ? connectPlanCopy("allowance").description
@@ -362,35 +404,38 @@ function UsageSection({
                   : t("billing.v3.usage.outBodyNoDate")}
             </T>
           </col>
-          {oneTime && connectPlanOfferEnabled() ? (
-            <Press text={tx(s.billingCallout)} {...s.billingBtn} {...s.billingBtnPrimary} onPress={() => {
+          {offerConnect ? (
+            <BillingButton
+              primary
+              onPress={() => {
                 planUsageDialog.close();
                 openConnectPlan({ conversationId: null, reason: "allowance", choose: true });
-              }}>
+              }}
+            >
               {connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect}
-            </Press>
+            </BillingButton>
           ) : null}
           {next ? (
-            <Press text={tx(s.billingBtn, oneTime && connectPlanOfferEnabled() ? {} : s.billingBtnPrimary)} {...s.billingBtn} {...(oneTime && connectPlanOfferEnabled() ? null : s.billingBtnPrimary)} disabled={busy !== null} onPress={() => (plan === "free" ? onCheckout(next) : onPortal())} {...((busy !== null) ? s.billingBtnDisabled : null)}>
+            <BillingButton primary={!offerConnect} disabled={busy !== null} onPress={() => (plan === "free" ? onCheckout(next) : onPortal())}>
               {t("billing.v3.usage.upgradeTo", { plan: PLAN_CATALOG[next].label })}
-            </Press>
+            </BillingButton>
           ) : null}
-        </box>
+        </col>
       ) : resumesAt !== null && credit > 0 ? (
-        <box {...s.billingCallout} role="status">
-          <col>
-            <T {...tx(s.billingCallout)} weight={700}>{t("billing.v3.usage.creditTitle")}</T>
-            <T {...tx(s.billingCallout)}>{t("billing.v3.usage.creditBody", { date: f.when(resumesAt, now) })}</T>
+        <col {...s.billingCallout} role="status">
+          <col {...s.billingCalloutText}>
+            <T {...s.billingCalloutTitle}>{t("billing.v3.usage.creditTitle")}</T>
+            <T {...s.billingCalloutBody}>{t("billing.v3.usage.creditBody", { date: f.when(resumesAt, now) })}</T>
           </col>
-        </box>
+        </col>
       ) : null}
 
       {oneTime ? null : (
-        <col w="full" {...s.billingRows}>
-          <Row label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })} hint={t("billing.v3.usage.rollingNote", { hours: def.budget.rollingWindowHours })}>
+        <col {...s.billingRows}>
+          <Row layout={layout} label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })} hint={t("billing.v3.usage.rollingNote", { hours: def.budget.rollingWindowHours })}>
             <Meter label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })} used={usage.rollingUsedUsd} limit={usage.rollingLimitUsd} caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)} />
           </Row>
-          <Row label={t("billing.v3.usage.weekly")} hint={t("billing.v3.usage.weeklyNote")}>
+          <Row layout={layout} last label={t("billing.v3.usage.weekly")} hint={t("billing.v3.usage.weeklyNote")}>
             <Meter label={t("billing.v3.usage.weekly")} used={usage.weeklyUsedUsd} limit={usage.weeklyLimitUsd} caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)} />
           </Row>
         </col>
@@ -407,6 +452,8 @@ function PlanSection({
   f,
   t,
   busy,
+  layout,
+  first,
   onCheckout,
   onPortal,
 }: {
@@ -415,6 +462,8 @@ function PlanSection({
   f: Formatters;
   t: Translate;
   busy: Busy;
+  layout: Layout;
+  first: boolean;
   onCheckout: (plan: PaidBillingPlan) => void;
   onPortal: () => void;
 }) {
@@ -438,47 +487,59 @@ function PlanSection({
   };
 
   return (
-    <Section id="billing-plans">
-      <box {...s.billingPlansHead}>
-        <T {...tx(s.billingPlansHead)} role="heading" {...s.billingPlansHeading}>{t("billing.v3.plan.heading")}</T>
-        <T {...tx(s.billingPlansHead)} w="full" {...s.billingPlansLede}>{t("billing.v3.plan.lede")}</T>
-      </box>
-      <box {...s.billingPlans} role="list">
-        {PLAN_ORDER.map((id) => {
+    <Section id="billing-plans" first={first}>
+      <col {...s.billingPlansHead}>
+        <T role="heading" {...s.billingSectionTitle}>{t("billing.v3.plan.heading")}</T>
+        <T {...s.billingSectionLede}>{t("billing.v3.plan.lede")}</T>
+      </col>
+      <row {...s.billingPlans} columns={layout.cols} role="list">
+        {PLAN_ORDER.map((id, index) => {
           const def = PLAN_CATALOG[id];
           const current = id === plan;
           const recommended = id === RECOMMENDED_PLAN;
           const action = actionFor(id);
+          const sides: [number, number, number, number] = [index >= layout.cols ? 1 : 0, 0, 0, index % layout.cols === 0 ? 0 : 1];
           return (
-            <col {...s.billingPlan} key={id} role="listitem" {...((current || undefined) ? s.billingPlanCurrent : null)}>
-              <T {...tx(s.billingPlan)} {...s.billingPlanFlag}>
+            <col
+              {...s.billingPlan}
+              {...(current ? s.billingPlanCurrent : null)}
+              key={id}
+              column={index % layout.cols}
+              role="listitem"
+              border={sides.some(Boolean) ? s.billingPlans.border : undefined}
+              borderSides={sides}
+              pt={(s.billingPlan.pt as number) + sides[0]}
+              pl={(s.billingPlan.px as number) + sides[3]}
+            >
+              {recommended ? <row {...s.billingPlanRecommendedBar} /> : null}
+              <T {...s.billingPlanFlag}>
                 {current ? t("billing.v3.plan.currentPlan") : recommended ? t("billing.v3.plan.recommended") : ""}
               </T>
-              <T {...tx(s.billingPlan)} {...s.billingPlanName}>{def.label}</T>
-              <T {...tx(s.billingPlan)} {...s.billingPlanTagline}>{planTagline(id, t)}</T>
-              <box {...s.billingPlanPrice}>
-                <T {...tx(s.billingPlan)} {...s.billingPlanAmount}>{f.amount(def.monthlyPriceCents / 100)}</T>
-                <T {...tx(s.billingPlan)} {...s.billingPlanPer}>{def.interval ? t("billing.v3.plan.month") : t("billing.v3.plan.noCard")}</T>
-              </box>
+              <T {...s.billingPlanName}>{def.label}</T>
+              <T {...s.billingPlanTagline}>{planTagline(id, t)}</T>
+              <col {...s.billingPlanPrice}>
+                <T {...s.billingPlanAmount} {...(recommended ? s.billingPlanAmountRecommended : null)}>{f.amount(def.monthlyPriceCents / 100)}</T>
+                <T {...s.billingPlanPer}>{def.interval ? t("billing.v3.plan.month") : t("billing.v3.plan.noCard")}</T>
+              </col>
               {action ? (
-                <Press text={tx(s.billingBtn, s.billingPlanBtn, action.primary ? s.billingBtnPrimary : {})} {...s.billingBtn} {...s.billingPlanBtn} {...(action.primary ? s.billingBtnPrimary : null)} disabled={busy !== null} onPress={action.onClick} {...((busy !== null) ? s.billingBtnDisabled : null)}>
+                <BillingButton {...s.billingPlanBtn} primary={action.primary} disabled={busy !== null} onPress={action.onClick}>
                   {action.label}
-                </Press>
+                </BillingButton>
               ) : (
-                <T {...tx(s.billingPlan)} {...s.billingBtn} {...s.billingPlanBtn} {...s.billingPlanBtnCurrent} aria-disabled="true">
-                  {t("billing.v3.plan.currentPlan")}
-                </T>
+                <row {...s.billingBtn} {...s.billingPlanBtn} {...s.billingPlanBtnCurrent} hover={undefined} aria-disabled="true">
+                  <T {...tx(s.billingBtn, s.billingPlanBtnCurrent)}>{t("billing.v3.plan.currentPlan")}</T>
+                </row>
               )}
-              <box {...s.billingPlanFeatures}>
+              <col {...s.billingPlanFeatures}>
                 {planIncludesLines(id, t).map((line) => (
-                  <T {...tx(s.billingPlan, s.billingPlanFeatures)} key={line}>{line}</T>
+                  <T key={line} {...s.billingPlanFeature}>{line}</T>
                 ))}
-              </box>
+              </col>
             </col>
           );
         })}
-      </box>
-      <T w="full" {...s.billingPlansNote}>
+      </row>
+      <T {...s.billingPlansNote}>
         {busy === "checkout" || busy === "portal"
           ? t("billing.v3.opening")
           : isPaid
@@ -486,18 +547,22 @@ function PlanSection({
             : t("billing.v3.plan.checkoutHint")}
       </T>
       {isPaid ? (
-        <col w="full" {...s.billingRows}>
-          <Row label={status.cancelAtPeriodEnd ? t("billing.v3.plan.ends") : t("billing.v3.plan.renews")} hint={
+        <col {...s.billingRows} {...s.billingRowsAfterNote}>
+          <Row
+            layout={layout}
+            label={status.cancelAtPeriodEnd ? t("billing.v3.plan.ends") : t("billing.v3.plan.renews")}
+            hint={
               status.cancelAtPeriodEnd
                 ? t("billing.v3.plan.endsHint", { plan: PLAN_CATALOG[plan].label })
                 : t("billing.v3.plan.renewsHint", { price: priceOf(plan) })
-            }>
+            }
+          >
             <T {...s.billingValue}>{periodEnd ?? "—"}</T>
           </Row>
-          <Row label={t("billing.v3.plan.manage")} hint={t("billing.v3.plan.manageHint")}>
-            <Press {...s.billingBtn} disabled={busy !== null} onPress={onPortal} {...((busy !== null) ? s.billingBtnDisabled : null)}>
+          <Row layout={layout} last label={t("billing.v3.plan.manage")} hint={t("billing.v3.plan.manageHint")}>
+            <BillingButton disabled={busy !== null} onPress={onPortal}>
               {busy === "portal" ? t("billing.v3.opening") : t("billing.v3.plan.manageButton")}
-            </Press>
+            </BillingButton>
           </Row>
         </col>
       ) : null}
@@ -542,44 +607,59 @@ function CreditSection({
 
   return (
     <Section title={t("billing.v3.credit.title")} lede={t("billing.v3.credit.lede")}>
-      <box {...s.billingBalance}>
+      <col {...s.billingBalance}>
         <T {...s.billingBalanceAmount}>{f.usd(status.credits.balanceUsd)}</T>
         <T {...s.billingMuted}>{t("billing.v3.credit.balance")}</T>
-      </box>
-      <box {...s.billingTopup}>
-        <row {...s.billingCredit} {...s.billingTopup_billingCredit}>
+      </col>
+      <col {...s.billingTopup}>
+        <row {...s.billingCredit}>
           <row {...s.billingSegmented} role="radiogroup" label={t("billing.v3.credit.add")}>
             {options.presetAmountCents.map((cents) => {
               const on = !custom.trim() && preset === cents;
               return (
-                <Press key={cents} role="radio" checked={on} onPress={() => {
+                <Press
+                  key={cents}
+                  {...s.billingSegment}
+                  {...(on ? s.billingSegmentOn : null)}
+                  role="radio"
+                  checked={on}
+                  onPress={() => {
                     setPreset(cents);
                     setCustom("");
                     setInputError(null);
-                  }}>
+                  }}
+                >
                   {f.amount(cents / 100)}
                 </Press>
               );
             })}
           </row>
           <row {...s.billingInputWrap}>
-            <T {...tx(s.billingInputWrap)}>$</T>
-            <Input {...s.billingInput} inputMode="decimal" placeholder={t("billing.v3.credit.other")} label={t("billing.v3.credit.other")} aria-invalid={inputError ? true : undefined} value={custom} onChange={(event) => {
+            <T {...s.billingInputDollar}>$</T>
+            <Input
+              {...s.billingInput}
+              inputMode="decimal"
+              placeholder={t("billing.v3.credit.other")}
+              aria-label={t("billing.v3.credit.other")}
+              aria-invalid={inputError ? true : undefined}
+              value={custom}
+              onChange={(event) => {
                 setCustom(event.target.value);
                 setInputError(null);
-              }} />
+              }}
+            />
           </row>
-          <Press {...s.billingBtn} {...s.billingBtnPrimary} disabled={busy !== null || amountCents === null} onPress={submit} {...((busy !== null || amountCents === null) ? s.billingBtnDisabled : null)}>
+          <BillingButton primary disabled={busy !== null || amountCents === null} onPress={submit}>
             {busy === "credit"
               ? t("billing.v3.opening")
               : amountCents
                 ? t("billing.v3.credit.addAmount", { amount: f.usd(amountCents / 100) })
                 : t("billing.v3.credit.add")}
-          </Press>
+          </BillingButton>
         </row>
         {inputError ? <T {...s.billingFieldError}>{inputError}</T> : null}
-        <T w="full" {...s.billingCenteredHint}>{t("billing.v3.credit.addHint")}</T>
-      </box>
+        <T {...s.billingCenteredHint}>{t("billing.v3.credit.addHint")}</T>
+      </col>
     </Section>
   );
 }
@@ -587,8 +667,8 @@ function CreditSection({
 export function BillingScreen() {
   const s = useBillingScreen();
   return (
-    <col>
-      <col>
+    <col w="full" h="full">
+      <col w="full" grow={1} shrink minH={0}>
         <col w="full" {...s.billingScreenScroll}>
           <BillingPanel />
         </col>

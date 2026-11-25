@@ -1,7 +1,6 @@
-import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, Press } from "../../kit/compat";
+import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, Press, VisuallyHidden } from "../../kit/compat";
 import { usePlanUsageDialog } from "./plan-usage-dialog.styles";
 import { lazy, Suspense, useState } from "react";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const BillingPanel = lazy(() =>
   import("./BillingScreen").then((module) => ({
@@ -32,10 +31,10 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl">
+      <DialogContent size="xl" frame={{ h: 700 }}>
         {/* The tabs name the surface, so the title would only repeat them.
             Keep it for the accessible name and give the row to the tabs. */}
-        <DialogHeader {...s.planUsageDialogHeader}>
+        <DialogHeader>
           <VisuallyHidden asChild>
             <DialogTitle>Plan &amp; usage</DialogTitle>
           </VisuallyHidden>

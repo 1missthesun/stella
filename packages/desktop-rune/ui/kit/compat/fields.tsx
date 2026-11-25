@@ -105,10 +105,11 @@ export type SelectProps<V extends string = string> = Style & {
   hideLabel?: boolean;
   id?: string;
   name?: string;
+  trigger?: { h?: number; fill?: string };
 };
 
 /** desktop-ui's `Select`; `settings-runtime-select` is the fit-width (120–240) round trigger Settings rows use. */
-export function Select<V extends string = string>({ value, onValueChange, options, disabled, className = "", placeholder, label, hideLabel, id, "aria-label": aria, w, minW, maxW, radius: corner }: SelectProps<V>) {
+export function Select<V extends string = string>({ value, onValueChange, options, disabled, className = "", placeholder, label, hideLabel, id, "aria-label": aria, w, minW, maxW, radius: corner, trigger }: SelectProps<V>) {
   const auto = useId();
   const [open, setOpen] = useState(false);
   const runtime = className.includes("settings-runtime-select");
@@ -129,6 +130,7 @@ export function Select<V extends string = string>({ value, onValueChange, option
       {...(minW !== undefined ? { minW: minW as number } : {})}
       {...(maxW !== undefined ? { maxW: maxW as number } : {})}
       {...(corner !== undefined ? { radius: corner } : {})}
+      trigger={trigger}
     />
   );
 }

@@ -1,54 +1,33 @@
 import { T } from "../kit/compat";
-import { useUsage } from "./usage.styles";
+import { useUsage, type UsageLayout } from "./usage.styles";
 import { memo } from "react";
 import type { UsageSummary } from "@/app/usage/usage-data";
 import { useT } from "@/shared/i18n";
 import { formatCost, formatPercent, formatTokens } from "@/app/usage/format";
 
-export const UsageSummaryCards = memo(function UsageSummaryCards({
-  summary,
-}: {
-  summary: UsageSummary;
-}) {
+export const UsageSummaryCards = memo(function UsageSummaryCards({ layout, summary }: { layout: UsageLayout; summary: UsageSummary }) {
   const s = useUsage();
   const t = useT();
+  const cols = layout.narrow ? 1 : layout.wide ? 4 : 2;
+  const cards = [
+    { label: t("app.usage.summary.estimatedCost"), value: formatCost(summary.totalCostUsd), note: t("app.usage.summary.providerCalls", { count: summary.calls }) },
+    { label: t("app.usage.summary.totalTokens"), value: formatTokens(summary.totalTokens), note: t("app.usage.summary.uncachedInput", { value: formatTokens(summary.inputTokens) }) },
+    {
+      label: t("app.usage.summary.cacheRead"),
+      value: formatPercent(summary.cacheReadRate),
+      note: t("app.usage.summary.cacheDetail", { read: formatTokens(summary.cacheReadTokens), written: formatTokens(summary.cacheWriteTokens) }),
+    },
+    { label: t("app.usage.summary.output"), value: formatTokens(summary.outputTokens), note: t("app.usage.summary.reasoningTokens", { value: formatTokens(summary.reasoningTokens) }) },
+  ];
   return (
-    <box {...s.usageSummary} label={t("app.usage.summary.label")}>
-      <col>
-        <T>{t("app.usage.summary.estimatedCost")}</T>
-        <T weight={700}>{formatCost(summary.totalCostUsd)}</T>
-        <T>
-          {t("app.usage.summary.providerCalls", { count: summary.calls })}
-        </T>
-      </col>
-      <col>
-        <T>{t("app.usage.summary.totalTokens")}</T>
-        <T weight={700}>{formatTokens(summary.totalTokens)}</T>
-        <T>
-          {t("app.usage.summary.uncachedInput", {
-            value: formatTokens(summary.inputTokens),
-          })}
-        </T>
-      </col>
-      <col>
-        <T>{t("app.usage.summary.cacheRead")}</T>
-        <T weight={700}>{formatPercent(summary.cacheReadRate)}</T>
-        <T>
-          {t("app.usage.summary.cacheDetail", {
-            read: formatTokens(summary.cacheReadTokens),
-            written: formatTokens(summary.cacheWriteTokens),
-          })}
-        </T>
-      </col>
-      <col>
-        <T>{t("app.usage.summary.output")}</T>
-        <T weight={700}>{formatTokens(summary.outputTokens)}</T>
-        <T>
-          {t("app.usage.summary.reasoningTokens", {
-            value: formatTokens(summary.reasoningTokens),
-          })}
-        </T>
-      </col>
+    <box {...s.usageSummary} columns={cols} label={t("app.usage.summary.label")}>
+      {cards.map((card) => (
+        <col key={card.label} {...s.usageSummaryCard} {...(layout.wide ? s.usageSummaryCardWide : null)}>
+          <T {...s.usageSummaryLabel}>{card.label}</T>
+          <T {...s.usageSummaryValue}>{card.value}</T>
+          <T {...s.usageSummaryNote}>{card.note}</T>
+        </col>
+      ))}
     </box>
   );
 });

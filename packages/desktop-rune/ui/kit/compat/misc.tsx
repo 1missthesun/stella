@@ -38,3 +38,12 @@ export function ClaudeLogoIcon({ size = 16, variant = "mark" }: { size?: number;
 export function InlineStellaMark({ size = 16 }: { size?: number; className?: string; children?: ReactNode }) {
   return <StellaMark size={size} />;
 }
+
+/** Radix's `VisuallyHidden`: announced, out of the layout and never drawn. */
+export function VisuallyHidden({ children }: { asChild?: boolean; children?: ReactNode }) {
+  return (
+    <col absolute={{ top: 0, left: 0 }} w={1} h={1} clip={0} opacity={0} inert>
+      {children}
+    </col>
+  );
+}

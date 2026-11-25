@@ -201,10 +201,12 @@ export type SelectProps<T extends string = string> = {
   minW?: number;
   maxW?: number;
   radius?: number;
+  /** A descendant rule's trigger height and fill (e.g. `.usage-filters [data-slot="select-trigger"]`). */
+  trigger?: { h?: number; fill?: string };
 };
 
 /** desktop-ui's `Select`: a 32pt field-like trigger with a chevron, opening a radio menu at least as wide as itself. */
-export function Select<T extends string = string>({ id, value, onValueChange, options, open = false, onOpenChange, disabled = false, placeholder, label, hideLabel, w = "full", minW, maxW, radius: triggerRadius = radius.md }: SelectProps<T>) {
+export function Select<T extends string = string>({ id, value, onValueChange, options, open = false, onOpenChange, disabled = false, placeholder, label, hideLabel, w = "full", minW, maxW, radius: triggerRadius = radius.md, trigger: triggerStyle }: SelectProps<T>) {
   const t = useTokens();
   const c = t.c;
   const sel = derive(t, "select", (t) => ({ hover: mix(t.c.foreground, 7, t.c.background), open: mix(t.c.foreground, 9, t.c.background) }));
@@ -236,14 +238,14 @@ export function Select<T extends string = string>({ id, value, onValueChange, op
             w={w === "fit" ? "fit" : "full"}
             minW={w === "fit" ? minW : undefined}
             maxW={w === "fit" ? maxW : undefined}
-            h={32}
+            h={triggerStyle?.h ?? 32}
             px={10 + 1}
             gap={8}
             align="center"
             justify="between"
             radius={triggerRadius}
             border={c.border}
-            fill={trig.open ? sel.open : c.background}
+            fill={trig.open ? sel.open : (triggerStyle?.fill ?? c.background)}
             hover={disabled ? undefined : sel.hover}
             opacity={disabled ? 0.5 : undefined}
             motion={{ dur: 0.12 }}

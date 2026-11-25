@@ -1,4 +1,5 @@
-import { T, tx } from "../kit/compat";
+import { T } from "../kit/compat";
+import { UsagePanel } from "./UsageTable";
 import { useUsage } from "./usage.styles";
 import { useTokens } from "../theme";
 import { memo, useMemo, useState } from "react";
@@ -6,7 +7,6 @@ import type { UsageTimelinePoint } from "@/app/usage/usage-data";
 import { useT } from "@/shared/i18n";
 import { formatCost, formatTokens } from "@/app/usage/format";
 
-const CHART_H = 220;
 const PAD_X = 8;
 const PAD_BOTTOM = 8;
 const MARGIN_TOP = 10;
@@ -49,6 +49,45 @@ function visibleXTicks(labels: string[], xs: number[]): number[] {
   return kept;
 }
 
+type Point = [number, number];
+
+const sign = (v: number) => (v < 0 ? -1 : 1);
+
+/** d3's `curveMonotoneX`, which Recharts' `type="monotone"` draws: cubic segments whose tangents never overshoot the points. */
+function monotonePath(points: Point[]): string {
+  const n = points.length;
+  if (n === 0) return "";
+  if (n === 1) return `M${points[0][0]},${points[0][1]}`;
+  if (n === 2) return `M${points[0][0]},${points[0][1]}L${points[1][0]},${points[1][1]}`;
+  const slope = (i: number) => {
+    const h = points[i + 1][0] - points[i][0];
+    return h === 0 ? 0 : (points[i + 1][1] - points[i][1]) / h;
+  };
+  const tangents: number[] = new Array(n);
+  for (let i = 1; i < n - 1; i++) {
+    const h0 = points[i][0] - points[i - 1][0];
+    const h1 = points[i + 1][0] - points[i][0];
+    const s0 = slope(i - 1);
+    const s1 = slope(i);
+    const p = (s0 * h1 + s1 * h0) / (h0 + h1);
+    tangents[i] = (sign(s0) + sign(s1)) * Math.min(Math.abs(s0), Math.abs(s1), 0.5 * Math.abs(p)) || 0;
+  }
+  const endTangent = (a: number, b: number, inner: number) => {
+    const h = points[b][0] - points[a][0];
+    return h === 0 ? inner : (3 * (points[b][1] - points[a][1])) / h / 2 - inner / 2;
+  };
+  tangents[0] = endTangent(0, 1, tangents[1]);
+  tangents[n - 1] = endTangent(n - 2, n - 1, tangents[n - 2]);
+  let d = `M${points[0][0]},${points[0][1]}`;
+  for (let i = 0; i < n - 1; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[i + 1];
+    const dx = (x1 - x0) / 3;
+    d += `C${x0 + dx},${y0 + dx * tangents[i]},${x1 - dx},${y1 - dx * tangents[i + 1]},${x1},${y1}`;
+  }
+  return d;
+}
+
 const svgColor = (color: string, attr: "fill" | "stroke" | "stop-color") => {
   const m = color.match(/^#([0-9a-f]{6})([0-9a-f]{2})?$/i);
   if (!m) return `${attr}="${color}"`;
@@ -60,11 +99,7 @@ const svgColor = (color: string, attr: "fill" | "stroke" | "stop-color") => {
 const legendIcon = (color: string) =>
   `<path ${svgColor(color, "stroke")} stroke-width="4" fill="none" d="M0,16h10.667A5.333,5.333,0,1,1,21.333,16H32M21.333,16A5.333,5.333,0,1,1,10.667,16"/>`;
 
-export const UsageTimelineChart = memo(function UsageTimelineChart({
-  timeline,
-}: {
-  timeline: UsageTimelinePoint[];
-}) {
+export const UsageTimelineChart = memo(function UsageTimelineChart({ timeline, height }: { timeline: UsageTimelinePoint[]; height: number }) {
   const s = useUsage();
   const t = useT();
   const tokens = useTokens();
@@ -74,7 +109,7 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
 
   const plot = useMemo(() => {
     const innerW = Math.max(0, width - PAD_X * 2);
-    const innerH = CHART_H - PAD_BOTTOM;
+    const innerH = height - PAD_BOTTOM;
     const left = LEFT_AXIS_W;
     const right = innerW - MARGIN_RIGHT - RIGHT_AXIS_W;
     const top = MARGIN_TOP;
@@ -90,16 +125,17 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
     const yCost = (v: number) => bottom - (v / costMax) * plotH;
     const yTokens = (v: number) => bottom - (v / tokenMax) * plotH;
     return { innerW, innerH, left, right, top, bottom, plotW, plotH, costTicks, tokenTicks, xs, yCost, yTokens };
-  }, [timeline, width]);
+  }, [timeline, width, height]);
 
   const svg = useMemo(() => {
     if (plot.innerW <= 0) return "";
     const { xs, yCost, yTokens, left, right, bottom, costTicks } = plot;
     const grid = costTicks.map((v) => `<line x1="${left}" x2="${right}" y1="${yCost(v)}" y2="${yCost(v)}" ${svgColor(c.borderWeak, "stroke")}/>`).join("");
-    const costPts = timeline.map((p, i) => `${xs[i]},${yCost(p.totalCostUsd)}`);
-    const area = costPts.length ? `<path d="M${costPts.join("L")}L${xs[xs.length - 1]},${bottom}L${xs[0]},${bottom}Z" fill="url(#usageCostFill)"/>` : "";
-    const costLine = costPts.length ? `<path d="M${costPts.join("L")}" fill="none" ${svgColor(c.accent, "stroke")} stroke-width="2"/>` : "";
-    const tokenLine = timeline.length ? `<path d="M${timeline.map((p, i) => `${xs[i]},${yTokens(p.totalTokens)}`).join("L")}" fill="none" ${svgColor(c.foreground, "stroke")} stroke-width="1.5"/>` : "";
+    const costPath = monotonePath(timeline.map((p, i): Point => [xs[i], yCost(p.totalCostUsd)]));
+    const tokenPath = monotonePath(timeline.map((p, i): Point => [xs[i], yTokens(p.totalTokens)]));
+    const area = costPath ? `<path d="${costPath}L${xs[xs.length - 1]},${bottom}L${xs[0]},${bottom}Z" fill="url(#usageCostFill)"/>` : "";
+    const costLine = costPath ? `<path d="${costPath}" fill="none" ${svgColor(c.accent, "stroke")} stroke-width="2"/>` : "";
+    const tokenLine = tokenPath ? `<path d="${tokenPath}" fill="none" ${svgColor(c.foreground, "stroke")} stroke-width="1.5"/>` : "";
     const cursor = active !== null && xs[active] !== undefined ? `<line x1="${xs[active]}" x2="${xs[active]}" y1="${plot.top}" y2="${bottom}" stroke="#cccccc"/>` : "";
     const dots =
       active !== null && timeline[active]
@@ -111,16 +147,10 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
 
   const xTicks = useMemo(() => visibleXTicks(timeline.map((p) => p.label), plot.xs), [timeline, plot.xs]);
   const point = active !== null ? timeline[active] : undefined;
-  const tick = { ...s.usageChart_text, color: c.textWeak, nowrap: true } as const;
+  const tick = { ...s.usageChartTick, nowrap: true } as const;
 
   return (
-    <col w="full" {...s.usagePanel}>
-      <row {...s.usagePanelHeading}>
-        <col>
-          <T role="heading" {...s.usagePanelHeading_h2}>{t("app.usage.timeline.title")}</T>
-          <T w="full" {...s.usagePanelHeading_p}>{t("app.usage.timeline.description")}</T>
-        </col>
-      </row>
+    <UsagePanel title={t("app.usage.timeline.title")} description={t("app.usage.timeline.description")}>
       <col w="full" {...s.usageChart} role="img" label={t("app.usage.timeline.chartLabel")} onLayout={(r) => setWidth(r.w)}>
         {svg ? (
           <col w={plot.innerW} h={plot.innerH}>
@@ -158,14 +188,14 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
             </row>
             {point && active !== null ? (
               <col {...s.usageChartTooltip} absolute={{ left: Math.min(plot.xs[active] + 10, plot.innerW - 170), top: plot.top + 10 }} raise inert>
-                <T {...tx(s.usageChartTooltip)} {...s.usageChartTooltip_strong} weight={700}>{point.label}</T>
-                <T {...tx(s.usageChartTooltip)}>
+                <T {...s.usageChartTooltipTitle}>{point.label}</T>
+                <T {...s.usageChartTooltipText}>
                   {t("app.usage.timeline.tooltip.estimated", { value: formatCost(point.totalCostUsd) })}
                 </T>
-                <T {...tx(s.usageChartTooltip)}>
+                <T {...s.usageChartTooltipText}>
                   {t("app.usage.timeline.tooltip.tokens", { value: formatTokens(point.totalTokens) })}
                 </T>
-                <T {...tx(s.usageChartTooltip)}>
+                <T {...s.usageChartTooltipText}>
                   {t("app.usage.timeline.tooltip.calls", { count: point.calls })}
                 </T>
               </col>
@@ -173,6 +203,6 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
           </col>
         ) : null}
       </col>
-    </col>
+    </UsagePanel>
   );
 });

@@ -82,14 +82,14 @@ export function GetTheApp() {
           return (
             <Press {...s.getAppPlatform} key={option.platform} role="radio" checked={selected} onPress={() => setPlatform(option.platform)} {...((selected || undefined) ? s.getAppPlatformActive : null)}>
               {option.platform === "ios" ? <AppleIcon size={14} /> : <AndroidIcon size={14} />}
-              <T {...tx(s.getAppPlatform)}>{option.label}</T>
+              <T {...tx(s.getAppPlatform)} {...(selected ? tx(s.getAppPlatformActive) : null)}>{option.label}</T>
             </Press>
           );
         })}
       </row>
       <col w="full" {...s.getAppQr}>
         {qr[platform] ? (
-          <image src={qr[platform]!} label={t(active.altKey)} />
+          <image {...s.getAppQr_img} src={qr[platform]!} label={t(active.altKey)} />
         ) : (
           <row {...s.getAppQrPlaceholder} />
         )}

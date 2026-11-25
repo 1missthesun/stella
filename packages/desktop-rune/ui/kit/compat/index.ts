@@ -3,7 +3,7 @@
 export { Button, type ButtonProps } from "./button";
 export { Input, NativeCheckbox, Select, Switch, TextField, type InputProps, type SelectOption, type SelectProps, type SwitchProps, type TextFieldProps } from "./fields";
 export * from "./icons";
-export { Avatar, BrandIcon, ClaudeLogoIcon, InlineStellaMark, Keybind } from "./misc";
+export { Avatar, BrandIcon, ClaudeLogoIcon, InlineStellaMark, Keybind, VisuallyHidden } from "./misc";
 export {
   Dialog, DialogBody, DialogCloseButton, DialogContent, DialogDescription, DialogHeader, DialogTitle,
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup,

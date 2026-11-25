@@ -1,5 +1,5 @@
 import { Select } from "../kit/compat";
-import { useUsage } from "./usage.styles";
+import { useUsage, type UsageLayout } from "./usage.styles";
 import { memo, useMemo } from "react";
 import type { LocalModelUsageRecord } from "@stella/contracts/local-chat";
 import { useT } from "@/shared/i18n";
@@ -23,6 +23,7 @@ export type UsageSearchPatch = {
 };
 
 type UsageFiltersBarProps = {
+  layout: UsageLayout;
   range: UsageRange;
   conversation?: string | undefined;
   thread?: string | undefined;
@@ -33,6 +34,7 @@ type UsageFiltersBarProps = {
 };
 
 export const UsageFiltersBar = memo(function UsageFiltersBar({
+  layout,
   range,
   conversation,
   thread,
@@ -103,30 +105,33 @@ export const UsageFiltersBar = memo(function UsageFiltersBar({
     [records, t],
   );
 
+  const cols = layout.narrow ? 1 : layout.widest ? 5 : layout.wide ? 3 : 2;
+  const trigger = { h: s.usageFilterTrigger.h as number, fill: s.usageFilterTrigger.fill };
+  const selects = [
+    <Select key="range" trigger={trigger} value={range} onValueChange={(value) => onSearchChange({ range: value as UsageRange })} options={rangeOptions} aria-label={t("app.usage.filters.timeRange")} />,
+    <Select key="conversation" trigger={trigger} value={conversation ?? ALL} onValueChange={(value) => onSearchChange({ conversation: value === ALL ? undefined : value, thread: undefined })} options={conversationOptions} aria-label={t("app.usage.filters.conversation")} />,
+    <Select
+      key="thread"
+      trigger={trigger}
+      value={thread ?? ALL}
+      onValueChange={(value) => {
+        const record = records.find((item) => item.threadId === value);
+        onSearchChange({ thread: value === ALL ? undefined : value, ...(record ? { conversation: record.conversationId } : {}) });
+      }}
+      options={threadOptions}
+      aria-label={t("app.usage.filters.thread")}
+    />,
+    <Select key="agent" trigger={trigger} value={agent ?? ALL} onValueChange={(value) => onSearchChange({ agent: value === ALL ? undefined : value })} options={agentOptions} aria-label={t("app.usage.filters.agentType")} />,
+    <Select key="model" trigger={trigger} value={model ?? ALL} onValueChange={(value) => onSearchChange({ model: value === ALL ? undefined : value })} options={modelOptions} aria-label={t("app.usage.filters.model")} />,
+  ];
+
   return (
-    <box {...s.usageFilters} label={t("app.usage.filters.label")}>
-      <Select value={range} onValueChange={(value) =>
-          onSearchChange({ range: value as UsageRange })
-        } options={rangeOptions} aria-label={t("app.usage.filters.timeRange")} />
-      <Select value={conversation ?? ALL} onValueChange={(value) =>
-          onSearchChange({
-            conversation: value === ALL ? undefined : value,
-            thread: undefined,
-          })
-        } options={conversationOptions} aria-label={t("app.usage.filters.conversation")} />
-      <Select value={thread ?? ALL} onValueChange={(value) => {
-          const record = records.find((item) => item.threadId === value);
-          onSearchChange({
-            thread: value === ALL ? undefined : value,
-            ...(record ? { conversation: record.conversationId } : {}),
-          });
-        }} options={threadOptions} aria-label={t("app.usage.filters.thread")} />
-      <Select value={agent ?? ALL} onValueChange={(value) =>
-          onSearchChange({ agent: value === ALL ? undefined : value })
-        } options={agentOptions} aria-label={t("app.usage.filters.agentType")} />
-      <Select value={model ?? ALL} onValueChange={(value) =>
-          onSearchChange({ model: value === ALL ? undefined : value })
-        } options={modelOptions} aria-label={t("app.usage.filters.model")} />
+    <box {...s.usageFilters} columns={cols} label={t("app.usage.filters.label")}>
+      {selects.map((select, index) => (
+        <col key={select.key ?? index} minW={0}>
+          {select}
+        </col>
+      ))}
     </box>
   );
 });

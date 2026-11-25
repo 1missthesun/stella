@@ -1,8 +1,7 @@
-import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogDescription, DialogTitle, Press, T, tx } from "../../kit/compat";
+import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogDescription, DialogTitle, Press, T, tx, VisuallyHidden } from "../../kit/compat";
 import { useAuthDialog } from "./AuthDialog.styles";
 import { useLocalMode } from "../local-mode/local-mode.styles";
 import { useCallback, useEffect, useState } from "react";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { MagicLinkAuthFlow } from "./MagicLinkAuthFlow";
 import { authClient } from "@/global/auth/lib/auth-client";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";

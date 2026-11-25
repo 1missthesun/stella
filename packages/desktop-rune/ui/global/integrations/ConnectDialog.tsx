@@ -30,12 +30,12 @@ export const ConnectDialog = ({ open, onOpenChange }: ConnectDialogProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent fit>
+      <DialogContent fit frame={{ w: 440 }} maxH={720}>
         <DialogHeader>
           <DialogTitle>{t("global.integrations.connectStellaApp")}</DialogTitle>
           <DialogCloseButton />
         </DialogHeader>
-        <DialogBody>
+        <DialogBody {...s.connectDialog_dialogBody}>
           <col {...s.connectSection}>
             <T role="heading" {...s.connectSectionTitle}>
               {t("global.integrations.getApp.title")}

@@ -1,4 +1,11 @@
-import { BrowserWindow, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import {
+  BrowserWindow,
+  shell,
+  type HandlerDetails,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+  type WindowOpenHandlerResponse,
+} from 'electron'
 
 const MAX_EXTERNAL_URL_LENGTH = 4096
 const EXTERNAL_OPEN_MIN_INTERVAL_MS = 300
@@ -17,6 +24,14 @@ export class ExternalLinkService {
 
   setCanvasShareHandler(handler: ((url: string) => boolean) | null) {
     this.canvasShareHandler = handler
+  }
+
+  private popupHandler:
+    | ((opener: BrowserWindow, details: HandlerDetails) => WindowOpenHandlerResponse | null)
+    | null = null
+
+  setPopupHandler(handler: NonNullable<typeof this.popupHandler>) {
+    this.popupHandler = handler
   }
 
   private tryHandleCanvasShare(url: string) {
@@ -129,20 +144,24 @@ export class ExternalLinkService {
     return false
   }
 
+  openUrlFromPage(url: string) {
+    if (!this.isAppUrl(url) && !this.tryHandleCanvasShare(url)) {
+      this.openSafeExternalUrl(url)
+    }
+  }
+
   setupExternalLinkHandlers(window: BrowserWindow) {
-    window.webContents.setWindowOpenHandler(({ url }) => {
-      if (!this.isAppUrl(url) && !this.tryHandleCanvasShare(url)) {
-        this.openSafeExternalUrl(url)
-      }
+    window.webContents.setWindowOpenHandler((details) => {
+      const popup = this.popupHandler?.(window, details)
+      if (popup) return popup
+      this.openUrlFromPage(details.url)
       return { action: 'deny' }
     })
 
     window.webContents.on('will-navigate', (event, url) => {
       if (!this.isAppUrl(url)) {
         event.preventDefault()
-        if (!this.tryHandleCanvasShare(url)) {
-          this.openSafeExternalUrl(url)
-        }
+        this.openUrlFromPage(url)
       }
     })
   }

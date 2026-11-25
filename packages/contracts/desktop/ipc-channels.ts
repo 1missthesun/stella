@@ -465,6 +465,11 @@ export const IPC_CLOUD_CONVERSATION_CACHE_REPLACE =
 export const IPC_CLOUD_CONVERSATION_CACHE_PURGE_CONVERSATION =
   "cloudConversationCache:purgeConversation" as const;
 
+export const IPC_VIEWER_WINDOW_PREPARE = "viewerWindow:prepare" as const;
+export const IPC_VIEWER_WINDOW_MOVE = "viewerWindow:move" as const;
+export const IPC_VIEWER_WINDOW_ACT = "viewerWindow:act" as const;
+export const IPC_VIEWER_WINDOW_CLOSED = "viewerWindow:closed" as const;
+
 export const IPC_COMPANION_HELLO = "companion:hello" as const;
 export const IPC_COMPANION_LAYOUT = "companion:layout" as const;
 export const IPC_COMPANION_HOVER = "companion:hover" as const;

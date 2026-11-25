@@ -333,6 +333,10 @@ import {
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
   IPC_USER_ASK_UPDATED,
+  IPC_VIEWER_WINDOW_ACT,
+  IPC_VIEWER_WINDOW_CLOSED,
+  IPC_VIEWER_WINDOW_MOVE,
+  IPC_VIEWER_WINDOW_PREPARE,
   IPC_VOICE_CREATE_OPENAI_SESSION,
   IPC_VOICE_CREATE_XAI_SESSION,
   IPC_VOICE_GET_RUNTIME_STATE,
@@ -667,6 +671,13 @@ export const createElectronApi = (
       onCaptureAudio: on(IPC_DICTATION_CAPTURE_AUDIO),
       onCaptureEvent: on(IPC_DICTATION_CAPTURE_EVENT),
       playSound: sender(IPC_DICTATION_PLAY_SOUND),
+    },
+
+    viewerWindow: {
+      prepare: invoker(IPC_VIEWER_WINDOW_PREPARE),
+      move: sender(IPC_VIEWER_WINDOW_MOVE),
+      act: sender(IPC_VIEWER_WINDOW_ACT),
+      onClosed: on(IPC_VIEWER_WINDOW_CLOSED),
     },
 
     companion: {

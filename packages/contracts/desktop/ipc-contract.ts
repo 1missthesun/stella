@@ -124,6 +124,12 @@ import type {
   CompanionState,
   CompanionVisibility,
 } from "./companion.js";
+import type {
+  ViewerWindowAct,
+  ViewerWindowClosed,
+  ViewerWindowMove,
+  ViewerWindowTicket,
+} from "./viewer-window.js";
 import type { ExternalOpener } from "./external-openers.js";
 import type { MemorySyncEraseResult, MemorySyncStatus } from "./memory-sync.js";
 import type { UiState } from "./ui.js";
@@ -456,6 +462,10 @@ import {
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
   IPC_USER_ASK_UPDATED,
+  IPC_VIEWER_WINDOW_ACT,
+  IPC_VIEWER_WINDOW_CLOSED,
+  IPC_VIEWER_WINDOW_MOVE,
+  IPC_VIEWER_WINDOW_PREPARE,
   IPC_VOICE_CREATE_OPENAI_SESSION,
   IPC_VOICE_CREATE_XAI_SESSION,
   IPC_VOICE_GET_RUNTIME_STATE,
@@ -1096,6 +1106,10 @@ export type IpcInvokeContract = {
   [IPC_COMPANION_GET_STATE]: Invoke<[], CompanionState | null>;
   [IPC_BACKEND_LIVE_WATCH]: Invoke<[request: BackendLiveWatchRequest], boolean>;
 
+  [IPC_VIEWER_WINDOW_PREPARE]: Invoke<
+    [request: { background: string }],
+    ViewerWindowTicket | null
+  >;
   [IPC_COMPANION_GET_VISIBLE]: Invoke<[], CompanionVisibility>;
   [IPC_COMPANION_SET_VISIBLE]: Invoke<[visible: boolean], CompanionVisibility>;
 
@@ -1702,6 +1716,8 @@ export type IpcSendContract = {
     payload: { sound: "startRecording" | "stopRecording" | "cancel" },
   ];
   [IPC_APP_SET_UNREAD_BADGE]: [badge: UnreadBadge];
+  [IPC_VIEWER_WINDOW_MOVE]: [move: ViewerWindowMove];
+  [IPC_VIEWER_WINDOW_ACT]: [act: ViewerWindowAct];
   [IPC_COMPANION_HELLO]: [];
   [IPC_COMPANION_HOVER]: [hovered: boolean];
   [IPC_COMPANION_PANEL_STATUS]: [status: CompanionPanelStatus];
@@ -1770,6 +1786,7 @@ export type IpcEventContract = {
   [IPC_DICTATION_TOGGLE]: DictationToggle;
   [IPC_DICTATION_CAPTURE_AUDIO]: { captureId: string; pcm: ArrayBuffer };
   [IPC_DICTATION_CAPTURE_EVENT]: DictationCaptureEvent;
+  [IPC_VIEWER_WINDOW_CLOSED]: ViewerWindowClosed;
   [IPC_COMPANION_LAYOUT]: CompanionLayout;
   [IPC_COMPANION_ACTIVITY]: CompanionActivity;
   [IPC_COMPANION_SET_EXPANDED]: { expanded: boolean };

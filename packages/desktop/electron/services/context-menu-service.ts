@@ -33,6 +33,13 @@ export type BrowserTabMenuHooks = {
   search: (text: string) => void;
 };
 
+type ContextMenuOptions = {
+  askRenderer: boolean;
+  /** The contents whose script builds this window's menus, when not its own. */
+  renderer?: WebContents;
+  browser?: BrowserTabMenuHooks;
+};
+
 type Pending = {
   contents: WebContents;
   resolve: (reply: ContextMenuCollectReply | null) => void;
@@ -380,15 +387,19 @@ const isMainFrame = (contents: WebContents, params: ContextMenuParams) => {
 const showMenu = async (
   contents: WebContents,
   params: ContextMenuParams,
-  options: { askRenderer: boolean; browser?: BrowserTabMenuHooks },
+  options: ContextMenuOptions,
 ) => {
   const fromApp = options.askRenderer && isMainFrame(contents, params);
-  const asked = fromApp ? await askRenderer(contents, params) : null;
+  const renderer = options.renderer ?? contents;
+  const asked =
+    fromApp && !renderer.isDestroyed()
+      ? await askRenderer(renderer, params)
+      : null;
   if (contents.isDestroyed()) return;
   const reply = asked?.reply ?? null;
   const pick = (id: string) => {
-    if (!asked || contents.isDestroyed()) return;
-    contents.send(IPC_CONTEXT_MENU_SELECT, {
+    if (!asked || renderer.isDestroyed()) return;
+    renderer.send(IPC_CONTEXT_MENU_SELECT, {
       requestId: asked.requestId,
       itemId: id,
     });
@@ -426,7 +437,7 @@ const showMenu = async (
 
 export const installContextMenu = (
   contents: WebContents,
-  options: { askRenderer: boolean; browser?: BrowserTabMenuHooks },
+  options: ContextMenuOptions,
 ): void => {
   contents.on("context-menu", (_event, params) => {
     void showMenu(contents, params, options).catch((error: unknown) => {

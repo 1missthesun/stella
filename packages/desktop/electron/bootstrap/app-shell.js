@@ -6,6 +6,7 @@ import { OverlayWindowController } from "../windows/overlay-window.js";
 import { CompanionWindowController } from "../windows/companion-window.js";
 import { broadcastCompanionVisibility } from "../ipc/companion-handlers.js";
 import { WindowManager } from "../windows/window-manager.js";
+import { ViewerWindowController } from "../windows/viewer-windows.js";
 import { TrayController } from "../windows/tray-controller.js";
 import { configureNotificationActivationHandling } from "../services/notification-service.js";
 import { configureStellaSessionPermissions } from "./session-permissions.js";
@@ -60,6 +61,13 @@ const initializeWindowShell = (context) => {
         electronDir: config.electronDir,
         isQuitting: () => state.isQuitting,
     });
+    const viewerWindows = new ViewerWindowController({
+        electronDir: config.electronDir,
+        getFullWindow: () => state.windowManager?.getFullWindow() ?? null,
+        assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
+        openExternalUrl: (url) => services.externalLinkService.openUrlFromPage(url),
+    });
+    services.externalLinkService.setPopupHandler((opener, details) => viewerWindows.handleOpen(opener, details));
     lifecycle.setWindowManager(new WindowManager({
         electronDir: config.electronDir,
         preloadPath,
@@ -67,6 +75,7 @@ const initializeWindowShell = (context) => {
         externalLinkService: services.externalLinkService,
         isQuitting: () => state.isQuitting,
         onMinimizeFullToTray: () => state.trayController?.notifyMinimizedToTray(),
+        holdFullClose: (window) => viewerWindows.holdMainClose(window),
     }));
     state.companionController = new CompanionWindowController({
         setupExternalLinkHandlers: (window) => services.externalLinkService.setupExternalLinkHandlers(window),

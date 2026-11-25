@@ -262,8 +262,13 @@ export class WindowManager {
             return;
         this.observedWindows.add(window);
         window.on('close', (event) => {
-            if (process.platform !== 'win32' || this.options.isQuitting?.())
+            if (this.options.isQuitting?.())
                 return;
+            if (process.platform !== 'win32') {
+                if (this.options.holdFullClose?.(window))
+                    event.preventDefault();
+                return;
+            }
             event.preventDefault();
             this.hideWindow(window);
             this.options.onMinimizeFullToTray?.();

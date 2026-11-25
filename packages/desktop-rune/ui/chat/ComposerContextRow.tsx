@@ -6,7 +6,7 @@ import {
   ComposerAttachmentTilesSection,
   ComposerSelectedTextContextSection,
   ComposerWindowContextSection,
-} from "@/app/chat/ComposerContextSections";
+} from "./ComposerContextSections";
 
 type ComposerContextRowProps = {
   variant?: "full" | "compact";

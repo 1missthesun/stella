@@ -1,4 +1,4 @@
-import { useId, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { createContext, useContext, useId, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { fileDisplayName } from "@stella/contracts/file-display-name";
 import type { ShowCaptureAttachment } from "@stella/contracts";
 import type { ChatContext, ChatContextFile } from "@/shared/types/electron";
@@ -91,11 +91,16 @@ type ContextPillProps = {
   children?: ReactNode;
 };
 
+/** `.context-pill--compact`: the narrower pill cap of the compact composer. */
+export const CompactContextPills = createContext(false);
+const COMPACT_PILL_MAX_W = 200;
+
 /** desktop-ui's `ContextPill`: a primary-tinted 12px pill with its kind's icon; brighter while its shell is hovered. */
 export function ContextPill({ id, kind, label, title, maxW, hovered, onPress, children }: ContextPillProps) {
   const t = useTokens();
   const c = pillColors(t);
-  const limit = maxW ?? (kind === "selected-text" ? 520 : 340);
+  const compact = useContext(CompactContextPills);
+  const limit = maxW ?? (compact && kind !== "window" ? COMPACT_PILL_MAX_W : kind === "selected-text" ? 520 : 340);
   return (
     <row
       id={id}
@@ -255,6 +260,17 @@ export function PendingCaptureChip({ w = 56, h = 42 }: { w?: number; h?: number 
   return (
     <box pad={2 + 1} radius={radius.full} border={t.c.borderStrong} fill={t.c.muted} inert>
       <box w={w} h={h} radius={6} fill={c.lo} loop={{ kind: "opacity", period: 1.2, low: 0.6, high: 1 }} />
+    </box>
+  );
+}
+
+/** `.attachment-tile--pending`: the same shimmer filling a 64px attachment tile. */
+export function PendingCaptureTile() {
+  const t = useTokens();
+  const lo = derive(t, "pending-capture-tile", (k) => mixOklch(k.c.foreground, 8, "transparent"));
+  return (
+    <box w={TILE_SIZE} h={TILE_SIZE} radius={12} clip={12} border={t.c.border} fill={t.c.muted} inert>
+      <box w="full" h="full" fill={lo} loop={{ kind: "opacity", period: 1.2, low: 0.6, high: 1 }} />
     </box>
   );
 }

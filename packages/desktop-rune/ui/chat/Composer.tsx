@@ -9,7 +9,7 @@ import { findDelegatedModelMentions } from "@stella/contracts/model-mentions";
 import { attachFilesToContext } from "@/features/chat/lib/file-attach";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { useDictationPaste } from "@/features/dictation/hooks/use-dictation-paste";
-import { DictationCancelButton, DictationRecordingBar } from "@/features/dictation/components/DictationRecordingBar";
+import { DictationCancelButton, DictationRecordingBar } from "./DictationRecordingBar";
 import { applyComposerModelMention, findComposerModelMentionTrigger, type ComposerModelMentionMenuHandle, type ComposerModelMentionOption, type ComposerModelMentionTrigger } from "@/app/chat/ComposerModelMentionMenu";
 import { ComposerModelMentionMenu } from "./ComposerModelMentionMenu";
 import { MiniModelPicker } from "./MiniModelPicker";

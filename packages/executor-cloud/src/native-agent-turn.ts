@@ -1408,7 +1408,7 @@ export const runCloudClaude = async (options: {
     } else if (cancellation.aborted && !error) {
       error = cancellation.reason?.message || "Claude Code turn was canceled.";
     }
-    if (result.exitCode !== 0 && !error && !quiet) {
+    if (result.exitCode !== 0 && !error && !quiet && !(handoffInterrupted && options.handoff?.pending())) {
       error =
         result.stderr.trim().slice(-4_000) ||
         `Claude Code exited with status ${result.exitCode ?? "unknown"}.`;

@@ -1084,7 +1084,6 @@
       "matches": "It matches",
       "getTitle": "Get your logins here",
       "getBody": "Go to {names}.",
-      "ok": "OK",
       "cloudUsed": "Cloud task used {label}"
     }
   },

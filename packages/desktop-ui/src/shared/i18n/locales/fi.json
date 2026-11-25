@@ -1084,7 +1084,6 @@
       "matches": "Täsmää",
       "getTitle": "Hae kirjautumisesi tänne",
       "getBody": "Siirry laitteelle {names}.",
-      "ok": "OK",
       "cloudUsed": "Pilvitehtävä käytti: {label}"
     }
   },

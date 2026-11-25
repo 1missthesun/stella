@@ -1074,7 +1074,6 @@
       "matches": "一致しています",
       "getTitle": "ログイン情報をここで使う",
       "getBody": "{names} を使ってください。",
-      "ok": "OK",
       "cloudUsed": "クラウドタスクが {label} を使用"
     }
   },

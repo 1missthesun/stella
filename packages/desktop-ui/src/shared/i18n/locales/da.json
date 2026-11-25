@@ -1084,7 +1084,6 @@
       "matches": "Det passer",
       "getTitle": "Hent dine logins hertil",
       "getBody": "Gå til {names}.",
-      "ok": "OK",
       "cloudUsed": "Cloudopgave brugte {label}"
     }
   },

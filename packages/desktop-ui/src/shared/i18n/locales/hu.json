@@ -1084,7 +1084,6 @@
       "matches": "Egyezik",
       "getTitle": "Hozd ide a belépéseidet",
       "getBody": "Menj ide: {names}.",
-      "ok": "OK",
       "cloudUsed": "Felhőfeladat használta: {label}"
     }
   },

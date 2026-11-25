@@ -1094,7 +1094,6 @@
       "matches": "Confere",
       "getTitle": "Traga seus logins para cá",
       "getBody": "Vá até {names}.",
-      "ok": "OK",
       "cloudUsed": "Uma tarefa na nuvem usou {label}"
     }
   },

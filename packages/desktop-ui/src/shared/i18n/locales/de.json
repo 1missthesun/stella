@@ -1084,7 +1084,6 @@
       "matches": "Stimmt überein",
       "getTitle": "Deine Logins hierher holen",
       "getBody": "Geh zu {names}.",
-      "ok": "OK",
       "cloudUsed": "Cloud-Aufgabe hat {label} verwendet"
     }
   },

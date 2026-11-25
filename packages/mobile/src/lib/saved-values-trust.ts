@@ -63,7 +63,6 @@ export type SavedValuesTrustView =
       confirmed: boolean;
       stopped: SavedValuesStopped | null;
       names: readonly string[];
-      hidden: boolean;
     }>
   | Readonly<{
       standing: "problem";
@@ -104,7 +103,6 @@ let myJoin: MyJoin | null = null;
 const myAnswers = new Map<string, MyAnswer>();
 let nextJoinAt = 0;
 let behindSince: number | null = null;
-let stoppedNow = false;
 let session = 0;
 
 const listeners = new Set<() => void>();
@@ -122,6 +120,14 @@ const setView = (next: SavedValuesTrustView) => {
   view = next;
   notify();
 };
+
+export const savedValuesNeedsAnswer = (trust: SavedValuesTrustView): boolean =>
+  trust.standing === "member"
+    ? trust.requests.length > 0
+    : trust.standing === "waiting" &&
+      !trust.stopped &&
+      trust.code !== null &&
+      !trust.confirmed;
 
 export const useSavedValuesTrust = (): SavedValuesTrustView =>
   useSyncExternalStore(subscribeSavedValues, () => view);
@@ -155,18 +161,14 @@ const samePin = (
 ) => left?.genesis === right?.genesis && left?.seq === right?.seq && left?.hash === right?.hash;
 
 const updateTrust = async (
-  change: Partial<
-    Pick<SavedValuesTrust, "pin" | "listed" | "stopped" | "hidden">
-  >,
+  change: Partial<Pick<SavedValuesTrust, "pin" | "listed" | "stopped">>,
 ): Promise<void> => {
   if (!trust) return;
   const next = { ...trust, ...change };
-  if (next.stopped !== trust.stopped) stoppedNow = next.stopped !== null;
   if (
     samePin(next.pin, trust.pin) &&
     next.listed === trust.listed &&
-    next.stopped === trust.stopped &&
-    next.hidden === trust.hidden
+    next.stopped === trust.stopped
   ) {
     return;
   }
@@ -245,7 +247,6 @@ export const resetSavedValuesTrust = () => {
   myAnswers.clear();
   nextJoinAt = 0;
   behindSince = null;
-  stoppedNow = false;
   lastCheck = null;
   if (wakeTimer) clearTimeout(wakeTimer);
   wakeTimer = null;
@@ -458,12 +459,7 @@ const stayMember = async (
   list: SavedValuesRoster,
   keys: SavedValuesDeviceKeys,
 ): Promise<void> => {
-  await updateTrust({
-    pin: list.head,
-    listed: true,
-    stopped: null,
-    hidden: false,
-  });
+  await updateTrust({ pin: list.head, listed: true, stopped: null });
   myJoin = null;
   const grew = roster?.head.hash !== list.head.hash;
   roster = list;
@@ -666,9 +662,6 @@ const ask = async (
     confirmed: myJoin?.confirmed ?? false,
     stopped: trust?.stopped ?? null,
     names: approverNames(list, me.deviceId, now),
-    hidden: trust?.stopped
-      ? !stoppedNow
-      : !code && (trust?.hidden ?? false),
   });
 };
 
@@ -684,19 +677,13 @@ const approverNames = (
   ].slice(0, MAX_APPROVER_NAMES);
 };
 
-export const hideSavedValuesCard = async (): Promise<void> => {
-  stoppedNow = false;
-  await updateTrust({ hidden: true });
-  await settle();
-};
-
 export const confirmSavedValuesCode = (): Promise<void> => {
   if (myJoin?.answer && myJoin.revealed) myJoin.confirmed = true;
   return settle();
 };
 
 export const askSavedValuesAgain = async (): Promise<void> => {
-  await updateTrust({ stopped: null, hidden: false });
+  await updateTrust({ stopped: null });
   nextJoinAt = 0;
   myJoin = null;
   await settle();

@@ -1074,7 +1074,6 @@
       "matches": "Khớp",
       "getTitle": "Đưa thông tin đăng nhập về đây",
       "getBody": "Hãy dùng {names}.",
-      "ok": "OK",
       "cloudUsed": "Tác vụ đám mây đã dùng {label}"
     }
   },

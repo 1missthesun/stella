@@ -1074,7 +1074,6 @@
       "matches": "Cocok",
       "getTitle": "Bawa login Anda ke sini",
       "getBody": "Buka {names}.",
-      "ok": "OK",
       "cloudUsed": "Tugas cloud memakai {label}"
     }
   },

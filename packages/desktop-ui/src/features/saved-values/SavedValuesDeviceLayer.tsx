@@ -65,16 +65,10 @@ export const SavedValuesDeviceLayer = () => {
 
   const request = status?.standing === "member" ? status.requests.find((entry) => !dismissed.has(entry.joinId)) : undefined;
   const waiting = status?.standing === "waiting" ? status.waiting : undefined;
-  const waitingKey = waiting
-    ? waiting.code
-      ? `match:${waiting.code}`
-      : waiting.declined || waiting.removed || waiting.hidden
-        ? null
-        : "get"
-    : null;
-  const showWaiting = waitingKey !== null && !dismissed.has(waitingKey) && !waiting?.confirmed;
+  const matchKey = waiting?.code && !waiting.confirmed ? `match:${waiting.code}` : null;
+  const showMatch = matchKey !== null && !dismissed.has(matchKey);
   const ready = onboarding.hydrated && onboarding.completed;
-  const free = useScreenFree(ready && (Boolean(request?.code) || showWaiting));
+  const free = useScreenFree(ready && (Boolean(request?.code) || showMatch));
 
   const dismiss = (key: string) => {
     setDismissed((current) => new Set([...current, key]));
@@ -147,69 +141,40 @@ export const SavedValuesDeviceLayer = () => {
     );
   }
 
-  if (!showWaiting || !waiting || !waitingKey) return null;
+  if (!showMatch || !waiting?.code) return null;
 
-  if (waiting.code) {
-    return (
-      <Dialog open onOpenChange={(next) => !next && !busy && dismiss(waitingKey)}>
-        <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-match="">
-          <DialogHeader>
-            <DialogTitle>
-              {t("global.savedValuesDevices.matchTitle", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") })}
-            </DialogTitle>
-            <DialogCloseButton aria-label={t("common.close")} />
-          </DialogHeader>
-          <DialogBody className="remote-execution-consent-body">
-            <div className="saved-values-device-code" data-saved-values-code="">
-              {formatJoinCode(waiting.code)}
-            </div>
-            {failed ? <div className="remote-execution-consent-error">{t("global.savedValuesDevices.failed")}</div> : null}
-            <div className="remote-execution-consent-actions">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={busy}
-                className="pill-btn pill-btn--lg"
-                onClick={() => void run(() => act({ action: "askAgain" }))}
-              >
-                {t("global.savedValuesDevices.useAnother")}
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={busy}
-                className="pill-btn pill-btn--primary pill-btn--lg"
-                onClick={() => void run(() => act({ action: "confirm" }))}
-              >
-                {t("global.savedValuesDevices.matches")}
-              </Button>
-            </div>
-          </DialogBody>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  const hide = () => {
-    dismiss(waitingKey);
-    void act({ action: "hide" });
-  };
   return (
-    <Dialog open onOpenChange={(next) => !next && hide()}>
-      <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-get="">
+    <Dialog open onOpenChange={(next) => !next && !busy && dismiss(matchKey)}>
+      <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-match="">
         <DialogHeader>
-          <DialogTitle>{t("global.savedValuesDevices.getTitle")}</DialogTitle>
+          <DialogTitle>
+            {t("global.savedValuesDevices.matchTitle", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") })}
+          </DialogTitle>
           <DialogCloseButton aria-label={t("common.close")} />
         </DialogHeader>
         <DialogBody className="remote-execution-consent-body">
-          <DialogDescription className="remote-execution-consent-text">
-            {t("global.savedValuesDevices.getBody", {
-              names: waiting.approvers?.join(" / ") || t("global.savedValuesDevices.otherDevice"),
-            })}
-          </DialogDescription>
+          <div className="saved-values-device-code" data-saved-values-code="">
+            {formatJoinCode(waiting.code)}
+          </div>
+          {failed ? <div className="remote-execution-consent-error">{t("global.savedValuesDevices.failed")}</div> : null}
           <div className="remote-execution-consent-actions">
-            <Button type="button" variant="primary" className="pill-btn pill-btn--primary pill-btn--lg" onClick={hide}>
-              {t("global.savedValuesDevices.ok")}
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              className="pill-btn pill-btn--lg"
+              onClick={() => void run(() => act({ action: "askAgain" }))}
+            >
+              {t("global.savedValuesDevices.useAnother")}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={busy}
+              className="pill-btn pill-btn--primary pill-btn--lg"
+              onClick={() => void run(() => act({ action: "confirm" }))}
+            >
+              {t("global.savedValuesDevices.matches")}
             </Button>
           </div>
         </DialogBody>

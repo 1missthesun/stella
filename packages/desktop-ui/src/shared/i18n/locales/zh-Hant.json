@@ -1074,7 +1074,6 @@
       "matches": "一致",
       "getTitle": "在這裡取得登入資訊",
       "getBody": "請使用 {names}。",
-      "ok": "好",
       "cloudUsed": "雲端任務使用了 {label}"
     }
   },

@@ -1074,7 +1074,6 @@
       "matches": "일치함",
       "getTitle": "여기로 로그인 가져오기",
       "getBody": "{names}(으)로 이동하세요.",
-      "ok": "확인",
       "cloudUsed": "클라우드 작업이 {label} 사용"
     }
   },

@@ -1094,7 +1094,6 @@
       "matches": "Ça correspond",
       "getTitle": "Récupérer vos identifiants ici",
       "getBody": "Allez sur {names}.",
-      "ok": "OK",
       "cloudUsed": "Une tâche cloud a utilisé {label}"
     }
   },

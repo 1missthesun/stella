@@ -1094,7 +1094,6 @@
       "matches": "Corrisponde",
       "getTitle": "Porta qui i tuoi accessi",
       "getBody": "Vai su {names}.",
-      "ok": "OK",
       "cloudUsed": "Un'attività cloud ha usato {label}"
     }
   },

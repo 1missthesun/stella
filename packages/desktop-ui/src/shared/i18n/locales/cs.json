@@ -1104,7 +1104,6 @@
       "matches": "Shoduje se",
       "getTitle": "Získat přihlášení sem",
       "getBody": "Přejděte k {names}.",
-      "ok": "OK",
       "cloudUsed": "Úloha v cloudu použila {label}"
     }
   },

@@ -84,7 +84,6 @@ type SyncState = {
   signSecretProtected?: string;
   pin?: SavedValuesRosterPin;
   joinPaused?: "declined" | "removed";
-  askHidden?: boolean;
   ownJoin?: OwnJoin;
   signers?: Record<string, string>;
 };
@@ -256,7 +255,6 @@ export class SavedValuesSync {
         ...(typeof stored.signSecretProtected === "string" ? { signSecretProtected: stored.signSecretProtected } : {}),
         ...(stored.pin ? { pin: stored.pin } : {}),
         ...(stored.joinPaused ? { joinPaused: stored.joinPaused } : {}),
-        ...(stored.askHidden ? { askHidden: true } : {}),
         ...(stored.ownJoin ? { ownJoin: stored.ownJoin } : {}),
         signers: { ...(stored.signers ?? {}) },
       };
@@ -494,19 +492,10 @@ export class SavedValuesSync {
     return { ok: false, error: "Your devices' list kept changing. Try again." };
   }
 
-  hideAsk(): void {
-    const state = this.loadState();
-    if (!state) return;
-    state.askHidden = true;
-    this.saveState();
-    this.schedule(0);
-  }
-
   askAgain(): void {
     const state = this.loadState();
     if (!state) return;
     delete state.joinPaused;
-    delete state.askHidden;
     const old = state.ownJoin;
     delete state.ownJoin;
     this.saveState();
@@ -611,7 +600,6 @@ export class SavedValuesSync {
       state.cardAt = undefined;
       delete state.pin;
       delete state.joinPaused;
-      delete state.askHidden;
       delete state.ownJoin;
       this.answered.clear();
       this.saveState();
@@ -667,7 +655,6 @@ export class SavedValuesSync {
 
     state.pin = roster.head;
     delete state.joinPaused;
-    delete state.askHidden;
     if (state.ownJoin) {
       const finished = state.ownJoin.joinId;
       delete state.ownJoin;
@@ -741,7 +728,7 @@ export class SavedValuesSync {
       }
       this.setStatus({
         standing: "waiting",
-        waiting: { code: null, ...this.asking(state, roster, remote, now) },
+        waiting: { code: null, approvers: this.approverNames(state, roster, remote, now) },
         devices: [],
         requests: [],
       });
@@ -775,7 +762,7 @@ export class SavedValuesSync {
       standing: "waiting",
       waiting: {
         code,
-        ...this.asking(state, roster, remote, now),
+        approvers: this.approverNames(state, roster, remote, now),
         ...(own.answer ? { approver: own.answer.name } : {}),
         ...(own.confirmed ? { confirmed: true } : {}),
       },
@@ -784,14 +771,11 @@ export class SavedValuesSync {
     });
   }
 
-  private asking(state: SyncState, roster: SavedValuesRoster, remote: SavedValuesState, now: number) {
+  private approverNames(state: SyncState, roster: SavedValuesRoster, remote: SavedValuesState, now: number) {
     const others = [...roster.members.values()].filter((member) => member.deviceId !== state.deviceId);
     const seen = others.filter((member) => !this.isQuiet(member, remote, now));
     const names = new Set((seen.length > 0 ? seen : others).map((member) => member.name));
-    return {
-      approvers: [...names].slice(0, MAX_APPROVER_NAMES),
-      ...(state.askHidden ? { hidden: true } : {}),
-    };
+    return [...names].slice(0, MAX_APPROVER_NAMES);
   }
 
   private isQuiet(member: SavedValuesMember, remote: SavedValuesState, now: number): boolean {

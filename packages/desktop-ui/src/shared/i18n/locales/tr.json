@@ -1084,7 +1084,6 @@
       "matches": "Eşleşiyor",
       "getTitle": "Girişlerinizi buraya alın",
       "getBody": "{names} cihazına geçin.",
-      "ok": "Tamam",
       "cloudUsed": "Bulut görevi {label} kullandı"
     }
   },

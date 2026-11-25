@@ -1094,7 +1094,6 @@
       "matches": "Se potrivește",
       "getTitle": "Adu-ți autentificările aici",
       "getBody": "Mergi la {names}.",
-      "ok": "OK",
       "cloudUsed": "O sarcină din cloud a folosit {label}"
     }
   },

@@ -7,7 +7,6 @@ import {
   askSavedValuesAgain,
   confirmSavedValuesCode,
   declineSavedValuesJoin,
-  hideSavedValuesCard,
   startSavedValuesOver,
   useSavedValuesTrust,
   type SavedValuesRequestView,
@@ -43,7 +42,6 @@ export function SavedLoginsChatCards({
 }) {
   const trust = useSavedValuesTrust();
   const { questions, secureInput } = useConversationUserAsks(conversationId);
-  const { run } = useSavedLoginsAction();
   if (questions.length > 0 || secureInput) return null;
   if (trust.standing === "member") {
     const request = trust.requests[0];
@@ -51,13 +49,8 @@ export function SavedLoginsChatCards({
       <SavedLoginsRequestCard key={request.joinId} request={request} />
     ) : null;
   }
-  if (trust.standing !== "waiting" || trust.hidden) return null;
-  return (
-    <SavedLoginsWaitingCard
-      waiting={trust}
-      onDismiss={() => run(hideSavedValuesCard)}
-    />
-  );
+  if (trust.standing !== "waiting" || trust.stopped || !trust.code) return null;
+  return <SavedLoginsWaitingCard waiting={trust} />;
 }
 
 export function SavedLoginsRequestCard({
@@ -89,26 +82,16 @@ export function SavedLoginsRequestCard({
 
 export function SavedLoginsWaitingCard({
   waiting,
-  onDismiss,
 }: {
   waiting: Waiting;
-  onDismiss?: () => void;
 }) {
   const t = useT();
   const { busy, run } = useSavedLoginsAction();
   const name = waiting.answeredBy ?? "";
-  const putAway = onDismiss ? (
-    <Action
-      label={t("mobile.savedLogins.notNow")}
-      disabled={busy}
-      onPress={onDismiss}
-    />
-  ) : null;
 
   if (waiting.stopped) {
     return (
       <Card title={t(`mobile.savedLogins.${waiting.stopped}`)}>
-        {putAway}
         <Action
           primary
           label={t("mobile.savedLogins.askAgain")}
@@ -128,7 +111,11 @@ export function SavedLoginsWaitingCard({
         })}
       >
         <StartOver disabled={busy} run={run} />
-        {putAway}
+        <Action
+          label={t("mobile.savedLogins.askAgain")}
+          disabled={busy}
+          onPress={() => run(askSavedValuesAgain)}
+        />
       </Card>
     );
   }

@@ -1094,7 +1094,6 @@
       "matches": "Coincide",
       "getTitle": "Trae aquí tus inicios de sesión",
       "getBody": "Ve a {names}.",
-      "ok": "Aceptar",
       "cloudUsed": "Una tarea en la nube usó {label}"
     }
   },

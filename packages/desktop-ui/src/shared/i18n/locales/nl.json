@@ -1084,7 +1084,6 @@
       "matches": "Klopt",
       "getTitle": "Haal je logins hierheen",
       "getBody": "Ga naar {names}.",
-      "ok": "OK",
       "cloudUsed": "Cloudtaak gebruikte {label}"
     }
   },

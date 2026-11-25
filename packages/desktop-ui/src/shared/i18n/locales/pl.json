@@ -1104,7 +1104,6 @@
       "matches": "Zgadza się",
       "getTitle": "Pobierz tu swoje loginy",
       "getBody": "Przejdź do {names}.",
-      "ok": "OK",
       "cloudUsed": "Zadanie w chmurze użyło {label}"
     }
   },

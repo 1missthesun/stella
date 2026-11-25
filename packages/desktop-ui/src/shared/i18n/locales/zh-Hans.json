@@ -1074,7 +1074,6 @@
       "matches": "一致",
       "getTitle": "在这里获取登录信息",
       "getBody": "请使用 {names}。",
-      "ok": "好",
       "cloudUsed": "云端任务使用了 {label}"
     }
   },

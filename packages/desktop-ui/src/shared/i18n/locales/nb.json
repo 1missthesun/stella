@@ -1084,7 +1084,6 @@
       "matches": "Det stemmer",
       "getTitle": "Hent innloggingene dine hit",
       "getBody": "Gå til {names}.",
-      "ok": "OK",
       "cloudUsed": "Skyoppgave brukte {label}"
     }
   },

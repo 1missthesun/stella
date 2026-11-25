@@ -55,7 +55,10 @@ import {
   type StoredPhoneAccess,
 } from "../lib/phone-access";
 import { withdrawSavedValuesDevice } from "../lib/saved-values";
-import { useSavedValuesTrust } from "../lib/saved-values-trust";
+import {
+  savedValuesNeedsAnswer,
+  useSavedValuesTrust,
+} from "../lib/saved-values-trust";
 import { useServerFeatures } from "../lib/server-features";
 import { isSelfHostedLaunch, launchServer } from "../lib/server-registry";
 import { useUserAskEscalationPolicy } from "../lib/user-ask-policy";
@@ -302,11 +305,7 @@ export function SettingsContent({
       : undefined;
 
   const showSavedLogins = isSignedIn && savedLoginsTrust.standing !== "off";
-  const savedLoginsAttention =
-    savedLoginsTrust.standing === "waiting" ||
-    savedLoginsTrust.standing === "problem" ||
-    (savedLoginsTrust.standing === "member" &&
-      savedLoginsTrust.requests.length > 0);
+  const savedLoginsAttention = savedValuesNeedsAnswer(savedLoginsTrust);
   const savedLoginsValue =
     savedLoginsTrust.standing === "member"
       ? String(savedLoginsTrust.devices.length)

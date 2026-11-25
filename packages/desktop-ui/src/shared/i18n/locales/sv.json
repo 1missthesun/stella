@@ -1084,7 +1084,6 @@
       "matches": "Det stämmer",
       "getTitle": "Hämta dina inloggningar hit",
       "getBody": "Gå till {names}.",
-      "ok": "OK",
       "cloudUsed": "Molnuppgift använde {label}"
     }
   },

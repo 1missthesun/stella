@@ -12,7 +12,6 @@ import {
   WRITE_STDIN_TOOL_DESCRIPTION,
   WRITE_STDIN_TOOL_NAME,
   WRITE_STDIN_TOOL_PARAMETERS,
-  WRITE_STDIN_TOOL_PROMPT_SNIPPET,
   WRITE_STDIN_TOOL_REPLAY,
 } from "./write-stdin-def.js";
 
@@ -27,7 +26,6 @@ export const createWriteStdinTool = (
   name: WRITE_STDIN_TOOL_NAME,
   replay: WRITE_STDIN_TOOL_REPLAY,
   description: WRITE_STDIN_TOOL_DESCRIPTION,
-  promptSnippet: WRITE_STDIN_TOOL_PROMPT_SNIPPET,
   parameters: WRITE_STDIN_TOOL_PARAMETERS,
   execute: async (args, context, extras) => {
     const result = await handleWriteStdin(

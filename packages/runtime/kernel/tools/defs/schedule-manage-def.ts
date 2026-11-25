@@ -97,7 +97,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       scriptPath: {
         type: "string",
         description:
-          "kind='watch' with runsOn 'computer': absolute path of the check script verified with ScriptDraft. Empty stdout = nothing found (silent); non-empty stdout = what it found; non-zero exit = sensor failure.",
+          "kind='watch' with runsOn 'computer': the scriptPath ScriptDraft returned.",
       },
       runsOn: {
         type: "string",
@@ -114,7 +114,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       threadId: {
         type: "string",
         description:
-          "kind='task' or 'watch' with deliverTo 'thread': the thread_id of an existing agent (from agent_status or spawn_agent) to message at fire time. Use it to have the agent already doing that work pick up its own follow-up (\"check the deploy in 2 hours\") instead of a fresh agent. Defaults to the calling agent's own thread. If that thread is gone when it fires, Stella gets it instead, with a note.",
+          "deliverTo 'thread': the existing agent to message at fire time, so the one already doing the work picks up its own follow-up. Defaults to the calling agent's own thread; if that thread is gone when it fires, Stella gets it, with a note.",
       },
       once: {
         type: "boolean",

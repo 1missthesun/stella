@@ -23,7 +23,6 @@ export const createMultiToolUseParallelTool = (
   replay: "unsafe",
   description:
     "Run several independent tool calls concurrently. Pass `tool_uses` as an array of `{ recipient_name, parameters }` entries; each entry runs in parallel and the combined results are returned. Only batch calls that don't depend on each other (e.g. multiple file reads) and stay within the same tool family.",
-  promptSnippet: "Fan out independent tool calls in parallel",
   parameters: {
     type: "object",
     properties: {

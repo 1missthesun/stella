@@ -12,6 +12,5 @@ export const writeTool: ToolDefinition = {
   replay: WRITE_TOOL_REPLAY,
   description: WRITE_TOOL_DESCRIPTION,
   parameters: WRITE_TOOL_PARAMETERS,
-  promptSnippet: "Create or overwrite a text file",
   execute: (args, context) => handleWrite(args, context),
 };

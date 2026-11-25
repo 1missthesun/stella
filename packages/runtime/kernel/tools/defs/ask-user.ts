@@ -5,7 +5,6 @@ import {
   ASK_USER_TOOL_LABEL,
   ASK_USER_TOOL_NAME,
   ASK_USER_TOOL_PARAMETERS,
-  ASK_USER_TOOL_PROMPT_SNIPPET,
   ASK_USER_TOOL_WORKING_TEXT,
 } from "./ask-user-def.js";
 
@@ -20,7 +19,6 @@ export const createAskUserTool = (options: AskUserOptions): ToolDefinition => ({
   replay: "unsafe",
   awaitsUser: true,
   description: ASK_USER_TOOL_DESCRIPTION,
-  promptSnippet: ASK_USER_TOOL_PROMPT_SNIPPET,
   parameters: ASK_USER_TOOL_PARAMETERS,
   execute: (args, context, extras) =>
     handleAskUser({ askUser: options.askUser }, args, context, extras?.signal),

@@ -2,10 +2,8 @@ export const EXEC_COMMAND_TOOL_NAME = "Bash";
 export const LEGACY_EXEC_COMMAND_TOOL_NAME = "exec_command";
 
 export const EXEC_COMMAND_TOOL_DESCRIPTION =
-  "Run a shell command and wait for it to finish, returning its full output in one result. Waits up to timeout_ms (default 120000, max 600000); a command still running at the timeout keeps running and the result carries a session_id for write_stdin. Set run_in_background: true for a job you do not need to wait on: the call returns right away with a session_id to check on it or stop it with write_stdin. By default stdin/stdout/stderr use ordinary pipes; set tty: true for a real Unix PTY on macOS/Linux or ConPTY on supported Windows when a program needs a terminal. Required: cmd. Node.js and Stella CLIs (stella-browser, stella-office, stella-computer, stella-media, stella-x-api) are auto-injected into PATH.";
+  "Run a shell command and return its output. A command still running at timeout_ms keeps running, and the result carries a session_id for write_stdin. Node.js and Stella CLIs (stella-browser, stella-office, stella-computer, stella-media, stella-x-api) are on PATH.";
 
-export const EXEC_COMMAND_TOOL_PROMPT_SNIPPET =
-  "Execute shell commands (git, build, package managers, file scripts)";
 
 export const EXEC_COMMAND_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
@@ -19,22 +17,22 @@ export const EXEC_COMMAND_TOOL_PARAMETERS: Record<string, unknown> = {
     shell: {
       type: "string",
       description:
-        "Shell binary to launch. Defaults to the user's detected login shell on macOS/Linux (with platform fallbacks), and to pwsh then Windows PowerShell on Windows with cmd.exe as the final fallback. Explicit shells use their native command syntax.",
+        "Shell binary. Defaults to the user's login shell on macOS/Linux; on Windows pwsh, then Windows PowerShell, then cmd.exe.",
     },
     tty: {
       type: "boolean",
       description:
-        "True allocates a real pseudo-terminal for interactive terminal programs; false or omitted uses ordinary pipes. Uses a Unix PTY on macOS/Linux and ConPTY on supported Windows.",
+        "True gives the command a real terminal (PTY, or ConPTY on Windows) for programs that need one; default is pipes.",
     },
     timeout_ms: {
       type: "number",
       description:
-        "How long to wait (in milliseconds) for the command to exit before returning with a session_id for the still-running process. Defaults to 120000; maximum 600000. Raise it for builds and test suites instead of polling.",
+        "How long to wait for the command to exit, in ms. Defaults to 120000; maximum 600000. Raise it for long builds instead of polling.",
     },
     run_in_background: {
       type: "boolean",
       description:
-        "True starts the command and returns immediately with a session_id instead of waiting. Use for servers, watchers, and long jobs whose result you do not need right now.",
+        "True returns at once with a session_id, for servers, watchers and jobs you don't need to wait on.",
     },
     max_output_tokens: {
       type: "integer",

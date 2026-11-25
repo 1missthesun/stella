@@ -222,7 +222,6 @@ export type ToolDefinition = {
   annotations?: Record<string, unknown>;
   agentTypes?: readonly string[];
   awaitsUser?: boolean;
-  promptSnippet?: string;
   demoted?: {
     searchTerms?: readonly string[];
     requiredConnectorProvider?: string;

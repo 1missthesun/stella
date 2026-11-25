@@ -8,7 +8,6 @@ import {
   EXEC_COMMAND_TOOL_DESCRIPTION,
   EXEC_COMMAND_TOOL_NAME,
   EXEC_COMMAND_TOOL_PARAMETERS,
-  EXEC_COMMAND_TOOL_PROMPT_SNIPPET,
   EXEC_COMMAND_TOOL_REPLAY,
 } from "./exec-command-def.js";
 
@@ -23,7 +22,6 @@ export const createExecCommandTool = (
   name: EXEC_COMMAND_TOOL_NAME,
   replay: EXEC_COMMAND_TOOL_REPLAY,
   description: EXEC_COMMAND_TOOL_DESCRIPTION,
-  promptSnippet: EXEC_COMMAND_TOOL_PROMPT_SNIPPET,
   parameters: EXEC_COMMAND_TOOL_PARAMETERS,
   execute: async (args, context, extras) => {
     const run = () =>

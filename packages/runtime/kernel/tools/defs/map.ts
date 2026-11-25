@@ -5,7 +5,6 @@ import {
   MAP_TOOL_DESCRIPTION,
   MAP_TOOL_NAME,
   MAP_TOOL_PARAMETERS,
-  MAP_TOOL_PROMPT_SNIPPET,
   MAP_TOOL_REPLAY,
   MAP_TOOL_SEARCH_TERMS,
   MAP_TOOL_WORKING_TEXT,
@@ -28,7 +27,6 @@ export const createMapTool = (options: MapToolOptions = {}): ToolDefinition => {
     agentTypes: [AGENT_IDS.ORCHESTRATOR],
     demoted: { searchTerms: MAP_TOOL_SEARCH_TERMS },
     description: MAP_TOOL_DESCRIPTION,
-    promptSnippet: MAP_TOOL_PROMPT_SNIPPET,
     workingText: MAP_TOOL_WORKING_TEXT,
     parameters: MAP_TOOL_PARAMETERS,
     execute: async (args, _context, extras) => {

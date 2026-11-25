@@ -1398,7 +1398,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }),
       prompt: str({
         description:
-          "The brief: the request and what the agent can't know. The user's standing rules are already in its context, so a brief that repeats one adds nothing.",
+          "The brief: the request and what the agent can't know.",
       }),
       model: opt(
         str({

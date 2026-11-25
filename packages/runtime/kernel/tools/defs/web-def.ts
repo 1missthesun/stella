@@ -17,7 +17,6 @@ export const WEB_TOOL_NAME = "web";
 export const WEB_TOOL_DESCRIPTION =
   "Search the web (query) or fetch a page as text (url); pass exactly one.";
 
-export const WEB_TOOL_PROMPT_SNIPPET = "Search the web or fetch a URL";
 
 export const WEB_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",

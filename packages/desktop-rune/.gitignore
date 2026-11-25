@@ -1,3 +1,4 @@
 engine/target/
 .hot/
 .run/
+.cargo/

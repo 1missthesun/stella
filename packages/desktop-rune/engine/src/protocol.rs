@@ -10,9 +10,10 @@
 //! | 6 REMOVE | parent u32, child u32 (frees the child's subtree) |
 //! | 9 COMMIT | generation u32, ack u32, t0 f64 (epoch ms), kind u8 |
 //! | 10 CMD | len u32, JSON |
+//! | 11 BLOB | id u32, len u32, bytes (image bytes, referenced as `blob:<id>`) |
+//! | 12 FREE_BLOB | id u32 |
 
 use std::io::Read;
-use std::process::ChildStdout;
 use std::sync::{Arc, Mutex, mpsc};
 
 use rune::Waker;
@@ -30,6 +31,8 @@ pub enum Op {
     /// the TS side started the work (file change seen, event received); `kind` 1 = hot swap.
     Commit { generation: u32, ack: u32, t0: f64, kind: u8 },
     Cmd(serde_json::Value),
+    Blob { id: u32, bytes: std::sync::Arc<[u8]> },
+    FreeBlob { id: u32 },
 }
 
 pub enum Msg {
@@ -113,6 +116,15 @@ fn decode(frame: &[u8]) -> Vec<Op> {
                     }
                 }
             }
+            11 => {
+                let (Some(id), Some(n)) = (c.u32(), c.u32()) else { break };
+                let Some(b) = c.bytes(n as usize) else { break };
+                Op::Blob { id, bytes: b.into() }
+            }
+            12 => {
+                let Some(id) = c.u32() else { break };
+                Op::FreeBlob { id }
+            }
             other => {
                 eprintln!("stella-engine: unknown op {other}; dropping the rest of the frame");
                 break;
@@ -123,7 +135,7 @@ fn decode(frame: &[u8]) -> Vec<Op> {
     ops
 }
 
-pub fn read_loop(mut out: ChildStdout, tx: mpsc::Sender<Msg>, waker: Arc<Mutex<Option<Waker>>>) {
+pub fn read_loop(mut out: impl Read, tx: mpsc::Sender<Msg>, waker: Arc<Mutex<Option<Waker>>>) {
     let mut len = [0u8; 4];
     let mut buf = Vec::new();
     loop {

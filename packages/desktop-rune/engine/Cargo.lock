@@ -2752,7 +2752,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -3112,6 +3112,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3db2be46835f013dd3f4fa7f5f7402c537787b54ebb6fe2b94bbdd7e2669bb7b"
+dependencies = [
+ "bitflags 2.13.2",
+ "memchr",
+ "unicase",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3272,7 +3283,6 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -3342,7 +3352,6 @@ dependencies = [
 [[package]]
 name = "rune-core"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "js-sys",
  "libc",
@@ -3361,7 +3370,6 @@ dependencies = [
 [[package]]
 name = "rune-edit"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "js-sys",
  "parley",
@@ -3375,7 +3383,6 @@ dependencies = [
 [[package]]
 name = "rune-gpu"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -3400,9 +3407,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rune-highlights"
+version = "0.0.1"
+dependencies = [
+ "unicode-ident",
+ "wasmparser",
+]
+
+[[package]]
 name = "rune-image"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "blake3",
  "image",
@@ -3418,9 +3432,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rune-kit"
+version = "0.0.1"
+dependencies = [
+ "icu_normalizer",
+ "pulldown-cmark",
+ "rune",
+ "rune-highlights",
+ "rune-mermaid",
+ "rune-motion",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "rune-media"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "ash",
  "blake3",
@@ -3449,14 +3475,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "rune-mermaid"
+version = "0.0.1"
+dependencies = [
+ "rune",
+]
+
+[[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
+
+[[package]]
+name = "rune-notify"
+version = "0.0.1"
+dependencies = [
+ "async-channel",
+ "async-io",
+ "block2 0.6.2",
+ "futures-lite",
+ "objc2 0.6.5",
+ "windows",
+ "windows-core",
+ "windows-registry",
+ "zbus",
+]
 
 [[package]]
 name = "rune-spell"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "js-sys",
  "objc2-app-kit 0.3.2",
@@ -3475,7 +3521,6 @@ dependencies = [
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "wgpu",
  "windows",
@@ -3484,7 +3529,6 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "stacker",
  "taffy",
@@ -3493,7 +3537,6 @@ dependencies = [
 [[package]]
 name = "rune-text"
 version = "0.0.1"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "bytemuck",
  "fontique",
@@ -3521,7 +3564,6 @@ dependencies = [
 [[package]]
 name = "rune-tiny-skia-path"
 version = "0.11.4"
-source = "git+https://github.com/1missthesun/rune?rev=c8acdcff68020f8894999bb70a558b8251f48087#c8acdcff68020f8894999bb70a558b8251f48087"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -3917,7 +3959,10 @@ name = "stella-engine"
 version = "0.1.0"
 dependencies = [
  "gtk",
+ "libc",
  "rune",
+ "rune-kit",
+ "rune-notify",
  "serde",
  "serde_json",
  "wry",
@@ -4421,6 +4466,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unicase"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357cc3acc6a036009fd6c973ed009037c732d60d0b4f6c673e9041497482a28f"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4574,6 +4625,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.245.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f08c9adee0428b7bddf3890fc27e015ac4b761cc608c822667102b8bfd6995e"
+dependencies = [
+ "bitflags 2.13.2",
+ "indexmap",
 ]
 
 [[package]]

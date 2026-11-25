@@ -117,6 +117,7 @@ export const CompactChildState = memo(function CompactChildState({
   running = false,
   pulse = false,
   dim = false,
+  indent = 23,
 }: {
   summary: CompactActivitySummary;
   prioritizeFailure: boolean;
@@ -124,6 +125,7 @@ export const CompactChildState = memo(function CompactChildState({
   running?: boolean;
   pulse?: boolean;
   dim?: boolean;
+  indent?: number;
 }) {
   const t = useTokens();
   const l = stripLook(t);
@@ -135,7 +137,7 @@ export const CompactChildState = memo(function CompactChildState({
   return (
     <>
       {summary.usesProgressBar ? (
-        <row align="center" gap={8} minW={0} maxW={168} ml={23} pt={2} opacity={dim ? 0.6 : 1} motion={{ dur: 0.4 }} inert>
+        <row align="center" gap={8} minW={0} maxW={168} ml={indent} pt={2} opacity={dim ? 0.6 : 1} motion={{ dur: 0.4 }} inert>
           <row grow={1} minW={0} gap={1} h={3} radius={999} clip={999} fill={l.bar}>
             {segment(summary.completedCount, l.cellDone)}
             {segment(summary.runningCount, t.c.foreground, true)}
@@ -147,7 +149,7 @@ export const CompactChildState = memo(function CompactChildState({
           </text>
         </row>
       ) : (
-        <row wrap gap={4} maxW={124} ml={23} pt={1} opacity={dim ? 0.6 : 1} motion={{ dur: 0.4 }}>
+        <row wrap gap={4} maxW={124} ml={indent} pt={1} opacity={dim ? 0.6 : 1} motion={{ dur: 0.4 }}>
           {summary.tasks.map((task, index) => (
             <box
               key={task.id}
@@ -164,7 +166,7 @@ export const CompactChildState = memo(function CompactChildState({
           ))}
         </row>
       )}
-      <text {...META_TEXT} color={failure ? t.c.destructive : t.c.textWeak} ml={23} minW={0} nowrap truncate>
+      <text {...META_TEXT} color={failure ? t.c.destructive : t.c.textWeak} ml={indent} minW={0} nowrap truncate>
         {`${statusText}${elapsedLabel ? ` · ${elapsedLabel}` : ""}`}
       </text>
     </>

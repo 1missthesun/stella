@@ -2563,6 +2563,7 @@ static Electron *electron_spawn(const char *executable, char **err) {
         env_set(&env, "STELLA_LAUNCHER_ENGINE", "rune");
         env_set(&env, "STELLA_RUNE_SERVICES", "1");
         env_set(&env, "STELLA_RUNE_ROOT", rune_root);
+        env_unset(&env, "BUN_RUNTIME_TRANSPILER_CACHE_PATH");
         if (g_bun_bin) env_set(&env, "STELLA_RUNE_BUN", g_bun_bin);
         free(rune_root);
     } else {

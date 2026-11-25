@@ -416,6 +416,7 @@ final class Launcher {
                 var env = electronEnvironment()
                 env["STELLA_LAUNCHER_ENGINE"] = "rune"
                 env["STELLA_RUNE_SERVICES"] = "1"
+                env.removeValue(forKey: "BUN_RUNTIME_TRANSPILER_CACHE_PATH")
                 env["STELLA_RUNE_ROOT"] = paths.app.appendingPathComponent("packages/desktop-rune").path
                 if let runtimes { env["STELLA_RUNE_BUN"] = runtimes.bunBin.path }
                 process = try ElectronProcess(

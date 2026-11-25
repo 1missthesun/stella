@@ -123,11 +123,11 @@ const RetainedActive = createContext(true);
 
 export const useRetainedSurfaceActive = () => useContext(RetainedActive);
 
-/** desktop-ui's `RetainedSurface`: stays mounted while hidden (not drawn, not hit, not announced), so returning to it is instant. */
-export function RetainedSurface({ id, active, children, grow }: { id?: string; active: boolean; children: ReactNode; grow?: number }) {
+/** desktop-ui's `RetainedSurface`: stays mounted while hidden (not drawn, not hit, not announced), so returning to it is instant. `layered` stacks it over its siblings instead of beside them. */
+export function RetainedSurface({ id, active, children, grow, layered }: { id?: string; active: boolean; children: ReactNode; grow?: number; layered?: boolean }) {
   const shown = useRetainedSurfaceActive() && active;
   return (
-    <col id={id} hidden={!active} grow={grow} w="full" minH={0}>
+    <col id={id} hidden={!active} grow={grow} w="full" minH={0} absolute={layered ? { left: 0, top: 0, right: 0, bottom: 0 } : undefined}>
       <RetainedActive.Provider value={shown}>{children}</RetainedActive.Provider>
     </col>
   );

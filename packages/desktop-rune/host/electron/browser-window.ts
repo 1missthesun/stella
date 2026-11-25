@@ -634,13 +634,26 @@ export function openChromiumPopup(opener: WebContents, targetId: string, url: st
   return win;
 }
 
+/** window.open's `left,top,width,height` features as window options, under the open handler's overrides (as in Electron). */
+function featureOptions(features: string): Record<string, number> {
+  const keys: Record<string, string> = { left: "x", top: "y", width: "width", height: "height" };
+  const options: Record<string, number> = {};
+  for (const part of features.split(",")) {
+    const [key, value] = part.split("=").map((s) => s.trim());
+    const option = key ? keys[key] : undefined;
+    const n = Number(value);
+    if (option && value && Number.isFinite(n)) options[option] = Math.round(n);
+  }
+  return options;
+}
+
 export function openWindowFrom(openerWindow: BrowserWindow, url: string, frameName = "", features = ""): BrowserWindow | null {
   const opener = openerWindow.webContents;
   const handler = opener.getWindowOpenHandler() as ((details: unknown) => WindowOpenResponse) | null;
   const details = { url, frameName, features, disposition: "new-window", referrer: { url: opener.getURL(), policy: "default" }, postBody: undefined };
   const decision: WindowOpenResponse = handler ? handler(details) ?? { action: "deny" } : { action: "allow" };
   if (decision.action !== "allow") return null;
-  const win = new BrowserWindow({ ...(decision.overrideBrowserWindowOptions ?? {}) });
+  const win = new BrowserWindow({ ...featureOptions(features), ...(decision.overrideBrowserWindowOptions ?? {}) });
   win.opener = { window: openerWindow, frameName };
   opener.emit("did-create-window", win, { url, frameName, options: decision.overrideBrowserWindowOptions ?? {}, disposition: "new-window" });
   void win.webContents.loadURL(url || "about:blank");

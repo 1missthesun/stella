@@ -24,7 +24,7 @@ export type HostWindowsProps = {
   chrome?(window: WindowSnapshot): WindowChrome | undefined;
 };
 
-export type WindowChrome = { titlebar?: number; trafficLights?: [number, number]; dark?: boolean };
+export type WindowChrome = { titlebar?: number; trafficLights?: [number, number]; dark?: boolean; keys?: string[]; onKey?: (e: import("../../host/rune-jsx/props").KeyEvent) => void };
 
 export function HostWindows({ renderApp, skip, chrome }: HostWindowsProps) {
   const windows = useHostWindows();

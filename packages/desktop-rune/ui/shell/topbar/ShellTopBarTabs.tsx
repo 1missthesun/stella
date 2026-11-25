@@ -1,5 +1,9 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { openTabNotch } from "./open-tab-notch";
+import { useWindowKeys } from "../window-keys";
+
+const TAB_CHORDS = ["mod+t", ...Array.from({ length: 9 }, (_, i) => `mod+${i + 1}`)];
 import { fileViewer, useFileViewer } from "@/features/workspace-display/file-viewer-store";
 import { fileNameFromDisplayTabId, isDocumentTab, sidebarSections, useSidebarActiveTabId, useSidebarOpenTabs, type SidebarTab } from "@/features/workspace-display/sidebar-sections";
 import { displayTabs, useDisplayPanelOpen, useDisplayTabList } from "@/features/workspace-display/tab-store";
@@ -132,6 +136,9 @@ export function ShellTopBarTabs({ room }: { room: number }) {
   const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
   const [drag, setDrag] = useState<Drag | null>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const edges = useRef({ chatRight: 0, stripRight: 0 });
+  const syncNotch = () => openTabNotch.set(shownTabId ? (widths.current.get(shownTabId) ?? null) : null, edges.current.chatRight, edges.current.stripRight);
+  useEffect(syncNotch);
 
   useEffect(() => () => {
     if (settleTimer.current) clearTimeout(settleTimer.current);
@@ -165,32 +172,23 @@ export function ShellTopBarTabs({ room }: { room: number }) {
     return tabs.some((tab) => Math.min(labelWidths[tab.id] ?? 0, labelRoom(TAB_MAX)) > fits + 0.5);
   }, [tabs, room, chatFull, labelWidths]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      if (event.key.toLowerCase() === "t") {
-        event.preventDefault();
-        setMenuOpenState((open) => !open);
-        return;
-      }
-      if (/^[1-9]$/.test(event.key)) {
-        const index = Number(event.key) - 1;
-        if (index === 0) {
-          event.preventDefault();
-          leaveStageViewer();
-          displayTabs.setPanelOpen(false);
-          return;
-        }
-        const list = sidebarSections.getSnapshot().tabs;
-        const target = event.key === "9" ? list[list.length - 1] : list[index - 1];
-        if (!target) return;
-        event.preventDefault();
-        openTab(target);
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  useWindowKeys(TAB_CHORDS, (e) => {
+    const key = e.chord.slice(4);
+    if (key === "t") {
+      setMenuOpenState((open) => !open);
+      return;
+    }
+    const index = Number(key) - 1;
+    if (index === 0) {
+      leaveStageViewer();
+      displayTabs.setPanelOpen(false);
+      return;
+    }
+    const list = sidebarSections.getSnapshot().tabs;
+    const target = key === "9" ? list[list.length - 1] : list[index - 1];
+    if (!target) return false;
+    openTab(target);
+  });
 
   const showChat = () => {
     leaveStageViewer();
@@ -262,7 +260,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
           </text>
         ))}
       </col>
-      <row id="topbar-tab-chat" h="full" align="center" mr={6} shrink={false} hoverGroup noWindowDrag>
+      <row id="topbar-tab-chat" h="full" align="center" mr={6} shrink={false} hoverGroup noWindowDrag onLayout={(r) => { edges.current.chatRight = r.x + r.w; syncNotch(); }}>
         <box absolute={{ left: 0, right: 0, top: 6, bottom: 6 }} radius={7} fill={l.hoverFill} hoverOpacity={[0, 1]} inert />
         <row
           id="topbar-tab-chat-target"
@@ -286,7 +284,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
           {chatNeedsRoom ? null : <text {...LABEL} nowrap color={chatActive ? l.strong : l.rest} hoverColor={chatActive ? l.strong : l.hover}>Chat</text>}
         </row>
       </row>
-      <row id="topbar-tabs-strip" role="tablist" label="Tabs" h="full" align="stretch" gap={TAB_GAP} minW={0} shrink scrollX pr={8} mr={-6} noWindowDrag>
+      <row id="topbar-tabs-strip" role="tablist" label="Tabs" h="full" align="stretch" gap={TAB_GAP} minW={0} shrink scrollX pr={8} mr={-6} noWindowDrag onLayout={(r) => { edges.current.stripRight = r.x + r.w; syncNotch(); }}>
         {tabs.map((tab, index) => {
           const active = tab.id === shownTabId;
           const title = titles.get(tab.id) ?? "";
@@ -315,6 +313,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
               motion={drag && !(dragging && !drag.settling) ? { dur: 0.16 } : { dur: 0 }}
               onLayout={(r) => {
                 widths.current.set(tab.id, { x: r.x, w: r.w });
+                if (tab.id === shownTabId) syncNotch();
                 setSizes((s) => (Math.abs((s[tab.id] ?? -1) - r.w) < 0.5 ? s : { ...s, [tab.id]: r.w }));
               }}
               onDrag={(d) => onTabDrag(tab, index, d)}

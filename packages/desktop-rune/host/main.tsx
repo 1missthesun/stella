@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { createElement } from "react";
 import * as bridge from "./bridge";
 import { command, commitCtx, engine, listen, now, onEngineEvent, stats } from "./bridge";
-import { batched, render } from "./reconciler";
+import { batched, render, windowPortal } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
@@ -53,7 +53,7 @@ if (SERVICES) {
 let app = await loadApp();
 const store = createStore(app.initialState?.() ?? {});
 const g = globalThis as any;
-g.stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent };
+g.stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal };
 if (services) g.stella.host = (await import("./services/ui-host")).createUiHost();
 
 /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */

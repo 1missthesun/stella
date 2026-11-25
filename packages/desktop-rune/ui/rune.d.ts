@@ -12,6 +12,8 @@ declare global {
     engine: typeof import("../host/bridge").engine;
     on: typeof import("../host/bridge").onEngineEvent;
     now: () => number;
+    /** Renders a `<window>` as a root child from anywhere in the tree, keeping context. */
+    windowPortal: typeof import("../host/reconciler").windowPortal;
     /** The runtime's default conversation, when the host runs Stella's services. */
     chat?: { conversationId: string; send(text: string): Promise<void> };
     /** Electron main's windows, their electronAPI and message boxes, when the host runs Stella's services. */

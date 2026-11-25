@@ -183,8 +183,16 @@ its own label.
   - `onInput(value)`
   - `onSubmit(value)`: Enter; Shift+Enter is a newline when `multiline`
   - `onSelection({start,end})`: UTF-16 offsets
-  - `onPaste({files, image, text})`: fires for file and image pastes; `image` is a temp PNG path
+  - `onPaste({files, image, text})`: fires for file and image pastes; `image` is a temp PNG path.
+    With `pasteAsEvent: {minChars?, minLines?}`, a text paste at or over either threshold fires
+    it too, and that text is not inserted.
   - `onKey({key, chord, mods, value, start, end, length})`: for `keys` chords
+  - `onLines({lines, height})`: the laid-out line count, whenever it changes
+- Growth (`multiline`): `minLines`, `maxLines` and/or `maxH` grow the field with its text, then
+  scroll inside it with the caret kept in view. The box props (size, padding, paint) wrap that
+  viewport.
+- `marks: [{start, end, bg?, color?, radius?, pad?}]`: paint-only highlights over UTF-16 ranges
+  (mentions, matches). They never reshape the text.
 - Commands: `engine.input.get / set / select`, `engine.focus(id)`, `engine.blur()`.
 
 ### image, icon, video

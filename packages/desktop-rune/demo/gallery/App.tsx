@@ -72,6 +72,9 @@ function Inputs() {
   const [value, setValue] = useState("controlled");
   const [last, setLast] = useState("—");
   const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState(1);
+  const [pasted, setPasted] = useState("");
+  const at = notes.indexOf("@stella");
   return (
     <Section title="Inputs">
       <row gap={10} w="full">
@@ -84,10 +87,12 @@ function Inputs() {
         </col>
         <input id="g-secure" w={160} h={32} px={10} radius={8} fill={c.inset} border={c.border} size={14} color={c.text} secure placeholder="password" placeholderColor={c.weaker} />
       </row>
-      <input id="g-notes" w="full" minH={64} pad={10} radius={8} fill={c.inset} border={c.border} size={14} lineHeight={20}
-        color={c.text} multiline spellcheck placeholder="Multiline with spellcheck (Shift+Enter)" placeholderColor={c.weaker}
-        onInput={setNotes} />
-      <text size={12} color={c.weaker}>{`${notes.length} chars`}</text>
+      <input id="g-notes" w="full" pad={10} radius={8} fill={c.inset} border={c.border} size={14} lineHeight={20}
+        color={c.text} multiline spellcheck placeholder="Multiline: grows 2 to 5 lines, marks @stella, long pastes become events" placeholderColor={c.weaker}
+        minLines={2} maxLines={5} value={notes} onInput={setNotes} onLines={(e) => setLines(e.lines)}
+        marks={at >= 0 ? [{ start: at, end: at + 7, bg: "#4f8cff33", color: "#9cc0ff", radius: 4, pad: 2 }] : []}
+        pasteAsEvent={{ minChars: 200, minLines: 8 }} onPaste={(p) => setPasted(`${p.text.length} chars as an attachment`)} />
+      <text id="g-notes-info" size={12} color={c.weaker}>{`${notes.length} chars · ${lines} lines${pasted ? ` · pasted ${pasted}` : ""}`}</text>
     </Section>
   );
 }

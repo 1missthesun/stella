@@ -103,7 +103,7 @@ fn list(id: u32, n: &Node) -> El {
 fn growth_spec(g: &crate::props::GrowthSpecP) -> GrowthSpec {
     let mut spec = GrowthSpec::default();
     if g.dur.is_some() || g.bounce.is_some() {
-        spec.spring = rune::Spring::new(g.dur.unwrap_or(0.3).max(0.0), g.bounce.unwrap_or(0.0).clamp(-1.0, 1.0));
+        spec.spring = crate::style::spring(g.dur.unwrap_or(0.3), g.bounce.unwrap_or(0.0));
     }
     let edges = rune::edge::ALL;
     if let Some(name) = g.edge.as_deref() {

@@ -170,9 +170,17 @@ export type InputProps = Omit<TextProps, "onKey"> & {
   /** Enter (Shift+Enter types a newline in a multiline field). */
   onSubmit?: (value: string) => void;
   onSelection?: (sel: { start: number; end: number }) => void;
-  /** Files or an image pasted (text pastes natively). `image` is a PNG path. */
+  /** Files or an image pasted, or text past `pasteAsEvent` (shorter text pastes natively). `image` is a PNG path. */
   onPaste?: (p: { files: string[]; image: string | null; text: string }) => void;
   onKey?: (e: InputKeyEvent) => void;
+  /** Multiline: grow from `minLines` to `maxLines` (or `maxH`), then scroll inside with the caret kept in view. */
+  minLines?: number;
+  /** Highlights over UTF-16 ranges of the value (mentions, chips, matches). Paint only: no reshaping. */
+  marks?: { start: number; end: number; bg?: Color; color?: Color; radius?: number; pad?: number }[];
+  /** A text paste at or over either threshold isn't inserted; it fires `onPaste` with its text instead. */
+  pasteAsEvent?: { minChars?: number; minLines?: number };
+  /** The value's laid-out line count, whenever it changes. */
+  onLines?: (e: { lines: number; height: number }) => void;
 };
 
 export type ImageProps = BoxProps & {

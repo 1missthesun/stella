@@ -114,10 +114,15 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
         });
     }
     if p.listens("paste") {
+        let long = p.paste_as_event;
         e = e.on_input_paste(move |_s: &mut Win, c: &rune::ClipboardContent, tx: &mut Tx| {
             let files: Vec<String> = c.files().iter().map(|f| f.to_string_lossy().into_owned()).collect();
             let image = c.image().and_then(|img| crate::commands::save_png(img.png()));
-            if files.is_empty() && image.is_none() {
+            let text = c.text();
+            let long_text = long.is_some_and(|l| {
+                l.min_chars.is_some_and(|m| text.chars().count() >= m) || l.min_lines.is_some_and(|m| text.lines().count() >= m)
+            });
+            if files.is_empty() && image.is_none() && !long_text {
                 return false;
             }
             element_event(n, "paste", json!({ "files": files, "image": image, "text": c.text() }), Some(tx));
@@ -174,6 +179,46 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
     if p.auto_focus {
         e = e.autofocus();
     }
+    if let Some(marks) = p.marks.as_ref().filter(|m| !m.is_empty()) {
+        let value = edit.text.as_str();
+        e = e.text_highlights(marks.iter().filter_map(|m| {
+            let (a, b) = (byte_of(value, m.start), byte_of(value, m.end));
+            (a < b).then(|| {
+                let mut h = rune::TextHighlight::new(a..b, m.bg.map(|c| c.0).unwrap_or(rune::Color::TRANSPARENT));
+                if let Some(c) = m.color {
+                    h = h.color(c.0);
+                }
+                if let Some(r) = m.radius {
+                    h = h.radius(r);
+                }
+                if let Some(pad) = m.pad {
+                    h = h.pad(pad);
+                }
+                h
+            })
+        }));
+    }
+    if p.listens("lines") {
+        let line = text::style_of(p).line_px().max(1.0);
+        let last = std::cell::Cell::new(0usize);
+        e = e.on_layout(move |_s: &mut Win, r: [f32; 4]| {
+            let lines = ((r[3] / line).round() as usize).max(1);
+            if lines != last.replace(lines) {
+                element_event(n, "lines", json!({ "lines": lines, "height": r[3] }), None);
+            }
+        });
+    }
+    let grows = p.multiline && (p.max_lines.is_some() || p.min_lines.is_some() || p.max_h.is_some());
+    if grows {
+        let field = handlers(e, n, &Props { on: p.on.iter().filter(|h| h.as_str() != "layout").cloned().collect(), ..text_only(p) }, true);
+        let grown = rune::auto_grow(field, p.min_lines.unwrap_or(1), p.max_lines.unwrap_or(10_000));
+        return style::apply(rune::col().key(format!("{}-box", rune_key(n, p))).child(grown), p);
+    }
     let e = style::apply(e, p);
     handlers(e, n, p, true)
+}
+
+/// The props that belong on the field itself when its box (size, padding, paint) wraps it.
+fn text_only(p: &Props) -> Props {
+    Props { id: p.id.clone(), keys: p.keys.clone(), modal: None, ..Default::default() }
 }

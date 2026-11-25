@@ -362,6 +362,25 @@ pub struct LinkStyleP {
     pub help: Option<String>,
 }
 
+/// A highlight over UTF-16 range `start..end` of an input's value.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MarkP {
+    pub start: usize,
+    pub end: usize,
+    pub bg: Option<C>,
+    pub color: Option<C>,
+    pub radius: Option<f32>,
+    pub pad: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PasteAsEventP {
+    pub min_chars: Option<usize>,
+    pub min_lines: Option<usize>,
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DragOutP {
@@ -540,6 +559,9 @@ pub struct Props {
     pub read_only: bool,
     pub select_on_focus: bool,
     pub caret_color: Option<C>,
+    pub min_lines: Option<usize>,
+    pub marks: Option<Vec<MarkP>>,
+    pub paste_as_event: Option<PasteAsEventP>,
 
     // Image, icon, video
     pub src: Option<String>,

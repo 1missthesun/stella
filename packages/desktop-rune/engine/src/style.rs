@@ -5,9 +5,15 @@ use rune::LoopSpec;
 
 use crate::props::{EffectP, PresenceP, Props, RaiseP, Size};
 
-fn spring(dur: f32, bounce: f32) -> Spring {
-    Spring::new(dur.max(0.0), bounce.clamp(-1.0, 1.0))
+/// `dur <= 0` (or not a number) means instant: a spring that settles within one frame, since
+/// Rune's springs need a positive duration.
+pub fn spring(dur: f32, bounce: f32) -> Spring {
+    let dur = if dur.is_finite() { dur.max(INSTANT) } else { INSTANT };
+    let bounce = if bounce.is_finite() { bounce.clamp(-1.0, 1.0) } else { 0.0 };
+    Spring::new(dur, bounce)
 }
+
+const INSTANT: f32 = 0.001;
 
 pub fn layout(mut e: El, p: &Props) -> El {
     match &p.w {

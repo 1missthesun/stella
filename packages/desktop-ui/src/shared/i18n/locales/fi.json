@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Kumottu juuri",
       "update": "Päivitä",
       "updateAvailable": "Päivitys saatavilla",
+      "updateOptions": "Päivitysasetukset",
       "updatedAgo": "Päivitetty {ago}",
       "updatedJustNow": "Päivitetty juuri",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Tallenteesi jälkeen",
       "afterReply": "Kun Stella on vastannut",
       "devices": {
-        "choose": "Valitse tietokoneet",
         "thisComputer": "Tämä tietokone",
         "offline": "Saa sen, kun se on taas päällä",
         "updateThisOnly": "Päivitä vain tämä tietokone",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Päivitetty laitteelta {device} juuri nyt",
         "fromAgo": "Päivitetty laitteelta {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automaattiset päivitykset",
+        "detail": "Stella asentaa uudet versiot itse. Stellan uudelleenkäynnistävät päivitykset odottavat, kunnes siirryt toiseen sovellukseen."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,19 @@
         "retrying": "Stella yrittää hetken kuluttua uudelleen.",
         "stopped": "Yrittäminen lopetettiin. Avaa tämä keskustelu uudelleen yrittääksesi uudelleen."
       },
-      "modelNotOnPlan": "Malli ei ole käytettävissä tilauksessasi"
+      "modelNotOnPlan": "Malli ei ole käytettävissä tilauksessasi",
+      "stellaUpdated": "Stella päivitettiin",
+      "more": "Lisää"
+    },
+    "whatsNew": {
+      "title": "Uutta",
+      "releases": "Versiot",
+      "moreInRelease": "Lisää tässä versiossa",
+      "product": {
+        "mobile": "Puhelin",
+        "launcher": "Asennusohjelma",
+        "backend": "Pilvi"
+      }
     }
   },
   "sidebar": {

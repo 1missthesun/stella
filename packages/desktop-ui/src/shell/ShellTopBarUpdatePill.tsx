@@ -16,6 +16,7 @@ import { getDeviceIdOrNull } from "@/platform/electron/device-id";
 import {
   appSourceApi,
   useAppSourceState,
+  useAutoUpdate,
   versionOffer,
 } from "@/features/app-source/app-source-store";
 import {
@@ -57,7 +58,7 @@ const useOtherComputers = (enabled: boolean): OtherComputer[] => {
   );
 };
 
-const UpdateTargets = ({
+const UpdateMenu = ({
   computers,
   disabled,
   onUpdate,
@@ -67,6 +68,7 @@ const UpdateTargets = ({
   onUpdate: (targets: string[]) => void;
 }) => {
   const t = useT();
+  const auto = useAutoUpdate();
   const [open, setOpen] = useState(false);
   const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = computers.filter((computer) => !left.has(computer.id));
@@ -89,9 +91,8 @@ const UpdateTargets = ({
         <button
           type="button"
           className="shell-topbar-update-pill__more"
-          disabled={disabled}
-          aria-label={t("shell.appSource.devices.choose")}
-          title={t("shell.appSource.devices.choose")}
+          aria-label={t("shell.appSource.updateOptions")}
+          title={t("shell.appSource.updateOptions")}
           data-testid="topbar-update-targets"
         >
           <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
@@ -102,37 +103,52 @@ const UpdateTargets = ({
         className="shell-topbar-update-targets"
         data-testid="topbar-update-targets-menu"
       >
-        <DropdownMenuCheckboxItem checked disabled>
-          {t("shell.appSource.devices.thisComputer")}
-        </DropdownMenuCheckboxItem>
-        {computers.map((computer) => (
-          <DropdownMenuCheckboxItem
-            key={computer.id}
-            checked={!left.has(computer.id)}
-            onSelect={(event) => event.preventDefault()}
-            onCheckedChange={() => toggle(computer.id)}
-            data-testid="topbar-update-target"
-          >
-            <span className="shell-topbar-update-targets__name">
-              <span className="shell-topbar-update-targets__label">{computer.name}</span>
-              {computer.online ? null : (
-                <span className="shell-topbar-update-targets__hint">
-                  {t("shell.appSource.devices.offline")}
+        {computers.length > 0 ? (
+          <>
+            <DropdownMenuCheckboxItem checked disabled>
+              {t("shell.appSource.devices.thisComputer")}
+            </DropdownMenuCheckboxItem>
+            {computers.map((computer) => (
+              <DropdownMenuCheckboxItem
+                key={computer.id}
+                checked={!left.has(computer.id)}
+                disabled={disabled}
+                onSelect={(event) => event.preventDefault()}
+                onCheckedChange={() => toggle(computer.id)}
+                data-testid="topbar-update-target"
+              >
+                <span className="shell-topbar-update-targets__name">
+                  <span className="shell-topbar-update-targets__label">{computer.name}</span>
+                  {computer.online ? null : (
+                    <span className="shell-topbar-update-targets__hint">
+                      {t("shell.appSource.devices.offline")}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </DropdownMenuCheckboxItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="shell-topbar-update-targets__go"
-          onSelect={() => onUpdate(chosen.map((computer) => computer.id))}
-          data-testid="topbar-update-targets-go"
+              </DropdownMenuCheckboxItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="shell-topbar-update-targets__go"
+              disabled={disabled}
+              onSelect={() => onUpdate(chosen.map((computer) => computer.id))}
+              data-testid="topbar-update-targets-go"
+            >
+              {chosen.length === 0
+                ? t("shell.appSource.devices.updateThisOnly")
+                : t("shell.appSource.update")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
+        <DropdownMenuCheckboxItem
+          checked={auto.on}
+          onSelect={(event) => event.preventDefault()}
+          onCheckedChange={(checked) => auto.set(checked === true)}
+          data-testid="topbar-auto-update"
         >
-          {chosen.length === 0
-            ? t("shell.appSource.devices.updateThisOnly")
-            : t("shell.appSource.update")}
-        </DropdownMenuItem>
+          {t("shell.appSource.autoUpdate.label")}
+        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -157,14 +173,15 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         : t("shell.appSource.updating")
     : t("shell.appSource.update");
   const blocked = updating || state.busy || pending !== null;
-  const choose = !updating && !offer.draft && computers.length > 0 && appSourceApi() !== null;
+  const menu = appSourceApi() !== null;
+  const choose = menu && !updating && !offer.draft && computers.length > 0;
 
   return (
     <div
       className="shell-topbar-update-pill"
       data-state={updating ? "updating" : "ready"}
       data-update-transition={updating ? "live" : undefined}
-      data-split={choose ? "" : undefined}
+      data-split={menu ? "" : undefined}
     >
       <button
         type="button"
@@ -187,9 +204,9 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         />
         <span className="shell-topbar-update-pill__label">{label}</span>
       </button>
-      {choose ? (
-        <UpdateTargets
-          computers={computers}
+      {menu ? (
+        <UpdateMenu
+          computers={choose ? computers : []}
           disabled={blocked}
           onUpdate={(targets) => void run(offer.key, () => addOffer(offer, targets))}
         />

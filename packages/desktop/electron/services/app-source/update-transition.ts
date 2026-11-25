@@ -1,5 +1,5 @@
 import { savedAgeMs } from "@stella/contracts/server-clock";
-import { existsSync, promises as fs, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, promises as fs, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   type BrowserWindow,
@@ -56,6 +56,7 @@ const READY_TIMEOUT_MS = 8_000;
 const HOLD_MAX_AGE_MS = 60_000;
 const LABEL_DELAY_MS = 700;
 const HOLD_RECORD = "update-hold.json";
+const RELAUNCH_WINDOW_RECORD = "update-relaunch-window.json";
 const HOLD_IMAGE = "update-hold.jpg";
 const HOLD_MARK = "update-hold-mark.png";
 const HOLD_MARK_PX = 102;
@@ -229,6 +230,39 @@ export const pendingHold = (holdDir: string): PendingHold | null => {
     const hold = JSON.parse(readFileSync(path.join(holdDir, HOLD_RECORD), "utf8")) as UpdateHold;
     if (savedAgeMs(hold.since) > HOLD_MAX_AGE_MS || !existsSync(hold.image)) return null;
     return { backgroundColor: hold.dark ? "#1c1c1e" : "#f2f2f3", image: hold.image };
+  } catch {
+    return null;
+  }
+};
+
+export type RelaunchWindow = "focused" | "behind" | "minimized" | "hidden";
+
+const RELAUNCH_WINDOWS: RelaunchWindow[] = ["focused", "behind", "minimized", "hidden"];
+
+export const noteRelaunchWindow = (holdDir: string, win: BrowserWindow | null, focused: boolean) => {
+  const shown: RelaunchWindow =
+    !win || win.isDestroyed() || !win.isVisible()
+      ? "hidden"
+      : win.isMinimized()
+        ? "minimized"
+        : focused
+          ? "focused"
+          : "behind";
+  try {
+    mkdirSync(holdDir, { recursive: true });
+    writeFileSync(path.join(holdDir, RELAUNCH_WINDOW_RECORD), JSON.stringify({ shown, since: Date.now() }));
+  } catch {
+    return;
+  }
+};
+
+export const takeRelaunchWindow = (holdDir: string): RelaunchWindow | null => {
+  const file = path.join(holdDir, RELAUNCH_WINDOW_RECORD);
+  try {
+    const saved = JSON.parse(readFileSync(file, "utf8")) as { shown?: RelaunchWindow; since?: number };
+    rmSync(file, { force: true });
+    if (typeof saved.since !== "number" || savedAgeMs(saved.since) > HOLD_MAX_AGE_MS) return null;
+    return saved.shown && RELAUNCH_WINDOWS.includes(saved.shown) ? saved.shown : null;
   } catch {
     return null;
   }
@@ -426,7 +460,7 @@ export class UpdateTransition {
             1_000,
             "Telling the window",
           ).catch(() => {});
-          this.options.onHold?.(hold);
+          if (!win.isDestroyed() && win.isFocused()) this.options.onHold?.(hold);
         },
         release: async () => {
           await this.uncover(win);

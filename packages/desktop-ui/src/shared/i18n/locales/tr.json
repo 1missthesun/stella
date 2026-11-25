@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Az önce geri alındı",
       "update": "Güncelle",
       "updateAvailable": "Güncelleme mevcut",
+      "updateOptions": "Güncelleme seçenekleri",
       "updatedAgo": "{ago} güncellendi",
       "updatedJustNow": "Az önce güncellendi",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Kaydınızdan sonra",
       "afterReply": "Stella yanıtını bitirince",
       "devices": {
-        "choose": "Bilgisayarları seç",
         "thisComputer": "Bu bilgisayar",
         "offline": "Yeniden açıldığında alacak",
         "updateThisOnly": "Yalnızca bu bilgisayarı güncelle",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Az önce {device} üzerinden güncellendi",
         "fromAgo": "{ago} {device} üzerinden güncellendi"
+      },
+      "autoUpdate": {
+        "label": "Otomatik güncellemeler",
+        "detail": "Stella yeni sürümleri kendisi yükler. Stella'yı yeniden başlatanlar, başka bir uygulamaya geçene kadar bekler."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,19 @@
         "retrying": "Stella birazdan yeniden deneyecek.",
         "stopped": "Denemeler durduruldu. Yeniden denemek için bu sohbeti tekrar aç."
       },
-      "modelNotOnPlan": "Model planında kullanılamıyor"
+      "modelNotOnPlan": "Model planında kullanılamıyor",
+      "stellaUpdated": "Stella güncellendi",
+      "more": "Daha fazla"
+    },
+    "whatsNew": {
+      "title": "Yenilikler",
+      "releases": "Sürümler",
+      "moreInRelease": "Bu sürümde daha fazlası",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Yükleyici",
+        "backend": "Bulut"
+      }
     }
   },
   "sidebar": {

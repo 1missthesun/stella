@@ -110,6 +110,7 @@ type AppSourceServiceOptions = {
   ) => Promise<RendererApplyOutcome> | undefined;
   userQuietFor?: () => Promise<number | null>;
   isUserAway?: () => boolean;
+  stellaFocused?: () => boolean;
   recordingOpen?: () => boolean;
   replying?: () => Promise<boolean>;
   relaunch: (options?: { keepRuntime?: boolean }) => void;
@@ -165,6 +166,8 @@ type SourceAccess = {
 const STATE_POLL_MS = 10_000;
 const AUTO_APPLY_QUIET_MS = 1_500;
 const AUTO_APPLY_RETRY_MS = 500;
+const AUTO_UPDATE_POLL_MS = 5_000;
+const RELAUNCH_STATE_HOLD_MS = 60_000;
 const SWAPS_BEFORE_RELOAD = 12;
 const RELOAD_WHEN_AWAY_POLL_MS = 30_000;
 const LAUNCH_SYNC_DELAY_MS = 5_000;
@@ -212,6 +215,7 @@ const EMPTY_STATE: AppSourceState = {
   waiting: [],
   skipped: [],
   busy: false,
+  autoUpdate: true,
 };
 
 type Offer = { tip: string; real: boolean; catchUp: boolean };
@@ -224,6 +228,17 @@ class PlainFailure extends Error {
     super(message);
   }
 }
+
+const installsItself = (record: PreparedUpdate | null): record is PreparedUpdate & { to: string } =>
+  Boolean(record?.to && (record.gate === null || record.gate.ok));
+
+const reloadsWindow = (paths: string[]) =>
+  paths.some(
+    (file) =>
+      file === "bun.lock" ||
+      (file.startsWith("packages/desktop-ui/") &&
+        (file.endsWith(".html") || file.startsWith("packages/desktop-ui/public/"))),
+  );
 
 const checkoutRefusal = () =>
   new PlainFailure(
@@ -299,6 +314,7 @@ export class AppSourceService {
   private publishedState = JSON.stringify(EMPTY_STATE);
   private queue: Promise<unknown> = Promise.resolve();
   private busy = false;
+  private relaunching = false;
   private heldForRecording = false;
   private heldForReply = false;
   private refreshing: Promise<void> | null = null;
@@ -343,6 +359,9 @@ export class AppSourceService {
   private readonly autoTried = new Set<string>();
   private readonly toldTasks = new Set<string>();
   private autoTimer: NodeJS.Timeout | null = null;
+  private autoVersion: string | null = null;
+  private autoUpdateTimer: NodeJS.Timeout | null = null;
+  private readonly disruptions = new Map<string, boolean>();
   private reloadTimer: NodeJS.Timeout | null = null;
   private readonly preparer: UpdatePreparer;
   private update: AppSourceUpdate | null = null;
@@ -450,6 +469,8 @@ export class AppSourceService {
     this.syncTimer = null;
     if (this.autoTimer) clearTimeout(this.autoTimer);
     this.autoTimer = null;
+    if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
+    this.autoUpdateTimer = null;
     if (this.wantTimer) clearTimeout(this.wantTimer);
     this.wantTimer = null;
     this.updateWatch?.stop();
@@ -469,7 +490,9 @@ export class AppSourceService {
   }
 
   applyDraft(name: string) {
-    return this.exclusive((cwd) => this.takeDraft(cwd, name));
+    return this.exclusive((cwd) =>
+      this.takeDraft(cwd, name, isUpdateDraft(name) ? (to) => this.noteVersionIn(cwd, to) : undefined),
+    );
   }
 
   private async takeDraft(cwd: string, name: string, after?: (to: string) => Promise<void>) {
@@ -662,26 +685,28 @@ export class AppSourceService {
   }
 
   applyUpstream(targets: string[] | null = null) {
-    return this.exclusive(async (cwd) => {
-      if (!this.upstreamTracked) throw new PlainFailure("nothing", "No update is available.");
-      const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
-      const head = await git(cwd, ["rev-parse", "HEAD"]);
-      if (await isAncestor(cwd, version, head)) throw new PlainFailure("nothing", "No update is available.");
-      await this.announceApply(version, targets);
-      const target = await this.updateTarget(cwd, head, version);
-      const prepared = await this.preparer.recordFor(head, target.tip);
-      const found = prepared ?? (await this.preparer.peek(head, target.tip));
-      const wanted: Wanted = { kind: "version", version, from: null, at: Date.now() };
-      if (!prepared && found?.plan?.kind === "conflict") {
-        const modelTried = found.resolve === "model" || Boolean(this.update?.version === version && this.update.unresolved);
-        if (this.waitingOnOther(version) || (!modelTried && this.options.modelResolve)) {
-          await this.want(wanted);
-          this.options.log("app-source.update-wanted", { version: version.slice(0, 12) });
-          return { background: true as const };
-        }
+    return this.exclusive((cwd) => this.startUpstream(cwd, targets, false));
+  }
+
+  private async startUpstream(cwd: string, targets: string[] | null, auto: boolean) {
+    if (!this.upstreamTracked) throw new PlainFailure("nothing", "No update is available.");
+    const version = await git(cwd, ["rev-parse", "--verify", `${UPSTREAM_REF}^{commit}`]);
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    if (await isAncestor(cwd, version, head)) throw new PlainFailure("nothing", "No update is available.");
+    if (!auto) await this.announceApply(version, targets);
+    const target = await this.updateTarget(cwd, head, version);
+    const prepared = await this.preparer.recordFor(head, target.tip);
+    const found = prepared ?? (await this.preparer.peek(head, target.tip));
+    const wanted: Wanted = { kind: "version", version, from: null, at: Date.now(), ...(auto ? { auto: true as const } : {}) };
+    if (!prepared && found?.plan?.kind === "conflict") {
+      const modelTried = found.resolve === "model" || Boolean(this.update?.version === version && this.update.unresolved);
+      if (this.waitingOnOther(version) || (!modelTried && this.options.modelResolve)) {
+        await this.want(wanted);
+        this.options.log("app-source.update-wanted", { version: version.slice(0, 12), auto });
+        return { background: true as const };
       }
-      return await this.takeUpstream(cwd);
-    });
+    }
+    return await this.takeUpstream(cwd, auto ? wanted : undefined);
   }
 
   private async take(
@@ -706,17 +731,14 @@ export class AppSourceService {
     });
     if (plan.kind === "none") throw new PlainFailure("nothing", source.emptyMessage);
     let to = plan.kind === "fast-forward" ? plan.tip : "";
+    const handOff = (brief: AgentBrief) => this.dispatchMerge(cwd, source, brief);
     if (plan.kind === "conflict" && !prepared?.to) {
-      return await this.dispatchMerge(cwd, source, source.brief(plan, head));
+      return await handOff(source.brief(plan, head));
     }
     if (plan.kind !== "fast-forward" && prepared?.to) {
       to = prepared.to;
       if (prepared.gate && !prepared.gate.ok) {
-        return await this.dispatchMerge(
-          cwd,
-          source,
-          source.brief(plan, head, prepared.gate.output),
-        );
+        return await handOff(source.brief(plan, head, prepared.gate.output));
       }
     } else if (plan.kind === "clean") {
       to = await git(
@@ -742,11 +764,7 @@ export class AppSourceService {
         );
         this.mark("gate");
         if (!gate.ok) {
-          return await this.dispatchMerge(
-            cwd,
-            source,
-            source.brief(plan, head, gate.output),
-          );
+          return await handOff(source.brief(plan, head, gate.output));
         }
       }
     }
@@ -881,6 +899,7 @@ export class AppSourceService {
         ms: Date.now() - record.since,
       });
       await this.setMerge(cwd, null);
+      if (record.from === "upstream" && status !== "ready") await this.dropAutoWanted();
     }
     return { record, status };
   }
@@ -1055,6 +1074,7 @@ export class AppSourceService {
         this.mark("hold");
         phase = "relaunching";
         this.logTimeline("relaunch");
+        this.holdStateForRelaunch();
         this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
         return;
       }
@@ -1131,7 +1151,7 @@ export class AppSourceService {
   private reloadWhenAway() {
     if (this.reloadTimer || this.disposed) return;
     const timer = setInterval(() => {
-      if (this.busy || !this.options.isUserAway?.()) return;
+      if (this.busy || this.stellaInFront()) return;
       clearInterval(timer);
       this.reloadTimer = null;
       this.queue = this.queue.then(async () => {
@@ -1288,8 +1308,18 @@ export class AppSourceService {
     this.publish({ ...this.state, busy });
   }
 
+  private holdStateForRelaunch() {
+    this.relaunching = true;
+    const timer = setTimeout(() => {
+      this.relaunching = false;
+      void this.refresh();
+    }, RELAUNCH_STATE_HOLD_MS);
+    timer.unref?.();
+  }
+
   private publish(next: AppSourceState) {
     this.state = next;
+    if (this.relaunching) return;
     const json = JSON.stringify(next);
     if (json === this.publishedState) return;
     this.publishedState = json;
@@ -1315,6 +1345,7 @@ export class AppSourceService {
           });
           this.considerAutoApply(this.state);
           this.considerWanted(this.state);
+          this.considerAutoUpdate(this.state);
         } catch (error) {
           this.options.log("app-source.refresh-failed", {
             message: errorMessage(error),
@@ -1348,6 +1379,7 @@ export class AppSourceService {
         developerCheckout: true,
         waiting: [],
         skipped: [],
+        autoUpdate: true,
       };
     }
     const inProgress = new Set(worktrees.map((tree) => tree.branch));
@@ -1420,6 +1452,7 @@ export class AppSourceService {
     let conflicts: AppSourceConflicts | undefined;
     this.versionReady = null;
     this.versionConflicts = null;
+    this.autoVersion = null;
     const version = upstreamOffer?.real ? upstreamOffer.tip : null;
     if (version) {
       const target = await this.updateTarget(cwd, head, version);
@@ -1444,6 +1477,7 @@ export class AppSourceService {
         upstreamShown = ready;
         if (ready && record?.to) this.versionReady = version;
       }
+      if (ready && target.ref === UPSTREAM_REF) this.autoVersion = version;
     }
     const wantedVersion =
       version !== null &&
@@ -1483,6 +1517,10 @@ export class AppSourceService {
         ? draft.name === mergeDraftName(versionTip)
         : isUpdateDraft(draft.name),
     );
+    const autoReady =
+      version !== null &&
+      (updateDraft !== undefined || this.versionReady === version) &&
+      intent.wanted.some((entry) => entry.kind === "version" && entry.version === version && entry.auto);
     if (versionTip || updateDraft) {
       const agentId =
         updateDraft?.agentId ??
@@ -1490,7 +1528,7 @@ export class AppSourceService {
       offered.push({
         kind: "version",
         key: `version:${versionTip ?? updateDraft!.sha}`,
-        adding: merging === "upstream" || wantedVersion,
+        adding: merging === "upstream" || (wantedVersion && !autoReady),
         ...(updateDraft ? { draft: updateDraft.name } : {}),
         ...(agentId ? { agentId } : {}),
         ...(conflicts && !updateDraft && merging !== "upstream" && !wantedVersion ? { conflicts } : {}),
@@ -1557,7 +1595,7 @@ export class AppSourceService {
     const skipped = skippedNow;
     await this.pruneWanted(cwd, head, intent, drafts, worktrees);
     const arrived =
-      intent.arrived && (intent.arrived.revert ?? intent.arrived.sha) === head
+      intent.arrived && (await isAncestor(cwd, intent.arrived.revert ?? intent.arrived.sha, head))
         ? intent.arrived
         : null;
     return {
@@ -1578,6 +1616,7 @@ export class AppSourceService {
       upstream: upstream ?? NO_UPSTREAM,
       recent,
       developerCheckout: false,
+      autoUpdate: intent.autoUpdate,
       ...(this.notShared ? { notShared: this.notShared } : {}),
       waiting: offered.filter((offer) => offer.adding || !skipped.has(offer.key)),
       skipped: offered.filter((offer) => !offer.adding && skipped.has(offer.key)),
@@ -1954,6 +1993,8 @@ export class AppSourceService {
     const intent = this.intent;
     if (!intent || intent.wanted.length === 0) return;
     let action: (() => Promise<AppSourceActionResult>) | null = null;
+    let applies: (() => Promise<string | null>) | null = null;
+    let auto = false;
     let label = "";
     for (const entry of intent.wanted) {
       if (entry.kind === "version") {
@@ -1962,11 +2003,14 @@ export class AppSourceService {
             candidate.kind === "version" && candidate.key === `version:${entry.version}`,
         );
         if (!offer) continue;
+        auto = entry.auto === true;
         if (offer.draft) {
           const name = offer.draft;
           action = () => this.applyDraftFor(name, entry);
+          applies = () => this.draftTip(name);
         } else if (this.versionReady === entry.version) {
           action = () => this.exclusive((cwd) => this.takeUpstream(cwd, entry));
+          applies = () => this.preparedTo(entry.version);
         } else if (!entry.task && this.versionNeedsTask(entry)) {
           action = async () => {
             if (!this.versionNeedsTask(entry)) return { ok: true };
@@ -1988,14 +2032,28 @@ export class AppSourceService {
     }
     if (!action) return;
     const run = action;
+    const lands = auto ? applies : null;
     const attempt = async () => {
       this.wantTimer = null;
       if (this.disposed || this.state.merging) return;
-      const quiet = this.busy ? 0 : ((await this.options.userQuietFor?.()) ?? Infinity);
-      if (quiet < AUTO_APPLY_QUIET_MS) {
-        this.wantTimer = setTimeout(() => void attempt(), AUTO_APPLY_RETRY_MS);
-        this.wantTimer.unref?.();
-        return;
+      if (auto && !this.intent?.autoUpdate) return;
+      if (lands) {
+        const to = await lands().catch(() => null);
+        const restart = to ? await this.disrupts(to).catch(() => true) : true;
+        const moment = await this.quietMoment(restart);
+        if (!moment) {
+          this.wantTimer = setTimeout(() => void attempt(), AUTO_UPDATE_POLL_MS);
+          this.wantTimer.unref?.();
+          return;
+        }
+        this.options.log("app-source.auto-update", { what: label, restart, moment });
+      } else {
+        const quiet = this.busy ? 0 : ((await this.options.userQuietFor?.()) ?? Infinity);
+        if (quiet < AUTO_APPLY_QUIET_MS) {
+          this.wantTimer = setTimeout(() => void attempt(), AUTO_APPLY_RETRY_MS);
+          this.wantTimer.unref?.();
+          return;
+        }
       }
       const result = await run();
       this.options.log("app-source.wanted-applied", {
@@ -2037,6 +2095,159 @@ export class AppSourceService {
     });
   }
 
+  private async noteVersionIn(cwd: string, to: string) {
+    const version = (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${UPSTREAM_REF}^{commit}`])).stdout.trim();
+    if (!version || !(await isAncestor(cwd, version, to))) return;
+    await this.noteArrived({ kind: "version", version, from: null, at: Date.now() }, to);
+  }
+
+  private considerAutoUpdate(state: AppSourceState) {
+    const version = this.autoVersion;
+    if (!version || this.autoUpdateTimer || this.disposed || state.busy || state.merging) return;
+    if (!this.autoOffer(version)) return;
+    const intent = this.intent;
+    if (!intent?.autoUpdate || intent.wanted.length > 0 || intent.autoTried.includes(version)) return;
+    this.autoUpdateTimer = setTimeout(() => void this.attemptAutoUpdate(version), 0);
+    this.autoUpdateTimer.unref?.();
+  }
+
+  private autoOffer(version: string) {
+    const offer = this.state.waiting.find(
+      (entry): entry is Extract<AppSourceWaiting, { kind: "version" }> =>
+        entry.kind === "version" && entry.key === `version:${version}`,
+    );
+    return offer && !offer.adding ? offer : null;
+  }
+
+  private async attemptAutoUpdate(version: string) {
+    this.autoUpdateTimer = null;
+    if (this.disposed || this.autoVersion !== version) return;
+    const intent = this.intent;
+    if (
+      this.busy ||
+      this.state.merging ||
+      !intent?.autoUpdate ||
+      intent.wanted.length > 0 ||
+      intent.autoTried.includes(version)
+    ) {
+      return;
+    }
+    const offer = this.autoOffer(version);
+    if (!offer) return;
+    const cwd = this.options.stellaAppDir;
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const record = offer.draft ? null : await this.preparer.peek(head, version);
+    const entry: Wanted = { kind: "version", version, from: null, at: Date.now(), auto: true };
+    if (installsItself(record)) {
+      const restart = await this.disrupts(record.to).catch(() => null);
+      const moment = restart === null ? null : await this.quietMoment(restart);
+      if (!moment) {
+        this.autoUpdateTimer = setTimeout(() => void this.attemptAutoUpdate(version), AUTO_UPDATE_POLL_MS);
+        this.autoUpdateTimer.unref?.();
+        return;
+      }
+      await this.markAutoTried(version);
+      this.options.log("app-source.auto-update", { version: version.slice(0, 12), restart, moment });
+      const key = `version:${version}`;
+      this.publish({
+        ...this.state,
+        waiting: this.state.waiting.map((other) => (other.key === key ? { ...other, adding: true } : other)),
+      });
+      const result = await this.exclusive((cwd) => this.takeUpstream(cwd, entry));
+      this.options.log("app-source.auto-update-done", {
+        version: version.slice(0, 12),
+        ok: result.ok,
+        ...(result.ok ? { background: result.background === true } : { reason: result.reason, error: result.error }),
+      });
+      return;
+    }
+    await this.markAutoTried(version);
+    this.options.log("app-source.auto-merge", { version: version.slice(0, 12), draft: offer.draft ?? null });
+    if (offer.draft) {
+      await this.want(entry);
+      void this.refresh();
+      return;
+    }
+    const result = await this.exclusive((cwd) => this.startUpstream(cwd, null, true));
+    this.options.log("app-source.auto-merge-started", {
+      version: version.slice(0, 12),
+      ok: result.ok,
+      ...(result.ok ? { background: result.background === true } : { reason: result.reason, error: result.error }),
+    });
+  }
+
+  private markAutoTried(version: string) {
+    return this.saveIntent((intent) => {
+      intent.autoTried = [...intent.autoTried.filter((tried) => tried !== version), version];
+    });
+  }
+
+  private async dropAutoWanted() {
+    if (!(await this.loadIntent()).wanted.some((entry) => entry.kind === "version" && entry.auto)) return;
+    await this.saveIntent((intent) => {
+      intent.wanted = intent.wanted.filter((entry) => !(entry.kind === "version" && entry.auto));
+    });
+    this.options.log("app-source.auto-merge-dropped", {});
+  }
+
+  async setAutoUpdate(on: boolean): Promise<AppSourceActionResult> {
+    await this.saveIntent((intent) => {
+      intent.autoUpdate = on;
+    });
+    if (!on) {
+      await this.dropAutoWanted();
+      if (this.autoUpdateTimer) clearTimeout(this.autoUpdateTimer);
+      this.autoUpdateTimer = null;
+    }
+    this.options.log("app-source.auto-update-set", { on });
+    void this.refresh();
+    return { ok: true };
+  }
+
+  private async draftTip(name: string) {
+    const cwd = this.options.stellaAppDir;
+    return (
+      (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${DRAFT_REF_PREFIX}${name}^{commit}`])).stdout.trim() ||
+      null
+    );
+  }
+
+  private async preparedTo(version: string) {
+    const cwd = this.options.stellaAppDir;
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const target = await this.updateTarget(cwd, head, version);
+    return (await this.preparer.peek(head, target.tip))?.to ?? null;
+  }
+
+  private async disrupts(to: string) {
+    const cwd = this.options.stellaAppDir;
+    const head = await git(cwd, ["rev-parse", "HEAD"]);
+    const key = `${head}:${to}`;
+    const known = this.disruptions.get(key);
+    if (known !== undefined) return known;
+    const paths = (await git(cwd, ["diff", "--name-only", head, to])).split("\n").filter(Boolean);
+    const restart =
+      relaunches(paths) ||
+      restartsRuntime(paths) ||
+      reloadsWindow(paths) ||
+      (await changesMainBundle(cwd, paths));
+    this.disruptions.set(key, restart);
+    return restart;
+  }
+
+  private stellaInFront() {
+    return this.options.stellaFocused ? this.options.stellaFocused() : !this.options.isUserAway?.();
+  }
+
+  private async quietMoment(restart: boolean): Promise<"away" | "unfocused" | "quiet" | null> {
+    if (this.options.recordingOpen?.()) return null;
+    if (await this.options.replying?.().catch(() => true)) return null;
+    if (!this.stellaInFront()) return this.options.isUserAway?.() ? "away" : "unfocused";
+    if (restart) return null;
+    const quiet = this.busy ? 0 : ((await this.options.userQuietFor?.().catch(() => 0)) ?? Infinity);
+    return quiet >= AUTO_APPLY_QUIET_MS ? "quiet" : null;
+  }
+
   private applyDraftFor(name: string, entry: Wanted) {
     return this.exclusive((cwd) => this.takeDraft(cwd, name, (to) => this.noteArrived(entry, to)));
   }
@@ -2057,7 +2268,7 @@ export class AppSourceService {
       brief: upstreamMergeBrief,
       pendingDraft: mergeDraftName(version),
       pendingDraftExists: false,
-      ...(wanted ? { settle: (to: string) => this.noteArrived(entry, to) } : {}),
+      settle: (to: string) => this.noteArrived(entry, to),
       wanted: { ...entry, task: true },
     });
   }

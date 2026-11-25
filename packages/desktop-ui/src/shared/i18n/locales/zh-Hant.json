@@ -2701,6 +2701,7 @@
       "undoneJustNow": "剛剛復原",
       "update": "更新",
       "updateAvailable": "有可用的更新",
+      "updateOptions": "更新選項",
       "updatedAgo": "{ago}更新",
       "updatedJustNow": "剛剛更新",
       "updates": {
@@ -2731,7 +2732,6 @@
       "afterRecording": "錄製結束後",
       "afterReply": "等 Stella 回覆完",
       "devices": {
-        "choose": "選擇電腦",
         "thisComputer": "這台電腦",
         "offline": "重新開機後就會更新",
         "updateThisOnly": "只更新這台電腦",
@@ -2745,6 +2745,10 @@
       "arrived": {
         "fromJustNow": "剛剛從 {device} 更新",
         "fromAgo": "{ago}從 {device} 更新"
+      },
+      "autoUpdate": {
+        "label": "自動更新",
+        "detail": "Stella 會自行安裝新版本。需要重新啟動 Stella 的更新會等你切換到其他 App 後再安裝。"
       }
     },
     "audioPlayer": {
@@ -3091,7 +3095,19 @@
         "retrying": "Stella 稍後會重試。",
         "stopped": "已停止重試。重新開啟這個聊天即可再試一次。"
       },
-      "modelNotOnPlan": "你的方案不支援此模型"
+      "modelNotOnPlan": "你的方案不支援此模型",
+      "stellaUpdated": "Stella 已更新",
+      "more": "更多"
+    },
+    "whatsNew": {
+      "title": "新功能",
+      "releases": "版本",
+      "moreInRelease": "此版本的更多內容",
+      "product": {
+        "mobile": "手機",
+        "launcher": "安裝程式",
+        "backend": "雲端"
+      }
     }
   },
   "sidebar": {

@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Gerade rückgängig gemacht",
       "update": "Update",
       "updateAvailable": "Update verfügbar",
+      "updateOptions": "Update-Optionen",
       "updatedAgo": "Aktualisiert {ago}",
       "updatedJustNow": "Gerade aktualisiert",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Nach deiner Aufnahme",
       "afterReply": "Wenn Stella fertig geantwortet hat",
       "devices": {
-        "choose": "Computer auswählen",
         "thisComputer": "Dieser Computer",
         "offline": "Bekommt es, sobald er wieder an ist",
         "updateThisOnly": "Nur diesen Computer aktualisieren",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Gerade eben von {device} aktualisiert",
         "fromAgo": "{ago} von {device} aktualisiert"
+      },
+      "autoUpdate": {
+        "label": "Automatische Updates",
+        "detail": "Stella installiert neue Versionen selbst. Updates, die Stella neu starten, warten, bis du zu einer anderen App wechselst."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,19 @@
         "retrying": "Stella versucht es gleich noch einmal.",
         "stopped": "Keine weiteren Versuche. Öffne diesen Chat erneut, um es noch einmal zu versuchen."
       },
-      "modelNotOnPlan": "Modell in deinem Tarif nicht verfügbar"
+      "modelNotOnPlan": "Modell in deinem Tarif nicht verfügbar",
+      "stellaUpdated": "Stella wurde aktualisiert",
+      "more": "Mehr"
+    },
+    "whatsNew": {
+      "title": "Neuigkeiten",
+      "releases": "Versionen",
+      "moreInRelease": "Mehr in dieser Version",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Installationsprogramm",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

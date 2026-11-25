@@ -25,6 +25,12 @@ that we publish, plus a private fork per user.
   are off the app. Applying fast-forwards the checkout and pushes it to the
   user's fork; Undo reverts. The agent workflow is the seeded skill
   `packages/home-seed/skills/modify-stella/SKILL.md`.
+- A published version applies itself once it builds (once per version, while
+  Automatic updates is on): an in-place interface change after a short
+  pause, anything that restarts or reloads only while Stella is unfocused. One
+  that clashes with the user's changes is merged first, as Update would.
+  Release notes live in `packages/contracts/stella-releases.ts`,
+  shared by stella.sh's What's New page and the desktop's What's new window.
 - An interface change is taken in place when every module that must load
   again only declares things (`electron/source/module-state.ts`; the app root
   is rendered again, the page and its stores stay). Anything else reloads the

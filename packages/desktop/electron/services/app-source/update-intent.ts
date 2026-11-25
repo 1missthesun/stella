@@ -8,6 +8,7 @@ export type Wanted =
       from: { deviceId: string; device: string } | null;
       at: number;
       task?: true;
+      auto?: true;
     }
   | { kind: "draft"; name: string; at: number };
 
@@ -23,13 +24,17 @@ export type UpdateIntent = {
   wanted: Wanted[];
   arrived: Arrived | null;
   handled: string[];
+  autoTried: string[];
+  autoUpdate: boolean;
 };
 
 const FILE = "stella-update-intent.json";
 export const WANTED_MAX_AGE_MS = 24 * 60 * 60_000;
 const HANDLED_KEEP = 50;
+const AUTO_TRIED_KEEP = 20;
 
-const EMPTY: UpdateIntent = { wanted: [], arrived: null, handled: [] };
+const strings = (value: unknown) =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 
 const isWanted = (value: unknown): value is Wanted => {
   const entry = value as Partial<Wanted> | null;
@@ -50,18 +55,22 @@ export const readIntent = async (commonDir: string): Promise<UpdateIntent> => {
         value.arrived && typeof value.arrived.sha === "string" && typeof value.arrived.at === "number"
           ? value.arrived
           : null,
-      handled: Array.isArray(value.handled)
-        ? value.handled.filter((key): key is string => typeof key === "string")
-        : [],
+      handled: strings(value.handled),
+      autoTried: strings(value.autoTried),
+      autoUpdate: value.autoUpdate !== false,
     };
   } catch {
-    return { ...EMPTY, wanted: [], handled: [] };
+    return { wanted: [], arrived: null, handled: [], autoTried: [], autoUpdate: true };
   }
 };
 
 export const writeIntent = async (commonDir: string, intent: UpdateIntent) => {
   const file = path.join(commonDir, FILE);
-  const kept: UpdateIntent = { ...intent, handled: intent.handled.slice(-HANDLED_KEEP) };
+  const kept: UpdateIntent = {
+    ...intent,
+    handled: intent.handled.slice(-HANDLED_KEEP),
+    autoTried: intent.autoTried.slice(-AUTO_TRIED_KEEP),
+  };
   const staging = `${file}.${process.pid}.tmp`;
   await fs.writeFile(staging, JSON.stringify(kept));
   await fs.rename(staging, file);

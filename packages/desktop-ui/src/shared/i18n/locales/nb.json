@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Angret nå nettopp",
       "update": "Oppdater",
       "updateAvailable": "Oppdatering tilgjengelig",
+      "updateOptions": "Oppdateringsvalg",
       "updatedAgo": "Oppdatert {ago}",
       "updatedJustNow": "Oppdatert nå nettopp",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "Etter opptaket ditt",
       "afterReply": "Når Stella har svart ferdig",
       "devices": {
-        "choose": "Velg datamaskiner",
         "thisComputer": "Denne datamaskinen",
         "offline": "Får den når den er på igjen",
         "updateThisOnly": "Oppdater bare denne datamaskinen",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Oppdatert fra {device} akkurat nå",
         "fromAgo": "Oppdatert fra {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatiske oppdateringer",
+        "detail": "Stella installerer nye versjoner selv. De som starter Stella på nytt, venter til du bytter til en annen app."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,19 @@
         "retrying": "Stella prøver igjen om et øyeblikk.",
         "stopped": "Sluttet å prøve. Åpne denne chatten på nytt for å prøve igjen."
       },
-      "modelNotOnPlan": "Modellen er ikke tilgjengelig i abonnementet ditt"
+      "modelNotOnPlan": "Modellen er ikke tilgjengelig i abonnementet ditt",
+      "stellaUpdated": "Stella er oppdatert",
+      "more": "Mer"
+    },
+    "whatsNew": {
+      "title": "Nyheter",
+      "releases": "Utgivelser",
+      "moreInRelease": "Mer i denne utgivelsen",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Installasjonsprogram",
+        "backend": "Sky"
+      }
     }
   },
   "sidebar": {

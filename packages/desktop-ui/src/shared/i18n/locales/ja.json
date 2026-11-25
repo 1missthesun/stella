@@ -2701,6 +2701,7 @@
       "undoneJustNow": "たった今元に戻しました",
       "update": "アップデート",
       "updateAvailable": "アップデートがあります",
+      "updateOptions": "アップデートのオプション",
       "updatedAgo": "{ago}に更新",
       "updatedJustNow": "たった今更新",
       "updates": {
@@ -2731,7 +2732,6 @@
       "afterRecording": "録画の終了後",
       "afterReply": "Stellaの返信が終わったら",
       "devices": {
-        "choose": "コンピュータを選ぶ",
         "thisComputer": "このコンピュータ",
         "offline": "次に起動したときに適用されます",
         "updateThisOnly": "このコンピュータだけ更新",
@@ -2745,6 +2745,10 @@
       "arrived": {
         "fromJustNow": "たった今 {device} から更新",
         "fromAgo": "{ago}に {device} から更新"
+      },
+      "autoUpdate": {
+        "label": "自動アップデート",
+        "detail": "Stella は新しいバージョンを自動でインストールします。Stella の再起動が必要なものは、ほかのアプリに切り替えるまで待ちます。"
       }
     },
     "audioPlayer": {
@@ -3091,7 +3095,19 @@
         "retrying": "Stella はまもなく再試行します。",
         "stopped": "再試行を停止しました。もう一度試すには、このチャットを開き直してください。"
       },
-      "modelNotOnPlan": "このモデルはご利用のプランでは使えません"
+      "modelNotOnPlan": "このモデルはご利用のプランでは使えません",
+      "stellaUpdated": "Stella をアップデートしました",
+      "more": "詳細"
+    },
+    "whatsNew": {
+      "title": "新機能",
+      "releases": "リリース",
+      "moreInRelease": "このリリースのその他の変更",
+      "product": {
+        "mobile": "スマートフォン",
+        "launcher": "インストーラ",
+        "backend": "クラウド"
+      }
     }
   },
   "sidebar": {

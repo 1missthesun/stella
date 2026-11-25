@@ -2734,6 +2734,7 @@
       "undoneJustNow": "Только что отменено",
       "update": "Обновить",
       "updateAvailable": "Доступно обновление",
+      "updateOptions": "Параметры обновления",
       "updatedAgo": "Обновлено {ago}",
       "updatedJustNow": "Только что обновлено",
       "updates": {
@@ -2764,7 +2765,6 @@
       "afterRecording": "После записи",
       "afterReply": "Когда Stella закончит ответ",
       "devices": {
-        "choose": "Выбрать компьютеры",
         "thisComputer": "Этот компьютер",
         "offline": "Получит, когда снова включится",
         "updateThisOnly": "Обновить только этот компьютер",
@@ -2778,6 +2778,10 @@
       "arrived": {
         "fromJustNow": "Обновлено с {device} только что",
         "fromAgo": "Обновлено с {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Автоматические обновления",
+        "detail": "Stella сама устанавливает новые версии. Обновления, которые перезапускают Stella, ждут, пока вы не переключитесь в другое приложение."
       }
     },
     "audioPlayer": {
@@ -3147,7 +3151,19 @@
         "retrying": "Stella попробует снова через мгновение.",
         "stopped": "Попытки остановлены. Откройте этот чат заново, чтобы попробовать ещё раз."
       },
-      "modelNotOnPlan": "Модель недоступна в вашем тарифе"
+      "modelNotOnPlan": "Модель недоступна в вашем тарифе",
+      "stellaUpdated": "Stella обновлена",
+      "more": "Подробнее"
+    },
+    "whatsNew": {
+      "title": "Что нового",
+      "releases": "Выпуски",
+      "moreInRelease": "Ещё в этом выпуске",
+      "product": {
+        "mobile": "Телефон",
+        "launcher": "Установщик",
+        "backend": "Облако"
+      }
     }
   },
   "sidebar": {

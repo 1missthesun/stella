@@ -15,7 +15,13 @@ export type NotificationAction = {
   primary?: boolean;
   disabled?: boolean;
   keep?: boolean;
+  panelOnly?: boolean;
   run: () => void | Promise<unknown>;
+};
+
+export type NotificationLink = {
+  label: string;
+  run: () => void;
 };
 
 export type NotificationInput = {
@@ -23,6 +29,7 @@ export type NotificationInput = {
   kind: NotificationKind;
   title: string;
   detail?: string;
+  more?: NotificationLink;
   createdAt?: number;
   busy?: boolean;
   busyLabel?: string;
@@ -97,10 +104,11 @@ const signature = (item: NotificationInput | AppNotification) =>
     item.kind,
     item.title,
     item.detail ?? "",
+    item.more?.label ?? "",
     item.busy ?? false,
     item.busyLabel ?? "",
     item.createdAt ?? 0,
-    (item.actions ?? []).map((action) => [action.label, action.primary, action.disabled, action.keep]),
+    (item.actions ?? []).map((action) => [action.label, action.primary, action.disabled, action.keep, action.panelOnly]),
   ]);
 
 const upsert = (input: NotificationInput, source: string | null): void => {
@@ -112,7 +120,7 @@ const upsert = (input: NotificationInput, source: string | null): void => {
       source,
     };
     if (signature(next) === signature(existing)) {
-      Object.assign(existing, { actions: input.actions, onDismiss: input.onDismiss });
+      Object.assign(existing, { actions: input.actions, more: input.more, onDismiss: input.onDismiss });
       return;
     }
     set({ items: state.items.map((item) => (item.id === input.id ? next : item)) });

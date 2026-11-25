@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "rune-jsx",
+    "paths": { "rune-jsx/*": ["./host/rune-jsx/*"] },
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["host/**/*.ts", "host/**/*.tsx", "ui/**/*.ts", "ui/**/*.tsx", "scripts/**/*.ts"],
+  "exclude": ["node_modules", ".hot"]
+}

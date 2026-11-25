@@ -1,0 +1,49 @@
+[package]
+name = "stella-engine"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "stella-engine"
+path = "src/main.rs"
+
+[dependencies]
+rune = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087", features = ["tooling"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wry = { version = "0.58", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { version = "0.19", optional = true }
+
+[features]
+default = ["webview"]
+webview = ["dep:wry", "dep:gtk"]
+
+[patch.crates-io]
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "c8acdcff68020f8894999bb70a558b8251f48087" }
+
+[profile.release]
+codegen-units = 16
+incremental = true
+
+[profile.dist]
+inherits = "release"
+codegen-units = 1
+incremental = false
+lto = "thin"
+strip = true
+
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = false

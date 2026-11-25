@@ -1,4 +1,4 @@
-import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
+import { SettingsTabHeader } from "@/global/settings/AiryControls";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { UserAskStoredSecureValue } from "@stella/contracts/user-ask";
 import type { SavedValuesSyncAction } from "@stella/contracts/saved-values";
@@ -134,10 +134,12 @@ export function SecureValuesCard() {
   );
 
   return (
-    <div className="settings-card" data-testid="secure-values-card">
-      <div className="settings-card-header">
-        <SettingsCardTitle titleKey="settings.secureValues.title" />
-      </div>
+    <>
+      <SettingsTabHeader
+        titleKey="settings.secureValues.title"
+        cardKey="settings.secureValues.title"
+      />
+      <div className="settings-card" data-testid="secure-values-card">
       <p className="settings-card-desc">
         {t("settings.secureValues.description")}
       </p>
@@ -287,6 +289,7 @@ export function SecureValuesCard() {
         </p>
       ) : null}
     </div>
+    </>
   );
 }
 
@@ -363,7 +366,7 @@ function SyncDevices({
       ) : null}
       {standing === "member" && sync.devices.length > 0 ? (
         <>
-          <div className="settings-card-desc">{t("settings.secureValues.devices")}</div>
+          <div className="settings-subhead">{t("settings.secureValues.devices")}</div>
           {sync.devices.map((device) => {
             const sameName = sync.devices.some((other) => other !== device && other.name === device.name);
             const details = [
@@ -397,7 +400,7 @@ function SyncDevices({
       ) : null}
       {sync.releases.length > 0 ? (
         <>
-          <div className="settings-card-desc">{t("settings.secureValues.cloudUses")}</div>
+          <div className="settings-subhead">{t("settings.secureValues.cloudUses")}</div>
           {sync.releases.slice(0, 5).map((entry) => (
             <div className="settings-row" key={`${entry.at}:${entry.label}`} data-testid="secure-values-release">
               <div className="settings-row-info">

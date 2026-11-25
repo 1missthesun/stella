@@ -1,6 +1,6 @@
 .ai-provider__head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
@@ -8,6 +8,10 @@
 
 .ai-provider__head .settings-card-title {
   margin: 0;
+  font-size: 20px;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  color: var(--text-strong);
 }
 
 .ai-primary {
@@ -23,8 +27,9 @@
 }
 
 .ai-primary__name {
-  font-size: var(--font-size-base);
+  font-size: 16px;
   font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
   color: var(--text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -33,7 +38,7 @@
 
 .ai-primary__name[data-empty] {
   font-weight: var(--weight-medium);
-  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+  color: var(--text-weak);
 }
 
 .ai-primary__meta {
@@ -42,24 +47,25 @@
   align-items: baseline;
   gap: 2px 12px;
   margin-top: 3px;
-  font-size: var(--font-size-sm);
+  font-size: 13px;
   line-height: 1.45;
-  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+  color: var(--text-weak);
 }
 
 .ai-primary__status {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ai-in-use {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-sm);
-  font-weight: var(--weight-medium);
+  gap: 7px;
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
   color: var(--text-strong);
   white-space: nowrap;
 }
@@ -67,7 +73,7 @@
 .ai-in-use__dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--primary);
 }
 
@@ -76,9 +82,9 @@
   align-items: center;
   gap: 12px;
   margin-top: 10px;
-  font-size: var(--font-size-sm);
+  font-size: 13.5px;
   line-height: 1.45;
-  color: var(--text-base);
+  color: var(--text-weak);
 }
 
 .ai-note__text {
@@ -95,10 +101,10 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: var(--font-size-sm);
-  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+  font-size: 13px;
+  color: var(--text-weak);
   text-decoration: underline;
-  text-decoration-color: color-mix(in oklch, currentColor 35%, transparent);
+  text-decoration-color: color-mix(in oklch, currentColor 32%, transparent);
   text-underline-offset: 3px;
   cursor: pointer;
 }
@@ -117,9 +123,9 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: 13.5px;
   font-weight: var(--weight-medium);
-  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+  color: var(--text-weak);
   cursor: pointer;
 }
 
@@ -139,27 +145,23 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  margin-top: 12px;
-  padding-left: 20px;
+  margin-top: 14px;
+  padding-left: 18px;
 }
 
 .ai-details-group__label {
-  font-size: var(--font-size-xs);
-  font-weight: var(--weight-medium);
-  color: var(--text-weak);
-  margin-bottom: 2px;
+  font-size: 12.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-weaker);
+  margin-bottom: 4px;
 }
 
 .ai-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   min-height: 40px;
-  padding: 4px 0;
-}
-
-.ai-row + .ai-row {
-  border-top: 1px solid color-mix(in oklch, var(--foreground) 6%, transparent);
+  padding: 5px 0;
 }
 
 .ai-row__text {
@@ -168,8 +170,9 @@
 }
 
 .ai-row__name {
-  font-size: var(--font-size-sm);
-  font-weight: var(--weight-medium);
+  font-size: 14.5px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.012em;
   color: var(--text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -178,15 +181,15 @@
 
 .ai-row__meta {
   margin-top: 1px;
-  font-size: var(--font-size-xs);
-  color: color-mix(in oklch, var(--text-base) 70%, var(--text-weak));
+  font-size: 12.5px;
+  color: var(--text-weak);
 }
 
 .ai-row__controls {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ai-row__install:not(:empty) {
@@ -203,10 +206,10 @@
 
 .ai-legal {
   display: flex;
-  gap: 16px;
-  font-size: var(--font-size-sm);
+  gap: 18px;
+  font-size: 13.5px;
 }
 
 .ai-provider--plain .ai-primary__name {
-  font-size: var(--font-size-base);
+  font-size: 16px;
 }

@@ -92,7 +92,7 @@ export function PasskeysCard() {
             <div className="settings-row-label">
               {passkey.name || t("settings.passkeys.unnamed")}
             </div>
-            <div className="settings-card-desc">
+            <div className="settings-row-sublabel">
               {passkey.createdAt
                 ? new Date(passkey.createdAt).toLocaleDateString()
                 : ""}

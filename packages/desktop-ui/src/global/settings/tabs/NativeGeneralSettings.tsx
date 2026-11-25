@@ -168,7 +168,7 @@ export function NativeDesktopGeneralSettings() {
       />
       <div className="settings-card">
         <div className="settings-card-header">
-          <SettingsCardTitle titleKey="settings.browserExtension.title" />
+          <SettingsCardTitle titleKey="settings.browserExtension.title" variant="row" />
           <Button
             type="button"
             variant="ghost"
@@ -185,7 +185,7 @@ export function NativeDesktopGeneralSettings() {
       </div>
       <div className="settings-card">
         <div className="settings-card-header">
-          <SettingsCardTitle titleKey="settings.developerPreviews.title" />
+          <SettingsCardTitle titleKey="settings.developerPreviews.title" variant="row" />
           <Switch
             checked={developerResourcePreviewsEnabled}
             onCheckedChange={(checked) =>
@@ -202,7 +202,7 @@ export function NativeDesktopGeneralSettings() {
       <OnboardingReplayCard />
       <div className="settings-card">
         <div className="settings-card-header">
-          <SettingsCardTitle titleKey="settings.resetCustomizations.title" />
+          <SettingsCardTitle titleKey="settings.resetCustomizations.title" variant="row" />
           <Button
             type="button"
             variant="ghost"

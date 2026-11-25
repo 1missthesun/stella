@@ -35,7 +35,7 @@ export function MessageSoundCard() {
   return (
     <div className="settings-card">
       <div className="settings-card-header">
-        <SettingsCardTitle titleKey={TITLE_KEY} />
+        <SettingsCardTitle titleKey={TITLE_KEY} variant="row" />
         <Switch
           aria-label={t(TITLE_KEY)}
           checked={preferences.enabled}

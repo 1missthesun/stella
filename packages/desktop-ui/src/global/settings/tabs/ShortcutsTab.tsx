@@ -1,4 +1,4 @@
-import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
+import { SettingsTabHeader } from "@/global/settings/AiryControls";
 import { useCallback, useEffect, useState } from "react";
 import { showToast } from "@/ui/toast";
 import { Button } from "@/ui/button";
@@ -279,8 +279,11 @@ export function ShortcutsTab() {
 
   return (
     <div className="settings-tab-content">
+      <SettingsTabHeader
+        titleKey="settings.shortcuts.title"
+        cardKey="settings.shortcuts.title"
+      />
       <div className="settings-card">
-        <SettingsCardTitle titleKey="settings.shortcuts.title" />
         {shortcutError ? (
           <p
             className="settings-card-desc settings-card-desc--error"

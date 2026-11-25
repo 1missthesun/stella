@@ -125,12 +125,12 @@ function CloudProjectsCardImpl() {
             </div>
             <input
               type="text"
+              className="settings-inline-input"
               value={connectCode}
               onChange={(event) => setConnectCode(event.target.value)}
               placeholder="XXXX-XXXX-XXXX"
               autoComplete="off"
               spellCheck={false}
-              style={{ width: "100%", marginTop: 6 }}
             />
           </div>
           <div className="settings-row-control">
@@ -167,21 +167,21 @@ function CloudProjectsCardImpl() {
           </div>
           <input
             type="text"
+            className="settings-inline-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Project name"
             autoComplete="off"
             spellCheck={false}
-            style={{ width: "100%", marginTop: 6 }}
           />
           <input
             type="text"
+            className="settings-inline-input"
             value={remoteUrl}
             onChange={(event) => setRemoteUrl(event.target.value)}
             placeholder="GitHub repository URL (optional)"
             autoComplete="off"
             spellCheck={false}
-            style={{ width: "100%", marginTop: 6 }}
           />
         </div>
         <div className="settings-row-control">

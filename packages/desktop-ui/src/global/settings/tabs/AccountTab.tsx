@@ -1,4 +1,4 @@
-import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
+import { SettingsTabHeader } from "@/global/settings/AiryControls";
 import { useCallback, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { Button } from "@/ui/button";
@@ -163,8 +163,11 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
 
   return (
     <div className="settings-tab-content settings-tab-content--account">
+      <SettingsTabHeader
+        titleKey="settings.account.title"
+        cardKey="settings.account.title"
+      />
       <div className="settings-card">
-        <SettingsCardTitle titleKey="settings.account.title" />
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">

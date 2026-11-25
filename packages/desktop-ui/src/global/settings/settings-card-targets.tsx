@@ -37,24 +37,44 @@ export const subscribeSettingsCardMounts = (
   };
 };
 
-export function SettingsCardTitle({ titleKey }: { titleKey: string }) {
+export const registerSettingsCardHeading = (
+  titleKey: string,
+  heading: HTMLHeadingElement | null,
+): (() => void) | undefined => {
+  if (!heading) return;
+  mountedCards.set(titleKey, heading);
+  for (const listener of mountListeners) listener();
+  return () => {
+    if (mountedCards.get(titleKey) === heading) {
+      mountedCards.delete(titleKey);
+    }
+  };
+};
+
+export function SettingsCardTitle({
+  titleKey,
+  labelKey,
+  variant = "section",
+}: {
+  titleKey: string;
+  labelKey?: string;
+  variant?: "section" | "row" | "provider";
+}) {
   const t = useT();
   const register = useCallback(
-    (heading: HTMLHeadingElement | null) => {
-      if (!heading) return;
-      mountedCards.set(titleKey, heading);
-      for (const listener of mountListeners) listener();
-      return () => {
-        if (mountedCards.get(titleKey) === heading) {
-          mountedCards.delete(titleKey);
-        }
-      };
-    },
+    (heading: HTMLHeadingElement | null) =>
+      registerSettingsCardHeading(titleKey, heading),
     [titleKey],
   );
+  const className =
+    variant === "row"
+      ? "settings-card-title settings-card-title--row"
+      : variant === "provider"
+        ? "settings-card-title settings-card-title--provider"
+        : "settings-card-title";
   return (
-    <h3 ref={register} className="settings-card-title">
-      {t(titleKey)}
+    <h3 ref={register} className={className}>
+      {t(labelKey ?? titleKey)}
     </h3>
   );
 }

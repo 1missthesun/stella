@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 import { getFileEntries } from "./files-index";
 import { displayTabs } from "./tab-store";
+import { fileViewer } from "./file-viewer-store";
 import type { DisplayTab, DisplayTabKind } from "./types";
 
 export const SIDEBAR_SECTIONS = [
@@ -173,16 +174,21 @@ export const fileNameFromDisplayTabId = (location: string): string => {
   return first.split(/[\\/]/).filter(Boolean).pop() || first || "File";
 };
 
+/** A file or app with its own tab; it opens in the viewer, not the stage. */
+export const isDocumentTab = (tab: SidebarTab): boolean =>
+  tab.location !== null && (tab.kind === "files" || tab.kind === "apps");
+
 type PersistedState = { tabs: SidebarTab[]; activeTabId: string | null };
 
 const withActive = (
   tabs: SidebarTab[],
   activeTabId: string | null,
 ): string | null => {
-  if (activeTabId && tabs.some((tab) => tab.id === activeTabId)) {
+  const places = tabs.filter((tab) => !isDocumentTab(tab));
+  if (activeTabId && places.some((tab) => tab.id === activeTabId)) {
     return activeTabId;
   }
-  return tabs[tabs.length - 1]?.id ?? null;
+  return places[places.length - 1]?.id ?? null;
 };
 
 const migrateLegacyTabs = (): PersistedState | null => {
@@ -305,26 +311,6 @@ if (snapshot.activeTabId === null) {
 
 const listeners = new Set<Listener>();
 
-type UnavailableFileTab = {
-  location: string;
-  message: string;
-};
-
-let unavailableFileTabs: ReadonlyMap<string, UnavailableFileTab> = new Map();
-const unavailableListeners = new Set<Listener>();
-
-const setUnavailableFileTabs = (
-  next: ReadonlyMap<string, UnavailableFileTab>,
-): void => {
-  unavailableFileTabs = next;
-  for (const listener of unavailableListeners) listener();
-};
-
-const isFileTabUnavailable = (tab: SidebarTab): boolean =>
-  tab.kind === "files" &&
-  tab.location !== null &&
-  unavailableFileTabs.get(tab.id)?.location === tab.location;
-
 const persist = (next: SidebarSectionsSnapshot): void => {
   if (typeof window === "undefined") return;
   const tabs = next.tabs.filter((tab) => tab.kind !== "takeover");
@@ -347,8 +333,7 @@ const activeTabOf = (state: SidebarSectionsSnapshot): SidebarTab | null =>
   state.tabs.find((tab) => tab.id === state.activeTabId) ?? null;
 
 const isReusableNavTab = (tab: SidebarTab): boolean =>
-  (tab.location === null && (tab.kind === "files" || tab.kind === "apps")) ||
-  isFileTabUnavailable(tab);
+  tab.location === null && (tab.kind === "files" || tab.kind === "apps");
 
 export const sidebarSections = {
   subscribe(listener: Listener): () => void {
@@ -387,6 +372,11 @@ export const sidebarSections = {
   openLocation(section: SidebarSection, location: string | null): void {
     const kind = resolveSidebarSection(section);
     const loc = location ?? null;
+
+    if (loc !== null && (kind === "files" || kind === "apps")) {
+      this.openDocument(kind, loc);
+      return;
+    }
 
     if (loc !== null || isSingletonTab(kind, loc)) {
       const existing = snapshot.tabs.find(
@@ -428,13 +418,29 @@ export const sidebarSections = {
     displayTabs.setPanelOpen(true);
   },
 
+  /** Gives a file or app its tab, read, without moving the stage to it. */
+  openDocument(kind: "files" | "apps", location: string): void {
+    const existing = snapshot.tabs.find(
+      (tab) => tab.kind === kind && tab.location === location,
+    );
+    if (existing && !existing.unread) return;
+    emit({
+      ...snapshot,
+      tabs: existing
+        ? snapshot.tabs.map((tab) =>
+            tab.id === existing.id ? { ...tab, unread: false } : tab,
+          )
+        : [...snapshot.tabs, withLocation(makeTab(kind, location), kind, location)],
+    });
+  },
+
   selectSection(section: SidebarSection): void {
     this.openLocation(section, null);
   },
 
   activateTab(tabId: string): void {
     const target = snapshot.tabs.find((tab) => tab.id === tabId);
-    if (!target) return;
+    if (!target || isDocumentTab(target)) return;
     if (snapshot.activeTabId === tabId && !target.unread) return;
     emit({
       tabs: target.unread
@@ -446,15 +452,23 @@ export const sidebarSections = {
     });
   },
 
+  markRead(tabId: string): void {
+    if (!snapshot.tabs.some((tab) => tab.id === tabId && tab.unread)) return;
+    emit({
+      ...snapshot,
+      tabs: snapshot.tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, unread: false } : tab,
+      ),
+    });
+  },
+
   addInBackground(section: SidebarSection, location: string): void {
     const kind = resolveSidebarSection(section);
     const existing = snapshot.tabs.find(
       (tab) => tab.kind === kind && tab.location === location,
     );
     const showing =
-      existing !== undefined &&
-      existing.id === snapshot.activeTabId &&
-      displayTabs.getLayoutSnapshot().panelOpen;
+      existing !== undefined && fileViewer.surfaceOf(location) !== null;
     if (existing) {
       if (showing || existing.unread) return;
       emit({
@@ -467,10 +481,7 @@ export const sidebarSections = {
     }
     const created = makeTab(kind, location);
     const tab = { ...withLocation(created, kind, location), unread: true };
-    emit({
-      tabs: [...snapshot.tabs, tab],
-      activeTabId: snapshot.activeTabId ?? tab.id,
-    });
+    emit({ ...snapshot, tabs: [...snapshot.tabs, tab] });
   },
 
   moveTab(tabId: string, toIndex: number): void {
@@ -487,45 +498,22 @@ export const sidebarSections = {
   closeTab(tabId: string): void {
     const index = snapshot.tabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
+    const closed = snapshot.tabs[index]!;
     const tabs = snapshot.tabs.filter((tab) => tab.id !== tabId);
-    if (unavailableFileTabs.has(tabId)) {
-      const next = new Map(unavailableFileTabs);
-      next.delete(tabId);
-      setUnavailableFileTabs(next);
-    }
-
-    if (tabs.length === 0) {
-      emit({ tabs: [], activeTabId: null });
-      displayTabs.setPanelOpen(false);
+    if (isDocumentTab(closed)) {
+      emit({ ...snapshot, tabs });
+      fileViewer.closeItem(closed.location!);
       return;
     }
-
-    let activeTabId = snapshot.activeTabId;
-    if (activeTabId === tabId) {
-      activeTabId = tabs[Math.min(index, tabs.length - 1)]!.id;
+    if (snapshot.activeTabId !== tabId) {
+      emit({ ...snapshot, tabs });
+      return;
     }
-    emit({ tabs, activeTabId });
-  },
-
-  setLocation(section: SidebarSection, location: string | null): void {
-    const kind = resolveSidebarSection(section);
-    const active = activeTabOf(snapshot);
-    if (!active || active.kind !== kind) return;
-    if (active.location === (location ?? null)) return;
-    const tabs = snapshot.tabs
-      .filter(
-        (tab) =>
-          tab.id === active.id ||
-          tab.kind !== kind ||
-          !isSingleEmptyTab(tab.kind, location ?? null) ||
-          tab.location !== null,
-      )
-      .map((tab) =>
-        tab.id === active.id
-          ? withLocation(tab, tab.kind, location ?? null)
-          : tab,
-      );
-    emit({ ...snapshot, tabs });
+    const before = snapshot.tabs.slice(0, index).filter((tab) => !isDocumentTab(tab));
+    const after = snapshot.tabs.slice(index + 1).filter((tab) => !isDocumentTab(tab));
+    const next = after[0] ?? before[before.length - 1] ?? null;
+    emit({ tabs, activeTabId: next?.id ?? null });
+    if (!next) displayTabs.setPanelOpen(false);
   },
 
   rememberFile(
@@ -569,60 +557,10 @@ export const sidebarSections = {
     });
   },
 
-  markFileUnavailable(
-    tabId: string,
-    location: string,
-    message: string,
-  ): void {
-    const current = unavailableFileTabs.get(tabId);
-    if (current?.location === location && current.message === message) return;
-    const next = new Map(unavailableFileTabs);
-    next.set(tabId, { location, message });
-    setUnavailableFileTabs(next);
-  },
-
-  subscribeUnavailable(listener: Listener): () => void {
-    unavailableListeners.add(listener);
-    return () => unavailableListeners.delete(listener);
-  },
-
-  getUnavailableSnapshot(): ReadonlyMap<string, UnavailableFileTab> {
-    return unavailableFileTabs;
-  },
-
-  clearLocation(section: SidebarSection): void {
-    this.setLocation(section, null);
-  },
-
   reset(): void {
     emit({ tabs: defaultTabs(), activeTabId: null });
   },
 };
-
-export const useSidebarFileUnavailable = (
-  tabId: string | undefined,
-  location: string | null,
-): string | null =>
-  useSyncExternalStore(
-    sidebarSections.subscribeUnavailable,
-    () => {
-      if (tabId === undefined || location === null) return null;
-      const entry = sidebarSections.getUnavailableSnapshot().get(tabId);
-      return entry?.location === location ? entry.message : null;
-    },
-    () => null,
-  );
-
-export const useSidebarTab = (tabId: string | undefined): SidebarTab | null =>
-  useSyncExternalStore(
-    sidebarSections.subscribe,
-    () =>
-      tabId === undefined
-        ? null
-        : (sidebarSections.getSnapshot().tabs.find((tab) => tab.id === tabId) ??
-          null),
-    () => null,
-  );
 
 export const useActiveSidebarSection = (): SidebarSection =>
   useSyncExternalStore(
@@ -630,23 +568,6 @@ export const useActiveSidebarSection = (): SidebarSection =>
     () => activeTabOf(sidebarSections.getSnapshot())?.kind ?? "home",
     () => activeTabOf(sidebarSections.getSnapshot())?.kind ?? "home",
   );
-
-export const useSidebarSectionLocation = (
-  section: SidebarSection,
-): string | null => {
-  const resolved = resolveSidebarSection(section);
-  return useSyncExternalStore(
-    sidebarSections.subscribe,
-    () => {
-      const active = activeTabOf(sidebarSections.getSnapshot());
-      return active && active.kind === resolved ? active.location : null;
-    },
-    () => {
-      const active = activeTabOf(sidebarSections.getSnapshot());
-      return active && active.kind === resolved ? active.location : null;
-    },
-  );
-};
 
 export const useSidebarOpenTabs = (): SidebarTab[] =>
   useSyncExternalStore(

@@ -3487,6 +3487,8 @@
     "copyMessage": "Copia messaggio",
     "copyAsMarkdown": "Copia come Markdown",
     "copyPublicLink": "Copia link pubblico",
+    "detachViewer": "Apri in una finestra separata",
+    "dockViewer": "Riporta in Stella",
     "expandViewer": "Espandi",
     "shrinkViewer": "Riduci a visualizzatore mobile",
     "closeViewer": "Chiudi visualizzatore",

@@ -3455,6 +3455,8 @@
     "copyMessage": "Αντιγραφή μηνύματος",
     "copyAsMarkdown": "Αντιγραφή ως Markdown",
     "copyPublicLink": "Αντιγραφή δημόσιου συνδέσμου",
+    "detachViewer": "Άνοιγμα σε δικό του παράθυρο",
+    "dockViewer": "Επιστροφή στη Stella",
     "expandViewer": "Ανάπτυξη",
     "shrinkViewer": "Σμίκρυνση σε αιωρούμενο πρόγραμμα προβολής",
     "closeViewer": "Κλείσιμο προβολής",

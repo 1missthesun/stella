@@ -1,7 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { MediaPreviewCard } from "@/shell/MediaPreviewCard";
 import type { SwipeDirection } from "@/shell/ZoomableImage";
-import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 import { fileViewer } from "@/features/workspace-display/file-viewer-store";
 import type { DisplayTabKind } from "@/features/workspace-display/types";
@@ -177,8 +176,7 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
   const handleDelete = useCallback(() => {
     removeGeneratedMediaItem(item.id);
     displayTabs.closeTab(item.id);
-    if (fileViewer.getSnapshot().fileId === item.id) fileViewer.close();
-    else sidebarSections.clearLocation("files");
+    fileViewer.closeItem(item.id);
   }, [item.id]);
 
   const inViewer = useContext(ViewerItemContext) === item.id;

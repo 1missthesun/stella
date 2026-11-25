@@ -1,11 +1,20 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { resolveCanvasLink, type CanvasDocumentLocation } from "@stella/contracts/canvas-links";
+import { resolveCanvasLink, type CanvasDocumentLocation, type CanvasLink } from "@stella/contracts/canvas-links";
+import { useViewerWindow } from "@/shell/workspace-stage/viewer-item-context";
 import { openCanvasLink } from "./open-canvas-link";
+
+const OPENS_IN_STELLA: ReadonlySet<CanvasLink["kind"]> = new Set([
+  "web",
+  "drive",
+  "device",
+  "app",
+]);
 
 export function useCanvasLinks(
   frameRef: RefObject<HTMLIFrameElement | null>,
   location: CanvasDocumentLocation | null,
 ): void {
+  const viewerWindow = useViewerWindow();
   const locationRef = useRef(location);
   locationRef.current = location;
   useEffect(() => {
@@ -24,15 +33,19 @@ export function useCanvasLinks(
       if (href === null) return;
       // A click in the canvas activates this window too; a canvas
       // script posting on its own does not, so it can't open anything.
-      if (navigator.userActivation && !navigator.userActivation.isActive) return;
+      const { userActivation } = viewerWindow.navigator;
+      if (userActivation && !userActivation.isActive) return;
       const link = resolveCanvasLink(href, locationRef.current);
       if (link.kind === "fragment") {
         frameWindow.postMessage({ type: "stella:canvas-scroll", fragment: link.fragment }, "*");
         return;
       }
       openCanvasLink(link);
+      if (viewerWindow !== window && OPENS_IN_STELLA.has(link.kind)) {
+        window.electronAPI?.window?.show?.();
+      }
     };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [frameRef]);
+    viewerWindow.addEventListener("message", handleMessage);
+    return () => viewerWindow.removeEventListener("message", handleMessage);
+  }, [frameRef, viewerWindow]);
 }

@@ -17,7 +17,7 @@ The whole bar is 12px medium text on one 26px rhythm (`shell-topbar-full.css`). 
 
 ## The stage
 
-A non-Chat tab shows on the stage (`.workspace-stage[data-visible="true"]`, `shell/workspace-stage/WorkspaceStage.tsx`): one layer over the chat, joined to the open tab, inset 20px, ending just above the composer (`--workspace-stage-bottom`, re-measured every 250 ms). The chat column never moves and the composer stays usable under it. Selecting **Chat (⌘1)** hides the stage. Files open in the file viewer, which either floats over the chat (movable, resizable, never over the composer) or fills the stage (ui-state `stella.fileViewer.mode`); see [files and viewers](./files-and-viewers.md).
+A file or app tab opens the viewer (`data-viewing` on the tab while it floats or has its own window, `data-active` while it fills the stage). Any other non-Chat tab shows on the stage (`.workspace-stage[data-visible="true"]`, `shell/workspace-stage/WorkspaceStage.tsx`): one layer over the chat, joined to the open tab, inset 20px, ending just above the composer (`--workspace-stage-bottom`, re-measured every 250 ms). The chat column never moves and the composer stays usable under it. Selecting **Chat (⌘1)** hides the stage. Files open in the file viewer, which either floats over the chat (movable, resizable, never over the composer) or fills the stage (ui-state `stella.fileViewer.mode`); see [files and viewers](./files-and-viewers.md).
 
 ## Driving it
 

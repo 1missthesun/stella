@@ -3487,6 +3487,8 @@
     "copyMessage": "Copiază mesajul",
     "copyAsMarkdown": "Copiază ca Markdown",
     "copyPublicLink": "Copiază linkul public",
+    "detachViewer": "Deschide într-o fereastră separată",
+    "dockViewer": "Mută înapoi în Stella",
     "expandViewer": "Extinde",
     "shrinkViewer": "Micșorează la vizualizator flotant",
     "closeViewer": "Închide vizualizatorul",

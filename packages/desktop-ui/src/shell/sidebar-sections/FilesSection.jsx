@@ -38,17 +38,8 @@ import {
 } from "@/features/workspace-display/media-files";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { openConversationFocus } from "@/features/chat/services/conversation-focus-store";
-import {
-  fileNameFromDisplayTabId,
-  sidebarSections,
-  useActiveSidebarSection,
-  useSidebarFileUnavailable,
-  useSidebarTab,
-} from "@/features/workspace-display/sidebar-sections";
-import {
-  useDisplayPanelOpen,
-  useDisplayTabList,
-} from "@/features/workspace-display/tab-store";
+import { useActiveSidebarSection } from "@/features/workspace-display/sidebar-sections";
+import { useDisplayPanelOpen } from "@/features/workspace-display/tab-store";
 import { notifyMediaGenerationError } from "@/global/billing/paid-media-tier-toast";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
@@ -57,14 +48,8 @@ import { displayTabKindForPayload } from "@/features/workspace-display/payload-k
 import { removeCanvasHtmlItem } from "@/shell/display/canvas-tab/canvas-items";
 import { removeGeneratedMediaItem } from "@/shell/display/payload-to-tab-spec";
 import { bucketByRecency } from "@/shared/lib/recency-buckets";
-import { ChevronRight, Eye, LayoutList, Search, X } from "@/ui/icons";
+import { ChevronRight, Eye, Search, X } from "@/ui/icons";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
-import { DeferredDisplayContent } from "./DeferredDisplayContent";
-import {
-  payloadFileUnavailableMessage,
-  restorablePayloadFor,
-  unrestorableFileMessage,
-} from "./file-tab-restore";
 import "./files-section.css";
 import { contextMenu, fileMenu } from "@/platform/context-menu";
 import { translateNow } from "@/shared/i18n";
@@ -619,93 +604,11 @@ export function WorkList({
     </div>
   );
 }
-function UnavailableFile({ name, message }) {
-  return (
-    <EmptyState
-      motif="unavailable"
-      title="File unavailable"
-      detail={name}
-      body={message}
-      action={{
-        label: "Browse files",
-        icon: LayoutList,
-        onClick: () => sidebarSections.clearLocation("files"),
-      }}
-    />
-  );
-}
-
-export function FilesSection({ tabId, location = null, active = false }) {
-  const { tabs } = useDisplayTabList();
-  const panelOpen = useDisplayPanelOpen();
-  const sidebarTab = useSidebarTab(tabId);
-  const unavailable = useSidebarFileUnavailable(tabId, location);
-  const openTab = location
-    ? (tabs.find((tab) => tab.id === location) ?? null)
-    : null;
-  const shown = active && panelOpen;
-  const needsRestore = Boolean(location && !openTab && !unavailable);
-
-  useEffect(() => {
-    if (!tabId || !location || !openTab) return;
-    sidebarSections.rememberFile(
-      tabId,
-      location,
-      openTab.title,
-      openTab.kind,
-      openTab.payload,
-    );
-  }, [location, openTab, tabId]);
-
-  useEffect(() => {
-    if (!shown || !needsRestore || !tabId || !location) return;
-    const tab = sidebarSections
-      .getSnapshot()
-      .tabs.find((item) => item.id === tabId);
-    const payload = tab ? restorablePayloadFor(tab) : null;
-    if (!payload) {
-      sidebarSections.markFileUnavailable(
-        tabId,
-        location,
-        unrestorableFileMessage(location),
-      );
-      return;
-    }
-    let cancelled = false;
-    void payloadFileUnavailableMessage(payload).then((message) => {
-      if (cancelled) return;
-      if (message) {
-        sidebarSections.markFileUnavailable(tabId, location, message);
-        return;
-      }
-      const openedId = openDisplayPayloadTab(payload, { activate: false });
-      if (openedId !== location) {
-        sidebarSections.retargetFile(tabId, location, openedId);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [location, needsRestore, shown, tabId]);
-
+export function FilesSection() {
   return (
     <div className="work-section">
       <div className="work-section__body">
-        {!location ? (
-          <WorkList section="files" />
-        ) : openTab ? (
-          <div className="sidebar-section__viewer-body">
-            <DeferredDisplayContent key={openTab.id} render={openTab.render} />
-          </div>
-        ) : unavailable ? (
-          <UnavailableFile
-            name={sidebarTab?.file?.title || fileNameFromDisplayTabId(location)}
-            kind={sidebarTab?.file?.kind ?? "text"}
-            message={unavailable}
-          />
-        ) : (
-          <div className="sidebar-section__viewer-body" aria-busy="true" />
-        )}
+        <WorkList section="files" />
       </div>
     </div>
   );

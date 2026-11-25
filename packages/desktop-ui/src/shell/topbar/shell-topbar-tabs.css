@@ -105,6 +105,14 @@
   background: color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
+.topbar-tabs__tab[data-viewing="true"] {
+  color: var(--text-strong);
+}
+
+.topbar-tabs__tab[data-viewing="true"]::before {
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
 .topbar-tabs__tab[data-active="true"] {
   color: var(--text-strong);
 }

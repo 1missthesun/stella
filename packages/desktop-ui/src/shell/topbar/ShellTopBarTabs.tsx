@@ -7,7 +7,12 @@ import {
   useSyncExternalStore,
 } from "react";
 import {
+  fileViewer,
+  useFileViewer,
+} from "@/features/workspace-display/file-viewer-store";
+import {
   fileNameFromDisplayTabId,
+  isDocumentTab,
   sidebarSections,
   useSidebarActiveTabId,
   useSidebarOpenTabs,
@@ -21,6 +26,7 @@ import {
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
 import { cloudAppTitles } from "@/features/cloud/cloud-app-title-store";
 import { cloudAppIdFromLocation } from "@/features/cloud/open-cloud-app-panel";
+import { openDocumentTab } from "@/shell/sidebar-sections/open-document-tab";
 import { SIDEBAR_SECTION_META } from "@/shell/sidebar-sections/section-meta";
 import { MessageSquare, Plus, X } from "@/ui/icons";
 import { displaySearchStore } from "@/features/workspace-display/display-search-store";
@@ -34,6 +40,20 @@ import {
 } from "./open-tab-notch";
 import { useEmailUnseenCount } from "@/features/email/email-unseen";
 import "./shell-topbar-tabs.css";
+
+const leaveStageViewer = () => {
+  if (fileViewer.getSnapshot().mode === "stage") fileViewer.close();
+};
+
+const openTab = (tab: SidebarTab) => {
+  if (isDocumentTab(tab)) {
+    openDocumentTab(tab);
+    return;
+  }
+  leaveStageViewer();
+  sidebarSections.activateTab(tab.id);
+  displayTabs.setPanelOpen(true);
+};
 
 export function ShellTopBarTabs() {
   const tabs = useSidebarOpenTabs();
@@ -54,7 +74,19 @@ export function ShellTopBarTabs() {
   const onTabPointerDown = useTabReorder(stripRef, tabIds);
   useOpenTabNotch(stripRef, tabIds);
   useTabStripReach(stripRef);
-  const chatActive = !panelOpen;
+  const viewer = useFileViewer();
+  const filling = viewer.mode === "stage" ? viewer.fileId : null;
+  const shownTabId = filling
+    ? (tabs.find((tab) => isDocumentTab(tab) && tab.location === filling)?.id ??
+      null)
+    : panelOpen
+      ? activeTabId
+      : null;
+  const chatActive = !panelOpen && !shownTabId;
+  const isOpenElsewhere = (tab: SidebarTab) =>
+    isDocumentTab(tab) &&
+    (viewer.fileId === tab.location ||
+      viewer.detached.some((entry) => entry.fileId === tab.location));
   const [menuOpen, setMenuOpenState] = useState(false);
   const emailUnseen = useEmailUnseenCount();
   const setMenuOpen = (next: boolean) => {
@@ -64,12 +96,12 @@ export function ShellTopBarTabs() {
 
   useLayoutEffect(() => {
     const strip = stripRef.current;
-    if (!activeTabId || !panelOpen || !strip) return;
+    if (!shownTabId || !strip) return;
     strip
-      .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeTabId)}"]`)
+      .querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(shownTabId)}"]`)
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     revealOpenTab(strip);
-  }, [activeTabId, panelOpen]);
+  }, [shownTabId]);
 
   useEffect(() => {
     const strip = stripRef.current;
@@ -105,6 +137,7 @@ export function ShellTopBarTabs() {
   }, [tabs, cloudTitles, displayItems]);
 
   const showChat = () => {
+    leaveStageViewer();
     displayTabs.setPanelOpen(false);
     if (!onChatRoute) void navigate({ to: "/chat" });
   };
@@ -122,6 +155,7 @@ export function ShellTopBarTabs() {
         const index = Number(event.key) - 1;
         if (index === 0) {
           event.preventDefault();
+          leaveStageViewer();
           displayTabs.setPanelOpen(false);
           return;
         }
@@ -130,8 +164,7 @@ export function ShellTopBarTabs() {
           event.key === "9" ? list[list.length - 1] : list[index - 1];
         if (!target) return;
         event.preventDefault();
-        sidebarSections.activateTab(target.id);
-        displayTabs.setPanelOpen(true);
+        openTab(target);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -198,7 +231,7 @@ export function ShellTopBarTabs() {
           </button>
         </div>
         {tabs.map((tab) => {
-          const active = panelOpen && tab.id === activeTabId;
+          const active = tab.id === shownTabId;
           const title = titleFor(tab);
           return (
             <div
@@ -206,6 +239,7 @@ export function ShellTopBarTabs() {
               className="topbar-tabs__tab"
               data-tab-id={tab.id}
               data-active={active ? "true" : undefined}
+              data-viewing={!active && isOpenElsewhere(tab) ? "true" : undefined}
               data-unread={tab.unread ? "true" : undefined}
               onPointerDown={(event) => onTabPointerDown(event, tab.id)}
             >
@@ -215,10 +249,7 @@ export function ShellTopBarTabs() {
                 aria-selected={active}
                 className="topbar-tabs__target"
                 title={tab.unread ? `${title} · new from Stella` : title}
-                onClick={() => {
-                  sidebarSections.activateTab(tab.id);
-                  displayTabs.setPanelOpen(true);
-                }}
+                onClick={() => openTab(tab)}
                 onAuxClick={(event) => {
                   if (event.button === 1) sidebarSections.closeTab(tab.id);
                 }}

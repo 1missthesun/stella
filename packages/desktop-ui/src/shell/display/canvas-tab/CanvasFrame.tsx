@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { injectCanvasActionBridge } from "@stella/contracts/canvas-actions";
 import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
+import { dispatchComposeText } from "@/shared/lib/stella-orb-chat";
+import { useViewerWindow } from "@/shell/workspace-stage/viewer-item-context";
 import { CANVAS_FRAME_SANDBOX, CANVAS_HOST_FILE, canvasHostMessageType } from "@stella/contracts/canvas-host";
 
 export type CanvasFrameSource = { src: string } | { html: string };
@@ -28,6 +30,9 @@ export function CanvasFrame({
   const onDocumentRef = useRef(onDocument);
   onDocumentRef.current = onDocument;
   const loadsRef = useRef(0);
+  const documentRef = useRef<Document | null>(null);
+  const scrollRef = useRef({ x: 0, y: 0 });
+  const viewerWindow = useViewerWindow();
   const generation = useRef({ html, count: 0 });
   if (generation.current.html !== html) generation.current = { html, count: generation.current.count + 1 };
   const hosted = html !== null;
@@ -44,9 +49,31 @@ export function CanvasFrame({
         onDocumentRef.current?.();
       }
     };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [hosted, frameRef]);
+    viewerWindow.addEventListener("message", onMessage);
+    return () => viewerWindow.removeEventListener("message", onMessage);
+  }, [hosted, frameRef, viewerWindow]);
+
+  useEffect(() => {
+    if (hosted) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow) return;
+      const data = event.data;
+      if (data?.type === "stella:canvas-scrolled") {
+        const { x, y } = data;
+        if (Number.isFinite(x) && Number.isFinite(y)) scrollRef.current = { x, y };
+      } else if (
+        data?.type === "stella:canvas-compose" &&
+        viewerWindow !== window &&
+        typeof data.text === "string" &&
+        data.text.trim()
+      ) {
+        dispatchComposeText({ text: data.text.trim(), selectedText: null });
+        window.electronAPI?.window?.show?.();
+      }
+    };
+    viewerWindow.addEventListener("message", onMessage);
+    return () => viewerWindow.removeEventListener("message", onMessage);
+  }, [hosted, frameRef, viewerWindow]);
 
   return (
     <iframe
@@ -57,8 +84,20 @@ export function CanvasFrame({
       src={hosted ? canvasHostUrl() : (source as { src: string }).src}
       sandbox={CANVAS_FRAME_SANDBOX}
       referrerPolicy="no-referrer"
-      onLoad={() => {
+      onLoad={(event) => {
         if (hosted) return;
+        const frame = event.currentTarget;
+        const moved =
+          documentRef.current !== null &&
+          documentRef.current !== frame.ownerDocument;
+        documentRef.current = frame.ownerDocument;
+        if (moved) {
+          loadsRef.current = 0;
+          frame.contentWindow?.postMessage(
+            { type: "stella:canvas-scroll", ...scrollRef.current },
+            "*",
+          );
+        }
         onDocumentRef.current?.();
         loadsRef.current += 1;
         if (loadsRef.current > 1) {

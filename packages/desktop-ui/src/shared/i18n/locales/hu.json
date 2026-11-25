@@ -3455,6 +3455,8 @@
     "copyMessage": "Üzenet másolása",
     "copyAsMarkdown": "Másolás Markdownként",
     "copyPublicLink": "Nyilvános hivatkozás másolása",
+    "detachViewer": "Megnyitás külön ablakban",
+    "dockViewer": "Vissza a Stellába",
     "expandViewer": "Kibontás",
     "shrinkViewer": "Lebegő nézetté kicsinyítés",
     "closeViewer": "Megjelenítő bezárása",

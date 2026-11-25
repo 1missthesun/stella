@@ -3421,6 +3421,8 @@
     "copyMessage": "メッセージをコピー",
     "copyAsMarkdown": "Markdown としてコピー",
     "copyPublicLink": "公開リンクをコピー",
+    "detachViewer": "別のウィンドウで開く",
+    "dockViewer": "Stella に戻す",
     "expandViewer": "拡大",
     "shrinkViewer": "フローティングビューアに縮小",
     "closeViewer": "ビューアを閉じる",

@@ -1,5 +1,8 @@
 import { CloudFileSource } from "@/features/cloud/CloudFileSource";
 
+import { CloudAppViewer } from "@/features/cloud/CloudAppViewer";
+import { cloudAppTitles } from "@/features/cloud/cloud-app-title-store";
+import { cloudAppIdFromLocation } from "@/features/cloud/open-cloud-app-panel";
 import { createElement } from "react";
 import { uiState } from "@/platform/ui-state";
 import type {
@@ -439,7 +442,18 @@ export const payloadToTabSpec = (payload: DisplayTabPayload): DisplayTabSpec => 
   return rememberInFiles(cloudSpec);
 };
 
+const appTabSpec = (id: string): DisplayTabSpec => {
+  const appId = cloudAppIdFromLocation(id) ?? id;
+  return {
+    id,
+    kind: "app",
+    title: cloudAppTitles.getSnapshot().titles[appId] || "Cloud app",
+    render: () => createElement(CloudAppViewer, { appId }),
+  };
+};
+
 registerWorkspaceDisplayPayloadAdapter({
+  appTabSpec,
   payloadToTabSpec,
   createSourceDiffTabSpec,
 });

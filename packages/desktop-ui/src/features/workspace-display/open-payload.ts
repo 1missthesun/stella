@@ -2,7 +2,7 @@ import type { DisplayTabPayload } from "@stella/contracts/desktop/display-payloa
 import { isFilesPayload } from "./payload-kind";
 import { sidebarSections } from "./sidebar-sections";
 import { displayTabs } from "./tab-store";
-import { fileViewer, opensAsStageTab } from "./file-viewer-store";
+import { fileViewer } from "./file-viewer-store";
 import {
   sourceDiffBatches,
   type SourceDiffBatch,
@@ -11,6 +11,7 @@ import type { DisplayTabSpec, OpenTabOptions } from "./types";
 import { viewAtom } from "@/platform/view-state/view-state";
 
 type WorkspaceDisplayPayloadAdapter = {
+  appTabSpec: (id: string) => DisplayTabSpec;
   payloadToTabSpec: (payload: DisplayTabPayload) => DisplayTabSpec;
   createSourceDiffTabSpec: () => DisplayTabSpec;
 };
@@ -20,8 +21,13 @@ let adapter: WorkspaceDisplayPayloadAdapter | null = null;
 const REMEMBERED_ITEMS = 16;
 const REMEMBERED_ITEM_BYTES = 16_000;
 const SOURCE_DIFF_KIND = "source-diff";
+const APP_KIND = "app";
 
-type OpenItems = { payloads: DisplayTabPayload[]; viewing: string | null };
+type OpenItems = {
+  payloads: DisplayTabPayload[];
+  viewing: string | null;
+  apps?: string[];
+};
 
 const openItems = viewAtom<OpenItems>("workspace.openItems", {
   payloads: [],
@@ -30,21 +36,26 @@ const openItems = viewAtom<OpenItems>("workspace.openItems", {
 
 const rememberOpenItems = () => {
   const payloads: DisplayTabPayload[] = [];
+  const apps: string[] = [];
   for (const tab of displayTabs.getTabListSnapshot().tabs) {
+    if (tab.kind === APP_KIND) apps.push(tab.id);
     if (!tab.payload) continue;
     if (JSON.stringify(tab.payload).length > REMEMBERED_ITEM_BYTES) continue;
     payloads.push(tab.payload);
   }
   const viewing = fileViewer.getSnapshot().fileId;
   const remembered = openItems.get();
-  const next = { payloads: payloads.slice(-REMEMBERED_ITEMS), viewing };
+  const next = { payloads: payloads.slice(-REMEMBERED_ITEMS), viewing, apps };
   if (JSON.stringify(next) !== JSON.stringify(remembered)) openItems.set(next);
 };
 
 const keepOpen = { activate: false } as const;
 
 const reopenRememberedItems = (from: WorkspaceDisplayPayloadAdapter) => {
-  const { payloads, viewing } = openItems.get();
+  const { payloads, viewing, apps = [] } = openItems.get();
+  for (const id of apps) {
+    displayTabs.openTab(from.appTabSpec(id), keepOpen);
+  }
   for (const payload of payloads) {
     try {
       displayTabs.openTab(from.payloadToTabSpec(payload), {
@@ -65,7 +76,9 @@ const rebuildOpenItems = (from: WorkspaceDisplayPayloadAdapter) => {
       ? from.payloadToTabSpec(tab.payload)
       : tab.kind === SOURCE_DIFF_KIND
         ? from.createSourceDiffTabSpec()
-        : null;
+        : tab.kind === APP_KIND
+          ? { ...from.appTabSpec(tab.id), title: tab.title }
+          : null;
     if (!spec || spec.id !== tab.id) continue;
     displayTabs.openTab(spec, {
       ...keepOpen,
@@ -89,9 +102,15 @@ export const registerWorkspaceDisplayPayloadAdapter = (
 };
 
 export const closeOpenItems = (): void => {
-  fileViewer.close();
+  fileViewer.closeAll();
   for (const tab of displayTabs.getTabListSnapshot().tabs) {
-    if (tab.payload || tab.kind === SOURCE_DIFF_KIND) displayTabs.closeTab(tab.id);
+    if (
+      tab.payload ||
+      tab.kind === SOURCE_DIFF_KIND ||
+      tab.kind === APP_KIND
+    ) {
+      displayTabs.closeTab(tab.id);
+    }
   }
 };
 
@@ -110,28 +129,38 @@ export const openDisplayPayloadTab = (
 ): string => {
   const spec = getAdapter().payloadToTabSpec(payload);
   const activate = opts?.activate ?? true;
-  const asTab = isFilesPayload(payload) && opensAsStageTab(spec.kind);
   displayTabs.openTab(spec, {
     activate,
-    openPanel:
-      activate && asTab ? true : displayTabs.getLayoutSnapshot().panelOpen,
+    openPanel: displayTabs.getLayoutSnapshot().panelOpen,
   });
   if (!activate) return spec.id;
-  if (asTab) {
-    sidebarSections.openLocation("files", spec.id);
-  } else {
-    showInViewer(spec.id);
+  if (isFilesPayload(payload) && spec.kind === "canvas") {
+    sidebarSections.openDocument("files", spec.id);
   }
+  showInViewer(spec.id);
   return spec.id;
+};
+
+export const openAppTab = (id: string): void => {
+  const spec = getAdapter().appTabSpec(id);
+  const known = displayTabs
+    .getTabListSnapshot()
+    .tabs.some((tab) => tab.id === id);
+  if (!known) {
+    displayTabs.openTab(spec, {
+      ...keepOpen,
+      openPanel: displayTabs.getLayoutSnapshot().panelOpen,
+    });
+  }
+  sidebarSections.openDocument("apps", id);
+  showInViewer(id);
 };
 
 export const showInViewer = (id: string): void => {
   const active = sidebarSections.getActiveTab();
   if (
     displayTabs.getLayoutSnapshot().panelOpen &&
-    (active?.kind === "browser" ||
-      active?.kind === "apps" ||
-      active?.kind === "takeover")
+    (active?.kind === "browser" || active?.kind === "takeover")
   ) {
     displayTabs.setPanelOpen(false);
   }

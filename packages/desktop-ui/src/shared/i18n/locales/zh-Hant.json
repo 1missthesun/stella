@@ -3421,6 +3421,8 @@
     "copyMessage": "複製訊息",
     "copyAsMarkdown": "複製為 Markdown",
     "copyPublicLink": "複製公開連結",
+    "detachViewer": "在獨立視窗中開啟",
+    "dockViewer": "移回 Stella",
     "expandViewer": "展開",
     "shrinkViewer": "縮小為浮動檢視器",
     "closeViewer": "關閉檢視器",

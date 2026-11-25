@@ -10,12 +10,19 @@ export type FileViewerRect = {
   height: number;
 };
 
+export type DetachedViewer = { name: string; fileId: string };
+
 export type FileViewerState = {
   fileId: string | null;
   mode: FileViewerMode;
   rect: FileViewerRect | null;
-  detail: string | null;
+  detached: readonly DetachedViewer[];
 };
+
+/** Where a viewer shows its item: inside Stella, or a detached window's name. */
+export type ViewerSurface = "docked" | (string & {});
+
+export const DOCKED: ViewerSurface = "docked";
 
 type Listener = () => void;
 
@@ -59,7 +66,7 @@ let state: FileViewerState = {
   fileId: null,
   mode: preferredMode,
   rect: readRect(),
-  detail: null,
+  detached: [],
 };
 const listeners = new Set<Listener>();
 
@@ -67,6 +74,26 @@ const emit = (next: FileViewerState) => {
   state = next;
   for (const listener of listeners) listener();
 };
+
+let closeWindow: (name: string) => void = () => {};
+let focusWindow: (name: string) => void = () => {};
+
+export const connectViewerWindows = (windows: {
+  close: (name: string) => void;
+  focus: (name: string) => void;
+}): void => {
+  closeWindow = windows.close;
+  focusWindow = windows.focus;
+};
+
+const without = (name: string) =>
+  state.detached.filter((viewer) => viewer.name !== name);
+
+const detachedWith = (fileId: string): DetachedViewer | undefined =>
+  state.detached.find((viewer) => viewer.fileId === fileId);
+
+const openMode = (): FileViewerMode =>
+  state.fileId ? state.mode : preferredMode;
 
 export const fileViewer = {
   subscribe(listener: Listener) {
@@ -78,18 +105,73 @@ export const fileViewer = {
   getSnapshot(): FileViewerState {
     return state;
   },
+  surfaceOf(fileId: string): ViewerSurface | null {
+    if (state.fileId === fileId) return DOCKED;
+    return detachedWith(fileId)?.name ?? null;
+  },
   open(fileId: string) {
     if (state.fileId === fileId) return;
+    const detached = detachedWith(fileId);
+    if (detached) {
+      focusWindow(detached.name);
+      return;
+    }
+    emit({ ...state, fileId, mode: openMode() });
+  },
+  /** Puts an item on a surface that is already open, as its strip does. */
+  show(surface: ViewerSurface, fileId: string) {
+    const elsewhere = detachedWith(fileId);
+    if (elsewhere?.name === surface) return;
+    if (elsewhere) this.closeDetached(elsewhere.name);
+    if (surface === DOCKED) {
+      emit({ ...state, fileId, mode: openMode() });
+      return;
+    }
     emit({
       ...state,
-      fileId,
-      mode: state.fileId ? state.mode : preferredMode,
-      detail: null,
+      fileId: state.fileId === fileId ? null : state.fileId,
+      detached: state.detached.map((viewer) =>
+        viewer.name === surface ? { ...viewer, fileId } : viewer,
+      ),
     });
   },
   close() {
     if (!state.fileId) return;
-    emit({ ...state, fileId: null, detail: null });
+    emit({ ...state, fileId: null });
+  },
+  closeItem(fileId: string) {
+    if (state.fileId === fileId) this.close();
+    const detached = detachedWith(fileId);
+    if (detached) this.closeDetached(detached.name);
+  },
+  closeAll() {
+    for (const viewer of state.detached) this.closeDetached(viewer.name);
+    this.close();
+  },
+  detach(viewer: DetachedViewer) {
+    emit({
+      ...state,
+      fileId: state.fileId === viewer.fileId ? null : state.fileId,
+      detached: [...without(viewer.name), viewer],
+    });
+  },
+  closeDetached(name: string) {
+    if (!state.detached.some((viewer) => viewer.name === name)) return;
+    emit({ ...state, detached: without(name) });
+    closeWindow(name);
+  },
+  /** Brings a detached viewer back inside Stella, floating at `rect`. */
+  dock(name: string, rect?: FileViewerRect) {
+    const viewer = state.detached.find((entry) => entry.name === name);
+    if (!viewer) return;
+    emit({
+      ...state,
+      fileId: viewer.fileId,
+      mode: rect ? "float" : openMode(),
+      rect: rect ?? state.rect,
+      detached: without(name),
+    });
+    closeWindow(name);
   },
   expand() {
     if (!state.fileId || state.mode === "stage") return;
@@ -105,13 +187,9 @@ export const fileViewer = {
     if (state.mode === "stage") this.collapse();
     else this.expand();
   },
-  setRect(rect: FileViewerRect, persist = true) {
+  setRect(rect: FileViewerRect) {
     emit({ ...state, rect });
-    if (persist) uiState.setItem(STORAGE_KEY_RECT, JSON.stringify(rect));
-  },
-  setDetail(fileId: string, detail: string | null) {
-    if (state.fileId !== fileId || state.detail === detail) return;
-    emit({ ...state, detail });
+    uiState.setItem(STORAGE_KEY_RECT, JSON.stringify(rect));
   },
 };
 
@@ -130,9 +208,7 @@ export const useFileViewerStageOpen = (): boolean =>
   );
 
 export const isExclusiveStageSection = (section: string | null | undefined) =>
-  section === "browser" || section === "apps" || section === "takeover";
-
-export const opensAsStageTab = (kind: string): boolean => kind === "canvas";
+  section === "browser" || section === "takeover";
 
 export const VIEWER_SELECTION_SURFACE = "stella-viewer";
 

@@ -148,8 +148,19 @@ export const CANVAS_BRIDGE_SCRIPT = String.raw`
   };
   window.addEventListener("mouseup", () => setTimeout(post, 0), true);
   document.addEventListener("selectionchange", () => setTimeout(post, 0));
+  let scrolledTimer = 0;
+  window.addEventListener("scroll", () => {
+    scrolledTimer ||= window.setTimeout(() => {
+      scrolledTimer = 0;
+      parent.postMessage({ type: "stella:canvas-scrolled", x: scrollX, y: scrollY }, "*");
+    }, 100);
+  }, { passive: true });
+  const hostWindow = parent.opener;
+  const hostOrigin = location.ancestorOrigins && location.ancestorOrigins[0];
   window.addEventListener("message", (event) => {
-    if (event.source !== parent) return;
+    const fromHost = event.source === parent ||
+      (Boolean(hostWindow) && event.source === hostWindow && event.origin === hostOrigin);
+    if (!fromHost) return;
     if (event.data && event.data.type === "stella:canvas-selection-clear") {
       window.getSelection()?.removeAllRanges();
       post();
@@ -157,6 +168,9 @@ export const CANVAS_BRIDGE_SCRIPT = String.raw`
     if (event.data && event.data.type === "stella:canvas-scroll" &&
         typeof event.data.fragment === "string") {
       scrollToFragment(event.data.fragment);
+    } else if (event.data && event.data.type === "stella:canvas-scroll" &&
+        Number.isFinite(event.data.x) && Number.isFinite(event.data.y)) {
+      window.scrollTo({ left: event.data.x, top: event.data.y, behavior: "instant" });
     }
   });
 })();

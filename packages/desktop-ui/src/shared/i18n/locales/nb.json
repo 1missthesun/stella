@@ -3455,6 +3455,8 @@
     "copyMessage": "Kopier melding",
     "copyAsMarkdown": "Kopier som Markdown",
     "copyPublicLink": "Kopier offentlig lenke",
+    "detachViewer": "Åpne i eget vindu",
+    "dockViewer": "Flytt tilbake til Stella",
     "expandViewer": "Utvid",
     "shrinkViewer": "Krymp til flytende visning",
     "closeViewer": "Lukk visningen",

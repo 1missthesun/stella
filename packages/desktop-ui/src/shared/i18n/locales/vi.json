@@ -3421,6 +3421,8 @@
     "copyMessage": "Sao chép tin nhắn",
     "copyAsMarkdown": "Sao chép dạng Markdown",
     "copyPublicLink": "Sao chép liên kết công khai",
+    "detachViewer": "Mở trong cửa sổ riêng",
+    "dockViewer": "Đưa trở lại Stella",
     "expandViewer": "Mở rộng",
     "shrinkViewer": "Thu nhỏ thành trình xem nổi",
     "closeViewer": "Đóng trình xem",

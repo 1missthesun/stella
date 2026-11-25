@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Folder, Globe, Image as ImageGlyph, MessageSquare, Trash2 } from "@/ui/icons";
+import { AppWindowMac, Folder, Globe, Image as ImageGlyph, MessageSquare, Trash2 } from "@/ui/icons";
 import { CustomHouse } from "@/ui/nav-icons";
 import type { DisplayTabKind } from "./types";
 
@@ -351,6 +351,10 @@ const UrlIcon = ({ size = 18, style }: IconProps) => (
   <Globe size={size} strokeWidth={1.5} style={style} />
 );
 
+const AppIcon = ({ size = 18, style }: IconProps) => (
+  <AppWindowMac size={size} strokeWidth={1.5} style={style} />
+);
+
 export const DisplayTabIcon = ({
   kind,
   size,
@@ -367,6 +371,8 @@ export const DisplayTabIcon = ({
       return <ChatIcon size={size} style={style} />;
     case "canvas":
       return <CanvasIcon size={size} style={style} />;
+    case "app":
+      return <AppIcon size={size} style={style} />;
     case "image":
       return <ImageIcon size={size} style={style} />;
     case "media":

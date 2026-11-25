@@ -3519,6 +3519,8 @@
     "copyMessage": "Копировать сообщение",
     "copyAsMarkdown": "Копировать как Markdown",
     "copyPublicLink": "Копировать публичную ссылку",
+    "detachViewer": "Открыть в отдельном окне",
+    "dockViewer": "Вернуть в Stella",
     "expandViewer": "Развернуть",
     "shrinkViewer": "Свернуть в плавающее окно",
     "closeViewer": "Закрыть просмотр",

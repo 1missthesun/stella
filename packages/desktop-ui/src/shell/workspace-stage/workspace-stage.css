@@ -111,6 +111,39 @@
   pointer-events: none;
 }
 
+.file-viewer[data-closed="true"] {
+  animation: none;
+}
+
+.file-viewer[data-interacting="true"] {
+  will-change: transform;
+}
+
+.file-viewer[data-mode="window"] {
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+
+.file-viewer[data-mode="window"] .file-viewer__header {
+  cursor: default;
+  -webkit-app-region: drag;
+}
+
+.file-viewer[data-mode="window"][data-platform="darwin"] .file-viewer__header {
+  padding-left: 78px;
+}
+
+.file-viewer[data-mode="window"] .file-viewer__header :is(button, input, a) {
+  -webkit-app-region: no-drag;
+}
+
+html[data-viewer-gesture="true"] {
+  user-select: none;
+}
+
 .file-viewer[data-interacting="true"] iframe,
 .file-viewer[data-interacting="true"] video {
   pointer-events: none;
@@ -229,17 +262,40 @@
   overflow: hidden;
 }
 
-.file-viewer__body > * {
+.file-viewer__slot {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.file-viewer[data-mode="stage"]
-  .file-viewer__body
-  > .right-sidebar__rich--markdown,
-.file-viewer[data-mode="stage"]
-  .file-viewer__body
-  > .right-sidebar__rich--diff {
+.file-viewer__host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.file-viewer__item {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.file-viewer__item[data-retained-surface="shown"] {
+  pointer-events: auto;
+}
+
+.file-viewer__item > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.file-viewer:is([data-mode="stage"], [data-mode="window"])
+  .file-viewer__item
+  > :is(.right-sidebar__rich--markdown, .right-sidebar__rich--diff) {
   width: 100%;
   max-width: 1040px;
   margin-inline: auto;

@@ -5,6 +5,7 @@ export type DisplayTabKind =
   | "home"
   | "chat"
   | "canvas"
+  | "app"
   | "url"
   | "markdown"
   | "source-diff"

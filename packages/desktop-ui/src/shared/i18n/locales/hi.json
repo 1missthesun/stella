@@ -3455,6 +3455,8 @@
     "copyMessage": "संदेश कॉपी करें",
     "copyAsMarkdown": "Markdown के रूप में कॉपी करें",
     "copyPublicLink": "सार्वजनिक लिंक कॉपी करें",
+    "detachViewer": "अलग विंडो में खोलें",
+    "dockViewer": "Stella में वापस लाएँ",
     "expandViewer": "विस्तृत करें",
     "shrinkViewer": "फ़्लोटिंग व्यूअर में छोटा करें",
     "closeViewer": "व्यूअर बंद करें",

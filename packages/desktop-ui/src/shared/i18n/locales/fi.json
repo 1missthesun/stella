@@ -3455,6 +3455,8 @@
     "copyMessage": "Kopioi viesti",
     "copyAsMarkdown": "Kopioi Markdownina",
     "copyPublicLink": "Kopioi julkinen linkki",
+    "detachViewer": "Avaa omassa ikkunassa",
+    "dockViewer": "Siirrä takaisin Stellaan",
     "expandViewer": "Laajenna",
     "shrinkViewer": "Pienennä kelluvaksi katseluikkunaksi",
     "closeViewer": "Sulje katseluikkuna",

@@ -3455,6 +3455,8 @@
     "copyMessage": "Bericht kopiëren",
     "copyAsMarkdown": "Kopiëren als Markdown",
     "copyPublicLink": "Openbare link kopiëren",
+    "detachViewer": "In eigen venster openen",
+    "dockViewer": "Terug naar Stella",
     "expandViewer": "Vergroten",
     "shrinkViewer": "Verkleinen tot zwevende viewer",
     "closeViewer": "Viewer sluiten",

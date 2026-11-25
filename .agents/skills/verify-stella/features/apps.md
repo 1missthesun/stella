@@ -5,9 +5,9 @@ Apps is Stella's library for cloud-backed user apps. The surface can be signed o
 ## Sub-features
 
 - `apps-open` opens the Apps tab from the top bar's + menu.
-- `apps-library` lists app cards; each opens as its own top-bar tab on the stage.
+- `apps-library` lists app cards; each opens in the viewer, with its own top-bar tab.
 - `apps-empty` hands a create-app request into chat.
-- `apps-cloud` opens a cloud app in its retained frame (kept alive while you switch tabs).
+- `apps-cloud` opens a cloud app in the viewer (`features/cloud/CloudAppViewer.tsx`); it keeps running while its tab is open, but reloads when it moves into or out of a window of its own.
 
 ## How to get to it (user POV)
 
@@ -26,7 +26,7 @@ Preconditions:
 - **Observe.** Run `node .agents/skills/verify-stella/control-stella.mjs apps state`. Read the returned surface text and inspect the visible content to assess loading, empty, populated, or error behavior. The helper does not infer readiness from absent error text.
 - **Empty handoff.** Only in an empty state, run `node .agents/skills/verify-stella/control-stella.mjs apps ask` (clicks the first example). Require its request in the real composer. Do not send it unless generation is in scope.
 - **Loading and failure.** Hold or fail `*/owners/me/apps` with CDP `Fetch` on the full-window page target, then `Page.reload` (the list is remembered in memory until a reload). The list only loads while the window is visible.
-- **Populated library.** Inspect a named card, open it, and capture the app's own tab (`activeTab` in `inspect state`).
+- **Populated library.** Inspect a named card, open it, and capture the viewer.
 
 ## Gotchas
 

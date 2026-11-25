@@ -1,10 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { CloudAppsLibrary } from "@/features/cloud/CloudAppsLibrary";
-import { PersistentCloudAppsHost } from "@/features/cloud/PersistentCloudAppsHost";
-import { isCloudAppLocation } from "@/features/cloud/open-cloud-app-panel";
+import { CloudAppsSync } from "@/features/cloud/CloudAppsSync";
 import { useCloudApps } from "@/features/cloud/use-cloud-apps";
-import { useSidebarSectionLocation } from "@/features/workspace-display/sidebar-sections";
 import { useT } from "@/shared/i18n";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { dispatchComposeText } from "@/shared/lib/stella-orb-chat";
@@ -16,20 +14,13 @@ const SESSION_STALL_MS = 15_000;
 
 export function AppsSection() {
   const cloudApps = useCloudApps();
-  const openCloudApp = isCloudAppLocation(useSidebarSectionLocation("apps"));
   return (
-    <>
-      {/* Back-to-library nav lives in the top bar now (browser-tab model),
-          so there is no in-body section header here. */}
-      <div className="apps-section__body">
-        {openCloudApp ? null : (
-          <div className="apps-section__library">
-            <AppsLibraryBody state={cloudApps} />
-          </div>
-        )}
-        <PersistentCloudAppsHost state={cloudApps} />
+    <div className="apps-section__body">
+      <div className="apps-section__library">
+        <AppsLibraryBody state={cloudApps} />
       </div>
-    </>
+      <CloudAppsSync state={cloudApps} />
+    </div>
   );
 }
 

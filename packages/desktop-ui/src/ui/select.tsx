@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { ChevronDown } from "@/ui/icons";
+import { usePortalContainer } from "./portal-container";
 import { cn } from "@/shared/lib/utils";
 
 export interface SelectOption<T extends string = string> {
@@ -37,6 +38,7 @@ export function Select<T extends string = string>({
   ...rest
 }: SelectProps<T>) {
   const ariaLabel = rest["aria-label"];
+  const container = usePortalContainer();
   const selected = options.find((option) => option.value === value);
   const display = selected?.label ?? placeholder ?? "";
 
@@ -63,7 +65,7 @@ export function Select<T extends string = string>({
           <span data-slot="select-value">{display}</span>
           <ChevronDown size={14} data-slot="select-icon" aria-hidden="true" />
         </DropdownMenuPrimitive.Trigger>
-        <DropdownMenuPrimitive.Portal>
+        <DropdownMenuPrimitive.Portal container={container}>
           <DropdownMenuPrimitive.Content
             data-component="dropdown-menu-content"
             data-slot="select-content"

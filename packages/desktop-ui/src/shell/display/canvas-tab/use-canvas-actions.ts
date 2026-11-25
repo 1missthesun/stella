@@ -6,6 +6,7 @@ import {
   type CanvasAction,
   type CanvasActionEvent,
 } from "@stella/contracts/canvas-actions";
+import { useViewerWindow } from "@/shell/workspace-stage/viewer-item-context";
 import { STELLA_SEND_MESSAGE_EVENT } from "@/shared/lib/stella-send-message";
 
 export type CanvasIdentity = { canvas: string; title: string };
@@ -28,8 +29,8 @@ export const sendCanvasActionToChat = (event: CanvasActionEvent): Promise<boolea
     window.setTimeout(() => done(false), 15_000);
   });
 
-const userActivationLapsed = (): boolean => {
-  const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } })
+const userActivationLapsed = (viewerWindow: Window): boolean => {
+  const activation = (viewerWindow.navigator as Navigator & { userActivation?: { isActive: boolean } })
     .userActivation;
   return activation ? !activation.isActive : false;
 };
@@ -44,8 +45,9 @@ export function useCanvasActions(args: {
   ) => Promise<CanvasActionOutcome | undefined> | CanvasActionOutcome | undefined;
 }): { onFrameLoad: () => void } {
   const portRef = useRef<MessagePort | null>(null);
-  const latest = useRef(args);
-  latest.current = args;
+  const viewerWindow = useViewerWindow();
+  const latest = useRef({ ...args, viewerWindow });
+  latest.current = { ...args, viewerWindow };
 
   const post = useCallback((message: unknown) => {
     try {
@@ -56,9 +58,9 @@ export function useCanvasActions(args: {
   const handle = useCallback(
     async (message: unknown) => {
       if (!isCanvasBridgeAction(message)) return;
-      const { actions, identity, onAction } = latest.current;
+      const { actions, identity, onAction, viewerWindow } = latest.current;
       const declared = actions?.find((action) => action.id === message.id);
-      if (!declared || userActivationLapsed()) {
+      if (!declared || userActivationLapsed(viewerWindow)) {
         if (!declared) console.warn(`Stella canvas: "${message.id}" is not one of this canvas's declared actions.`);
         post({ type: "state", id: message.id, state: "refused" });
         return;

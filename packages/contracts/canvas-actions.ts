@@ -293,12 +293,19 @@ export const CANVAS_ACTION_FRAME_BRIDGE = canvasActionBridgeSource(String.raw`((
     const portsOf = Object.getOwnPropertyDescriptor(MessageEvent.prototype, "ports").get;
     const portPost = MessagePort.prototype.postMessage;
     const portStart = MessagePort.prototype.start;
+    const originOf = Object.getOwnPropertyDescriptor(MessageEvent.prototype, "origin").get;
     const parentWindow = window.parent;
+    // In a viewer window of its own, the host is the app window that opened it.
+    const hostWindow = parentWindow.opener;
+    const hostOrigin = location.ancestorOrigins && location.ancestorOrigins[0];
     let port = null;
     let receive = null;
     const queued = [];
     apply(addListener, window, ["message", (event) => {
-      if (apply(sourceOf, event, []) !== parentWindow) return;
+      const source = apply(sourceOf, event, []);
+      const fromHost = source === parentWindow ||
+        (Boolean(source) && source === hostWindow && apply(originOf, event, []) === hostOrigin);
+      if (!fromHost) return;
       const data = apply(dataOf, event, []);
       if (!data || data.type !== "stella:canvas-port") return;
       // Every port the host hands over is the bridge's; the page never sees one.

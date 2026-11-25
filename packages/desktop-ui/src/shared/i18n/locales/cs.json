@@ -3519,6 +3519,8 @@
     "copyMessage": "Kopírovat zprávu",
     "copyAsMarkdown": "Kopírovat jako Markdown",
     "copyPublicLink": "Kopírovat veřejný odkaz",
+    "detachViewer": "Otevřít v samostatném okně",
+    "dockViewer": "Vrátit do Stelly",
     "expandViewer": "Rozbalit",
     "shrinkViewer": "Zmenšit na plovoucí prohlížeč",
     "closeViewer": "Zavřít prohlížeč",

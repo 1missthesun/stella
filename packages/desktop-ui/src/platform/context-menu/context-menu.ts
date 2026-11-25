@@ -81,12 +81,16 @@ const state: MenuState = (globalThis.__stellaContextMenus ??= {
   collect: async () => {},
 });
 
+// Not instanceof: a detached viewer's nodes belong to another window's realm.
+const isNode = (target: EventTarget | null): target is Node =>
+  target !== null && "nodeType" in target;
+
 const elementOf = (target: EventTarget | null): Element | null =>
-  target instanceof Element
-    ? target
-    : target instanceof Node
-      ? target.parentElement
-      : null;
+  isNode(target)
+    ? target.nodeType === Node.ELEMENT_NODE
+      ? (target as Element)
+      : target.parentElement
+    : null;
 
 export const addContextMenu = (
   event: Event | ReactMouseEvent,
@@ -196,7 +200,7 @@ const collect = async (request: ContextMenuCollectRequest) => {
     before !== null &&
     before.trim().length === 0 &&
     target.closest(CONTROL_SELECTOR) !== null;
-  if (ignoreSelection) window.getSelection()?.removeAllRanges();
+  if (ignoreSelection) target.ownerDocument.getSelection()?.removeAllRanges();
   const context: MenuContext = {
     target,
     selectionText: ignoreSelection ? "" : request.selectionText,
@@ -256,19 +260,17 @@ const waitForFocus = (): Promise<void> =>
         window.addEventListener("focus", done);
       });
 
-export const installContextMenus = (): void => {
-  const api = window.electronAPI?.contextMenu;
-  if (state.installed || !api) return;
-  state.installed = true;
-  window.addEventListener(
+/** Also gathers menus for a window drawn from this one. */
+export const trackContextMenus = (target: Window): void => {
+  target.addEventListener(
     "pointerdown",
     (event) => {
       state.selectedBeforePress =
-        event.button === 2 ? (window.getSelection()?.toString() ?? "") : null;
+        event.button === 2 ? (target.getSelection()?.toString() ?? "") : null;
     },
     true,
   );
-  window.addEventListener(
+  target.addEventListener(
     "contextmenu",
     (event) => {
       const target = elementOf(event.target);
@@ -283,6 +285,13 @@ export const installContextMenus = (): void => {
     },
     true,
   );
+};
+
+export const installContextMenus = (): void => {
+  const api = window.electronAPI?.contextMenu;
+  if (state.installed || !api) return;
+  state.installed = true;
+  trackContextMenus(window);
   api.onCollect((request) => {
     void state.collect(request);
   });

@@ -1,5 +1,5 @@
 import type { CloudApp } from "./cloud-api";
-import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
+import { openAppTab } from "@/features/workspace-display/open-payload";
 
 const CLOUD_APP_LOCATION_PREFIX = "cloud:";
 
@@ -12,12 +12,6 @@ export const cloudAppIdFromLocation = (location: string | null): string | null =
   return appId || null;
 };
 
-export const isCloudAppLocation = (location: string | null): boolean =>
-  cloudAppIdFromLocation(location) !== null;
-
-export const openCloudAppPanel = (
-  app: Pick<CloudApp, "appId">,
-): void => {
-  sidebarSections.openLocation("apps", cloudAppLocation(app.appId));
+export const openCloudAppPanel = (app: Pick<CloudApp, "appId">): void => {
+  openAppTab(cloudAppLocation(app.appId));
 };
-

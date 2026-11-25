@@ -3487,6 +3487,8 @@
     "copyMessage": "העתק הודעה",
     "copyAsMarkdown": "העתק כ-Markdown",
     "copyPublicLink": "העתק קישור ציבורי",
+    "detachViewer": "פתיחה בחלון נפרד",
+    "dockViewer": "החזרה אל Stella",
     "expandViewer": "הרחב",
     "shrinkViewer": "כווץ לחלון צף",
     "closeViewer": "סגור את המציג",

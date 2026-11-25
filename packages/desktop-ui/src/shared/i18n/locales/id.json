@@ -3421,6 +3421,8 @@
     "copyMessage": "Salin pesan",
     "copyAsMarkdown": "Salin sebagai Markdown",
     "copyPublicLink": "Salin tautan publik",
+    "detachViewer": "Buka di jendela sendiri",
+    "dockViewer": "Kembalikan ke Stella",
     "expandViewer": "Perluas",
     "shrinkViewer": "Perkecil ke penampil mengambang",
     "closeViewer": "Tutup penampil",

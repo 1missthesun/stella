@@ -12,7 +12,6 @@ import {
 } from "@/features/workspace-display/files-index";
 import { fileViewer } from "@/features/workspace-display/file-viewer-store";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
-import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import type { DisplayTabKind } from "@/features/workspace-display/types";
 
 const STRIP_KINDS: ReadonlySet<DisplayTabKind> = new Set([
@@ -166,9 +165,6 @@ export const useViewerSiblings = (
 
 export const showSibling = (fromId: string, entry: FileEntry): void => {
   openDisplayPayloadTab(entry.payload, { activate: false });
-  if (fileViewer.getSnapshot().fileId === fromId) {
-    fileViewer.open(entry.id);
-  } else {
-    sidebarSections.setLocation("files", entry.id);
-  }
+  const surface = fileViewer.surfaceOf(fromId);
+  if (surface) fileViewer.show(surface, entry.id);
 };

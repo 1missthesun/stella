@@ -1,5 +1,6 @@
 import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { usePortalContainer } from "./portal-container";
 import { cn } from "@/shared/lib/utils";
 
 const PopoverRoot = PopoverPrimitive.Root;
@@ -13,7 +14,10 @@ const PopoverContent = React.forwardRef<
     { className, sideOffset = 4, children, forceMount, ...props },
     ref,
   ) => (
-    <PopoverPrimitive.Portal forceMount={forceMount}>
+    <PopoverPrimitive.Portal
+      forceMount={forceMount}
+      container={usePortalContainer()}
+    >
       <PopoverPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}

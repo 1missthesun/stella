@@ -3583,6 +3583,8 @@
     "copyMessage": "نسخ الرسالة",
     "copyAsMarkdown": "نسخ بتنسيق Markdown",
     "copyPublicLink": "نسخ رابط عام",
+    "detachViewer": "فتح في نافذة منفصلة",
+    "dockViewer": "إعادة إلى Stella",
     "expandViewer": "توسيع",
     "shrinkViewer": "تصغير إلى عارض عائم",
     "closeViewer": "إغلاق العارض",

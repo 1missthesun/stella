@@ -13,6 +13,23 @@ export function FileSidebarTabExistenceReconciler() {
   );
 
   useEffect(() => {
+    for (const tab of sidebarTabs) {
+      const open =
+        tab.kind === "files" && tab.location !== null
+          ? tabs.find((item) => item.id === tab.location)
+          : undefined;
+      if (!open?.payload) continue;
+      sidebarSections.rememberFile(
+        tab.id,
+        open.id,
+        open.title,
+        open.kind,
+        open.payload,
+      );
+    }
+  }, [sidebarTabs, tabs]);
+
+  useEffect(() => {
     const nextDisplayTabIds = new Set(tabs.map((tab) => tab.id));
     const removedDisplayTabIds = new Set(
       [...previousDisplayTabIds.current].filter(

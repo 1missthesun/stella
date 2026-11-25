@@ -3519,6 +3519,8 @@
     "copyMessage": "Kopiuj wiadomość",
     "copyAsMarkdown": "Kopiuj jako Markdown",
     "copyPublicLink": "Kopiuj link publiczny",
+    "detachViewer": "Otwórz w osobnym oknie",
+    "dockViewer": "Przenieś z powrotem do Stelli",
     "expandViewer": "Rozwiń",
     "shrinkViewer": "Zmniejsz do pływającego podglądu",
     "closeViewer": "Zamknij podgląd",

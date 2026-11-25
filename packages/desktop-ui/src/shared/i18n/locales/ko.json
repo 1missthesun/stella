@@ -3421,6 +3421,8 @@
     "copyMessage": "메시지 복사",
     "copyAsMarkdown": "Markdown으로 복사",
     "copyPublicLink": "공개 링크 복사",
+    "detachViewer": "별도 창에서 열기",
+    "dockViewer": "Stella로 되돌리기",
     "expandViewer": "확장",
     "shrinkViewer": "떠 있는 뷰어로 축소",
     "closeViewer": "뷰어 닫기",

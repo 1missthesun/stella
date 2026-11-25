@@ -1,4 +1,5 @@
 import {
+  isDocumentTab,
   useActiveSidebarSection,
   useSidebarActiveTabId,
   useSidebarOpenTabs,
@@ -48,24 +49,17 @@ export function SidebarSectionBody() {
       <FileSidebarTabExistenceReconciler />
       {tabs.map((tab) => {
         const Body = PER_ITEM_BODIES[tab.kind];
-        if (!Body) return null;
+        if (!Body || isDocumentTab(tab)) return null;
         return (
           <SectionHost
             key={tab.id}
             section={tab.kind}
             active={tab.id === activeTabId}
           >
-            <Body
-              tabId={tab.id}
-              location={tab.location}
-              active={tab.id === activeTabId}
-            />
+            <Body location={tab.location} active={tab.id === activeTabId} />
           </SectionHost>
         );
       })}
-      {/* Shared singletons: one apps host + one embedded browser. They render
-          whichever apps/browser tab is active (the active tab's slug / empty
-          browser); switching between apps/browser tabs re-points them. */}
       <SectionHost section="apps" active={appsActive}>
         <AppsSection />
       </SectionHost>

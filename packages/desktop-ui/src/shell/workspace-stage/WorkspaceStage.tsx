@@ -6,13 +6,12 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
-  useSyncExternalStore,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import {
   type DisplayTabPayload,
   normalizeDisplayPayload,
@@ -22,13 +21,21 @@ import type { ChatContext } from "@/shared/types/electron";
 type ChatAppSelection = NonNullable<ChatContext["appSelections"]>[number];
 import { useChatRuntime } from "@/context/use-chat-runtime";
 import { getComposerAppSelections } from "@/features/chat/composer-context";
+import { detachedWindows } from "@/features/workspace-display/detached-windows";
 import {
+  DOCKED,
   fileViewer,
   isExclusiveStageSection,
   useFileViewer,
   VIEWER_SELECTION_SURFACE,
-  type FileViewerRect,
+  type FileViewerMode,
+  type ViewerSurface,
 } from "@/features/workspace-display/file-viewer-store";
+import {
+  useViewerItem,
+  viewerItems,
+  type ViewerNav,
+} from "@/features/workspace-display/viewer-items";
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
 import { useTabStageVisible } from "@/features/workspace-display/tab-stage-visible";
 import {
@@ -36,9 +43,11 @@ import {
   openDisplayPayloadTab,
 } from "@/features/workspace-display/open-payload";
 import {
+  isDocumentTab,
   sidebarSections,
   useSidebarActiveTabId,
   useSidebarOpenTabs,
+  type SidebarTab,
 } from "@/features/workspace-display/sidebar-sections";
 import {
   displayTabs,
@@ -80,19 +89,34 @@ import {
 import { RetainedSurface } from "@/ui/retained-surface";
 import { translateNow, useT } from "@/shared/i18n";
 import {
-  contextMenu,
+  addContextMenu,
   fileMenu,
   linkMenu,
   type MenuBuilder,
   type MenuSection,
 } from "@/platform/context-menu";
+import { PortalContainerContext } from "@/ui/portal-container";
+import { ViewerItemContext, ViewerSurfaceContext } from "./viewer-item-context";
 import {
-  ViewerActionsContext,
-  ViewerItemContext,
-  ViewerNavContext,
-  type ViewerItemActions,
-  type ViewerNav,
-} from "./viewer-item-context";
+  clampFloatRect,
+  defaultFloatRect,
+  FLOAT_MIN_HEIGHT,
+  FLOAT_MIN_WIDTH,
+  useGeometry,
+  useGeometryTracking,
+} from "./viewer-geometry";
+import { dragViewer, resizeViewer } from "./viewer-drag";
+import {
+  createViewerHost,
+  dropViewerHost,
+  placeViewerHost,
+  registerViewerSlot,
+} from "./viewer-hosts";
+import {
+  canDetachViewer,
+  popOutViewer,
+  reopenViewerWindows,
+} from "./viewer-windows";
 import { ViewerStrip } from "./ViewerStrip";
 import { showSibling, useViewerSiblings } from "./viewer-siblings";
 import "@/shell/right-sidebar.css";
@@ -103,164 +127,6 @@ export interface WorkspaceStageHandle {
   update(payload: DisplayTabPayload, opts?: { tab?: boolean }): void;
   close(): void;
 }
-
-const STAGE_GAP_ABOVE_COMPOSER = 12;
-const STAGE_BOTTOM_WITHOUT_COMPOSER = 14;
-const FLOAT_MARGIN = 8;
-const FLOAT_MIN_WIDTH = 320;
-const FLOAT_MIN_HEIGHT = 220;
-const FLOAT_TOP_GAP = 10;
-
-type Geometry = {
-  topbar: number;
-  viewportWidth: number;
-  viewportHeight: number;
-  floor: number;
-  composer: { left: number; width: number } | null;
-};
-
-const readTopbarHeight = (): number => {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(
-    "--shell-topbar-height",
-  );
-  const parsed = Number.parseFloat(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 38;
-};
-
-const findComposerShell = (): HTMLElement | null => {
-  const surface = document.querySelector(".persistent-chat-surface--active");
-  if (!surface) return null;
-  let best: { el: HTMLElement; bottom: number } | null = null;
-  for (const el of surface.querySelectorAll<HTMLElement>(".composer-shell")) {
-    if (el.closest("[inert]")) continue;
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) continue;
-    if (!best || rect.bottom > best.bottom) best = { el, bottom: rect.bottom };
-  }
-  return best?.el ?? null;
-};
-
-const topOfComposerArea = (shell: HTMLElement, top: number): number => {
-  let el = shell.closest(".composer-wrap")?.previousElementSibling ?? null;
-  while (el && !el.classList.contains("chat-viewport-region")) {
-    const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) top = Math.min(top, rect.top);
-    el = el.previousElementSibling;
-  }
-  return top;
-};
-
-const measureGeometry = (): Geometry => {
-  const shell = findComposerShell();
-  const composer = shell?.getBoundingClientRect() ?? null;
-  const viewportHeight = window.innerHeight;
-  return {
-    topbar: readTopbarHeight(),
-    viewportWidth: window.innerWidth,
-    viewportHeight,
-    floor:
-      shell && composer
-        ? topOfComposerArea(shell, composer.top) - STAGE_GAP_ABOVE_COMPOSER
-        : viewportHeight - STAGE_BOTTOM_WITHOUT_COMPOSER,
-    composer: composer ? { left: composer.left, width: composer.width } : null,
-  };
-};
-
-const sameGeometry = (a: Geometry, b: Geometry) =>
-  a.topbar === b.topbar &&
-  a.viewportWidth === b.viewportWidth &&
-  a.viewportHeight === b.viewportHeight &&
-  Math.round(a.floor) === Math.round(b.floor) &&
-  Math.round(a.composer?.left ?? -1) === Math.round(b.composer?.left ?? -1) &&
-  Math.round(a.composer?.width ?? -1) === Math.round(b.composer?.width ?? -1);
-
-// @reloadable the geometry is measured again on first use
-let geometry: Geometry | null = null;
-const geometryListeners = new Set<() => void>();
-const refreshGeometry = () => {
-  const next = measureGeometry();
-  if (geometry && sameGeometry(geometry, next)) return;
-  geometry = next;
-  document.documentElement.style.setProperty(
-    "--workspace-stage-bottom",
-    `${Math.max(0, Math.round(next.viewportHeight - next.floor))}px`,
-  );
-  for (const listener of geometryListeners) listener();
-};
-const subscribeGeometry = (listener: () => void) => {
-  geometryListeners.add(listener);
-  return () => {
-    geometryListeners.delete(listener);
-  };
-};
-const getGeometry = (): Geometry => {
-  if (!geometry) refreshGeometry();
-  return geometry!;
-};
-
-const useGeometryTracking = (active: boolean) => {
-  useLayoutEffect(() => {
-    if (!active) return;
-    refreshGeometry();
-    const interval = window.setInterval(refreshGeometry, 250);
-    window.addEventListener("resize", refreshGeometry);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("resize", refreshGeometry);
-    };
-  }, [active]);
-};
-
-const useGeometry = (): Geometry =>
-  useSyncExternalStore(subscribeGeometry, getGeometry, getGeometry);
-
-const defaultFloatRect = (geo: Geometry): FileViewerRect => {
-  const available = geo.floor - geo.topbar - FLOAT_MARGIN * 2;
-  const width = Math.min(
-    760,
-    Math.max(FLOAT_MIN_WIDTH, geo.composer?.width ?? 680),
-    geo.viewportWidth - FLOAT_MARGIN * 2,
-  );
-  const height = Math.max(
-    Math.min(FLOAT_MIN_HEIGHT, available),
-    Math.min(500, available),
-  );
-  const centre = geo.composer
-    ? geo.composer.left + geo.composer.width / 2
-    : geo.viewportWidth / 2;
-  return {
-    x: Math.round(centre - width / 2),
-    y: Math.round(geo.topbar + FLOAT_TOP_GAP),
-    width: Math.round(width),
-    height: Math.round(height),
-  };
-};
-
-const clampFloatRect = (
-  rect: FileViewerRect,
-  geo: Geometry,
-): FileViewerRect => {
-  const minTop = geo.topbar + 2;
-  const maxBottom = geo.floor;
-  const maxWidth = geo.viewportWidth - FLOAT_MARGIN * 2;
-  const maxHeight = Math.max(120, maxBottom - minTop);
-  const width = Math.min(Math.max(rect.width, FLOAT_MIN_WIDTH), maxWidth);
-  const height = Math.min(
-    Math.max(rect.height, Math.min(FLOAT_MIN_HEIGHT, maxHeight)),
-    maxHeight,
-  );
-  const x = Math.min(
-    Math.max(rect.x, FLOAT_MARGIN),
-    geo.viewportWidth - FLOAT_MARGIN - width,
-  );
-  const y = Math.min(Math.max(rect.y, minTop), maxBottom - height);
-  return {
-    x: Math.round(x),
-    y: Math.round(Math.max(minTop, y)),
-    width: Math.round(width),
-    height: Math.round(height),
-  };
-};
 
 function TabStage({ visible }: { visible: boolean }) {
   return (
@@ -289,6 +155,40 @@ const MinimizeIcon = ({ size = 15 }: { size?: number }) => (
     aria-hidden="true"
   >
     <path d="M4.5 14H10v5.5M4.75 19.25 10.5 13.5M19.5 10H14V4.5M19.25 4.75 13.5 10.5" />
+  </svg>
+);
+
+const PopOutIcon = ({ size = 15 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.75}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M10 5.25H7A2.75 2.75 0 0 0 4.25 8v9A2.75 2.75 0 0 0 7 19.75h9A2.75 2.75 0 0 0 18.75 17v-3" />
+    <path d="M13.75 4.25h6v6M19.5 4.5l-7.25 7.25" />
+  </svg>
+);
+
+const DockIcon = ({ size = 15 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.75}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M10 5.25H7A2.75 2.75 0 0 0 4.25 8v9A2.75 2.75 0 0 0 7 19.75h9A2.75 2.75 0 0 0 18.75 17v-3" />
+    <path d="M12.25 5.75v6h6M12.5 11.5l7.25-7.25" />
   </svg>
 );
 
@@ -357,19 +257,23 @@ function HeaderButton({
 
 function ViewerHeader({
   item,
-  meta,
-  stage,
-  actions,
+  placement,
   onPointerDown,
-  menuRef,
+  onDetach,
+  onClose,
+  onDock,
 }: {
   item: DisplayTab;
-  meta: string | null;
-  stage: boolean;
-  actions: ViewerItemActions | null;
-  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-  menuRef: { current: MenuBuilder | null };
+  placement: FileViewerMode | "window";
+  onPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
+  onDetach: (() => void) | null;
+  onClose: () => void;
+  onDock?: () => void;
 }) {
+  const t = useT();
+  const stage = placement === "stage";
+  const detached = placement === "window";
+  const { detail: meta, actions } = useViewerItem(item.id);
   const drivePath = item.payload?.cloudDrivePath ?? null;
   const path = drivePath ?? payloadPath(item.payload);
   const filePath = drivePath ? null : localFilePath(item.payload);
@@ -403,7 +307,7 @@ function ViewerHeader({
     setStatus(result.ok ? "Saved" : (result.error ?? "Couldn't save"));
   }, [filePath]);
 
-  const canShare = Boolean(drivePath || filePath);
+  const canShare = Boolean(drivePath || filePath) && item.kind !== "canvas";
   const share = useCallback(() => {
     if (sharing) return;
     const link = drivePath
@@ -453,7 +357,7 @@ function ViewerHeader({
   const remove = actions?.remove;
   const hasMenu = Boolean(actions?.copy || path || remove);
 
-  menuRef.current = async ({ target }) => {
+  const buildMenu: MenuBuilder = async ({ target }) => {
     if (target.closest(".viewer-strip")) return null;
     const sections: MenuSection[] = [];
     if (actions?.copy) {
@@ -484,25 +388,33 @@ function ViewerHeader({
       ]);
     }
     sections.push([
-      {
-        label: stage
-          ? translateNow("contextMenu.shrinkViewer")
-          : translateNow("contextMenu.expandViewer"),
-        run: () => fileViewer.toggleMode(),
-      },
-      {
-        label: translateNow("contextMenu.closeViewer"),
-        run: () => fileViewer.close(),
-      },
+      ...(detached
+        ? [{ label: t("contextMenu.dockViewer"), run: () => onDock?.() }]
+        : [
+            {
+              label: stage
+                ? t("contextMenu.shrinkViewer")
+                : t("contextMenu.expandViewer"),
+              run: () => fileViewer.toggleMode(),
+            },
+            ...(onDetach
+              ? [{ label: t("contextMenu.detachViewer"), run: onDetach }]
+              : []),
+          ]),
+      { label: t("contextMenu.closeViewer"), run: onClose },
     ]);
     return sections;
   };
+  useLayoutEffect(() => {
+    viewerItems.setMenu(item.id, buildMenu);
+  });
 
   return (
     <header
       className="file-viewer__header"
       onPointerDown={onPointerDown}
       onDoubleClick={(event) => {
+        if (detached) return;
         if ((event.target as HTMLElement).closest("button")) return;
         fileViewer.toggleMode();
       }}
@@ -571,7 +483,7 @@ function ViewerHeader({
           </HeaderButton>
         ) : null}
         {hasMenu ? (
-          <DropdownMenu onOpenChange={(open) => !open && setArmed(false)}>
+          <DropdownMenu modal={!detached} onOpenChange={(open) => !open && setArmed(false)}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -630,23 +542,44 @@ function ViewerHeader({
           </DropdownMenu>
         ) : null}
         <span className="file-viewer__divider" aria-hidden="true" />
-        <HeaderButton
-          label={stage ? "Shrink to a floating viewer" : "Expand"}
-          onClick={() => fileViewer.toggleMode()}
-        >
-          {stage ? (
-            <MinimizeIcon size={15} />
-          ) : (
-            <Maximize2 size={15} strokeWidth={1.75} />
-          )}
-        </HeaderButton>
-        <HeaderButton
-          label="Close"
-          shortcut="Esc"
-          onClick={() => fileViewer.close()}
-        >
-          <X size={16} strokeWidth={1.75} />
-        </HeaderButton>
+        {detached ? (
+          <HeaderButton
+            label={t("contextMenu.dockViewer")}
+            onClick={() => onDock?.()}
+          >
+            <DockIcon />
+          </HeaderButton>
+        ) : (
+          <>
+            {onDetach ? (
+              <HeaderButton
+                label={t("contextMenu.detachViewer")}
+                onClick={onDetach}
+              >
+                <PopOutIcon />
+              </HeaderButton>
+            ) : null}
+            <HeaderButton
+              label={stage ? "Shrink to a floating viewer" : "Expand"}
+              onClick={() => fileViewer.toggleMode()}
+            >
+              {stage ? (
+                <MinimizeIcon size={15} />
+              ) : (
+                <Maximize2 size={15} strokeWidth={1.75} />
+              )}
+            </HeaderButton>
+          </>
+        )}
+        {detached && window.electronAPI?.platform === "darwin" ? null : (
+          <HeaderButton
+            label="Close"
+            {...(detached ? {} : { shortcut: "Esc" })}
+            onClick={onClose}
+          >
+            <X size={16} strokeWidth={1.75} />
+          </HeaderButton>
+        )}
       </div>
     </header>
   );
@@ -717,96 +650,81 @@ const IMMEDIATE_KINDS: ReadonlySet<DisplayTab["kind"]> = new Set([
   "audio",
 ]);
 
-function FileViewerFrame({
+const gestureStart = (event: ReactPointerEvent<HTMLElement>) => ({
+  pointerId: event.pointerId,
+  clientX: event.clientX,
+  clientY: event.clientY,
+  screenX: event.screenX,
+  screenY: event.screenY,
+});
+
+const addItemMenu = (event: ReactMouseEvent, id: string): void => {
+  const menu = viewerItems.menu(id);
+  if (!menu) return;
+  addContextMenu(event, menu, {
+    claims: viewerItems.get(id).actions?.copy ? ["image"] : [],
+  });
+};
+
+function ViewerSlot({ surface }: { surface: ViewerSurface }) {
+  const attach = useCallback(
+    (slot: HTMLDivElement | null) =>
+      slot ? registerViewerSlot(surface, slot) : undefined,
+    [surface],
+  );
+  return <div ref={attach} className="file-viewer__slot" />;
+}
+
+function ViewerMain({
+  item,
+  surface,
+}: {
+  item: DisplayTab | null;
+  surface: ViewerSurface;
+}) {
+  const { nav: bodyNav } = useViewerItem(item?.id ?? null);
+  const siblingNav = useSiblingNav(item);
+  return (
+    <div className="file-viewer__main">
+      <div className="file-viewer__body">
+        <ViewerSlot surface={surface} />
+        <EdgeArrows nav={bodyNav ?? siblingNav} />
+      </div>
+      {item ? <ViewerStrip item={item} /> : null}
+    </div>
+  );
+}
+
+function DockedViewer({
+  item,
   hiddenForExclusiveTab,
 }: {
+  item: DisplayTab | null;
   hiddenForExclusiveTab: boolean;
 }) {
-  const { fileId, mode, rect, detail } = useFileViewer();
-  const { tabs } = useDisplayTabList();
-  const item = fileId ? (tabs.find((tab) => tab.id === fileId) ?? null) : null;
+  const { mode, rect } = useFileViewer();
   const geo = useGeometry();
   const stage = mode === "stage";
-  const frameRef = useRef<HTMLDivElement | null>(null);
-  const [interacting, setInteracting] = useState(false);
-  const [bodyNav, setBodyNav] = useState<ViewerNav | null>(null);
-  const siblingNav = useSiblingNav(item);
-  const nav = bodyNav ?? siblingNav;
-  const [bodyActions, setBodyActions] = useState<ViewerItemActions | null>(
-    null,
-  );
-  const menuRef = useRef<MenuBuilder | null>(null);
-
-  useEffect(() => setBodyNav(null), [fileId]);
-
-  useEffect(() => {
-    if (fileId && !item) fileViewer.close();
-  }, [fileId, item]);
-
   const floatRect = useMemo(
     () => clampFloatRect(rect ?? defaultFloatRect(geo), geo),
     [geo, rect],
   );
+  const hidden = !item || (!stage && hiddenForExclusiveTab);
+  const detachable = item?.kind !== "chat" && canDetachViewer();
 
-  const startGesture = useCallback(
-    (
-      event: ReactPointerEvent<HTMLElement>,
-      apply: (dx: number, dy: number, start: FileViewerRect) => FileViewerRect,
-    ) => {
+  const startDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (stage || !item || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button, a, input")) return;
+    event.preventDefault();
+    dragViewer(gestureStart(event), item.id, floatRect, detachable);
+  };
+
+  const startResize =
+    (edge: ResizeEdge) => (event: ReactPointerEvent<HTMLElement>) => {
       if (event.button !== 0) return;
       event.preventDefault();
-      const target = event.currentTarget;
-      target.setPointerCapture?.(event.pointerId);
-      const pointerId = event.pointerId;
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const start = floatRect;
-      let latest = start;
-      setInteracting(true);
-      const previousUserSelect = document.body.style.userSelect;
-      document.body.style.userSelect = "none";
-
-      const onMove = (ev: PointerEvent) => {
-        latest = clampFloatRect(
-          apply(ev.clientX - startX, ev.clientY - startY, start),
-          getGeometry(),
-        );
-        fileViewer.setRect(latest, false);
-      };
-      const onUp = () => {
-        target.removeEventListener("pointermove", onMove);
-        target.removeEventListener("pointerup", onUp);
-        target.removeEventListener("pointercancel", onUp);
-        if (target.hasPointerCapture?.(pointerId)) {
-          target.releasePointerCapture(pointerId);
-        }
-        document.body.style.userSelect = previousUserSelect;
-        setInteracting(false);
-        fileViewer.setRect(latest, true);
-      };
-      target.addEventListener("pointermove", onMove);
-      target.addEventListener("pointerup", onUp);
-      target.addEventListener("pointercancel", onUp);
-    },
-    [floatRect],
-  );
-
-  const handleHeaderPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (stage) return;
-      if ((event.target as HTMLElement).closest("button, a, input")) return;
-      startGesture(event, (dx, dy, start) => ({
-        ...start,
-        x: start.x + dx,
-        y: start.y + dy,
-      }));
-    },
-    [stage, startGesture],
-  );
-
-  const handleResizePointerDown = useCallback(
-    (edge: ResizeEdge) => (event: ReactPointerEvent<HTMLElement>) => {
-      startGesture(event, (dx, dy, start) => {
+      const { cursor } = getComputedStyle(event.currentTarget);
+      resizeViewer(gestureStart(event), cursor, floatRect, (dx, dy, start) => {
         let { x, y, width, height } = start;
         if (edge.includes("e")) width = start.width + dx;
         if (edge.includes("s")) height = start.height + dy;
@@ -820,28 +738,20 @@ function FileViewerFrame({
         }
         return { x, y, width, height };
       });
-    },
-    [startGesture],
-  );
-
-  if (!item) return null;
-  const hidden = !stage && hiddenForExclusiveTab;
+    };
 
   return (
     <div
-      ref={frameRef}
       className="file-viewer"
+      data-surface="docked"
       data-mode={mode}
+      data-closed={item ? undefined : "true"}
       data-hidden={hidden ? "true" : undefined}
-      data-interacting={interacting ? "true" : undefined}
       role="dialog"
-      aria-label={item.title}
+      aria-label={item?.title}
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
-      onContextMenu={contextMenu(
-        (context) => menuRef.current?.(context) ?? null,
-        { claims: bodyActions?.copy ? ["image"] : [] },
-      )}
+      onContextMenu={(event) => item && addItemMenu(event, item.id)}
       style={
         stage
           ? undefined
@@ -853,43 +763,212 @@ function FileViewerFrame({
             }
       }
     >
-      <ViewerHeader
-        item={item}
-        meta={detail}
-        stage={stage}
-        actions={bodyActions}
-        onPointerDown={handleHeaderPointerDown}
-        menuRef={menuRef}
-      />
-      <div className="file-viewer__main">
-      <div className="file-viewer__body">
-        <ViewerItemContext value={item.id}>
-          <ViewerNavContext value={setBodyNav}>
-            <ViewerActionsContext value={setBodyActions}>
-              <DeferredDisplayContent
-                key={item.id}
-                render={item.render}
-                immediate={IMMEDIATE_KINDS.has(item.kind)}
-              />
-            </ViewerActionsContext>
-          </ViewerNavContext>
-        </ViewerItemContext>
-        <EdgeArrows nav={nav} />
-      </div>
-      <ViewerStrip item={item} />
-      </div>
+      {item ? (
+        <ViewerHeader
+          item={item}
+          placement={mode}
+          onPointerDown={startDrag}
+          onDetach={
+            detachable ? () => void popOutViewer(item.id, floatRect) : null
+          }
+          onClose={() => fileViewer.close()}
+        />
+      ) : null}
+      <ViewerMain item={item} surface={DOCKED} />
       {!stage
         ? RESIZE_EDGES.map((edge) => (
             <div
               key={edge}
               className="file-viewer__resize"
               data-edge={edge}
-              onPointerDown={handleResizePointerDown(edge)}
+              onPointerDown={startResize(edge)}
               aria-hidden="true"
             />
           ))
         : null}
     </div>
+  );
+}
+
+function DetachedViewerFrame({
+  name,
+  item,
+}: {
+  name: string;
+  item: DisplayTab;
+}) {
+  const target = detachedWindows.get(name)?.window ?? window;
+
+  useEffect(() => {
+    target.document.title = item.title;
+  }, [item.title, target]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      stepViewer(event, target.document.querySelector(".file-viewer"));
+    };
+    target.document.addEventListener("keydown", onKey);
+    return () => target.document.removeEventListener("keydown", onKey);
+  }, [target]);
+
+  return (
+    <div
+      className="file-viewer"
+      data-surface="window"
+      data-mode="window"
+      data-platform={window.electronAPI?.platform}
+      role="dialog"
+      aria-label={item.title}
+      onContextMenu={(event) => addItemMenu(event, item.id)}
+    >
+      <ViewerHeader
+        item={item}
+        placement="window"
+        onDetach={null}
+        onClose={() => fileViewer.closeDetached(name)}
+        onDock={() => {
+          window.electronAPI?.window?.show?.();
+          flushSync(() => fileViewer.dock(name));
+        }}
+      />
+      <ViewerMain item={item} surface={name} />
+    </div>
+  );
+}
+
+type PlacedBody = {
+  item: DisplayTab;
+  surface: ViewerSurface;
+  active: boolean;
+};
+
+function ViewerBody({ item, surface, active }: PlacedBody) {
+  const [host] = useState(createViewerHost);
+
+  useLayoutEffect(() => {
+    placeViewerHost(host, surface);
+  }, [host, surface]);
+
+  useLayoutEffect(
+    () => () => {
+      viewerItems.setMenu(item.id, null);
+      dropViewerHost(host);
+    },
+    [host, item.id],
+  );
+
+  return createPortal(
+    <RetainedSurface
+      active={active}
+      className="file-viewer__item"
+      onContextMenu={(event) => addItemMenu(event, item.id)}
+    >
+      <PortalContainerContext value={detachedWindows.get(surface)?.root ?? null}>
+        <ViewerSurfaceContext value={surface}>
+          <ViewerItemContext value={item.id}>
+            <DeferredDisplayContent
+              render={item.render}
+              immediate={IMMEDIATE_KINDS.has(item.kind)}
+            />
+          </ViewerItemContext>
+        </ViewerSurfaceContext>
+      </PortalContainerContext>
+    </RetainedSurface>,
+    host,
+    item.id,
+  );
+}
+
+const NO_IDS: readonly string[] = [];
+
+/** Documents and apps with a tab keep running once shown, until it closes. */
+const useKeptIds = (
+  fileId: string | null,
+  sidebarTabs: readonly SidebarTab[],
+): readonly string[] => {
+  const [kept, setKept] = useState(NO_IDS);
+  const open = useMemo(
+    () =>
+      new Set(
+        sidebarTabs.filter(isDocumentTab).map((tab) => tab.location as string),
+      ),
+    [sidebarTabs],
+  );
+  const current = kept.filter((id) => open.has(id));
+  const next =
+    fileId && open.has(fileId) && !current.includes(fileId)
+      ? [...current, fileId]
+      : current;
+  if (next.length !== kept.length || next.some((id, i) => id !== kept[i])) {
+    setKept(next);
+  }
+  return next;
+};
+
+function Viewers({ hiddenForExclusiveTab }: { hiddenForExclusiveTab: boolean }) {
+  const { fileId, detached } = useFileViewer();
+  const { tabs } = useDisplayTabList();
+  const sidebarTabs = useSidebarOpenTabs();
+  const kept = useKeptIds(fileId, sidebarTabs);
+  const itemOf = (id: string) => tabs.find((tab) => tab.id === id) ?? null;
+  const item = fileId ? itemOf(fileId) : null;
+
+  useEffect(() => {
+    void reopenViewerWindows();
+  }, []);
+
+  useEffect(() => {
+    if (fileId && !item) fileViewer.close();
+    for (const viewer of detached) {
+      if (!tabs.some((tab) => tab.id === viewer.fileId)) {
+        fileViewer.closeDetached(viewer.name);
+      }
+    }
+  }, [detached, fileId, item, tabs]);
+
+  const bodies: PlacedBody[] = [];
+  for (const viewer of detached) {
+    const shown = itemOf(viewer.fileId);
+    if (!shown) continue;
+    bodies.push({ item: shown, surface: viewer.name, active: true });
+  }
+  const dockedIds = fileId ? [...kept.filter((id) => id !== fileId), fileId] : kept;
+  for (const id of dockedIds) {
+    const shown = itemOf(id);
+    if (!shown || bodies.some((body) => body.item.id === id)) continue;
+    bodies.push({ item: shown, surface: DOCKED, active: id === fileId });
+  }
+  bodies.sort((a, b) => a.item.ord - b.item.ord);
+  const hasDocked = bodies.some((body) => body.surface === DOCKED);
+
+  return (
+    <>
+      {hasDocked ? (
+        <DockedViewer
+          item={item}
+          hiddenForExclusiveTab={hiddenForExclusiveTab}
+        />
+      ) : null}
+      {detached.map(({ name, fileId: id }) => {
+        const shown = itemOf(id);
+        const root = detachedWindows.get(name)?.root;
+        return shown && root
+          ? createPortal(
+              <PortalContainerContext value={root}>
+                <ViewerSurfaceContext value={name}>
+                  <DetachedViewerFrame name={name} item={shown} />
+                </ViewerSurfaceContext>
+              </PortalContainerContext>,
+              root,
+              name,
+            )
+          : null;
+      })}
+      {bodies.map((body) => (
+        <ViewerBody key={body.item.id} {...body} />
+      ))}
+    </>
   );
 }
 
@@ -933,7 +1012,7 @@ function useViewerChatAttachment(
   item: DisplayTab,
 ): { added: boolean; toggle: () => void } | null {
   const chat = useChatRuntime();
-  const { detail } = useFileViewer();
+  const { detail } = useViewerItem(item.id);
   const setChatContext = chat.composer.setChatContext;
   const added = getComposerAppSelections(chat.composer.chatContext).some(
     (entry) =>
@@ -979,9 +1058,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 const editableIsEmpty = (target: EventTarget | null): boolean => {
   const el = target as HTMLElement | null;
   if (!el) return true;
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    return el.value.length === 0;
-  }
+  if ("value" in el) return el.value === "";
   return (el.textContent ?? "").length === 0;
 };
 
@@ -1001,6 +1078,31 @@ const setJumpTarget = (
   return (
     neighbour?.querySelector<HTMLButtonElement>(".viewer-strip__item") ?? null
   );
+};
+
+const stepViewer = (event: KeyboardEvent, frame: Element | null): void => {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  if (event.metaKey || event.altKey || event.ctrlKey) return;
+  if (!frame || frame.getAttribute("data-hidden") === "true") return;
+  if (isEditableTarget(event.target) && !editableIsEmpty(event.target)) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("video, audio, [role='slider']")) return;
+  const backwards = event.key === "ArrowLeft";
+  if (event.shiftKey) {
+    const jump = setJumpTarget(frame, backwards);
+    if (jump) {
+      jump.click();
+      event.preventDefault();
+    }
+    return;
+  }
+  const button = frame.querySelector<HTMLButtonElement>(
+    `.file-viewer__edge[data-dir='${backwards ? "previous" : "next"}']`,
+  );
+  if (button && !button.disabled) {
+    button.click();
+    event.preventDefault();
+  }
 };
 
 const hasOpenOverlay = (): boolean =>
@@ -1076,39 +1178,11 @@ export const WorkspaceStage = memo(
             }
             return;
           }
-          if (
-            (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
-            viewerState.fileId &&
-            !event.metaKey &&
-            !event.altKey &&
-            !event.ctrlKey
-          ) {
-            if (
-              isEditableTarget(event.target) &&
-              !editableIsEmpty(event.target)
-            )
-              return;
-            const frame = document.querySelector(".file-viewer");
-            if (frame?.getAttribute("data-hidden") === "true") return;
-            const target = event.target as HTMLElement | null;
-            if (target?.closest("video, audio, [role='slider']")) return;
-            if (event.shiftKey) {
-              const jump = setJumpTarget(frame, event.key === "ArrowLeft");
-              if (jump) {
-                jump.click();
-                event.preventDefault();
-              }
-              return;
-            }
-            const button = frame?.querySelector<HTMLButtonElement>(
-              event.key === "ArrowLeft"
-                ? ".file-viewer__edge[data-dir='previous']"
-                : ".file-viewer__edge[data-dir='next']",
+          if (viewerState.fileId) {
+            stepViewer(
+              event,
+              document.querySelector(".file-viewer[data-surface='docked']"),
             );
-            if (button && !button.disabled) {
-              button.click();
-              event.preventDefault();
-            }
           }
         };
         document.addEventListener("keydown", onKey);
@@ -1121,7 +1195,7 @@ export const WorkspaceStage = memo(
       return createPortal(
         <>
           <TabStage visible={tabStageVisible} />
-          <FileViewerFrame hiddenForExclusiveTab={exclusiveTabShown} />
+          <Viewers hiddenForExclusiveTab={exclusiveTabShown} />
         </>,
         target,
       );

@@ -3455,6 +3455,8 @@
     "copyMessage": "Mesajı kopyala",
     "copyAsMarkdown": "Markdown olarak kopyala",
     "copyPublicLink": "Herkese açık bağlantıyı kopyala",
+    "detachViewer": "Kendi penceresinde aç",
+    "dockViewer": "Stella'ya geri taşı",
     "expandViewer": "Genişlet",
     "shrinkViewer": "Kayan görüntüleyiciye küçült",
     "closeViewer": "Görüntüleyiciyi kapat",

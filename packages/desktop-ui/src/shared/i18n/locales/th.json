@@ -3421,6 +3421,8 @@
     "copyMessage": "คัดลอกข้อความ",
     "copyAsMarkdown": "คัดลอกเป็น Markdown",
     "copyPublicLink": "คัดลอกลิงก์สาธารณะ",
+    "detachViewer": "เปิดในหน้าต่างแยก",
+    "dockViewer": "ย้ายกลับไปที่ Stella",
     "expandViewer": "ขยาย",
     "shrinkViewer": "ย่อเป็นหน้าต่างลอย",
     "closeViewer": "ปิดตัวแสดง",

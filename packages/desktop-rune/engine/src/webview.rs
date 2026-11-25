@@ -188,20 +188,33 @@ fn main_frame_only() -> Option<bool> {
 }
 
 /// WebKitGTK asks navigation policy for subframes too without saying which frame; the response
-/// policy does, so `navigate` comes from a main frame's document response.
+/// policy does, so `navigate` comes from a main frame's document response. A main-frame load
+/// that gets no response (an unknown scheme, a policy cancel, a network error) reports through
+/// `load-failed`, which is main-frame only.
 #[cfg(target_os = "linux")]
 fn main_frame_navigations(n: u32, view: &WebView) {
+    use gtk::prelude::Cast;
     use webkit2gtk::{PolicyDecisionType, ResponsePolicyDecision, ResponsePolicyDecisionExt, URIResponseExt, WebViewExt};
     use wry::WebViewExtUnix;
-    use gtk::prelude::Cast;
-    view.webview().connect_decide_policy(move |_, decision, kind| {
+    let reported = std::rc::Rc::new(std::cell::RefCell::new(String::new()));
+    let seen = reported.clone();
+    let web = view.webview();
+    web.connect_decide_policy(move |_, decision, kind| {
         if kind != PolicyDecisionType::Response {
             return false;
         }
         let Some(r) = decision.downcast_ref::<ResponsePolicyDecision>() else { return false };
         if r.is_main_frame_main_resource() {
             let url = r.response().and_then(|res| res.uri()).map(|u| u.to_string()).unwrap_or_default();
+            *seen.borrow_mut() = url.clone();
             element_event(n, "navigate", json!({ "url": url, "mainFrame": true }), None);
+        }
+        false
+    });
+    web.connect_load_failed(move |_, _, uri, _| {
+        if *reported.borrow() != uri {
+            *reported.borrow_mut() = uri.to_owned();
+            element_event(n, "navigate", json!({ "url": uri, "mainFrame": true }), None);
         }
         false
     });

@@ -56,8 +56,9 @@ What changes when it is on (Linux `stella-launcher.c`, Windows `stella-launcher.
    A source without `packages/desktop-rune/host/main.tsx` or without an asset for the platform
    fails with a clear message rather than falling back silently.
 3. The launcher spawns `stella-engine` (no arguments, cwd = app source) with the usual Stella
-   environment plus `STELLA_LAUNCHER_ENGINE=rune`, `STELLA_RUNE_ROOT=<app>/packages/desktop-rune`
-   and `STELLA_RUNE_BUN=<runtimes>/bun-<v>/bun`. The engine starts the TS host with that Bun.
+   environment plus `STELLA_LAUNCHER_ENGINE=rune`, `STELLA_RUNE_ROOT=<app>/packages/desktop-rune`,
+   `STELLA_RUNE_BUN=<runtimes>/bun-<v>/bun` and `STELLA_RUNE_SERVICES=1` (the host boots Stella's
+   services, not the demo UI). The engine starts the TS host with that Bun.
 4. The supervisor protocol is unchanged. On Linux and macOS the launcher's channel is fd 3, which
    the engine passes to the host (proven on Linux: the host process holds the launcher's
    socket on fd 3). On Windows the host connects to `STELLA_LAUNCHER_PIPE`; the pipe accepts the
@@ -77,3 +78,9 @@ Not done yet (ship-time work):
 - Rune is private: an outside builder can't compile the engine until the mirror is public or the
   engine ships only as a binary.
 - The Linux launcher's log is still `logs/electron.log` for both.
+- User data: a launcher-started engine uses Electron Stella's userData and data dirs (same account,
+  same files) but its own single-instance lock (`RuneSingleton.sock`), so Electron Stella and Rune
+  Stella can run at once against the same data. One lock for both before anyone opts in.
+- Proven on Linux (omarchy, Xvfb): `stella-launcher --self-test --engine-bin <dist engine>` clones
+  the source, installs Bun and deps, starts the engine, gets `ready` 0.5-10 s after spawn, sends
+  `quit`, gets `exiting 0`, exits 0; the runtime worker then stops by itself.

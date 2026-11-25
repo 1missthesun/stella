@@ -19,6 +19,8 @@ import { Markdown } from "../../chat/Markdown";
 import { mounted } from "../../app/mount";
 
 export { MediaTabContent } from "./media-tab/MediaTabContent";
+export { PreviewEmpty, PreviewProblem } from "./preview-states";
+import { PreviewEmpty, PreviewProblem } from "./preview-states";
 
 const fileName = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
 
@@ -35,31 +37,6 @@ const previewLook = (t: Tokens) =>
     navHover: mixOklch(t.c.foreground, 5, "transparent"),
     navCurrent: mixOklch(t.c.foreground, 8, "transparent"),
   }));
-
-const READABLE_ERROR_MAX = 120;
-const isReadableError = (error: string): boolean => error.length <= READABLE_ERROR_MAX && !/(^|\s)(\/|[A-Za-z]:\\)\S/u.test(error) && !/^[\w.-]+:[\w.-]+\b/u.test(error);
-
-/** desktop-ui's `PreviewProblem`: a missing file, or a preview that failed (with a retry). */
-export function PreviewProblem({ error, missing = false, onRetry, size = "regular", title }: { error?: string | null; missing?: boolean; onRetry?: () => void; size?: "regular" | "compact"; title?: string }) {
-  const t = useT();
-  const message = error?.trim() ?? "";
-  if (missing) return <EmptyState motif="unavailable" size={size} title={title ?? t("shell.display.preview.unavailableTitle")} body={message || undefined} />;
-  const readable = message.length > 0 && message !== t("shell.display.preview.unavailable") && isReadableError(message);
-  return (
-    <EmptyState
-      motif="preview"
-      size={size}
-      title={title ?? t("shell.display.preview.failedTitle")}
-      body={readable ? message : t("shell.display.preview.failedBody")}
-      detail={message && !readable ? message : undefined}
-      action={onRetry ? { label: t("common.tryAgain"), icon: Icons.stella.RotateCcw, onClick: onRetry } : undefined}
-    />
-  );
-}
-
-export function PreviewEmpty({ title, body, motif = "blank", size = "regular" }: { title: string; body?: string; motif?: EmptyStateMotif; size?: "regular" | "compact" }) {
-  return <EmptyState motif={motif} size={size} title={title} body={body} />;
-}
 
 function PreviewButton({ id, label, onPress }: { id: string; label: string; onPress: () => void }) {
   const t = useTokens();

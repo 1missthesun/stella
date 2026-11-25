@@ -132,6 +132,14 @@
   filter: brightness(0.9);
 }
 
+.media-tile[data-kind="page"] .media-tile__frame {
+  background: #fff;
+}
+
+.media-tile[data-kind="page"] .media-tile__image {
+  object-position: top;
+}
+
 .media-tile__caption {
   color: var(--muted-foreground);
   font-size: var(--font-size-xs);

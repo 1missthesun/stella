@@ -7,7 +7,13 @@ import {
   type DriveFileRecord,
   type DriveFileUrl,
   type DriveFileVersions,
+  type DrivePagePreview,
 } from "@stella/contracts/backend/drive";
+import {
+  isHtmlPagePath,
+  PAGE_PREVIEW_SOURCE_MAX_BYTES,
+} from "@stella/contracts/page-preview";
+import { renderDrivePagePreview } from "../../drive-page-preview.js";
 import { DEVICE_FILE_COPY_LIMITS } from "@stella/contracts/device-files";
 import {
   EVIDENCE_THUMBNAIL_DRIVE_ROOT,
@@ -56,6 +62,7 @@ const PENDING_UPLOAD_TTL_MS = 6 * 60 * 60_000;
 const CLEANUP_LEASE_MS = 5 * 60_000;
 /** R2 deletes at most 1,000 keys per call. */
 const CLEANUP_BATCH = 1_000;
+const R2_DELETE_MAX_KEYS = 1_000;
 const CLEANUP_MAX_BATCHES_PER_RUN = 20;
 const CLEANUP_CONTINUE_MS = 60_000;
 const REPLACEMENT_GRACE_MS = DOWNLOAD_URL_EXPIRES_SECONDS * 1_000;
@@ -340,6 +347,9 @@ const signerOf = (ctx: Pick<OwnerContext, "env">): R2Signer => {
 
 export const driveOwnerPrefix = async (ownerId: string): Promise<string> =>
   `drive/${await sha256Hex(ownerId)}/`;
+
+const pagePreviewKey = async (ownerId: string, r2Key: string): Promise<string> =>
+  `${await driveOwnerPrefix(ownerId)}.page-previews/${await sha256Hex(r2Key)}`;
 
 const attachmentDisposition = (name: string): string => {
   const fallback = name.replace(/[^\x20-\x7e]|["\\]/g, "_") || "download";
@@ -723,6 +733,59 @@ const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<Drive
     url: await signGet(signerOf(ctx), row.r2_key, DOWNLOAD_URL_EXPIRES_SECONDS, row.name, now),
     expiresAt: now + DOWNLOAD_URL_EXPIRES_SECONDS * 1_000,
     version: fileVersion(row.r2_key),
+  };
+};
+
+const pagePreviewsRendering = new Map<string, Promise<void>>();
+
+const renderPagePreviewOnce = (
+  ctx: OwnerContext,
+  row: FileRow,
+  key: string,
+): Promise<void> => {
+  const pending = pagePreviewsRendering.get(key);
+  if (pending) return pending;
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "drive.pagePreview",
+    { count: 60, windowMs: 10 * 60_000 },
+    "Too many page previews at once. Try again in a few minutes.",
+  );
+  const work = (async () => {
+    const rendered = await renderDrivePagePreview(ctx.env, ctx.ownerId, row.r2_key);
+    if (!rendered.ok) {
+      throw rendered.reason === "budget"
+        ? new RpcError("FORBIDDEN", rendered.message, { reason: "budget" })
+        : new RpcError("UNAVAILABLE", rendered.message, { retryAfterMs: 60_000 });
+    }
+    await bucketOf(ctx).put(key, rendered.bytes, {
+      httpMetadata: { contentType: rendered.contentType, cacheControl: "private, max-age=31536000, immutable" },
+    });
+  })().finally(() => pagePreviewsRendering.delete(key));
+  pagePreviewsRendering.set(key, work);
+  return work;
+};
+
+const pagePreview = async (
+  ctx: OwnerContext,
+  args: { path: string },
+): Promise<DrivePagePreview> => {
+  const path = normalizeDrivePath(args.path);
+  if (!isHtmlPagePath(path)) throw invalid("Only web pages have a page preview.");
+  const row = getFile(ctx.db, spaceOf(ctx), path);
+  if (!row) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
+  if (row.size_bytes > PAGE_PREVIEW_SOURCE_MAX_BYTES) {
+    throw invalid("This page is too large to preview.");
+  }
+  const key = await pagePreviewKey(ctx.ownerId, row.r2_key);
+  if (!(await bucketOf(ctx).head(key))) await renderPagePreviewOnce(ctx, row, key);
+  const now = Date.now();
+  return {
+    path,
+    version: fileVersion(row.r2_key),
+    url: await signGet(signerOf(ctx), key, DOWNLOAD_URL_EXPIRES_SECONDS, `${row.name}.jpg`, now),
+    expiresAt: now + DOWNLOAD_URL_EXPIRES_SECONDS * 1_000,
   };
 };
 
@@ -1730,9 +1793,17 @@ const runCleanup = async (ctx: OwnerContext): Promise<void> => {
     const doomed = due.filter((row) => !isKeyReferenced(ctx.db, row.r2_key));
     if (doomed.length > 0) {
       const keys = [...new Set(doomed.map((row) => row.r2_key))];
-      const prepared = await Promise.all(keys.map((key) => attachmentImageKey(ctx.ownerId, key)));
+      const prepared = await Promise.all(
+        keys.flatMap((key) => [
+          attachmentImageKey(ctx.ownerId, key),
+          pagePreviewKey(ctx.ownerId, key),
+        ]),
+      );
+      const doomedKeys = [...keys, ...prepared];
       try {
-        await bucketOf(ctx).delete([...keys, ...prepared]);
+        for (let start = 0; start < doomedKeys.length; start += R2_DELETE_MAX_KEYS) {
+          await bucketOf(ctx).delete(doomedKeys.slice(start, start + R2_DELETE_MAX_KEYS));
+        }
       } catch {
         break;
       }
@@ -1814,6 +1885,11 @@ export const driveDomain = {
       scope: "owner",
       parse: object({ path: pathArg }),
       handler: fileUrl,
+    },
+    "drive.pagePreview": {
+      scope: "owner",
+      parse: object({ path: pathArg }),
+      handler: pagePreview,
     },
     "drive.list": {
       scope: "owner",

@@ -11,6 +11,11 @@ import {
   isEvidenceThumbnailSource,
 } from "@stella/contracts/chat-evidence-thumbnails";
 import type { EvidenceSourceKind } from "@stella/contracts/chat-evidence-naming";
+import {
+  isHtmlPagePath,
+  PAGE_PREVIEW_MAX_BYTES,
+} from "@stella/contracts/page-preview";
+import { getBackendClient } from "./backend";
 import { resolveCloudDriveFile } from "./use-cloud-drive-file-uri";
 import { driveFileVersions } from "./drive-file-versions";
 import { downloadFileWithinIdle } from "./cloud-request";
@@ -39,6 +44,7 @@ const GENERATION_CONCURRENCY = 3;
 
 export type EvidencePreview =
   | { kind: "image"; uri: string; width?: number; height?: number }
+  | { kind: "page"; uri: string }
   | { kind: "video"; posterUri: string; durationMs?: number }
   | { kind: "audio"; peaks: number[]; durationMs: number };
 
@@ -83,7 +89,7 @@ const readManifest = (contentKey: string): EvidencePreview | null => {
     const file = manifestFile(contentKey);
     if (!file.exists) return null;
     const parsed = JSON.parse(file.textSync()) as EvidencePreview;
-    if (parsed.kind === "image" && parsed.uri) {
+    if ((parsed.kind === "image" || parsed.kind === "page") && parsed.uri) {
       return new File(parsed.uri).exists ? parsed : null;
     }
     if (parsed.kind === "video" && parsed.posterUri) {
@@ -249,6 +255,60 @@ const deviceThumbnailFor = async (
   return { kind: "image", uri: target.uri };
 };
 
+const drivePagePreviewFor = async (drivePath: string): Promise<EvidencePreview> => {
+  const preview = await getBackendClient().call("drive.pagePreview", { path: drivePath });
+  const identity = `${CACHE_SCHEMA}:page:${preview.path}:${preview.version}`;
+  const cached = readManifest(identity);
+  if (cached?.kind === "page") return cached;
+  const target = new File(directoryFor("page"), `${stableKey(identity)}.jpg`);
+  await downloadFileWithinIdle(preview.url, target, {
+    label: "Downloading a page preview from your Drive",
+  });
+  const page: EvidencePreview = { kind: "page", uri: target.uri };
+  writeManifest(identity, page);
+  return page;
+};
+
+const devicePagePreviewFor = async (
+  request: EvidencePreviewRequest,
+): Promise<EvidencePreview> => {
+  const location = await locateDeviceFile(request.filePath);
+  if (location?.drivePath) {
+    const copy = await drivePagePreviewFor(location.drivePath).catch(() => null);
+    if (copy) return copy;
+  }
+  const source = await resolveLinkedFile(
+    request.access,
+    request.conversationId,
+    request.filePath,
+  );
+  if (source.kind !== "device" || linkedSourceIsFolder(source)) {
+    throw new Error("This page has no preview.");
+  }
+  const result = await readLinkedThumbnail(source, request.conversationId, request.filePath);
+  if (
+    !result.mimeType.startsWith("image/") ||
+    result.bytes.byteLength === 0 ||
+    result.bytes.byteLength > PAGE_PREVIEW_MAX_BYTES
+  ) {
+    throw new Error("This page has no preview.");
+  }
+  const target = new File(
+    directoryFor("page"),
+    `${stableKey(`device:${request.filePath}`)}-${result.bytes.byteLength}.jpg`,
+  );
+  target.create({ overwrite: true, intermediates: true });
+  target.write(result.bytes);
+  return { kind: "page", uri: target.uri };
+};
+
+const pagePreviewFor = async (request: EvidencePreviewRequest): Promise<EvidencePreview> => {
+  const drivePath = evidenceDrivePath(request.filePath);
+  return drivePath
+    ? await drivePagePreviewFor(drivePath)
+    : await devicePagePreviewFor(request);
+};
+
 const imagePreviewFor = async (
   request: EvidencePreviewRequest,
   remote: RemoteSource | null,
@@ -368,6 +428,9 @@ export const requestEvidencePreview = (
   const pending = inFlight.get(key);
   if (pending) return pending;
   const work = withSlot(async () => {
+    if (request.kind === "page" && isHtmlPagePath(request.filePath)) {
+      return await pagePreviewFor(request);
+    }
     const remote = await remoteSourceFor(request.filePath);
     if (request.kind === "image") return await imagePreviewFor(request, remote);
     if (request.kind === "video") return await videoPreviewFor(request, remote);

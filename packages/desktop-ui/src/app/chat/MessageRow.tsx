@@ -50,6 +50,7 @@ import {
 } from "@stella/contracts/local-file-links";
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { replyAttachmentPlacement } from "@stella/contracts/reply-attachments";
+import { isHtmlPagePath } from "@stella/contracts/page-preview";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import {
   evidenceCardDrivePath,
@@ -673,15 +674,30 @@ export const AssistantMessageRow = memo(
     ];
     const linkedFiles = row.linkedFiles ?? [];
     const linkTargets = hasText ? extractFileLinkTargets(text) : [];
-    const evidencePaths = linkTargets.filter((target) => !driveLinkPath(target));
+    const resourcePayload = row.resourcePayload;
+    const canvasPage =
+      resourcePayload?.kind === "canvas-html" && isHtmlPagePath(resourcePayload.filePath)
+        ? resourcePayload
+        : null;
+    const canvasDrivePath = canvasPage?.driveBacked
+      ? canvasPage.filePath.replace(/^\/+/, "")
+      : null;
+    const canvasLocalPath = canvasPage && !canvasPage.driveBacked ? canvasPage.filePath : null;
+    const evidencePaths = [
+      ...new Set([
+        ...linkTargets.filter((target) => !driveLinkPath(target)),
+        ...(canvasLocalPath ? [canvasLocalPath] : []),
+      ]),
+    ];
     const evidencePathSet = new Set(evidencePaths);
     const linkedDrivePaths = [
-      ...new Set(
-        linkTargets.flatMap((target) => {
+      ...new Set([
+        ...linkTargets.flatMap((target) => {
           const drivePath = driveLinkPath(target);
           return drivePath ? [drivePath] : [];
         }),
-      ),
+        ...(canvasDrivePath ? [canvasDrivePath] : []),
+      ]),
     ];
     const driveCards = useDriveEvidenceCards(
       linkedDrivePaths.filter(
@@ -698,10 +714,11 @@ export const AssistantMessageRow = memo(
     const unpreviewableFiles = linkedFiles.filter(
       (file) => file.cloudDriveFile || !evidencePathSet.has(file.path),
     );
-    const resourcePayload = row.resourcePayload;
     const resourceShownElsewhere =
       !resourcePayload ||
       resourcePayload.kind === "source-diff" ||
+      canvasLocalPath !== null ||
+      (canvasDrivePath !== null && previewedDrivePaths.has(canvasDrivePath)) ||
       (resourcePayload.kind === "media" &&
         resourcePayload.presentation === "inline-image") ||
       (resourcePayload.kind === "office" && Boolean(row.officePreviewRef));

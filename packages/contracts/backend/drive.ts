@@ -26,6 +26,13 @@ export type DriveFileUrl = {
   version: string;
 };
 
+export type DrivePagePreview = {
+  path: string;
+  version: string;
+  url: string;
+  expiresAt: number;
+};
+
 export type DriveFileVersions = Record<string, string | null>;
 
 export const DRIVE_VERSIONS_MAX_PATHS = 200;
@@ -60,6 +67,10 @@ export type DriveCalls = {
   "drive.fileUrl": {
     args: { path: string };
     result: DriveFileUrl;
+  };
+  "drive.pagePreview": {
+    args: { path: string };
+    result: DrivePagePreview;
   };
   "drive.delete": {
     args: { path: string };

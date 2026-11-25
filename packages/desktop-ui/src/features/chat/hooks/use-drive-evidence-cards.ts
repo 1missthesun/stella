@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { EvidenceCard } from "@stella/contracts/chat-evidence";
-import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath, driveLinkTarget } from "@stella/contracts/cloud-world-paths";
+import { humanTitleFor } from "@stella/contracts/chat-evidence-naming";
+import { isHtmlPagePath } from "@stella/contracts/page-preview";
 import type { DriveFileVersion } from "@stella/contracts/drive-file-versions";
 import {
   backendClient,
@@ -14,6 +16,41 @@ const EMPTY: readonly EvidenceCard[] = [];
 type Resolved = {
   versions: readonly (string | null)[];
   cards: readonly EvidenceCard[];
+  expiresAt?: number;
+};
+
+const PREVIEW_URL_MARGIN_MS = 60_000;
+
+const isFresh = (entry: Resolved): boolean =>
+  entry.expiresAt === undefined || entry.expiresAt - PREVIEW_URL_MARGIN_MS > Date.now();
+
+const hostRendersCards = (): boolean => Boolean(window.electronAPI?.chatEvidence?.driveCards);
+
+const requestPagePreviews = async (drivePaths: readonly string[]): Promise<Resolved> => {
+  const previews = await Promise.all(
+    drivePaths.map((path) =>
+      backendClient.call("drive.pagePreview", { path }).catch(() => null),
+    ),
+  );
+  const cards = previews.flatMap((preview): EvidenceCard[] =>
+    preview
+      ? [
+          {
+            id: `page:${preview.path}:${preview.version}`,
+            kind: "page",
+            title: humanTitleFor(preview.path, "page"),
+            sourcePaths: [driveLinkTarget(preview.path)],
+            thumbnail: preview.url,
+          },
+        ]
+      : [],
+  );
+  const expiries = previews.flatMap((preview) => (preview ? [preview.expiresAt] : []));
+  return {
+    versions: previews.map((preview) => preview?.version ?? null),
+    cards: cards.length === 0 ? EMPTY : cards,
+    ...(expiries.length > 0 ? { expiresAt: Math.min(...expiries) } : {}),
+  };
 };
 
 const resolved = new Map<string, Resolved>();
@@ -35,9 +72,13 @@ const requestCards = (key: string): Promise<Resolved | null> => {
   if (existing) return existing;
   const drivePaths = key.split("\n");
   const bridge = window.electronAPI?.chatEvidence;
-  if (!bridge?.driveCards) return Promise.resolve(null);
   const epoch = readBackendAccountEpoch();
   const work = (async (): Promise<Resolved> => {
+    if (!bridge?.driveCards) {
+      const next = await requestPagePreviews(drivePaths);
+      if (epoch === readBackendAccountEpoch()) resolved.set(key, next);
+      return next;
+    }
     const located = await Promise.all(
       drivePaths.map((path) =>
         backendClient.call("drive.fileUrl", { path }).catch(() => null),
@@ -78,7 +119,7 @@ const loadCards = async (
   const inFlight = pending.get(key);
   if (inFlight) {
     const settled = await inFlight;
-    if (settled && versionsMatch(versions, settled.versions)) return settled;
+    if (settled && isFresh(settled) && versionsMatch(versions, settled.versions)) return settled;
   }
   return await requestCards(key);
 };
@@ -87,8 +128,11 @@ export const evidenceCardDrivePath = (card: EvidenceCard): string | null =>
   card.sourcePaths[0] ? driveLinkPath(card.sourcePaths[0]) : null;
 
 export const useDriveEvidenceCards = (
-  drivePaths: readonly string[],
+  requestedPaths: readonly string[],
 ): readonly EvidenceCard[] => {
+  const drivePaths = hostRendersCards()
+    ? requestedPaths
+    : requestedPaths.filter((path) => isHtmlPagePath(path));
   const key = drivePaths.join("\n");
   const versions = useDriveFileVersions(drivePaths);
   const [cards, setCards] = useState<readonly EvidenceCard[]>(
@@ -102,7 +146,7 @@ export const useDriveEvidenceCards = (
     }
     const cached = resolved.get(key);
     if (cached) setCards(cached.cards);
-    if (cached && versionsMatch(versions, cached.versions)) return;
+    if (cached && isFresh(cached) && versionsMatch(versions, cached.versions)) return;
     let live = true;
     void loadCards(key, versions).then((next) => {
       if (live && next) setCards(next.cards);

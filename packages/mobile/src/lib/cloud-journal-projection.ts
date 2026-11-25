@@ -441,27 +441,42 @@ const projectTurn = (
     });
   }
 
-  const ownOutputPaths = new Set<string>();
-  for (const { payload } of toolResults.values()) {
+  const htmlOutputs = new Map<string, Record<string, unknown>>();
+  for (const { error, payload } of toolResults.values()) {
     const toolName =
       typeof payload.toolName === "string"
         ? (payload.toolName.split("__").at(-1) ?? payload.toolName)
         : "";
     const details = asRecord(payload.details);
-    if (toolName === "html" && typeof details?.filePath === "string") {
-      ownOutputPaths.add(details.filePath);
+    if (!error && toolName === "html" && typeof details?.filePath === "string") {
+      htmlOutputs.set(details.filePath, details);
     }
   }
   const files = turn.flatMap((record) =>
     record.kind === "card" && record.card.type === "files"
-      ? record.card.files.filter((file) => ownOutputPaths.has(file.path))
+      ? record.card.files.filter((file) => htmlOutputs.has(file.path))
       : [],
   );
-  if (files.length) {
+  const carded = new Set(files.map((file) => file.path));
+  const canvases = [...htmlOutputs].filter(([filePath]) => !carded.has(filePath));
+  if (files.length || canvases.length) {
     const createdAt = turn.at(-1)?.createdAtMs ?? 0;
-    const artifacts: ChatArtifact[] = files.map((file) =>
-      cloudFileArtifact(file, args.conversationId ?? "", createdAt),
-    );
+    const conversationId = args.conversationId ?? "";
+    const artifacts: ChatArtifact[] = [
+      ...files.map((file) => cloudFileArtifact(file, conversationId, createdAt)),
+      ...canvases.map(([filePath, details]): ChatArtifact => ({
+        id: `cloud:${turnId}:canvas:${filePath}`,
+        conversationId,
+        payload: {
+          kind: "canvas-html",
+          filePath,
+          ...(typeof details.title === "string" && details.title ? { title: details.title } : {}),
+          ...(typeof details.slug === "string" && details.slug ? { slug: details.slug } : {}),
+          createdAt: typeof details.createdAt === "number" ? details.createdAt : createdAt,
+          ...(details.driveBacked === true ? { driveBacked: true } : {}),
+        },
+      })),
+    ];
     const lastAssistantIndex = out.findLastIndex(
       (message) =>
         message.role === "assistant" && message.requestId === userMessageId,

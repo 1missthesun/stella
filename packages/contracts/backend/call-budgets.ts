@@ -28,6 +28,7 @@ const SLOW_CALLS = new Set<string>([
   "memory.files.write",
   "memory.files.read",
   "drive.finalizeUpload",
+  "drive.pagePreview",
   "skills.heads",
 ]);
 

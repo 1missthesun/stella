@@ -13,6 +13,7 @@ import { useRegisterViewerNav } from "@/shell/workspace-stage/viewer-item-contex
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { useT } from "@/shared/i18n";
 import { PreviewBoundary, PreviewProblem } from "@/shell/display/preview-states";
+import { useRetainedSurfaceActive } from "@/ui/retained-surface";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "./pdf-viewer-card.css";
@@ -33,10 +34,140 @@ type PdfViewerCardProps = {
 
 const PAGE_RAIL_MAX_PAGES = 80;
 const PAGE_RAIL_THUMB_WIDTH = 76;
+const PAGE_RAIL_WIDTH = 112;
+const PAGE_RAIL_MIN_VIEWER_WIDTH = 620;
+const EAGER_MAIN_PAGES = 2;
+const DEFAULT_PAGE_ASPECT = 792 / 612;
 
 type LoadStatus = "loading" | "ready" | "error";
 
 const RESIZE_DEBOUNCE_MS = 100;
+
+function useNearScrollRoot(
+  ref: React.RefObject<HTMLElement | null>,
+  rootRef: React.RefObject<HTMLElement | null>,
+  enabled: boolean,
+  rootMargin: string,
+): boolean {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!enabled || visible) return;
+    const target = ref.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setVisible(true);
+      },
+      { root: rootRef.current, rootMargin },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [enabled, rootMargin, rootRef, ref, visible]);
+  return visible;
+}
+
+function LazyPdfPage({
+  pageNumber,
+  width,
+  aspect,
+  scrollRef,
+  eager,
+  onFirstRender,
+}: {
+  pageNumber: number;
+  width: number | null;
+  aspect: number;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  eager: boolean;
+  onFirstRender?: (aspectRatio: number) => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const near = useNearScrollRoot(wrapRef, scrollRef, !eager, "800px 0px");
+  const shouldRender = eager || near;
+  const estHeight = Math.round((width ?? 612) * aspect);
+  return (
+    <div
+      ref={wrapRef}
+      className="pdf-viewer-card__page-wrap"
+      data-pdf-page={pageNumber}
+      style={shouldRender ? undefined : { minHeight: estHeight }}
+    >
+      {shouldRender ? (
+        <Page
+          pageNumber={pageNumber}
+          width={width ?? undefined}
+          renderAnnotationLayer={false}
+          renderTextLayer={false}
+          className="pdf-viewer-card__page"
+          onRenderSuccess={
+            onFirstRender
+              ? () => {
+                  const canvas = wrapRef.current?.querySelector("canvas");
+                  if (canvas && canvas.width > 0 && canvas.height > 0) {
+                    onFirstRender(canvas.height / canvas.width);
+                  } else {
+                    onFirstRender(DEFAULT_PAGE_ASPECT);
+                  }
+                }
+              : undefined
+          }
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function LazyRailThumb({
+  pageNumber,
+  current,
+  railRef,
+  enabled,
+  onSelect,
+}: {
+  pageNumber: number;
+  current: boolean;
+  railRef: React.RefObject<HTMLElement | null>;
+  enabled: boolean;
+  onSelect: () => void;
+}) {
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const near = useNearScrollRoot(btnRef, railRef, enabled, "300px 0px");
+  return (
+    <button
+      ref={btnRef}
+      type="button"
+      className="pdf-viewer-card__rail-page"
+      data-current={current ? "true" : undefined}
+      aria-label={`Page ${pageNumber}`}
+      aria-current={current ? "page" : undefined}
+      onClick={onSelect}
+    >
+      {enabled && near ? (
+        <Page
+          pageNumber={pageNumber}
+          width={PAGE_RAIL_THUMB_WIDTH}
+          renderAnnotationLayer={false}
+          renderTextLayer={false}
+          loading={null}
+          className="pdf-viewer-card__rail-thumb"
+        />
+      ) : (
+        <span
+          className="pdf-viewer-card__rail-thumb"
+          style={{
+            display: "block",
+            width: PAGE_RAIL_THUMB_WIDTH,
+            height: Math.round(PAGE_RAIL_THUMB_WIDTH * DEFAULT_PAGE_ASPECT),
+          }}
+        />
+      )}
+      <span className="pdf-viewer-card__rail-number">{pageNumber}</span>
+    </button>
+  );
+}
 
 export function PdfViewerCard({
   filePath,
@@ -67,6 +198,7 @@ function PdfViewerCardContent({
   onRetry,
 }: PdfViewerCardProps & { onRetry: () => void }) {
   const t = useT();
+  const active = useRetainedSurfaceActive();
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const {
@@ -80,7 +212,10 @@ function PdfViewerCardContent({
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageWidth, setPageWidth] = useState<number | null>(null);
+  const [firstPageReady, setFirstPageReady] = useState(false);
+  const [pageAspect, setPageAspect] = useState(DEFAULT_PAGE_ASPECT);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const railRef = useRef<HTMLElement | null>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const resizeTimerRef = useRef<number | null>(null);
   const lastWidthRef = useRef<number | null>(null);
@@ -88,20 +223,39 @@ function PdfViewerCardContent({
 
   const status: LoadStatus = fileError ? "error" : loadStatus;
   const errorMessage = fileError ?? loadErrorMessage;
+  const showRail = pageRail && numPages > 1;
+  const hasBytes = Boolean(bytes);
 
   useLayoutEffect(() => {
+    if (!active) return;
+    const layout = layoutRef.current;
     const container = containerRef.current;
-    if (!container || typeof ResizeObserver === "undefined") return;
+    if (!layout || typeof ResizeObserver === "undefined") return;
 
-    const applyWidth = () => {
-      const next = Math.floor(container.getBoundingClientRect().width);
+    const measure = () => {
+      const scroll = containerRef.current;
+      let next = scroll ? Math.floor(scroll.getBoundingClientRect().width) : 0;
+      if (next <= 0) {
+        const layoutWidth = Math.floor(layout.getBoundingClientRect().width);
+        if (layoutWidth > 0) {
+          const viewer = layout.closest<HTMLElement>(".file-viewer");
+          const viewerWidth = viewer
+            ? viewer.getBoundingClientRect().width
+            : layoutWidth;
+          const railSpace =
+            showRail && viewerWidth > PAGE_RAIL_MIN_VIEWER_WIDTH
+              ? PAGE_RAIL_WIDTH
+              : 0;
+          next = Math.max(120, layoutWidth - railSpace);
+        }
+      }
       if (next > 0 && next !== lastWidthRef.current) {
         lastWidthRef.current = next;
         setPageWidth(next);
       }
     };
 
-    applyWidth();
+    measure();
 
     const observer = new ResizeObserver(() => {
       if (resizeTimerRef.current !== null) {
@@ -109,10 +263,10 @@ function PdfViewerCardContent({
       }
       resizeTimerRef.current = window.setTimeout(() => {
         resizeTimerRef.current = null;
-        applyWidth();
+        measure();
       }, RESIZE_DEBOUNCE_MS);
     });
-    observer.observe(container);
+    observer.observe(container ?? layout);
 
     return () => {
       observer.disconnect();
@@ -121,7 +275,13 @@ function PdfViewerCardContent({
         resizeTimerRef.current = null;
       }
     };
-  }, [numPages]);
+  }, [active, numPages, showRail, hasBytes]);
+
+  useEffect(() => {
+    if (numPages <= 1 || firstPageReady) return;
+    const fallback = window.setTimeout(() => setFirstPageReady(true), 250);
+    return () => window.clearTimeout(fallback);
+  }, [firstPageReady, numPages]);
 
   const handleLoadSuccess = useCallback(
     ({ numPages }: { numPages: number }) => {
@@ -139,7 +299,15 @@ function PdfViewerCardContent({
     [t],
   );
 
-  const documentFile = useMemo(() => (bytes ? { data: bytes } : null), [bytes]);
+  const handleFirstPageRender = useCallback((aspect: number) => {
+    setPageAspect(aspect);
+    setFirstPageReady(true);
+  }, []);
+
+  const documentFile = useMemo(
+    () => (bytes ? { data: bytes } : null),
+    [bytes],
+  );
 
   useEffect(() => {
     const layout = layoutRef.current;
@@ -194,8 +362,6 @@ function PdfViewerCardContent({
     setCurrentPage(pageNumber);
     container.scrollTo({ top, behavior: "smooth" });
   }, []);
-
-  const showRail = pageRail && numPages > 1;
 
   useRegisterViewerNav(
     pageRail && numPages > 1
@@ -263,37 +429,24 @@ function PdfViewerCardContent({
               className="pdf-viewer-card__document-root"
             >
               {showRail ? (
-                <nav className="pdf-viewer-card__rail" aria-label="Pages">
+                <nav
+                  ref={railRef}
+                  className="pdf-viewer-card__rail"
+                  aria-label="Pages"
+                >
                   {Array.from(
                     { length: Math.min(numPages, PAGE_RAIL_MAX_PAGES) },
                     (_, index) => {
                       const pageNumber = index + 1;
                       return (
-                        <button
+                        <LazyRailThumb
                           key={pageNumber}
-                          type="button"
-                          className="pdf-viewer-card__rail-page"
-                          data-current={
-                            pageNumber === currentPage ? "true" : undefined
-                          }
-                          aria-label={`Page ${pageNumber}`}
-                          aria-current={
-                            pageNumber === currentPage ? "page" : undefined
-                          }
-                          onClick={() => scrollToPage(pageNumber)}
-                        >
-                          <Page
-                            pageNumber={pageNumber}
-                            width={PAGE_RAIL_THUMB_WIDTH}
-                            renderAnnotationLayer={false}
-                            renderTextLayer={false}
-                            loading={null}
-                            className="pdf-viewer-card__rail-thumb"
-                          />
-                          <span className="pdf-viewer-card__rail-number">
-                            {pageNumber}
-                          </span>
-                        </button>
+                          pageNumber={pageNumber}
+                          current={pageNumber === currentPage}
+                          railRef={railRef}
+                          enabled={firstPageReady}
+                          onSelect={() => scrollToPage(pageNumber)}
+                        />
                       );
                     },
                   )}
@@ -304,29 +457,24 @@ function PdfViewerCardContent({
               {Array.from({ length: numPages }, (_, index) => {
                 const pageNumber = index + 1;
                 return (
-                  <div
+                  <LazyPdfPage
                     key={pageNumber}
-                    className="pdf-viewer-card__page-wrap"
-                    data-pdf-page={pageNumber}
-                  >
-                    <Page
-                      pageNumber={pageNumber}
-                      width={pageWidth ?? undefined}
-                      renderAnnotationLayer={false}
-                      renderTextLayer={false}
-                      className="pdf-viewer-card__page"
-                    />
-                  </div>
+                    pageNumber={pageNumber}
+                    width={pageWidth}
+                    aspect={pageAspect}
+                    scrollRef={containerRef}
+                    eager={pageNumber <= EAGER_MAIN_PAGES}
+                    onFirstRender={
+                      pageNumber === 1 ? handleFirstPageRender : undefined
+                    }
+                  />
                 );
               })}
               </div>
               </div>
             </Document>
           ) : (
-            <div
-              ref={containerRef}
-              className="file-preview-card__placeholder pdf-viewer-card__placeholder"
-            >
+            <div className="file-preview-card__placeholder pdf-viewer-card__placeholder">
               {t("app.chat.pdfViewer.loading")}
             </div>
           )}

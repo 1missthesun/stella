@@ -11,7 +11,10 @@ import {
   type FileEntry,
 } from "@/features/workspace-display/files-index";
 import { fileViewer } from "@/features/workspace-display/file-viewer-store";
-import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
+import {
+  openDisplayPayloadTab,
+  prefetchDisplayPayload,
+} from "@/features/workspace-display/open-payload";
 import type { DisplayTabKind } from "@/features/workspace-display/types";
 
 const STRIP_KINDS: ReadonlySet<DisplayTabKind> = new Set([
@@ -164,6 +167,7 @@ export const useViewerSiblings = (
 };
 
 export const showSibling = (fromId: string, entry: FileEntry): void => {
+  prefetchDisplayPayload(entry.payload);
   openDisplayPayloadTab(entry.payload, { activate: false });
   const surface = fileViewer.surfaceOf(fromId);
   if (surface) fileViewer.show(surface, entry.id);

@@ -77,6 +77,7 @@ const readDisplayFileRaw = async (
 };
 // @reloadable a cache of file reads; a newer copy starts empty
 const cache = new Map<string, CacheEntry>();
+let lastConversationId: string | null = null;
 
 export const readDisplayFileOnce = (
   filePath: string,
@@ -275,6 +276,67 @@ export const prefetchDisplayFile = (
     release(cacheKey, entry);
   };
 };
+
+export const prefetchDisplayFileBytes = (
+  filePath: string,
+  conversationId?: string | null,
+  maxBytes?: number,
+): void => {
+  if (!isDisplayFileApiAvailable()) return;
+  const targetConversationId =
+    conversationId !== undefined ? conversationId : lastConversationId;
+  const cacheKey = displayFileCacheKey(
+    filePath,
+    targetConversationId,
+    undefined,
+    maxBytes,
+  );
+  const entry = acquire(
+    filePath,
+    undefined,
+    targetConversationId,
+    undefined,
+    maxBytes,
+    null,
+  );
+  void entry.promise.finally(() => {
+    release(cacheKey, entry);
+  });
+};
+
+type BytesState = {
+  key: string;
+  bytes: Uint8Array | null;
+  error: string | null;
+  missing: boolean;
+  truncated: boolean;
+  loading: boolean;
+};
+
+const cachedBytesState = (cacheKey: string): BytesState => {
+  const entry = cache.get(cacheKey);
+  const resolved = entry?.resolved;
+  if (entry && resolved && !resolved.missing) {
+    if (entry.refCount === 0) entry.idleSince = performance.now();
+    return {
+      key: cacheKey,
+      bytes: resolved.bytes,
+      error: null,
+      missing: false,
+      truncated: resolved.truncated === true,
+      loading: false,
+    };
+  }
+  return {
+    key: cacheKey,
+    bytes: null,
+    error: null,
+    missing: false,
+    truncated: false,
+    loading: true,
+  };
+};
+
 export function useDisplayFileBytes(
   filePath: string,
   unavailableMessage?: string,
@@ -290,30 +352,31 @@ export function useDisplayFileBytes(
 } {
   const source = useContext(DisplayFileSourceContext);
   const uiState = useOptionalUiState();
+  if (uiState?.state.conversationId) {
+    lastConversationId = uiState.state.conversationId;
+  }
   const conversationId = source
     ? source.key
     : conversationIdOverride !== undefined
       ? conversationIdOverride
       : (uiState?.state.conversationId ?? null);
-  const [bytes, setBytes] = useState<Uint8Array | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [missing, setMissing] = useState(false);
-  const [truncated, setTruncated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = displayFileCacheKey(
+    filePath,
+    conversationId,
+    version,
+    maxBytes,
+  );
   const [reread, setReread] = useState(0);
+  const [stored, setStored] = useState<BytesState>(() =>
+    cachedBytesState(cacheKey),
+  );
+  let state = stored;
+  if (state.key !== cacheKey) {
+    state = cachedBytesState(cacheKey);
+    setStored(state);
+  }
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setMissing(false);
-    setTruncated(false);
-    setBytes(null);
-    const cacheKey = displayFileCacheKey(
-      filePath,
-      conversationId,
-      version,
-      maxBytes,
-    );
     const entry = acquire(
       filePath,
       unavailableMessage,
@@ -326,31 +389,80 @@ export function useDisplayFileBytes(
       if (!cancelled) setReread((count) => count + 1);
     };
     entry.stale.add(onStale);
+    const update = (next: Omit<BytesState, "key">) => {
+      if (cancelled) return;
+      setStored((previous) =>
+        previous.key === cacheKey &&
+        previous.loading === next.loading &&
+        previous.error === next.error &&
+        previous.missing === next.missing &&
+        previous.truncated === next.truncated &&
+        previous.bytes === next.bytes
+          ? previous
+          : { key: cacheKey, ...next },
+      );
+    };
+    if (entry.resolved && !entry.resolved.missing) {
+      update({
+        bytes: entry.resolved.bytes,
+        error: null,
+        missing: false,
+        truncated: entry.resolved.truncated === true,
+        loading: false,
+      });
+    } else {
+      update({
+        bytes: null,
+        error: null,
+        missing: false,
+        truncated: false,
+        loading: true,
+      });
+    }
     void entry.promise
       .then((result) => {
         if (cancelled) return;
         if (result.missing) {
-          setMissing(true);
-          setError(deviceFileMissingMessage(result.reason, filePath));
+          update({
+            bytes: null,
+            error: deviceFileMissingMessage(result.reason, filePath),
+            missing: true,
+            truncated: false,
+            loading: false,
+          });
           return;
         }
-        setBytes(result.bytes);
-        setTruncated(result.truncated === true);
+        update({
+          bytes: result.bytes,
+          error: null,
+          missing: false,
+          truncated: result.truncated === true,
+          loading: false,
+        });
       })
       .catch((caught) => {
         if (cancelled) return;
-        setError(caught instanceof Error ? caught.message : String(caught));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        update({
+          bytes: null,
+          error: caught instanceof Error ? caught.message : String(caught),
+          missing: false,
+          truncated: false,
+          loading: false,
+        });
       });
     return () => {
       cancelled = true;
       entry.stale.delete(onStale);
       release(cacheKey, entry);
     };
-  }, [conversationId, filePath, maxBytes, unavailableMessage, version, source, reread]);
-  return { bytes, error, loading, missing, truncated };
+  }, [cacheKey, conversationId, filePath, maxBytes, unavailableMessage, version, source, reread]);
+  return {
+    bytes: state.bytes,
+    error: state.error,
+    loading: state.loading,
+    missing: state.missing,
+    truncated: state.truncated,
+  };
 }
 
 type BlobResult = {
@@ -425,6 +537,9 @@ export function useDisplayFileBlobs(
 } {
   const source = useContext(DisplayFileSourceContext);
   const uiState = useOptionalUiState();
+  if (uiState?.state.conversationId) {
+    lastConversationId = uiState.state.conversationId;
+  }
   const conversationId = source
     ? source.key
     : conversationIdOverride !== undefined

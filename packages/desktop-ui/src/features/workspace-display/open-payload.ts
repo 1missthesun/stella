@@ -14,6 +14,7 @@ type WorkspaceDisplayPayloadAdapter = {
   appTabSpec: (id: string) => DisplayTabSpec;
   payloadToTabSpec: (payload: DisplayTabPayload) => DisplayTabSpec;
   createSourceDiffTabSpec: () => DisplayTabSpec;
+  prefetchPayload?: (payload: DisplayTabPayload) => void;
 };
 
 let adapter: WorkspaceDisplayPayloadAdapter | null = null;
@@ -123,12 +124,17 @@ const getAdapter = (): WorkspaceDisplayPayloadAdapter => {
   return adapter;
 };
 
+export const prefetchDisplayPayload = (payload: DisplayTabPayload): void => {
+  adapter?.prefetchPayload?.(payload);
+};
+
 export const openDisplayPayloadTab = (
   payload: DisplayTabPayload,
   opts?: OpenTabOptions,
 ): string => {
-  const spec = getAdapter().payloadToTabSpec(payload);
   const activate = opts?.activate ?? true;
+  if (activate) prefetchDisplayPayload(payload);
+  const spec = getAdapter().payloadToTabSpec(payload);
   displayTabs.openTab(spec, {
     activate,
     openPanel: displayTabs.getLayoutSnapshot().panelOpen,

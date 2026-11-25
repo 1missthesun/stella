@@ -47,9 +47,9 @@ export function SettingsRailNav({
             {groupTabs.map(({ key, labelKey, Icon }) => {
               const isActive = activeTab === key;
               return (
-                <Press {...s.settingsRailItem} key={key} {...tabButtonProps(key, isActive)} onPress={() => onSelect(key)} {...((isActive ? "true" : undefined) ? s.settingsRailItemActive : null)}>
+                <Press {...s.settingsRailItem} key={key} {...tabButtonProps(key, isActive)} onPress={() => onSelect(key)} {...(isActive ? s.settingsRailItemActive : null)}>
                   <Icon size={16} strokeWidth={1.75} />
-                  <T {...tx(s.settingsRailItem)}>{t(labelKey)}</T>
+                  <T {...tx(s.settingsRailItem)} {...(isActive ? tx(s.settingsRailItemActive) : null)}>{t(labelKey)}</T>
                 </Press>
               );
             })}

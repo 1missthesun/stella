@@ -1,7 +1,7 @@
 import { Children, type ReactNode } from "react";
 import { derive, font, mix, radius, useTokens, type Style, type Tokens } from "../../theme";
 import { domEvent, useFormSubmit, type DomEvent } from "./press";
-import { Ink, T } from "./text";
+import { Ink, T, flowChildren } from "./text";
 import { APP_TEXT, TextScope } from "./scope";
 
 export type ButtonProps = Omit<Style, "size" | "onPress"> & {
@@ -105,7 +105,7 @@ export function Button({ variant = "secondary", size = "normal", className = "",
               {children}
             </T>
           ) : (
-            children
+            flowChildren(children, { ...text, color, nowrap: true })
           )}
         </Ink.Provider>
       </TextScope>

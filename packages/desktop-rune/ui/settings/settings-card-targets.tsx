@@ -53,7 +53,7 @@ const subscribePulse = (l: () => void) => {
 /** The card key a search jump is pulsing now, for `SettingsCard`'s highlight. */
 export const usePulsingCard = () => useSyncExternalStore(subscribePulse, () => pulse);
 
-export function SettingsCardTitle({ titleKey }: { titleKey: string }) {
+export function SettingsCardTitle({ titleKey, flush = false }: { titleKey: string; flush?: boolean }) {
   const t = useT();
   const s = useSettings();
   const card = useCardRegistration();
@@ -63,7 +63,7 @@ export function SettingsCardTitle({ titleKey }: { titleKey: string }) {
     return () => card.setTitleKey(null);
   }, [card, titleKey]);
   return (
-    <T role="heading" w="full" {...s.settingsCardTitle} {...(card?.inHeader ? { mb: 0 } : null)} {...(card?.account ? s.settingsTabContentAccount_settingsCardTitle : null)}>
+    <T role="heading" w="full" {...s.settingsCardTitle} {...(card?.inHeader || flush ? { mb: 0 } : null)} {...(card?.account ? s.settingsTabContentAccount_settingsCardTitle : null)}>
       {t(titleKey)}
     </T>
   );

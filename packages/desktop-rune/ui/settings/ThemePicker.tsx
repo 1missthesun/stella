@@ -47,6 +47,7 @@ interface ThemePickerProps {
   triggerLabel?: string;
   side?: "top" | "bottom";
   align?: "start" | "center" | "end";
+  anchor?: string;
 }
 
 export function ThemePicker({
@@ -59,6 +60,7 @@ export function ThemePicker({
   triggerLabel = "Theme",
   side = "top",
   align = "end",
+  anchor,
 }: ThemePickerProps) {
   const {
     selectedThemeId,
@@ -117,7 +119,7 @@ export function ThemePicker({
         cancelPreview();
       }}>
       <col {...s.section} {...s.sectionBordered}>
-        <T {...s.label} w="full">Appearance</T>
+        <T {...s.label} mt={0} w="full">Appearance</T>
         <row {...s.buttonRow}>
           {COLOR_SCHEMES.map((scheme) => (
             <Button key={scheme.id} size="small" variant={colorMode === scheme.id ? "secondary" : "ghost"} {...optionButton(colorMode === scheme.id)} onClick={() => setColorMode(scheme.id)}>
@@ -149,8 +151,8 @@ export function ThemePicker({
 
       <col {...s.section}>
         <row {...s.label} mt={0} {...s.labelRow}>
-          <T {...s.label} pad={0} mt={0}>Theme</T>
-          <T {...s.label} pad={0} mt={0} {...s.themeName}>
+          <T {...s.label} py={0} px={0} mt={0}>Theme</T>
+          <T {...s.label} py={0} px={0} mt={0} {...s.themeName}>
             {(hoveredTheme ?? selectedTheme)?.name ?? ""}
           </T>
         </row>
@@ -201,14 +203,16 @@ export function ThemePicker({
           cancelPreview();
         }
       }}>
-      <PopoverTrigger asChild>
-        {popoverTrigger ?? (
-          <Button {...(s.trigger as Omit<Style, "size">)} variant="ghost" size="normal" {...(hideTrigger ? { opacity: 0, inert: true, absolute: {} } : null)}>
-            {triggerLabel}
-          </Button>
-        )}
-      </PopoverTrigger>
-      <PopoverContent {...s.content} side={side} align={align} collisionPadding={8}>
+      {anchor && hideTrigger ? null : (
+        <PopoverTrigger asChild>
+          {popoverTrigger ?? (
+            <Button {...(s.trigger as Omit<Style, "size">)} variant="ghost" size="normal" {...(hideTrigger ? { opacity: 0, inert: true, absolute: {} } : null)}>
+              {triggerLabel}
+            </Button>
+          )}
+        </PopoverTrigger>
+      )}
+      <PopoverContent {...s.content} side={side} align={align} anchorTo={anchor} collisionPadding={8}>
         <PopoverBody pad={0}>{themeContent}</PopoverBody>
       </PopoverContent>
     </Popover>

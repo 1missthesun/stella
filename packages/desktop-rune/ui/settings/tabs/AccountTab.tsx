@@ -1,4 +1,4 @@
-import { SettingsCard, SettingsRow, SettingsTabContent } from "../parts";
+import { SettingsCard, SettingsRow, SettingsTabContent, SettingsTabItem } from "../parts";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Press, T, showToast, tx } from "../../kit/compat";
 import { useSettings } from "../settings.styles";
 import { usePill } from "../../global/shared/pill.styles";
@@ -215,14 +215,16 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
       ) : null}
       {hasConnectedAccount ? <PasskeysCard /> : null}
       <ServerSettingsCard />
-      <row {...sAiAccounts.aiLegal}>
-        <Press text={tx(sAiAccounts.aiLegal)} {...sAiAccounts.aiLink} onPress={() => onOpenLegal?.("terms")}>
-          {t("settings.account.legal.terms")}
-        </Press>
-        <Press text={tx(sAiAccounts.aiLegal)} {...sAiAccounts.aiLink} onPress={() => onOpenLegal?.("privacy")}>
-          {t("settings.account.legal.privacy")}
-        </Press>
-      </row>
+      <SettingsTabItem>
+        <row {...sAiAccounts.aiLegal}>
+          <Press text={tx(sAiAccounts.aiLegal)} {...sAiAccounts.aiLink} onPress={() => onOpenLegal?.("terms")}>
+            {t("settings.account.legal.terms")}
+          </Press>
+          <Press text={tx(sAiAccounts.aiLegal)} {...sAiAccounts.aiLink} onPress={() => onOpenLegal?.("privacy")}>
+            {t("settings.account.legal.privacy")}
+          </Press>
+        </row>
+      </SettingsTabItem>
       <Dialog open={pendingDeleteAction !== null} onOpenChange={closeDeleteDialog}>
         <DialogContent fit {...s.settingsConfirmDialog}>
           <DialogHeader>

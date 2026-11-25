@@ -67,14 +67,12 @@ export function DialogContent({ size = "md", fit = false, children, onEscapeKeyD
   return (
     <>
       <Scrim id={`dlg${id}-scrim`} color={t.c.scrim} />
-      <col id={`dlg${id}-layer`} fixed inset={0} raise={layer.dialog + 1} center pad={8} onPress={() => dismiss(true)}>
+      <col id={`dlg${id}-layer`} fixed inset={0} raise={layer.dialog + 1} center pad={8} modal={{ clickOutside: false }} onDismiss={() => dismiss(false)} onPress={() => dismiss(true)}>
         <col w={s.w} maxW="100%" h={fit ? undefined : s.h} maxH="100%" align="center" justify="start">
           <col
             id={`dlg${id}`}
             role="dialog"
             label={label}
-            modal={{ clickOutside: false }}
-            onDismiss={() => dismiss(false)}
             w="full"
             h={sized === "page" ? "full" : undefined}
             maxH="100%"
@@ -213,6 +211,8 @@ export type FloatingContentProps = Style & {
   onInteractOutside?: (e: DomEvent) => void;
   avoidCollisions?: boolean;
   "aria-label"?: string;
+  /** The id of the element to open at instead of the trigger (a hidden Radix trigger laid over it). */
+  anchorTo?: string;
 };
 
 /** desktop-ui's `DropdownMenuContent`: the glass menu surface anchored to its trigger, closing on choice, Escape or a press outside. */
@@ -242,7 +242,7 @@ export function DropdownMenuContent({ side = "bottom", align = "center", sideOff
 }
 
 /** desktop-ui's `PopoverContent`: an anchored overlay-surface panel; `PopoverBody` pads it. */
-export function PopoverContent({ side = "bottom", align = "center", sideOffset = 4, children, className: _c, collisionPadding: _p, forceMount: _f, onOpenAutoFocus: _o, onCloseAutoFocus: _cl, onEscapeKeyDown: _e, onInteractOutside: _i, avoidCollisions: _a, "aria-label": label, ...style }: FloatingContentProps) {
+export function PopoverContent({ side = "bottom", align = "center", sideOffset = 4, anchorTo, children, className: _c, collisionPadding: _p, forceMount: _f, onOpenAutoFocus: _o, onCloseAutoFocus: _cl, onEscapeKeyDown: _e, onInteractOutside: _i, avoidCollisions: _a, "aria-label": label, ...style }: FloatingContentProps) {
   const t = useTokens();
   const { open, setOpen, id } = useFloating();
   if (!open) return null;
@@ -251,7 +251,7 @@ export function PopoverContent({ side = "bottom", align = "center", sideOffset =
       id={`fl${id}-content`}
       role="dialog"
       label={label}
-      anchor={{ to: `fl${id}-trigger`, side, align, gap: sideOffset }}
+      anchor={{ to: anchorTo ?? `fl${id}-trigger`, side, align, gap: sideOffset }}
       raise={layer.popover}
       modal={{ clickOutside: true }}
       onDismiss={() => setOpen(false)}

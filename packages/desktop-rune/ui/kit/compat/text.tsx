@@ -1,9 +1,9 @@
-import { Children, Fragment, createContext, isValidElement, useContext, type ReactElement, type ReactNode } from "react";
+import { Children, Fragment, cloneElement, createContext, isValidElement, useContext, type ReactElement, type ReactNode } from "react";
 import type { Run, TextProps } from "../../rune";
 import { useTokens, type Style } from "../../theme";
-import { useTextBase } from "./scope";
+import { TextScope, useTextBase } from "./scope";
 
-const TEXT_KEYS = ["size", "weight", "lh", "lineHeight", "em", "tracking", "color", "family", "mono", "textAlign", "textCase", "italic", "nowrap"] as const;
+const TEXT_KEYS = ["size", "weight", "lh", "lineHeight", "em", "tracking", "color", "family", "mono", "textAlign", "textCase", "italic", "underline", "nowrap"] as const;
 type TextKey = (typeof TEXT_KEYS)[number];
 export type TextStyle = Pick<Style, TextKey>;
 
@@ -96,6 +96,52 @@ export function T({ size, weight, lh, em, lineHeight: lhPx, tracking, color, fam
   const links: ((e?: unknown) => void)[] = [];
   flatten(children, {}, runs, links);
   return <text {...base} spans={runs} onPress={onPress} onLink={(href) => links[Number(href.slice(1))]?.()} />;
+}
+
+/** Children as a flex container lays them out: each run of strings becomes one `T` in `text`; elements stay as they are. */
+export function flowChildren(children: ReactNode, text: TextStyle): ReactNode[] {
+  const items: ReactNode[] = [];
+  let run = "";
+  const flush = () => {
+    if (run) items.push(<T key={`t${items.length}`} {...text}>{run}</T>);
+    run = "";
+  };
+  const walk = (nodes: ReactNode) =>
+    Children.forEach(nodes, (child) => {
+      if (child === null || child === undefined || typeof child === "boolean") return;
+      if (typeof child === "string" || typeof child === "number") run += String(child);
+      else if (isValidElement(child) && child.type === Fragment) walk((child.props as { children?: ReactNode }).children);
+      else {
+        flush();
+        items.push(isValidElement(child) && child.key == null ? cloneElement(child, { key: `e${items.length}` }) : child);
+      }
+    });
+  walk(children);
+  flush();
+  return items;
+}
+
+/** A CSS flex container with mixed children: each run of strings becomes text in the container's text style, which nested `T` and icons inherit; elements stay elements. */
+export function Flow({ vertical, children, ...style }: Style & { vertical?: boolean; children?: ReactNode }) {
+  const inherited = useTextBase();
+  const outerInk = useInk();
+  const text = tx(style);
+  const base = {
+    size: text.size ?? inherited.size,
+    weight: text.weight ?? inherited.weight,
+    lh: text.lh ?? inherited.lh,
+    em: text.em ?? inherited.em,
+    family: text.family ?? inherited.family,
+  };
+  const items = flowChildren(children, text);
+  const Box = vertical ? "col" : "row";
+  return (
+    <Box {...style}>
+      <TextScope base={base}>
+        <Ink.Provider value={(text.color as string | undefined) ?? outerInk}>{items}</Ink.Provider>
+      </TextScope>
+    </Box>
+  );
 }
 
 /** A line break inside `T`. */

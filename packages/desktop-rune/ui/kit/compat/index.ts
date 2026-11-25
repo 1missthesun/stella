@@ -11,6 +11,6 @@ export {
 } from "./overlays";
 export { Form, Press, domEvent, useFormSubmit, type DomEvent, type PressProps } from "./press";
 export { APP_TEXT, BODY_TEXT, TextScope, useTextBase, type TextBase } from "./scope";
-export { Br, Ink, T, tx, useInk, type TProps, type TextStyle } from "./text";
+export { Br, Flow, Ink, T, tx, useInk, type TProps, type TextStyle } from "./text";
 export { ToastProvider, dismissToast, showToast, type ToastOptions } from "./toast";
 export * from "./theme-orb";

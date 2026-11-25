@@ -16,11 +16,12 @@ function strongFamilies(family: string): string[] {
  * The face Chromium picks for desktop-ui's body stack (`-apple-system, BlinkMacSystemFont, "Segoe UI",
  * Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif`): what text in portalled dialogs that sets
  * no family of its own is drawn in. On Linux Skia takes fontconfig's match for the first family whose
- * match is that family or one of its strong aliases.
+ * match is that family or one of its strong aliases. On macOS Rune names the system UI font
+ * "System Font" (SF with its `opsz` axis and `trak` table applied as Chromium does).
  */
 export function systemFontFamily(): string {
   if (resolved) return resolved;
-  if (process.platform === "darwin") return (resolved = "SF Pro Text");
+  if (process.platform === "darwin") return (resolved = "System Font");
   if (process.platform === "win32") return (resolved = "Segoe UI");
   for (const family of LINUX_STACK) {
     const matched = run("fc-match", [family, "--format=%{family[0]}"]).trim();

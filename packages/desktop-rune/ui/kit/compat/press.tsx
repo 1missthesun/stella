@@ -1,6 +1,6 @@
 import { Children, createContext, useContext, type ReactNode } from "react";
 import { useTokens, type BoxHandlers, type Style } from "../../theme";
-import { Ink, T, tx, type TextStyle } from "./text";
+import { Ink, T, flowChildren, tx, type TextStyle } from "./text";
 
 export type DomEvent = { preventDefault(): void; stopPropagation(): void; defaultPrevented: boolean; target: { value: string }; currentTarget: { value: string }; key?: string; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; nativeEvent?: { isComposing: boolean } };
 
@@ -79,7 +79,7 @@ export function Press({ onPress, disabled, type, role = "button", text, vertical
       {...style}
       onPress={press}
     >
-      <Ink.Provider value={ink}>{textual(children) && children != null && children !== "" ? <T {...tx(text, style)}>{children}</T> : children}</Ink.Provider>
+      <Ink.Provider value={ink}>{textual(children) ? (children != null && children !== "" ? <T {...tx(text, style)}>{children}</T> : children) : flowChildren(children, tx(text, style))}</Ink.Provider>
     </Box>
   );
 }

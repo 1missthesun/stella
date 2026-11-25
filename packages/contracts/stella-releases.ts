@@ -57,6 +57,20 @@ export const releaseDateLabel = (
 export const stellaReleases: readonly StellaRelease[] = [
   {
     date: "2026-11-25",
+    title: "A lighter Settings and instant Plans & Usage",
+    summary: "Settings has a cleaner, roomier look, Plans & Usage opens instantly, and files you open again appear right away.",
+    tags: ["Polish"],
+    highlights: [
+      "Settings has a lighter, roomier look that matches Account on your phone, with fewer boxes and less repeated text.",
+      "Plans & Usage opens instantly and stays the same size while it loads, with a short summary of your usage at the top.",
+      "Pages, PDFs and files you opened recently come back right away when you open them again, and a PDF shows its first page almost at once.",
+    ],
+    more: [
+      "A video or sound playing in a page you close stops instead of carrying on in the background.",
+    ],
+  },
+  {
+    date: "2026-11-25",
     title: "Long conversations and tasks stay on track",
     summary: "Stella now keeps the details that matter when a long conversation or task carries on, so it picks up right where it left off.",
     tags: ["Polish"],

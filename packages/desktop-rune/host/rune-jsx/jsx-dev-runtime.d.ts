@@ -1,5 +1,5 @@
 // Rune's own JSX namespace: only Rune host elements, no DOM. Runtime is React's jsx-runtime.
-import type { BoxProps, IconProps, ImageProps, InputProps, ListProps, MarkdownProps, MediaProps, TextProps, WebviewProps, WindowProps } from "./props";
+import type { BoxProps, IconProps, VectorProps, ImageProps, InputProps, ListProps, MarkdownProps, MediaProps, TextProps, WebviewProps, WindowProps } from "./props";
 export { Fragment, jsx, jsxs } from "react/jsx-runtime";
 export namespace JSX {
   type ElementType = React.JSX.ElementType;
@@ -20,6 +20,7 @@ export namespace JSX {
     input: InputProps & K;
     image: ImageProps & K;
     icon: IconProps & K;
+    vector: VectorProps & K;
     markdown: MarkdownProps & K;
     video: MediaProps & K;
     audio: MediaProps & K;

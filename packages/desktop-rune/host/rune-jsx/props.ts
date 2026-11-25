@@ -182,6 +182,12 @@ export type ImageProps = BoxProps & {
   tint?: Color;
 };
 
+/** One SVG path of a `<vector>`. Transforms and gradients aren't drawn: bake transforms into `d`. */
+export type VectorPath = { d: string; fill?: string; stroke?: string; strokeWidth?: number; cap?: "round" | "butt"; opacity?: number; evenOdd?: boolean };
+
+/** SVG paths drawn as shapes, for drawing that changes every frame (nothing is cached per body). */
+export type VectorProps = BoxProps & { viewBox?: [number, number]; paths: VectorPath[] };
+
 export type IconProps = BoxProps & {
   /** SVG body (paths inside the root <svg>, `currentColor` tinted by `color`). */
   svg: string; name?: string; view?: number; size?: number; color?: Color;

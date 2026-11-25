@@ -67,6 +67,7 @@ or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark d
 | `input` | native text field (single or `multiline`) |
 | `image` | path, `file://`, `blob:N`, `data:`, `http(s)` (fetched by the host), SVG |
 | `icon` | SVG body tinted through `currentColor` |
+| `vector` | SVG paths drawn as shapes, for drawing that changes every frame |
 | `markdown` | rune-kit Markdown: streaming, selection, syntax, tables, mermaid |
 | `video` `audio` | native player |
 | `list` | virtualized column (only rows near the viewport are built); inside a `scrollY` box |
@@ -191,7 +192,11 @@ its own label.
 - `image`: `src`, `fit` (`cover` | `contain` | `stretch`), `tint`, and any box paint (border,
   radius, shadows).
 - `icon`: `svg` (the inner body of an `<svg>`, `currentColor` allowed), `view` (viewBox size,
-  default 24), `size`, `color`, `spin` (period in seconds).
+  default 24), `size`, `color`, `spin` (period in seconds). Each distinct body is cached for the
+  life of the process, so use `vector` for anything that changes per frame.
+- `vector`: `viewBox` (`[w, h]`, stretched to the element's size) and `paths`, each
+  `{d, fill?, stroke?, strokeWidth?, cap?, opacity?, evenOdd?}`. Paths are rebuilt on each change
+  and nothing is cached. Gradients and `transform` aren't drawn: bake transforms into `d`.
 - `video` / `audio`: `src`, `fit`, `autoplay`, `muted`, `loopMedia`. Commands:
   `engine.media.play / pause / seek / state`.
 

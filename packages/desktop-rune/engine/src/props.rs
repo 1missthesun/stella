@@ -19,6 +19,7 @@ pub enum Kind {
     List,
     Markdown,
     Video,
+    Vector,
 }
 
 impl Kind {
@@ -35,6 +36,7 @@ impl Kind {
             "list" => Kind::List,
             "markdown" => Kind::Markdown,
             "video" | "audio" => Kind::Video,
+            "vector" => Kind::Vector,
             _ => Kind::Col,
         }
     }
@@ -325,6 +327,19 @@ pub struct ScrollFadeP {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+pub struct VectorPathP {
+    pub d: String,
+    pub fill: Option<C>,
+    pub stroke: Option<C>,
+    pub stroke_width: Option<f32>,
+    /// `round` (default) or `butt`.
+    pub cap: Option<String>,
+    pub opacity: Option<f32>,
+    pub even_odd: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DragOutP {
     pub paths: Vec<String>,
     pub text: Option<String>,
@@ -509,6 +524,8 @@ pub struct Props {
     pub svg: Option<String>,
     pub name: Option<String>,
     pub view: Option<f32>,
+    pub view_box: Option<[f32; 2]>,
+    pub paths: Option<Vec<VectorPathP>>,
     pub spin: Option<f32>,
     pub autoplay: bool,
     pub muted: bool,

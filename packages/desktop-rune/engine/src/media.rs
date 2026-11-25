@@ -105,6 +105,26 @@ pub fn icon(p: &Props) -> El {
     e
 }
 
+/// `<vector>`: SVG paths drawn as Rune shapes, rebuilt whenever they change and never cached.
+pub fn vector(p: &Props) -> El {
+    let mut shape = rune::Shape::new();
+    for path in p.paths.iter().flatten() {
+        let alpha = path.opacity.unwrap_or(1.0).clamp(0.0, 1.0);
+        if let Some(c) = path.fill {
+            let rule = if path.even_odd { rune::FillRule::EvenOdd } else { rune::FillRule::NonZero };
+            shape = shape.fill_svg_with(&path.d, rule, c.0.alpha(c.0.a * alpha));
+        }
+        if let Some(c) = path.stroke {
+            let cap = if path.cap.as_deref() == Some("butt") { rune::LineCap::Butt } else { rune::LineCap::Round };
+            shape = shape.stroke_svg(&path.d, path.stroke_width.unwrap_or(1.0), cap, c.0.alpha(c.0.a * alpha));
+        }
+    }
+    if let Some([w, h]) = p.view_box {
+        shape = shape.view_box(w, h);
+    }
+    rune::canvas(shape)
+}
+
 pub fn video(n: u32, p: &Props) -> El {
     let Some(src) = p.src.clone() else { return el() };
     let player = PLAYERS.with(|m| {

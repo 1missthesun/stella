@@ -109,8 +109,40 @@ function Visuals() {
         </row>
         <image src={SVG_IMAGE} w={160} h={96} radius={14} />
         <image src={PNG} w={72} h={72} radius={16} fit="cover" border={c.border} borderWidth={1} />
+        <Morph />
       </row>
     </Section>
+  );
+}
+
+function blob(t: number): string {
+  const pts = Array.from({ length: 8 }, (_, i) => {
+    const a = (i / 8) * Math.PI * 2;
+    const r = 26 + Math.sin(t * 3 + i * 1.7) * 6;
+    return [32 + Math.cos(a) * r, 32 + Math.sin(a) * r];
+  });
+  return pts.map(([x, y], i) => {
+    const [nx, ny] = pts[(i + 1) % pts.length];
+    return `${i ? "" : `M${(x + nx) / 2} ${(y + ny) / 2} `}Q${nx} ${ny} ${(nx + pts[(i + 2) % pts.length][0]) / 2} ${(ny + pts[(i + 2) % pts.length][1]) / 2}`;
+  }).join(" ") + "Z";
+}
+
+function Morph() {
+  const [t, setT] = useState(0);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const start = performance.now();
+    const id = setInterval(() => {
+      const now = (performance.now() - start) / 1000;
+      setT(now);
+      if (now > 3) setOn(false);
+    }, 16);
+    return () => clearInterval(id);
+  }, [on]);
+  return (
+    <vector id="g-morph" w={72} h={72} viewBox={[64, 64]} onPress={() => setOn(true)}
+      paths={[{ d: blob(t), fill: c.accent, opacity: 0.85 }, { d: "M24 30h4M36 30h4", stroke: "#ffffff", strokeWidth: 3 }]} />
   );
 }
 

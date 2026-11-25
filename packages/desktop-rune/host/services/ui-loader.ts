@@ -1,7 +1,8 @@
 // Loads the UI bundle for boot and every hot swap without the host growing: the bundler runs in a
-// recycled child (ui-build-child.ts), each build is evaluated as a CommonJS factory that no module
+// child (ui-build-child.ts) that exists only while builds come in (started on demand, stopped when
+// idle, recycled as it grows), each build is evaluated as a CommonJS factory that no module
 // registry keeps (its global registrations scoped, ui-scope.ts), so a replaced UI is garbage once
-// React lets go of it, and once swaps settle the compiled code of replaced UIs is released.
+// React lets go of it, and once loads settle the compiled code of replaced UIs is released.
 
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -21,8 +22,10 @@ export type UiLoaderOptions = {
   recycleAfter?: number;
   /** Child RSS (MB) past which it is replaced after its current build. */
   recycleAboveMb?: number;
-  /** Quiet time after a swap before JSC's compiled code of replaced UIs is dropped. */
+  /** Quiet time after a load before JSC's compiled code of replaced UIs is dropped. */
   settleMs?: number;
+  /** Quiet time after a build before the bundler process is stopped. */
+  idleStopMs?: number;
 };
 
 type Child = { proc: Subprocess; ready: Promise<void>; builds: number; pending: Map<number, (reply: UiBuildReply) => void> };
@@ -33,7 +36,7 @@ export function createUiLoader(options: UiLoaderOptions) {
   const hostRequire = createRequire(options.entry);
   let nextId = 0;
   let child: Child | null = null;
-  let disposed = false;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const spawnChild = (): Child => {
     let resolveReady!: () => void;
@@ -57,11 +60,21 @@ export function createUiLoader(options: UiLoaderOptions) {
   };
 
   const retire = (c: Child) => {
-    if (child === c) child = disposed ? null : spawnChild();
+    if (child === c) child = null;
     c.proc.kill();
   };
 
+  const stopWhenIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      if (child && child.pending.size === 0) retire(child);
+    }, options.idleStopMs ?? 20_000);
+    idleTimer.unref();
+  };
+
   const build = async (): Promise<string> => {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
     const c = (child ??= spawnChild());
     await c.ready;
     const id = ++nextId;
@@ -71,6 +84,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     });
     c.builds++;
     if (c.builds >= recycleAfter || reply.rssMb > recycleAboveMb) retire(c);
+    else stopWhenIdle();
     if (!reply.ok) throw new Error(reply.error);
     return reply.code;
   };
@@ -90,6 +104,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     if (settleTimer) clearTimeout(settleTimer);
     settleTimer = setTimeout(() => {
       settleTimer = null;
+      Bun.gc(true);
       Bun.shrink();
     }, options.settleMs ?? 2000);
     settleTimer.unref();
@@ -104,15 +119,13 @@ export function createUiLoader(options: UiLoaderOptions) {
     async load(): Promise<UiModule> {
       const code = await build();
       const { value, scope } = evaluateInScope(() => evaluate(code, ++generation));
-      if (liveScope) {
-        liveScope.dispose();
-        settle();
-      }
+      liveScope?.dispose();
       liveScope = scope;
+      settle();
       return value;
     },
     dispose() {
-      disposed = true;
+      if (idleTimer) clearTimeout(idleTimer);
       if (child) retire(child);
     },
   };

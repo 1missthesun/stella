@@ -6,7 +6,7 @@
   "scripts": {
     "engine:build": "cd engine && cargo build --release",
     "start": "./scripts/launch.sh",
-    "typecheck": "node ../../node_modules/typescript-7/bin/tsc -p . --noEmit",
+    "typecheck": "bun scripts/typecheck.ts",
     "icons": "bun --tsconfig-override=../desktop-ui/tsconfig.app.json scripts/gen-icons.ts",
     "icons:check": "bun --tsconfig-override=../desktop-ui/tsconfig.app.json scripts/gen-icons.ts --check"
   },

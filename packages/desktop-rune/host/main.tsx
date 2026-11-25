@@ -10,6 +10,7 @@ import { createElement } from "react";
 import { command, commitCtx, listen, now, stats, type EngineEvent } from "./bridge";
 import { batched, handlers, render } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
+import { viteCompat } from "./vite-compat";
 
 const t_boot = now();
 const ROOT = join(import.meta.dir, "..");
@@ -27,6 +28,7 @@ async function loadApp(): Promise<any> {
     target: "bun",
     format: "esm",
     tsconfig: join(ROOT, "tsconfig.build.json"),
+    plugins: [viteCompat],
   } as any);
   if (!res.success) throw new Error(res.logs.map((l) => String(l)).join("\n"));
   const file = join(HOT, `app-${n}.js`);

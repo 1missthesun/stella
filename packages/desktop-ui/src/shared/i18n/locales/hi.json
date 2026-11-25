@@ -1083,7 +1083,7 @@
       "useAnother": "दूसरा डिवाइस",
       "matches": "मेल खाता है",
       "getTitle": "अपने लॉगिन यहाँ लाएँ",
-      "getBody": "किसी दूसरे डिवाइस पर Stella खोलें।",
+      "getBody": "{names} पर जाएँ।",
       "ok": "ठीक है",
       "cloudUsed": "क्लाउड कार्य ने {label} इस्तेमाल किया"
     }
@@ -1750,7 +1750,7 @@
       "notNow": "अभी नहीं",
       "allow": "अनुमति दें",
       "waitingTitle": "अपने लॉगिन यहाँ पाएँ",
-      "waitingBody": "किसी दूसरे डिवाइस पर Stella खोलें",
+      "waitingBody": "{names} पर जाएँ",
       "startOver": "फिर से शुरू करें",
       "compare": "देखें कि {name} पर {code} दिख रहा है",
       "matches": "मेल खाता है",

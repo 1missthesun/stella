@@ -1083,7 +1083,7 @@
       "useAnother": "Anden enhed",
       "matches": "Det passer",
       "getTitle": "Hent dine logins hertil",
-      "getBody": "Åbn Stella på en anden enhed.",
+      "getBody": "Gå til {names}.",
       "ok": "OK",
       "cloudUsed": "Cloudopgave brugte {label}"
     }
@@ -1750,7 +1750,7 @@
       "notNow": "Ikke nu",
       "allow": "Tillad",
       "waitingTitle": "Få dine logins her",
-      "waitingBody": "Åbn Stella på en anden enhed",
+      "waitingBody": "Gå til {names}",
       "startOver": "Start forfra",
       "compare": "Tjek, at {name} viser {code}",
       "matches": "De er ens",

@@ -850,7 +850,7 @@
       "notNow": "Nie teraz",
       "allow": "Zezwól",
       "waitingTitle": "Pobierz tu swoje loginy",
-      "waitingBody": "Otwórz Stellę na innym urządzeniu",
+      "waitingBody": "Przejdź do {names}",
       "startOver": "Zacznij od nowa",
       "compare": "Sprawdź, czy {name} pokazuje {code}",
       "matches": "Zgadza się",

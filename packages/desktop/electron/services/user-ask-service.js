@@ -1384,6 +1384,9 @@ export class UserAskService {
             case "askAgain":
                 this.sync.askAgain();
                 return { ok: true };
+            case "hide":
+                this.sync.hideAsk();
+                return { ok: true };
             case "startOver":
                 return await this.sync.startOver();
             case "remove":

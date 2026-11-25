@@ -849,7 +849,7 @@
       "notNow": "Ahora no",
       "allow": "Permitir",
       "waitingTitle": "Trae aquí tus accesos",
-      "waitingBody": "Abre Stella en otro dispositivo",
+      "waitingBody": "Ve a {names}",
       "startOver": "Empezar de nuevo",
       "compare": "Comprueba que {name} muestra {code}",
       "matches": "Coincide",

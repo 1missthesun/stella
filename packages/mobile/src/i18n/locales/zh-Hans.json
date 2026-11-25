@@ -847,7 +847,7 @@
       "notNow": "暂不",
       "allow": "允许",
       "waitingTitle": "在这里使用你的登录信息",
-      "waitingBody": "在另一台设备上打开 Stella",
+      "waitingBody": "请使用 {names}",
       "startOver": "重新开始",
       "compare": "请确认 {name} 显示 {code}",
       "matches": "一致",

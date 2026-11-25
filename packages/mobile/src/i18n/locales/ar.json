@@ -852,7 +852,7 @@
       "notNow": "ليس الآن",
       "allow": "سماح",
       "waitingTitle": "احصل على بيانات دخولك هنا",
-      "waitingBody": "افتح Stella على جهاز آخر",
+      "waitingBody": "انتقل إلى {names}",
       "startOver": "البدء من جديد",
       "compare": "تأكد من أن {name} يعرض {code}",
       "matches": "متطابق",

@@ -848,7 +848,7 @@
       "notNow": "Όχι τώρα",
       "allow": "Να επιτραπεί",
       "waitingTitle": "Πάρε εδώ τις συνδέσεις σου",
-      "waitingBody": "Άνοιξε το Stella σε άλλη συσκευή",
+      "waitingBody": "Πήγαινε στο {names}",
       "startOver": "Ξεκίνα από την αρχή",
       "compare": "Έλεγξε ότι το {name} δείχνει {code}",
       "matches": "Ταιριάζει",

@@ -7,6 +7,7 @@ import {
   askSavedValuesAgain,
   confirmSavedValuesCode,
   declineSavedValuesJoin,
+  hideSavedValuesCard,
   startSavedValuesOver,
   useSavedValuesTrust,
   type SavedValuesRequestView,
@@ -35,8 +36,6 @@ export function useSavedLoginsAction() {
   return { busy, run };
 }
 
-let waitingDismissed = false;
-
 export function SavedLoginsChatCards({
   conversationId,
 }: {
@@ -44,7 +43,7 @@ export function SavedLoginsChatCards({
 }) {
   const trust = useSavedValuesTrust();
   const { questions, secureInput } = useConversationUserAsks(conversationId);
-  const [dismissed, setDismissed] = useState(waitingDismissed);
+  const { run } = useSavedLoginsAction();
   if (questions.length > 0 || secureInput) return null;
   if (trust.standing === "member") {
     const request = trust.requests[0];
@@ -52,15 +51,11 @@ export function SavedLoginsChatCards({
       <SavedLoginsRequestCard key={request.joinId} request={request} />
     ) : null;
   }
-  if (trust.standing !== "waiting" || (dismissed && !trust.code)) return null;
-  if (trust.stopped && !trust.stoppedNow) return null;
+  if (trust.standing !== "waiting" || trust.hidden) return null;
   return (
     <SavedLoginsWaitingCard
       waiting={trust}
-      onDismiss={() => {
-        waitingDismissed = true;
-        setDismissed(true);
-      }}
+      onDismiss={() => run(hideSavedValuesCard)}
     />
   );
 }
@@ -128,7 +123,9 @@ export function SavedLoginsWaitingCard({
     return (
       <Card
         title={t("mobile.savedLogins.waitingTitle")}
-        line={t("mobile.savedLogins.waitingBody")}
+        line={t("mobile.savedLogins.waitingBody", {
+          names: waiting.names.join(" / "),
+        })}
       >
         <StartOver disabled={busy} run={run} />
         {putAway}

@@ -1083,7 +1083,7 @@
       "useAnother": "Annan enhet",
       "matches": "Det stämmer",
       "getTitle": "Hämta dina inloggningar hit",
-      "getBody": "Öppna Stella på en annan enhet.",
+      "getBody": "Gå till {names}.",
       "ok": "OK",
       "cloudUsed": "Molnuppgift använde {label}"
     }
@@ -1750,7 +1750,7 @@
       "notNow": "Inte nu",
       "allow": "Tillåt",
       "waitingTitle": "Få dina inloggningar här",
-      "waitingBody": "Öppna Stella på en annan enhet",
+      "waitingBody": "Gå till {names}",
       "startOver": "Börja om",
       "compare": "Kontrollera att {name} visar {code}",
       "matches": "Det stämmer",

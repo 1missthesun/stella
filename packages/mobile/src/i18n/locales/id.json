@@ -847,7 +847,7 @@
       "notNow": "Nanti saja",
       "allow": "Izinkan",
       "waitingTitle": "Dapatkan login Anda di sini",
-      "waitingBody": "Buka Stella di perangkat lain",
+      "waitingBody": "Buka {names}",
       "startOver": "Mulai ulang",
       "compare": "Pastikan {name} menampilkan {code}",
       "matches": "Cocok",

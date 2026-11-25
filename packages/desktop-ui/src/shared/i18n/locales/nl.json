@@ -1083,7 +1083,7 @@
       "useAnother": "Ander apparaat",
       "matches": "Klopt",
       "getTitle": "Haal je logins hierheen",
-      "getBody": "Open Stella op een ander apparaat.",
+      "getBody": "Ga naar {names}.",
       "ok": "OK",
       "cloudUsed": "Cloudtaak gebruikte {label}"
     }
@@ -1750,7 +1750,7 @@
       "notNow": "Niet nu",
       "allow": "Toestaan",
       "waitingTitle": "Haal je logins hierheen",
-      "waitingBody": "Open Stella op een ander apparaat",
+      "waitingBody": "Ga naar {names}",
       "startOver": "Opnieuw beginnen",
       "compare": "Controleer of {name} {code} toont",
       "matches": "Het klopt",

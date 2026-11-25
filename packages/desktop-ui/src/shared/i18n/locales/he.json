@@ -1093,7 +1093,7 @@
       "useAnother": "מכשיר אחר",
       "matches": "תואם",
       "getTitle": "קבל לכאן את הכניסות שלך",
-      "getBody": "פתח את Stella במכשיר אחר.",
+      "getBody": "יש לעבור אל {names}.",
       "ok": "אישור",
       "cloudUsed": "משימת ענן השתמשה ב-{label}"
     }
@@ -1760,7 +1760,7 @@
       "notNow": "לא עכשיו",
       "allow": "אישור",
       "waitingTitle": "קבלת פרטי הכניסה שלך כאן",
-      "waitingBody": "יש לפתוח את Stella במכשיר אחר",
+      "waitingBody": "יש לעבור אל {names}",
       "startOver": "התחלה מחדש",
       "compare": "כדאי לוודא שב-{name} מופיע {code}",
       "matches": "זה תואם",

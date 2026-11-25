@@ -1083,7 +1083,7 @@
       "useAnother": "Başka cihaz",
       "matches": "Eşleşiyor",
       "getTitle": "Girişlerinizi buraya alın",
-      "getBody": "Stella'yı başka bir cihazda açın.",
+      "getBody": "{names} cihazına geçin.",
       "ok": "Tamam",
       "cloudUsed": "Bulut görevi {label} kullandı"
     }
@@ -1750,7 +1750,7 @@
       "notNow": "Şimdi değil",
       "allow": "İzin ver",
       "waitingTitle": "Girişlerini buraya al",
-      "waitingBody": "Stella’yı başka bir cihazda aç",
+      "waitingBody": "{names} cihazına geçin",
       "startOver": "Baştan başla",
       "compare": "{name} cihazının {code} gösterdiğini kontrol et",
       "matches": "Eşleşiyor",

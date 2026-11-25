@@ -1093,7 +1093,7 @@
       "useAnother": "Alt dispozitiv",
       "matches": "Se potrivește",
       "getTitle": "Adu-ți autentificările aici",
-      "getBody": "Deschide Stella pe alt dispozitiv.",
+      "getBody": "Mergi la {names}.",
       "ok": "OK",
       "cloudUsed": "O sarcină din cloud a folosit {label}"
     }
@@ -1760,7 +1760,7 @@
       "notNow": "Nu acum",
       "allow": "Permite",
       "waitingTitle": "Adu-ți aici conectările",
-      "waitingBody": "Deschide Stella pe alt dispozitiv",
+      "waitingBody": "Mergi la {names}",
       "startOver": "Ia-o de la capăt",
       "compare": "Verifică dacă {name} arată {code}",
       "matches": "Se potrivește",

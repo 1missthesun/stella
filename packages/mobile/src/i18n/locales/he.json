@@ -849,7 +849,7 @@
       "notNow": "לא עכשיו",
       "allow": "אישור",
       "waitingTitle": "קבלת פרטי הכניסה שלך כאן",
-      "waitingBody": "יש לפתוח את Stella במכשיר אחר",
+      "waitingBody": "יש לעבור אל {names}",
       "startOver": "התחלה מחדש",
       "compare": "כדאי לוודא שב-{name} מופיע {code}",
       "matches": "זה תואם",

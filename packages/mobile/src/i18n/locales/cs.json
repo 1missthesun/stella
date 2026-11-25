@@ -850,7 +850,7 @@
       "notNow": "Teď ne",
       "allow": "Povolit",
       "waitingTitle": "Získej tu svá přihlášení",
-      "waitingBody": "Otevři Stellu na jiném zařízení",
+      "waitingBody": "Přejděte k {names}",
       "startOver": "Začít znovu",
       "compare": "Zkontroluj, že {name} ukazuje {code}",
       "matches": "Shoduje se",

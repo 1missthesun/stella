@@ -1103,7 +1103,7 @@
       "useAnother": "Inne urządzenie",
       "matches": "Zgadza się",
       "getTitle": "Pobierz tu swoje loginy",
-      "getBody": "Otwórz Stellę na innym urządzeniu.",
+      "getBody": "Przejdź do {names}.",
       "ok": "OK",
       "cloudUsed": "Zadanie w chmurze użyło {label}"
     }
@@ -1770,7 +1770,7 @@
       "notNow": "Nie teraz",
       "allow": "Zezwól",
       "waitingTitle": "Pobierz tu swoje loginy",
-      "waitingBody": "Otwórz Stellę na innym urządzeniu",
+      "waitingBody": "Przejdź do {names}",
       "startOver": "Zacznij od nowa",
       "compare": "Sprawdź, czy {name} pokazuje {code}",
       "matches": "Zgadza się",

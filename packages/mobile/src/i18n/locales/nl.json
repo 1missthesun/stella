@@ -848,7 +848,7 @@
       "notNow": "Niet nu",
       "allow": "Toestaan",
       "waitingTitle": "Haal je logins hierheen",
-      "waitingBody": "Open Stella op een ander apparaat",
+      "waitingBody": "Ga naar {names}",
       "startOver": "Opnieuw beginnen",
       "compare": "Controleer of {name} {code} toont",
       "matches": "Het klopt",

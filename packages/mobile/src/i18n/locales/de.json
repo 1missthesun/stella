@@ -848,7 +848,7 @@
       "notNow": "Nicht jetzt",
       "allow": "Erlauben",
       "waitingTitle": "Hol dir deine Logins hierher",
-      "waitingBody": "Öffne Stella auf einem anderen Gerät",
+      "waitingBody": "Geh zu {names}",
       "startOver": "Neu anfangen",
       "compare": "Prüfe, ob {name} {code} zeigt",
       "matches": "Stimmt überein",

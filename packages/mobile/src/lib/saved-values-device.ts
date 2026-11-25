@@ -85,6 +85,7 @@ export type SavedValuesTrust = Readonly<{
   pin: SavedValuesRosterPin | null;
   listed: boolean;
   stopped: SavedValuesStopped | null;
+  hidden: boolean;
 }>;
 
 const isPin = (value: unknown): value is SavedValuesRosterPin => {
@@ -103,6 +104,7 @@ export const loadTrust = async (ownerId: string): Promise<SavedValuesTrust> => {
     pin: null,
     listed: false,
     stopped: null,
+    hidden: false,
   };
   const stored = await SecureStore.getDeviceOnlyItemAsync(TRUST_ITEM);
   if (!stored) return nothing;
@@ -118,6 +120,7 @@ export const loadTrust = async (ownerId: string): Promise<SavedValuesTrust> => {
         value.stopped === "removed"
           ? value.stopped
           : null,
+      hidden: value.hidden === true,
     };
   } catch {
     return nothing;

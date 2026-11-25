@@ -848,7 +848,7 @@
       "notNow": "Ikke nu",
       "allow": "Tillad",
       "waitingTitle": "Få dine logins her",
-      "waitingBody": "Åbn Stella på en anden enhed",
+      "waitingBody": "Gå til {names}",
       "startOver": "Start forfra",
       "compare": "Tjek, at {name} viser {code}",
       "matches": "De er ens",

@@ -1093,7 +1093,7 @@
       "useAnother": "Autre appareil",
       "matches": "Ça correspond",
       "getTitle": "Récupérer vos identifiants ici",
-      "getBody": "Ouvrez Stella sur un autre appareil.",
+      "getBody": "Allez sur {names}.",
       "ok": "OK",
       "cloudUsed": "Une tâche cloud a utilisé {label}"
     }
@@ -1760,7 +1760,7 @@
       "notNow": "Pas maintenant",
       "allow": "Autoriser",
       "waitingTitle": "Récupère tes identifiants ici",
-      "waitingBody": "Ouvre Stella sur un autre appareil",
+      "waitingBody": "Allez sur {names}",
       "startOver": "Recommencer",
       "compare": "Vérifie que {name} affiche {code}",
       "matches": "C’est pareil",

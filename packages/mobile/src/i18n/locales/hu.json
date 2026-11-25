@@ -848,7 +848,7 @@
       "notNow": "Most nem",
       "allow": "Engedélyezés",
       "waitingTitle": "Hozd ide a belépéseidet",
-      "waitingBody": "Nyisd meg a Stellát egy másik eszközön",
+      "waitingBody": "Menj ide: {names}",
       "startOver": "Újrakezdés",
       "compare": "Nézd meg, hogy a(z) {name} ezt mutatja-e: {code}",
       "matches": "Egyezik",

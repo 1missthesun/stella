@@ -68,7 +68,7 @@ export const SavedValuesDeviceLayer = () => {
   const waitingKey = waiting
     ? waiting.code
       ? `match:${waiting.code}`
-      : waiting.declined || waiting.removed
+      : waiting.declined || waiting.removed || waiting.hidden
         ? null
         : "get"
     : null;
@@ -190,8 +190,12 @@ export const SavedValuesDeviceLayer = () => {
     );
   }
 
+  const hide = () => {
+    dismiss(waitingKey);
+    void act({ action: "hide" });
+  };
   return (
-    <Dialog open onOpenChange={(next) => !next && dismiss(waitingKey)}>
+    <Dialog open onOpenChange={(next) => !next && hide()}>
       <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-get="">
         <DialogHeader>
           <DialogTitle>{t("global.savedValuesDevices.getTitle")}</DialogTitle>
@@ -199,10 +203,12 @@ export const SavedValuesDeviceLayer = () => {
         </DialogHeader>
         <DialogBody className="remote-execution-consent-body">
           <DialogDescription className="remote-execution-consent-text">
-            {t("global.savedValuesDevices.getBody")}
+            {t("global.savedValuesDevices.getBody", {
+              names: waiting.approvers?.join(" / ") || t("global.savedValuesDevices.otherDevice"),
+            })}
           </DialogDescription>
           <div className="remote-execution-consent-actions">
-            <Button type="button" variant="primary" className="pill-btn pill-btn--primary pill-btn--lg" onClick={() => dismiss(waitingKey)}>
+            <Button type="button" variant="primary" className="pill-btn pill-btn--primary pill-btn--lg" onClick={hide}>
               {t("global.savedValuesDevices.ok")}
             </Button>
           </div>

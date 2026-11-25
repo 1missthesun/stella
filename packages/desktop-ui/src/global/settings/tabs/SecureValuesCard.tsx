@@ -303,7 +303,9 @@ function SyncDevices({
                   button: t("global.savedValuesDevices.matches"),
                 }
               : standing === "waiting"
-                ? { label: t("global.savedValuesDevices.getTitle"), sub: t("global.savedValuesDevices.getBody") }
+                ? { label: t("global.savedValuesDevices.getTitle"), sub: t("global.savedValuesDevices.getBody", {
+                      names: waiting?.approvers?.join(" / ") || t("global.savedValuesDevices.otherDevice"),
+                    }) }
                 : null;
   return (
     <>

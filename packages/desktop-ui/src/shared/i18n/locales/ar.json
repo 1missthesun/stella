@@ -1123,7 +1123,7 @@
       "useAnother": "جهاز آخر",
       "matches": "متطابق",
       "getTitle": "احصل على تسجيلات دخولك هنا",
-      "getBody": "افتح Stella على جهاز آخر.",
+      "getBody": "انتقل إلى {names}.",
       "ok": "حسنًا",
       "cloudUsed": "استخدمت مهمة سحابية {label}"
     }
@@ -1790,7 +1790,7 @@
       "notNow": "ليس الآن",
       "allow": "سماح",
       "waitingTitle": "احصل على بيانات دخولك هنا",
-      "waitingBody": "افتح Stella على جهاز آخر",
+      "waitingBody": "انتقل إلى {names}",
       "startOver": "البدء من جديد",
       "compare": "تأكد من أن {name} يعرض {code}",
       "matches": "متطابق",

@@ -40,6 +40,7 @@ const APPEND_RETRY_MS = 1_000;
 const BEHIND_GRACE_MS = 10_000;
 const WAKE_SLACK_MS = 1_000;
 const DECIDED_GRACE_MS = 5 * 60_000;
+const MAX_APPROVER_NAMES = 3;
 
 export type SavedValuesRequestView = Readonly<{
   joinId: string;
@@ -61,7 +62,8 @@ export type SavedValuesTrustView =
       answeredBy: string | null;
       confirmed: boolean;
       stopped: SavedValuesStopped | null;
-      stoppedNow: boolean;
+      names: readonly string[];
+      hidden: boolean;
     }>
   | Readonly<{
       standing: "problem";
@@ -153,7 +155,9 @@ const samePin = (
 ) => left?.genesis === right?.genesis && left?.seq === right?.seq && left?.hash === right?.hash;
 
 const updateTrust = async (
-  change: Partial<Pick<SavedValuesTrust, "pin" | "listed" | "stopped">>,
+  change: Partial<
+    Pick<SavedValuesTrust, "pin" | "listed" | "stopped" | "hidden">
+  >,
 ): Promise<void> => {
   if (!trust) return;
   const next = { ...trust, ...change };
@@ -161,7 +165,8 @@ const updateTrust = async (
   if (
     samePin(next.pin, trust.pin) &&
     next.listed === trust.listed &&
-    next.stopped === trust.stopped
+    next.stopped === trust.stopped &&
+    next.hidden === trust.hidden
   ) {
     return;
   }
@@ -453,7 +458,12 @@ const stayMember = async (
   list: SavedValuesRoster,
   keys: SavedValuesDeviceKeys,
 ): Promise<void> => {
-  await updateTrust({ pin: list.head, listed: true, stopped: null });
+  await updateTrust({
+    pin: list.head,
+    listed: true,
+    stopped: null,
+    hidden: false,
+  });
   myJoin = null;
   const grew = roster?.head.hash !== list.head.hash;
   roster = list;
@@ -655,8 +665,29 @@ const ask = async (
     answeredBy: myJoin?.answer?.byName || null,
     confirmed: myJoin?.confirmed ?? false,
     stopped: trust?.stopped ?? null,
-    stoppedNow,
+    names: approverNames(list, me.deviceId, now),
+    hidden: trust?.stopped
+      ? !stoppedNow
+      : !code && (trust?.hidden ?? false),
   });
+};
+
+const approverNames = (
+  list: SavedValuesRoster,
+  deviceId: string,
+  now: number,
+): string[] => {
+  const others = listedDevices(list, deviceId, now);
+  const seen = others.filter((device) => !device.quiet);
+  return [
+    ...new Set((seen.length > 0 ? seen : others).map((device) => device.name)),
+  ].slice(0, MAX_APPROVER_NAMES);
+};
+
+export const hideSavedValuesCard = async (): Promise<void> => {
+  stoppedNow = false;
+  await updateTrust({ hidden: true });
+  await settle();
 };
 
 export const confirmSavedValuesCode = (): Promise<void> => {
@@ -665,7 +696,7 @@ export const confirmSavedValuesCode = (): Promise<void> => {
 };
 
 export const askSavedValuesAgain = async (): Promise<void> => {
-  await updateTrust({ stopped: null });
+  await updateTrust({ stopped: null, hidden: false });
   nextJoinAt = 0;
   myJoin = null;
   await settle();

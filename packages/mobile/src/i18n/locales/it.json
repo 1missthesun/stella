@@ -849,7 +849,7 @@
       "notNow": "Non ora",
       "allow": "Consenti",
       "waitingTitle": "Porta qui i tuoi accessi",
-      "waitingBody": "Apri Stella su un altro dispositivo",
+      "waitingBody": "Vai su {names}",
       "startOver": "Ricomincia",
       "compare": "Controlla che {name} mostri {code}",
       "matches": "Corrisponde",

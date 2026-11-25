@@ -1073,7 +1073,7 @@
       "useAnother": "ใช้อุปกรณ์อื่น",
       "matches": "ตรงกัน",
       "getTitle": "ใช้การเข้าสู่ระบบที่นี่",
-      "getBody": "เปิด Stella บนอุปกรณ์อื่น",
+      "getBody": "ไปที่ {names}",
       "ok": "ตกลง",
       "cloudUsed": "งานบนคลาวด์ใช้ {label}"
     }
@@ -1740,7 +1740,7 @@
       "notNow": "ไว้ก่อน",
       "allow": "อนุญาต",
       "waitingTitle": "ใช้ข้อมูลเข้าสู่ระบบของคุณที่นี่",
-      "waitingBody": "เปิด Stella บนอุปกรณ์อื่น",
+      "waitingBody": "ไปที่ {names}",
       "startOver": "เริ่มใหม่",
       "compare": "ตรวจดูว่า {name} แสดง {code}",
       "matches": "ตรงกัน",

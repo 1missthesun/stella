@@ -1093,7 +1093,7 @@
       "useAnother": "Usar outro dispositivo",
       "matches": "Confere",
       "getTitle": "Traga seus logins para cá",
-      "getBody": "Abra a Stella em outro dispositivo.",
+      "getBody": "Vá até {names}.",
       "ok": "OK",
       "cloudUsed": "Uma tarefa na nuvem usou {label}"
     }
@@ -1760,7 +1760,7 @@
       "notNow": "Agora não",
       "allow": "Permitir",
       "waitingTitle": "Traga seus logins para cá",
-      "waitingBody": "Abra a Stella em outro dispositivo",
+      "waitingBody": "Vá até {names}",
       "startOver": "Começar de novo",
       "compare": "Confira se {name} mostra {code}",
       "matches": "Está igual",

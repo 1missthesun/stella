@@ -66,6 +66,8 @@ const PKCS8_SCOPE = `${PROTECT_SCOPE}:device-key`;
 const SIGN_SCOPE = `${PROTECT_SCOPE}:sign-key`;
 const RECONCILE_DEBOUNCE_MS = 1_500;
 const RETRY_MS = 60_000;
+const USER_CHECK_MS = 3_000;
+const MAX_APPROVER_NAMES = 3;
 const GET_BATCH = 50;
 
 type SyncState = {
@@ -82,6 +84,7 @@ type SyncState = {
   signSecretProtected?: string;
   pin?: SavedValuesRosterPin;
   joinPaused?: "declined" | "removed";
+  askHidden?: boolean;
   ownJoin?: OwnJoin;
   signers?: Record<string, string>;
 };
@@ -199,6 +202,7 @@ export class SavedValuesSync {
   private answered = new Map<string, Answered>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private retry: ReturnType<typeof setInterval> | null = null;
+  private userCheck: ReturnType<typeof setInterval> | null = null;
   private running: Promise<void> | null = null;
   private again = false;
   private status: SavedValuesSyncStatus = {
@@ -252,6 +256,7 @@ export class SavedValuesSync {
         ...(typeof stored.signSecretProtected === "string" ? { signSecretProtected: stored.signSecretProtected } : {}),
         ...(stored.pin ? { pin: stored.pin } : {}),
         ...(stored.joinPaused ? { joinPaused: stored.joinPaused } : {}),
+        ...(stored.askHidden ? { askHidden: true } : {}),
         ...(stored.ownJoin ? { ownJoin: stored.ownJoin } : {}),
         signers: { ...(stored.signers ?? {}) },
       };
@@ -357,7 +362,23 @@ export class SavedValuesSync {
     this.retry = null;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.stopWaitingForUser();
     this.setStatus({ active: false });
+  }
+
+  private waitForUser(): void {
+    if (this.userCheck) return;
+    this.userCheck = setInterval(() => {
+      if (this.options.isUserActive?.() === false) return;
+      this.stopWaitingForUser();
+      this.schedule(0);
+    }, USER_CHECK_MS);
+    this.userCheck.unref?.();
+  }
+
+  private stopWaitingForUser(): void {
+    if (this.userCheck) clearInterval(this.userCheck);
+    this.userCheck = null;
   }
 
   noteAuthToken(token: string | null | undefined): void {
@@ -473,10 +494,19 @@ export class SavedValuesSync {
     return { ok: false, error: "Your devices' list kept changing. Try again." };
   }
 
+  hideAsk(): void {
+    const state = this.loadState();
+    if (!state) return;
+    state.askHidden = true;
+    this.saveState();
+    this.schedule(0);
+  }
+
   askAgain(): void {
     const state = this.loadState();
     if (!state) return;
     delete state.joinPaused;
+    delete state.askHidden;
     const old = state.ownJoin;
     delete state.ownJoin;
     this.saveState();
@@ -581,6 +611,7 @@ export class SavedValuesSync {
       state.cardAt = undefined;
       delete state.pin;
       delete state.joinPaused;
+      delete state.askHidden;
       delete state.ownJoin;
       this.answered.clear();
       this.saveState();
@@ -599,6 +630,7 @@ export class SavedValuesSync {
       if (!card || card.publicKey !== state.publicKey) return;
     }
 
+    this.stopWaitingForUser();
     let check = checkRoster(remote.roster, state.pin);
     if (!check.ok && check.reason === "reset") {
       delete state.pin;
@@ -635,6 +667,7 @@ export class SavedValuesSync {
 
     state.pin = roster.head;
     delete state.joinPaused;
+    delete state.askHidden;
     if (state.ownJoin) {
       const finished = state.ownJoin.joinId;
       delete state.ownJoin;
@@ -697,7 +730,8 @@ export class SavedValuesSync {
         delete state.ownJoin;
         this.saveState();
       }
-      if (!state.ownJoin && this.options.isUserActive?.() !== false) {
+      if (!state.ownJoin && this.options.isUserActive?.() === false) this.waitForUser();
+      else if (!state.ownJoin) {
         const nonce = randomNonce();
         const joinId = `join-${randomBytes(12).toString("hex")}`;
         const commit = joinCommit(nonce);
@@ -705,7 +739,12 @@ export class SavedValuesSync {
         state.ownJoin = { joinId, nonce, commit, device: self, startedAt: now };
         this.saveState();
       }
-      this.setStatus({ standing: "waiting", waiting: { code: null }, devices: [], requests: [] });
+      this.setStatus({
+        standing: "waiting",
+        waiting: { code: null, ...this.asking(state, roster, remote, now) },
+        devices: [],
+        requests: [],
+      });
       return;
     }
     if (!own.answer && live.answeredBy && live.listedNonce && live.pin) {
@@ -736,12 +775,28 @@ export class SavedValuesSync {
       standing: "waiting",
       waiting: {
         code,
+        ...this.asking(state, roster, remote, now),
         ...(own.answer ? { approver: own.answer.name } : {}),
         ...(own.confirmed ? { confirmed: true } : {}),
       },
       devices: [],
       requests: [],
     });
+  }
+
+  private asking(state: SyncState, roster: SavedValuesRoster, remote: SavedValuesState, now: number) {
+    const others = [...roster.members.values()].filter((member) => member.deviceId !== state.deviceId);
+    const seen = others.filter((member) => !this.isQuiet(member, remote, now));
+    const names = new Set((seen.length > 0 ? seen : others).map((member) => member.name));
+    return {
+      approvers: [...names].slice(0, MAX_APPROVER_NAMES),
+      ...(state.askHidden ? { hidden: true } : {}),
+    };
+  }
+
+  private isQuiet(member: SavedValuesMember, remote: SavedValuesState, now: number): boolean {
+    const card = remote.devices.find((device) => device.deviceId === member.deviceId);
+    return !card || card.publicKey !== member.sealKey || now - card.updatedAt >= SAVED_VALUES_QUIET_MS;
   }
 
   private async answerJoins(state: SyncState, remote: SavedValuesState, roster: SavedValuesRoster, now: number) {
@@ -751,9 +806,16 @@ export class SavedValuesSync {
         this.answered.delete(joinId);
       }
     }
-    if (this.options.isUserActive?.() === false) return;
-    for (const join of remote.joins) {
-      if (join.state !== "open" || join.listedNonce || join.device.deviceId === state.deviceId || join.expiresAt <= now) continue;
+    const unanswered = remote.joins.filter(
+      (join) =>
+        join.state === "open" && !join.listedNonce && join.device.deviceId !== state.deviceId && join.expiresAt > now,
+    );
+    if (unanswered.length === 0) return;
+    if (this.options.isUserActive?.() === false) {
+      this.waitForUser();
+      return;
+    }
+    for (const join of unanswered) {
       const listedNonce = randomNonce();
       const answered: Answered = {
         joinId: join.joinId,
@@ -783,7 +845,7 @@ export class SavedValuesSync {
           thisDevice,
           addedAt: member.addedAt,
           ...(card ? { lastSeenAt: card.updatedAt } : {}),
-          quiet: !thisDevice && (!card || card.publicKey !== member.sealKey || now - card.updatedAt >= SAVED_VALUES_QUIET_MS),
+          quiet: !thisDevice && this.isQuiet(member, remote, now),
         };
       })
       .sort((left, right) => Number(right.thisDevice) - Number(left.thisDevice) || left.name.localeCompare(right.name) || left.addedAt - right.addedAt);

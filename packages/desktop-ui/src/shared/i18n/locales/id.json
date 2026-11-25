@@ -1073,7 +1073,7 @@
       "useAnother": "Perangkat lain",
       "matches": "Cocok",
       "getTitle": "Bawa login Anda ke sini",
-      "getBody": "Buka Stella di perangkat lain.",
+      "getBody": "Buka {names}.",
       "ok": "OK",
       "cloudUsed": "Tugas cloud memakai {label}"
     }
@@ -1740,7 +1740,7 @@
       "notNow": "Nanti saja",
       "allow": "Izinkan",
       "waitingTitle": "Dapatkan login Anda di sini",
-      "waitingBody": "Buka Stella di perangkat lain",
+      "waitingBody": "Buka {names}",
       "startOver": "Mulai ulang",
       "compare": "Pastikan {name} menampilkan {code}",
       "matches": "Cocok",

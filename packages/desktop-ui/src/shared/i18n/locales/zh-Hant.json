@@ -1073,7 +1073,7 @@
       "useAnother": "換一台裝置",
       "matches": "一致",
       "getTitle": "在這裡取得登入資訊",
-      "getBody": "在另一台裝置上開啟 Stella。",
+      "getBody": "請使用 {names}。",
       "ok": "好",
       "cloudUsed": "雲端任務使用了 {label}"
     }
@@ -1740,7 +1740,7 @@
       "notNow": "暫時不要",
       "allow": "允許",
       "waitingTitle": "在這裡使用你的登入資訊",
-      "waitingBody": "在另一部裝置上開啟 Stella",
+      "waitingBody": "請使用 {names}",
       "startOver": "重新開始",
       "compare": "請確認 {name} 顯示 {code}",
       "matches": "一致",

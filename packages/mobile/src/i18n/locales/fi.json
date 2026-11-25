@@ -848,7 +848,7 @@
       "notNow": "Ei nyt",
       "allow": "Salli",
       "waitingTitle": "Hae kirjautumisesi tänne",
-      "waitingBody": "Avaa Stella toisella laitteella",
+      "waitingBody": "Siirry laitteelle {names}",
       "startOver": "Aloita alusta",
       "compare": "Tarkista, että laitteessa {name} näkyy {code}",
       "matches": "Täsmää",

@@ -1073,7 +1073,7 @@
       "useAnother": "Thiết bị khác",
       "matches": "Khớp",
       "getTitle": "Đưa thông tin đăng nhập về đây",
-      "getBody": "Mở Stella trên thiết bị khác.",
+      "getBody": "Hãy dùng {names}.",
       "ok": "OK",
       "cloudUsed": "Tác vụ đám mây đã dùng {label}"
     }
@@ -1740,7 +1740,7 @@
       "notNow": "Để sau",
       "allow": "Cho phép",
       "waitingTitle": "Dùng thông tin đăng nhập tại đây",
-      "waitingBody": "Mở Stella trên thiết bị khác",
+      "waitingBody": "Hãy dùng {names}",
       "startOver": "Bắt đầu lại",
       "compare": "Kiểm tra xem {name} có hiện {code} không",
       "matches": "Khớp rồi",

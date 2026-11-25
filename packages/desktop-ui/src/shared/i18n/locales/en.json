@@ -1083,7 +1083,7 @@
       "useAnother": "Use another device",
       "matches": "It matches",
       "getTitle": "Get your logins here",
-      "getBody": "Open Stella on another device.",
+      "getBody": "Go to {names}.",
       "ok": "OK",
       "cloudUsed": "Cloud task used {label}"
     }
@@ -1750,7 +1750,7 @@
       "notNow": "Not now",
       "allow": "Allow",
       "waitingTitle": "Get your logins here",
-      "waitingBody": "Open Stella on another device",
+      "waitingBody": "Go to {names}",
       "startOver": "Start over",
       "compare": "Check {name} shows {code}",
       "matches": "It matches",

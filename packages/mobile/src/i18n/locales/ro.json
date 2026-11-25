@@ -849,7 +849,7 @@
       "notNow": "Nu acum",
       "allow": "Permite",
       "waitingTitle": "Adu-ți aici conectările",
-      "waitingBody": "Deschide Stella pe alt dispozitiv",
+      "waitingBody": "Mergi la {names}",
       "startOver": "Ia-o de la capăt",
       "compare": "Verifică dacă {name} arată {code}",
       "matches": "Se potrivește",

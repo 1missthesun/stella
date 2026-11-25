@@ -848,7 +848,7 @@
       "notNow": "Ikke nå",
       "allow": "Tillat",
       "waitingTitle": "Få påloggingene dine her",
-      "waitingBody": "Åpne Stella på en annen enhet",
+      "waitingBody": "Gå til {names}",
       "startOver": "Start på nytt",
       "compare": "Sjekk at {name} viser {code}",
       "matches": "Det stemmer",

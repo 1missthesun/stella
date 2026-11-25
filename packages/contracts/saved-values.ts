@@ -170,6 +170,8 @@ export type SavedValuesSyncStatus = Readonly<{
   standing: "member" | "waiting" | "problem" | "off";
   waiting?: Readonly<{
     code: string | null;
+    approvers?: readonly string[];
+    hidden?: boolean;
     approver?: string;
     confirmed?: boolean;
     declined?: boolean;
@@ -186,7 +188,7 @@ export type SavedValuesSyncStatus = Readonly<{
 
 export type SavedValuesSyncAction =
   | Readonly<{ action: "allow" | "decline"; joinId: string }>
-  | Readonly<{ action: "confirm" | "askAgain" | "startOver" }>
+  | Readonly<{ action: "confirm" | "askAgain" | "hide" | "startOver" }>
   | Readonly<{ action: "remove"; deviceId: string }>;
 
 export type SavedValueReleaseRequest = Readonly<{

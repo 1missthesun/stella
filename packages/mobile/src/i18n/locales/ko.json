@@ -847,7 +847,7 @@
       "notNow": "나중에",
       "allow": "허용",
       "waitingTitle": "여기서도 로그인 정보 사용하기",
-      "waitingBody": "다른 기기에서 Stella를 여세요",
+      "waitingBody": "{names}(으)로 이동하세요",
       "startOver": "처음부터 다시",
       "compare": "{name}에 {code}이(가) 표시되는지 확인하세요",
       "matches": "일치해요",

@@ -850,7 +850,7 @@
       "notNow": "Не сейчас",
       "allow": "Разрешить",
       "waitingTitle": "Ваши логины — и здесь",
-      "waitingBody": "Откройте Stella на другом устройстве",
+      "waitingBody": "Перейдите к {names}",
       "startOver": "Начать заново",
       "compare": "Проверьте, что {name} показывает {code}",
       "matches": "Совпадает",

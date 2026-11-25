@@ -3,11 +3,12 @@
 
 import type { BunPlugin } from "bun";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { uiBuildMode } from "./services/ui-env";
 
 const DESKTOP_UI_SRC = resolve(import.meta.dir, "../../desktop-ui/src");
+const REPLACE_DIR = resolve(import.meta.dir, "../ui/replace");
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"];
 const ASSET = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|woff2?|ttf|otf|mp3|wav|ogg|m4a|mp4|webm|mov|wasm|pdf|txt|md|html)$/i;
 const SOURCE = /\.(m?[jt]sx?)$/;
@@ -26,6 +27,15 @@ function resolveSpecifier(spec: string, importer: string): string | undefined {
   if (spec.startsWith("@/")) return resolveFile(join(DESKTOP_UI_SRC, spec.slice(2)));
   if (spec.startsWith("./") || spec.startsWith("../")) return resolveFile(resolve(dirname(importer), spec));
   if (spec.startsWith("/")) return resolveFile(spec);
+  return undefined;
+}
+
+/** `ui/replace/<path>` stands in for desktop-ui's `src/<path>`, whatever either's extension, except to itself. */
+function replacementFor(path: string, importer: string): string | undefined {
+  if (!path.startsWith(DESKTOP_UI_SRC + sep)) return undefined;
+  const base = join(REPLACE_DIR, relative(DESKTOP_UI_SRC, path)).replace(SOURCE, "");
+  if (importer.replace(SOURCE, "") === base) return undefined;
+  for (const ext of EXTENSIONS) if (existsSync(base + ext)) return base + ext;
   return undefined;
 }
 
@@ -133,7 +143,14 @@ export const viteCompat: BunPlugin = {
   setup(build) {
     build.onResolve({ filter: /^@\// }, (args) => {
       const path = resolveSpecifier(args.path, args.importer);
-      return path ? { path } : undefined;
+      return path ? { path: replacementFor(path, args.importer) ?? path } : undefined;
+    });
+
+    build.onResolve({ filter: /^\.\.?\// }, (args) => {
+      if (!args.importer.startsWith(DESKTOP_UI_SRC + sep)) return undefined;
+      const path = resolveSpecifier(args.path, args.importer);
+      const replacement = path && replacementFor(path, args.importer);
+      return replacement ? { path: replacement } : undefined;
     });
 
     build.onResolve({ filter: /\?(url|raw|inline|worker|worker&url)$/ }, (args) => {

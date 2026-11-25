@@ -17,6 +17,9 @@ How every surface of `packages/desktop-ui/src` moves to `packages/desktop-rune/u
   positions or CSS), write the Rune equivalent next to the component. Don't fork the store it
   serves. If a DOM-free core needs a small extraction to be importable, put that extraction
   under `ui/` as a wrapper; master's file stays unchanged.
+- A DOM module that desktop-ui's own hooks and stores import is replaced for the whole UI bundle by
+  `ui/replace/<path under desktop-ui/src>` (any source extension): `ui/replace/ui/toast.tsx` stands
+  in for `@/ui/toast`. Only the replacement itself still reaches the original.
 - Styles: translate the CSS that applies, token by token, from `ui/theme`. Match the Electron
   app's look and motion exactly. Don't redesign anything.
 - Strings: always use `t()` with desktop-ui's keys. Add no new strings unless desktop-ui has
@@ -32,7 +35,7 @@ How every surface of `packages/desktop-ui/src` moves to `packages/desktop-rune/u
   (`.agents/skills/verify-stella/SKILL.md`) on its own Xvfb, with `STELLA_VERIFY_RUN=<name>` so
   runs don't collide. Make side-by-sides in `~/.stella/outputs/stella-rune/<track>/`.
 - Gates before each push:
-  - `node ../../node_modules/typescript-7/bin/tsc -p packages/desktop-rune --noEmit`
+  - `bun run typecheck` in `packages/desktop-rune` (it counts only this package's diagnostics)
   - `bun run i18n:parity`
   - `bun run check:invariants`, with 0 comment violations
   - lint where configured

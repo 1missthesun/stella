@@ -1,11 +1,5 @@
-import { Form } from "../../../kit/compat";
-import { useFullShellComposer } from "../../shared/full-shell.composer.styles";
-import { useCallback } from "react";
-import {
-  ComposerAddButton,
-  ComposerSubmitButton,
-  ComposerTextarea,
-} from "@/features/chat/ComposerPrimitives";
+import { ComposerShell } from "../../../chat/ComposerShell";
+import { ComposerAddButton, ComposerSubmitButton } from "../../../chat/ComposerPrimitives";
 import { useT } from "@/shared/i18n";
 
 type OnboardingComposerProps = {
@@ -15,41 +9,22 @@ type OnboardingComposerProps = {
   disabled?: boolean;
 };
 
-export function OnboardingComposer({
-  value,
-  onChange,
-  onSend,
-  disabled = false,
-}: OnboardingComposerProps) {
-  const s = useFullShellComposer();
+export function OnboardingComposer({ value, onChange, onSend, disabled = false }: OnboardingComposerProps) {
   const t = useT();
   const canSubmit = value.trim().length > 0 && !disabled;
-
-  const submit = useCallback(
-    (event?: { preventDefault(): void }) => {
-      event?.preventDefault();
-      if (!canSubmit) return;
-      onSend();
-    },
-    [canSubmit, onSend],
-  );
-
+  const send = () => {
+    if (canSubmit) onSend();
+  };
   return (
-    <col {...s.composer}>
-      <col w="full" {...s.composerShell}>
-        <col {...s.composerShellContent}>
-          <Form {...s.composerForm} onSubmit={submit}>
-            <ComposerAddButton className="composer-add-button" title={t("app.chat.composer.add")} disabled />
-            <ComposerTextarea className="composer-input" value={value} placeholder={t("onboarding.chat.composerPlaceholder")} disabled={disabled} rows={1} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  submit();
-                }
-              }} />
-            <ComposerSubmitButton className="composer-submit" disabled={!canSubmit} aria-label={t("onboarding.chat.send")} animated />
-          </Form>
-        </col>
-      </col>
-    </col>
+    <ComposerShell
+      value={value}
+      onChange={onChange}
+      onSubmit={send}
+      placeholder={t("onboarding.chat.composerPlaceholder")}
+      disabled={disabled}
+      canSubmit={canSubmit}
+      leading={<ComposerAddButton title={t("app.chat.composer.add")} disabled />}
+      trailing={<ComposerSubmitButton label={t("onboarding.chat.send")} disabled={!canSubmit} animated onPress={send} />}
+    />
   );
 }

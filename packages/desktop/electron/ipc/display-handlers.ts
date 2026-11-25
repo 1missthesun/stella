@@ -45,6 +45,12 @@ import {
   isEvidenceThumbnailSource,
 } from "@stella/contracts/chat-evidence-thumbnails";
 import { renderDesktopEvidenceThumbnail } from "../services/evidence-thumbnail.js";
+import { snapshotPage } from "../services/page-snapshot.js";
+import {
+  isHtmlPagePath,
+  PAGE_PREVIEW_CONTENT_TYPE,
+  PAGE_PREVIEW_SOURCE_MAX_BYTES,
+} from "@stella/contracts/page-preview";
 import { readCanvasActionManifest } from "@stella/contracts/canvas-actions";
 import {
   canvasActionsOfLocalFile,
@@ -311,6 +317,12 @@ const assertNotCloudWorkspacePath = (filePath: string): void => {
   throw new Error(
     "This file lives in Stella's cloud workspace, not on this computer, so it can't be opened here. Ask Stella to put it in your Drive.",
   );
+};
+
+const pageThumbnail = async (filePath: string): Promise<Buffer | null> => {
+  const stats = await fs.stat(filePath).catch(() => null);
+  if (!stats?.isFile() || stats.size > PAGE_PREVIEW_SOURCE_MAX_BYTES) return null;
+  return await snapshotPage({ kind: "file", filePath });
 };
 
 export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
@@ -1160,9 +1172,12 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       const { resolved, elsewhere } = await authorizeDisplayRead(payload, {
         remote: true,
       });
-      const thumbnail = !elsewhere && isEvidenceThumbnailSource(resolved)
-        ? await renderDesktopEvidenceThumbnail(resolved)
-        : null;
+      const page = !elsewhere && isHtmlPagePath(resolved);
+      const thumbnail = page
+        ? await pageThumbnail(resolved)
+        : !elsewhere && isEvidenceThumbnailSource(resolved)
+          ? await renderDesktopEvidenceThumbnail(resolved)
+          : null;
       if (thumbnail) {
         return {
           missing: false as const,
@@ -1171,9 +1186,10 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
             thumbnail.byteOffset,
             thumbnail.byteLength,
           ),
-          mimeType: EVIDENCE_THUMBNAIL_CONTENT_TYPE,
+          mimeType: page ? PAGE_PREVIEW_CONTENT_TYPE : EVIDENCE_THUMBNAIL_CONTENT_TYPE,
         };
       }
+      if (page) throw new Error("This page has no preview.");
       return await readDisplayFile(payload, { remote: true });
     },
   };

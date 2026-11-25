@@ -49,6 +49,11 @@ import {
   fetchWithInactivity,
   REQUEST_BUDGET_MS,
 } from "@stella/contracts/request-deadline";
+import {
+  isHtmlPagePath,
+  PAGE_PREVIEW_SOURCE_MAX_BYTES,
+} from "@stella/contracts/page-preview";
+import { snapshotPageDataUrl } from "./page-snapshot.js";
 
 const CACHE_DIRNAME = "chat-evidence";
 const CACHE_SCHEMA = "v1";
@@ -71,6 +76,13 @@ type SourceEntry = {
 
 const PEER_IMAGE_MAX_BYTES = 16 * 1024 * 1024;
 const PEER_VIDEO_HEAD_BYTES = 8 * 1024 * 1024;
+const PAGE_SNAPSHOT_SCHEMA = "page-snapshot-1";
+
+const isSnapshotPage = (entry: Pick<SourceEntry, "kind" | "filePath">): boolean =>
+  entry.kind === "page" && isHtmlPagePath(entry.filePath);
+
+const isUnfinishedPageCard = (card: EvidenceCard): boolean =>
+  card.kind === "page" && !card.thumbnail && isHtmlPagePath(card.sourcePaths[0] ?? "");
 
 type CardPlan =
   | { kind: "single"; entry: SourceEntry }
@@ -182,7 +194,8 @@ const planCacheKey = async (plan: CardPlan): Promise<string> => {
     );
   };
   if (plan.kind === "single") {
-    return `${CACHE_SCHEMA}:single:${plan.entry.kind}:${await hashOne(plan.entry)}`;
+    const kind = isSnapshotPage(plan.entry) ? PAGE_SNAPSHOT_SCHEMA : plan.entry.kind;
+    return `${CACHE_SCHEMA}:single:${kind}:${await hashOne(plan.entry)}`;
   }
   const hashes = await Promise.all(plan.entries.map(hashOne));
   return `${CACHE_SCHEMA}:stack:${plan.sourceKind}:${hashes.sort().join(",")}`;
@@ -272,10 +285,15 @@ const buildSingleCard = async (
   }
 
   if (entry.kind === "page") {
+    const thumbnail =
+      isSnapshotPage(entry) && entry.byteSize <= PAGE_PREVIEW_SOURCE_MAX_BYTES
+        ? await snapshotPageDataUrl({ kind: "file", filePath: entry.filePath })
+        : null;
     return {
       ...base,
       kind: "page",
       subtitle: formatByteSize(entry.byteSize),
+      ...(thumbnail ? { thumbnail } : {}),
     };
   }
 
@@ -446,6 +464,23 @@ const buildDriveCard = async (
           : formatByteSize(file.sizeBytes),
     };
   }
+  if (kind === "page" && isHtmlPagePath(file.drivePath)) {
+    if (file.sizeBytes > PAGE_PREVIEW_SOURCE_MAX_BYTES) return null;
+    const bytes = await fetchDriveBytes(file.url, PAGE_PREVIEW_SOURCE_MAX_BYTES);
+    if (!bytes) return null;
+    const thumbnail = await snapshotPageDataUrl({
+      kind: "html",
+      html: bytes.toString("utf8"),
+      drivePath: file.drivePath,
+    });
+    if (!thumbnail) return null;
+    return {
+      ...base,
+      kind: "page",
+      thumbnail,
+      subtitle: formatByteSize(file.sizeBytes),
+    };
+  }
   if (kind === "video") {
     const poster = await driveVideoPoster(file, boxFor("video"));
     if (!poster) return null;
@@ -515,15 +550,17 @@ export const createChatEvidenceService = (options: {
     const holder = entry.holder;
     const dataDir = options.getStellaDataDir();
     if (!peers || !holder || !dataDir?.trim()) return null;
-    if (entry.kind !== "image" && entry.kind !== "video") return null;
+    const page = isSnapshotPage(entry);
+    if (entry.kind !== "image" && entry.kind !== "video" && !page) return null;
     if (entry.kind === "image" && entry.byteSize > PEER_IMAGE_MAX_BYTES) return null;
-    const cacheKey = `${CACHE_SCHEMA}:peer:${holder.deviceId}:${entry.filePath}:${entry.byteSize}:${holder.modifiedAt}`;
+    if (page && entry.byteSize > PAGE_PREVIEW_SOURCE_MAX_BYTES) return null;
+    const cacheKey = `${CACHE_SCHEMA}:peer:${page ? `${PAGE_SNAPSHOT_SCHEMA}:` : ""}${holder.deviceId}:${entry.filePath}:${entry.byteSize}:${holder.modifiedAt}`;
     const cached = await readCached(cacheKey);
     if (cached) return cached;
     const length =
-      entry.kind === "image"
-        ? entry.byteSize
-        : Math.min(entry.byteSize, PEER_VIDEO_HEAD_BYTES);
+      entry.kind === "video"
+        ? Math.min(entry.byteSize, PEER_VIDEO_HEAD_BYTES)
+        : entry.byteSize;
     const conversationId = options.getActiveConversationId?.() ?? null;
     const parts: Uint8Array[] = [];
     for (const range of deviceFileReadRanges(length)) {
@@ -532,6 +569,25 @@ export const createChatEvidenceService = (options: {
       );
     }
     const digest = createHash("sha1").update(cacheKey).digest("hex");
+    if (page) {
+      const thumbnail = await snapshotPageDataUrl({
+        kind: "html",
+        html: Buffer.concat(parts).toString("utf8"),
+        devicePath: entry.filePath,
+      });
+      if (!thumbnail) return null;
+      const card: EvidenceCard = {
+        id: `peer:${digest.slice(0, 32)}`,
+        kind: "page",
+        title: humanTitleFor(entry.filePath, entry.kind),
+        subtitle: formatByteSize(entry.byteSize),
+        sourcePaths: [entry.filePath],
+        byteSize: entry.byteSize,
+        thumbnail,
+      };
+      await writeCached(cacheKey, card);
+      return card;
+    }
     const copyPath = path.join(
       dataDir,
       CACHE_DIRNAME,
@@ -572,7 +628,7 @@ export const createChatEvidenceService = (options: {
     const work = (async () => {
       try {
         const card = await buildCard(cacheKey.slice(0, 40), plan);
-        await writeCached(cacheKey, card);
+        if (!isUnfinishedPageCard(card)) await writeCached(cacheKey, card);
         return card;
       } finally {
         inFlight.delete(cacheKey);

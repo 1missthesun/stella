@@ -9,7 +9,7 @@ import {
 } from "@/shell/chat-history-pagination";
 import type { ScrollPos } from "../rune";
 
-const engine = () => globalThis.stella.engine;
+import { rune as engine } from "./engine";
 
 
 const SCROLL_BUTTON_THRESHOLD = 180;

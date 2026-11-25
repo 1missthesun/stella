@@ -94,7 +94,7 @@ const CODE_ACTIONS = [
 
 const EXTENSIONS: Record<string, string> = { typescript: "ts", javascript: "js", python: "py", bash: "sh", shell: "sh", zsh: "sh", rust: "rs", markdown: "md", text: "txt", plaintext: "txt", yaml: "yml", ruby: "rb", golang: "go", kotlin: "kt", csharp: "cs" };
 
-async function codeAction(a: { action: string; language: string | null; source: string }) {
+export async function codeAction(a: { action: string; language: string | null; source: string }) {
   if (a.action === "copy") await engine.writeText(a.source);
   else if (a.action === "download") {
     const lang = a.language?.toLowerCase() ?? "txt";

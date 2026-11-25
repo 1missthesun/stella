@@ -43,7 +43,6 @@ export function useChatScroll(
   const awayFromBottomLimit =
     SCROLL_AWAY_FROM_BOTTOM_BASE_PX + listTrailingSlackPx;
   const metricsRef = useRef({ offsetY: 0, contentHeight: 0, layoutHeight: 0 });
-  const contentHeightRef = useRef(0);
   const followArmedRef = useRef(true);
   const [isFollowingLatest, setIsFollowingLatest] = useState(true);
   const followRearmBlockedRef = useRef(false);
@@ -108,6 +107,19 @@ export function useChatScroll(
     }, MANUAL_SCROLL_SETTLE_MS);
   }, []);
 
+  const refreshBottomState = useCallback(() => {
+    const { offsetY, contentHeight, layoutHeight } = metricsRef.current;
+    if (layoutHeight <= 0) return;
+    const hasOverflow = contentHeight > layoutHeight + 2;
+    const distFromBottom = Math.max(0, contentHeight - offsetY - layoutHeight);
+    setAwayFromBottom(hasOverflow && distFromBottom > awayFromBottomLimit);
+    setTailOffscreen(hasOverflow && distFromBottom > tailOffscreenLimit);
+  }, [awayFromBottomLimit, tailOffscreenLimit]);
+
+  useEffect(() => {
+    if (followTargetOffsetRef.current === null) refreshBottomState();
+  }, [refreshBottomState]);
+
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -118,7 +130,6 @@ export function useChatScroll(
         contentHeight: contentSize.height,
         layoutHeight: layoutMeasurement.height,
       };
-      contentHeightRef.current = contentSize.height;
 
       const maxOffsetY = Math.max(
         0,
@@ -135,7 +146,6 @@ export function useChatScroll(
         }
       }
 
-      const hasOverflow = contentSize.height > layoutMeasurement.height + 2;
       const distFromBottom = Math.max(
         0,
         contentSize.height - contentOffset.y - layoutMeasurement.height,
@@ -157,15 +167,12 @@ export function useChatScroll(
         stopFollowLoop();
       }
 
-      if (followTargetOffsetRef.current !== null) return;
-      setAwayFromBottom(hasOverflow && distFromBottom > awayFromBottomLimit);
-      setTailOffscreen(hasOverflow && distFromBottom > tailOffscreenLimit);
+      if (followTargetOffsetRef.current === null) refreshBottomState();
     },
     [
       atBottomLimit,
-      awayFromBottomLimit,
-      tailOffscreenLimit,
       nearBottomLimit,
+      refreshBottomState,
       scheduleManualScrollSettle,
       setFollowArmed,
       stopFollowLoop,
@@ -272,30 +279,14 @@ export function useChatScroll(
   ]);
 
   const prepareAssistantLayoutFollow = useCallback(() => {
-    assistantLayoutBaselineRef.current = contentHeightRef.current;
+    assistantLayoutBaselineRef.current = metricsRef.current.contentHeight;
   }, []);
-
-  const updateAwayFromBottom = useCallback(
-    (offset: number) => {
-      const { layoutHeight } = metricsRef.current;
-      const contentHeight = contentHeightRef.current;
-      const dist = Math.max(0, contentHeight - offset - layoutHeight);
-      setAwayFromBottom(
-        contentHeight > layoutHeight + 2 && dist > awayFromBottomLimit,
-      );
-      setTailOffscreen(
-        contentHeight > layoutHeight + 2 && dist > tailOffscreenLimit,
-      );
-    },
-    [awayFromBottomLimit, tailOffscreenLimit],
-  );
 
   const setFollowTarget = useCallback(
     (target: number, gentle = false) => {
       if (!followArmedRef.current) return;
 
-      const { layoutHeight } = metricsRef.current;
-      const contentHeight = contentHeightRef.current;
+      const { layoutHeight, contentHeight } = metricsRef.current;
       const maxOffset = Math.max(0, contentHeight - layoutHeight);
       const clamped = Math.max(0, Math.min(maxOffset, target));
       const inFlight = followTargetOffsetRef.current !== null;
@@ -320,22 +311,21 @@ export function useChatScroll(
         () => {
           followSettleTimerRef.current = null;
           followTargetOffsetRef.current = null;
-          updateAwayFromBottom(metricsRef.current.offsetY);
+          refreshBottomState();
         },
         animated ? FOLLOW_NATIVE_SCROLL_MS : 0,
       );
     },
-    [updateAwayFromBottom],
+    [refreshBottomState],
   );
 
   const followActiveAssistantRow = useCallback(() => {
     const assistantHeight = activeAssistantHeightRef.current;
     if (assistantHeight <= 0) return;
 
-    const { layoutHeight } = metricsRef.current;
+    const { layoutHeight, contentHeight } = metricsRef.current;
     if (layoutHeight <= 0) return;
 
-    const contentHeight = contentHeightRef.current;
     const rowBottom = Math.max(0, contentHeight - listTrailingSlackPx);
     const rowTop = Math.max(0, rowBottom - assistantHeight);
     const desiredScrollTop = Math.max(0, contentHeight - layoutHeight);
@@ -370,10 +360,10 @@ export function useChatScroll(
   }, [resetAssistantAutoScroll, setFollowArmed]);
 
   const getShouldPlaceLatestTurn = useCallback(() => {
-    const { offsetY, layoutHeight } = metricsRef.current;
+    const { offsetY, contentHeight, layoutHeight } = metricsRef.current;
     const distanceFromBottomPx = Math.max(
       0,
-      contentHeightRef.current - offsetY - layoutHeight,
+      contentHeight - offsetY - layoutHeight,
     );
     return shouldPlaceLatestTurn({
       distanceFromBottomPx,
@@ -389,7 +379,7 @@ export function useChatScroll(
       return;
     }
     const metrics = metricsRef.current;
-    const contentHeight = contentHeightRef.current;
+    const { contentHeight } = metrics;
     const maxOffset = Math.max(0, contentHeight - metrics.layoutHeight);
     const measurement = latestUserLayoutRef.current;
     const isInitialPlacement = pending.placedRowHeightPx === null;
@@ -414,12 +404,8 @@ export function useChatScroll(
     setFollowTarget(target, true);
   }, [setFollowTarget]);
 
-  const onListContentSizeChange = useCallback(
-    (_width: number, height: number) => {
-      const previousHeight = contentHeightRef.current;
-      contentHeightRef.current = height;
-      metricsRef.current.contentHeight = height;
-
+  const followContentResize = useCallback(
+    (height: number, previousHeight: number) => {
       const pending = pendingSendAnchorRef.current;
       if (
         pending &&
@@ -451,6 +437,24 @@ export function useChatScroll(
       }
     },
     [followActiveAssistantRow, placeLatestTurn, setFollowTarget],
+  );
+
+  const onListContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      const previousHeight = metricsRef.current.contentHeight;
+      metricsRef.current.contentHeight = height;
+      followContentResize(height, previousHeight);
+      if (followTargetOffsetRef.current === null) refreshBottomState();
+    },
+    [followContentResize, refreshBottomState],
+  );
+
+  const onListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      metricsRef.current.layoutHeight = event.nativeEvent.layout.height;
+      if (followTargetOffsetRef.current === null) refreshBottomState();
+    },
+    [refreshBottomState],
   );
 
   const onLatestUserLayout = useCallback(
@@ -489,6 +493,7 @@ export function useChatScroll(
     listRef,
     onScroll,
     onListContentSizeChange,
+    onListLayout,
     onActiveAssistantLayout,
     clearActiveAssistantLayout,
     scrollToBottom,

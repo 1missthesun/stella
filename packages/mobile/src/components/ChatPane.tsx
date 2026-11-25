@@ -1942,6 +1942,7 @@ export function ChatPane({
                   onMomentumScrollBegin={handleListMomentumScrollBegin}
                   onMomentumScrollEnd={handleListMomentumScrollEnd}
                   onContentSizeChange={handleListContentSizeChange}
+                  onLayout={scroll.onListLayout}
                   scrollEventThrottle={16}
                   showsVerticalScrollIndicator={false}
                   keyboardDismissMode="on-drag"

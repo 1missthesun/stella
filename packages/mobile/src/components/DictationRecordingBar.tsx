@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
@@ -105,12 +106,12 @@ const ElapsedTimer = memo(function ElapsedTimer({
   style: StyleProp<ViewStyle>;
 }) {
   const startedAt = useDictationMeterStartedAt();
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(steadyNow());
 
   useEffect(() => {
     if (!startedAt) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), TIMER_TICK_MS);
+    setNow(steadyNow());
+    const timer = setInterval(() => setNow(steadyNow()), TIMER_TICK_MS);
     return () => clearInterval(timer);
   }, [startedAt]);
 

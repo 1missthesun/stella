@@ -150,9 +150,9 @@ export class WorkerPeerBroker {
     params?: unknown,
     options?: { retryOnDisconnect?: boolean; timeoutMs?: number },
   ): Promise<TResult> {
-    const deadline = Date.now() + NO_HOST_TIMEOUT_MS;
+    const deadline = performance.now() + NO_HOST_TIMEOUT_MS;
     while (true) {
-      const remainingMs = Math.max(1, deadline - Date.now());
+      const remainingMs = Math.max(1, deadline - performance.now());
       const peer = this.pickPeer() ?? (await this.waitForPeer(remainingMs));
       try {
         return await peer.request<TResult>(
@@ -169,7 +169,7 @@ export class WorkerPeerBroker {
         if (
           options?.retryOnDisconnect !== true ||
           (!detached && !disposed) ||
-          Date.now() >= deadline
+          performance.now() >= deadline
         ) {
           throw error;
         }

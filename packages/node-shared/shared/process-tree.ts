@@ -205,9 +205,9 @@ const terminatePosixTree = async (
     [...targets].some(isPidAlive);
 
   const waitUntilGone = async (timeoutMs: number) => {
-    const deadline = Date.now() + timeoutMs;
+    const deadline = performance.now() + timeoutMs;
     while (anyAlive()) {
-      if (Date.now() >= deadline) return false;
+      if (performance.now() >= deadline) return false;
       await sleep(POLL_INTERVAL_MS);
     }
     return true;
@@ -248,9 +248,9 @@ const terminateWindowsTree = async (
   options: Required<TerminateProcessTreeOptions>,
 ) => {
   const waitForRootExit = async (timeoutMs: number) => {
-    const deadline = Date.now() + timeoutMs;
+    const deadline = performance.now() + timeoutMs;
     while (options.isRootRunning()) {
-      if (Date.now() >= deadline) return false;
+      if (performance.now() >= deadline) return false;
       await sleep(POLL_INTERVAL_MS);
     }
     return true;

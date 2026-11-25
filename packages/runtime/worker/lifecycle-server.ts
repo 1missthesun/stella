@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { createWriteStream, promises as fsPromises, type WriteStream } from "node:fs";
 import {
   type LockOwner,
@@ -128,7 +129,7 @@ export class WorkerLifecycleServer {
   noteRelaunching() {
     if (this.shuttingDown) return;
     this.quitRequested = false;
-    this.relaunchGraceUntil = Date.now() + RELAUNCH_GRACE_MS;
+    this.relaunchGraceUntil = steadyNow() + RELAUNCH_GRACE_MS;
     getFileLogger()?.process("worker.relaunch-announced", { graceMs: RELAUNCH_GRACE_MS });
   }
 
@@ -170,7 +171,7 @@ export class WorkerLifecycleServer {
   private scheduleIdleShutdown() {
     if (this.shuttingDown) return;
     this.idleTimer?.cancel();
-    const wait = Math.max(this.idleShutdownMs, this.relaunchGraceUntil - Date.now());
+    const wait = Math.max(this.idleShutdownMs, this.relaunchGraceUntil - steadyNow());
     this.idleTimer = forkDelayed(wait, () => {
       this.idleTimer = null;
       void this.evaluateIdleShutdown();

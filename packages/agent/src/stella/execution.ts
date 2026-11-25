@@ -80,13 +80,13 @@ const pause = (ms: number, signal?: AbortSignal): Promise<void> =>
 const RETRIED_NOTE = `Checked again for ${DEVICE_OFFLINE_RETRY_MS / 1000} seconds.`;
 
 export const whileDeviceOffline = async <T>(attempt: () => Promise<T>, signal?: AbortSignal): Promise<T> => {
-  const deadline = Date.now() + DEVICE_OFFLINE_RETRY_MS;
+  const deadline = performance.now() + DEVICE_OFFLINE_RETRY_MS;
   for (;;) {
     try {
       return await attempt();
     } catch (error) {
       if (!isDeviceOfflineError(error)) throw error;
-      if (Date.now() >= deadline) {
+      if (performance.now() >= deadline) {
         throw Object.assign(new Error(`${(error as Error).message} ${RETRIED_NOTE}`), { reason: DEVICE_OFFLINE_REASON });
       }
       await pause(DEVICE_OFFLINE_POLL_MS, signal);
@@ -100,10 +100,10 @@ export const untilOnline = async (
   context: Context,
 ): Promise<DeviceStanding | undefined> => {
   if (!standing) return undefined;
-  const deadline = Date.now() + DEVICE_OFFLINE_RETRY_MS;
+  const deadline = performance.now() + DEVICE_OFFLINE_RETRY_MS;
   for (;;) {
     const current = await standing(deviceId, context).catch(() => undefined);
-    if (!current || current.online || Date.now() >= deadline) return current;
+    if (!current || current.online || performance.now() >= deadline) return current;
     await pause(DEVICE_OFFLINE_POLL_MS, context.abortSignal);
   }
 };

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useRef } from "react";
 import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { listExecutionDevices } from "@/features/cloud/placement-client";
@@ -19,7 +20,7 @@ export function useExecutionDeviceList(options: {
     let pushed = false;
     let fallbackRead = false;
     const read = () => {
-      const startedAt = Date.now();
+      const startedAt = steadyNow();
       void listExecutionDevices({
         httpOrigin,
         getToken: (tokenOptions) => getAuthToken(tokenOptions ?? {}),
@@ -39,7 +40,7 @@ export function useExecutionDeviceList(options: {
       (value) => {
         if (!active) return;
         pushed = true;
-        callbacks.current.onDevices(value.devices, Date.now());
+        callbacks.current.onDevices(value.devices, steadyNow());
       },
       () => {
         if (!active || pushed || fallbackRead) return;

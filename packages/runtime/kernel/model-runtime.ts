@@ -1,3 +1,4 @@
+import { savedAgeMs, steadyNow } from "@stella/contracts/server-clock";
 import fs from "node:fs";
 import path from "node:path";
 import { bundledModels } from "./bundled-models.js";
@@ -513,7 +514,7 @@ export class ModelRuntime {
           if (
             !options.force &&
             checkedAt !== undefined &&
-            Date.now() - checkedAt < REMOTE_CATALOG_REFRESH_INTERVAL_MS
+            steadyNow() - checkedAt < REMOTE_CATALOG_REFRESH_INTERVAL_MS
           ) {
             return;
           }
@@ -524,7 +525,7 @@ export class ModelRuntime {
               signal: options.signal,
             });
             if (!models || options.signal?.aborted) return;
-            this.liveCatalogs.set(providerId, { models, checkedAt: Date.now() });
+            this.liveCatalogs.set(providerId, { models, checkedAt: steadyNow() });
             changed = true;
           } catch (error) {
             console.warn(
@@ -764,7 +765,7 @@ export class ModelRuntime {
     if (
       !options.force &&
       stored?.checkedAt !== undefined &&
-      Date.now() - stored.checkedAt < REMOTE_CATALOG_REFRESH_INTERVAL_MS
+      savedAgeMs(stored.checkedAt) < REMOTE_CATALOG_REFRESH_INTERVAL_MS
     ) {
       return false;
     }

@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -147,9 +148,9 @@ const sleep = abortableComputerDelay;
 
 const acquireLock = async (key: string, sessionId: string) => {
   const lockPath = path.join(locksDir(), normalizeTargetKey(key) || "lock");
-  const deadlineAt = Date.now() + getLockTimeoutMs();
+  const deadlineAt = performance.now() + getLockTimeoutMs();
 
-  while (Date.now() <= deadlineAt) {
+  while (performance.now() <= deadlineAt) {
     try {
       fs.mkdirSync(lockPath);
       fs.writeFileSync(
@@ -176,7 +177,7 @@ const acquireLock = async (key: string, sessionId: string) => {
 
       try {
         const stats = fs.statSync(lockPath);
-        if (Date.now() - stats.mtimeMs > staleLockTimeoutMs) {
+        if (savedAgeMs(stats.mtimeMs) > staleLockTimeoutMs) {
           fs.rmSync(lockPath, { recursive: true, force: true });
           continue;
         }

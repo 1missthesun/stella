@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -52,8 +53,8 @@ export function useConversationSummaries(
         : NO_OFFER_INPUT,
     [enabled, messages],
   );
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => setNow(Date.now()), [catchUps]);
+  const [now, setNow] = useState(() => serverNow());
+  useEffect(() => setNow(serverNow()), [catchUps]);
   const offer = useMemo(
     () => catchUpOffer(offerInput, catchUps, now),
     [catchUps, now, offerInput],
@@ -61,8 +62,8 @@ export function useConversationSummaries(
   useEffect(() => {
     if (!offer.lingerUntil) return;
     const timer = setTimeout(
-      () => setNow(Date.now()),
-      Math.max(0, offer.lingerUntil - Date.now()) + 50,
+      () => setNow(serverNow()),
+      Math.max(0, offer.lingerUntil - serverNow()) + 50,
     );
     return () => clearTimeout(timer);
   }, [offer.lingerUntil]);

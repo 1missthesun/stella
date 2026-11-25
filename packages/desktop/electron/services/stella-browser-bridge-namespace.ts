@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
@@ -239,7 +240,7 @@ export const withBrowserBridgeClaimLock = async <T>(
 ): Promise<T> => {
   mkdirSync(socketDir, { recursive: true, mode: 0o700 });
   const lockFile = `${ownerRecordPath(socketDir, session)}.lock`;
-  const deadline = Date.now() + timeoutMs;
+  const deadline = performance.now() + timeoutMs;
   for (;;) {
     const lock = tryAcquireOwnerLock(lockFile);
     if (lock.acquired) {
@@ -249,7 +250,7 @@ export const withBrowserBridgeClaimLock = async <T>(
         releaseOwnerLock(lockFile, lock.owner);
       }
     }
-    if (Date.now() >= deadline) {
+    if (performance.now() >= deadline) {
       throw new Error(
         `Timed out waiting for ${lockFile} (held by pid ${lock.holder?.pid ?? "unknown"}).`,
       );
@@ -302,7 +303,7 @@ export const isLiveForeignOwner = (
       record.instanceId !== BROWSER_BRIDGE_INSTANCE_ID &&
       record.ownerPid !== process.pid &&
       recordedOwnerIsLive(record) &&
-      (recordedDaemonIsLive(record) || now - record.recordedAtMs < LAUNCH_GRACE_MS),
+      (recordedDaemonIsLive(record) || savedAgeMs(record.recordedAtMs, now) < LAUNCH_GRACE_MS),
   );
 
 const ownerPriority = (owner: { claim: boolean; packaged: boolean }): number =>

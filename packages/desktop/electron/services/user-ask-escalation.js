@@ -1,3 +1,4 @@
+import { savedAgeMs, serverNow } from "@stella/contracts/server-clock";
 import fs from "fs";
 import path from "path";
 import {
@@ -89,7 +90,7 @@ export class UserAskEscalationEngine {
         }, delayMs);
         timer.unref?.();
         this.timers.set(askId, timer);
-        return Date.now() + delayMs;
+        return serverNow() + delayMs;
     }
     async step(askId) {
         const ask = this.options.getAsk(askId);
@@ -100,7 +101,7 @@ export class UserAskEscalationEngine {
         if (!this.options.getAsk(askId) || this.options.getAsk(askId).state !== "pending") {
             return;
         }
-        const now = Date.now();
+        const now = serverNow();
         const minuteOfDay = minuteOfDayAt(now, policy.timeZone);
         const ceiling = effectiveEscalationCeiling(policy, ask.urgency, minuteOfDay);
         const level = nextEscalationLevel(ask.escalationLevel, ceiling);
@@ -129,7 +130,7 @@ export class UserAskEscalationEngine {
         if (!stellaAppDir) {
             return true;
         }
-        const events = readBudgetEvents(stellaAppDir).filter((at) => now - at < BUDGET_WINDOW_MS);
+        const events = readBudgetEvents(stellaAppDir).filter((at) => savedAgeMs(at, now) < BUDGET_WINDOW_MS);
         if (events.length >= policy.maxPerHour) {
             writeBudgetEvents(stellaAppDir, events);
             return false;

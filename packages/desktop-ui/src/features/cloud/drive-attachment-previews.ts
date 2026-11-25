@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Attachment, MessageRecord } from "@stella/contracts/local-chat";
 import {
@@ -119,7 +120,7 @@ const pump = () => {
     const startedEpoch = epoch;
     active += 1;
     void fetchPreview(path)
-      .catch((): Resolved => ({ status: "failed", at: Date.now() }))
+      .catch((): Resolved => ({ status: "failed", at: steadyNow() }))
       .then((entry) => {
         active -= 1;
         if (startedEpoch !== epoch) {
@@ -136,7 +137,7 @@ const pump = () => {
 const request = (path: string) => {
   const current = resolved.get(path);
   if (current?.status === "ready" || current?.status === "pending") return;
-  if (current?.status === "failed" && Date.now() - current.at < RETRY_MS) return;
+  if (current?.status === "failed" && steadyNow() - current.at < RETRY_MS) return;
   resolved.set(path, { status: "pending" });
   queue.push(path);
   pump();

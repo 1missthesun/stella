@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   RealtimeVoiceSession,
   type VoiceSessionEvent,
@@ -70,7 +71,7 @@ export class VoiceSessionManager {
   private restartRequested = false;
   private restartInFlight = false;
   private activeVoiceStartedAt: number | null = null;
-  private lastActivityAt = Date.now();
+  private lastActivityAt = steadyNow();
   private quietTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(deps: VoiceSessionManagerDeps) {
@@ -82,7 +83,7 @@ export class VoiceSessionManager {
     if (this.deps.inputActiveRef.current) {
       this.beginVisibleVoiceSession();
     }
-    this.lastActivityAt = Date.now();
+    this.lastActivityAt = steadyNow();
     this.stopQuietTimer();
     this.quietTimer = setInterval(
       () => this.endActiveVoiceIfQuiet(),
@@ -110,7 +111,7 @@ export class VoiceSessionManager {
   updateSession(conversationId: string, inputActive: boolean): void {
     const session = this.sessionRef.current;
     if (inputActive && this.activeVoiceStartedAt === null) {
-      this.lastActivityAt = Date.now();
+      this.lastActivityAt = steadyNow();
     }
     this.syncVisibleVoiceSessionState(inputActive);
     if (!session) return;
@@ -150,7 +151,7 @@ export class VoiceSessionManager {
 
   private endActiveVoice(reason: ActiveVoiceEndReason): void {
     if (this.aborted || !this.deps.inputActiveRef.current) return;
-    this.lastActivityAt = Date.now();
+    this.lastActivityAt = steadyNow();
     this.deps.onActiveVoiceEnded(reason);
   }
 
@@ -164,10 +165,10 @@ export class VoiceSessionManager {
       this.userSpeaking ||
       session.isDelegating
     ) {
-      this.lastActivityAt = Date.now();
+      this.lastActivityAt = steadyNow();
       return;
     }
-    if (Date.now() - this.lastActivityAt >= ACTIVE_VOICE_QUIET_END_MS) {
+    if (steadyNow() - this.lastActivityAt >= ACTIVE_VOICE_QUIET_END_MS) {
       this.endActiveVoice("quiet");
     }
   }
@@ -304,12 +305,12 @@ export class VoiceSessionManager {
     this.persistVoiceTranscript(role, text, "hidden");
   }
 
-  private beginVisibleVoiceSession(now = Date.now()): void {
+  private beginVisibleVoiceSession(now = steadyNow()): void {
     if (this.activeVoiceStartedAt !== null) return;
     this.activeVoiceStartedAt = now;
   }
 
-  private endVisibleVoiceSession(now = Date.now()): void {
+  private endVisibleVoiceSession(now = steadyNow()): void {
     const startedAt = this.activeVoiceStartedAt;
     if (startedAt === null) return;
     this.activeVoiceStartedAt = null;
@@ -359,7 +360,7 @@ export class VoiceSessionManager {
       if (this.aborted) return;
       if (this.sessionRef.current !== session) return;
 
-      this.lastActivityAt = Date.now();
+      this.lastActivityAt = steadyNow();
       this.deps.analyserRef.current = session.getAnalyser();
       this.deps.outputAnalyserRef.current = session.getOutputAnalyser();
 

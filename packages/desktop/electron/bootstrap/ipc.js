@@ -177,12 +177,12 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                     return false;
                 const resource = state.stellaBrowserBridgeService;
                 if (!resource || resource.getStatus?.().state !== "connected") {
-                    extensionStatusSettlesAt = Date.now() + EXTENSION_STATUS_SETTLE_MS;
+                    extensionStatusSettlesAt = performance.now() + EXTENSION_STATUS_SETTLE_MS;
                     startStellaBrowserBridge(context);
                     return null;
                 }
                 const connected = await resource.getExtensionStatus();
-                if (!connected && Date.now() < extensionStatusSettlesAt)
+                if (!connected && performance.now() < extensionStatusSettlesAt)
                     return null;
                 return connected;
             },

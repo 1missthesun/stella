@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { createReadStream, promises as fsPromises } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -79,7 +80,7 @@ const findPeerHolder = async (
 ): Promise<PeerHolder | null> => {
   const peers = peerFiles;
   if (!peers || source.kind === "local") return null;
-  const now = Date.now();
+  const now = steadyNow();
   for (const [key, entry] of holders) {
     if (now - entry.at >= HOLDER_CACHE_MS) holders.delete(key);
   }

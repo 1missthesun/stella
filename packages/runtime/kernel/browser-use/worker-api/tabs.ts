@@ -322,8 +322,8 @@ export const createTabs = (
       before.tabs.map((tab) => `${tab.id}:${tab.generation}`),
     );
     await action();
-    const startedAt = Date.now();
-    while (Date.now() - startedAt <= timeoutMs) {
+    const startedAt = performance.now();
+    while (performance.now() - startedAt <= timeoutMs) {
       const current = await listTabsInternal(backend);
       const added = current.tabs.filter(
         (tab) => !previousHandles.has(`${tab.id}:${tab.generation}`),
@@ -335,7 +335,7 @@ export const createTabs = (
         );
       }
       await delay(
-        Math.min(50, Math.max(1, timeoutMs - (Date.now() - startedAt))),
+        Math.min(50, Math.max(1, timeoutMs - (performance.now() - startedAt))),
       );
     }
     throw new Error(`Timeout waiting ${timeoutMs}ms for a newly adopted tab.`);
@@ -450,8 +450,8 @@ export const createTabs = (
             timeout,
           };
           if (state.backend === "external") {
-            const startedAt = Date.now();
-            while (Date.now() - startedAt <= timeout) {
+            const startedAt = performance.now();
+            while (performance.now() - startedAt <= timeout) {
               const data = await boundCommand("evaluate", {
                 tabId: currentTabId(state),
                 ...tabGenerationParams(state.generation),
@@ -459,7 +459,7 @@ export const createTabs = (
               });
               if (fieldOrSelf(data, "result")) return true;
               await delay(
-                Math.min(100, Math.max(1, timeout - (Date.now() - startedAt))),
+                Math.min(100, Math.max(1, timeout - (performance.now() - startedAt))),
               );
             }
             throw new Error(`Timeout waiting ${timeout}ms for page function.`);
@@ -645,7 +645,7 @@ export const createTabs = (
         (await context.downloads()).map((download) => download.id),
       );
       await action();
-      const startedAt = Date.now();
+      const startedAt = performance.now();
       for (;;) {
         const fresh = (await context.downloads()).filter(
           (download) => !earlier.has(download.id),
@@ -657,7 +657,7 @@ export const createTabs = (
           }
           return first;
         }
-        if (Date.now() - startedAt >= timeoutMs) {
+        if (performance.now() - startedAt >= timeoutMs) {
           throw new Error(
             `No download finished within ${timeoutMs}ms of the action. Check that the action starts a download, or pass a longer { timeoutMs } for a large file.`,
           );

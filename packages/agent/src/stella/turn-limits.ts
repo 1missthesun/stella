@@ -1,4 +1,5 @@
 import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   createAssistantMessageEventStream,
   type AssistantMessage,
@@ -123,8 +124,9 @@ export function createTurnLimits(options: TurnLimitsOptions, report: (error: unk
     let partial: AssistantMessage | undefined;
     let phase: Phase = "opening";
     let begun = false;
-    let lastEventAt = Date.now();
-    let lastTickAt = Date.now();
+    let lastEventAt = performance.now();
+    let lastTickAt = performance.now();
+    let lastSteadyAt = steadyNow();
     let sleptAt: number | undefined;
     let ended = false;
 
@@ -145,7 +147,7 @@ export function createTurnLimits(options: TurnLimitsOptions, report: (error: unk
       const times = (stalls.get(sessionId) ?? 0) + 1;
       if (times > 1) stalls.delete(sessionId);
       else stalls.set(sessionId, times);
-      report(new Error(`${model.provider}/${model.id} sent nothing for ${Math.round((Date.now() - lastEventAt) / 1000)} s; attempt ${times}.`));
+      report(new Error(`${model.provider}/${model.id} sent nothing for ${Math.round((performance.now() - lastEventAt) / 1000)} s; attempt ${times}.`));
       // pi tries an error that reads as a timeout again; the second in a row ends the turn.
       const errorMessage =
         times === 1
@@ -155,9 +157,11 @@ export function createTurnLimits(options: TurnLimitsOptions, report: (error: unk
     };
     const check = () => {
       if (ended) return;
-      const at = Date.now();
-      if (at - lastTickAt > SLEEP_GAP_MS) sleptAt = at;
+      const at = performance.now();
+      const steadyAt = steadyNow();
+      if (at - lastTickAt > SLEEP_GAP_MS || steadyAt - lastSteadyAt > SLEEP_GAP_MS) sleptAt = at;
       lastTickAt = at;
+      lastSteadyAt = steadyAt;
       if (model.provider === LOCAL_PROVIDER_ID || options.watches?.(model.provider) === false || engines.some((engine) => engine.holding(sessionId) || engine.compacting(sessionId))) {
         lastEventAt = at;
         return;
@@ -179,7 +183,7 @@ export function createTurnLimits(options: TurnLimitsOptions, report: (error: unk
       const inner = models.streamSimple(model, transcript, { ...streamOptions, signal: controller.signal });
       for await (const event of inner) {
         if (ended) return;
-        lastEventAt = Date.now();
+        lastEventAt = performance.now();
         phase = phaseOf(event) ?? phase;
         if ("partial" in event) partial = event.partial;
         begun = true;

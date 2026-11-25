@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import http from "node:http";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { URL } from "node:url";
@@ -138,7 +139,7 @@ export const loadConnectorTokenPayload = async (
         broker ? broker.load(key) : readStoredConnectorToken(stellaAppDir, key),
       );
       if (!payload?.accessToken) return null;
-      if (!payload.expiresAt || payload.expiresAt > Date.now() + 30_000) {
+      if (!payload.expiresAt || payload.expiresAt > serverNow() + 30_000) {
         return payload;
       }
       return yield* refreshConnectorAccessTokenDeduped(
@@ -162,12 +163,12 @@ const normalizeScopes = (scopes?: string[]) => {
 
 const tokenExpiresAt = (value: unknown) => {
   if (typeof value === "number" && Number.isFinite(value)) {
-    return Date.now() + value * 1000;
+    return serverNow() + value * 1000;
   }
   if (typeof value !== "string" || !value.trim()) return undefined;
   const asNumber = Number(value);
   if (Number.isFinite(asNumber)) {
-    return Date.now() + asNumber * 1000;
+    return serverNow() + asNumber * 1000;
   }
   const asDate = Date.parse(value);
   return Number.isFinite(asDate) ? asDate : undefined;
@@ -541,8 +542,8 @@ export const completeConnectorDeviceOAuth = async (
   },
 ) => {
   let intervalMs = Math.max(0, args.authorization.interval ?? 5) * 1000;
-  const expiresAt = Date.now() + args.authorization.expires_in * 1000;
-  while (Date.now() < expiresAt) {
+  const expiresAt = performance.now() + args.authorization.expires_in * 1000;
+  while (performance.now() < expiresAt) {
     await sleepWithAbort(intervalMs, args.signal);
     const body = new URLSearchParams({
       client_id: args.clientId,
@@ -1051,7 +1052,7 @@ export const connectPreregisteredConnectorOAuth = async (
     await saveConnectorTokenPayload(stellaAppDir, args.tokenKey, {
       accessToken: callbackResult.accessToken,
       expiresAt: callbackResult.expiresIn
-        ? Date.now() + callbackResult.expiresIn * 1000
+        ? serverNow() + callbackResult.expiresIn * 1000
         : undefined,
       clientId: args.clientId,
       resourceUrl: args.resourceUrl,

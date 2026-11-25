@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import type { ChatMessage } from "../types";
 
 const SETTLE_MS = 700;
@@ -54,7 +55,7 @@ export class ReplyQueue {
   }
 
   scan(messages: readonly ChatMessage[], turnRunning: boolean): number | null {
-    const now = Date.now();
+    const now = steadyNow();
     let waiting = false;
     for (const message of messages) {
       if (message.role !== "assistant" || this.isKnown(message)) continue;
@@ -92,7 +93,7 @@ export class ReplyQueue {
 
   next(): QueuedReply | null {
     const reply = this.queue.shift() ?? null;
-    if (reply) this.spoken.set(reply.source, Date.now());
+    if (reply) this.spoken.set(reply.source, steadyNow());
     return reply;
   }
 

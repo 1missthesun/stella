@@ -106,7 +106,7 @@ const buildExecToolPayload = (
   callStartedAt: number,
   interactionReceipt?: ShellInteractionReceipt,
 ): ExecToolPayload => {
-  const wallTimeSeconds = (Date.now() - callStartedAt) / 1000;
+  const wallTimeSeconds = Math.round(performance.now() - callStartedAt) / 1000;
   const chunkSequence = record.chunkSequence + 1;
   record.chunkSequence = chunkSequence;
   const receipt = interactionReceipt ??
@@ -249,7 +249,7 @@ export const handleExecCommand = async (
   signal?: AbortSignal,
   onUpdate?: ToolUpdateCallback,
 ): Promise<ToolResult> => {
-  const callStartedAt = Date.now();
+  const callStartedAt = performance.now();
   if (invalidExecOutputTokens(args.max_output_tokens)) {
     return { error: "max_output_tokens must be a non-negative safe integer." };
   }
@@ -380,7 +380,7 @@ export const handleWriteStdin = async (
   context?: ToolContext,
   signal?: AbortSignal,
 ): Promise<ToolResult> => {
-  const callStartedAt = Date.now();
+  const callStartedAt = performance.now();
   if (invalidExecOutputTokens(args.max_output_tokens)) {
     return { error: "max_output_tokens must be a non-negative safe integer." };
   }
@@ -480,7 +480,7 @@ export const handleWriteStdin = async (
         waitForShellActivityEffect(
           record,
           record.outputVersion,
-          Math.max(0, passivePollDeadlineAt - Date.now()),
+          Math.max(0, passivePollDeadlineAt - performance.now()),
           signal,
         ),
       );
@@ -501,7 +501,7 @@ export const handleWriteStdin = async (
   const interactionDeadlineAt =
     operation === "poll"
       ? passivePollDeadlineAt
-      : Date.now() + interactionYieldTimeMs;
+      : performance.now() + interactionYieldTimeMs;
   const receipt: ShellInteractionReceipt = {
     operation,
     ...(writeId ? { write_id: writeId } : {}),

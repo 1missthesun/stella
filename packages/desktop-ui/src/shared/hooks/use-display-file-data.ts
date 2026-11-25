@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   DisplayFileSourceContext,
   type DisplayFileSource,
@@ -172,8 +173,8 @@ const recheck = (
   conversationId: string | null,
 ) => {
   const read = entry.stamp;
-  if (!read || Date.now() - entry.checkedAt < RECHECK_MS) return;
-  entry.checkedAt = Date.now();
+  if (!read || steadyNow() - entry.checkedAt < RECHECK_MS) return;
+  entry.checkedAt = steadyNow();
   void Promise.all([read, statFile(filePath, conversationId)]).then(
     ([before, now]) => {
       if (cache.get(cacheKey) !== entry || sameStamp(before, now)) return;
@@ -215,7 +216,7 @@ const acquire = (
       refCount: 0,
       idleSince: 0,
       stamp: source ? null : statFile(filePath, conversationId),
-      checkedAt: Date.now(),
+      checkedAt: steadyNow(),
       stale: new Set(),
     };
     entry = created;

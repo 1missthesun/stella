@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { putSignedUpload } from "@stella/contracts/request-deadline";
 import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
@@ -1360,7 +1361,7 @@ export class StellaRuntimeHost {
 
   private async oauthSignedIn(provider: string): Promise<boolean> {
     const known = this.planLogins;
-    if (Date.now() - known.at >= 60_000 && !known.pending) {
+    if (steadyNow() - known.at >= 60_000 && !known.pending) {
       known.pending = (async () => {
         const answer = (await this.options.hostHandlers
           .requestLlmCredentials?.({ operation: "list" })
@@ -1370,7 +1371,7 @@ export class StellaRuntimeHost {
             answer?.ok === true && Array.isArray(answer.oauthProviders)
               ? answer.oauthProviders.filter((entry): entry is string => typeof entry === "string")
               : [],
-          at: Date.now(),
+          at: steadyNow(),
         };
       })();
       if (known.at === 0) await known.pending;
@@ -1380,12 +1381,12 @@ export class StellaRuntimeHost {
 
   private async claudeCodeSignedIn(): Promise<boolean> {
     const known = this.claudeCodeLogin;
-    if (Date.now() - known.at >= 60_000 && !known.pending) {
+    if (steadyNow() - known.at >= 60_000 && !known.pending) {
       known.pending = (async () => {
         const answer = (await this.options.hostHandlers
           .requestLlmCredentials?.({ operation: "claude-config", cached: true })
           .catch(() => undefined)) as { ok?: boolean; signedIn?: boolean } | undefined;
-        this.claudeCodeLogin = { signedIn: answer?.ok === true && answer.signedIn === true, at: Date.now() };
+        this.claudeCodeLogin = { signedIn: answer?.ok === true && answer.signedIn === true, at: steadyNow() };
       })();
       if (known.at === 0) await known.pending;
     }

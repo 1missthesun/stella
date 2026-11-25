@@ -24,6 +24,7 @@ import {
 } from './shared/schedule-scripts.js'
 import type { StellaHostRunnerTarget } from '@stella/node-shared/lifecycle-targets.js'
 import type { RuntimeAutomationTurnResult } from '@stella/contracts/protocol'
+import { savedAgeMs } from '@stella/contracts/server-clock'
 import {
   SCHEDULE_THREAD_ID_MAX_CHARS,
   scheduledThreadFallbackNote,
@@ -1241,6 +1242,27 @@ export class LocalSchedulerService {
     return nextDueAt
   }
 
+  private rescheduleAfterClockChange(now: number) {
+    const planned = (record: { enabled: boolean; runningAtMs?: number; nextRunAtMs: number; updatedAt: number }) =>
+      record.enabled &&
+      record.runningAtMs === undefined &&
+      record.nextRunAtMs > now &&
+      !Number.isFinite(savedAgeMs(record.updatedAt, now))
+    const jobs = this.state.cronJobs.filter(planned)
+    const heartbeats = this.state.heartbeats.filter(planned)
+    for (const job of jobs) {
+      job.nextRunAtMs = computeNextRunAtMs(job.schedule, now)
+      job.updatedAt = now
+    }
+    for (const config of heartbeats) {
+      config.nextRunAtMs = now + normalizeIntervalMs(config.intervalMs)
+      config.updatedAt = now
+    }
+    if (jobs.length + heartbeats.length === 0) return
+    this.persistState()
+    this.emitChange()
+  }
+
   private getNextDueItem(
     now: number,
   ):
@@ -1301,7 +1323,9 @@ export class LocalSchedulerService {
         if (!this.started) {
           return Effect.void
         }
-        const dueItem = this.getNextDueItem(Date.now())
+        const now = Date.now()
+        this.rescheduleAfterClockChange(now)
+        const dueItem = this.getNextDueItem(now)
         if (!dueItem) {
           return Effect.void
         }

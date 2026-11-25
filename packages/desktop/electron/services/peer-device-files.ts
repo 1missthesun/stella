@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { randomUUID } from "node:crypto";
 import {
   DEVICE_REQUEST_DEVICE_HEADERS,
@@ -114,7 +115,7 @@ export const createPeerDeviceFiles = (deps: Deps): PeerDeviceFiles => {
       paramsHash: await deviceRequestParamsHash(paramsJson),
       targetDeviceId: deviceId,
     });
-    const issuedAt = Date.now();
+    const issuedAt = serverNow();
     const signature = await deps.sign(
       buildDeviceRequestDeviceProofMessage({
         requesterDeviceId: ownDeviceId,
@@ -167,7 +168,7 @@ export const createPeerDeviceFiles = (deps: Deps): PeerDeviceFiles => {
     const token = await deps.getAuthToken().catch(() => null);
     if (!baseUrl || !token) return [];
     const owner = `${baseUrl}\0${token.slice(-24)}`;
-    const now = Date.now();
+    const now = steadyNow();
     if (devicesCache && devicesCache.owner === owner && now - devicesCache.at < DEVICES_CACHE_MS) {
       return await devicesCache.value;
     }

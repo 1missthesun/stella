@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -179,8 +180,8 @@ const migrateLegacy = async (
   let run = migrations.get(key);
   if (!run) {
     const lastAttempt = legacyAttempts.get(key) ?? 0;
-    if (pendingLegacy && Date.now() - lastAttempt < LEGACY_RETRY_MS) return;
-    legacyAttempts.set(key, Date.now());
+    if (pendingLegacy && steadyNow() - lastAttempt < LEGACY_RETRY_MS) return;
+    legacyAttempts.set(key, steadyNow());
     run = adoptLegacyToken(stellaAppDir, config).finally(() =>
       migrations.delete(key),
     );

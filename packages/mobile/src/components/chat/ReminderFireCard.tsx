@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { memo, useMemo, useState } from "react";
 import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../Text";
@@ -76,7 +77,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
     const label =
       fire.state === "done"
         ? `✓ ${t("reminders.doneState")}`
-        : fire.snoozedUntil && fire.snoozedUntil > Date.now()
+        : fire.snoozedUntil && fire.snoozedUntil > serverNow()
           ? t("reminders.snoozedUntil", { time: formatTime(fire.snoozedUntil) })
           : t("reminders.snoozed");
     trailing = (

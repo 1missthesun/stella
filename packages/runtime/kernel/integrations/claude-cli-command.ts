@@ -28,7 +28,7 @@ export const runCliCommand = (
     let stderr = "";
     let output = "";
     let spawnError: string | null = null;
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(executable, [...args], {
@@ -69,7 +69,7 @@ export const runCliCommand = (
         timedOut:
           exitCode === null &&
           spawnError === null &&
-          Date.now() - startedAt >= options.timeoutMs,
+          performance.now() - startedAt >= options.timeoutMs,
         spawnError,
         stdout: stdout.trim(),
         stderr: stderr.trim(),

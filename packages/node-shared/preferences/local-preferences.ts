@@ -341,14 +341,14 @@ const sleepSync = (ms: number) =>
 
 const withFileLock = <A>(filePath: string, run: () => A): A => {
   const lockPath = `${filePath}.lock`;
-  const deadline = Date.now() + LOCK_WAIT_MS;
+  const deadline = performance.now() + LOCK_WAIT_MS;
   let fd: number | null = null;
   while (fd === null) {
     try {
       fd = fs.openSync(lockPath, "wx", 0o600);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      if (Date.now() >= deadline) {
+      if (performance.now() >= deadline) {
         fs.rmSync(lockPath, { force: true });
         continue;
       }

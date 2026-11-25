@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -133,9 +134,9 @@ export class OnDeviceDictation {
   status(locales: readonly string[]): Promise<OnDeviceDictationStatus> {
     const key = locales.join(",");
     const cached = this.statusCache.get(key);
-    if (cached && Date.now() - cached.at < STATUS_TTL_MS) return cached.value;
+    if (cached && steadyNow() - cached.at < STATUS_TTL_MS) return cached.value;
     const value = this.computeStatus(locales);
-    this.statusCache.set(key, { at: Date.now(), value });
+    this.statusCache.set(key, { at: steadyNow(), value });
     return value;
   }
 

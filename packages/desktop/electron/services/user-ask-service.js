@@ -1,3 +1,4 @@
+import { savedAgeMs, serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { randomInt, randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
@@ -180,7 +181,7 @@ const storeKeychainFallback = (stellaAppDir, target, value) => {
         service: target.service,
         account: target.account,
         valueProtected: protectValue(scope, value),
-        updatedAt: Date.now(),
+        updatedAt: serverNow(),
     };
     writePrivateFileSync(filePath, JSON.stringify({ version: 1, entries }, null, 2));
 };
@@ -365,7 +366,7 @@ export class UserAskService {
             ...requested,
             timeZone: requested.timeZone || localTimeZone(),
         });
-        this.policyCache = { policy, at: Date.now() };
+        this.policyCache = { policy, at: steadyNow() };
         this.cachePolicyLocally(policy);
         await this.cloudRequest(CLOUD_POLICY_PATH, {
             method: "PUT",
@@ -482,7 +483,7 @@ export class UserAskService {
         if (!ask) {
             return;
         }
-        const minuteOfDay = minuteOfDayAt(Date.now(), policy.timeZone);
+        const minuteOfDay = minuteOfDayAt(serverNow(), policy.timeZone);
         const level = effectiveEscalationCeiling(policy, ask.urgency, minuteOfDay);
         if (level < 2) {
             return;
@@ -745,7 +746,7 @@ export class UserAskService {
         const whole = found.whole;
         const taskName = typeof params.taskName === "string" ? params.taskName.trim().slice(0, 240) : "";
         const use = {
-            at: Date.now(),
+            at: serverNow(),
             label: whole.saved.label,
             service: whole.saved.service || save.service,
             ...(taskName ? { taskName } : {}),
@@ -806,8 +807,8 @@ export class UserAskService {
         }
     }
     releasesInLastHour() {
-        const since = Date.now() - 60 * 60_000;
-        return this.releaseLog().filter((entry) => !entry.refused && entry.at >= since).length;
+        const now = serverNow();
+        return this.releaseLog().filter((entry) => !entry.refused && savedAgeMs(entry.at, now) <= 60 * 60_000).length;
     }
     logRelease(entry) {
         const file = this.releaseLogPath();
@@ -920,7 +921,7 @@ export class UserAskService {
                     ...asked,
                     ...this.syncedFlag(),
                 },
-                answeredAt: Date.now(),
+                answeredAt: serverNow(),
             },
         };
     }
@@ -948,7 +949,7 @@ export class UserAskService {
     }
     async open({ request, blocking, timeoutMs, kind, detail, saveContext = null }) {
         const askId = randomUUID();
-        const createdAt = Date.now();
+        const createdAt = serverNow();
         const seal = kind === "secure_input" ? createUserAskRecipientKey() : null;
         const ask = {
             schemaVersion: USER_ASK_SCHEMA_VERSION,
@@ -1007,7 +1008,7 @@ export class UserAskService {
         }
         this.escalation.stop(askId);
         this.updateAsk(askId, { state: "defaulted" });
-        this.pending.resolve(askId, userAskDefaultedResolution(askId, record.ask.detail, Date.now()));
+        this.pending.resolve(askId, userAskDefaultedResolution(askId, record.ask.detail, serverNow()));
     }
     expire(askId) {
         const record = this.asks.get(askId);
@@ -1020,7 +1021,7 @@ export class UserAskService {
             this.pending.resolve(askId, {
                 outcome: "expired",
                 askId,
-                at: Date.now(),
+                at: serverNow(),
                 note: USER_ASK_EXPIRED_NOTE,
             });
         }
@@ -1041,7 +1042,7 @@ export class UserAskService {
             this.pending.resolve(askId, {
                 outcome: "declined",
                 askId,
-                at: Date.now(),
+                at: serverNow(),
                 note: userAskDeclinedNote(reason),
                 ...(reason ? { reason } : {}),
             });
@@ -1068,7 +1069,7 @@ export class UserAskService {
                 this.pending.resolve(askId, {
                     outcome: "canceled",
                     askId,
-                    at: Date.now(),
+                    at: serverNow(),
                     note: "The run was stopped before the user answered.",
                 });
             }
@@ -1084,7 +1085,7 @@ export class UserAskService {
                 this.pending.resolve(askId, {
                     outcome: "canceled",
                     askId,
-                    at: Date.now(),
+                    at: serverNow(),
                     note: "Stella was reset before the user answered.",
                 });
             }
@@ -1123,7 +1124,7 @@ export class UserAskService {
         return { ok: true, late: true };
     }
     async buildAnsweredResolution(record, payload, late) {
-        const answeredAt = Date.now();
+        const answeredAt = serverNow();
         const askId = record.ask.askId;
         if (payload?.kind === "questions") {
             const responses = validateUserAskResponses(record.ask.detail, payload.responses);
@@ -1408,7 +1409,7 @@ export class UserAskService {
     async useSecureValue(request) {
         const handle = typeof request?.handle === "string" ? request.handle : "";
         const target = request?.target;
-        const usedAt = Date.now();
+        const usedAt = serverNow();
         if (!isUserAskSecretHandle(handle)) {
             return {
                 handle,
@@ -1613,7 +1614,7 @@ export class UserAskService {
     }
     async resolvePolicy(maxAgeMs = POLICY_CACHE_MAX_AGE_MS) {
         const cached = this.policyCache;
-        if (cached && Date.now() - cached.at <= maxAgeMs) {
+        if (cached && steadyNow() - cached.at <= maxAgeMs) {
             return cached.policy;
         }
         const client = this.ensureBackendClient();
@@ -1621,7 +1622,7 @@ export class UserAskService {
             try {
                 const remote = await client.call(CLOUD_POLICY_CALL, {});
                 const policy = normalizeUserAskEscalationPolicy(remote);
-                this.policyCache = { policy, at: Date.now() };
+                this.policyCache = { policy, at: steadyNow() };
                 this.cachePolicyLocally(policy);
                 return policy;
             }
@@ -1948,7 +1949,7 @@ export class UserAskService {
             ...record.ask,
             ...patch,
             revision: record.ask.revision + 1,
-            updatedAt: Date.now(),
+            updatedAt: serverNow(),
         };
         record.ask = ask;
         this.broadcast(IPC_USER_ASK_UPDATED, ask);
@@ -1966,7 +1967,7 @@ export class UserAskService {
         if (record.ttlTimer) {
             clearTimeout(record.ttlTimer);
         }
-        record.ask = { ...record.ask, state, updatedAt: Date.now() };
+        record.ask = { ...record.ask, state, updatedAt: serverNow() };
         this.asks.delete(askId);
         this.broadcast(IPC_USER_ASK_CLOSED, { askId, state });
         void this.publishAskResolved(askId, state, reason);

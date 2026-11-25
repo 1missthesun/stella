@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { createHash, randomUUID } from "node:crypto";
 import {
   appendFile,
@@ -513,7 +514,7 @@ export class RemoteTelemetryClient {
 
   private schedule(delayMs: number): void {
     if (this.closing || this.closed) return;
-    const dueAt = Date.now() + delayMs;
+    const dueAt = steadyNow() + delayMs;
     if (this.timer && this.timerDueAt <= dueAt) return;
     this.clearScheduledFlush();
     this.timerDueAt = dueAt;

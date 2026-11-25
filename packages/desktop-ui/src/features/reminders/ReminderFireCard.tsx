@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { memo, useState, type ReactNode } from "react";
 import {
   tomorrowMorningMinutes,
@@ -65,7 +66,7 @@ export const ReminderFireCard = memo(function ReminderFireCard({
     const until = fire.snoozedUntil;
     trailing = (
       <span className="schedule-card__settled" data-reminder-state="snoozed">
-        {until && until > Date.now()
+        {until && until > serverNow()
           ? t("reminders.snoozedUntil", { time: formatTime(until) })
           : t("reminders.snoozed")}
       </span>

@@ -1,3 +1,4 @@
+import { savedWaitMs } from "@stella/contracts/server-clock";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 import type { AgentToolSnapshot } from "../tools/types.js";
 import {
@@ -433,11 +434,12 @@ export const createComputerAgentCloudRecords = (
         });
       if (heads.length === 0) return;
       const now = Date.now();
-      const entry = heads.find((head) => head.nextAttemptAt <= now);
+      const waits = heads.map((head) =>
+        savedWaitMs(head.nextAttemptAt, MAX_RETRY_MS, now),
+      );
+      const entry = heads[waits.indexOf(0)];
       if (!entry) {
-        scheduleDrain(
-          Math.min(...heads.map((head) => head.nextAttemptAt)) - now,
-        );
+        scheduleDrain(Math.min(...waits));
         return;
       }
       const authority = options.store.getComputerAgentCloudThreadAuthority(

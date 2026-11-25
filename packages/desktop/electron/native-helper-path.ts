@@ -27,7 +27,7 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
   }
 
   const missingUntil = missingHelperUntil.get(baseName)
-  if (missingUntil !== undefined && Date.now() < missingUntil) {
+  if (missingUntil !== undefined && performance.now() < missingUntil) {
     return null
   }
 
@@ -48,6 +48,6 @@ export const resolveNativeHelperPath = (baseName: string): string | null => {
     }
   }
 
-  missingHelperUntil.set(baseName, Date.now() + NEGATIVE_CACHE_TTL_MS)
+  missingHelperUntil.set(baseName, performance.now() + NEGATIVE_CACHE_TTL_MS)
   return null
 }

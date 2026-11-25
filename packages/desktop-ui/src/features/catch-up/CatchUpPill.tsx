@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import {
   memo,
   useCallback,
@@ -169,7 +170,7 @@ export const CatchUpPill = memo(function CatchUpPill({
   const view = useBackendView("catchUps.list", { conversationId });
   const catchUps = useMemo(() => view.value?.catchUps ?? [], [view.value]);
   const offerInput = useMemo(() => offerMessages(messages), [messages]);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => serverNow());
   const offer = useMemo(
     () => catchUpOffer(offerInput, catchUps, now),
     [catchUps, now, offerInput],
@@ -177,8 +178,8 @@ export const CatchUpPill = memo(function CatchUpPill({
   useEffect(() => {
     if (!offer.lingerUntil) return;
     const timer = window.setTimeout(
-      () => setNow(Date.now()),
-      Math.max(0, offer.lingerUntil - Date.now()) + 50,
+      () => setNow(serverNow()),
+      Math.max(0, offer.lingerUntil - serverNow()) + 50,
     );
     return () => window.clearTimeout(timer);
   }, [offer.lingerUntil]);
@@ -288,7 +289,7 @@ export const CatchUpPill = memo(function CatchUpPill({
     [goTo, pagesNode, shown],
   );
 
-  useEffect(() => setNow(Date.now()), [catchUps]);
+  useEffect(() => setNow(serverNow()), [catchUps]);
 
   if (!offer.offer && !pending && !open && !offer.lingerUntil) return null;
 

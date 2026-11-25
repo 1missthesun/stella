@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -243,7 +244,7 @@ export const revalidateRemotePrompts =
     if (state.inFlight) return state.inFlight;
     const endpoint = currentEndpoint();
     if (!endpoint) return "unconfigured";
-    const now = Date.now();
+    const now = steadyNow();
     if (now - state.lastAttemptAt < MIN_REVALIDATE_GAP_MS) return "in-flight";
     state.lastAttemptAt = now;
     const attempt = (async (): Promise<RemotePromptRevalidation> => {

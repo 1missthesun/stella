@@ -1,3 +1,4 @@
+import { savedWaitMs, steadyNow } from "@stella/contracts/server-clock";
 import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import type { FileHandle } from "node:fs/promises";
@@ -549,7 +550,7 @@ export const createClaudeSessionSync = (options: {
 
   const scheduleDrain = (delayMs: number): void => {
     if (stopped) return;
-    const at = Date.now() + Math.max(0, delayMs);
+    const at = steadyNow() + Math.max(0, delayMs);
     if (cancelScheduled && scheduledAt <= at) return;
     cancelScheduled?.();
     scheduledAt = at;
@@ -720,9 +721,10 @@ export const createClaudeSessionSync = (options: {
       const rows = repo.listPending(scope, 64);
       if (rows.length === 0) return;
       const now = Date.now();
-      const row = rows.find((candidate) => candidate.nextAttemptAt <= now);
+      const waitOf = (candidate: SessionRow) => savedWaitMs(candidate.nextAttemptAt, MAX_RETRY_MS, now);
+      const row = rows.find((candidate) => waitOf(candidate) === 0);
       if (!row) {
-        scheduleDrain(Math.min(...rows.map((candidate) => candidate.nextAttemptAt)) - now);
+        scheduleDrain(Math.min(...rows.map(waitOf)));
         return;
       }
       if (
@@ -1092,11 +1094,11 @@ export const createClaudeSessionSync = (options: {
   };
 
   const flush: ClaudeSessionSync["flush"] = async (timeoutMs = 60_000) => {
-    const deadline = Date.now() + timeoutMs;
+    const deadline = performance.now() + timeoutMs;
     for (;;) {
       await drain();
       if (pendingCount() === 0) return true;
-      if (Date.now() >= deadline) return false;
+      if (performance.now() >= deadline) return false;
       await new Promise<void>((resolve) => {
         forkDelayedCall(250, resolve);
       });

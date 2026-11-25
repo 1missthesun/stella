@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   ASK_STELLA_TOOL_NAME,
   parseAskStellaRequest,
@@ -320,7 +321,7 @@ export class DelegationController {
   private reportProgress(task: ActiveTask, text: string): void {
     if (!this.deps.channel.reportProgress) return;
     if (!this.deps.isInputActive()) return;
-    const now = Date.now();
+    const now = steadyNow();
     if (now - this.lastProgressAt < PROGRESS_MIN_INTERVAL_MS) return;
     this.lastProgressAt = now;
     this.deps.channel.reportProgress(task.taskId, text);

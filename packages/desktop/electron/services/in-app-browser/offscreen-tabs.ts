@@ -340,7 +340,7 @@ export class OffscreenTabs {
     }
     if (
       binding.inFlightSince !== null &&
-      Date.now() - binding.inFlightSince < MIRROR_ACK_TIMEOUT_MS
+      performance.now() - binding.inFlightSince < MIRROR_ACK_TIMEOUT_MS
     ) {
       return;
     }
@@ -365,7 +365,7 @@ export class OffscreenTabs {
       ...region,
     };
     binding.sentSize = size;
-    binding.inFlightSince = Date.now();
+    binding.inFlightSince = performance.now();
     mirror.webContents.send(MIRROR_FRAME_CHANNEL, frame, pixels);
   }
 

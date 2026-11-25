@@ -9,10 +9,10 @@ export const pollWithDeadline = <A, E, ED, R>(args: {
   onDeadline: () => ED;
 }): Effect.Effect<A, E | ED, R> =>
   Effect.suspend(() => {
-    const deadline = Date.now() + args.timeoutMs;
+    const deadline = performance.now() + args.timeoutMs;
     let deadlineError: ED | undefined;
     const gated = Effect.suspend((): Effect.Effect<A, E | ED, R> => {
-      if (Date.now() >= deadline) {
+      if (performance.now() >= deadline) {
         deadlineError = args.onDeadline();
         return Effect.fail(deadlineError);
       }

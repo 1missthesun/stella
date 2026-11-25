@@ -65,11 +65,11 @@ export const createPageSettle =
     tabId: number,
     kind: PageSettleKind,
   ): Promise<void> => {
-    const deadline = Date.now() + SETTLE_CAP_MS;
+    const deadline = performance.now() + SETTLE_CAP_MS;
     let current = kind;
     let navigating = false;
     for (;;) {
-      const capMs = deadline - Date.now();
+      const capMs = deadline - performance.now();
       if (capMs < 50) return;
       const options = {
         kind: current,

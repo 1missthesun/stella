@@ -36,7 +36,7 @@ export const useConversationBootstrap = () => {
       const devicePromise = getOrCreateDeviceId();
       const settleRuntime = () =>
         Promise.allSettled([hostPromise, devicePromise]);
-      const startedAt = Date.now();
+      const startedAt = performance.now();
 
       try {
         while (!cancelled) {
@@ -53,7 +53,7 @@ export const useConversationBootstrap = () => {
             markReady();
             return;
           } catch (error) {
-            if (Date.now() - startedAt >= CONVERSATION_BOOTSTRAP_TIMEOUT_MS) {
+            if (performance.now() - startedAt >= CONVERSATION_BOOTSTRAP_TIMEOUT_MS) {
               throw error;
             }
             await wait(CONVERSATION_BOOTSTRAP_RETRY_MS);

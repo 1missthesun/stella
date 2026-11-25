@@ -85,9 +85,9 @@ const HEALTH_SCRIPT = `(() => {
 const ANSI_STYLE = /\u001b\[[0-9;]*m/g;
 
 const cameBack = async (contents: Electron.WebContents): Promise<string | null> => {
-  const deadline = Date.now() + RELOAD_HEALTH_TIMEOUT_MS;
+  const deadline = performance.now() + RELOAD_HEALTH_TIMEOUT_MS;
   let emptySince: number | null = null;
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     if (contents.isDestroyed()) return null;
     const state = contents.isLoading()
       ? "loading"
@@ -95,8 +95,8 @@ const cameBack = async (contents: Electron.WebContents): Promise<string | null> 
     if (state === "ok") return null;
     if (state === "crashed") return "The new version stopped with an error when it started.";
     if (state === "empty") {
-      emptySince ??= Date.now();
-      if (Date.now() - emptySince >= RELOAD_EMPTY_TIMEOUT_MS) break;
+      emptySince ??= performance.now();
+      if (performance.now() - emptySince >= RELOAD_EMPTY_TIMEOUT_MS) break;
     } else {
       emptySince = null;
     }

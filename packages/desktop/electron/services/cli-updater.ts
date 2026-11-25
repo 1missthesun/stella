@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import fs from "node:fs";
 import path from "node:path";
 import { powerMonitor } from "electron";
@@ -72,7 +73,7 @@ export class CliUpdater {
   private running = false;
   private started = false;
   private lastStatus: UpdaterState["status"] | null = null;
-  private dueAt = Date.now() + AFTER_START_MS;
+  private dueAt = steadyNow() + AFTER_START_MS;
   private readonly onResume = () => this.arm();
 
   constructor(
@@ -90,7 +91,7 @@ export class CliUpdater {
     const last = stored.checkedAt ?? 0;
     const sinceLast = Date.now() - last;
     if (sinceLast >= 0 && sinceLast < RESTART_QUIET_MS) {
-      this.dueAt = last + intervalAfter(stored.status);
+      this.dueAt = steadyNow() + intervalAfter(stored.status) - sinceLast;
     }
     this.started = true;
     powerMonitor.on("resume", this.onResume);
@@ -99,7 +100,7 @@ export class CliUpdater {
 
   noteCliFound(): void {
     if (!this.started || this.lastStatus !== "not_installed") return;
-    this.dueAt = Date.now();
+    this.dueAt = steadyNow();
     this.arm();
   }
 
@@ -115,10 +116,10 @@ export class CliUpdater {
   private arm(): void {
     if (this.abort.signal.aborted) return;
     if (this.timer) clearTimeout(this.timer);
-    const wait = Math.min(Math.max(this.dueAt - Date.now(), 0), DUE_POLL_MS);
+    const wait = Math.min(Math.max(this.dueAt - steadyNow(), 0), DUE_POLL_MS);
     this.timer = setTimeout(() => {
       this.timer = null;
-      if (Date.now() >= this.dueAt) void this.check();
+      if (steadyNow() >= this.dueAt) void this.check();
       else this.arm();
     }, wait);
     this.timer.unref?.();
@@ -166,7 +167,7 @@ export class CliUpdater {
     } else if (outcome.status !== previous.status || outcome.status === "updated") {
       logger?.process(`${this.options.log}.update-${outcome.status}`, { ...outcome });
     }
-    this.dueAt = Date.now() + intervalAfter(outcome.status);
+    this.dueAt = steadyNow() + intervalAfter(outcome.status);
     this.arm();
   }
 

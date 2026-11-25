@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useRef, useState } from "react";
 import type { EventRecord } from "@stella/contracts/local-chat";
 
@@ -61,7 +62,7 @@ export const useTurnHandoff = ({
     }
   } else if (handoff && !handoff.started) {
     if (turnRunning) handoff = { ...handoff, started: true };
-    else if (handoff.admittedAt === undefined) handoff = { ...handoff, admittedAt: Date.now() };
+    else if (handoff.admittedAt === undefined) handoff = { ...handoff, admittedAt: steadyNow() };
   }
   handoffRef.current = handoff;
 
@@ -72,14 +73,14 @@ export const useTurnHandoff = ({
     handoff !== null &&
     !handoff.started &&
     admittedAt !== undefined &&
-    Date.now() - admittedAt < HANDOFF_HOLD_MS &&
+    steadyNow() - admittedAt < HANDOFF_HOLD_MS &&
     awaitingReply(persistedMessages, handoff.messageId);
 
   useEffect(() => {
     if (!holding || admittedAt === undefined) return;
     const timer = setTimeout(
       () => setExpired((count) => count + 1),
-      Math.max(0, admittedAt + HANDOFF_HOLD_MS - Date.now()),
+      Math.max(0, admittedAt + HANDOFF_HOLD_MS - steadyNow()),
     );
     return () => clearTimeout(timer);
   }, [holding, admittedAt]);

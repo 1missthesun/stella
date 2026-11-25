@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { createConnection, type Socket } from "node:net";
@@ -60,7 +61,7 @@ const MAX_BROWSER_TURN_CLEANUP_TIMEOUT_MS = 2_000;
 const BROWSER_TAB_RETIRE_TIMEOUT_MS = 10_000;
 const BROWSER_TAB_RESTORE_TIMEOUT_MS = 30_000;
 const BROWSER_COMMAND_TIMEOUT_GRACE_MS = 5_000;
-let lastBrowserOwnerLeaseIssuedAt = Date.now();
+let lastBrowserOwnerLeaseIssuedAt = 0;
 
 export type BrowserJsonPrimitive = string | number | boolean | null;
 export type BrowserJsonValue =
@@ -1204,7 +1205,7 @@ export class BrowserSession implements BrowserSessionClient {
         : requireNonEmptyString(options.ownerLeaseId, "ownerLeaseId");
     this.configuredOwnerLeaseIssuedAt = requirePositiveInteger(
       options.ownerLeaseIssuedAt ??
-        Math.max(Date.now(), lastBrowserOwnerLeaseIssuedAt + 1),
+        Math.max(serverNow(), lastBrowserOwnerLeaseIssuedAt + 1),
       "ownerLeaseIssuedAt",
     );
     lastBrowserOwnerLeaseIssuedAt = Math.max(
@@ -1321,7 +1322,7 @@ export class BrowserSession implements BrowserSessionClient {
       this.taskTabs?.retired(this.sessionId, backend);
       return true;
     }
-    const deadline = Date.now() + BROWSER_TAB_RETIRE_TIMEOUT_MS;
+    const deadline = performance.now() + BROWSER_TAB_RETIRE_TIMEOUT_MS;
     const config = await this.ensureInAppBrowserReady(
       this.route.kind === "bound"
         ? this.route.route.config
@@ -1429,7 +1430,7 @@ export class BrowserSession implements BrowserSessionClient {
     const remembered: RememberedTabs | undefined =
       this.taskTabs.takeRemembered(this.sessionId, backend);
     if (!remembered) return;
-    const deadline = Date.now() + BROWSER_TAB_RESTORE_TIMEOUT_MS;
+    const deadline = performance.now() + BROWSER_TAB_RESTORE_TIMEOUT_MS;
     const send = async (action: string, extra: Record<string, unknown> = {}) => {
       const response = await this.ownerRoundTrip(
         turn,
@@ -1471,7 +1472,7 @@ export class BrowserSession implements BrowserSessionClient {
     signal: AbortSignal | undefined,
     deadline: number,
   ): Promise<BrowserCommandResult> {
-    const timeoutMs = Math.max(1, deadline - Date.now());
+    const timeoutMs = Math.max(1, Math.ceil(deadline - performance.now()));
     await this.ensureConnected(signal, deadline, timeoutMs);
     const requestId = randomUUID();
     return await this.roundTrip(
@@ -1659,7 +1660,7 @@ export class BrowserSession implements BrowserSessionClient {
       });
     }
     const ownerLeaseIssuedAt = Math.max(
-      Date.now(),
+      serverNow(),
       lastBrowserOwnerLeaseIssuedAt + 1,
     );
     lastBrowserOwnerLeaseIssuedAt = ownerLeaseIssuedAt;
@@ -1734,7 +1735,7 @@ export class BrowserSession implements BrowserSessionClient {
       this.commandTimeoutMs,
       MAX_BROWSER_TURN_CLEANUP_TIMEOUT_MS,
     );
-    const deadline = Date.now() + timeoutMs;
+    const deadline = performance.now() + timeoutMs;
     if (
       backend === "external" &&
       (await readStellaBrowserExtensionStatus({
@@ -1983,7 +1984,7 @@ export class BrowserSession implements BrowserSessionClient {
       ownerLeaseIssuedAt: turn.ownerLeaseIssuedAt,
       ...(backend === "external" ? { browserBackend: "extension" } : {}),
     };
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     const deadline = startedAt + timeoutMs;
     let response: BrowserCommandResult<TData>;
     let attempts = 0;
@@ -2132,7 +2133,7 @@ export class BrowserSession implements BrowserSessionClient {
       params,
       result: response,
       attempts,
-      durationMs: Date.now() - startedAt,
+      durationMs: Math.round(performance.now() - startedAt),
     });
     if (!response.success) {
       const timedOut = /(?:tim(?:ed)?\s*out|timeout|execution budget)/i.test(
@@ -2191,9 +2192,9 @@ export class BrowserSession implements BrowserSessionClient {
     signal: AbortSignal | undefined,
     deadline: number,
   ): Promise<void> {
-    if (Date.now() < this.externalAttachCheckedUntil) return;
+    if (performance.now() < this.externalAttachCheckedUntil) return;
     const graceUntil =
-      Date.now() +
+      performance.now() +
       Math.min(EXTERNAL_ATTACH_GRACE_MS, this.remainingTime(deadline) / 2);
     let connected: boolean | undefined;
     for (;;) {
@@ -2209,7 +2210,7 @@ export class BrowserSession implements BrowserSessionClient {
       });
       throwIfAborted(signal);
       if (connected !== false) break;
-      if (Date.now() + EXTERNAL_ATTACH_GRACE_POLL_MS > graceUntil) break;
+      if (performance.now() + EXTERNAL_ATTACH_GRACE_POLL_MS > graceUntil) break;
       await runBrowserUseEffect(
         Effect.scoped(
           Effect.gen(function* () {
@@ -2225,7 +2226,7 @@ export class BrowserSession implements BrowserSessionClient {
     }
     if (connected === true) {
       this.externalAttachCheckedUntil =
-        Date.now() + EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS;
+        performance.now() + EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS;
       return;
     }
     if (connected !== false) return;
@@ -2240,7 +2241,7 @@ export class BrowserSession implements BrowserSessionClient {
   }
 
   private remainingTime(deadline: number): number {
-    return Math.max(0, deadline - Date.now());
+    return Math.max(0, Math.ceil(deadline - performance.now()));
   }
 
   private async ensureInAppBrowserReady(

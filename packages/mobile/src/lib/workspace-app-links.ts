@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   parseWorkspaceApps,
   type WorkspaceApp,
@@ -32,7 +33,7 @@ const subscribe = (listener: () => void) => {
 
 export function shareWorkspaceApps(list: WorkspaceApp[]) {
   state = { ...state, apps: list };
-  fetchedAt = Date.now();
+  fetchedAt = steadyNow();
   notify();
 }
 
@@ -76,12 +77,12 @@ export function useWorkspaceApp(slug: string): WorkspaceApp | null | undefined {
     };
   }, []);
   useEffect(() => {
-    if (!known || Date.now() - fetchedAt > REFRESH_AFTER_MS)
+    if (!known || steadyNow() - fetchedAt > REFRESH_AFTER_MS)
       void refreshWorkspaceApps();
   }, [slug, known]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => {
-      if (next === "active" && Date.now() - fetchedAt > REFRESH_AFTER_MS)
+      if (next === "active" && steadyNow() - fetchedAt > REFRESH_AFTER_MS)
         void refreshWorkspaceApps();
     });
     return () => subscription.remove();

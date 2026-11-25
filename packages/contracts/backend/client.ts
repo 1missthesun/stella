@@ -4,7 +4,7 @@ import {
   retryIdempotent,
   withDeadline,
 } from "../request-deadline.js";
-import { noteServerDate } from "../server-clock.js";
+import { noteServerDate, noteServerTime, steadyNow } from "../server-clock.js";
 import { socketCredentialProtocol } from "../socket-ticket.js";
 import { backendCallBudget } from "./call-budgets.js";
 import type {
@@ -49,7 +49,7 @@ export type TokenProvider = (options?: {
 
 const readTokenPayload = (
   token: string | null | undefined,
-): { exp?: unknown; sub?: unknown } | null => {
+): { exp?: unknown; iat?: unknown; sub?: unknown } | null => {
   const segment = token?.split(".")[1];
   if (!segment) return null;
   const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
@@ -58,7 +58,7 @@ const readTokenPayload = (
     "=",
   );
   try {
-    return JSON.parse(atob(padded)) as { exp?: unknown; sub?: unknown };
+    return JSON.parse(atob(padded)) as { exp?: unknown; iat?: unknown; sub?: unknown };
   } catch {
     return null;
   }
@@ -69,6 +69,11 @@ export const backendTokenExpiryMs = (
 ): number | null => {
   const exp = readTokenPayload(token)?.exp;
   return typeof exp === "number" ? exp * 1000 : null;
+};
+
+export const noteFreshTokenTime = (token: string | null | undefined): void => {
+  const iat = readTokenPayload(token)?.iat;
+  if (typeof iat === "number") noteServerTime(iat * 1000);
 };
 
 export const backendTokenSubject = (
@@ -449,7 +454,7 @@ export class BackendClient {
     }
     const socket = this.socket;
     if (!socket || socket.readyState !== SOCKET_OPEN || this.nudgeTimer) return;
-    const askedAt = Date.now();
+    const askedAt = steadyNow();
     this.sendKeepalive();
     this.nudgeTimer = setTimeout(() => {
       this.nudgeTimer = null;
@@ -600,7 +605,7 @@ export class BackendClient {
     };
     socket.onmessage = (event) => {
       if (this.socket !== socket) return;
-      this.socketHeardAt = Date.now();
+      this.socketHeardAt = steadyNow();
       this.reconnectAttempt = 0;
       this.handleFrame(event.data);
     };
@@ -762,14 +767,10 @@ export class BackendClient {
 
   private startPing(): void {
     this.stopPing();
-    this.socketHeardAt = Date.now();
+    this.socketHeardAt = steadyNow();
     this.pingTimer = setInterval(() => {
-      if (Date.now() - this.socketHeardAt > SILENCE_LIMIT_MS) {
-        this.closeSocket(4001, "silent");
-        if (this.subscriptions.size > 0) this.scheduleReconnect();
-        return;
-      }
-      this.sendKeepalive();
+      if (steadyNow() - this.socketHeardAt > SILENCE_LIMIT_MS) this.nudge();
+      else this.sendKeepalive();
     }, PING_INTERVAL_MS);
   }
 

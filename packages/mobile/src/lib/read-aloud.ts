@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAudioPlayer, type AudioPlayer } from "expo-audio";
@@ -341,8 +342,8 @@ async function tryStreamReply(
 }
 
 async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
-  const deadline = Date.now() + PLAYLIST_READY_TIMEOUT_MS;
-  while (!signal.aborted && Date.now() < deadline) {
+  const deadline = steadyNow() + PLAYLIST_READY_TIMEOUT_MS;
+  while (!signal.aborted && steadyNow() < deadline) {
     let delayMs = PLAYLIST_READY_POLL_MS;
     try {
       const response = await fetchWithinDeadline(
@@ -350,7 +351,7 @@ async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
         { headers: { "cache-control": "no-cache" } },
         {
           label: "Preparing read-aloud",
-          timeoutMs: Math.min(REQUEST_BUDGET_MS.lookup, Math.max(0, deadline - Date.now())),
+          timeoutMs: Math.min(REQUEST_BUDGET_MS.lookup, Math.max(0, deadline - steadyNow())),
           signal,
         },
       );
@@ -361,7 +362,7 @@ async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
       if (body?.error?.retryable !== true) return;
       delayMs = Math.min(
         Math.max(body.error.retryAfterMs ?? PLAYLIST_READY_POLL_MS, PLAYLIST_READY_POLL_MS),
-        Math.max(0, deadline - Date.now()),
+        Math.max(0, deadline - steadyNow()),
       );
     } catch {
       if (signal.aborted) return;
@@ -387,7 +388,7 @@ async function playHlsResilient(
     let recoverAttempts = 0;
     let startRetries = 0;
     let lastTime = startAt;
-    let lastProgressAt = Date.now();
+    let lastProgressAt = steadyNow();
     let expectedDur = 0;
     let player: AudioPlayer | null = null;
     let startTimer: ReturnType<typeof setTimeout> | null = null;
@@ -478,7 +479,7 @@ async function playHlsResilient(
 
     const attach = (at: number) => {
       if (finished || superseded()) return;
-      lastProgressAt = Date.now();
+      lastProgressAt = steadyNow();
       startTimer = setTimeout(retry, STREAM_START_TIMEOUT_MS);
       try {
         playbackSession.hold();
@@ -514,7 +515,7 @@ async function playHlsResilient(
             typeof status.currentTime === "number" ? status.currentTime : 0;
           if (t > lastTime + 0.01) {
             lastTime = t;
-            lastProgressAt = Date.now();
+            lastProgressAt = steadyNow();
             clearStartTimer();
             started = true;
             if (playbackState?.status !== "paused")
@@ -552,10 +553,10 @@ async function playHlsResilient(
     hlsWatchdog = setInterval(() => {
       if (finished || superseded() || !started || recovering) return;
       if (playbackState?.status === "paused") {
-        lastProgressAt = Date.now();
+        lastProgressAt = steadyNow();
         return;
       }
-      if (Date.now() - lastProgressAt > HLS_STALL_TIMEOUT_MS) retry();
+      if (steadyNow() - lastProgressAt > HLS_STALL_TIMEOUT_MS) retry();
     }, HLS_WATCHDOG_INTERVAL_MS);
     attach(startAt);
   });

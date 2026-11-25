@@ -8,6 +8,7 @@
  * after that) through a 127.0.0.1 loopback redirect.
  */
 
+import { serverNow } from "./server-clock.js";
 import { formEncode } from "./oauth-pkce.js";
 
 export const CHATGPT_SIWC = {
@@ -276,7 +277,7 @@ const epochMs = (value: unknown): number | undefined => {
 
 export const chatGptTokenSet = (
   json: Record<string, unknown>,
-  now = Date.now(),
+  now = serverNow(),
   previousScopes?: readonly string[],
 ): ChatGptTokenSet => {
   const scope =

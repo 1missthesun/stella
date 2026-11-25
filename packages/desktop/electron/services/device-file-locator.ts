@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import type { DeviceFileLocation, DriveFileUrl } from "@stella/contracts/backend/drive";
 import { rpcPath, type RpcResponse } from "@stella/contracts/backend/protocol";
 import {
@@ -83,7 +84,7 @@ export const createDeviceFileLocator = (deps: Deps): DeviceFileLocator => {
     const owner = await currentOwner();
     if (!baseUrl || !owner) return { ok: false, message: SIGNED_OUT_MESSAGE };
     const cacheKey = `${baseUrl}\0${owner}\0${sourcePath}`;
-    const now = Date.now();
+    const now = steadyNow();
     const cached = cache.get(cacheKey);
     if (cached && now - cached.at < LOCATION_CACHE_TTL_MS) return await cached.value;
     const value = call<{ files: DeviceFileLocation[] }>("drive.locateDeviceFiles", {
@@ -122,14 +123,14 @@ export const createDeviceFileLocator = (deps: Deps): DeviceFileLocator => {
 
   const copyUrl = async (drivePath: string, options?: { fresh?: boolean }) => {
     const owner = (await currentOwner()) ?? "";
-    const now = Date.now();
+    const now = serverNow();
     for (const [key, entry] of copyUrls) {
       if (entry.file && entry.file.expiresAt <= now) copyUrls.delete(key);
     }
     const cached = copyUrls.get(drivePath);
     if (cached && cached.owner === owner && !options?.fresh) {
       const file = await cached.value.catch(() => null);
-      if (file && file.expiresAt - COPY_URL_EXPIRY_MARGIN_MS > Date.now()) return file;
+      if (file && file.expiresAt - COPY_URL_EXPIRY_MARGIN_MS > serverNow()) return file;
     }
     const entry: CopyUrlEntry = {
       owner,

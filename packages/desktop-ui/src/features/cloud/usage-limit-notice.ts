@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { stellaUsageLimitOf } from "@stella/contracts/stella-usage-limit";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
@@ -44,7 +45,7 @@ export const presentLatestTurnUsageLimit = (
     if (record.kind === "turn") latest = record;
   }
   if (!latest || latest.kind !== "turn" || latest.phase !== "failed") return;
-  if (latest.createdAtMs < Date.now() - RECENT_MS) return;
+  if (latest.createdAtMs < serverNow() - RECENT_MS) return;
   const key = `${conversationId}:${latest.seq}`;
   if (presented.has(key)) return;
   if (presentCloudUsageLimit(latest.notice, conversationId)) presented.add(key);
@@ -75,7 +76,7 @@ export const presentUsageLimitPauses = (
     );
     return;
   }
-  if (pauses.resumed && Date.now() - latest.createdAtMs < USAGE_LIMIT_PAUSE_STALE_MS) {
+  if (pauses.resumed && serverNow() - latest.createdAtMs < USAGE_LIMIT_PAUSE_STALE_MS) {
     presentUsageLimitResumed(conversationId);
     return;
   }

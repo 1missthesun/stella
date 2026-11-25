@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import {
   linkSync,
   readFileSync,
@@ -58,7 +59,7 @@ const readOwner = (file: string): { raw: string; owner: LockOwner | null } | nul
 const isStale = (file: string, read: { owner: LockOwner | null }): boolean => {
   if (read.owner) return !processIdentityIsLive(read.owner.pid, read.owner.identity);
   try {
-    return Date.now() - statSync(file).mtimeMs > UNREADABLE_LOCK_STALE_MS;
+    return savedAgeMs(statSync(file).mtimeMs) > UNREADABLE_LOCK_STALE_MS;
   } catch {
     return false;
   }

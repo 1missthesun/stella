@@ -429,7 +429,7 @@ export const createLocators = (context: BrowserWorkerContext) => {
       extra: Record<string, unknown> = {},
     ): Promise<unknown> {
       const state = await this.resolveSemanticLast(this.state());
-      const deadline = Date.now() + 3_000;
+      const deadline = performance.now() + 3_000;
       let lastError: unknown;
       for (;;) {
         try {
@@ -456,7 +456,7 @@ export const createLocators = (context: BrowserWorkerContext) => {
             /not match|not found|no clickable|not clickable|detached|not visible|no clickable area/i.test(
               message,
             );
-          const remaining = deadline - Date.now();
+          const remaining = deadline - performance.now();
           if (!retryable || remaining <= 0) break;
           await delay(Math.min(100, remaining));
         }
@@ -710,8 +710,8 @@ export const createLocators = (context: BrowserWorkerContext) => {
         );
         return;
       }
-      const startedAt = Date.now();
-      while (Date.now() - startedAt <= timeout) {
+      const startedAt = performance.now();
+      while (performance.now() - startedAt <= timeout) {
         const count = await this.count();
         const visible = count > 0 ? await this.isVisible() : false;
         if (
@@ -723,7 +723,7 @@ export const createLocators = (context: BrowserWorkerContext) => {
           return;
         }
         await delay(
-          Math.min(100, Math.max(1, timeout - (Date.now() - startedAt))),
+          Math.min(100, Math.max(1, timeout - (performance.now() - startedAt))),
         );
       }
       throw new Error(

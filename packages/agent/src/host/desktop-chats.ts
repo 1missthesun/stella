@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import {
   applyUsageLimitCard,
   dropStaleUsageLimitPauses,
@@ -486,10 +487,10 @@ export function desktopChats(options: DesktopChatsOptions) {
           : undefined;
         executionContextRead = {
           snapshot: snapshot?.devicesKnown || !executionContextRead.snapshot ? snapshot : executionContextRead.snapshot,
-          at: Date.now(),
+          at: steadyNow(),
         };
       })());
-    if (executionContextRead.at === 0 || Date.now() - executionContextRead.at >= EXECUTION_CONTEXT_TTL_MS) await loadOnce();
+    if (executionContextRead.at === 0 || steadyNow() - executionContextRead.at >= EXECUTION_CONTEXT_TTL_MS) await loadOnce();
     return executionContextRead.snapshot;
   };
   const placedIn = new Map<string, string>();
@@ -555,7 +556,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   const rememberBrain = (
     conversationId: string,
     entry: { record: PiBrainRecord | null; host: PiBrainRecord | null; failed?: true },
-    readAt = Date.now(),
+    readAt = steadyNow(),
   ) => {
     const before = brains.get(conversationId);
     brains.set(conversationId, { ...entry, at: readAt });
@@ -565,7 +566,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
   const brainHost = async (conversationId: string): Promise<PiBrainRecord | null> => {
     const known = brains.get(conversationId);
-    if (known && Date.now() - known.at < BRAIN_TTL_MS) return known.host;
+    if (known && steadyNow() - known.at < BRAIN_TTL_MS) return known.host;
     const brain = options.brain?.(conversationId);
     if (!brain) return null;
     let record: PiBrainRecord | null;
@@ -737,7 +738,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           ...(status.monthly ? { monthly: true as const } : {}),
           ...(options.deviceId ? { deviceId: options.deviceId } : {}),
         },
-        Date.now(),
+        serverNow(),
       );
       recordUsageLimit(conversationId, {
         key,
@@ -749,7 +750,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       return;
     }
     if (!pauses.held.has(key)) return;
-    applyUsageLimitCard(pauses, { type: "usage-limit", state: "resumed", ...(threadId ? { threadId } : {}) }, Date.now());
+    applyUsageLimitCard(pauses, { type: "usage-limit", state: "resumed", ...(threadId ? { threadId } : {}) }, serverNow());
     recordUsageLimit(conversationId, { key, state: "resumed" });
     if (pauses.held.size > 0) {
       emitUsageLimit(conversationId);
@@ -763,17 +764,17 @@ export function desktopChats(options: DesktopChatsOptions) {
     const before = pauses.held.size;
     if (card.resume) {
       if (card.requestId && ownResumes.has(card.requestId)) return;
-      if (Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS) for (const engine of cliEngines) engine.wakeUsageLimitHolds(conversationId);
+      if (serverNow() - at < USAGE_LIMIT_PAUSE_STALE_MS) for (const engine of cliEngines) engine.wakeUsageLimitHolds(conversationId);
     }
     applyUsageLimitCard(pauses, card, at);
     if (pauses.held.size > 0 || before > 0 || card.resume) {
-      emitUsageLimit(conversationId, { text: USAGE_LIMIT_RESUMED_TITLE, resumed: Date.now() - at < USAGE_LIMIT_PAUSE_STALE_MS });
+      emitUsageLimit(conversationId, { text: USAGE_LIMIT_RESUMED_TITLE, resumed: serverNow() - at < USAGE_LIMIT_PAUSE_STALE_MS });
     }
   };
   const resumeUsageLimit = async (conversationId: string): Promise<{ woken: number; cloud: number }> => {
     const woken = cliEngines.reduce((sum, engine) => sum + engine.wakeUsageLimitHolds(conversationId), 0);
     const pauses = pausesOf(conversationId);
-    const now = Date.now();
+    const now = serverNow();
     applyUsageLimitCard(pauses, { type: "usage-limit", state: "resumed", resume: true }, now);
     emitUsageLimit(conversationId, { text: USAGE_LIMIT_RESUMED_TITLE, resumed: true });
     let cloud = 0;
@@ -1556,8 +1557,8 @@ export function desktopChats(options: DesktopChatsOptions) {
           ...(devices ? { devices } : {}),
           ...(brain ? { brain } : {}),
           turnEnded: async () => {
-            const deadline = Date.now() + BRAIN_HANDOFF_WAIT_MS;
-            while (Date.now() < deadline) {
+            const deadline = performance.now() + BRAIN_HANDOFF_WAIT_MS;
+            while (performance.now() < deadline) {
               await new Promise((resolve) => setTimeout(resolve, 1_000));
               if (opened && (await opened.harness.snapshot(LiveDoc, opened.root.id, context))?.run === undefined) return;
             }
@@ -1889,8 +1890,8 @@ export function desktopChats(options: DesktopChatsOptions) {
         let following = false;
         let brainReadAt = 0;
         const followCheck = setInterval(() => {
-          if (opened?.watchers && mirror && Date.now() - brainReadAt >= BRAIN_WATCH_MS) {
-            brainReadAt = Date.now();
+          if (opened?.watchers && mirror && steadyNow() - brainReadAt >= BRAIN_WATCH_MS) {
+            brainReadAt = steadyNow();
             void recheckBrainHost(conversationId).catch((error: unknown) => options.report(error));
           }
           if (!mirror || following || !opened) return;

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useState } from "react";
 import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { useExecutionDeviceList } from "@/features/cloud/use-execution-device-list";
@@ -82,9 +83,9 @@ export const DeviceWorkOfferLayer = () => {
 
   useEffect(() => {
     if (!eligible || open) return;
-    let lastInputAt = Date.now();
+    let lastInputAt = steadyNow();
     const input = () => {
-      lastInputAt = Date.now();
+      lastInputAt = steadyNow();
     };
     window.addEventListener("keydown", input, true);
     window.addEventListener("pointerdown", input, true);
@@ -93,7 +94,7 @@ export const DeviceWorkOfferLayer = () => {
         document.visibilityState === "visible" &&
         document.hasFocus() &&
         !document.querySelector('[data-slot="dialog-content"]') &&
-        Date.now() - lastInputAt >= CALM_IDLE_MS;
+        steadyNow() - lastInputAt >= CALM_IDLE_MS;
       if (calm) setOpen(true);
     }, CALM_POLL_MS);
     return () => {

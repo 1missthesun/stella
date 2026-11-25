@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import fs from "fs";
 import path from "path";
 import {
@@ -267,7 +268,7 @@ export const getChatGptAccessToken = async (
   options: { forceRefresh?: boolean } = {},
 ): Promise<string | null> => {
   const file = readFile(stellaAppDir);
-  const now = Date.now();
+  const now = serverNow();
   const profile = activeProfile(file);
   if (!profile) return null;
   const secrets = readSecrets(profile);

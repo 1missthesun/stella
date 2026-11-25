@@ -1,3 +1,5 @@
+import { noteFreshTokenTime } from "@stella/contracts/backend/client";
+import { serverNow } from "@stella/contracts/server-clock";
 import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { authClient } from "./auth-client";
 import { assert } from "./assert";
@@ -22,6 +24,7 @@ async function loadAuthToken() {
   if (generation === cacheGeneration) {
     const claims = decodeTokenOwner(token);
     cachedToken = token;
+    noteFreshTokenTime(token);
     cachedTokenExpiresAt = claims.expiresAtSeconds * 1000 - REFRESH_MARGIN_MS;
   }
   return token;
@@ -35,7 +38,7 @@ export async function getAuthToken(
   if (options.forceRefresh) {
     clearCachedToken();
   }
-  if (cachedToken && Date.now() < cachedTokenExpiresAt) {
+  if (cachedToken && serverNow() < cachedTokenExpiresAt) {
     return cachedToken;
   }
 

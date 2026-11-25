@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import type {
   MediaStream,
   RTCPeerConnection as NativeRTCPeerConnection,
@@ -385,7 +386,7 @@ export class MobileRealtimeVoiceSession {
       // configuration above. Reassert Stella's assistant-style loudspeaker
       // route after the peer and microphone are both live.
       await this.ensureLoudspeakerRoute();
-      this.connectedAt = Date.now();
+      this.connectedAt = steadyNow();
       this.publish({
         phase: "listening",
         isConnected: true,
@@ -793,7 +794,7 @@ export class MobileRealtimeVoiceSession {
     if (this.stopped) return;
     const remainingMs = Math.min(
       LEASE_MAX_LOCAL_LIFETIME_MS,
-      leaseExpiresAt - Date.now(),
+      leaseExpiresAt - serverNow(),
     );
     const delay = Math.max(0, remainingMs - LEASE_EXPIRY_SKEW_MS);
     this.leaseExpiryTimer = setTimeout(() => {
@@ -932,7 +933,7 @@ export class MobileRealtimeVoiceSession {
       }
     }
     if (desktopVoice && connectedAt !== null) {
-      const durationMs = Math.max(0, Date.now() - connectedAt);
+      const durationMs = Math.max(0, steadyNow() - connectedAt);
       try {
         await persistDesktopRealtimeVoiceTranscript(desktopVoice, {
           conversationId: this.options.conversationId,

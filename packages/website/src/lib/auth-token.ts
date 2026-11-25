@@ -1,5 +1,7 @@
 "use client";
 
+import { noteFreshTokenTime } from "@stella/contracts/backend/client";
+import { serverNow } from "@stella/contracts/server-clock";
 import { authClient, hasSessionToken } from "./auth-client";
 
 let cachedToken: string | null = null;
@@ -22,7 +24,7 @@ export async function getAuthToken(
     return null;
   }
 
-  if (!forceRefresh && cachedToken && Date.now() < tokenExpiresAt) {
+  if (!forceRefresh && cachedToken && serverNow() < tokenExpiresAt) {
     return cachedToken;
   }
 
@@ -46,6 +48,7 @@ export async function getAuthToken(
       }
 
       cachedToken = token;
+      noteFreshTokenTime(token);
       try {
         const payload = JSON.parse(
           atob((token.split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/")),
@@ -55,7 +58,7 @@ export async function getAuthToken(
         }
         tokenExpiresAt = payload.exp * 1000 - REFRESH_MARGIN_MS;
       } catch {
-        tokenExpiresAt = Date.now() + 4 * 60 * 1000;
+        tokenExpiresAt = serverNow() + 4 * 60 * 1000;
       }
 
       return token;

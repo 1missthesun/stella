@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import {
   GATEWAY_SESSION_CAPABILITY_PATH,
@@ -43,10 +44,10 @@ const clockKey = (url: string): string => {
 };
 
 export const gatewayNow = (gatewayUrl: string | null | undefined): number =>
-  Date.now() + (gatewayUrl ? (gatewayClockOffsets.get(clockKey(gatewayUrl)) ?? 0) : 0);
+  steadyNow() + (gatewayUrl ? (gatewayClockOffsets.get(clockKey(gatewayUrl)) ?? 0) : 0);
 
 export const gatewayClockOffsetMs = (gatewayUrl: string): number =>
-  gatewayClockOffsets.get(clockKey(gatewayUrl)) ?? 0;
+  gatewayNow(gatewayUrl) - Date.now();
 
 export const noteGatewayClock = (
   gatewayUrl: string,
@@ -64,10 +65,11 @@ export const noteGatewayClock = (
   if (Math.abs(next - previous) <= slack) return false;
   if (next === 0) gatewayClockOffsets.delete(key);
   else gatewayClockOffsets.set(key, next);
+  const offset = gatewayClockOffsetMs(gatewayUrl);
   console.warn(
-    next === 0
+    Math.abs(offset) <= slack
       ? `[gateway-session] This computer's clock agrees with ${key} again.`
-      : `[gateway-session] This computer's clock is ${describeClockOffset(next)} ${key}; device proofs use the gateway's time.`,
+      : `[gateway-session] This computer's clock is ${describeClockOffset(offset)} ${key}; device proofs use the gateway's time.`,
   );
   return true;
 };
@@ -320,7 +322,7 @@ const exchangeOnce = async (args: {
       ? { turnstileToken: args.turnstileToken }
       : {}),
   };
-  const sentAt = Date.now();
+  const sentAt = steadyNow();
   const response = await args.fetchImpl(
     `${args.gatewayOrigin}${GATEWAY_SESSION_CAPABILITY_PATH}`,
     {
@@ -337,7 +339,7 @@ const exchangeOnce = async (args: {
     args.gatewayOrigin,
     response,
     sentAt,
-    Date.now(),
+    steadyNow(),
   );
   if (!response.ok) {
     const { code, message } = await readGatewayError(response);

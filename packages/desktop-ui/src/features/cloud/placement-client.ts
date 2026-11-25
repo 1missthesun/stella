@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import {
   DEVICES_PATH,
   DISPATCH_SUBMIT_PATH,
@@ -121,7 +122,7 @@ const retryAfterHeaderMs = (response: Response): number | null => {
   const seconds = Number(raw);
   if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
   const at = Date.parse(raw);
-  return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
+  return Number.isFinite(at) ? Math.max(0, at - serverNow()) : null;
 };
 
 const readErrorBody = async (

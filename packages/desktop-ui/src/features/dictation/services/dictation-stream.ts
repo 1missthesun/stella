@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
@@ -21,12 +22,12 @@ const CONFIG_TTL_MS = 10 * 60_000;
 let cachedConfig: { value: Promise<RealtimeConfig>; at: number } | null = null;
 
 export const loadDictationRealtimeConfig = (): Promise<RealtimeConfig> => {
-  if (cachedConfig && Date.now() - cachedConfig.at < CONFIG_TTL_MS) {
+  if (cachedConfig && steadyNow() - cachedConfig.at < CONFIG_TTL_MS) {
     return cachedConfig.value;
   }
   const entry = {
     value: backendClient.call("dictation.realtimeConfig", {}),
-    at: Date.now(),
+    at: steadyNow(),
   };
   cachedConfig = entry;
   entry.value.catch(() => {
@@ -92,10 +93,10 @@ let warmSocket: { socket: Promise<WebSocket>; expiresAt: number } | null =
   null;
 
 export const warmDictationSocket = (): void => {
-  if (warmSocket && Date.now() < warmSocket.expiresAt) return;
+  if (warmSocket && steadyNow() < warmSocket.expiresAt) return;
   const entry = {
     socket: connectRelay(),
-    expiresAt: Date.now() + WARM_SOCKET_TTL_MS,
+    expiresAt: steadyNow() + WARM_SOCKET_TTL_MS,
   };
   warmSocket = entry;
   entry.socket.then(
@@ -107,7 +108,7 @@ export const warmDictationSocket = (): void => {
         if (warmSocket !== entry) return;
         warmSocket = null;
         socket.close(1000, "Dictation idle");
-      }, Math.max(0, entry.expiresAt - Date.now()));
+      }, Math.max(0, entry.expiresAt - steadyNow()));
     },
     () => {
       if (warmSocket === entry) warmSocket = null;
@@ -118,7 +119,7 @@ export const warmDictationSocket = (): void => {
 const takeWarmSocket = (): Promise<WebSocket> | null => {
   const entry = warmSocket;
   warmSocket = null;
-  if (!entry || Date.now() >= entry.expiresAt) {
+  if (!entry || steadyNow() >= entry.expiresAt) {
     void entry?.socket.then((socket) => socket.close(1000), () => undefined);
     return null;
   }
@@ -219,14 +220,14 @@ export class DictationStream {
   }
 
   async replay(chunks: readonly Int16Array[]): Promise<void> {
-    const deadline = Date.now() + REPLAY_TIMEOUT_MS;
+    const deadline = performance.now() + REPLAY_TIMEOUT_MS;
     for (const chunk of chunks) {
       const socket = this.socket;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         throw new Error("Dictation disconnected.");
       }
       while (socket.bufferedAmount > 256 * 1024) {
-        if (Date.now() >= deadline) {
+        if (performance.now() >= deadline) {
           throw new Error("Dictation took too long to receive audio.");
         }
         await new Promise((resolve) => setTimeout(resolve, 10));

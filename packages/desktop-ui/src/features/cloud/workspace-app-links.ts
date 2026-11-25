@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   parseWorkspaceApps,
   type WorkspaceApp,
@@ -38,7 +39,7 @@ function refreshApps(): Promise<void> {
       });
       if (!response.ok) return;
       const apps = parseWorkspaceApps((await response.json()).apps);
-      fetchedAt = Date.now();
+      fetchedAt = steadyNow();
       setState({ apps });
     } catch {} finally {
       inflight = null;
@@ -55,7 +56,7 @@ export function useLinkedCloudApp(
   const app = snapshot.apps?.find((entry) => entry.slug === slug);
   const known = app !== undefined;
   useEffect(() => {
-    if (!known || Date.now() - fetchedAt > REFRESH_AFTER_MS)
+    if (!known || steadyNow() - fetchedAt > REFRESH_AFTER_MS)
       void refreshApps();
   }, [slug, known]);
   if (app) return app.status === "ready" ? app : null;

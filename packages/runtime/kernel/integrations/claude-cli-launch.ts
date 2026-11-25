@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -110,9 +111,9 @@ export const describeClaudeCliInstall = async (
     return { launcher, method: methodOf(real), executable: launcher };
   }
   const known = miseAnswers.get(launcher);
-  if (known && Date.now() - known.at < MISE_ANSWER_TTL_MS) return await known.answer;
+  if (known && steadyNow() - known.at < MISE_ANSWER_TTL_MS) return await known.answer;
   const answer = askMise(launcher, real, env);
-  miseAnswers.set(launcher, { at: Date.now(), answer });
+  miseAnswers.set(launcher, { at: steadyNow(), answer });
   return await answer;
 };
 

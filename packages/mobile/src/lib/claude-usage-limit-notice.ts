@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import * as Crypto from "expo-crypto";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
@@ -18,7 +19,7 @@ const resetTime = (until: number): string => {
   const at = new Date(until);
   const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   if (at.toDateString() === new Date().toDateString()) return time;
-  const far = until - Date.now() > 6 * 24 * 60 * 60 * 1000;
+  const far = until - serverNow() > 6 * 24 * 60 * 60 * 1000;
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
 };
 
@@ -105,7 +106,7 @@ export function useClaudeUsageLimitNotice(
       return;
     }
     dismissUsageLimitCard(conversationId);
-    if (!state.resumed || Date.now() - state.latestAt > USAGE_LIMIT_PAUSE_STALE_MS) return;
+    if (!state.resumed || serverNow() - state.latestAt > USAGE_LIMIT_PAUSE_STALE_MS) return;
     setCard(conversationId, { title: usageLimitNotice("resumed", resetTime).title });
     const timer = setTimeout(() => dismissUsageLimitCard(conversationId), RESUMED_VISIBLE_MS);
     return () => clearTimeout(timer);

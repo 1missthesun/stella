@@ -161,7 +161,7 @@ function PdfViewerCardContent({
       setCurrentPage(page);
     };
     const onScroll = () => {
-      if (Date.now() < jumpUntilRef.current) return;
+      if (performance.now() < jumpUntilRef.current) return;
       if (!frame) frame = requestAnimationFrame(update);
     };
     // Scroll doesn't bubble; capture on the stable wrapper, since react-pdf
@@ -190,7 +190,7 @@ function PdfViewerCardContent({
       page.getBoundingClientRect().top -
       container.getBoundingClientRect().top +
       container.scrollTop;
-    jumpUntilRef.current = Date.now() + 700;
+    jumpUntilRef.current = performance.now() + 700;
     setCurrentPage(pageNumber);
     container.scrollTo({ top, behavior: "smooth" });
   }, []);

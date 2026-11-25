@@ -481,7 +481,7 @@ export async function journalMirror(args: {
         }
         const usageLimit = record.kind === "card" ? parseClaudeUsageLimitCard(record.card) : null;
         if (usageLimit) {
-          args.onUsageLimit?.(usageLimit, record.createdAtMs ?? Date.now());
+          args.onUsageLimit?.(usageLimit, record.createdAtMs ?? serverNow());
           continue;
         }
         const reminder = record.kind === "card" ? parseReminderCard(record.card) : null;
@@ -491,7 +491,7 @@ export async function journalMirror(args: {
             turnId: record.turnId,
             role: "assistant",
             hidden: false,
-            message: reminderAssistantMessage(reminder, record.createdAtMs ?? Date.now()) as JournalMessage["message"],
+            message: reminderAssistantMessage(reminder, record.createdAtMs ?? serverNow()) as JournalMessage["message"],
           });
           continue;
         }
@@ -886,13 +886,13 @@ export async function journalMirror(args: {
     remoteTurns,
     turnOpen: () => [...known.values()].some((turn) => turn.s === "held" || turn.s === "beginning"),
     async delivered(withinMs) {
-      const deadline = Date.now() + withinMs;
+      const deadline = performance.now() + withinMs;
       for (;;) {
         await settleEnding();
         if (![...known.values()].some((turn) => turn.s === "held" || turn.s === "beginning" || turn.s === "ending")) {
           return true;
         }
-        if (stopped || Date.now() >= deadline) return false;
+        if (stopped || performance.now() >= deadline) return false;
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
     },

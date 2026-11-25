@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
@@ -183,14 +184,14 @@ export class ClaudeLocalAccounts {
   }
 
   async list(): Promise<ClaudeLocalAccountsState> {
-    if (!this.configs || Date.now() - this.lastRefreshAt >= FOCUS_REFRESH_MIN_INTERVAL_MS) {
+    if (!this.configs || steadyNow() - this.lastRefreshAt >= FOCUS_REFRESH_MIN_INTERVAL_MS) {
       await this.refresh();
     }
     return this.state();
   }
 
   noteWindowFocus(): void {
-    if (Date.now() - this.lastRefreshAt < FOCUS_REFRESH_MIN_INTERVAL_MS) return;
+    if (steadyNow() - this.lastRefreshAt < FOCUS_REFRESH_MIN_INTERVAL_MS) return;
     void this.refresh().catch(() => undefined);
   }
 
@@ -201,7 +202,7 @@ export class ClaudeLocalAccounts {
     let resolved = this.resolveForTurn();
     if (!resolved.signedIn) {
       if (options.cached) {
-        if (Date.now() - this.lastRefreshAt >= SIGNED_OUT_RECHECK_MS) {
+        if (steadyNow() - this.lastRefreshAt >= SIGNED_OUT_RECHECK_MS) {
           void this.refresh().catch(() => undefined);
         }
         return resolved;
@@ -689,7 +690,7 @@ export class ClaudeLocalAccounts {
           return status.known || !last?.known ? status : last;
         });
       }
-      this.lastRefreshAt = Date.now();
+      this.lastRefreshAt = steadyNow();
       this.broadcastIfChanged();
       void this.reportIfChanged();
     })().finally(() => {
@@ -889,7 +890,7 @@ export class ClaudeLocalAccounts {
       return;
     }
     const key = JSON.stringify({ list, cliInstalled: this.cliInstalled });
-    const now = Date.now();
+    const now = steadyNow();
     if (this.lastSent?.key === key && now - this.lastSent.at < REPORT_SETTLE_MS) return;
     if (this.lastFailed?.key === key && now - this.lastFailed.at < REPORT_RETRY_MIN_INTERVAL_MS) {
       return;
@@ -903,10 +904,10 @@ export class ClaudeLocalAccounts {
         logins: list,
         cliInstalled: this.cliInstalled,
       });
-      this.lastSent = { key, at: Date.now() };
+      this.lastSent = { key, at: steadyNow() };
       this.lastFailed = null;
     } catch (error) {
-      this.lastFailed = { key, at: Date.now() };
+      this.lastFailed = { key, at: steadyNow() };
       console.warn(
         `[claude-accounts] reporting logins failed: ${error instanceof Error ? error.message : String(error)}`,
       );

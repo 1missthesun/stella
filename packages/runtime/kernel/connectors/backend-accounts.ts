@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { FINISH_CONNECT_PATH } from "@stella/contracts/backend/integrations";
 import type {
   GoogleConnectionProvider,
@@ -96,7 +97,7 @@ export const fetchBackendConnections = (
 ): Promise<IntegrationConnection[]> => {
   const key = `${auth.baseUrl}\0${auth.authToken.slice(-16)}`;
   const cached = cache.get(key);
-  if (!options.fresh && cached && Date.now() - cached.at < CONNECTIONS_TTL_MS) {
+  if (!options.fresh && cached && steadyNow() - cached.at < CONNECTIONS_TTL_MS) {
     return cached.connections;
   }
   const connections = backendRequest(
@@ -105,7 +106,7 @@ export const fetchBackendConnections = (
     { method: "GET" },
     options.fetchImpl,
   ).then(readBackendConnections);
-  cache.set(key, { at: Date.now(), connections });
+  cache.set(key, { at: steadyNow(), connections });
   connections.catch(() => {
     if (cache.get(key)?.connections === connections) cache.delete(key);
   });
@@ -180,7 +181,7 @@ export const fetchGoogleProviderState = (
 ): Promise<GoogleProviderState> => {
   const key = `${auth.baseUrl}\0${auth.authToken.slice(-16)}`;
   const cached = googleProviderCache.get(key);
-  if (!options.fresh && cached && Date.now() - cached.at < CONNECTIONS_TTL_MS) {
+  if (!options.fresh && cached && steadyNow() - cached.at < CONNECTIONS_TTL_MS) {
     return cached.state;
   }
   const state = backendRequest(
@@ -189,7 +190,7 @@ export const fetchGoogleProviderState = (
     { method: "GET" },
     options.fetchImpl,
   ).then(readGoogleProviderState);
-  googleProviderCache.set(key, { at: Date.now(), state });
+  googleProviderCache.set(key, { at: steadyNow(), state });
   state.catch(() => {
     if (googleProviderCache.get(key)?.state === state) {
       googleProviderCache.delete(key);

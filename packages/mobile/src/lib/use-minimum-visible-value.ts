@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useRef, useState } from "react";
 
 type Held<T> = {
@@ -12,7 +13,7 @@ export function useMinimumVisibleValue<T>(
 ): T {
   const [visibleValue, setVisibleValue] = useState(value);
   const visibleRef = useRef<Held<T>>({ value, minimumVisibleMs });
-  const visibleSinceRef = useRef(Date.now());
+  const visibleSinceRef = useRef(steadyNow());
   const pendingRef = useRef<Held<T> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEqualRef = useRef(isEqual);
@@ -29,11 +30,11 @@ export function useMinimumVisibleValue<T>(
       Math.max(
         0,
         visibleRef.current.minimumVisibleMs -
-          (Date.now() - visibleSinceRef.current),
+          (steadyNow() - visibleSinceRef.current),
       );
     const show = (held: Held<T>) => {
       visibleRef.current = held;
-      visibleSinceRef.current = Date.now();
+      visibleSinceRef.current = steadyNow();
       pendingRef.current = null;
       setVisibleValue(held.value);
     };

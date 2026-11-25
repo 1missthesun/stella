@@ -12,7 +12,7 @@ export function useMinimumVisibleValue<T>(
 ): T {
   const [visibleValue, setVisibleValue] = useState(value);
   const visibleRef = useRef<Held<T>>({ value, minimumVisibleMs });
-  const visibleSinceRef = useRef(Date.now());
+  const visibleSinceRef = useRef(performance.now());
   const pendingRef = useRef<Held<T> | null>(null);
   const timerRef = useRef<number | null>(null);
   const isEqualRef = useRef(isEqual);
@@ -29,11 +29,11 @@ export function useMinimumVisibleValue<T>(
       Math.max(
         0,
         visibleRef.current.minimumVisibleMs -
-          (Date.now() - visibleSinceRef.current),
+          (performance.now() - visibleSinceRef.current),
       );
     const show = (held: Held<T>) => {
       visibleRef.current = held;
-      visibleSinceRef.current = Date.now();
+      visibleSinceRef.current = performance.now();
       pendingRef.current = null;
       setVisibleValue(held.value);
     };

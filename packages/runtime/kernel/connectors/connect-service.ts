@@ -1,3 +1,4 @@
+import { savedAgeMs, steadyNow } from "@stella/contracts/server-clock";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as Effect from "effect/Effect";
@@ -1036,7 +1037,7 @@ const accountMcpListing = (
 ): Promise<AccountMcpListing | null> => {
   if (!accountMcpSocket(options)) return Promise.resolve(null);
   const cached = accountListings.get(options.stellaAppDir);
-  if (cached && Date.now() - cached.at < ACCOUNT_MCP_TTL_MS) {
+  if (cached && steadyNow() - cached.at < ACCOUNT_MCP_TTL_MS) {
     return cached.listing;
   }
   const socketPath = accountMcpSocket(options)!;
@@ -1056,7 +1057,7 @@ const accountMcpListing = (
       }
       return null;
     });
-  accountListings.set(options.stellaAppDir, { at: Date.now(), listing });
+  accountListings.set(options.stellaAppDir, { at: steadyNow(), listing });
   return listing;
 };
 
@@ -1666,11 +1667,11 @@ const backendActions = (
 ): Promise<ConnectorActionSource[]> => {
   const key = `${socketPath}\0${connectorId}`;
   const cached = backendActionsCache.get(key);
-  if (cached && Date.now() - cached.at < BACKEND_ACTIONS_TTL_MS) {
+  if (cached && steadyNow() - cached.at < BACKEND_ACTIONS_TTL_MS) {
     return cached.actions;
   }
   const actions = fetchBackendActions(socketPath, connectorId);
-  backendActionsCache.set(key, { at: Date.now(), actions });
+  backendActionsCache.set(key, { at: steadyNow(), actions });
   actions.catch(() => {
     if (backendActionsCache.get(key)?.actions === actions) {
       backendActionsCache.delete(key);
@@ -1701,11 +1702,11 @@ const mcpToolsFor = async (
 ): Promise<McpToolsListing> => {
   const cached = cache.connectors[command.id];
   const key = mcpProbeKey(options.stellaAppDir, command.id);
-  if (cached && Date.now() - cached.updatedAt < MCP_TOOLS_REFRESH_MS) {
+  if (cached && savedAgeMs(cached.updatedAt) < MCP_TOOLS_REFRESH_MS) {
     return { tools: cached.tools };
   }
   const failure = mcpProbeFailures.get(key);
-  if (failure && Date.now() - failure.at < MCP_PROBE_RETRY_MS) {
+  if (failure && steadyNow() - failure.at < MCP_PROBE_RETRY_MS) {
     return cached ? { tools: cached.tools } : failure.needsAuth ? { needsAuth: true } : null;
   }
   try {
@@ -1728,7 +1729,7 @@ const mcpToolsFor = async (
     return { tools: probe.tools };
   } catch (error) {
     const needsAuth = error instanceof ConnectorAuthError;
-    mcpProbeFailures.set(key, { at: Date.now(), needsAuth });
+    mcpProbeFailures.set(key, { at: steadyNow(), needsAuth });
     if (cached) return { tools: cached.tools };
     return needsAuth ? { needsAuth: true } : null;
   }

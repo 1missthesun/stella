@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
@@ -273,7 +274,7 @@ const waitForNextRead = (args: {
     const onWake = () => {
       if (settled) return;
       woken = true;
-      arm(args.earliestAt - Date.now());
+      arm(args.earliestAt - steadyNow());
     };
     const onAbort = () =>
       finish(() => reject(new AutomaticExecutionWaitAbortedError()));
@@ -326,7 +327,7 @@ export const waitForAutomaticExecutionStatus = async <
     }
     const woken = await waitForNextRead({
       delayMs,
-      earliestAt: Date.now() + STATUS_POLL_MIN_GAP_MS,
+      earliestAt: steadyNow() + STATUS_POLL_MIN_GAP_MS,
       signal: args.signal,
       wake: args.wake,
     });

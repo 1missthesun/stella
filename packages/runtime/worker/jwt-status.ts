@@ -1,6 +1,8 @@
+import { serverNow } from "@stella/contracts/server-clock";
+
 export const jwtStatus = (
   token: string,
-  now = Date.now(),
+  now = serverNow(),
 ): "opaque" | "valid" | "expired" | "malformed" => {
   const parts = token.split(".");
   if (parts.length !== 3) return "opaque";

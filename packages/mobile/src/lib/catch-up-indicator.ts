@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useRef, useState } from "react";
 
 export const CATCH_UP_SHOW_DELAY_MS = 300;
@@ -76,11 +77,11 @@ export function useCatchUpIndicatorVisible(catchingUp: boolean): boolean {
     stateRef.current = applyCatchUpSignal(
       stateRef.current,
       catchingUp,
-      Date.now(),
+      steadyNow(),
     );
     let timer: ReturnType<typeof setTimeout> | null = null;
     const evaluate = () => {
-      const now = Date.now();
+      const now = steadyNow();
       setVisible(isCatchUpIndicatorVisible(stateRef.current, now));
       const next = nextCatchUpTransitionAt(stateRef.current, now);
       if (next !== null) {

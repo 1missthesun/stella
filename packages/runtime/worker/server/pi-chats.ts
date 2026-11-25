@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
@@ -777,8 +778,8 @@ const RESTART_NOTE_WAIT_MS = 60_000;
 const SIGN_IN_WAIT_MS = 10 * 60_000;
 
 const signedIn = async (session: OpenSession, maxMs: number): Promise<void> => {
-  const until = Date.now() + maxMs;
-  while (!session.runnerCell.get()?.getStellaSiteAuth() && Date.now() < until) {
+  const until = performance.now() + maxMs;
+  while (!session.runnerCell.get()?.getStellaSiteAuth() && performance.now() < until) {
     await sleepMs(2_000);
   }
 };
@@ -866,7 +867,7 @@ const recheckOnceListed = (session: OpenSession, hostBus: HostBus.Interface, thr
     state = { threads: new Map(), running: false };
     unlistedWaits.set(session, state);
   }
-  if (!state.threads.has(threadId)) state.threads.set(threadId, Date.now());
+  if (!state.threads.has(threadId)) state.threads.set(threadId, steadyNow());
   if (state.running) return;
   state.running = true;
   const pending = state;
@@ -874,7 +875,7 @@ const recheckOnceListed = (session: OpenSession, hostBus: HostBus.Interface, thr
     try {
       while (pending.threads.size > 0) {
         await sleepMs(RECHECK_EVERY_MS);
-        for (const [id, since] of pending.threads) if (Date.now() - since > RECHECK_FOR_MS) pending.threads.delete(id);
+        for (const [id, since] of pending.threads) if (steadyNow() - since > RECHECK_FOR_MS) pending.threads.delete(id);
         if (!(await listWakeJobs(hostBus))?.complete) continue;
         const chats = await piChatsFor(session, hostBus);
         for (const id of [...pending.threads.keys()]) {

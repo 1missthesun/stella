@@ -5,7 +5,7 @@ import {
   normalizePastedText,
   toPastedTextDescriptor,
 } from "@stella/contracts/pasted-text";
-import { serverNow } from "@stella/contracts/server-clock";
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, LayoutAnimation } from "react-native";
 import type { TurnStatusWake } from "./turn-status-wake";
@@ -937,12 +937,12 @@ export function useChatThread(opts: {
         conversationId: canonicalConversationId ?? "",
         ignoreStoredAccess: false,
       };
-      const startedAt = Date.now();
+      const startedAt = steadyNow();
       for (;;) {
         if (!stillWanted() || signal.aborted) {
           throw new AutomaticExecutionWaitAbortedError();
         }
-        if (Date.now() - startedAt > ADMISSION_GIVE_UP_MS) {
+        if (steadyNow() - startedAt > ADMISSION_GIVE_UP_MS) {
           throw new SendNotDeliveredError();
         }
         if (!admissionEnabledRef.current) {

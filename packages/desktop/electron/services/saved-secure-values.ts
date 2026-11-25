@@ -18,7 +18,7 @@ import {
   protectValue,
   unprotectValue,
 } from "@stella/node-shared/shared/protected-storage";
-import { serverNow } from "@stella/contracts/server-clock";
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 import {
   SAVED_VALUES_FORMAT_VERSION,
@@ -71,6 +71,8 @@ type FreshValue = {
   expiresAt: number;
   owner: SecureValueOwner;
 };
+
+const freshUntil = (entry: FreshValue): number => Date.now() + entry.expiresAt - steadyNow();
 
 export type SecureValueResolution =
   | { ok: true; value: string; label: string; fresh: boolean; expiresAt?: number }
@@ -559,7 +561,7 @@ export class SavedSecureValues {
 
   rememberFresh(value: string, label: string, owner: SecureValueOwner): string {
     this.sweepFresh();
-    const now = Date.now();
+    const now = steadyNow();
     const handle = newHandle();
     this.fresh.set(handle, {
       value,
@@ -575,10 +577,11 @@ export class SavedSecureValues {
   }
 
   freshExpiresAt(handle: string): number | undefined {
-    return this.fresh.get(handle)?.expiresAt;
+    const fresh = this.fresh.get(handle);
+    return fresh && freshUntil(fresh);
   }
 
-  private sweepFresh(now = Date.now()) {
+  private sweepFresh(now = steadyNow()) {
     for (const [handle, entry] of this.fresh) {
       if (now >= entry.expiresAt) {
         this.fresh.delete(handle);
@@ -610,7 +613,7 @@ export class SavedSecureValues {
         value: fresh.value,
         label: fresh.label,
         fresh: true,
-        expiresAt: fresh.expiresAt,
+        expiresAt: freshUntil(fresh),
       };
     }
     if (this.expired.has(handle)) return { ok: false, reason: "expired" };
@@ -628,7 +631,7 @@ export class SavedSecureValues {
     if (fresh) {
       this.fresh.delete(handle);
       this.expired.add(handle);
-      return Date.now() < fresh.expiresAt ? fresh.value : null;
+      return steadyNow() < fresh.expiresAt ? fresh.value : null;
     }
     const resolved = await this.resolve(handle, {});
     return resolved.ok ? resolved.value : null;

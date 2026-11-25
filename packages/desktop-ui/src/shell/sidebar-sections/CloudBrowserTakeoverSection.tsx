@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useState } from "react";
 import {
   cloudBrowserLiveViewViewport,
@@ -113,7 +114,7 @@ function CloudBrowserLiveView({
           !url ||
           next.interactionId !== detail.interactionId ||
           next.revision !== detail.revision ||
-          next.expiresAt <= Date.now()
+          next.expiresAt <= serverNow()
         ) {
           setIssue(t("cloudBrowser.errors.liveViewBoundary"));
           return;

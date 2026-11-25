@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import { unwatchFile, watchFile } from "node:fs";
@@ -248,8 +249,8 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       const turn = proc.turn;
       if (!turn) return;
       const working = turn.executing > 0 || [...turn.calls.values()].some((call) => !call.stella && !call.ended);
-      if (working) lost.quietSince = Date.now();
-      const remaining = lost.quietSince + NETWORK_LOSS_SILENCE_MS - Date.now();
+      if (working) lost.quietSince = steadyNow();
+      const remaining = lost.quietSince + NETWORK_LOSS_SILENCE_MS - steadyNow();
       if (remaining > 0) {
         lost.cancelCheck = forkTimeoutFiber(remaining, check);
         return;
@@ -440,7 +441,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
               return result;
             } finally {
               turn.executing -= 1;
-              if (proc.networkLost) proc.networkLost.quietSince = Date.now();
+              if (proc.networkLost) proc.networkLost.quietSince = steadyNow();
             }
           },
         };
@@ -631,7 +632,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
 
   const onUpdate = (proc: Proc, update: Record<string, any>) => {
     const turn = proc.turn;
-    if (proc.networkLost && Date.now() - proc.networkLost.at > NETWORK_LOSS_DRAIN_MS) networkKept(proc);
+    if (proc.networkLost && steadyNow() - proc.networkLost.at > NETWORK_LOSS_DRAIN_MS) networkKept(proc);
     switch (update.sessionUpdate) {
       case "agent_message_chunk":
         if (!turn) return endStray(proc);

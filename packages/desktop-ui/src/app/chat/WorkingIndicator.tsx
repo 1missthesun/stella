@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMinimumVisibleValue } from "@/shared/hooks/use-minimum-visible-value";
 import { useWindowFocus } from "@/shared/hooks/use-window-focus";
@@ -54,14 +55,14 @@ function useStretchElapsedMs(stretch: string | null): number {
       setStarted(null);
       return;
     }
-    setStarted({ stretch, at: Date.now() });
+    setStarted({ stretch, at: steadyNow() });
     const timers = STRETCH_MARKS_MS.map((ms) =>
       window.setTimeout(() => setTick((tick) => tick + 1), ms),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [stretch]);
   if (stretch === null || started?.stretch !== stretch) return 0;
-  return Date.now() - started.at;
+  return steadyNow() - started.at;
 }
 
 export function WorkingIndicator({

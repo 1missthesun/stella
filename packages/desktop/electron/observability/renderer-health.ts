@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { app, type WebContents } from "electron";
 import { resolveBundleFrames } from "../source/bundle-stacks.js";
 import { rendererCacheDir } from "../source/renderer-protocol.js";
@@ -48,7 +49,7 @@ export class RendererHealthMonitor {
   private stallLogged = false;
   private busySince = 0;
   private busyLogged = false;
-  private summaryStartedAt = Date.now();
+  private summaryStartedAt = steadyNow();
   private summaryProbeMax = 0;
   private summarySlowProbes = 0;
   private summaryStalls = 0;
@@ -84,7 +85,7 @@ export class RendererHealthMonitor {
   resetProbe() {
     this.probeSeq += 1;
     this.probeSentAt = 0;
-    this.lastAnswerAt = Date.now();
+    this.lastAnswerAt = steadyNow();
     this.stallLogged = false;
     this.busySince = 0;
     this.busyLogged = false;
@@ -93,7 +94,7 @@ export class RendererHealthMonitor {
   }
 
   snapshot(): RendererHealthSnapshot {
-    const now = Date.now();
+    const now = steadyNow();
     const recent = this.samples.slice(-15);
     const last = this.samples[this.samples.length - 1];
     return {
@@ -114,7 +115,7 @@ export class RendererHealthMonitor {
   private tick() {
     const contents = this.contents;
     if (!contents || contents.isDestroyed()) return;
-    const now = Date.now();
+    const now = steadyNow();
     this.sampleMetrics(contents, now);
     this.probe(contents, now);
     this.checkBusy(now);
@@ -190,7 +191,7 @@ export class RendererHealthMonitor {
           this.probeSentAt = 0;
           return;
         }
-        const answeredAt = Date.now();
+        const answeredAt = steadyNow();
         const took = answeredAt - sentAt;
         this.probeSentAt = 0;
         this.lastAnswerAt = answeredAt;

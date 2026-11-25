@@ -1,5 +1,5 @@
 import { REQUEST_BUDGET_MS, withDeadline } from "./request-deadline.js";
-import { noteServerTime } from "./server-clock.js";
+import { noteServerTime, steadyNow } from "./server-clock.js";
 import { socketCredentialProtocol } from "./socket-ticket.js";
 import {
   BACKFILL_BATCH_RECORDS,
@@ -126,10 +126,10 @@ const closeMessage = (code: number): string => {
 
 class BackfillBudget {
   private tokens = RATE_BACKFILL_PER_MIN;
-  private refilledAt = Date.now();
+  private refilledAt = steadyNow();
 
   private refill(): void {
-    const now = Date.now();
+    const now = steadyNow();
     const gained = ((now - this.refilledAt) / 60_000) * RATE_BACKFILL_PER_MIN;
     if (gained >= 1) {
       this.tokens = Math.min(RATE_BACKFILL_PER_MIN, this.tokens + gained);
@@ -306,7 +306,7 @@ export class ConversationSocket {
       void this.connect();
       return;
     }
-    if (Date.now() - this.lastFrameAtMs < SOCKET_STALE_MS) return;
+    if (steadyNow() - this.lastFrameAtMs < SOCKET_STALE_MS) return;
     try {
       socket.send("ping");
     } catch {
@@ -387,7 +387,7 @@ export class ConversationSocket {
       const socket = this.socket;
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
       if (!this.isActive()) return;
-      if (Date.now() - this.lastFrameAtMs < KEEPALIVE_INTERVAL_MS) return;
+      if (steadyNow() - this.lastFrameAtMs < KEEPALIVE_INTERVAL_MS) return;
       try {
         socket.send("ping");
       } catch {}
@@ -464,7 +464,7 @@ export class ConversationSocket {
     this.connecting = false;
     this.socket = socket;
     this.options.onReadiness?.("socket-created");
-    this.lastFrameAtMs = Date.now();
+    this.lastFrameAtMs = steadyNow();
     if (this.openTimer) clearTimeout(this.openTimer);
     this.openTimer = setTimeout(() => {
       this.openTimer = null;
@@ -480,13 +480,13 @@ export class ConversationSocket {
 
     socket.onopen = () => {
       if (this.socket !== socket) return;
-      this.lastFrameAtMs = Date.now();
+      this.lastFrameAtMs = steadyNow();
       this.options.onReadiness?.("socket-open");
       this.startKeepalive();
     };
     socket.onmessage = (event) => {
       if (this.socket !== socket) return;
-      this.lastFrameAtMs = Date.now();
+      this.lastFrameAtMs = steadyNow();
       if (typeof event.data !== "string") return;
       if (event.data === "pong") return;
       const frame = decodeServerFrame(event.data);
@@ -535,7 +535,7 @@ export class ConversationSocket {
     this.noProgressBackfills = 0;
     this.ahead.clear();
     this.olderRequests.clear();
-    if (Date.now() - this.liveSinceMs > BACKOFF_RESET_MS && this.liveSinceMs) {
+    if (steadyNow() - this.liveSinceMs > BACKOFF_RESET_MS && this.liveSinceMs) {
       this.attempt = 0;
     }
     this.liveSinceMs = 0;
@@ -628,7 +628,7 @@ export class ConversationSocket {
     noteServerTime(ready.serverTimeMs);
     if (this.openTimer) clearTimeout(this.openTimer);
     this.openTimer = null;
-    this.liveSinceMs = Date.now();
+    this.liveSinceMs = steadyNow();
     this.authRetryUsed = false;
     this.reauthInFlight = false;
     this.headSeq = ready.headSeq;

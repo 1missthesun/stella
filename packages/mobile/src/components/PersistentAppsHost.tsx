@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import {
   parseWorkspaceApps,
   type WorkspaceApp,
@@ -213,7 +214,7 @@ function AppsHost({
 
   const open = async (app: WorkspaceApp) => {
     if (openingRef.current) return;
-    const cached = reusableAppFrame(frames, app, Date.now());
+    const cached = reusableAppFrame(frames, app, serverNow());
     if (cached) {
       setFrames((current) => retainAppFrame(current, cached));
       setSelected(app.slug);
@@ -246,7 +247,7 @@ function AppsHost({
         !response.ok ||
         typeof data.url !== "string" ||
         !Number.isFinite(data.expiresAt) ||
-        data.expiresAt <= Date.now() + 60_000
+        data.expiresAt <= serverNow() + 60_000
       )
         throw new Error(data.error ?? "App could not be opened.");
       if (mounted.current && id === request.current) {
@@ -301,7 +302,7 @@ function AppsHost({
     if (!visible || !active || !frame) return;
     const timer = setTimeout(
       () => renewSelected(),
-      Math.max(0, frame.expiresAt - Date.now() - 60_000),
+      Math.max(0, frame.expiresAt - serverNow() - 60_000),
     );
     return () => clearTimeout(timer);
   }, [visible, active, frame]);

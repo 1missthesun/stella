@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useState } from "react";
 import type { EvidenceCard } from "@stella/contracts/chat-evidence";
 import { driveLinkPath, driveLinkTarget } from "@stella/contracts/cloud-world-paths";
@@ -22,7 +23,7 @@ type Resolved = {
 const PREVIEW_URL_MARGIN_MS = 60_000;
 
 const isFresh = (entry: Resolved): boolean =>
-  entry.expiresAt === undefined || entry.expiresAt - PREVIEW_URL_MARGIN_MS > Date.now();
+  entry.expiresAt === undefined || entry.expiresAt - PREVIEW_URL_MARGIN_MS > serverNow();
 
 const hostRendersCards = (): boolean => Boolean(window.electronAPI?.chatEvidence?.driveCards);
 

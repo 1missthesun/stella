@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   createContext,
   createElement,
@@ -78,7 +79,7 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
   const [sentToEmail, setSentToEmail] = useState<string | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const claimSecretRef = useRef<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => steadyNow());
   const [isResending, setIsResending] = useState(false);
 
   const sendMagicLink = async (
@@ -114,7 +115,7 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
         const retryAfterSec = retryAfterHeader
           ? Math.max(1, parseInt(retryAfterHeader, 10) || 1)
           : 60;
-        setCooldownUntil(Date.now() + retryAfterSec * 1000);
+        setCooldownUntil(steadyNow() + retryAfterSec * 1000);
         setError({
           kind: "plural",
           key: "global.auth.tooManyRequests",
@@ -135,7 +136,7 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
       setRequestId(data.requestId);
       setSentToEmail(targetEmail);
       setStatus("sent");
-      setCooldownUntil(Date.now() + RESEND_COOLDOWN_MS);
+      setCooldownUntil(steadyNow() + RESEND_COOLDOWN_MS);
       return true;
     } catch (err) {
       if (mode === "initial") setStatus("error");
@@ -161,14 +162,14 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
   const resend = async () => {
     const trimmed = email.trim();
     if (!trimmed) return;
-    if (Date.now() < cooldownUntil) return;
+    if (steadyNow() < cooldownUntil) return;
     if (isResending) return;
     await sendMagicLink(trimmed, "resend");
   };
 
   useEffect(() => {
-    if (cooldownUntil <= Date.now()) return;
-    const id = setInterval(() => setNow(Date.now()), 500);
+    if (cooldownUntil <= steadyNow()) return;
+    const id = setInterval(() => setNow(steadyNow()), 500);
     return () => clearInterval(id);
   }, [cooldownUntil]);
 

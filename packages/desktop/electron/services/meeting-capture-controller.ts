@@ -87,9 +87,9 @@ export class MeetingCaptureController {
   }
 
   private async waitForDaemonReady(timeoutMs = STARTUP_TIMEOUT_MS): Promise<boolean> {
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     let pollMs = STARTUP_POLL_MS;
-    while (Date.now() - startedAt < timeoutMs) {
+    while (performance.now() - startedAt < timeoutMs) {
       if ((await this.runCommand(["ping"])) === "pong") {
         return true;
       }

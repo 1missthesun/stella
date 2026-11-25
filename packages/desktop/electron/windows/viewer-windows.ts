@@ -235,8 +235,8 @@ export class ViewerWindowController {
       if (!hyprland) return;
       const cursor = await hyprland.cursorPos();
       window.setTitle(name);
-      const deadline = Date.now() + HYPRLAND_ATTACH_TIMEOUT_MS;
-      while (Date.now() < deadline && !window.isDestroyed()) {
+      const deadline = performance.now() + HYPRLAND_ATTACH_TIMEOUT_MS;
+      while (performance.now() < deadline && !window.isDestroyed()) {
         const client = (await hyprland.clients()).find(
           (entry) => entry.mapped && entry.title === name,
         );

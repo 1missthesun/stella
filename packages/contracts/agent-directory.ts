@@ -1,3 +1,4 @@
+import { serverNow } from "./server-clock.js";
 import { agentStatusOf, isLiveAgentStatus, type AgentStatus } from "./agent-status.js";
 import { USAGE_LIMIT_PAUSED_STATUS } from "./claude-usage-limit.js";
 import { longToolCallText, type CurrentToolCall } from "./long-tool-call.js";
@@ -158,7 +159,7 @@ const sessionLine = (row: AgentDirectorySessionRow, now: number): string =>
 
 export const renderAgentRoster = (
   rows: readonly AgentDirectoryAgentRow[],
-  now = Date.now(),
+  now = serverNow(),
 ): string | undefined => {
   const roster = selectAgentRoster(rows);
   if (roster.active.length === 0 && roster.inactive.length === 0) return undefined;
@@ -180,7 +181,7 @@ export const renderAgentRoster = (
   ].join("\n");
 };
 
-export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now()) => {
+export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = serverNow()) => {
   const offline = offlineText(row, now);
   const waiting = awaitingConsentText(row);
   return {
@@ -195,7 +196,7 @@ export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now(
   };
 };
 
-export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = Date.now()) => ({
+export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = serverNow()) => ({
   thread_id: row.conversationId,
   description: row.title.trim() || "Untitled chat",
   status: row.active ? "running" : "idle",
@@ -213,7 +214,7 @@ export const buildAgentDirectoryResult = (input: {
   now?: number;
   unavailable?: string;
 }): string => {
-  const now = input.now ?? Date.now();
+  const now = input.now ?? serverNow();
   const { caller } = input;
   const roster = selectAgentRoster(
     input.agents.filter(

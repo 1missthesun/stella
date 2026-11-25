@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import os from "node:os";
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -1085,7 +1086,7 @@ class NodeReplKernel {
         cancelTimeout: () => {},
         timeoutMs,
         remainingMs: timeoutMs,
-        clockStartedAt: Date.now(),
+        clockStartedAt: performance.now(),
         awaitingUser: 0,
         signal,
         resolve,
@@ -1148,7 +1149,7 @@ class NodeReplKernel {
   }
 
   private startClock(active: ActiveEvaluation) {
-    active.clockStartedAt = Date.now();
+    active.clockStartedAt = performance.now();
     active.cancelTimeout = forkCancelableTimeout(active.remainingMs, () => {
       if (this.active !== active) return;
       this.terminateActive(
@@ -1179,7 +1180,7 @@ class NodeReplKernel {
       active.cancelTimeout = () => {};
       active.remainingMs = Math.max(
         1,
-        active.remainingMs - (Date.now() - active.clockStartedAt),
+        active.remainingMs - (performance.now() - active.clockStartedAt),
       );
       for (const listener of [...this.awaitingUserListeners]) listener();
     }
@@ -3053,7 +3054,7 @@ export class NodeReplKernelRegistry {
   private readonly browserSessionFactory: (
     options: BrowserSessionOptions,
   ) => BrowserSessionClient;
-  private lastOwnerLeaseIssuedAt = Date.now();
+  private lastOwnerLeaseIssuedAt = 0;
   private sweeping = false;
   private cancelTaskTabSweep?: () => void;
   private taskTabSweepStopped = false;
@@ -3181,12 +3182,12 @@ export class NodeReplKernelRegistry {
       ownerId: id,
       kernel,
       generation: kernel.generation,
-      startedAt: Date.now(),
+      startedAt: steadyNow(),
       content: [],
       cursor: 0,
       deliveredCursor: 0,
       listeners: new Set(),
-      lastObservedAt: Date.now(),
+      lastObservedAt: steadyNow(),
       settled: Promise.resolve(),
     };
     const callerOnContent = options.onContent;
@@ -3209,7 +3210,7 @@ export class NodeReplKernelRegistry {
           cell.cursor = cell.content.length;
         }
         cell.outcome = { ok: true, value };
-        cell.completedAt = Date.now();
+        cell.completedAt = steadyNow();
         notifyCellObservers(cell);
         this.pruneCells();
       },
@@ -3218,7 +3219,7 @@ export class NodeReplKernelRegistry {
           ok: false,
           error: error instanceof Error ? error : new Error(String(error)),
         };
-        cell.completedAt = Date.now();
+        cell.completedAt = steadyNow();
         notifyCellObservers(cell);
         this.pruneCells();
       },
@@ -3306,7 +3307,7 @@ export class NodeReplKernelRegistry {
           context.stellaAppDir,
       );
       const ownerLeaseIssuedAt = Math.max(
-        Date.now(),
+        serverNow(),
         this.lastOwnerLeaseIssuedAt + 1,
       );
       this.lastOwnerLeaseIssuedAt = ownerLeaseIssuedAt;
@@ -3451,8 +3452,8 @@ export class NodeReplKernelRegistry {
     const cursor = cell.cursor;
     const content = cell.content.slice(fromCursor, cursor);
     cell.deliveredCursor = Math.max(cell.deliveredCursor, cursor);
-    cell.lastObservedAt = Date.now();
-    const elapsedMs = Date.now() - cell.startedAt;
+    cell.lastObservedAt = steadyNow();
+    const elapsedMs = steadyNow() - cell.startedAt;
     if (!cell.outcome) {
       return {
         cellId: cell.cellId,
@@ -3505,7 +3506,7 @@ export class NodeReplKernelRegistry {
     };
   }
 
-  private pruneCells(now = Date.now()): void {
+  private pruneCells(now = steadyNow()): void {
     for (const [cellId, cell] of this.cells) {
       if (
         cell.completedAt !== undefined &&

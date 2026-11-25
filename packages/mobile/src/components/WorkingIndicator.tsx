@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   memo,
   useCallback,
@@ -181,14 +182,14 @@ function useStretchElapsedMs(stretch: string | null): number {
   const [, setTick] = useState(0);
   useEffect(() => {
     if (stretch === null) return;
-    setStarted({ stretch, at: Date.now() });
+    setStarted({ stretch, at: steadyNow() });
     const timers = STRETCH_MARKS_MS.map((ms) =>
       setTimeout(() => setTick((tick) => tick + 1), ms),
     );
     return () => timers.forEach((timer) => clearTimeout(timer));
   }, [stretch]);
   if (stretch === null || started?.stretch !== stretch) return 0;
-  return Date.now() - started.at;
+  return steadyNow() - started.at;
 }
 
 export const WorkingIndicator = memo(function WorkingIndicator({

@@ -84,12 +84,12 @@ const startCallProgress = (
   if (progressToken === undefined) {
     return { update: () => undefined, stop: () => undefined };
   }
-  const startedAt = Date.now();
+  const startedAt = performance.now();
   let lastSentAt = startedAt;
   let progress = 0;
   const update = (message: string) => {
     progress += 1;
-    lastSentAt = Date.now();
+    lastSentAt = performance.now();
     void send({
       method: "notifications/progress",
       params: { progressToken, progress, message },
@@ -98,8 +98,8 @@ const startCallProgress = (
   const stop =
     heartbeatMs > 0
       ? forkCancelableInterval(heartbeatMs, () => {
-          if (Date.now() - lastSentAt < heartbeatMs / 2) return;
-          update(`Still running (${formatElapsed(Date.now() - startedAt)})`);
+          if (performance.now() - lastSentAt < heartbeatMs / 2) return;
+          update(`Still running (${formatElapsed(performance.now() - startedAt)})`);
         })
       : () => undefined;
   return { update, stop };

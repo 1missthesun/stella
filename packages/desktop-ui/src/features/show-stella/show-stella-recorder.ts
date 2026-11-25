@@ -67,10 +67,15 @@ export class ShowStellaRecorder {
   private mimeType: string | null = null;
   private stopped = false;
 
-  constructor(private readonly start: ShowStellaRecorderStart) {}
+  private readonly createdTicks = performance.now();
+  private readonly lateMs: number;
+
+  constructor(private readonly start: ShowStellaRecorderStart) {
+    this.lateMs = Date.now() - start.startedAtMs;
+  }
 
   private now(): number {
-    return Date.now() - this.start.startedAtMs;
+    return this.lateMs + Math.round(performance.now() - this.createdTicks);
   }
 
   async begin(): Promise<void> {

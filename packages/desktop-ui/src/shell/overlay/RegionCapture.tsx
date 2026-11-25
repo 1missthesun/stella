@@ -89,7 +89,7 @@ export function RegionCapture() {
       return;
     }
     lastProbedPointRef.current = latest;
-    lastProbeAtRef.current = Date.now();
+    lastProbeAtRef.current = performance.now();
     overlayApi?.previewWindowHighlightAtPoint?.(latest);
   }, [overlayApi]);
 
@@ -97,7 +97,7 @@ export function RegionCapture() {
     (point: Point) => {
       hoverPointRef.current = point;
       if (hoverPreviewTimerRef.current) return;
-      if (Date.now() - lastProbeAtRef.current >= HOVER_PREVIEW_DEBOUNCE_MS) {
+      if (performance.now() - lastProbeAtRef.current >= HOVER_PREVIEW_DEBOUNCE_MS) {
         probeLatestHoverPoint();
       }
       hoverPreviewTimerRef.current = setTimeout(() => {

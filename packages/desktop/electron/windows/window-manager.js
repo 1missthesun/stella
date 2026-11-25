@@ -1,3 +1,4 @@
+import { steadyNow } from '@stella/contracts/server-clock';
 import { app, BrowserWindow } from 'electron';
 import { FullWindowController } from './full-window.js';
 import { getMainLogger } from '../observability/main-logger.js';
@@ -79,7 +80,7 @@ export class WindowManager {
             return false;
         if (details.errorCode === -3)
             return true;
-        const now = Date.now();
+        const now = steadyNow();
         const previous = this.transientReloadState;
         const attemptsSoFar = previous && now - previous.lastFailureAtMs < RELOAD_RETRY_RESET_MS
             ? previous.attempts
@@ -142,7 +143,7 @@ export class WindowManager {
         this.rendererHealth.resetProbe();
         if (this.options.isQuitting?.())
             return;
-        const now = Date.now();
+        const now = steadyNow();
         this.rendererExits = this.rendererExits.filter((at) => now - at < RENDERER_AUTO_RELOAD_WINDOW_MS);
         this.rendererExits.push(now);
         const reload = details.reason !== 'launch-failed' &&

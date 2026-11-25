@@ -1,3 +1,4 @@
+import { savedAgeMs, serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { hostname } from "node:os";
@@ -380,7 +381,7 @@ export class AppSourceService {
       if (this.options.isAnyWindowVisible()) void this.refresh();
       this.followBackend();
       void this.followOwner();
-      if (this.syncWanted && Date.now() >= this.syncNotBefore) void this.syncFork();
+      if (this.syncWanted && steadyNow() >= this.syncNotBefore) void this.syncFork();
     }, STATE_POLL_MS);
     poll.unref?.();
     this.timers = [poll];
@@ -391,7 +392,7 @@ export class AppSourceService {
       tidy.unref?.();
       this.timers.push(tidy);
     }
-    this.syncNotBefore = Date.now() + LAUNCH_SYNC_DELAY_MS;
+    this.syncNotBefore = steadyNow() + LAUNCH_SYNC_DELAY_MS;
     this.wantSync("launch");
     void this.checkLinkedCheckout().then(() => this.followBackend());
     void installCheckoutGuard(this.options.stellaAppDir, this.options.log).catch(
@@ -853,8 +854,11 @@ export class AppSourceService {
     worktreeBranches: Set<string | null>,
     offered: (name: string) => boolean,
   ): Promise<{ record: MergeRecord; status: MergeStatus } | null> {
-    const record = await this.mergeRecord(cwd);
-    if (!record) return null;
+    const saved = await this.mergeRecord(cwd);
+    if (!saved) return null;
+    const now = Date.now();
+    const record = saved.since > now ? { ...saved, since: now } : saved;
+    if (record !== saved) await this.setMerge(cwd, record);
     const ref = `${DRAFT_REF_PREFIX}${record.draft}`;
     const tip =
       (await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])).stdout.trim() ||
@@ -868,7 +872,7 @@ export class AppSourceService {
       descendsFromHead,
       offered: offered(record.draft),
       agentRunning: record.agent && !settledByGit ? await this.agentRunning(record.agent) : null,
-      now: Date.now(),
+      now,
     });
     if (!isMerging(status) && this.merge === record) {
       this.options.log("app-source.merge-settled", {
@@ -1256,8 +1260,8 @@ export class AppSourceService {
     this.heldForRecording = true;
     this.publish({ ...this.state, heldForRecording: true });
     this.options.log("app-source.held-for-recording", {});
-    const until = Date.now() + RECORDING_HOLD_MAX_MS;
-    while (!this.disposed && Date.now() < until && this.options.recordingOpen?.()) await delay(500);
+    const until = performance.now() + RECORDING_HOLD_MAX_MS;
+    while (!this.disposed && performance.now() < until && this.options.recordingOpen?.()) await delay(500);
     this.heldForRecording = false;
     const { heldForRecording: _held, ...rest } = this.state;
     this.publish(rest);
@@ -1269,13 +1273,13 @@ export class AppSourceService {
     this.heldForReply = true;
     this.publish({ ...this.state, heldForReply: true });
     this.options.log("app-source.held-for-reply", {});
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     const until = startedAt + REPLY_HOLD_MAX_MS;
-    while (!this.disposed && Date.now() < until && (await replying().catch(() => false))) await delay(500);
+    while (!this.disposed && performance.now() < until && (await replying().catch(() => false))) await delay(500);
     this.heldForReply = false;
     const { heldForReply: _held, ...rest } = this.state;
     this.publish(rest);
-    this.options.log("app-source.reply-hold-ended", { ms: Date.now() - startedAt });
+    this.options.log("app-source.reply-hold-ended", { ms: Math.round(performance.now() - startedAt) });
     return true;
   }
 
@@ -1736,15 +1740,15 @@ export class AppSourceService {
   }
 
   private async paidPlan(): Promise<boolean | null> {
-    if (this.plan && Date.now() - this.plan.at < PLAN_TTL_MS) return this.plan.paid;
+    if (this.plan && steadyNow() - this.plan.at < PLAN_TTL_MS) return this.plan.paid;
     const baseUrl = this.backendUrl();
     if (!baseUrl || !this.options.hasConnectedAccount()) return null;
     try {
       const status = await this.backendClient(baseUrl).read("billing.status", {}, { timeoutMs: 15_000 });
-      this.plan = { paid: status.plan !== "free", at: Date.now() };
+      this.plan = { paid: status.plan !== "free", at: steadyNow() };
     } catch (error) {
       this.options.log("app-source.plan-unknown", { message: errorMessage(error) });
-      this.plan = { paid: null, at: Date.now() - PLAN_TTL_MS + 60_000 };
+      this.plan = { paid: null, at: steadyNow() - PLAN_TTL_MS + 60_000 };
     }
     return this.plan.paid;
   }
@@ -1766,7 +1770,7 @@ export class AppSourceService {
         preparer.deviceId !== me &&
         !update!.result &&
         !update!.unresolved &&
-        Date.now() - preparer.at < UPDATE_PREPARER_STALE_MS,
+        serverNow() - preparer.at < UPDATE_PREPARER_STALE_MS,
     );
   }
 
@@ -1779,8 +1783,8 @@ export class AppSourceService {
     const update = this.update?.version === version ? this.update : null;
     if (update?.result || update?.unresolved || this.waitingOnOther(version)) return false;
     const last = this.claimTried.get(version) ?? 0;
-    if (Date.now() - last < CLAIM_RETRY_MS) return false;
-    this.claimTried.set(version, Date.now());
+    if (steadyNow() - last < CLAIM_RETRY_MS) return false;
+    this.claimTried.set(version, steadyNow());
     try {
       const { update: claimed } = await this.backendClient(baseUrl).call("appSource.claimUpdate", {
         version,
@@ -1807,7 +1811,7 @@ export class AppSourceService {
     if (this.plan?.paid === false) return { files, why: "allowance" };
     if (this.plan?.paid === true && this.options.modelResolve && !update?.result) {
       const last = this.claimTried.get(version);
-      if (last === undefined || Date.now() - last < CLAIM_RETRY_MS) return undefined;
+      if (last === undefined || steadyNow() - last < CLAIM_RETRY_MS) return undefined;
     }
     return { files, why: "unsure" };
   }
@@ -1891,7 +1895,7 @@ export class AppSourceService {
     if (intent.handled.includes(key)) return;
     const cwd = this.options.stellaAppDir;
     const head = await git(cwd, ["rev-parse", "HEAD"]);
-    const fresh = Date.now() - apply.at < WANTED_MAX_AGE_MS;
+    const fresh = serverNow() - apply.at < WANTED_MAX_AGE_MS;
     const already = await isAncestor(cwd, update.version, head);
     await this.saveIntent((current) => {
       current.handled = [...current.handled, key];
@@ -2014,7 +2018,7 @@ export class AppSourceService {
   private versionNeedsTask(entry: Extract<Wanted, { kind: "version" }>) {
     if (this.versionConflicts?.why !== "unsure" || this.waitingOnOther(entry.version)) return false;
     const update = this.update?.version === entry.version ? this.update : null;
-    const waited = Date.now() - entry.at >= MERGE_WAIT_MS;
+    const waited = savedAgeMs(entry.at) >= MERGE_WAIT_MS;
     if (entry.from && !update?.result && !waited) return false;
     if (update?.result && this.resultUnusable !== update.result.sha && !waited) return false;
     return true;
@@ -2528,7 +2532,7 @@ export class AppSourceService {
   private wantSync(reason: string) {
     if (!this.syncWanted) this.syncReason = reason;
     this.syncWanted = true;
-    const wait = this.syncNotBefore - Date.now();
+    const wait = this.syncNotBefore - steadyNow();
     if (wait <= 0) {
       void this.syncFork();
       return;
@@ -2583,7 +2587,7 @@ export class AppSourceService {
         this.syncWanted = true;
         this.syncReason = "retry";
         this.syncNotBefore =
-          Date.now() + Math.min(SYNC_RETRY_MAX_MS, SYNC_RETRY_MS * 2 ** this.syncFailures);
+          steadyNow() + Math.min(SYNC_RETRY_MAX_MS, SYNC_RETRY_MS * 2 ** this.syncFailures);
         this.syncFailures += 1;
       }
       void this.refresh();
@@ -2868,7 +2872,7 @@ export class AppSourceService {
       cached.owner === owner &&
       Math.min(cached.upstream.expiresAt, cached.fork?.expiresAt ?? Infinity) -
         60_000 >
-        Date.now()
+        serverNow()
     ) {
       return cached;
     }

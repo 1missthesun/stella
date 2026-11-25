@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { gcm } from "@noble/ciphers/aes.js";
 import { x25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "@noble/hashes/hkdf.js";
@@ -74,7 +75,7 @@ export const captureAndEncryptCloudBrowserSession = async (args: {
     args.capability.algorithm !== ALGORITHM ||
     args.capability.interactionId !== args.interactionId ||
     args.capability.revision !== args.interactionRevision ||
-    args.capability.expiresAt <= Date.now()
+    args.capability.expiresAt <= serverNow()
   ) {
     throw new Error("Invalid cloud browser transfer boundary.");
   }

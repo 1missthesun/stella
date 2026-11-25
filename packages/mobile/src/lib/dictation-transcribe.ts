@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { isRequestTimeout, withDeadline } from "@stella/contracts/request-deadline";
 import { getAuthToken } from "./auth-token";
 import { fetchWithinDeadline } from "./cloud-request";
@@ -82,7 +83,7 @@ let streamingAvailability: { value: Promise<boolean>; at: number } | null =
 export const loadDictationStreamingAvailable = (): Promise<boolean> => {
   if (
     streamingAvailability &&
-    Date.now() - streamingAvailability.at < STREAMING_AVAILABILITY_TTL_MS
+    steadyNow() - streamingAvailability.at < STREAMING_AVAILABILITY_TTL_MS
   ) {
     return streamingAvailability.value;
   }
@@ -95,7 +96,7 @@ export const loadDictationStreamingAvailable = (): Promise<boolean> => {
       .then(
         (body: { streaming?: unknown } | null) => body?.streaming === true,
       ),
-    at: Date.now(),
+    at: steadyNow(),
   };
   streamingAvailability = entry;
   entry.value.catch(() => {

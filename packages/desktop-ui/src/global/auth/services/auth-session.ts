@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useSyncExternalStore } from "react";
 import {
   getAuthSessionIdentityIntent,
@@ -232,11 +233,11 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
       { label: "sign-in check", timeoutMs: REQUEST_BUDGET_MS.call },
       async () => {
         let session = await interiorBridge.getSession();
-        if (session.expiresAt <= Date.now() + 5_000) {
+        if (session.expiresAt <= serverNow() + 5_000) {
           await interiorBridge.getToken({ forceRefresh: true });
           session = await interiorBridge.getSession();
         }
-        if (session.expiresAt <= Date.now()) {
+        if (session.expiresAt <= serverNow()) {
           throw new Error("The Stella interior session is expired.");
         }
         if (version !== refreshVersion) return;
@@ -522,7 +523,7 @@ const revalidateAuthSessionFromEvent = () => {
   if (inFlightRefresh) {
     return;
   }
-  const now = Date.now();
+  const now = steadyNow();
   if (now - lastEventRevalidateAt < EVENT_REVALIDATE_THROTTLE_MS) {
     return;
   }

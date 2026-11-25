@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import {
   createContext,
   Fragment,
@@ -109,11 +110,11 @@ const formatRemaining = (ms: number): string => {
 };
 
 const useRemaining = (deadlineAt: number | undefined): number | null => {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => serverNow());
   useEffect(() => {
     if (deadlineAt === undefined) return;
-    setNow(Date.now());
-    const interval = setInterval(() => setNow(Date.now()), 1000);
+    setNow(serverNow());
+    const interval = setInterval(() => setNow(serverNow()), 1000);
     return () => clearInterval(interval);
   }, [deadlineAt]);
   return deadlineAt === undefined ? null : Math.max(0, deadlineAt - now);

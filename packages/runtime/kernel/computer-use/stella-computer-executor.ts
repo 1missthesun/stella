@@ -1230,7 +1230,7 @@ const handOffResolution = (
   resolution: MacTargetResolution,
 ) => {
   const handoffs = resolutionHandoffs.get(sessionPaths.sessionId) ?? new Map();
-  handoffs.set(targetSelectorKey(target), { resolution, at: Date.now() });
+  handoffs.set(targetSelectorKey(target), { resolution, at: performance.now() });
   resolutionHandoffs.set(sessionPaths.sessionId, handoffs);
 };
 
@@ -1242,7 +1242,7 @@ const requestTargetResolver = (sessionPaths: SessionPaths): MacTargetResolver =>
   const handedOff = resolutionHandoffs.get(sessionPaths.sessionId);
   resolutionHandoffs.delete(sessionPaths.sessionId);
   const resolved = new Map<string, MacTargetResolution>();
-  const now = Date.now();
+  const now = performance.now();
   for (const [key, entry] of handedOff ?? []) {
     const pid = entry.resolution.target.pid;
     if (
@@ -1755,7 +1755,7 @@ const executeMacComputerUseRequest = async (
     }
 
     const temporaryStatePath = waitStatePath(statePath, request.requestId);
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     let pollCount = 0;
     try {
       for (;;) {
@@ -1819,7 +1819,7 @@ const executeMacComputerUseRequest = async (
                     ? { afterVisualStateId: request.afterVisualStateId }
                     : {}),
                   timeoutMs: request.timeoutMs,
-                  elapsedMs: Date.now() - startedAt,
+                  elapsedMs: Math.round(performance.now() - startedAt),
                   pollCount,
                   changeKinds,
                 },
@@ -1827,7 +1827,7 @@ const executeMacComputerUseRequest = async (
             };
           }
         }
-        const elapsedMs = Date.now() - startedAt;
+        const elapsedMs = Math.round(performance.now() - startedAt);
         const remainingMs = request.timeoutMs - elapsedMs;
         if (remainingMs <= 0) {
           throw new ComputerUseWaitTimeoutError(

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   EMPTY_SECRET_FINGERPRINTS,
   redactSecretFingerprints,
@@ -61,12 +62,12 @@ export const currentSecureValueFingerprints =
   async (): Promise<SecretFingerprints> => {
     const read = source;
     if (!read) return EMPTY_SECRET_FINGERPRINTS;
-    if (Date.now() - cached.at < MAX_AGE_MS) return cached.fingerprints;
+    if (steadyNow() - cached.at < MAX_AGE_MS) return cached.fingerprints;
     if (!inflight) {
       const pending = read()
         .then((value) => {
           const fingerprints = parseFingerprints(value) ?? cached.fingerprints;
-          cached = { at: Date.now(), fingerprints };
+          cached = { at: steadyNow(), fingerprints };
           return fingerprints;
         })
         .catch(() => cached.fingerprints)

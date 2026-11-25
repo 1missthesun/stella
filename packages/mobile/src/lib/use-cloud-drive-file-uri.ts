@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useState } from "react";
 import type { DriveFileUrl } from "@stella/contracts/backend/drive";
 import { getBackendClient } from "./backend";
@@ -19,7 +20,7 @@ const fresh = (
   entry: DriveFileUrl | undefined,
 ): entry is DriveFileUrl =>
   entry !== undefined &&
-  entry.expiresAt > Date.now() + REFRESH_MARGIN_MS &&
+  entry.expiresAt > serverNow() + REFRESH_MARGIN_MS &&
   isCurrent(path, entry);
 
 export const resolveCloudDriveFile = async (
@@ -89,7 +90,7 @@ export const useCloudDriveFileUri = (
           if (cancelled) return;
           setState({ path, uri, failed: false });
           const expiresAt = cache.get(path)?.expiresAt ?? 0;
-          const delay = Math.max(1_000, expiresAt - Date.now() - REFRESH_MARGIN_MS);
+          const delay = Math.max(1_000, expiresAt - serverNow() - REFRESH_MARGIN_MS);
           timer = setTimeout(load, Math.min(delay, 2_147_483_647));
         })
         .catch(() => {

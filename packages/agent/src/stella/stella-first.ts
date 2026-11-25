@@ -1,6 +1,7 @@
 import type { Context } from "@earendil-works/chord/context";
 import type { ConversationId, ToolExecutionApi, ToolRegistration, Tx, Wrap } from "@earendil-works/pi-durable";
 import { PI_ASK_FIRST_PREFIX } from "@stella/contracts/pi-chat";
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import { StellaAgentDoc } from "./agent-doc.ts";
 
 const ASK_USER = "ask_user";
@@ -146,9 +147,9 @@ const askStella = async (
     const told = await host.tellStella(api, key, noteFor(tool, args, savedHere), context).catch(() => false);
     if (!told) return undefined;
     const signal = context.abortSignal;
-    const deadline = Date.now() + STELLA_FIRST_WAIT_MS;
-    while (Date.now() < deadline && !signal?.aborted) {
-      await sleep(Math.min(STELLA_FIRST_POLL_MS, deadline - Date.now()), signal);
+    const deadline = performance.now() + STELLA_FIRST_WAIT_MS;
+    while (performance.now() < deadline && !signal?.aborted) {
+      await sleep(Math.min(STELLA_FIRST_POLL_MS, deadline - performance.now()), signal);
       const reply = (await api.snapshot(StellaAgentDoc, api.conversationId, context))?.askingStella?.reply;
       if (reply !== undefined) return reply;
     }
@@ -169,7 +170,7 @@ export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
         if (!role || role.agentType === "orchestrator" || !role.threadId) return await tool.execute(args, api, context);
         const input = (args ?? {}) as Record<string, unknown>;
         const replied = role.stellaReplied;
-        if (replied?.tool === name && Date.now() - replied.at < STELLA_FIRST_PASS_MS) {
+        if (replied?.tool === name && savedAgeMs(replied.at) < STELLA_FIRST_PASS_MS) {
           await markPass(api, undefined, context);
           return await tool.execute(args, api, context);
         }

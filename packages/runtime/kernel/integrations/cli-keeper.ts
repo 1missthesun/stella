@@ -1,3 +1,4 @@
+import { savedAgeMs, steadyNow } from "@stella/contracts/server-clock";
 import fs from "node:fs";
 import path from "node:path";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
@@ -155,7 +156,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       return { ok: false, problem: "doesn't exist." };
     }
     const cached = options.fresh ? undefined : checkCache.get(identity);
-    if (cached && (cached.check.ok || Date.now() - cached.at < FAILED_CHECK_TTL_MS)) {
+    if (cached && (cached.check.ok || steadyNow() - cached.at < FAILED_CHECK_TTL_MS)) {
       return cached.check;
     }
     const result = await runCliCommand(executable, ["--version"], {
@@ -170,7 +171,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       version && !versionProblem
         ? { ok: true, version }
         : { ok: false, problem: versionProblem ?? describeRunFailure(executable, result) };
-    checkCache.set(identity, { check, at: Date.now() });
+    checkCache.set(identity, { check, at: steadyNow() });
     return check;
   };
 
@@ -334,7 +335,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
 
   const repairLockHeld = (dir: string): boolean => {
     try {
-      if (Date.now() - fs.statSync(repairLock(dir)).mtimeMs > REPAIR_LOCK_STALE_MS) return false;
+      if (savedAgeMs(fs.statSync(repairLock(dir)).mtimeMs) > REPAIR_LOCK_STALE_MS) return false;
     } catch {
       return false;
     }
@@ -394,7 +395,7 @@ export const createCliKeeper = <Method extends string>(spec: CliKeeperSpec<Metho
       !options.force &&
       last?.target === key &&
       last.status !== "repaired" &&
-      Date.now() - last.at < REPAIR_RETRY_MS
+      savedAgeMs(last.at) < REPAIR_RETRY_MS
     ) {
       return { status: "skipped", reason: "A repair of this install failed a few minutes ago." };
     }

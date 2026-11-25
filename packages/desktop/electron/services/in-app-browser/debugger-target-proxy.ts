@@ -687,7 +687,7 @@ export class DebuggerTargetProxy {
     host.contentView.addChildView(tab.view);
     tab.view.setBounds(this.drawableBounds());
     lease.mountedInHiddenHost = true;
-    lease.layoutReadyAt = Date.now() + HIDDEN_MOUNT_LAYOUT_MS;
+    lease.layoutReadyAt = performance.now() + HIDDEN_MOUNT_LAYOUT_MS;
     this.armHiddenMountExpiry(tab, lease);
   }
 
@@ -747,7 +747,7 @@ export class DebuggerTargetProxy {
 
   private async settleDrawableHost(tabId: string) {
     const lease = this.drawableLeases.get(tabId);
-    const layoutWait = (lease?.layoutReadyAt ?? 0) - Date.now();
+    const layoutWait = (lease?.layoutReadyAt ?? 0) - performance.now();
     if (layoutWait > 0) await this.delay(layoutWait);
     const tab = this.options.tabs.get(tabId);
     if (!tab || !lease || this.options.getAttachedView() === tab.view) return;

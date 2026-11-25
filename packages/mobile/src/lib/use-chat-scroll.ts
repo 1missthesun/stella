@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   LayoutChangeEvent,
@@ -150,7 +151,7 @@ export function useChatScroll(
         !bouncingBackFromTail &&
         pendingSendAnchorRef.current === null &&
         followTargetOffsetRef.current === null &&
-        Date.now() > followAnimatingUntilMsRef.current
+        steadyNow() > followAnimatingUntilMsRef.current
       ) {
         setFollowArmed(false);
         stopFollowLoop();
@@ -310,7 +311,7 @@ export function useChatScroll(
         Math.abs(clamped - from) <= layoutHeight * FOLLOW_HARD_SNAP_VIEWPORTS;
       followCurrentRef.current = clamped;
       followTargetOffsetRef.current = clamped;
-      followAnimatingUntilMsRef.current = Date.now() + FOLLOW_NATIVE_SCROLL_MS;
+      followAnimatingUntilMsRef.current = steadyNow() + FOLLOW_NATIVE_SCROLL_MS;
       listRef.current?.scrollToOffset({ offset: clamped, animated });
       if (followSettleTimerRef.current) {
         clearTimeout(followSettleTimerRef.current);
@@ -383,7 +384,7 @@ export function useChatScroll(
   const placeLatestTurn = useCallback(() => {
     const pending = pendingSendAnchorRef.current;
     if (!pending) return;
-    if (Date.now() > pending.staleAtMs) {
+    if (steadyNow() > pending.staleAtMs) {
       pendingSendAnchorRef.current = null;
       return;
     }
@@ -423,7 +424,7 @@ export function useChatScroll(
       if (
         pending &&
         pending.userMessageId === trailingMessageIdRef.current &&
-        Date.now() <= pending.staleAtMs
+        steadyNow() <= pending.staleAtMs
       ) {
         placeLatestTurn();
         return;
@@ -458,7 +459,7 @@ export function useChatScroll(
       latestUserLayoutRef.current = { id: messageId, height };
       const pending = pendingSendAnchorRef.current;
       if (!pending || pending.userMessageId !== messageId) return;
-      if (Date.now() > pending.staleAtMs) return;
+      if (steadyNow() > pending.staleAtMs) return;
       if (
         pending.placedRowHeightPx === null ||
         Math.abs(pending.placedRowHeightPx - height) > 1
@@ -474,7 +475,7 @@ export function useChatScroll(
       pendingSendAnchorRef.current = {
         userMessageId,
         placedRowHeightPx: null,
-        staleAtMs: Date.now() + POST_SEND_REANCHOR_WINDOW_MS,
+        staleAtMs: steadyNow() + POST_SEND_REANCHOR_WINDOW_MS,
       };
       followRearmBlockedRef.current = false;
       setFollowArmed(true);

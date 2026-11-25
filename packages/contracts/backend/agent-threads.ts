@@ -1,3 +1,4 @@
+import { serverNow } from "../server-clock.js";
 import type { SafeguardAction, SafeguardCard } from "../safeguard-block.js";
 import type { CloudExecutionSelection } from "../agent-engine.js";
 import type { AgentWorkspaceSize } from "../turn-plane/turn-start.js";
@@ -67,7 +68,7 @@ export const AGENT_MOVE_REASON_TEXT: Record<AgentMoveReason, string> = {
 
 const utcMinute = (at: number): string => `${new Date(at).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
-export const agentMoveText = (result: AgentMoveResult, now = Date.now()): string => {
+export const agentMoveText = (result: AgentMoveResult, now = serverNow()): string => {
   const from = result.from.name;
   const destination = result.to.kind === "cloud" ? "Stella's cloud" : result.where.replace(/^on /, "");
   return [

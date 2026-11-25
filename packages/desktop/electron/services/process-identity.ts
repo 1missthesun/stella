@@ -161,8 +161,8 @@ export const terminateOwnedProcess = async (
     log("SIGTERM", pidIsAlive(pid) ? "failed" : "gone", String(error));
     return !pidIsAlive(pid);
   }
-  const deadline = Date.now() + graceMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + graceMs;
+  while (performance.now() < deadline) {
     if (!pidIsAlive(pid)) return true;
     await delay(25);
   }

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import {
   resolveNativeConnectorCatalog,
@@ -76,7 +77,7 @@ const loadCatalog = async (
   if (
     catalogMemo &&
     catalogMemo.stellaDataDir === options.stellaDataDir &&
-    Date.now() - catalogMemo.loadedAt < SERVER_CATALOG_TTL_MS
+    steadyNow() - catalogMemo.loadedAt < SERVER_CATALOG_TTL_MS
   ) {
     return {
       entries: catalogMemo.entries,
@@ -90,7 +91,7 @@ const loadCatalog = async (
   });
   catalogMemo = {
     stellaDataDir: options.stellaDataDir,
-    loadedAt: Date.now(),
+    loadedAt: steadyNow(),
     entries: resolved.entries,
     source: resolved.source,
     sources: resolved.sources,

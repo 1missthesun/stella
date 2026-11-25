@@ -410,8 +410,8 @@ const promptForAutomationAccessibility = async (
     return { ok: true, helperTrusted: true, hostGranted: false };
   }
 
-  const deadline = Date.now() + accessibilityWaitMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + accessibilityWaitMs;
+  while (performance.now() < deadline) {
     await delayMs(automationAccessibilityPollIntervalMs);
     lastResult = await checkAccessibility(false);
     if (lastResult.ok) {

@@ -412,8 +412,8 @@ export const registerOfficePreviewHandlers = (
         typeof payload.sessionId === "string" && payload.sessionId.trim()
           ? payload.sessionId.trim()
           : (await startPreview(payload, policy)).sessionId;
-      const deadline = Date.now() + REMOTE_PREVIEW_TIMEOUT_MS;
-      while (Date.now() < deadline) {
+      const deadline = performance.now() + REMOTE_PREVIEW_TIMEOUT_MS;
+      while (performance.now() < deadline) {
         const snapshot = (await listPreviews(policy)).find(
           (entry) => entry.sessionId === sessionId,
         );

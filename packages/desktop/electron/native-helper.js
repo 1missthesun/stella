@@ -1,3 +1,4 @@
+import { steadyNow } from '@stella/contracts/server-clock';
 import { execFile } from 'child_process';
 import { resolveNativeHelperPath } from './native-helper-path.js';
 import { getFileLogger } from '@stella/node-shared/observability/file-logger';
@@ -53,7 +54,7 @@ const helperTimedOutOrKilled = (error) => {
         typed.signal === 'SIGTERM');
 };
 const circuitOpenResult = (circuit) => {
-    const now = Date.now();
+    const now = steadyNow();
     return {
         stdout: null,
         skipped: true,
@@ -80,28 +81,28 @@ export const runNativeHelperDetailed = async (helperName, args, options) => {
         };
     }
     const circuit = getCircuit(helperName);
-    if (circuit.openUntil > Date.now()) {
+    if (circuit.openUntil > steadyNow()) {
         return circuitOpenResult(circuit);
     }
     const useGovernor = process.platform === 'win32';
     if (useGovernor) {
         await acquireWin32SpawnSlot();
     }
-    if (circuit.openUntil > Date.now()) {
+    if (circuit.openUntil > steadyNow()) {
         if (useGovernor)
             releaseWin32SpawnSlot();
         return circuitOpenResult(circuit);
     }
     try {
         return await new Promise((resolve) => {
-            const startedAt = Date.now();
+            const startedAt = steadyNow();
             execFile(helperPath, args, {
                 timeout: options.timeout,
                 encoding: options.encoding ?? 'utf8',
                 maxBuffer: options.maxBuffer,
                 windowsHide: true,
             }, (error, stdout) => {
-                const now = Date.now();
+                const now = steadyNow();
                 const durationMs = now - startedAt;
                 if (error) {
                     const typedError = error;

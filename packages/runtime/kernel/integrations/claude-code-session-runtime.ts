@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { spawn } from "child_process";
 import { claudeCodeQuitting, markClaudeCodeQuitting } from "./claude-code-quitting.js";
 import { signalOwnChild } from "@stella/node-shared/shared/process-identity.js";
@@ -758,7 +759,7 @@ const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60 * 1000;
 const USAGE_LIMIT_RESET_MARGIN_MS = 30 * 1000;
 const USAGE_LIMIT_MIN_HOLD_MS = 5 * 60 * 1000;
 const USAGE_LIMIT_MAX_MIN_HOLD_MS = 60 * 60 * 1000;
-const waitUntil = (until: number | undefined, signal: AbortSignal | undefined, wake: Promise<void>) =>
+const waitUntil = (until: number | undefined, signal: AbortSignal | undefined, wake: Promise<void>, clock: () => number = steadyNow) =>
   new Promise<"woken" | "reset">((resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason ?? new Error("Stopped."));
@@ -780,7 +781,7 @@ const waitUntil = (until: number | undefined, signal: AbortSignal | undefined, w
       reject(signal?.reason ?? new Error("Stopped."));
     };
     const tick = () => {
-      const remaining = until === undefined ? 60_000 : until - Date.now();
+      const remaining = until === undefined ? 60_000 : until - clock();
       if (until !== undefined && remaining <= 0) {
         finish("reset");
         return;
@@ -1860,7 +1861,7 @@ const ensureSessionState = (
     const replacement: ClaudeCodeSession = {
       sessionId: persistedSessionId ?? crypto.randomUUID(),
       cwd: normalizedCwd,
-      lastUsedAt: Date.now(),
+      lastUsedAt: steadyNow(),
       turnCount: persistedSessionId ? 1 : 0,
       resumeReady: Boolean(persistedSessionId),
       running: false,
@@ -1872,7 +1873,7 @@ const ensureSessionState = (
   const created: ClaudeCodeSession = {
     sessionId: persistedSessionId ?? crypto.randomUUID(),
     cwd: normalizedCwd,
-    lastUsedAt: Date.now(),
+    lastUsedAt: steadyNow(),
     turnCount: persistedSessionId ? 1 : 0,
     resumeReady: Boolean(persistedSessionId),
     running: false,
@@ -1908,7 +1909,7 @@ class ClaudeCodeSessionRuntime {
     if (request.persistedSessionId?.trim()) {
       request.onSessionId?.(session.sessionId);
     }
-    session.lastUsedAt = Date.now();
+    session.lastUsedAt = steadyNow();
     return await new Promise<ClaudeCodeTurnResult>((resolve, reject) => {
       session.queue.push({ request, resolve, reject });
       this.pumpSession(request.sessionKey, session);
@@ -1999,7 +2000,7 @@ class ClaudeCodeSessionRuntime {
     this.idleCloseTimers.clear();
   }
   pruneIdleSessions() {
-    const now = Date.now();
+    const now = steadyNow();
     for (const [sessionKey, session] of this.sessions.entries()) {
       if (session.running || session.queue.length > 0) continue;
       if ((session.backgroundTasks ?? 0) > 0 || session.process?.adrift) {
@@ -2026,7 +2027,7 @@ class ClaudeCodeSessionRuntime {
       .catch(job.reject)
       .finally(() => {
         session.running = false;
-        session.lastUsedAt = Date.now();
+        session.lastUsedAt = steadyNow();
         if (this.closeWhenIdle.has(sessionKey) && session.queue.length === 0) {
           this.closeSession(sessionKey, session);
           return;
@@ -2264,7 +2265,7 @@ class ClaudeCodeSessionRuntime {
           });
           const backgroundStopped = session.backgroundShellStarted === true;
           this.resetStreamingProcess(request.sessionKey, session, backgroundStopped ? { told: true } : {});
-          await waitUntil(Date.now() + delay, request.abortSignal, new Promise<void>(() => {}));
+          await waitUntil(steadyNow() + delay, request.abortSignal, new Promise<void>(() => {}));
           if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
           if (failedAttemptMcpCalls.length > 0) {
             currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
@@ -2315,7 +2316,7 @@ class ClaudeCodeSessionRuntime {
         if (isClaudeRefreshLockBusy(error) && refreshLockWaits < CLAUDE_REFRESH_LOCK_RETRIES) {
           refreshLockWaits += 1;
           this.resetStreamingProcess(request.sessionKey, session);
-          await waitUntil(Date.now() + CLAUDE_REFRESH_LOCK_WAIT_MS, request.abortSignal, new Promise<void>(() => {}));
+          await waitUntil(steadyNow() + CLAUDE_REFRESH_LOCK_WAIT_MS, request.abortSignal, new Promise<void>(() => {}));
           if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
           if (failedAttemptMcpCalls.length > 0) {
             currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
@@ -2386,15 +2387,15 @@ class ClaudeCodeSessionRuntime {
       text: CLAUDE_LOGIN_HOLD_TEXT,
       ...(email ? { email } : {}),
     });
-    const deadline = Date.now() + CLAUDE_LOGIN_HOLD_MAX_MS;
+    const deadline = steadyNow() + CLAUDE_LOGIN_HOLD_MAX_MS;
     let resumed = false;
     let reprobes = options.earlierHolds ?? 0;
     let reprobeAt =
-      Date.now() + CLAUDE_LOGIN_REPROBE_DELAYS_MS[Math.min(reprobes, CLAUDE_LOGIN_REPROBE_DELAYS_MS.length - 1)]!;
+      steadyNow() + CLAUDE_LOGIN_REPROBE_DELAYS_MS[Math.min(reprobes, CLAUDE_LOGIN_REPROBE_DELAYS_MS.length - 1)]!;
     try {
       for (;;) {
         await waitUntil(
-          Math.min(deadline, Date.now() + CLAUDE_LOGIN_POLL_MS, reprobeAt),
+          Math.min(deadline, steadyNow() + CLAUDE_LOGIN_POLL_MS, reprobeAt),
           request.abortSignal,
           new Promise<void>(() => {}),
         );
@@ -2403,10 +2404,10 @@ class ClaudeCodeSessionRuntime {
           resumed = true;
           return;
         }
-        if (Date.now() >= reprobeAt) {
+        if (steadyNow() >= reprobeAt) {
           reprobes += 1;
           reprobeAt =
-            Date.now() +
+            steadyNow() +
             CLAUDE_LOGIN_REPROBE_DELAYS_MS[Math.min(reprobes, CLAUDE_LOGIN_REPROBE_DELAYS_MS.length - 1)]!;
           config = await getClaudeCodeConfig({ retryRefused: true });
           if (config.signedIn) {
@@ -2414,7 +2415,7 @@ class ClaudeCodeSessionRuntime {
             return;
           }
         }
-        if (Date.now() >= deadline) {
+        if (steadyNow() >= deadline) {
           throw withClaudeLoginRejected("Waited for a Claude sign-in.", email);
         }
       }
@@ -2435,7 +2436,7 @@ class ClaudeCodeSessionRuntime {
       typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
         ? limit.resetsAt
         : undefined;
-    const now = Date.now();
+    const now = serverNow();
     const minHold = Math.min(
       USAGE_LIMIT_MAX_MIN_HOLD_MS,
       USAGE_LIMIT_MIN_HOLD_MS * 2 ** Math.max(0, holds - 1),
@@ -2465,7 +2466,7 @@ class ClaudeCodeSessionRuntime {
     this.usageLimitWakers.set(request.sessionKey, wake);
     let outcome: "woken" | "reset" | undefined;
     try {
-      outcome = await waitUntil(until, request.abortSignal, woken);
+      outcome = await waitUntil(until, request.abortSignal, woken, serverNow);
     } finally {
       if (this.usageLimitWakers.get(request.sessionKey) === wake) {
         this.usageLimitWakers.delete(request.sessionKey);
@@ -3162,7 +3163,7 @@ class ClaudeCodeSessionRuntime {
         this.detachAbortListener(completed);
         if (completed.quietInterrupted) {
           session.turnCount += 1;
-          session.lastUsedAt = Date.now();
+          session.lastUsedAt = steadyNow();
           completed.resolve({ message: "", sessionId: session.sessionId, usage: undefined });
           return undefined;
         }
@@ -3528,7 +3529,7 @@ class ClaudeCodeSessionRuntime {
     const echo = finished !== undefined && echoesEndedSession(finished);
     if (processState.closed) return false;
     if (processState.pending.length > 0) {
-      if (echo) processState.echoAt = Date.now();
+      if (echo) processState.echoAt = steadyNow();
       else if (finished) (processState.finished ??= []).push(finished);
       return false;
     }
@@ -3540,7 +3541,7 @@ class ClaudeCodeSessionRuntime {
           line.type === "system" &&
           line.subtype === "init" &&
           processState.echoAt !== undefined &&
-          Date.now() - processState.echoAt < ECHO_QUERY_WINDOW_MS);
+          steadyNow() - processState.echoAt < ECHO_QUERY_WINDOW_MS);
       if (echoQuery || (line.type === "system" && line.subtype === "init")) processState.echoAt = undefined;
       if (echoQuery) processState.adrift = { lines: [], woke: false, tasks: [], echo: true };
     }
@@ -3832,7 +3833,7 @@ class ClaudeCodeSessionRuntime {
       );
     }
     session.turnCount += 1;
-    session.lastUsedAt = Date.now();
+    session.lastUsedAt = steadyNow();
     return {
       message,
       sessionId: session.sessionId,

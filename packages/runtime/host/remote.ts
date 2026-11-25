@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { attachJsonRpcPeerToStreams } from "@stella/contracts/protocol/jsonl";
@@ -165,8 +166,8 @@ export class RemoteRuntimeHost {
 
   private async waitForRuntimeExit(exitTimeoutMs: number): Promise<void> {
     const stellaAppDir = this.options.initializeParams.stellaAppDir;
-    const deadline = Date.now() + exitTimeoutMs;
-    while (Date.now() < deadline && (await probeRunningWorker(stellaAppDir)) != null) {
+    const deadline = performance.now() + exitTimeoutMs;
+    while (performance.now() < deadline && (await probeRunningWorker(stellaAppDir)) != null) {
       await runHostEffect(Effect.sleep(50));
     }
   }
@@ -330,7 +331,7 @@ export class RemoteRuntimeHost {
     attachmentId: string | undefined,
   ): void {
     this.fenceDrops += 1;
-    const now = Date.now();
+    const now = steadyNow();
     const last = this.fenceLogAt.get(reason) ?? 0;
     if (now - last < FENCE_LOG_WINDOW_MS) return;
     this.fenceLogAt.set(reason, now);
@@ -377,7 +378,7 @@ export class RemoteRuntimeHost {
       ]!;
     const first = this.reconnectAttempt === 0 && Boolean(gonePid);
     this.reconnectAttempt += 1;
-    const deadline = Date.now() + delay;
+    const deadline = performance.now() + delay;
     const alive = (pid: number) => {
       try {
         process.kill(pid, 0);
@@ -387,7 +388,7 @@ export class RemoteRuntimeHost {
       }
     };
     const wait = () =>
-      first && Date.now() < deadline && alive(gonePid!)
+      first && performance.now() < deadline && alive(gonePid!)
         ? REAP_POLL_MS
         : 0;
     const attempt = () => {

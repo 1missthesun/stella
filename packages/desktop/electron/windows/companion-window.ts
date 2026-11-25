@@ -676,8 +676,8 @@ export class CompanionWindowController {
     const title = STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES[0];
     const wanted: Record<CompanionWindowKind, { width: number; height: number }> =
       { mark: COMPANION_COMPACT_SIZE, panel: COMPANION_FULL_SIZE };
-    const deadline = Date.now() + HYPRLAND_ATTACH_TIMEOUT_MS;
-    while (run === this.hyprAttachRun && Date.now() < deadline) {
+    const deadline = performance.now() + HYPRLAND_ATTACH_TIMEOUT_MS;
+    while (run === this.hyprAttachRun && performance.now() < deadline) {
       let clients;
       try {
         clients = await hypr.clients();
@@ -813,7 +813,7 @@ export class CompanionWindowController {
     this.boundsRepairTimer = setTimeout(() => {
       this.boundsRepairTimer = null;
       if (this.drag) return;
-      const now = Date.now();
+      const now = performance.now();
       this.boundsRepairs = this.boundsRepairs.filter((at) => now - at < 1_000);
       for (const slot of [this.mark, this.panel]) {
         const win = this.live(slot);

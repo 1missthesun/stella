@@ -52,7 +52,7 @@ class LineDelimitedHelperDaemon {
 
   private ensureChild(): DaemonChild | null {
     if (this.child) return this.child
-    if (Date.now() < this.disabledUntil) return null
+    if (performance.now() < this.disabledUntil) return null
 
     const helperPath = resolveNativeHelperPath(this.helperName)
     if (!helperPath) return null
@@ -75,7 +75,7 @@ class LineDelimitedHelperDaemon {
     child.on('error', () => this.onChildGone(child))
 
     this.child = child
-    this.childSpawnedAt = Date.now()
+    this.childSpawnedAt = performance.now()
     this.childAnswered = false
     this.armIdleTimer()
     getFileLogger()?.process('native.helper.daemon.started', {
@@ -98,8 +98,8 @@ class LineDelimitedHelperDaemon {
       p.resolve(undefined)
     }
     this.pending.clear()
-    if (!answered && spawnedAt > 0 && Date.now() - spawnedAt < EARLY_EXIT_MS) {
-      this.disabledUntil = Date.now() + UNSUPPORTED_COOLDOWN_MS
+    if (!answered && spawnedAt > 0 && performance.now() - spawnedAt < EARLY_EXIT_MS) {
+      this.disabledUntil = performance.now() + UNSUPPORTED_COOLDOWN_MS
       getFileLogger()?.process('native.helper.daemon.unsupported', {
         helper: this.helperName,
         cooldownMs: UNSUPPORTED_COOLDOWN_MS,
@@ -136,7 +136,7 @@ class LineDelimitedHelperDaemon {
   private noteFailure() {
     this.consecutiveFailures += 1
     if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-      this.disabledUntil = Date.now() + DISABLE_COOLDOWN_MS
+      this.disabledUntil = performance.now() + DISABLE_COOLDOWN_MS
       this.consecutiveFailures = 0
       getFileLogger()?.warn('native.helper.daemon.disabled', {
         helper: this.helperName,

@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { stripMarkdownForTts } from "./markdown-strip";
@@ -64,7 +65,7 @@ export function useReadAloud(messages: readonly MessageRecord[]): void {
       return;
     }
     if (enabledAtMsRef.current === null) {
-      enabledAtMsRef.current = Date.now();
+      enabledAtMsRef.current = serverNow();
     }
     const threshold = enabledAtMsRef.current;
     for (const message of messages) {

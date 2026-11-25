@@ -476,7 +476,7 @@ export class HyprlandDesktop implements LinuxDesktop {
       (window.offscreen || window.minimized) &&
       (await this.setWindowProp(window, "render_unfocused", "1"))
     ) {
-      this.renderingSince.set(window.id, Date.now());
+      this.renderingSince.set(window.id, performance.now());
       // Hyprland only starts the hidden-window frame timer when a window's
       // rules are re-evaluated, which setprop does not do; a tag change does.
       await this.dispatch([
@@ -497,7 +497,7 @@ export class HyprlandDesktop implements LinuxDesktop {
       await this.prepareWindow(window).catch(() => undefined);
       const since = this.renderingSince.get(window.id);
       if (since !== undefined) {
-        const wait = since + HIDDEN_CATCH_UP_MS - Date.now();
+        const wait = since + HIDDEN_CATCH_UP_MS - performance.now();
         if (wait > 0) await sleep(wait);
       }
     }

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect } from "react";
 import { AppState } from "react-native";
 import { deviceTimeZone } from "@stella/contracts/schedule-zone";
@@ -11,7 +12,7 @@ export function useReportTimeZone(enabled: boolean): void {
     const report = () => {
       const timeZone = deviceTimeZone();
       if (!timeZone) return;
-      const now = Date.now();
+      const now = steadyNow();
       if (timeZone === reported && now - lastAt < 6 * 60 * 60_000) return;
       reported = timeZone;
       lastAt = now;

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { networkInterfaces } from "node:os";
 import { forkTimeoutFiber } from "../cli/effect-runtime.js";
 
@@ -27,7 +28,7 @@ const poll = (): void => {
   const lost = [...before].some((address) => !addresses.has(address));
   const gained = [...addresses].some((address) => !before.has(address));
   if (!lost && !gained) return;
-  const change: NetworkChange = { at: Date.now(), lost };
+  const change: NetworkChange = { at: steadyNow(), lost };
   for (const listener of [...listeners]) listener(change);
 };
 

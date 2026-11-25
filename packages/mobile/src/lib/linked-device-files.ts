@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { File } from "expo-file-system";
 import type { DeviceFileLocation } from "@stella/contracts/backend/drive";
 import {
@@ -105,7 +106,7 @@ let computersCache: {
 } | null = null;
 
 const listedComputers = (): Promise<ListedComputer[] | null> => {
-  const now = Date.now();
+  const now = steadyNow();
   if (computersCache && now - computersCache.at < COMPUTERS_CACHE_MS) {
     return computersCache.value;
   }
@@ -341,7 +342,7 @@ export const resolveLinkedFile = (
 ): Promise<LinkedFileSource> => {
   const preferDeviceId = options?.preferDeviceId ?? null;
   const key = `${access?.desktopDeviceId ?? ""}\0${preferDeviceId ?? ""}\0${conversationId}\0${filePath}`;
-  const now = Date.now();
+  const now = steadyNow();
   const cached = resolutions.get(key);
   if (cached && now - cached.at < RESOLUTION_CACHE_MS) {
     return withAbort(cached.value, options?.signal);

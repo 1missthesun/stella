@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 export type ResourceEntry<T> = {
@@ -58,7 +59,7 @@ export function createResourceStore<K extends string, T>(opts: {
   const isFresh = (entry: ResourceEntry<T>): boolean => {
     if (entry.data === undefined) return false;
     if (opts.staleMs === undefined) return true;
-    return Date.now() - entry.fetchedAt < opts.staleMs;
+    return steadyNow() - entry.fetchedAt < opts.staleMs;
   };
 
   const shouldAccept = (next: T, current: T | undefined): boolean =>
@@ -88,11 +89,11 @@ export function createResourceStore<K extends string, T>(opts: {
               ? {
                   data,
                   error: null,
-                  fetchedAt: Date.now(),
+                  fetchedAt: steadyNow(),
                   isFetching: false,
                 }
               :
-                { error: null, fetchedAt: Date.now(), isFetching: false },
+                { error: null, fetchedAt: steadyNow(), isFetching: false },
           );
         }
         return data;
@@ -122,7 +123,7 @@ export function createResourceStore<K extends string, T>(opts: {
       setEntry(key, {
         data,
         error: null,
-        fetchedAt: Date.now(),
+        fetchedAt: steadyNow(),
         isFetching: false,
       });
     },
@@ -132,7 +133,7 @@ export function createResourceStore<K extends string, T>(opts: {
       setEntry(key, {
         data,
         error: null,
-        fetchedAt: Date.now(),
+        fetchedAt: steadyNow(),
       });
     },
     invalidate(key) {

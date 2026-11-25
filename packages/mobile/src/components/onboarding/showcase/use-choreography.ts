@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Cue } from "./chapters";
 
@@ -27,7 +28,7 @@ export function useChoreography({
 
   useEffect(() => {
     if (!playing || instant || doneRef.current) return;
-    const startedAt = Date.now() - elapsedRef.current;
+    const startedAt = steadyNow() - elapsedRef.current;
     const timers: ReturnType<typeof setTimeout>[] = [];
     cues.forEach((cue, index) => {
       const delay = cue.at - elapsedRef.current;
@@ -44,7 +45,7 @@ export function useChoreography({
     });
     return () => {
       for (const timer of timers) clearTimeout(timer);
-      elapsedRef.current = Date.now() - startedAt;
+      elapsedRef.current = steadyNow() - startedAt;
     };
   }, [cues, instant, playing]);
 

@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import type { AgentInputSender } from "@stella/contracts/agent-rules";
 import {
   AGENT_STOPPED_ERROR_CODE,
@@ -75,6 +76,7 @@ const AGENT_RUN_RETRY_MAX_MS = 60_000;
 export const AGENT_RUN_INTERRUPTED_ERROR_CODE = "LOCAL_RUN_INTERRUPTED";
 const DISPATCH_WATCH_POLL_MS = 750;
 const DEVICE_PRESENCE_SILENCE_MS = 3 * DEVICE_PRESENCE_PING_INTERVAL_MS + 2_000;
+const DEVICE_PRESENCE_PROBE_MS = 5_000;
 
 type PlacementKind = ExecutionKind;
 type PlacementCapability = ExecutionCapability;
@@ -358,6 +360,7 @@ export class ExecutionPlacementBridge {
   private socketProven = false;
   private pendingConsent: boolean | null = null;
   private socketPingTimer: HostTimerHandle | null = null;
+  private socketProbeTimer: HostTimerHandle | null = null;
   private socketHeardAt = 0;
   private socketTokenTimer: HostTimerHandle | null = null;
   private advertisedAvailability = "";
@@ -384,7 +387,7 @@ export class ExecutionPlacementBridge {
     this.inbox = new ExecutionPlacementInbox(options.database);
     this.fetchImpl = options.fetch ?? globalThis.fetch;
     this.leases = new ExecutionPlacementLeases({
-      now: () => this.now(),
+      now: () => this.steady(),
       leaseRenewalGraceMs: options.leaseRenewalGraceMs,
       claimAckRetryBaseMs: options.claimAckRetryBaseMs,
     });
@@ -405,6 +408,10 @@ export class ExecutionPlacementBridge {
 
   private now() {
     return (this.options.now ?? Date.now)();
+  }
+
+  private steady() {
+    return (this.options.now ?? steadyNow)();
   }
 
   private log(level: "warn" | "error", message: string, error?: unknown) {
@@ -661,6 +668,8 @@ export class ExecutionPlacementBridge {
     this.leases.cancelReconnect();
     this.socketPingTimer?.cancel();
     this.socketPingTimer = null;
+    this.socketProbeTimer?.cancel();
+    this.socketProbeTimer = null;
     this.socketTokenTimer?.cancel();
     this.socketTokenTimer = null;
     const socket = this.socket;
@@ -754,14 +763,19 @@ export class ExecutionPlacementBridge {
     }
     this.socket = socket;
     this.socketProven = false;
-    this.socketHeardAt = this.now();
+    this.socketHeardAt = this.steady();
     this.socketPingTimer?.cancel();
     this.socketPingTimer = forkInterval(DEVICE_PRESENCE_PING_INTERVAL_MS, () => {
       if (this.socket !== socket) return;
-      if (this.now() - this.socketHeardAt > DEVICE_PRESENCE_SILENCE_MS) {
-        this.log("warn", "The device presence socket went silent; reconnecting.");
-        this.dropSocket(socket, 4001, "silent");
-        return;
+      if (this.steady() - this.socketHeardAt > DEVICE_PRESENCE_SILENCE_MS) {
+        const askedAt = this.steady();
+        this.socketProbeTimer?.cancel();
+        this.socketProbeTimer = forkDelayed(DEVICE_PRESENCE_PROBE_MS, () => {
+          this.socketProbeTimer = null;
+          if (this.socket !== socket || this.socketHeardAt >= askedAt) return;
+          this.log("warn", "The device presence socket went silent; reconnecting.");
+          this.dropSocket(socket, 4001, "silent");
+        });
       }
       this.sendKeepalive();
     });
@@ -772,13 +786,13 @@ export class ExecutionPlacementBridge {
         token,
         Math.max(
           MIN_TOKEN_REFRESH_DELAY_MS,
-          expiresAt - TOKEN_REFRESH_MARGIN_MS - this.now(),
+          expiresAt - TOKEN_REFRESH_MARGIN_MS - (this.options.now ?? serverNow)(),
         ),
       );
     }
 
     socket.on("message", (data: unknown) => {
-      if (this.socket === socket) this.socketHeardAt = this.now();
+      if (this.socket === socket) this.socketHeardAt = this.steady();
       let frame: DevicePresenceServerFrame;
       try {
         const text =
@@ -845,6 +859,8 @@ export class ExecutionPlacementBridge {
     this.advertisedAvailability = "";
     this.socketPingTimer?.cancel();
     this.socketPingTimer = null;
+    this.socketProbeTimer?.cancel();
+    this.socketProbeTimer = null;
     this.socketTokenTimer?.cancel();
     this.socketTokenTimer = null;
     if (code !== undefined) {
@@ -1497,7 +1513,7 @@ export class ExecutionPlacementBridge {
         this.leases.clearRenewalFailure(row.dispatchId);
       } catch (error) {
         identityRefreshNeeded = true;
-        const leaseLost = this.leases.noteRenewalFailure(row.dispatchId, now);
+        const leaseLost = this.leases.noteRenewalFailure(row.dispatchId, this.steady());
         this.log("warn", "Execution placement lease renewal failed.", error);
         if (
           isOwnerLifecycleFenceError(error) ||
@@ -2112,15 +2128,15 @@ export class ExecutionPlacementBridge {
         });
         if (row.kind === "agent" && !this.isLiveEpoch(epoch)) return null;
         if (firstLostAt !== undefined) {
-          this.log("warn", `Execution placement task ${row.dispatchId} resumed after ${attempt - 1} lost run(s) over ${Math.round((Date.now() - firstLostAt) / 1000)}s.`);
+          this.log("warn", `Execution placement task ${row.dispatchId} resumed after ${attempt - 1} lost run(s) over ${Math.round((steadyNow() - firstLostAt) / 1000)}s.`);
         }
         return result;
       } catch (error) {
         if (row.kind !== "agent") throw error;
         if (!this.isLiveEpoch(epoch)) return null;
         if (this.inbox.get(row.dispatchId)?.cancelRpcPending) throw error;
-        firstLostAt ??= Date.now();
-        const elapsed = Date.now() - firstLostAt;
+        firstLostAt ??= steadyNow();
+        const elapsed = steadyNow() - firstLostAt;
         if (elapsed >= AGENT_RUN_RETRY_WINDOW_MS) {
           this.log(
             "warn",

@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useMemo, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authClient } from "./auth-client";
@@ -16,15 +17,15 @@ void AsyncStorage.getItem(SEEN_KEY)
     const stored = Number(raw);
     if (Number.isFinite(stored) && stored > 0) setSeen(stored);
     else {
-      const now = Date.now();
+      const now = serverNow();
       setSeen(now);
       void AsyncStorage.setItem(SEEN_KEY, String(now));
     }
   })
-  .catch(() => setSeen(Date.now()));
+  .catch(() => setSeen(serverNow()));
 
 export const markEmailSeen = (): void => {
-  const now = Date.now();
+  const now = serverNow();
   setSeen(now);
   void AsyncStorage.setItem(SEEN_KEY, String(now)).catch(() => undefined);
 };

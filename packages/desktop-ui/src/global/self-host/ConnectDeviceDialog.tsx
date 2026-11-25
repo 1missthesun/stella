@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { Button } from "@/ui/button";
@@ -31,7 +32,7 @@ const remaining = (expiresAt: number, now: number) => {
 export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
   const [state, setState] = useState<State>({ kind: "starting" });
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => serverNow());
   const [copied, setCopied] = useState(false);
   const pendingId = useRef<string | null>(null);
 
@@ -69,7 +70,7 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!pairingId) return;
     let stopped = false;
-    const tick = window.setInterval(() => setNow(Date.now()), 1_000);
+    const tick = window.setInterval(() => setNow(serverNow()), 1_000);
     const poll = async () => {
       if (stopped) return;
       const status = await window.electronAPI?.selfHost?.pairingStatus(pairingId);
@@ -79,7 +80,7 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
         setState({ kind: "claimed", deviceName: status.deviceName });
         return;
       }
-      if ((status.ok && status.status !== "pending") || Date.now() > expiresAt) {
+      if ((status.ok && status.status !== "pending") || serverNow() > expiresAt) {
         pendingId.current = null;
         setState({ kind: "expired" });
         return;

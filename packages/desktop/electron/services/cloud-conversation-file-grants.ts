@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 
 const READ_BATCH = 200;
@@ -155,7 +156,7 @@ export const createCloudConversationFileGrants = (
     listPaths: (conversationId) => {
       const id = conversationId.trim();
       if (!id) return Promise.resolve([]);
-      const now = Date.now();
+      const now = steadyNow();
       const cached = cache.get(id);
       if (cached && now - cached.at < CACHE_TTL_MS) return cached.paths;
       const paths = load(id).catch((error: unknown) => {

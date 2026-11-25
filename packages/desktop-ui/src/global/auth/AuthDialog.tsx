@@ -100,8 +100,8 @@ const pollDesktopSocialAuth = async (
   claimSecret: string,
   t: Translate,
 ) => {
-  const deadline = Date.now() + SOCIAL_AUTH_TIMEOUT_MS;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + SOCIAL_AUTH_TIMEOUT_MS;
+  while (performance.now() < deadline) {
     await wait(SOCIAL_AUTH_POLL_INTERVAL_MS);
     const response = await fetchWithDeadline(
       fetch,

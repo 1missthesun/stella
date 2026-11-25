@@ -246,8 +246,8 @@ export class ConnectorConnectService {
         void shell
             .openExternal(BROWSER_EXTENSION_WEB_STORE_URL)
             .catch(() => undefined);
-        const deadline = Date.now() + EXTENSION_FLOW_TIMEOUT_MS;
-        while (Date.now() < deadline) {
+        const deadline = performance.now() + EXTENSION_FLOW_TIMEOUT_MS;
+        while (performance.now() < deadline) {
             if (!this.pending.has(requestId))
                 return;
             if (signal.aborted) {

@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { execFile } from "node:child_process";
 import {
   app,
@@ -66,7 +67,7 @@ const isInStellaQuietHours = async (
 ): Promise<boolean> => {
   const policy = await getPolicy().catch(() => null);
   return policy
-    ? isWithinQuietHours(policy.quietHours, minuteOfDayAt(Date.now(), policy.timeZone))
+    ? isWithinQuietHours(policy.quietHours, minuteOfDayAt(serverNow(), policy.timeZone))
     : false;
 };
 

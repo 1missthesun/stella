@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { BrowserWindow } from "electron";
 import { OverlayWindowController } from "../windows/overlay-window.js";
 import { WindowManager } from "../windows/window-manager.js";
@@ -32,7 +33,7 @@ export const pendingRemoteExecutionRequest = (context) => {
     const pending = context.state.pendingRemoteExecutionRequest;
     if (!pending)
         return null;
-    if (Date.now() - pending.receivedAt > PENDING_REMOTE_EXECUTION_REQUEST_TTL_MS) {
+    if (steadyNow() - pending.receivedAt > PENDING_REMOTE_EXECUTION_REQUEST_TTL_MS) {
         context.state.pendingRemoteExecutionRequest = null;
         return null;
     }

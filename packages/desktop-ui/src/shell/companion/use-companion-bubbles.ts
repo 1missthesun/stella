@@ -136,7 +136,7 @@ export function useCompanionBubbles(
       setHideAt(null);
       return;
     }
-    if (changed) setHideAt(Date.now() + dwellFor(settledText));
+    if (changed) setHideAt(performance.now() + dwellFor(settledText));
   }, [signature, settled, settledText]);
 
   const wasPausedRef = useRef(paused);
@@ -147,13 +147,13 @@ export function useCompanionBubbles(
     }
     if (wasPausedRef.current) {
       wasPausedRef.current = false;
-      if (settled && visible) setHideAt(Date.now() + RESUME_DWELL_MS);
+      if (settled && visible) setHideAt(performance.now() + RESUME_DWELL_MS);
     }
   }, [paused, settled, visible]);
 
   useEffect(() => {
     if (paused || hideAt === null || !visible) return;
-    const delay = Math.max(0, hideAt - Date.now());
+    const delay = Math.max(0, hideAt - performance.now());
     const timer = window.setTimeout(() => setVisible(false), delay);
     return () => window.clearTimeout(timer);
   }, [hideAt, paused, visible]);

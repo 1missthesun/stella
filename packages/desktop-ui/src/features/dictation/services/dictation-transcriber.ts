@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendUrl } from "@/platform/backend/backend-url";
 import {
@@ -40,7 +41,7 @@ let routeGeneration = 0;
 let lastRoute: DictationRoute | null = null;
 
 const loadManagedAvailability = (): Promise<ManagedAvailability | null> => {
-  if (managedAvailability && Date.now() - managedAvailability.at < AVAILABILITY_TTL_MS) {
+  if (managedAvailability && steadyNow() - managedAvailability.at < AVAILABILITY_TTL_MS) {
     return managedAvailability.value;
   }
   const entry = {
@@ -54,7 +55,7 @@ const loadManagedAvailability = (): Promise<ManagedAvailability | null> => {
           )
           .catch(() => null)
       : Promise.resolve({ available: false, streaming: false }),
-    at: Date.now(),
+    at: steadyNow(),
   };
   managedAvailability = entry;
   void entry.value.then((value) => {

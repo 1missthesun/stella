@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioModule } from "expo-audio";
 import { AudioStudioModule } from "@siteed/audio-studio";
@@ -250,7 +251,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     if (statusRef.current !== "idle" || operationInFlightRef.current) {
       return false;
     }
-    const pressedAt = Date.now();
+    const pressedAt = steadyNow();
     stopReadAloudForDictation();
     operationInFlightRef.current = true;
     const starting: { stop: "commit" | "cancel" | null } = { stop: null };
@@ -317,7 +318,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       current.live = live;
       if (__DEV__) {
         void live.opened.then(() => {
-          current.marks.socket = Date.now() - pressedAt;
+          current.marks.socket = steadyNow() - pressedAt;
         });
       }
       for (const chunk of current.chunks) live.pacer.send(chunk);
@@ -360,7 +361,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return abandon();
       }
 
-      current.marks.permission = Date.now() - pressedAt;
+      current.marks.permission = steadyNow() - pressedAt;
       phase = "audio-session";
       const lease = await acquireRecordingAudioSession(undefined, {
         prewarmed,
@@ -378,7 +379,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return abandon();
       }
 
-      current.marks.session = Date.now() - pressedAt;
+      current.marks.session = steadyNow() - pressedAt;
       phase = "recorder";
       const meterLevels = createLevelMeter();
       const emitter = new LegacyEventEmitter(AudioStudioModule);
@@ -393,7 +394,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         const bytes = audioEventToPcm16(audio);
         if (bytes.byteLength === 0) return;
         if (current.firstAudioAt === 0) {
-          current.firstAudioAt = Date.now();
+          current.firstAudioAt = steadyNow();
           if (__DEV__) {
             current.marks.firstAudio = current.firstAudioAt - current.pressedAt;
             setTimeout(() => {
@@ -418,7 +419,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         prewarmed ? PREWARMED_START_OPTIONS : DICTATION_RECORDING_OPTIONS,
       );
       if (prewarmed) keepScreenAwakeForDictation(true);
-      current.marks.recorder = Date.now() - pressedAt;
+      current.marks.recorder = steadyNow() - pressedAt;
 
       if (!mountedRef.current) {
         await AudioStudioModule.stopRecording().catch(() => undefined);
@@ -430,7 +431,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return abandon();
       }
       cancelledRef.current = false;
-      startedAtRef.current = Date.now();
+      startedAtRef.current = steadyNow();
       startDictationMeter(startedAtRef.current);
       tapMedium();
       safeSetStatus("recording");
@@ -477,12 +478,12 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return null;
       }
       operationInFlightRef.current = true;
-      const durationMs = Date.now() - startedAtRef.current;
+      const durationMs = steadyNow() - startedAtRef.current;
       cancelledRef.current = !commit;
       tapLight();
       safeSetStatus(commit ? "transcribing" : "idle");
 
-      const stoppedAt = Date.now();
+      const stoppedAt = steadyNow();
       let uri: string | null = null;
       try {
         const recording = (await AudioStudioModule.stopRecording()) as {
@@ -499,7 +500,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       }
       const stoppedCapture = captureRef.current;
       if (__DEV__ && stoppedCapture) {
-        const heldMs = Date.now() - stoppedCapture.pressedAt;
+        const heldMs = steadyNow() - stoppedCapture.pressedAt;
         const capturedMs = Math.round(stoppedCapture.bytes / PCM_BYTES_PER_MS);
         console.info(
           `[dictation] held ${heldMs}ms captured ${capturedMs}ms missing ${heldMs - capturedMs}ms lost ${Math.round(lostAudioMs(stoppedCapture, stoppedAt))}ms silenced ${Math.round(stoppedCapture.silencedBytes / PCM_BYTES_PER_MS)}ms leftApp ${stoppedCapture.leftApp} live ${stoppedCapture.live ? (stoppedCapture.live.stream.failure?.message ?? "ok") : "none"}`,

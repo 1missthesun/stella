@@ -93,6 +93,7 @@ type Recording = {
   id: string;
   dir: string;
   startedAtMs: number;
+  startedTicks: number;
   display: Display;
   input: ShowStellaInput | null;
   phase: "starting" | "recording" | "stopping";
@@ -220,7 +221,7 @@ export class ShowStellaController {
   async toggle(): Promise<boolean> {
     const current = this.recording;
     if (current) {
-      if (Date.now() - this.lastStartAt < RESTART_GUARD_MS) return true;
+      if (performance.now() - this.lastStartAt < RESTART_GUARD_MS) return true;
       if (current.phase === "stopping") return true;
       void this.stop(false);
       return true;
@@ -270,11 +271,13 @@ export class ShowStellaController {
     }
 
     const startedAtMs = Date.now();
-    this.lastStartAt = startedAtMs;
+    const startedTicks = performance.now();
+    this.lastStartAt = startedTicks;
     const recording: Recording = {
       id,
       dir,
       startedAtMs,
+      startedTicks,
       display,
       input: null,
       phase: "starting",
@@ -293,7 +296,7 @@ export class ShowStellaController {
     const panel = this.nativePanel();
     const input = new ShowStellaInput({
       display: display.bounds,
-      now: () => Date.now() - startedAtMs,
+      now: () => Math.round(performance.now() - startedTicks),
       toScreen:
         process.platform === "win32"
           ? (point) => screen.screenToDipPoint(point)
@@ -408,7 +411,7 @@ export class ShowStellaController {
     if (!recording || recording.phase === "stopping") return;
     recording.phase = "stopping";
     recording.discard = discard;
-    const durationMs = Date.now() - recording.startedAtMs;
+    const durationMs = Math.round(performance.now() - recording.startedTicks);
     const quiet = !this.stellaInFront();
     const timeline = this.releaseInput(recording);
     const overlay = this.options.getOverlay();
@@ -627,9 +630,9 @@ export class ShowStellaController {
     if (review.keepTimer) clearTimeout(review.keepTimer);
     review.keepTimer = null;
     if (!review.capture || review.typing) return;
-    review.readyAt ??= Date.now();
+    review.readyAt ??= performance.now();
     const wait = review.engaged
-      ? Math.max(KEEP_AFTER_MS, review.readyAt + HOVER_HOLD_MAX_MS - Date.now())
+      ? Math.max(KEEP_AFTER_MS, review.readyAt + HOVER_HOLD_MAX_MS - performance.now())
       : KEEP_AFTER_MS;
     review.keepTimer = setTimeout(() => {
       void this.review({ captureId: review.id, action: "keep" });

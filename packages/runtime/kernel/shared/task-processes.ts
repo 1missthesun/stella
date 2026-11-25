@@ -404,13 +404,13 @@ const groupAlive = (pgid: number) => {
 const sleep = (ms: number) => Effect.runPromise(Effect.sleep(ms));
 
 const waitGone = async (targets: Targets, ms: number) => {
-  const deadline = Date.now() + ms;
+  const deadline = performance.now() + ms;
   for (;;) {
     const remaining =
       [...targets.pids].some(([pid, identity]) => alive(pid) && readProcessIdentity(pid) === identity) ||
       [...targets.groups.keys()].some(groupAlive);
     if (!remaining) return true;
-    if (Date.now() >= deadline) return false;
+    if (performance.now() >= deadline) return false;
     await sleep(POLL_MS);
   }
 };

@@ -1,3 +1,4 @@
+import { savedWaitMs } from "@stella/contracts/server-clock";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -178,7 +179,7 @@ export class TaskTabs {
           record.backends.length > 0 &&
           !this.running.has(owner) &&
           (record.closeAt !== undefined
-            ? record.closeAt <= now
+            ? savedWaitMs(record.closeAt, TASK_TABS_CLOSE_GRACE_MS, now) === 0
             : record.usedAt <= now - TASK_TABS_ORPHAN_AGE_MS),
       )
       .map(([owner]) => owner);

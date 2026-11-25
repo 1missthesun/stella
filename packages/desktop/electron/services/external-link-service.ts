@@ -109,7 +109,7 @@ export class ExternalLinkService {
   }
 
   consumeExternalOpenBudget(senderId: number) {
-    const now = Date.now()
+    const now = performance.now()
     const existing = this.externalOpenRateBySender.get(senderId)
     if (!existing || now - existing.windowStartMs > EXTERNAL_OPEN_WINDOW_MS) {
       this.externalOpenRateBySender.set(senderId, {

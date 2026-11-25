@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -323,7 +324,7 @@ const fetchCatalogFromNetwork = (
   if (existing) {
     return existing;
   }
-  lastCatalogFetchAttemptAtMs.set(request.identityKey, Date.now());
+  lastCatalogFetchAttemptAtMs.set(request.identityKey, steadyNow());
   const inFlight = catalogRuntime.runPromise(
     Effect.gen(function* () {
       const res = yield* tryCatalogOp(() =>
@@ -420,7 +421,7 @@ const fetchStellaModelCatalogEffect = (args: {
         lastCatalogFetchAttemptAtMs.get(request.identityKey) ?? 0;
       if (
         !inFlightCatalogRequests.has(request.identityKey) &&
-        Date.now() - lastAttempt >= CATALOG_REFRESH_MIN_INTERVAL_MS
+        steadyNow() - lastAttempt >= CATALOG_REFRESH_MIN_INTERVAL_MS
       ) {
         catalogRuntime.runFork(
           tryCatalogOp(() =>

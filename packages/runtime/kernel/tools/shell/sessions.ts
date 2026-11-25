@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import { signalOwnChild } from "@stella/node-shared/shared/process-identity.js";
@@ -498,12 +499,12 @@ export const waitForShellUntilDeadlineEffect = (
   signal?: AbortSignal,
 ): Effect.Effect<void, unknown> =>
   Effect.gen(function* () {
-    while (record.running && Date.now() < deadlineAt) {
+    while (record.running && performance.now() < deadlineAt) {
       const observedVersion = record.outputVersion;
       yield* waitForShellActivityEffect(
         record,
         observedVersion,
-        Math.max(0, deadlineAt - Date.now()),
+        Math.max(0, deadlineAt - performance.now()),
         signal,
       );
     }
@@ -582,13 +583,13 @@ export const settleCompletedShellEffect = (
   hardDeadlineAt = Number.POSITIVE_INFINITY,
 ): Effect.Effect<void, unknown> =>
   Effect.gen(function* () {
-    const deadline = Math.min(Date.now() + 250, hardDeadlineAt);
-    while (record.running && Date.now() < deadline) {
+    const deadline = Math.min(performance.now() + 250, hardDeadlineAt);
+    while (record.running && performance.now() < deadline) {
       const observedVersion = record.outputVersion;
       yield* waitForShellActivityEffect(
         record,
         observedVersion,
-        Math.min(25, Math.max(1, deadline - Date.now())),
+        Math.min(25, Math.max(1, deadline - performance.now())),
         signal,
       );
     }
@@ -720,7 +721,7 @@ export const startShell = (
     const schedulePtyFinish = () => {
       if (!pendingExit || !record.running) return;
       if (settleTimer) clearTimeout(settleTimer);
-      const remaining = Math.max(0, settleDeadlineAt - Date.now());
+      const remaining = Math.max(0, settleDeadlineAt - performance.now());
       settleTimer = setTimeout(
         () => {
           if (!pendingExit) return;
@@ -759,7 +760,7 @@ export const startShell = (
           },
           onExit: (exitCode, _signalCode, error) => {
             pendingExit = { exitCode, ...(error ? { error } : {}) };
-            settleDeadlineAt = Date.now() + PTY_OUTPUT_MAX_SETTLE_MS;
+            settleDeadlineAt = performance.now() + PTY_OUTPUT_MAX_SETTLE_MS;
             schedulePtyFinish();
           },
           onTerminalExit: (terminalExitCode) => {
@@ -767,7 +768,7 @@ export const startShell = (
             notifyShellActivity(record);
             if (pendingExit) {
               if (settleTimer) clearTimeout(settleTimer);
-              settleDeadlineAt = Date.now();
+              settleDeadlineAt = performance.now();
               schedulePtyFinish();
             } else if (terminalExitCode !== 0 && record.running) {
               append("PTY stream closed unexpectedly.\n", true);
@@ -1009,7 +1010,7 @@ export const writeFingerprint = (chars: string): string =>
 
 export const pruneAcceptedWriteIds = (
   record: ManagedShellRecord,
-  now = Date.now(),
+  now = steadyNow(),
 ): void => {
   for (const [id, receipt] of record.acceptedWriteIds) {
     if (now - receipt.acceptedAt >= ACCEPTED_WRITE_ID_TTL_MS) {
@@ -1033,7 +1034,7 @@ export const recordAcceptedWriteId = (
   record.acceptedWriteIds.delete(writeId);
   record.acceptedWriteIds.set(writeId, {
     fingerprint,
-    acceptedAt: Date.now(),
+    acceptedAt: steadyNow(),
   });
   pruneAcceptedWriteIds(record);
 };

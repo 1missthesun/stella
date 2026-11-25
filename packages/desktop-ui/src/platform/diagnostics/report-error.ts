@@ -19,7 +19,7 @@ export const reportRendererError = (payload: RendererErrorPayload): void => {
   const signature = `${payload.kind ?? ''}:${payload.message ?? ''}:${
     payload.source ?? ''
   }`
-  const now = Date.now()
+  const now = performance.now()
   const last = recent.get(signature)
   if (last != null && now - last < DEDUP_WINDOW_MS) return
   recent.set(signature, now)

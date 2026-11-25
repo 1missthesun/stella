@@ -34,7 +34,7 @@ export function ShowStellaReviewCard({
   const ready = state.status !== "preparing";
   const typing = focused || note.trim().length > 0;
   const readyAt = useRef<number | null>(null);
-  if (ready && readyAt.current === null) readyAt.current = Date.now();
+  if (ready && readyAt.current === null) readyAt.current = performance.now();
 
   const answer = (action: ShowStellaReviewAction) => {
     if (answered.current) return;
@@ -51,7 +51,7 @@ export function ShowStellaReviewCard({
     if (!ready || typing) return;
     const captureId = state.captureId;
     const wait = hovered
-      ? Math.max(KEEP_AFTER_MS, (readyAt.current ?? Date.now()) + HOVER_HOLD_MAX_MS - Date.now())
+      ? Math.max(KEEP_AFTER_MS, (readyAt.current ?? performance.now()) + HOVER_HOLD_MAX_MS - performance.now())
       : KEEP_AFTER_MS;
     const timer = setTimeout(() => keepCapture(captureId), wait);
     return () => clearTimeout(timer);

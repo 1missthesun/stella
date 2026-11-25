@@ -417,13 +417,13 @@ export class InAppBrowserService {
     const budgetMs =
       this.options.demandConnectionTimeoutMs ??
       DEFAULT_DEMAND_CONNECTION_TIMEOUT_MS;
-    const deadline = Date.now() + Math.max(0, budgetMs);
+    const deadline = performance.now() + Math.max(0, budgetMs);
     const wait =
       this.options.wait ??
       ((delayMs: number) =>
         new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
     for (let index = 0; !this.disposed; index += 1) {
-      const remainingMs = deadline - Date.now();
+      const remainingMs = deadline - performance.now();
       if (index > 0 && remainingMs <= 0) break;
       const windowMs =
         DEMAND_ATTEMPT_WINDOWS_MS[
@@ -439,7 +439,7 @@ export class InAppBrowserService {
         DEMAND_RETRY_BACKOFF_MS[
           Math.min(index, DEMAND_RETRY_BACKOFF_MS.length - 1)
         ]!;
-      if (deadline - Date.now() <= backoffMs) break;
+      if (deadline - performance.now() <= backoffMs) break;
       await wait(backoffMs);
     }
     return this.state.connection === "connected";
@@ -981,7 +981,7 @@ export class InAppBrowserService {
   }
 
   private async pollExtensionStatus(timeoutMs: number, pollMs: number) {
-    const deadline = Date.now() + Math.max(0, timeoutMs);
+    const deadline = performance.now() + Math.max(0, timeoutMs);
     do {
       try {
         if (await this.options.getExtensionStatus()) return true;
@@ -993,7 +993,7 @@ export class InAppBrowserService {
       ) {
         break;
       }
-      if (Date.now() >= deadline || this.disposed) break;
+      if (performance.now() >= deadline || this.disposed) break;
       await (
         this.options.wait ??
         ((delayMs: number) =>

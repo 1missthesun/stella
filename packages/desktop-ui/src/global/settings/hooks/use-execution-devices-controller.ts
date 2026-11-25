@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   DeviceDestination,
@@ -78,7 +79,7 @@ export function useExecutionDevicesController() {
           );
           remoteExecution = result.remoteExecution;
         }
-        lastWriteAt.current = Date.now();
+        lastWriteAt.current = steadyNow();
         setDevices((current) =>
           (current ?? []).map((device) =>
             device.deviceId === deviceId

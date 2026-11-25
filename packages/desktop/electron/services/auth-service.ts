@@ -1,3 +1,5 @@
+import { noteFreshTokenTime } from "@stella/contracts/backend/client";
+import { serverNow } from "@stella/contracts/server-clock";
 import { app, BrowserWindow, powerMonitor } from "electron";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -1243,6 +1245,7 @@ export class AuthService {
       typeof data?.token === "string" && data.token.trim()
         ? data.token.trim()
         : "";
+    noteFreshTokenTime(token);
     return token ? { ok: true, token } : { ok: false, reason: "http" };
   }
 
@@ -1404,7 +1407,7 @@ export class AuthService {
   private isHostAuthTokenExpired(token: string): boolean {
     const payload = decodeBase64UrlJson(token.split(".")[1] ?? "");
     const exp = (payload as { exp?: unknown } | null)?.exp;
-    return typeof exp === "number" && Date.now() >= exp * 1000;
+    return typeof exp === "number" && serverNow() >= exp * 1000;
   }
 
   private isHostAuthTokenFresh(token: string): boolean {
@@ -1413,7 +1416,7 @@ export class AuthService {
     if (typeof exp !== "number") {
       return true;
     }
-    return Date.now() < exp * 1000 - HOST_AUTH_TOKEN_REFRESH_MARGIN_MS;
+    return serverNow() < exp * 1000 - HOST_AUTH_TOKEN_REFRESH_MARGIN_MS;
   }
 
   private async mintHostAuthToken(): Promise<string | null> {
@@ -1642,7 +1645,7 @@ export class AuthService {
       typeof exp === "number"
         ? Math.max(
             HOST_AUTH_TOKEN_SCHEDULE_MIN_DELAY_MS,
-            exp * 1000 - Date.now() - HOST_AUTH_TOKEN_SCHEDULE_MARGIN_MS,
+            exp * 1000 - serverNow() - HOST_AUTH_TOKEN_SCHEDULE_MARGIN_MS,
           )
         : HOST_AUTH_TOKEN_SCHEDULE_FALLBACK_MS,
     );

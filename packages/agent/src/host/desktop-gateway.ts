@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   GATEWAY_REQUEST_ID_HEADER,
   GATEWAY_RESOLVE_PATH,
@@ -86,14 +87,14 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
     });
     for (const [name, value] of Object.entries(proof)) headers.set(name, value);
     if (wantsKeepalive(request, body)) headers.set(GATEWAY_RELAY_KEEPALIVE_HEADER, "1");
-    const sentAt = Date.now();
+    const sentAt = steadyNow();
     const response = await fetchWithInactivity(
       fetch,
       request.url,
       { method: request.method, headers, body },
       { label: "Stella model gateway", idleMs: REQUEST_BUDGET_MS.streamIdle, signal: request.signal },
     );
-    const clockMoved = noteGatewayClock(request.url, response, sentAt, Date.now());
+    const clockMoved = noteGatewayClock(request.url, response, sentAt, steadyNow());
     const unwrapped = await unwrapRelayKeepalive(response);
     if (await dpopInvalid(unwrapped)) {
       if (clockMoved && !clockRetried) return send(request, body, capability, true);

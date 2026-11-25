@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -324,7 +325,7 @@ export class InAppBrowserCdpAdapter {
     server.on("upgrade", (request, socket, head) => {
       const requestPath = request.url ?? "";
       const route = this.ownerRoutes.get(requestPath);
-      if (!route || route.expiresAt <= Date.now()) {
+      if (!route || route.expiresAt <= steadyNow()) {
         this.ownerRoutes.delete(requestPath);
         socket.destroy();
         return;
@@ -391,11 +392,13 @@ export class InAppBrowserCdpAdapter {
     const legacyUrl = await this.start();
     const parsed = new URL(legacyUrl);
     const routePath = `/devtools/browser/${randomBytes(32).toString("hex")}`;
-    const expiresAt = Date.now() + OWNER_CAPABILITY_TTL_MS;
     this.pruneExpiredOwnerRoutes();
-    this.ownerRoutes.set(routePath, { ownerId: normalizedOwnerId, expiresAt });
+    this.ownerRoutes.set(routePath, {
+      ownerId: normalizedOwnerId,
+      expiresAt: steadyNow() + OWNER_CAPABILITY_TTL_MS,
+    });
     parsed.pathname = routePath;
-    return { cdpUrl: parsed.toString(), expiresAt };
+    return { cdpUrl: parsed.toString(), expiresAt: Date.now() + OWNER_CAPABILITY_TTL_MS };
   }
 
   async stop(): Promise<void> {
@@ -838,7 +841,7 @@ export class InAppBrowserCdpAdapter {
   }
 
   private pruneExpiredOwnerRoutes() {
-    const now = Date.now();
+    const now = steadyNow();
     for (const [routePath, route] of this.ownerRoutes) {
       if (route.expiresAt <= now) this.ownerRoutes.delete(routePath);
     }

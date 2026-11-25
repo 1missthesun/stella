@@ -133,7 +133,7 @@ export class MicrophoneCapture {
 
   private ensureChild(): HelperChild | null {
     if (this.child) return this.child;
-    if (this.disposed || Date.now() < this.retryAt) return null;
+    if (this.disposed || performance.now() < this.retryAt) return null;
     const helper = resolveNativeHelperPath(HELPER);
     if (!helper) return null;
     let child: HelperChild;
@@ -158,7 +158,7 @@ export class MicrophoneCapture {
     if (child && this.child !== child) return;
     this.child = null;
     if (this.disposed) return;
-    this.retryAt = Date.now() + RESPAWN_BACKOFF_MS;
+    this.retryAt = performance.now() + RESPAWN_BACKOFF_MS;
     getFileLogger()?.process("native.mic-capture.gone", { reason });
     this.abandonCurrent("The microphone stopped.");
   }

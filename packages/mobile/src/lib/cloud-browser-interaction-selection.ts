@@ -1,9 +1,10 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import type { CloudBrowserInteractionSummary } from "./cloud-browser";
 
 export function selectCurrentConversationBrowserInteraction(
   interactions: readonly CloudBrowserInteractionSummary[],
   conversationId: string | null | undefined,
-  now = Date.now(),
+  now = serverNow(),
 ): CloudBrowserInteractionSummary | null {
   if (!conversationId) return null;
 

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { fetchWithInactivity, REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
 import {
   STELLA_DEEPSEEK_V4_FLASH_UPSTREAM_MODEL,
@@ -420,12 +421,12 @@ const sessionCapabilityFetch = (
         idleMs: REQUEST_BUDGET_MS.streamIdle,
         signal: callerSignal,
       });
-    const sentAt = Date.now();
+    const sentAt = steadyNow();
     const response = await send(input, {
       ...init,
       headers: await proofHeaders(firstCapability),
     });
-    const clockMoved = noteGatewayClock(requestUrl, response, sentAt, Date.now());
+    const clockMoved = noteGatewayClock(requestUrl, response, sentAt, steadyNow());
     let capability: string | undefined;
     if (await isDpopInvalid(response)) {
       if (!clockMoved) throw gatewayDeviceVerificationError(requestUrl);

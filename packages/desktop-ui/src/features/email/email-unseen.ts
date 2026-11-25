@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useMemo, useSyncExternalStore } from "react";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
@@ -9,7 +10,7 @@ const listeners = new Set<() => void>();
 const read = (): number => {
   const stored = Number(window.localStorage.getItem(KEY));
   if (Number.isFinite(stored) && stored > 0) return stored;
-  const now = Date.now();
+  const now = serverNow();
   window.localStorage.setItem(KEY, String(now));
   return now;
 };
@@ -17,7 +18,7 @@ const read = (): number => {
 let seenAt = read();
 
 export const markEmailSeen = (): void => {
-  seenAt = Date.now();
+  seenAt = serverNow();
   window.localStorage.setItem(KEY, String(seenAt));
   for (const listener of listeners) listener();
 };

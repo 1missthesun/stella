@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import { existsSync, promises as fs, readFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -226,7 +227,7 @@ const HELD_FRAME_ID = "stella-update-hold";
 export const pendingHold = (holdDir: string): PendingHold | null => {
   try {
     const hold = JSON.parse(readFileSync(path.join(holdDir, HOLD_RECORD), "utf8")) as UpdateHold;
-    if (Date.now() - hold.since > HOLD_MAX_AGE_MS || !existsSync(hold.image)) return null;
+    if (savedAgeMs(hold.since) > HOLD_MAX_AGE_MS || !existsSync(hold.image)) return null;
     return { backgroundColor: hold.dark ? "#1c1c1e" : "#f2f2f3", image: hold.image };
   } catch {
     return null;
@@ -460,7 +461,7 @@ export class UpdateTransition {
       .then((text) => JSON.parse(text) as UpdateHold)
       .catch(() => null);
     await fs.rm(record, { force: true });
-    if (!hold || Date.now() - hold.since > HOLD_MAX_AGE_MS) return;
+    if (!hold || savedAgeMs(hold.since) > HOLD_MAX_AGE_MS) return;
     let view: WebContentsView;
     const removeHeldFrame = () =>
       win.isDestroyed() ? Promise.resolve() : win.webContents.executeJavaScript(REMOVE_HELD_FRAME).catch(() => {});
@@ -503,7 +504,7 @@ export class UpdateTransition {
 
   private holdOptions(hold: UpdateHold): HoldOptions {
     return {
-      labelDelayMs: hold.since + LABEL_DELAY_MS - Date.now(),
+      labelDelayMs: Math.min(LABEL_DELAY_MS, hold.since + LABEL_DELAY_MS - Date.now()),
       heldMs: Date.now() - hold.since,
       dark: hold.dark,
       label: this.options.holdLabel(),
@@ -604,8 +605,8 @@ export class UpdateTransition {
         .then(() => true, () => false);
       if (painted && !reloaded() && !contents.isLoading()) return;
     }
-    const deadline = Date.now() + READY_TIMEOUT_MS;
-    while (Date.now() < deadline) {
+    const deadline = performance.now() + READY_TIMEOUT_MS;
+    while (performance.now() < deadline) {
       const isLive = await timeout(
         contents.executeJavaScript(LIVE_SCRIPT) as Promise<boolean>,
         1_000,

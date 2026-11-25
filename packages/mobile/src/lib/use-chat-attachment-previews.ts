@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { File } from "expo-file-system";
@@ -55,7 +56,7 @@ export function useChatAttachmentPreviews(
     }
     if (!authorityScope || paths.length === 0) return;
     const pending = paths.filter((path) =>
-      (cache.entries.get(path)?.expiresAt ?? 0) <= Date.now() + REFRESH_MARGIN_MS);
+      (cache.entries.get(path)?.expiresAt ?? 0) <= serverNow() + REFRESH_MARGIN_MS);
     let cursor = 0;
     const current = () => alive && cacheRef.current === cache;
     const worker = async () => {
@@ -80,8 +81,8 @@ export function useChatAttachmentPreviews(
         if (!current()) return;
         const nextRefresh = Math.min(...paths.map((path) => {
           const expiry = cache.entries.get(path)?.expiresAt ?? 0;
-          return expiry > Date.now() + REFRESH_MARGIN_MS
-            ? expiry - Date.now() - REFRESH_MARGIN_MS
+          return expiry > serverNow() + REFRESH_MARGIN_MS
+            ? expiry - serverNow() - REFRESH_MARGIN_MS
             : RETRY_MS;
         }));
         timer = setTimeout(() => setRefresh((value) => value + 1),
@@ -117,13 +118,13 @@ export function useChatAttachmentPreviews(
       if (!attachmentPaths?.length) return message;
       const resolved = attachmentPaths.flatMap((path) => {
         const preview = entries.get(path);
-        return preview && preview.expiresAt > Date.now() ? [preview] : [];
+        return preview && preview.expiresAt > serverNow() ? [preview] : [];
       });
       const existingPreviews = new Map(message.attachmentPreviews?.map((preview) => [preview.path, preview]));
       const attachmentPreviews = attachmentPaths.map((path) => {
         const preview = entries.get(path);
         const existing = existingPreviews.get(path);
-        if (!preview || preview.expiresAt <= Date.now()) {
+        if (!preview || preview.expiresAt <= serverNow()) {
           return existing ?? { path, name: chatAttachmentDisplayName(path) };
         }
         return {

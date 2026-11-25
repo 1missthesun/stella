@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -222,7 +223,7 @@ export const knownAntigravitySignIn = (home: string): boolean => readRecord(home
 
 export const noteAntigravitySignIn = (home: string, signedIn: boolean): void => {
   const last = readRecord(home);
-  if (last?.signedIn === signedIn && Date.now() - last.at < 10_000) return;
+  if (last?.signedIn === signedIn && savedAgeMs(last.at) < 10_000) return;
   const signedOutAt = last?.signedOutAt;
   writeRecord(home, { signedIn, at: Date.now(), ...(signedOutAt ? { signedOutAt } : {}) });
 };
@@ -233,7 +234,10 @@ export const noteAntigravitySignedOut = (home: string): void => {
   if (last.models.length > 0) writeJson(modelsFile(home), { ...last, models: [] });
 };
 
-export const antigravitySignedOutSince = (home: string, since: number): boolean => (readRecord(home)?.signedOutAt ?? 0) >= since;
+export const antigravitySignedOutSince = (home: string, since: number): boolean => {
+  const at = readRecord(home)?.signedOutAt ?? 0;
+  return at >= since && Number.isFinite(savedAgeMs(at));
+};
 
 const asking = new Map<string, Promise<boolean>>();
 
@@ -259,6 +263,6 @@ export const refreshAntigravitySignIn = (home: string, executable: () => Promise
 
 export const currentAntigravitySignIn = async (home: string, executable: () => Promise<string | undefined>): Promise<boolean> => {
   const record = readRecord(home);
-  if (record && Date.now() - record.at < (record.signedIn ? SIGNED_IN_FRESH_MS : SIGNED_OUT_FRESH_MS)) return record.signedIn;
+  if (record && savedAgeMs(record.at) < (record.signedIn ? SIGNED_IN_FRESH_MS : SIGNED_OUT_FRESH_MS)) return record.signedIn;
   return await refreshAntigravitySignIn(home, executable);
 };

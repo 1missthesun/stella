@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { sendStateInFlight } from "@stella/contracts/send-state";
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import {
@@ -231,21 +232,21 @@ const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
   const [offlineWindow, setOfflineWindow] = useState<CloudOfflineWindow>(
     idleCloudOfflineWindow,
   );
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => steadyNow());
   useEffect(() => {
     setOfflineWindow((current) =>
-      nextCloudOfflineWindow(current, status, Date.now()),
+      nextCloudOfflineWindow(current, status, steadyNow()),
     );
   }, [status]);
   useEffect(() => {
     const dueAt = cloudOfflineNoticeDueAt(offlineWindow, status);
     if (dueAt === null) return;
-    const now = Date.now();
+    const now = steadyNow();
     if (now >= dueAt) {
       setNowMs((current) => (current >= dueAt ? current : now));
       return;
     }
-    const timer = setTimeout(() => setNowMs(Date.now()), dueAt - now + 1);
+    const timer = setTimeout(() => setNowMs(steadyNow()), dueAt - now + 1);
     return () => clearTimeout(timer);
   }, [offlineWindow, status]);
   return shouldShowCloudOfflineNotice(offlineWindow, status, nowMs);

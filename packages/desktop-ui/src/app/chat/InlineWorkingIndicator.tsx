@@ -146,7 +146,7 @@ export function InlineWorkingIndicator({
       clearTimer();
       handoffController?.indicatorReactivated();
       if (!wasActiveRef.current) {
-        activatedAtRef.current = Date.now();
+        activatedAtRef.current = performance.now();
       }
       wasActiveRef.current = true;
       setLeaving(false);
@@ -191,8 +191,8 @@ export function InlineWorkingIndicator({
     const remainingMs = exitImmediately
       ? 0
       : getInlineWorkingIndicatorExitDelayMs({
-          activatedAtMs: activatedAtRef.current ?? Date.now(),
-          nowMs: Date.now(),
+          activatedAtMs: activatedAtRef.current ?? performance.now(),
+          nowMs: performance.now(),
           minVisibleMs: MIN_VISIBLE_MS,
         });
     if (remainingMs > 0) {

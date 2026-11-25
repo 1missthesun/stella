@@ -44,7 +44,7 @@ import {
   signedEnvelope,
   type SavedValuesRoster,
 } from "@stella/contracts/saved-values-trust";
-import { serverNow } from "@stella/contracts/server-clock";
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { authClient } from "./auth-client";
 import { getBackendClient, useBackendView } from "./backend";
 import { base64UrlToBytes, bytesToBase64Url } from "./base64url";
@@ -142,9 +142,9 @@ const publishDevice = async (): Promise<void> => {
     mine.publicKey === keys.publicKey &&
     serverNow() - mine.updatedAt < SAVED_VALUES_DEVICE_REFRESH_MS;
   if (current || publishing) return;
-  if (mine && Date.now() - lastPublishAttemptAt < PUBLISH_RETRY_MS) return;
+  if (mine && steadyNow() - lastPublishAttemptAt < PUBLISH_RETRY_MS) return;
   publishing = true;
-  lastPublishAttemptAt = Date.now();
+  lastPublishAttemptAt = steadyNow();
   try {
     await getBackendClient().call("savedValues.putDevice", {
       deviceId: keys.deviceId,

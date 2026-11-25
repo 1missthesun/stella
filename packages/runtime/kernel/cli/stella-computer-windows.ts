@@ -511,11 +511,11 @@ const connectWindowsPipeWithRetry = async (
   budgetMs: number,
   signal = getComputerExecutionSignal(),
 ): Promise<net.Socket> => {
-  const deadline = Date.now() + budgetMs;
+  const deadline = performance.now() + budgetMs;
   let lastError: unknown = null;
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     try {
-      const remainingMs = Math.max(1, deadline - Date.now());
+      const remainingMs = Math.max(1, deadline - performance.now());
       return await connectWindowsPipe(
         pipeName,
         Math.min(150, remainingMs),
@@ -562,11 +562,11 @@ export const waitForWindowsDaemonTeardown = async (
     overrides.pipeAccepting ?? windowsPipeAcceptingConnections;
   const timeoutMs = overrides.timeoutMs ?? windowsDaemonTeardownBudgetMs;
   const pollMs = overrides.pollMs ?? 25;
-  const deadline = Date.now() + timeoutMs;
+  const deadline = performance.now() + timeoutMs;
   let processStillRunning = isPidRunning(pid);
   let stalePipeAccepting = await isPipeAccepting(pipeName);
   while (processStillRunning || stalePipeAccepting) {
-    if (Date.now() >= deadline) {
+    if (performance.now() >= deadline) {
       const blockers = [
         processStillRunning
           ? `helper pid ${pid ?? "unknown"} is still running`
@@ -688,8 +688,8 @@ const connectWindowsDaemon = async (
   );
 
   try {
-    const deadline = Date.now() + windowsDaemonStartupBudgetMs;
-    while (Date.now() < deadline) {
+    const deadline = performance.now() + windowsDaemonStartupBudgetMs;
+    while (performance.now() < deadline) {
       const pid = readPidFile(pidPath);
       if (pid && pidIsRunning(pid)) {
         try {

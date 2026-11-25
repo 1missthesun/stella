@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import type { Api, Model, ProviderStreams } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
@@ -96,7 +97,7 @@ const settled = (models: Promise<LiveProviderModel[] | undefined>): Promise<Live
 
 const listedProviderModels = (providerId: string): Promise<LiveProviderModel[]> => {
   const cached = listedModels.get(providerId);
-  if (cached && Date.now() - cached.at < LISTED_MODELS_TTL_MS) return cached.models;
+  if (cached && steadyNow() - cached.at < LISTED_MODELS_TTL_MS) return cached.models;
   const models = Promise.all([
     settled(fetchPublishedProviderModels(providerId)),
     settled(liveProviderModelListNeedsKey(providerId) ? Promise.resolve([]) : fetchLiveProviderModels(providerId)),
@@ -104,7 +105,7 @@ const listedProviderModels = (providerId: string): Promise<LiveProviderModel[]> 
     if (published.length + live.length === 0) listedModels.delete(providerId);
     return [...published, ...live];
   });
-  listedModels.set(providerId, { at: Date.now(), models });
+  listedModels.set(providerId, { at: steadyNow(), models });
   return models;
 };
 

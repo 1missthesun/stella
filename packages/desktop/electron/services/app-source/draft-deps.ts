@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -132,7 +133,7 @@ const install = (bun: string, cwd: string, timeoutMs: number) =>
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const withLock = async <T>(lock: string, timeoutMs: number, work: () => Promise<T>): Promise<T> => {
-  const until = Date.now() + timeoutMs;
+  const until = performance.now() + timeoutMs;
   for (;;) {
     try {
       fs.mkdirSync(lock);
@@ -153,12 +154,12 @@ const withLock = async <T>(lock: string, timeoutMs: number, work: () => Promise<
           return (probe as NodeJS.ErrnoException).code === "EPERM";
         }
       })();
-      const age = Date.now() - (lstat(lock)?.mtimeMs ?? Date.now());
+      const age = savedAgeMs(lstat(lock)?.mtimeMs ?? Date.now());
       if (!alive || age > timeoutMs) {
         fs.rmSync(lock, { recursive: true, force: true });
         continue;
       }
-      if (Date.now() > until) throw new Error("Timed out waiting for another install of the draft's packages.");
+      if (performance.now() > until) throw new Error("Timed out waiting for another install of the draft's packages.");
       await delay(500);
     }
   }

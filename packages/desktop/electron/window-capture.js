@@ -69,7 +69,7 @@ const queryWindowInfo = (x, y, options) => {
 };
 export const getWindowInfoAtPoint = (x, y, options) => {
     const key = windowInfoPointKey(x, y, options);
-    const now = Date.now();
+    const now = performance.now();
     const cached = windowInfoPointCache.get(key);
     if (cached && cached.expiresAt > now) {
         return Promise.resolve(cached.value);
@@ -85,7 +85,7 @@ export const getWindowInfoAtPoint = (x, y, options) => {
     return promise
         .then((value) => {
         windowInfoPointCache.set(key, {
-            expiresAt: Date.now() + WINDOW_INFO_POINT_CACHE_MS,
+            expiresAt: performance.now() + WINDOW_INFO_POINT_CACHE_MS,
             value,
         });
         if (windowInfoPointCache.size > WINDOW_INFO_POINT_CACHE_MAX) {

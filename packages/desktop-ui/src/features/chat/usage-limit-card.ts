@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useSyncExternalStore } from "react";
 import {
   usageLimitNotice,
@@ -48,7 +49,7 @@ const resetTime = (until: number) => {
   const at = new Date(until);
   const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   if (at.toDateString() === new Date().toDateString()) return time;
-  const far = until - Date.now() > 6 * 24 * 60 * 60 * 1000;
+  const far = until - serverNow() > 6 * 24 * 60 * 60 * 1000;
   return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
 };
 

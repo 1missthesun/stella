@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useCallback, useEffect, useState } from "react";
 import type {
   ClaudePlaceStatus,
@@ -211,7 +212,7 @@ export function ClaudeAccountsSection({
       ?.places?.find((entry) => entry.kind === "cloud");
     if (!login || login.kind !== "cloud") return undefined;
     const email = place.inUse.email;
-    const now = Date.now();
+    const now = serverNow();
     if (login.loginEnded || (login.loginEndsAt !== undefined && login.loginEndsAt <= now)) {
       return { state: "ended", ...(email ? { email } : {}) };
     }

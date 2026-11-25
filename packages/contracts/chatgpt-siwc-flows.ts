@@ -1,3 +1,4 @@
+import { serverNow } from "./server-clock.js";
 import {
   CHATGPT_SIWC,
   ChatGptError,
@@ -184,7 +185,7 @@ export const refreshChatGptTokens = async (
     },
     options,
   );
-  const tokens = chatGptTokenSet(json, Date.now(), args.scopes);
+  const tokens = chatGptTokenSet(json, serverNow(), args.scopes);
   if (tokens.idToken) {
     const identity = await verifyChatGptIdToken(tokens.idToken, { clientId: args.clientId }, options);
     if (identity.subject !== args.subject) {
@@ -325,7 +326,7 @@ export const verifyChatGptIdToken = async (
   }
   if (!valid) throw invalidIdToken();
 
-  const now = Math.floor((expected.now ?? Date.now()) / 1000);
+  const now = Math.floor((expected.now ?? serverNow()) / 1000);
   const audience = claims.aud;
   const audiences = Array.isArray(audience) ? audience : [audience];
   if (

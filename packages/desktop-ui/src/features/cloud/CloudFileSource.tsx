@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import type { DriveFileUrl } from "@stella/contracts/backend/drive";
@@ -37,15 +38,15 @@ export const driveFileLink = async (path: string): Promise<DriveFileUrl> => {
     const known = driveFileVersions.version(path);
     if (
       link &&
-      link.expiresAt - LINK_MARGIN_MS > Date.now() &&
+      link.expiresAt - LINK_MARGIN_MS > serverNow() &&
       (known === link.version ||
-        (known === undefined && Date.now() - pending.at < JUST_FETCHED_MS))
+        (known === undefined && steadyNow() - pending.at < JUST_FETCHED_MS))
     ) {
       return link;
     }
   }
   const value = backendClient.call("drive.fileUrl", { path });
-  const entry = { at: Date.now(), value };
+  const entry = { at: steadyNow(), value };
   links.set(path, entry);
   value.catch(() => {
     if (links.get(path) === entry) links.delete(path);

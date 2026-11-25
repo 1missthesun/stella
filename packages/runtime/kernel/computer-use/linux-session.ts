@@ -1307,14 +1307,14 @@ export const createLinuxComputerUseSession = (
           // Chromium scrolls in its renderer and reports new positions a
           // moment later.
           let moved = 0;
-          const deadline = Date.now() + SCROLL_SETTLE_MS;
+          const deadline = performance.now() + SCROLL_SETTLE_MS;
           do {
             const after =
               (await atspi.extents(anchor.ref).catch(() => null)) ?? before;
             moved = vertical ? before.y - after.y : before.x - after.x;
             if (Math.abs(moved) > 1) break;
             await sleepMs(30);
-          } while (Date.now() < deadline);
+          } while (performance.now() < deadline);
           if (Math.abs(moved) > 1) {
             return {
               route: "atspi.scroll_to_point",
@@ -1977,7 +1977,7 @@ export const createLinuxComputerUseSession = (
       sessionState(sessionId).recentActions.delete(snapshot.window.id);
     else
       sessionState(sessionId).recentActions.set(snapshot.window.id, {
-        at: Date.now(),
+        at: performance.now(),
         stateId: stateIdOf(snapshot),
       });
     const done = performance.now();
@@ -2001,12 +2001,12 @@ export const createLinuxComputerUseSession = (
     const recent = state.recentActions.get(first.window.id);
     if (!recent) return first;
     state.recentActions.delete(first.window.id);
-    const started = Date.now();
+    const started = performance.now();
     const changeDeadline = recent.at + SETTLE_CHANGE_MS;
     let current = first;
     let reread = false;
     while (
-      Date.now() < changeDeadline &&
+      performance.now() < changeDeadline &&
       stateIdOf(current) === recent.stateId
     ) {
       await sleepMs(SETTLE_POLL_MS);
@@ -2014,8 +2014,8 @@ export const createLinuxComputerUseSession = (
       reread = true;
     }
     if (stateIdOf(current) !== recent.stateId) {
-      const stableDeadline = Date.now() + SETTLE_STABLE_MAX_MS;
-      while (Date.now() < stableDeadline) {
+      const stableDeadline = performance.now() + SETTLE_STABLE_MAX_MS;
+      while (performance.now() < stableDeadline) {
         await sleepMs(SETTLE_POLL_MS);
         const next = await readSnapshot(sessionId, target, "never");
         reread = true;
@@ -2026,7 +2026,7 @@ export const createLinuxComputerUseSession = (
     }
     if (reread && policy !== "never")
       current = await readSnapshot(sessionId, target, policy);
-    current.timings.settle_ms = Date.now() - started;
+    current.timings.settle_ms = Math.round(performance.now() - started);
     return current;
   };
 
@@ -2152,9 +2152,9 @@ export const createLinuxComputerUseSession = (
           visualStateIdOf(baseline) ?? "visual_state_unavailable",
         );
       }
-      const started = Date.now();
+      const started = performance.now();
       let polls = 0;
-      while (Date.now() - started < request.timeoutMs) {
+      while (performance.now() - started < request.timeoutMs) {
         if (signal?.aborted)
           throw signal.reason ?? new Error("Computer-use wait aborted.");
         polls += 1;
@@ -2190,20 +2190,20 @@ export const createLinuxComputerUseSession = (
                   ? { afterVisualStateId: request.afterVisualStateId }
                   : {}),
                 timeoutMs: request.timeoutMs,
-                elapsedMs: Date.now() - started,
+                elapsedMs: Math.round(performance.now() - started),
                 pollCount: polls,
                 changeKinds: kinds,
               },
             }),
           };
         }
-        const remaining = request.timeoutMs - (Date.now() - started);
+        const remaining = request.timeoutMs - (performance.now() - started);
         if (remaining > 0)
           await sleepMs(Math.min(150, remaining));
       }
       throw new LinuxWaitTimeoutError(
         request.timeoutMs,
-        Date.now() - started,
+        Math.round(performance.now() - started),
         polls,
         request.afterStateId,
         request.afterVisualStateId,
@@ -2242,8 +2242,8 @@ export const createLinuxComputerUseSession = (
           : null;
         receipts.push(await runAction(sessionId, command, lives[index]));
         if (base) {
-          const deadline = Date.now() + SETTLE_CHANGE_MS;
-          while (Date.now() < deadline) {
+          const deadline = performance.now() + SETTLE_CHANGE_MS;
+          while (performance.now() < deadline) {
             await sleepMs(SETTLE_POLL_MS);
             if (
               stateIdOf(

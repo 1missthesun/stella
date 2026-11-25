@@ -1,3 +1,4 @@
+import { serverNow, steadyNow } from "@stella/contracts/server-clock";
 import { z } from "zod";
 import type {
   VoiceHistoryMessage,
@@ -122,7 +123,7 @@ function shouldGateVoiceInputForEcho({
   micLevel,
   outputLevel,
   recentOutputActiveUntil = 0,
-  now = Date.now(),
+  now = steadyNow(),
 }: VoiceEchoMetrics): boolean {
   const assistantAudioActive =
     assistantSpeaking || recentOutputActiveUntil > now;
@@ -449,7 +450,7 @@ export class RealtimeVoiceSession {
       this.syncEchoGuard();
       if (
         !this.assistantOutputActive &&
-        this.recentOutputActiveUntil <= Date.now()
+        this.recentOutputActiveUntil <= steadyNow()
       ) {
         if (this.softInputMuted) this.applySoftInputMute(false);
         this.stopEchoGuardMonitor();
@@ -605,13 +606,12 @@ export class RealtimeVoiceSession {
   }
 
   private updateLocalAuthorityExpiry(leaseExpiresAt: number) {
-    const now = Date.now();
     const remainingMs = Math.min(
       STELLA_VOICE_AUTHORITY_MAX_LOCAL_LIFETIME_MS,
-      leaseExpiresAt - now,
+      leaseExpiresAt - serverNow(),
     );
     this.authorityLocalExpiresAt =
-      now + Math.max(0, remainingMs - STELLA_VOICE_AUTHORITY_EXPIRY_SKEW_MS);
+      steadyNow() + Math.max(0, remainingMs - STELLA_VOICE_AUTHORITY_EXPIRY_SKEW_MS);
   }
 
   private claimTerminalLeaseRequest(
@@ -709,7 +709,7 @@ export class RealtimeVoiceSession {
       void this.terminateForAuthority(null, "Realtime voice lease was invalid");
       return false;
     }
-    const delayMs = expiresAt - Date.now();
+    const delayMs = expiresAt - steadyNow();
     if (delayMs <= 0) {
       void this.terminateForAuthority("expired", "Realtime voice lease expired");
       return false;
@@ -764,7 +764,7 @@ export class RealtimeVoiceSession {
       }
 
       const previousExpiry = this.authorityLocalExpiresAt;
-      if (typeof previousExpiry !== "number" || Date.now() >= previousExpiry) {
+      if (typeof previousExpiry !== "number" || steadyNow() >= previousExpiry) {
         void this.terminateForAuthority(
           "expired",
           "Realtime voice lease expired",
@@ -935,7 +935,7 @@ export class RealtimeVoiceSession {
   }
 
   private markAssistantSpeaking() {
-    this.recentOutputActiveUntil = Date.now() + ECHO_GUARD_RELEASE_MS;
+    this.recentOutputActiveUntil = steadyNow() + ECHO_GUARD_RELEASE_MS;
     if (!this.assistantOutputActive) {
       this.assistantOutputActive = true;
       this.emit({ type: "speaking-start" });
@@ -945,7 +945,7 @@ export class RealtimeVoiceSession {
   }
 
   private markAssistantIdle() {
-    this.recentOutputActiveUntil = Date.now() + ECHO_GUARD_RELEASE_MS;
+    this.recentOutputActiveUntil = steadyNow() + ECHO_GUARD_RELEASE_MS;
     if (this.assistantOutputActive) {
       this.assistantOutputActive = false;
       this.emit({ type: "speaking-end" });

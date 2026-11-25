@@ -156,7 +156,7 @@ export class MouseHookManager {
             otherKeyHeld) {
             return;
         }
-        this.altDownAt = Date.now();
+        this.altDownAt = performance.now();
     };
     handleKeyup = (event) => {
         if (!this.started)
@@ -170,7 +170,7 @@ export class MouseHookManager {
         if (!ALT_KEYCODES.has(event.keycode) || this.altDownAt === null) {
             return;
         }
-        const durationMs = Date.now() - this.altDownAt;
+        const durationMs = performance.now() - this.altDownAt;
         this.altDownAt = null;
         if (durationMs <= ALT_TAP_MAX_MS) {
             this.handlers?.toggle();

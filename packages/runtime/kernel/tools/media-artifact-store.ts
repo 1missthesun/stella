@@ -1,3 +1,4 @@
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -104,7 +105,7 @@ export const materializeMediaArtifact = async (args: {
         return { path: args.filePath, sizeBytes: raced, created: false };
       }
       const lockStat = await fs.stat(lockPath).catch(() => null);
-      if (lockStat && Date.now() - lockStat.mtimeMs > LOCK_STALE_MS) {
+      if (lockStat && savedAgeMs(lockStat.mtimeMs) > LOCK_STALE_MS) {
         await fs.unlink(lockPath).catch(() => undefined);
         continue;
       }

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
 import {
   MAX_CLIENT_RECORDS,
@@ -311,7 +312,7 @@ class ConversationStore {
 
   private emit(): void {
     if (this.emitTimer || this.turnEndHold) return;
-    const sinceLast = Date.now() - this.lastEmitMs;
+    const sinceLast = steadyNow() - this.lastEmitMs;
     if (sinceLast >= EMIT_COALESCE_MS) {
       this.notify();
       return;
@@ -323,7 +324,7 @@ class ConversationStore {
   }
 
   private notify(): void {
-    this.lastEmitMs = Date.now();
+    this.lastEmitMs = steadyNow();
     for (const listener of this.listeners) listener();
   }
 

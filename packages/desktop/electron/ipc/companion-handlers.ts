@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import {
   BrowserWindow,
   type IpcMainEvent,
@@ -90,7 +91,7 @@ export const registerCompanionHandlers = (
   };
 
   const flushPending = (win: BrowserWindow) => {
-    const now = Date.now();
+    const now = steadyNow();
     const queue = pending;
     pending = [];
     for (const request of queue) {
@@ -108,7 +109,7 @@ export const registerCompanionHandlers = (
       win.webContents.send(request.channel, request.payload);
       return;
     }
-    pending.push({ ...request, at: Date.now() });
+    pending.push({ ...request, at: steadyNow() });
     if (pending.length > MAX_PENDING_REQUESTS) {
       pending = pending.slice(-MAX_PENDING_REQUESTS);
     }

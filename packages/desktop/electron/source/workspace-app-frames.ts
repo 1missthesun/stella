@@ -26,7 +26,7 @@ const openOutsideApp = (value: string) => {
     return;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return;
-  const now = Date.now();
+  const now = performance.now();
   if (now - lastExternalOpenAtMs < EXTERNAL_OPEN_MIN_INTERVAL_MS) return;
   lastExternalOpenAtMs = now;
   void shell.openExternal(url.toString());

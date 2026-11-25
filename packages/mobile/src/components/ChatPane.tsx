@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { ChatRowAnchors } from "@stella/contracts/chat-placement";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { isAgentScheduleNotice } from "@stella/contracts/schedule-notice-group";
@@ -939,7 +940,7 @@ export function ChatPane({
     placeLatestTurnFor(lastMessage.id);
     replyPinRef.current = {
       id: lastMessage.id,
-      untilMs: Date.now() + REPLY_PLACEMENT_PIN_SUPPRESS_MS,
+      untilMs: steadyNow() + REPLY_PLACEMENT_PIN_SUPPRESS_MS,
     };
   }, [
     historyLoading,
@@ -953,12 +954,12 @@ export function ChatPane({
   const replyPinned =
     replyPin !== null &&
     replyPin.id === lastMessage?.id &&
-    Date.now() < replyPin.untilMs;
+    steadyNow() < replyPin.untilMs;
   useEffect(() => {
     if (!replyPinned || !replyPin) return;
     const timer = setTimeout(
       () => setReplyPinExpiry((tick) => tick + 1),
-      Math.max(0, replyPin.untilMs - Date.now()),
+      Math.max(0, replyPin.untilMs - steadyNow()),
     );
     return () => clearTimeout(timer);
   }, [replyPin, replyPinned]);

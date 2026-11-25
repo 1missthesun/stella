@@ -49,6 +49,8 @@ type AuthSessionData =
 
 const MODEL_CATALOG_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+const CLOCK_SET_BACK_REVISIONS = 60_000 * 1_000;
+
 const EMPTY_STELLA: StellaCatalogPayload = { models: [], defaults: [] };
 const EMPTY_MANAGED: ManagedRuntimeCatalogPayload = {
   revision: 0,
@@ -68,7 +70,9 @@ const stellaCatalogStore = createResourceStore<string, StellaCatalogPayload>({
 
 const managedGatewayStore = createResourceStore<"default", ManagedRuntimeCatalogPayload>({
   staleMs: MODEL_CATALOG_REFRESH_INTERVAL_MS,
-  accept: (next, current) => next.revision > current.revision,
+  accept: (next, current) =>
+    next.revision > current.revision ||
+    current.revision - next.revision > CLOCK_SET_BACK_REVISIONS,
   fetcher: async (_key, context) => {
     const data = await window.electronAPI?.system?.listLlmModels?.({
       forceRefresh: context.force,

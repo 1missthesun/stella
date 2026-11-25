@@ -1,3 +1,5 @@
+import { serverNow } from "./server-clock.js";
+
 /**
  * Claude's monthly spend cap does not lift at the session reset Claude may name
  * alongside it.
@@ -99,7 +101,7 @@ const future = (at: number, now: number): ClaudeUsageLimit => {
   return now - at < JUST_RESET_MS ? { resetsAt: now + JUST_RESET_RECHECK_MS } : {};
 };
 
-export const claudeUsageLimitOf = (error: unknown, now = Date.now()): ClaudeUsageLimit | null => {
+export const claudeUsageLimitOf = (error: unknown, now = serverNow()): ClaudeUsageLimit | null => {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (!LIMIT_PATTERN.test(message)) return null;
   if (MONTHLY_PATTERN.test(message)) return { monthly: true };
@@ -111,7 +113,7 @@ export const claudeUsageLimitOf = (error: unknown, now = Date.now()): ClaudeUsag
   return resetsAt !== undefined && Number.isFinite(resetsAt) ? { resetsAt } : {};
 };
 
-export const formatClaudeUsageLimitReset = (resetsAt: number, now = Date.now()) => {
+export const formatClaudeUsageLimitReset = (resetsAt: number, now = serverNow()) => {
   const at = new Date(resetsAt);
   const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const sameDay = new Date(now).toDateString() === at.toDateString();
@@ -186,7 +188,7 @@ export const applyUsageLimitCard = (pauses: UsageLimitPauses, card: ClaudeUsageL
   if (pauses.held.delete(key) && pauses.held.size === 0 && pauses.resumedAt !== undefined) pauses.resumed = true;
 };
 
-export const dropStaleUsageLimitPauses = (pauses: UsageLimitPauses, now = Date.now()): void => {
+export const dropStaleUsageLimitPauses = (pauses: UsageLimitPauses, now = serverNow()): void => {
   for (const [key, pause] of pauses.held) {
     const stale =
       pause.until !== undefined
@@ -199,7 +201,7 @@ export const dropStaleUsageLimitPauses = (pauses: UsageLimitPauses, now = Date.n
 
 export const foldUsageLimitPauses = (
   cards: Iterable<{ card: ClaudeUsageLimitCard; createdAtMs: number }>,
-  now = Date.now(),
+  now = serverNow(),
 ): UsageLimitPauses => {
   const pauses = emptyUsageLimitPauses();
   for (const { card, createdAtMs } of cards) applyUsageLimitCard(pauses, card, createdAtMs);

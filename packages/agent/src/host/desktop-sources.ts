@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
@@ -48,7 +49,7 @@ function servedPrompts(backendUrl: string | undefined) {
         signal: AbortSignal.timeout(5_000),
       });
       if (response.status === 304 && current) {
-        current = { ...current, checkedAt: Date.now() };
+        current = { ...current, checkedAt: steadyNow() };
         return;
       }
       if (!response.ok) return;
@@ -56,14 +57,14 @@ function servedPrompts(backendUrl: string | undefined) {
       current = {
         revision: body.revision,
         prompts: new Map(body.prompts.map((prompt) => [prompt.id, prompt.content])),
-        checkedAt: Date.now(),
+        checkedAt: steadyNow(),
       };
     } catch {}
   };
   const start = () => (pending ??= refresh().finally(() => (pending = undefined)));
   return async (id: string): Promise<string | undefined> => {
     if (current === undefined) await start();
-    else if (Date.now() - current.checkedAt > SERVED_PROMPTS_MAX_AGE_MS) void start();
+    else if (steadyNow() - current.checkedAt > SERVED_PROMPTS_MAX_AGE_MS) void start();
     return current?.prompts.get(id);
   };
 }

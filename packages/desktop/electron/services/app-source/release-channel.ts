@@ -7,9 +7,11 @@ import {
   SOCKET_KEEPALIVE_PONG,
 } from "@stella/contracts/backend/protocol";
 import { REQUEST_BUDGET_MS } from "@stella/contracts/request-deadline";
+import { steadyNow } from "@stella/contracts/server-clock";
 
 const PING_INTERVAL_MS = 30_000;
 const SILENCE_LIMIT_MS = 2 * PING_INTERVAL_MS + 5_000;
+const PROBE_ANSWER_MS = 5_000;
 const MIN_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 5 * 60_000;
 
@@ -24,6 +26,7 @@ export class ReleaseChannel {
   private socket: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pingTimer: NodeJS.Timeout | null = null;
+  private probeTimer: NodeJS.Timeout | null = null;
   private connectTimer: NodeJS.Timeout | null = null;
   private heardAt = 0;
   private attempt = 0;
@@ -76,11 +79,11 @@ export class ReleaseChannel {
     this.connectTimer.unref?.();
     socket.onopen = () => {
       this.clearConnectTimer();
-      this.heardAt = Date.now();
+      this.heardAt = steadyNow();
       this.startPing(socket);
     };
     socket.onmessage = (event) => {
-      this.heardAt = Date.now();
+      this.heardAt = steadyNow();
       if (event.data === SOCKET_KEEPALIVE_PONG) return;
       let frame: AppSourceReleaseFrame | null = null;
       try {
@@ -112,20 +115,28 @@ export class ReleaseChannel {
   private startPing(socket: WebSocket) {
     this.stopPing();
     this.pingTimer = setInterval(() => {
-      if (Date.now() - this.heardAt > SILENCE_LIMIT_MS) {
-        this.socket = null;
-        this.stopPing();
-        try {
-          socket.close();
-        } catch {}
-        this.scheduleReconnect();
-        return;
-      }
+      if (steadyNow() - this.heardAt > SILENCE_LIMIT_MS) this.probe(socket);
       try {
         socket.send(SOCKET_KEEPALIVE_PING);
       } catch {}
     }, PING_INTERVAL_MS);
     this.pingTimer.unref?.();
+  }
+
+  private probe(socket: WebSocket) {
+    if (this.probeTimer) return;
+    const askedAt = steadyNow();
+    this.probeTimer = setTimeout(() => {
+      this.probeTimer = null;
+      if (this.socket !== socket || this.heardAt >= askedAt) return;
+      this.socket = null;
+      this.stopPing();
+      try {
+        socket.close();
+      } catch {}
+      this.scheduleReconnect();
+    }, PROBE_ANSWER_MS);
+    this.probeTimer.unref?.();
   }
 
   private clearConnectTimer() {
@@ -136,6 +147,8 @@ export class ReleaseChannel {
   private stopPing() {
     if (this.pingTimer) clearInterval(this.pingTimer);
     this.pingTimer = null;
+    if (this.probeTimer) clearTimeout(this.probeTimer);
+    this.probeTimer = null;
   }
 
   private scheduleReconnect() {

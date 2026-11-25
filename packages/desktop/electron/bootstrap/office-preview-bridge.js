@@ -76,8 +76,8 @@ export const listOfficePreviewSnapshots = async (stellaDataDir) => {
         .sort((left, right) => left.updatedAt - right.updatedAt);
 };
 const waitForProcessExit = async (pid, timeoutMs = 2_500) => {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
+    const startedAt = performance.now();
+    while (performance.now() - startedAt < timeoutMs) {
         try {
             process.kill(pid, 0);
             await new Promise((resolve) => setTimeout(resolve, 100));

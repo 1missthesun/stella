@@ -1,3 +1,4 @@
+import { savedAgeMs, steadyNow } from "@stella/contracts/server-clock";
 import {
   promises as fs,
   unwatchFile,
@@ -307,7 +308,7 @@ export class MemorySyncService {
   }
 
   noteWindowFocus(): void {
-    if (!this.subject || Date.now() - this.lastFullPassAt < FOCUS_MIN_GAP_MS) {
+    if (!this.subject || steadyNow() - this.lastFullPassAt < FOCUS_MIN_GAP_MS) {
       return;
     }
     this.request("full", 0);
@@ -442,9 +443,9 @@ export class MemorySyncService {
   private request(mode: "full" | "local", delayMs: number): void {
     if (this.disposed || !this.subject || this.heldForChoice) return;
     if (mode === "full") {
-      delayMs = Math.max(delayMs, this.retryNotBefore - Date.now());
+      delayMs = Math.max(delayMs, this.retryNotBefore - steadyNow());
     }
-    const due = Date.now() + delayMs;
+    const due = steadyNow() + delayMs;
     const debounce = mode === "local" && this.pendingMode === "local";
     this.pendingMode =
       mode === "full" || this.pendingMode === "full" ? "full" : "local";
@@ -545,7 +546,7 @@ export class MemorySyncService {
         error instanceof BackendRequestError ? error.retryAfterMs : undefined,
       );
     }
-    this.lastFullPassAt = Date.now();
+    this.lastFullPassAt = steadyNow();
 
     const inEpoch = state.owner === subject && state.epoch === listing.memoryEpoch;
     const importing = !inEpoch && local.size > 0;
@@ -572,7 +573,7 @@ export class MemorySyncService {
       (action) =>
         action.kind !== "push" ||
         refused[action.path] !== action.localSha ||
-        now - (refusals[action.path]?.at ?? 0) >= REFUSED_RETRY_MS,
+        savedAgeMs(refusals[action.path]?.at ?? 0, now) >= REFUSED_RETRY_MS,
     );
     if (actions.length > 0) this.publish({ phase: "syncing" });
     const context = {
@@ -683,7 +684,7 @@ export class MemorySyncService {
     );
     this.failedPasses += 1;
     const retryAt = Date.now() + delay;
-    this.retryNotBefore = retryAt;
+    this.retryNotBefore = steadyNow() + delay;
     this.log("memory_sync.failed", {
       step: detail.step,
       files: detail.files.join(","),
@@ -871,7 +872,7 @@ export class MemorySyncService {
         .then(() => true)
         .catch(() => false);
       if (!exists) continue;
-      if (merge.dispatchedAt !== null && now - merge.dispatchedAt > MERGE_SHOWN_MS) {
+      if (merge.dispatchedAt !== null && savedAgeMs(merge.dispatchedAt, now) > MERGE_SHOWN_MS) {
         continue;
       }
       live.push(merge);

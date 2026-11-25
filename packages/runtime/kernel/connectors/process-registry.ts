@@ -57,8 +57,8 @@ const waitForPidExit = async (
   pid: number,
   timeoutMs = PROCESS_EXIT_GRACE_MS,
 ) => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
     if (!isPidAlive(pid)) return true;
     await delay(50);
   }

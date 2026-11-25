@@ -237,9 +237,9 @@ const waitForJob = async (
   jobId: string,
   options: Pick<CliOptions, "timeoutMs" | "pollIntervalMs" | "json">,
 ): Promise<MediaJob> => {
-  const deadline = Date.now() + options.timeoutMs;
+  const deadline = performance.now() + options.timeoutMs;
   let lastStatus = "";
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     const job = await getJob(jobId);
     if (job.status !== lastStatus && !options.json) {
       process.stderr.write(`media job ${jobId}: ${job.status}\n`);
@@ -249,7 +249,7 @@ const waitForJob = async (
       return job;
     }
     await sleep(
-      Math.min(options.pollIntervalMs, Math.max(250, deadline - Date.now())),
+      Math.min(options.pollIntervalMs, Math.max(250, deadline - performance.now())),
     );
   }
   throw new Error(

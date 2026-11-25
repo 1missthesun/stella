@@ -1,3 +1,5 @@
+import { noteFreshTokenTime } from "@stella/contracts/backend/client";
+import { serverNow } from "@stella/contracts/server-clock";
 import { configurePiRuntime } from "@/platform/electron/device";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import { getJwtExpMs, parseJwtPayload } from "@/shared/lib/jwt";
@@ -34,7 +36,7 @@ export async function getAuthToken(
     invalidateTokenCache();
   }
 
-  if (!forceRefresh && cachedToken && Date.now() < tokenExpiresAt) {
+  if (!forceRefresh && cachedToken && serverNow() < tokenExpiresAt) {
     return cachedToken;
   }
 
@@ -65,6 +67,7 @@ export async function getAuthToken(
           } else {
             const result = await authClient.token();
             token = result.data?.token ?? null;
+            noteFreshTokenTime(token);
           }
           if (!token) {
             if (requestVersion === tokenRequestVersion) {
@@ -80,13 +83,13 @@ export async function getAuthToken(
 
           cachedToken = token;
           if (scopedTokenExpiresAt !== null) {
-            if (scopedTokenExpiresAt <= Date.now()) {
+            if (scopedTokenExpiresAt <= serverNow()) {
               cachedToken = null;
               tokenExpiresAt = 0;
               return null;
             }
             tokenExpiresAt = Math.max(
-              Date.now(),
+              serverNow(),
               scopedTokenExpiresAt - REFRESH_MARGIN_MS,
             );
           } else {
@@ -97,7 +100,7 @@ export async function getAuthToken(
                 "[auth-token] JWT parse failed, using 4-minute cache:",
                 (err as Error).message,
               );
-              tokenExpiresAt = Date.now() + 4 * 60 * 1000;
+              tokenExpiresAt = serverNow() + 4 * 60 * 1000;
             }
           }
 

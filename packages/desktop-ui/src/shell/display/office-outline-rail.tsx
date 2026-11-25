@@ -116,7 +116,7 @@ export function OfficeOutlineRail({
       const doc = frame.contentDocument;
       if (!win || !doc) return;
       const onScroll = () => {
-        if (Date.now() < jumpUntilRef.current) return;
+        if (performance.now() < jumpUntilRef.current) return;
         const targets = targetsIn(doc, kind);
         const first = targets[0];
         if (!first) return;
@@ -156,7 +156,7 @@ export function OfficeOutlineRail({
           target.getBoundingClientRect().top -
           viewportTopOf(container, doc) +
           container.scrollTop;
-        jumpUntilRef.current = Date.now() + 700;
+        jumpUntilRef.current = performance.now() + 700;
         container.scrollTo({ top, behavior: "smooth" });
       }
       setCurrent(index);

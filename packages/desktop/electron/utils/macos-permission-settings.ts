@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { shell } from "electron";
 
 const SETTINGS_URL_BY_KIND: Record<string, string> = {
@@ -15,13 +16,13 @@ export const launchPermissionSettings = (
   open: () => Promise<unknown>,
 ): Promise<boolean> => {
   if (launching) return launching;
-  if (Date.now() - lastLaunchAt < SETTINGS_RELAUNCH_GUARD_MS) {
+  if (steadyNow() - lastLaunchAt < SETTINGS_RELAUNCH_GUARD_MS) {
     return Promise.resolve(false);
   }
   launching = (async () => {
     try {
       await open();
-      lastLaunchAt = Date.now();
+      lastLaunchAt = steadyNow();
       return true;
     } catch {
       return false;

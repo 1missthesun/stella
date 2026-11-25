@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useRef } from "react";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { stellaUsageLimitOf } from "@stella/contracts/stella-usage-limit";
@@ -20,7 +21,7 @@ export function useStellaUsageLimitNotice(
   useEffect(() => {
     if (!conversationId || !latest || latest.kind !== "turn") return;
     if (latest.phase !== "failed" || shown.current === latest.seq) return;
-    if (Date.now() - latest.createdAtMs > RECENT_MS) return;
+    if (serverNow() - latest.createdAtMs > RECENT_MS) return;
     if (!stellaUsageLimitOf(latest.notice)) return;
     shown.current = latest.seq;
     showComposerNoticeForError(latest.notice ?? "", conversationId);

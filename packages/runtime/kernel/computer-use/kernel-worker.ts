@@ -1069,10 +1069,10 @@ const nodeReplWorkerMain = async (
       workerData.maxToolDrainWaitMs > 0
         ? workerData.maxToolDrainWaitMs
         : 60_000;
-    const deadlineAt = Date.now() + drainWaitMs;
+    const deadlineAt = performance.now() + drainWaitMs;
     while (pendingToolSettlements.size > 0) {
       const batch = [...pendingToolSettlements];
-      const remainingMs = deadlineAt - Date.now();
+      const remainingMs = deadlineAt - performance.now();
       let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
       let settlements =
         remainingMs > 0

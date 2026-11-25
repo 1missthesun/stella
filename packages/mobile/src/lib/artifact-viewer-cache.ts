@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import type { ArtifactMediaFile } from "./artifact-media-file";
 
 const MAX_ENTRIES = 16;
@@ -56,7 +57,7 @@ export function cachedViewerEntry<T>(
   const entry = entries.get(key) as Entry<T> | undefined;
   if (!entry) return null;
   if (
-    (entry.expiresAt !== null && entry.expiresAt <= Date.now()) ||
+    (entry.expiresAt !== null && entry.expiresAt <= serverNow()) ||
     !stillValid(entry.value)
   ) {
     drop(key);

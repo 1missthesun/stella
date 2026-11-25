@@ -1046,7 +1046,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       ...(relaunched ? { relaunched: true as const } : {}),
     };
     session.turn = turn;
-    session.lastSignAt = Date.now();
+    session.lastSignAt = performance.now();
     if (!record.open) {
       record.open = true;
       void saveRecord(session);
@@ -1116,7 +1116,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           }),
         onEvent: (event) => {
           if (turn.done) return;
-          session.lastSignAt = Date.now();
+          session.lastSignAt = performance.now();
           if (event.type === "stream_event") answered();
           if (event.type === "user") {
             noteRefusals(turn, event as Record<string, unknown>);
@@ -1128,7 +1128,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           settleNative(toolUseId, { text: result, isError });
         },
         onStatus: (status) => {
-          session.lastSignAt = Date.now();
+          session.lastSignAt = performance.now();
           if (status.state === "compacting") session.hold = "compacting";
           else if (status.state === "usage-limit" || status.state === "login-required") session.hold = "user";
           else delete session.hold;

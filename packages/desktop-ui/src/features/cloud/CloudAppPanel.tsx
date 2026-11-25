@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { getAuthHeaders } from "@/global/auth/services/auth-token";
 import { useEffect, useState } from "react";
@@ -47,7 +48,7 @@ export function CloudAppPanel({ slug }: { slug: string }) {
             setState({
               error: "This app session expired. Reopen it to continue.",
             }),
-          Math.max(0, value.expiresAt - Date.now()),
+          Math.max(0, value.expiresAt - serverNow()),
         );
       } catch (e) {
         if (!cancelled)

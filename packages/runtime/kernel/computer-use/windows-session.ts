@@ -910,9 +910,9 @@ export const createWindowsComputerUseSession = (
                   );
                 }
 
-                const startedAt = Date.now();
+                const startedAt = performance.now();
                 let pollCount = 0;
-                while (Date.now() - startedAt < typedRequest.timeoutMs) {
+                while (performance.now() - startedAt < typedRequest.timeoutMs) {
                   pollCount += 1;
                   const polled = await requestHelper(
                     typedRequest.sessionId,
@@ -984,7 +984,7 @@ export const createWindowsComputerUseSession = (
                             }
                           : {}),
                         timeoutMs: typedRequest.timeoutMs,
-                        elapsedMs: Date.now() - startedAt,
+                        elapsedMs: Math.round(performance.now() - startedAt),
                         pollCount,
                         changeKinds,
                       };
@@ -1005,14 +1005,14 @@ export const createWindowsComputerUseSession = (
                     }
                   }
                   const remaining =
-                    typedRequest.timeoutMs - (Date.now() - startedAt);
+                    typedRequest.timeoutMs - (performance.now() - startedAt);
                   if (remaining > 0) {
                     await abortableDelay(Math.min(150, remaining), signal);
                   }
                 }
                 throw new WindowsComputerWaitTimeoutError(
                   typedRequest.timeoutMs,
-                  Date.now() - startedAt,
+                  Math.round(performance.now() - startedAt),
                   pollCount,
                   typedRequest.afterStateId,
                   typedRequest.afterVisualStateId,

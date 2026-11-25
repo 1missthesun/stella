@@ -333,11 +333,11 @@ export class RuntimeClientServer {
   }
 
   private async waitForClient(): Promise<JsonRpcPeer> {
-    const deadline = Date.now() + (this.options.clientWaitMs ?? DEFAULT_CLIENT_WAIT_MS);
+    const deadline = performance.now() + (this.options.clientWaitMs ?? DEFAULT_CLIENT_WAIT_MS);
     while (!this.closed) {
       const client = this.clients.at(-1);
       if (client && !client.isClosed()) return client;
-      const remaining = deadline - Date.now();
+      const remaining = deadline - performance.now();
       if (remaining <= 0) break;
       await new Promise<void>((resolve) => {
         let timer: HostTimerHandle | null = null;

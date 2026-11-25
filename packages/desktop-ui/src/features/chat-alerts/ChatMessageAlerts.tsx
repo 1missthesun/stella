@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
@@ -221,7 +222,7 @@ export function ChatMessageAlerts({
     session.knownThrough = Math.max(session.knownThrough, summary.newestSequence);
     if (!arrived || attentiveRef.current) return;
     const preferences = messageSoundPreferences();
-    const now = Date.now();
+    const now = steadyNow();
     if (!preferences.enabled || now - session.lastSoundAt < MIN_SOUND_GAP_MS) return;
     session.lastSoundAt = now;
     void (async () => {

@@ -194,11 +194,11 @@ const NotificationToast = ({ anchor }: { anchor: RefObject<HTMLButtonElement | n
   const paused = held || !windowFocused || leaving;
   useEffect(() => {
     if (!id || paused) return;
-    const started = Date.now();
+    const started = performance.now();
     const timer = window.setTimeout(() => leaveRef.current(), remaining.current);
     return () => {
       window.clearTimeout(timer);
-      remaining.current = Math.max(1200, remaining.current - (Date.now() - started));
+      remaining.current = Math.max(1200, remaining.current - (performance.now() - started));
     };
   }, [id, paused]);
 

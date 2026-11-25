@@ -1,3 +1,5 @@
+import { serverNow } from "./server-clock.js";
+
 export const DEVICE_OFFLINE_REASON = "device_offline";
 
 export const DEVICE_OFFLINE_RETRY_MS = 8_000;
@@ -12,7 +14,7 @@ const age = (ms: number): string => {
   return `${Math.floor(hours / 24)} days ago`;
 };
 
-export const deviceLastSeenText = (lastSeenAt: number | undefined, now = Date.now()): string =>
+export const deviceLastSeenText = (lastSeenAt: number | undefined, now = serverNow()): string =>
   lastSeenAt === undefined
     ? ""
     : `, last seen ${new Date(lastSeenAt).toISOString().slice(0, 16).replace("T", " ")} UTC (${age(now - lastSeenAt)})`;
@@ -20,7 +22,7 @@ export const deviceLastSeenText = (lastSeenAt: number | undefined, now = Date.no
 export const deviceOfflineText = (
   device: { name: string; deviceId: string; lastSeenAt?: number },
   outcome: string,
-  now = Date.now(),
+  now = serverNow(),
 ): string =>
   `${device.name} (device_id ${device.deviceId}) is offline${deviceLastSeenText(device.lastSeenAt, now)}. ${outcome}`;
 

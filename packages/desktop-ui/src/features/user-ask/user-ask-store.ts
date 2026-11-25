@@ -1,3 +1,4 @@
+import { serverNow } from "@stella/contracts/server-clock";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type {
   UserAsk,
@@ -352,12 +353,12 @@ export const useConversationUserAsks = (
 export const useUserAskRemainingMs = (
   deadlineAt: number | undefined,
 ): number | null => {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => serverNow());
 
   useEffect(() => {
     if (deadlineAt === undefined) return undefined;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    setNow(serverNow());
+    const timer = setInterval(() => setNow(serverNow()), 1000);
     return () => clearInterval(timer);
   }, [deadlineAt]);
 

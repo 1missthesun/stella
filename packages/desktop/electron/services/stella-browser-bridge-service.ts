@@ -1051,8 +1051,8 @@ export class StellaBrowserBridgeService {
   }
 
   private async waitForAgentDaemonReady(backend: AgentBackendRecord) {
-    const deadline = Date.now() + DAEMON_READY_TIMEOUT_MS;
-    while (Date.now() < deadline) {
+    const deadline = performance.now() + DAEMON_READY_TIMEOUT_MS;
+    while (performance.now() < deadline) {
       if (backend.process.exitCode !== null) {
         throw new Error("Agent browser daemon exited before it became ready.");
       }
@@ -1123,9 +1123,9 @@ export class StellaBrowserBridgeService {
   }
 
   private async waitForDaemonReady() {
-    const deadline = Date.now() + DAEMON_READY_TIMEOUT_MS;
+    const deadline = performance.now() + DAEMON_READY_TIMEOUT_MS;
 
-    while (Date.now() < deadline) {
+    while (performance.now() < deadline) {
       if (this.stopped) {
         throw new Error("Browser bridge startup cancelled.");
       }
@@ -1420,10 +1420,10 @@ export class StellaBrowserBridgeService {
   }
 
   private async waitForPortToClose(port: number, timeoutMs: number) {
-    const deadline = Date.now() + timeoutMs;
+    const deadline = performance.now() + timeoutMs;
 
     if (process.platform === "win32") {
-      while (Date.now() < deadline) {
+      while (performance.now() < deadline) {
         if (!(await this.isTcpPortListening(port))) {
           return true;
         }
@@ -1433,7 +1433,7 @@ export class StellaBrowserBridgeService {
       return !(await this.isTcpPortListening(port));
     }
 
-    while (Date.now() < deadline) {
+    while (performance.now() < deadline) {
       if ((await this.getListeningProcessesForPort(port)).length === 0) {
         return true;
       }

@@ -1,3 +1,4 @@
+import { steadyNow } from "@stella/contracts/server-clock";
 import { app } from "electron";
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
@@ -270,7 +271,7 @@ export const createHostRunnerHandlers = (context, options) => ({
         const fresh = !pendingRemoteExecutionRequest(context);
         context.state.pendingRemoteExecutionRequest = {
             request: payload,
-            receivedAt: Date.now(),
+            receivedAt: steadyNow(),
         };
         broadcastToWindows(context, IPC_EXECUTION_REMOTE_REQUEST, payload);
         const windowManager = context.state.windowManager;

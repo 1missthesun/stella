@@ -39,11 +39,11 @@ const delay = (durationMs: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, durationMs));
 
 const acquireDiscoveryLock = async (lockPath: string): Promise<() => void> => {
-  const deadline = Date.now() + DISCOVERY_LOCK_TIMEOUT_MS;
+  const deadline = performance.now() + DISCOVERY_LOCK_TIMEOUT_MS;
   for (;;) {
     const lock = tryAcquireOwnerLock(lockPath);
     if (lock.acquired) return () => releaseOwnerLock(lockPath, lock.owner);
-    if (Date.now() >= deadline) {
+    if (performance.now() >= deadline) {
       throw new Error(
         `Timed out acquiring browser bootstrap discovery lock: ${lockPath}`,
       );

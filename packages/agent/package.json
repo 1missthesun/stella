@@ -11,10 +11,10 @@
     "typecheck": "tsc -p tsconfig.json --pretty false --noEmit"
   },
   "dependencies": {
-    "@earendil-works/chord": "1.6.0",
-    "@earendil-works/pi-ai": "1.6.0",
-    "@earendil-works/pi-durable": "1.6.0",
-    "@earendil-works/pi-schema": "1.6.0",
+    "@earendil-works/chord": "1.6.1",
+    "@earendil-works/pi-ai": "1.6.1",
+    "@earendil-works/pi-durable": "1.6.1",
+    "@earendil-works/pi-schema": "1.6.1",
     "@stella/contracts": "workspace:*",
     "@stella/node-shared": "workspace:*",
     "@stella/runtime": "workspace:*"

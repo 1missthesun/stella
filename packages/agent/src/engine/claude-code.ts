@@ -1720,9 +1720,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           }),
           hook(CompactionTask, {
             beforeCompact: async (compaction, api, context) => {
-              if (compaction.reason !== "manual") return { decline: true };
+              if (compaction.reason !== "manual") return { kind: "decline" };
               const bound = await bindingOf(conversationId, api, context);
-              if (!bound) return { decline: true };
+              if (!bound) return { kind: "decline" };
               const summary = await compactWithCli(
                 bound.binding,
                 bound.model,
@@ -1733,7 +1733,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
                 report(error);
                 return undefined;
               });
-              return summary ? { summary } : { decline: true };
+              return summary ? { kind: "summary", summary } : { kind: "decline" };
             },
           }),
           hook(ToolTask, {

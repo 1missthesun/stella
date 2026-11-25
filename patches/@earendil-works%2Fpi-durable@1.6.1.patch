@@ -24,10 +24,10 @@ index 7dc4337e83009a92045cb0b1ae4fd6a71aa86abe..b0a5e5955cdd66ec364b383fe109e7f3
      absolutePath(path: string, _context: Context): Promise<Result<string, FileError>>;
      joinPath(parts: string[], _context: Context): Promise<Result<string, FileError>>;
 diff --git a/dist/env/node.js b/dist/env/node.js
-index d1530da2acd24090992c767fd20a91b78e91de9e..a992025f6a881c093146672510fba2d6f621a5b7 100644
+index b2e5b3368cafd4ce8fa47a6a3a2a27bbe57108a9..e8b49a3d057150199c14c2f76d726e8e2eacb2fd 100644
 --- a/dist/env/node.js
 +++ b/dist/env/node.js
-@@ -556,11 +556,27 @@ export class NodeExecutionEnv {
+@@ -576,11 +576,27 @@ export class NodeExecutionEnv {
      shellEnv;
      watchOptions;
      activeChildPids = new Set();
@@ -55,7 +55,7 @@ index d1530da2acd24090992c767fd20a91b78e91de9e..a992025f6a881c093146672510fba2d6
      }
      async watch(targets, onChange, context) {
          const aborted = abortResult(context.abortSignal);
-@@ -636,7 +652,7 @@ export class NodeExecutionEnv {
+@@ -656,7 +672,7 @@ export class NodeExecutionEnv {
              let spillBackpressured = false;
              const onAbort = () => {
                  if (child?.pid)
@@ -64,7 +64,7 @@ index d1530da2acd24090992c767fd20a91b78e91de9e..a992025f6a881c093146672510fba2d6
              };
              const failCallback = (error) => {
                  if (callbackError !== undefined)
-@@ -1169,9 +1185,9 @@ export class NodeExecutionEnv {
+@@ -1189,9 +1205,9 @@ export class NodeExecutionEnv {
          }
      }
      async cleanup(_context) {

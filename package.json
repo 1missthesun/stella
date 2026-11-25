@@ -196,6 +196,6 @@
     "expo-modules-jsi@57.1.1": "patches/expo-modules-jsi@57.1.1.patch",
     "react-native-nitro-markdown@0.6.2": "patches/react-native-nitro-markdown@0.6.2.patch",
     "streamdown@2.7.0": "patches/streamdown@2.7.0.patch",
-    "@earendil-works/pi-durable@1.6.0": "patches/@earendil-works%2Fpi-durable@1.6.0.patch"
+    "@earendil-works/pi-durable@1.6.1": "patches/@earendil-works%2Fpi-durable@1.6.1.patch"
   }
 }

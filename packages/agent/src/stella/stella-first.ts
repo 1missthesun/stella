@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord/context";
-import type { ConversationId, ToolExecutionApi, ToolRegistration, Tx, Wrap } from "@earendil-works/pi-durable";
+import { type ConversationId, type ToolExecutionApi, type ToolRegistration, type Tx, type Wrap, wrapTool } from "@earendil-works/pi-durable";
 import { PI_ASK_FIRST_PREFIX } from "@stella/contracts/pi-chat";
 import { savedAgeMs } from "@stella/contracts/server-clock";
 import { StellaAgentDoc } from "./agent-doc.ts";
@@ -161,9 +161,8 @@ const askStella = async (
 };
 
 export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
-  STELLA_FIRST_TOOLS.map((name) => ({
-    tool: name,
-    wrap: (tool: ToolRegistration): ToolRegistration => ({
+  STELLA_FIRST_TOOLS.map((name) =>
+    wrapTool({ name } as ToolRegistration, (tool) => ({
       ...tool,
       async execute(args, api, context) {
         const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
@@ -186,5 +185,5 @@ export const stellaFirstWraps = (host: StellaFirstHost): Wrap[] =>
         await markPass(api, name, context);
         return { output: [{ type: "text", text: repliedText(name, reply) }] };
       },
-    }),
-  }));
+    })),
+  );

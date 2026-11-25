@@ -4,7 +4,7 @@ import { withAbortSignal, withoutAbortSignal } from "@earendil-works/chord/conte
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
 import path from "node:path";
-import { AgentDoc, defineExtension, type Extension, type ToolRegistration, type Wrap } from "@earendil-works/pi-durable";
+import { AgentDoc, defineExtension, type Extension, type ToolRegistration, type Wrap, wrapTool } from "@earendil-works/pi-durable";
 import {
   needsProviderToolSchemaNormalization,
   normalizeProviderToolInputSchema,
@@ -173,9 +173,8 @@ export const STELLA_CODE_TOOL_NAME = "code";
 const READ_TOOL = "Read";
 const IMAGE_READ_CODES: ReadonlySet<string> = new Set(["image", "unsupported_image"]);
 
-const imageRead = (host: StellaToolHost): Wrap => ({
-  tool: READ_TOOL,
-  wrap: (tool: ToolRegistration): ToolRegistration => {
+const imageRead = (host: StellaToolHost): Wrap =>
+  wrapTool({ name: READ_TOOL } as ToolRegistration, (tool) => {
     const viewer = register("general", { name: READ_TOOL, description: "", parameters: {}, replay: "safe" }, host);
     const wrapped: ToolRegistration = {
       ...tool,
@@ -194,8 +193,7 @@ const imageRead = (host: StellaToolHost): Wrap => ({
       },
     };
     return wrapped;
-  },
-});
+  });
 
 export function stellaToolExtensions(host: StellaToolHost | undefined): Extension[] {
   const build = (role: StellaToolRole, name: string) => {

@@ -340,6 +340,30 @@ pub struct VectorPathP {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+pub struct LinkPaintP {
+    pub color: Option<C>,
+    pub bg: Option<C>,
+    pub underline: Option<C>,
+    pub ring: Option<(C, f32)>,
+}
+
+/// A look for markdown links whose destination starts with `prefix`.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LinkStyleP {
+    pub prefix: String,
+    pub color: Option<C>,
+    pub weight: Option<f32>,
+    pub bg: Option<C>,
+    pub pad: Option<f32>,
+    pub underline: Option<C>,
+    pub ring: Option<(C, f32)>,
+    pub hover: Option<LinkPaintP>,
+    pub help: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct DragOutP {
     pub paths: Vec<String>,
     pub text: Option<String>,
@@ -541,6 +565,10 @@ pub struct Props {
     // Markdown
     pub streaming: bool,
     pub md_style: Option<serde_json::Value>,
+    pub link_styles: Option<Vec<LinkStyleP>>,
+    /// Markdown image sources as written → what to load (path, `file://`, `blob:N`).
+    pub images: Option<std::collections::HashMap<String, String>>,
+    pub image_radius: Option<f32>,
 
     // Webview
     pub url: Option<String>,

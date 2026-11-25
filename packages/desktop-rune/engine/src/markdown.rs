@@ -232,6 +232,9 @@ struct CodeFrameP {
     actions_on_hover: Option<bool>,
     /// Draw the block's frame here, the label row inside it (streamdown's layout).
     inside: Option<InsideP>,
+    /// `[top, right]`: the actions float at this inset from the frame's top right corner
+    /// instead of sitting in the label row.
+    actions_at: Option<[f32; 2]>,
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -290,7 +293,13 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
         if f.actions_on_hover.unwrap_or(true) {
             actions = actions.group_opacity(0.0, 1.0);
         }
-        head = head.child(actions);
+        let floating = match f.actions_at {
+            Some([top, right]) => Some(actions.pin(None, Some(top), Some(right), None).raise()),
+            None => {
+                head = head.child(actions);
+                None
+            }
+        };
         let mut frame = rune::col().key(format!("code-{}", c.index)).w_full().gap(f.label_gap.unwrap_or(4.0)).hover_group();
         if let Some(i) = &f.inside {
             let [x, top, bottom] = i.pad.unwrap_or([12.0, 6.0, 0.0]);
@@ -302,8 +311,52 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
                 frame = frame.border(1.0, c.0);
             }
         }
-        frame.child(head).child(card)
+        let frame = frame.child(head).child(card);
+        match floating {
+            Some(a) => frame.child(a),
+            None => frame,
+        }
     })
+}
+
+fn link_styles(md: Markdown, styles: Vec<crate::props::LinkStyleP>) -> Markdown {
+    let styles = std::rc::Rc::new(styles);
+    let find = |styles: &std::rc::Rc<Vec<crate::props::LinkStyleP>>, href: &str| styles.iter().position(|s| href.starts_with(&s.prefix));
+    let (a, b, c) = (styles.clone(), styles.clone(), styles.clone());
+    md.link_style(move |href| {
+        let s = &a[find(&a, href)?];
+        let mut span = rune::Span::new(0, 0);
+        if let Some(c) = s.color {
+            span = span.color(c.0);
+        }
+        if let Some(w) = s.weight {
+            span = span.weight(w);
+        }
+        if let Some(c) = s.bg {
+            span = span.bg(c.0, s.pad.unwrap_or(2.0));
+        }
+        if let Some(c) = s.underline {
+            span = span.underline(c.0);
+        }
+        let mut hover = rune::LinkPaint::new();
+        if let Some(h) = &s.hover {
+            if let Some(c) = h.color {
+                hover = hover.color(c.0);
+            }
+            if let Some(c) = h.bg {
+                hover = hover.bg(c.0);
+            }
+            if let Some(c) = h.underline {
+                hover = hover.underline(c.0);
+            }
+            if let Some((c, w)) = h.ring {
+                hover = hover.ring(c.0, w);
+            }
+        }
+        Some((span, hover))
+    })
+    .link_ring(move |href| b[find(&b, href)?].ring.map(|(c, w)| (c.0, w)))
+    .link_help(move |href| c[find(&c, href)?].help.clone())
 }
 
 pub fn build(n: u32, p: &Props) -> El {
@@ -315,6 +368,37 @@ pub fn build(n: u32, p: &Props) -> El {
     if p.listens("link") {
         md = md.on_link_tx(move |_s: &mut crate::windows::Win, href: &str, tx: &mut rune::Tx| {
             crate::engine::element_event(n, "link", serde_json::json!({ "href": href }), Some(tx));
+        });
+    }
+    if p.listens("linkContextMenu") {
+        md = md.on_link_secondary(move |_s: &mut crate::windows::Win, href: &str, at: rune::PointerPress, tx: &mut rune::Tx| {
+            crate::engine::element_event(n, "linkContextMenu", serde_json::json!({ "href": href, "x": at.x, "y": at.y }), Some(tx));
+        });
+    }
+    if let Some(styles) = p.link_styles.clone().filter(|s| !s.is_empty()) {
+        md = link_styles(md, styles);
+    }
+    if let Some(images) = p.images.clone() {
+        md = md.images(move |src| {
+            let to = images.get(src).map(String::as_str).unwrap_or(src);
+            crate::engine::read(|e| crate::media::load(e, to, 1024.0))
+        });
+    }
+    let radius = p.image_radius;
+    let on_image = p.listens("image");
+    if radius.is_some() || on_image {
+        md = md.image_frame(move |el, frame| {
+            let mut el = el;
+            if let Some(r) = radius {
+                el = el.radius(r);
+            }
+            if on_image {
+                let (src, alt) = (frame.src.to_owned(), frame.alt.to_owned());
+                el = el.cursor(rune::Cursor::Pointer).on_press_tx(move |_s: &mut crate::windows::Win, tx: &mut rune::Tx| {
+                    crate::engine::element_event(n, "image", serde_json::json!({ "src": src, "alt": alt }), Some(tx));
+                });
+            }
+            el
         });
     }
     md.render(&style_for(p.md_style.as_ref()))

@@ -33,7 +33,7 @@ fn fit(p: &Props) -> SurfaceFit {
     }
 }
 
-fn load(eng: &Engine, src: &str, size: f32) -> Option<rune::image::Image> {
+pub fn load(eng: &Engine, src: &str, size: f32) -> Option<rune::image::Image> {
     if let Some(img) = IMAGES.with(|m| m.borrow().get(src).cloned()) {
         return Some(img);
     }

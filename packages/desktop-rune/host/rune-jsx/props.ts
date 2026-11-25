@@ -206,9 +206,21 @@ export type MarkdownProps = BoxProps & {
   onLink?: (href: string) => void;
   /** A `mdStyle.codeFrame.actions` button was pressed on a code block. */
   onCodeAction?: (a: { action: string; index: number; language: string | null; source: string }) => void;
+  /** Right-click (control-click) on a link, at window points. */
+  onLinkContextMenu?: (e: { href: string; x: number; y: number }) => void;
+  /** Looks for links whose href starts with `prefix`; the first match wins. */
+  linkStyles?: LinkStyle[];
+  /** Image sources as written → what to load (path, `file://`, `blob:N`). Sources not listed load as written. */
+  images?: Record<string, string>;
+  imageRadius?: number;
+  /** A shown image was pressed. */
+  onImage?: (e: { src: string; alt: string }) => void;
 };
 
 export type MediaProps = BoxProps & { src: string; fit?: "cover" | "contain"; autoplay?: boolean; muted?: boolean; loopMedia?: boolean };
+
+export type LinkPaint = { color?: string; bg?: string; underline?: string; ring?: [string, number] };
+export type LinkStyle = { prefix: string; color?: string; weight?: number; bg?: string; pad?: number; underline?: string; ring?: [string, number]; hover?: LinkPaint; help?: string };
 
 export type FadeEdge = { size: number; stops?: [number, number][]; linear?: boolean; feather?: boolean; fullAt?: number };
 

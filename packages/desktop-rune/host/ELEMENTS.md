@@ -237,7 +237,18 @@ actionHover, actionsOnHover}` adds a language row above each code block, with ac
 right. Pressing an action fires `onCodeAction({action, index, language, source})`; TS does the
 copy or download. `inside: {fill, border, radius, pad: [x, top, bottom]}` draws the block's frame itself with
 the label row inside it (streamdown's layout): pair it with `codeBlock: ["transparent", "transparent"]`
-and `codeBlockPadding: [0, y]`.
+and `codeBlockPadding: [0, y]`. `actionsAt: [top, right]` floats the actions at that inset from
+the frame's top right corner instead of placing them in the label row.
+
+**Links and images.**
+- `linkStyles: [{prefix, color?, weight?, bg?, pad?, underline?, ring?: [color, width],
+  hover?: {color?, bg?, underline?, ring?}, help?}]`: a look for links by href prefix (the first
+  match wins). `help` is the link's tooltip. Use it for connector chips and file links.
+- `onLinkContextMenu({href, x, y})`: right-click on a link, at window points.
+- `images: {[srcAsWritten]: pathOrBlob}` resolves `![alt](src)` sources (a path, `file://` or
+  `blob:N`); unlisted sources load as written. Images draw at their own size up to the text's
+  width. `imageRadius` rounds them, and `onImage({src, alt})` makes them pressable.
+- `w="fit"` hugs the text (with `maxW` for chat bubbles).
 
 ### list
 

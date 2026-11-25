@@ -17,7 +17,7 @@ const PNG = `${process.env.STELLA_RUNE_ROOT}/../desktop-ui/public/stella-app-ico
 
 const MD = `### Markdown
 
-Native **rune-kit** markdown with \`inline code\`, [a link](https://example.com) and lists:
+Native **rune-kit** markdown with \`inline code\`, [a link](https://example.com), a [Gmail](stella://connector/gmail) chip and lists:
 
 - streaming and selection
 - syntax highlighting
@@ -32,7 +32,11 @@ iso.test("2026-11-25"); // true
 |---|---|
 | Rune | 4 ms |
 | Chromium | 16 ms |
+
+![Icon](app-icon)
 `;
+
+const BUBBLE = "Short reply that **hugs** its text.";
 
 const PAGE = `<!doctype html><html><body style="margin:0;font:14px system-ui;background:#f5f6f8;color:#111;display:flex;flex-direction:column;gap:8px;padding:14px">
 <b>WebView (wry)</b><div id="log">waiting for TS…</div>
@@ -229,15 +233,21 @@ function Docs() {
   return (
     <Section title="Markdown">
       <markdown id="g-md" src={MD} selectable onLink={(href) => setAction(`link ${href}`)}
+        onLinkContextMenu={(e) => setAction(`context menu on ${e.href} at ${Math.round(e.x)},${Math.round(e.y)}`)}
+        linkStyles={[{ prefix: "stella://", color: c.text, weight: 600, bg: "#4f8cff33", pad: 4, ring: ["#4f8cff66", 1], hover: { bg: "#4f8cff55" }, help: "Open the connector" }]}
+        images={{ "app-icon": PNG }} imageRadius={14} onImage={(e) => setAction(`image ${e.alt}`)}
         onCodeAction={(a) => { void stella.engine.clipboard.writeText(a.source); setAction(`${a.action} ${a.language} block ${a.index}`); }}
         mdStyle={{
           dark: true, text: c.text, muted: c.weak, link: c.accent, inlineCodeBg: "#ffffff14", codeBlock: ["transparent", "transparent"],
           codeBlockPadding: [0, 10], body: { size: 14, lineHeight: 21 }, tableFullWidth: true, tableFlushLeft: true,
           codeFrame: {
             label: c.weak, labelSize: 12, labelGap: 0, actionColor: c.weak, actionHover: c.hover, actions: [{ id: "copy", label: "Copy", svg: COPY }],
-            inside: { fill: c.inset, border: c.border, radius: 10, pad: [14, 6, 2] },
+            inside: { fill: c.inset, border: c.border, radius: 10, pad: [14, 6, 2] }, actionsAt: [6, 6],
           },
         }} />
+      <row w="full" justify="end">
+        <markdown id="g-bubble" w="fit" maxW={420} src={BUBBLE} fill={c.raised} radius={14} px={12} py={8} mdStyle={{ dark: true, text: c.text, body: { size: 14, lineHeight: 21 } }} />
+      </row>
       <text size={12} color={c.weaker}>{action || "Hover the code block for Copy"}</text>
     </Section>
   );

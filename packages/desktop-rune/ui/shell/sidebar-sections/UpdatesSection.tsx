@@ -10,7 +10,7 @@ const SMALL = look(fontSize.sm, 400);
 const XS = look(12, 400);
 
 /** `.updates-section__button` (and its `[data-primary]` form). */
-function UpdateButton({ id, label, primary = false, disabled, onPress }: { id: string; label: string; primary?: boolean; disabled: boolean; onPress: () => void }) {
+export function UpdateButton({ id, label, primary = false, disabled, onPress }: { id: string; label: string; primary?: boolean; disabled: boolean; onPress: () => void }) {
   const t = useTokens();
   return (
     <box
@@ -123,7 +123,7 @@ function HistoryItem({ commit, now, pending, blocked, onUndo }: { commit: AppSou
   );
 }
 
-function Heading({ children, first = false }: { children: string; first?: boolean }) {
+export function UpdatesHeading({ children, first = false }: { children: string; first?: boolean }) {
   const t = useTokens();
   return (
     <text role="heading" {...look(12, 500, { em: 0.02 })} mt={first ? 0 : 10} mb={4} mx={4} color={t.c.textWeak}>
@@ -159,7 +159,7 @@ export function UpdatesSection() {
         <Note id="updates-developer-checkout">{t("shell.appSource.updates.developerCheckout")}</Note>
       ) : (
         <>
-          <Heading first>{t("shell.appSource.updates.waiting")}</Heading>
+          <UpdatesHeading first>{t("shell.appSource.updates.waiting")}</UpdatesHeading>
           {state.waiting.length === 0 ? (
             <row align="center" gap={8} pad={10}>
               <Icon icon={Icons.stella.Check} size={14} strokeWidth={2} color={tk.c.textWeak} />
@@ -178,7 +178,7 @@ export function UpdatesSection() {
       )}
       {state.skipped.length > 0 ? (
         <>
-          <Heading>{t("shell.appSource.updates.skipped")}</Heading>
+          <UpdatesHeading>{t("shell.appSource.updates.skipped")}</UpdatesHeading>
           <col id="updates-skipped" role="list" gap={2}>
             {state.skipped.map((offer) => (
               <WaitingItem key={offer.key} offer={offer} pending={pending === offer.key} blocked={blocked} bordered={false} quiet onAdd={() => void run(offer.key, () => addOffer(offer))} />
@@ -189,7 +189,7 @@ export function UpdatesSection() {
       {state.notShared ? <Note id="updates-not-shared">{state.notShared === "conflict" ? t("shell.appSource.updates.notSharedConflict") : t("shell.appSource.updates.notSharedBuild")}</Note> : null}
       {state.recent.length > 0 ? (
         <>
-          <Heading>{t("shell.appSource.updates.history")}</Heading>
+          <UpdatesHeading>{t("shell.appSource.updates.history")}</UpdatesHeading>
           <col id="updates-history" role="list" gap={2}>
             {state.recent.map((commit) => (
               <HistoryItem key={commit.sha} commit={commit} now={now} pending={pending === `undo:${commit.sha}`} blocked={blocked} onUndo={!state.developerCheckout ? () => void run(`undo:${commit.sha}`, () => api.undo(commit.sha)) : null} />

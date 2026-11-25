@@ -3739,6 +3739,93 @@
       "lineServer": "Dùng khóa OpenRouter của máy chủ này: đã phân loại {sorted} trong tháng này · {cost}",
       "deviceKeyHint": "Để dùng khóa OpenRouter của riêng bạn, hãy thêm khóa trong Mô hình khi đã đăng nhập để khóa được lưu vào tài khoản. Khóa chỉ lưu trên máy tính này sẽ không dùng được khi máy tắt.",
       "deviceKeyHintPhone": "Để dùng khóa OpenRouter của riêng bạn, hãy thêm khóa trong cài đặt trò chuyện khi đã đăng nhập để khóa được lưu vào tài khoản. Khóa chỉ lưu trên điện thoại này sẽ không dùng được cho email."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Đang chờ người khác",
+        "handled": "Stella đã xử lý"
+      },
+      "rules": {
+        "title": "Quy tắc",
+        "settingsTitle": "Quy tắc và cài đặt",
+        "yours": "Quy tắc của bạn",
+        "hint": "Cho Stella biết điều gì quan trọng và điều gì không, Stella sẽ lưu lại ở đây thành quy tắc.",
+        "wake": "Báo bạn ngay",
+        "act": "Stella xử lý ngay",
+        "ignore": "Không đưa vào trang này",
+        "remove": "Xóa quy tắc: {rule}"
+      },
+      "tell": {
+        "action": "Nói với Stella",
+        "about": "Nói với Stella về: {title}",
+        "placeholder": "Cho Stella biết cần làm gì, hoặc vì sao việc này không quan trọng…",
+        "sendHint": "{keys} để gửi",
+        "send": "Gửi cho Stella",
+        "sent": "Đã gửi cho Stella."
+      },
+      "draft": {
+        "label": "Bản nháp trả lời",
+        "read": "Đọc bản nháp"
+      },
+      "details": "Chi tiết",
+      "showDetails": "Hiện chi tiết",
+      "hideDetails": "Ẩn chi tiết",
+      "onIt": "Đang làm…",
+      "working": "Stella đang xử lý.",
+      "ignored": {
+        "eyebrow": "Đã lọc bỏ",
+        "count": {
+          "other": "Đã bỏ qua {count} email"
+        },
+        "short": "Đã bỏ qua · {count}",
+        "hint": "Hãy nói với Stella trong cuộc trò chuyện nếu lần sau email từ những người gửi này cần có mặt ở đây."
+      },
+      "inboxes": {
+        "title": "Hộp thư",
+        "reading": "Đang đọc",
+        "count": {
+          "other": "{count} hộp thư"
+        }
+      },
+      "nextCheck": {
+        "title": "Lần kiểm tra tự động tiếp theo",
+        "hint": "Thư gấp sẽ đánh thức Stella giữa các lần đọc theo lịch.",
+        "at": "Lần kiểm tra tự động tiếp theo: {time}",
+        "short": "Tiếp theo: {time}"
+      },
+      "automation": "Tự động hóa",
+      "off": {
+        "title": "Tắt Email",
+        "confirm": "Tắt Email?",
+        "body": "Stella sẽ ngừng đọc thư của bạn và xóa trống trang này.",
+        "working": "Đang tắt…"
+      },
+      "summary": {
+        "caughtUp": "Đã xong hết",
+        "waitingFirstRead": "Đang chờ lần đọc đầu tiên",
+        "readAt": "Đã đọc: {time}",
+        "notRead": "Chưa đọc",
+        "newSince": {
+          "other": "{count} thư mới từ đó"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Không có gì cần bạn",
+        "caughtUpNext": "Bạn đã xem hết. Lần kiểm tra tự động tiếp theo: {time}.",
+        "caughtUpUrgent": "Bạn đã xem hết. Thư gấp sẽ đến với bạn ngay.",
+        "firstReadTitle": "Stella sẽ sớm đọc thư của bạn",
+        "firstReadBody": "Trang này tự điền khi Stella đọc lần tới, hoặc bạn có thể cho đọc ngay bây giờ."
+      },
+      "check": "Kiểm tra",
+      "request": {
+        "check": "Kiểm tra email của tôi ngay",
+        "about": "Về: {title}"
+      },
+      "a11y": {
+        "list": "Danh sách email",
+        "items": "Các mục email",
+        "back": "Quay lại Email"
+      }
     }
   },
   "nudges": {

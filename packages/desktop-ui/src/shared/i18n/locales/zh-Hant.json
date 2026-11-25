@@ -3739,6 +3739,93 @@
       "lineServer": "使用此伺服器的 OpenRouter 金鑰：本月已分類 {sorted} 封 · {cost}",
       "deviceKeyHint": "若要使用你自己的 OpenRouter 金鑰，請在登入狀態下到「模型」中加入，這樣它會儲存到你的帳戶。只儲存在這台電腦上的金鑰，在電腦關機時無法使用。",
       "deviceKeyHintPhone": "若要使用你自己的 OpenRouter 金鑰，請在登入狀態下到聊天設定中加入，這樣它會儲存到你的帳戶。只儲存在這支手機上的金鑰無法用於郵件。"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "等待他人",
+        "handled": "我已處理"
+      },
+      "rules": {
+        "title": "規則",
+        "settingsTitle": "規則與設定",
+        "yours": "你的規則",
+        "hint": "告訴 Stella 什麼重要、什麼不重要，她會作為規則保存在這裡。",
+        "wake": "立即通知你",
+        "act": "Stella 立即處理",
+        "ignore": "不顯示在此頁面",
+        "remove": "移除規則：{rule}"
+      },
+      "tell": {
+        "action": "告訴 Stella",
+        "about": "告訴 Stella 關於：{title}",
+        "placeholder": "告訴 Stella 該怎麼做，或為什麼這不重要…",
+        "sendHint": "按 {keys} 傳送",
+        "send": "傳給 Stella",
+        "sent": "已傳給 Stella。"
+      },
+      "draft": {
+        "label": "回覆草稿",
+        "read": "查看草稿"
+      },
+      "details": "詳細資訊",
+      "showDetails": "顯示詳細資訊",
+      "hideDetails": "隱藏詳細資訊",
+      "onIt": "處理中…",
+      "working": "Stella 正在處理。",
+      "ignored": {
+        "eyebrow": "已過濾",
+        "count": {
+          "other": "已忽略 {count} 封郵件"
+        },
+        "short": "已忽略 · {count}",
+        "hint": "如果希望這些寄件者的郵件下次出現在此頁面，請在聊天中告訴 Stella。"
+      },
+      "inboxes": {
+        "title": "收件匣",
+        "reading": "讀取中",
+        "count": {
+          "other": "{count} 個收件匣"
+        }
+      },
+      "nextCheck": {
+        "title": "下次自動檢查",
+        "hint": "在排定的讀取之間，緊急郵件也會喚醒 Stella。",
+        "at": "下次自動檢查：{time}",
+        "short": "下次：{time}"
+      },
+      "automation": "自動化",
+      "off": {
+        "title": "關閉郵件",
+        "confirm": "要關閉郵件嗎？",
+        "body": "Stella 將不再讀取你的郵件，並清空此頁面。",
+        "working": "正在關閉…"
+      },
+      "summary": {
+        "caughtUp": "已全部處理",
+        "waitingFirstRead": "等待首次讀取",
+        "readAt": "讀取於 {time}",
+        "notRead": "尚未讀取",
+        "newSince": {
+          "other": "此後 {count} 封新郵件"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "沒有需要你處理的郵件",
+        "caughtUpNext": "已全部處理。下次自動檢查：{time}。",
+        "caughtUpUrgent": "已全部處理。緊急郵件會立即通知你。",
+        "firstReadTitle": "Stella 很快會讀取你的郵件",
+        "firstReadBody": "Stella 下次讀取後，此頁面會自動填入內容；你也可以現在就開始讀取。"
+      },
+      "check": "檢查",
+      "request": {
+        "check": "立即檢查我的郵件",
+        "about": "關於：{title}"
+      },
+      "a11y": {
+        "list": "郵件清單",
+        "items": "郵件項目",
+        "back": "返回郵件"
+      }
     }
   },
   "nudges": {

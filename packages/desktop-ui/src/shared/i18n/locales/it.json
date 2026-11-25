@@ -3849,6 +3849,99 @@
       "lineServer": "Con la chiave OpenRouter di questo server: {sorted} smistate questo mese · {cost}",
       "deviceKeyHint": "Per usare la tua chiave OpenRouter, aggiungila in Modelli dopo aver effettuato l'accesso, così viene salvata nel tuo account. Una chiave conservata solo su questo computer non si può usare quando il computer è spento.",
       "deviceKeyHintPhone": "Per usare la tua chiave OpenRouter, aggiungila nelle impostazioni della chat dopo aver effettuato l'accesso, così viene salvata nel tuo account. Una chiave conservata solo su questo telefono non si può usare per l'email."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "In attesa di altri",
+        "handled": "Ci ho pensato io"
+      },
+      "rules": {
+        "title": "Regole",
+        "settingsTitle": "Regole e impostazioni",
+        "yours": "Le tue regole",
+        "hint": "Di' a Stella cosa conta e cosa no: lo terrà qui come regola.",
+        "wake": "Ti avvisa subito",
+        "act": "Stella agisce subito",
+        "ignore": "Escluse da questa pagina",
+        "remove": "Rimuovi la regola: {rule}"
+      },
+      "tell": {
+        "action": "Di' a Stella",
+        "about": "Di' qualcosa a Stella su: {title}",
+        "placeholder": "Di' a Stella cosa fare, o perché non è importante…",
+        "sendHint": "{keys} per inviare",
+        "send": "Invia a Stella",
+        "sent": "Inviato a Stella."
+      },
+      "draft": {
+        "label": "Risposta preparata",
+        "read": "Leggi bozza"
+      },
+      "details": "Dettagli",
+      "showDetails": "Mostra dettagli",
+      "hideDetails": "Nascondi dettagli",
+      "onIt": "In corso…",
+      "working": "Se ne sta occupando Stella.",
+      "ignored": {
+        "eyebrow": "Escluse",
+        "count": {
+          "many": "{count} email ignorate",
+          "one": "{count} email ignorata",
+          "other": "{count} email ignorate"
+        },
+        "short": "Ignorate · {count}",
+        "hint": "Di' a Stella in chat se la prossima volta qualcosa da questi mittenti deve comparire qui."
+      },
+      "inboxes": {
+        "title": "Caselle di posta",
+        "reading": "In lettura",
+        "count": {
+          "many": "{count} caselle",
+          "one": "{count} casella",
+          "other": "{count} caselle"
+        }
+      },
+      "nextCheck": {
+        "title": "Prossimo controllo automatico",
+        "hint": "Le email urgenti svegliano Stella tra una lettura programmata e l'altra.",
+        "at": "Prossimo controllo automatico: {time}",
+        "short": "Prossimo: {time}"
+      },
+      "automation": "Automazione",
+      "off": {
+        "title": "Disattiva Email",
+        "confirm": "Disattivare Email?",
+        "body": "Stella smette di leggere la tua posta e svuota questa pagina.",
+        "working": "Disattivazione…"
+      },
+      "summary": {
+        "caughtUp": "Tutto in ordine",
+        "waitingFirstRead": "In attesa della prima lettura",
+        "readAt": "Ultima lettura: {time}",
+        "notRead": "Non ancora letta",
+        "newSince": {
+          "many": "{count} nuove da allora",
+          "one": "{count} nuova da allora",
+          "other": "{count} nuove da allora"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Niente richiede te",
+        "caughtUpNext": "Sei in pari. Prossimo controllo automatico: {time}.",
+        "caughtUpUrgent": "Sei in pari. Le email urgenti ti raggiungeranno subito.",
+        "firstReadTitle": "Stella leggerà presto la tua posta",
+        "firstReadBody": "Questa pagina si riempie da sola alla prossima lettura di Stella, oppure puoi avviarne una ora."
+      },
+      "check": "Controlla",
+      "request": {
+        "check": "Controlla la mia posta ora",
+        "about": "Su: {title}"
+      },
+      "a11y": {
+        "list": "Elenco email",
+        "items": "Elementi email",
+        "back": "Torna a Email"
+      }
     }
   },
   "nudges": {

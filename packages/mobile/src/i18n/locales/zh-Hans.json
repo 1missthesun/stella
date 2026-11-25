@@ -173,6 +173,7 @@
     }
   },
   "common": {
+    "back": "返回",
     "cancel": "取消",
     "close": "关闭",
     "continue": "继续",
@@ -184,6 +185,11 @@
   },
   "errors": {
     "generic": "出了点问题"
+  },
+  "global": {
+    "schedule": {
+      "removing": "正在移除…"
+    }
   },
   "mobile": {
     "account": {
@@ -1145,6 +1151,11 @@
   "email": {
     "title": "邮件",
     "failed": "无法更新，请重试。",
+    "card": {
+      "needYou": {
+        "other": "{count} 封需要你处理"
+      }
+    },
     "section": {
       "connectBody": "连接 Gmail 后，Stella 会在新邮件到达时进行分类。紧急邮件会立即通知你，其余的留在「今天」里，需要回复时会备好回复草稿。",
       "connect": "连接 Gmail",
@@ -1155,7 +1166,103 @@
       "loadErrorBody": "Stella 暂时无法连接服务器。请检查网络后重试。",
       "offBody": "Stella 会在新邮件到达时进行分类。紧急邮件会立即通知你，其余的留在「今天」里，需要回复时会备好回复草稿。无关邮件会被挡在外面。",
       "turnOn": "开启",
-      "turningOn": "正在分类最近的邮件…"
+      "turningOn": "正在分类最近的邮件…",
+      "needsYou": "需要你处理",
+      "openInGmail": "在 Gmail 中打开",
+      "remove": "移除",
+      "checkNow": "立即检查",
+      "checking": "正在检查…",
+      "turnOff": "关闭"
+    },
+    "digest": {
+      "send": "发送"
+    },
+    "brief": {
+      "emails": {
+        "other": "{count} 封邮件"
+      },
+      "hide": "隐藏"
+    },
+    "reply": {
+      "to": "收件人：{to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "等待他人",
+        "handled": "我已处理"
+      },
+      "rules": {
+        "settingsTitle": "规则与设置",
+        "yours": "你的规则",
+        "hint": "告诉 Stella 什么重要、什么不重要，她会作为规则保存在这里。",
+        "wake": "立即通知你",
+        "act": "Stella 立即处理",
+        "ignore": "不显示在此页面",
+        "remove": "移除规则：{rule}"
+      },
+      "tell": {
+        "action": "告诉 Stella",
+        "about": "告诉 Stella 关于：{title}",
+        "placeholder": "告诉 Stella 该怎么做，或为什么这不重要…",
+        "send": "发给 Stella",
+        "sent": "已发给 Stella。"
+      },
+      "draft": {
+        "label": "回复草稿",
+        "read": "查看草稿"
+      },
+      "details": "详情",
+      "showDetails": "显示详情",
+      "hideDetails": "隐藏详情",
+      "working": "Stella 正在处理。",
+      "ignored": {
+        "count": {
+          "other": "已忽略 {count} 封邮件"
+        }
+      },
+      "inboxes": {
+        "title": "收件箱",
+        "reading": "读取中",
+        "count": {
+          "other": "{count} 个收件箱"
+        }
+      },
+      "nextCheck": {
+        "title": "下次自动检查",
+        "hint": "在定时读取之间，紧急邮件也会唤醒 Stella。",
+        "at": "下次自动检查：{time}"
+      },
+      "automation": "自动化",
+      "off": {
+        "title": "关闭邮件",
+        "confirm": "要关闭邮件吗？",
+        "body": "Stella 将不再读取你的邮件，并清空此页面。",
+        "working": "正在关闭…"
+      },
+      "summary": {
+        "caughtUp": "已全部处理",
+        "waitingFirstRead": "等待首次读取",
+        "readAt": "读取于 {time}",
+        "notRead": "尚未读取",
+        "newSince": {
+          "other": "此后 {count} 封新邮件"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "没有需要你处理的邮件",
+        "caughtUpNext": "已全部处理。下次自动检查：{time}。",
+        "caughtUpUrgent": "已全部处理。紧急邮件会立即通知你。",
+        "firstReadTitle": "Stella 很快会读取你的邮件",
+        "firstReadBody": "Stella 下次读取后，此页面会自动填充；你也可以现在就开始读取。"
+      },
+      "check": "检查",
+      "request": {
+        "check": "立即检查我的邮件",
+        "about": "关于：{title}"
+      },
+      "a11y": {
+        "back": "返回邮件"
+      }
     }
   }
 }

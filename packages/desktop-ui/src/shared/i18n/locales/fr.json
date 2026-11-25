@@ -3849,6 +3849,99 @@
       "lineServer": "Sur la clé OpenRouter de ce serveur : {sorted} triés ce mois-ci · {cost}",
       "deviceKeyHint": "Pour utiliser votre propre clé OpenRouter, ajoutez-la dans Modèles en étant connecté, afin qu'elle soit enregistrée dans votre compte. Une clé gardée uniquement sur cet ordinateur ne peut pas servir quand l'ordinateur est éteint.",
       "deviceKeyHintPhone": "Pour utiliser votre propre clé OpenRouter, ajoutez-la dans les paramètres du chat en étant connecté, afin qu'elle soit enregistrée dans votre compte. Une clé gardée uniquement sur ce téléphone ne peut pas servir pour les e-mails."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "En attente des autres",
+        "handled": "Ce que j'ai traité"
+      },
+      "rules": {
+        "title": "Règles",
+        "settingsTitle": "Règles et réglages",
+        "yours": "Vos règles",
+        "hint": "Dites à Stella ce qui compte et ce qui ne compte pas : elle le garde ici sous forme de règle.",
+        "wake": "Vous prévient tout de suite",
+        "act": "Stella agit tout de suite",
+        "ignore": "N'apparaît pas sur cette page",
+        "remove": "Retirer la règle : {rule}"
+      },
+      "tell": {
+        "action": "Dire à Stella",
+        "about": "Dire quelque chose à Stella : {title}",
+        "placeholder": "Dites à Stella quoi faire, ou pourquoi ce n'est pas important…",
+        "sendHint": "{keys} pour envoyer",
+        "send": "Envoyer à Stella",
+        "sent": "Envoyé à Stella."
+      },
+      "draft": {
+        "label": "Réponse préparée",
+        "read": "Lire le brouillon"
+      },
+      "details": "Détails",
+      "showDetails": "Afficher les détails",
+      "hideDetails": "Masquer les détails",
+      "onIt": "En cours…",
+      "working": "Stella s'en occupe.",
+      "ignored": {
+        "eyebrow": "Écartés",
+        "count": {
+          "many": "{count} e-mails ignorés",
+          "one": "{count} e-mail ignoré",
+          "other": "{count} e-mails ignorés"
+        },
+        "short": "Ignorés · {count}",
+        "hint": "Dites à Stella dans le chat si un e-mail de ces expéditeurs doit apparaître ici la prochaine fois."
+      },
+      "inboxes": {
+        "title": "Boîtes mail",
+        "reading": "Lecture active",
+        "count": {
+          "many": "{count} boîtes mail",
+          "one": "{count} boîte mail",
+          "other": "{count} boîtes mail"
+        }
+      },
+      "nextCheck": {
+        "title": "Prochaine vérification automatique",
+        "hint": "Un e-mail urgent réveille Stella entre les lectures prévues.",
+        "at": "Prochaine vérification automatique : {time}",
+        "short": "Prochaine : {time}"
+      },
+      "automation": "Automatisation",
+      "off": {
+        "title": "Désactiver E-mail",
+        "confirm": "Désactiver E-mail ?",
+        "body": "Stella arrête de lire vos e-mails et vide cette page.",
+        "working": "Désactivation…"
+      },
+      "summary": {
+        "caughtUp": "Tout est à jour",
+        "waitingFirstRead": "En attente de la première lecture",
+        "readAt": "Lecture : {time}",
+        "notRead": "Pas encore lu",
+        "newSince": {
+          "many": "{count} nouveaux depuis",
+          "one": "{count} nouveau depuis",
+          "other": "{count} nouveaux depuis"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Rien ne vous attend",
+        "caughtUpNext": "Vous êtes à jour. Prochaine vérification automatique : {time}",
+        "caughtUpUrgent": "Vous êtes à jour. Les e-mails urgents vous parviendront tout de suite.",
+        "firstReadTitle": "Stella lira bientôt vos e-mails",
+        "firstReadBody": "Cette page se remplit automatiquement à la prochaine lecture de Stella. Vous pouvez aussi en lancer une maintenant."
+      },
+      "check": "Vérifier",
+      "request": {
+        "check": "Vérifier mes e-mails maintenant",
+        "about": "À propos de : {title}"
+      },
+      "a11y": {
+        "list": "Liste des e-mails",
+        "items": "Éléments de la liste",
+        "back": "Retour à E-mail"
+      }
     }
   },
   "nudges": {

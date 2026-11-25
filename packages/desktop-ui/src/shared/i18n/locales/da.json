@@ -3795,6 +3795,96 @@
       "lineServer": "På denne servers OpenRouter-nøgle: {sorted} sorteret denne måned · {cost}",
       "deviceKeyHint": "Vil du bruge din egen OpenRouter-nøgle, så tilføj den under Modeller, mens du er logget ind, så den gemmes på din konto. En nøgle, der kun ligger på denne computer, kan ikke bruges, mens computeren er slukket.",
       "deviceKeyHintPhone": "Vil du bruge din egen OpenRouter-nøgle, så tilføj den i chatindstillingerne, mens du er logget ind, så den gemmes på din konto. En nøgle, der kun ligger på denne telefon, kan ikke bruges til e-mail."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Venter på andre",
+        "handled": "Det har jeg klaret"
+      },
+      "rules": {
+        "title": "Regler",
+        "settingsTitle": "Regler og indstillinger",
+        "yours": "Dine regler",
+        "hint": "Fortæl Stella, hvad der er vigtigt, og hvad der ikke er, så gemmer hun det her som en regel.",
+        "wake": "Siger til med det samme",
+        "act": "Stella handler med det samme",
+        "ignore": "Vises ikke på denne side",
+        "remove": "Fjern reglen: {rule}"
+      },
+      "tell": {
+        "action": "Sig til Stella",
+        "about": "Sig noget til Stella om: {title}",
+        "placeholder": "Fortæl Stella, hvad hun skal gøre, eller hvorfor det ikke er vigtigt…",
+        "sendHint": "{keys} for at sende",
+        "send": "Send til Stella",
+        "sent": "Sendt til Stella."
+      },
+      "draft": {
+        "label": "Svarkladde",
+        "read": "Læs kladde"
+      },
+      "details": "Detaljer",
+      "showDetails": "Vis detaljer",
+      "hideDetails": "Skjul detaljer",
+      "onIt": "I gang…",
+      "working": "Stella er i gang med det.",
+      "ignored": {
+        "eyebrow": "Sorteret fra",
+        "count": {
+          "one": "{count} ignoreret e-mail",
+          "other": "{count} ignorerede e-mails"
+        },
+        "short": "Ignoreret · {count}",
+        "hint": "Sig til Stella i chatten, hvis noget fra disse afsendere skal med på siden næste gang."
+      },
+      "inboxes": {
+        "title": "Indbakker",
+        "reading": "Læses",
+        "count": {
+          "one": "{count} indbakke",
+          "other": "{count} indbakker"
+        }
+      },
+      "nextCheck": {
+        "title": "Næste automatiske tjek",
+        "hint": "Presserende mails vækker Stella mellem de planlagte læsninger.",
+        "at": "Næste automatiske tjek: {time}",
+        "short": "Næste: {time}"
+      },
+      "automation": "Automatisering",
+      "off": {
+        "title": "Slå E-mail fra",
+        "confirm": "Slå E-mail fra?",
+        "body": "Stella holder op med at læse din post og rydder denne side.",
+        "working": "Slår fra…"
+      },
+      "summary": {
+        "caughtUp": "Helt ajour",
+        "waitingFirstRead": "Venter på første læsning",
+        "readAt": "Læst: {time}",
+        "notRead": "Ikke læst endnu",
+        "newSince": {
+          "one": "{count} ny siden da",
+          "other": "{count} nye siden da"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Intet har brug for dig",
+        "caughtUpNext": "Du er ajour. Næste automatiske tjek: {time}",
+        "caughtUpUrgent": "Du er ajour. Presserende mails når dig med det samme.",
+        "firstReadTitle": "Stella læser snart din post",
+        "firstReadBody": "Siden udfyldes automatisk, næste gang Stella læser, eller du kan starte en læsning nu."
+      },
+      "check": "Tjek",
+      "request": {
+        "check": "Tjek min e-mail nu",
+        "about": "Om: {title}"
+      },
+      "a11y": {
+        "list": "E-mailliste",
+        "items": "E-mailelementer",
+        "back": "Tilbage til E-mail"
+      }
     }
   },
   "nudges": {

@@ -176,6 +176,7 @@
     }
   },
   "common": {
+    "back": "Zpět",
     "cancel": "Zrušit",
     "close": "Zavřít",
     "continue": "Pokračovat",
@@ -187,6 +188,11 @@
   },
   "errors": {
     "generic": "Něco se pokazilo"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Odebírání…"
+    }
   },
   "mobile": {
     "account": {
@@ -1190,6 +1196,14 @@
   "email": {
     "title": "E-mail",
     "failed": "Aktualizace se nezdařila. Zkuste to znovu.",
+    "card": {
+      "needYou": {
+        "few": "Čeká na vás: {count}",
+        "many": "Čeká na vás: {count}",
+        "one": "Čeká na vás: {count}",
+        "other": "Čeká na vás: {count}"
+      }
+    },
     "section": {
       "connectBody": "Připojte Gmail a Stella bude třídit novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek počká v sekci Dnes, s připravenou odpovědí, kde je potřeba.",
       "connect": "Připojit Gmail",
@@ -1200,7 +1214,115 @@
       "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontrolujte připojení a zkuste to znovu.",
       "offBody": "Stella třídí novou poštu hned, jak dorazí. Naléhavé se k vám dostane hned, zbytek počká v sekci Dnes, s připravenou odpovědí, kde je potřeba. Šum zůstane venku.",
       "turnOn": "Zapnout",
-      "turningOn": "Třídím nedávnou poštu…"
+      "turningOn": "Třídím nedávnou poštu…",
+      "needsYou": "Čeká na vás",
+      "openInGmail": "Otevřít v Gmailu",
+      "remove": "Odebrat",
+      "checkNow": "Zkontrolovat",
+      "checking": "Kontroluji…",
+      "turnOff": "Vypnout"
+    },
+    "digest": {
+      "send": "Odeslat"
+    },
+    "brief": {
+      "emails": {
+        "few": "E-maily: {count}",
+        "many": "E-maily: {count}",
+        "one": "E-maily: {count}",
+        "other": "E-maily: {count}"
+      },
+      "hide": "Skrýt"
+    },
+    "reply": {
+      "to": "Komu: {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Čeká na ostatní",
+        "handled": "Vyřídila jsem"
+      },
+      "rules": {
+        "settingsTitle": "Pravidla a nastavení",
+        "yours": "Vaše pravidla",
+        "hint": "Řekněte Stelle, co je důležité a co ne, a ona si to tu uloží jako pravidlo.",
+        "wake": "Dá vědět hned",
+        "act": "Stella hned jedná",
+        "ignore": "Na této stránce se nezobrazí",
+        "remove": "Odebrat pravidlo: {rule}"
+      },
+      "tell": {
+        "action": "Říct Stelle",
+        "about": "Říct Stelle něco k: {title}",
+        "placeholder": "Řekněte Stelle, co má udělat, nebo proč to není důležité…",
+        "send": "Odeslat Stelle",
+        "sent": "Odesláno Stelle."
+      },
+      "draft": {
+        "label": "Koncept odpovědi",
+        "read": "Přečíst koncept"
+      },
+      "details": "Podrobnosti",
+      "showDetails": "Zobrazit podrobnosti",
+      "hideDetails": "Skrýt podrobnosti",
+      "working": "Stella na tom pracuje.",
+      "ignored": {
+        "count": {
+          "few": "{count} ignorované e-maily",
+          "many": "{count} ignorovaného e-mailu",
+          "one": "{count} ignorovaný e-mail",
+          "other": "{count} ignorovaných e-mailů"
+        }
+      },
+      "inboxes": {
+        "title": "Schránky",
+        "reading": "Čte se",
+        "count": {
+          "few": "{count} schránky",
+          "many": "{count} schránky",
+          "one": "{count} schránka",
+          "other": "{count} schránek"
+        }
+      },
+      "nextCheck": {
+        "title": "Další automatická kontrola",
+        "hint": "Naléhavá pošta probudí Stellu i mezi naplánovanými čteními.",
+        "at": "Další automatická kontrola: {time}"
+      },
+      "automation": "Automatizace",
+      "off": {
+        "title": "Vypnout E-mail",
+        "confirm": "Vypnout E-mail?",
+        "body": "Stella přestane číst vaši poštu a vyprázdní tuto stránku.",
+        "working": "Vypínání…"
+      },
+      "summary": {
+        "caughtUp": "Vše vyřízeno",
+        "waitingFirstRead": "Čeká se na první čtení",
+        "readAt": "Přečteno: {time}",
+        "notRead": "Zatím nepřečteno",
+        "newSince": {
+          "few": "{count} nové od té doby",
+          "many": "{count} nového od té doby",
+          "one": "{count} nový od té doby",
+          "other": "{count} nových od té doby"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nic na vás nečeká",
+        "caughtUpNext": "Máte vše vyřízeno. Další automatická kontrola: {time}",
+        "caughtUpUrgent": "Máte vše vyřízeno. Naléhavá pošta se k vám dostane hned.",
+        "firstReadTitle": "Stella brzy přečte vaši poštu",
+        "firstReadBody": "Stránka se sama naplní při dalším čtení, nebo ho můžete spustit hned."
+      },
+      "check": "Zkontrolovat",
+      "request": {
+        "check": "Zkontrolovat teď moji poštu",
+        "about": "Ohledně: {title}"
+      },
+      "a11y": {
+        "back": "Zpět na E-mail"
+      }
     }
   }
 }

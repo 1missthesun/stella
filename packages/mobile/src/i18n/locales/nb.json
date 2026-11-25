@@ -174,6 +174,7 @@
     }
   },
   "common": {
+    "back": "Tilbake",
     "cancel": "Avbryt",
     "close": "Lukk",
     "continue": "Fortsett",
@@ -185,6 +186,11 @@
   },
   "errors": {
     "generic": "Noe gikk galt"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Fjerner…"
+    }
   },
   "mobile": {
     "account": {
@@ -1160,6 +1166,12 @@
   "email": {
     "title": "E-post",
     "failed": "Kunne ikke oppdatere. Prøv igjen.",
+    "card": {
+      "needYou": {
+        "one": "{count} trenger deg",
+        "other": "{count} trenger deg"
+      }
+    },
     "section": {
       "connectBody": "Koble til Gmail, så sorterer Stella ny e-post når den kommer. Det som haster, når deg med en gang; resten venter i I dag, med et svarutkast klart når det trengs.",
       "connect": "Koble til Gmail",
@@ -1170,7 +1182,107 @@
       "loadErrorBody": "Stella når ikke serverne sine akkurat nå. Sjekk tilkoblingen og prøv igjen.",
       "offBody": "Stella sorterer ny e-post når den kommer. Det som haster, når deg med en gang; resten venter i I dag, med et svarutkast klart når det trengs. Støy holdes ute.",
       "turnOn": "Slå på",
-      "turningOn": "Sorterer den nyeste e-posten…"
+      "turningOn": "Sorterer den nyeste e-posten…",
+      "needsYou": "Trenger deg",
+      "openInGmail": "Åpne i Gmail",
+      "remove": "Fjern",
+      "checkNow": "Sjekk nå",
+      "checking": "Sjekker…",
+      "turnOff": "Slå av"
+    },
+    "digest": {
+      "send": "Send"
+    },
+    "brief": {
+      "emails": {
+        "one": "{count} e-post",
+        "other": "{count} e-poster"
+      },
+      "hide": "Skjul"
+    },
+    "reply": {
+      "to": "Til {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Venter på andre",
+        "handled": "Det har jeg ordnet"
+      },
+      "rules": {
+        "settingsTitle": "Regler og innstillinger",
+        "yours": "Reglene dine",
+        "hint": "Fortell Stella hva som er viktig og ikke, så lagrer hun det her som en regel.",
+        "wake": "Sier fra med en gang",
+        "act": "Stella handler med en gang",
+        "ignore": "Vises ikke på denne siden",
+        "remove": "Fjern regelen: {rule}"
+      },
+      "tell": {
+        "action": "Si til Stella",
+        "about": "Si noe til Stella om: {title}",
+        "placeholder": "Fortell Stella hva hun skal gjøre, eller hvorfor det ikke er viktig…",
+        "send": "Send til Stella",
+        "sent": "Sendt til Stella."
+      },
+      "draft": {
+        "label": "Svarutkast",
+        "read": "Les utkast"
+      },
+      "details": "Detaljer",
+      "showDetails": "Vis detaljer",
+      "hideDetails": "Skjul detaljer",
+      "working": "Stella er i gang med det.",
+      "ignored": {
+        "count": {
+          "one": "{count} ignorert e-post",
+          "other": "{count} ignorerte e-poster"
+        }
+      },
+      "inboxes": {
+        "title": "Innbokser",
+        "reading": "Leses",
+        "count": {
+          "one": "{count} innboks",
+          "other": "{count} innbokser"
+        }
+      },
+      "nextCheck": {
+        "title": "Neste automatiske sjekk",
+        "hint": "E-post som haster, vekker Stella mellom de planlagte lesingene.",
+        "at": "Neste automatiske sjekk: {time}"
+      },
+      "automation": "Automatisering",
+      "off": {
+        "title": "Slå av E-post",
+        "confirm": "Slå av E-post?",
+        "body": "Stella slutter å lese e-posten din og tømmer denne siden.",
+        "working": "Slår av…"
+      },
+      "summary": {
+        "caughtUp": "Helt à jour",
+        "waitingFirstRead": "Venter på første lesing",
+        "readAt": "Lest: {time}",
+        "notRead": "Ikke lest ennå",
+        "newSince": {
+          "one": "{count} ny siden da",
+          "other": "{count} nye siden da"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Ingenting trenger deg",
+        "caughtUpNext": "Du er à jour. Neste automatiske sjekk: {time}",
+        "caughtUpUrgent": "Du er à jour. E-post som haster, når deg med en gang.",
+        "firstReadTitle": "Stella leser snart e-posten din",
+        "firstReadBody": "Siden fylles ut automatisk neste gang Stella leser, eller du kan starte en lesing nå."
+      },
+      "check": "Sjekk",
+      "request": {
+        "check": "Sjekk e-posten min nå",
+        "about": "Om: {title}"
+      },
+      "a11y": {
+        "back": "Tilbake til E-post"
+      }
     }
   }
 }

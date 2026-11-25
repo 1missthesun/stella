@@ -175,6 +175,7 @@
     }
   },
   "common": {
+    "back": "חזרה",
     "cancel": "ביטול",
     "close": "סגירה",
     "continue": "המשך",
@@ -186,6 +187,11 @@
   },
   "errors": {
     "generic": "משהו השתבש"
+  },
+  "global": {
+    "schedule": {
+      "removing": "מסיר…"
+    }
   },
   "mobile": {
     "account": {
@@ -1175,6 +1181,13 @@
   "email": {
     "title": "דוא\"ל",
     "failed": "העדכון נכשל. נסו שוב.",
+    "card": {
+      "needYou": {
+        "one": "{count} מחכה לך",
+        "other": "{count} מחכים לך",
+        "two": "{count} מחכים לך"
+      }
+    },
     "section": {
       "connectBody": "חברו את Gmail ו-Stella תמיין דואר חדש כשהוא מגיע. דחוף יגיע אליכם מיד; השאר ממתין ב„היום”, עם טיוטת תשובה כשצריך לענות.",
       "connect": "חיבור Gmail",
@@ -1185,7 +1198,111 @@
       "loadErrorBody": "Stella לא מצליחה להגיע לשרתים שלה כרגע. בדקו את החיבור ונסו שוב.",
       "offBody": "Stella ממיינת דואר חדש כשהוא מגיע. דחוף יגיע אליכם מיד; השאר ממתין ב„היום”, עם טיוטת תשובה כשצריך לענות. הרעש נשאר בחוץ.",
       "turnOn": "הפעלה",
-      "turningOn": "ממיינת את הדואר האחרון…"
+      "turningOn": "ממיינת את הדואר האחרון…",
+      "needsYou": "מחכה לך",
+      "openInGmail": "פתיחה ב-Gmail",
+      "remove": "הסרה",
+      "checkNow": "בדיקה עכשיו",
+      "checking": "בודקת…",
+      "turnOff": "כיבוי"
+    },
+    "digest": {
+      "send": "שליחה"
+    },
+    "brief": {
+      "emails": {
+        "one": "אימיילים: {count}",
+        "other": "אימיילים: {count}",
+        "two": "אימיילים: {count}"
+      },
+      "hide": "הסתר"
+    },
+    "reply": {
+      "to": "אל {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "ממתין לאחרים",
+        "handled": "טיפלתי"
+      },
+      "rules": {
+        "settingsTitle": "כללים והגדרות",
+        "yours": "הכללים שלך",
+        "hint": "אמרו ל-Stella מה חשוב ומה לא, והיא תשמור את זה כאן ככלל.",
+        "wake": "מודיעה מיד",
+        "act": "Stella פועלת מיד",
+        "ignore": "לא מופיע בעמוד הזה",
+        "remove": "הסרת הכלל: {rule}"
+      },
+      "tell": {
+        "action": "לומר ל-Stella",
+        "about": "לומר ל-Stella משהו על: {title}",
+        "placeholder": "אמרו ל-Stella מה לעשות, או למה זה לא חשוב…",
+        "send": "שליחה ל-Stella",
+        "sent": "נשלח ל-Stella."
+      },
+      "draft": {
+        "label": "טיוטת תשובה",
+        "read": "קריאת הטיוטה"
+      },
+      "details": "פרטים",
+      "showDetails": "הצגת פרטים",
+      "hideDetails": "הסתרת פרטים",
+      "working": "Stella מטפלת בזה.",
+      "ignored": {
+        "count": {
+          "one": "אימייל אחד שלא נכלל",
+          "other": "{count} אימיילים שלא נכללו",
+          "two": "שני אימיילים שלא נכללו"
+        }
+      },
+      "inboxes": {
+        "title": "תיבות דואר",
+        "reading": "בקריאה",
+        "count": {
+          "one": "תיבת דואר אחת",
+          "other": "{count} תיבות דואר",
+          "two": "שתי תיבות דואר"
+        }
+      },
+      "nextCheck": {
+        "title": "הבדיקה האוטומטית הבאה",
+        "hint": "דואר דחוף מעיר את Stella בין הקריאות המתוזמנות.",
+        "at": "הבדיקה האוטומטית הבאה: {time}"
+      },
+      "automation": "אוטומציה",
+      "off": {
+        "title": "כיבוי הדוא\"ל",
+        "confirm": "לכבות את הדוא\"ל?",
+        "body": "Stella תפסיק לקרוא את הדואר שלך ותרוקן את העמוד הזה.",
+        "working": "מכבה…"
+      },
+      "summary": {
+        "caughtUp": "הכול מטופל",
+        "waitingFirstRead": "ממתין לקריאה הראשונה",
+        "readAt": "נקרא: {time}",
+        "notRead": "עוד לא נקרא",
+        "newSince": {
+          "one": "חדש אחד מאז",
+          "other": "{count} חדשים מאז",
+          "two": "שני חדשים מאז"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "שום דבר לא מחכה לך",
+        "caughtUpNext": "הכול מטופל. הבדיקה האוטומטית הבאה: {time}.",
+        "caughtUpUrgent": "הכול מטופל. דואר דחוף יגיע אליך מיד.",
+        "firstReadTitle": "Stella תקרא בקרוב את הדואר שלך",
+        "firstReadBody": "העמוד יתמלא אוטומטית בקריאה הבאה של Stella, או שאפשר להתחיל אחת עכשיו."
+      },
+      "check": "בדיקה",
+      "request": {
+        "check": "בדיקת הדואר שלי עכשיו",
+        "about": "בנוגע ל: {title}"
+      },
+      "a11y": {
+        "back": "חזרה לדוא\"ל"
+      }
     }
   }
 }

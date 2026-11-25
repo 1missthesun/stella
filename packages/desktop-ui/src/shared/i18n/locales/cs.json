@@ -3903,6 +3903,102 @@
       "lineServer": "Z klíče OpenRouter tohoto serveru: tento měsíc roztříděno {sorted} · {cost}",
       "deviceKeyHint": "Chcete-li použít vlastní klíč OpenRouter, přidejte ho v sekci Modely, když jste přihlášeni, aby se uložil do vašeho účtu. Klíč uložený jen v tomto počítači nelze použít, když je počítač vypnutý.",
       "deviceKeyHintPhone": "Chcete-li použít vlastní klíč OpenRouter, přidejte ho v nastavení chatu, když jste přihlášeni, aby se uložil do vašeho účtu. Klíč uložený jen v tomto telefonu nelze pro e-mail použít."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Čeká na ostatní",
+        "handled": "Vyřídila jsem"
+      },
+      "rules": {
+        "title": "Pravidla",
+        "settingsTitle": "Pravidla a nastavení",
+        "yours": "Vaše pravidla",
+        "hint": "Řekněte Stelle, co je důležité a co ne, a ona si to tu uloží jako pravidlo.",
+        "wake": "Dá vědět hned",
+        "act": "Stella hned jedná",
+        "ignore": "Na této stránce se nezobrazí",
+        "remove": "Odebrat pravidlo: {rule}"
+      },
+      "tell": {
+        "action": "Říct Stelle",
+        "about": "Říct Stelle něco k: {title}",
+        "placeholder": "Řekněte Stelle, co má udělat, nebo proč to není důležité…",
+        "sendHint": "{keys} pro odeslání",
+        "send": "Odeslat Stelle",
+        "sent": "Odesláno Stelle."
+      },
+      "draft": {
+        "label": "Koncept odpovědi",
+        "read": "Přečíst koncept"
+      },
+      "details": "Podrobnosti",
+      "showDetails": "Zobrazit podrobnosti",
+      "hideDetails": "Skrýt podrobnosti",
+      "onIt": "Pracuje se…",
+      "working": "Stella na tom pracuje.",
+      "ignored": {
+        "eyebrow": "Odfiltrováno",
+        "count": {
+          "few": "{count} ignorované e-maily",
+          "many": "{count} ignorovaného e-mailu",
+          "one": "{count} ignorovaný e-mail",
+          "other": "{count} ignorovaných e-mailů"
+        },
+        "short": "Ignorováno · {count}",
+        "hint": "Pokud se má příště něco od těchto odesílatelů na této stránce objevit, řekněte to Stelle v chatu."
+      },
+      "inboxes": {
+        "title": "Schránky",
+        "reading": "Čte se",
+        "count": {
+          "few": "{count} schránky",
+          "many": "{count} schránky",
+          "one": "{count} schránka",
+          "other": "{count} schránek"
+        }
+      },
+      "nextCheck": {
+        "title": "Další automatická kontrola",
+        "hint": "Naléhavá pošta probudí Stellu i mezi naplánovanými čteními.",
+        "at": "Další automatická kontrola: {time}",
+        "short": "Další: {time}"
+      },
+      "automation": "Automatizace",
+      "off": {
+        "title": "Vypnout E-mail",
+        "confirm": "Vypnout E-mail?",
+        "body": "Stella přestane číst vaši poštu a vyprázdní tuto stránku.",
+        "working": "Vypínání…"
+      },
+      "summary": {
+        "caughtUp": "Vše vyřízeno",
+        "waitingFirstRead": "Čeká se na první čtení",
+        "readAt": "Přečteno: {time}",
+        "notRead": "Zatím nepřečteno",
+        "newSince": {
+          "few": "{count} nové od té doby",
+          "many": "{count} nového od té doby",
+          "one": "{count} nový od té doby",
+          "other": "{count} nových od té doby"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nic na vás nečeká",
+        "caughtUpNext": "Máte vše vyřízeno. Další automatická kontrola: {time}",
+        "caughtUpUrgent": "Máte vše vyřízeno. Naléhavá pošta se k vám dostane hned.",
+        "firstReadTitle": "Stella brzy přečte vaši poštu",
+        "firstReadBody": "Stránka se sama naplní při dalším čtení, nebo ho můžete spustit hned."
+      },
+      "check": "Zkontrolovat",
+      "request": {
+        "check": "Zkontrolovat teď moji poštu",
+        "about": "Ohledně: {title}"
+      },
+      "a11y": {
+        "list": "Seznam e-mailů",
+        "items": "Položky e-mailu",
+        "back": "Zpět na E-mail"
+      }
     }
   },
   "nudges": {

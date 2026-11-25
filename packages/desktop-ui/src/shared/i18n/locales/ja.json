@@ -3739,6 +3739,93 @@
       "lineServer": "このサーバーの OpenRouter キー：今月 {sorted}件を仕分け · {cost}",
       "deviceKeyHint": "ご自身の OpenRouter キーを使うには、サインインした状態でモデルから追加してください。アカウントに保存されます。このコンピュータだけに保存したキーは、コンピュータの電源が切れている間は使えません。",
       "deviceKeyHintPhone": "ご自身の OpenRouter キーを使うには、サインインした状態でチャット設定から追加してください。アカウントに保存されます。この電話だけに保存したキーはメールには使えません。"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "相手待ち",
+        "handled": "対応済み"
+      },
+      "rules": {
+        "title": "ルール",
+        "settingsTitle": "ルールと設定",
+        "yours": "あなたのルール",
+        "hint": "大切なこととそうでないことを Stella に伝えると、ここにルールとして残ります。",
+        "wake": "すぐに知らせます",
+        "act": "Stella がすぐに対応します",
+        "ignore": "このページには表示しません",
+        "remove": "ルールを削除: {rule}"
+      },
+      "tell": {
+        "action": "Stella に伝える",
+        "about": "Stella に伝える: {title}",
+        "placeholder": "してほしいことや、重要でない理由を Stella に伝えてください…",
+        "sendHint": "{keys} で送信",
+        "send": "Stella に送信",
+        "sent": "Stella に送りました。"
+      },
+      "draft": {
+        "label": "返信の下書き",
+        "read": "下書きを読む"
+      },
+      "details": "詳細",
+      "showDetails": "詳細を表示",
+      "hideDetails": "詳細を隠す",
+      "onIt": "対応中…",
+      "working": "Stella が対応しています。",
+      "ignored": {
+        "eyebrow": "除外",
+        "count": {
+          "other": "除外したメール {count}件"
+        },
+        "short": "除外 · {count}",
+        "hint": "これらの送信者のメールを次回このページに表示したい場合は、チャットで Stella に伝えてください。"
+      },
+      "inboxes": {
+        "title": "受信トレイ",
+        "reading": "確認対象",
+        "count": {
+          "other": "受信トレイ {count}件"
+        }
+      },
+      "nextCheck": {
+        "title": "次回の自動確認",
+        "hint": "急ぎのメールが届くと、予定された確認の合間でも Stella が対応します。",
+        "at": "次回の自動確認: {time}",
+        "short": "次回 {time}"
+      },
+      "automation": "自動化",
+      "off": {
+        "title": "メールをオフにする",
+        "confirm": "メールをオフにしますか？",
+        "body": "Stella はメールを読むのをやめ、このページを空にします。",
+        "working": "オフにしています…"
+      },
+      "summary": {
+        "caughtUp": "すべて対応済み",
+        "waitingFirstRead": "初回の確認待ち",
+        "readAt": "確認 {time}",
+        "notRead": "まだ確認していません",
+        "newSince": {
+          "other": "その後の新着 {count}件"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "対応が必要なものはありません",
+        "caughtUpNext": "すべて対応済みです。次回の自動確認: {time}",
+        "caughtUpUrgent": "すべて対応済みです。急ぎのメールはすぐにお知らせします。",
+        "firstReadTitle": "まもなく Stella がメールを確認します",
+        "firstReadBody": "次に Stella がメールを確認すると、このページに自動で表示されます。今すぐ確認することもできます。"
+      },
+      "check": "確認",
+      "request": {
+        "check": "今すぐメールを確認",
+        "about": "「{title}」について"
+      },
+      "a11y": {
+        "list": "メール一覧",
+        "items": "メールの項目",
+        "back": "メールに戻る"
+      }
     }
   },
   "nudges": {

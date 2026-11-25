@@ -173,6 +173,7 @@
     }
   },
   "common": {
+    "back": "Quay lại",
     "cancel": "Hủy",
     "close": "Đóng",
     "continue": "Tiếp tục",
@@ -184,6 +185,11 @@
   },
   "errors": {
     "generic": "Đã có lỗi xảy ra"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Đang xóa…"
+    }
   },
   "mobile": {
     "account": {
@@ -1145,6 +1151,11 @@
   "email": {
     "title": "Email",
     "failed": "Không cập nhật được. Hãy thử lại.",
+    "card": {
+      "needYou": {
+        "other": "{count} cần bạn"
+      }
+    },
     "section": {
       "connectBody": "Kết nối Gmail và Stella sẽ phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại chờ trong Hôm nay, kèm thư trả lời soạn sẵn khi cần trả lời.",
       "connect": "Kết nối Gmail",
@@ -1155,7 +1166,103 @@
       "loadErrorBody": "Stella hiện không kết nối được máy chủ. Hãy kiểm tra kết nối rồi thử lại.",
       "offBody": "Stella phân loại thư mới ngay khi đến. Thư gấp đến với bạn ngay; phần còn lại chờ trong Hôm nay, kèm thư trả lời soạn sẵn khi cần trả lời. Thư rác vặt bị gạt ra ngoài.",
       "turnOn": "Bật",
-      "turningOn": "Đang phân loại thư gần đây…"
+      "turningOn": "Đang phân loại thư gần đây…",
+      "needsYou": "Cần bạn",
+      "openInGmail": "Mở trong Gmail",
+      "remove": "Xóa",
+      "checkNow": "Kiểm tra ngay",
+      "checking": "Đang kiểm tra…",
+      "turnOff": "Tắt"
+    },
+    "digest": {
+      "send": "Gửi"
+    },
+    "brief": {
+      "emails": {
+        "other": "{count} email"
+      },
+      "hide": "Ẩn"
+    },
+    "reply": {
+      "to": "Đến {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Đang chờ người khác",
+        "handled": "Stella đã xử lý"
+      },
+      "rules": {
+        "settingsTitle": "Quy tắc và cài đặt",
+        "yours": "Quy tắc của bạn",
+        "hint": "Cho Stella biết điều gì quan trọng và điều gì không, Stella sẽ lưu lại ở đây thành quy tắc.",
+        "wake": "Báo bạn ngay",
+        "act": "Stella xử lý ngay",
+        "ignore": "Không đưa vào trang này",
+        "remove": "Xóa quy tắc: {rule}"
+      },
+      "tell": {
+        "action": "Nói với Stella",
+        "about": "Nói với Stella về: {title}",
+        "placeholder": "Cho Stella biết cần làm gì, hoặc vì sao việc này không quan trọng…",
+        "send": "Gửi cho Stella",
+        "sent": "Đã gửi cho Stella."
+      },
+      "draft": {
+        "label": "Bản nháp trả lời",
+        "read": "Đọc bản nháp"
+      },
+      "details": "Chi tiết",
+      "showDetails": "Hiện chi tiết",
+      "hideDetails": "Ẩn chi tiết",
+      "working": "Stella đang xử lý.",
+      "ignored": {
+        "count": {
+          "other": "Đã bỏ qua {count} email"
+        }
+      },
+      "inboxes": {
+        "title": "Hộp thư",
+        "reading": "Đang đọc",
+        "count": {
+          "other": "{count} hộp thư"
+        }
+      },
+      "nextCheck": {
+        "title": "Lần kiểm tra tự động tiếp theo",
+        "hint": "Thư gấp sẽ đánh thức Stella giữa các lần đọc theo lịch.",
+        "at": "Lần kiểm tra tự động tiếp theo: {time}"
+      },
+      "automation": "Tự động hóa",
+      "off": {
+        "title": "Tắt Email",
+        "confirm": "Tắt Email?",
+        "body": "Stella sẽ ngừng đọc thư của bạn và xóa trống trang này.",
+        "working": "Đang tắt…"
+      },
+      "summary": {
+        "caughtUp": "Đã xong hết",
+        "waitingFirstRead": "Đang chờ lần đọc đầu tiên",
+        "readAt": "Đã đọc: {time}",
+        "notRead": "Chưa đọc",
+        "newSince": {
+          "other": "{count} thư mới từ đó"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Không có gì cần bạn",
+        "caughtUpNext": "Bạn đã xem hết. Lần kiểm tra tự động tiếp theo: {time}.",
+        "caughtUpUrgent": "Bạn đã xem hết. Thư gấp sẽ đến với bạn ngay.",
+        "firstReadTitle": "Stella sẽ sớm đọc thư của bạn",
+        "firstReadBody": "Trang này tự điền khi Stella đọc lần tới, hoặc bạn có thể cho đọc ngay bây giờ."
+      },
+      "check": "Kiểm tra",
+      "request": {
+        "check": "Kiểm tra email của tôi ngay",
+        "about": "Về: {title}"
+      },
+      "a11y": {
+        "back": "Quay lại Email"
+      }
     }
   }
 }

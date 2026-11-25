@@ -22,7 +22,7 @@ import {
   type EmailPageItem,
   type EmailPageSection,
 } from "@stella/contracts/email-page";
-import { useLocale, useT } from "../i18n";
+import { useLocale, useT, useTPlural } from "../i18n";
 import { authClient } from "../lib/auth-client";
 import { getBackendClient, useBackendView } from "../lib/backend";
 import { sendToChat } from "../lib/chat-send-queue";
@@ -35,16 +35,23 @@ import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { Text } from "./Text";
 
-const SECTION_ORDER: readonly { key: EmailPageSection; title: string }[] = [
-  { key: "needs_you", title: "Needs you" },
-  { key: "waiting", title: "Waiting on others" },
-  { key: "handled", title: "I handled" },
+const SECTION_ORDER: readonly { key: EmailPageSection; titleKey: string }[] = [
+  { key: "needs_you", titleKey: "email.section.needsYou" },
+  { key: "waiting", titleKey: "email.workspace.sections.waiting" },
+  { key: "handled", titleKey: "email.workspace.sections.handled" },
 ];
 
-const RULE_KIND_LABEL: Record<EmailRuleKind, string> = {
-  wake: "Tells you at once",
-  act: "Stella acts at once",
-  ignore: "Left off this page",
+const RULE_KIND_LABEL_KEY: Record<EmailRuleKind, string> = {
+  wake: "email.workspace.rules.wake",
+  act: "email.workspace.rules.act",
+  ignore: "email.workspace.rules.ignore",
+};
+
+type PendingKind = "working" | "sent";
+
+const PENDING_LABEL_KEY: Record<PendingKind, string> = {
+  working: "email.workspace.working",
+  sent: "email.workspace.tell.sent",
 };
 
 const formatWhen = (at: number | undefined, locale: string): string => {
@@ -139,6 +146,8 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
   const colors = useColors();
   const { isDark } = useTheme();
   const locale = useLocale();
+  const t = useT();
+  const tPlural = useTPlural();
   const bottomInset = useSafeAreaInsets().bottom;
   const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
@@ -147,7 +156,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
   const [tellingOpen, setTellingOpen] = useState<Record<string, boolean>>({});
   const [tellDrafts, setTellDrafts] = useState<Record<string, string>>({});
   const [tellSending, setTellSending] = useState<Record<string, boolean>>({});
-  const [pendingById, setPendingById] = useState<Record<string, string>>({});
+  const [pendingById, setPendingById] = useState<Record<string, PendingKind>>({});
   const [checking, setChecking] = useState(false);
   const [ignoredOpen, setIgnoredOpen] = useState(false);
   const [removingRuleId, setRemovingRuleId] = useState<string | null>(null);
@@ -205,26 +214,26 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
     setChecking(true);
     const sent = await sendAction({
       canvas: EMAIL_PAGE_CANVAS,
-      title: "Email",
+      title: t("email.title"),
       id: EMAIL_PAGE_CHECK_ACTION,
-      label: "Check my email now",
+      label: t("email.workspace.request.check"),
     });
     if (!sent) {
       setChecking(false);
       return;
     }
     setTimeout(() => setChecking(false), 12_000);
-  }, [checking, sendAction]);
+  }, [checking, sendAction, t]);
 
   const handlePrimaryAction = useCallback(
     async (item: EmailPageItem) => {
       if (!item.action || pendingById[item.id]) return;
       tapLight();
       const prefix = item.section === "handled" ? "undo" : "do";
-      setPendingById((prev) => ({ ...prev, [item.id]: "Stella's on it." }));
+      setPendingById((prev) => ({ ...prev, [item.id]: "working" }));
       const sent = await sendAction({
         canvas: EMAIL_PAGE_CANVAS,
-        title: "Email",
+        title: t("email.title"),
         id: `${prefix}:${item.id}`,
         label: `${item.action}: ${item.title}`,
       });
@@ -236,7 +245,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
         });
       }
     },
-    [pendingById, sendAction],
+    [pendingById, sendAction, t],
   );
 
   const handleTellSubmit = useCallback(
@@ -247,19 +256,19 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
       setTellSending((prev) => ({ ...prev, [item.id]: true }));
       const sent = await sendAction({
         canvas: EMAIL_PAGE_CANVAS,
-        title: "Email",
+        title: t("email.title"),
         id: `tell:${item.id}`,
-        label: `About ${item.title}`,
+        label: t("email.workspace.request.about", { title: item.title }),
         fields: { text },
       });
       setTellSending((prev) => ({ ...prev, [item.id]: false }));
       if (sent) {
         setTellDrafts((prev) => ({ ...prev, [item.id]: "" }));
         setTellingOpen((prev) => ({ ...prev, [item.id]: false }));
-        setPendingById((prev) => ({ ...prev, [item.id]: "Sent to Stella." }));
+        setPendingById((prev) => ({ ...prev, [item.id]: "sent" }));
       }
     },
-    [sendAction, tellDrafts, tellSending],
+    [sendAction, t, tellDrafts, tellSending],
   );
 
   const handleRemoveRule = useCallback(async (ruleId: string) => {
@@ -275,12 +284,12 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
   const confirmTurnOff = useCallback(() => {
     tapLight();
     Alert.alert(
-      "Turn off Email?",
-      "Stella stops reading your mail and clears this page.",
+      t("email.workspace.off.confirm"),
+      t("email.workspace.off.body"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Turn off",
+          text: t("email.section.turnOff"),
           style: "destructive",
           onPress: () => {
             setTurningOff(true);
@@ -291,19 +300,23 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
         },
       ],
     );
-  }, []);
+  }, [t]);
 
   const summaryLabel =
     needsYouCount > 0
-      ? `${needsYouCount} ${needsYouCount === 1 ? "needs you" : "need you"}`
+      ? tPlural("email.card.needYou", needsYouCount)
       : state.page.readAt
-        ? "All caught up"
-        : "Waiting for first read";
+        ? t("email.workspace.summary.caughtUp")
+        : t("email.workspace.summary.waitingFirstRead");
   const metaParts: string[] = [
-    state.page.readAt ? `Read ${formatWhen(state.page.readAt, locale)}` : "Not read yet",
+    state.page.readAt
+      ? t("email.workspace.summary.readAt", { time: formatWhen(state.page.readAt, locale) })
+      : t("email.workspace.summary.notRead"),
   ];
-  if (state.unread > 0) metaParts.push(`${state.unread} new since`);
-  if (state.accounts.length > 1) metaParts.push(`${state.accounts.length} inboxes`);
+  if (state.unread > 0) metaParts.push(tPlural("email.workspace.summary.newSince", state.unread));
+  if (state.accounts.length > 1) {
+    metaParts.push(tPlural("email.workspace.inboxes.count", state.accounts.length));
+  }
 
   if (settingsOpen) {
     return (
@@ -316,7 +329,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
         <View style={styles.settingsHeader}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back to Email"
+            accessibilityLabel={t("email.workspace.a11y.back")}
             onPress={() => {
               tapLight();
               setSettingsOpen(false);
@@ -324,13 +337,13 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
             style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressedSoft]}
           >
             <Icon name="chevron-left" size={16} color={colors.textStrong} />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t("common.back")}</Text>
           </Pressable>
-          <Text style={styles.settingsTitle}>Rules & settings</Text>
+          <Text style={styles.settingsTitle}>{t("email.workspace.rules.settingsTitle")}</Text>
         </View>
 
         <View style={styles.settingsGroup}>
-          <Text style={styles.sectionHeading}>Your rules</Text>
+          <Text style={styles.sectionHeading}>{t("email.workspace.rules.yours")}</Text>
           {state.rules.length > 0 ? (
             <View style={styles.hairlineList}>
               {state.rules.map((rule) => {
@@ -339,16 +352,16 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                   <View key={rule.ruleId} style={styles.settingsRow}>
                     <View style={styles.settingsRowCopy}>
                       <Text style={styles.settingsRowMain}>{rule.text}</Text>
-                      <Text style={styles.settingsRowSub}>{RULE_KIND_LABEL[rule.kind] ?? ""}</Text>
+                      <Text style={styles.settingsRowSub}>{RULE_KIND_LABEL_KEY[rule.kind] ? t(RULE_KIND_LABEL_KEY[rule.kind]) : ""}</Text>
                     </View>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Remove rule ${rule.text}`}
+                      accessibilityLabel={t("email.workspace.rules.remove", { rule: rule.text })}
                       disabled={removing}
                       onPress={() => void handleRemoveRule(rule.ruleId)}
                       style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressedSoft]}
                     >
-                      <Text style={styles.ghostBtnText}>{removing ? "Removing…" : "Remove"}</Text>
+                      <Text style={styles.ghostBtnText}>{removing ? t("global.schedule.removing") : t("email.section.remove")}</Text>
                     </Pressable>
                   </View>
                 );
@@ -356,12 +369,12 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
             </View>
           ) : null}
           <Text style={styles.footnote}>
-            Tell Stella what matters and what doesn't, and she keeps it here as a rule.
+            {t("email.workspace.rules.hint")}
           </Text>
         </View>
 
         <View style={styles.settingsGroup}>
-          <Text style={styles.sectionHeading}>Inboxes</Text>
+          <Text style={styles.sectionHeading}>{t("email.workspace.inboxes.title")}</Text>
           <View style={styles.hairlineList}>
             {state.accounts.map((account) => (
               <View key={account} style={styles.settingsRow}>
@@ -371,15 +384,15 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                     {account}
                   </Text>
                 </View>
-                <Text style={styles.settingsRowValue}>Reading</Text>
+                <Text style={styles.settingsRowValue}>{t("email.workspace.inboxes.reading")}</Text>
               </View>
             ))}
             {state.nextReadAt ? (
               <View style={styles.settingsRow}>
                 <View style={styles.settingsRowCopy}>
-                  <Text style={styles.settingsRowMain}>Next automatic check</Text>
+                  <Text style={styles.settingsRowMain}>{t("email.workspace.nextCheck.title")}</Text>
                   <Text style={styles.settingsRowSub}>
-                    Urgent mail wakes Stella between scheduled reads.
+                    {t("email.workspace.nextCheck.hint")}
                   </Text>
                 </View>
                 <Text style={styles.settingsRowValue}>{formatWhen(state.nextReadAt, locale)}</Text>
@@ -389,23 +402,23 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
         </View>
 
         <View style={styles.settingsGroup}>
-          <Text style={styles.sectionHeading}>Automation</Text>
+          <Text style={styles.sectionHeading}>{t("email.workspace.automation")}</Text>
           <View style={styles.hairlineList}>
             <View style={styles.settingsRow}>
               <View style={styles.settingsRowCopy}>
-                <Text style={styles.settingsRowMain}>Turn off Email</Text>
+                <Text style={styles.settingsRowMain}>{t("email.workspace.off.title")}</Text>
                 <Text style={styles.settingsRowSub}>
-                  Stops automatic reads and clears this page.
+                  {t("email.workspace.off.body")}
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Turn off Email"
+                accessibilityLabel={t("email.workspace.off.title")}
                 disabled={turningOff}
                 onPress={confirmTurnOff}
                 style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressedSoft]}
               >
-                <Text style={styles.dangerBtnText}>{turningOff ? "Turning off…" : "Turn off"}</Text>
+                <Text style={styles.dangerBtnText}>{turningOff ? t("email.workspace.off.working") : t("email.section.turnOff")}</Text>
               </Pressable>
             </View>
           </View>
@@ -436,7 +449,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
           <View style={styles.topActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Check email now"
+              accessibilityLabel={t("email.workspace.request.check")}
               disabled={checking}
               onPress={() => void handleCheckNow()}
               style={({ pressed }) => [
@@ -446,11 +459,11 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
               ]}
             >
               <Icon name="refresh-cw" size={14} color={colors.textMuted} />
-              <Text style={styles.headerBtnText}>{checking ? "Checking" : "Check"}</Text>
+              <Text style={styles.headerBtnText}>{checking ? t("email.section.checking") : t("email.workspace.check")}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Rules and settings"
+              accessibilityLabel={t("email.workspace.rules.settingsTitle")}
               onPress={() => {
                 tapLight();
                 setSettingsOpen(true);
@@ -475,18 +488,20 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
               />
             </View>
             <Text style={styles.emptyTitle}>
-              {state.page.readAt ? "Nothing needs you" : "Stella will read your mail soon"}
+              {state.page.readAt
+                ? t("email.workspace.empty.caughtUpTitle")
+                : t("email.workspace.empty.firstReadTitle")}
             </Text>
             <Text style={styles.emptyBody}>
               {state.page.readAt
                 ? state.nextReadAt
-                  ? `You're caught up. Next check ${formatWhen(state.nextReadAt, locale)}.`
-                  : "You're caught up. Urgent mail will reach you right away."
-                : "Your page fills in automatically on Stella's next read, or you can run one now."}
+                  ? t("email.workspace.empty.caughtUpNext", { time: formatWhen(state.nextReadAt, locale) })
+                  : t("email.workspace.empty.caughtUpUrgent")
+                : t("email.workspace.empty.firstReadBody")}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Check email now"
+              accessibilityLabel={t("email.workspace.request.check")}
               disabled={checking}
               onPress={() => void handleCheckNow()}
               style={({ pressed }) => [
@@ -496,7 +511,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
               ]}
             >
               <Icon name="refresh-cw" size={13} color={colors.textStrong} />
-              <Text style={styles.secondaryBtnText}>{checking ? "Checking…" : "Check now"}</Text>
+              <Text style={styles.secondaryBtnText}>{checking ? t("email.section.checking") : t("email.section.checkNow")}</Text>
             </Pressable>
           </View>
         ) : (
@@ -505,14 +520,14 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
             return (
               <View key={group.key} style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionHeading}>{group.title}</Text>
+                  <Text style={styles.sectionHeading}>{t(group.titleKey)}</Text>
                   {group.items.length > 0 ? (
                     <Text style={styles.sectionCount}>{group.items.length}</Text>
                   ) : null}
                 </View>
 
                 {group.items.length === 0 ? (
-                  <Text style={styles.quietLine}>Nothing needs you.</Text>
+                  <Text style={styles.quietLine}>{t("email.workspace.empty.caughtUpTitle")}</Text>
                 ) : (
                   group.items.map((item, idx) => {
                     const hasMore = Boolean(item.detail || item.draft);
@@ -524,7 +539,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                     const emphasizeAction = Boolean(item.urgent || (open && item.draft));
                     const meta: string[] = [];
                     if (item.from) meta.push(item.from);
-                    if (item.count && item.count > 1) meta.push(`${item.count} emails`);
+                    if (item.count && item.count > 1) meta.push(tPlural("email.brief.emails", item.count));
                     if (state.accounts.length > 1 && thread?.account) meta.push(thread.account);
                     const draftText = tellDrafts[item.id] ?? "";
                     const sendDisabled = draftText.trim().length === 0 || Boolean(tellSending[item.id]);
@@ -582,11 +597,11 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                 <View style={styles.draftHead}>
                                   <View style={styles.draftLabelRow}>
                                     <Icon name="reply" size={12} color={colors.textMuted} />
-                                    <Text style={styles.draftLabel}>Drafted reply</Text>
+                                    <Text style={styles.draftLabel}>{t("email.workspace.draft.label")}</Text>
                                   </View>
                                   {item.from ? (
                                     <Text style={styles.draftTo} numberOfLines={1}>
-                                      To {item.from}
+                                      {t("email.reply.to", { to: item.from })}
                                     </Text>
                                   ) : null}
                                 </View>
@@ -599,7 +614,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                         {pending ? (
                           <View style={styles.pendingRow}>
                             <ActivityIndicator size="small" color={colors.textMuted} />
-                            <Text style={styles.pendingText}>{pending}</Text>
+                            <Text style={styles.pendingText}>{t(PENDING_LABEL_KEY[pending])}</Text>
                           </View>
                         ) : (
                           <>
@@ -639,7 +654,11 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                 <Pressable
                                   accessibilityRole="button"
                                   accessibilityLabel={
-                                    open ? "Hide details" : item.draft ? "Read draft" : "Show details"
+                                    open
+                                      ? t("email.workspace.hideDetails")
+                                      : item.draft
+                                        ? t("email.workspace.draft.read")
+                                        : t("email.workspace.showDetails")
                                   }
                                   onPress={() => {
                                     tapLight();
@@ -651,14 +670,18 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                   ]}
                                 >
                                   <Text style={styles.ghostBtnText}>
-                                    {open ? "Hide" : item.draft ? "Read draft" : "Details"}
+                                    {open
+                                      ? t("email.brief.hide")
+                                      : item.draft
+                                        ? t("email.workspace.draft.read")
+                                        : t("email.workspace.details")}
                                   </Text>
                                 </Pressable>
                               ) : null}
 
                               <Pressable
                                 accessibilityRole="button"
-                                accessibilityLabel={`Tell Stella about ${item.title}`}
+                                accessibilityLabel={t("email.workspace.tell.about", { title: item.title })}
                                 onPress={() => {
                                   tapLight();
                                   setTellingOpen((prev) => ({
@@ -671,13 +694,13 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                   pressed && styles.pressedSoft,
                                 ]}
                               >
-                                <Text style={styles.ghostBtnText}>Tell Stella</Text>
+                                <Text style={styles.ghostBtnText}>{t("email.workspace.tell.action")}</Text>
                               </Pressable>
 
                               {thread ? (
                                 <Pressable
                                   accessibilityRole="button"
-                                  accessibilityLabel="Open in Gmail"
+                                  accessibilityLabel={t("email.section.openInGmail")}
                                   onPress={() => {
                                     tapLight();
                                     void Linking.openURL(gmailThreadUrl(thread)).catch(() => undefined);
@@ -698,7 +721,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                 <TextInput
                                   style={styles.tellInput}
                                   multiline
-                                  placeholder="Tell Stella what to do, or why it doesn't matter…"
+                                  placeholder={t("email.workspace.tell.placeholder")}
                                   placeholderTextColor={colors.textWeaker}
                                   value={draftText}
                                   editable={!tellSending[item.id]}
@@ -709,7 +732,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                 <View style={styles.tellBar}>
                                   <Pressable
                                     accessibilityRole="button"
-                                    accessibilityLabel="Cancel"
+                                    accessibilityLabel={t("common.cancel")}
                                     onPress={() =>
                                       setTellingOpen((prev) => ({ ...prev, [item.id]: false }))
                                     }
@@ -718,11 +741,11 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                       pressed && styles.pressedSoft,
                                     ]}
                                   >
-                                    <Text style={styles.ghostBtnText}>Cancel</Text>
+                                    <Text style={styles.ghostBtnText}>{t("common.cancel")}</Text>
                                   </Pressable>
                                   <Pressable
                                     accessibilityRole="button"
-                                    accessibilityLabel="Send to Stella"
+                                    accessibilityLabel={t("email.workspace.tell.send")}
                                     disabled={sendDisabled}
                                     onPress={() => void handleTellSubmit(item)}
                                     style={({ pressed }) => [
@@ -733,7 +756,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
                                     ]}
                                   >
                                     <Text style={styles.primaryBtnText}>
-                                      {tellSending[item.id] ? "Sending…" : "Send"}
+                                      {tellSending[item.id] ? t("userAsk.question.sending") : t("email.digest.send")}
                                     </Text>
                                   </Pressable>
                                 </View>
@@ -754,7 +777,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
           <View style={styles.ignoredBlock}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Ignored ${state.page.ignored.count} emails`}
+              accessibilityLabel={tPlural("email.workspace.ignored.count", state.page.ignored.count)}
               onPress={() => {
                 tapLight();
                 setIgnoredOpen((open) => !open);
@@ -762,8 +785,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
               style={({ pressed }) => [styles.ignoredToggle, pressed && styles.pressedSoft]}
             >
               <Text style={styles.ignoredLabel}>
-                Ignored {state.page.ignored.count}{" "}
-                {state.page.ignored.count === 1 ? "email" : "emails"}
+                {tPlural("email.workspace.ignored.count", state.page.ignored.count)}
               </Text>
               <Icon
                 name={ignoredOpen ? "chevron-down" : "chevron-right"}
@@ -795,7 +817,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
           <View style={styles.footerMeta}>
             <Icon name="clock" size={12} color={colors.textWeaker} />
             <Text style={styles.footerMetaText}>
-              Next automatic check {formatWhen(state.nextReadAt, locale)}
+              {t("email.workspace.nextCheck.at", { time: formatWhen(state.nextReadAt, locale) })}
             </Text>
           </View>
         ) : null}

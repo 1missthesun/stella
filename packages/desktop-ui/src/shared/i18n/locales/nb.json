@@ -3795,6 +3795,96 @@
       "lineServer": "På denne serverens OpenRouter-nøkkel: {sorted} sortert denne måneden · {cost}",
       "deviceKeyHint": "For å bruke din egen OpenRouter-nøkkel, legg den til under Modeller mens du er logget inn, så den lagres på kontoen din. En nøkkel som bare ligger på denne datamaskinen, kan ikke brukes mens datamaskinen er av.",
       "deviceKeyHintPhone": "For å bruke din egen OpenRouter-nøkkel, legg den til i chatinnstillingene mens du er logget inn, så den lagres på kontoen din. En nøkkel som bare ligger på denne telefonen, kan ikke brukes til e-post."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Venter på andre",
+        "handled": "Det har jeg ordnet"
+      },
+      "rules": {
+        "title": "Regler",
+        "settingsTitle": "Regler og innstillinger",
+        "yours": "Reglene dine",
+        "hint": "Fortell Stella hva som er viktig og ikke, så lagrer hun det her som en regel.",
+        "wake": "Sier fra med en gang",
+        "act": "Stella handler med en gang",
+        "ignore": "Vises ikke på denne siden",
+        "remove": "Fjern regelen: {rule}"
+      },
+      "tell": {
+        "action": "Si til Stella",
+        "about": "Si noe til Stella om: {title}",
+        "placeholder": "Fortell Stella hva hun skal gjøre, eller hvorfor det ikke er viktig…",
+        "sendHint": "{keys} for å sende",
+        "send": "Send til Stella",
+        "sent": "Sendt til Stella."
+      },
+      "draft": {
+        "label": "Svarutkast",
+        "read": "Les utkast"
+      },
+      "details": "Detaljer",
+      "showDetails": "Vis detaljer",
+      "hideDetails": "Skjul detaljer",
+      "onIt": "I gang…",
+      "working": "Stella er i gang med det.",
+      "ignored": {
+        "eyebrow": "Sortert bort",
+        "count": {
+          "one": "{count} ignorert e-post",
+          "other": "{count} ignorerte e-poster"
+        },
+        "short": "Ignorert · {count}",
+        "hint": "Si fra til Stella i chatten hvis noe fra disse avsenderne skal med på siden neste gang."
+      },
+      "inboxes": {
+        "title": "Innbokser",
+        "reading": "Leses",
+        "count": {
+          "one": "{count} innboks",
+          "other": "{count} innbokser"
+        }
+      },
+      "nextCheck": {
+        "title": "Neste automatiske sjekk",
+        "hint": "E-post som haster, vekker Stella mellom de planlagte lesingene.",
+        "at": "Neste automatiske sjekk: {time}",
+        "short": "Neste: {time}"
+      },
+      "automation": "Automatisering",
+      "off": {
+        "title": "Slå av E-post",
+        "confirm": "Slå av E-post?",
+        "body": "Stella slutter å lese e-posten din og tømmer denne siden.",
+        "working": "Slår av…"
+      },
+      "summary": {
+        "caughtUp": "Helt à jour",
+        "waitingFirstRead": "Venter på første lesing",
+        "readAt": "Lest: {time}",
+        "notRead": "Ikke lest ennå",
+        "newSince": {
+          "one": "{count} ny siden da",
+          "other": "{count} nye siden da"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Ingenting trenger deg",
+        "caughtUpNext": "Du er à jour. Neste automatiske sjekk: {time}",
+        "caughtUpUrgent": "Du er à jour. E-post som haster, når deg med en gang.",
+        "firstReadTitle": "Stella leser snart e-posten din",
+        "firstReadBody": "Siden fylles ut automatisk neste gang Stella leser, eller du kan starte en lesing nå."
+      },
+      "check": "Sjekk",
+      "request": {
+        "check": "Sjekk e-posten min nå",
+        "about": "Om: {title}"
+      },
+      "a11y": {
+        "list": "E-postliste",
+        "items": "E-postelementer",
+        "back": "Tilbake til E-post"
+      }
     }
   },
   "nudges": {

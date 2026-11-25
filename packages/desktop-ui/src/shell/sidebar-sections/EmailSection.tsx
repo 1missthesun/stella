@@ -15,6 +15,7 @@ import { useDisplayPanelOpen } from "@/features/workspace-display/tab-store";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
+import { getPlatform } from "@/platform/electron/platform";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { useI18n } from "@/shared/i18n";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
@@ -37,16 +38,23 @@ import {
 } from "@/ui/icons";
 import "./email-section.css";
 
-const SECTION_ORDER: readonly { key: EmailPageSection; title: string }[] = [
-  { key: "needs_you", title: "Needs you" },
-  { key: "waiting", title: "Waiting on others" },
-  { key: "handled", title: "I handled" },
+const SECTION_ORDER: readonly { key: EmailPageSection; titleKey: string }[] = [
+  { key: "needs_you", titleKey: "email.section.needsYou" },
+  { key: "waiting", titleKey: "email.workspace.sections.waiting" },
+  { key: "handled", titleKey: "email.workspace.sections.handled" },
 ];
 
-const RULE_KIND_LABEL: Record<EmailRuleKind, string> = {
-  wake: "Tells you at once",
-  act: "Stella acts at once",
-  ignore: "Left off this page",
+const RULE_KIND_LABEL_KEY: Record<EmailRuleKind, string> = {
+  wake: "email.workspace.rules.wake",
+  act: "email.workspace.rules.act",
+  ignore: "email.workspace.rules.ignore",
+};
+
+type PendingKind = "working" | "sent";
+
+const PENDING_LABEL_KEY: Record<PendingKind, string> = {
+  working: "email.workspace.working",
+  sent: "email.workspace.tell.sent",
 };
 
 type Selection =
@@ -139,11 +147,13 @@ function TellStellaComposer({
   onSubmit: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     if (autoFocus) areaRef.current?.focus();
   }, [autoFocus, item.id]);
   const empty = value.trim().length === 0;
+  const sendKeys = getPlatform() === "darwin" ? "⌘↵" : "Ctrl+↵";
   return (
     <form
       className="email-tell"
@@ -156,7 +166,7 @@ function TellStellaComposer({
         ref={areaRef}
         className="email-tell__input"
         value={value}
-        placeholder="Tell Stella what to do, or why it doesn't matter…"
+        placeholder={t("email.workspace.tell.placeholder")}
         disabled={submitting}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
@@ -170,7 +180,7 @@ function TellStellaComposer({
         }}
       />
       <div className="email-tell__bar">
-        <span className="email-tell__hint">⌘↵ to send</span>
+        <span className="email-tell__hint">{t("email.workspace.tell.sendHint", { keys: sendKeys })}</span>
         <div className="email-tell__actions">
           {canCancel ? (
             <button
@@ -179,7 +189,7 @@ function TellStellaComposer({
               disabled={submitting}
               onClick={onCancel}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           ) : null}
           <button
@@ -187,7 +197,7 @@ function TellStellaComposer({
             className="email-btn email-btn--primary email-btn--compact email-tell__send"
             disabled={empty || submitting}
           >
-            {submitting ? "Sending…" : "Send"}
+            {submitting ? t("userAsk.question.sending") : t("email.digest.send")}
           </button>
         </div>
       </div>
@@ -199,7 +209,7 @@ function EmailDetailView({
   item,
   accountsCount,
   locale,
-  pendingText,
+  pending,
   tellOpen,
   tellDraft,
   tellSending,
@@ -211,7 +221,7 @@ function EmailDetailView({
   item: EmailPageItem;
   accountsCount: number;
   locale: string;
-  pendingText: string | undefined;
+  pending: PendingKind | undefined;
   tellOpen: boolean;
   tellDraft: string;
   tellSending: boolean;
@@ -220,15 +230,16 @@ function EmailDetailView({
   onTellChange: (itemId: string, value: string) => void;
   onTellSubmit: (item: EmailPageItem) => void;
 }) {
+  const { t, tPlural } = useI18n();
   const thread = item.threads?.[0];
-  const sectionLabel = SECTION_ORDER.find((entry) => entry.key === item.section)?.title ?? "";
+  const sectionTitleKey = SECTION_ORDER.find((entry) => entry.key === item.section)?.titleKey;
   const time = formatWhen(item.mailAt ?? item.at, locale);
   const inlineTell = !item.action && item.section === "needs_you";
-  const showTellBox = (inlineTell || tellOpen) && !pendingText;
+  const showTellBox = (inlineTell || tellOpen) && !pending;
   const metaParts: { key: string; text: string; strong?: boolean }[] = [];
   if (item.from) metaParts.push({ key: "from", text: item.from, strong: true });
   if (accountsCount > 1 && thread?.account) metaParts.push({ key: "account", text: thread.account });
-  if (item.count && item.count > 1) metaParts.push({ key: "count", text: `${item.count} emails` });
+  if (item.count && item.count > 1) metaParts.push({ key: "count", text: tPlural("email.brief.emails", item.count) });
   if (time) metaParts.push({ key: "time", text: time });
 
   return (
@@ -238,11 +249,11 @@ function EmailDetailView({
           {item.urgent ? (
             <>
               <span className="email-urgent-dot" aria-hidden="true" />
-              <span className="email-detail__urgent-label">Urgent</span>
+              <span className="email-detail__urgent-label">{t("email.section.urgent")}</span>
               <span className="email-bar__sep" aria-hidden="true">·</span>
             </>
           ) : null}
-          <span>{sectionLabel}</span>
+          <span>{sectionTitleKey ? t(sectionTitleKey) : ""}</span>
         </span>
         {thread ? (
           <button
@@ -250,7 +261,7 @@ function EmailDetailView({
             className="email-detail__gmail"
             onClick={() => openExternalUrl(gmailThreadUrl(thread))}
           >
-            <span>Open in Gmail</span>
+            <span>{t("email.section.openInGmail")}</span>
             <ExternalLink size={12} strokeWidth={1.9} aria-hidden="true" />
           </button>
         ) : null}
@@ -281,12 +292,14 @@ function EmailDetailView({
           <div className="email-draft__head">
             <span className="email-draft__label">
               <Reply size={13} strokeWidth={1.9} aria-hidden="true" />
-              <span>Drafted reply</span>
+              <span>{t("email.workspace.draft.label")}</span>
             </span>
-            {item.from ? <span className="email-draft__to">To {item.from}</span> : null}
+            {item.from ? (
+              <span className="email-draft__to">{t("email.reply.to", { to: item.from })}</span>
+            ) : null}
           </div>
           <div className="email-draft__body">{item.draft}</div>
-          {!pendingText && (item.action || !inlineTell) ? (
+          {!pending && (item.action || !inlineTell) ? (
             <div className="email-draft__foot">
               {item.action ? (
                 <button
@@ -312,7 +325,7 @@ function EmailDetailView({
                   onClick={() => onToggleTell(item.id, !tellOpen)}
                 >
                   <MessageSquare size={12} strokeWidth={1.9} aria-hidden="true" />
-                  <span>Tell Stella</span>
+                  <span>{t("email.workspace.tell.action")}</span>
                 </button>
               ) : null}
             </div>
@@ -320,10 +333,10 @@ function EmailDetailView({
         </div>
       ) : null}
 
-      {pendingText ? (
+      {pending ? (
         <div className="email-pending" role="status">
           <RefreshCw size={13} strokeWidth={2} className="email-spin" aria-hidden="true" />
-          <span>{pendingText}</span>
+          <span>{t(PENDING_LABEL_KEY[pending])}</span>
         </div>
       ) : (
         <>
@@ -353,7 +366,7 @@ function EmailDetailView({
                   onClick={() => onToggleTell(item.id, !tellOpen)}
                 >
                   <MessageSquare size={13} strokeWidth={1.9} aria-hidden="true" />
-                  <span>Tell Stella</span>
+                  <span>{t("email.workspace.tell.action")}</span>
                 </button>
               ) : null}
             </div>
@@ -378,14 +391,15 @@ function EmailDetailView({
 }
 
 function EmailIgnoredView({ ignored }: { ignored: EmailPageIgnored }) {
+  const { t, tPlural } = useI18n();
   const senders = ignored.senders ?? [];
   return (
     <div className="email-stage__inner" data-testid="email-ignored-view">
       <div className="email-detail__eyebrow">
-        <span className="email-detail__context">Filtered out</span>
+        <span className="email-detail__context">{t("email.workspace.ignored.eyebrow")}</span>
       </div>
       <h2 className="email-detail__title">
-        {ignored.count} {ignored.count === 1 ? "ignored email" : "ignored emails"}
+        {tPlural("email.workspace.ignored.count", ignored.count)}
       </h2>
       {ignored.gist ? <p className="email-detail__meta">{ignored.gist}</p> : null}
       {senders.length > 0 ? (
@@ -399,7 +413,7 @@ function EmailIgnoredView({ ignored }: { ignored: EmailPageIgnored }) {
         </ul>
       ) : null}
       <p className="email-footnote">
-        Tell Stella in chat if anything from these senders should reach this page next time.
+        {t("email.workspace.ignored.hint")}
       </p>
     </div>
   );
@@ -424,23 +438,24 @@ function EmailSettingsView({
   onRemoveRule: (ruleId: string) => void;
   onTurnOff: () => void;
 }) {
+  const { t } = useI18n();
   const [confirmOff, setConfirmOff] = useState(false);
   const rules = state.rules ?? [];
 
   return (
     <div className="email-stage__inner" data-testid="email-settings-view">
       <div className="email-settings__head">
-        <h2 className="email-settings__title">Rules & settings</h2>
+        <h2 className="email-settings__title">{t("email.workspace.rules.settingsTitle")}</h2>
         {showBack ? (
           <button type="button" className="email-btn email-btn--ghost" onClick={onBack}>
             <ArrowLeft size={13} strokeWidth={2} aria-hidden="true" />
-            <span>Back</span>
+            <span>{t("common.back")}</span>
           </button>
         ) : null}
       </div>
 
       <section className="email-settings__group">
-        <h3 className="email-settings__group-title">Your rules</h3>
+        <h3 className="email-settings__group-title">{t("email.workspace.rules.yours")}</h3>
         {rules.length > 0 ? (
           <ul className="email-settings__list">
             {rules.map((rule) => {
@@ -450,7 +465,7 @@ function EmailSettingsView({
                   <div className="email-settings__row-copy">
                     <span className="email-settings__row-main">{rule.text}</span>
                     <span className="email-settings__row-sub">
-                      {RULE_KIND_LABEL[rule.kind] ?? ""}
+                      {RULE_KIND_LABEL_KEY[rule.kind] ? t(RULE_KIND_LABEL_KEY[rule.kind]) : ""}
                     </span>
                   </div>
                   <button
@@ -459,7 +474,7 @@ function EmailSettingsView({
                     disabled={removing}
                     onClick={() => onRemoveRule(rule.ruleId)}
                   >
-                    {removing ? "Removing…" : "Remove"}
+                    {removing ? t("global.schedule.removing") : t("email.section.remove")}
                   </button>
                 </li>
               );
@@ -467,12 +482,12 @@ function EmailSettingsView({
           </ul>
         ) : null}
         <p className="email-footnote">
-          Tell Stella what matters and what doesn't, and she keeps it here as a rule.
+          {t("email.workspace.rules.hint")}
         </p>
       </section>
 
       <section className="email-settings__group">
-        <h3 className="email-settings__group-title">Inboxes</h3>
+        <h3 className="email-settings__group-title">{t("email.workspace.inboxes.title")}</h3>
         <ul className="email-settings__list">
           {state.accounts.map((account) => (
             <li key={account} className="email-settings__row">
@@ -480,15 +495,15 @@ function EmailSettingsView({
                 <Mail size={14} strokeWidth={1.85} className="email-settings__account-icon" aria-hidden="true" />
                 <span>{account}</span>
               </span>
-              <span className="email-settings__row-value">Reading</span>
+              <span className="email-settings__row-value">{t("email.workspace.inboxes.reading")}</span>
             </li>
           ))}
           {state.nextReadAt ? (
             <li className="email-settings__row">
               <div className="email-settings__row-copy">
-                <span className="email-settings__row-main">Next automatic check</span>
+                <span className="email-settings__row-main">{t("email.workspace.nextCheck.title")}</span>
                 <span className="email-settings__row-sub">
-                  Urgent mail wakes Stella between scheduled reads.
+                  {t("email.workspace.nextCheck.hint")}
                 </span>
               </div>
               <span className="email-settings__row-value">{formatWhen(state.nextReadAt, locale)}</span>
@@ -498,13 +513,13 @@ function EmailSettingsView({
       </section>
 
       <section className="email-settings__group">
-        <h3 className="email-settings__group-title">Automation</h3>
+        <h3 className="email-settings__group-title">{t("email.workspace.automation")}</h3>
         <ul className="email-settings__list">
           <li className="email-settings__row">
             <div className="email-settings__row-copy">
-              <span className="email-settings__row-main">Turn off Email</span>
+              <span className="email-settings__row-main">{t("email.workspace.off.title")}</span>
               <span className="email-settings__row-sub">
-                Stella stops reading your mail and clears this page.
+                {t("email.workspace.off.body")}
               </span>
             </div>
             {confirmOff ? (
@@ -515,7 +530,7 @@ function EmailSettingsView({
                   disabled={turningOff}
                   onClick={() => setConfirmOff(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -523,7 +538,7 @@ function EmailSettingsView({
                   disabled={turningOff}
                   onClick={onTurnOff}
                 >
-                  {turningOff ? "Turning off…" : "Turn off"}
+                  {turningOff ? t("email.workspace.off.working") : t("email.section.turnOff")}
                 </button>
               </div>
             ) : (
@@ -532,7 +547,7 @@ function EmailSettingsView({
                 className="email-btn email-btn--secondary email-btn--compact"
                 onClick={() => setConfirmOff(true)}
               >
-                Turn off
+                {t("email.section.turnOff")}
               </button>
             )}
           </li>
@@ -543,13 +558,13 @@ function EmailSettingsView({
 }
 
 function EmailWorkspace({ state }: { state: EmailPageState }) {
-  const { locale } = useI18n();
+  const { locale, t, tPlural } = useI18n();
   const [selection, setSelection] = useState<Selection | null>(null);
   const [expandedCompact, setExpandedCompact] = useState<Record<string, boolean>>({});
   const [tellingOpen, setTellingOpen] = useState<Record<string, boolean>>({});
   const [tellDrafts, setTellDrafts] = useState<Record<string, string>>({});
   const [tellSending, setTellSending] = useState<Record<string, boolean>>({});
-  const [pendingById, setPendingById] = useState<Record<string, string>>({});
+  const [pendingById, setPendingById] = useState<Record<string, PendingKind>>({});
   const [checking, setChecking] = useState(false);
   const [compactIgnoredOpen, setCompactIgnoredOpen] = useState(false);
   const [removingRuleId, setRemovingRuleId] = useState<string | null>(null);
@@ -622,25 +637,25 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
     setChecking(true);
     const sent = await sendAction({
       canvas: EMAIL_PAGE_CANVAS,
-      title: "Email",
+      title: t("email.title"),
       id: EMAIL_PAGE_CHECK_ACTION,
-      label: "Check my email now",
+      label: t("email.workspace.request.check"),
     });
     if (!sent) {
       setChecking(false);
       return;
     }
     window.setTimeout(() => setChecking(false), 12_000);
-  }, [checking, sendAction]);
+  }, [checking, sendAction, t]);
 
   const handlePrimaryAction = useCallback(
     async (item: EmailPageItem) => {
       if (!item.action || pendingById[item.id]) return;
       const prefix = item.section === "handled" ? "undo" : "do";
-      setPendingById((prev) => ({ ...prev, [item.id]: "Stella's on it." }));
+      setPendingById((prev) => ({ ...prev, [item.id]: "working" }));
       const sent = await sendAction({
         canvas: EMAIL_PAGE_CANVAS,
-        title: "Email",
+        title: t("email.title"),
         id: `${prefix}:${item.id}`,
         label: `${item.action}: ${item.title}`,
       });
@@ -652,7 +667,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
         });
       }
     },
-    [pendingById, sendAction],
+    [pendingById, sendAction, t],
   );
 
   const handleTellSubmit = useCallback(
@@ -662,19 +677,19 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
       setTellSending((prev) => ({ ...prev, [item.id]: true }));
       const sent = await sendAction({
         canvas: EMAIL_PAGE_CANVAS,
-        title: "Email",
+        title: t("email.title"),
         id: `tell:${item.id}`,
-        label: `About ${item.title}`,
+        label: t("email.workspace.request.about", { title: item.title }),
         fields: { text },
       });
       setTellSending((prev) => ({ ...prev, [item.id]: false }));
       if (sent) {
         setTellDrafts((prev) => ({ ...prev, [item.id]: "" }));
         setTellingOpen((prev) => ({ ...prev, [item.id]: false }));
-        setPendingById((prev) => ({ ...prev, [item.id]: "Sent to Stella." }));
+        setPendingById((prev) => ({ ...prev, [item.id]: "sent" }));
       }
     },
-    [sendAction, tellDrafts, tellSending],
+    [sendAction, t, tellDrafts, tellSending],
   );
 
   const handleRemoveRule = useCallback(async (ruleId: string) => {
@@ -727,13 +742,13 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
   const settingsOpen = activeSelection?.kind === "settings";
   const summaryLabel =
     needsYouCount > 0
-      ? `${needsYouCount} ${needsYouCount === 1 ? "needs you" : "need you"}`
+      ? tPlural("email.card.needYou", needsYouCount)
       : state.page.readAt
-        ? "All caught up"
-        : "Waiting for first read";
+        ? t("email.workspace.summary.caughtUp")
+        : t("email.workspace.summary.waitingFirstRead");
   const readLabel = state.page.readAt
-    ? `Read ${formatWhen(state.page.readAt, locale)}`
-    : "Not read yet";
+    ? t("email.workspace.summary.readAt", { time: formatWhen(state.page.readAt, locale) })
+    : t("email.workspace.summary.notRead");
   const rulesCount = state.rules.length;
 
   return (
@@ -751,13 +766,17 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
             {state.unread > 0 ? (
               <>
                 <span className="email-bar__sep" aria-hidden="true">·</span>
-                <span className="email-bar__meta">{state.unread} new since</span>
+                <span className="email-bar__meta">
+                  {tPlural("email.workspace.summary.newSince", state.unread)}
+                </span>
               </>
             ) : null}
             {state.accounts.length > 1 ? (
               <>
                 <span className="email-bar__sep" aria-hidden="true">·</span>
-                <span className="email-bar__meta">{state.accounts.length} inboxes</span>
+                <span className="email-bar__meta">
+                  {tPlural("email.workspace.inboxes.count", state.accounts.length)}
+                </span>
               </>
             ) : null}
           </span>
@@ -770,7 +789,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
             onClick={() => void handleCheckNow()}
           >
             <RefreshCw size={13} strokeWidth={1.9} className={checking ? "email-spin" : undefined} aria-hidden="true" />
-            <span>{checking ? "Checking…" : "Check now"}</span>
+            <span>{checking ? t("email.section.checking") : t("email.section.checkNow")}</span>
           </button>
           <button
             type="button"
@@ -779,7 +798,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
             onClick={toggleSettings}
           >
             <SlidersHorizontal size={13} strokeWidth={1.9} aria-hidden="true" />
-            <span>Rules</span>
+            <span>{t("email.workspace.rules.title")}</span>
             {rulesCount > 0 ? <span className="email-bar__btn-count">{rulesCount}</span> : null}
           </button>
         </div>
@@ -796,14 +815,16 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
               )}
             </div>
             <h2 className="email-empty__title">
-              {state.page.readAt ? "Nothing needs you" : "Stella will read your mail soon"}
+              {state.page.readAt
+                ? t("email.workspace.empty.caughtUpTitle")
+                : t("email.workspace.empty.firstReadTitle")}
             </h2>
             <p className="email-empty__body">
               {state.page.readAt
                 ? state.nextReadAt
-                  ? `You're caught up. Next automatic check ${formatWhen(state.nextReadAt, locale)}.`
-                  : "You're caught up. Urgent mail will reach you right away."
-                : "Your page fills in automatically on Stella's next read, or you can run one now."}
+                  ? t("email.workspace.empty.caughtUpNext", { time: formatWhen(state.nextReadAt, locale) })
+                  : t("email.workspace.empty.caughtUpUrgent")
+                : t("email.workspace.empty.firstReadBody")}
             </p>
             <div className="email-empty__actions">
               <button
@@ -813,7 +834,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                 onClick={() => void handleCheckNow()}
               >
                 <RefreshCw size={13} strokeWidth={1.9} className={checking ? "email-spin" : undefined} aria-hidden="true" />
-                <span>{checking ? "Checking…" : "Check now"}</span>
+                <span>{checking ? t("email.section.checking") : t("email.section.checkNow")}</span>
               </button>
             </div>
             {hasIgnored ? (
@@ -825,8 +846,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                   onClick={() => setCompactIgnoredOpen((open) => !open)}
                 >
                   <span>
-                    Ignored {state.page.ignored.count}{" "}
-                    {state.page.ignored.count === 1 ? "email" : "emails"}
+                    {tPlural("email.workspace.ignored.count", state.page.ignored.count)}
                   </span>
                   {compactIgnoredOpen ? (
                     <ChevronDown size={14} strokeWidth={1.9} aria-hidden="true" />
@@ -858,20 +878,20 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
       ) : (
         <>
           <div className="email-split">
-            <aside className="email-rail" aria-label="Email list">
-              <div className="email-rail__scroll" role="listbox" aria-label="Email items">
+            <aside className="email-rail" aria-label={t("email.workspace.a11y.list")}>
+              <div className="email-rail__scroll" role="listbox" aria-label={t("email.workspace.a11y.items")}>
                 {grouped.map((group) => {
                   if (group.items.length === 0 && group.key !== "needs_you") return null;
                   return (
                     <section key={group.key} className="email-rail__section">
                       <h3 className="email-rail__heading">
-                        <span>{group.title}</span>
+                        <span>{t(group.titleKey)}</span>
                         {group.items.length > 0 ? (
                           <span className="email-rail__heading-count">{group.items.length}</span>
                         ) : null}
                       </h3>
                       {group.items.length === 0 ? (
-                        <p className="email-rail__empty-note">Nothing needs you.</p>
+                        <p className="email-rail__empty-note">{t("email.workspace.empty.caughtUpTitle")}</p>
                       ) : (
                         <ul className="email-rail__list">
                           {group.items.map((item) => {
@@ -884,7 +904,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                 ? `${item.from} · ${item.count}`
                                 : item.from
                               : item.count && item.count > 1
-                                ? `${item.count} emails`
+                                ? tPlural("email.brief.emails", item.count)
                                 : "";
                             return (
                               <li key={item.id}>
@@ -900,7 +920,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                 >
                                   <div className="email-rail__row-top">
                                     {item.urgent ? (
-                                      <span className="email-urgent-dot" aria-label="Urgent" />
+                                      <span className="email-urgent-dot" aria-label={t("email.section.urgent")} />
                                     ) : null}
                                     <span className="email-rail__title">{item.title}</span>
                                     {time ? <span className="email-rail__time">{time}</span> : null}
@@ -909,12 +929,12 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                     <span className="email-rail__from">{fromLabel}</span>
                                     {pending ? (
                                       <span className="email-rail__cue email-rail__cue--pending">
-                                        On it…
+                                        {t("email.workspace.onIt")}
                                       </span>
                                     ) : item.draft ? (
                                       <span className="email-rail__cue">
                                         <Reply size={11} strokeWidth={1.9} aria-hidden="true" />
-                                        <span>Draft</span>
+                                        <span>{t("email.brief.draft")}</span>
                                       </span>
                                     ) : null}
                                   </div>
@@ -941,14 +961,20 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                       data-testid="email-ignored-trigger"
                       onClick={() => setSelection({ kind: "ignored" })}
                     >
-                      <span>Ignored · {state.page.ignored.count}</span>
+                      <span>
+                        {t("email.workspace.ignored.short", { count: state.page.ignored.count })}
+                      </span>
                       <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />
                     </button>
                   ) : null}
                   {state.nextReadAt ? (
                     <span className="email-rail__foot-next">
                       <Clock size={11.5} strokeWidth={1.85} aria-hidden="true" />
-                      <span>Next {formatWhen(state.nextReadAt, locale)}</span>
+                      <span>
+                        {t("email.workspace.nextCheck.short", {
+                          time: formatWhen(state.nextReadAt, locale),
+                        })}
+                      </span>
                     </span>
                   ) : null}
                 </div>
@@ -974,7 +1000,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                   item={selectedItem}
                   accountsCount={state.accounts.length}
                   locale={locale}
-                  pendingText={pendingById[selectedItem.id]}
+                  pending={pendingById[selectedItem.id]}
                   tellOpen={Boolean(tellingOpen[selectedItem.id])}
                   tellDraft={tellDrafts[selectedItem.id] ?? ""}
                   tellSending={Boolean(tellSending[selectedItem.id])}
@@ -1012,7 +1038,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                   return (
                     <section key={group.key} className="email-compact__section">
                       <h3 className="email-compact__heading">
-                        <span>{group.title}</span>
+                        <span>{t(group.titleKey)}</span>
                         {group.items.length > 0 ? (
                           <span className="email-compact__heading-count">
                             {group.items.length}
@@ -1020,7 +1046,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                         ) : null}
                       </h3>
                       {group.items.length === 0 ? (
-                        <p className="email-compact__meta">Nothing needs you.</p>
+                        <p className="email-compact__meta">{t("email.workspace.empty.caughtUpTitle")}</p>
                       ) : (
                         group.items.map((item) => {
                           const hasMore = Boolean(item.detail || item.draft);
@@ -1030,7 +1056,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                           const time = formatWhen(item.mailAt ?? item.at, locale);
                           const meta: string[] = [];
                           if (item.from) meta.push(item.from);
-                          if (item.count && item.count > 1) meta.push(`${item.count} emails`);
+                          if (item.count && item.count > 1) meta.push(tPlural("email.brief.emails", item.count));
                           if (state.accounts.length > 1 && thread?.account) meta.push(thread.account);
                           const emphasizeAction = Boolean(item.urgent || (open && item.draft));
 
@@ -1042,7 +1068,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                             >
                               <div className="email-compact__item-head">
                                 {item.urgent ? (
-                                  <span className="email-urgent-dot" aria-label="Urgent" />
+                                  <span className="email-urgent-dot" aria-label={t("email.section.urgent")} />
                                 ) : null}
                                 <h4 className="email-compact__title">{item.title}</h4>
                                 {time ? <span className="email-compact__time">{time}</span> : null}
@@ -1060,10 +1086,12 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                       <div className="email-draft__head">
                                         <span className="email-draft__label">
                                           <Reply size={13} strokeWidth={1.9} aria-hidden="true" />
-                                          <span>Drafted reply</span>
+                                          <span>{t("email.workspace.draft.label")}</span>
                                         </span>
                                         {item.from ? (
-                                          <span className="email-draft__to">To {item.from}</span>
+                                          <span className="email-draft__to">
+                                            {t("email.reply.to", { to: item.from })}
+                                          </span>
                                         ) : null}
                                       </div>
                                       <div className="email-draft__body">{item.draft}</div>
@@ -1080,7 +1108,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                     className="email-spin"
                                     aria-hidden="true"
                                   />
-                                  <span>{pending}</span>
+                                  <span>{t(PENDING_LABEL_KEY[pending])}</span>
                                 </div>
                               ) : (
                                 <>
@@ -1116,7 +1144,11 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                         }
                                       >
                                         <span>
-                                          {open ? "Hide" : item.draft ? "Read draft" : "Details"}
+                                          {open
+                                            ? t("email.brief.hide")
+                                            : item.draft
+                                              ? t("email.workspace.draft.read")
+                                              : t("email.workspace.details")}
                                         </span>
                                       </button>
                                     ) : null}
@@ -1131,7 +1163,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                                         }))
                                       }
                                     >
-                                      <span>Tell Stella</span>
+                                      <span>{t("email.workspace.tell.action")}</span>
                                     </button>
                                     {thread ? (
                                       <button
@@ -1180,8 +1212,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
                       onClick={() => setCompactIgnoredOpen((open) => !open)}
                     >
                       <span>
-                        Ignored {state.page.ignored.count}{" "}
-                        {state.page.ignored.count === 1 ? "email" : "emails"}
+                        {tPlural("email.workspace.ignored.count", state.page.ignored.count)}
                       </span>
                       {compactIgnoredOpen ? (
                         <ChevronDown size={14} strokeWidth={1.9} aria-hidden="true" />
@@ -1211,7 +1242,7 @@ function EmailWorkspace({ state }: { state: EmailPageState }) {
 
                 {state.nextReadAt ? (
                   <p className="email-compact__foot">
-                    Next automatic check {formatWhen(state.nextReadAt, locale)}
+                    {t("email.workspace.nextCheck.at", { time: formatWhen(state.nextReadAt, locale) })}
                   </p>
                 ) : null}
               </div>

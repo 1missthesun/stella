@@ -174,6 +174,7 @@
     }
   },
   "common": {
+    "back": "Back",
     "cancel": "Cancel",
     "close": "Close",
     "continue": "Continue",
@@ -185,6 +186,11 @@
   },
   "errors": {
     "generic": "Something went wrong"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Removing…"
+    }
   },
   "mobile": {
     "account": {
@@ -1160,6 +1166,12 @@
   "email": {
     "title": "Email",
     "failed": "Couldn't update. Try again.",
+    "card": {
+      "needYou": {
+        "one": "{count} needs you",
+        "other": "{count} need you"
+      }
+    },
     "section": {
       "connectBody": "Connect Gmail and Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest waits in Today, with a reply drafted when one is needed.",
       "connect": "Connect Gmail",
@@ -1170,7 +1182,107 @@
       "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
       "offBody": "Stella sorts new mail as it arrives. Urgent email reaches you right away; the rest waits in Today, with a reply drafted when one is needed. Noise stays out.",
       "turnOn": "Turn on",
-      "turningOn": "Sorting your recent mail…"
+      "turningOn": "Sorting your recent mail…",
+      "needsYou": "Needs you",
+      "openInGmail": "Open in Gmail",
+      "remove": "Remove",
+      "checkNow": "Check now",
+      "checking": "Checking…",
+      "turnOff": "Turn off"
+    },
+    "digest": {
+      "send": "Send"
+    },
+    "brief": {
+      "emails": {
+        "one": "{count} email",
+        "other": "{count} emails"
+      },
+      "hide": "Hide"
+    },
+    "reply": {
+      "to": "To {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Waiting on others",
+        "handled": "I handled"
+      },
+      "rules": {
+        "settingsTitle": "Rules & settings",
+        "yours": "Your rules",
+        "hint": "Tell Stella what matters and what doesn't, and she keeps it here as a rule.",
+        "wake": "Tells you at once",
+        "act": "Stella acts at once",
+        "ignore": "Left off this page",
+        "remove": "Remove rule {rule}"
+      },
+      "tell": {
+        "action": "Tell Stella",
+        "about": "Tell Stella about {title}",
+        "placeholder": "Tell Stella what to do, or why it doesn't matter…",
+        "send": "Send to Stella",
+        "sent": "Sent to Stella."
+      },
+      "draft": {
+        "label": "Drafted reply",
+        "read": "Read draft"
+      },
+      "details": "Details",
+      "showDetails": "Show details",
+      "hideDetails": "Hide details",
+      "working": "Stella's on it.",
+      "ignored": {
+        "count": {
+          "one": "Ignored {count} email",
+          "other": "Ignored {count} emails"
+        }
+      },
+      "inboxes": {
+        "title": "Inboxes",
+        "reading": "Reading",
+        "count": {
+          "one": "{count} inbox",
+          "other": "{count} inboxes"
+        }
+      },
+      "nextCheck": {
+        "title": "Next automatic check",
+        "hint": "Urgent mail wakes Stella between scheduled reads.",
+        "at": "Next automatic check {time}"
+      },
+      "automation": "Automation",
+      "off": {
+        "title": "Turn off Email",
+        "confirm": "Turn off Email?",
+        "body": "Stella stops reading your mail and clears this page.",
+        "working": "Turning off…"
+      },
+      "summary": {
+        "caughtUp": "All caught up",
+        "waitingFirstRead": "Waiting for first read",
+        "readAt": "Read {time}",
+        "notRead": "Not read yet",
+        "newSince": {
+          "one": "{count} new since",
+          "other": "{count} new since"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nothing needs you",
+        "caughtUpNext": "You're caught up. Next automatic check {time}.",
+        "caughtUpUrgent": "You're caught up. Urgent mail will reach you right away.",
+        "firstReadTitle": "Stella will read your mail soon",
+        "firstReadBody": "Your page fills in automatically on Stella's next read, or you can run one now."
+      },
+      "check": "Check",
+      "request": {
+        "check": "Check my email now",
+        "about": "About {title}"
+      },
+      "a11y": {
+        "back": "Back to Email"
+      }
     }
   }
 }

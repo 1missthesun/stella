@@ -3849,6 +3849,99 @@
       "lineServer": "Pe cheia OpenRouter a acestui server: {sorted} sortate luna aceasta · {cost}",
       "deviceKeyHint": "Ca să folosești propria cheie OpenRouter, adaug-o în Modele cât timp ești conectat, ca să fie salvată în contul tău. O cheie păstrată doar pe acest computer nu poate fi folosită cât timp computerul e oprit.",
       "deviceKeyHintPhone": "Ca să folosești propria cheie OpenRouter, adaug-o în setările chatului cât timp ești conectat, ca să fie salvată în contul tău. O cheie păstrată doar pe acest telefon nu poate fi folosită pentru e-mail."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "În așteptarea altora",
+        "handled": "De care m-am ocupat"
+      },
+      "rules": {
+        "title": "Reguli",
+        "settingsTitle": "Reguli și setări",
+        "yours": "Regulile tale",
+        "hint": "Spune-i Stellei ce contează și ce nu, iar ea păstrează totul aici ca regulă.",
+        "wake": "Te anunță imediat",
+        "act": "Stella acționează imediat",
+        "ignore": "Nu apare pe această pagină",
+        "remove": "Elimină regula: {rule}"
+      },
+      "tell": {
+        "action": "Spune-i Stellei",
+        "about": "Spune-i Stellei ceva despre: {title}",
+        "placeholder": "Spune-i Stellei ce să facă sau de ce nu contează…",
+        "sendHint": "{keys} pentru a trimite",
+        "send": "Trimite Stellei",
+        "sent": "Trimis Stellei."
+      },
+      "draft": {
+        "label": "Răspuns pregătit",
+        "read": "Citește ciorna"
+      },
+      "details": "Detalii",
+      "showDetails": "Arată detaliile",
+      "hideDetails": "Ascunde detaliile",
+      "onIt": "În lucru…",
+      "working": "Stella se ocupă.",
+      "ignored": {
+        "eyebrow": "Filtrate",
+        "count": {
+          "few": "{count} e-mailuri ignorate",
+          "one": "{count} e-mail ignorat",
+          "other": "{count} de e-mailuri ignorate"
+        },
+        "short": "Ignorate · {count}",
+        "hint": "Spune-i Stellei în chat dacă ceva de la acești expeditori ar trebui să apară aici data viitoare."
+      },
+      "inboxes": {
+        "title": "Căsuțe de e-mail",
+        "reading": "Se citește",
+        "count": {
+          "few": "{count} căsuțe",
+          "one": "{count} căsuță",
+          "other": "{count} de căsuțe"
+        }
+      },
+      "nextCheck": {
+        "title": "Următoarea verificare automată",
+        "hint": "E-mailurile urgente o trezesc pe Stella între citirile programate.",
+        "at": "Următoarea verificare automată: {time}",
+        "short": "Următoarea: {time}"
+      },
+      "automation": "Automatizare",
+      "off": {
+        "title": "Dezactivează E-mail",
+        "confirm": "Dezactivezi E-mail?",
+        "body": "Stella nu îți mai citește e-mailurile și golește această pagină.",
+        "working": "Se dezactivează…"
+      },
+      "summary": {
+        "caughtUp": "Totul e la zi",
+        "waitingFirstRead": "Se așteaptă prima citire",
+        "readAt": "Citit: {time}",
+        "notRead": "Încă necitit",
+        "newSince": {
+          "few": "{count} noi de atunci",
+          "one": "{count} nou de atunci",
+          "other": "{count} noi de atunci"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nimic nu are nevoie de tine",
+        "caughtUpNext": "Ești la zi. Următoarea verificare automată: {time}",
+        "caughtUpUrgent": "Ești la zi. E-mailurile urgente ajung imediat la tine.",
+        "firstReadTitle": "Stella îți va citi e-mailurile în curând",
+        "firstReadBody": "Pagina se completează automat la următoarea citire a Stellei sau poți porni una acum."
+      },
+      "check": "Verifică",
+      "request": {
+        "check": "Verifică-mi e-mailul acum",
+        "about": "Despre: {title}"
+      },
+      "a11y": {
+        "list": "Lista de e-mailuri",
+        "items": "Elemente e-mail",
+        "back": "Înapoi la E-mail"
+      }
     }
   },
   "nudges": {

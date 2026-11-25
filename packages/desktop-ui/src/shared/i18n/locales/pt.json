@@ -3849,6 +3849,99 @@
       "lineServer": "Na chave do OpenRouter deste servidor: {sorted} organizados neste mês · {cost}",
       "deviceKeyHint": "Para usar sua própria chave do OpenRouter, adicione-a em Modelos com a conta conectada, para que ela fique salva na sua conta. Uma chave guardada só neste computador não pode ser usada enquanto ele estiver desligado.",
       "deviceKeyHintPhone": "Para usar sua própria chave do OpenRouter, adicione-a nas configurações do chat com a conta conectada, para que ela fique salva na sua conta. Uma chave guardada só neste celular não pode ser usada para e-mail."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Aguardando outras pessoas",
+        "handled": "Já resolvi"
+      },
+      "rules": {
+        "title": "Regras",
+        "settingsTitle": "Regras e ajustes",
+        "yours": "Suas regras",
+        "hint": "Diga à Stella o que importa e o que não importa, e ela guarda aqui como regra.",
+        "wake": "Avisa você na hora",
+        "act": "A Stella age na hora",
+        "ignore": "Fica fora desta página",
+        "remove": "Remover a regra: {rule}"
+      },
+      "tell": {
+        "action": "Dizer à Stella",
+        "about": "Dizer algo à Stella sobre: {title}",
+        "placeholder": "Diga à Stella o que fazer ou por que isso não importa…",
+        "sendHint": "{keys} para enviar",
+        "send": "Enviar para a Stella",
+        "sent": "Enviado para a Stella."
+      },
+      "draft": {
+        "label": "Resposta rascunhada",
+        "read": "Ler rascunho"
+      },
+      "details": "Detalhes",
+      "showDetails": "Mostrar detalhes",
+      "hideDetails": "Ocultar detalhes",
+      "onIt": "Cuidando disso…",
+      "working": "A Stella está cuidando disso.",
+      "ignored": {
+        "eyebrow": "Filtrados",
+        "count": {
+          "many": "{count} e-mails ignorados",
+          "one": "{count} e-mail ignorado",
+          "other": "{count} e-mails ignorados"
+        },
+        "short": "Ignorados · {count}",
+        "hint": "Diga à Stella no chat se algo destes remetentes deve aparecer aqui da próxima vez."
+      },
+      "inboxes": {
+        "title": "Caixas de entrada",
+        "reading": "Em leitura",
+        "count": {
+          "many": "{count} caixas de entrada",
+          "one": "{count} caixa de entrada",
+          "other": "{count} caixas de entrada"
+        }
+      },
+      "nextCheck": {
+        "title": "Próxima verificação automática",
+        "hint": "E-mails urgentes acordam a Stella entre as leituras programadas.",
+        "at": "Próxima verificação automática: {time}",
+        "short": "Próxima: {time}"
+      },
+      "automation": "Automação",
+      "off": {
+        "title": "Desativar E-mail",
+        "confirm": "Desativar E-mail?",
+        "body": "A Stella para de ler seus e-mails e limpa esta página.",
+        "working": "Desativando…"
+      },
+      "summary": {
+        "caughtUp": "Tudo em dia",
+        "waitingFirstRead": "Aguardando a primeira leitura",
+        "readAt": "Lido: {time}",
+        "notRead": "Ainda não lido",
+        "newSince": {
+          "many": "{count} novos desde então",
+          "one": "{count} novo desde então",
+          "other": "{count} novos desde então"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nada precisa de você",
+        "caughtUpNext": "Está tudo em dia. Próxima verificação automática: {time}",
+        "caughtUpUrgent": "Está tudo em dia. E-mails urgentes chegam a você na hora.",
+        "firstReadTitle": "A Stella vai ler seus e-mails em breve",
+        "firstReadBody": "Esta página se preenche sozinha na próxima leitura da Stella, ou você pode iniciar uma agora."
+      },
+      "check": "Verificar",
+      "request": {
+        "check": "Verificar meus e-mails agora",
+        "about": "Sobre: {title}"
+      },
+      "a11y": {
+        "list": "Lista de e-mails",
+        "items": "Itens de e-mail",
+        "back": "Voltar para E-mail"
+      }
     }
   },
   "nudges": {

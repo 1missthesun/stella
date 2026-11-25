@@ -3795,6 +3795,96 @@
       "lineServer": "On this server's OpenRouter key: {sorted} sorted this month · {cost}",
       "deviceKeyHint": "To use your own OpenRouter key, add it in Models while signed in so it's saved to your account. A key kept only on this computer can't be used while the computer is off.",
       "deviceKeyHintPhone": "To use your own OpenRouter key, add it in Chat's settings while signed in so it's saved to your account. A key kept only on this phone can't be used for email."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Waiting on others",
+        "handled": "I handled"
+      },
+      "rules": {
+        "title": "Rules",
+        "settingsTitle": "Rules & settings",
+        "yours": "Your rules",
+        "hint": "Tell Stella what matters and what doesn't, and she keeps it here as a rule.",
+        "wake": "Tells you at once",
+        "act": "Stella acts at once",
+        "ignore": "Left off this page",
+        "remove": "Remove rule {rule}"
+      },
+      "tell": {
+        "action": "Tell Stella",
+        "about": "Tell Stella about {title}",
+        "placeholder": "Tell Stella what to do, or why it doesn't matter…",
+        "sendHint": "{keys} to send",
+        "send": "Send to Stella",
+        "sent": "Sent to Stella."
+      },
+      "draft": {
+        "label": "Drafted reply",
+        "read": "Read draft"
+      },
+      "details": "Details",
+      "showDetails": "Show details",
+      "hideDetails": "Hide details",
+      "onIt": "On it…",
+      "working": "Stella's on it.",
+      "ignored": {
+        "eyebrow": "Filtered out",
+        "count": {
+          "one": "Ignored {count} email",
+          "other": "Ignored {count} emails"
+        },
+        "short": "Ignored · {count}",
+        "hint": "Tell Stella in chat if anything from these senders should reach this page next time."
+      },
+      "inboxes": {
+        "title": "Inboxes",
+        "reading": "Reading",
+        "count": {
+          "one": "{count} inbox",
+          "other": "{count} inboxes"
+        }
+      },
+      "nextCheck": {
+        "title": "Next automatic check",
+        "hint": "Urgent mail wakes Stella between scheduled reads.",
+        "at": "Next automatic check {time}",
+        "short": "Next {time}"
+      },
+      "automation": "Automation",
+      "off": {
+        "title": "Turn off Email",
+        "confirm": "Turn off Email?",
+        "body": "Stella stops reading your mail and clears this page.",
+        "working": "Turning off…"
+      },
+      "summary": {
+        "caughtUp": "All caught up",
+        "waitingFirstRead": "Waiting for first read",
+        "readAt": "Read {time}",
+        "notRead": "Not read yet",
+        "newSince": {
+          "one": "{count} new since",
+          "other": "{count} new since"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nothing needs you",
+        "caughtUpNext": "You're caught up. Next automatic check {time}.",
+        "caughtUpUrgent": "You're caught up. Urgent mail will reach you right away.",
+        "firstReadTitle": "Stella will read your mail soon",
+        "firstReadBody": "Your page fills in automatically on Stella's next read, or you can run one now."
+      },
+      "check": "Check",
+      "request": {
+        "check": "Check my email now",
+        "about": "About {title}"
+      },
+      "a11y": {
+        "list": "Email list",
+        "items": "Email items",
+        "back": "Back to Email"
+      }
     }
   },
   "nudges": {

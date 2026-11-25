@@ -3739,6 +3739,93 @@
       "lineServer": "Dengan kunci OpenRouter server ini: {sorted} dipilah bulan ini · {cost}",
       "deviceKeyHint": "Untuk memakai kunci OpenRouter milik Anda, tambahkan di Model saat sedang masuk agar tersimpan di akun Anda. Kunci yang hanya disimpan di komputer ini tidak bisa dipakai saat komputer mati.",
       "deviceKeyHintPhone": "Untuk memakai kunci OpenRouter milik Anda, tambahkan di pengaturan obrolan saat sedang masuk agar tersimpan di akun Anda. Kunci yang hanya disimpan di ponsel ini tidak bisa dipakai untuk email."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Menunggu orang lain",
+        "handled": "Sudah saya tangani"
+      },
+      "rules": {
+        "title": "Aturan",
+        "settingsTitle": "Aturan & pengaturan",
+        "yours": "Aturan Anda",
+        "hint": "Beri tahu Stella apa yang penting dan apa yang tidak, lalu ia menyimpannya di sini sebagai aturan.",
+        "wake": "Langsung mengabari",
+        "act": "Stella langsung bertindak",
+        "ignore": "Tidak masuk halaman ini",
+        "remove": "Hapus aturan: {rule}"
+      },
+      "tell": {
+        "action": "Beri tahu Stella",
+        "about": "Beri tahu Stella tentang: {title}",
+        "placeholder": "Beri tahu Stella apa yang harus dilakukan, atau mengapa ini tidak penting…",
+        "sendHint": "{keys} untuk mengirim",
+        "send": "Kirim ke Stella",
+        "sent": "Terkirim ke Stella."
+      },
+      "draft": {
+        "label": "Draf balasan",
+        "read": "Baca draf"
+      },
+      "details": "Detail",
+      "showDetails": "Tampilkan detail",
+      "hideDetails": "Sembunyikan detail",
+      "onIt": "Dikerjakan…",
+      "working": "Stella sedang mengerjakannya.",
+      "ignored": {
+        "eyebrow": "Disaring",
+        "count": {
+          "other": "{count} email diabaikan"
+        },
+        "short": "Diabaikan · {count}",
+        "hint": "Beri tahu Stella di chat jika sesuatu dari pengirim ini perlu masuk halaman ini lain kali."
+      },
+      "inboxes": {
+        "title": "Kotak masuk",
+        "reading": "Dibaca",
+        "count": {
+          "other": "{count} kotak masuk"
+        }
+      },
+      "nextCheck": {
+        "title": "Pemeriksaan otomatis berikutnya",
+        "hint": "Email mendesak membangunkan Stella di antara jadwal membaca.",
+        "at": "Pemeriksaan otomatis berikutnya: {time}",
+        "short": "Berikutnya: {time}"
+      },
+      "automation": "Otomatisasi",
+      "off": {
+        "title": "Matikan Email",
+        "confirm": "Matikan Email?",
+        "body": "Stella berhenti membaca email Anda dan mengosongkan halaman ini.",
+        "working": "Mematikan…"
+      },
+      "summary": {
+        "caughtUp": "Semua beres",
+        "waitingFirstRead": "Menunggu pembacaan pertama",
+        "readAt": "Dibaca: {time}",
+        "notRead": "Belum dibaca",
+        "newSince": {
+          "other": "{count} baru sejak itu"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Tidak ada yang perlu Anda",
+        "caughtUpNext": "Semua sudah beres. Pemeriksaan otomatis berikutnya: {time}.",
+        "caughtUpUrgent": "Semua sudah beres. Email mendesak akan langsung sampai ke Anda.",
+        "firstReadTitle": "Stella akan segera membaca email Anda",
+        "firstReadBody": "Halaman ini terisi otomatis saat Stella membaca berikutnya, atau Anda bisa memulainya sekarang."
+      },
+      "check": "Periksa",
+      "request": {
+        "check": "Periksa email saya sekarang",
+        "about": "Tentang: {title}"
+      },
+      "a11y": {
+        "list": "Daftar email",
+        "items": "Item email",
+        "back": "Kembali ke Email"
+      }
     }
   },
   "nudges": {

@@ -174,6 +174,7 @@
     }
   },
   "common": {
+    "back": "Zurück",
     "cancel": "Abbrechen",
     "close": "Schließen",
     "continue": "Weiter",
@@ -185,6 +186,11 @@
   },
   "errors": {
     "generic": "Etwas ist schiefgelaufen"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Wird entfernt…"
+    }
   },
   "mobile": {
     "account": {
@@ -1160,6 +1166,12 @@
   "email": {
     "title": "E-Mail",
     "failed": "Konnte nicht aktualisiert werden. Versuch es noch einmal.",
+    "card": {
+      "needYou": {
+        "one": "{count} braucht dich",
+        "other": "{count} brauchen dich"
+      }
+    },
     "section": {
       "connectBody": "Verbinde Gmail, und Stella sortiert neue E-Mails, sobald sie ankommen. Dringendes erreicht dich sofort, der Rest wartet unter Heute, mit einem vorbereiteten Antwortentwurf, wo nötig.",
       "connect": "Gmail verbinden",
@@ -1170,7 +1182,107 @@
       "loadErrorBody": "Stella erreicht ihre Server gerade nicht. Prüf deine Verbindung und versuch es noch einmal.",
       "offBody": "Stella sortiert neue E-Mails, sobald sie ankommen. Dringendes erreicht dich sofort, der Rest wartet unter Heute, mit einem vorbereiteten Antwortentwurf, wo nötig. Unwichtiges bleibt draußen.",
       "turnOn": "Einschalten",
-      "turningOn": "Deine letzten E-Mails werden sortiert…"
+      "turningOn": "Deine letzten E-Mails werden sortiert…",
+      "needsYou": "Braucht dich",
+      "openInGmail": "In Gmail öffnen",
+      "remove": "Entfernen",
+      "checkNow": "Jetzt prüfen",
+      "checking": "Wird geprüft…",
+      "turnOff": "Ausschalten"
+    },
+    "digest": {
+      "send": "Senden"
+    },
+    "brief": {
+      "emails": {
+        "one": "{count} E-Mail",
+        "other": "{count} E-Mails"
+      },
+      "hide": "Ausblenden"
+    },
+    "reply": {
+      "to": "An {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Wartet auf andere",
+        "handled": "Von mir erledigt"
+      },
+      "rules": {
+        "settingsTitle": "Regeln & Einstellungen",
+        "yours": "Deine Regeln",
+        "hint": "Sag Stella, was wichtig ist und was nicht, und sie hält es hier als Regel fest.",
+        "wake": "Sagt dir sofort Bescheid",
+        "act": "Stella handelt sofort",
+        "ignore": "Erscheint nicht auf dieser Seite",
+        "remove": "Regel entfernen: {rule}"
+      },
+      "tell": {
+        "action": "Stella sagen",
+        "about": "Stella etwas sagen zu: {title}",
+        "placeholder": "Sag Stella, was zu tun ist oder warum es nicht wichtig ist…",
+        "send": "An Stella senden",
+        "sent": "An Stella gesendet."
+      },
+      "draft": {
+        "label": "Antwortentwurf",
+        "read": "Entwurf lesen"
+      },
+      "details": "Details",
+      "showDetails": "Details anzeigen",
+      "hideDetails": "Details ausblenden",
+      "working": "Stella kümmert sich darum.",
+      "ignored": {
+        "count": {
+          "one": "{count} ignorierte E-Mail",
+          "other": "{count} ignorierte E-Mails"
+        }
+      },
+      "inboxes": {
+        "title": "Postfächer",
+        "reading": "Wird gelesen",
+        "count": {
+          "one": "{count} Postfach",
+          "other": "{count} Postfächer"
+        }
+      },
+      "nextCheck": {
+        "title": "Nächste automatische Prüfung",
+        "hint": "Dringende E-Mails wecken Stella auch zwischen den geplanten Durchgängen.",
+        "at": "Nächste automatische Prüfung: {time}"
+      },
+      "automation": "Automatisierung",
+      "off": {
+        "title": "E-Mail ausschalten",
+        "confirm": "E-Mail ausschalten?",
+        "body": "Stella liest deine E-Mails nicht mehr und leert diese Seite.",
+        "working": "Wird ausgeschaltet…"
+      },
+      "summary": {
+        "caughtUp": "Alles erledigt",
+        "waitingFirstRead": "Wartet auf den ersten Durchgang",
+        "readAt": "Gelesen: {time}",
+        "notRead": "Noch nicht gelesen",
+        "newSince": {
+          "one": "{count} neue seitdem",
+          "other": "{count} neue seitdem"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nichts braucht dich",
+        "caughtUpNext": "Du bist auf dem neuesten Stand. Nächste automatische Prüfung: {time}",
+        "caughtUpUrgent": "Du bist auf dem neuesten Stand. Dringende E-Mails erreichen dich sofort.",
+        "firstReadTitle": "Stella liest deine E-Mails bald",
+        "firstReadBody": "Diese Seite füllt sich automatisch, wenn Stella das nächste Mal liest. Du kannst das auch jetzt gleich starten."
+      },
+      "check": "Prüfen",
+      "request": {
+        "check": "Meine E-Mails jetzt prüfen",
+        "about": "Zu: {title}"
+      },
+      "a11y": {
+        "back": "Zurück zu E-Mail"
+      }
     }
   }
 }

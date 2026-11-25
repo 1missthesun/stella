@@ -175,6 +175,7 @@
     }
   },
   "common": {
+    "back": "Înapoi",
     "cancel": "Anulează",
     "close": "Închide",
     "continue": "Continuă",
@@ -186,6 +187,11 @@
   },
   "errors": {
     "generic": "Ceva nu a mers"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Se elimină…"
+    }
   },
   "mobile": {
     "account": {
@@ -1175,6 +1181,13 @@
   "email": {
     "title": "E-mail",
     "failed": "Actualizarea a eșuat. Încearcă din nou.",
+    "card": {
+      "needYou": {
+        "few": "{count} au nevoie de tine",
+        "one": "{count} are nevoie de tine",
+        "other": "{count} au nevoie de tine"
+      }
+    },
     "section": {
       "connectBody": "Conectează Gmail și Stella sortează mesajele noi pe măsură ce sosesc. Cele urgente ajung imediat la tine; restul te așteaptă în Azi, cu un răspuns pregătit când e nevoie de unul.",
       "connect": "Conectează Gmail",
@@ -1185,7 +1198,111 @@
       "loadErrorBody": "Stella nu își poate accesa serverele acum. Verifică conexiunea și încearcă din nou.",
       "offBody": "Stella sortează mesajele noi pe măsură ce sosesc. Cele urgente ajung imediat la tine; restul te așteaptă în Azi, cu un răspuns pregătit când e nevoie de unul. Zgomotul rămâne afară.",
       "turnOn": "Activează",
-      "turningOn": "Se sortează mesajele recente…"
+      "turningOn": "Se sortează mesajele recente…",
+      "needsYou": "Are nevoie de tine",
+      "openInGmail": "Deschide în Gmail",
+      "remove": "Elimină",
+      "checkNow": "Verifică acum",
+      "checking": "Se verifică…",
+      "turnOff": "Dezactivează"
+    },
+    "digest": {
+      "send": "Trimite"
+    },
+    "brief": {
+      "emails": {
+        "few": "E-mailuri: {count}",
+        "one": "E-mailuri: {count}",
+        "other": "E-mailuri: {count}"
+      },
+      "hide": "Ascunde"
+    },
+    "reply": {
+      "to": "Către {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "În așteptarea altora",
+        "handled": "De care m-am ocupat"
+      },
+      "rules": {
+        "settingsTitle": "Reguli și setări",
+        "yours": "Regulile tale",
+        "hint": "Spune-i Stellei ce contează și ce nu, iar ea păstrează totul aici ca regulă.",
+        "wake": "Te anunță imediat",
+        "act": "Stella acționează imediat",
+        "ignore": "Nu apare pe această pagină",
+        "remove": "Elimină regula: {rule}"
+      },
+      "tell": {
+        "action": "Spune-i Stellei",
+        "about": "Spune-i Stellei ceva despre: {title}",
+        "placeholder": "Spune-i Stellei ce să facă sau de ce nu contează…",
+        "send": "Trimite Stellei",
+        "sent": "Trimis Stellei."
+      },
+      "draft": {
+        "label": "Răspuns pregătit",
+        "read": "Citește ciorna"
+      },
+      "details": "Detalii",
+      "showDetails": "Arată detaliile",
+      "hideDetails": "Ascunde detaliile",
+      "working": "Stella se ocupă.",
+      "ignored": {
+        "count": {
+          "few": "{count} e-mailuri ignorate",
+          "one": "{count} e-mail ignorat",
+          "other": "{count} de e-mailuri ignorate"
+        }
+      },
+      "inboxes": {
+        "title": "Căsuțe de e-mail",
+        "reading": "Se citește",
+        "count": {
+          "few": "{count} căsuțe",
+          "one": "{count} căsuță",
+          "other": "{count} de căsuțe"
+        }
+      },
+      "nextCheck": {
+        "title": "Următoarea verificare automată",
+        "hint": "E-mailurile urgente o trezesc pe Stella între citirile programate.",
+        "at": "Următoarea verificare automată: {time}"
+      },
+      "automation": "Automatizare",
+      "off": {
+        "title": "Dezactivează E-mail",
+        "confirm": "Dezactivezi E-mail?",
+        "body": "Stella nu îți mai citește e-mailurile și golește această pagină.",
+        "working": "Se dezactivează…"
+      },
+      "summary": {
+        "caughtUp": "Totul e la zi",
+        "waitingFirstRead": "Se așteaptă prima citire",
+        "readAt": "Citit: {time}",
+        "notRead": "Încă necitit",
+        "newSince": {
+          "few": "{count} noi de atunci",
+          "one": "{count} nou de atunci",
+          "other": "{count} noi de atunci"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nimic nu are nevoie de tine",
+        "caughtUpNext": "Ești la zi. Următoarea verificare automată: {time}",
+        "caughtUpUrgent": "Ești la zi. E-mailurile urgente ajung imediat la tine.",
+        "firstReadTitle": "Stella îți va citi e-mailurile în curând",
+        "firstReadBody": "Pagina se completează automat la următoarea citire a Stellei sau poți porni una acum."
+      },
+      "check": "Verifică",
+      "request": {
+        "check": "Verifică-mi e-mailul acum",
+        "about": "Despre: {title}"
+      },
+      "a11y": {
+        "back": "Înapoi la E-mail"
+      }
     }
   }
 }

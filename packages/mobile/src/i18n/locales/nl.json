@@ -174,6 +174,7 @@
     }
   },
   "common": {
+    "back": "Terug",
     "cancel": "Annuleren",
     "close": "Sluiten",
     "continue": "Doorgaan",
@@ -185,6 +186,11 @@
   },
   "errors": {
     "generic": "Er ging iets mis"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Verwijderen…"
+    }
   },
   "mobile": {
     "account": {
@@ -1160,6 +1166,12 @@
   "email": {
     "title": "E-mail",
     "failed": "Bijwerken lukte niet. Probeer het opnieuw.",
+    "card": {
+      "needYou": {
+        "one": "{count} heeft je nodig",
+        "other": "{count} hebben je nodig"
+      }
+    },
     "section": {
       "connectBody": "Koppel Gmail en Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest wacht in Vandaag, met een conceptantwoord als er een antwoord nodig is.",
       "connect": "Gmail koppelen",
@@ -1170,7 +1182,107 @@
       "loadErrorBody": "Stella kan haar servers nu niet bereiken. Controleer je verbinding en probeer het opnieuw.",
       "offBody": "Stella sorteert nieuwe mail zodra die binnenkomt. Dringende mail krijg je meteen; de rest wacht in Vandaag, met een conceptantwoord als er een antwoord nodig is. Ruis blijft buiten.",
       "turnOn": "Inschakelen",
-      "turningOn": "Je recente mail wordt gesorteerd…"
+      "turningOn": "Je recente mail wordt gesorteerd…",
+      "needsYou": "Heeft je nodig",
+      "openInGmail": "Openen in Gmail",
+      "remove": "Verwijderen",
+      "checkNow": "Nu controleren",
+      "checking": "Controleren…",
+      "turnOff": "Uitschakelen"
+    },
+    "digest": {
+      "send": "Versturen"
+    },
+    "brief": {
+      "emails": {
+        "one": "{count} e-mail",
+        "other": "{count} e-mails"
+      },
+      "hide": "Verbergen"
+    },
+    "reply": {
+      "to": "Aan {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Wacht op anderen",
+        "handled": "Door mij afgehandeld"
+      },
+      "rules": {
+        "settingsTitle": "Regels en instellingen",
+        "yours": "Jouw regels",
+        "hint": "Vertel Stella wat belangrijk is en wat niet, dan bewaart ze het hier als regel.",
+        "wake": "Laat het je meteen weten",
+        "act": "Stella handelt meteen",
+        "ignore": "Komt niet op deze pagina",
+        "remove": "Regel verwijderen: {rule}"
+      },
+      "tell": {
+        "action": "Zeg tegen Stella",
+        "about": "Zeg iets tegen Stella over: {title}",
+        "placeholder": "Vertel Stella wat ze moet doen, of waarom het niet belangrijk is…",
+        "send": "Naar Stella sturen",
+        "sent": "Naar Stella gestuurd."
+      },
+      "draft": {
+        "label": "Conceptantwoord",
+        "read": "Concept lezen"
+      },
+      "details": "Details",
+      "showDetails": "Details tonen",
+      "hideDetails": "Details verbergen",
+      "working": "Stella is ermee bezig.",
+      "ignored": {
+        "count": {
+          "one": "{count} genegeerde e-mail",
+          "other": "{count} genegeerde e-mails"
+        }
+      },
+      "inboxes": {
+        "title": "Postvakken",
+        "reading": "Wordt gelezen",
+        "count": {
+          "one": "{count} postvak",
+          "other": "{count} postvakken"
+        }
+      },
+      "nextCheck": {
+        "title": "Volgende automatische controle",
+        "hint": "Dringende mail maakt Stella wakker tussen de geplande leesrondes.",
+        "at": "Volgende automatische controle: {time}"
+      },
+      "automation": "Automatisering",
+      "off": {
+        "title": "E-mail uitschakelen",
+        "confirm": "E-mail uitschakelen?",
+        "body": "Stella leest je mail niet meer en maakt deze pagina leeg.",
+        "working": "Uitschakelen…"
+      },
+      "summary": {
+        "caughtUp": "Helemaal bij",
+        "waitingFirstRead": "Wacht op de eerste leesronde",
+        "readAt": "Gelezen: {time}",
+        "notRead": "Nog niet gelezen",
+        "newSince": {
+          "one": "{count} nieuwe sindsdien",
+          "other": "{count} nieuwe sindsdien"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Niets heeft je nodig",
+        "caughtUpNext": "Je bent bij. Volgende automatische controle: {time}.",
+        "caughtUpUrgent": "Je bent bij. Dringende mail krijg je meteen.",
+        "firstReadTitle": "Stella leest binnenkort je mail",
+        "firstReadBody": "Deze pagina vult zich vanzelf bij Stella's volgende leesronde, of je start er nu een."
+      },
+      "check": "Controleren",
+      "request": {
+        "check": "Mijn e-mail nu controleren",
+        "about": "Over: {title}"
+      },
+      "a11y": {
+        "back": "Terug naar E-mail"
+      }
     }
   }
 }

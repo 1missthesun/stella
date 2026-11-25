@@ -174,6 +174,7 @@
     }
   },
   "common": {
+    "back": "Vissza",
     "cancel": "Mégse",
     "close": "Bezárás",
     "continue": "Tovább",
@@ -185,6 +186,11 @@
   },
   "errors": {
     "generic": "Valami hiba történt"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Eltávolítás…"
+    }
   },
   "mobile": {
     "account": {
@@ -1160,6 +1166,12 @@
   "email": {
     "title": "E-mail",
     "failed": "Nem sikerült frissíteni. Próbáld újra.",
+    "card": {
+      "needYou": {
+        "one": "{count} rád vár",
+        "other": "{count} rád vár"
+      }
+    },
     "section": {
       "connectBody": "Kapcsold össze a Gmailt, és Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi a Ma nézetben vár, ahol kell, előre megírt válasszal.",
       "connect": "Gmail összekapcsolása",
@@ -1170,7 +1182,107 @@
       "loadErrorBody": "Stella most nem éri el a szervereit. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "offBody": "Stella érkezéskor rendezi az új leveleket. A sürgős azonnal eljut hozzád, a többi a Ma nézetben vár, ahol kell, előre megírt válasszal. A zaj kimarad.",
       "turnOn": "Bekapcsolás",
-      "turningOn": "A legutóbbi levelek rendezése…"
+      "turningOn": "A legutóbbi levelek rendezése…",
+      "needsYou": "Rád vár",
+      "openInGmail": "Megnyitás a Gmailben",
+      "remove": "Eltávolítás",
+      "checkNow": "Ellenőrzés most",
+      "checking": "Ellenőrzés…",
+      "turnOff": "Kikapcsolás"
+    },
+    "digest": {
+      "send": "Küldés"
+    },
+    "brief": {
+      "emails": {
+        "one": "{count} e-mail",
+        "other": "{count} e-mail"
+      },
+      "hide": "Elrejtés"
+    },
+    "reply": {
+      "to": "Címzett: {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Másokra vár",
+        "handled": "Elintéztem"
+      },
+      "rules": {
+        "settingsTitle": "Szabályok és beállítások",
+        "yours": "A te szabályaid",
+        "hint": "Mondd el Stellának, mi fontos és mi nem, ő pedig szabályként megőrzi itt.",
+        "wake": "Azonnal szól",
+        "act": "Stella azonnal intézkedik",
+        "ignore": "Nem kerül erre az oldalra",
+        "remove": "Szabály eltávolítása: {rule}"
+      },
+      "tell": {
+        "action": "Szólj Stellának",
+        "about": "Szólj Stellának erről: {title}",
+        "placeholder": "Írd meg Stellának, mit tegyen, vagy miért nem fontos…",
+        "send": "Küldés Stellának",
+        "sent": "Elküldve Stellának."
+      },
+      "draft": {
+        "label": "Választervezet",
+        "read": "Piszkozat olvasása"
+      },
+      "details": "Részletek",
+      "showDetails": "Részletek megjelenítése",
+      "hideDetails": "Részletek elrejtése",
+      "working": "Stella már intézi.",
+      "ignored": {
+        "count": {
+          "one": "{count} mellőzött e-mail",
+          "other": "{count} mellőzött e-mail"
+        }
+      },
+      "inboxes": {
+        "title": "Postafiókok",
+        "reading": "Olvasás alatt",
+        "count": {
+          "one": "{count} postafiók",
+          "other": "{count} postafiók"
+        }
+      },
+      "nextCheck": {
+        "title": "Következő automatikus ellenőrzés",
+        "hint": "A sürgős levelek az ütemezett olvasások között is felébresztik Stellát.",
+        "at": "Következő automatikus ellenőrzés: {time}"
+      },
+      "automation": "Automatizálás",
+      "off": {
+        "title": "E-mail kikapcsolása",
+        "confirm": "Kikapcsolod az E-mailt?",
+        "body": "Stella nem olvassa tovább a leveleidet, és kiüríti ezt az oldalt.",
+        "working": "Kikapcsolás…"
+      },
+      "summary": {
+        "caughtUp": "Minden rendben",
+        "waitingFirstRead": "Az első olvasásra vár",
+        "readAt": "Olvasva: {time}",
+        "notRead": "Még nincs olvasva",
+        "newSince": {
+          "one": "azóta {count} új",
+          "other": "azóta {count} új"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Semmi sem vár rád",
+        "caughtUpNext": "Mindennel naprakész vagy. Következő automatikus ellenőrzés: {time}.",
+        "caughtUpUrgent": "Mindennel naprakész vagy. A sürgős levelek azonnal eljutnak hozzád.",
+        "firstReadTitle": "Stella hamarosan elolvassa a leveleidet",
+        "firstReadBody": "Az oldal Stella következő olvasásakor magától megtelik, de most is indíthatsz egyet."
+      },
+      "check": "Ellenőrzés",
+      "request": {
+        "check": "Leveleim ellenőrzése most",
+        "about": "Erről: {title}"
+      },
+      "a11y": {
+        "back": "Vissza az E-mailhez"
+      }
     }
   }
 }

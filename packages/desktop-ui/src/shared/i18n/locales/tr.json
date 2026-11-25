@@ -3795,6 +3795,96 @@
       "lineServer": "Bu sunucunun OpenRouter anahtarıyla: bu ay {sorted} ayrıldı · {cost}",
       "deviceKeyHint": "Kendi OpenRouter anahtarınızı kullanmak için oturum açıkken Modeller bölümüne ekleyin; böylece hesabınıza kaydedilir. Yalnızca bu bilgisayarda tutulan bir anahtar, bilgisayar kapalıyken kullanılamaz.",
       "deviceKeyHintPhone": "Kendi OpenRouter anahtarınızı kullanmak için oturum açıkken sohbet ayarlarına ekleyin; böylece hesabınıza kaydedilir. Yalnızca bu telefonda tutulan bir anahtar e-posta için kullanılamaz."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Başkalarını bekliyor",
+        "handled": "Ben hallettim"
+      },
+      "rules": {
+        "title": "Kurallar",
+        "settingsTitle": "Kurallar ve ayarlar",
+        "yours": "Kurallarınız",
+        "hint": "Stella'ya neyin önemli olup neyin olmadığını söyleyin, burada kural olarak saklasın.",
+        "wake": "Hemen haber verir",
+        "act": "Stella hemen harekete geçer",
+        "ignore": "Bu sayfada yer almaz",
+        "remove": "Kuralı kaldır: {rule}"
+      },
+      "tell": {
+        "action": "Stella'ya söyle",
+        "about": "Stella'ya şunun hakkında söyle: {title}",
+        "placeholder": "Stella'ya ne yapacağını veya bunun neden önemli olmadığını söyleyin…",
+        "sendHint": "Göndermek için {keys}",
+        "send": "Stella'ya gönder",
+        "sent": "Stella'ya gönderildi."
+      },
+      "draft": {
+        "label": "Yanıt taslağı",
+        "read": "Taslağı oku"
+      },
+      "details": "Ayrıntılar",
+      "showDetails": "Ayrıntıları göster",
+      "hideDetails": "Ayrıntıları gizle",
+      "onIt": "Yapılıyor…",
+      "working": "Stella ilgileniyor.",
+      "ignored": {
+        "eyebrow": "Elenenler",
+        "count": {
+          "one": "{count} e-posta yok sayıldı",
+          "other": "{count} e-posta yok sayıldı"
+        },
+        "short": "Yok sayılan · {count}",
+        "hint": "Bu gönderenlerden gelenlerin bir dahaki sefere bu sayfada görünmesini isterseniz sohbette Stella'ya söyleyin."
+      },
+      "inboxes": {
+        "title": "Gelen kutuları",
+        "reading": "Okunuyor",
+        "count": {
+          "one": "{count} gelen kutusu",
+          "other": "{count} gelen kutusu"
+        }
+      },
+      "nextCheck": {
+        "title": "Sonraki otomatik kontrol",
+        "hint": "Acil e-postalar, planlı okumalar arasında Stella'yı uyandırır.",
+        "at": "Sonraki otomatik kontrol: {time}",
+        "short": "Sonraki: {time}"
+      },
+      "automation": "Otomasyon",
+      "off": {
+        "title": "E-postayı kapat",
+        "confirm": "E-posta kapatılsın mı?",
+        "body": "Stella e-postalarınızı okumayı bırakır ve bu sayfayı temizler.",
+        "working": "Kapatılıyor…"
+      },
+      "summary": {
+        "caughtUp": "Her şey tamam",
+        "waitingFirstRead": "İlk okuma bekleniyor",
+        "readAt": "Okundu: {time}",
+        "notRead": "Henüz okunmadı",
+        "newSince": {
+          "one": "o zamandan beri {count} yeni",
+          "other": "o zamandan beri {count} yeni"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Sizi bekleyen bir şey yok",
+        "caughtUpNext": "Her şey güncel. Sonraki otomatik kontrol: {time}.",
+        "caughtUpUrgent": "Her şey güncel. Acil e-postalar size hemen ulaşır.",
+        "firstReadTitle": "Stella yakında e-postalarınızı okuyacak",
+        "firstReadBody": "Bu sayfa Stella'nın sonraki okumasında kendiliğinden dolar; isterseniz şimdi de başlatabilirsiniz."
+      },
+      "check": "Kontrol et",
+      "request": {
+        "check": "E-postamı şimdi kontrol et",
+        "about": "Konu: {title}"
+      },
+      "a11y": {
+        "list": "E-posta listesi",
+        "items": "E-posta öğeleri",
+        "back": "E-postaya dön"
+      }
     }
   },
   "nudges": {

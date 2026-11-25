@@ -176,6 +176,7 @@
     }
   },
   "common": {
+    "back": "Wstecz",
     "cancel": "Anuluj",
     "close": "Zamknij",
     "continue": "Dalej",
@@ -187,6 +188,11 @@
   },
   "errors": {
     "generic": "Coś poszło nie tak"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Usuwanie…"
+    }
   },
   "mobile": {
     "account": {
@@ -1190,6 +1196,14 @@
   "email": {
     "title": "E-mail",
     "failed": "Nie udało się zaktualizować. Spróbuj ponownie.",
+    "card": {
+      "needYou": {
+        "few": "Czeka na ciebie: {count}",
+        "many": "Czeka na ciebie: {count}",
+        "one": "Czeka na ciebie: {count}",
+        "other": "Czeka na ciebie: {count}"
+      }
+    },
     "section": {
       "connectBody": "Połącz Gmaila, a Stella będzie sortować nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta czeka w widoku Dziś, z gotowym szkicem odpowiedzi, gdy trzeba odpisać.",
       "connect": "Połącz Gmaila",
@@ -1200,7 +1214,115 @@
       "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
       "offBody": "Stella sortuje nowe wiadomości na bieżąco. Pilne dotrą do ciebie od razu, reszta czeka w widoku Dziś, z gotowym szkicem odpowiedzi, gdy trzeba odpisać. Szum zostaje za drzwiami.",
       "turnOn": "Włącz",
-      "turningOn": "Sortuję ostatnią pocztę…"
+      "turningOn": "Sortuję ostatnią pocztę…",
+      "needsYou": "Czeka na ciebie",
+      "openInGmail": "Otwórz w Gmailu",
+      "remove": "Usuń",
+      "checkNow": "Sprawdź teraz",
+      "checking": "Sprawdzam…",
+      "turnOff": "Wyłącz"
+    },
+    "digest": {
+      "send": "Wyślij"
+    },
+    "brief": {
+      "emails": {
+        "few": "E-maile: {count}",
+        "many": "E-maile: {count}",
+        "one": "E-maile: {count}",
+        "other": "E-maile: {count}"
+      },
+      "hide": "Ukryj"
+    },
+    "reply": {
+      "to": "Do: {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Czeka na innych",
+        "handled": "Załatwiłam"
+      },
+      "rules": {
+        "settingsTitle": "Reguły i ustawienia",
+        "yours": "Twoje reguły",
+        "hint": "Powiedz Stelli, co jest ważne, a co nie, a zapisze to tutaj jako regułę.",
+        "wake": "Daje znać od razu",
+        "act": "Stella działa od razu",
+        "ignore": "Nie trafia na tę stronę",
+        "remove": "Usuń regułę: {rule}"
+      },
+      "tell": {
+        "action": "Powiedz Stelli",
+        "about": "Powiedz Stelli o: {title}",
+        "placeholder": "Powiedz Stelli, co zrobić albo dlaczego to nieważne…",
+        "send": "Wyślij do Stelli",
+        "sent": "Wysłano do Stelli."
+      },
+      "draft": {
+        "label": "Szkic odpowiedzi",
+        "read": "Przeczytaj szkic"
+      },
+      "details": "Szczegóły",
+      "showDetails": "Pokaż szczegóły",
+      "hideDetails": "Ukryj szczegóły",
+      "working": "Stella się tym zajmuje.",
+      "ignored": {
+        "count": {
+          "few": "{count} pominięte e-maile",
+          "many": "{count} pominiętych e-maili",
+          "one": "{count} pominięty e-mail",
+          "other": "{count} pominiętego e-maila"
+        }
+      },
+      "inboxes": {
+        "title": "Skrzynki",
+        "reading": "Czytana",
+        "count": {
+          "few": "{count} skrzynki",
+          "many": "{count} skrzynek",
+          "one": "{count} skrzynka",
+          "other": "{count} skrzynki"
+        }
+      },
+      "nextCheck": {
+        "title": "Następne automatyczne sprawdzenie",
+        "hint": "Pilna poczta budzi Stellę między zaplanowanymi odczytami.",
+        "at": "Następne automatyczne sprawdzenie: {time}"
+      },
+      "automation": "Automatyzacja",
+      "off": {
+        "title": "Wyłącz E-mail",
+        "confirm": "Wyłączyć E-mail?",
+        "body": "Stella przestanie czytać twoją pocztę i wyczyści tę stronę.",
+        "working": "Wyłączanie…"
+      },
+      "summary": {
+        "caughtUp": "Wszystko załatwione",
+        "waitingFirstRead": "Czeka na pierwszy odczyt",
+        "readAt": "Odczyt: {time}",
+        "notRead": "Jeszcze nieodczytane",
+        "newSince": {
+          "few": "{count} nowe od tego czasu",
+          "many": "{count} nowych od tego czasu",
+          "one": "{count} nowy od tego czasu",
+          "other": "{count} nowego od tego czasu"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nic na ciebie nie czeka",
+        "caughtUpNext": "Jesteś na bieżąco. Następne automatyczne sprawdzenie: {time}.",
+        "caughtUpUrgent": "Jesteś na bieżąco. Pilna poczta dotrze do ciebie od razu.",
+        "firstReadTitle": "Stella wkrótce przeczyta twoją pocztę",
+        "firstReadBody": "Strona wypełni się sama przy następnym odczycie Stelli. Możesz też uruchomić go teraz."
+      },
+      "check": "Sprawdź",
+      "request": {
+        "check": "Sprawdź teraz moją pocztę",
+        "about": "W sprawie: {title}"
+      },
+      "a11y": {
+        "back": "Wróć do E-mail"
+      }
     }
   }
 }

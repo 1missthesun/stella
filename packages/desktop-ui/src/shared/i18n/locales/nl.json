@@ -3795,6 +3795,96 @@
       "lineServer": "Op de OpenRouter-sleutel van deze server: {sorted} gesorteerd deze maand · {cost}",
       "deviceKeyHint": "Wil je je eigen OpenRouter-sleutel gebruiken? Voeg hem toe in Modellen terwijl je bent ingelogd, zodat hij in je account wordt bewaard. Een sleutel die alleen op deze computer staat, kan niet worden gebruikt als de computer uit staat.",
       "deviceKeyHintPhone": "Wil je je eigen OpenRouter-sleutel gebruiken? Voeg hem toe in de chatinstellingen terwijl je bent ingelogd, zodat hij in je account wordt bewaard. Een sleutel die alleen op deze telefoon staat, kan niet voor e-mail worden gebruikt."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Wacht op anderen",
+        "handled": "Door mij afgehandeld"
+      },
+      "rules": {
+        "title": "Regels",
+        "settingsTitle": "Regels en instellingen",
+        "yours": "Jouw regels",
+        "hint": "Vertel Stella wat belangrijk is en wat niet, dan bewaart ze het hier als regel.",
+        "wake": "Laat het je meteen weten",
+        "act": "Stella handelt meteen",
+        "ignore": "Komt niet op deze pagina",
+        "remove": "Regel verwijderen: {rule}"
+      },
+      "tell": {
+        "action": "Zeg tegen Stella",
+        "about": "Zeg iets tegen Stella over: {title}",
+        "placeholder": "Vertel Stella wat ze moet doen, of waarom het niet belangrijk is…",
+        "sendHint": "{keys} om te versturen",
+        "send": "Naar Stella sturen",
+        "sent": "Naar Stella gestuurd."
+      },
+      "draft": {
+        "label": "Conceptantwoord",
+        "read": "Concept lezen"
+      },
+      "details": "Details",
+      "showDetails": "Details tonen",
+      "hideDetails": "Details verbergen",
+      "onIt": "Mee bezig…",
+      "working": "Stella is ermee bezig.",
+      "ignored": {
+        "eyebrow": "Weggefilterd",
+        "count": {
+          "one": "{count} genegeerde e-mail",
+          "other": "{count} genegeerde e-mails"
+        },
+        "short": "Genegeerd · {count}",
+        "hint": "Laat het Stella in de chat weten als iets van deze afzenders volgende keer wel op deze pagina moet komen."
+      },
+      "inboxes": {
+        "title": "Postvakken",
+        "reading": "Wordt gelezen",
+        "count": {
+          "one": "{count} postvak",
+          "other": "{count} postvakken"
+        }
+      },
+      "nextCheck": {
+        "title": "Volgende automatische controle",
+        "hint": "Dringende mail maakt Stella wakker tussen de geplande leesrondes.",
+        "at": "Volgende automatische controle: {time}",
+        "short": "Volgende: {time}"
+      },
+      "automation": "Automatisering",
+      "off": {
+        "title": "E-mail uitschakelen",
+        "confirm": "E-mail uitschakelen?",
+        "body": "Stella leest je mail niet meer en maakt deze pagina leeg.",
+        "working": "Uitschakelen…"
+      },
+      "summary": {
+        "caughtUp": "Helemaal bij",
+        "waitingFirstRead": "Wacht op de eerste leesronde",
+        "readAt": "Gelezen: {time}",
+        "notRead": "Nog niet gelezen",
+        "newSince": {
+          "one": "{count} nieuwe sindsdien",
+          "other": "{count} nieuwe sindsdien"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Niets heeft je nodig",
+        "caughtUpNext": "Je bent bij. Volgende automatische controle: {time}.",
+        "caughtUpUrgent": "Je bent bij. Dringende mail krijg je meteen.",
+        "firstReadTitle": "Stella leest binnenkort je mail",
+        "firstReadBody": "Deze pagina vult zich vanzelf bij Stella's volgende leesronde, of je start er nu een."
+      },
+      "check": "Controleren",
+      "request": {
+        "check": "Mijn e-mail nu controleren",
+        "about": "Over: {title}"
+      },
+      "a11y": {
+        "list": "E-maillijst",
+        "items": "E-mailitems",
+        "back": "Terug naar E-mail"
+      }
     }
   },
   "nudges": {

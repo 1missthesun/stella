@@ -3795,6 +3795,96 @@
       "lineServer": "Tämän palvelimen OpenRouter-avaimella: {sorted} lajiteltu tässä kuussa · {cost}",
       "deviceKeyHint": "Jos haluat käyttää omaa OpenRouter-avaintasi, lisää se kohdassa Mallit kirjautuneena, niin se tallentuu tiliisi. Vain tälle tietokoneelle tallennettua avainta ei voi käyttää, kun tietokone on pois päältä.",
       "deviceKeyHintPhone": "Jos haluat käyttää omaa OpenRouter-avaintasi, lisää se keskustelun asetuksissa kirjautuneena, niin se tallentuu tiliisi. Vain tälle puhelimelle tallennettua avainta ei voi käyttää sähköpostiin."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Odottaa muita",
+        "handled": "Hoidin nämä"
+      },
+      "rules": {
+        "title": "Säännöt",
+        "settingsTitle": "Säännöt ja asetukset",
+        "yours": "Omat sääntösi",
+        "hint": "Kerro Stellalle, mikä on tärkeää ja mikä ei, niin hän pitää sen tässä sääntönä.",
+        "wake": "Kertoo heti",
+        "act": "Stella toimii heti",
+        "ignore": "Ei näy tällä sivulla",
+        "remove": "Poista sääntö: {rule}"
+      },
+      "tell": {
+        "action": "Kerro Stellalle",
+        "about": "Kerro Stellalle aiheesta: {title}",
+        "placeholder": "Kerro Stellalle, mitä tehdä tai miksi tällä ei ole väliä…",
+        "sendHint": "Lähetä: {keys}",
+        "send": "Lähetä Stellalle",
+        "sent": "Lähetetty Stellalle."
+      },
+      "draft": {
+        "label": "Vastausluonnos",
+        "read": "Lue luonnos"
+      },
+      "details": "Tiedot",
+      "showDetails": "Näytä tiedot",
+      "hideDetails": "Piilota tiedot",
+      "onIt": "Työn alla…",
+      "working": "Stella hoitaa asiaa.",
+      "ignored": {
+        "eyebrow": "Suodatettu pois",
+        "count": {
+          "one": "{count} ohitettu sähköposti",
+          "other": "{count} ohitettua sähköpostia"
+        },
+        "short": "Ohitetut · {count}",
+        "hint": "Kerro Stellalle keskustelussa, jos jonkin näiden lähettäjien viestin pitäisi ensi kerralla näkyä tällä sivulla."
+      },
+      "inboxes": {
+        "title": "Postilaatikot",
+        "reading": "Luetaan",
+        "count": {
+          "one": "{count} postilaatikko",
+          "other": "{count} postilaatikkoa"
+        }
+      },
+      "nextCheck": {
+        "title": "Seuraava automaattinen tarkistus",
+        "hint": "Kiireellinen posti herättää Stellan ajoitettujen lukukertojen välillä.",
+        "at": "Seuraava automaattinen tarkistus: {time}",
+        "short": "Seuraava: {time}"
+      },
+      "automation": "Automaatio",
+      "off": {
+        "title": "Poista Sähköposti käytöstä",
+        "confirm": "Poistetaanko Sähköposti käytöstä?",
+        "body": "Stella lakkaa lukemasta sähköpostiasi ja tyhjentää tämän sivun.",
+        "working": "Poistetaan käytöstä…"
+      },
+      "summary": {
+        "caughtUp": "Kaikki ajan tasalla",
+        "waitingFirstRead": "Odottaa ensimmäistä lukukertaa",
+        "readAt": "Luettu: {time}",
+        "notRead": "Ei vielä luettu",
+        "newSince": {
+          "one": "{count} uusi sen jälkeen",
+          "other": "{count} uutta sen jälkeen"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Mikään ei tarvitse sinua",
+        "caughtUpNext": "Olet ajan tasalla. Seuraava automaattinen tarkistus: {time}",
+        "caughtUpUrgent": "Olet ajan tasalla. Kiireellinen posti tavoittaa sinut heti.",
+        "firstReadTitle": "Stella lukee sähköpostisi pian",
+        "firstReadBody": "Sivu täyttyy automaattisesti, kun Stella seuraavan kerran lukee postin, tai voit käynnistää luvun nyt."
+      },
+      "check": "Tarkista",
+      "request": {
+        "check": "Tarkista sähköpostini nyt",
+        "about": "Aihe: {title}"
+      },
+      "a11y": {
+        "list": "Sähköpostiluettelo",
+        "items": "Sähköpostikohteet",
+        "back": "Takaisin Sähköpostiin"
+      }
     }
   },
   "nudges": {

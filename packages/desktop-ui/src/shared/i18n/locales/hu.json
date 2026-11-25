@@ -3795,6 +3795,96 @@
       "lineServer": "A szerver OpenRouter-kulcsáról: ebben a hónapban {sorted} rendezve · {cost}",
       "deviceKeyHint": "A saját OpenRouter-kulcsod használatához bejelentkezve add meg a Modellek alatt, így a fiókodba mentődik. A csak ezen a számítógépen tárolt kulcs nem használható, amíg a gép ki van kapcsolva.",
       "deviceKeyHintPhone": "A saját OpenRouter-kulcsod használatához bejelentkezve add meg a csevegés beállításaiban, így a fiókodba mentődik. A csak ezen a telefonon tárolt kulcs nem használható az e-mailekhez."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Másokra vár",
+        "handled": "Elintéztem"
+      },
+      "rules": {
+        "title": "Szabályok",
+        "settingsTitle": "Szabályok és beállítások",
+        "yours": "A te szabályaid",
+        "hint": "Mondd el Stellának, mi fontos és mi nem, ő pedig szabályként megőrzi itt.",
+        "wake": "Azonnal szól",
+        "act": "Stella azonnal intézkedik",
+        "ignore": "Nem kerül erre az oldalra",
+        "remove": "Szabály eltávolítása: {rule}"
+      },
+      "tell": {
+        "action": "Szólj Stellának",
+        "about": "Szólj Stellának erről: {title}",
+        "placeholder": "Írd meg Stellának, mit tegyen, vagy miért nem fontos…",
+        "sendHint": "Küldés: {keys}",
+        "send": "Küldés Stellának",
+        "sent": "Elküldve Stellának."
+      },
+      "draft": {
+        "label": "Választervezet",
+        "read": "Piszkozat olvasása"
+      },
+      "details": "Részletek",
+      "showDetails": "Részletek megjelenítése",
+      "hideDetails": "Részletek elrejtése",
+      "onIt": "Folyamatban…",
+      "working": "Stella már intézi.",
+      "ignored": {
+        "eyebrow": "Kiszűrve",
+        "count": {
+          "one": "{count} mellőzött e-mail",
+          "other": "{count} mellőzött e-mail"
+        },
+        "short": "Mellőzött · {count}",
+        "hint": "Szólj Stellának a csevegésben, ha ezektől a feladóktól valaminek legközelebb meg kell jelennie itt."
+      },
+      "inboxes": {
+        "title": "Postafiókok",
+        "reading": "Olvasás alatt",
+        "count": {
+          "one": "{count} postafiók",
+          "other": "{count} postafiók"
+        }
+      },
+      "nextCheck": {
+        "title": "Következő automatikus ellenőrzés",
+        "hint": "A sürgős levelek az ütemezett olvasások között is felébresztik Stellát.",
+        "at": "Következő automatikus ellenőrzés: {time}",
+        "short": "Következő: {time}"
+      },
+      "automation": "Automatizálás",
+      "off": {
+        "title": "E-mail kikapcsolása",
+        "confirm": "Kikapcsolod az E-mailt?",
+        "body": "Stella nem olvassa tovább a leveleidet, és kiüríti ezt az oldalt.",
+        "working": "Kikapcsolás…"
+      },
+      "summary": {
+        "caughtUp": "Minden rendben",
+        "waitingFirstRead": "Az első olvasásra vár",
+        "readAt": "Olvasva: {time}",
+        "notRead": "Még nincs olvasva",
+        "newSince": {
+          "one": "azóta {count} új",
+          "other": "azóta {count} új"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Semmi sem vár rád",
+        "caughtUpNext": "Mindennel naprakész vagy. Következő automatikus ellenőrzés: {time}.",
+        "caughtUpUrgent": "Mindennel naprakész vagy. A sürgős levelek azonnal eljutnak hozzád.",
+        "firstReadTitle": "Stella hamarosan elolvassa a leveleidet",
+        "firstReadBody": "Az oldal Stella következő olvasásakor magától megtelik, de most is indíthatsz egyet."
+      },
+      "check": "Ellenőrzés",
+      "request": {
+        "check": "Leveleim ellenőrzése most",
+        "about": "Erről: {title}"
+      },
+      "a11y": {
+        "list": "E-mail-lista",
+        "items": "E-mail-elemek",
+        "back": "Vissza az E-mailhez"
+      }
     }
   },
   "nudges": {

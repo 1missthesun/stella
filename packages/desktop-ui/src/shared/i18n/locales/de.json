@@ -3795,6 +3795,96 @@
       "lineServer": "Über den OpenRouter-Schlüssel dieses Servers: diesen Monat {sorted} sortiert · {cost}",
       "deviceKeyHint": "Um deinen eigenen OpenRouter-Schlüssel zu nutzen, füge ihn angemeldet unter Modelle hinzu, damit er in deinem Konto gespeichert wird. Ein Schlüssel, der nur auf diesem Computer liegt, kann nicht genutzt werden, solange der Computer aus ist.",
       "deviceKeyHintPhone": "Um deinen eigenen OpenRouter-Schlüssel zu nutzen, füge ihn angemeldet in den Chat-Einstellungen hinzu, damit er in deinem Konto gespeichert wird. Ein Schlüssel, der nur auf diesem Telefon liegt, kann nicht für E-Mails genutzt werden."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Wartet auf andere",
+        "handled": "Von mir erledigt"
+      },
+      "rules": {
+        "title": "Regeln",
+        "settingsTitle": "Regeln & Einstellungen",
+        "yours": "Deine Regeln",
+        "hint": "Sag Stella, was wichtig ist und was nicht, und sie hält es hier als Regel fest.",
+        "wake": "Sagt dir sofort Bescheid",
+        "act": "Stella handelt sofort",
+        "ignore": "Erscheint nicht auf dieser Seite",
+        "remove": "Regel entfernen: {rule}"
+      },
+      "tell": {
+        "action": "Stella sagen",
+        "about": "Stella etwas sagen zu: {title}",
+        "placeholder": "Sag Stella, was zu tun ist oder warum es nicht wichtig ist…",
+        "sendHint": "{keys} zum Senden",
+        "send": "An Stella senden",
+        "sent": "An Stella gesendet."
+      },
+      "draft": {
+        "label": "Antwortentwurf",
+        "read": "Entwurf lesen"
+      },
+      "details": "Details",
+      "showDetails": "Details anzeigen",
+      "hideDetails": "Details ausblenden",
+      "onIt": "In Arbeit…",
+      "working": "Stella kümmert sich darum.",
+      "ignored": {
+        "eyebrow": "Aussortiert",
+        "count": {
+          "one": "{count} ignorierte E-Mail",
+          "other": "{count} ignorierte E-Mails"
+        },
+        "short": "Ignoriert · {count}",
+        "hint": "Sag Stella im Chat Bescheid, wenn etwas von diesen Absendern beim nächsten Mal hier erscheinen soll."
+      },
+      "inboxes": {
+        "title": "Postfächer",
+        "reading": "Wird gelesen",
+        "count": {
+          "one": "{count} Postfach",
+          "other": "{count} Postfächer"
+        }
+      },
+      "nextCheck": {
+        "title": "Nächste automatische Prüfung",
+        "hint": "Dringende E-Mails wecken Stella auch zwischen den geplanten Durchgängen.",
+        "at": "Nächste automatische Prüfung: {time}",
+        "short": "Nächste: {time}"
+      },
+      "automation": "Automatisierung",
+      "off": {
+        "title": "E-Mail ausschalten",
+        "confirm": "E-Mail ausschalten?",
+        "body": "Stella liest deine E-Mails nicht mehr und leert diese Seite.",
+        "working": "Wird ausgeschaltet…"
+      },
+      "summary": {
+        "caughtUp": "Alles erledigt",
+        "waitingFirstRead": "Wartet auf den ersten Durchgang",
+        "readAt": "Gelesen: {time}",
+        "notRead": "Noch nicht gelesen",
+        "newSince": {
+          "one": "{count} neue seitdem",
+          "other": "{count} neue seitdem"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Nichts braucht dich",
+        "caughtUpNext": "Du bist auf dem neuesten Stand. Nächste automatische Prüfung: {time}",
+        "caughtUpUrgent": "Du bist auf dem neuesten Stand. Dringende E-Mails erreichen dich sofort.",
+        "firstReadTitle": "Stella liest deine E-Mails bald",
+        "firstReadBody": "Diese Seite füllt sich automatisch, wenn Stella das nächste Mal liest. Du kannst das auch jetzt gleich starten."
+      },
+      "check": "Prüfen",
+      "request": {
+        "check": "Meine E-Mails jetzt prüfen",
+        "about": "Zu: {title}"
+      },
+      "a11y": {
+        "list": "E-Mail-Liste",
+        "items": "E-Mail-Einträge",
+        "back": "Zurück zu E-Mail"
+      }
     }
   },
   "nudges": {

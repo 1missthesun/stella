@@ -3795,6 +3795,96 @@
       "lineServer": "På den här serverns OpenRouter-nyckel: {sorted} sorterade den här månaden · {cost}",
       "deviceKeyHint": "Om du vill använda din egen OpenRouter-nyckel lägger du till den under Modeller medan du är inloggad, så sparas den på ditt konto. En nyckel som bara finns på den här datorn kan inte användas när datorn är avstängd.",
       "deviceKeyHintPhone": "Om du vill använda din egen OpenRouter-nyckel lägger du till den i chattinställningarna medan du är inloggad, så sparas den på ditt konto. En nyckel som bara finns på den här telefonen kan inte användas för e-post."
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Väntar på andra",
+        "handled": "Det jag har skött"
+      },
+      "rules": {
+        "title": "Regler",
+        "settingsTitle": "Regler och inställningar",
+        "yours": "Dina regler",
+        "hint": "Berätta för Stella vad som är viktigt och inte, så sparar hon det här som en regel.",
+        "wake": "Säger till direkt",
+        "act": "Stella agerar direkt",
+        "ignore": "Visas inte på den här sidan",
+        "remove": "Ta bort regeln: {rule}"
+      },
+      "tell": {
+        "action": "Säg till Stella",
+        "about": "Säg något till Stella om: {title}",
+        "placeholder": "Berätta för Stella vad hon ska göra, eller varför det inte är viktigt…",
+        "sendHint": "{keys} för att skicka",
+        "send": "Skicka till Stella",
+        "sent": "Skickat till Stella."
+      },
+      "draft": {
+        "label": "Svarsutkast",
+        "read": "Läs utkast"
+      },
+      "details": "Detaljer",
+      "showDetails": "Visa detaljer",
+      "hideDetails": "Dölj detaljer",
+      "onIt": "På gång…",
+      "working": "Stella tar hand om det.",
+      "ignored": {
+        "eyebrow": "Bortsorterat",
+        "count": {
+          "one": "{count} ignorerat mejl",
+          "other": "{count} ignorerade mejl"
+        },
+        "short": "Ignorerat · {count}",
+        "hint": "Säg till Stella i chatten om något från de här avsändarna ska visas här nästa gång."
+      },
+      "inboxes": {
+        "title": "Inkorgar",
+        "reading": "Läses",
+        "count": {
+          "one": "{count} inkorg",
+          "other": "{count} inkorgar"
+        }
+      },
+      "nextCheck": {
+        "title": "Nästa automatiska kontroll",
+        "hint": "Brådskande mejl väcker Stella mellan de schemalagda läsningarna.",
+        "at": "Nästa automatiska kontroll: {time}",
+        "short": "Nästa: {time}"
+      },
+      "automation": "Automatisering",
+      "off": {
+        "title": "Stäng av E-post",
+        "confirm": "Stänga av E-post?",
+        "body": "Stella slutar läsa din e-post och tömmer den här sidan.",
+        "working": "Stänger av…"
+      },
+      "summary": {
+        "caughtUp": "Allt är avklarat",
+        "waitingFirstRead": "Väntar på första läsningen",
+        "readAt": "Läst: {time}",
+        "notRead": "Inte läst än",
+        "newSince": {
+          "one": "{count} nytt sedan dess",
+          "other": "{count} nya sedan dess"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Inget behöver dig",
+        "caughtUpNext": "Du är i fas. Nästa automatiska kontroll: {time}",
+        "caughtUpUrgent": "Du är i fas. Brådskande mejl når dig direkt.",
+        "firstReadTitle": "Stella läser snart din e-post",
+        "firstReadBody": "Sidan fylls i automatiskt vid Stellas nästa läsning, eller så kan du starta en nu."
+      },
+      "check": "Kontrollera",
+      "request": {
+        "check": "Kontrollera min e-post nu",
+        "about": "Om: {title}"
+      },
+      "a11y": {
+        "list": "E-postlista",
+        "items": "E-postposter",
+        "back": "Tillbaka till E-post"
+      }
     }
   },
   "nudges": {

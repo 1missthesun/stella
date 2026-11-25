@@ -175,6 +175,7 @@
     }
   },
   "common": {
+    "back": "Retour",
     "cancel": "Annuler",
     "close": "Fermer",
     "continue": "Continuer",
@@ -186,6 +187,11 @@
   },
   "errors": {
     "generic": "Une erreur est survenue"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Suppression…"
+    }
   },
   "mobile": {
     "account": {
@@ -1175,6 +1181,13 @@
   "email": {
     "title": "E-mail",
     "failed": "Mise à jour impossible. Réessayez.",
+    "card": {
+      "needYou": {
+        "many": "{count} vous attendent",
+        "one": "{count} vous attend",
+        "other": "{count} vous attendent"
+      }
+    },
     "section": {
       "connectBody": "Connectez Gmail et Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste vous attend dans Aujourd’hui, avec une réponse préparée quand il en faut une.",
       "connect": "Connecter Gmail",
@@ -1185,7 +1198,111 @@
       "loadErrorBody": "Stella ne peut pas joindre ses serveurs pour le moment. Vérifiez votre connexion et réessayez.",
       "offBody": "Stella trie les nouveaux e-mails dès leur arrivée. L'urgent vous parvient tout de suite ; le reste vous attend dans Aujourd’hui, avec une réponse préparée quand il en faut une. Le superflu reste à l'écart.",
       "turnOn": "Activer",
-      "turningOn": "Tri de vos e-mails récents…"
+      "turningOn": "Tri de vos e-mails récents…",
+      "needsYou": "Vous attend",
+      "openInGmail": "Ouvrir dans Gmail",
+      "remove": "Retirer",
+      "checkNow": "Vérifier",
+      "checking": "Vérification…",
+      "turnOff": "Désactiver"
+    },
+    "digest": {
+      "send": "Envoyer"
+    },
+    "brief": {
+      "emails": {
+        "many": "{count} e-mails",
+        "one": "{count} e-mail",
+        "other": "{count} e-mails"
+      },
+      "hide": "Masquer"
+    },
+    "reply": {
+      "to": "À {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "En attente des autres",
+        "handled": "Ce que j'ai traité"
+      },
+      "rules": {
+        "settingsTitle": "Règles et réglages",
+        "yours": "Vos règles",
+        "hint": "Dites à Stella ce qui compte et ce qui ne compte pas : elle le garde ici sous forme de règle.",
+        "wake": "Vous prévient tout de suite",
+        "act": "Stella agit tout de suite",
+        "ignore": "N'apparaît pas sur cette page",
+        "remove": "Retirer la règle : {rule}"
+      },
+      "tell": {
+        "action": "Dire à Stella",
+        "about": "Dire quelque chose à Stella : {title}",
+        "placeholder": "Dites à Stella quoi faire, ou pourquoi ce n'est pas important…",
+        "send": "Envoyer à Stella",
+        "sent": "Envoyé à Stella."
+      },
+      "draft": {
+        "label": "Réponse préparée",
+        "read": "Lire le brouillon"
+      },
+      "details": "Détails",
+      "showDetails": "Afficher les détails",
+      "hideDetails": "Masquer les détails",
+      "working": "Stella s'en occupe.",
+      "ignored": {
+        "count": {
+          "many": "{count} e-mails ignorés",
+          "one": "{count} e-mail ignoré",
+          "other": "{count} e-mails ignorés"
+        }
+      },
+      "inboxes": {
+        "title": "Boîtes mail",
+        "reading": "Lecture active",
+        "count": {
+          "many": "{count} boîtes mail",
+          "one": "{count} boîte mail",
+          "other": "{count} boîtes mail"
+        }
+      },
+      "nextCheck": {
+        "title": "Prochaine vérification automatique",
+        "hint": "Un e-mail urgent réveille Stella entre les lectures prévues.",
+        "at": "Prochaine vérification automatique : {time}"
+      },
+      "automation": "Automatisation",
+      "off": {
+        "title": "Désactiver E-mail",
+        "confirm": "Désactiver E-mail ?",
+        "body": "Stella arrête de lire vos e-mails et vide cette page.",
+        "working": "Désactivation…"
+      },
+      "summary": {
+        "caughtUp": "Tout est à jour",
+        "waitingFirstRead": "En attente de la première lecture",
+        "readAt": "Lecture : {time}",
+        "notRead": "Pas encore lu",
+        "newSince": {
+          "many": "{count} nouveaux depuis",
+          "one": "{count} nouveau depuis",
+          "other": "{count} nouveaux depuis"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Rien ne vous attend",
+        "caughtUpNext": "Vous êtes à jour. Prochaine vérification automatique : {time}",
+        "caughtUpUrgent": "Vous êtes à jour. Les e-mails urgents vous parviendront tout de suite.",
+        "firstReadTitle": "Stella lira bientôt vos e-mails",
+        "firstReadBody": "Cette page se remplit automatiquement à la prochaine lecture de Stella. Vous pouvez aussi en lancer une maintenant."
+      },
+      "check": "Vérifier",
+      "request": {
+        "check": "Vérifier mes e-mails maintenant",
+        "about": "À propos de : {title}"
+      },
+      "a11y": {
+        "back": "Retour à E-mail"
+      }
     }
   }
 }

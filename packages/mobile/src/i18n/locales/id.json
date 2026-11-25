@@ -173,6 +173,7 @@
     }
   },
   "common": {
+    "back": "Kembali",
     "cancel": "Batal",
     "close": "Tutup",
     "continue": "Lanjutkan",
@@ -184,6 +185,11 @@
   },
   "errors": {
     "generic": "Terjadi kesalahan"
+  },
+  "global": {
+    "schedule": {
+      "removing": "Menghapus…"
+    }
   },
   "mobile": {
     "account": {
@@ -1145,6 +1151,11 @@
   "email": {
     "title": "Email",
     "failed": "Gagal memperbarui. Coba lagi.",
+    "card": {
+      "needYou": {
+        "other": "{count} perlu Anda"
+      }
+    },
     "section": {
       "connectBody": "Hubungkan Gmail dan Stella memilah email baru begitu tiba. Yang mendesak langsung sampai ke Anda; sisanya menunggu di Hari ini, dengan draf balasan bila perlu dibalas.",
       "connect": "Hubungkan Gmail",
@@ -1155,7 +1166,103 @@
       "loadErrorBody": "Stella tidak bisa menjangkau servernya sekarang. Periksa koneksi Anda lalu coba lagi.",
       "offBody": "Stella memilah email baru begitu tiba. Yang mendesak langsung sampai ke Anda; sisanya menunggu di Hari ini, dengan draf balasan bila perlu dibalas. Yang tidak penting tetap di luar.",
       "turnOn": "Aktifkan",
-      "turningOn": "Memilah email terbaru…"
+      "turningOn": "Memilah email terbaru…",
+      "needsYou": "Perlu Anda",
+      "openInGmail": "Buka di Gmail",
+      "remove": "Hapus",
+      "checkNow": "Periksa sekarang",
+      "checking": "Memeriksa…",
+      "turnOff": "Matikan"
+    },
+    "digest": {
+      "send": "Kirim"
+    },
+    "brief": {
+      "emails": {
+        "other": "{count} email"
+      },
+      "hide": "Sembunyikan"
+    },
+    "reply": {
+      "to": "Kepada {to}"
+    },
+    "workspace": {
+      "sections": {
+        "waiting": "Menunggu orang lain",
+        "handled": "Sudah saya tangani"
+      },
+      "rules": {
+        "settingsTitle": "Aturan & pengaturan",
+        "yours": "Aturan Anda",
+        "hint": "Beri tahu Stella apa yang penting dan apa yang tidak, lalu ia menyimpannya di sini sebagai aturan.",
+        "wake": "Langsung mengabari",
+        "act": "Stella langsung bertindak",
+        "ignore": "Tidak masuk halaman ini",
+        "remove": "Hapus aturan: {rule}"
+      },
+      "tell": {
+        "action": "Beri tahu Stella",
+        "about": "Beri tahu Stella tentang: {title}",
+        "placeholder": "Beri tahu Stella apa yang harus dilakukan, atau mengapa ini tidak penting…",
+        "send": "Kirim ke Stella",
+        "sent": "Terkirim ke Stella."
+      },
+      "draft": {
+        "label": "Draf balasan",
+        "read": "Baca draf"
+      },
+      "details": "Detail",
+      "showDetails": "Tampilkan detail",
+      "hideDetails": "Sembunyikan detail",
+      "working": "Stella sedang mengerjakannya.",
+      "ignored": {
+        "count": {
+          "other": "{count} email diabaikan"
+        }
+      },
+      "inboxes": {
+        "title": "Kotak masuk",
+        "reading": "Dibaca",
+        "count": {
+          "other": "{count} kotak masuk"
+        }
+      },
+      "nextCheck": {
+        "title": "Pemeriksaan otomatis berikutnya",
+        "hint": "Email mendesak membangunkan Stella di antara jadwal membaca.",
+        "at": "Pemeriksaan otomatis berikutnya: {time}"
+      },
+      "automation": "Otomatisasi",
+      "off": {
+        "title": "Matikan Email",
+        "confirm": "Matikan Email?",
+        "body": "Stella berhenti membaca email Anda dan mengosongkan halaman ini.",
+        "working": "Mematikan…"
+      },
+      "summary": {
+        "caughtUp": "Semua beres",
+        "waitingFirstRead": "Menunggu pembacaan pertama",
+        "readAt": "Dibaca: {time}",
+        "notRead": "Belum dibaca",
+        "newSince": {
+          "other": "{count} baru sejak itu"
+        }
+      },
+      "empty": {
+        "caughtUpTitle": "Tidak ada yang perlu Anda",
+        "caughtUpNext": "Semua sudah beres. Pemeriksaan otomatis berikutnya: {time}.",
+        "caughtUpUrgent": "Semua sudah beres. Email mendesak akan langsung sampai ke Anda.",
+        "firstReadTitle": "Stella akan segera membaca email Anda",
+        "firstReadBody": "Halaman ini terisi otomatis saat Stella membaca berikutnya, atau Anda bisa memulainya sekarang."
+      },
+      "check": "Periksa",
+      "request": {
+        "check": "Periksa email saya sekarang",
+        "about": "Tentang: {title}"
+      },
+      "a11y": {
+        "back": "Kembali ke Email"
+      }
     }
   }
 }

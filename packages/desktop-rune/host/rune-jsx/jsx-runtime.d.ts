@@ -1,5 +1,5 @@
 // Rune's own JSX namespace: only Rune host elements, no DOM. Runtime is React's jsx-runtime.
-import type { BoxProps, InputProps, TextProps } from "../app/rune";
+import type { BoxProps, InputProps, TextProps } from "../../ui/rune";
 export { Fragment, jsx, jsxs } from "react/jsx-runtime";
 export namespace JSX {
   type ElementType = React.JSX.ElementType;

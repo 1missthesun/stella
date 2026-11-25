@@ -13,6 +13,7 @@
     "react-reconciler": "0.34.0"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.4",
     "@types/react-reconciler": "0.32.3"
   }
 }

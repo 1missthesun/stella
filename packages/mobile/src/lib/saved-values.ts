@@ -44,6 +44,7 @@ import {
   signedEnvelope,
   type SavedValuesRoster,
 } from "@stella/contracts/saved-values-trust";
+import { serverNow } from "@stella/contracts/server-clock";
 import { authClient } from "./auth-client";
 import { getBackendClient, useBackendView } from "./backend";
 import { base64UrlToBytes, bytesToBase64Url } from "./base64url";
@@ -139,7 +140,7 @@ const publishDevice = async (): Promise<void> => {
     mine !== undefined &&
     mine.kind === "phone" &&
     mine.publicKey === keys.publicKey &&
-    Date.now() - mine.updatedAt < SAVED_VALUES_DEVICE_REFRESH_MS;
+    serverNow() - mine.updatedAt < SAVED_VALUES_DEVICE_REFRESH_MS;
   if (current || publishing) return;
   if (mine && Date.now() - lastPublishAttemptAt < PUBLISH_RETRY_MS) return;
   publishing = true;
@@ -194,7 +195,7 @@ const withdraw = async (): Promise<void> => {
           target: keys.deviceId,
           by: keys.deviceId,
           key: keys.signing,
-          at: Date.now(),
+          at: serverNow(),
         }),
       })
       .catch(() => undefined);
@@ -370,7 +371,7 @@ const putRecord = async (args: {
     roster,
     devices: state.devices,
     selfId: keys.deviceId,
-    now: Date.now(),
+    now: serverNow(),
   }).filter((member) => member.deviceId !== args.except);
   const result = await getBackendClient().call("savedValues.put", {
     id: payload.id,
@@ -392,7 +393,7 @@ const sealForNewDevices = async (): Promise<void> => {
     roster,
     devices: state.devices,
     selfId: keys.deviceId,
-    now: Date.now(),
+    now: serverNow(),
   });
   const lacking = new Map(
     state.records
@@ -621,7 +622,7 @@ export const rememberOnDevices = async (args: {
     else fields.push(stored);
     values[stored.id] = value;
   }
-  const now = Date.now();
+  const now = serverNow();
   const updatedAt = Math.max(now, (existing?.updatedAt ?? 0) + 1);
   const label =
     savedValueLabel(service, account) || fields[0]?.label || "Saved value";

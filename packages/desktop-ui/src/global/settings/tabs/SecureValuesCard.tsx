@@ -10,6 +10,11 @@ import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
 import { getElectronApi } from "@/platform/electron/electron";
 
+const ASKED_SHOWN_MS = 4_000;
+
+const formatTime = (at: number) =>
+  new Date(at).toLocaleTimeString(undefined, { timeStyle: "short" });
+
 const formatWhen = (at: number) =>
   new Date(at).toLocaleString(undefined, {
     dateStyle: "medium",
@@ -54,6 +59,18 @@ export function SecureValuesCard() {
     [setEnabled],
   );
 
+  const [justAsked, setJustAsked] = useState(false);
+  useEffect(() => {
+    if (!justAsked) return;
+    const timer = window.setTimeout(() => setJustAsked(false), ASKED_SHOWN_MS);
+    return () => window.clearTimeout(timer);
+  }, [justAsked]);
+
+  const askedAt = sync?.waiting?.askedAt;
+  useEffect(() => {
+    if (askedAt) setError(null);
+  }, [askedAt]);
+
   const syncAction = useCallback(
     async (key: string, action: SavedValuesSyncAction) => {
       setBusy(key);
@@ -61,6 +78,7 @@ export function SecureValuesCard() {
       try {
         const result = await act(action);
         if (!result.ok) setError(t("settings.secureValues.errors.devices"));
+        else if (action.action === "askAgain") setJustAsked(true);
       } finally {
         setBusy(null);
       }
@@ -145,7 +163,7 @@ export function SecureValuesCard() {
         </div>
       ) : null}
       {sync?.active ? (
-        <SyncDevices sync={sync} busy={busy} onAction={syncAction} />
+        <SyncDevices sync={sync} busy={busy} justAsked={justAsked} onAction={syncAction} />
       ) : null}
       {values.length === 0 ? (
         <p className="settings-card-desc">{t("settings.secureValues.empty")}</p>
@@ -275,22 +293,29 @@ export function SecureValuesCard() {
 function SyncDevices({
   sync,
   busy,
+  justAsked,
   onAction,
 }: {
   sync: NonNullable<ReturnType<typeof useSavedValuesSync>["status"]>;
   busy: string | null;
+  justAsked: boolean;
   onAction: (key: string, action: SavedValuesSyncAction) => Promise<void>;
 }) {
   const t = useT();
   const standing = sync.standing;
   const waiting = sync.waiting;
+  const askAgain = {
+    action: "askAgain" as const,
+    button: t(justAsked ? "settings.secureValues.askedNow" : "settings.secureValues.askAgain"),
+  };
+  const askNames = waiting?.approvers?.join(" / ") || t("global.savedValuesDevices.otherDevice");
   const state =
     standing === "problem"
       ? { label: t("settings.secureValues.problem"), action: "startOver" as const, button: t("settings.secureValues.startOver") }
       : standing === "waiting" && waiting?.removed
-        ? { label: t("settings.secureValues.removedHere"), action: "askAgain" as const, button: t("settings.secureValues.askAgain") }
+        ? { label: t("settings.secureValues.removedHere"), ...askAgain }
         : standing === "waiting" && waiting?.declined
-          ? { label: t("settings.secureValues.declined"), action: "askAgain" as const, button: t("settings.secureValues.askAgain") }
+          ? { label: t("settings.secureValues.declined"), ...askAgain }
           : standing === "waiting" && waiting?.confirmed
             ? { label: t("settings.secureValues.waitingFor", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") }) }
             : standing === "waiting" && waiting?.code
@@ -305,11 +330,12 @@ function SyncDevices({
               : standing === "waiting"
                 ? {
                     label: t("global.savedValuesDevices.getTitle"),
-                    sub: t("global.savedValuesDevices.getBody", {
-                      names: waiting?.approvers?.join(" / ") || t("global.savedValuesDevices.otherDevice"),
-                    }),
-                    action: "askAgain" as const,
-                    button: t("settings.secureValues.askAgain"),
+                    sub: waiting?.askFailed
+                      ? t("settings.secureValues.askFailed")
+                      : waiting?.askedAt
+                        ? t("settings.secureValues.asked", { time: formatTime(waiting.askedAt), names: askNames })
+                        : t("global.savedValuesDevices.getBody", { names: askNames }),
+                    ...askAgain,
                   }
                 : null;
   return (
@@ -326,7 +352,7 @@ function SyncDevices({
                 type="button"
                 variant="ghost"
                 className="pill-btn"
-                disabled={busy !== null}
+                disabled={busy !== null || (justAsked && state.action === "askAgain")}
                 onClick={() => void onAction("standing", { action: state.action })}
               >
                 {state.button}

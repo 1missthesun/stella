@@ -4,6 +4,7 @@ import {
   retryIdempotent,
   withDeadline,
 } from "../request-deadline.js";
+import { noteServerDate } from "../server-clock.js";
 import { socketCredentialProtocol } from "../socket-ticket.js";
 import { backendCallBudget } from "./call-budgets.js";
 import type {
@@ -256,6 +257,7 @@ export class BackendClient {
       await response.body?.cancel().catch(() => undefined);
       response = await this.postCall(name, args, true, signal);
     }
+    noteServerDate(response);
     let body: RpcResponse<CallResult<K>>;
     try {
       body = (await response.json()) as RpcResponse<CallResult<K>>;

@@ -1382,8 +1382,7 @@ export class UserAskService {
                 this.sync.confirmJoin();
                 return { ok: true };
             case "askAgain":
-                this.sync.askAgain();
-                return { ok: true };
+                return await this.sync.askAgain();
             case "startOver":
                 return await this.sync.startOver();
             case "remove":

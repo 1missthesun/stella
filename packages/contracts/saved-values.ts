@@ -171,6 +171,8 @@ export type SavedValuesSyncStatus = Readonly<{
   waiting?: Readonly<{
     code: string | null;
     approvers?: readonly string[];
+    askedAt?: number;
+    askFailed?: boolean;
     approver?: string;
     confirmed?: boolean;
     declined?: boolean;

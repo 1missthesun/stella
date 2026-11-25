@@ -98,8 +98,10 @@ export const SavedValuesDeviceLayer = () => {
       }
       return result;
     };
+    const decline = () =>
+      void run(() => act({ action: "decline", joinId: request.joinId }), () => dismiss(request.joinId));
     return (
-      <Dialog open onOpenChange={(next) => !next && !busy && dismiss(request.joinId)}>
+      <Dialog open onOpenChange={(next) => !next && !busy && decline()}>
         <DialogContent fit className="remote-execution-consent saved-values-device" data-saved-values-allow="">
           <DialogHeader>
             <DialogTitle>{t("global.savedValuesDevices.allowTitle", { name: request.name })}</DialogTitle>
@@ -119,9 +121,7 @@ export const SavedValuesDeviceLayer = () => {
                 variant="ghost"
                 disabled={busy}
                 className="pill-btn pill-btn--lg"
-                onClick={() =>
-                  void run(() => act({ action: "decline", joinId: request.joinId }), () => dismiss(request.joinId))
-                }
+                onClick={decline}
               >
                 {t("global.savedValuesDevices.notNow")}
               </Button>

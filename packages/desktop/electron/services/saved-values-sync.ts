@@ -55,6 +55,7 @@ import {
   type SavedValuesSigningKey,
   type SavedValuesJoin,
 } from "@stella/contracts/saved-values-trust";
+import { serverNow, toDeviceTime } from "@stella/contracts/server-clock";
 import { protectValue, unprotectValue } from "@stella/node-shared/shared/protected-storage";
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 import type { SavedSecureValues, SavedValuesChange } from "./saved-secure-values.js";
@@ -120,6 +121,7 @@ type Answered = Pick<SavedValuesJoin, "joinId" | "device" | "commit"> & {
 };
 
 const ACTIVE_ANSWER_MS = 15 * 60_000;
+const POSTED_VISIBLE_MS = 30_000;
 
 const computerName = () =>
   hostname().trim().replace(/\.(local|localdomain|lan|home)$/i, "").slice(0, 120) || "Computer";
@@ -198,6 +200,7 @@ export class SavedValuesSync {
   private stopWatch: (() => void) | null = null;
   private latest: SavedValuesState | null = null;
   private roster: SavedValuesRoster | null = null;
+  private posted: SavedValuesJoin | null = null;
   private answered = new Map<string, Answered>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private retry: ReturnType<typeof setInterval> | null = null;
@@ -446,7 +449,7 @@ export class SavedValuesSync {
       try {
         if (!onRoster(fresh.roster, answered.device)) {
           await client.call("savedValues.rosterAppend", {
-            entry: addToRoster({ roster: fresh.roster, device: answered.device, by: state.deviceId, key: this.signing, at: Date.now() }),
+            entry: addToRoster({ roster: fresh.roster, device: answered.device, by: state.deviceId, key: this.signing, at: serverNow() }),
           });
         }
         await client.call("savedValues.joinDecide", { joinId, by: state.deviceId, state: "allowed" });
@@ -480,7 +483,7 @@ export class SavedValuesSync {
       if (!fresh.roster.members.has(deviceId)) return { ok: true };
       try {
         await client.call("savedValues.rosterAppend", {
-          entry: removeFromRoster({ roster: fresh.roster, target: deviceId, by: state.deviceId, key: this.signing, at: Date.now() }),
+          entry: removeFromRoster({ roster: fresh.roster, target: deviceId, by: state.deviceId, key: this.signing, at: serverNow() }),
         });
         this.schedule(0);
         return { ok: true };
@@ -492,16 +495,16 @@ export class SavedValuesSync {
     return { ok: false, error: "Your devices' list kept changing. Try again." };
   }
 
-  askAgain(): void {
+  async askAgain(): Promise<{ ok: boolean; error?: string }> {
     const state = this.loadState();
-    if (!state) return;
+    if (!state) return { ok: false, error: "Saved values aren't syncing here." };
     delete state.joinPaused;
-    const old = state.ownJoin;
     delete state.ownJoin;
+    this.posted = null;
     this.saveState();
-    if (old) void this.client()?.call("savedValues.joinCancel", { joinId: old.joinId }).catch(() => undefined);
-    this.setStatus({ waiting: { code: null } });
-    this.schedule(0);
+    await this.reconcile();
+    if (state.ownJoin || this.status.standing === "member") return { ok: true };
+    return { ok: false, error: this.status.error ?? "Stella isn't connected." };
   }
 
   async startOver(): Promise<{ ok: boolean; error?: string }> {
@@ -511,7 +514,7 @@ export class SavedValuesSync {
     if (!state || !client || !self || !this.signing) return { ok: false, error: "Saved values aren't syncing here." };
     await this.cancelOwnJoin();
     await client.call("savedValues.rosterReset", {
-      entry: foundRoster({ self, key: this.signing, at: Date.now() }),
+      entry: foundRoster({ self, key: this.signing, at: serverNow() }),
     });
     delete state.pin;
     delete state.joinPaused;
@@ -604,9 +607,9 @@ export class SavedValuesSync {
       this.answered.clear();
       this.saveState();
     }
-    const now = Date.now();
+    const now = serverNow();
     const card = remote.devices.find((device) => device.deviceId === state.deviceId);
-    if (!card || card.publicKey !== state.publicKey || !state.cardAt || now - state.cardAt > SAVED_VALUES_DEVICE_REFRESH_MS) {
+    if (!card || card.publicKey !== state.publicKey || !state.cardAt || state.cardAt > now || now - state.cardAt > SAVED_VALUES_DEVICE_REFRESH_MS) {
       await client.call("savedValues.putDevice", {
         deviceId: state.deviceId,
         kind: "computer",
@@ -704,7 +707,7 @@ export class SavedValuesSync {
       return;
     }
     const own = state.ownJoin;
-    const live = own ? remote.joins.find((join) => join.joinId === own.joinId) : undefined;
+    const live = own ? this.ownLiveJoin(own, remote, now) : undefined;
     if (own && live?.state === "declined") {
       state.joinPaused = "declined";
       delete state.ownJoin;
@@ -712,23 +715,31 @@ export class SavedValuesSync {
       this.setStatus({ standing: "waiting", waiting: { code: null, declined: true }, devices: [], requests: [] });
       return;
     }
-    if (!own || !live || live.expiresAt <= now) {
-      if (own && live?.state !== "allowed") {
+    const approvers = this.approverNames(state, roster, remote, now);
+    if (!own || !live || (live.state === "open" && live.expiresAt <= now)) {
+      if (own) {
         delete state.ownJoin;
         this.saveState();
       }
-      if (!state.ownJoin && this.options.isUserActive?.() === false) this.waitForUser();
-      else if (!state.ownJoin) {
-        const nonce = randomNonce();
-        const joinId = `join-${randomBytes(12).toString("hex")}`;
-        const commit = joinCommit(nonce);
-        await client.call("savedValues.joinStart", { joinId, device: self, commit });
-        state.ownJoin = { joinId, nonce, commit, device: self, startedAt: now };
-        this.saveState();
+      const nonce = randomNonce();
+      const joinId = `join-${randomBytes(12).toString("hex")}`;
+      const commit = joinCommit(nonce);
+      try {
+        this.posted = await client.call("savedValues.joinStart", { joinId, device: self, commit });
+      } catch (error) {
+        this.setStatus({
+          standing: "waiting",
+          waiting: { code: null, approvers, askFailed: true },
+          devices: [],
+          requests: [],
+        });
+        throw error;
       }
+      state.ownJoin = { joinId, nonce, commit, device: self, startedAt: this.posted.createdAt };
+      this.saveState();
       this.setStatus({
         standing: "waiting",
-        waiting: { code: null, approvers: this.approverNames(state, roster, remote, now) },
+        waiting: { code: null, approvers, askedAt: toDeviceTime(this.posted.createdAt) },
         devices: [],
         requests: [],
       });
@@ -762,13 +773,24 @@ export class SavedValuesSync {
       standing: "waiting",
       waiting: {
         code,
-        approvers: this.approverNames(state, roster, remote, now),
+        approvers,
+        askedAt: toDeviceTime(live.createdAt),
         ...(own.answer ? { approver: own.answer.name } : {}),
         ...(own.confirmed ? { confirmed: true } : {}),
       },
       devices: [],
       requests: [],
     });
+  }
+
+  private ownLiveJoin(own: OwnJoin, remote: SavedValuesState, now: number): SavedValuesJoin | undefined {
+    const shown = remote.joins.find((join) => join.joinId === own.joinId);
+    if (shown) {
+      this.posted = null;
+      return shown;
+    }
+    if (this.posted?.joinId !== own.joinId || now - this.posted.createdAt >= POSTED_VISIBLE_MS) return undefined;
+    return this.posted;
   }
 
   private approverNames(state: SyncState, roster: SavedValuesRoster, remote: SavedValuesState, now: number) {

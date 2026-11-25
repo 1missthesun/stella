@@ -18,6 +18,7 @@ import {
   protectValue,
   unprotectValue,
 } from "@stella/node-shared/shared/protected-storage";
+import { serverNow } from "@stella/contracts/server-clock";
 import { readPrivateJsonValueSync, writePrivateFileSync } from "@stella/node-shared/shared/private-fs";
 import {
   SAVED_VALUES_FORMAT_VERSION,
@@ -410,7 +411,7 @@ export class SavedSecureValues {
       createdAt?: number;
     },
   ): Promise<SavedEntry> {
-    const now = Date.now();
+    const now = serverNow();
     const base: SavedEntry = input.existing
       ? {
           ...input.existing,
@@ -418,7 +419,7 @@ export class SavedSecureValues {
           account: input.account || input.existing.account,
           label: input.existing.label,
           fields: input.fields,
-          updatedAt: now,
+          updatedAt: Math.max(now, input.existing.updatedAt + 1),
         }
       : {
           id: randomUUID(),
@@ -670,7 +671,7 @@ export class SavedSecureValues {
     }
     if (targets.length > 0) {
       this.writeIndex(dir, index);
-      this.emit({ kind: "removed", ids: targets.map((entry) => entry.id), at: Date.now() });
+      this.emit({ kind: "removed", ids: targets.map((entry) => entry.id), at: serverNow() });
     }
     return targets.length;
   }
@@ -683,7 +684,7 @@ export class SavedSecureValues {
     const entry = index.entries[id];
     if (!entry) return false;
     entry.label = next;
-    entry.updatedAt = Math.max(Date.now(), entry.updatedAt + 1);
+    entry.updatedAt = Math.max(serverNow(), entry.updatedAt + 1);
     this.writeIndex(dir, index);
     this.emit({ kind: "saved", id });
     return true;

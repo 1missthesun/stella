@@ -21,6 +21,7 @@ import {
   type SavedValuesRosterCheck,
   type SavedValuesRosterPin,
 } from "@stella/contracts/saved-values-trust";
+import { serverNow } from "@stella/contracts/server-clock";
 import { getBackendClient } from "./backend";
 import {
   loadDeviceKeys,
@@ -192,7 +193,7 @@ const wakeAt = (at: number) => {
       wakeTimer = null;
       void settle();
     },
-    Math.max(0, at - Date.now()) + WAKE_SLACK_MS,
+    Math.max(0, at - serverNow()) + WAKE_SLACK_MS,
   );
 };
 
@@ -207,7 +208,7 @@ export const settle = (): Promise<void> => {
       try {
         await step();
       } catch {
-        wakeAt(Date.now() + RETRY_MS);
+        wakeAt(serverNow() + RETRY_MS);
       }
     } while (again);
   })().finally(() => {
@@ -269,8 +270,8 @@ const step = async (): Promise<void> => {
       (checked.reason === "reset" && state.roster.length === 0));
   if (!behind) behindSince = null;
   else {
-    behindSince ??= Date.now();
-    if (Date.now() - behindSince < BEHIND_GRACE_MS) {
+    behindSince ??= serverNow();
+    if (serverNow() - behindSince < BEHIND_GRACE_MS) {
       wakeAt(behindSince + BEHIND_GRACE_MS);
       return;
     }
@@ -325,7 +326,7 @@ const startList = async (
   const entry = foundRoster({
     self: selfMember(keys),
     key: keys.signing,
-    at: Date.now(),
+    at: serverNow(),
   });
   const hash = rosterEntryHash(entry);
   const before = trust;
@@ -463,7 +464,7 @@ const stayMember = async (
   myJoin = null;
   const grew = roster?.head.hash !== list.head.hash;
   roster = list;
-  const now = Date.now();
+  const now = serverNow();
   const requests = openRequests(keys.deviceId, now);
   const open = openJoins(keys.deviceId, now);
   for (const joinId of myAnswers.keys()) {
@@ -524,7 +525,7 @@ export const allowSavedValuesJoin = async (joinId: string): Promise<void> => {
           device,
           by: keys.deviceId,
           key: keys.signing,
-          at: Date.now(),
+          at: serverNow(),
         }),
   );
   await decide(joinId, "allowed").catch(() => decide(joinId, "allowed"));
@@ -555,7 +556,7 @@ export const removeFromSavedValues = (target: string): Promise<void> =>
           target,
           by: keys.deviceId,
           key: keys.signing,
-          at: Date.now(),
+          at: serverNow(),
         })
       : null,
   );
@@ -571,7 +572,7 @@ const ask = async (
   me: SavedValuesMember,
 ): Promise<void> => {
   const mine = session;
-  const now = Date.now();
+  const now = serverNow();
   if (myJoin && now >= myJoin.expiresAt + (myJoin.answer ? DECIDED_GRACE_MS : 0)) {
     myJoin = null;
   }

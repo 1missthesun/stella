@@ -59,6 +59,8 @@ export type IconName =
   | "gift"
   | "credit-card"
   | "checklist"
+  | "grid"
+  | "list"
   | "bell"
   | "clock"
   | "refresh-cw"
@@ -141,6 +143,8 @@ const FEATHER_NAMES: Record<
   gift: "gift",
   "credit-card": "credit-card",
   checklist: "check-square",
+  grid: "grid",
+  list: "list",
   bell: "bell",
   clock: "clock",
   "refresh-cw": "refresh-cw",
@@ -221,6 +225,8 @@ const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
   gift: "gift",
   "credit-card": "creditcard",
   checklist: "checklist",
+  grid: "square.grid.2x2",
+  list: "list.bullet",
   bell: "bell",
   clock: "clock",
   "refresh-cw": "arrow.clockwise",

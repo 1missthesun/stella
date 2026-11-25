@@ -1135,7 +1135,9 @@
           "code": "Kod",
           "pages": "Strony",
           "other": "Inne"
-        }
+        },
+        "viewGrid": "Widok siatki",
+        "viewList": "Widok listy"
       },
       "schedule": {
         "actionFailed": "Nie udało się.",
@@ -1179,7 +1181,6 @@
       }
     },
     "apps": {
-      "emailHint": "Strona Stelli dla Twojej skrzynki odbiorczej",
       "empty": "Tutaj znajdą się aplikacje, które Stella dla Ciebie zbuduje.",
       "emptyAction": "Zbuduj aplikację",
       "emptyActionPrompt": "Zbuduj mi aplikację, która "

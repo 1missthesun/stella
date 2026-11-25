@@ -1155,7 +1155,9 @@
           "code": "الكود",
           "pages": "الصفحات",
           "other": "أخرى"
-        }
+        },
+        "viewGrid": "عرض شبكي",
+        "viewList": "عرض القائمة"
       },
       "schedule": {
         "actionFailed": "لم تنجح العملية.",
@@ -1199,7 +1201,6 @@
       }
     },
     "apps": {
-      "emailHint": "صفحة Stella لبريدك الوارد",
       "empty": "ستظهر هنا التطبيقات التي تبنيها Stella لك.",
       "emptyAction": "إنشاء تطبيق",
       "emptyActionPrompt": "أنشئ لي تطبيقًا "

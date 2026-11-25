@@ -1125,7 +1125,9 @@
           "code": "Codice",
           "pages": "Pagine",
           "other": "Altro"
-        }
+        },
+        "viewGrid": "Vista griglia",
+        "viewList": "Vista elenco"
       },
       "schedule": {
         "actionFailed": "Non è andata a buon fine.",
@@ -1169,7 +1171,6 @@
       }
     },
     "apps": {
-      "emailHint": "La pagina di Stella per la tua posta in arrivo",
       "empty": "Qui troverai le app che Stella crea per te.",
       "emptyAction": "Crea un’app",
       "emptyActionPrompt": "Creami un’app che "

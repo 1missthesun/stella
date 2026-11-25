@@ -1,12 +1,13 @@
-import { Pressable, StyleSheet } from "react-native";
-import { Text } from "./Text";
-import { Icon, type IconName } from "./Icon";
+import { memo } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import type { MobileSchedule } from "../lib/schedules";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
-import type { Colors } from "../theme/colors";
-import { fonts } from "../theme/fonts";
-
-export type ScheduleRowStyles = ReturnType<typeof makeScheduleRowStyles>;
+import { fadeHex } from "../theme/oklch";
+import { useColors } from "../theme/theme-context";
+import type { AiryListStyles } from "./airy-list";
+import { Icon, type IconName } from "./Icon";
+import { Text } from "./Text";
 
 const scheduleIcon = (schedule: MobileSchedule): IconName => {
   if (schedule.kind === "heartbeat") return "waveform";
@@ -16,112 +17,86 @@ const scheduleIcon = (schedule: MobileSchedule): IconName => {
   return "clock";
 };
 
-export function ScheduleRow({
+export const ScheduleRow = memo(function ScheduleRow({
   schedule,
-  trailing,
+  when,
+  failed,
   busy,
   highlighted,
   styles,
-  colors,
   onPress,
 }: {
   schedule: MobileSchedule;
-  trailing: string | null;
+  when: string;
+  failed: string | null;
   busy: boolean;
-  highlighted?: boolean;
-  styles: ScheduleRowStyles;
-  colors: Colors;
-  onPress: () => void;
+  highlighted: boolean;
+  styles: AiryListStyles;
+  onPress: (schedule: MobileSchedule) => void;
 }) {
-  const paused = !schedule.enabled;
-  const failed = !paused && Boolean(schedule.lastError);
+  const colors = useColors();
+  const detail = [when, failed].filter(Boolean).join(" · ");
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[schedule.title, trailing].filter(Boolean).join(", ")}
+      accessibilityLabel={[schedule.title, detail].filter(Boolean).join(", ")}
+      accessibilityState={{ busy }}
       disabled={busy}
-      onPress={onPress}
+      onPress={() => onPress(schedule)}
       style={({ pressed }) => [
         styles.row,
-        (pressed || highlighted) && styles.rowPressed,
-        busy && styles.rowBusy,
+        pressed && styles.pressed,
+        busy && { opacity: 0.45 },
       ]}
     >
+      {highlighted ? (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(500)}
+          pointerEvents="none"
+          style={{
+            backgroundColor: fadeHex(colors.text, 0.07),
+            borderCurve: "continuous",
+            borderRadius: 16,
+            bottom: 0,
+            left: -12,
+            position: "absolute",
+            right: -12,
+            top: 0,
+          }}
+        />
+      ) : null}
       <Icon
         name={scheduleIcon(schedule)}
-        size={19}
-        color={paused ? colors.textMuted : colors.accent}
-        style={styles.icon}
+        size={23}
+        color={schedule.enabled ? colors.accent : colors.textMuted}
+        style={local.icon}
       />
-      <Text
-        style={[styles.title, paused && styles.titlePaused]}
-        numberOfLines={1}
-        maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-      >
-        {schedule.title}
-      </Text>
-      {failed ? (
-        <Icon name="alert-circle" size={15} color={colors.danger} />
-      ) : null}
-      {trailing ? (
+      <View style={styles.copy}>
         <Text
-          style={styles.trailing}
-          numberOfLines={1}
+          style={[styles.title, !schedule.enabled && styles.quiet]}
+          numberOfLines={2}
           maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
         >
-          {trailing}
+          {schedule.title}
         </Text>
-      ) : null}
+        {detail ? (
+          <Text
+            style={styles.detail}
+            numberOfLines={1}
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          >
+            {when}
+            {failed ? (
+              <Text style={styles.danger}>{when ? ` · ${failed}` : failed}</Text>
+            ) : null}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
-}
+});
 
-export const makeScheduleRowStyles = (colors: Colors) =>
-  StyleSheet.create({
-    section: {
-      alignSelf: "center",
-      color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 12,
-      letterSpacing: -0.1,
-      paddingBottom: 6,
-      paddingTop: 16,
-    },
-    row: {
-      alignItems: "center",
-      borderRadius: 12,
-      flexDirection: "row",
-      gap: 14,
-      marginHorizontal: -8,
-      minHeight: 48,
-      paddingHorizontal: 8,
-      paddingVertical: 10,
-    },
-    rowPressed: {
-      backgroundColor: colors.surfaceInset,
-    },
-    rowBusy: {
-      opacity: 0.5,
-    },
-    icon: {
-      width: 24,
-    },
-    title: {
-      color: colors.text,
-      flex: 1,
-      fontFamily: fonts.sans.regular,
-      fontSize: 17,
-      letterSpacing: -0.3,
-      minWidth: 0,
-    },
-    titlePaused: {
-      color: colors.textMuted,
-    },
-    trailing: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 15,
-      fontVariant: ["tabular-nums"],
-      letterSpacing: -0.2,
-    },
-  });
+const local = StyleSheet.create({
+  icon: { width: 28 },
+});

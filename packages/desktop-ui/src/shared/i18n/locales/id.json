@@ -1105,7 +1105,9 @@
           "code": "Kode",
           "pages": "Halaman",
           "other": "Lainnya"
-        }
+        },
+        "viewGrid": "Tampilan kisi",
+        "viewList": "Tampilan daftar"
       },
       "schedule": {
         "actionFailed": "Tidak berhasil.",
@@ -1149,7 +1151,6 @@
       }
     },
     "apps": {
-      "emailHint": "Halaman Stella untuk kotak masuk Anda",
       "empty": "Aplikasi yang dibuat Stella untukmu akan ada di sini.",
       "emptyAction": "Buat aplikasi",
       "emptyActionPrompt": "Buatkan aku aplikasi yang "

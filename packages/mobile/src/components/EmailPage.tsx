@@ -2,16 +2,14 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useFocusEffect } from "expo-router";
 import type { EmailPageState, EmailRuleKind } from "@stella/contracts/backend/email";
 import { canvasActionMessage, type CanvasActionEvent } from "@stella/contracts/canvas-actions";
@@ -27,6 +25,7 @@ import { authClient } from "../lib/auth-client";
 import { getBackendClient, useBackendView } from "../lib/backend";
 import { sendToChat } from "../lib/chat-send-queue";
 import { markEmailSeen } from "../lib/email";
+import { useTabBottomInset } from "../lib/bottom-bar";
 import { tapLight } from "../lib/haptics";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
@@ -34,6 +33,8 @@ import { useColors, useTheme } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { Text } from "./Text";
+
+const TELL_ACTIONS_CLEARANCE = 88;
 
 const SECTION_ORDER: readonly { key: EmailPageSection; titleKey: string }[] = [
   { key: "needs_you", titleKey: "email.section.needsYou" },
@@ -148,7 +149,7 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
   const locale = useLocale();
   const t = useT();
   const tPlural = useTPlural();
-  const bottomInset = useSafeAreaInsets().bottom;
+  const bottomInset = useTabBottomInset();
   const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -428,401 +429,397 @@ function NativeEmailView({ state }: { state: EmailPageState }) {
   }
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
+      bottomOffset={TELL_ACTIONS_CLEARANCE}
       style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 36 }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      testID="mobile-email"
     >
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 36 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        testID="mobile-email"
-      >
-        <View style={styles.topBar}>
-          <View style={styles.topSummary}>
-            <Text style={styles.topCount}>{summaryLabel}</Text>
-            <Text style={styles.topMeta} numberOfLines={1}>
-              {metaParts.join(" · ")}
-            </Text>
-          </View>
-          <View style={styles.topActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("email.workspace.request.check")}
-              disabled={checking}
-              onPress={() => void handleCheckNow()}
-              style={({ pressed }) => [
-                styles.headerIconBtn,
-                pressed && styles.pressedSoft,
-                checking && styles.disabled,
-              ]}
-            >
-              <Icon name="refresh-cw" size={14} color={colors.textMuted} />
-              <Text style={styles.headerBtnText}>{checking ? t("email.section.checking") : t("email.workspace.check")}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("email.workspace.rules.settingsTitle")}
-              onPress={() => {
-                tapLight();
-                setSettingsOpen(true);
-              }}
-              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressedSoft]}
-            >
-              <Icon name="settings" size={14} color={colors.textMuted} />
-              {state.rules.length > 0 ? (
-                <Text style={styles.headerBtnCount}>{state.rules.length}</Text>
-              ) : null}
-            </Pressable>
-          </View>
+      <View style={styles.topBar}>
+        <View style={styles.topSummary}>
+          <Text style={styles.topCount}>{summaryLabel}</Text>
+          <Text style={styles.topMeta} numberOfLines={1}>
+            {metaParts.join(" · ")}
+          </Text>
         </View>
+        <View style={styles.topActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("email.workspace.request.check")}
+            disabled={checking}
+            onPress={() => void handleCheckNow()}
+            style={({ pressed }) => [
+              styles.headerIconBtn,
+              pressed && styles.pressedSoft,
+              checking && styles.disabled,
+            ]}
+          >
+            <Icon name="refresh-cw" size={14} color={colors.textMuted} />
+            <Text style={styles.headerBtnText}>{checking ? t("email.section.checking") : t("email.workspace.check")}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("email.workspace.rules.settingsTitle")}
+            onPress={() => {
+              tapLight();
+              setSettingsOpen(true);
+            }}
+            style={({ pressed }) => [styles.headerIconBtn, pressed && styles.pressedSoft]}
+          >
+            <Icon name="settings" size={14} color={colors.textMuted} />
+            {state.rules.length > 0 ? (
+              <Text style={styles.headerBtnCount}>{state.rules.length}</Text>
+            ) : null}
+          </Pressable>
+        </View>
+      </View>
 
-        {totalItems === 0 ? (
-          <View style={styles.emptyBlock}>
-            <View style={styles.emptyIcon}>
-              <Icon
-                name={state.page.readAt ? "check-circle" : "mail"}
-                size={20}
-                color={colors.textMuted}
-              />
-            </View>
-            <Text style={styles.emptyTitle}>
-              {state.page.readAt
-                ? t("email.workspace.empty.caughtUpTitle")
-                : t("email.workspace.empty.firstReadTitle")}
-            </Text>
-            <Text style={styles.emptyBody}>
-              {state.page.readAt
-                ? state.nextReadAt
-                  ? t("email.workspace.empty.caughtUpNext", { time: formatWhen(state.nextReadAt, locale) })
-                  : t("email.workspace.empty.caughtUpUrgent")
-                : t("email.workspace.empty.firstReadBody")}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("email.workspace.request.check")}
-              disabled={checking}
-              onPress={() => void handleCheckNow()}
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                styles.emptyAction,
-                pressed && styles.pressedSoft,
-              ]}
-            >
-              <Icon name="refresh-cw" size={13} color={colors.textStrong} />
-              <Text style={styles.secondaryBtnText}>{checking ? t("email.section.checking") : t("email.section.checkNow")}</Text>
-            </Pressable>
+      {totalItems === 0 ? (
+        <View style={styles.emptyBlock}>
+          <View style={styles.emptyIcon}>
+            <Icon
+              name={state.page.readAt ? "check-circle" : "mail"}
+              size={20}
+              color={colors.textMuted}
+            />
           </View>
-        ) : (
-          grouped.map((group) => {
-            if (group.items.length === 0 && group.key !== "needs_you") return null;
-            return (
-              <View key={group.key} style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionHeading}>{t(group.titleKey)}</Text>
-                  {group.items.length > 0 ? (
-                    <Text style={styles.sectionCount}>{group.items.length}</Text>
-                  ) : null}
-                </View>
+          <Text style={styles.emptyTitle}>
+            {state.page.readAt
+              ? t("email.workspace.empty.caughtUpTitle")
+              : t("email.workspace.empty.firstReadTitle")}
+          </Text>
+          <Text style={styles.emptyBody}>
+            {state.page.readAt
+              ? state.nextReadAt
+                ? t("email.workspace.empty.caughtUpNext", { time: formatWhen(state.nextReadAt, locale) })
+                : t("email.workspace.empty.caughtUpUrgent")
+              : t("email.workspace.empty.firstReadBody")}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("email.workspace.request.check")}
+            disabled={checking}
+            onPress={() => void handleCheckNow()}
+            style={({ pressed }) => [
+              styles.secondaryBtn,
+              styles.emptyAction,
+              pressed && styles.pressedSoft,
+            ]}
+          >
+            <Icon name="refresh-cw" size={13} color={colors.textStrong} />
+            <Text style={styles.secondaryBtnText}>{checking ? t("email.section.checking") : t("email.section.checkNow")}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        grouped.map((group) => {
+          if (group.items.length === 0 && group.key !== "needs_you") return null;
+          return (
+            <View key={group.key} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionHeading}>{t(group.titleKey)}</Text>
+                {group.items.length > 0 ? (
+                  <Text style={styles.sectionCount}>{group.items.length}</Text>
+                ) : null}
+              </View>
 
-                {group.items.length === 0 ? (
-                  <Text style={styles.quietLine}>{t("email.workspace.empty.caughtUpTitle")}</Text>
-                ) : (
-                  group.items.map((item, idx) => {
-                    const hasMore = Boolean(item.detail || item.draft);
-                    const open = Boolean(expanded[item.id]);
-                    const pending = pendingById[item.id];
-                    const thread = item.threads?.[0];
-                    const time = formatWhen(item.mailAt ?? item.at, locale);
-                    const isSecondarySection = item.section !== "needs_you";
-                    const emphasizeAction = Boolean(item.urgent || (open && item.draft));
-                    const meta: string[] = [];
-                    if (item.from) meta.push(item.from);
-                    if (item.count && item.count > 1) meta.push(tPlural("email.brief.emails", item.count));
-                    if (state.accounts.length > 1 && thread?.account) meta.push(thread.account);
-                    const draftText = tellDrafts[item.id] ?? "";
-                    const sendDisabled = draftText.trim().length === 0 || Boolean(tellSending[item.id]);
+              {group.items.length === 0 ? (
+                <Text style={styles.quietLine}>{t("email.workspace.empty.caughtUpTitle")}</Text>
+              ) : (
+                group.items.map((item, idx) => {
+                  const hasMore = Boolean(item.detail || item.draft);
+                  const open = Boolean(expanded[item.id]);
+                  const pending = pendingById[item.id];
+                  const thread = item.threads?.[0];
+                  const time = formatWhen(item.mailAt ?? item.at, locale);
+                  const isSecondarySection = item.section !== "needs_you";
+                  const emphasizeAction = Boolean(item.urgent || (open && item.draft));
+                  const meta: string[] = [];
+                  if (item.from) meta.push(item.from);
+                  if (item.count && item.count > 1) meta.push(tPlural("email.brief.emails", item.count));
+                  if (state.accounts.length > 1 && thread?.account) meta.push(thread.account);
+                  const draftText = tellDrafts[item.id] ?? "";
+                  const sendDisabled = draftText.trim().length === 0 || Boolean(tellSending[item.id]);
 
-                    return (
-                      <View
-                        key={item.id}
-                        style={[
-                          styles.item,
-                          idx === group.items.length - 1 && styles.itemLast,
-                        ]}
+                  return (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.item,
+                        idx === group.items.length - 1 && styles.itemLast,
+                      ]}
+                    >
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={item.title}
+                        disabled={!hasMore}
+                        onPress={() => {
+                          if (!hasMore) return;
+                          tapLight();
+                          setExpanded((prev) => ({ ...prev, [item.id]: !open }));
+                        }}
                       >
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={item.title}
-                          disabled={!hasMore}
-                          onPress={() => {
-                            if (!hasMore) return;
-                            tapLight();
-                            setExpanded((prev) => ({ ...prev, [item.id]: !open }));
-                          }}
-                        >
-                          <View style={styles.itemHead}>
-                            {item.urgent ? <View style={styles.urgentDot} /> : null}
-                            <Text
-                              style={[
-                                styles.itemTitle,
-                                isSecondarySection && styles.itemTitleMuted,
-                              ]}
-                            >
-                              {item.title}
-                            </Text>
-                            {time ? <Text style={styles.itemTime}>{time}</Text> : null}
-                          </View>
-                          {meta.length > 0 ? (
-                            <Text style={styles.itemMeta} numberOfLines={1}>
-                              {meta.join(" · ")}
-                            </Text>
-                          ) : null}
+                        <View style={styles.itemHead}>
+                          {item.urgent ? <View style={styles.urgentDot} /> : null}
                           <Text
                             style={[
-                              styles.itemGist,
-                              isSecondarySection && styles.itemGistMuted,
+                              styles.itemTitle,
+                              isSecondarySection && styles.itemTitleMuted,
                             ]}
                           >
-                            {item.gist}
+                            {item.title}
                           </Text>
-                        </Pressable>
-
-                        {hasMore && open ? (
-                          <View style={styles.expandedBody}>
-                            {item.detail ? <MobileRichText text={item.detail} styles={styles} /> : null}
-                            {item.draft ? (
-                              <View style={styles.draftBox}>
-                                <View style={styles.draftHead}>
-                                  <View style={styles.draftLabelRow}>
-                                    <Icon name="reply" size={12} color={colors.textMuted} />
-                                    <Text style={styles.draftLabel}>{t("email.workspace.draft.label")}</Text>
-                                  </View>
-                                  {item.from ? (
-                                    <Text style={styles.draftTo} numberOfLines={1}>
-                                      {t("email.reply.to", { to: item.from })}
-                                    </Text>
-                                  ) : null}
-                                </View>
-                                <Text style={styles.draftBody}>{item.draft}</Text>
-                              </View>
-                            ) : null}
-                          </View>
+                          {time ? <Text style={styles.itemTime}>{time}</Text> : null}
+                        </View>
+                        {meta.length > 0 ? (
+                          <Text style={styles.itemMeta} numberOfLines={1}>
+                            {meta.join(" · ")}
+                          </Text>
                         ) : null}
+                        <Text
+                          style={[
+                            styles.itemGist,
+                            isSecondarySection && styles.itemGistMuted,
+                          ]}
+                        >
+                          {item.gist}
+                        </Text>
+                      </Pressable>
 
-                        {pending ? (
-                          <View style={styles.pendingRow}>
-                            <ActivityIndicator size="small" color={colors.textMuted} />
-                            <Text style={styles.pendingText}>{t(PENDING_LABEL_KEY[pending])}</Text>
-                          </View>
-                        ) : (
-                          <>
-                            <View style={styles.actionRow}>
-                              {item.action ? (
-                                <Pressable
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`${item.action}: ${item.title}`}
-                                  onPress={() => void handlePrimaryAction(item)}
-                                  style={({ pressed }) => [
-                                    item.section === "handled"
-                                      ? styles.secondaryBtn
-                                      : emphasizeAction
-                                        ? styles.primaryBtn
-                                        : styles.tonalBtn,
-                                    pressed && styles.pressedSoft,
-                                  ]}
-                                >
-                                  {item.section === "handled" ? (
-                                    <Icon name="rotate-ccw" size={12} color={colors.textStrong} />
-                                  ) : null}
-                                  <Text
-                                    style={
-                                      item.section === "handled"
-                                        ? styles.secondaryBtnText
-                                        : emphasizeAction
-                                          ? styles.primaryBtnText
-                                          : styles.tonalBtnText
-                                    }
-                                  >
-                                    {item.action}
+                      {hasMore && open ? (
+                        <View style={styles.expandedBody}>
+                          {item.detail ? <MobileRichText text={item.detail} styles={styles} /> : null}
+                          {item.draft ? (
+                            <View style={styles.draftBox}>
+                              <View style={styles.draftHead}>
+                                <View style={styles.draftLabelRow}>
+                                  <Icon name="reply" size={12} color={colors.textMuted} />
+                                  <Text style={styles.draftLabel}>{t("email.workspace.draft.label")}</Text>
+                                </View>
+                                {item.from ? (
+                                  <Text style={styles.draftTo} numberOfLines={1}>
+                                    {t("email.reply.to", { to: item.from })}
                                   </Text>
-                                </Pressable>
-                              ) : null}
+                                ) : null}
+                              </View>
+                              <Text style={styles.draftBody}>{item.draft}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
 
-                              {hasMore ? (
-                                <Pressable
-                                  accessibilityRole="button"
-                                  accessibilityLabel={
-                                    open
-                                      ? t("email.workspace.hideDetails")
-                                      : item.draft
-                                        ? t("email.workspace.draft.read")
-                                        : t("email.workspace.showDetails")
-                                  }
-                                  onPress={() => {
-                                    tapLight();
-                                    setExpanded((prev) => ({ ...prev, [item.id]: !open }));
-                                  }}
-                                  style={({ pressed }) => [
-                                    styles.ghostBtn,
-                                    pressed && styles.pressedSoft,
-                                  ]}
-                                >
-                                  <Text style={styles.ghostBtnText}>
-                                    {open
-                                      ? t("email.brief.hide")
-                                      : item.draft
-                                        ? t("email.workspace.draft.read")
-                                        : t("email.workspace.details")}
-                                  </Text>
-                                </Pressable>
-                              ) : null}
-
+                      {pending ? (
+                        <View style={styles.pendingRow}>
+                          <ActivityIndicator size="small" color={colors.textMuted} />
+                          <Text style={styles.pendingText}>{t(PENDING_LABEL_KEY[pending])}</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View style={styles.actionRow}>
+                            {item.action ? (
                               <Pressable
                                 accessibilityRole="button"
-                                accessibilityLabel={t("email.workspace.tell.about", { title: item.title })}
+                                accessibilityLabel={`${item.action}: ${item.title}`}
+                                onPress={() => void handlePrimaryAction(item)}
+                                style={({ pressed }) => [
+                                  item.section === "handled"
+                                    ? styles.secondaryBtn
+                                    : emphasizeAction
+                                      ? styles.primaryBtn
+                                      : styles.tonalBtn,
+                                  pressed && styles.pressedSoft,
+                                ]}
+                              >
+                                {item.section === "handled" ? (
+                                  <Icon name="rotate-ccw" size={12} color={colors.textStrong} />
+                                ) : null}
+                                <Text
+                                  style={
+                                    item.section === "handled"
+                                      ? styles.secondaryBtnText
+                                      : emphasizeAction
+                                        ? styles.primaryBtnText
+                                        : styles.tonalBtnText
+                                  }
+                                >
+                                  {item.action}
+                                </Text>
+                              </Pressable>
+                            ) : null}
+
+                            {hasMore ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={
+                                  open
+                                    ? t("email.workspace.hideDetails")
+                                    : item.draft
+                                      ? t("email.workspace.draft.read")
+                                      : t("email.workspace.showDetails")
+                                }
                                 onPress={() => {
                                   tapLight();
-                                  setTellingOpen((prev) => ({
-                                    ...prev,
-                                    [item.id]: !prev[item.id],
-                                  }));
+                                  setExpanded((prev) => ({ ...prev, [item.id]: !open }));
                                 }}
                                 style={({ pressed }) => [
                                   styles.ghostBtn,
                                   pressed && styles.pressedSoft,
                                 ]}
                               >
-                                <Text style={styles.ghostBtnText}>{t("email.workspace.tell.action")}</Text>
+                                <Text style={styles.ghostBtnText}>
+                                  {open
+                                    ? t("email.brief.hide")
+                                    : item.draft
+                                      ? t("email.workspace.draft.read")
+                                      : t("email.workspace.details")}
+                                </Text>
                               </Pressable>
+                            ) : null}
 
-                              {thread ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={t("email.workspace.tell.about", { title: item.title })}
+                              onPress={() => {
+                                tapLight();
+                                setTellingOpen((prev) => ({
+                                  ...prev,
+                                  [item.id]: !prev[item.id],
+                                }));
+                              }}
+                              style={({ pressed }) => [
+                                styles.ghostBtn,
+                                pressed && styles.pressedSoft,
+                              ]}
+                            >
+                              <Text style={styles.ghostBtnText}>{t("email.workspace.tell.action")}</Text>
+                            </Pressable>
+
+                            {thread ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={t("email.section.openInGmail")}
+                                onPress={() => {
+                                  tapLight();
+                                  void Linking.openURL(gmailThreadUrl(thread)).catch(() => undefined);
+                                }}
+                                style={({ pressed }) => [
+                                  styles.gmailBtn,
+                                  pressed && styles.pressedSoft,
+                                ]}
+                              >
+                                <Text style={styles.gmailBtnText}>Gmail</Text>
+                                <Icon name="external-link" size={11} color={colors.textWeaker} />
+                              </Pressable>
+                            ) : null}
+                          </View>
+
+                          {tellingOpen[item.id] ? (
+                            <View style={styles.tellBox}>
+                              <TextInput
+                                style={styles.tellInput}
+                                multiline
+                                placeholder={t("email.workspace.tell.placeholder")}
+                                placeholderTextColor={colors.textWeaker}
+                                value={draftText}
+                                editable={!tellSending[item.id]}
+                                onChangeText={(next) =>
+                                  setTellDrafts((prev) => ({ ...prev, [item.id]: next }))
+                                }
+                              />
+                              <View style={styles.tellBar}>
                                 <Pressable
                                   accessibilityRole="button"
-                                  accessibilityLabel={t("email.section.openInGmail")}
-                                  onPress={() => {
-                                    tapLight();
-                                    void Linking.openURL(gmailThreadUrl(thread)).catch(() => undefined);
-                                  }}
+                                  accessibilityLabel={t("common.cancel")}
+                                  onPress={() =>
+                                    setTellingOpen((prev) => ({ ...prev, [item.id]: false }))
+                                  }
                                   style={({ pressed }) => [
-                                    styles.gmailBtn,
+                                    styles.ghostBtn,
                                     pressed && styles.pressedSoft,
                                   ]}
                                 >
-                                  <Text style={styles.gmailBtnText}>Gmail</Text>
-                                  <Icon name="external-link" size={11} color={colors.textWeaker} />
+                                  <Text style={styles.ghostBtnText}>{t("common.cancel")}</Text>
                                 </Pressable>
-                              ) : null}
-                            </View>
-
-                            {tellingOpen[item.id] ? (
-                              <View style={styles.tellBox}>
-                                <TextInput
-                                  style={styles.tellInput}
-                                  multiline
-                                  placeholder={t("email.workspace.tell.placeholder")}
-                                  placeholderTextColor={colors.textWeaker}
-                                  value={draftText}
-                                  editable={!tellSending[item.id]}
-                                  onChangeText={(next) =>
-                                    setTellDrafts((prev) => ({ ...prev, [item.id]: next }))
-                                  }
-                                />
-                                <View style={styles.tellBar}>
-                                  <Pressable
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t("common.cancel")}
-                                    onPress={() =>
-                                      setTellingOpen((prev) => ({ ...prev, [item.id]: false }))
-                                    }
-                                    style={({ pressed }) => [
-                                      styles.ghostBtn,
-                                      pressed && styles.pressedSoft,
-                                    ]}
-                                  >
-                                    <Text style={styles.ghostBtnText}>{t("common.cancel")}</Text>
-                                  </Pressable>
-                                  <Pressable
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t("email.workspace.tell.send")}
-                                    disabled={sendDisabled}
-                                    onPress={() => void handleTellSubmit(item)}
-                                    style={({ pressed }) => [
-                                      styles.primaryBtn,
-                                      styles.tellSendBtn,
-                                      sendDisabled && styles.disabled,
-                                      pressed && styles.pressedSoft,
-                                    ]}
-                                  >
-                                    <Text style={styles.primaryBtnText}>
-                                      {tellSending[item.id] ? t("userAsk.question.sending") : t("email.digest.send")}
-                                    </Text>
-                                  </Pressable>
-                                </View>
+                                <Pressable
+                                  accessibilityRole="button"
+                                  accessibilityLabel={t("email.workspace.tell.send")}
+                                  disabled={sendDisabled}
+                                  onPress={() => void handleTellSubmit(item)}
+                                  style={({ pressed }) => [
+                                    styles.primaryBtn,
+                                    styles.tellSendBtn,
+                                    sendDisabled && styles.disabled,
+                                    pressed && styles.pressedSoft,
+                                  ]}
+                                >
+                                  <Text style={styles.primaryBtnText}>
+                                    {tellSending[item.id] ? t("userAsk.question.sending") : t("email.digest.send")}
+                                  </Text>
+                                </Pressable>
                               </View>
-                            ) : null}
-                          </>
-                        )}
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            );
-          })
-        )}
+                            </View>
+                          ) : null}
+                        </>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          );
+        })
+      )}
 
-        {hasIgnored ? (
-          <View style={styles.ignoredBlock}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={tPlural("email.workspace.ignored.count", state.page.ignored.count)}
-              onPress={() => {
-                tapLight();
-                setIgnoredOpen((open) => !open);
-              }}
-              style={({ pressed }) => [styles.ignoredToggle, pressed && styles.pressedSoft]}
-            >
-              <Text style={styles.ignoredLabel}>
-                {tPlural("email.workspace.ignored.count", state.page.ignored.count)}
-              </Text>
-              <Icon
-                name={ignoredOpen ? "chevron-down" : "chevron-right"}
-                size={15}
-                color={colors.textWeaker}
-              />
-            </Pressable>
-            {ignoredOpen ? (
-              <View style={styles.ignoredContent}>
-                {state.page.ignored.gist ? (
-                  <Text style={styles.itemMeta}>{state.page.ignored.gist}</Text>
-                ) : null}
-                {state.page.ignored.senders?.length ? (
-                  <View style={styles.senderList}>
-                    {state.page.ignored.senders.map((sender) => (
-                      <View key={sender.name} style={styles.senderRow}>
-                        <Text style={styles.senderName}>{sender.name}</Text>
-                        <Text style={styles.senderCount}>{sender.count}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {state.nextReadAt ? (
-          <View style={styles.footerMeta}>
-            <Icon name="clock" size={12} color={colors.textWeaker} />
-            <Text style={styles.footerMetaText}>
-              {t("email.workspace.nextCheck.at", { time: formatWhen(state.nextReadAt, locale) })}
+      {hasIgnored ? (
+        <View style={styles.ignoredBlock}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tPlural("email.workspace.ignored.count", state.page.ignored.count)}
+            onPress={() => {
+              tapLight();
+              setIgnoredOpen((open) => !open);
+            }}
+            style={({ pressed }) => [styles.ignoredToggle, pressed && styles.pressedSoft]}
+          >
+            <Text style={styles.ignoredLabel}>
+              {tPlural("email.workspace.ignored.count", state.page.ignored.count)}
             </Text>
-          </View>
-        ) : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Icon
+              name={ignoredOpen ? "chevron-down" : "chevron-right"}
+              size={15}
+              color={colors.textWeaker}
+            />
+          </Pressable>
+          {ignoredOpen ? (
+            <View style={styles.ignoredContent}>
+              {state.page.ignored.gist ? (
+                <Text style={styles.itemMeta}>{state.page.ignored.gist}</Text>
+              ) : null}
+              {state.page.ignored.senders?.length ? (
+                <View style={styles.senderList}>
+                  {state.page.ignored.senders.map((sender) => (
+                    <View key={sender.name} style={styles.senderRow}>
+                      <Text style={styles.senderName}>{sender.name}</Text>
+                      <Text style={styles.senderCount}>{sender.count}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {state.nextReadAt ? (
+        <View style={styles.footerMeta}>
+          <Icon name="clock" size={12} color={colors.textWeaker} />
+          <Text style={styles.footerMetaText}>
+            {t("email.workspace.nextCheck.at", { time: formatWhen(state.nextReadAt, locale) })}
+          </Text>
+        </View>
+      ) : null}
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -831,7 +828,7 @@ export function EmailPage() {
   const { isDark } = useTheme();
   const t = useT();
   const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
-  const bottomInset = useSafeAreaInsets().bottom;
+  const bottomInset = useTabBottomInset();
   const signedIn = Boolean(authClient.useSession().data?.user);
   const feed = useBackendView("email.page", signedIn ? {} : "skip");
   const value = feed.value;

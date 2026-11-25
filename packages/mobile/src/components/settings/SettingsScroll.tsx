@@ -1,6 +1,7 @@
 import { forwardRef, type ReactNode } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTabBottomInset } from "../../lib/bottom-bar";
 import { KIT } from "../chat-settings/kit";
 import { DrawerScrollView } from "../sidebar/DrawerStage";
 import { SIDEBAR_BRAND_TOP } from "../sidebar/SidebarPanel";
@@ -10,7 +11,8 @@ export const SettingsScroll = forwardRef<
   { inDrawer: boolean; children: ReactNode }
 >(function SettingsScroll({ inDrawer, children }, ref) {
   const insets = useSafeAreaInsets();
-  const paddingBottom = 32 + insets.bottom;
+  const tabInset = useTabBottomInset();
+  const paddingBottom = 32 + (inDrawer ? insets.bottom : tabInset);
   if (inDrawer) {
     return (
       <DrawerScrollView

@@ -14,7 +14,6 @@ import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authClient } from "../lib/auth-client";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   isEngineConnectionUsable,
   type ChatGptSharedRegistration,
@@ -31,6 +30,7 @@ import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 import { makeSettingsStyles } from "./settings/settings-styles";
 import { getBackendClient, useBackendView } from "../lib/backend";
+import { useTabBottomInset } from "../lib/bottom-bar";
 import { isSelfHostedLaunch } from "../lib/server-registry";
 import { tapLight } from "../lib/haptics";
 import { type Colors } from "../theme/colors";
@@ -153,7 +153,7 @@ const reusableChatGptRegistrations = (
 export function EngineAccountsSettings() {
   const colors = useColors();
   const t = useT();
-  const insets = useSafeAreaInsets();
+  const bottomInset = useTabBottomInset();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
@@ -161,7 +161,7 @@ export function EngineAccountsSettings() {
       style={styles.screen}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: 32 + insets.bottom },
+        { paddingBottom: 32 + bottomInset },
       ]}
       keyboardShouldPersistTaps="handled"
     >

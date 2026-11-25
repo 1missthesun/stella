@@ -1125,7 +1125,9 @@
           "code": "קוד",
           "pages": "דפים",
           "other": "אחר"
-        }
+        },
+        "viewGrid": "תצוגת רשת",
+        "viewList": "תצוגת רשימה"
       },
       "schedule": {
         "actionFailed": "זה לא הצליח.",
@@ -1169,7 +1171,6 @@
       }
     },
     "apps": {
-      "emailHint": "הדף של Stella לתיבת הדואר שלך",
       "empty": "אפליקציות ש-Stella בונה בשבילך יופיעו כאן.",
       "emptyAction": "לבנות אפליקציה",
       "emptyActionPrompt": "תבני לי אפליקציה ש"

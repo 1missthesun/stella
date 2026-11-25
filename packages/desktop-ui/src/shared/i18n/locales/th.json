@@ -1105,7 +1105,9 @@
           "code": "โค้ด",
           "pages": "หน้าเว็บ",
           "other": "อื่นๆ"
-        }
+        },
+        "viewGrid": "มุมมองตาราง",
+        "viewList": "มุมมองรายการ"
       },
       "schedule": {
         "actionFailed": "ดำเนินการไม่สำเร็จ",
@@ -1149,7 +1151,6 @@
       }
     },
     "apps": {
-      "emailHint": "หน้าของ Stella สำหรับกล่องจดหมายของคุณ",
       "empty": "แอปที่ Stella สร้างให้คุณจะแสดงที่นี่",
       "emptyAction": "สร้างแอป",
       "emptyActionPrompt": "สร้างแอปที่"

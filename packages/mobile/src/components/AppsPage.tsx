@@ -1,4 +1,3 @@
-import { useMemo, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,16 +15,17 @@ import { useEmailUnseenCount } from "../lib/email";
 import { useEmailFeature } from "../lib/email-feature";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
 import { MAIN_TAB_HREFS } from "../lib/last-main-tab";
-import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { useColors } from "../theme/theme-context";
+import { useAiryList } from "./airy-list";
+import { Dot, Hairline } from "./chat-settings/kit";
 import { EmptyState } from "./EmptyState";
 import { Icon } from "./Icon";
 import { Text } from "./Text";
 
 export function AppsPage() {
   const colors = useColors();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useAiryList();
   const t = useT();
   const router = useRouter();
   const focused = useIsFocused();
@@ -37,28 +37,23 @@ export function AppsPage() {
 
   if (!page) {
     return session.isPending || session.data?.user ? (
-      <ActivityIndicator />
+      <ActivityIndicator color={colors.textMuted} style={local.loading} />
     ) : (
-      <Text>Apps are unavailable. Please try again.</Text>
+      <Text style={styles.detail}>Apps are unavailable. Please try again.</Text>
     );
   }
 
   const { apps, error, opening, open } = page;
   const empty = apps?.length === 0 && !error;
-  const emailRow =
+  const email =
     emailOn && !wide ? (
-      <EmailRow
-        styles={styles}
-        colors={colors}
-        carded={!empty}
-        onPress={() => router.push(MAIN_TAB_HREFS.email)}
-      />
+      <EmailEntry onPress={() => router.push(MAIN_TAB_HREFS.email)} />
     ) : null;
 
   if (empty) {
     return (
       <>
-        {emailRow}
+        {email}
         <EmptyState
           motif="apps"
           message={t("mobile.apps.empty")}
@@ -75,68 +70,80 @@ export function AppsPage() {
 
   return (
     <ScrollView
-      contentContainerStyle={[
-        styles.list,
-        { paddingBottom: bottomInset + 24 },
-      ]}
+      style={local.screen}
+      contentContainerStyle={{ paddingBottom: bottomInset + 32 }}
       showsVerticalScrollIndicator={false}
     >
-      {emailRow}
-      {apps === null && !error ? <ActivityIndicator /> : null}
+      {email}
+      {email && apps ? <Hairline space={16} /> : <View style={local.lead} />}
+      {apps === null && !error ? (
+        <ActivityIndicator color={colors.textMuted} style={local.loading} />
+      ) : null}
       {error ? (
-        <Text accessibilityRole="alert" style={{ color: colors.text }}>
+        <Text
+          accessibilityRole="alert"
+          style={[styles.detail, styles.danger, local.error]}
+        >
           {error}
         </Text>
       ) : null}
-      {apps?.map((app) => (
-        <Pressable
-          key={app.slug}
-          accessibilityRole="button"
-          accessibilityLabel={app.title}
-          accessibilityState={{ busy: opening === app.slug }}
-          disabled={opening !== null || app.status !== "ready"}
-          onPress={() => open(app)}
-          style={[styles.row, styles.card]}
-        >
-          <Tile styles={styles}>
-            {app.icon ? (
-              <Text style={styles.emoji} maxFontSizeMultiplier={1}>
-                {app.icon}
+      {apps?.map((app) => {
+        const ready = app.status === "ready";
+        return (
+          <Pressable
+            key={app.slug}
+            accessibilityRole="button"
+            accessibilityLabel={app.title}
+            accessibilityState={{ busy: opening === app.slug, disabled: !ready }}
+            disabled={opening !== null || !ready}
+            onPress={() => open(app)}
+            style={({ pressed }) => [
+              styles.row,
+              local.row,
+              pressed && styles.pressed,
+            ]}
+            testID={`mobile-app-${app.slug}`}
+          >
+            <View style={local.glyph}>
+              {app.icon ? (
+                <Text style={local.emoji} maxFontSizeMultiplier={1}>
+                  {app.icon}
+                </Text>
+              ) : (
+                <Icon name="apps" size={26} color={colors.text} />
+              )}
+            </View>
+            <View style={styles.copy}>
+              <Text
+                style={[styles.title, !ready && styles.quiet]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                {app.title}
               </Text>
-            ) : (
-              <Icon name="apps" size={22} color={colors.text} />
-            )}
-          </Tile>
-          <View style={styles.words}>
-            <Text style={styles.title}>{app.title}</Text>
-            {app.error ? (
-              <Text style={{ color: colors.text }}>{app.error}</Text>
+              {app.error ? (
+                <Text
+                  style={[styles.detail, styles.danger]}
+                  numberOfLines={3}
+                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                >
+                  {app.error}
+                </Text>
+              ) : null}
+            </View>
+            {opening === app.slug ? (
+              <ActivityIndicator color={colors.textMuted} />
             ) : null}
-          </View>
-          {opening === app.slug ? <ActivityIndicator /> : null}
-        </Pressable>
-      ))}
+          </Pressable>
+        );
+      })}
     </ScrollView>
   );
 }
 
-type Styles = ReturnType<typeof makeStyles>;
-
-function Tile({ styles, children }: { styles: Styles; children: ReactNode }) {
-  return <View style={styles.tile}>{children}</View>;
-}
-
-function EmailRow({
-  styles,
-  colors,
-  carded,
-  onPress,
-}: {
-  styles: Styles;
-  colors: Colors;
-  carded: boolean;
-  onPress: () => void;
-}) {
+function EmailEntry({ onPress }: { onPress: () => void }) {
+  const colors = useColors();
+  const styles = useAiryList();
   const t = useT();
   const unseen = useEmailUnseenCount();
   const title = t("email.title");
@@ -147,70 +154,50 @@ function EmailRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        carded ? styles.card : styles.plain,
+        local.email,
         pressed && styles.pressed,
       ]}
       testID="mobile-apps-email"
     >
-      <Tile styles={styles}>
-        <Icon name="mail" size={20} color={colors.text} />
-      </Tile>
-      <View style={styles.words}>
-        <Text style={styles.title}>{title}</Text>
-        <Text
-          style={styles.hint}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {t("mobile.apps.emailHint")}
-        </Text>
+      <View style={local.glyph}>
+        <Icon name="mail" size={27} color={colors.text} />
+      </View>
+      <View style={styles.copy}>
+        <View style={local.emailLine}>
+          <Text
+            style={[local.emailTitle, { color: colors.text }]}
+            numberOfLines={1}
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          >
+            {title}
+          </Text>
+          {unseen > 0 ? <Dot /> : null}
+        </View>
       </View>
       {unseen > 0 ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText} maxFontSizeMultiplier={1.2}>
-            {unseen > 99 ? "99+" : unseen}
-          </Text>
-        </View>
+        <Text style={styles.trailing} maxFontSizeMultiplier={1.2}>
+          {unseen > 99 ? "99+" : unseen}
+        </Text>
       ) : null}
-      <Icon name="chevron-right" size={15} color={colors.textMuted} />
     </Pressable>
   );
 }
 
-const makeStyles = (colors: Colors) =>
-  StyleSheet.create({
-    list: { gap: 16, paddingTop: 8 },
-    row: { alignItems: "center", flexDirection: "row", gap: 12 },
-    card: { backgroundColor: colors.surface, borderRadius: 12, padding: 12 },
-    plain: { marginTop: 8, paddingVertical: 10 },
-    pressed: { opacity: 0.6 },
-    tile: {
-      alignItems: "center",
-      backgroundColor: colors.surfaceInset,
-      borderColor: colors.border,
-      borderCurve: "continuous",
-      borderRadius: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      height: 44,
-      justifyContent: "center",
-      width: 44,
-    },
-    emoji: { fontSize: 24 },
-    words: { flex: 1, gap: 2, minWidth: 0 },
-    title: { color: colors.text, fontSize: 17 },
-    hint: { color: colors.textMuted, fontSize: 13 },
-    badge: {
-      alignItems: "center",
-      backgroundColor: colors.accent,
-      borderRadius: 999,
-      height: 20,
-      justifyContent: "center",
-      minWidth: 20,
-      paddingHorizontal: 6,
-    },
-    badgeText: {
-      color: colors.accentForeground,
-      fontFamily: fonts.sans.bold,
-      fontSize: 12,
-    },
-  });
+const local = StyleSheet.create({
+  screen: { flex: 1 },
+  lead: { height: 8 },
+  loading: { marginTop: 32 },
+  error: { paddingVertical: 12 },
+  row: { minHeight: 66 },
+  glyph: { alignItems: "center", justifyContent: "center", width: 36 },
+  emoji: { fontSize: 30, lineHeight: 38 },
+  email: { marginTop: 10, minHeight: 72 },
+  emailLine: { alignItems: "center", flexDirection: "row", gap: 10 },
+  emailTitle: {
+    flexShrink: 1,
+    fontFamily: fonts.sans.bold,
+    fontSize: 28,
+    letterSpacing: -1,
+    lineHeight: 34,
+  },
+});

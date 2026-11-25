@@ -1115,7 +1115,9 @@
           "code": "Code",
           "pages": "Pages",
           "other": "Other"
-        }
+        },
+        "viewGrid": "Grid view",
+        "viewList": "List view"
       },
       "schedule": {
         "actionFailed": "That didn’t go through.",
@@ -1159,7 +1161,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella's page for your inbox",
       "empty": "Apps Stella builds for you live here.",
       "emptyAction": "Build an app",
       "emptyActionPrompt": "Build me an app that "

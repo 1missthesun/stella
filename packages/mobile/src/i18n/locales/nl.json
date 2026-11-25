@@ -221,7 +221,9 @@
           "code": "Code",
           "pages": "Pagina’s",
           "other": "Overig"
-        }
+        },
+        "viewGrid": "Rasterweergave",
+        "viewList": "Lijstweergave"
       },
       "schedule": {
         "actionFailed": "Dat is niet gelukt.",
@@ -265,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella's pagina voor je inbox",
       "empty": "Apps die Stella voor je bouwt, verschijnen hier.",
       "emptyAction": "Een app bouwen",
       "emptyActionPrompt": "Bouw een app voor me die "
@@ -955,6 +956,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} bestand",
+        "other": "{count} bestanden"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

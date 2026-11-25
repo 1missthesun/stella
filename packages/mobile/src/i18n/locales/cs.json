@@ -223,7 +223,9 @@
           "code": "Kód",
           "pages": "Stránky",
           "other": "Ostatní"
-        }
+        },
+        "viewGrid": "Zobrazit jako mřížku",
+        "viewList": "Zobrazit jako seznam"
       },
       "schedule": {
         "actionFailed": "Nepovedlo se to.",
@@ -267,7 +269,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stránka Stelly pro vaši doručenou poštu",
       "empty": "Zde budou aplikace, které pro vás Stella vytvoří.",
       "emptyAction": "Vytvořit aplikaci",
       "emptyActionPrompt": "Vytvoř mi aplikaci, která "
@@ -957,6 +958,14 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} soubory",
+        "many": "{count} souboru",
+        "one": "{count} soubor",
+        "other": "{count} souborů"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

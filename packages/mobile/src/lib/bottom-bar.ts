@@ -18,6 +18,11 @@ export function isBottomBarTab(tab: MainTabId | null): tab is BottomBarTab {
   return BOTTOM_BAR_TABS.some((candidate) => candidate === tab);
 }
 
+export function bottomBarTabFor(tab: MainTabId | null): BottomBarTab | null {
+  if (tab === "email") return "apps";
+  return isBottomBarTab(tab) ? tab : null;
+}
+
 const WIDE_LAYOUT_MIN_WIDTH = 920;
 const HOME_INDICATOR_OVERLAP = 6;
 const MIN_BOTTOM_PADDING = 4;
@@ -33,14 +38,16 @@ export function bottomBarPadding(safeAreaBottom: number): number {
   return Math.max(safeAreaBottom - HOME_INDICATOR_OVERLAP, MIN_BOTTOM_PADDING);
 }
 
-/** The space a tab page keeps free at its bottom edge: the safe area plus the bar. */
-export function useTabBottomInset(): number {
+export function useBottomBarHeight(): number {
   const safeAreaBottom = useSafeAreaInsets().bottom;
   const wide = useWideLayout();
-  if (wide) return safeAreaBottom;
-  return (
-    bottomBarPadding(safeAreaBottom) +
-    BOTTOM_BAR_ROW_HEIGHT +
-    CLEARANCE_ABOVE_BAR
-  );
+  return wide
+    ? safeAreaBottom
+    : bottomBarPadding(safeAreaBottom) + BOTTOM_BAR_ROW_HEIGHT;
+}
+
+/** The space a tab page keeps free at its bottom edge: the safe area plus the bar. */
+export function useTabBottomInset(): number {
+  const barHeight = useBottomBarHeight();
+  return useWideLayout() ? barHeight : barHeight + CLEARANCE_ABOVE_BAR;
 }

@@ -76,6 +76,7 @@ import type {
 import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
 import { stellaFileChatArtifact } from "../lib/stella-file-links";
 import { fetchWithinDeadline } from "../lib/cloud-request";
+import { loadDriveHtml } from "../lib/drive-html";
 import { transferBudgetMs } from "@stella/contracts/request-deadline";
 import {
   embedRelativeHtmlAssets,
@@ -976,28 +977,7 @@ export function ArtifactViewerContent({
         }
       }
       if (payload.kind === "canvas-html" && payload.driveBacked) {
-        const uri = await resolveCloudDriveFileUri(payload.filePath);
-        const response = await fetchWithinDeadline(uri, undefined, {
-          label: "Loading this file from your Drive",
-          timeoutMs: transferBudgetMs(null),
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("This file is no longer available.");
-        const html = await embedRelativeHtmlAssets(
-          await response.text(),
-          `/${payload.filePath.replace(/^\/+/u, "")}`,
-          async ({ path, kind }) => {
-            const assetUri = await resolveCloudDriveFileUri(path.replace(/^\/+/u, ""));
-            if (kind !== "text") return assetUri;
-            const asset = await fetchWithinDeadline(assetUri, undefined, {
-              label: "Loading this file from your Drive",
-              timeoutMs: transferBudgetMs(null),
-              signal: controller.signal,
-            });
-            return asset.ok ? await asset.text() : null;
-          },
-          controller.signal,
-        );
+        const html = await loadDriveHtml(payload.filePath, controller.signal);
         return {
           kind: "canvas-html" as const,
           html: prepareDocumentHtml(html),

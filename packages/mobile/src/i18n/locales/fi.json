@@ -221,7 +221,9 @@
           "code": "Koodi",
           "pages": "Sivut",
           "other": "Muut"
-        }
+        },
+        "viewGrid": "Ruudukkonäkymä",
+        "viewList": "Luettelonäkymä"
       },
       "schedule": {
         "actionFailed": "Se ei onnistunut.",
@@ -265,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stellan sivu postilaatikollesi",
       "empty": "Stellan sinulle rakentamat sovellukset näkyvät täällä.",
       "emptyAction": "Rakenna sovellus",
       "emptyActionPrompt": "Rakenna minulle sovellus, joka "
@@ -955,6 +956,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} tiedosto",
+        "other": "{count} tiedostoa"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

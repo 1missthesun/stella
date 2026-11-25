@@ -221,7 +221,9 @@
           "code": "Kode",
           "pages": "Sider",
           "other": "Annet"
-        }
+        },
+        "viewGrid": "Rutenettvisning",
+        "viewList": "Listevisning"
       },
       "schedule": {
         "actionFailed": "Det gikk ikke.",
@@ -265,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stellas side for innboksen din",
       "empty": "Apper som Stella bygger for deg, vises her.",
       "emptyAction": "Bygg en app",
       "emptyActionPrompt": "Bygg en app til meg som "
@@ -955,6 +956,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} fil",
+        "other": "{count} filer"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

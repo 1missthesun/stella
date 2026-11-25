@@ -1105,7 +1105,9 @@
           "code": "コード",
           "pages": "ページ",
           "other": "その他"
-        }
+        },
+        "viewGrid": "グリッド表示",
+        "viewList": "リスト表示"
       },
       "schedule": {
         "actionFailed": "実行できませんでした。",
@@ -1149,7 +1151,6 @@
       }
     },
     "apps": {
-      "emailHint": "受信トレイのためのStellaのページ",
       "empty": "Stella があなたのために作ったアプリはここに表示されます。",
       "emptyAction": "アプリを作成",
       "emptyActionPrompt": "こんなアプリを作って: "

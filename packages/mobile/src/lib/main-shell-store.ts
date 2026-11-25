@@ -33,6 +33,8 @@ export type ComputerControl = {
 export type BackOverride = {
   label: string;
   onPress: () => void;
+  title?: string;
+  onReset?: () => void;
 };
 
 type ShellState = {

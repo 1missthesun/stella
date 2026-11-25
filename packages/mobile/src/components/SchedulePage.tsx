@@ -14,7 +14,9 @@ import {
 } from "react-native";
 import { Text } from "./Text";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useT } from "../i18n";
+import { describeScheduleTiming } from "@stella/contracts/schedule-format";
+import { scheduleTimingText } from "@stella/contracts/schedule-notice";
+import { useLocale, useT, useTPlural } from "../i18n";
 import {
   scheduleCadence,
   scheduleRowBadge,
@@ -23,6 +25,7 @@ import {
   type MobileSchedule,
   type MobileScheduleAction,
 } from "../lib/schedules";
+import { parseStoredSchedule } from "../lib/schedule-format";
 import { tapLight } from "../lib/haptics";
 import { timeOfDay, upcomingSection } from "../lib/list-sections";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/font-scale";
@@ -31,18 +34,21 @@ import { startChatWith } from "../lib/ask-stella";
 import { useTabBottomInset } from "../lib/bottom-bar";
 import { useColors } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
-import { ScheduleRow, makeScheduleRowStyles } from "./schedule-rows";
+import { useAiryList } from "./airy-list";
+import { ScheduleRow } from "./schedule-rows";
 
 export function SchedulePage() {
   const colors = useColors();
   const t = useT();
+  const tPlural = useTPlural();
+  const locale = useLocale();
   const styles = useMemo(() => makeStyles(), []);
   const router = useRouter();
   const { focus } = useLocalSearchParams<{ focus?: string }>();
   const listRef = useRef<LegendListRef>(null);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const focusedRef = useRef<string | null>(null);
-  const rowStyles = useMemo(() => makeScheduleRowStyles(colors), [colors]);
+  const rowStyles = useAiryList();
   const bottomInset = useTabBottomInset();
   const session = authClient.useSession();
   const signedIn = Boolean(session.data?.user);
@@ -104,6 +110,29 @@ export function SchedulePage() {
     setNowMs(Date.now());
   }, [schedules]);
 
+  const whenOf = useCallback(
+    (schedule: MobileSchedule): string => {
+      if (schedule.waitingSinceMs !== undefined) return t("schedule.waiting");
+      const stored = schedule.scheduleJson
+        ? parseStoredSchedule(schedule.scheduleJson)
+        : null;
+      const time = timeOfDay(schedule.nextRunAtMs);
+      if (!stored || stored.kind === "at") return schedule.enabled ? time : "";
+      const cadence = scheduleTimingText(
+        describeScheduleTiming(stored, {
+          nowMs,
+          nextRunAtMs: schedule.nextRunAtMs,
+          ...(schedule.zone ? { zone: schedule.zone } : {}),
+        }),
+        { t, tPlural, locale },
+      );
+      return stored.kind === "every" && schedule.enabled
+        ? `${time} · ${cadence}`
+        : cadence;
+    },
+    [locale, nowMs, t, tPlural],
+  );
+
   const items = useMemo<ListItem[]>(() => {
     const active = schedules
       .filter((schedule) => schedule.enabled)
@@ -118,6 +147,7 @@ export function SchedulePage() {
           kind: "section",
           key: `section:${section.key}`,
           label: section.label,
+          first: out.length === 0,
         });
         previous = section.key;
       }
@@ -125,10 +155,7 @@ export function SchedulePage() {
         kind: "schedule",
         key: `${schedule.kind}:${schedule.id}`,
         schedule,
-        trailing:
-          schedule.waitingSinceMs !== undefined
-            ? t("schedule.waiting")
-            : timeOfDay(schedule.nextRunAtMs),
+        when: whenOf(schedule),
       });
     }
     if (paused.length > 0) {
@@ -136,18 +163,19 @@ export function SchedulePage() {
         kind: "section",
         key: "section:paused",
         label: t("mobile.activityHub.schedule.paused"),
+        first: out.length === 0,
       });
       for (const schedule of paused) {
         out.push({
           kind: "schedule",
           key: `${schedule.kind}:${schedule.id}`,
           schedule,
-          trailing: null,
+          when: whenOf(schedule),
         });
       }
     }
     return out;
-  }, [nowMs, schedules, t]);
+  }, [nowMs, schedules, t, whenOf]);
 
   useEffect(() => {
     if (!focus || focusedRef.current === focus) return;
@@ -287,7 +315,7 @@ export function SchedulePage() {
         renderItem={({ item }: LegendListRenderItemProps<ListItem>) =>
           item.kind === "section" ? (
             <Text
-              style={rowStyles.section}
+              style={[rowStyles.section, item.first && rowStyles.sectionFirst]}
               numberOfLines={1}
               maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
               accessibilityRole="header"
@@ -297,18 +325,22 @@ export function SchedulePage() {
           ) : (
             <ScheduleRow
               schedule={item.schedule}
-              trailing={item.trailing}
+              when={item.when}
+              failed={
+                item.schedule.enabled && item.schedule.lastError
+                  ? t("mobile.activityHub.task.failed")
+                  : null
+              }
               busy={busyKey === item.key}
               highlighted={highlightKey === item.key}
               styles={rowStyles}
-              colors={colors}
-              onPress={() => openActions(item.schedule)}
+              onPress={openActions}
             />
           )
         }
         extraData={`${busyKey ?? ""}|${highlightKey ?? ""}`}
         showsVerticalScrollIndicator={false}
-        estimatedItemSize={48}
+        estimatedItemSize={64}
         recycleItems
       />
     );
@@ -320,12 +352,12 @@ export function SchedulePage() {
 const EMPTY: MobileSchedule[] = [];
 
 type ListItem =
-  | { kind: "section"; key: string; label: string }
+  | { kind: "section"; key: string; label: string; first: boolean }
   | {
       kind: "schedule";
       key: string;
       schedule: MobileSchedule;
-      trailing: string | null;
+      when: string;
     };
 
 const makeStyles = () =>

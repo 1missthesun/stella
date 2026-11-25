@@ -220,7 +220,9 @@
           "code": "코드",
           "pages": "페이지",
           "other": "기타"
-        }
+        },
+        "viewGrid": "그리드 보기",
+        "viewList": "목록 보기"
       },
       "schedule": {
         "actionFailed": "처리하지 못했습니다.",
@@ -264,7 +266,6 @@
       }
     },
     "apps": {
-      "emailHint": "받은편지함을 위한 Stella 페이지",
       "empty": "Stella가 만들어 준 앱이 여기에 표시됩니다.",
       "emptyAction": "앱 만들기",
       "emptyActionPrompt": "이런 앱을 만들어 줘: "
@@ -954,6 +955,11 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "other": "파일 {count}개"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

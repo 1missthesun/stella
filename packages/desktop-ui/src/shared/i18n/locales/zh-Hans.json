@@ -1105,7 +1105,9 @@
           "code": "代码",
           "pages": "网页",
           "other": "其他"
-        }
+        },
+        "viewGrid": "网格视图",
+        "viewList": "列表视图"
       },
       "schedule": {
         "actionFailed": "操作未成功。",
@@ -1149,7 +1151,6 @@
       }
     },
     "apps": {
-      "emailHint": "Stella 的收件箱页面",
       "empty": "Stella 为你构建的应用会显示在这里。",
       "emptyAction": "构建应用",
       "emptyActionPrompt": "帮我做一个应用，"

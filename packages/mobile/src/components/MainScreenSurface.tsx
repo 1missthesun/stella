@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KIT } from "./chat-settings/kit";
 import { AppBackdrop, TOP_BAR_BAR_HEIGHT } from "./AppBackdrop";
 
 export const mainContentStyles = StyleSheet.create({
@@ -24,7 +25,10 @@ export function MainDetailSurface({ children }: { children: ReactNode }) {
       <View
         style={[
           mainContentStyles.content,
-          { paddingTop: topInset + mainContentStyles.content.paddingTop },
+          {
+            paddingHorizontal: KIT.gutter,
+            paddingTop: topInset + mainContentStyles.content.paddingTop,
+          },
         ]}
       >
         {children}

@@ -223,7 +223,9 @@
           "code": "Код",
           "pages": "Страницы",
           "other": "Другое"
-        }
+        },
+        "viewGrid": "Вид сеткой",
+        "viewList": "Вид списком"
       },
       "schedule": {
         "actionFailed": "Не получилось.",
@@ -267,7 +269,6 @@
       }
     },
     "apps": {
-      "emailHint": "Страница Stella для ваших входящих",
       "empty": "Здесь будут приложения, которые Stella создаст для вас.",
       "emptyAction": "Создать приложение",
       "emptyActionPrompt": "Сделай мне приложение, которое "
@@ -957,6 +958,14 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} файла",
+        "many": "{count} файлов",
+        "one": "{count} файл",
+        "other": "{count} файла"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

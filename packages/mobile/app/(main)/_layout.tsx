@@ -83,7 +83,11 @@ import {
   useBackOverride,
   useTopBarAccessory,
 } from "../../src/lib/main-shell-store";
-import { isBottomBarTab, useWideLayout } from "../../src/lib/bottom-bar";
+import {
+  bottomBarTabFor,
+  isBottomBarTab,
+  useWideLayout,
+} from "../../src/lib/bottom-bar";
 import { useT } from "../../src/i18n";
 import { topBarCover, useTopBarCovered } from "../../src/lib/top-bar-cover";
 
@@ -159,7 +163,9 @@ export default function MainLayout() {
     onTabRoot && !backOverride && activeTab
       ? PAGE_TITLE_KEYS[activeTab]
       : undefined;
-  const pageTitle = pageTitleKey ? t(pageTitleKey) : null;
+  const pageTitle = pageTitleKey
+    ? t(pageTitleKey)
+    : (backOverride?.title ?? null);
   const topBarAccessory = useTopBarAccessory();
   const accessoryVisible = Boolean(pageTitle) && topBarAccessory != null;
 
@@ -184,19 +190,27 @@ export default function MainLayout() {
   }, [onChatSurface, router, wide]);
 
   const onPlace = onChatSurface || (onTabRoot && !backOverride);
-  const barTab = !wide && isBottomBarTab(activeTab) ? activeTab : null;
-  const barVisible = onPlace && barTab !== null;
-  const backVisible = wide ? !onPlace : !barVisible;
+  const barTab = bottomBarTabFor(activeTab);
+  const onBarPlace = onPlace && isBottomBarTab(activeTab);
+  const backVisible = wide ? !onPlace : !onBarPlace;
 
   const selectTab = (tab: MainTabId) => {
     const destination = MAIN_TAB_HREFS[tab];
     tapLight();
-    if (destination === pathname) return;
+    if (destination === pathname) {
+      if (backOverride) (backOverride.onReset ?? backOverride.onPress)();
+      return;
+    }
     Keyboard.dismiss();
     if (destination === "/chat") {
       router.dismissTo("/chat");
     } else if (onChatSurface) {
       router.push(destination);
+    } else if (!wide && barTab === tab) {
+      router.dismissTo(destination);
+    } else if (!wide && activeTab !== barTab) {
+      queueMainTab(tab);
+      router.dismissTo("/chat");
     } else if (onTabRoot) {
       router.replace(destination);
     } else if (activeTab === tab) {
@@ -230,8 +244,8 @@ export default function MainLayout() {
   }, [onChatSurface]);
 
   useEffect(() => {
-    if (!barVisible && isDrawerOpen("start")) closeDrawer();
-  }, [barVisible]);
+    if (!onBarPlace && isDrawerOpen("start")) closeDrawer();
+  }, [onBarPlace]);
 
   useEffect(
     () => () => {
@@ -240,7 +254,7 @@ export default function MainLayout() {
     [],
   );
 
-  const accountHandedOff = barVisible && drawerLive && drawerSide === "start";
+  const accountHandedOff = onBarPlace && drawerLive && drawerSide === "start";
   const settingsHandedOff =
     onChatSurface && drawerLive && drawerSide === "end";
 
@@ -300,7 +314,7 @@ export default function MainLayout() {
                   </View>
                 ) : null}
                 {accessoryVisible ? (
-                  <View style={[styles.topBarSide, styles.topBarEnd]}>
+                  <View style={[styles.topBarAccessory, styles.topBarEnd]}>
                     {topBarAccessory}
                   </View>
                 ) : null}
@@ -311,7 +325,7 @@ export default function MainLayout() {
       ) : (
         <DrawerStage
           start={{
-            enabled: barVisible,
+            enabled: onBarPlace,
             panel: <AccountPanel width={travel} />,
             chevron: {
               left: TOP_BAR_INSET,
@@ -343,11 +357,7 @@ export default function MainLayout() {
           <View style={styles.content}>
             <MainStack wide={false} />
           </View>
-          <BottomBar
-            active={barTab}
-            visible={barVisible}
-            onSelect={selectTab}
-          />
+          <BottomBar active={barTab} onSelect={selectTab} />
 
           <Animated.View
             pointerEvents={topBarCovered ? "none" : "box-none"}
@@ -434,7 +444,7 @@ export default function MainLayout() {
               </View>
             )}
             {!search.isOpen && accessoryVisible ? (
-              <View style={[styles.topBarSide, styles.topBarEnd]}>
+              <View style={[styles.topBarAccessory, styles.topBarEnd]}>
                 {topBarAccessory}
               </View>
             ) : null}
@@ -560,6 +570,10 @@ const makeStyles = (colors: Colors) =>
       height: 44,
       justifyContent: "center",
       width: 44,
+    },
+    topBarAccessory: {
+      height: TOP_BAR_BUTTON,
+      justifyContent: "center",
     },
     searchRow: {
       alignItems: "center",

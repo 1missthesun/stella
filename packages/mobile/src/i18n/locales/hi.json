@@ -221,7 +221,9 @@
           "code": "कोड",
           "pages": "पेज",
           "other": "अन्य"
-        }
+        },
+        "viewGrid": "ग्रिड दृश्य",
+        "viewList": "सूची दृश्य"
       },
       "schedule": {
         "actionFailed": "यह पूरा नहीं हो सका।",
@@ -265,7 +267,6 @@
       }
     },
     "apps": {
-      "emailHint": "आपके इनबॉक्स के लिए Stella का पेज",
       "empty": "Stella आपके लिए जो ऐप बनाती है, वे यहाँ रहेंगे।",
       "emptyAction": "ऐप बनाएँ",
       "emptyActionPrompt": "मेरे लिए एक ऐप बनाओ जो "
@@ -955,6 +956,12 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "one": "{count} फ़ाइल",
+        "other": "{count} फ़ाइलें"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

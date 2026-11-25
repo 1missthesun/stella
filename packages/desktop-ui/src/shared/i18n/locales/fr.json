@@ -1125,7 +1125,9 @@
           "code": "Code",
           "pages": "Pages",
           "other": "Autres"
-        }
+        },
+        "viewGrid": "Affichage en grille",
+        "viewList": "Affichage en liste"
       },
       "schedule": {
         "actionFailed": "Ça n’a pas fonctionné.",
@@ -1169,7 +1171,6 @@
       }
     },
     "apps": {
-      "emailHint": "La page de Stella pour votre boîte de réception",
       "empty": "Les apps que Stella crée pour vous apparaîtront ici.",
       "emptyAction": "Créer une app",
       "emptyActionPrompt": "Crée-moi une app qui "

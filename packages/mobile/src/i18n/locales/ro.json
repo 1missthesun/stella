@@ -222,7 +222,9 @@
           "code": "Cod",
           "pages": "Pagini",
           "other": "Altele"
-        }
+        },
+        "viewGrid": "Vizualizare grilă",
+        "viewList": "Vizualizare listă"
       },
       "schedule": {
         "actionFailed": "Nu a reușit.",
@@ -266,7 +268,6 @@
       }
     },
     "apps": {
-      "emailHint": "Pagina Stellei pentru inboxul tău",
       "empty": "Aplicațiile pe care Stella le creează pentru tine vor apărea aici.",
       "emptyAction": "Creează o aplicație",
       "emptyActionPrompt": "Creează-mi o aplicație care "
@@ -956,6 +957,13 @@
     }
   },
   "shell": {
+    "appSource": {
+      "files": {
+        "few": "{count} fișiere",
+        "one": "{count} fișier",
+        "other": "{count} de fișiere"
+      }
+    },
     "display": {
       "canvasShare": {
         "toasts": {

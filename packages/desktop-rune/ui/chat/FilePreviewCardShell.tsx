@@ -13,6 +13,8 @@ type FilePreviewCardShellProps = {
   onSave: () => void;
   onCopy: () => void;
   mt?: number;
+  grow?: boolean;
+  headerAlign?: "start" | "center";
   children: ReactNode;
 };
 
@@ -28,13 +30,13 @@ function ShellAction({ label, onPress }: { label: string; onPress: () => void })
   );
 }
 
-export function FilePreviewCardShell({ eyebrow, title, titlePath, meta, actionStatus, hideActions = false, onSave, onCopy, mt, children }: FilePreviewCardShellProps) {
+export function FilePreviewCardShell({ eyebrow, title, titlePath, meta, actionStatus, hideActions = false, onSave, onCopy, mt, grow = false, headerAlign = "start", children }: FilePreviewCardShellProps) {
   const t = useT();
   const tokens = useTokens();
   const surface = panelSurface(tokens);
   return (
-    <col w="full" mt={mt} radius={radius.lg} clip={radius.lg} gradient={surface.gradient} border={surface.border} shadows={surface.shadows}>
-      <row align="start" justify="between" gap={12} pt={12 + 1} px={14 + 1} pb={12 + 1} fill={tokens.c.surfaceInset} borderSides={[0, 0, 1, 0]} border={tokens.c.border}>
+    <col w="full" mt={mt} {...(grow ? { grow: 1, minH: 0 } : {})} radius={radius.lg} clip={radius.lg} gradient={surface.gradient} border={surface.border} shadows={surface.shadows}>
+      <row shrink={false} align={headerAlign} justify="between" gap={12} pt={12 + 1} px={14 + 1} pb={12 + 1} fill={tokens.c.surfaceInset} borderSides={[0, 0, 1, 0]} border={tokens.c.border}>
         <col minW={0}>
           <text mb={4} size={fontSize.xs} weight={600} tracking={fontSize.xs * 0.08} textCase="upper" color={tokens.c.mutedForeground}>
             {eyebrow}

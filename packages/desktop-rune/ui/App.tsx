@@ -108,6 +108,11 @@ const replies = [
 
 function send(text: string) {
   const s = stella.store;
+  if (stella.chat) {
+    s.set({ draft: "" });
+    void stella.chat.send(text);
+    return;
+  }
   const id = `n${Date.now()}`;
   const at = new Date().toTimeString().slice(0, 5);
   s.set((st) => ({ draft: "", messages: [...st.messages, { id: `${id}u`, role: "user", text, at }] }));

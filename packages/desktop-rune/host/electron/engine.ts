@@ -119,8 +119,9 @@ type BridgeModule = {
 let bridge: BridgeModule | null = null;
 
 /** Attaches the engine bridge; until then (and in a headless host) the fallbacks answer. */
-export function attachEngine(module: BridgeModule) {
-  bridge = module;
+/** `module` is host/bridge.ts; its `engine` and `onEngineEvent` exports are used when present. */
+export function attachEngine(module: object) {
+  bridge = module as BridgeModule;
   for (const [t, handlers] of pendingListeners) for (const h of handlers) bridge.onEngineEvent?.(t, h);
 }
 

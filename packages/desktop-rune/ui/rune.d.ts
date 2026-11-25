@@ -41,5 +41,7 @@ declare global {
     useStore: <T>(sel: (s: import("../host/store").AppState) => T) => T;
     command: (v: Record<string, unknown>) => void;
     now: () => number;
+    /** The runtime's default conversation, when the host runs Stella's services. */
+    chat?: { conversationId: string; send(text: string): Promise<void> };
   };
 }

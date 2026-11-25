@@ -2,6 +2,7 @@
 // worker, and the app window's `electronAPI` on a local control port. For scripted checks
 // (sign-in, chat) and memory measurements.
 
+import "./stdio";
 import { bootElectronMain } from "./electron-main";
 import { firstAppWindow, rendererApiFor } from "./renderer-api";
 import { startControlServer } from "./control";

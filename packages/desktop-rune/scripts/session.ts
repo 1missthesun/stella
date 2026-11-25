@@ -6,10 +6,11 @@
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png>
 //   bun scripts/session.ts stop
+// With STELLA_LAUNCHER=1 and a socket on fd 3, the app gets that launcher channel, as from a launcher.
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -29,6 +30,22 @@ type Run = { runDir: string; dataDir: string; userDataDir: string; homeDir: stri
 
 const readRun = (): Run => JSON.parse(readFileSync(POINTER, "utf8"));
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const cmdline = (pid: number) => { try { return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0"); } catch { return []; } };
+
+/** A display no other X server (the verify harness's, another agent's) holds, outside the harness's range. */
+const freeDisplay = () => {
+  for (let n = 140; n < 200; n++) {
+    if (!existsSync(`/tmp/.X11-unix/X${n}`) && !existsSync(`/tmp/.X${n}-lock`)) return `:${n}`;
+  }
+  throw new Error("No free X display in :140-:199.");
+};
+
+/** The run's Xvfb, only while it is the process this script started and still serves the run's display. */
+const ownDisplay = (run: Run) => {
+  const pid = run.pids.xvfb;
+  if (!run.display || !pid || !alive(pid) || !cmdline(pid).includes(run.display)) throw new Error(`Run ${runName} has no live display of its own.`);
+  return run.display;
+};
 
 const adminSecret = (): string | null => {
   if (process.env.STELLA_ADMIN_API_SECRET?.trim()) return process.env.STELLA_ADMIN_API_SECRET.trim();
@@ -92,6 +109,8 @@ async function start() {
 
   const env: Record<string, string> = {};
   for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR"]) if (process.env[key]) env[key] = process.env[key]!;
+  const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();
+  if (launcherChannel) env.STELLA_LAUNCHER = "1";
   env.PATH = (env.PATH ?? "").split(path.delimiter).filter((p) => path.basename(p) !== "shell-shims").join(path.delimiter);
   const realHome = os.homedir();
   for (const [key, rel] of [["BUN_INSTALL_CACHE_DIR", ".bun/install/cache"], ["MISE_DATA_DIR", ".local/share/mise"]] as const) {
@@ -123,17 +142,20 @@ async function start() {
   const log = openSync(path.join(RUN_DIR, "host.log"), "a");
   let display: string | undefined;
   if (headless) {
-    const child = spawn(BUN, [path.join(ROOT, "host/services/headless.ts")], { cwd: REPO, env, stdio: ["ignore", log, log], detached: true });
+    const stdoutLog = openSync(path.join(RUN_DIR, "host.stdout"), "a");
+    const child = spawn(BUN, [path.join(ROOT, "host/services/headless.ts")], { cwd: REPO, env, stdio: ["ignore", stdoutLog, log, ...(launcherChannel ? [3] : [])], detached: true });
+    closeSync(stdoutLog);
     pids.host = child.pid!;
     child.unref();
   } else {
-    display = flag("--display") ?? `:${90 + (Math.abs([...runName].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) % 9)}`;
+    display = flag("--display") ?? freeDisplay();
     const w = Number(process.env.W ?? 1400);
     const h = Number(process.env.H ?? 940);
     const xvfb = spawn(XVFB, [display, "-screen", "0", `${w + 40}x${h + 40}x24`, "-nolisten", "tcp"], { stdio: ["ignore", log, log], detached: true });
     pids.xvfb = xvfb.pid!;
     xvfb.unref();
-    for (let i = 0; i < 100 && !existsSync(`/tmp/.X11-unix/X${display.slice(1)}`); i++) await Bun.sleep(50);
+    for (let i = 0; i < 100 && alive(xvfb.pid!) && !existsSync(`/tmp/.X11-unix/X${display.slice(1)}`); i++) await Bun.sleep(50);
+    if (!alive(xvfb.pid!)) throw new Error(`Xvfb could not start on ${display}; see ${path.join(RUN_DIR, "host.log")}.`);
     Object.assign(env, {
       DISPLAY: display,
       VK_ICD_FILENAMES: "/usr/share/vulkan/icd.d/lvp_icd.json",
@@ -148,7 +170,7 @@ async function start() {
       STELLA_RUNE_SCREEN_W: String(w + 40),
       STELLA_RUNE_SCREEN_H: String(h + 40),
     });
-    const engine = spawn(ENGINE, [], { cwd: REPO, env, stdio: ["ignore", log, log], detached: true });
+    const engine = spawn(ENGINE, [], { cwd: REPO, env, stdio: ["ignore", log, log, ...(launcherChannel ? [3] : [])], detached: true });
     pids.engine = engine.pid!;
     engine.unref();
   }
@@ -172,8 +194,7 @@ async function evaluate(body: string) {
 
 function shot(file: string) {
   const run = readRun();
-  if (!run.display) throw new Error("Headless run has no display.");
-  const r = spawnSync("import", ["-window", "root", file], { env: { ...process.env, DISPLAY: run.display }, stdio: "inherit" });
+  const r = spawnSync("import", ["-window", "root", file], { env: { ...process.env, DISPLAY: ownDisplay(run) }, stdio: "inherit" });
   if (r.status !== 0) throw new Error("screenshot failed");
   console.log(file);
 }
@@ -186,11 +207,20 @@ async function stop() {
     await fetch(`http://127.0.0.1:${run.ctlPort}/eval`, { method: "POST", body: "setTimeout(() => electron.app.quit(), 10); return true;" }).catch(() => {});
     for (let i = 0; i < 80 && alive(app); i++) await Bun.sleep(100);
   }
-  for (const name of ["host", "engine", "xvfb"]) {
-    const pid = run.pids[name];
-    if (!pid || !alive(pid)) continue;
-    try { process.kill(-pid, "SIGTERM"); } catch { try { process.kill(pid, "SIGTERM"); } catch {} }
-  }
+  const signal = (sig: NodeJS.Signals) => {
+    for (const name of ["host", "engine", "xvfb"]) {
+      const pid = run.pids[name];
+      if (!pid || !alive(pid)) continue;
+      try { process.kill(-pid, sig); } catch { try { process.kill(pid, sig); } catch {} }
+    }
+  };
+  const pids = Object.values(run.pids);
+  signal("SIGTERM");
+  for (let i = 0; i < 50 && pids.some(alive); i++) await Bun.sleep(100);
+  if (pids.some(alive)) signal("SIGKILL");
+  for (let i = 0; i < 20 && pids.some(alive); i++) await Bun.sleep(100);
+  if (pids.some(alive)) throw new Error(`Run ${runName} did not stop: ${pids.filter(alive).join(", ")}`);
+  rmSync(POINTER, { force: true });
   console.log(`stopped ${JSON.stringify(run.pids)}`);
 }
 

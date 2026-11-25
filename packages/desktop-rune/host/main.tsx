@@ -1,42 +1,48 @@
 // Entry of the TS UI host. Spawned by the compiled Rune engine; stdout is the bridge, so all
 // logging goes to stderr. Watches ui/app/ and hot-swaps it into the running engine.
 
-console.log = console.error;
-console.info = console.error;
-
-import { watch, statSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import "./services/stdio";
+import { watch, statSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
+import * as bridge from "./bridge";
 import { command, commitCtx, listen, now, stats, type EngineEvent } from "./bridge";
 import { batched, handlers, render } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
-import { viteCompat } from "./vite-compat";
+import { applyUiEnv } from "./services/ui-env";
+import { createUiLoader } from "./services/ui-loader";
+import type { RuneServices } from "./services/boot";
+import type { ControlContext } from "./services/control";
 
 const t_boot = now();
 const ROOT = join(import.meta.dir, "..");
 const APP_DIR = join(ROOT, "ui");
-const HOT = join(ROOT, ".hot");
-rmSync(HOT, { recursive: true, force: true });
-mkdirSync(HOT, { recursive: true });
+const SERVICES = process.env.STELLA_RUNE_SERVICES === "1";
+
+applyUiEnv();
+const ui = createUiLoader({
+  entry: join(APP_DIR, "App.tsx"),
+  tsconfig: join(ROOT, "tsconfig.build.json"),
+  external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
+});
+ui.warm();
 
 let swapN = 0;
 async function loadApp(): Promise<any> {
-  const n = ++swapN;
-  const res = await Bun.build({
-    entrypoints: [join(APP_DIR, "App.tsx")],
-    external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
-    target: "bun",
-    format: "esm",
-    tsconfig: join(ROOT, "tsconfig.build.json"),
-    plugins: [viteCompat],
-  } as any);
-  if (!res.success) throw new Error(res.logs.map((l) => String(l)).join("\n"));
-  const file = join(HOT, `app-${n}.js`);
-  await Bun.write(file, await res.outputs[0].text());
-  const mod = await import(file);
-  // Keep the folder small: older builds are already evaluated.
-  for (const f of readdirSync(HOT)) if (f !== `app-${n}.js`) rmSync(join(HOT, f), { force: true });
+  const mod = await ui.load();
+  swapN++;
   return mod;
+}
+
+const quit = (code: number) => {
+  command({ cmd: "quit" });
+  setTimeout(() => process.exit(code), 1000).unref();
+};
+
+let services: RuneServices | null = null;
+if (SERVICES) {
+  const { bootRuneServices } = await import("./services/boot");
+  services = await bootRuneServices({ bridge, exit: quit });
 }
 
 let app = await loadApp();
@@ -62,9 +68,12 @@ watch(APP_DIR, { recursive: true }, (_ev, file) => {
 
 async function swap() {
   pending = null;
-  const t0 = t_seen;
   let mtime = 0;
   try { mtime = statSync(join(APP_DIR, changed)).mtimeMs; } catch {}
+  await applySwap(changed, t_seen, mtime);
+}
+
+async function applySwap(label: string, t0: number, mtime = t0): Promise<boolean> {
   try {
     const next = await loadApp();
     const t_built = now();
@@ -73,17 +82,21 @@ async function swap() {
     render(createElement(app.App), { t0, kind: 1 });
     const t_committed = now();
     store.set({ lastSwapMs: Math.round(t_committed - t0) });
-    console.error(`[ui] hot swap #${swapN} ${changed}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+import ${(t_built - t0).toFixed(1)} ms, render+send ${(t_committed - t_built).toFixed(1)} ms`);
+    console.error(`[ui] hot swap #${swapN} ${label}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render+send ${(t_committed - t_built).toFixed(1)} ms`);
+    return true;
   } catch (err) {
     // A broken edit never takes the UI down: the old app keeps running, the error shows.
     console.error("[ui] hot swap failed, keeping the running UI:", err);
     store.set({ error: String((err as Error).message ?? err).slice(0, 400) });
+    return false;
   }
 }
 
 // ---------------------------------------------------------------- engine events
 const waiters = new Map<string, (v: unknown) => void>();
+let lastInput = now();
 listen((e: EngineEvent) => {
+  if (e.t === "press" || e.t === "input" || e.t === "submit" || e.t === "key") lastInput = now();
   if (e.t === "rec") { waiters.get("rec")?.(e.result); waiters.delete("rec"); return; }
   const h = handlers.get(e.key);
   batched(() => {
@@ -96,6 +109,25 @@ listen((e: EngineEvent) => {
   });
 });
 
+
+// ---------------------------------------------------------------- services
+let control: ControlContext | null = null;
+if (services) {
+  const { setUiSwapTarget } = await import("./services/renderer-source");
+  setUiSwapTarget({
+    async apply(paths) {
+      const ok = await applySwap(paths.join(", ") || "app-source", now());
+      return ok ? { mode: "swap", swaps: swapN } : { mode: "failed", error: store.get().error ?? "swap failed", reloaded: false };
+    },
+    async quietFor() { return now() - lastInput; },
+  });
+  const { startChatFeed } = await import("./services/chat-feed");
+  startChatFeed(services.api, store).then(
+    (feed) => { g.stella.chat = feed; console.error(`[host] chat feed on conversation ${feed.conversationId}`); },
+    (err) => console.error("[host] chat feed failed:", err),
+  );
+  control = { api: services.api };
+}
 
 // ---------------------------------------------------------------- bench control (opt-in)
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -170,6 +202,17 @@ const bench: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
     return true;
   },
   async stats() { return { ...stats, swaps: swapN, rss_mb: process.memoryUsage().rss / 1048576, heap_mb: process.memoryUsage().heapUsed / 1048576 }; },
+  async swap(q) {
+    const n = Number(q.get("n") ?? 1);
+    const rss = () => { Bun.gc(true); return Math.round(process.memoryUsage().rss / 1048576 * 10) / 10; };
+    const samples = [rss()];
+    for (let i = 1; i <= n; i++) {
+      await applySwap(`bench ${i}`, now());
+      if (i % 10 === 0 || i === n) samples.push(rss());
+    }
+    await sleep(2600);
+    return { swaps: swapN, rss_mb: samples, settled_rss_mb: rss() };
+  },
   async quit() { setTimeout(() => command({ cmd: "quit" }), 50); return true; },
 };
 
@@ -180,6 +223,11 @@ if (port) {
     hostname: "127.0.0.1",
     idleTimeout: 255,
     async fetch(req) {
+      if (control) {
+        const { handleControl } = await import("./services/control");
+        const handled = await handleControl(req, control);
+        if (handled) return handled;
+      }
       const u = new URL(req.url);
       const fn = bench[u.pathname.slice(1)];
       if (!fn) return new Response("unknown", { status: 404 });

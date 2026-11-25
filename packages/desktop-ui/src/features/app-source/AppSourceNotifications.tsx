@@ -84,6 +84,7 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
               : t("shell.appSource.updates.newVersionDetail"),
         more: {
           label: t("shell.notifications.more"),
+          lasting: news ? { open: "whats-new", release: releaseKey(news) } : { open: "whats-new" },
           run: () => whatsNewDialog.open(news ? releaseKey(news) : undefined),
         },
         createdAt: arrived.date,

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
 import { pendingPrompts } from "./conversation-outbox";
 import { cloudConversationCacheClient } from "./cloud-conversation-cache-client";
+import { forgetNotificationHistory } from "@/features/notifications/notification-store";
 
 const GENERATION_PREFIX = "stella:cloudOwnerGeneration:";
 const OUTBOX_PREFIX = "stella:paused-outbox:";
@@ -142,6 +143,7 @@ export const wipeAccountsFromThisComputer = async (
   keep: string | null,
 ): Promise<void> => {
   removeScopedKeys(keep);
+  forgetNotificationHistory(keep);
   if (!keep || lastAccountScope() !== keep) uiState.removeItem(LAST_ACCOUNT_SCOPE_KEY);
   if (keep) rememberAccountScope(keep);
   emit();

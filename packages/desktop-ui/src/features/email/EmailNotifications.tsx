@@ -49,7 +49,9 @@ function UrgentEmailNotifications() {
           title: clip(item.title),
           detail: clip(item.gist),
           createdAt: item.at,
-          actions: [{ label: t("email.notify.open"), primary: true, run: openFromBell }],
+          actions: [
+            { label: t("email.notify.open"), primary: true, lasting: { open: "email" }, run: openFromBell },
+          ],
         })),
     [page, seenAt, t],
   );

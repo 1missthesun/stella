@@ -83,10 +83,11 @@ export function useTierRestrictedModelToast() {
         tense: "is",
       }),
       actions: [
-        { label: BYOK_TOAST_ACTION.label, run: BYOK_TOAST_ACTION.onClick },
+        { label: BYOK_TOAST_ACTION.label, lasting: { open: "models" }, run: BYOK_TOAST_ACTION.onClick },
         {
           label: getModelRestrictionActionLabel(audience),
           primary: true,
+          lasting: { open: "plans" },
           run: () => planUsageDialog.openPlans(),
         },
       ],

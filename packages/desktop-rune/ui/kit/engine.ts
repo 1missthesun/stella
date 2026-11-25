@@ -1,21 +1,19 @@
-export type NativeMenuItem = { id?: string; label?: string; type?: "normal" | "separator" | "checkbox" | "submenu"; enabled?: boolean; checked?: boolean; accelerator?: string; submenu?: NativeMenuItem[] };
+import type { engine as BridgeEngine, MenuItem } from "../../host/bridge";
 
-type EngineApi = {
-  fonts: (f: { files: string[]; sans?: string; mono?: string }) => Promise<unknown>;
-  colorMotion: (dur: number) => Promise<unknown>;
-  menu: { popup: (items: NativeMenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) => Promise<string | null> };
-  clipboard: { writeText: (text: string) => Promise<unknown> };
-};
+export type NativeMenuItem = MenuItem;
 
-const api = () => (globalThis as { stella?: { engine?: EngineApi } }).stella?.engine;
+const api = (): typeof BridgeEngine | undefined => (globalThis as { stella?: { engine?: typeof BridgeEngine } }).stella?.engine;
 
-/** The engine calls the kit makes (host/bridge's `engine`), absent when the kit renders elsewhere. */
+/** The engine calls the kit makes (host/bridge's `engine`); each is a no-op where the kit renders without the engine. */
 export const engine = {
   colorMotion(dur: number) {
     void api()?.colorMotion(dur);
   },
   fonts(files: string[], sans: string, mono: string) {
     void api()?.fonts({ files, sans, mono });
+  },
+  background(color: string) {
+    void api()?.background(color);
   },
   popupMenu(items: NativeMenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }): Promise<string | null> {
     return api()?.menu.popup(items, at) ?? Promise.resolve(null);
@@ -24,6 +22,15 @@ export const engine = {
     const e = api();
     if (!e) return false;
     await e.clipboard.writeText(text);
+    return true;
+  },
+  /** Asks where to save `text` and writes it there; false when cancelled or without the engine. */
+  async saveText(text: string, defaultName: string): Promise<boolean> {
+    const e = api();
+    if (!e) return false;
+    const path = await e.dialog.saveFile({ defaultPath: defaultName });
+    if (!path) return false;
+    await Bun.write(path, text);
     return true;
   },
 };

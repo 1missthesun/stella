@@ -1,3 +1,10 @@
+/**
+ * desktop-ui declares its radii in Tailwind's `@theme inline`, which emits no CSS variables, so a
+ * plain `var(--radius-*)` without a fallback draws square corners there (assistant bubbles, code
+ * blocks, the empty-state detail chip). Those places use this.
+ */
+export const radiusUnset = 0;
+
 export const radius = { xs: 4, sm: 6, md: 8, lg: 10, xl: 12, "2xl": 14, "3xl": 18, "4xl": 24, full: 9999 } as const;
 
 export const fontSize = { "2xs": 10, xs: 11, sm: 12, base: 13, md: 14, lg: 15, xl: 17, "2xl": 20, "3xl": 24, "4xl": 32 } as const;

@@ -1,9 +1,9 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { sampleWorkingDots, WORKING_DOTS_CYCLE_MS, WORKING_DOTS_STAGGER, workingDotsReducedOpacity } from "@stella/contracts/working-dots-bounce";
-import { derive, font, fontSize, look, mix, mixOklch, radius, useTokens } from "../theme";
+import { derive, font, fontSize, look, mix, mixOklch, radius, radiusUnset, useTokens } from "../theme";
 import { Pill } from "./Button";
 import { Icon, Icons, type IconData } from "./icons";
-import type { KitFrame, KitLoop } from "./pending-props";
+import type { Frame, Loop } from "../rune";
 import { MotifArt, type EmptyStateMotif } from "./empty-state/MotifArt";
 
 export type TabItem<T extends string = string> = { value: T; label: string; icon?: IconData; disabled?: boolean };
@@ -65,10 +65,10 @@ export function Keybind({ keys }: { keys: string | string[] }) {
   );
 }
 
-let bounce: KitFrame[] | null = null;
-let fade: KitFrame[] | null = null;
+let bounce: Frame[] | null = null;
+let fade: Frame[] | null = null;
 
-function dotFrames(dot: number, reduced: boolean): KitFrame[] {
+function dotFrames(dot: number, reduced: boolean): Frame[] {
   if (reduced) {
     return (fade ??= Array.from({ length: 25 }, (_, i) => ({ at: i / 24, opacity: workingDotsReducedOpacity(i / 24) })));
   }
@@ -148,7 +148,7 @@ const MARK_SPOT: Partial<Record<EmptyStateMotif, [number, number]>> = {
   trash: [0, 6],
 };
 
-const MARK_SWEEP: KitLoop = {
+const MARK_SWEEP: Loop = {
   kind: "sequence",
   period: 7,
   frames: Array.from({ length: 25 }, (_, i) => {
@@ -187,7 +187,7 @@ export function EmptyState({ id = "empty-state", motif, title, body, detail, act
           {title}
         </text>
         {detail ? (
-          <box px={10} py={2} radius={radius.full} fill={detailFill} maxW={240}>
+          <box px={10} py={2} radius={radiusUnset} fill={detailFill} maxW={240}>
             <text {...look(fontSize.xs, 500, { lh: 1.6 })} color={t.c.textBase} truncate title={detail}>
               {detail}
             </text>

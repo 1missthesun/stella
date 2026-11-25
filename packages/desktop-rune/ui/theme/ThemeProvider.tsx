@@ -10,10 +10,11 @@ const TokensContext = createContext<Tokens | null>(null);
 /** Seconds a theme or colour-mode switch springs its colours over. */
 export const THEME_SPRING = 0.3;
 
-function useSpringOnChange(tokens: Tokens) {
+function useSpringOnChange(tokens: Tokens, windowRoot = false) {
   const last = useRef<Tokens | null>(null);
   if (last.current !== tokens) {
     if (last.current) engine.colorMotion(THEME_SPRING);
+    if (windowRoot && last.current?.c.background !== tokens.c.background) engine.background(tokens.c.background);
     last.current = tokens;
   }
 }
@@ -22,7 +23,7 @@ function TokensFromTheme({ children }: { children: ReactNode }) {
   const { theme, colors, resolvedColorMode, flat } = useTheme();
   const dark = resolvedColorMode === "dark";
   const tokens = useMemo(() => buildTokens({ themeId: theme.id, colors, dark, flat }), [theme.id, colors, dark, flat]);
-  useSpringOnChange(tokens);
+  useSpringOnChange(tokens, true);
   return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
 }
 

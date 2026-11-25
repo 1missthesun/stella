@@ -1,5 +1,5 @@
 import { derive, hex, mixOklch, type Tokens, useTokens } from "../../theme";
-import type { KitFrame, KitLoop } from "../pending-props";
+import type { Frame, Loop } from "../../rune";
 import { MOTIFS, type MotifLayer } from "./motifs.gen";
 
 export type EmptyStateMotif = keyof typeof MOTIFS;
@@ -62,17 +62,17 @@ function squareBody(l: MotifLayer, body: string) {
 const wave = (t: number) => (1 - Math.cos(2 * Math.PI * t)) / 2;
 const SAMPLES = 24;
 
-function sampled(period: number, delay: number, frame: (p: number) => Omit<KitFrame, "at">): KitFrame[] {
+function sampled(period: number, delay: number, frame: (p: number) => Omit<Frame, "at">): Frame[] {
   const phase = (((-delay / period) % 1) + 1) % 1;
   return Array.from({ length: SAMPLES + 1 }, (_, i) => ({ at: i / SAMPLES, ...frame(wave(i / SAMPLES + phase)) }));
 }
 
-function spin(period: number, dir: 1 | -1): KitLoop {
+function spin(period: number, dir: 1 | -1): Loop {
   return { kind: "sequence", period, frames: [0, 0.25, 0.5, 0.75, 1].map((at) => ({ at, rotate: dir * at * 2 * Math.PI })) };
 }
 
 /** desktop-ui's motif keyframes (es-float, es-sweep, es-spin, the orbit's counter-spin) for one layer of `px` points. */
-function layerLoop(l: MotifLayer, px: { w: number; h: number }): KitLoop | undefined {
+function layerLoop(l: MotifLayer, px: { w: number; h: number }): Loop | undefined {
   const m = l.motion.split(/\s+/);
   if (m.includes("es-float")) {
     const period = m.includes("es-float--row") ? 8 : m.includes("es-float--badge") ? 5 : 7;

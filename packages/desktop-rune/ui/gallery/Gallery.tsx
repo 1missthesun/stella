@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ThemeBackdrop, ThemeScope, fontSize, look, useTokens } from "../theme";
+import { ThemeBackdrop, ThemeScope, fontSize, look, radiusUnset, useTokens } from "../theme";
 import {
   Avatar,
   Button,
@@ -271,7 +271,7 @@ function MarkdownPage() {
   const t = useTokens();
   return (
     <row w="full" justify="start">
-      <col maxW="85%" px={14} py={8} radius={18} fill={t.c.chatAssistantBubbleFillTop} gradient={t.gradient.assistantBubble}>
+      <col maxW="85%" px={14} py={8} radius={radiusUnset} fill={t.c.chatAssistantBubbleFillTop} gradient={t.gradient.assistantBubble}>
         <Markdown id="md" text={GALLERY_MARKDOWN} />
       </col>
     </row>

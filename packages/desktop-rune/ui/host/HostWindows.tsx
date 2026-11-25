@@ -102,9 +102,21 @@ export function HostWebView({ window: w }: { window: WindowSnapshot }) {
 
 type BrowserViewLayout = { w: number | "full"; h: number | "full"; fixed?: boolean; absolute?: { left: number; top: number } };
 
-/** A Chromium page drawn from its frames. */
+/** A Chromium page: its frames on a `<surface>`, with the user's pointer, wheel and keys sent back to it. */
 export function HostBrowserView({ contentsId, ...layout }: { contentsId: number } & BrowserViewLayout) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [src, setSrc] = useState<string | undefined>(undefined);
   useEffect(() => stella.host?.browser.frames(contentsId, setSrc), [contentsId]);
-  return src ? <image src={src} fit="stretch" {...layout} /> : <box fill="#ffffff" {...layout} />;
+  const browser = stella.host?.browser;
+  return (
+    <surface
+      src={src}
+      fit="stretch"
+      fill="#ffffff"
+      focusable
+      onPointer={(pointer) => browser?.surface(contentsId, { pointer })}
+      onWheel={(wheel) => browser?.surface(contentsId, { wheel })}
+      onKeyRaw={(key) => browser?.surface(contentsId, { key })}
+      {...layout}
+    />
+  );
 }

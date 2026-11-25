@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
 import { RendererIpc } from "./ipc";
 import { sessionFor, type Session } from "./session";
 import { warnOnce } from "./engine";
-import { ChromiumPage, type ScreencastFrame } from "./chromium-page";
+import { ChromiumPage, type PageKey, type PagePointer, type PageWheel, type ScreencastFrame } from "./chromium-page";
 import { chromiumTargetFor } from "./chromium-profiles";
 import { nativeImage } from "./native-image";
 
@@ -227,6 +227,15 @@ export class WebContents extends EventEmitter {
     if (width < 1 || height < 1) return;
     this.viewport = { width: Math.round(width), height: Math.round(height) };
     void this.livePage?.setViewport(this.viewport.width, this.viewport.height).catch(() => {});
+  }
+
+  /** Input from the UI's surface for this page (CSS px). */
+  surfaceInput(event: { pointer: PagePointer } | { wheel: PageWheel } | { key: PageKey }) {
+    const page = this.livePage;
+    if (!page) return;
+    const sent = "pointer" in event ? page.pointer(event.pointer) : "wheel" in event ? page.wheel(event.wheel) : page.key(event.key);
+    sent.catch(() => {});
+    if ("pointer" in event && event.pointer.kind === "down") this.focus();
   }
 
   /** Streams the page's frames (JPEG) while the UI shows it; returns the stop. */

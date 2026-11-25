@@ -8,6 +8,7 @@ import { engine } from "../electron/engine";
 import { hostDialogs, type HostDialogRequest } from "../electron/native";
 import { defaultSession, fetchProtocolIn } from "../electron/session";
 import { WebContents } from "../electron/web-contents";
+import type { PageKey, PagePointer, PageWheel } from "../electron/chromium-page";
 import { rendererApiFor, type ElectronApi } from "./renderer-api";
 
 export type HostMessageBox = Omit<HostDialogRequest, "resolve">;
@@ -47,13 +48,14 @@ export type UiHost = {
     frames(contentsId: number, listener: (src: string) => void, maxSize?: { width: number; height: number }): () => void;
     /** Electron input events (sendInputEvent shapes) for the page. */
     input(contentsId: number, event: Record<string, unknown>): void;
+    /** A `<surface>`'s pointer, wheel and key events, in the page's CSS px. */
+    surface(contentsId: number, event: { pointer: PagePointer } | { wheel: PageWheel } | { key: PageKey }): void;
     insertText(contentsId: number, text: string): void;
     focus(contentsId: number): void;
   };
 };
 
-const FRAME_INTERVAL_MS = 1000 / 30;
-const BLOB_RETIRE_MS = 500;
+const FRAME_INTERVAL_MS = 1000 / 60;
 
 const STANDARD_SCHEMES = new Set(["http", "https", "file", "data", "blob", "about", "javascript", "ws", "wss"]);
 
@@ -78,7 +80,7 @@ function streamFrames(contentsId: number, listener: (src: string) => void, maxSi
     latest = null;
     lastPush = performance.now();
     listener(`blob:${current}`);
-    if (previous) setTimeout(() => freeBlob(previous), BLOB_RETIRE_MS);
+    if (previous) freeBlob(previous);
   };
   const stop = contents.streamFrames((frame) => {
     latest = frame.jpeg;
@@ -89,7 +91,7 @@ function streamFrames(contentsId: number, listener: (src: string) => void, maxSi
     stopped = true;
     stop();
     if (timer) clearTimeout(timer);
-    if (current) setTimeout(() => freeBlob(current), BLOB_RETIRE_MS);
+    if (current) freeBlob(current);
   };
 }
 
@@ -207,6 +209,7 @@ export function createUiHost(): UiHost {
     browser: {
       frames: streamFrames,
       input(contentsId, event) { WebContents.fromId(contentsId)?.sendInputEvent(event); },
+      surface(contentsId, event) { WebContents.fromId(contentsId)?.surfaceInput(event); },
       insertText(contentsId, text) { void WebContents.fromId(contentsId)?.insertText(text).catch(() => {}); },
       focus(contentsId) { WebContents.fromId(contentsId)?.focus(); },
     },

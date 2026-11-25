@@ -21,6 +21,15 @@ export type PageEvents = {
 
 export type ScreencastFrame = { jpeg: Uint8Array; width: number; height: number; scale: number };
 
+export type Mods = { shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean };
+export type PagePointer = { kind: "move" | "down" | "up" | "leave"; x: number; y: number; button: string | null; buttons: number; clicks: number; mods: Mods };
+export type PageWheel = { x: number; y: number; dx: number; dy: number; mode: "pixel" | "line"; mods: Mods };
+export type PageKey = { type: "down" | "up"; key: string; text: string | null; mods: Mods };
+
+const LINE_PX = 40;
+const modsMask = (m: Mods) => (m.alt ? 1 : 0) | (m.ctrl ? 2 : 0) | (m.meta ? 4 : 0) | (m.shift ? 8 : 0);
+const CDP_BUTTONS = new Set(["left", "right", "middle", "back", "forward"]);
+
 type ElectronInput = {
   type: string;
   x?: number; y?: number; button?: "left" | "middle" | "right"; clickCount?: number;
@@ -47,7 +56,7 @@ const KEY_CODES: Record<string, { key: string; code: string; vk: number }> = {
   Enter: { key: "Enter", code: "Enter", vk: 13 }, Return: { key: "Enter", code: "Enter", vk: 13 },
   Tab: { key: "Tab", code: "Tab", vk: 9 }, Backspace: { key: "Backspace", code: "Backspace", vk: 8 },
   Escape: { key: "Escape", code: "Escape", vk: 27 }, Delete: { key: "Delete", code: "Delete", vk: 46 },
-  Space: { key: " ", code: "Space", vk: 32 }, Up: { key: "ArrowUp", code: "ArrowUp", vk: 38 },
+  Space: { key: " ", code: "Space", vk: 32 }, " ": { key: " ", code: "Space", vk: 32 }, Up: { key: "ArrowUp", code: "ArrowUp", vk: 38 },
   Down: { key: "ArrowDown", code: "ArrowDown", vk: 40 }, Left: { key: "ArrowLeft", code: "ArrowLeft", vk: 37 },
   Right: { key: "ArrowRight", code: "ArrowRight", vk: 39 }, Home: { key: "Home", code: "Home", vk: 36 },
   End: { key: "End", code: "End", vk: 35 }, PageUp: { key: "PageUp", code: "PageUp", vk: 33 },
@@ -284,6 +293,33 @@ export class ChromiumPage extends EventEmitter {
   }
 
   insertText(text: string) { return this.send("Input.insertText", { text }); }
+
+  /** Pointer input from the UI's surface, in CSS px of the page. */
+  pointer(e: PagePointer) {
+    const type = e.kind === "down" ? "mousePressed" : e.kind === "up" ? "mouseReleased" : "mouseMoved";
+    const button = e.button && CDP_BUTTONS.has(e.button) ? e.button : "none";
+    return this.send("Input.dispatchMouseEvent", {
+      type, x: e.x, y: e.y, modifiers: modsMask(e.mods), buttons: e.buttons,
+      button: type === "mouseMoved" ? "none" : button, clickCount: type === "mouseMoved" ? 0 : Math.max(1, e.clicks),
+    });
+  }
+
+  /** A surface wheel: positive dy scrolls up (towards the top), as the engine reports it. */
+  wheel(e: PageWheel) {
+    const scale = e.mode === "line" ? LINE_PX : 1;
+    return this.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: e.x, y: e.y, deltaX: -e.dx * scale, deltaY: -e.dy * scale, modifiers: modsMask(e.mods) });
+  }
+
+  key(e: PageKey) {
+    const k = keyOf(e.key);
+    const modifiers = modsMask(e.mods);
+    const text = e.type === "down" ? e.text ?? (k.key === "Enter" ? "\r" : null) : null;
+    return this.send("Input.dispatchKeyEvent", {
+      type: e.type === "up" ? "keyUp" : text ? "keyDown" : "rawKeyDown",
+      key: k.key, code: k.code, windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk, modifiers,
+      ...(text ? { text, unmodifiedText: text } : {}),
+    });
+  }
   setUserAgent(userAgent: string) {
     return this.send("Emulation.setUserAgentOverride", { userAgent, userAgentMetadata: userAgentMetadataFor(userAgent) });
   }

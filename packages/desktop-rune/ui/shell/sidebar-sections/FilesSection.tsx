@@ -404,7 +404,7 @@ export function WorkList({ section = "files", idleContent = null, embedded = fal
           <EmptyState motif="files" title="No files yet" body="Files from Stella show up here." />
         )
       ) : (
-        <col id={`files-list-scroll-${section}`} grow={1} minH={0} maxH={embedded ? 380 : undefined} scrollY pt={8} px={10} pb={14} onScroll={onScroll}>
+        <col id={`files-list-scroll-${section}`} grow={1} minH={0} maxH={embedded ? 380 : undefined} scrollY pt={embedded ? 4 : 8} px={embedded ? 4 : 10} pb={embedded ? 4 : 14} onScroll={onScroll}>
           <col role="list" gap={10}>
             {itemGroups.map((group) => (
               <col key={group.id} gap={1}>

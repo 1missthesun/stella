@@ -5,6 +5,7 @@ import { dispatchComposeText } from "@/shared/lib/stella-orb-chat";
 import { useViewerWindow } from "@/shell/workspace-stage/viewer-item-context";
 import type { Layout, WebviewMessage, WebviewRequest } from "../../../../host/rune-jsx/props";
 import { useRetainedSurfaceActive } from "../../../kit";
+import { useTokens } from "../../../theme";
 import { publishCanvasSelection } from "../../selection/AskStellaSelectionChip";
 
 export type CanvasFrameSource = { src: string } | { html: string };
@@ -46,7 +47,37 @@ const CANVAS_PRELOAD = `(() => {
     if (event.source !== window || !event.data || !outgoing.has(event.data.type)) return;
     toHost(event.data, "*");
   }, true);
+  let scheme = null;
+  const reportScheme = () => {
+    const root = document.documentElement;
+    let next = root ? getComputedStyle(root).colorScheme : "normal";
+    if (!next || next === "normal") next = document.querySelector('meta[name="color-scheme"]')?.content || "normal";
+    if (next === scheme) return;
+    scheme = next;
+    toHost({ type: "stella:rune-canvas-color-scheme", scheme }, "*");
+  };
+  const watchScheme = () => {
+    reportScheme();
+    const watch = new MutationObserver(reportScheme);
+    watch.observe(document.documentElement, { attributes: true });
+    if (document.head) watch.observe(document.head, { childList: true, subtree: true, attributes: true, characterData: true });
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchScheme, { once: true });
+  else watchScheme();
+  window.addEventListener("load", reportScheme);
 })();`;
+
+/**
+ * Chromium's backdrop for an iframe: transparent when the page's used color scheme is the
+ * embedder's, otherwise opaque in the page's canvas colour (white for a page that sets none).
+ * Before the page reports, it is a page that sets none.
+ */
+const pageBackdrop = (scheme: string, appDark: boolean): string | undefined => {
+  const offered = scheme.split(/\s+/).filter((s) => s === "light" || s === "dark");
+  const used = offered.includes(appDark ? "dark" : "light") ? (appDark ? "dark" : "light") : (offered[0] ?? "light");
+  if ((used === "dark") === appDark) return undefined;
+  return used === "dark" ? "#121212" : "#ffffff";
+};
 
 const scrollMemory = new Map<string, { x: number; y: number }>();
 
@@ -125,6 +156,8 @@ export function CanvasFrame({
   const active = useRetainedSurfaceActive();
   const activeRef = useRef(active);
   activeRef.current = active;
+  const appDark = useTokens().dark;
+  const [scheme, setScheme] = useState("normal");
 
   useEffect(() => {
     host.post({ type: "stella:canvas-visibility", active });
@@ -161,6 +194,10 @@ export function CanvasFrame({
         portListener.current?.(data.data);
         return;
       }
+      if (data.type === "stella:rune-canvas-color-scheme") {
+        if (typeof data.scheme === "string") setScheme(data.scheme);
+        return;
+      }
       if (data.type === "stella:canvas-scrolled") {
         const { x, y } = data as { x?: unknown; y?: unknown };
         if (typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)) scrollMemory.set(id, { x, y });
@@ -189,6 +226,7 @@ export function CanvasFrame({
       w="full"
       label={title}
       transparent
+      fill={pageBackdrop(scheme, appDark)}
       {...(html !== undefined ? { html } : { url: (source as { src: string }).src })}
       preload={CANVAS_PRELOAD}
       protocols={protocols}

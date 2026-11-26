@@ -5,6 +5,7 @@ import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat
 import { ConversationEvents } from "@/app/chat/ConversationEvents";
 import type { InlineWorkingIndicatorMountProps } from "@/app/chat/InlineWorkingIndicator";
 import type { LegendContentStyle } from "../../../chat/ChatTimeline";
+import { ChatVariantContext } from "../../../chat/chat-text";
 
 type CompactConversationSurfaceProps = {
   className: string;
@@ -49,21 +50,23 @@ export function CompactConversationSurface({
     <col id={`chat-viewport-region-${variant}`} grow={showConversation ? 1 : undefined} minH={0} w="full" clip={0}>
       {showConversation ? (
         <col grow={1} minH={0} w="full" justify="end">
-          <ConversationEvents
-            messages={paintedMessages}
-            conversationId={conversationId}
-            maxItems={maxItems}
-            pendingUserMessageId={pendingUserMessageId}
-            indicator={indicator}
-            hasOlderMessages={hasOlderMessages}
-            isLoadingOlder={isLoadingOlder}
-            isLoadingHistory={isLoadingHistory}
-            list={scroll.list}
-            className={className}
-            contentContainerStyle={contentContainerStyle}
-            estimatedItemSize={estimatedItemSize}
-            extraTail={extraTail}
-          />
+          <ChatVariantContext.Provider value={variant === "sidebar" ? "sidebar" : "full"}>
+            <ConversationEvents
+              messages={paintedMessages}
+              conversationId={conversationId}
+              maxItems={maxItems}
+              pendingUserMessageId={pendingUserMessageId}
+              indicator={indicator}
+              hasOlderMessages={hasOlderMessages}
+              isLoadingOlder={isLoadingOlder}
+              isLoadingHistory={isLoadingHistory}
+              list={scroll.list}
+              className={className}
+              contentContainerStyle={contentContainerStyle}
+              estimatedItemSize={estimatedItemSize}
+              extraTail={extraTail}
+            />
+          </ChatVariantContext.Provider>
         </col>
       ) : null}
     </col>

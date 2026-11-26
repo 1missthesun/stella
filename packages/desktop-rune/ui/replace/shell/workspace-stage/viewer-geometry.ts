@@ -21,6 +21,7 @@ export type Geometry = {
 export type ComposerArea = { top: number; left: number; width: number };
 
 let composerArea: ComposerArea | null = null;
+let homeGreetingTop: number | null = null;
 
 const measureGeometry = (): Geometry => {
   const viewportHeight = window.innerHeight;
@@ -28,7 +29,7 @@ const measureGeometry = (): Geometry => {
     topbar: SHELL_TOPBAR_HEIGHT,
     viewportWidth: window.innerWidth,
     viewportHeight,
-    floor: composerArea ? composerArea.top - STAGE_GAP_ABOVE_COMPOSER : viewportHeight - STAGE_BOTTOM_WITHOUT_COMPOSER,
+    floor: composerArea ? Math.min(composerArea.top, homeGreetingTop ?? Infinity) - STAGE_GAP_ABOVE_COMPOSER : viewportHeight - STAGE_BOTTOM_WITHOUT_COMPOSER,
     composer: composerArea ? { left: composerArea.left, width: composerArea.width } : null,
   };
 };
@@ -62,6 +63,13 @@ export const getGeometry = (): Geometry => {
 };
 
 /** The chat column reports where its composer area is, or `null` when no composer shows. */
+/** The home greeting's window top while Home shows it: it sits above the home composer in desktop-ui's composer area. */
+export const reportHomeGreetingTop = (top: number | null): void => {
+  if (top === homeGreetingTop || (top !== null && homeGreetingTop !== null && Math.round(top) === Math.round(homeGreetingTop))) return;
+  homeGreetingTop = top;
+  refreshGeometry();
+};
+
 export const reportComposerArea = (area: ComposerArea | null): void => {
   const same =
     area === composerArea ||

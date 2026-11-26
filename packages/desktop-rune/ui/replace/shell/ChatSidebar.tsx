@@ -8,7 +8,7 @@ import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import { useChatScrollManagement } from "@/shell/use-chat-scroll-management";
 import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
 import { ComposerNotice } from "@/app/chat/ComposerNotice";
-import { Composer } from "@/app/chat/Composer";
+import { Composer } from "../../chat/Composer";
 import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
 import { deriveComposerState } from "@/features/chat/composer-context";
 import { buildInlineWorkingIndicatorProps } from "@/features/chat/working-indicator-state";
@@ -236,7 +236,7 @@ function AccountScopedChatPanelTab({
           estimatedItemSize={wideLayout ? 140 : undefined}
           extraTail={tail}
         />
-        <col id="chat-sidebar-composer" w="full" shrink={false} align="center" gap={6} pt={4} px={wideLayout ? 24 : 12}>
+        <col id="chat-sidebar-composer" w="full" shrink={false} align="center" gap={6} px={wideLayout ? 24 : window.innerWidth <= 600 ? 6 : 12}>
           <ConnectorConnectCard compact conversationId={conversationId} />
           <CloudBrowserInterventionCard compact conversationId={conversationId} />
           <ComposerNotice compact conversationId={conversationId} />
@@ -256,6 +256,7 @@ function AccountScopedChatPanelTab({
           isDragOver={isDragOver}
           replyPeek={replyPeek}
           suggestionsActive={false}
+          variant={wideLayout ? "sidebar-wide" : "sidebar"}
         />
       </col>
     </col>

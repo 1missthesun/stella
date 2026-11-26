@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { font, look, useTokens } from "../../theme";
+import { reportHomeGreetingTop } from "../../replace/shell/workspace-stage/viewer-geometry";
 
 const FUN_GREETINGS = [
   "Welcome back!",
@@ -86,6 +87,7 @@ export function HomeContent({ children, leaving = false }: { children?: ReactNod
   const greeting = useGreeting();
   const narrow = useSyncExternalStore(subscribeResize, isNarrow);
   const title = look(narrow ? 29 : 36, 600, { lh: 1.2, em: -0.03, family: font.display });
+  useEffect(() => () => reportHomeGreetingTop(null), []);
   return (
     <col id="home-content" grow={1} w="100%" maxW={780} px={24} py={48} align="center" justify="center" selfAlign="center">
       <text
@@ -98,6 +100,7 @@ export function HomeContent({ children, leaving = false }: { children?: ReactNod
         opacity={leaving ? 0 : 1}
         y={leaving ? 8 : 0}
         motion={{ dur: 0.28 }}
+        onLayout={(r) => reportHomeGreetingTop(r.y)}
       >
         {greeting}
       </text>

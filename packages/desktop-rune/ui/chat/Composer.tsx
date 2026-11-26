@@ -48,6 +48,8 @@ const COMPOSER_PAD_X = 24;
 /** `.composer-shell` / `.composer-context-peek-anchor` max-width: `min(50rem, 100% - 48px)` of the padded `.composer` column. */
 export const composerShellMaxW = (composerW: number) => (composerW > 0 ? Math.min(COMPOSER_MAX_W, composerW - COMPOSER_PAD_X * 2 - 48) : COMPOSER_MAX_W);
 const MENU_KEYS = ["ArrowUp", "ArrowDown", "Tab", "Escape", "Enter"];
+const STOP_KEYS = ["Escape"];
+const NO_KEYS: string[] = [];
 const INPUT_MAX_H = 200;
 const PASTE_AS_ATTACHMENT = { minChars: PASTE_AS_ATTACHMENT_MIN_CHARS, minLines: PASTE_AS_ATTACHMENT_MIN_LINES };
 
@@ -244,7 +246,7 @@ function ComposerImpl({
         maxH={INPUT_MAX_H}
         marks={mentionMarks}
         pasteAsEvent={PASTE_AS_ATTACHMENT}
-        keys={modelMentionTrigger ? MENU_KEYS : ["Escape"]}
+        keys={modelMentionTrigger ? MENU_KEYS : canStop && !dictationInFlight ? STOP_KEYS : NO_KEYS}
         onKey={onKey}
         onInput={(value) => {
           valueRef.current = value;

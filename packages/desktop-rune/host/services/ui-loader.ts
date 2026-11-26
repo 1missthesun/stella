@@ -107,6 +107,9 @@ export function createUiLoader(options: UiLoaderOptions) {
     try {
       return hostRequire(file) as UiModule;
     } finally {
+      // Bun keeps a required module's exports alive after its cache entry goes.
+      const cached = hostRequire.cache[file];
+      if (cached) cached.exports = {};
       delete hostRequire.cache[file];
     }
   };

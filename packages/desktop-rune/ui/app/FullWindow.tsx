@@ -1,6 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { BackendAuthProvider } from "@/global/auth/BackendAuthProvider";
 import { I18nProvider } from "@/shared/i18n/RemoteI18nProvider";
+import { useLocale } from "@/shared/i18n/I18nProvider";
+import { localeDir } from "@stella/contracts/locales";
 import { BootstrapStateProvider } from "@/bootstrap/bootstrap-state";
 import { UiStateProvider } from "@/context/ui-state";
 import { CanvasShareProvider } from "@/features/canvas-share/canvas-share-context";
@@ -83,9 +85,10 @@ function App() {
     return () => window.clearTimeout(timer);
   }, []);
   const transitionLook = useUpdateTransitionAppLook();
+  const dir = localeDir(useLocale());
   return (
     <>
-    <col id="app" w="full" h="full" fill={t.c.background} dir={document.documentElement.dir === "rtl" ? "rtl" : "ltr"} {...transitionLook}>
+    <col id="app" w="full" h="full" fill={t.c.background} dir={dir} {...transitionLook}>
       <ChatStoreProvider>
         <AppBootstrap />
         <CloudMemoryPreferenceBridge />

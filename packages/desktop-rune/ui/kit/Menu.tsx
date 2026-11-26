@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, isValidElement, useContext, type ReactNode } from "react";
 import { derive, font, fontSize, layer, look, mix, radius, type Tokens, useTokens } from "../theme";
 import { Icon, Icons, type IconData } from "./icons";
 
@@ -38,7 +38,7 @@ export type DropdownMenuProps = {
   children: ReactNode;
 };
 
-/** desktop-ui's `DropdownMenu` (Radix): a trigger and an anchored, modal menu that closes on choice, Escape or outside click. */
+/** desktop-ui's `DropdownMenu` (Radix): a trigger and an anchored, modal menu that closes on choice, Escape or outside click. Radix lays menu content left to right unless a DirectionProvider says otherwise, and desktop-ui has none. */
 export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom", align = "start", sideOffset = 4, minW = 180, maxW, maxH, matchTriggerWidth, children }: DropdownMenuProps) {
   const t = useTokens();
   const s = menuSurface(t);
@@ -52,6 +52,7 @@ export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom",
           <col
             id={`${id}-content`}
             role="menu"
+            dir="ltr"
             anchor={{ to: triggerId, side, align, gap: sideOffset, fit: matchTriggerWidth }}
             raise={layer.menu}
             modal={{ clickOutside: true }}
@@ -90,9 +91,11 @@ function itemLook(t: Tokens, destructive: boolean): ItemLook {
 
 const ITEM_TEXT = look(fontSize.base, 500, { lh: 1.3 });
 
-type ItemBase = { id?: string; disabled?: boolean; keepOpen?: boolean; trailing?: ReactNode; children: ReactNode };
+type ItemBase = { id?: string; disabled?: boolean; keepOpen?: boolean; trailing?: ReactNode; centered?: boolean; strong?: boolean; children: ReactNode };
 
-function ItemRow({ id, disabled, destructive = false, lead, trailing, role, checked, onSelect, keepOpen, children }: ItemBase & { destructive?: boolean; lead?: ReactNode; role: string; checked?: boolean; onSelect?: () => void }) {
+const isLayoutNode = (node: ReactNode) => isValidElement(node) && typeof node.type === "string" && node.type !== "text";
+
+function ItemRow({ id, disabled, destructive = false, lead, trailing, role, checked, onSelect, keepOpen, centered, strong, children }: ItemBase & { destructive?: boolean; lead?: ReactNode; role: string; checked?: boolean; onSelect?: () => void }) {
   const t = useTokens();
   const close = useMenuClose();
   const l = derive(t, `menu-item:${destructive}`, (t) => itemLook(t, destructive));
@@ -108,6 +111,7 @@ function ItemRow({ id, disabled, destructive = false, lead, trailing, role, chec
       px={10}
       py={8}
       align="center"
+      justify={centered ? "center" : undefined}
       radius={radius.sm}
       hover={disabled ? undefined : l.hi}
       hoverColor={disabled ? undefined : l.hiText}
@@ -123,9 +127,15 @@ function ItemRow({ id, disabled, destructive = false, lead, trailing, role, chec
       }
     >
       {lead}
-      <text {...ITEM_TEXT} color={disabled ? t.c.mutedForeground : l.text} grow={1} shrink truncate>
-        {children}
-      </text>
+      {isLayoutNode(children) ? (
+        <col grow={1} shrink minW={0}>
+          {children}
+        </col>
+      ) : (
+        <text {...ITEM_TEXT} weight={strong ? 600 : ITEM_TEXT.weight} color={disabled ? t.c.mutedForeground : strong ? t.c.textStrong : l.text} grow={centered ? undefined : 1} shrink truncate>
+          {children}
+        </text>
+      )}
       {trailing}
     </row>
   );

@@ -266,7 +266,7 @@ class PowerMonitor extends EventEmitter {
     const child = spawn("sh", ["-c", monitor], { stdio: ["pipe", "pipe", "ignore"] });
     child.on("error", () => {});
     child.unref();
-    for (const stream of [child.stdin, child.stdout] as (NodeJS.Stream & { unref?: () => void })[]) stream.unref?.();
+    for (const stream of [child.stdin, child.stdout] as ({ unref?: () => void } | null)[]) stream?.unref?.();
     let buffer = "";
     child.stdout!.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();

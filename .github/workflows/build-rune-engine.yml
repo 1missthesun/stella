@@ -292,7 +292,8 @@ jobs:
 
       - name: Native helpers (meeting_capture, stella_show)
         shell: pwsh
-        run: ./packages/native/build.ps1
+        working-directory: packages/native
+        run: ./build.ps1
 
       - name: Services session (window, audio, WebView2 media page)
         env:

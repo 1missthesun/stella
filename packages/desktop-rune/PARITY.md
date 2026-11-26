@@ -11,12 +11,17 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 - [ ] Clipboard text/image, copy fallbacks; drag and drop in (files, images) and out
 - [ ] Text selection across messages, IME, spellcheck, accessibility tree (AccessKit)
 - [ ] Notifications (OS), sounds (message sound)
+  - macOS: message sound plays through AVPlayer, setSinkId routes output: ~/.stella/outputs/stella-rune/host/audio-output-mac.txt
 - [ ] WebViews: HTML deliverables, canvases (bridge + actions), Cloud Apps, stella-media scheme
 - [ ] Browser-only APIs on demand: realtime voice (WebRTC), dictation/microphone, pdf/office previews
+  - macOS: dictation microphone (~/.stella/outputs/stella-rune/host/dictation-mic-mac.txt), media probe via master's fallbacks (~/.stella/outputs/stella-rune/host/media-probe-mac.txt). Realtime voice, WebAudio and MediaSource are still open.
 - [ ] Agent browsing: in-app browser panel + CDP on an on-demand Chromium; Stella Browser extension bridge
+  - macOS: an agent browses on the on-demand Chromium in a signed-in turn (~/.stella/outputs/stella-rune/host/agent-browsing-mac.txt, agent-browsing-chat-mac.png). Extension bridge not proven.
 - [ ] Show Stella capture (screen recording + talking + marks), meeting capture
 - [ ] Hot swap of `ui/` (zero Cargo, state kept, flat memory); host restart keeps windows
+  - macOS: an app-source draft and its Undo hot-swap `ui/` with no relaunch or Cargo (~/.stella/outputs/stella-rune/host/app-source-hot-swap-mac.txt, app-source-*-mac.png). Host restart keeps windows not proven.
 - [ ] Linux X11 + Wayland, macOS, Windows builds; launcher starts the engine; Update flow
+  - macOS: the launcher starts the engine isolated (~/.stella/outputs/stella-rune/host/isolation-launcher-mac.txt, launcher-mac-rune.log); Update flow for a draft (~/.stella/outputs/stella-rune/host/app-source-hot-swap-mac.txt).
 
 ## Shell
 - [ ] Launch splash, crash surface, error boundary, route error recovery

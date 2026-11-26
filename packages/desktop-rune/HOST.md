@@ -20,9 +20,20 @@ Electron main (`packages/desktop/electron`, unchanged) under an `electron` modul
    `stella.chat` mirrors the runtime's default conversation (`services/chat-feed.ts`).
 
 `services/headless.ts` boots the same services without an engine. `scripts/session.ts` runs
-isolated sessions (own data dir, HOME, protected-storage key, dev test account, a private Xvfb
-display) and drives them over the control port (`/eval` runs with `api` = the window's
-electronAPI).
+isolated sessions (own data dir, HOME, protected-storage key, dev test account; a private Xvfb
+display on Linux, `RUNE_UNSEEN` windows on macOS, `--show` for a slotted visible one) and drives
+them over the control port (`/eval` runs with `api` = the window's electronAPI; `shot` uses the
+engine's `/control/screenshot`). `--installed` lets app-source updates move the run's checkout;
+prove those from a separate clone.
+
+- On macOS an isolated `HOME` makes Chrome's keychain access hang every https load, so with
+  `STELLA_RUNE_ACCOUNT_HOME` set (session.ts sets the real home) the on-demand Chromium gets that
+  HOME plus `--use-mock-keychain --password-store=basic`.
+- UI and main share one process. An uncaught error whose throwing frame is in the UI bundle
+  (`?swap=<n>` sourceURL) skips main's crash handlers and goes to the window's `error` /
+  `unhandledrejection` event, as a renderer error does in Chromium (`services/renderer-errors.ts`).
+- An app-source update takes the swap the file watcher already started for it, so one update
+  builds the UI once.
 
 ## How the plugin adapts master's sources
 
@@ -107,9 +118,11 @@ needs the engine's message loop, so it is engine work; the shim keeps a named pi
 |---|---|---|
 | In-app browser: WebContentsView tabs, offscreen tabs, CDP debugger proxy | `services/in-app-browser*`, `debugger-target-proxy.ts` | Done (section above). Downloads and cookie/permission handlers on browser sessions still to map. |
 | Page snapshot (capturePage + debugger) | `services/page-snapshot.ts` | Same on-demand Chromium (CDP `Page.captureScreenshot`, DOM snapshot). |
-| Offscreen media probe (video poster, audio peaks, duration) | `services/offscreen-media-probe.ts` | Native: decode in the host/engine (ffmpeg if present, else the engine's media decoder). A hidden engine WebView is the fallback; no Chromium. |
+| Offscreen media probe (video poster, audio peaks, duration) | `services/offscreen-media-probe.ts` | Parity today through master's own fallbacks: the offscreen probe returns null at once and ffmpeg / qlmanage / afconvert / mdls produce poster, duration and peaks (macOS proof). An engine decoder would drop the ffmpeg dependency on Linux and Windows. |
 | Realtime voice (WebRTC, shared microphone) | desktop-ui `features/voice` | Native: engine audio I/O (capture/playback via cpal, echo cancellation) plus the realtime API's WebSocket audio transport in the host. A hidden WebView with WebRTC is the fallback on platforms whose WebView has it (WebView2, WKWebView). |
-| Dictation (getUserMedia + AudioWorklet PCM) | desktop-ui `features/dictation` | Native: the same engine microphone stream, PCM frames to the host over the bridge. |
+| Dictation (getUserMedia + AudioWorklet PCM) | desktop-ui `features/dictation` | Done on macOS through master's native `mic_capture` path (16 kHz PCM, live/ended events). |
+| Audio output (`Audio`, `HTMLMediaElement`, `setSinkId`) | desktop-ui message sounds, read-aloud, Settings › Audio | macOS: AVPlayer over Bun FFI (`electron/macos-audio-player.ts`, `dom/media-element.ts`), `setSinkId` on CoreAudio output UIDs with Chromium's semantics. Linux/Windows: `play()` ends at once. WebAudio (`AudioContext`) and `MediaSource` are still absent (voice cues, streaming read-aloud): engine audio I/O. |
+| Devices and media access | `navigator.mediaDevices.enumerateDevices`, `systemPreferences` | macOS: CoreAudio devices in `MediaDeviceInfo` shape with `default` entries; `getMediaAccessStatus` from AVFoundation / CGPreflightScreenCaptureAccess. `askForMediaAccess` reports the status without prompting: the prompt needs the signed engine bundle with `NSMicrophoneUsageDescription` (DISTRIBUTION.md). |
 | Wakeword | `services/wakeword-service.ts` | Already a native helper; runs unchanged. |
 | Meeting capture | `services/meeting-capture-controller.ts` | Already a native helper; runs unchanged. macOS microphone status needs `systemPreferences.getMediaAccessStatus` from the engine. |
 | Show Stella recording (desktopCapturer + getUserMedia desktop + MediaRecorder) | `show-stella-controller.ts`, desktop-ui `show-stella-recorder.ts` | Native capture in the engine (PipeWire/xdg-desktop-portal ScreenCast, ScreenCaptureKit, Windows.Graphics.Capture), encoded by the existing screen-recording helper; `desktopCapturer.getSources` then lists the engine's displays. |
@@ -135,3 +148,20 @@ The total is ~308 MB. With the desktop-ui source worker, before it was replaced,
 - A chat reply renders ~3.4 s after Return.
 - Hot swap: ~10–25 ms bundle and load, ~1.5 ms render and send.
 - Host RSS over 100 swaps: 114 → 111 MB once swaps settle.
+
+## Measured (macOS 15.6, MacBook Air arm64, dev test account, idle)
+
+`footprint` per process (Activity Monitor's Memory), same rune/desktop tree for both apps:
+
+| | Electron Stella (verify-stella copy) | Rune Stella |
+|---|---|---|
+| Total | ~569 MB (RSS 773) | ~372–398 MB |
+| Parts | main 251, GPU 40, utilities 19, renderers 155, runtime worker 104 | engine 160–175, host 114–125, runtime worker 98 |
+
+- The launchers and session.ts run the engine with `MIMALLOC_PURGE_DELAY=0`; the host fell from
+  ~167 to 114–125 MB with it.
+- The UI builder child exists only while building (220–355 MB RSS) and stops 20 s after the last
+  build.
+- Quit: a SIGTERM to the engine ends the runtime worker in ~0.6 s and everything in ~1.8 s.
+- An app-source draft that edits `ui/` applies in ~380 ms with one swap (bundle and load 150–220
+  ms warm, ~560–880 ms on the first swap after boot); Undo is the same.

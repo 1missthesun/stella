@@ -284,7 +284,7 @@ export function ShowStellaOverlay() {
 
   return (
     <>
-      {display && catching ? <box absolute={{ left: display.x, top: display.y }} w={display.width} h={display.height} fill="#00000001" cursor="default" /> : null}
+      {display && catching ? <box absolute={{ left: display.x, top: display.y }} w={display.width} h={display.height} fill="#00000001" cursor="crosshair" /> : null}
       {display ? <box absolute={{ left: display.x, top: display.y }} w={display.width} h={display.height} border="#e5372b99" borderWidth={2} inert /> : null}
       {[...ink.strokes.values()].map((stroke) => (
         <Stroke key={stroke.id} stroke={stroke} width={width} height={height} onGone={ink.strokeGone} />

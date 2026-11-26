@@ -9,8 +9,11 @@ export const engine = {
   colorMotion(dur: number) {
     void api()?.colorMotion(dur);
   },
-  fonts(files: string[], sans: string, mono: string) {
-    void api()?.fonts({ files, sans, mono });
+  /** False where there is no engine yet (a module evaluated before the host bridge exists). */
+  fonts(files: string[], sans: string, mono: string): boolean {
+    const e = api();
+    void e?.fonts({ files, sans, mono });
+    return e !== undefined;
   },
   /** After the commit that mounts the window, so the engine has a window to paint. */
   background(color: string) {

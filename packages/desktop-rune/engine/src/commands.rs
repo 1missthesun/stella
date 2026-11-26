@@ -326,12 +326,23 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
             "window.setTitle" => tx.set_title(s(&v, "title").to_owned()),
             "window.setAlwaysOnTop" => handle(st).ok_or("window not open")?.set_always_on_top(v.get("on").and_then(|x| x.as_bool()).unwrap_or(true)),
             "window.setBounds" => {
-                if let (Some(w), Some(h)) = (f(&v, "width"), f(&v, "height")) {
-                    tx.resize_window((w, h));
-                }
-                if let (Some(x), Some(y)) = (v.get("x").and_then(|x| x.as_i64()), v.get("y").and_then(|y| y.as_i64())) {
-                    let k = handle(st).and_then(|h| h.scale()).unwrap_or(1.0);
-                    handle(st).ok_or("window not open")?.set_position(((x as f64 * k) as i32, (y as f64 * k) as i32));
+                let h = handle(st).ok_or("window not open")?;
+                let at = h.placement();
+                let k = at.as_ref().map(|p| p.scale).filter(|k| *k > 0.0).unwrap_or(1.0);
+                let pt = |v: i32| (v as f64 / k) as f32;
+                let origin = match (f(&v, "x"), f(&v, "y")) {
+                    (Some(x), Some(y)) => Some((x, y)),
+                    (x, y) => at.as_ref().map(|p| (x.unwrap_or(pt(p.position.0)), y.unwrap_or(pt(p.position.1)))),
+                };
+                let size = match (f(&v, "width"), f(&v, "height")) {
+                    (Some(w), Some(h)) => Some((w, h)),
+                    (w, h) => at.as_ref().map(|p| (w.unwrap_or(pt(p.content_size.0 as i32)), h.unwrap_or(pt(p.content_size.1 as i32)))),
+                };
+                match (origin, size) {
+                    (Some(origin), Some(size)) => h.set_bounds(origin, size),
+                    (None, Some(size)) => tx.resize_window_instant(size),
+                    (Some((x, y)), None) => h.set_position(((x as f64 * k).round() as i32, (y as f64 * k).round() as i32)),
+                    (None, None) => {}
                 }
             }
             "window.getBounds" | "window.state" => {

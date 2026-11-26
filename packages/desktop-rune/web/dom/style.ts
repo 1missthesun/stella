@@ -20,6 +20,7 @@ const JUSTIFY: Record<string, string> = { start: "flex-start", center: "center",
 const CURSORS: Record<string, string> = {
   default: "default", pointer: "pointer", text: "text", grab: "grab", grabbing: "grabbing", notAllowed: "not-allowed", "not-allowed": "not-allowed",
   move: "move", colResize: "col-resize", rowResize: "row-resize", ewResize: "ew-resize", nsResize: "ns-resize", nwseResize: "nwse-resize", neswResize: "nesw-resize",
+  zoomIn: "zoom-in", zoomOut: "zoom-out",
 };
 
 export function gradientCss(g: Gradient): string {

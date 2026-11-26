@@ -14,6 +14,5 @@ let loaded = false;
 
 export function loadFonts() {
   if (loaded) return;
-  loaded = true;
-  engine.fonts(FONT_FILES, font.sans, font.mono);
+  loaded = engine.fonts(FONT_FILES, font.sans, font.mono);
 }

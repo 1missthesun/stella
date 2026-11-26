@@ -27,7 +27,9 @@ export type Loop = {
 };
 export type Cursor =
   | "default" | "pointer" | "text" | "grab" | "grabbing" | "notAllowed" | "move"
-  | "colResize" | "rowResize" | "ewResize" | "nsResize" | "nwseResize" | "neswResize";
+  | "colResize" | "rowResize" | "ewResize" | "nsResize" | "nwseResize" | "neswResize"
+  | "n-resize" | "e-resize" | "s-resize" | "w-resize" | "crosshair" | "cell" | "alias" | "copy"
+  | "zoomIn" | "zoomOut" | "help" | "progress" | "wait" | "none";
 export type KeyEvent = { key: string; chord: string; mods: Mods };
 export type InputKeyEvent = KeyEvent & { value: string; start: number; end: number; length: number };
 export type Layout = { x: number; y: number; w: number; h: number };

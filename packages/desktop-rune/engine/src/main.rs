@@ -13,6 +13,8 @@ mod capture;
 mod inputhook;
 mod commands;
 mod control;
+#[cfg(target_os = "linux")]
+mod desktop_fonts;
 mod engine;
 mod input;
 mod keys;
@@ -237,6 +239,8 @@ fn main() {
     #[cfg(unix)]
     block_quit_signals();
     metrics::mark_process_start();
+    #[cfg(target_os = "linux")]
+    let desktop_fonts = desktop_fonts::start();
     #[cfg(target_os = "macos")]
     rune::text::set_fallback_base(Some("Lucida Grande"));
     #[cfg(all(target_os = "linux", feature = "webview"))]
@@ -275,10 +279,15 @@ fn main() {
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
     let app = windows::decorate_main(app, &p).window_options(windows::options(&p));
-    // Chromium on Linux draws text through FreeType's light autohint (fontconfig's `hintslight`)
-    // on subpixel pens.
     #[cfg(target_os = "linux")]
-    let app = app.font_smoothing(rune::FontSmoothing::HintedGpu);
+    let app = {
+        let desktop = desktop_fonts::wait(&desktop_fonts, std::time::Duration::from_millis(250));
+        rune::text::set_fallback_base(desktop.ui_family.as_deref());
+        let scale = std::env::var("WINIT_X11_SCALE_FACTOR").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
+        let (mode, why) = desktop_fonts::smoothing(&desktop, scale);
+        eprintln!("stella-engine: text {mode:?} ({why}, system-ui {:?})", desktop.ui_family);
+        app.font_smoothing(mode)
+    };
     let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));

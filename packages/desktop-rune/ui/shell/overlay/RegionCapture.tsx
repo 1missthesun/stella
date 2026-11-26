@@ -201,8 +201,8 @@ export function RegionCapture() {
   };
 
   return (
-    <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} cursor="default">
-      <surface absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill="#00000003" focusable autoFocus onPointer={onPointer} />
+    <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} cursor="crosshair">
+      <surface absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill="#00000003" cursor="crosshair" focusable autoFocus onPointer={onPointer} />
       {!selection && !vacuum && !isPreparingCapture && !dimSuppressedAfterVacuum ? <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill={DIM} inert /> : null}
       {selection ? (
         <>

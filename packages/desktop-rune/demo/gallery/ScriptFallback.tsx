@@ -1,7 +1,5 @@
 import { loadFonts } from "../../ui/theme/fonts";
 
-loadFonts();
-
 const LINES: [string, string][] = [
   ["ar", "الإعدادات الحساب والخصوصية"],
   ["he", "הגדרות חשבון ופרטיות"],
@@ -9,6 +7,7 @@ const LINES: [string, string][] = [
 ];
 
 export function Root() {
+  loadFonts();
   return (
     <window id="main" title="script fallback" bg="#ffffff" w={500} h={240}>
       <col pad={10} gap={10} align="start">

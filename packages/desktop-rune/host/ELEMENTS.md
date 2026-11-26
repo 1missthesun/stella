@@ -137,7 +137,8 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
   since Rune scales uniformly.
 
 **Interaction.**
-- Pointer and focus: `cursor`, `inert` (pointer-events none for the subtree), `focusable`,
+- Pointer and focus: `cursor` (CSS names, also `crosshair`, `cell`, `copy`, `alias`, `zoomIn`/`zoomOut`,
+  `help`, `progress`/`wait`, `none`, one-way `n|e|s|w-resize`), `inert` (pointer-events none for the subtree), `focusable`,
   `tabIndex`, `autoFocus`, `focusGroup` (arrow-key roving and type-select).
 - `keys: ["mod+k", "Escape", "shift+Enter"]`: chords this element takes while focus is inside;
   each fires `onKey`. `mod` is ⌘ on macOS and Ctrl elsewhere; names are DOM key names.

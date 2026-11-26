@@ -314,7 +314,7 @@ jobs:
           sleep 3
           grep -m1 '"first_content_frame"' "$run_dir/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY" || true
           timeout 60 "$BUN" scripts/session.ts shot "$out/window.png" || echo "engine screenshot failed" | tee -a "$GITHUB_STEP_SUMMARY"
-          pwsh -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$i=New-Object System.Drawing.Bitmap \$b.Width,\$b.Height; [System.Drawing.Graphics]::FromImage(\$i).CopyFromScreen(\$b.Location,[System.Drawing.Point]::Empty,\$b.Size); \$i.Save('$(cygpath -w "$out/desktop.png")')" || true
+          pwsh -NoProfile -File scripts/ci/desktop-shot.ps1 -Png "$(cygpath -w "$out/desktop.png")" -List "$(cygpath -w "$out/windows.txt")" || true
           audio='const a = new Audio("/sounds/message-chime.mp3"); a.volume = 0.5; const t0 = performance.now();
             const ended = new Promise((resolve, reject) => { a.onended = () => resolve(performance.now() - t0); a.onerror = () => reject(new Error(a.error?.message ?? "error")); setTimeout(() => reject(new Error("no ended in 15 s")), 15000); });
             await a.play(); const playingMs = performance.now() - t0; const endedMs = await ended;

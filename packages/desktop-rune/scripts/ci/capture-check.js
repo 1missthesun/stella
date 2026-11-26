@@ -47,6 +47,24 @@ public static class U {
   [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   public static string Mouse(uint flags, int dx, uint data) { var i = new IN[1]; i[0].type = 0; i[0].mi.dx = dx; i[0].mi.flags = flags; i[0].mi.data = data; var n = SendInput(1, i, Marshal.SizeOf(typeof(IN))); return n + "/" + Marshal.GetLastWin32Error(); }
   public static string Key(ushort vk, uint flags) { var i = new IN[1]; i[0].type = 1; i[0].ki.vk = vk; i[0].ki.flags = flags; var n = SendInput(1, i, Marshal.SizeOf(typeof(IN))); return n + "/" + Marshal.GetLastWin32Error(); }
+  public delegate IntPtr HookProc(int code, IntPtr w, IntPtr l);
+  [StructLayout(LayoutKind.Sequential)] public struct MSG { public IntPtr hwnd; public uint message; public IntPtr w, l; public uint time; public int x, y; }
+  [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetWindowsHookExW(int id, HookProc proc, IntPtr mod, uint thread);
+  [DllImport("user32.dll")] public static extern bool UnhookWindowsHookEx(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr CallNextHookEx(IntPtr h, int code, IntPtr w, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool PeekMessageW(out MSG m, IntPtr h, uint a, uint b, uint remove);
+  [DllImport("kernel32.dll")] public static extern IntPtr GetModuleHandleW(string name);
+  static HookProc keep; static int seen;
+  public static string OwnHookProbe() {
+    keep = (c, w, l) => { if (c >= 0) seen++; return CallNextHookEx(IntPtr.Zero, c, w, l); };
+    var h = SetWindowsHookExW(13, keep, GetModuleHandleW(null), 0);
+    if (h == IntPtr.Zero) return "hook failed " + Marshal.GetLastWin32Error();
+    Key(0x43, 0); Key(0x43, 2);
+    var until = DateTime.Now.AddMilliseconds(400); MSG m;
+    while (DateTime.Now < until) { PeekMessageW(out m, IntPtr.Zero, 0, 0, 1); System.Threading.Thread.Sleep(5); }
+    UnhookWindowsHookEx(h);
+    return "own keyboard hook saw " + seen;
+  }
   public static string Foreground() { var h = GetForegroundWindow(); var s = new StringBuilder(256); GetWindowText(h, s, 256); return h + " " + s; }
 }
 '@
@@ -54,7 +72,8 @@ public static class U {
     "size " + [System.Runtime.InteropServices.Marshal]::SizeOf([type][U+IN])
     "foreground " + [U]::Foreground()
     "keydown " + [U]::Key(0x41, 0); Start-Sleep -Milliseconds 30; "keyup " + [U]::Key(0x41, 2)
-    "wheel " + [U]::Mouse(0x0800, 0, 120)`;
+    "wheel " + [U]::Mouse(0x0800, 0, 120)
+    [U]::OwnHookProbe()`;
   const run = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", ps], { encoding: "utf8", timeout: 90_000, stdio: ["ignore", "pipe", "pipe"] });
   result.synth = { status: run.status, signal: run.signal, stdout: (run.stdout ?? "").trim().split(/\r?\n/), stderr: (run.stderr ?? "").slice(0, 500) };
   await new Promise((r) => setTimeout(r, 500));

@@ -42,6 +42,11 @@ const LINE = fontSize.md * 1.5;
 const PILL_INPUT_PAD_X = 4;
 export const COMPOSER_NARROW_W = 600;
 export const COMPOSER_PAD_TOP = 4;
+export const COMPOSER_GAP = 8;
+const COMPOSER_PAD_X = 24;
+
+/** `.composer-shell` / `.composer-context-peek-anchor` max-width: `min(50rem, 100% - 48px)` of the padded `.composer` column. */
+export const composerShellMaxW = (composerW: number) => (composerW > 0 ? Math.min(COMPOSER_MAX_W, composerW - COMPOSER_PAD_X * 2 - 48) : COMPOSER_MAX_W);
 const MENU_KEYS = ["ArrowUp", "ArrowDown", "Tab", "Escape", "Enter"];
 const INPUT_MAX_H = 200;
 const PASTE_AS_ATTACHMENT = { minChars: PASTE_AS_ATTACHMENT_MIN_CHARS, minLines: PASTE_AS_ATTACHMENT_MIN_LINES };
@@ -287,11 +292,11 @@ function ComposerImpl({
   );
 
   return (
-    <col w="full" shrink={false} align="center" justify="end" gap={8} pt={COMPOSER_PAD_TOP} px={narrow ? 8 : 24} pb={10} onLayout={(r) => setComposerW(r.w)}>
-      <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp ? conversationId : null} />
+    <col w="full" shrink={false} align="center" justify="end" gap={COMPOSER_GAP} pt={COMPOSER_PAD_TOP} px={narrow ? 8 : COMPOSER_PAD_X} pb={10} onLayout={(r) => setComposerW(r.w)}>
+      <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp ? conversationId : null} maxW={narrow ? undefined : composerShellMaxW(composerW)} />
       <col
         w="full"
-        maxW={narrow ? undefined : COMPOSER_MAX_W}
+        maxW={narrow ? undefined : composerShellMaxW(composerW)}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
         radius={radius}
         clip={radius}

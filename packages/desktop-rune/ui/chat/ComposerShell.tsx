@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { fontSize, useTokens } from "../theme";
 import { ComposerAddButton, ComposerSubmitButton, ComposerTextarea, type ComposerTextareaProps } from "./ComposerPrimitives";
-import { COMPOSER_MAX_W, composerShellLook, MIN_COMPOSER_SHELL_HEIGHT } from "./Composer";
+import { COMPOSER_MAX_W, composerShellLook, composerShellMaxW, MIN_COMPOSER_SHELL_HEIGHT } from "./Composer";
 
 const LINE = fontSize.md * 1.5;
 const PILL_INPUT_PAD_X = 4;
@@ -39,16 +39,17 @@ export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled
   const [focused, setFocused] = useState(false);
   const [pillFieldW, setPillFieldW] = useState(0);
   const [pillTextH, setPillTextH] = useState(0);
+  const [columnW, setColumnW] = useState(0);
   const expanded = !replace && value.length > 0 && pillFieldW > 0 && pillTextH > LINE + 0.5;
   const look = composerShellLook(tokens);
   const submittable = canSubmit ?? (!disabled && value.trim().length > 0);
   const lead = leading ?? <ComposerAddButton disabled />;
   const trail = trailing ?? <ComposerSubmitButton disabled={!submittable} animated onPress={onSubmit} />;
   return (
-    <col w="full" shrink={false} align="center" justify="end" gap={8} {...(bare ? {} : { pt: 4, px: 24, pb: 10 })}>
+    <col w="full" shrink={false} align="center" justify="end" gap={8} {...(bare ? {} : { pt: 4, px: 24, pb: 10 })} onLayout={bare ? undefined : (r) => setColumnW(r.w)}>
       <col
         w="full"
-        maxW={COMPOSER_MAX_W}
+        maxW={bare ? COMPOSER_MAX_W : composerShellMaxW(columnW)}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
         radius={expanded ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2}
         clip={expanded ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2}

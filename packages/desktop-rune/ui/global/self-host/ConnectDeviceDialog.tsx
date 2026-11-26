@@ -104,13 +104,13 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
         </DialogHeader>
         <col {...s.selfHostDialogBody}>
           {state.kind === "claimed" ? (
-            <DialogDescription {...s.selfHostDialogText} {...s.selfHostDialog_selfHostDialogText}>
+            <DialogDescription {...s.selfHostDialogDescription}>
               {state.deviceName
                 ? t("selfHost.device.claimedNamed", { name: state.deviceName })
                 : t("selfHost.device.claimed")}
             </DialogDescription>
           ) : (
-            <DialogDescription {...s.selfHostDialogText} {...s.selfHostDialog_selfHostDialogText}>
+            <DialogDescription {...s.selfHostDialogDescription}>
               {t("selfHost.device.intro")}
             </DialogDescription>
           )}

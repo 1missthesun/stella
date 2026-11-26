@@ -9,6 +9,7 @@ export const useSelfHost = sheet((c, t) => ({
   selfHostDialogMeta: { family: "sans", size: 12, lh: 1.5, color: c.textWeak, textAlign: "center" },
   selfHostDialogError: { family: "sans", size: 12, lh: 1.5, color: "#c2410c" },
   selfHostDialog_selfHostDialogText: { pad: 0, pl: 0, pr: 0, pb: 0, mt: 0 },
+  selfHostDialogDescription: { size: 14, pad: 0, pl: 0, pr: 0, pb: 0 },
   selfHostDialogInput: { py: 11, px: 13, w: "full", radius: 10, border: c.borderWeak, fill: mixOklch(c.textStrong, 3, "transparent"), color: c.textStrong, mono: true, size: 12, lh: 1.45, focusBorder: c.borderStrong },
   selfHostDialogActions: { mt: 6, justify: "end", gap: 8 },
   selfHostDialogProgress: { h: 3, radius: 999 },

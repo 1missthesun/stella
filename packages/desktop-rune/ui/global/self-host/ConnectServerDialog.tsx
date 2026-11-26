@@ -106,7 +106,7 @@ export function ConnectServerDialog({
               event.preventDefault();
               if (text.trim()) void inspect(text);
             }}>
-            <DialogDescription {...s.selfHostDialogText} {...s.selfHostDialog_selfHostDialogText}>
+            <DialogDescription {...s.selfHostDialogDescription}>
               {t("selfHost.connect.intro")}
             </DialogDescription>
             {notice ? <T w="full" {...s.selfHostDialogNotice}>{notice}</T> : null}

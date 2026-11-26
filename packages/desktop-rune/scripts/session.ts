@@ -2,10 +2,11 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--name <run>]
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png>
 //   bun scripts/session.ts stop
+// --installed lets app-source updates move this checkout, as in an installed app (prove those from a clone).
 // With STELLA_LAUNCHER=1 and a socket on fd 3, the app gets that launcher channel, as from a launcher.
 // Linux runs the engine on a private Xvfb. macOS runs windows unseen (RUNE_UNSEEN: invisible,
 // click-through, never activated, still presenting for shot/record/input); --show puts a real
@@ -134,6 +135,7 @@ async function start() {
   for (const [key, value] of Object.entries(process.env)) if (/^(MIMALLOC_|RUNE_|STELLA_CHAT_FIXTURE_)/.test(key) && value) env[key] = value;
   const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();
   if (launcherChannel) env.STELLA_LAUNCHER = "1";
+  if (has("--installed")) env.STELLA_APP_SOURCE_INSTALLED = "1";
   env.PATH = (env.PATH ?? "").split(path.delimiter).filter((p) => path.basename(p) !== "shell-shims").join(path.delimiter);
   const realHome = os.homedir();
   for (const [key, rel] of [["BUN_INSTALL_CACHE_DIR", ".bun/install/cache"], ["MISE_DATA_DIR", ".local/share/mise"]] as const) {

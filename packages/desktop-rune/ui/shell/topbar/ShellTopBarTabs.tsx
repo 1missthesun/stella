@@ -317,7 +317,6 @@ export function ShellTopBarTabs({ room }: { room: number }) {
                 if (tab.id === shownTabId) syncNotch();
                 setSizes((s) => (Math.abs((s[tab.id] ?? -1) - r.w) < 0.5 ? s : { ...s, [tab.id]: r.w }));
               }}
-              onDrag={(d) => onTabDrag(tab, index, d)}
             >
               {active ? (
                 <OpenTabSurface t={tk} />
@@ -349,6 +348,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
                 radius={7}
                 focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 7 }}
                 onPress={() => openTab(tab)}
+                onDrag={(d) => onTabDrag(tab, index, d)}
               >
                 <box hoverOpacity={iconSwaps ? [1, 0] : undefined}>
                   {renderIcon(tab, color, false)}

@@ -61,8 +61,11 @@ export function GlobalModelsControl({ visible = true }: { visible?: boolean; pla
           <col grow={1} minH={0} minW={0} clip={0}>
             <AgentModelPicker active={open} focusSection={focus} />
           </col>
-          <row pt={8} justify="end">
-            <Switch id="work-models-pin-switch" label="Show in composer" checked={modelPinned} onCheckedChange={() => composerModelPin.toggle()} />
+          <row pt={8} gap={8} align="center" justify="end">
+            <text {...look(fontSize.sm, 400, { lh: 1.67 })} color={t.c.textWeak} onPress={() => composerModelPin.toggle()}>
+              Show in composer
+            </text>
+            <Switch id="work-models-pin-switch" label="Show in composer" hideLabel checked={modelPinned} onCheckedChange={() => composerModelPin.toggle()} />
           </row>
         </col>
       </Panel>

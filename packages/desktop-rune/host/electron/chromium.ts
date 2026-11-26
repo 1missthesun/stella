@@ -27,7 +27,7 @@ const CANDIDATES: Record<string, string[]> = {
   ],
 };
 
-/** A managed Chrome for Testing under Stella's runtimes, else a Chrome/Chromium on the system. */
+/** A managed Chrome for Testing under Stella's runtimes or the stella-browser CLI's, else a Chrome/Chromium on the system. */
 export function resolveChromium(): string | null {
   const configured = process.env.STELLA_RUNE_CHROMIUM?.trim();
   if (configured) return existsSync(configured) ? configured : null;
@@ -36,7 +36,26 @@ export function resolveChromium(): string | null {
     ? "chrome/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
     : process.platform === "win32" ? "chrome/chrome.exe" : "chrome/chrome";
   if (existsSync(path.join(runtimes, managed))) return path.join(runtimes, managed);
-  return (CANDIDATES[process.platform] ?? []).find((p) => existsSync(p)) ?? null;
+  return stellaBrowserChrome() ?? (CANDIDATES[process.platform] ?? []).find((p) => existsSync(p)) ?? null;
+}
+
+/** The newest Chrome for Testing the stella-browser CLI installed (`~/.stella-browser/browsers/chrome-<version>`). */
+function stellaBrowserChrome(): string | null {
+  const root = path.join(os.homedir(), ".stella-browser", "browsers");
+  let versions: string[];
+  try {
+    versions = readdirSync(root).filter((name) => name.startsWith("chrome-")).sort().reverse();
+  } catch {
+    return null;
+  }
+  const inner = process.platform === "darwin"
+    ? ["Google Chrome for Testing.app", `chrome-mac-${process.arch === "arm64" ? "arm64" : "x64"}/Google Chrome for Testing.app`].map((app) => `${app}/Contents/MacOS/Google Chrome for Testing`)
+    : process.platform === "win32" ? ["chrome.exe", "chrome-win64/chrome.exe"] : ["chrome", "chrome-linux64/chrome"];
+  for (const version of versions) {
+    const found = inner.map((rel) => path.join(root, version, rel)).find((p) => existsSync(p));
+    if (found) return found;
+  }
+  return null;
 }
 
 let majorVersion: string | null | undefined;

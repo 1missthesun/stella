@@ -25,6 +25,10 @@ installed Stellas keep starting Electron until the opt-in below is turned on by 
   on `1missthesun/stella`; git rewrites the https URL to ssh for that one repo.
 - `launch (linux-x64)` starts the built binary on Xvfb with lavapipe and the TS host, waits for
   `first_content_frame` and uploads a screenshot and metrics (`stella-engine-linux-x64-launch`).
+- `launch (win-x64, WebView2)` builds master's native helpers, starts the engine and host
+  services on the runner's desktop, opens a window and the WebView2 media page, plays audio,
+  records the screen, reads input through the hook, runs meeting capture and uploads a
+  screenshot (`stella-engine-win-x64-launch`).
 - `launcher compiles` builds the three launchers with the opt-in (compile only, nothing signed).
 - Manual runs (`workflow_dispatch`, `profile: dist|release`) work once the workflow is on the
   default branch; until then push to a `rune/**` branch.
@@ -85,6 +89,17 @@ Not done yet (ship-time work):
 - Proven on Linux (omarchy, Xvfb): `stella-launcher --self-test --engine-bin <dist engine>` clones
   the source, installs Bun and deps, starts the engine, gets `ready` 0.5-10 s after spawn, sends
   `quit`, gets `exiting 0`, exits 0; the runtime worker then stops by itself.
+
+## Linux: realtime voice needs a Chrome
+
+Stock WebKitGTK has no WebRTC, so on Linux the voice media page runs in a headless Chrome or
+Chromium started while voice is on (`host/media/chromium-media.ts`). The host takes the first of:
+`STELLA_RUNE_CHROMIUM`; `~/.local/share/stella/runtimes/chrome/chrome`; the newest Chrome for
+Testing the stella-browser CLI installed under `~/.stella-browser/browsers/chrome-<version>/`;
+a system Chrome/Chromium (`/usr/bin/chromium`, `google-chrome-stable`, snap). With none of them,
+voice reports that it cannot start; nothing downloads one for voice alone. Where Ubuntu's
+AppArmor user-namespace restriction blocks Chromium's sandbox for that binary, the page is
+started again with `--no-sandbox` (it loads only Stella's own page).
 
 ## macOS bundle and media access
 

@@ -529,7 +529,7 @@ function ViewerMain({ item, bodies, surface, wide, idBase }: { item: DisplayTab 
   return (
     <Main grow={1} minW={0} minH={0}>
       {item && wide ? <ViewerStrip item={item} vertical /> : null}
-      <col id={`${idBase}-body`} grow={1} minW={0} minH={0} clip={0}>
+      <col id={`${idBase}-body`} grow={1} minW={0} minH={0} clip={0} hoverGroup>
         {bodies.filter((body) => body.surface === surface).map((body) => (
           <ViewerBody key={body.item.id} {...body} />
         ))}

@@ -95,6 +95,9 @@ struct Over {
     corners: [f32; 4],
     build: u64,
     paints: bool,
+    /// Whether it shows (Rune's `on_drawn_shows`): one that paints but doesn't (faded out, a
+    /// hover-only control at rest) still takes the pointer, as CSS's does, but shows the page.
+    shows: bool,
 }
 
 /// Props a native view takes only when it is created.
@@ -191,7 +194,7 @@ pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
     let build = build_of(window);
     OVER.with(|o| {
         let mut o = o.borrow_mut();
-        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build, paints });
+        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build, paints, shows: false });
         entry.window = window;
         entry.corners = corners;
         entry.build = build;
@@ -202,6 +205,15 @@ pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
         OVER.with(|o| {
             if let Some(entry) = o.borrow_mut().get_mut(&n) {
                 entry.rect = Some(r);
+            }
+        });
+        refresh(s.node);
+    })
+    .on_drawn_shows(move |s: &mut Win, on: bool, tx: &mut rune::Tx| {
+        tx.live_only();
+        OVER.with(|o| {
+            if let Some(entry) = o.borrow_mut().get_mut(&n) {
+                entry.shows = on;
             }
         });
         refresh(s.node);
@@ -297,7 +309,7 @@ fn shape(n: u32, window: u32, r: [f32; 4]) -> Option<Shape> {
             .filter_map(|x| {
                 let rect = x.rect?;
                 let inside = intersect(rect, vis)?;
-                Some((if contains(vis, rect) { (rect, x.corners) } else { (inside, [0.0; 4]) }, x.paints))
+                Some((if contains(vis, rect) { (rect, x.corners) } else { (inside, [0.0; 4]) }, x.paints && x.shows))
             })
             .collect()
     });
@@ -817,6 +829,7 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
     #[cfg(target_os = "linux")]
     {
         main_frame_navigations(n, &view);
+        forward_hover(n, &view);
         enable_webrtc(&view);
         crate::webview_look::prepare(&view);
         match (&p.url, &p.html) {
@@ -878,6 +891,45 @@ fn main_frame_navigations(n: u32, view: &WebView) {
             element_event(live(n), "navigate", json!({ "url": uri, "mainFrame": true }), None);
         }
         false
+    });
+}
+
+/// The pointer over a native view never reaches Rune, so what holds the view would never light
+/// its hover, where Chromium's `:hover` holds for an iframe's ancestors: the view tells Rune
+/// where the pointer is as it enters, and as it moves (at most every 100 ms). Leaving for Rune's
+/// own area or out of the window, Rune hears it from the window itself.
+#[cfg(target_os = "linux")]
+fn forward_hover(n: u32, view: &WebView) {
+    use gtk::prelude::WidgetExt;
+    use std::cell::Cell;
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
+    use wry::WebViewExtUnix;
+    let web = view.webview();
+    let last: Rc<Cell<Option<Instant>>> = Rc::new(Cell::new(None));
+    let tell = move |w: &webkit2gtk::WebView, (x, y): (f64, f64), entered: bool| {
+        if !entered && last.get().is_some_and(|t| t.elapsed() < Duration::from_millis(100)) {
+            return;
+        }
+        last.set(Some(Instant::now()));
+        let scale = w.scale_factor() as f32;
+        let n = live(n);
+        let Some((window, rect)) = VIEWS.with(|v| v.borrow().get(&n).map(|x| (x.window, x.rect))) else { return };
+        let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32 * ui_zoom(window);
+        let at = [rect[0] + x as f32 * scale / k, rect[1] + y as f32 * scale / k];
+        if let Some(h) = handle_of(window) {
+            let _ = h.inject_script(json!([{ "type": "move", "x": at[0], "y": at[1] }]));
+        }
+    };
+    let tell = Rc::new(tell);
+    let on_enter = tell.clone();
+    web.connect_enter_notify_event(move |w, e| {
+        on_enter(w, e.position(), true);
+        gtk::glib::Propagation::Proceed
+    });
+    web.connect_motion_notify_event(move |w, e| {
+        tell(w, e.position(), false);
+        gtk::glib::Propagation::Proceed
     });
 }
 

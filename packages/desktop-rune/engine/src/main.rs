@@ -99,6 +99,7 @@ pub fn end_host_group() {
 }
 
 /// The host's own deadline for main's quit on a signal (`SIGNAL_QUIT_DEADLINE_MS`).
+#[cfg(unix)]
 const HOST_QUIT_GRACE: std::time::Duration = std::time::Duration::from_secs(8);
 
 /// The host runs main's own quit on SIGTERM (before-quit cleanups, the runtime told to quit);

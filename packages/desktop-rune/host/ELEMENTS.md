@@ -355,12 +355,20 @@ Only rows near the viewport are built. The list must sit inside a `scrollY` box.
 url`.
 
 The view is created on first layout, follows the element's rect and visibility, and is destroyed
-on unmount. A native view can't be clipped: inside a scroll box it shows only while it lies wholly
-in the viewport, so give webviews a panel of their own rather than scrolling content. `radius` /
-`corners` round it (macOS); an ancestor's radius doesn't, so give the webview its panel's corners.
-A native view draws above every engine layer, so while an overlay (an anchored popover or menu, or
-a lifted layer holding a `modal`) overlaps it, the view steps aside and its slot shows the page's
-last snapshot (macOS; elsewhere the slot is empty) under the overlay, until the overlay goes.
+on unmount. It is clipped like any child: to its scroll viewports and `clip` ancestors (rounded by
+a rounded clip's corners where they reach it), and rounded by its own `radius` / `corners`. Elements
+CSS would paint over it (positioned later siblings of it or of an ancestor, a higher `raise`, fixed
+layers) cut their drawn shape out of the native view, which then neither shows nor takes the pointer
+there, so a pill over a canvas draws and clicks while the page beside it stays live. A cut shows
+the engine's drawing, not the page: a translucent element over a webview shows what the engine
+draws under the view rather than the page through it. macOS masks the WKWebView's layer; Linux
+sets the X11 container's bounding and input shapes; Windows sets the WebView2 container's window
+region. While an overlay (an anchored popover or menu, or a lifted layer holding a `modal`)
+overlaps a view, the view steps aside and its slot shows the page's last snapshot under the
+overlay, until the overlay goes (Windows: the slot is empty). `control.screenshot` and
+`control.record` draw each view's snapshot with the same clip and cuts.
+On Linux WebKitGTK lays pages out at GTK's integer scale; the engine zooms each view so a CSS
+pixel is one point at the window's scale, as in Electron (`webview.zoom` multiplies that).
 WebKitGTK keeps one handler per scheme for the whole process; the engine routes each request to
 the view that asked, so any number of views can share a scheme.
 

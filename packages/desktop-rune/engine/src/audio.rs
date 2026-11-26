@@ -55,7 +55,10 @@ mod imp {
         Output(Option<String>),
     }
 
-    static PLAYERS: Mutex<Option<HashMap<String, (u64, Sender<Control>)>>> = Mutex::new(None);
+    /// A playing id's token and the channel to its playback thread.
+    type Player = (u64, Sender<Control>);
+
+    static PLAYERS: Mutex<Option<HashMap<String, Player>>> = Mutex::new(None);
     static NEXT_TOKEN: AtomicU64 = AtomicU64::new(1);
 
     fn players<R>(f: impl FnOnce(&mut HashMap<String, (u64, Sender<Control>)>) -> R) -> R {
@@ -118,10 +121,10 @@ mod imp {
             "volume" => Control::Volume(v["value"].as_f64().unwrap_or(1.0).clamp(0.0, 1.0) as f32),
             "output" => {
                 let device = requested_device(&v["value"]);
-                if let Some(name) = &device {
-                    if find_output(name).is_none() {
-                        return crate::engine::reply(rid, Err(format!("Requested device not found: {name}")));
-                    }
+                if let Some(name) = &device
+                    && find_output(name).is_none()
+                {
+                    return crate::engine::reply(rid, Err(format!("Requested device not found: {name}")));
                 }
                 Control::Output(device)
             }

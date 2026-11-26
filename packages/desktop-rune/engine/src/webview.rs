@@ -34,6 +34,53 @@ struct View {
     /// An overlay (a modal layer, a popover, a menu) covers it: the native view is hidden and its
     /// slot draws the page's last snapshot, so engine-drawn layers above it stay on top.
     covered: bool,
+    /// What of it shows, as last applied to the native view, with the rect, corners and scale
+    /// it was applied for.
+    applied: Option<(Shape, [f32; 4], [f32; 4], f32)>,
+    /// The page zoom TS asked for (`webview.zoom`), and the window scale it was applied at.
+    zoom: f64,
+    zoomed_at: f32,
+}
+
+/// The part of a placed webview that shows, in window coordinates: inside its clipping
+/// ancestors (`vis`, rounded by `round` where a rounded clip's corner reaches it), less the
+/// elements painted over it (`cuts`: rect and corner radii).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Shape {
+    pub vis: [f32; 4],
+    pub round: [f32; 4],
+    pub cuts: Vec<([f32; 4], [f32; 4])>,
+}
+
+/// The clipped area of a view at `r` inside its clipping ancestors `chain`: the rect and the
+/// radius of each of its corners that a rounded clip's corner cuts (top-left, top-right,
+/// bottom-right, bottom-left). `None` when nothing of it is inside.
+fn clipped(r: [f32; 4], chain: &[u32]) -> Option<([f32; 4], [f32; 4])> {
+    let clips: Vec<([f32; 4], f32)> = CLIPS.with(|m| chain.iter().filter_map(|c| m.borrow().get(c).copied()).collect());
+    let mut vis = r;
+    for (c, _) in &clips {
+        vis = intersect(vis, *c)?;
+    }
+    let mut round = [0.0f32; 4];
+    for (c, radius) in clips.iter().filter(|(_, radius)| *radius > 0.0) {
+        let corners = [(vis[0] - c[0], vis[1] - c[1]), (c[0] + c[2] - vis[0] - vis[2], vis[1] - c[1]), (c[0] + c[2] - vis[0] - vis[2], c[1] + c[3] - vis[1] - vis[3]), (vis[0] - c[0], c[1] + c[3] - vis[1] - vis[3])];
+        for (i, (dx, dy)) in corners.into_iter().enumerate() {
+            let inset = dx.max(dy);
+            if inset < *radius {
+                round[i] = round[i].max(radius - inset);
+            }
+        }
+    }
+    Some((vis, round))
+}
+
+/// An element painted over a window's webviews, by node: where it was drawn, and the window
+/// build that last made it one (an older build's entry no longer applies).
+struct Over {
+    window: u32,
+    rect: Option<[f32; 4]>,
+    corners: [f32; 4],
+    build: u64,
 }
 
 thread_local! {
@@ -57,8 +104,104 @@ const PARENT_SHIM: &str = r#"(() => {
 })();"#;
 
 thread_local! {
-    /// Drawn rects of the scroll viewports webviews sit in.
-    static CLIPS: RefCell<HashMap<u32, [f32; 4]>> = RefCell::new(HashMap::new());
+    /// Drawn rects of the scroll viewports and clipping boxes webviews sit in, with the radius
+    /// they round their clip to.
+    static CLIPS: RefCell<HashMap<u32, ([f32; 4], f32)>> = RefCell::new(HashMap::new());
+    static OVER: RefCell<HashMap<u32, Over>> = RefCell::new(HashMap::new());
+    /// Each window's view build count.
+    static BUILDS: RefCell<HashMap<u32, u64>> = RefCell::new(HashMap::new());
+}
+
+/// Starts a build of `window`'s view: elements over its webviews mark themselves again.
+pub fn begin_build(window: u32) {
+    BUILDS.with(|b| *b.borrow_mut().entry(window).or_default() += 1);
+}
+
+fn build_of(window: u32) -> u64 {
+    BUILDS.with(|b| b.borrow().get(&window).copied().unwrap_or(0))
+}
+
+/// An element painted over a webview: the native view leaves its drawn rect (rounded by its
+/// corners) to the engine, both in what shows and in what takes the pointer.
+pub fn over(e: El, window: u32, n: u32, corners: [f32; 4]) -> El {
+    let build = build_of(window);
+    OVER.with(|o| {
+        let mut o = o.borrow_mut();
+        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build });
+        entry.window = window;
+        entry.corners = corners;
+        entry.build = build;
+    });
+    e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+        tx.live_only();
+        OVER.with(|o| {
+            if let Some(entry) = o.borrow_mut().get_mut(&n) {
+                entry.rect = Some(r);
+            }
+        });
+        refresh(s.node);
+    })
+}
+
+pub fn forget_over(n: u32) {
+    if let Some(gone) = OVER.with(|o| o.borrow_mut().remove(&n)) {
+        refresh(gone.window);
+    }
+}
+
+/// Re-places `window`'s views (every window's with `None`) whose shape changed.
+pub fn refresh_all() {
+    let views: Vec<(u32, u32, [f32; 4])> = VIEWS.with(|v| v.borrow().iter().map(|(n, x)| (*n, x.window, x.rect)).collect());
+    for (n, window, r) in views {
+        place(n, window, r);
+    }
+}
+
+fn refresh(window: u32) {
+    let views: Vec<(u32, [f32; 4])> = VIEWS.with(|v| v.borrow().iter().filter(|(_, x)| x.window == window).map(|(n, x)| (*n, x.rect)).collect());
+    for (n, r) in views {
+        place(n, window, r);
+    }
+}
+
+fn intersect(a: [f32; 4], b: [f32; 4]) -> Option<[f32; 4]> {
+    let (x0, y0) = (a[0].max(b[0]), a[1].max(b[1]));
+    let (x1, y1) = ((a[0] + a[2]).min(b[0] + b[2]), (a[1] + a[3]).min(b[1] + b[3]));
+    (x1 - x0 >= 0.5 && y1 - y0 >= 0.5).then_some([x0, y0, x1 - x0, y1 - y0])
+}
+
+fn contains(outer: [f32; 4], inner: [f32; 4]) -> bool {
+    let eps = 0.5;
+    inner[0] >= outer[0] - eps && inner[1] >= outer[1] - eps && inner[0] + inner[2] <= outer[0] + outer[2] + eps && inner[1] + inner[3] <= outer[1] + outer[3] + eps
+}
+
+/// What of view `n` at `r` in `window` shows; `None` when nothing does.
+fn shape(n: u32, window: u32, r: [f32; 4]) -> Option<Shape> {
+    let chain = engine::read(|e| e.tree.clip_of.get(&n).cloned()).unwrap_or_default();
+    let (vis, round) = clipped(r, &chain)?;
+    let build = build_of(window);
+    let mut cuts: Vec<([f32; 4], [f32; 4])> = OVER.with(|o| {
+        o.borrow()
+            .values()
+            .filter(|x| x.window == window && x.build == build)
+            .filter_map(|x| {
+                let rect = x.rect?;
+                let inside = intersect(rect, vis)?;
+                Some(if contains(vis, rect) { (rect, x.corners) } else { (inside, [0.0; 4]) })
+            })
+            .collect()
+    });
+    cuts.sort_by(|a, b| (b.0[2] * b.0[3]).total_cmp(&(a.0[2] * a.0[3])));
+    let mut kept: Vec<([f32; 4], [f32; 4])> = Vec::with_capacity(cuts.len());
+    for c in cuts {
+        if !kept.iter().any(|k| contains(k.0, c.0)) {
+            kept.push(c);
+        }
+    }
+    if kept.iter().any(|k| contains(k.0, vis)) {
+        return None;
+    }
+    Some(Shape { vis, round, cuts: kept })
 }
 
 /// The slot element: an empty box whose drawn rect the WebView follows, showing the page's
@@ -95,7 +238,7 @@ pub fn overlay(layer: El, eng: &engine::Engine, n: u32) -> El {
     })
 }
 
-fn is_overlay(eng: &engine::Engine, n: u32) -> bool {
+pub fn is_overlay(eng: &engine::Engine, n: u32) -> bool {
     let Some(node) = eng.tree.get(n) else { return false };
     node.props.anchor.is_some() || node.props.modal.is_some() || node.children.iter().any(|c| eng.tree.get(*c).is_some_and(|c| c.props.modal.is_some()))
 }
@@ -155,24 +298,19 @@ fn cover(n: u32, window: u32) {
         }
         redraw(window);
     };
-    #[cfg(target_os = "macos")]
-    {
-        let sent = with_view(n, |view| {
-            mac::snapshot(&view.view, move |image| {
-                if let Some(image) = image {
-                    let pixels = rune::Pixels::new();
-                    pixels.set(image.width(), image.height(), image.into_raw());
-                    COVERS.with(|c| c.borrow_mut().insert(n, pixels));
-                }
-                hide();
-            })
-        });
-        if sent.is_err() {
+    let sent = with_view(n, |view| {
+        snap(&view.view, move |image| {
+            if let Some(image) = image {
+                let pixels = rune::Pixels::new();
+                pixels.set(image.width(), image.height(), image.into_raw());
+                COVERS.with(|c| c.borrow_mut().insert(n, pixels));
+            }
             hide();
-        }
+        })
+    });
+    if sent.is_err() {
+        hide();
     }
-    #[cfg(not(target_os = "macos"))]
-    hide();
 }
 
 fn redraw(window: u32) {
@@ -184,12 +322,12 @@ fn redraw(window: u32) {
     engine::wake(window);
 }
 
-/// Records a scroll viewport's drawn rect and re-places the webviews inside it.
-pub fn clipper(e: El, id: u32) -> El {
+/// Records a scroll viewport's or clipping box's drawn rect and re-places the webviews inside it.
+pub fn clipper(e: El, id: u32, radius: f32) -> El {
     e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
         tx.live_only();
-        CLIPS.with(|c| c.borrow_mut().insert(id, r));
-        let inside: Vec<(u32, [f32; 4])> = engine::read(|e| e.tree.clip_of.iter().filter(|(_, c)| **c == id).map(|(w, _)| *w).collect::<Vec<_>>())
+        CLIPS.with(|c| c.borrow_mut().insert(id, (r, radius)));
+        let inside: Vec<(u32, [f32; 4])> = engine::read(|e| e.tree.clip_of.iter().filter(|(_, c)| c.contains(&id)).map(|(w, _)| *w).collect::<Vec<_>>())
             .into_iter()
             .filter_map(|w| VIEWS.with(|v| v.borrow().get(&w).map(|view| (w, view.rect))))
             .collect();
@@ -199,12 +337,11 @@ pub fn clipper(e: El, id: u32) -> El {
     })
 }
 
-/// A native view can't be clipped: it shows only while wholly inside its scroll viewport.
+/// Whether the view lies wholly inside its scroll viewport. Off macOS a native view can't be
+/// clipped, so it shows only then.
 fn fits(n: u32, r: [f32; 4]) -> bool {
-    let Some(c) = engine::read(|e| e.tree.clip_of.get(&n).copied()) else { return true };
-    let Some(c) = CLIPS.with(|m| m.borrow().get(&c).copied()) else { return true };
-    let eps = 0.5;
-    r[0] >= c[0] - eps && r[1] >= c[1] - eps && r[0] + r[2] <= c[0] + c[2] + eps && r[1] + r[3] <= c[1] + c[3] + eps
+    let chain = engine::read(|e| e.tree.clip_of.get(&n).cloned()).unwrap_or_default();
+    clipped(r, &chain).is_some_and(|(vis, _)| contains(vis, r))
 }
 
 fn rect(window: u32, r: [f32; 4]) -> Rect {
@@ -438,14 +575,14 @@ fn enable_webrtc(view: &WebView) {
 
 /// Places (creating on first use) the WebView for node `n` at its slot's drawn rect.
 pub fn place(n: u32, window: u32, r: [f32; 4]) {
-    let props = engine::read(|e| e.tree.get(n).map(|node| (*node.props).clone()));
-    let Some(p) = props else { return };
     let exists = VIEWS.with(|v| v.borrow().contains_key(&n));
     if !exists && handle_of(window).is_none() {
         WAITING.with(|w| w.borrow_mut().insert(n, (window, r)));
         return;
     }
     if !exists {
+        let props = engine::read(|e| e.tree.get(n).map(|node| (*node.props).clone()));
+        let Some(p) = props else { return };
         let t0 = std::time::Instant::now();
         match create(n, window, &p, r) {
             Ok(view) => {
@@ -453,7 +590,9 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 #[cfg(target_os = "macos")]
                 mac::round(&view, corners(&p));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
-                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false }));
+                VIEWS.with(|v| {
+                    v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: 0.0 })
+                });
                 element_event(n, "ready", json!({}), None);
             }
             Err(e) => {
@@ -463,6 +602,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             }
         }
     }
+    let shape = shape(n, window, r);
     VIEWS.with(|v| {
         let mut v = v.borrow_mut();
         let Some(view) = v.get_mut(&n) else { return };
@@ -470,7 +610,22 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             let _ = view.view.set_bounds(rect(window, r));
             view.rect = r;
         }
-        let hidden = r[2] < 1.0 || r[3] < 1.0 || !fits(n, r) || view.covered;
+        let hidden = r[2] < 1.0 || r[3] < 1.0 || shape.is_none() || view.covered;
+        let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32;
+        if view.zoomed_at != k {
+            view.zoomed_at = k;
+            zoom(view, k);
+        }
+        if !hidden && let Some(s) = shape {
+            let key = (s, r, view.corners, k);
+            if view.applied.as_ref() != Some(&key) {
+                #[cfg(target_os = "macos")]
+                mac::mask(&view.view, r, Some(&key.0));
+                #[cfg(any(target_os = "linux", target_os = "windows"))]
+                native_shape::apply(&view.view, r, &key.0, view.corners, k);
+                view.applied = Some(key);
+            }
+        }
         if view.visible == hidden {
             let _ = view.view.set_visible(!hidden);
             view.visible = !hidden;
@@ -478,60 +633,271 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
     });
 }
 
+/// What shows of a native view that can't be masked by layers: a region of device-pixel rects,
+/// set as the view's window shape so it neither draws nor takes the pointer outside it.
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod native_shape {
+    /// Rows of the view's own rounded rect, of what its clips leave, and of what is cut out.
+    type Region<'a> = (&'a [[i32; 4]], &'a [[i32; 4]], &'a [[i32; 4]]);
+    /// Device-pixel rows `[x, y, w, h]` covering a rect with corner radii (top-left, top-right,
+    /// bottom-right, bottom-left), relative to `origin`; rows with the same span are merged.
+    fn rows(r: [f32; 4], c: [f32; 4], k: f32, origin: [i32; 2]) -> Vec<[i32; 4]> {
+        let (x0, y0) = ((r[0] * k).round() as i32, (r[1] * k).round() as i32);
+        let (x1, y1) = (((r[0] + r[2]) * k).round() as i32, ((r[1] + r[3]) * k).round() as i32);
+        let (w, h) = ((x1 - x0) as f32, (y1 - y0) as f32);
+        let c = c.map(|v| (v * k).clamp(0.0, w.min(h) / 2.0));
+        let inset = |rad: f32, d: f32| if d <= 0.0 || rad <= 0.0 { 0.0 } else { rad - (rad * rad - d * d).max(0.0).sqrt() };
+        let mut out: Vec<[i32; 4]> = Vec::new();
+        for y in y0..y1 {
+            let yc = (y - y0) as f32 + 0.5;
+            let left = inset(c[0], c[0] - yc).max(inset(c[3], yc - (h - c[3])));
+            let right = inset(c[1], c[1] - yc).max(inset(c[2], yc - (h - c[2])));
+            let (a, b) = (x0 + left.round() as i32, x1 - right.round() as i32);
+            if b <= a {
+                continue;
+            }
+            let row = [a - origin[0], y - origin[1], b - a, 1];
+            match out.last_mut() {
+                Some(last) if last[0] == row[0] && last[2] == row[2] && last[1] + last[3] == row[1] => last[3] += 1,
+                _ => out.push(row),
+            }
+        }
+        out
+    }
+
+    /// The view at `r` shows `shape` (window coordinates), rounded by its own `corners`.
+    pub fn apply(view: &wry::WebView, r: [f32; 4], shape: &super::Shape, corners: [f32; 4], k: f32) {
+        let origin = [(r[0] * k).round() as i32, (r[1] * k).round() as i32];
+        let whole = shape.cuts.is_empty() && super::contains(shape.vis, r) && corners.iter().chain(&shape.round).all(|c| *c <= 0.0);
+        if whole {
+            platform::set(view, None);
+            return;
+        }
+        let own = rows(r, corners, k, origin);
+        let vis = rows(shape.vis, shape.round, k, origin);
+        let cuts: Vec<[i32; 4]> = shape.cuts.iter().flat_map(|(c, radii)| rows(*c, *radii, k, origin)).collect();
+        platform::set(view, Some((&own, &vis, &cuts)));
+    }
+
+    #[cfg(target_os = "linux")]
+    mod platform {
+        use gtk::prelude::{Cast, WidgetExt};
+        use std::sync::OnceLock;
+        use wry::WebViewExtUnix;
+        use x11_dl::xfixes;
+        use x11_dl::xlib::XRectangle;
+
+        const SHAPE_BOUNDING: i32 = 0;
+        const SHAPE_INPUT: i32 = 2;
+
+        fn lib() -> Option<&'static xfixes::Xlib> {
+            static LIB: OnceLock<Option<xfixes::Xlib>> = OnceLock::new();
+            LIB.get_or_init(|| xfixes::Xlib::open().ok()).as_ref()
+        }
+
+        /// Shapes wry's X11 container (the foreign window its GTK toplevel wraps): the X server
+        /// clips the page's drawing and pointer hits to the region, and the engine window under
+        /// it gets what falls outside.
+        pub fn set(view: &wry::WebView, region: Option<super::Region<'_>>) {
+            let Some(x) = lib() else { return };
+            let Some(top) = view.webview().toplevel().and_then(|t| t.downcast::<gtk::Window>().ok()) else { return };
+            let Some(gdk_window) = top.window() else { return };
+            let Ok(xw) = gdk_window.downcast::<gdkx11::X11Window>() else { return };
+            let Some(display) = gtk::gdk::Display::default() else { return };
+            let Ok(xd) = display.clone().downcast::<gdkx11::X11Display>() else { return };
+            // SAFETY: GDK's Xlib display, alive as long as GDK is.
+            let dpy = unsafe { xd.xdisplay() } as *mut x11_dl::xlib::Display;
+            let win = xw.xid();
+            let make = |rects: &[[i32; 4]]| {
+                let mut xr: Vec<XRectangle> = rects.iter().map(|q| XRectangle { x: q[0] as i16, y: q[1] as i16, width: q[2].max(0) as u16, height: q[3].max(0) as u16 }).collect();
+                // SAFETY: `dpy` is GDK's live Xlib display; the rects outlive the call.
+                unsafe { (x.XFixesCreateRegion)(dpy, xr.as_mut_ptr(), xr.len() as i32) }
+            };
+            gtk::gdk::error_trap_push();
+            match region {
+                None => {
+                    // SAFETY: as above; region 0 (None) removes the shape.
+                    unsafe {
+                        (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_BOUNDING, 0, 0, 0);
+                        (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_INPUT, 0, 0, 0);
+                    }
+                }
+                Some((own, vis, cuts)) => {
+                    let (a, b, c) = (make(own), make(vis), make(cuts));
+                    // SAFETY: as above; every region is created here and destroyed after use.
+                    unsafe {
+                        (x.XFixesIntersectRegion)(dpy, a, a, b);
+                        (x.XFixesSubtractRegion)(dpy, a, a, c);
+                        (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_BOUNDING, 0, 0, a);
+                        (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_INPUT, 0, 0, a);
+                        for r in [a, b, c] {
+                            (x.XFixesDestroyRegion)(dpy, r);
+                        }
+                    }
+                }
+            }
+            display.flush();
+            gtk::gdk::error_trap_pop_ignored();
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    mod platform {
+        use windows::Win32::Graphics::Gdi::{CombineRgn, CreateRectRgn, DeleteObject, HRGN, RGN_AND, RGN_DIFF, RGN_OR, SetWindowRgn};
+        use wry::WebViewExtWindows;
+
+        fn region(rects: &[[i32; 4]]) -> HRGN {
+            // SAFETY: plain GDI region calls on regions made here.
+            unsafe {
+                let out = CreateRectRgn(0, 0, 0, 0);
+                for q in rects {
+                    let one = CreateRectRgn(q[0], q[1], q[0] + q[2], q[1] + q[3]);
+                    CombineRgn(Some(out), Some(out), Some(one), RGN_OR);
+                    let _ = DeleteObject(one.into());
+                }
+                out
+            }
+        }
+
+        /// Sets the window region of wry's WebView2 container: Windows clips the container and
+        /// its child windows (the browser's) to it, in drawing and hit testing.
+        pub fn set(view: &wry::WebView, rows: Option<super::Region<'_>>) {
+            let hwnd = view.hwnd();
+            // SAFETY: `hwnd` is wry's live container; the system owns a region once it is set.
+            unsafe {
+                match rows {
+                    None => {
+                        SetWindowRgn(hwnd, None, true);
+                    }
+                    Some((own, vis, cuts)) => {
+                        let (a, b, c) = (region(own), region(vis), region(cuts));
+                        CombineRgn(Some(a), Some(a), Some(b), RGN_AND);
+                        CombineRgn(Some(a), Some(a), Some(c), RGN_DIFF);
+                        let _ = DeleteObject(b.into());
+                        let _ = DeleteObject(c.into());
+                        SetWindowRgn(hwnd, Some(a), true);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Applies the view's page zoom at window scale `k`. WebKitGTK lays pages out at GTK's integer
+/// scale (GDK_SCALE), not the window's: its zoom makes up the difference, so a CSS pixel is one
+/// engine point as in Electron.
+fn zoom(view: &View, k: f32) {
+    #[cfg(target_os = "linux")]
+    let base = {
+        use gtk::prelude::WidgetExt;
+        use wry::WebViewExtUnix;
+        f64::from(k) / f64::from(view.view.webview().scale_factor().max(1))
+    };
+    #[cfg(not(target_os = "linux"))]
+    let base = {
+        let _ = k;
+        1.0
+    };
+    let _ = view.view.zoom(base * view.zoom);
+}
+
 /// The webview's corner radii (top-left, top-right, bottom-right, bottom-left).
 fn corners(p: &Props) -> [f32; 4] {
     p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4])
 }
 
-/// A shown webview's pixels at its placed rect, for drawing into a captured frame.
+/// A shown webview's pixels at its placed rect, for drawing into a captured frame: only inside
+/// `clip` and outside `cuts`, as on screen.
 pub struct Shot {
     pub rect: [f32; 4],
     pub corners: [f32; 4],
     pub clip: Option<[f32; 4]>,
+    pub cuts: Vec<([f32; 4], [f32; 4])>,
     pub image: image::RgbaImage,
 }
 
 /// Snapshots still to come, those taken, and who hears them all.
-#[cfg(target_os = "macos")]
 type Gathering = (usize, Vec<Shot>, Option<Box<dyn FnOnce(Vec<Shot>) + Send>>);
 
-/// Snapshots every shown webview of `window` and hands them to `done` once all have answered.
-/// Only macOS can snapshot so far; elsewhere `done` gets none.
-pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
-    let targets: Vec<(u32, [f32; 4])> =
-        VIEWS.with(|v| v.borrow().iter().filter(|(_, x)| x.window == window && x.visible).map(|(n, x)| (*n, x.rect)).collect());
+/// Takes the page's current pixels, at the view's size in device pixels or larger.
+fn snap(view: &WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
     #[cfg(target_os = "macos")]
-    if !targets.is_empty() {
-        let pending = std::rc::Rc::new(RefCell::new((targets.len(), Vec::new(), Some(done))));
-        let answer = |pending: &std::rc::Rc<RefCell<Gathering>>, shot: Option<Shot>| {
-            let mut p = pending.borrow_mut();
-            p.0 -= 1;
-            p.1.extend(shot);
-            if p.0 == 0
-                && let Some(done) = p.2.take()
-            {
-                done(std::mem::take(&mut p.1));
-            }
-        };
-        for (n, rect) in targets {
-            let (c, clip) = engine::read(|e| {
-                let c = e.tree.get(n).map(|node| corners(&node.props)).unwrap_or_default();
-                let clip = e.tree.clip_of.get(&n).and_then(|c| CLIPS.with(|m| m.borrow().get(c).copied()));
-                (c, clip)
-            });
-            let pending = pending.clone();
-            let sent = with_view(n, |view| {
-                let pending = pending.clone();
-                mac::snapshot(&view.view, move |image| answer(&pending, image.map(|image| Shot { rect, corners: c, clip, image })));
-            });
-            if sent.is_err() {
-                answer(&pending, None);
-            }
-        }
+    mac::snapshot(view, done);
+    #[cfg(target_os = "linux")]
+    gtk_snap::snapshot(view, done);
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = view;
+        done(None);
+    }
+}
+
+/// Snapshots every shown webview of `window` and hands them to `done` once all have answered.
+/// Windows can't snapshot yet; there `done` gets none.
+pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
+    let targets: Vec<(u32, [f32; 4], Option<Shape>)> = VIEWS.with(|v| {
+        v.borrow().iter().filter(|(_, x)| x.window == window && x.visible).map(|(n, x)| (*n, x.rect, x.applied.as_ref().map(|a| a.0.clone()))).collect()
+    });
+    if targets.is_empty() {
+        done(Vec::new());
         return;
     }
-    let _ = targets;
-    done(Vec::new());
+    let pending = std::rc::Rc::new(RefCell::new((targets.len(), Vec::new(), Some(done))));
+    let answer = |pending: &std::rc::Rc<RefCell<Gathering>>, shot: Option<Shot>| {
+        let mut p = pending.borrow_mut();
+        p.0 -= 1;
+        p.1.extend(shot);
+        if p.0 == 0
+            && let Some(done) = p.2.take()
+        {
+            done(std::mem::take(&mut p.1));
+        }
+    };
+    for (n, rect, shape) in targets {
+        let c = engine::read(|e| e.tree.get(n).map(|node| corners(&node.props)).unwrap_or_default());
+        let (clip, cuts) = match shape {
+            Some(s) => (Some(s.vis), s.cuts),
+            None => (None, Vec::new()),
+        };
+        let pending = pending.clone();
+        let sent = with_view(n, |view| {
+            let pending = pending.clone();
+            snap(&view.view, move |image| answer(&pending, image.map(|image| Shot { rect, corners: c, clip, cuts, image })));
+        });
+        if sent.is_err() {
+            answer(&pending, None);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod gtk_snap {
+    use webkit2gtk::{SnapshotOptions, SnapshotRegion, WebViewExt};
+    use wry::WebViewExtUnix;
+
+    pub fn snapshot(view: &wry::WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
+        view.webview().snapshot(SnapshotRegion::Visible, SnapshotOptions::TRANSPARENT_BACKGROUND, None::<&gtk::gio::Cancellable>, move |res| {
+            done(res.ok().and_then(decode));
+        });
+    }
+
+    /// Cairo's ARGB32 is premultiplied, in native-endian words (BGRA bytes here).
+    fn decode(surface: gtk::cairo::Surface) -> Option<image::RgbaImage> {
+        let mut img = gtk::cairo::ImageSurface::try_from(surface).ok()?;
+        img.flush();
+        let (w, h, stride) = (img.width() as usize, img.height() as usize, img.stride() as usize);
+        let data = img.data().ok()?;
+        let mut px = Vec::with_capacity(w * h * 4);
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * stride + x * 4;
+                let (b, g, r, a) = (data[i], data[i + 1], data[i + 2], data[i + 3]);
+                let un = |c: u8| if a == 0 { 0 } else { ((u32::from(c) * 255 + u32::from(a) / 2) / u32::from(a)).min(255) as u8 };
+                px.extend_from_slice(&[un(r), un(g), un(b), a]);
+            }
+        }
+        image::RgbaImage::from_raw(w as u32, h as u32, px)
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -550,9 +916,9 @@ mod mac {
     use dispatch2::DispatchQueue;
     use objc2_app_kit::NSImage;
     use objc2_core_foundation::{CGPoint, CGRect, CGSize};
-    use objc2_core_graphics::{CGBitmapContextCreate, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo, CGImageByteOrderInfo, kCGColorSpaceSRGB};
+    use objc2_core_graphics::{CGBitmapContextCreate, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo, CGImageByteOrderInfo, CGMutablePath, kCGColorSpaceSRGB};
     use objc2_foundation::NSError;
-    use objc2_quartz_core::CACornerMask;
+    use objc2_quartz_core::{CACornerMask, CAShapeLayer, CATransaction, kCAFillRuleEvenOdd};
     use wry::WebViewExtMacOS;
 
     thread_local! {
@@ -658,6 +1024,159 @@ mod mac {
             }
         }
         image::RgbaImage::from_raw(w as u32, h as u32, px)
+    }
+
+    thread_local! {
+        /// What each masked WKWebView shows, in its own top-left coordinates, by view pointer.
+        static HOLES: RefCell<HashMap<usize, super::Shape>> = RefCell::new(HashMap::new());
+    }
+
+    fn inside(s: &super::Shape, x: f32, y: f32) -> bool {
+        let within = |r: [f32; 4]| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
+        within(s.vis) && in_corners(x - s.vis[0], y - s.vis[1], s.vis[2], s.vis[3], s.round) && !s.cuts.iter().any(|(r, c)| within(*r) && in_corners(x - r[0], y - r[1], r[2], r[3], *c))
+    }
+
+    /// Whether (x, y) inside a w×h box lies within its corner radii (top-left, top-right,
+    /// bottom-right, bottom-left).
+    fn in_corners(x: f32, y: f32, w: f32, h: f32, c: [f32; 4]) -> bool {
+        let c = c.map(|r| r.min(w / 2.0).min(h / 2.0));
+        let corner = if x < c[0] && y < c[0] {
+            Some((c[0], c[0], c[0]))
+        } else if x > w - c[1] && y < c[1] {
+            Some((c[1], w - c[1], c[1]))
+        } else if x > w - c[2] && y > h - c[2] {
+            Some((c[2], w - c[2], h - c[2]))
+        } else if x < c[3] && y > h - c[3] {
+            Some((c[3], c[3], h - c[3]))
+        } else {
+            None
+        };
+        corner.is_none_or(|(r, cx, cy)| (x - cx).powi(2) + (y - cy).powi(2) <= r * r)
+    }
+
+    type HitTest = unsafe extern "C-unwind" fn(&AnyObject, Sel, CGPoint) -> *mut AnyObject;
+    static SUPER_HIT: OnceLock<HitTest> = OnceLock::new();
+
+    /// The masked parts of a WKWebView pass the pointer to the engine's view under it.
+    unsafe extern "C-unwind" fn hit_test(this: &AnyObject, sel: Sel, point: CGPoint) -> *mut AnyObject {
+        let key = this as *const AnyObject as usize;
+        let shape = HOLES.try_with(|h| h.borrow().get(&key).cloned()).ok().flatten();
+        if let Some(shape) = shape {
+            // SAFETY: AppKit calls `hitTest:` on the main thread with the receiver alive.
+            let local: CGPoint = unsafe {
+                let parent: *mut AnyObject = objc2::msg_send![this, superview];
+                objc2::msg_send![this, convertPoint: point, fromView: parent]
+            };
+            // SAFETY: as above.
+            let (bounds, flipped): (CGRect, bool) = unsafe { (objc2::msg_send![this, bounds], objc2::msg_send![this, isFlipped]) };
+            let x = (local.x - bounds.origin.x) as f32;
+            let y = if flipped { local.y - bounds.origin.y } else { bounds.origin.y + bounds.size.height - local.y } as f32;
+            if x >= 0.0 && y >= 0.0 && x < bounds.size.width as f32 && y < bounds.size.height as f32 && !inside(&shape, x, y) {
+                return std::ptr::null_mut();
+            }
+        }
+        match SUPER_HIT.get() {
+            // SAFETY: the inherited `hitTest:` implementation, with its own arguments.
+            Some(f) => unsafe { f(this, sel, point) },
+            None => std::ptr::null_mut(),
+        }
+    }
+
+    /// wry's WKWebView class inherits `hitTest:`; it gets one that asks the mask first.
+    fn install_hit_test(wk: &AnyObject) {
+        static DONE: OnceLock<bool> = OnceLock::new();
+        DONE.get_or_init(|| {
+            let class = wk.class();
+            let Some(parent) = class.superclass() else { return false };
+            let (Some(own), Some(inherited)) = (class.instance_method(sel!(hitTest:)), parent.instance_method(sel!(hitTest:))) else { return false };
+            if !std::ptr::eq(own, inherited) {
+                return false;
+            }
+            // SAFETY: `hit_test` has `hitTest:`'s exact signature; the inherited IMP is stored
+            // before the method is added, both on the main thread.
+            unsafe {
+                let _ = SUPER_HIT.set(std::mem::transmute::<Imp, HitTest>(inherited.implementation()));
+                let imp: Imp = std::mem::transmute::<HitTest, Imp>(hit_test);
+                objc2::ffi::class_addMethod(class as *const _ as *mut _, sel!(hitTest:), imp, c"@@:{CGPoint=dd}".as_ptr()).as_bool()
+            }
+        });
+    }
+
+    /// Shows only `shape` of the WKWebView placed at `r` (all of it with `None`), and lets the
+    /// pointer through where it doesn't show.
+    pub fn mask(view: &wry::WebView, r: [f32; 4], shape: Option<&super::Shape>) {
+        let wk = view.webview();
+        let key = objc2::rc::Retained::as_ptr(&wk) as usize;
+        let local = shape.map(|s| super::Shape {
+            vis: [s.vis[0] - r[0], s.vis[1] - r[1], s.vis[2], s.vis[3]],
+            round: s.round,
+            cuts: s.cuts.iter().map(|(c, k)| ([c[0] - r[0], c[1] - r[1], c[2], c[3]], *k)).collect(),
+        });
+        let whole = local.as_ref().is_none_or(|s| s.cuts.is_empty() && s.round.iter().all(|c| *c <= 0.0) && s.vis[0] <= 0.5 && s.vis[1] <= 0.5 && s.vis[2] >= r[2] - 0.5 && s.vis[3] >= r[3] - 0.5);
+        wk.setWantsLayer(true);
+        let Some(layer) = wk.layer() else { return };
+        CATransaction::begin();
+        CATransaction::setDisableActions(true);
+        match local.filter(|_| !whole) {
+            None => {
+                HOLES.with(|h| h.borrow_mut().remove(&key));
+                // SAFETY: main thread; clearing the layer's mask.
+                unsafe { layer.setMask(None) };
+            }
+            Some(s) => {
+                install_hit_test(wk.as_ref());
+                let bounds = layer.bounds();
+                let top_down = layer.contentsAreFlipped();
+                let h = bounds.size.height;
+                let to_layer = |q: [f32; 4]| {
+                    let y = if top_down { f64::from(q[1]) } else { h - f64::from(q[1]) - f64::from(q[3]) };
+                    CGRect::new(CGPoint::new(bounds.origin.x + f64::from(q[0]), bounds.origin.y + y), CGSize::new(f64::from(q[2]), f64::from(q[3])))
+                };
+                let path = CGMutablePath::new();
+                let flip = |radii: [f32; 4]| if top_down { radii } else { [radii[3], radii[2], radii[1], radii[0]] };
+                rounded(&path, to_layer(s.vis), flip(s.round));
+                for (c, radii) in &s.cuts {
+                    rounded(&path, to_layer(*c), flip(*radii));
+                }
+                let shaped = layer.mask().and_then(|m| m.downcast::<CAShapeLayer>().ok());
+                let m = shaped.unwrap_or_else(|| {
+                    let m = CAShapeLayer::new();
+                    // SAFETY: a static CoreAnimation constant.
+                    m.setFillRule(unsafe { kCAFillRuleEvenOdd });
+                    // SAFETY: main thread; `m` is a fresh layer nothing else holds.
+                    unsafe { layer.setMask(Some(&m)) };
+                    m
+                });
+                m.setFrame(bounds);
+                m.setPath(Some(&path));
+                HOLES.with(|h| h.borrow_mut().insert(key, s));
+            }
+        }
+        CATransaction::commit();
+    }
+
+    /// Adds a rect with per-corner radii, listed from the corner at its lowest x and y going
+    /// round through increasing x.
+    fn rounded(path: &CGMutablePath, r: CGRect, radii: [f32; 4]) {
+        let (x0, y0) = (r.origin.x, r.origin.y);
+        let (x1, y1) = (x0 + r.size.width, y0 + r.size.height);
+        let cap = (r.size.width.min(r.size.height) / 2.0).max(0.0);
+        let [a, b, c, d] = radii.map(|v| f64::from(v).clamp(0.0, cap));
+        // SAFETY: `path` is a live mutable path; no transform.
+        unsafe {
+            CGMutablePath::move_to_point(Some(path), std::ptr::null(), x0 + a, y0);
+            CGMutablePath::add_arc_to_point(Some(path), std::ptr::null(), x1, y0, x1, y0 + b, b);
+            CGMutablePath::add_arc_to_point(Some(path), std::ptr::null(), x1, y1, x1 - c, y1, c);
+            CGMutablePath::add_arc_to_point(Some(path), std::ptr::null(), x0, y1, x0, y1 - d, d);
+            CGMutablePath::add_arc_to_point(Some(path), std::ptr::null(), x0, y0, x0 + a, y0, a);
+        }
+        CGMutablePath::close_subpath(Some(path));
+    }
+
+    /// Forgets a closing view's mask.
+    pub fn unmask(view: &wry::WebView) {
+        let key = objc2::rc::Retained::as_ptr(&view.webview()) as usize;
+        HOLES.with(|h| h.borrow_mut().remove(&key));
     }
 
     /// Rounds the WKWebView's own layer, which clips the page drawn in its sublayers.
@@ -766,6 +1285,10 @@ fn destroy(views: Vec<View>) {
         }
         gtk::gdk::error_trap_pop_ignored();
     }
+    #[cfg(target_os = "macos")]
+    for v in &views {
+        mac::unmask(&v.view);
+    }
     #[cfg(not(target_os = "linux"))]
     drop(views);
 }
@@ -801,14 +1324,27 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
         "webview.forward" => with_view(n, |w| w.view.evaluate_script("history.forward()").map_err(|e| e.to_string()))??,
         "webview.focus" => with_view(n, |w| w.view.focus().map_err(|e| e.to_string()))??,
         "webview.blur" => with_view(n, |w| w.view.focus_parent().map_err(|e| e.to_string()))??,
-        "webview.zoom" => with_view(n, |w| w.view.zoom(v.get("factor").and_then(|f| f.as_f64()).unwrap_or(1.0)).map_err(|e| e.to_string()))??,
+        "webview.zoom" => {
+            let factor = v.get("factor").and_then(|f| f.as_f64()).unwrap_or(1.0);
+            VIEWS.with(|views| {
+                let mut views = views.borrow_mut();
+                let w = views.get_mut(&n).ok_or("no such webview")?;
+                w.zoom = factor;
+                zoom(w, w.zoomed_at);
+                Ok::<(), String>(())
+            })?;
+        }
         "webview.state" => {
-            let clip = engine::read(|e| e.tree.clip_of.get(&n).copied()).map(|c| (c, CLIPS.with(|m| m.borrow().get(&c).copied())));
+            let clip: Vec<serde_json::Value> = engine::read(|e| e.tree.clip_of.get(&n).cloned())
+                .unwrap_or_default()
+                .into_iter()
+                .map(|c| json!({ "node": c, "rect": CLIPS.with(|m| m.borrow().get(&c).map(|x| x.0)), "radius": CLIPS.with(|m| m.borrow().get(&c).map(|x| x.1)) }))
+                .collect();
             return with_view(n, |w| {
                 let covering: Vec<serde_json::Value> = OVERLAYS.with(|o| {
                     o.borrow().iter().filter(|(_, (win, r))| *win == w.window && overlaps(*r, w.rect)).map(|(k, (_, r))| json!({ "node": k, "rect": r })).collect()
                 });
-                json!({ "rect": w.rect, "shown": w.visible, "covered": w.covered, "covering": covering, "fits": fits(n, w.rect), "clip": clip.map(|(c, r)| json!({ "node": c, "rect": r })) })
+                json!({ "rect": w.rect, "shown": w.visible, "covered": w.covered, "covering": covering, "fits": fits(n, w.rect), "clip": clip, "shape": w.applied.as_ref().map(|a| json!({ "vis": a.0.vis, "round": a.0.round, "cuts": a.0.cuts })) })
             });
         }
         "webview.url" => return with_view(n, |w| json!(w.view.url().ok().map(|u| scheme_url::from_view(&w.protocols, &u)))),

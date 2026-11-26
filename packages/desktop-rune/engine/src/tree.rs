@@ -30,9 +30,12 @@ pub struct Tree {
     live: HashSet<u32>,
     /// Ancestors of live nodes: never memoized, since a cached subtree would hold stale state.
     pub live_above: HashSet<u32>,
-    /// Each webview's nearest scrolling or clipping ancestor, which its native view must stay inside.
-    pub clip_of: HashMap<u32, u32>,
+    /// Each webview's scrolling or clipping ancestors, nearest first, which its native view must
+    /// stay inside.
+    pub clip_of: HashMap<u32, Vec<u32>>,
     pub clippers: HashSet<u32>,
+    /// Ancestors of webviews, up to their window: where siblings drawn over a native view are found.
+    pub web_above: HashSet<u32>,
     live_moved: bool,
 }
 
@@ -93,16 +96,24 @@ impl Tree {
         self.live_above.clear();
         self.clip_of.clear();
         self.clippers.clear();
+        self.web_above.clear();
         for &l in &self.live {
-            if self.nodes.get(&l).is_some_and(|n| n.kind == Kind::Webview)
-                && let Some(c) = self.clipper_above(l)
-            {
-                self.clip_of.insert(l, c);
-                self.clippers.insert(c);
+            let web = self.nodes.get(&l).is_some_and(|n| n.kind == Kind::Webview);
+            if web {
+                let chain = self.clippers_above(l);
+                if !chain.is_empty() {
+                    self.clippers.extend(chain.iter().copied());
+                    self.clip_of.insert(l, chain);
+                }
             }
             let mut id = self.nodes.get(&l).map_or(0, |n| n.parent);
             for _ in 0..4096 {
-                if id == 0 || !self.live_above.insert(id) {
+                if id == 0 {
+                    break;
+                }
+                let new_live = self.live_above.insert(id);
+                let new_web = web && self.web_above.insert(id);
+                if !new_live && !new_web {
                     break;
                 }
                 id = self.nodes.get(&id).map_or(0, |n| n.parent);
@@ -110,19 +121,20 @@ impl Tree {
         }
     }
 
-    fn clipper_above(&self, id: u32) -> Option<u32> {
-        let mut id = self.nodes.get(&id)?.parent;
+    fn clippers_above(&self, id: u32) -> Vec<u32> {
+        let mut out = Vec::new();
+        let Some(mut id) = self.nodes.get(&id).map(|n| n.parent) else { return out };
         for _ in 0..4096 {
-            let n = self.nodes.get(&id)?;
+            let Some(n) = self.nodes.get(&id) else { break };
             if id == 0 || n.kind == Kind::Window {
-                return None;
+                break;
             }
             if n.props.scroll_y || n.props.scroll_x || n.props.clip.is_some() {
-                return Some(id);
+                out.push(id);
             }
             id = n.parent;
         }
-        None
+        out
     }
 
     pub fn touch(&mut self, mut id: u32) {

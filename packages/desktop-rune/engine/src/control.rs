@@ -192,6 +192,7 @@ pub struct Shot {
     rect: [f32; 4],
     corners: [f32; 4],
     clip: Option<[f32; 4]>,
+    cuts: Vec<([f32; 4], [f32; 4])>,
     image: image::RgbaImage,
 }
 
@@ -200,8 +201,8 @@ fn snapshots(_window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
     done(Vec::new());
 }
 
-/// Draws each webview snapshot over the frame at its rect, inside its scroll viewport and
-/// rounded by its corner radii.
+/// Draws each webview snapshot over the frame at its rect, inside its scroll viewport, rounded
+/// by its corner radii, and outside the elements drawn over it.
 fn composite(f: &mut rune::CapturedFrame, shots: &[Shot]) {
     let k = f.scale as f32;
     let (fw, fh) = (f.width as i64, f.height as i64);
@@ -215,6 +216,7 @@ fn composite(f: &mut rune::CapturedFrame, shots: &[Shot]) {
         };
         let clip = shot.clip.map(|c| c.map(|v| v * k)).unwrap_or([0.0, 0.0, fw as f32, fh as f32]);
         let radii = shot.corners.map(|r| (r * k).min(w / 2.0).min(h / 2.0));
+        let cuts: Vec<([f32; 4], [f32; 4])> = shot.cuts.iter().map(|(c, r)| (c.map(|v| v * k), r.map(|v| (v * k).min(c[2] * k / 2.0).min(c[3] * k / 2.0)))).collect();
         let (x0, y0) = (x.round() as i64, y.round() as i64);
         for py in 0..ph as i64 {
             let gy = y0 + py;
@@ -226,7 +228,13 @@ fn composite(f: &mut rune::CapturedFrame, shots: &[Shot]) {
                 if gx < 0 || gx >= fw || (gx as f32) < clip[0] || (gx as f32) >= clip[0] + clip[2] {
                     continue;
                 }
-                let cover = corner_cover(px as f32 + 0.5, py as f32 + 0.5, w, h, radii);
+                let mut cover = corner_cover(px as f32 + 0.5, py as f32 + 0.5, w, h, radii);
+                for (c, r) in &cuts {
+                    let (cx, cy) = (gx as f32 + 0.5 - c[0], gy as f32 + 0.5 - c[1]);
+                    if cx >= 0.0 && cy >= 0.0 && cx < c[2] && cy < c[3] {
+                        cover *= 1.0 - corner_cover(cx, cy, c[2], c[3], *r);
+                    }
+                }
                 if cover <= 0.0 {
                     continue;
                 }

@@ -10,9 +10,9 @@ name = "stella-engine"
 path = "src/main.rs"
 
 [dependencies]
-rune = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a", features = ["tooling"] }
-rune-kit = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a", features = ["markdown", "mermaid"] }
-rune-notify = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+rune = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116", features = ["tooling"] }
+rune-kit = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116", features = ["markdown", "mermaid"] }
+rune-notify = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
@@ -27,8 +27,8 @@ block2 = "0.6"
 dispatch2 = "0.3"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSError", "NSObject", "NSString", "NSURL", "NSValue"] }
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSDockTile", "NSView", "NSResponder", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics", "objc2-quartz-core"] }
-objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
-objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage", "CGPath"] }
+objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer", "CAShapeLayer", "CATransaction", "objc2-core-graphics"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "block2", "objc2-app-kit", "WKFrameInfo", "WKNavigationAction", "WKNavigationDelegate", "WKWebView", "WKSnapshotConfiguration"] }
 objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes"] }
 objc2-core-audio-types = { version = "0.3", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
@@ -72,20 +72,22 @@ webkit2gtk = { version = "3", optional = true, features = ["v2_40"] }
 wayland-client = { version = "0.31", optional = true }
 wayland-protocols = { version = "0.32", optional = true, features = ["client", "unstable"] }
 x11rb = { version = "0.13", optional = true, features = ["randr"] }
+gdkx11 = { version = "0.19", optional = true }
+x11-dl = { version = "2.21", optional = true }
 
 [features]
 default = ["webview"]
-webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk", "dep:wayland-client", "dep:wayland-protocols", "dep:x11rb"]
+webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk", "dep:wayland-client", "dep:wayland-protocols", "dep:x11rb", "dep:gdkx11", "dep:x11-dl"]
 
 [patch.crates-io]
-wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-naga = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-winit = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-parley_engine = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
-accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "7ce83274c9af5a0385799c79b484a79e866b8116" }
 
 [profile.release]
 codegen-units = 16

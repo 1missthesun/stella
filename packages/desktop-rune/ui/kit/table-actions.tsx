@@ -142,6 +142,7 @@ function fullscreenStyle(t: Tokens) {
     body: cell,
     table: [c.border, mix(c.muted, 80, "transparent")],
     tableOutline: c.border,
+    tableRadius: 0,
     tableRules: c.border,
     tableHeaderRule: c.border,
     tableHeaderText: c.foreground,

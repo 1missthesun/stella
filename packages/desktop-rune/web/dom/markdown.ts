@@ -124,8 +124,9 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
   const { s, p } = c;
   const index = c.codeIndex.n++;
   const frame = (s.codeFrame ?? {}) as Style;
-  const inside = (frame.inside ?? null) as { fill?: string; border?: string; radius?: number; pad?: [number, number, number] } | null;
+  const inside = (frame.inside ?? null) as { fill?: string; border?: string; radius?: number; pad?: [number, number, number]; padRight?: number } | null;
   const [padX, padTop, padBottom] = inside?.pad ?? [16, 12, 12];
+  const padRight = inside?.padRight ?? padX;
   const language = n.lang ?? null;
   const source = n.value ?? "";
   const actions = (frame.actions ?? []) as { id: string; label?: string; svg?: string; view?: number }[];
@@ -136,7 +137,7 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
   const actionRow = actions.length
     ? createElement("div", {
       className: frame.actionsOnHover ? "mdca hov" : "mdca",
-      style: { position: "absolute", top: px(at?.[0] ?? padTop), right: px(at?.[1] ?? padX), display: "flex", gap: "2px", color: frame.actionColor, "--mdca-hover": frame.actionHover } as Css,
+      style: { position: "absolute", top: px(at?.[0] ?? padTop), right: px(at?.[1] ?? padRight), display: "flex", gap: "2px", color: frame.actionColor, "--mdca-hover": frame.actionHover } as Css,
     }, actions.map((a) => createElement("button", {
       key: a.id, type: "button", className: "mdcb", "aria-label": a.label ?? a.id, title: a.label ?? (a.id === "copy" ? "Copy" : a.id === "download" ? "Download" : a.id),
       onClick: (e: React.MouseEvent) => {
@@ -147,18 +148,41 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
     }, a.svg ? undefined : a.label)))
     : null;
   const label = language && frame.label
-    ? createElement("div", { style: { color: frame.label, fontSize: px(frame.labelSize ?? 12), lineHeight: 1.5, marginBottom: px(frame.labelGap ?? 4), paddingRight: "60px", fontFamily: "var(--rune-sans)" } }, language)
+    ? createElement("div", {
+      style: {
+        color: frame.label, fontSize: px(frame.labelSize ?? 12), lineHeight: frame.labelHeight ? px(frame.labelHeight) : 1.5, marginBottom: px(frame.labelGap ?? 4),
+        paddingLeft: px(frame.labelInset ?? 0), paddingRight: "60px", fontFamily: (frame.labelFamily && FAMILY({ family: frame.labelFamily })) || "var(--rune-sans)",
+      },
+    }, language)
     : null;
   const [, codePadY] = pair(s.codeBlockPadding, [0, 0]);
   return createElement("div", {
     key, className: "mdcode",
     style: {
       ...margin(s.codeMargin, [0, 12]), position: "relative", background: fill, borderRadius: px(radius && radius > 0 ? radius : 8),
-      boxShadow: border ? `inset 0 0 0 1px ${border}` : undefined, padding: `${padTop}px ${padX}px ${padBottom}px`,
+      boxShadow: border ? `inset 0 0 0 1px ${border}` : undefined, padding: `${padTop}px ${padRight}px ${padBottom}px ${padX}px`,
     },
-  }, label, createElement("pre", {
-    style: { margin: 0, padding: `${codePadY}px 0`, overflowX: "auto", whiteSpace: "pre", ...fontCss({ family: "mono", ...(s.codeBlockFont as Font) }), color: s.codeBlockText, scrollbarWidth: "thin" },
-  }, createElement("code", null, source)), actionRow);
+  }, label, codeBody(s, source, codePadY), actionRow);
+}
+
+type LineNumbers = { font?: Font; color?: string; width?: number; gap?: number };
+
+function codeBody(s: Style, source: string, padY: number): ReactNode {
+  const code = { family: "mono", ...(s.codeBlockFont as Font) };
+  const pre = createElement("pre", {
+    style: { margin: 0, padding: `${padY}px 0`, overflowX: "auto", whiteSpace: "pre", ...fontCss(code), color: s.codeBlockText, scrollbarWidth: "thin", flex: 1, minWidth: 0 },
+  }, createElement("code", null, source));
+  const numbers = s.codeLineNumbers as LineNumbers | undefined;
+  if (!numbers) return pre;
+  const lines = source.replace(/\n$/, "").split("\n").length;
+  const gutter = createElement("div", {
+    "aria-hidden": true,
+    style: {
+      ...fontCss({ ...numbers.font, lineHeight: code.lineHeight }), color: numbers.color, width: px(numbers.width ?? 24), marginRight: px(numbers.gap ?? 16),
+      padding: `${padY}px 0`, textAlign: "right", whiteSpace: "pre", userSelect: "none", flexShrink: 0,
+    },
+  }, Array.from({ length: lines }, (_, i) => i + 1).join("\n"));
+  return createElement("div", { style: { display: "flex", alignItems: "flex-start" } }, gutter, pre);
 }
 
 type TableActionP = { id: string; label?: string; svg?: string; view?: number; size?: number };
@@ -199,19 +223,27 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
   const { s } = c;
   const [cellX, cellY] = pair(s.tableCellPadding, [12, 8]);
   const [headX, headY] = pair(s.tableHeaderPad, [cellX, cellY]);
+  const edges = s.tableHeaderPadEdges as [number, number, number] | undefined;
+  const [headPadX, headTop, headBottom] = edges ?? [headX, headY, headY];
+  const cellsFlush = !!s.tableCellsFlushLeft;
+  const flushRight = !!s.tableFlushRight;
+  const endRule = s.tableEndRule !== false && !s.tableOutline;
   const rules = s.tableRules ?? (Array.isArray(s.table) ? s.table[0] : undefined);
+  const headRule = `${s.tableHeaderRuleWidth ?? 1}px solid ${s.tableHeaderRule ?? rules}`;
   const headerFill = Array.isArray(s.table) ? s.table[1] : undefined;
   const flush = !!s.tableFlushLeft;
   const rows = n.children ?? [];
   const align = n.align ?? [];
   const cell = (row: Md, r: number) => (row.children ?? []).map((cellNode, i) => {
     const header = r === 0;
-    const [x, y] = header ? [headX, headY] : [cellX, cellY];
+    const [x, top, bottom] = header ? [headPadX, headTop, headBottom] : [cellX, cellY, cellY];
     const last = (row.children?.length ?? 0) - 1;
+    const left = cellsFlush || (i === 0 && flush) ? 0 : x;
+    const right = flushRight && i === last ? 0 : x;
     const style: Css = {
       textAlign: (align[i] ?? "left") as Css["textAlign"],
-      padding: flush ? `${y}px ${i === last ? 0 : 2 * x}px ${y}px 0` : `${y}px ${x}px`,
-      borderBottom: header ? `1px solid ${s.tableHeaderRule ?? rules}` : r < rows.length - 1 ? `1px solid ${rules}` : undefined,
+      padding: `${top}px ${right}px ${bottom}px ${left}px`,
+      borderBottom: header ? headRule : r < rows.length - 1 || endRule ? `1px solid ${rules}` : undefined,
       verticalAlign: "top",
     };
     if (header) {
@@ -258,7 +290,7 @@ function block(n: Md, c: Ctx, key: number, nested: boolean): ReactNode {
       const tight = (n.children ?? []).every((li) => (li.children ?? []).length <= 1 || (li.children ?? []).every((x) => x.type !== "paragraph" || true));
       return createElement(tag, {
         key, start: n.ordered && n.start && n.start !== 1 ? n.start : undefined,
-        style: { ...(nested ? { marginTop: "4px", marginBottom: "4px" } : margin(s.listMargin, [16, 16])), paddingLeft: px(nested ? nestedIndent : indent), listStyleType: n.ordered ? "decimal" : nested ? "circle" : "disc", listStylePosition: s.listMarkersOutside === false ? "inside" : "outside", "--md-marker": s.muted } as Css,
+        style: { ...(nested ? { marginTop: "4px", marginBottom: "4px" } : { ...margin(s.listMargin, [16, 16]), paddingTop: px(pair(s.listPadding, [0, 0])[0]), paddingBottom: px(pair(s.listPadding, [0, 0])[1]) }), paddingLeft: px(nested ? nestedIndent : indent), listStyleType: n.ordered ? "decimal" : nested ? "circle" : "disc", listStylePosition: s.listMarkersOutside === false ? "inside" : "outside", "--md-marker": s.muted } as Css,
       }, (n.children ?? []).map((li, i) => createElement("li", { key: i, style: { marginTop: i ? px(gap) : 0 } },
         li.checked !== null && li.checked !== undefined ? createElement("input", { type: "checkbox", checked: li.checked, readOnly: true, style: { marginRight: "6px" } }) : null,
         blocks(li.children, c, tight))));

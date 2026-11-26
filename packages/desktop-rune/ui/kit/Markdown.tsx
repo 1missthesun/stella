@@ -9,6 +9,8 @@ type Font = { size: number; weight: number; lineHeight: number; tracking?: numbe
 /** Chat text metrics (`--chat-text-*` in desktop-ui's full-shell and compact conversation CSS). */
 export type ChatText = { size: number; weight: number; strongWeight: number; lineHeight: number; color?: string };
 
+const LINE_NUMBER_SIZE = 13;
+
 export const CHAT_TEXT: ChatText = { size: fontSize.lg, weight: 400, strongWeight: 500, lineHeight: 1.5 };
 export const CHAT_TEXT_COMPACT: ChatText = { ...CHAT_TEXT, size: fontSize.base };
 
@@ -29,7 +31,8 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
   const lh = (size: number, k: number) => Math.round(size * k * 100) / 100;
   const body: Font = { size: chat.size, weight: chat.weight, lineHeight: lh(chat.size, chat.lineHeight), tracking: 0 };
   const heading = (size: number): Font => ({ size, weight: 600, lineHeight: lh(size, 1.3) });
-  const code: Font = { size: fontSize.sm, weight: 400, lineHeight: lh(fontSize.sm, 1.5), family: font.mono };
+  // Streamdown's 13px line-number box, on the body's text-sm 20/14 line height, sets each code line's height.
+  const code: Font = { size: fontSize.sm, weight: 400, lineHeight: lh(LINE_NUMBER_SIZE, 20 / 14), family: font.mono };
   const rule = mix(text, 12, "transparent");
   return {
     dark: t.dark,
@@ -48,6 +51,9 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     codeBlockRadius: radiusUnset,
     codeBlockFont: code,
     codeBlockText: text,
+    codeLineNumbers: { font: { size: LINE_NUMBER_SIZE, weight: 400, family: font.mono }, color: mix(c.mutedForeground, 50, "transparent"), width: 24, gap: 16 },
+    scrollWide: true,
+    wideFade: 0,
     quoteRule: c.borderWeak,
     quote: [c.borderWeak, 2, 12, c.textWeak],
     rule: c.borderWeak,
@@ -60,7 +66,8 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     paragraphMargin: [0, 12],
     headingMargins: [[16, 6.4], [16, 6.4], [16, 6.4], [16, 6.4]],
     codeMargin: [0, 12],
-    listMargin: [4 + 12, 12 + 4],
+    listMargin: [4, 12],
+    listPadding: [4, 4],
     quoteMargin: [16, 16],
     ruleMargin: [24, 24],
     imageMargin: [16, 16],
@@ -68,11 +75,15 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     tableOutline: null,
     tableRules: rule,
     tableHeaderRule: mix(text, 32, "transparent"),
+    tableHeaderRuleWidth: 1,
     tableHeaderText: c.textStrong,
     tableHeaderWeight: chat.strongWeight,
-    tableCellPadding: [12, 10],
-    tableHeaderPad: [12, 9],
+    tableCellPadding: [24, 10],
+    tableHeaderPadEdges: [24, 10, 8],
     tableFlushLeft: true,
+    tableEndRule: false,
+    tableCellsFlushLeft: true,
+    tableFlushRight: true,
     tableFont: { ...body, lineHeight: lh(chat.size, 20 / 14) },
     tableFullWidth: true,
     selection: mix(c.primary, 30, "transparent"),
@@ -80,13 +91,17 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     codeFrame: {
       label: c.textWeak,
       labelSize: fontSize.sm,
-      labelGap: 4,
+      labelHeight: 16,
+      labelFamily: font.mono,
+      labelInset: 3.5,
+      labelGap: 4.5,
       actions: CODE_ACTIONS,
       actionColor: c.textWeak,
       actionHover: c.textStrong,
       actionsOnHover: true,
       actionsAt: [6, 6],
-      inside: { fill: c.surfaceInset, border: c.borderWeak, radius: 8, pad: [12, 10, 10] },
+      // Electron's 1px border plus 10/12 padding, and the code body's own transparent 1px border, less the code frame's 0.5 layout border.
+      inside: { fill: c.surfaceInset, border: c.borderWeak, radius: 8, pad: [13.5, 11, 11.5], padRight: 13.5 },
     },
     tableFrame: { actions: TABLE_ACTIONS, actionColor: c.mutedForeground, actionHover: c.foreground, actionsOnHover: true, actionsAt: [6, 0], actionsFill: c.background, gap: 4, buttonPad: 4 },
   };

@@ -648,6 +648,7 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
       {...frame}
       fill={t.c.background}
       border={l.edge}
+      pad={1}
       radius={STAGE_RADIUS}
       clip={STAGE_RADIUS}
       hidden={hidden}

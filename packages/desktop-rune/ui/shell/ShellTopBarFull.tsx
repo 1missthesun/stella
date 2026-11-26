@@ -48,7 +48,7 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: { onS
       windowDrag
       onLayout={(r) => setWidth((w) => (Math.abs(w - r.w) < 0.5 ? w : r.w))}
     >
-      <row id="shell-topbar-full-left" w={left + reach} mr={-reach} h="full" align="center" gap={8} pl={padLeft} pr={12} minW={0} clip={0} windowDrag>
+      <row id="shell-topbar-full-left" w={left + reach} mr={-reach} raise={1} h="full" align="center" gap={8} pl={padLeft} pr={12} minW={0} clip={0} windowDrag>
         <ShellTopBarTabs room={left + reach - padLeft - 12} />
       </row>
       <ShellTopBarActivity width={middle} />

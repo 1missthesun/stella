@@ -14,6 +14,7 @@ import { useT } from "@/shared/i18n";
 import { ViewerItemContext, useRegisterViewerActions } from "@/shell/workspace-stage/viewer-item-context";
 import { Button, EmptyState, useRetainedSurfaceActive } from "../../../kit";
 import { look, useTokens } from "../../../theme";
+import { AudioPlayer, VideoPlayer } from "./MediaControls";
 
 const filenameOf = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
 
@@ -168,14 +169,21 @@ function VideoView({ filePath, viewer }: { filePath: string; viewer: boolean }) 
   const t = useT();
   const tk = useTokens();
   const { url, failure } = useMediaStream(filePath, "video");
-  usePauseWhenHidden(`media-video-${filePath}`);
+  const id = `media-video-${filePath}`;
+  usePauseWhenHidden(id);
   const remote = url && !url.startsWith("stella-media:") ? url : null;
+  const saveAs = window.electronAPI?.system?.saveFileAs;
   return (
     <col grow={1} minH={0} w="full" gap={10}>
       {failure ? (
         <EmptyState motif="unavailable" title={t("shell.display.media.videoUnavailable")} body={failure} />
       ) : (
-        <video id={`media-video-${filePath}`} src={remote ?? filePath} fit="contain" loopMedia grow={1} minH={0} w="full" radius={6} />
+        <VideoPlayer
+          id={id}
+          src={remote ?? filePath}
+          onFullSize={() => fileViewer.expand()}
+          onMore={saveAs ? () => void saveAs(filePath, filenameOf(filePath)) : undefined}
+        />
       )}
       {!viewer ? (
         <>
@@ -193,18 +201,21 @@ function AudioView({ filePath, viewer }: { filePath: string; viewer: boolean }) 
   const t = useT();
   const tk = useTokens();
   const { url, failure } = useMediaStream(filePath, "audio file");
-  usePauseWhenHidden(`media-audio-${filePath}`);
+  const id = `media-audio-${filePath}`;
+  usePauseWhenHidden(id);
   const remote = url && !url.startsWith("stella-media:") ? url : null;
   return (
-    <col w="full" maxW={560} gap={8} py={4} px={2}>
-      {failure ? (
-        <EmptyState motif="unavailable" size="compact" title={t("shell.display.media.audioUnavailable")} body={failure} />
-      ) : (
-        <audio id={`media-audio-${filePath}`} src={remote ?? filePath} w="full" h={48} />
-      )}
-      <text {...look(12, 500)} color={tk.c.textBase} truncate>
-        {filenameOf(filePath)}
-      </text>
+    <col w="full" gap={viewer ? 0 : 12}>
+      <col w="full" gap={8} py={4} px={2}>
+        {failure ? (
+          <EmptyState motif="unavailable" size="compact" title={t("shell.display.media.audioUnavailable")} body={failure} />
+        ) : url ? (
+          <AudioPlayer key={url} id={id} src={remote ?? filePath} />
+        ) : null}
+        <text {...look(12, 400)} color={tk.c.textWeak} textAlign="center" truncate>
+          {filenameOf(filePath)}
+        </text>
+      </col>
       {!viewer ? <MediaActions filePath={filePath} copyText={filePath} extra={[{ label: t("shell.display.media.expand"), run: () => fileViewer.expand() }]} /> : null}
     </col>
   );

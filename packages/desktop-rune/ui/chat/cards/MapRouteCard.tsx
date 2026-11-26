@@ -89,7 +89,7 @@ const MapCard = ({ map }: { map: MapArtifact }) => {
       </box>
       <row align="center" justify="between" gap={12} py={9} px={12 + 1} pb={9 + 1} borderSides={[1, 0, 0, 0]} border={tokens.c.border}>
         <row align="end" gap={8} minW={0}>
-          <text size={13} weight={600} color={tokens.c.textStrong} title={title} nowrap truncate>
+          <text size={13} weight={600} color={tokens.c.textStrong} title={title} minW={0} nowrap truncate>
             {title}
           </text>
           <text size={12} color={tokens.c.textWeak} nowrap shrink={false}>

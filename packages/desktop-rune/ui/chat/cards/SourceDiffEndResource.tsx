@@ -38,8 +38,7 @@ export const SourceDiffEndResource = ({ batchId, payloads }: { batchId: string; 
       role="button"
       focusable
       title={diffs.map((entry) => entry.filePath).join("\n")}
-      selfAlign="start"
-      maxW="full"
+      w="full"
       align="center"
       gap={8}
       mt={10}

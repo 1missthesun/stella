@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMaterializedMediaPayload, useMaterializedMediaPayloadSnapshot } from "@/app/media/media-materializer-state";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import type { MediaJob } from "@stella/contracts/backend/media";
@@ -12,6 +12,7 @@ import { useT } from "@/shared/i18n";
 import { derive, fontSize, mixOklch, radius, useTokens } from "../../theme";
 import { panelSurface } from "../surfaces";
 import { GeneratingGlow } from "./GeneratingGlow";
+import { encodedImageSize } from "../../../host/electron/encoded-image-size";
 
 export type InlineGeneratedImagePayload = Extract<DisplayPayload, { kind: "media" }>;
 
@@ -49,6 +50,27 @@ const previewAspectRatio = (payload: InlineGeneratedImagePayload, job: MediaJobL
   const requestedSize = payload.requestedSize ?? requestedSizeFromInput(job?.input);
   if (requestedSize) return requestedSize.width / requestedSize.height;
   return ratioFromAspectRatio(payload.aspectRatio) ?? 4 / 3;
+};
+
+const HEADER_BYTES = 512 * 1024;
+
+const useNaturalAspect = (blob: Blob | null): number | null => {
+  const [aspect, setAspect] = useState<{ blob: Blob; value: number | null } | null>(null);
+  useEffect(() => {
+    if (!blob) return;
+    let cancelled = false;
+    void blob
+      .slice(0, HEADER_BYTES)
+      .arrayBuffer()
+      .then((buffer) => {
+        const size = encodedImageSize(new Uint8Array(buffer));
+        if (!cancelled) setAspect({ blob, value: size && size.height > 0 ? size.width / size.height : null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [blob]);
+  return blob && aspect?.blob === blob ? aspect.value : null;
 };
 
 const resolveImageCount = (payload: InlineGeneratedImagePayload, materializedPayload: DisplayPayload | null): number => {
@@ -182,7 +204,8 @@ export const InlineGeneratedImageCardFrame = ({
   const primaryFile = files[0] ?? null;
   const primaryPath = filePaths[0];
   const jobFailed = job?.status === "failed" || job?.status === "canceled";
-  const aspect = previewAspectRatio(effectivePayload, job);
+  const naturalAspect = useNaturalAspect(layout === "strip" ? null : (primaryFile?.blob ?? null));
+  const aspect = (primaryFile ? naturalAspect : null) ?? previewAspectRatio(effectivePayload, job);
   const open = useCallback(() => {
     if (!isImage || filePaths.length === 0) return;
     openDisplayPayloadTab(effectivePayload);

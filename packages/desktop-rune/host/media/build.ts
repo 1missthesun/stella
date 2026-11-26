@@ -2,11 +2,12 @@
 // process: Bun.build keeps native memory for the life of the process that calls it.
 
 import type { BunPlugin } from "bun";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const DESKTOP_UI_SRC = resolve(import.meta.dir, "../../../desktop-ui/src");
 const PAGE_UI_STATE = join(import.meta.dir, "page/ui-state.ts");
+const DICTATION_PCM_WORKLET = resolve(import.meta.dir, "../../../desktop-ui/public/dictation-pcm-worklet.js");
 const EXTENSIONS = [".ts", ".tsx", ".js"];
 
 const resolveFile = (base: string) => {
@@ -32,6 +33,7 @@ const result = await Bun.build({
   target: "browser",
   format: "iife",
   minify: true,
+  define: { DICTATION_PCM_WORKLET: JSON.stringify(readFileSync(DICTATION_PCM_WORKLET, "utf8")) },
   plugins: [desktopUi],
 });
 if (!result.success) {

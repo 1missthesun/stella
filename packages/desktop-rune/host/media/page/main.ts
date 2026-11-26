@@ -86,7 +86,95 @@ const frameOf = (node: AnalyserNode): AnalyserFrame => {
   return { freq: toBase64(freq), time: toBase64(time) };
 };
 
+declare const DICTATION_PCM_WORKLET: string;
+
+const WORKLETS: Record<string, string> = { "dictation-pcm-worklet.js": DICTATION_PCM_WORKLET };
+const PCM_BATCH_SAMPLES = 320;
+
+/** An AudioContext feeding a microphone stream into a PCM worklet (`{pcm: Int16Array, rms}` per message), for the UI's AudioContext stand-in: frames go out in ~20 ms batches. */
+class PcmWorkletPipeline {
+  private readonly context = new AudioContext({ latencyHint: "interactive" });
+  private source: MediaStreamAudioSourceNode | null = null;
+  private node: AudioWorkletNode | null = null;
+  private batch: Int16Array[] = [];
+  private samples = 0;
+  private energy = 0;
+
+  constructor(private readonly onFrame: (pcm: Int16Array, rms: number) => void) {}
+
+  async addModule(file: string) {
+    const source = WORKLETS[file];
+    if (!source) throw new Error(`Unknown audio worklet ${file}`);
+    const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+    try {
+      await this.context.audioWorklet.addModule(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async resume() {
+    if (this.context.state === "suspended") await this.context.resume();
+  }
+
+  async connect(stream: MediaStream, processor: string, options: AudioWorkletNodeOptions) {
+    this.disconnect();
+    await this.resume();
+    const source = this.context.createMediaStreamSource(stream);
+    const node = new AudioWorkletNode(this.context, processor, options);
+    node.port.onmessage = (event: MessageEvent<{ pcm?: Int16Array; rms?: number }>) => {
+      const { pcm, rms } = event.data ?? {};
+      if (pcm?.length) this.push(pcm, rms ?? 0);
+    };
+    source.connect(node);
+    this.source = source;
+    this.node = node;
+  }
+
+  disconnect() {
+    if (this.node) {
+      this.node.port.onmessage = null;
+      this.node.port.close();
+      this.node.disconnect();
+      this.node = null;
+    }
+    this.source?.disconnect();
+    this.source = null;
+    this.flush();
+  }
+
+  async close() {
+    this.disconnect();
+    if (this.context.state !== "closed") await this.context.close();
+  }
+
+  private push(pcm: Int16Array, rms: number) {
+    this.batch.push(pcm);
+    this.samples += pcm.length;
+    this.energy += rms * rms * pcm.length;
+    if (this.samples >= PCM_BATCH_SAMPLES) this.flush();
+  }
+
+  private flush() {
+    if (!this.samples) return;
+    const pcm = new Int16Array(this.samples);
+    let at = 0;
+    for (const chunk of this.batch) {
+      pcm.set(chunk, at);
+      at += chunk.length;
+    }
+    const rms = Math.sqrt(this.energy / this.samples);
+    this.batch = [];
+    this.samples = 0;
+    this.energy = 0;
+    this.onFrame(pcm, rms);
+  }
+}
+
 const classes: Record<string, (handle: number, args: unknown[]) => unknown> = {
+  PcmWorkletPipeline(handle) {
+    return new PcmWorkletPipeline((pcm, rms) => emit(handle, "frame", toBase64(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength)), rms));
+  },
   WebRTCMediaSession(handle, [options]) {
     const { dataChannelLabel, logPrefix } = options as { dataChannelLabel: string; logPrefix: string };
     const session = new WebRTCMediaSession({

@@ -89,7 +89,7 @@ export function WorkingDots({ id, size = 6, gap = 4, color, label, reducedMotion
           h={size}
           radius={size / 2}
           fill={color ?? t.c.textWeak}
-          loop={{ kind: "sequence", period, delay: slot * WORKING_DOTS_STAGGER * period, frames: dotFrames(size, reducedMotion), origin: [0.5, 1] }}
+          loop={{ kind: "sequence", period, delay: slot * WORKING_DOTS_STAGGER * period, ease: "linear", frames: dotFrames(size, reducedMotion), origin: [0.5, 1] }}
         />
       ))}
     </row>
@@ -154,6 +154,7 @@ const MARK_SPOT: Partial<Record<EmptyStateMotif, [number, number]>> = {
 const MARK_SWEEP: Loop = {
   kind: "sequence",
   period: 7,
+  ease: "linear",
   frames: Array.from({ length: 25 }, (_, i) => {
     const p = (1 - Math.cos((2 * Math.PI * i) / 24)) / 2;
     return { at: i / 24, x: 148 * (-0.04 + 0.08 * p), y: -148 * 0.02 * p };

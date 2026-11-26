@@ -46,7 +46,7 @@ export function TextShimmer({ text, look, active = true, durationMs, exclusiveGr
     }
     window.push({ at: 1, x: width });
     inner.push({ at: 1, x: -width });
-    return { window: { kind: "sequence" as const, period, frames: window }, inner: { kind: "sequence" as const, period, frames: inner } };
+    return { window: { kind: "sequence" as const, period, ease: "linear" as const, frames: window }, inner: { kind: "sequence" as const, period, ease: "linear" as const, frames: inner } };
   }, [duration, width]);
   return (
     <box onLayout={(r) => setWidth(Math.round(r.w))} maxW="full" clip={0}>

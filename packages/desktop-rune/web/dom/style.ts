@@ -68,6 +68,8 @@ export function springCurve(bounce = 0): string {
 
 const TRANSITIONED = "transform, opacity, background-color, box-shadow, color, width, height, min-width, max-width, min-height, max-height, filter, border-radius, left, top, right, bottom, padding, margin";
 
+const SEQUENCE_EASE: Record<NonNullable<Loop["ease"]>, string> = { linear: "linear", ease: "ease", easeIn: "ease-in", easeOut: "ease-out", easeInOut: "ease-in-out" };
+
 function loopAnimation(l: Loop, base = ""): string | undefined {
   const pre = base ? `${base} ` : "";
   const period = Math.max(0.01, l.period);
@@ -106,7 +108,7 @@ function loopAnimation(l: Loop, base = ""): string | undefined {
     const body = frames.join(" ");
     name = `rl-q-${hash(body)}`;
     ensureRule(name, `@keyframes ${name} { ${body} }`);
-    return `${name} ${period}s linear ${delay} ${iterations}`;
+    return `${name} ${period}s ${SEQUENCE_EASE[l.ease ?? "easeInOut"]} ${delay} ${iterations}`;
   }
   return undefined;
 }

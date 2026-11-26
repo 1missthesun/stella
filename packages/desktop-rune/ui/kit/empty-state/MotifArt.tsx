@@ -68,7 +68,7 @@ function sampled(period: number, delay: number, frame: (p: number) => Omit<Frame
 }
 
 function spin(period: number, dir: 1 | -1): Loop {
-  return { kind: "sequence", period, frames: [0, 0.25, 0.5, 0.75, 1].map((at) => ({ at, rotate: dir * at * 2 * Math.PI })) };
+  return { kind: "sequence", period, ease: "linear", frames: [0, 0.25, 0.5, 0.75, 1].map((at) => ({ at, rotate: dir * at * 2 * Math.PI })) };
 }
 
 /** desktop-ui's motif keyframes (es-float, es-sweep, es-spin, the orbit's counter-spin) for one layer of `px` points. */
@@ -76,9 +76,9 @@ function layerLoop(l: MotifLayer, px: { w: number; h: number }): Loop | undefine
   const m = l.motion.split(/\s+/);
   if (m.includes("es-float")) {
     const period = m.includes("es-float--row") ? 8 : m.includes("es-float--badge") ? 5 : 7;
-    return { kind: "sequence", period, frames: sampled(period, l.delay, (p) => ({ y: -3 * p, rotate: 1.5 * DEG * p })) };
+    return { kind: "sequence", period, ease: "linear", frames: sampled(period, l.delay, (p) => ({ y: -3 * p, rotate: 1.5 * DEG * p })) };
   }
-  if (m.includes("es-sweep")) return { kind: "sequence", period: 7, frames: sampled(7, 0, (p) => ({ x: px.w * (-0.04 + 0.08 * p), y: -px.h * 0.02 * p })) };
+  if (m.includes("es-sweep")) return { kind: "sequence", period: 7, ease: "linear", frames: sampled(7, 0, (p) => ({ x: px.w * (-0.04 + 0.08 * p), y: -px.h * 0.02 * p })) };
   if (m.includes("es-spin")) return spin(24, 1);
   if (m.includes("es-tile")) return spin(90, -1);
   return undefined;

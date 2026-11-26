@@ -261,6 +261,8 @@ pub struct LoopP {
     pub frames: Vec<FrameP>,
     #[serde(default)]
     pub origin: Option<[f32; 2]>,
+    #[serde(default)]
+    pub ease: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]

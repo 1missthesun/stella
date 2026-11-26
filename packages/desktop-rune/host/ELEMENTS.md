@@ -136,9 +136,10 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
   element or an ancestor, a change lands at once, as in CSS.
 - `enter` / `exit`: a preset (`fade rise drop blur scale pop slide`) or `{opacity, scale, x, y,
   blur, dur, bounce}`.
-- `loop`: `opacity`, `rotation`, `slide`, or `sequence {period, delay, frames:[{at, x, y, scale,
+- `loop`: `opacity`, `rotation`, `slide`, or `sequence {period, delay, ease, frames:[{at, x, y, scale,
   opacity, rotate}]}`. `at` ≤ 1 is a fraction of the period. `scaleX` / `scaleY` are averaged,
-  since Rune scales uniformly.
+  since Rune scales uniformly. `ease` (`linear ease easeIn easeOut easeInOut`, default `easeInOut`)
+  times each segment like CSS `animation-timing-function`; frames sampled from a curve want `linear`.
 
 **Interaction.**
 - Pointer and focus: `cursor` (CSS names, also `crosshair`, `cell`, `copy`, `alias`, `zoomIn`/`zoomOut`,

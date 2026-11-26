@@ -24,6 +24,8 @@ export type Frame = { at: number; x?: number; y?: number; scale?: number; scaleX
 export type Loop = {
   kind: "opacity" | "rotation" | "slide" | "sequence"; period: number; delay?: number; times?: number;
   low?: number; high?: number; from?: number | [number, number]; to?: number | [number, number]; frames?: Frame[]; origin?: [number, number];
+  /** Each `sequence` segment's timing, like CSS `animation-timing-function`; `easeInOut` by default. `linear` for frames sampled from a curve. */
+  ease?: "linear" | "ease" | "easeIn" | "easeOut" | "easeInOut";
 };
 export type Cursor =
   | "default" | "pointer" | "text" | "grab" | "grabbing" | "notAllowed" | "move"

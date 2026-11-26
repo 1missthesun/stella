@@ -402,6 +402,13 @@ fn sequence(e: El, l: &crate::props::LoopP) -> El {
     }
     let fractions = l.frames.iter().all(|f| f.at <= 1.0);
     let period = l.period.max(0.01);
+    let easing = match l.ease.as_deref() {
+        Some("linear") => rune::Easing::LINEAR,
+        Some("ease") => rune::Easing::EASE,
+        Some("easeIn") => rune::Easing::EASE_IN,
+        Some("easeOut") => rune::Easing::EASE_OUT,
+        _ => rune::Easing::EASE_IN_OUT,
+    };
     let beats: Vec<rune::Beat> = l
         .frames
         .iter()
@@ -416,6 +423,7 @@ fn sequence(e: El, l: &crate::props::LoopP) -> El {
                 .scale(scale.unwrap_or(1.0))
                 .translate(f.x.unwrap_or(0.0), f.y.unwrap_or(0.0))
                 .rotate(f.rotate.unwrap_or(0.0))
+                .easing(easing)
         })
         .collect();
     let h = {
@@ -429,6 +437,7 @@ fn sequence(e: El, l: &crate::props::LoopP) -> El {
             b.translate[1].to_bits().hash(&mut s);
             b.rotate.to_bits().hash(&mut s);
         }
+        l.ease.hash(&mut s);
         s.finish()
     };
     let frames: &'static [rune::Beat] = SEQUENCES.with(|m| *m.borrow_mut().entry(h).or_insert_with(|| Box::leak(beats.into_boxed_slice())));

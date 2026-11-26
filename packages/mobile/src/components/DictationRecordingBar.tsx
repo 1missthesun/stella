@@ -30,9 +30,14 @@ import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 import {
-  subscribeDictationLevel,
+  subscribeDictationLevels,
   useDictationMeterStartedAt,
 } from "../lib/dictation-meter";
+import {
+  createDictationLevelPlayback,
+  stepDictationLevelPlayback,
+  type DictationLevelBatch,
+} from "../lib/dictation-level-playback";
 
 const WAVEFORM_HEIGHT = 32;
 const WAVEFORM_FILL = 0.94;
@@ -128,26 +133,33 @@ const DictationWaveform = memo(function DictationWaveform({
 }: {
   color: string;
 }) {
-  const target = useSharedValue(0);
+  const batch = useSharedValue<DictationLevelBatch>({ seq: 0, levels: [] });
+  const playback = useSharedValue(createDictationLevelPlayback());
   const width = useSharedValue(0);
   const wave = useSharedValue<DictationWaveformState>(
     createDictationWaveformState(),
   );
   const [barCount, setBarCount] = useState(0);
 
-  useEffect(
-    () =>
-      subscribeDictationLevel((level) => {
-        target.value = level;
-      }),
-    [target],
-  );
+  useEffect(() => {
+    let seq = batch.value.seq;
+    return subscribeDictationLevels((levels) => {
+      seq += 1;
+      batch.value = { seq, levels: [...levels] };
+    });
+  }, [batch]);
 
   useFrameCallback((frame) => {
     "worklet";
+    playback.modify((state) => {
+      "worklet";
+      stepDictationLevelPlayback(state, frame.timestamp, batch.value);
+      return state;
+    }, false);
+    const level = playback.value.level;
     wave.modify((state) => {
       "worklet";
-      stepDictationWaveform(state, frame.timestamp, target.value);
+      stepDictationWaveform(state, frame.timestamp, level);
       return state;
     });
   });

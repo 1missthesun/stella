@@ -7,7 +7,7 @@ type DictationMeterSnapshot = {
 
 let snapshot: DictationMeterSnapshot = { active: false, startedAt: 0 };
 const listeners = new Set<() => void>();
-const levelListeners = new Set<(level: number) => void>();
+const levelListeners = new Set<(levels: readonly number[]) => void>();
 
 const publish = (next: DictationMeterSnapshot): void => {
   snapshot = next;
@@ -18,10 +18,9 @@ export const startDictationMeter = (startedAt: number): void => {
   publish({ active: true, startedAt });
 };
 
-export const pushDictationLevel = (level: number): void => {
-  if (!snapshot.active) return;
-  const clamped = Math.max(0, Math.min(1, level));
-  for (const listener of levelListeners) listener(clamped);
+export const pushDictationLevels = (levels: readonly number[]): void => {
+  if (!snapshot.active || levels.length === 0) return;
+  for (const listener of levelListeners) listener(levels);
 };
 
 export const stopDictationMeter = (): void => {
@@ -29,8 +28,8 @@ export const stopDictationMeter = (): void => {
   publish({ active: false, startedAt: 0 });
 };
 
-export const subscribeDictationLevel = (
-  listener: (level: number) => void,
+export const subscribeDictationLevels = (
+  listener: (levels: readonly number[]) => void,
 ): (() => void) => {
   levelListeners.add(listener);
   return () => {

@@ -5,7 +5,10 @@ import { AudioStudioModule } from "@siteed/audio-studio";
 import { LegacyEventEmitter, type EventSubscription } from "expo-modules-core";
 import { File } from "expo-file-system";
 import { Alert, AppState, Linking } from "react-native";
-import { createDictationLevelMeter } from "@stella/contracts/dictation-waveform";
+import {
+  DICTATION_LEVEL_WINDOW_MS,
+  dictationLevelFromRms,
+} from "@stella/contracts/dictation-waveform";
 import { hasAiConsent, requestAiConsent } from "./ai-consent";
 import {
   acquireRecordingAudioSession,
@@ -41,7 +44,7 @@ import { tapLight, tapMedium } from "./haptics";
 import {
   startDictationMeter,
   stopDictationMeter,
-  pushDictationLevel,
+  pushDictationLevels,
 } from "./dictation-meter";
 
 const MIN_RECORDING_MS = 300;
@@ -402,7 +405,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
             }, 1500);
           }
         }
-        pushDictationLevel(meterLevels(bytes));
+        pushDictationLevels(meterLevels(bytes));
         if (current.full) return;
         current.chunks.push(bytes);
         current.bytes += bytes.byteLength;
@@ -701,22 +704,24 @@ const audioEventToPcm16 = (
   return pcm.buffer;
 };
 
-const LEVEL_FRAME_SAMPLES = 128;
+const LEVEL_WINDOW_SAMPLES =
+  (DICTATION_SAMPLE_RATE * DICTATION_LEVEL_WINDOW_MS) / 1000;
 
 const createLevelMeter = () => {
-  const meter = createDictationLevelMeter();
-  return (bytes: ArrayBuffer): number => {
+  let energy = 0;
+  let count = 0;
+  return (bytes: ArrayBuffer): number[] => {
     const samples = new Int16Array(bytes);
-    for (let start = 0; start < samples.length; start += LEVEL_FRAME_SAMPLES) {
-      const end = Math.min(samples.length, start + LEVEL_FRAME_SAMPLES);
-      let sum = 0;
-      for (let i = start; i < end; i += 1) {
-        const sample = samples[i]! / 0x8000;
-        sum += sample * sample;
-      }
-      const count = end - start;
-      meter.pushRms(Math.sqrt(sum / count), (count * 1000) / DICTATION_SAMPLE_RATE);
+    const levels: number[] = [];
+    for (let i = 0; i < samples.length; i += 1) {
+      const sample = samples[i]! / 0x8000;
+      energy += sample * sample;
+      count += 1;
+      if (count < LEVEL_WINDOW_SAMPLES) continue;
+      levels.push(dictationLevelFromRms(Math.sqrt(energy / count)));
+      energy = 0;
+      count = 0;
     }
-    return meter.takeLevel();
+    return levels;
   };
 };

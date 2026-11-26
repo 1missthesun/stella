@@ -59,7 +59,7 @@ pub fn route(v: Value) {
             reply(rid, Ok(Value::Null));
         }
         "recStop" => {
-            let out = crate::metrics::METRICS.lock().unwrap_or_else(|e| e.into_inner()).rec_stop();
+            let out = crate::metrics::METRICS.lock().unwrap_or_else(|e| e.into_inner()).rec_stop(v.get("frames").and_then(|f| f.as_bool()).unwrap_or(false));
             engine::send(json!({ "t": "rec", "result": out }));
             reply(rid, Ok(out));
         }

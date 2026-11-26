@@ -148,8 +148,10 @@ impl Metrics {
         self.skipped = 0;
     }
 
-    pub fn rec_stop(&mut self) -> serde_json::Value {
+    /// The recording's summary; `with_frames` adds each drawn frame as `[at, update_ms, encode_ms]`.
+    pub fn rec_stop(&mut self, with_frames: bool) -> serde_json::Value {
         let Some((label, frames)) = self.rec.take() else { return serde_json::Value::Null };
+        let listed = with_frames.then(|| serde_json::json!(frames.iter().map(|f| [f.0, f.1, f.2]).collect::<Vec<_>>()));
         let mut gaps: Vec<f64> = frames.windows(2).map(|w| w[1].0 - w[0].0).collect();
         let mut cpu: Vec<f64> = frames.iter().map(|f| f.1 + f.2).collect();
         let dur = match (frames.first(), frames.last()) {
@@ -169,6 +171,10 @@ impl Metrics {
             "frame_cpu_p50_ms": q(&cpu, 0.5), "frame_cpu_p95_ms": q(&cpu, 0.95), "frame_cpu_max_ms": cpu.last().copied().unwrap_or(0.0),
         });
         self.say(v.clone());
+        let mut v = v;
+        if let Some(list) = listed {
+            v["frame_list"] = list;
+        }
         v
     }
 }

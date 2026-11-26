@@ -102,9 +102,10 @@ fn style(v: &Value) -> MarkdownStyle {
             s = f(s, c);
         }
     }
-    let pairs: [(&str, SetPair); 12] = [
+    let pairs: [(&str, SetPair); 13] = [
         ("codeBlockPadding", MarkdownStyle::code_block_padding),
         ("list", MarkdownStyle::list),
+        ("listPadding", MarkdownStyle::list_padding),
         ("listNestedIndent", MarkdownStyle::list_nested_indent),
         ("inlineCodeFont", MarkdownStyle::inline_code_font),
         ("paragraphMargin", MarkdownStyle::paragraph_margin),
@@ -124,8 +125,16 @@ fn style(v: &Value) -> MarkdownStyle {
     if let Some([x, y]) = pair(v, "tableHeaderPad") {
         s = s.table_header_pad(x, y);
     }
-    let nums: [(&str, Set<f32>); 5] = [
+    if let Some(a) = v.get("tableHeaderPadEdges").and_then(|a| a.as_array())
+        && let [Some(x), Some(top), Some(bottom)] = [0, 1, 2].map(|i| a.get(i).and_then(Value::as_f64))
+    {
+        s = s.table_header_pad_edges(x as f32, top as f32, bottom as f32);
+    }
+    let nums: [(&str, Set<f32>); 8] = [
         ("codeBlockRadius", MarkdownStyle::code_block_radius),
+        ("tableRadius", MarkdownStyle::table_radius),
+        ("tableHeaderRuleWidth", MarkdownStyle::table_header_rule_width),
+        ("wideFade", MarkdownStyle::wide_fade),
         ("inlineCodePad", MarkdownStyle::inline_code_pad),
         ("strongWeight", MarkdownStyle::strong_weight),
         ("textWidth", MarkdownStyle::text_width),
@@ -139,6 +148,9 @@ fn style(v: &Value) -> MarkdownStyle {
     for (k, f) in [
         ("listMarkersOutside", MarkdownStyle::list_markers_outside as Set<bool>),
         ("tableFlushLeft", MarkdownStyle::table_flush_left),
+        ("tableEndRule", MarkdownStyle::table_end_rule),
+        ("tableCellsFlushLeft", MarkdownStyle::table_cells_flush_left),
+        ("tableFlushRight", MarkdownStyle::table_flush_right),
         ("syntaxHighlight", MarkdownStyle::syntax_highlight),
     ] {
         if let Some(on) = v.get(k).and_then(|b| b.as_bool()) {
@@ -187,6 +199,12 @@ fn style(v: &Value) -> MarkdownStyle {
     if let Some(f) = v.get("codeBlockFont") {
         s = s.code_block_font(font(f, body));
     }
+    if let Some(n) = v.get("codeLineNumbers")
+        && let Some(color) = col(n, "color")
+    {
+        let f = n.get("font").map(|f| font(f, body)).unwrap_or(body);
+        s = s.code_line_numbers(f, color, num(n, "width").unwrap_or(24.0), num(n, "gap").unwrap_or(16.0));
+    }
     if let Some(f) = v.get("tableFont") {
         s = s.table_font(font(f, body));
     }
@@ -225,6 +243,11 @@ fn style_for(v: Option<&Value>) -> MarkdownStyle {
 struct CodeFrameP {
     label: Option<crate::props::C>,
     label_size: Option<f32>,
+    /// The label row's height (22 by default).
+    label_height: Option<f32>,
+    /// The label's inset from the row's start.
+    label_inset: Option<f32>,
+    label_family: Option<String>,
     label_gap: Option<f32>,
     actions: Vec<ActionP>,
     action_color: Option<crate::props::C>,
@@ -245,6 +268,8 @@ struct InsideP {
     radius: Option<f32>,
     /// `[x, top, bottom]` around the label row and code.
     pad: Option<[f32; 3]>,
+    /// Right padding when it differs from 6.
+    pad_right: Option<f32>,
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -272,8 +297,8 @@ struct TableFrameP {
     button_pad: Option<f32>,
 }
 
-fn label(t: &str, size: f32, color: rune::Color) -> El {
-    crate::text::build(&Props { content: Some(t.to_owned()), size: Some(size), color: Some(crate::props::C(color)), ..Default::default() })
+fn label(t: &str, size: f32, color: rune::Color, family: Option<&str>) -> El {
+    crate::text::build(&Props { content: Some(t.to_owned()), size: Some(size), color: Some(crate::props::C(color)), family: family.map(str::to_owned), ..Default::default() })
 }
 
 /// `mdStyle.codeFrame`: a language label row above each code block and actions at its top
@@ -283,8 +308,8 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
     md.code_frame(move |card, c| {
         let weak = f.label.map(|c| c.0).unwrap_or(parse_color("#8a8a8e").unwrap_or(rune::Color::TRANSPARENT));
         let size = f.label_size.unwrap_or(12.0);
-        let mut head = rune::row().w_full().items_center().justify_between().h(22.0);
-        head = head.child(label(c.language.unwrap_or(""), size, weak));
+        let mut head = rune::row().w_full().items_center().justify_between().h(f.label_height.unwrap_or(22.0)).pl(f.label_inset.unwrap_or(0.0));
+        head = head.child(label(c.language.unwrap_or(""), size, weak, f.label_family.as_deref()));
         let mut actions = rune::row().gap(2.0).items_center();
         for a in &f.actions {
             let color = f.action_color.map(|c| c.0).unwrap_or(weak);
@@ -297,8 +322,8 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
                     let ip = Props { svg: Some(svg.clone()), view: a.view, size: Some(14.0), color: Some(crate::props::C(color)), ..Default::default() };
                     b.child(crate::media::icon(&ip)).label(a.label.clone().unwrap_or_else(|| a.id.clone()))
                 }
-                (None, Some(l)) => b.child(label(l, size, color)),
-                (None, None) => b.child(label(&a.id, size, color)),
+                (None, Some(l)) => b.child(label(l, size, color, None)),
+                (None, None) => b.child(label(&a.id, size, color, None)),
             };
             let (id, index, language, source) = (a.id.clone(), c.index, c.language.map(str::to_owned), c.source.to_owned());
             b = b.on_press_tx(move |_s: &mut crate::windows::Win, tx: &mut rune::Tx| {
@@ -319,7 +344,7 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
         let mut frame = rune::col().key(format!("code-{}", c.index)).w_full().gap(f.label_gap.unwrap_or(4.0)).hover_group();
         if let Some(i) = &f.inside {
             let [x, top, bottom] = i.pad.unwrap_or([12.0, 6.0, 0.0]);
-            frame = frame.pl(x).pr(6.0).pt(top).pb(bottom).radius(i.radius.unwrap_or(0.0));
+            frame = frame.pl(x).pr(i.pad_right.unwrap_or(6.0)).pt(top).pb(bottom).radius(i.radius.unwrap_or(0.0));
             if let Some(c) = i.fill {
                 frame = frame.fill(c.0);
             }
@@ -360,7 +385,7 @@ fn table_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
                 .label(a.label.clone().unwrap_or_else(|| a.id.clone()));
             let mut icon = match &a.svg {
                 Some(svg) => crate::media::icon(&Props { svg: Some(svg.clone()), view: a.view, size: Some(size), color: Some(crate::props::C(color)), ..Default::default() }),
-                None => label(a.label.as_deref().unwrap_or(&a.id), 12.0, color),
+                None => label(a.label.as_deref().unwrap_or(&a.id), 12.0, color, None),
             };
             if let Some(h) = f.action_hover {
                 icon = icon.group_color(h.0);
@@ -424,6 +449,9 @@ fn link_styles(md: Markdown, styles: Vec<crate::props::LinkStyleP>) -> Markdown 
 pub fn build(n: u32, p: &Props) -> El {
     let src = p.src.clone().unwrap_or_default();
     let mut md = Markdown::new(src).streaming(p.streaming).selectable(p.selectable || p.selection_group);
+    if p.md_style.as_ref().and_then(|v| v.get("scrollWide")).and_then(Value::as_bool) == Some(true) {
+        md = md.scroll_wide(true);
+    }
     if let Some(f) = p.md_style.as_ref().and_then(|v| v.get("codeFrame")) {
         md = code_frame(n, md, f);
     }

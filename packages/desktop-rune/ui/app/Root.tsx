@@ -1,7 +1,7 @@
 import { HostWindows } from "../host/HostWindows";
 import type { WindowSnapshot } from "../../host/electron/browser-window";
 import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
-import { useWindowKeyProps } from "../shell/window-keys";
+import { useScopedWindowKeyProps, useWindowKeyProps } from "../shell/window-keys";
 import { FullWindow } from "./FullWindow";
 import { AuxWindow } from "./AuxWindow";
 
@@ -14,6 +14,7 @@ const isViewerWindow = (w: WindowSnapshot) => w.frameName?.startsWith("stella-vi
 /** Every window Electron main keeps open: the full shell, companion, overlay and web windows. Detached viewers are drawn by the workspace stage. */
 export function Root() {
   const windowKeys = useWindowKeyProps();
+  const auxKeys = useScopedWindowKeyProps();
   if (!stella.host) {
     return (
       <window id="main" {...windowKeys}>
@@ -21,5 +22,5 @@ export function Root() {
       </window>
     );
   }
-  return <HostWindows renderApp={renderApp} chrome={(w) => (w.mode === "full" ? { titlebar: SHELL_TOPBAR_HEIGHT, trafficLights: isMac ? [16, 13] : undefined, ...windowKeys } : undefined)} skip={isViewerWindow} />;
+  return <HostWindows renderApp={renderApp} chrome={(w) => (w.mode === "full" ? { titlebar: SHELL_TOPBAR_HEIGHT, trafficLights: isMac ? [16, 13] : undefined, ...windowKeys } : auxKeys(w.id))} skip={isViewerWindow} />;
 }

@@ -23,6 +23,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { mounted, Nothing } from "./mount";
 import { FullShell } from "../shell/FullShell";
 import { LaunchSplash } from "../shell/LaunchSplash";
+import { useNotificationToastSpace } from "../features/notifications/NotificationBell";
 import { UpdateTransitionLayer, useUpdateTransitionAppLook } from "../shell/update-transition/UpdateTransitionLayer";
 
 const RemoteExecutionConsentLayer = mounted(import.meta.glob("../replace/global/execution/RemoteExecutionConsentLayer.tsx", { eager: true }), "RemoteExecutionConsentLayer", Nothing);
@@ -31,9 +32,13 @@ const SavedValuesDeviceLayer = mounted(import.meta.glob("../replace/features/sav
 const ToastProvider = mounted<{ children: ReactNode }>(import.meta.glob("../replace/ui/toast.tsx", { eager: true }), "ToastProvider", ({ children }) => (
   <>
     {children}
-    <ToastRegion />
+    <AppToastRegion />
   </>
 ));
+
+function AppToastRegion() {
+  return <ToastRegion top={48 + useNotificationToastSpace()} />;
+}
 
 const AUTO_REPAIR_SIGNATURE_KEY = "stella:auto-repair:last-signature";
 

@@ -388,6 +388,9 @@ export const engine = {
     blur: (target: string) => request("webview.blur", { target }),
     zoom: (target: string, factor: number) => request("webview.zoom", { target, factor }),
     url: (target: string) => request<string | null>("webview.url", { target }),
+    /** Why a native view shows or hides: its rect, whether it fits its scroll viewport (`clip`), and the overlays covering it. */
+    state: (target: string) =>
+      request<{ rect: number[]; shown: boolean; covered: boolean; covering: { node: number; rect: number[] }[]; fits: boolean; clip: { node: number; rect: number[] | null } | null }>("webview.state", { target }),
     /** Answers a custom-scheme `request` event. */
     respond: (rid: number, r: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array }) => {
       const b = r.body instanceof Uint8Array ? blob(r.body) : undefined;

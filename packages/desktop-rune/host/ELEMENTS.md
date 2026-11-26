@@ -99,7 +99,8 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 - Grid: `columns` on the container, `column` on the child.
 - Position: `absolute={{left,top,right,bottom}}` or `inset`. `fixed` pins to the window and paints
   in its top layer, keeping React context (scrims, dialogs, toasts). `raise` paints above later
-  siblings. `dir`.
+  siblings. `dir` (fixed and anchored layers take their tree ancestors' `dir`, as CSS direction reaches
+  fixed descendants).
 
 **Paint.** `fill`, `gradient {angle, stops}`, `radial`, `border`, `borderWidth`, `borderSides
 [top, right, bottom, left]`, `borderDash`, `radius`, `corners [tl, tr, br, bl]` (both in CSS order), `clip` (overflow hidden, rounded),
@@ -343,6 +344,8 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
 
 - `window.*`: focus, show, hide, close, minimize, maximize, unmaximize, toggleMaximize,
   setFullScreen, center, setTitle, setAlwaysOnTop, setBounds, getBounds, isMaximized
+- `webview.state(target)`: why a native view shows or hides (rect, fits its scroll viewport, the
+  overlays covering it)
 - `clipboard.*`: read, readText, readHTML, readFiles, readImage (PNG bytes), writeText,
   writeHTML, writeImage
 - `dialog.*`: openFile (`multi`), openFolder, saveFile, all with filters and defaultPath.

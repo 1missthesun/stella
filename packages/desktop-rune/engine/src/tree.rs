@@ -64,6 +64,22 @@ impl Tree {
         self.lifted.iter().copied().filter(|n| self.window_of(*n) == Some(window)).collect()
     }
 
+    /// The `dir` a lifted node takes from where it sits in the tree, as CSS direction reaches
+    /// fixed descendants: its own, else its nearest ancestor's.
+    pub fn dir_of(&self, mut id: u32) -> Option<&str> {
+        for _ in 0..4096 {
+            let n = self.nodes.get(&id)?;
+            if let Some(d) = n.props.dir.as_deref() {
+                return Some(d);
+            }
+            if n.parent == 0 {
+                return None;
+            }
+            id = n.parent;
+        }
+        None
+    }
+
     /// The node whose `id` prop is `key`.
     pub fn find_key(&self, key: &str) -> Option<u32> {
         self.nodes.iter().find(|(_, n)| n.props.id.as_deref() == Some(key)).map(|(id, _)| *id)

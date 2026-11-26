@@ -75,7 +75,14 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
             root = crate::style::paint(root, &inner);
             root = crate::view::children(s, eng, n, root);
             for l in eng.tree.lifted_in(node) {
-                let layer = build(s, eng, l);
+                let mut layer = build(s, eng, l);
+                if eng.tree.get(l).is_some_and(|n| n.props.dir.is_none()) {
+                    match eng.tree.dir_of(l) {
+                        Some("rtl") => layer = layer.dir(rune::Direction::Rtl),
+                        Some("ltr") => layer = layer.dir(rune::Direction::Ltr),
+                        _ => {}
+                    }
+                }
                 #[cfg(feature = "webview")]
                 let layer = crate::webview::overlay(layer, eng, l);
                 root = root.child(layer);

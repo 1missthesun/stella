@@ -796,6 +796,15 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
         "webview.focus" => with_view(n, |w| w.view.focus().map_err(|e| e.to_string()))??,
         "webview.blur" => with_view(n, |w| w.view.focus_parent().map_err(|e| e.to_string()))??,
         "webview.zoom" => with_view(n, |w| w.view.zoom(v.get("factor").and_then(|f| f.as_f64()).unwrap_or(1.0)).map_err(|e| e.to_string()))??,
+        "webview.state" => {
+            let clip = engine::read(|e| e.tree.clip_of.get(&n).copied()).map(|c| (c, CLIPS.with(|m| m.borrow().get(&c).copied())));
+            return with_view(n, |w| {
+                let covering: Vec<serde_json::Value> = OVERLAYS.with(|o| {
+                    o.borrow().iter().filter(|(_, (win, r))| *win == w.window && overlaps(*r, w.rect)).map(|(k, (_, r))| json!({ "node": k, "rect": r })).collect()
+                });
+                json!({ "rect": w.rect, "shown": w.visible, "covered": w.covered, "covering": covering, "fits": fits(n, w.rect), "clip": clip.map(|(c, r)| json!({ "node": c, "rect": r })) })
+            });
+        }
         "webview.url" => return with_view(n, |w| json!(w.view.url().ok().map(|u| scheme_url::from_view(&w.protocols, &u)))),
         "webview.respond" => {
             let rid = v.get("req").and_then(|r| r.as_u64()).ok_or("webview.respond: needs req")?;

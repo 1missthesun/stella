@@ -134,7 +134,7 @@ function HoverChip({ kind, label, title, children, previewW, previewMaxH, previe
     <box id={`hover-chip:${id}`} maxW={340} minW={0} onHover={children ? hover.onHover : undefined} onFocus={children ? hover.onFocus : undefined} focusable={Boolean(children)}>
       <ContextPill kind={kind} label={label} title={title} hovered={hover.open} />
       {children ? (
-        <ChipPreview anchor={`hover-chip:${id}`} open={hover.open} interactive={kind === "selected-text"} onHover={hover.onHover} w={previewW} maxH={previewMaxH} py={previewPad?.[0]} px={previewPad?.[1]} radius={12} {...previewCard(tokens)}>
+        <ChipPreview anchor={`hover-chip:${id}`} open={hover.open} interactive={kind === "selected-text"} onHover={hover.onHover} w={previewW} maxH={previewMaxH} py={previewPad?.[0]} px={previewPad?.[1]} radius={12} clip={12} {...previewCard(tokens)}>
           {children}
         </ChipPreview>
       ) : null}
@@ -159,7 +159,7 @@ function UserQuotedTextChip({ quotedText }: { quotedText: string }) {
   return (
     <HoverChip kind="selected-text" label={preview ? `"${label}"` : t("app.chat.messageRow.quotedTextLabel")} title={t("app.chat.messageRow.quotedTextLabel")} previewW={460} previewMaxH={220} previewPad={[12 + 1, 14 + 1]}>
       {preview ? (
-        <col scrollY minH={0}>
+        <col scrollY grow={1} shrink minW={0} minH={0}>
           <text size={fontSize.sm} lineHeight={18} tracking={fontSize.sm * 0.01} color={tokens.c.textStrong} selectable>
             {preview}
           </text>

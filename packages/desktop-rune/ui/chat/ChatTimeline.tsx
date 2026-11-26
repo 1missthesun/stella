@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ChatVariantContext, type ChatVariant } from "./chat-text";
 import type { ChatListBinding } from "./use-chat-scroll-management";
 import { buildChatTimelineItems, type ChatTimelineItem } from "@/features/chat/lib/chat-timeline-items";
@@ -246,6 +246,8 @@ export const ChatTimeline = memo(function ChatTimeline({
   }, [dataKey, onReady]);
   useEffect(markReady, [markReady]);
   const padding = contentPadding(contentContainerStyle);
+  const contextVariant = useContext(ChatVariantContext);
+  const surfaceVariant = variant ?? contextVariant;
   const maxW = contentMaxWidth(contentContainerStyle);
   const scrollId = list?.scrollId;
 
@@ -273,7 +275,26 @@ export const ChatTimeline = memo(function ChatTimeline({
     </col>
   ) : null;
 
-  const viewport = (children: ReactNode, centered = false) => (
+  const fallback = (children: ReactNode, status?: { role: "status"; label: string }) => (
+    <col
+      id={scrollId}
+      w="full"
+      h="full"
+      gap={surfaceVariant === "sidebar" ? 8 : 20}
+      pt={32}
+      justify="center"
+      align="center"
+      {...status}
+      onLayout={() => {
+        laidOutRef.current = true;
+        markReady();
+      }}
+    >
+      {children}
+    </col>
+  );
+
+  const viewport = (children: ReactNode) => (
     <col
       id={scrollId}
       w="full"
@@ -288,24 +309,22 @@ export const ChatTimeline = memo(function ChatTimeline({
         markReady();
       }}
     >
-      <col w="full" maxW={maxW} selfAlign="center" minH={centered ? "full" : undefined} justify={centered ? "center" : undefined} align={centered ? "center" : undefined} {...padding}>
+      <col w="full" maxW={maxW} selfAlign="center" {...padding}>
         {children}
       </col>
     </col>
   );
 
   if (isLoadingHistory && rows.length === 0) {
-    return viewport(
-      <box role="status" label={t("app.chat.timeline.loadingConversation")} pt={32}>
-        <Icon icon={withStroke(Icons.stella.LoaderCircle, 2)} size={18} color={tokens.c.textWeak} spin={0.8} />
-      </box>,
-      true,
+    return fallback(
+      <Icon icon={withStroke(Icons.stella.LoaderCircle, 2)} size={18} color={tokens.c.textWeak} spin={0.8} />,
+      { role: "status", label: t("app.chat.timeline.loadingConversation") },
     );
   }
 
   if (rows.length === 0) {
-    return viewport(
-      <col w="full" gap={20} pt={32} align="center">
+    return fallback(
+      <>
         {askRecords.length > 0
           ? askRecords.map((record) => <UserAskRecordCard key={record.id} record={record} />)
           : (emptyState ?? (
@@ -314,8 +333,7 @@ export const ChatTimeline = memo(function ChatTimeline({
               </text>
             ))}
         {tail}
-      </col>,
-      true,
+      </>,
     );
   }
 

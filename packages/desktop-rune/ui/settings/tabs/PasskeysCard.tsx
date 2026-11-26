@@ -96,11 +96,11 @@ export function PasskeysCard() {
             <T w="full" {...s.settingsRowLabel}>
               {passkey.name || t("settings.passkeys.unnamed")}
             </T>
-            <SettingsCardDesc>
+            <T w="full" {...s.settingsRowSublabel}>
               {passkey.createdAt
                 ? new Date(passkey.createdAt).toLocaleDateString()
                 : ""}
-            </SettingsCardDesc>
+            </T>
           </col>
           <row {...s.settingsRowControl}>
             <Button variant="ghost" className="pill-btn pill-btn--danger" disabled={busy} onClick={() => remove(passkey.id)}>

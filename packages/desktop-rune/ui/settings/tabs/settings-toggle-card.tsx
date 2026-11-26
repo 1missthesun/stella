@@ -27,7 +27,7 @@ export function SettingsToggleCard({
   return (
     <SettingsCard>
       <SettingsCardHeader>
-        <SettingsCardTitle titleKey={titleKey} />
+        <SettingsCardTitle titleKey={titleKey} variant="row" />
         <Switch aria-label={t(titleKey)} checked={checked} disabled={disabled} onCheckedChange={(next) => onChange(Boolean(next))} hideLabel />
       </SettingsCardHeader>
       <SettingsCardDesc>{description}</SettingsCardDesc>

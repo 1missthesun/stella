@@ -21,7 +21,7 @@ export function OnboardingReplayCard() {
   return (
     <SettingsCard>
       <SettingsCardHeader>
-        <SettingsCardTitle titleKey="settings.onboardingReplay.title" />
+        <SettingsCardTitle titleKey="settings.onboardingReplay.title" variant="row" />
         <Button variant="ghost" className="pill-btn" onClick={handleReplay}>
           {t("settings.onboardingReplay.action")}
         </Button>

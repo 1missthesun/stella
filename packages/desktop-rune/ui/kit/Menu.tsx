@@ -202,7 +202,7 @@ export type SelectProps<T extends string = string> = {
   maxW?: number;
   radius?: number;
   /** A descendant rule's trigger height and fill (e.g. `.usage-filters [data-slot="select-trigger"]`). */
-  trigger?: { h?: number; fill?: string; px?: number; hover?: string; color?: string };
+  trigger?: { h?: number; fill?: string; px?: number; pl?: number; pr?: number; hover?: string; color?: string; hoverColor?: string; border?: string; size?: number; weight?: number; tracking?: number };
 };
 
 /** desktop-ui's `Select`: a 32pt field-like trigger with a chevron, opening a radio menu at least as wide as itself. */
@@ -240,18 +240,21 @@ export function Select<T extends string = string>({ id, value, onValueChange, op
             maxW={w === "fit" ? maxW : undefined}
             h={triggerStyle?.h ?? 32}
             px={triggerStyle?.px ?? 10 + 1}
+            pl={triggerStyle?.pl}
+            pr={triggerStyle?.pr}
             gap={8}
             align="center"
             justify="between"
             radius={triggerRadius}
-            border={c.border}
+            border={triggerStyle?.border ?? c.border}
             fill={trig.open ? sel.open : (triggerStyle?.fill ?? c.background)}
+            hoverColor={disabled ? undefined : triggerStyle?.hoverColor}
             hover={disabled ? undefined : (triggerStyle?.hover ?? sel.hover)}
             opacity={disabled ? 0.5 : undefined}
             motion={{ dur: 0.12 }}
             onPress={disabled ? undefined : trig.toggle}
           >
-            <text {...text} color={triggerStyle?.color ?? c.foreground} grow={1} shrink={w !== "fit"} truncate={w !== "fit"} nowrap>
+            <text {...text} {...(triggerStyle?.size !== undefined ? { size: triggerStyle.size, lineHeight: Math.round(triggerStyle.size * 1.5) } : null)} {...(triggerStyle?.weight !== undefined ? { weight: triggerStyle.weight } : null)} {...(triggerStyle?.tracking !== undefined ? { tracking: triggerStyle.tracking } : null)} color={triggerStyle?.color ?? c.foreground} grow={1} shrink={w !== "fit"} truncate={w !== "fit"} nowrap>
               {selected?.label ?? placeholder ?? ""}
             </text>
             <Icon icon={Icons.stella.ChevronDown} size={14} color={c.mutedForeground} />

@@ -3,7 +3,7 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogT
 import { useSettings } from "../settings.styles";
 import { usePill } from "../../global/shared/pill.styles";
 import { useAiAccounts } from "../../global/cloud/ai-accounts.styles";
-import { SettingsCardTitle } from "../settings-card-targets";
+import { SettingsTabHeader } from "../AiryControls";
 import { useCallback, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
@@ -160,8 +160,8 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
 
   return (
     <SettingsTabContent account>
+      <SettingsTabHeader titleKey="settings.account.title" cardKey="settings.account.title" />
       <SettingsCard>
-        <SettingsCardTitle titleKey="settings.account.title" />
         <SettingsRow>
           <col {...s.settingsRowInfo}>
             <T w="full" {...s.settingsRowLabel}>

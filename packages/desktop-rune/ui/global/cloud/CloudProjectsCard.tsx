@@ -120,7 +120,7 @@ function CloudProjectsCardImpl() {
             <T w="full" {...s.settingsRowSublabel}>
               Enter the connect code GitHub showed you.
             </T>
-            <Input type="text" value={connectCode} onChange={(event) => setConnectCode(event.target.value)} placeholder="XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false} w="full" mt={6} />
+            <Input type="text" value={connectCode} onChange={(event) => setConnectCode(event.target.value)} placeholder="XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false} {...s.settingsInlineInput} />
           </col>
           <row {...s.settingsRowControl}>
             <Button variant="ghost" className="pill-btn" onClick={() => void handleFinishConnect()} disabled={busy || !connectCode.trim()}>
@@ -148,8 +148,8 @@ function CloudProjectsCardImpl() {
           <T w="full" {...s.settingsRowSublabel}>
             New project
           </T>
-          <Input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" autoComplete="off" spellCheck={false} w="full" mt={6} />
-          <Input type="text" value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} placeholder="GitHub repository URL (optional)" autoComplete="off" spellCheck={false} w="full" mt={6} />
+          <Input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" autoComplete="off" spellCheck={false} {...s.settingsInlineInput} />
+          <Input type="text" value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} placeholder="GitHub repository URL (optional)" autoComplete="off" spellCheck={false} {...s.settingsInlineInput} />
         </col>
         <row {...s.settingsRowControl}>
           <Button variant="ghost" className="pill-btn" onClick={() => void handleCreate()} disabled={busy || !name.trim()}>

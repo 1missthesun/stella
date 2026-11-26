@@ -189,6 +189,9 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
   if (type === "time")
     return (
       <TimeInput
+        {...box}
+        textSize={size}
+        textWeight={weight}
         id={id}
         value={current}
         disabled={disabled}
@@ -255,7 +258,7 @@ export function TextField({ label, hideLabel, description, error, variant = "nor
   const [focused, setFocused] = useState(false);
   const errorFill = derive(t, "compat-field-error", (t) => mix(t.c.destructive, 10, t.c.background));
   if (variant === "ghost") return <Input field {...input} multiline={multiline} disabled={disabled} w="full" />;
-  if (input.type === "time") return <Input {...input} disabled={disabled} aria-label={input["aria-label"] ?? label} />;
+  if (input.type === "time") return <Input {...input} {...wrapperStyle} size={inputStyle?.size} weight={inputStyle?.weight} disabled={disabled} aria-label={input["aria-label"] ?? label} />;
   return (
     <col w="full" gap={8} align="start">
       {label && !hideLabel ? (

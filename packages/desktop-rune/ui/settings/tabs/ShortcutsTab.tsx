@@ -2,7 +2,7 @@ import { SettingsCard, SettingsCardDesc, SettingsRow, SettingsTabContent } from 
 import { Button, Keybind, T, showToast } from "../../kit/compat";
 import { useSettings } from "../settings.styles";
 import { usePill } from "../../global/shared/pill.styles";
-import { SettingsCardTitle } from "../settings-card-targets";
+import { SettingsTabHeader } from "../AiryControls";
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "@/shared/i18n";
 import { getSettingsErrorMessage } from "@/global/settings/tabs/shared";
@@ -85,6 +85,7 @@ type ShortcutAction = "dictation" | "voice";
 
 export function ShortcutsTab() {
   const s = useSettings();
+  const sPill = usePill();
   const t = useT();
   const voiceVisible = useRealtimeVoiceVisible();
   const actionLabel = useCallback(
@@ -253,7 +254,7 @@ export function ShortcutsTab() {
             ? t("settings.shortcuts.capturing")
             : t("settings.shortcuts.change")}
         </Button>
-        <Button variant="ghost" className="pill-btn" disabled={
+        <Button variant="ghost" className="pill-btn" ml={sPill.pillBtnAfterPill.ml} disabled={
             !loaded ||
             savingShortcut !== null ||
             capturingShortcut !== null ||
@@ -267,8 +268,8 @@ export function ShortcutsTab() {
 
   return (
     <SettingsTabContent>
+      <SettingsTabHeader titleKey="settings.shortcuts.title" cardKey="settings.shortcuts.title" />
       <SettingsCard>
-        <SettingsCardTitle titleKey="settings.shortcuts.title" />
         {shortcutError ? (
           <SettingsCardDesc error role="alert">
             {shortcutError}

@@ -1,6 +1,6 @@
 import { ArrowRight, Press, Search, T, tx } from "../kit/compat";
 import { useSettings } from "./settings.styles";
-import { Fragment, useMemo, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
   expandedMatchTerms,
   searchSettings,
@@ -26,6 +26,8 @@ export function SettingsSearchResults({
 }: SettingsSearchResultsProps) {
   const s = useSettings();
   const t = useT();
+  const [linkHover, setLinkHover] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   const highlightTerms = useMemo(() => expandedMatchTerms(query), [query]);
   const results = useMemo(
@@ -49,7 +51,7 @@ export function SettingsSearchResults({
         </T>
         <col w="full" {...s.settingsSearchResultsEmptyBody}>
           {t("settings.search.noResultsBody")}{" "}
-          <Press text={tx(s.settingsSearchResultsEmpty, s.settingsSearchResultsEmptyBody)} {...s.settingsSearchResultsLink} onPress={onClear}>
+          <Press text={tx(s.settingsSearchResultsEmpty, s.settingsSearchResultsEmptyBody)} {...s.settingsSearchResultsLink} underline={linkHover} onHover={setLinkHover} onPress={onClear}>
             {t("settings.search.clear")}
           </Press>
           .
@@ -78,8 +80,8 @@ export function SettingsSearchResults({
       </row>
       <col {...s.settingsSearchResultsList}>
         {results.map((entry, index) => (
-          <col w="full" key={`${entry.tab}:${entry.title}`}>
-            <Press {...s.settingsSearchResultButton} role="option" selected={index === 0} onPress={() => onSelect(entry)}>
+          <col w="full" key={`${entry.tab}:${entry.title}`} {...(index > 0 ? s.settingsSearchResultDivider : null)}>
+            <Press {...s.settingsSearchResultButton} role="option" selected={index === 0} onHover={(on: boolean) => setHovered((h) => (on ? index : h === index ? null : h))} onPress={() => onSelect(entry)}>
               <col {...s.settingsSearchResultBody}>
                 <T {...tx(s.settingsSearchResultButton)} w="full" {...s.settingsSearchResultTitle}>
                   {highlightTokens(entry.title, highlightTerms)}
@@ -92,7 +94,7 @@ export function SettingsSearchResults({
                 <T {...tx(s.settingsSearchResultButton)} {...s.settingsSearchResultTab}>
                   {t(getTabLabelKey(entry.tab))}
                 </T>
-                <ArrowRight size={13} strokeWidth={1.85} {...s.settingsSearchResultArrow} color={s.settingsSearchResultArrow.color} />
+                <ArrowRight size={13} strokeWidth={1.85} {...s.settingsSearchResultArrow} {...(hovered === index ? { opacity: 1, x: 0, ...s.settingsSearchResultArrowHover } : { x: -3 })} color={hovered === index ? s.settingsSearchResultArrowHover.color : s.settingsSearchResultArrow.color} />
               </row>
             </Press>
           </col>

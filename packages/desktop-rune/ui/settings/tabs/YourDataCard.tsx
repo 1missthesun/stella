@@ -119,11 +119,11 @@ export function YourDataCard() {
           <T w="full" {...s.settingsRowLabel}>
             {t("settings.yourData.supportLabel")}
           </T>
-          <SettingsCardDesc>
+          <T w="full" {...s.settingsRowSublabel}>
             {until
               ? `${t("settings.yourData.supportActive")} ${new Date(until).toLocaleString()}`
               : t("settings.yourData.supportOff")}
-          </SettingsCardDesc>
+          </T>
         </col>
         <row {...s.settingsRowControl}>
           <Button variant="ghost" className="pill-btn" disabled={supportSaving} onClick={() => setGrant(!until)}>

@@ -1,5 +1,5 @@
 import { SettingsCard, SettingsRow, SettingsTabContent } from "../parts";
-import { Select, T } from "../../kit/compat";
+import { AiryWordPicker, SettingsTabHeader } from "../AiryControls";
 import { useSettings } from "../settings.styles";
 import { SettingsCardTitle } from "../settings-card-targets";
 import { lazy, Suspense } from "react";
@@ -32,22 +32,19 @@ export function GeneralTab() {
 
   return (
     <SettingsTabContent>
+      <SettingsTabHeader titleKey="settings.tabs.general" />
       <LanguageSettingsRow />
       <SettingsCard>
-        <SettingsCardTitle titleKey="settings.motion.title" />
         <SettingsRow>
           <col {...s.settingsRowInfo}>
-            <T w="full" {...s.settingsRowLabel}>
-              {t("settings.motion.reduceMotion.label")}
-            </T>
-            <T w="full" {...s.settingsRowSublabel}>
-              {t("settings.motion.reduceMotion.description")}
-            </T>
+            <SettingsCardTitle titleKey="settings.motion.title" labelKey="settings.motion.reduceMotion.label" variant="row" />
           </col>
           <row {...s.settingsRowControl}>
-            <Select {...s.settingsRuntimeSelect} value={reduceMotion} aria-label={t("settings.motion.reduceMotion.label")} onValueChange={(value) =>
-                setReduceMotionPreference(value as ReduceMotionPreference)
-              } options={[
+            <AiryWordPicker
+              value={reduceMotion}
+              ariaLabel={t("settings.motion.reduceMotion.label")}
+              onChange={(next) => setReduceMotionPreference(next as ReduceMotionPreference)}
+              options={[
                 {
                   value: "system",
                   label: t("settings.motion.reduceMotion.system"),
@@ -60,7 +57,8 @@ export function GeneralTab() {
                   value: "off",
                   label: t("settings.motion.reduceMotion.off"),
                 },
-              ]} />
+              ]}
+            />
           </row>
         </SettingsRow>
       </SettingsCard>

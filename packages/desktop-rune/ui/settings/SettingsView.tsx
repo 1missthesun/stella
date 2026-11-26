@@ -1,5 +1,6 @@
 import { SettingsTabContent as TabColumn } from "./parts";
 import { useSettings } from "./settings.styles";
+import { SettingsScreenScope } from "../global/shared/pill.styles";
 import {
   lazy,
   Suspense,
@@ -128,6 +129,7 @@ export const SettingsScreen = ({
   return (
     <>
       <col {...s.settingsScreen} onLayout={measure}>
+        <SettingsScreenScope.Provider value={true}>
         <Layout {...s.settingsLayout}>
           <col {...(narrow ? s.settingsLayoutBar_settingsNav : s.settingsLayoutRail_settingsNav)}>
             <SettingsSearch value={searchQuery} onChange={setSearchQuery} />
@@ -147,6 +149,7 @@ export const SettingsScreen = ({
             )}
           </SettingsPanel>
         </Layout>
+        </SettingsScreenScope.Provider>
       </col>
       <Suspense fallback={null}>
         <LegalDialog document={activeLegalDoc} onOpenChange={(open) => {

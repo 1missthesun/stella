@@ -1,7 +1,8 @@
-import { SettingsCard, SettingsCardDesc, SettingsCardHeader, SettingsRow } from "../parts";
-import { Select, Switch, T, TextField } from "../../kit/compat";
+import { SettingsCard, SettingsCardDesc, SettingsCardHeader, SettingsRow, SettingsSelect } from "../parts";
+import { Switch, T, TextField } from "../../kit/compat";
 import { useSettings } from "../settings.styles";
 import { SettingsCardTitle } from "../settings-card-targets";
+import { AiryWordPicker } from "../AiryControls";
 import { useCallback, useEffect, useState } from "react";
 import type {
   UserAskEscalationPolicy,
@@ -33,6 +34,8 @@ const timeValueToMinute = (value: string, fallback: number): number => {
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return fallback;
   return (((hours * 60 + minutes) % 1440) + 1440) % 1440;
 };
+
+const TIME_TEXT = { size: 14.5, weight: 600 };
 
 const RATE_LIMIT_CHOICES = [1, 2, 3, 4, 6, 8, 10, 12, 15, 20].filter(
   (value) => value <= USER_ASK_MAX_PER_HOUR_LIMIT,
@@ -123,7 +126,7 @@ export function NativeAskEscalationSettings() {
   const disabled = !loaded || saving;
   const levelOptions = USER_ASK_URGENCY_NAMES.map((name, index) => ({
     value: String(index + 1),
-    label: t(`settings.escalation.levels.${name}`),
+    label: t(`mobile.settings.userAsk.level.${name}`),
   }));
   const now = new Date();
   const quietNow = isWithinQuietHours(
@@ -141,29 +144,21 @@ export function NativeAskEscalationSettings() {
         {t("settings.escalation.description")}
       </SettingsCardDesc>
 
-      <SettingsRow>
+      <SettingsRow stacked>
         <col {...s.settingsRowInfo}>
           <T w="full" {...s.settingsRowLabel}>
-            {t("settings.escalation.ceiling.label")}
-          </T>
-          <T w="full" {...s.settingsRowSublabel}>
-            {t("settings.escalation.ceiling.sublabel")}
+            {t("mobile.settings.userAsk.ceiling")}
           </T>
         </col>
-        <row {...s.settingsRowControl}>
-          <Select {...s.settingsRuntimeSelect} value={String(policy.ceiling)} aria-label={t("settings.escalation.ceiling.label")} disabled={disabled} options={levelOptions} onValueChange={(value) =>
-              void commit({ ceiling: Number(value) as UserAskUrgencyLevel })
-            } />
-        </row>
+        <AiryWordPicker value={String(policy.ceiling)} ariaLabel={t("mobile.settings.userAsk.ceiling")} disabled={disabled} options={levelOptions} onChange={(value) =>
+            void commit({ ceiling: Number(value) as UserAskUrgencyLevel })
+          } />
       </SettingsRow>
 
       <SettingsRow>
         <col {...s.settingsRowInfo}>
           <T w="full" {...s.settingsRowLabel}>
             {t("settings.escalation.sound.label")}
-          </T>
-          <T w="full" {...s.settingsRowSublabel}>
-            {t("settings.escalation.sound.sublabel")}
           </T>
         </col>
         <row {...s.settingsRowControl}>
@@ -178,12 +173,9 @@ export function NativeAskEscalationSettings() {
           <T w="full" {...s.settingsRowLabel}>
             {t("settings.escalation.rateLimit.label")}
           </T>
-          <T w="full" {...s.settingsRowSublabel}>
-            {t("settings.escalation.rateLimit.sublabel")}
-          </T>
         </col>
         <row {...s.settingsRowControl}>
-          <Select {...s.settingsRuntimeSelect} value={String(policy.maxPerHour)} aria-label={t("settings.escalation.rateLimit.label")} disabled={disabled} options={RATE_LIMIT_CHOICES.map((value) => ({
+          <SettingsSelect value={String(policy.maxPerHour)} aria-label={t("settings.escalation.rateLimit.label")} disabled={disabled} options={RATE_LIMIT_CHOICES.map((value) => ({
               value: String(value),
               label: t("settings.escalation.rateLimit.value", {
                 count: String(value),
@@ -228,8 +220,8 @@ export function NativeAskEscalationSettings() {
                 {t("settings.escalation.quietHours.windowSublabel", { zone })}
               </T>
             </col>
-            <row {...s.settingsRowControl}>
-              <TextField type="time" label={t("settings.escalation.quietHours.start")} hideLabel aria-label={t("settings.escalation.quietHours.start")} disabled={disabled} value={minuteToTimeValue(policy.quietHours.startMinute)} onChange={(event) =>
+            <row {...s.settingsRowControl} {...s.settingsEscalationWindow}>
+              <TextField wrapperStyle={s.settingsEscalationTime} inputStyle={TIME_TEXT} type="time" label={t("settings.escalation.quietHours.start")} hideLabel aria-label={t("settings.escalation.quietHours.start")} disabled={disabled} value={minuteToTimeValue(policy.quietHours.startMinute)} onChange={(event) =>
                   void commit({
                     quietHours: {
                       ...policy.quietHours,
@@ -240,7 +232,7 @@ export function NativeAskEscalationSettings() {
                     },
                   })
                 } />
-              <TextField type="time" label={t("settings.escalation.quietHours.end")} hideLabel aria-label={t("settings.escalation.quietHours.end")} disabled={disabled} value={minuteToTimeValue(policy.quietHours.endMinute)} onChange={(event) =>
+              <TextField wrapperStyle={s.settingsEscalationTime} inputStyle={TIME_TEXT} type="time" label={t("settings.escalation.quietHours.end")} hideLabel aria-label={t("settings.escalation.quietHours.end")} disabled={disabled} value={minuteToTimeValue(policy.quietHours.endMinute)} onChange={(event) =>
                   void commit({
                     quietHours: {
                       ...policy.quietHours,
@@ -254,22 +246,17 @@ export function NativeAskEscalationSettings() {
             </row>
           </SettingsRow>
 
-          <SettingsRow>
+          <SettingsRow stacked>
             <col {...s.settingsRowInfo}>
               <T w="full" {...s.settingsRowLabel}>
-                {t("settings.escalation.quietHours.ceilingLabel")}
-              </T>
-              <T w="full" {...s.settingsRowSublabel}>
-                {t("settings.escalation.quietHours.ceilingSublabel")}
+                {t("mobile.settings.userAsk.quietCeiling")}
               </T>
             </col>
-            <row {...s.settingsRowControl}>
-              <Select {...s.settingsRuntimeSelect} value={String(policy.quietHoursCeiling)} aria-label={t("settings.escalation.quietHours.ceilingLabel")} disabled={disabled} options={levelOptions} onValueChange={(value) =>
-                  void commit({
-                    quietHoursCeiling: Number(value) as UserAskUrgencyLevel,
-                  })
-                } />
-            </row>
+            <AiryWordPicker value={String(policy.quietHoursCeiling)} ariaLabel={t("mobile.settings.userAsk.quietCeiling")} disabled={disabled} options={levelOptions} onChange={(value) =>
+                void commit({
+                  quietHoursCeiling: Number(value) as UserAskUrgencyLevel,
+                })
+              } />
           </SettingsRow>
         </>
       ) : null}

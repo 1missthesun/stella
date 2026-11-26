@@ -38,12 +38,9 @@ function CloudBrowserDataCardImpl() {
   return (
     <>
       <SettingsCard>
-        <SettingsCardTitle titleKey="cloudBrowser.settings.title" />
         <SettingsRow>
           <col {...s.settingsRowInfo}>
-            <T w="full" {...s.settingsRowLabel}>
-              {t("cloudBrowser.settings.defaultProfile")}
-            </T>
+            <SettingsCardTitle titleKey="cloudBrowser.settings.title" variant="row" />
             <T w="full" {...s.settingsRowSublabel}>
               {t("cloudBrowser.settings.description")}
             </T>

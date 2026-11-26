@@ -1,6 +1,7 @@
-import { SettingsCard, SettingsCardDesc, SettingsRow, SettingsTabContent } from "./parts";
+import { SettingsCard, SettingsCardDesc, SettingsRow, SettingsTabContent, SettingsSelect } from "./parts";
 import { Select, Switch, T } from "../kit/compat";
 import { useSettings } from "./settings.styles";
+import { SettingsTabHeader } from "./AiryControls";
 import { SettingsCardTitle } from "./settings-card-targets";
 import {
   lazy,
@@ -183,12 +184,9 @@ export function AudioTab() {
             <T w="full" {...s.settingsRowLabel}>
               {t("settings.audio.microphone.deviceLabel")}
             </T>
-            <T w="full" {...s.settingsRowSublabel}>
-              {t("settings.audio.microphone.deviceDescription")}
-            </T>
           </col>
           <row {...s.settingsRowControl}>
-            <Select {...s.settingsRuntimeSelect} value={selectedMicId} onValueChange={(value) => handleMicChange(value)} aria-label={t("settings.audio.microphone.deviceLabel")} options={[
+            <SettingsSelect value={selectedMicId} onValueChange={(value) => handleMicChange(value)} aria-label={t("settings.audio.microphone.deviceLabel")} options={[
                 { value: "", label: t("settings.audio.systemDefault") },
                 ...audioInputDevices.map((device, index) => ({
                   value: device.deviceId,
@@ -221,6 +219,7 @@ export function AudioTab() {
   );
   return (
     <SettingsTabContent>
+      <SettingsTabHeader titleKey="settings.tabs.audio" />
       <SettingsCard>
         <SettingsCardTitle titleKey="settings.audio.microphone.title" />
         {permissionError ? (
@@ -259,12 +258,9 @@ export function AudioTab() {
                 <T w="full" {...s.settingsRowLabel}>
                   {t("settings.audio.speaker.outputLabel")}
                 </T>
-                <T w="full" {...s.settingsRowSublabel}>
-                  {t("settings.audio.speaker.outputDescription")}
-                </T>
               </col>
               <row {...s.settingsRowControl}>
-                <Select {...s.settingsRuntimeSelect} value={selectedSpeakerId} onValueChange={(value) => handleSpeakerChange(value)} aria-label={t("settings.audio.speaker.outputLabel")} options={[
+                <SettingsSelect value={selectedSpeakerId} onValueChange={(value) => handleSpeakerChange(value)} aria-label={t("settings.audio.speaker.outputLabel")} options={[
                     { value: "", label: t("settings.audio.systemDefault") },
                     ...audioOutputDevices.map((device, index) => ({
                       value: device.deviceId,

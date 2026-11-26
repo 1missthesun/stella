@@ -1,13 +1,13 @@
 import { Children, Fragment, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { mixOklch, useTokens, type Style } from "../theme";
-import { T } from "../kit/compat";
+import { Select, T, type SelectProps } from "../kit/compat";
 import { SettingsCardTitle, forgetCardPlace, noteCardPlace, usePulsingCard } from "./settings-card-targets";
 import { useSettings } from "./settings.styles";
 
 type TabContent = { account: boolean; place: (id: string, y: number | null) => void; last: string | null };
 const TabContentCtx = createContext<TabContent | null>(null);
 
-/** `.settings-tab-content`: the 720-wide column of cards; every card but the last ends in a divider (`--account`: wider gaps, no row dividers). */
+/** `.settings-tab-content`: the 640-wide column of cards; every card but the last ends in a hairline. */
 export function SettingsTabContent({ account = false, children, ...style }: Style & { account?: boolean; children?: ReactNode }) {
   const s = useSettings();
   const places = useRef(new Map<string, number>());
@@ -22,7 +22,7 @@ export function SettingsTabContent({ account = false, children, ...style }: Styl
   }, []);
   const value = useMemo(() => ({ account, place, last }), [account, place, last]);
   return (
-    <col {...s.settingsTabContent} {...(account ? s.settingsTabContentAccount : null)} {...style}>
+    <col {...s.settingsTabContent} {...style}>
       <TabContentCtx.Provider value={value}>{children}</TabContentCtx.Provider>
     </col>
   );
@@ -57,7 +57,7 @@ function flatten(children: ReactNode): ReactNode[] {
   return out;
 }
 
-/** `.settings-card`: lays its rows out as CSS does (`.settings-row + .settings-row` divider, `:first-of-type` 4pt top, `:last-child` no bottom). */
+/** `.settings-card`: lays its rows out as CSS does (`:first-of-type` 2pt top, `:last-child` no bottom; a description ending the card loses its bottom margin). */
 export function SettingsCard({ children, ...style }: Style & { children?: ReactNode; "data-testid"?: string }) {
   const s = useSettings();
   const t = useTokens();
@@ -111,7 +111,7 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
   let seenDiv = false;
   let prevRow = false;
   const nextRowSlot = (last: boolean): RowSlot => {
-    const slot = { first: !seenDiv, divided: prevRow && !tab?.account, last };
+    const slot = { first: !seenDiv, divided: false, last };
     seenDiv = true;
     prevRow = true;
     return slot;
@@ -126,10 +126,14 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
     if (kind === "row") return cloneElement(child as ReactElement<RowSlot>, nextRowSlot(i === lastIndex));
     if (kind === "div") seenDiv = true;
     prevRow = false;
-    return child;
+    if (!isValidElement(child) || child.type !== SettingsCardDesc) return child;
+    const prev = kids[i - 1];
+    const collapsed = isValidElement(prev) && (prev.type === SettingsCardHeader || prev.type === SettingsCardTitle) ? { mt: 0 } : null;
+    const last = i === lastIndex ? { mb: 0 } : null;
+    return collapsed || last ? cloneElement(child as ReactElement<Style>, { ...collapsed, ...last }) : child;
   });
   const isLast = tab ? tab.last === cardId : false;
-  const divider = tab && !isLast ? { pb: 28 + 1, border: mixOklch(t.c.foreground, 6, "transparent"), borderSides: [0, 0, 1, 0] as [number, number, number, number] } : tab ? { pb: 0 } : null;
+  const divider = tab && !isLast ? { pb: 24 + 1, border: mixOklch(t.c.foreground, 7, "transparent"), borderSides: [0, 0, 1, 0] as [number, number, number, number] } : tab ? { pb: 0 } : null;
   return (
     <col
       id={cardId}
@@ -172,8 +176,8 @@ const isRowHost = (el: ReactElement) =>
   typeof el.type !== "string" && el.type !== Fragment && el.type !== T && el.type !== SettingsCardTitle && el.type !== SettingsCardHeader && el.type !== SettingsCardDesc && el.type !== SettingsCard && el.type !== SettingsTabItem;
 const keyOf = (child: ReactNode, i: number) => (isValidElement(child) && child.key != null ? child.key : `row-host-${i}`);
 
-/** `.settings-row`: info on the left, control on the right; its card decides dividers and edge padding. */
-export function SettingsRow({ children, first: firstProp, divided: dividedProp, last: lastProp, ...style }: Style & RowSlot & { children?: ReactNode }) {
+/** `.settings-row`: info on the left, control on the right (`--stacked`: one above the other); its card decides edge padding. */
+export function SettingsRow({ children, stacked = false, first: firstProp, divided: dividedProp, last: lastProp, ...style }: Style & RowSlot & { stacked?: boolean; children?: ReactNode }) {
   const s = useSettings();
   const host = useContext(RowSlotCtx);
   const rowId = useId();
@@ -186,18 +190,20 @@ export function SettingsRow({ children, first: firstProp, divided: dividedProp, 
   const divided = dividedProp ?? hostSlot?.divided;
   const last = lastProp ?? hostSlot?.last;
   const t = useTokens();
+  const Box = stacked ? "col" : "row";
   return (
-    <row
+    <Box
       w="full"
       {...s.settingsRow}
-      pt={(first ? 4 : 12) + (divided ? 1 : 0)}
-      pb={last ? 0 : 12}
+      {...(stacked ? s.settingsRowStacked : null)}
+      pt={(first ? 2 : 10) + (divided ? 1 : 0)}
+      pb={last ? 0 : 10}
       {...(divided ? { border: mixOklch(t.c.foreground, 7, "transparent"), borderSides: [1, 0, 0, 0] as [number, number, number, number] } : null)}
       {...style}
       onLayout={host ? (r) => host.hostRow(host.index, rowId, r.y) : undefined}
     >
       {children}
-    </row>
+    </Box>
   );
 }
 
@@ -209,4 +215,15 @@ export function SettingsCardDesc({ error = false, children, ...style }: Style & 
       {children}
     </T>
   );
+}
+
+/** A Select in a settings row control: the quiet trigger (`.settings-screen .settings-row-control [data-slot="select-trigger"]`). */
+export function SettingsSelect<V extends string = string>(props: SelectProps<V>) {
+  const s = useSettings();
+  const t = useTokens();
+  const trigger = useMemo(
+    () => ({ h: 32, pl: 10, pr: 6, border: "#00000000", fill: "#00000000", color: t.c.textBase, hover: mixOklch(t.c.foreground, 5.5, "transparent"), hoverColor: t.c.textStrong, size: 14.5, weight: 600, tracking: -0.17 }),
+    [t],
+  );
+  return <Select {...s.settingsRuntimeSelect} trigger={trigger} {...props} />;
 }

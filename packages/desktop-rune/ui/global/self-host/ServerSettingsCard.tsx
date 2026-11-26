@@ -1,5 +1,5 @@
 import { SettingsCard, SettingsCardHeader } from "../../settings/parts";
-import { Button, Check, CloudIcon, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Monitor, Plus, Press, T, Trash2, showToast, tx } from "../../kit/compat";
+import { Button, CloudIcon, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Monitor, Plus, Press, T, Trash2, showToast, tx } from "../../kit/compat";
 import { usePill } from "../shared/pill.styles";
 import { useSelfHost } from "./self-host.styles";
 import { useSettings } from "../../settings/settings.styles";
@@ -105,10 +105,10 @@ export function ServerSettingsCard() {
         ) : null}
       </SettingsCardHeader>
       <col role="list">
-        {list.map((entry, index) => {
+        {list.map((entry) => {
           const ServerIcon = entry.kind === "hosted" ? CloudIcon : Monitor;
           return (
-            <row {...sSelfHost.serverListRow} {...(index > 0 ? sSelfHost.serverListRowDivided : null)} key={entry.id} role="listitem">
+            <row {...sSelfHost.serverListRow} key={entry.id} role="listitem">
               <Press {...sSelfHost.serverListMain} selected={entry.active} disabled={busy || entry.active || !state.canSwitch} onPress={() => setPending({ kind: "switch", entry })} {...((busy || entry.active || !state.canSwitch) ? sSelfHost.serverListMainDisabled : null)}>
                 <ServerIcon size={18} {...sSelfHost.serverListIcon} />
                 <col {...sSelfHost.serverListCopy}>
@@ -119,7 +119,7 @@ export function ServerSettingsCard() {
                       : t("selfHost.settings.selfHostedSub", { host: hostOf(entry.origin) })}
                   </T>
                 </col>
-                {entry.active ? <Check size={16} {...sSelfHost.serverListCheck} color={sSelfHost.serverListCheck.color} /> : null}
+                {entry.active ? <box {...sSelfHost.serverListDot} /> : null}
               </Press>
               {entry.kind === "self-hosted" && !entry.active && state.canSwitch ? (
                 <Press {...sSelfHost.serverListRemove} label={t("selfHost.settings.removeA11y", { name: nameOf(entry) })} title={t("selfHost.settings.removeA11y", { name: nameOf(entry) })} disabled={busy} onPress={() => setPending({ kind: "remove", entry })}>
@@ -130,7 +130,7 @@ export function ServerSettingsCard() {
           );
         })}
         {state.canSwitch ? (
-          <row {...sSelfHost.serverListRow} {...(list.length > 0 ? sSelfHost.serverListRowDivided : null)} role="listitem">
+          <row {...sSelfHost.serverListRow} role="listitem">
             <Press {...sSelfHost.serverListMain} {...sSelfHost.serverListMainAdd} disabled={busy} onPress={() => selfHostDialogs.openConnect()} {...((busy) ? sSelfHost.serverListMainDisabled : null)}>
               <Plus size={18} {...sSelfHost.serverListIcon} {...sSelfHost.serverListMainAdd_serverListIcon} color={sSelfHost.serverListMainAdd_serverListIcon.color} />
               <T {...tx(sSelfHost.serverListMain)} {...sSelfHost.serverListName} {...sSelfHost.serverListMainAdd_serverListName} {...(busy ? null : sSelfHost.serverListNameHover)}>{t("selfHost.settings.addServer")}</T>

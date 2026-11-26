@@ -16,7 +16,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const toValue = (h: number, m: number) => `${pad(h)}:${pad(m)}`;
 
 /** Chromium's `<input type="time">` in an en-US 12-hour locale: `hh : mm AM` segments edited with arrows and digits, and a clock button that opens hour / minute / AM-PM columns. */
-export function TimeInput({ value, onValue, disabled, label, id, ...style }: Style & { value: string; onValue: (next: string) => void; disabled?: boolean; label?: string; id?: string }) {
+export function TimeInput({ value, onValue, disabled, label, id, textSize = 14, textWeight, ...style }: Style & { value: string; onValue: (next: string) => void; disabled?: boolean; label?: string; id?: string; textSize?: number; textWeight?: number }) {
   const t = useTokens();
   const c = t.c;
   const auto = useId();
@@ -87,7 +87,8 @@ export function TimeInput({ value, onValue, disabled, label, id, ...style }: Sty
       fill={focus === name && !disabled ? c.selectFill : undefined}
       color={focus === name && !disabled ? c.selectText : c.foreground}
       radius={2}
-      size={14}
+      size={textSize}
+      weight={textWeight}
       lh={1.43}
       em={-0.01}
       family="sans"
@@ -102,9 +103,9 @@ export function TimeInput({ value, onValue, disabled, label, id, ...style }: Sty
     <row id={base} w={120} h={34} pl={13} pr={5} align="center" radius={radius.md} fill={c.background} border={c.border} opacity={disabled ? 0.5 : undefined} label={label} {...style}>
       <row grow={1} shrink minW={0} align="center">
         {segment("hour", h12 === null ? "--" : pad(h12))}
-        <T size={14} lh={1.43} family="sans" color={c.foreground} px={1}>:</T>
+        <T size={textSize} weight={textWeight} lh={1.43} family="sans" color={c.foreground} px={1}>:</T>
         {segment("minute", time ? pad(time.m) : "--")}
-        <T size={14} family="sans"> </T>
+        <T size={textSize} family="sans"> </T>
         {segment("period", period ?? "--")}
       </row>
       <box id={`${base}-picker`} w={24} h={24} center radius={radius.sm} hover={disabled ? undefined : mix(c.foreground, 8, "transparent")} onPress={disabled ? undefined : () => setOpen(!open)} label={label}>

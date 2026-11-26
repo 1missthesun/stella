@@ -1,4 +1,4 @@
-import { SettingsCard, SettingsCardDesc, SettingsRow } from "./parts";
+import { SettingsCard, SettingsCardDesc, SettingsRow, SettingsSelect } from "./parts";
 import { Button, Input, Select, T } from "../kit/compat";
 import { useSettings } from "./settings.styles";
 import { usePromptPresetCard } from "./PromptPresetCard.styles";
@@ -213,12 +213,9 @@ export function PromptPresetCard() {
           <T w="full" {...s.settingsRowLabel}>
             {t("settings.systemPrompt.agentLabel")}
           </T>
-          <T w="full" {...s.settingsRowSublabel}>
-            {t("settings.systemPrompt.agentSublabel")}
-          </T>
         </col>
         <row {...s.settingsRowControl}>
-          <Select {...s.settingsRuntimeSelect} value={agentId} disabled={busy} aria-label={t("settings.systemPrompt.agentLabel")} onValueChange={(value) => {
+          <SettingsSelect value={agentId} disabled={busy} aria-label={t("settings.systemPrompt.agentLabel")} onValueChange={(value) => {
               if (value === "orchestrator" || value === "general") {
                 setAgentId(value);
               }
@@ -234,14 +231,9 @@ export function PromptPresetCard() {
           <T w="full" {...s.settingsRowLabel}>
             {t("settings.systemPrompt.activeLabel")}
           </T>
-          <T w="full" {...s.settingsRowSublabel}>
-            {usingDefault
-              ? t("settings.systemPrompt.usingDefault")
-              : t("settings.systemPrompt.usingCustom")}
-          </T>
         </col>
         <row {...s.settingsRowControl}>
-          <Select {...s.settingsRuntimeSelect} value={selectedId} disabled={busy} aria-label={t("settings.systemPrompt.activeLabel")} onValueChange={(value) => void handleSelect(value)} options={[
+          <SettingsSelect value={selectedId} disabled={busy} aria-label={t("settings.systemPrompt.activeLabel")} onValueChange={(value) => void handleSelect(value)} options={[
               {
                 value: DEFAULT_PRESET_ID,
                 label: t("settings.systemPrompt.defaultOption"),

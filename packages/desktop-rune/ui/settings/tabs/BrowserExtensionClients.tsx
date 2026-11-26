@@ -1,4 +1,4 @@
-import { SettingsCardDesc, SettingsRow } from "../parts";
+import { SettingsCardDesc, SettingsRow, SettingsSelect } from "../parts";
 import { Select, Switch, T } from "../../kit/compat";
 import { useSettings } from "../settings.styles";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -108,7 +108,7 @@ export function BrowserExtensionClients() {
           </T>
         </col>
         <row {...s.settingsRowControl}>
-          <Select {...s.settingsRuntimeSelect} aria-label={t("settings.browserExtension.useLabel")} value={
+          <SettingsSelect aria-label={t("settings.browserExtension.useLabel")} value={
               preferredKnown && state.preferredKey
                 ? state.preferredKey
                 : AUTOMATIC

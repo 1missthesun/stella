@@ -1,5 +1,5 @@
-import { SettingsCard, SettingsRow } from "./parts";
-import { Select, T } from "../kit/compat";
+import { SettingsCard, SettingsRow, SettingsSelect } from "./parts";
+import { T } from "../kit/compat";
 import { useSettings } from "./settings.styles";
 import { SettingsCardTitle } from "./settings-card-targets";
 import { useMemo } from "react";
@@ -20,13 +20,13 @@ export function LanguageSettingsRow() {
 
   return (
     <SettingsCard>
-      <SettingsCardTitle titleKey="settings.language.title" />
       <SettingsRow>
         <col {...s.settingsRowInfo}>
-          <T w="full" {...s.settingsRowLabel}>{t("common.language")}</T>
+          <SettingsCardTitle titleKey="settings.language.title" variant="row" />
+          <T w="full" {...s.settingsRowSublabel}>{t("settings.language.description")}</T>
         </col>
         <row {...s.settingsRowControl}>
-          <Select {...s.settingsRuntimeSelect} value={locale} onValueChange={(next) => setLocale(next)} options={localeOptions} aria-label={t("common.language")} />
+          <SettingsSelect value={locale} onValueChange={(next) => setLocale(next)} options={localeOptions} aria-label={t("settings.language.title")} />
         </row>
       </SettingsRow>
     </SettingsCard>

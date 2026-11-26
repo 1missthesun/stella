@@ -1,8 +1,8 @@
-import { SettingsCard, SettingsCardDesc, SettingsCardHeader, SettingsRow } from "../parts";
+import { SettingsCard, SettingsCardDesc, SettingsRow } from "../parts";
 import { Button, Form, Switch, T, TextField, type DomEvent } from "../../kit/compat";
 import { useSettings } from "../settings.styles";
 import { usePill } from "../../global/shared/pill.styles";
-import { SettingsCardTitle } from "../settings-card-targets";
+import { SettingsTabHeader } from "../AiryControls";
 import { useCallback, useEffect, useState } from "react";
 import type { UserAskStoredSecureValue } from "@stella/contracts/user-ask";
 import type { SavedValuesSyncAction } from "@stella/contracts/saved-values";
@@ -136,10 +136,9 @@ export function SecureValuesCard() {
   );
 
   return (
+    <>
+    <SettingsTabHeader titleKey="settings.secureValues.title" cardKey="settings.secureValues.title" />
     <SettingsCard>
-      <SettingsCardHeader>
-        <SettingsCardTitle titleKey="settings.secureValues.title" />
-      </SettingsCardHeader>
       <SettingsCardDesc>
         {t("settings.secureValues.description")}
       </SettingsCardDesc>
@@ -238,6 +237,7 @@ export function SecureValuesCard() {
         </SettingsCardDesc>
       ) : null}
     </SettingsCard>
+    </>
   );
 }
 
@@ -309,7 +309,7 @@ function SyncDevices({
       ) : null}
       {standing === "member" && sync.devices.length > 0 ? (
         <>
-          <SettingsCardDesc>{t("settings.secureValues.devices")}</SettingsCardDesc>
+          <T w="full" {...s.settingsSubhead}>{t("settings.secureValues.devices")}</T>
           {sync.devices.map((device) => {
             const sameName = sync.devices.some((other) => other !== device && other.name === device.name);
             const details = [
@@ -337,7 +337,7 @@ function SyncDevices({
       ) : null}
       {sync.releases.length > 0 ? (
         <>
-          <SettingsCardDesc>{t("settings.secureValues.cloudUses")}</SettingsCardDesc>
+          <T w="full" {...s.settingsSubhead}>{t("settings.secureValues.cloudUses")}</T>
           {sync.releases.slice(0, 5).map((entry) => (
             <SettingsRow key={`${entry.at}:${entry.label}`}>
               <col {...s.settingsRowInfo}>

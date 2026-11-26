@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useTheme, useThemeControl } from "@/context/theme-context";
 import { isHiddenOverlay } from "@stella/theme";
+import { AiryWordPicker } from "./AiryControls";
 
 type ColorScheme = "light" | "dark" | "system";
 
@@ -20,9 +21,6 @@ const useThemePicker = sheet((c, t) => ({
   label: { py: 4, px: 8, mt: 4, family: "Manrope", size: 11, weight: 600, em: -0.02, lh: 1.5, color: c.mutedForeground },
   labelRow: { align: "center", justify: "between", gap: 8 },
   themeName: { truncate: true, nowrap: true, color: c.foreground, weight: 500, shrink: true, minW: 0 },
-  buttonRow: { gap: 4 },
-  optionButton: { grow: 1, shrink: true, minW: 0, w: 0, justify: "center", px: 9 },
-  optionButtonActive: { fill: c.selectFill, border: c.selectBorder, color: c.selectText, shadows: [], hover: mixOklch(c.primary, 20, "transparent") },
   grid: { pt: 2, px: 8, pb: 4, gap: 6, wrap: true },
   orb: { w: 26, h: 26, radius: 13, border: mixOklch(c.foreground, 12, "transparent"), opacity: 0.82, motion: { dur: 0.2 }, pressScale: 0.94 },
   orbHover: { opacity: 1, scale: 1.08, border: mixOklch(c.foreground, 28, "transparent") },
@@ -110,8 +108,6 @@ export function ThemePicker({
   const triggerElement = trigger && isValidElement(trigger) ? trigger : null;
   const popoverTrigger = triggerElement;
 
-  const optionButton = (active: boolean): Omit<Style, "size"> => ({ ...s.optionButton, ...(active ? s.optionButtonActive : null) });
-
   const themeContent = (
     <col {...s.sections} {...(inline ? s.sectionsInline : null)} maxH={inline ? undefined : 560} onHover={(inside) => {
         if (inside) return;
@@ -120,33 +116,15 @@ export function ThemePicker({
       }}>
       <col {...s.section} {...s.sectionBordered}>
         <T {...s.label} mt={0} w="full">Appearance</T>
-        <row {...s.buttonRow}>
-          {COLOR_SCHEMES.map((scheme) => (
-            <Button key={scheme.id} size="small" variant={colorMode === scheme.id ? "secondary" : "ghost"} {...optionButton(colorMode === scheme.id)} onClick={() => setColorMode(scheme.id)}>
-              {scheme.label}
-            </Button>
-          ))}
-        </row>
+        <AiryWordPicker theme value={colorMode} ariaLabel="Appearance" onChange={setColorMode} options={COLOR_SCHEMES.map((scheme) => ({ value: scheme.id, label: scheme.label }))} />
       </col>
 
       <col {...s.section} {...s.sectionBordered} {...(flat ? s.sectionDisabled : null)} role="group" label="Gradient controls" disabled={flat || undefined}>
         <T {...s.label} mt={0} w="full">Gradient Style</T>
-        <row {...s.buttonRow}>
-          {(["soft", "flat"] as const).map((value) => (
-            <Button key={value} size="small" variant={gradientMode === value ? "secondary" : "ghost"} {...optionButton(gradientMode === value)} onClick={() => setGradientMode(value)} disabled={flat}>
-              {value === "soft" ? "Soft" : "Flat"}
-            </Button>
-          ))}
-        </row>
+        <AiryWordPicker theme value={gradientMode} ariaLabel="Gradient Style" disabled={flat} onChange={setGradientMode} options={[{ value: "soft", label: "Soft" }, { value: "flat", label: "Flat" }]} />
 
         <T {...s.label} w="full">Gradient Color</T>
-        <row {...s.buttonRow}>
-          {(["relative", "strong"] as const).map((value) => (
-            <Button key={value} size="small" variant={gradientColor === value ? "secondary" : "ghost"} {...optionButton(gradientColor === value)} onClick={() => setGradientColor(value)} disabled={flat}>
-              {value === "relative" ? "Relative" : "Strong"}
-            </Button>
-          ))}
-        </row>
+        <AiryWordPicker theme value={gradientColor} ariaLabel="Gradient Color" disabled={flat} onChange={setGradientColor} options={[{ value: "relative", label: "Relative" }, { value: "strong", label: "Strong" }]} />
       </col>
 
       <col {...s.section}>

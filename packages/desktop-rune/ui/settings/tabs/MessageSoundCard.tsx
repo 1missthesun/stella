@@ -1,4 +1,4 @@
-import { SettingsCard, SettingsCardDesc, SettingsCardHeader, SettingsRow } from "../parts";
+import { SettingsCard, SettingsCardDesc, SettingsCardHeader, SettingsRow, SettingsSelect } from "../parts";
 import { Button, Play, Select, Switch, T } from "../../kit/compat";
 import { useSettings } from "../settings.styles";
 import { useState } from "react";
@@ -35,7 +35,7 @@ export function MessageSoundCard() {
   return (
     <SettingsCard>
       <SettingsCardHeader>
-        <SettingsCardTitle titleKey={TITLE_KEY} />
+        <SettingsCardTitle titleKey={TITLE_KEY} variant="row" />
         <Switch aria-label={t(TITLE_KEY)} checked={preferences.enabled} onCheckedChange={(next) => save({ enabled: Boolean(next) })} hideLabel />
       </SettingsCardHeader>
       <SettingsCardDesc>{t("settings.messageSound.description")}</SettingsCardDesc>
@@ -47,7 +47,7 @@ export function MessageSoundCard() {
           <Button variant="ghost" size="small" aria-label={t("settings.messageSound.preview")} title={t("settings.messageSound.preview")} onClick={() => void playMessageSound(preferences.sound)}>
             <Play size={14} />
           </Button>
-          <Select {...s.settingsRuntimeSelect} value={preferences.sound} aria-label={t("settings.messageSound.sound")} disabled={!preferences.enabled} options={options} onValueChange={(sound) => {
+          <SettingsSelect value={preferences.sound} aria-label={t("settings.messageSound.sound")} disabled={!preferences.enabled} options={options} onValueChange={(sound) => {
               save({ sound });
               void playMessageSound(sound);
             }} />

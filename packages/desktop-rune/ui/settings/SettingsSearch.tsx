@@ -28,8 +28,8 @@ export function SettingsSearch({ value, onChange, placeholder }: SettingsSearchP
   }, [onChange]);
 
   return (
-    <row {...s.settingsSearch} {...(focused ? { fill: s.settingsSearch.focusFill, border: s.settingsSearch.focusBorder, shadows: s.settingsSearchFocused.shadows, hover: undefined, hoverBorder: undefined } : null)} role="search">
-      <Search size={15} strokeWidth={1.85} {...s.settingsSearchIcon} />
+    <row {...s.settingsSearch} {...(focused ? { border: s.settingsSearch.focusBorder, hoverBorder: undefined } : null)} role="search">
+      <Search size={15} strokeWidth={1.85} {...s.settingsSearchIcon} {...(focused ? s.settingsSearchIconFocused : null)} />
       <Input
         id={INPUT_ID}
         {...s.settingsSearchInput}

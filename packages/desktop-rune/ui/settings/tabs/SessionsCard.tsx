@@ -93,7 +93,7 @@ export function SessionsCard() {
                   ? `${deviceLabel(session)} · ${t("settings.sessions.current")}`
                   : deviceLabel(session)}
             </T>
-            <SettingsCardDesc>
+            <T w="full" {...s.settingsRowSublabel}>
               {[
                 session.ipAddress,
                 session.updatedAt
@@ -102,7 +102,7 @@ export function SessionsCard() {
               ]
                 .filter(Boolean)
                 .join(" · ")}
-            </SettingsCardDesc>
+            </T>
           </col>
           <row {...s.settingsRowControl}>
             {!session.current ? (

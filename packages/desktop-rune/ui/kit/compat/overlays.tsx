@@ -1,3 +1,4 @@
+import { SettingsScreenScope } from "../../global/shared/pill.styles";
 import { Children, cloneElement, createContext, isValidElement, useContext, useId, useState, type ReactElement, type ReactNode } from "react";
 import { Scrim } from "../Dialog";
 import { menuSurface } from "../Menu";
@@ -92,7 +93,9 @@ export function DialogContent({ size = "md", fit = false, frame, children, onEsc
             onPress={() => {}}
             {...panel}
           >
-            <TextScope base={BODY_TEXT}>{children}</TextScope>
+            <SettingsScreenScope.Provider value={false}>
+              <TextScope base={BODY_TEXT}>{children}</TextScope>
+            </SettingsScreenScope.Provider>
           </col>
         </col>
       </col>
@@ -267,7 +270,9 @@ export function PopoverContent({ side = "bottom", align = "center", sideOffset =
       pad={1}
       {...style}
     >
-      <TextScope base={BODY_TEXT}>{children}</TextScope>
+      <SettingsScreenScope.Provider value={false}>
+        <TextScope base={BODY_TEXT}>{children}</TextScope>
+      </SettingsScreenScope.Provider>
     </col>
   );
 }

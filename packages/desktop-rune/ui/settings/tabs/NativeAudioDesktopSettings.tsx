@@ -79,16 +79,16 @@ function MacMicrophoneRecoveryRow() {
             : t("settings.audio.recovery.manageDescription")}
         </T>
       </col>
-      <col {...s.settingsRowControl} {...s.settingsRowControlStacked}>
+      <row {...s.settingsRowControl} {...s.settingsRowControlStacked}>
         <Press {...sPill.pillBtn} disabled={microphoneRecovery.isResetting} onPress={microphoneRecovery.openSettings} {...((microphoneRecovery.isResetting) ? sPill.pillBtnDisabled : null)}>
           {t("settings.audio.recovery.openSettings")}
         </Press>
-        <Press {...sPill.pillBtn} {...sPill.pillBtnDanger} disabled={microphoneRecovery.isResetting} onPress={() => void microphoneRecovery.resetAndRestart()} {...((microphoneRecovery.isResetting) ? sPill.pillBtnDisabled : null)}>
+        <Press {...sPill.pillBtn} {...sPill.pillBtnDanger} {...sPill.pillBtnAfterPill} disabled={microphoneRecovery.isResetting} onPress={() => void microphoneRecovery.resetAndRestart()} {...((microphoneRecovery.isResetting) ? sPill.pillBtnDisabled : null)}>
           {microphoneRecovery.isResetting
             ? t("settings.audio.recovery.closing")
             : t("settings.audio.recovery.reset")}
         </Press>
-      </col>
+      </row>
     </SettingsRow>
   );
 }

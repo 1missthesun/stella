@@ -1,4 +1,5 @@
 import { SettingsTabContent } from "../parts";
+import { SettingsTabHeader } from "../AiryControls";
 import { lazy, Suspense, useState } from "react";
 import { useUiState } from "@/context/ui-state";
 import {
@@ -50,6 +51,7 @@ export function PrivacyTab() {
 
   return (
     <SettingsTabContent>
+      <SettingsTabHeader titleKey="settings.tabs.privacy" />
       {platformCapabilities.nativeSettings ? (
         <SettingsToggleCard titleKey="settings.chatStorage.title" description={t("settings.chatStorage.description")} checked={storageMode === "cloud"} disabled={savingStorage || uiState.isVoiceRtcActive} error={
             storageError ??

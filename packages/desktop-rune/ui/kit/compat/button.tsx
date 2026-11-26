@@ -1,5 +1,7 @@
 import { Children, type ReactNode } from "react";
-import { derive, font, mix, radius, useTokens, type Style, type Tokens } from "../../theme";
+import { useContext } from "react";
+import { derive, font, mix, mixOklch, radius, useTokens, type Style, type Tokens } from "../../theme";
+import { SettingsScreenScope } from "../../global/shared/pill.styles";
 import { domEvent, useFormSubmit, type DomEvent } from "./press";
 import { Ink, T, flowChildren } from "./text";
 import { APP_TEXT, TextScope } from "./scope";
@@ -29,10 +31,21 @@ const SIZE = {
 } as const;
 
 function buttonLook(t: Tokens, key: string): Look {
-  const [variant, size, pill, lg, active, tone, disabled] = key.split(":");
+  const [variant, size, pill, lg, active, tone, disabled, inSettings] = key.split(":");
   const c = t.c;
   const sz = SIZE[size as keyof typeof SIZE];
   const off = disabled === "1";
+  if (pill === "1" && inSettings === "1") {
+    const text = { size: 14.5, weight: 600, em: -0.012, color: c.interactive };
+    const look: Look = { minH: 28, py: 5, px: 9, mx: -9, my: -5, gap: sz.gap, radius: 7, text, motion: { dur: 0.15 } };
+    if (tone === "primary") {
+      const primary: Look = { ...look, mx: 0, my: 0, py: 6, px: 14, radius: radius.full, fill: c.interactive, text: { ...text, color: c.interactiveForeground } };
+      return off ? { ...primary, opacity: 0.45 } : { ...primary, hover: mix(c.foreground, 10, c.interactive), press: mix(c.foreground, 16, c.interactive) };
+    }
+    if (off) return { ...look, opacity: 0.45, text: tone === "danger" ? { ...text, color: c.destructive } : text };
+    if (tone === "danger") return { ...look, hover: mixOklch(c.destructive, 9, "transparent"), press: mix(c.foreground, 10, "transparent"), text: { ...text, color: c.destructive } };
+    return { ...look, hover: mixOklch(c.foreground, 6, "transparent"), press: mix(c.foreground, 10, "transparent") };
+  }
   if (pill === "1") {
     const large = lg === "1";
     const look: Look = {
@@ -70,7 +83,7 @@ export function Button({ variant = "secondary", size = "normal", className = "",
   const classes = className.split(/\s+/);
   const pill = classes.includes("pill-btn");
   const tone = classes.includes("pill-btn--primary") ? "primary" : classes.includes("pill-btn--danger") ? "danger" : "";
-  const key = [variant, size, pill ? 1 : 0, classes.includes("pill-btn--lg") ? 1 : 0, classes.includes("pill-btn--active") ? 1 : 0, tone, disabled ? 1 : 0].join(":");
+  const key = [variant, size, pill ? 1 : 0, classes.includes("pill-btn--lg") ? 1 : 0, classes.includes("pill-btn--active") ? 1 : 0, tone, disabled ? 1 : 0, useContext(SettingsScreenScope) ? 1 : 0].join(":");
   const { text, ...look } = derive(t, `compat-button:${key}`, (t) => buttonLook(t, key));
   const style: Style = {};
   for (const [k, v] of Object.entries(rest)) if (!k.startsWith("data-")) (style as Record<string, unknown>)[k] = v;

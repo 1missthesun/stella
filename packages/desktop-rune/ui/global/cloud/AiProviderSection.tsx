@@ -32,8 +32,8 @@ export function AiProviderSection({
   return (
     <SettingsCard>
       <row {...s.aiProviderHead}>
-        <SettingsCardTitle titleKey={titleKey} flush />
-        {action ? <Flow shrink={false} minH={25} align="center">{action}</Flow> : null}
+        <SettingsCardTitle titleKey={titleKey} variant="provider" flush />
+        {action ? <Flow shrink={false} minH={24} align="center">{action}</Flow> : null}
       </row>
       {children}
       {notes}

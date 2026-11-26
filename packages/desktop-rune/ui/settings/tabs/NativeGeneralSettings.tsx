@@ -155,7 +155,7 @@ export function NativeDesktopGeneralSettings() {
       <SettingsToggleCard titleKey="settings.power.title" description={t("settings.power.description")} error={preventSleepError} checked={preventComputerSleep} disabled={!preventSleepLoaded || isSavingPreventSleep} onChange={(checked) => void handlePreventSleepChange(checked)} />
       <SettingsCard>
         <SettingsCardHeader>
-          <SettingsCardTitle titleKey="settings.browserExtension.title" />
+          <SettingsCardTitle titleKey="settings.browserExtension.title" variant="row" />
           <Button variant="ghost" className="pill-btn" onClick={() => openExternalUrl(STELLA_BROWSER_EXTENSION_STORE_URL)}>
             {t("settings.browserExtension.action")}
           </Button>
@@ -167,7 +167,7 @@ export function NativeDesktopGeneralSettings() {
       </SettingsCard>
       <SettingsCard>
         <SettingsCardHeader>
-          <SettingsCardTitle titleKey="settings.developerPreviews.title" />
+          <SettingsCardTitle titleKey="settings.developerPreviews.title" variant="row" />
           <Switch checked={developerResourcePreviewsEnabled} onCheckedChange={(checked) =>
               setDeveloperResourcePreviewsEnabled(Boolean(checked))
             } hideLabel />
@@ -180,7 +180,7 @@ export function NativeDesktopGeneralSettings() {
       <OnboardingReplayCard />
       <SettingsCard>
         <SettingsCardHeader>
-          <SettingsCardTitle titleKey="settings.resetCustomizations.title" />
+          <SettingsCardTitle titleKey="settings.resetCustomizations.title" variant="row" />
           <Button variant="ghost" className="pill-btn" disabled={isResettingCustomizations} onClick={() => void handleResetCustomizations()}>
             {t("settings.resetCustomizations.action")}
           </Button>

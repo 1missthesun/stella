@@ -1,5 +1,6 @@
 import { ChevronDown, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Press, T, tx } from "../kit/compat";
 import { useSettings } from "./settings.styles";
+import { AiryDotItem } from "./AiryControls";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useT } from "@/shared/i18n";
 import {
@@ -47,9 +48,12 @@ export function SettingsRailNav({
             {groupTabs.map(({ key, labelKey, Icon }) => {
               const isActive = activeTab === key;
               return (
-                <Press {...s.settingsRailItem} key={key} {...tabButtonProps(key, isActive)} onPress={() => onSelect(key)} {...(isActive ? s.settingsRailItemActive : null)}>
-                  <Icon size={16} strokeWidth={1.75} />
-                  <T {...tx(s.settingsRailItem)} {...(isActive ? tx(s.settingsRailItemActive) : null)}>{t(labelKey)}</T>
+                <Press {...s.settingsRailItem} key={key} {...tabButtonProps(key, isActive)} hoverGroup onPress={() => onSelect(key)} {...(isActive ? s.settingsRailItemActive : null)}>
+                  <box {...s.settingsRailItemIcon} {...(isActive ? { opacity: 1, hoverOpacity: undefined } : null)}>
+                    <Icon size={16} strokeWidth={1.75} />
+                  </box>
+                  <T {...tx(s.settingsRailItem)} {...(isActive ? tx(s.settingsRailItemActive) : null)} {...s.settingsRailItemLabel}>{t(labelKey)}</T>
+                  {isActive ? <box {...s.settingsRailDot} /> : null}
                 </Press>
               );
             })}
@@ -60,7 +64,7 @@ export function SettingsRailNav({
   );
 }
 
-const BAR_GAP = 2;
+const BAR_GAP = 18;
 const MORE_KEY = "__more";
 
 export function SettingsBarNav({
@@ -109,11 +113,7 @@ export function SettingsBarNav({
       <row {...s.settingsBarNav} role="tablist" label={label} onLayout={(r) => setAvailable(r.w)}>
         {visible.map(({ key, labelKey }) => {
           const isActive = activeTab === key;
-          return (
-            <Press {...s.settingsBarItem} key={key} {...tabButtonProps(key, isActive)} onPress={() => onSelect(key)} {...(isActive ? s.settingsBarItemActive : null)}>
-              {t(labelKey)}
-            </Press>
-          );
+          return <AiryDotItem bar key={key} id={`settings-tab-${key}`} role="tab" label={t(labelKey)} active={isActive} onPress={() => onSelect(key)} tabProps={tabButtonProps(key, isActive)} />;
         })}
         {overflow.length > 0 ? (
           <DropdownMenu>

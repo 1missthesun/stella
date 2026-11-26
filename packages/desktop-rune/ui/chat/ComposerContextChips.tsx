@@ -295,8 +295,8 @@ export function ImageAttachmentChip({ thumbnailUrl, fullImageUrl, alt, title, re
         { claims: ["image"] },
       )}
     >
-      <box role="button" focusable label={alt} title={title} h={TILE_SIZE} minW={40} maxW={180} radius={12} clip={12} border={look.border} fill={look.fill} hoverBorder={look.hoverBorder} hoverFill={look.hoverFill} center onPress={() => setPreviewOpen(true)}>
-        <image src={thumbnailUrl} h="full" maxW={180} fit="contain" />
+      <box role="button" focusable label={alt} title={title} h={TILE_SIZE} minW={40} maxW={180} pad={1} radius={12} clip={12} border={look.border} fill={look.fill} hoverBorder={look.hoverBorder} hoverFill={look.hoverFill} center onPress={() => setPreviewOpen(true)}>
+        <image src={thumbnailUrl} h={TILE_SIZE - 2} maxW={180 - 2} fit="contain" radius={11} />
       </box>
       <ImageLightbox id={`image-chip:${id}`} open={previewOpen} onOpenChange={setPreviewOpen} src={fullImageUrl} alt={alt} />
     </ChipShell>

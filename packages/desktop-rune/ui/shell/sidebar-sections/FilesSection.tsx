@@ -23,7 +23,7 @@ import { contextMenu } from "../../chat/context-menu";
 import type { DisplayTabPayload } from "@stella/contracts/desktop/display-payload";
 import type { DisplayTabKind } from "@/features/workspace-display/types";
 import { DisplayTabIcon } from "../../features/workspace-display/icons";
-import { fileFromPath } from "../../chat/use-file-drop";
+import { fileFromPath } from "../../chat/attach-paths";
 import { EmptyState, Icon, Icons } from "../../kit";
 import { fontSize, look, mixOklch, radius, useTokens } from "../../theme";
 import { AgentLifecycleStatusIcon, CompactChildState } from "../workspace/activity-rows";

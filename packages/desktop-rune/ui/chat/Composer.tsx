@@ -6,7 +6,6 @@ import { deriveComposerState, hasAttachedComposerChips } from "@/features/chat/c
 import { attachPastedText, shouldAttachPastedText } from "@/features/chat/lib/paste-context";
 import { PASTE_AS_ATTACHMENT_MIN_CHARS, PASTE_AS_ATTACHMENT_MIN_LINES } from "@stella/contracts/pasted-text";
 import { findDelegatedModelMentions } from "@stella/contracts/model-mentions";
-import { attachFilesToContext } from "@/features/chat/lib/file-attach";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { useDictationPaste } from "@/features/dictation/hooks/use-dictation-paste";
 import { DictationCancelButton, DictationRecordingBar } from "./DictationRecordingBar";
@@ -28,7 +27,7 @@ import { ComposerMicButton, ComposerRealtimeVoiceButton, ComposerSubmitButton, C
 import { ScreenshotPreviewOverlay, useScreenshotPreview } from "./ScreenshotPreview";
 import { BrowserAttachmentTray } from "./BrowserAttachmentTray";
 import { panelSurface } from "./surfaces";
-import { fileFromPath } from "./use-file-drop";
+import { attachPathsToContext } from "./attach-paths";
 import { rune } from "./engine";
 
 const MemoComposerMicButton = memo(ComposerMicButton);
@@ -227,7 +226,7 @@ function ComposerImpl({
   const onPaste = (paste: { files: string[]; image: string | null; text: string }) => {
     const paths = [...paste.files, ...(paste.image ? [paste.image] : [])];
     if (paths.length > 0) {
-      void attachFilesToContext(paths.map(fileFromPath), setChatContext);
+      void attachPathsToContext(paths, setChatContext, { inline: paste.image ? [paste.image] : [] });
       return;
     }
     if (paste.text && shouldAttachPastedText(paste.text)) attachPastedText(paste.text, setChatContext);
@@ -311,6 +310,7 @@ function ComposerImpl({
         w="full"
         maxW={shellMaxW}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
+        pad={1}
         radius={radius}
         clip={radius}
         gradient={look.gradient}

@@ -1,13 +1,12 @@
 import { memo, useCallback, useId, useState, type Dispatch, type SetStateAction } from "react";
 import { toggleShowStella, useShowStellaStatus } from "@/features/show-stella/use-show-stella";
 import { getElectronApi } from "@/platform/electron/electron";
-import { attachFilesToContext } from "@/features/chat/lib/file-attach";
 import type { ChatContext } from "@/shared/types/electron";
 import { useT } from "@/shared/i18n";
 import { DropdownMenu, Icons, MenuItem, withStroke } from "../kit";
 import { useTokens } from "../theme";
 import { ComposerAddButton } from "./ComposerPrimitives";
-import { fileFromPath } from "./use-file-drop";
+import { attachPathsToContext } from "./attach-paths";
 import { rune } from "./engine";
 
 type ComposerAddMenuProps = {
@@ -37,7 +36,7 @@ export const ComposerAddMenu = memo(function ComposerAddMenu({ setChatContext, t
   const attachFiles = useCallback(async () => {
     const paths = await rune().dialog.openFile({ multi: true });
     if (!paths || paths.length === 0) return;
-    await attachFilesToContext(paths.map(fileFromPath), setChatContext);
+    await attachPathsToContext(paths, setChatContext);
   }, [setChatContext]);
 
   const capture = useCallback(async () => {

@@ -2,6 +2,7 @@
 // registry, each window's electronAPI, the message-box queue main raises, and the plumbing of web
 // windows' `<webview>`s (custom schemes, navigation, executeJavaScript).
 
+import path from "node:path";
 import { blob, freeBlob } from "../bridge";
 import { BrowserWindow, hostWindows, openWindowFrom, type WindowSnapshot } from "../electron/browser-window";
 import { engine } from "../electron/engine";
@@ -12,6 +13,8 @@ import type { PageKey, PagePointer, PageWheel } from "../electron/chromium-page"
 import { rendererApiFor, type ElectronApi } from "./renderer-api";
 import { mediaPage, type MediaPage } from "../media/media-page";
 
+export type ImagePreview = { dataUrl: string; width: number; height: number };
+
 export type HostMessageBox = Omit<HostDialogRequest, "resolve">;
 
 export type WebviewRequest = { rid: number; scheme: string; url: string; method: string; headers: Record<string, string>; body?: string | null };
@@ -19,6 +22,8 @@ export type WebviewRequest = { rid: number; scheme: string; url: string; method:
 export type UiHost = {
   /** The WebView running desktop-ui's WebRTC, WebAudio and MediaSource modules (ui/host/MediaWebView.tsx). */
   media: MediaPage;
+  /** An image file decoded off the UI thread and scaled to fit `maxEdge`: a WebP data URL and the full image's size, or null when it isn't an image. */
+  imagePreview(file: string, maxEdge: number): Promise<ImagePreview | null>;
   windows: { subscribe(listener: () => void): () => void; snapshot(): WindowSnapshot[] };
   apiFor(windowId: string): ElectronApi | null;
   /** Focus changes of a host window (a DOM window's `focus` / `blur` for an aux window's tree); returns the stop. */
@@ -63,6 +68,26 @@ export type UiHost = {
 };
 
 const FRAME_INTERVAL_MS = 1000 / 60;
+
+let previewWorker: Worker | null = null;
+let previewSeq = 0;
+const previewWaiters = new Map<number, (preview: ImagePreview | null) => void>();
+
+function imagePreview(file: string, maxEdge: number): Promise<ImagePreview | null> {
+  if (!previewWorker) {
+    previewWorker = new Worker(path.join(import.meta.dir, "image-preview-worker.ts"));
+    previewWorker.onmessage = (e: MessageEvent<{ id: number; preview: ImagePreview | null }>) => {
+      previewWaiters.get(e.data.id)?.(e.data.preview);
+      previewWaiters.delete(e.data.id);
+    };
+    (previewWorker as Worker & { unref(): void }).unref();
+  }
+  const id = ++previewSeq;
+  return new Promise((resolve) => {
+    previewWaiters.set(id, resolve);
+    previewWorker!.postMessage({ id, file, maxEdge });
+  });
+}
 
 const STANDARD_SCHEMES = new Set(["http", "https", "file", "data", "blob", "about", "javascript", "ws", "wss"]);
 
@@ -166,6 +191,7 @@ export function createUiHost(): UiHost {
 
   return {
     media: mediaPage,
+    imagePreview,
     windows: { subscribe: hostWindows.subscribe, snapshot: hostWindows.snapshot },
     apiFor(windowId) {
       const win = hostWindows.get(windowId);

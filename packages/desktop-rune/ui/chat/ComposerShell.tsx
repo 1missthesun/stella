@@ -51,6 +51,7 @@ export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled
         w="full"
         maxW={bare ? COMPOSER_MAX_W : composerShellMaxW(columnW)}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
+        pad={1}
         radius={expanded ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2}
         clip={expanded ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2}
         gradient={look.gradient}

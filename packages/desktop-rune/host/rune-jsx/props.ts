@@ -264,8 +264,10 @@ export type WebviewProps = BoxProps & {
   preload?: string;
   /** Custom schemes answered by `onRequest` + `engine.webview.respond`. */
   protocols?: string[];
+  /** The page may capture the microphone without a prompt (Stella's own pages only, as in Electron's app session). */
+  microphone?: boolean;
   onMessage?: (m: WebviewMessage) => void;
-  /** Main-frame navigations only (Linux, Windows); on macOS `mainFrame` is absent and frames may arrive too. */
+  /** Navigations; `mainFrame` is false for a subframe's (macOS asks for those too). */
   onNavigate?: (e: { url: string; mainFrame?: boolean }) => void;
   onTitle?: (title: string) => void;
   onLoad?: (e: { phase: "started" | "finished"; url: string }) => void;

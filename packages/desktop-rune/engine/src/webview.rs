@@ -10,7 +10,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rune::{El, el};
 use serde_json::json;
@@ -25,6 +25,7 @@ use crate::windows::Win;
 struct View {
     view: WebView,
     window: u32,
+    protocols: Arc<[String]>,
     url: Option<String>,
     html: Option<String>,
     rect: [f32; 4],
@@ -231,10 +232,42 @@ fn ensure_gtk() {
     }
 }
 
+/// WebView2 serves a custom scheme only as `https://<scheme>.<host>/…` (wry's mapping, which also
+/// gives pages a secure context); everything outside this module sees `<scheme>://<host>/…`.
+mod scheme_url {
+    #[cfg(target_os = "windows")]
+    pub fn to_view(protocols: &[String], url: &str) -> String {
+        protocols
+            .iter()
+            .find_map(|s| url.strip_prefix(&format!("{s}://")).map(|rest| format!("https://{s}.{rest}")))
+            .unwrap_or_else(|| url.to_owned())
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn from_view(protocols: &[String], url: &str) -> String {
+        protocols
+            .iter()
+            .find_map(|s| url.strip_prefix(&format!("https://{s}.")).map(|rest| format!("{s}://{rest}")))
+            .unwrap_or_else(|| url.to_owned())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn to_view(_: &[String], url: &str) -> String {
+        url.to_owned()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn from_view(_: &[String], url: &str) -> String {
+        url.to_owned()
+    }
+}
+
 fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String> {
     #[cfg(target_os = "linux")]
     ensure_gtk();
     let id = format!("stella-{n}");
+    let protocols: Arc<[String]> = p.protocols.clone().into();
+    let load_protocols = protocols.clone();
     let mut b = WebViewBuilder::new()
         .with_id(&id)
         .with_bounds(rect(window, r))
@@ -252,17 +285,30 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
                 PageLoadEvent::Started => "started",
                 PageLoadEvent::Finished => "finished",
             };
-            element_event(n, "load", json!({ "phase": phase, "url": url }), None)
+            element_event(n, "load", json!({ "phase": phase, "url": scheme_url::from_view(&load_protocols, &url) }), None)
         });
     #[cfg(not(target_os = "linux"))]
     {
+        let protocols = protocols.clone();
         b = b.with_navigation_handler(move |url: String| {
-            let mut ev = json!({ "url": url });
+            let mut ev = json!({ "url": scheme_url::from_view(&protocols, &url) });
             if let Some(main) = main_frame_only() {
                 ev["mainFrame"] = json!(main);
             }
             element_event(n, "navigate", ev, None);
             true
+        });
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use wry::WebViewBuilderExtWindows;
+        b = b.with_https_scheme(true);
+    }
+    #[cfg(not(target_os = "macos"))]
+    if p.microphone {
+        b = b.with_permission_handler(|kind| match kind {
+            wry::PermissionKind::Microphone => wry::PermissionResponse::Allow,
+            _ => wry::PermissionResponse::Default,
         });
     }
     if let Some(ua) = &p.user_agent {
@@ -291,14 +337,17 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
         });
     }
     b = match (&p.url, &p.html) {
-        (Some(u), _) => b.with_url(u),
+        (Some(u), _) => b.with_url(scheme_url::to_view(&protocols, u)),
         (None, Some(h)) => b.with_html(h),
         (None, None) => b.with_url("about:blank"),
     };
     let handle = handle_of(window).ok_or("the webview's window isn't open")?;
     let view = handle.with_raw_handle(|raw| b.build_as_child(&raw).map_err(|e| e.to_string()))??;
     #[cfg(target_os = "linux")]
-    main_frame_navigations(n, &view);
+    {
+        main_frame_navigations(n, &view);
+        enable_webrtc(&view);
+    }
     #[cfg(target_os = "macos")]
     mac::track_main_frame(&view);
     Ok(view)
@@ -347,6 +396,16 @@ fn main_frame_navigations(n: u32, view: &WebView) {
     });
 }
 
+/// WebKitGTK ships WebRTC off; Chromium (Electron) and WKWebView have it on.
+#[cfg(target_os = "linux")]
+fn enable_webrtc(view: &WebView) {
+    use webkit2gtk::{SettingsExt, WebViewExt};
+    use wry::WebViewExtUnix;
+    if let Some(settings) = WebViewExt::settings(&view.webview()) {
+        settings.set_enable_webrtc(true);
+    }
+}
+
 /// Places (creating on first use) the WebView for node `n` at its slot's drawn rect.
 pub fn place(n: u32, window: u32, r: [f32; 4]) {
     let props = engine::read(|e| e.tree.get(n).map(|node| (*node.props).clone()));
@@ -364,7 +423,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 #[cfg(target_os = "macos")]
                 mac::round(&view, corners(&p));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
-                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false }));
+                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false }));
                 element_event(n, "ready", json!({}), None);
             }
             Err(e) => {
@@ -561,7 +620,7 @@ pub fn sync(n: u32, p: &Props) {
         }
         if p.url.is_some() && p.url != view.url {
             if let Some(u) = &p.url {
-                let _ = view.view.load_url(u);
+                let _ = view.view.load_url(&scheme_url::to_view(&view.protocols, u));
             }
             view.url = p.url.clone();
         } else if p.url.is_none() && p.html.is_some() && p.html != view.html {
@@ -651,7 +710,7 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
             with_view(n, |w| w.view.evaluate_script(&js).map_err(|e| e.to_string()))??;
         }
         "webview.eval" => with_view(n, |w| w.view.evaluate_script(&s("js")).map_err(|e| e.to_string()))??,
-        "webview.load" => with_view(n, |w| w.view.load_url(&s("url")).map_err(|e| e.to_string()))??,
+        "webview.load" => with_view(n, |w| w.view.load_url(&scheme_url::to_view(&w.protocols, &s("url"))).map_err(|e| e.to_string()))??,
         "webview.loadHtml" => with_view(n, |w| w.view.load_html(&s("html")).map_err(|e| e.to_string()))??,
         "webview.reload" => with_view(n, |w| w.view.reload().map_err(|e| e.to_string()))??,
         "webview.back" => with_view(n, |w| w.view.evaluate_script("history.back()").map_err(|e| e.to_string()))??,
@@ -659,7 +718,7 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
         "webview.focus" => with_view(n, |w| w.view.focus().map_err(|e| e.to_string()))??,
         "webview.blur" => with_view(n, |w| w.view.focus_parent().map_err(|e| e.to_string()))??,
         "webview.zoom" => with_view(n, |w| w.view.zoom(v.get("factor").and_then(|f| f.as_f64()).unwrap_or(1.0)).map_err(|e| e.to_string()))??,
-        "webview.url" => return with_view(n, |w| json!(w.view.url().ok())),
+        "webview.url" => return with_view(n, |w| json!(w.view.url().ok().map(|u| scheme_url::from_view(&w.protocols, &u)))),
         "webview.respond" => {
             let rid = v.get("req").and_then(|r| r.as_u64()).ok_or("webview.respond: needs req")?;
             let responder = PENDING.lock().unwrap_or_else(|e| e.into_inner()).as_mut().and_then(|m| m.remove(&rid)).ok_or("no such request")?;

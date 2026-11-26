@@ -224,9 +224,12 @@ jobs:
           "$BUN" scripts/session.ts eval "$audio" | tee "$out/audio.json"
           jq -r '"audio: playing after \(.value.playingMs|floor) ms, ended after \(.value.endedMs|floor) ms (message-chime.mp3 is 0.68 s); devices \(.value.devices)"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
           jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null
-          media='const t0 = performance.now(); const release = await stella.host.media.use(); const readyMs = performance.now() - t0; const caps = stella.host.media.caps; release(); return { readyMs, caps };'
-          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json" || true
-          jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY" || true
+          media='const m = stella.host.media; const t0 = performance.now(); const release = await m.use(); const readyMs = performance.now() - t0; const caps = m.caps;
+            let mic; try { const got = await m.invoke("acquireSharedMicrophone"); await m.invoke("releaseMicrophone", [got.lease, { immediate: true }]); mic = "granted"; } catch (error) { mic = String(error && error.message || error); }
+            release(); return { readyMs, caps, mic };'
+          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json"
+          jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -e '.ok and .value.caps.secureContext and .value.caps.getUserMedia and .value.caps.rtc and .value.caps.audioContext and .value.caps.mediaSource and .value.mic == "granted"' "$out/media-page.json" >/dev/null
 
       - uses: actions/upload-artifact@v4
         if: always()

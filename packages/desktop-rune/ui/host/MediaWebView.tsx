@@ -26,6 +26,7 @@ export function MediaWindow() {
         transparent
         url={media.url}
         protocols={[media.scheme]}
+        microphone
         onRequest={(r) => media.request(r)}
         onMessage={(m) => media.message(m.data)}
         onError={(error) => media.failed(error)}

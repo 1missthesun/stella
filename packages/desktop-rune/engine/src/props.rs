@@ -605,6 +605,8 @@ pub struct Props {
     pub preload: Option<String>,
     /// Custom URL schemes this webview serves through TS (`request` events).
     pub protocols: Vec<String>,
+    /// The page may capture the microphone without a prompt.
+    pub microphone: bool,
 
     // Window
     pub kind: Option<String>,

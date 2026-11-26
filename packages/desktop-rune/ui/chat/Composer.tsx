@@ -327,7 +327,7 @@ function ComposerImpl({
           </row>
         ) : null}
         <BrowserAttachmentTray />
-        <col w="full" role="form" label="chat-composer">
+        <col w="full" gap={isExpanded ? 8 : 0} role="form" label="chat-composer">
           <row w="full" align="center" gap={8} minH={isExpanded ? undefined : 44} py={isExpanded ? 0 : 6} px={isExpanded ? 0 : sidebar ? 6 : 8}>
             {isExpanded ? null : <box key="add">{addMenu}</box>}
             {field}

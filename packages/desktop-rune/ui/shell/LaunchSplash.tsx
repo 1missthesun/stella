@@ -4,9 +4,16 @@ import { font, look, useTokens } from "../theme";
 import { useLaunchSplashPhase } from "./launch-splash";
 
 const COLORS = {
-  light: { bg: "#fdfdfb", fg: "#141413", btnBorder: "#0000002e", btnFill: "#0000000a", btnHover: "#00000014" },
-  dark: { bg: "#0f0f0d", fg: "#f4f3ee", btnBorder: "#ffffff2e", btnFill: "#ffffff0f", btnHover: "#ffffff1f" },
+  light: { bg: "#fdfdfb", fg: "#141413" },
+  dark: { bg: "#0f0f0d", fg: "#f4f3ee" },
 };
+
+const BUTTON = {
+  light: { border: "#0000002e", fill: "#0000000a", hover: "#00000014" },
+  dark: { border: "#ffffff2e", fill: "#ffffff0f", hover: "#ffffff1f" },
+};
+
+const systemDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
 
 const DOT_LOOP = (delay: number) => ({
   kind: "sequence" as const,
@@ -27,7 +34,8 @@ export function LaunchSplash() {
   const [restarting, setRestarting] = useState(false);
   if (phase === "gone") return null;
   const c = t.dark ? COLORS.dark : COLORS.light;
-  const name = look(26, 600, { em: -0.03, family: font.display });
+  const button = systemDark() ? BUTTON.dark : BUTTON.light;
+  const name = look(26, 600, { em: -0.03, lh: 1, family: font.display });
   const hint = look(13, 400, { em: -0.03, family: font.sans });
   return (
     <col
@@ -41,12 +49,12 @@ export function LaunchSplash() {
       inert={phase !== "rescue"}
       label="Stella"
     >
-      <col align="center" gap={10}>
+      <col align="center" gap={14} y={-8}>
         <box shadow={[14, 24, "#0000001a"]} radius={36}>
           <Icon icon={Icons.mark.stella} size={72} />
         </box>
         <text {...name} color={c.fg}>Stella</text>
-        <row gap={4} mt={2} h={6} opacity={0.55} align="center">
+        <row gap={4} mt={2} h={6} opacity={0.55}>
           {[0, 0.18, 0.36].map((delay) => (
             <box key={delay} w={4} h={4} radius={2} fill={c.fg} loop={DOT_LOOP(delay)} />
           ))}
@@ -58,12 +66,12 @@ export function LaunchSplash() {
               id="stella-launch-restart"
               role="button"
               px={14}
-              h={29}
+              h={32}
               radius={999}
               center
-              border={c.btnBorder}
-              fill={c.btnFill}
-              hover={c.btnHover}
+              border={button.border}
+              fill={button.fill}
+              hover={button.hover}
               opacity={restarting ? 0.5 : 1}
               onPress={restarting ? undefined : () => {
                 setRestarting(true);

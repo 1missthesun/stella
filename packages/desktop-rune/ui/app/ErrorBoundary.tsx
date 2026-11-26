@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportRendererError } from "@/platform/diagnostics/report-error";
 import { STELLA_BUILD_ERROR_CLEARED_EVENT, STELLA_BUILD_ERROR_EVENT, type StellaBuildErrorDetail } from "@/platform/dev/vite-error-recovery";
 import { CrashSurface } from "../shell/CrashSurface";
+import { ThemeProvider } from "../theme";
 
 type Props = { children: ReactNode; fallback?: (error: Error | null, componentStack: string | null) => ReactNode };
 
@@ -50,6 +51,10 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.hasError) return this.props.children;
     const { caughtError, componentStack } = this.state;
-    return this.props.fallback ? this.props.fallback(caughtError, componentStack) : <CrashSurface error={caughtError} componentStack={componentStack} />;
+    return this.props.fallback ? this.props.fallback(caughtError, componentStack) : (
+      <ThemeProvider>
+        <CrashSurface error={caughtError} componentStack={componentStack} />
+      </ThemeProvider>
+    );
   }
 }

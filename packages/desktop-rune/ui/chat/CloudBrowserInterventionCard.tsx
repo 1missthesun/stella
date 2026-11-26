@@ -6,7 +6,7 @@ import { openExternalUrl } from "@/platform/electron/open-external";
 import { sidebarSections } from "@/features/workspace-display/sidebar-sections";
 import { useCloudBrowserActions, useCurrentConversationBrowserInteraction } from "@/features/cloud/use-cloud-browser-interactions";
 import { useT } from "@/shared/i18n";
-import { Button } from "../kit/compat";
+import { APP_TRACKING, Button } from "../kit/compat";
 import { Icon, Icons, type IconData } from "../kit";
 import { derive, fontSize, mixOklch, useTokens } from "../theme";
 
@@ -84,7 +84,7 @@ export function CloudBrowserInterventionCard({ compact = false, conversationId }
 
   const wraps = compact || width < WRAP_W;
   const sub = (text: string) => (
-    <text mt={2} size={fontSize.xs} lineHeight={fontSize.xs * 1.4} color={tokens.c.textWeak}>
+    <text mt={2} size={fontSize.xs} lineHeight={fontSize.xs * 1.4} tracking={APP_TRACKING} color={tokens.c.textWeak}>
       {text}
     </text>
   );
@@ -117,7 +117,7 @@ export function CloudBrowserInterventionCard({ compact = false, conversationId }
         <Icon icon={resuming ? Icons.stella.Check : Icons.stella.Lock} size={16} color={tokens.c.textStrong} />
       </box>
       <col grow={1} minW={Math.min(180, width)} w={wraps ? 180 : undefined}>
-        <text size={fontSize.sm} weight={500} color={tokens.c.textStrong}>
+        <text size={fontSize.sm} lineHeight={fontSize.sm * 1.45} weight={500} tracking={APP_TRACKING} color={tokens.c.textStrong}>
           {title}
         </text>
         {summary.kind === "device_code" ? (
@@ -164,7 +164,7 @@ export function CloudBrowserInterventionCard({ compact = false, conversationId }
       {detail === null ? (
         <row role="alert" align="center" gap={5}>
           <Icon icon={Icons.stella.AlertCircle} size={14} color={tokens.c.danger} />
-          <text size={fontSize.xs} color={tokens.c.danger}>
+          <text size={fontSize.xs} tracking={APP_TRACKING} color={tokens.c.danger}>
             {t("cloudBrowser.errors.expired")}
           </text>
         </row>

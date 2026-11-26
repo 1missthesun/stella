@@ -9,6 +9,7 @@ import { useT } from "@/shared/i18n";
 import { useCloudBrowserActions, useCloudBrowserInteraction } from "@/features/cloud/use-cloud-browser-interactions";
 import { parseCloudBrowserLiveViewUrl } from "@/features/cloud/cloud-browser-live-view";
 import { Icon, Icons, Pill, showToast } from "../../kit";
+import { Button } from "../../kit/compat";
 import { font, fontSize, look, mixOklch, useTokens } from "../../theme";
 
 const closeTakeoverTab = (interactionId: string) => {
@@ -180,7 +181,7 @@ export function CloudBrowserTakeoverSection({ location, active }: { location: st
     <col id="cloud-browser-takeover" role="region" label={detail ? t("cloudBrowser.takeover.frameTitle", { origin: detail.displayOrigin }) : t("common.signIn")} grow={1} minW={0} minH={0} clip={0}>
       {detail ? (
         <row id="cloud-browser-takeover-controls" shrink={false} align="center" justify="between" gap={12} minH={48} py={7} px={10} fill={tk.c.background} border={tk.c.borderWeak} borderSides={[0, 0, 1, 0]}>
-          <row align="center" gap={6} minW={0} shrink>
+          <row align="center" gap={6} grow={1} minW={0} shrink>
             <Icon icon={Icons.stella.Lock} size={12} color={tk.c.textWeak} />
             <text {...look(fontSize.xs, 500)} color={tk.c.textStrong} shrink minW={0} nowrap truncate>
               {detail.displayOrigin}
@@ -192,12 +193,12 @@ export function CloudBrowserTakeoverSection({ location, active }: { location: st
             )}
           </row>
           <row align="center" gap={7} shrink={false}>
-            <Pill id="cloud-browser-takeover-cancel" disabled={Boolean(busyDecision)} onPress={() => void decideInteraction("cancel")}>
+            <Button id="cloud-browser-takeover-cancel" type="button" variant="ghost" className="pill-btn" disabled={Boolean(busyDecision)} onClick={() => void decideInteraction("cancel")}>
               {busyDecision === "cancel" ? t("cloudBrowser.actions.canceling") : t("common.cancel")}
-            </Pill>
-            <Pill id="cloud-browser-takeover-done" tone="primary" disabled={Boolean(busyDecision)} onPress={() => void decideInteraction("done")}>
+            </Button>
+            <Button id="cloud-browser-takeover-done" type="button" variant="primary" className="pill-btn pill-btn--primary" disabled={Boolean(busyDecision)} onClick={() => void decideInteraction("done")}>
               {busyDecision === "done" ? t("cloudBrowser.actions.finishing") : t("cloudBrowser.actions.done")}
-            </Pill>
+            </Button>
           </row>
         </row>
       ) : null}

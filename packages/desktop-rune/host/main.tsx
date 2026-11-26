@@ -12,6 +12,7 @@ import { batched, render, windowPortal } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
+import { scopeUiFacing } from "./services/ui-scope";
 import { installRendererErrorRouting } from "./services/renderer-errors";
 import type { RuneServices } from "./services/boot";
 import type { ControlContext } from "./services/control";
@@ -63,8 +64,10 @@ if (SERVICES) {
 let app = await loadApp();
 const store = createStore(app.initialState?.() ?? {});
 const g = globalThis as any;
-g.stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal };
-if (services) g.stella.host = (await import("./services/ui-host")).createUiHost();
+// Everything the UI reaches through `stella` is owned by the generation that called it (ui-scope.ts).
+const READS = ["get", "useStore", "now", "snapshot"];
+g.stella = scopeUiFacing({ store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal }, READS);
+if (services) g.stella.host = scopeUiFacing((await import("./services/ui-host")).createUiHost(), READS);
 
 /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */
 const root = () => app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App));
@@ -183,7 +186,7 @@ if (services) {
   });
   const { startChatFeed } = await import("./services/chat-feed");
   startChatFeed(services.api, store).then(
-    (feed) => { g.stella.chat = feed; console.error(`[host] chat feed on conversation ${feed.conversationId}`); },
+    (feed) => { g.stella.chat = scopeUiFacing(feed, READS); console.error(`[host] chat feed on conversation ${feed.conversationId}`); },
     (err) => console.error("[host] chat feed failed:", err),
   );
   control = { api: services.api };

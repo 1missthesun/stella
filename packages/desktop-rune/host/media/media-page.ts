@@ -218,7 +218,14 @@ class MediaPage {
     if (this.chromium) return this.chromium.post(message);
     const e = engine();
     if (!e) throw new Error("The media page is not running.");
-    void e.webview.post(ELEMENT_ID, message).catch((error: Error) => console.error("[media] post failed:", error.message));
+    void e.webview.post(ELEMENT_ID, message).catch((error: Error) => {
+      console.error("[media] post failed:", error.message);
+      if (this.caps) return this.unmount(`the page is gone: ${error.message}`);
+      if (message.t !== "call" && message.t !== "new") return;
+      const waiter = this.pending.get(message.id);
+      this.pending.delete(message.id);
+      waiter?.reject(error);
+    });
   }
 
   /** A message from the page. */
@@ -296,9 +303,12 @@ class MediaPage {
     return this.call<T>(0, method, args, signal);
   }
 
-  /** Events of page-level functions (read-aloud playing state and ends). */
+  /** Events of page-level functions (read-aloud playing state and ends); returns the stop. */
   onFunctionEvent(sink: EventSink) {
     this.sinks.set(0, sink);
+    return () => {
+      if (this.sinks.get(0) === sink) this.sinks.delete(0);
+    };
   }
 
   /** A page object of `cls`; `events` hears its events, `callbacks` answers its calls to the host. */
@@ -307,10 +317,17 @@ class MediaPage {
     this.sinks.set(handle, events);
     if (callbacks) this.handlers.set(handle, callbacks);
     const id = this.nextId++;
-    await new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.post({ t: "new", id, handle, cls, args });
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        this.pending.set(id, { resolve, reject });
+        this.post({ t: "new", id, handle, cls, args });
+      });
+    } catch (error) {
+      this.pending.delete(id);
+      this.sinks.delete(handle);
+      this.handlers.delete(handle);
+      throw error;
+    }
     return new PageObject(this, handle);
   }
 
@@ -393,6 +410,8 @@ class MediaPage {
 }
 
 export class PageObject {
+  private dropped = false;
+
   constructor(private readonly page: MediaPage, readonly handle: number) {}
 
   call<T = unknown>(method: string, args: unknown[] = [], signal?: AbortSignal) {
@@ -412,7 +431,13 @@ export class PageObject {
   }
 
   drop() {
+    if (this.dropped) return;
+    this.dropped = true;
     this.page.drop(this.handle);
+  }
+
+  [Symbol.dispose]() {
+    this.drop();
   }
 }
 

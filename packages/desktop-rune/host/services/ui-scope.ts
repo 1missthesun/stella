@@ -12,18 +12,26 @@ type Generation = {
   id: number;
   retired: boolean;
   disposers: Set<Disposer>;
+  /** Timeouts it had due soon when it was replaced, run once it is (see RETIRED_TIMEOUT_GRACE_MS). */
+  due: { at: number; run: () => void }[];
   listeners: ListenerRecord[];
   sweepAt: number;
+  /** What its callbacks handed to host methods stand in for (see `handOver`), dropped when it is replaced. */
+  handed: { standIns: WeakMap<Function, Function>; targets: WeakMap<Function, Function> } | null;
 };
 
 type ListenerRecord = { target: WeakRef<object>; listener: WeakRef<object>; type: string; capture: boolean; dispose: Disposer };
 
 const generations = new Map<number, Generation>();
 const GENERATION_FRAME = /\?swap=(\d+)/;
-/** Host files the UI reaches a registration through (DOM stand-ins, this file); the frame past them decides. */
-const TRANSPARENT_FRAME = /[/\\]host[/\\](dom[/\\]|services[/\\]ui-scope\.)|\(native|at native|\[native code\]/;
+/** Host files the UI reaches a registration through (DOM stand-ins, its electronAPI and renderer IPC, this file); the frame past them decides. */
+const TRANSPARENT_FRAME = /[/\\]host[/\\](dom[/\\]|services[/\\](ui-scope|renderer-api)\.|electron[/\\]ipc\.)|[/\\]contracts[/\\]desktop[/\\]electron-api\.|\(native|at native|\[native code\]/;
 const holder: { stack?: string } = {};
-/** A replaced generation's timeouts due within this still run once (a save its unmount scheduled). */
+/**
+ * A replaced generation's timeouts due within this run right after it is retired instead of
+ * when due (a save or a socket teardown its unmount scheduled), so nothing waits on them;
+ * later ones are dropped, as a closed page's are.
+ */
 const RETIRED_TIMEOUT_GRACE_MS = 5000;
 
 /** The live or replaced generation whose code called `fn`, or null when host code did. */
@@ -117,8 +125,10 @@ function install() {
   const setIntervalNative = timers.setInterval!;
   const clearTimeoutNative = timers.clearTimeout!;
   const clearIntervalNative = timers.clearInterval!;
-  const timerDisposers = new WeakMap<object, Disposer>();
-  const timerKey = (timer: unknown) => (typeof timer === "object" && timer !== null ? timer : null);
+  // On the timer object itself, not in a WeakMap: a WeakMap value reaches the UI's callback, and
+  // JSC kept the replaced generations of a timer's key alive through it.
+  const FORGET = Symbol("ui-scope.forget");
+  const timerKey = (timer: unknown) => (typeof timer === "object" && timer !== null ? (timer as { [FORGET]?: Disposer }) : null);
 
   const scopedSetTimeout = function (this: unknown, callback: unknown, ...rest: unknown[]) {
     const generation = typeof callback === "function" ? callerGeneration(scopedSetTimeout) : null;
@@ -131,10 +141,11 @@ function install() {
       return (callback as Function).apply(this, args);
     }, ...rest);
     forget = own(generation, () => {
-      if (due - performance.now() > RETIRED_TIMEOUT_GRACE_MS) clearTimeoutNative(timer);
+      clearTimeoutNative(timer);
+      if (due - performance.now() <= RETIRED_TIMEOUT_GRACE_MS) generation.due.push({ at: due, run: () => (callback as Function)(...rest.slice(1)) });
     });
     const key = timerKey(timer);
-    if (key) timerDisposers.set(key, forget);
+    if (key) key[FORGET] = forget;
     return timer;
   };
   const scopedSetInterval = function (this: unknown, callback: unknown, ...rest: unknown[]) {
@@ -144,14 +155,14 @@ function install() {
     const timer = setIntervalNative.call(this, callback, ...rest);
     const key = timerKey(timer);
     const forget = own(generation, () => clearIntervalNative(timer));
-    if (key) timerDisposers.set(key, forget);
+    if (key) key[FORGET] = forget;
     return timer;
   };
   const clearScoped = (clear: (timer: unknown) => void) => function (this: unknown, timer: unknown) {
     const key = timerKey(timer);
     if (key) {
-      timerDisposers.get(key)?.();
-      timerDisposers.delete(key);
+      key[FORGET]?.();
+      key[FORGET] = undefined;
     }
     return clear.call(this, timer);
   };
@@ -215,6 +226,126 @@ export function scopeCallbackScheduler(host: Record<string, any>, schedule: stri
   };
 }
 
+/** What a host call hands the UI that it must give back: an unsubscribe or release function, or a `Symbol.dispose` resource. */
+function disposerOf(value: unknown): Disposer | null {
+  if (typeof value === "function") return value as Disposer;
+  const dispose = value !== null && typeof value === "object" ? (value as { [Symbol.dispose]?: unknown })[Symbol.dispose] : undefined;
+  return typeof dispose === "function" ? () => dispose.call(value) : null;
+}
+
+/** `value` now belongs to `generation`: given back when it is replaced, or at once if it already was. */
+function adopt(generation: Generation, value: unknown): unknown {
+  const dispose = disposerOf(value);
+  if (!dispose) return value;
+  if (generation.retired) {
+    try { dispose(); } catch {}
+    return value;
+  }
+  const forget = own(generation, dispose);
+  if (typeof value !== "function") return value;
+  return function (this: unknown, ...args: unknown[]) {
+    forget();
+    return (value as Function).apply(this, args);
+  };
+}
+
+/**
+ * A host promise the UI awaits, handed over through a link the generation cuts when it is
+ * replaced: a page that never settles (a media page that doesn't start) then holds nothing of
+ * the replaced UI, and what it settles with later is given back (a lease is released).
+ */
+function relay(generation: Generation, source: PromiseLike<unknown>): Promise<unknown> {
+  let link: { resolve(value: unknown): void; reject(error: unknown): void } | null = null;
+  const settled = new Promise((resolve, reject) => { link = { resolve, reject }; });
+  const cut = own(generation, () => { link = null; });
+  source.then(
+    (value) => {
+      cut();
+      const to = link;
+      link = null;
+      const adopted = adopt(generation, value);
+      to?.resolve(adopted);
+    },
+    (error) => {
+      cut();
+      const to = link;
+      link = null;
+      to?.reject(error);
+    },
+  );
+  return settled;
+}
+
+const retiredCallback = () => undefined;
+
+/**
+ * The callback `fn` as a host method may keep it (a sink, a subscriber, a page's event handler):
+ * a stand-in that calls it until `generation` is replaced and does nothing after, so a host that
+ * keeps it past then (a call that never settles) holds none of the replaced UI. The same `fn`
+ * gets the same stand-in, so a later removal by identity still matches.
+ */
+function handOver(generation: Generation, fn: Function): Function {
+  const handed = generation.handed;
+  if (!handed) return retiredCallback;
+  let standIn = handed.standIns.get(fn);
+  if (standIn) return standIn;
+  standIn = function (this: unknown, ...args: unknown[]) {
+    return generation.handed?.targets.get(standIn!)?.apply(this, args);
+  };
+  handed.standIns.set(fn, standIn);
+  handed.targets.set(standIn, fn);
+  return standIn;
+}
+
+const scopedCalls = new WeakSet<Function>();
+
+function scopeCall(original: Function): Function {
+  if (scopedCalls.has(original)) return original;
+  const scoped = function (this: unknown, ...args: unknown[]) {
+    const generation = callerGeneration(scoped);
+    if (generation) args = args.map((arg) => (typeof arg === "function" ? handOver(generation, arg) : arg));
+    const result = original.apply(this, args);
+    if (!generation) return result;
+    if (result !== null && (typeof result === "object" || typeof result === "function") && typeof (result as PromiseLike<unknown>).then === "function") {
+      return relay(generation, result as PromiseLike<unknown>);
+    }
+    return adopt(generation, result);
+  };
+  Object.defineProperty(scoped, "name", { value: original.name });
+  scopedCalls.add(scoped);
+  return scoped;
+}
+
+/**
+ * Hands `surface` (an object the host gives the UI: `globalThis.stella`, its `host`, the chat
+ * feed) to hot-swapped generations. Every method on it, on its nested objects and on the classes
+ * of its class instances (the media pages) gives the calling generation what it returns: an
+ * unsubscribe or release function or a `Symbol.dispose` resource is given back when that
+ * generation is replaced, and a promise reaches it only while it is live. Host callers are
+ * untouched. `skip` names methods that only read (called on every render).
+ */
+export function scopeUiFacing<T extends object>(surface: T, skip: readonly string[] = []): T {
+  const visit = (target: object, seen: WeakSet<object>) => {
+    if (seen.has(target)) return;
+    seen.add(target);
+    for (const key of Object.getOwnPropertyNames(target)) {
+      if (key === "constructor" || skip.includes(key)) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(target, key);
+      if (!descriptor || !("value" in descriptor)) continue;
+      const value = descriptor.value as unknown;
+      if (typeof value === "function") {
+        if (descriptor.writable || descriptor.configurable) Object.defineProperty(target, key, { ...descriptor, value: scopeCall(value) });
+      } else if (value !== null && typeof value === "object" && Object.prototype.toString.call(value) === "[object Object]") {
+        const proto = Object.getPrototypeOf(value);
+        if (proto === Object.prototype || proto === null) visit(value, seen);
+        else for (let p = proto; p && p !== Object.prototype; p = Object.getPrototypeOf(p)) visit(p, seen);
+      }
+    }
+  };
+  visit(surface, new WeakSet());
+  return surface;
+}
+
 /**
  * Ties a resource the caller's generation opened (a WebSocket) to that generation: closed when it
  * is replaced, refused once it is.
@@ -232,16 +363,21 @@ export type UiScope = { dispose(): void };
 /** Opens generation `id` (the `?swap=<id>` in its code's sourceURL) and runs `evaluate`; the scope undoes everything it registers. */
 export function evaluateInScope<T>(id: number, evaluate: () => T): { value: T; scope: UiScope } {
   install();
-  const generation: Generation = { id, retired: false, disposers: new Set(), listeners: [], sweepAt: 256 };
+  const generation: Generation = { id, retired: false, disposers: new Set(), due: [], listeners: [], sweepAt: 256, handed: { standIns: new WeakMap(), targets: new WeakMap() } };
   generations.set(id, generation);
   const scope: UiScope = {
     dispose() {
       generation.retired = true;
+      generation.handed = null;
       const disposers = [...generation.disposers];
       generation.disposers.clear();
       generation.listeners = [];
       for (const dispose of disposers) {
         try { dispose(); } catch {}
+      }
+      const due = generation.due.splice(0).sort((a, b) => a.at - b.at);
+      for (const timeout of due) {
+        try { timeout.run(); } catch (error) { console.error("[ui] a replaced UI's timeout failed:", error); }
       }
     },
   };

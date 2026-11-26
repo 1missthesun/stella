@@ -97,6 +97,8 @@ export class CdpError extends Error {
 }
 
 /** One Chromium process and its pipe connection. */
+const STDERR_TAIL = 4096;
+
 export class ChromiumProcess extends EventEmitter {
   readonly child: ChildProcess;
   private readonly writer: NodeJS.WritableStream;
@@ -105,6 +107,7 @@ export class ChromiumProcess extends EventEmitter {
   private readonly sessions = new Map<string, (m: CdpMessage) => void>();
   private pages = 0;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private stderr = "";
   exited = false;
 
   constructor(readonly profileDir: string, binary: string, private readonly onGone: () => void, extraArgs: string[] = []) {
@@ -137,7 +140,9 @@ export class ChromiumProcess extends EventEmitter {
         try { this.dispatch(JSON.parse(text)); } catch (error) { console.error("[chromium] bad message", error); }
       }
     });
-    (this.child.stdio[2] as NodeJS.ReadableStream).on("data", () => {});
+    (this.child.stdio[2] as NodeJS.ReadableStream).on("data", (chunk: Buffer) => {
+      this.stderr = (this.stderr + chunk.toString("utf8")).slice(-STDERR_TAIL);
+    });
     this.child.once("exit", (code, signal) => {
       this.exited = true;
       for (const w of this.waiting.values()) w.reject(new Error(`Chromium exited (${code ?? signal})`));
@@ -146,6 +151,11 @@ export class ChromiumProcess extends EventEmitter {
       onGone();
     });
     console.error(`[chromium] started pid ${this.child.pid} (${path.basename(binary)}, profile ${profileDir})`);
+  }
+
+  /** The end of what Chromium wrote to stderr, for diagnosing a launch that went wrong. */
+  stderrTail() {
+    return this.stderr;
   }
 
   private dispatch(m: CdpMessage) {

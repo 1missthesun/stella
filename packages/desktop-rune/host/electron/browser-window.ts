@@ -482,7 +482,10 @@ export class BrowserWindow extends BaseWindow {
   setTrafficLightPosition() {}
   setTitleBarOverlay() {}
   setIcon() {}
-  setOverlayIcon() {}
+  setOverlayIcon(overlay: unknown, description = "") {
+    const count = overlay ? Number(/^\d+/.exec(description)?.[0] ?? 1) : 0;
+    app.showBadge(count > 0 ? String(count) : "", count);
+  }
   setThumbarButtons() { return true; }
   setThumbnailClip() {}
   setThumbnailToolTip() {}

@@ -182,7 +182,10 @@ class MediaPage {
     });
     this.readyPromise = promise;
     const timer = setTimeout(() => {
-      if (this.readyPromise === promise && !this.caps) this.unmount("the page did not start");
+      if (this.readyPromise !== promise || this.caps) return;
+      const chromium = this.chromium;
+      if (chromium) console.error(`[media] chromium page did not start (stage ${chromium.stats().stage}); stderr:\n${chromium.stderrTail()}`);
+      this.unmount(chromium ? `the page did not start: Chromium ${chromium.stats().stage}` : "the page did not start");
     }, READY_TIMEOUT_MS);
     timer.unref?.();
     void promise.finally(() => clearTimeout(timer)).catch(() => {});

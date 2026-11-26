@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { warnOnce } from "./engine";
+import { engine, warnOnce } from "./engine";
 import { nativeImage } from "./native-image";
 import { ProcessSingleton } from "./process-singleton";
 
@@ -55,12 +55,13 @@ class App extends EventEmitter {
   readonly commandLine = new CommandLine();
   readonly isPackaged = false;
   readonly dock = process.platform === "darwin"
-    ? { show: async () => {}, hide: () => {}, isVisible: () => true, setBadge: () => {}, getBadge: () => "", bounce: () => 0, cancelBounce: () => {}, setIcon: () => {}, setMenu: () => {}, getMenu: () => null, downloadFinished: () => {} }
+    ? { show: async () => {}, hide: () => {}, isVisible: () => true, setBadge: (label: string) => this.showBadge(label), getBadge: () => this.badgeLabel, bounce: () => 0, cancelBounce: () => {}, setIcon: () => {}, setMenu: () => {}, getMenu: () => null, downloadFinished: () => {} }
     : undefined;
   userAgentFallback = "Mozilla/5.0 Stella (Rune)";
   accessibilitySupportEnabled = false;
   applicationMenu: unknown = null;
   badgeCount = 0;
+  private badgeLabel = "";
   readonly runningUnderARM64Translation = false;
   hooks: AppHooks = { exit: (code) => process.exit(code) };
   private name = "Stella";
@@ -235,7 +236,17 @@ class App extends EventEmitter {
   getApplicationInfoForProtocol() { return Promise.resolve({ icon: nativeImage.createEmpty(), path: "", name: "" }); }
   setAppUserModelId() {}
   setActivationPolicy() {}
-  setBadgeCount(count?: number) { this.badgeCount = count ?? 0; return true; }
+  setBadgeCount(count?: number) {
+    this.badgeCount = Math.max(0, Math.floor(count ?? 0));
+    this.showBadge(this.badgeCount > 0 ? String(this.badgeCount) : "", this.badgeCount);
+    return true;
+  }
+
+  /** The Dock label on macOS, the main window's taskbar count on Windows (engine `app.setBadge`). */
+  showBadge(label: string, count?: number) {
+    this.badgeLabel = label;
+    void engine()?.app.setBadge(label || null, count).catch((error: Error) => warnOnce("app.setBadge", `engine app.setBadge failed: ${error.message}`));
+  }
   getBadgeCount() { return this.badgeCount; }
   setUserTasks() { return true; }
   getJumpListSettings() { return { minItems: 0, removedItems: [] }; }

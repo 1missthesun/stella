@@ -45,7 +45,7 @@ export type ChromiumMediaCallbacks = {
   failed(error: string): void;
 };
 
-export type ChromiumMediaStats = { pid: number | undefined; launchMs: number | null; pageMs: number | null };
+export type ChromiumMediaStats = { pid: number | undefined; stage: string; launchMs: number | null; pageMs: number | null };
 
 export class ChromiumMediaHost {
   private proc: ChromiumProcess | null = null;
@@ -55,6 +55,7 @@ export class ChromiumMediaHost {
   private readonly startedAt = performance.now();
   private launchedAt: number | null = null;
   private pageAt: number | null = null;
+  private stage = "starting";
 
   constructor(private readonly callbacks: ChromiumMediaCallbacks) {}
 
@@ -81,9 +82,11 @@ export class ChromiumMediaHost {
     };
     process.once("exit", killOnExit);
     proc.once("exit", () => process.off("exit", killOnExit));
+    this.stage = "connecting";
     await proc.send("Browser.getVersion");
     if (this.stopped) return;
     await proc.send("Browser.grantPermissions", { origin: ORIGIN, permissions: ["audioCapture"] });
+    this.stage = "attaching";
     const { targetInfos } = await proc.send<{ targetInfos: { targetId: string; type: string }[] }>("Target.getTargets");
     const targetId = targetInfos.find((t) => t.type === "page")?.targetId
       ?? (await proc.send<{ targetId: string }>("Target.createTarget", { url: "about:blank" })).targetId;
@@ -100,6 +103,7 @@ export class ChromiumMediaHost {
       proc.send("Fetch.enable", { patterns: [{ urlPattern: `${ORIGIN}/*`, requestStage: "Request" }] }, sessionId),
     ]);
     if (this.stopped) return;
+    this.stage = "navigating";
     await proc.send("Page.navigate", { url: `${ORIGIN}${PAGE_PATH}` }, sessionId);
   }
 
@@ -108,12 +112,22 @@ export class ChromiumMediaHost {
     switch (m.method) {
       case "Runtime.bindingCalled":
         if (params.name !== BINDING) return;
-        if (this.pageAt === null) this.pageAt = performance.now();
+        if (this.pageAt === null) {
+          this.pageAt = performance.now();
+          this.stage = "running";
+        }
         try {
           this.callbacks.message(JSON.parse(String(params.payload)));
         } catch {}
         return;
+      case "Runtime.exceptionThrown":
+        console.error("[media] chromium page exception:", (params.exceptionDetails as { exception?: { description?: string }; text?: string })?.exception?.description ?? (params.exceptionDetails as { text?: string })?.text);
+        return;
+      case "Runtime.consoleAPICalled":
+        if (params.type === "error" || params.type === "warning") console.error(`[media] chromium page ${params.type}:`, ((params.args as { value?: unknown; description?: string }[]) ?? []).map((a) => a.value ?? a.description).join(" "));
+        return;
       case "Fetch.requestPaused":
+        if (this.stage === "navigating") this.stage = "loading";
         return void this.serve(String(params.requestId), String((params.request as { url?: string })?.url ?? ""));
       case "Inspector.targetCrashed":
         if (!this.stopped) this.callbacks.failed("Chromium media page crashed");
@@ -161,9 +175,15 @@ export class ChromiumMediaHost {
   stats(): ChromiumMediaStats {
     return {
       pid: this.proc?.child.pid,
+      stage: this.stage,
       launchMs: this.launchedAt === null ? null : this.launchedAt - this.startedAt,
       pageMs: this.pageAt === null ? null : this.pageAt - this.startedAt,
     };
+  }
+
+  /** The end of Chromium's stderr while it runs. */
+  stderrTail() {
+    return this.proc?.stderrTail() ?? "";
   }
 
   stop() {

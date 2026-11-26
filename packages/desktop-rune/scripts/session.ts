@@ -246,7 +246,7 @@ async function shot(file: string) {
   const run = readRun();
   if (MAC || WIN) {
     const target = path.resolve(file);
-    const response = await fetch(`http://127.0.0.1:${run.ctlPort}/control/screenshot?path=${encodeURIComponent(target)}`);
+    const response = await fetch(`http://127.0.0.1:${run.ctlPort}/control/screenshot?path=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`screenshot failed: ${response.status} ${await response.text()}`);
     console.log(target);
     return;

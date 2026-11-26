@@ -298,7 +298,7 @@ jobs:
           mkdir -p "$out"
           export BIN="$RUNNER_TEMP/engine/stella-engine-win-x64.exe"
           run_dir=$(cygpath -u "$("$BUN" scripts/session.ts dir)")
-          trap '"$BUN" scripts/session.ts stop || true; cp "$run_dir/host.log" "$out/services-host.log" 2>/dev/null || true; cp "$run_dir/metrics.jsonl" "$out/metrics.jsonl" 2>/dev/null || true' EXIT
+          trap '"$BUN" scripts/session.ts stop || true; cp "$run_dir/host.log" "$out/services-host.log" 2>/dev/null || true; cp "$run_dir/metrics.jsonl" "$out/metrics.jsonl" 2>/dev/null || true; find "$run_dir" -name "runtime.log*" -exec cp {} "$out/" \; 2>/dev/null || true' EXIT
           "$BUN" scripts/session.ts start --account signed-out | tee "$out/start.json"
           jq -e '.ready' "$out/start.json" >/dev/null || { echo "session did not get ready"; tail -n 120 "$run_dir/host.log"; exit 1; }
           sleep 3
@@ -316,10 +316,22 @@ jobs:
           jq -r '"media page (WebView2): \(.value // .error | tojson)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
           "$BUN" scripts/session.ts eval 'const w = new electron.BrowserWindow({ width: 640, height: 420, show: true }); await w.loadURL("https://example.com/"); await new Promise((r) => setTimeout(r, 1500));
             const r = await w.webContents.executeJavaScript(`({ title: document.title, rtc: typeof RTCPeerConnection, secure: isSecureContext })`); return r;' | tee "$out/web-window.json"
-          "$BUN" scripts/session.ts shot "$out/window-after.png" || true
+          diag='const m = stella.host.media; const use = m.use().then((release) => { release(); return "ready"; }, (e) => String(e?.message ?? e));
+            await new Promise((r) => setTimeout(r, 8000));
+            const state = await stella.engine.webview.state(m.elementId).catch((e) => `state failed: ${e.message}`);
+            return { wanted: m.wanted(), state, use: await use };'
+          "$BUN" scripts/session.ts eval "$diag" | tee "$out/media-page-diag.json"
+          "$BUN" scripts/session.ts eval "$(cat scripts/ci/capture-check.js)" | tee "$out/capture.json"
+          jq -r '"capture: \(.value // .error | tojson)"' "$out/capture.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          mp4=$(jq -r '.value.capture.stopped.file // empty' "$out/capture.json"); [ -n "$mp4" ] && cp "$(cygpath -u "$mp4")" "$out/capture.mp4" || true
+          jpg=$(jq -r '.value.capture.firstFrame // empty' "$out/capture.json"); [ -n "$jpg" ] && cp "$(cygpath -u "$jpg")" "$out/capture-frame.jpg" || true
           ps -W | grep -iE "stella-engine|bun|msedgewebview2" | tee "$out/processes.txt" || true
           jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null && echo "audio ok" || echo "AUDIO FAILED" | tee -a "$GITHUB_STEP_SUMMARY"
-          jq -e '.ok and .value.caps.rtc and .value.caps.secureContext and .value.loop.state == "connected" and .value.loop.inbound.bytes > 0' "$out/media-page.json" >/dev/null && echo "media page ok" || { echo "MEDIA PAGE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+          status=0
+          jq -e '.ok and .value.capture.bytes > 10000 and .value.capture.frames > 0' "$out/capture.json" >/dev/null && echo "capture ok" || { echo "CAPTURE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          jq -e '.ok and (.value.hookEvents.mousemove // 0) > 0 and (.value.hookEvents.keydown // 0) > 0' "$out/capture.json" >/dev/null && echo "input hook ok" || { echo "INPUT HOOK FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          jq -e '.ok and .value.caps.rtc and .value.caps.secureContext and .value.loop.state == "connected" and .value.loop.inbound.bytes > 0' "$out/media-page.json" >/dev/null && echo "media page ok" || { echo "MEDIA PAGE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          exit $status
 
       - uses: actions/upload-artifact@v4
         if: always()

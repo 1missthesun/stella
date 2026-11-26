@@ -41,11 +41,17 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 
 ## Chat
 - [ ] Timeline: message rows, time dividers, pagination/history, follow/scroll management, catch-up pill, jump to message
+  - macOS: rows and dividers match Electron in light/dark/gradient (~/.stella/outputs/stella-rune/chat/timeline-fixture-{dark,light,gradient}-side-by-side.png); sidebar look (~/.stella/outputs/stella-rune/chat/timeline-sidebar-variant-dark.png); a 100-record dev chat pages older history while scrolling (~/.stella/outputs/stella-rune/chat/history-load-scroll.mp4); a send while scrolled up keeps the place and shows the reply peek (~/.stella/outputs/stella-rune/chat/send-while-scrolled-up-reply-peek.mp4); scroll 47–58 fps (~/.stella/outputs/stella-rune/chat/metrics.md). Catch-up pill is off behind CATCH_UP_ENABLED=false in both; jump to message not proven.
 - [ ] Markdown (streamdown parity), code blocks, tables, images, file pills, Stella file links, model mention text
+  - macOS: paragraphs, lists, inline code, code blocks, tables and links match (~/.stella/outputs/stella-rune/chat/timeline-fixture-*-side-by-side.png). Gaps: code-block line numbers wait on an engine markdown option; selection across markdown blocks and image onError are open engine items. Images, file pills, Stella file links and model mention text not proven.
 - [ ] Assistant streaming, working indicator, text shimmer, activity/task shimmer, agent assistant updates
+  - macOS: a real dev-backend reply streams in with the working indicator (~/.stella/outputs/stella-rune/chat/send-and-stream.mp4). Activity/task shimmer and agent updates not proven.
 - [ ] Cards: generated images (+job), map route, office preview, PDF viewer, media preview, screenshot, connector connect, cloud connector, safeguard, usage limit, reminder fire, schedule notice, voice session, user ask (deck/list/record), browser intervention/data, app preview, source diff
+  - macOS: safeguard, usage limit, reminder fire, schedule notice, voice session, user ask deck and record, composer notice match Electron in light/dark/gradient (~/.stella/outputs/stella-rune/chat/cards-{dark,light,gradient}-side-by-side.png). The media, map, office, PDF, connector, browser, app preview and source diff cards not proven.
 - [ ] Message actions + context menu, copy, reply preview/handoff, send failure marks, held send
+  - macOS: reply from a selection hands off as a quote chip, sends, and shows its preview (~/.stella/outputs/stella-rune/chat/reply-handoff-chip.png, reply-sent-with-preview.png); quoted-text hover preview clips and scrolls at 220 (~/.stella/outputs/stella-rune/chat/quote-chip-preview-clipped.png). Context menu, failure marks and held send not proven.
 - [ ] Composer: lead row, context chips/rows/sections, add menu, model mention menu, mini model picker, notices, attachments (tiles, browser tray, drop overlay), dictation, voice
+  - macOS: shell and lead row cap at min(800, column − 48); Escape is claimed only to stop a reply or close the mention menu; sidebar / sidebar-wide variants; upgrade notice matches (~/.stella/outputs/stella-rune/chat/cards-*-side-by-side.png); keystroke→frame p50 18.8 ms (~/.stella/outputs/stella-rune/chat/metrics.md). Attachments, drop overlay, image paste, dictation and voice not proven.
 - [ ] Message alerts + sound, anonymous first-reply counter, nudges, found-via notice
 
 ## Global surfaces

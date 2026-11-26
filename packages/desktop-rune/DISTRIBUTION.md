@@ -126,8 +126,30 @@ granted to Stella carries over:
   JIT runs in its own XPC processes).
 - Screen recording: macOS 15 re-asks monthly ("continue to allow") for apps that capture without
   `SCContentSharingPicker`; the grant survives engine updates only while the requirement holds.
-- Prompting: once the engine runs from that bundle it sets `STELLA_RUNE_MEDIA_PROMPTS=1` for the
-  host, and `systemPreferences.askForMediaAccess` asks for real: the microphone through an engine
-  command that calls `AVCaptureDevice requestAccessForMediaType:completionHandler:` (a block, so it
-  belongs in the engine's objc2 code, not Bun FFI), the screen through
-  `CGRequestScreenCaptureAccess`. Without the variable the host keeps reporting status only.
+- Prompting: an engine whose executable sits in an `.app` bundle sets `STELLA_RUNE_MEDIA_PROMPTS=1`
+  for the host (`spawn_ts` in `engine/src/main.rs`); a bare binary never does, because the alert
+  would name whichever app launched it. With it, `systemPreferences.isTrustedAccessibilityClient(true)`
+  shows macOS's Accessibility alert. `askForMediaAccess` still reports status only: asking for the
+  microphone needs an engine command around `AVCaptureDevice requestAccessForMediaType:completionHandler:`
+  (a block, so objc2 in the engine, not Bun FFI). Screen access is asked by master's
+  `screen_permission` helper, which runs unchanged.
+
+### Accessibility (ink, marks, global input)
+
+Electron asks `systemPreferences.isTrustedAccessibilityClient` in its main process, so the grant
+belongs to Stella.app. Under Rune the same call runs in the Bun host and goes to
+`AXIsProcessTrustedWithOptions` over FFI (`host/electron/macos-media.ts`). TCC answers for the
+responsible process, so everything below the engine counts as the engine: the host's check and
+prompt, the engine's CGEventTap (`engine/src/inputhook.rs`), and the `stella_show` ink helper the
+host spawns.
+
+- The binary that needs the grant is `Stella.app/Contents/MacOS/stella-engine`, bundle id
+  `com.stella.app`. Signed with the launcher team's requirement (above), a grant already given to
+  Electron Stella carries over, so users are not asked again.
+- The flow is Electron's, unchanged: Show Stella's controller checks `hasMacPermission("accessibility")`,
+  asks once with `requestMacPermission("accessibility")` (the macOS alert), and opens
+  `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` through
+  `shell.openExternal`.
+- Proof without changing System Settings (`accessibility-tcc-mac.txt`): the host's check returns
+  true from a granted dev shell and false when the same Bun code runs under a fresh, never-granted
+  bundle launched with `open`, with no alert shown.

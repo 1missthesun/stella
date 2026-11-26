@@ -160,6 +160,12 @@ fn spawn_ts() -> Boot {
     let host = format!("{root}/host/main.tsx");
     let mut cmd = Command::new(&bun);
     cmd.arg(&host).args(std::env::args_os().skip(1)).current_dir(&root).stderr(Stdio::inherit());
+    if let Ok(exe) = std::env::current_exe() {
+        // TCC prompts name the responsible app: only a bundled engine (Stella.app) may ask.
+        if cfg!(target_os = "macos") && std::env::var_os("STELLA_RUNE_MEDIA_PROMPTS").is_none() && exe.to_string_lossy().contains(".app/Contents/MacOS/") {
+            cmd.env("STELLA_RUNE_MEDIA_PROMPTS", "1");
+        }
+    }
     let (child, from_host, to_host) = spawn_host(&mut cmd);
     let (tx, rx) = mpsc::channel();
     let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));

@@ -84,11 +84,22 @@ watch(APP_DIR, { recursive: true }, (_ev, file) => {
   pending = setTimeout(swap, 4); // coalesce the editor's write events
 });
 
-async function swap() {
+let watchSwap: Promise<boolean> | null = null;
+function swap() {
+  if (pending) clearTimeout(pending);
   pending = null;
   let mtime = 0;
   try { mtime = statSync(join(APP_DIR, changed)).mtimeMs; } catch {}
-  await applySwap(changed, t_seen, mtime);
+  const running = applySwap(changed, t_seen, mtime);
+  watchSwap = running;
+  void running.finally(() => { if (watchSwap === running) watchSwap = null; });
+  return running;
+}
+
+/** An app-source update has already moved the files, so a swap the watcher has seen covers it. */
+function swapForUpdate(paths: string[]): Promise<boolean> {
+  if (pending) return swap();
+  return watchSwap ?? applySwap(paths.join(", ") || "app-source", now());
 }
 
 async function applySwap(label: string, t0: number, mtime = t0): Promise<boolean> {
@@ -126,7 +137,7 @@ if (services) {
   const { setUiSwapTarget } = await import("./services/renderer-source");
   setUiSwapTarget({
     async apply(paths) {
-      const ok = await applySwap(paths.join(", ") || "app-source", now());
+      const ok = await swapForUpdate(paths);
       return ok ? { mode: "swap", swaps: swapN } : { mode: "failed", error: store.get().error ?? "swap failed", reloaded: false };
     },
     async quietFor() { return now() - lastInput; },

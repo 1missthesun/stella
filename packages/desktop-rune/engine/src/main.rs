@@ -6,6 +6,8 @@
 //! scrolling, hover, springs and painting stay native; only state changes cross the bridge.
 //! Events go back to the host as JSON lines. The protocol is in `host/ELEMENTS.md`.
 
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod audio;
 mod capture;
 mod inputhook;
@@ -160,6 +162,12 @@ fn spawn_ts() -> Boot {
     let host = format!("{root}/host/main.tsx");
     let mut cmd = Command::new(&bun);
     cmd.arg(&host).args(std::env::args_os().skip(1)).current_dir(&root).stderr(Stdio::inherit());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
     if let Ok(exe) = std::env::current_exe() {
         // TCC prompts name the responsible app: only a bundled engine (Stella.app) may ask.
         if cfg!(target_os = "macos") && std::env::var_os("STELLA_RUNE_MEDIA_PROMPTS").is_none() && exe.to_string_lossy().contains(".app/Contents/MacOS/") {

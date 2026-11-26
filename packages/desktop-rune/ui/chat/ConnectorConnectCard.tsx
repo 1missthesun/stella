@@ -4,7 +4,7 @@ import { useCloudConnectRequestActions, useCurrentConversationConnectRequest } f
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
-import { Button } from "../kit/compat";
+import { APP_TRACKING, Button } from "../kit/compat";
 import { Icon, Icons } from "../kit";
 import { derive, mixOklch, radius, useTokens } from "../theme";
 
@@ -68,13 +68,15 @@ export function ConnectorCardFrame({
         <text
           size={compact ? 12.5 : 13}
           weight={600}
+          lineHeight={(compact ? 12.5 : 13) * 1.45}
+          tracking={APP_TRACKING}
           color={t.c.textStrong}
           loop={phase === "connecting" ? { kind: "sequence", period: 1.6, frames: [{ at: 0, opacity: 1 }, { at: 0.5, opacity: 0.55 }, { at: 1, opacity: 1 }] } : undefined}
         >
           {title}
         </text>
         {sub ? (
-          <text mt={2} size={compact ? 11.5 : 12.5} lineHeight={(compact ? 11.5 : 12.5) * 1.35} color={t.c.textWeak} maxLines={2} truncate>
+          <text mt={2} size={compact ? 11.5 : 12.5} lineHeight={(compact ? 11.5 : 12.5) * 1.35} tracking={APP_TRACKING} color={t.c.textWeak} maxLines={2} truncate>
             {sub}
           </text>
         ) : null}

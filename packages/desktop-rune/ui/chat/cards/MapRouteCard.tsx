@@ -3,6 +3,7 @@ import { appleMapsUrl, mapsEmbedUrl, type MapRouteArtifact as MapArtifact } from
 import { useT, useTPlural } from "@/shared/i18n";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import { Icon, Icons } from "../../kit";
+import { APP_TRACKING } from "../../kit/compat";
 import { derive, mixOklch, radius, useTokens } from "../../theme";
 import { rune } from "../engine";
 
@@ -84,15 +85,15 @@ const MapCard = ({ map }: { map: MapArtifact }) => {
             </>,
           )
         ) : (
-          <webview absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} url={embedUrl} label={t("app.chat.mapCard.frameTitle", { title })} onError={() => setFrameFailed(true)} />
+          <webview absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} corners={[radius["2xl"] - 1, radius["2xl"] - 1, 0, 0]} url={embedUrl} label={t("app.chat.mapCard.frameTitle", { title })} onError={() => setFrameFailed(true)} />
         )}
       </box>
       <row align="center" justify="between" gap={12} py={9} px={12 + 1} pb={9 + 1} borderSides={[1, 0, 0, 0]} border={tokens.c.border}>
-        <row align="end" gap={8} minW={0}>
-          <text size={13} weight={600} color={tokens.c.textStrong} title={title} minW={0} nowrap truncate>
+        <row align="end" gap={8} minW={0} shrink>
+          <text size={13} weight={600} tracking={APP_TRACKING} color={tokens.c.textStrong} title={title} minW={0} nowrap truncate>
             {title}
           </text>
-          <text size={12} color={tokens.c.textWeak} nowrap shrink={false}>
+          <text size={12} tracking={APP_TRACKING} color={tokens.c.textWeak} nowrap shrink={false}>
             {summary}
           </text>
         </row>
@@ -113,7 +114,7 @@ const MapCard = ({ map }: { map: MapArtifact }) => {
           focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
           onPress={() => void rune().shell.openExternal(handoffUrl)}
         >
-          <text size={12} weight={500} color={tokens.c.textWeak} hoverColor={tokens.c.textStrong}>
+          <text size={12} weight={500} tracking={APP_TRACKING} color={tokens.c.textWeak} hoverColor={tokens.c.textStrong}>
             {t("app.chat.mapCard.appleMapsLabel")}
           </text>
           <box hoverColor={tokens.c.textStrong}>

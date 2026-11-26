@@ -3,7 +3,8 @@ import { useOfficePreview } from "@/features/chat/office-preview-store";
 import { useFilePreviewActions } from "@/features/chat/hooks/use-file-preview-actions";
 import { PreviewProblem } from "@/shell/display/preview-states";
 import { useT } from "@/shared/i18n";
-import { fontSize, useTokens } from "../../theme";
+import { fontSize, look, radius, useTokens } from "../../theme";
+import { APP_TRACKING } from "../../kit/compat";
 import { FilePreviewCardShell } from "../FilePreviewCardShell";
 
 const statusLabelKey = (status?: string) => {
@@ -28,7 +29,7 @@ export function OfficePreviewCard({ previewRef }: { previewRef: OfficePreviewRef
       titlePath={previewRef.sourcePath}
       meta={
         updatedAtLabel ? (
-          <text shrink={false} size={fontSize.sm} color={tokens.c.mutedForeground}>
+          <text shrink={false} {...look(fontSize.sm, 400)} tracking={APP_TRACKING} color={tokens.c.mutedForeground}>
             {t("app.chat.officePreview.updatedAt", { time: updatedAtLabel })}
           </text>
         ) : null
@@ -40,7 +41,9 @@ export function OfficePreviewCard({ previewRef }: { previewRef: OfficePreviewRef
       {snapshot?.status === "error" ? (
         <PreviewProblem size="compact" error={snapshot.error?.trim() || t("app.chat.officePreview.sessionError")} />
       ) : snapshot?.html ? (
-        <webview w="full" minH={420} h={420} html={snapshot.html} label={t("app.chat.officePreview.frameTitle", { title })} fill={tokens.c.card} />
+        <col w="full" px={1} pb={1}>
+          <webview w="full" minH={420} h={420} html={snapshot.html} label={t("app.chat.officePreview.frameTitle", { title })} fill={tokens.c.card} corners={[0, 0, radius.lg - 1, radius.lg - 1]} />
+        </col>
       ) : (
         <text py={18} px={16} size={fontSize.base} color={tokens.c.mutedForeground}>
           {t("app.chat.officePreview.preparingBody")}

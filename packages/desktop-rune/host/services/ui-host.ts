@@ -71,6 +71,12 @@ const contentsById = (id: number) => {
   return WebContents.fromId(id);
 };
 
+/** The renderer's session (Electron main registers the app's schemes on its partition), for webviews the UI owns. */
+const rendererSession = () => {
+  const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed() && win.webContents.kind === "app");
+  return (windows.find((win) => win.webContents.id === hostWindows.snapshot().find((w) => w.engineId === "main")?.contentsId) ?? windows[0])?.webContents.session;
+};
+
 function streamFrames(contentsId: number, listener: (src: string) => void, maxSize?: { width: number; height: number }) {
   const contents = WebContents.fromId(contentsId);
   if (!contents?.isBrowserBacked) return () => {};
@@ -212,7 +218,7 @@ export function createUiHost(): UiHost {
       schemes(contentsId) {
         const contents = contentsId === undefined ? undefined : contentsById(contentsId);
         const schemes = new Set<string>();
-        for (const session of [contents?.session, defaultSession()]) {
+        for (const session of [contents?.session ?? rendererSession(), defaultSession()]) {
           for (const scheme of session?.protocol.handlers.keys() ?? []) if (!STANDARD_SCHEMES.has(scheme)) schemes.add(scheme);
         }
         return [...schemes];
@@ -221,7 +227,7 @@ export function createUiHost(): UiHost {
         const e = engine();
         if (!e) return;
         const respond = (status: number, headers: Record<string, string>, body: string | Uint8Array) => void e.webview.respond(req.rid, { status, headers, body }).catch(() => {});
-        const session = contentsId === undefined ? defaultSession() : contentsById(contentsId)?.session;
+        const session = contentsId === undefined ? rendererSession() ?? defaultSession() : contentsById(contentsId)?.session;
         if (!session) return respond(404, {}, "");
         const hasBody = req.body !== undefined && req.method !== "GET" && req.method !== "HEAD";
         fetchProtocolIn(session, new Request(req.url, { method: req.method, headers: req.headers, body: hasBody ? req.body ?? undefined : undefined }))

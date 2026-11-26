@@ -25,9 +25,10 @@ const flag = (name: string) => { const i = args.indexOf(name); return i >= 0 ? (
 const has = (name: string) => args.includes(name);
 const runName = flag("--name") ?? process.env.STELLA_RUNE_RUN ?? "default";
 const MAC = process.platform === "darwin";
+const WIN = process.platform === "win32";
 /** Runtime and bridge sockets live under the run folder: macOS caps socket paths at 104 bytes. */
-const RUN_DIR = path.join("/tmp", `sr-${runName}`);
-if (RUN_DIR.length > 30) throw new Error(`Run folder ${RUN_DIR} is too long for runtime sockets; use a shorter --name.`);
+const RUN_DIR = path.join(WIN ? os.tmpdir() : "/tmp", `sr-${runName}`);
+if (!WIN && RUN_DIR.length > 30) throw new Error(`Run folder ${RUN_DIR} is too long for runtime sockets; use a shorter --name.`);
 const POINTER = path.join(RUN_DIR, "run.json");
 const DEV_BACKEND = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
 const XVFB = process.env.XVFB ?? path.join(os.homedir(), ".cache/stella-verify/xvfb/usr/bin/Xvfb");
@@ -47,6 +48,10 @@ const releaseSlot = (slot?: string) => { if (slot) spawnSync(SLOTS, ["release", 
 const readRun = (): Run => JSON.parse(readFileSync(POINTER, "utf8"));
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const cmdline = (pid: number): string[] => {
+  if (WIN) {
+    const ps = spawnSync("powershell", ["-NoProfile", "-Command", `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`], { encoding: "utf8" });
+    return ps.status === 0 ? ps.stdout.trim().split(/\s+/) : [];
+  }
   if (MAC) {
     const ps = spawnSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8" });
     return ps.status === 0 ? ps.stdout.trim().split(/\s+/) : [];
@@ -118,7 +123,7 @@ async function start() {
   const userDataDir = path.join(RUN_DIR, "user-data");
   const homeDir = path.join(RUN_DIR, "home");
   for (const dir of [dataDir, userDataDir, homeDir]) mkdirSync(dir, { recursive: true, mode: 0o700 });
-  symlinkSync(dataDir, path.join(homeDir, ".stella"), "dir");
+  symlinkSync(dataDir, path.join(homeDir, ".stella"), WIN ? "junction" : "dir");
   writeFileSync(path.join(homeDir, ".gitconfig"), "[user]\n\tname = Stella Rune Verify\n\temail = verify@test.stella.local\n");
   const keyFile = path.join(RUN_DIR, "protected-storage.key");
   writeFileSync(keyFile, randomBytes(32).toString("base64url"), { mode: 0o600 });
@@ -179,7 +184,13 @@ async function start() {
   } else {
     const w = Number(process.env.W ?? 1400);
     const h = Number(process.env.H ?? 940);
-    if (MAC) {
+    if (WIN) {
+      env.RUNE_OPEN_INACTIVE = "1";
+      for (const key of ["SystemRoot", "SYSTEMROOT", "windir", "ComSpec", "PATHEXT", "TEMP", "TMP", "LOCALAPPDATA", "APPDATA", "USERPROFILE", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]) {
+        if (process.env[key]) env[key] = process.env[key]!;
+      }
+      env.USERPROFILE = homeDir;
+    } else if (MAC) {
       env.RUNE_OPEN_INACTIVE = "1";
       if (unseen) env.RUNE_UNSEEN = "1";
       else slot = acquireSlot();
@@ -233,7 +244,7 @@ async function evaluate(body: string) {
 
 async function shot(file: string) {
   const run = readRun();
-  if (MAC) {
+  if (MAC || WIN) {
     const target = path.resolve(file);
     const response = await fetch(`http://127.0.0.1:${run.ctlPort}/control/screenshot?path=${encodeURIComponent(target)}`);
     if (!response.ok) throw new Error(`screenshot failed: ${response.status} ${await response.text()}`);
@@ -247,7 +258,9 @@ async function shot(file: string) {
 
 /** Every live process under `root`, from `ps` (pid → command); all were started by this run. */
 const descendants = (root: number) => {
-  const ps = spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" });
+  const ps = WIN
+    ? spawnSync("powershell", ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId)\" }"], { encoding: "utf8" })
+    : spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" });
   const children = new Map<number, number[]>();
   for (const line of ps.stdout.split("\n")) {
     const [pid, ppid] = line.trim().split(/\s+/).map(Number);

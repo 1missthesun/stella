@@ -408,6 +408,7 @@ pub struct Props {
     pub min_h: Option<Size>,
     pub max_h: Option<Size>,
     pub grow: Option<f32>,
+    pub basis: Option<Size>,
     pub shrink: bool,
     pub pad: Option<f32>,
     pub px: Option<f32>,

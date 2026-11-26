@@ -38,7 +38,10 @@ export type BoxProps = {
   children?: React.ReactNode;
   // Layout
   w?: Size; h?: Size; minW?: Size; maxW?: Size; minH?: Size; maxH?: Size;
-  grow?: number; shrink?: boolean; aspect?: number;
+  grow?: number;
+  /** Flex basis: `"auto"` starts from the content size (CSS `flex: 1 1 auto` with `grow`), a number is points, `"40%"` a fraction. With `grow` and no basis it is 0 (CSS `flex: 1`). */
+  basis?: "auto" | number | `${number}%`;
+  shrink?: boolean; aspect?: number;
   pad?: number; px?: number; py?: number; pt?: number; pr?: number; pb?: number; pl?: number;
   mt?: number; mb?: number; ml?: number; mr?: number; mx?: number; my?: number;
   gap?: number; rowGap?: number;

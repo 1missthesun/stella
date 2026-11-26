@@ -60,7 +60,14 @@ pub fn layout(mut e: El, p: &Props) -> El {
         e = e.max_h(v);
     }
     if let Some(v) = p.grow {
-        e = e.grow(v).basis_frac(0.0);
+        e = e.grow(v);
+    }
+    match (&p.basis, frac(&p.basis)) {
+        (Some(Size::Pt(v)), _) => e = e.basis(*v),
+        (Some(Size::Str(s)), _) if s == "auto" => e = e.basis_auto(),
+        (_, Some(f)) => e = e.basis_frac(f),
+        (None, _) if p.grow.is_some() => e = e.basis_frac(0.0),
+        _ => {}
     }
     if p.shrink {
         e = e.shrink();
@@ -154,6 +161,9 @@ pub fn layout(mut e: El, p: &Props) -> El {
     }
     if let Some(a) = p.absolute {
         e = e.pin(a.left, a.top, a.right, a.bottom);
+        if a.left.is_some() || a.right.is_some() {
+            e = e.unmirrored();
+        }
     }
     if p.fixed && p.absolute.is_none() && p.inset.is_none() {
         e = e.pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0));

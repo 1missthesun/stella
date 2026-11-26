@@ -97,13 +97,15 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 
 **Layout.**
 - Sizes: `w h minW maxW minH maxH`, each a number, `"full"`, `"fit"` or `"N%"`.
-- Flex: `grow`, `shrink`, `aspect`, `pad px py pt pr pb pl`, margins `mt mb ml mr mx my`, `gap`,
+- Flex: `grow`, `basis`, `shrink`, `aspect`, `pad px py pt pr pb pl`, margins `mt mb ml mr mx my`, `gap`,
   `rowGap`, `align`, `justify` (incl. `between around evenly`), `selfAlign`, `center`, `wrap`.
   `grow={g}` is CSS `flex: g 1 0%`: it fills a bounded parent and sizes to its content in an
-  unbounded one (an auto-height dialog, a `w="fit"` row). `<text>` shrinks like a CSS text flex
+  unbounded one (an auto-height dialog, a `w="fit"` row). `basis` overrides that 0%: `"auto"`
+  starts from the content size (`grow={1} basis="auto"` is CSS `flex: 1 1 auto`), a number is
+  points, and `"40%"` is a fraction. `<text>` shrinks like a CSS text flex
   item, down to its longest word. A scroller's end padding counts in its scroll extent.
 - Grid: `columns` on the container, `column` on the child.
-- Position: `absolute={{left,top,right,bottom}}` or `inset`. `fixed` pins to the window and paints
+- Position: `absolute={{left,top,right,bottom}}` or `inset`. `left` and `right` are physical, as in CSS: they stay put under `dir="rtl"`. `fixed` pins to the window and paints
   in its top layer, keeping React context (scrims, dialogs, toasts). `raise` paints above later
   siblings. `dir` (fixed and anchored layers take their tree ancestors' `dir`, as CSS direction reaches
   fixed descendants).

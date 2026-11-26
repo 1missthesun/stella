@@ -249,6 +249,8 @@ function Docs() {
           <text size={13} color={c.text}>A user bubble stops at 85% of its column (maxW="85%"), so a long message wraps well before the far edge at any window width.</text>
         </col>
       </row>
+      <box id="g-ring" w={140} h={30} radius={8} fill={c.raised} mt={6} mb={6} ml={6}
+        shadows={[{ x: 0, y: 0, blur: 0, spread: 2, color: c.bg }, { x: 0, y: 0, blur: 0, spread: 4, color: c.accent }]} />
       <col id="g-selgroup" gap={4} selectionGroup>
         <text id="g-sel-1" size={13} color={c.weak} selectable>Select across these two paragraphs; selection.get reads the group.</text>
         <text id="g-sel-2" size={13} color={c.weak} selectable>The second paragraph joins the same selection.</text>

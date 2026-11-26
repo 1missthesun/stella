@@ -103,7 +103,7 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 
 **Paint.** `fill`, `gradient {angle, stops}`, `radial`, `border`, `borderWidth`, `borderSides
 [top, right, bottom, left]`, `borderDash`, `radius`, `corners [tl, tr, br, bl]` (both in CSS order), `clip` (overflow hidden, rounded),
-`shadow [y, blur, color]` or `shadows [{x,y,blur,spread,color,inset}]`, `opacity`, `blur`,
+`shadow [y, blur, color]` or `shadows [{x,y,blur,spread,color,inset}]` (CSS box-shadow order: the first paints on top), `opacity`, `blur`,
 `backdropBlur`.
 
 **States.**

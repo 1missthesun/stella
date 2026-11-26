@@ -211,7 +211,7 @@ pub fn paint(mut e: El, p: &Props) -> El {
         e = e.shadow(y, blur, c.0);
     }
     if let Some(list) = &p.shadows {
-        for s in list {
+        for s in list.iter().rev() {
             e = e.box_shadow(Shadow { x: s.x, y: s.y, blur: s.blur, spread: s.spread, color: s.color.0, inset: s.inset });
         }
     }

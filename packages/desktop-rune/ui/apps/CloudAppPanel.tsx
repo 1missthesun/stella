@@ -97,7 +97,7 @@ export function CloudAppPanel({ slug }: { slug: string }) {
           title={slug}
           url={state.url}
           w="full"
-          h={state.loaded ? "full" : 0}
+          h="full"
           corners={[0, 0, 12, 12]}
           onLoad={(e) => {
             if (e.phase === "finished") setState((current) => ({ ...current, loaded: true }));

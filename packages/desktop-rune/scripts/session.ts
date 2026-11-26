@@ -2,7 +2,7 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--first-run] [--name <run>]
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png>
 //   bun scripts/session.ts stop
@@ -123,8 +123,9 @@ async function start() {
   const keyFile = path.join(RUN_DIR, "protected-storage.key");
   writeFileSync(keyFile, randomBytes(32).toString("base64url"), { mode: 0o600 });
   const accountMode = flag("--account") ?? "pro";
-  writeFileSync(path.join(dataDir, "ui-state.json"), JSON.stringify({ "stella-onboarding-complete": "true" }));
-  writeFileSync(path.join(dataDir, "preferences.json"), JSON.stringify({ onboardingCompleted: true }));
+  const firstRun = has("--first-run");
+  writeFileSync(path.join(dataDir, "ui-state.json"), JSON.stringify(firstRun ? {} : { "stella-onboarding-complete": "true" }));
+  writeFileSync(path.join(dataDir, "preferences.json"), JSON.stringify(firstRun ? {} : { onboardingCompleted: true }));
   const minted = accountMode === "signed-out" ? null : await mint(accountMode);
   const ctlPort = await freePort();
   const headless = has("--headless");

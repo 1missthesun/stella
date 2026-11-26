@@ -23,7 +23,7 @@ export const useOnboardingChat = sheet((c, t) => ({
   obcUserText: { size: 15, lh: 1.45, color: c.chatUserBubbleText },
   obcLegal: { mt: 10, size: 11, color: c.textWeaker, lh: 1.5 },
   obcLegalLink: { pad: 0, color: c.textWeak, underline: true, hoverColor: c.textStrong },
-  obcCard: { py: 19, px: 21, gap: 14, radius: 20, border: c.panelSurfaceBorder, shadows: [{ x: 0, y: 0, blur: 0, color: t.vars["--shadow-sm"] }, { x: 0, y: 0, blur: 0, color: c.panelSurfaceHighlight }], motion: { dur: 0.26 } },
+  obcCard: { py: 19, px: 21, gap: 14, radius: 20, border: c.panelSurfaceBorder, gradient: t.gradient.panel, shadows: [...t.shadow.sm, { x: 0, y: 1, blur: 0, spread: 0, color: c.panelSurfaceHighlight, inset: true }], motion: { dur: 0.26 } },
   obcCardSettled: { py: 12, px: 16, align: "center", gap: 12 },
   obcCardTitle: { size: 15, weight: 600, em: -0.01, color: c.textStrong, lh: 1.3 },
   obcCardBody: { size: 14, lh: 1.5, color: c.textWeak },

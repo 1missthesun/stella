@@ -233,6 +233,13 @@ jobs:
           "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json"
           jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
           jq -e '.ok and .value.caps.secureContext and .value.caps.getUserMedia and .value.caps.audioContext and .value.caps.mediaSource and .value.mic == "granted"' "$out/media-page.json" >/dev/null
+          "$BUN" scripts/session.ts eval "$(cat scripts/ci/voice-check.js)" | tee "$out/voice-chromium.json"
+          jq -r '.value // .error | "voice (Chromium): host \(.host), ready \(.readyMs|floor) ms, \(.memory), loop \(.loop | tojson), sink inputs: \(.sinkInputs)"' "$out/voice-chromium.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          voice_pid=$(jq -r '.value.stats.pid' "$out/voice-chromium.json")
+          sleep 8
+          if kill -0 "$voice_pid" 2>/dev/null; then echo "voice Chromium $voice_pid still running 8 s after release" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; fi
+          echo "voice Chromium $voice_pid stopped after the session" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -e '.ok and .value.host == "chromium" and .value.caps.rtc and .value.caps.secureContext and .value.loop.state.b == "connected" and (.value.loop.candidates.a | length) > 0 and .value.loop.inbound.bytes > 0 and .value.loop.remoteRms > 0.001' "$out/voice-chromium.json" >/dev/null
           lib=$(ldconfig -p | awk '/libwebkit2gtk-4.1.so.0 /{print $NF; exit}')
           { echo "webkit: $lib"; echo "RTCPeerConnection strings: $(strings "$lib" | grep -c RTCPeerConnection || true)";
             gst-inspect-1.0 webrtcbin >/dev/null 2>&1 && echo "gst webrtcbin: yes" || echo "gst webrtcbin: no";

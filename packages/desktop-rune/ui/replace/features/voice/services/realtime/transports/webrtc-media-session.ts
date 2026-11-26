@@ -1,4 +1,4 @@
-// desktop-ui's WebRTCMediaSession runs unchanged in the media page (a system WebView with WebRTC);
+// desktop-ui's WebRTCMediaSession runs unchanged in the voice media page (host.voice);
 // this stand-in carries its calls there, its data-channel events back, the SDP exchange to the
 // transport's fetcher here, and its analysers as page analysers.
 
@@ -8,7 +8,7 @@ import {
   type WebRTCMediaSessionOptions,
 } from "@/features/voice/services/realtime/transports/webrtc-media-session";
 import type { PageObject } from "../../../../../../../host/media/media-page";
-import { analyserOf, pushUiState, useMediaPage, type PageAnalyser } from "../../../../../../host/media-client";
+import { analyserOf, pushUiState, useMediaPage, voiceMediaPage, type PageAnalyser } from "../../../../../../host/media-client";
 
 export * from "@/features/voice/services/realtime/transports/webrtc-media-session";
 
@@ -42,7 +42,7 @@ export class WebRTCMediaSession {
   async open(signal: AbortSignal): Promise<void> {
     this.throwIfCanceled(signal);
     this.openSignal = signal;
-    const { media, release } = await useMediaPage();
+    const { media, release } = await useMediaPage(voiceMediaPage);
     if (this.closed || signal.aborted) {
       release();
       this.throwIfCanceled(signal);
@@ -94,7 +94,7 @@ export class WebRTCMediaSession {
     this.micEnabled = enabled;
     const object = this.object;
     if (!object) return Promise.resolve();
-    const media = globalThis.stella?.host?.media;
+    const media = voiceMediaPage();
     if (media) pushUiState(media);
     return object.call<void>("setMicEnabled", [enabled]);
   }

@@ -133,7 +133,7 @@ async function start() {
   const env: Record<string, string> = {};
   for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR"]) if (process.env[key]) env[key] = process.env[key]!;
   env.MIMALLOC_PURGE_DELAY = "0";
-  for (const [key, value] of Object.entries(process.env)) if (/^(MIMALLOC_|RUNE_|STELLA_CHAT_FIXTURE_)/.test(key) && value) env[key] = value;
+  for (const [key, value] of Object.entries(process.env)) if (/^(MIMALLOC_|RUNE_|STELLA_CHAT_FIXTURE_|STELLA_RUNE_(VOICE_HOST|CHROMIUM)$)/.test(key) && value) env[key] = value;
   const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();
   if (launcherChannel) env.STELLA_LAUNCHER = "1";
   if (has("--installed")) env.STELLA_APP_SOURCE_INSTALLED = "1";

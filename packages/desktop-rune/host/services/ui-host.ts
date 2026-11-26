@@ -11,7 +11,7 @@ import { defaultSession, fetchProtocolIn } from "../electron/session";
 import { WebContents } from "../electron/web-contents";
 import type { PageKey, PagePointer, PageWheel } from "../electron/chromium-page";
 import { rendererApiFor, type ElectronApi } from "./renderer-api";
-import { mediaPage, type MediaPage } from "../media/media-page";
+import { mediaPage, voicePage, type MediaPage } from "../media/media-page";
 
 export type ImagePreview = { dataUrl: string; width: number; height: number };
 
@@ -22,6 +22,8 @@ export type WebviewRequest = { rid: number; scheme: string; url: string; method:
 export type UiHost = {
   /** The WebView running desktop-ui's WebRTC, WebAudio and MediaSource modules (ui/host/MediaWebView.tsx). */
   media: MediaPage;
+  /** The page realtime voice runs in: `media`, or on Linux its own page in the on-demand Chromium. */
+  voice: MediaPage;
   /** An image file decoded off the UI thread and scaled to fit `maxEdge`: a WebP data URL and the full image's size, or null when it isn't an image. */
   imagePreview(file: string, maxEdge: number): Promise<ImagePreview | null>;
   windows: { subscribe(listener: () => void): () => void; snapshot(): WindowSnapshot[] };
@@ -191,6 +193,7 @@ export function createUiHost(): UiHost {
 
   return {
     media: mediaPage,
+    voice: voicePage,
     imagePreview,
     windows: { subscribe: hostWindows.subscribe, snapshot: hostWindows.snapshot },
     apiFor(windowId) {

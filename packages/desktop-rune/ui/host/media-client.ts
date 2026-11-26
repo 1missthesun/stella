@@ -10,12 +10,14 @@ const UI_STATE_KEYS = ["stella-preferred-speaker-id", "stella-preferred-mic-id",
 
 export const mediaPage = (): MediaPage | null => globalThis.stella?.host?.media ?? null;
 
+export const voiceMediaPage = (): MediaPage | null => globalThis.stella?.host?.voice ?? null;
+
 export const pushUiState = (media: MediaPage) =>
   media.setUiState(Object.fromEntries(UI_STATE_KEYS.map((key) => [key, uiState.getItem(key)])));
 
 /** The running media page and the release that lets it go. */
-export async function useMediaPage(): Promise<{ media: MediaPage; release: () => void }> {
-  const media = mediaPage();
+export async function useMediaPage(page: () => MediaPage | null = mediaPage): Promise<{ media: MediaPage; release: () => void }> {
+  const media = page();
   if (!media) throw new Error("Audio is unavailable in this window.");
   const release = await media.use();
   pushUiState(media);

@@ -14,7 +14,7 @@ export type CdpMessage = { id?: number; method?: string; params?: Record<string,
 const IDLE_STOP_MS = 60_000;
 
 const CANDIDATES: Record<string, string[]> = {
-  linux: ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/opt/google/chrome/chrome"],
+  linux: ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/opt/google/chrome/chrome", "/snap/bin/chromium"],
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
@@ -107,7 +107,7 @@ export class ChromiumProcess extends EventEmitter {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   exited = false;
 
-  constructor(readonly profileDir: string, binary: string, private readonly onGone: () => void) {
+  constructor(readonly profileDir: string, binary: string, private readonly onGone: () => void, extraArgs: string[] = []) {
     super();
     this.setMaxListeners(0);
     mkdirSync(profileDir, { recursive: true });
@@ -122,6 +122,7 @@ export class ChromiumProcess extends EventEmitter {
       "--force-device-scale-factor=1",
       "--window-size=1280,720",
       ...(accountHome ? ["--use-mock-keychain", "--password-store=basic"] : []),
+      ...extraArgs,
       "about:blank",
     ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"], env: chromiumEnv() });
     this.writer = this.child.stdio[3] as NodeJS.WritableStream;

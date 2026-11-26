@@ -1,11 +1,13 @@
-// The media page's host side: mounts a system WebView on demand (ui/host/MediaWebView.tsx
-// renders it in a background window while `wanted()`), serves it the page built from host/media/page, and carries calls,
-// events, host callbacks, pulled byte streams and analyser frames over its message channel.
-// The page stays while anything uses it and is dropped a minute after the last user leaves.
+// The media page's host side: runs the page built from host/media/page on demand and carries
+// calls, events, host callbacks, pulled byte streams and analyser frames over its message channel.
+// The page runs in a system WebView (ui/host/MediaWebView.tsx renders it in a background window
+// while `wanted()`), or in the on-demand Chromium (`chromium-media.ts`) where the system WebView
+// has no WebRTC. It stays while anything uses it and goes `lingerMs` after the last user leaves.
 
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { engine } from "../electron/engine";
+import { ChromiumMediaHost } from "./chromium-media";
 import type { AnalyserFrame, FromPage, HandleRef, MediaPageCaps, ToPage } from "./protocol";
 
 const ELEMENT_ID = "stella-media-page";
@@ -20,6 +22,8 @@ const BUILD_SCRIPT = path.join(import.meta.dir, "build.ts");
 type Waiter = { resolve(value: unknown): void; reject(error: Error): void };
 type EventSink = (name: string, args: unknown[]) => void;
 type CallbackHandler = (name: string, args: unknown[]) => unknown;
+
+export type MediaPageHost = "webview" | "chromium";
 
 export type MediaPageRequest = { rid: number; url: string };
 
@@ -37,7 +41,7 @@ const buildPage = () =>
     });
   });
 
-const pageHtml = (script: string) =>
+export const pageHtml = (script: string) =>
   `<!doctype html><html><head><meta charset="utf-8"><title>Stella media</title></head><body><script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 
 class MediaPage {
@@ -57,19 +61,23 @@ class MediaPage {
   private frames = new Map<string, AnalyserFrame | null>();
   private sampleTimer: ReturnType<typeof setInterval> | null = null;
   private lastSampleWanted = 0;
+  private chromium: ChromiumMediaHost | null = null;
   caps: MediaPageCaps | null = null;
 
   readonly elementId = ELEMENT_ID;
   readonly scheme = SCHEME;
   readonly url = PAGE_URL;
 
+  constructor(readonly host: MediaPageHost, private readonly lingerMs: number) {}
+
   subscribe(listener: () => void) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
+  /** The UI should render the page's WebView. */
   wanted() {
-    return this.mounted;
+    return this.host === "webview" && this.mounted;
   }
 
   /** The page has started and takes messages. */
@@ -80,7 +88,33 @@ class MediaPage {
   private setMounted(mounted: boolean) {
     if (this.mounted === mounted) return;
     this.mounted = mounted;
+    if (this.host === "chromium") {
+      if (mounted) this.startChromium();
+      else {
+        this.chromium?.stop();
+        this.chromium = null;
+      }
+    }
     for (const listener of this.listeners) listener();
+  }
+
+  private startChromium() {
+    const chromium = new ChromiumMediaHost({
+      source: () => this.source ?? Promise.reject(new Error("no page")),
+      message: (data) => {
+        if (this.chromium === chromium) this.message(data);
+      },
+      failed: (error) => {
+        if (this.chromium === chromium) this.failed(error);
+      },
+    });
+    this.chromium = chromium;
+    chromium.start();
+  }
+
+  /** The Chromium hosting the page (`host === "chromium"`), while it runs. */
+  get chromiumHost() {
+    return this.chromium;
   }
 
   /** Keeps the page alive until the returned release; resolves once the page runs. */
@@ -111,7 +145,7 @@ class MediaPage {
     this.lingerTimer = setTimeout(() => {
       this.lingerTimer = null;
       if (this.users === 0) this.unmount("idle");
-    }, LINGER_MS);
+    }, this.lingerMs);
     this.lingerTimer.unref?.();
   }
 
@@ -177,8 +211,10 @@ class MediaPage {
   }
 
   private post(message: ToPage) {
+    if (!this.mounted || !this.caps) throw new Error("The media page is not running.");
+    if (this.chromium) return this.chromium.post(message);
     const e = engine();
-    if (!e || !this.mounted || !this.caps) throw new Error("The media page is not running.");
+    if (!e) throw new Error("The media page is not running.");
     void e.webview.post(ELEMENT_ID, message).catch((error: Error) => console.error("[media] post failed:", error.message));
   }
 
@@ -193,7 +229,7 @@ class MediaPage {
       case "hello":
         if (this.caps) this.dropPageState("the page reloaded");
         this.caps = message.caps;
-        console.error(`[media] page ready: ${JSON.stringify(message.caps)}`);
+        console.error(`[media] page ready (${this.host}): ${JSON.stringify(message.caps)}`);
         this.readyWaiter?.resolve(message.caps);
         this.readyWaiter = null;
         return;
@@ -378,4 +414,13 @@ export class PageObject {
 }
 
 export type { MediaPage };
-export const mediaPage = new MediaPage();
+export const mediaPage = new MediaPage("webview", LINGER_MS);
+
+const VOICE_LINGER_MS = 5_000;
+
+/** The page realtime voice runs in: the system WebView's, or on Linux, whose WebKitGTK builds have
+ * no WebRTC, its own page in the on-demand Chromium, started for a voice session and stopped after it. */
+export const voicePage: MediaPage =
+  (process.env.STELLA_RUNE_VOICE_HOST ?? (process.platform === "linux" ? "chromium" : "webview")) === "chromium"
+    ? new MediaPage("chromium", VOICE_LINGER_MS)
+    : mediaPage;

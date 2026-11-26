@@ -85,21 +85,33 @@ watch(APP_DIR, { recursive: true }, (_ev, file) => {
 });
 
 let watchSwap: Promise<boolean> | null = null;
+let watchSwapStartedAt = 0;
+let watchSwapOk = false;
 function swap() {
   if (pending) clearTimeout(pending);
   pending = null;
   let mtime = 0;
   try { mtime = statSync(join(APP_DIR, changed)).mtimeMs; } catch {}
+  watchSwapStartedAt = Date.now();
   const running = applySwap(changed, t_seen, mtime);
   watchSwap = running;
-  void running.finally(() => { if (watchSwap === running) watchSwap = null; });
+  void running.then((ok) => { if (watchSwap === running) { watchSwapOk = ok; watchSwap = null; } });
   return running;
 }
+
+/** A file the watcher's last swap already built from, i.e. one written before that swap started. */
+const builtByWatcher = (file: string) => {
+  const absolute = resolve(ROOT, "../..", file);
+  if (!absolute.startsWith(APP_DIR + "/")) return false;
+  try { return statSync(absolute).mtimeMs <= watchSwapStartedAt; } catch { return watchSwapStartedAt > 0; }
+};
 
 /** An app-source update has already moved the files, so a swap the watcher has seen covers it. */
 function swapForUpdate(paths: string[]): Promise<boolean> {
   if (pending) return swap();
-  return watchSwap ?? applySwap(paths.join(", ") || "app-source", now());
+  if (watchSwap) return watchSwap;
+  if (watchSwapOk && paths.length > 0 && paths.every(builtByWatcher)) return Promise.resolve(true);
+  return applySwap(paths.join(", ") || "app-source", now());
 }
 
 async function applySwap(label: string, t0: number, mtime = t0): Promise<boolean> {

@@ -15,9 +15,14 @@ pub fn rune_key(n: u32, p: &Props) -> String {
     p.id.clone().unwrap_or_else(|| format!("n{n}"))
 }
 
+thread_local! {
+    /// Building an element painted over a webview: its painting descendants mark where they draw.
+    static OVER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 pub fn build(s: &Win, eng: &Engine, id: u32) -> El {
     let Some(n) = eng.tree.get(id) else { return el() };
-    if n.props.id.is_some() && !eng.tree.live_above.contains(&id) && !matches!(n.kind, Kind::Input | Kind::Video | Kind::Audio | Kind::Webview) {
+    if !OVER.get() && n.props.id.is_some() && !eng.tree.live_above.contains(&id) && !matches!(n.kind, Kind::Input | Kind::Video | Kind::Audio | Kind::Webview) {
         let key = rune_key(id, &n.props);
         return rune::memo::memo_with_hash(key, n.ver, || build_node(s, eng, id, n));
     }
@@ -25,23 +30,96 @@ pub fn build(s: &Win, eng: &Engine, id: u32) -> El {
 }
 
 pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
-    for c in &n.children {
-        if eng.tree.get(*c).is_some_and(|c| c.props.lifted()) {
+    let toward_web: Vec<(usize, i16)> = if eng.tree.web_above.is_empty() {
+        Vec::new()
+    } else {
+        n.children
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| eng.tree.get(*c).filter(|x| x.kind == Kind::Webview || eng.tree.web_above.contains(c)).map(|x| (i, paint_order(&x.props))))
+            .collect()
+    };
+    for (i, c) in n.children.iter().enumerate() {
+        let Some(child) = eng.tree.get(*c) else {
+            e = e.child(build(s, eng, *c));
+            continue;
+        };
+        if child.props.lifted() {
             continue;
         }
-        e = e.child(build(s, eng, *c));
+        let p = &child.props;
+        let positioned = p.absolute.is_some() || p.inset.is_some() || paint_order(p) != 0;
+        let over = positioned
+            && !toward_web.iter().any(|(j, _)| *j == i)
+            && toward_web.iter().any(|(j, order)| paint_order(p) > *order || (paint_order(p) == *order && i > *j));
+        e = e.child(if over { build_over(s, eng, *c) } else { build(s, eng, *c) });
     }
     e
 }
 
+/// Builds an element CSS would paint over a webview (a positioned later sibling of the
+/// webview or of an ancestor, or one with a higher paint order; a fixed layer).
+pub fn build_over(s: &Win, eng: &Engine, id: u32) -> El {
+    let was = OVER.replace(true);
+    let e = build(s, eng, id);
+    OVER.set(was);
+    e
+}
+
+fn paint_order(p: &Props) -> i16 {
+    match p.raise {
+        Some(crate::props::RaiseP::Order(n)) => n,
+        _ => 0,
+    }
+}
+
+/// Whether the element itself draws something (rather than only holding children).
+fn paints(kind: Kind, p: &Props) -> bool {
+    !matches!(kind, Kind::Row | Kind::Col | Kind::Box | Kind::Window | Kind::List)
+        || p.fill.is_some()
+        || p.gradient.is_some()
+        || p.radial.is_some()
+        || p.border.is_some()
+        || p.shadows.as_ref().is_some_and(|s| !s.is_empty())
+        || p.backdrop_blur.is_some()
+}
+
 fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     let p = &*n.props;
-    let e = match n.kind {
+    if n.kind == Kind::Input {
+        let e = crate::input::build(s, id, p);
+        #[cfg(feature = "webview")]
+        if OVER.get() && !p.hidden {
+            return crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]));
+        }
+        return e;
+    }
+    let over = OVER.get();
+    let unseen = p.hidden || p.opacity == Some(0.0);
+    let marks = over && !unseen && paints(n.kind, p) && n.kind != Kind::Webview;
+    if over && (marks || unseen) {
+        OVER.set(false);
+    }
+    let e = build_kind(s, eng, id, n, p);
+    OVER.set(over);
+    let e = style::apply(e, p);
+    let mut e = handlers(e, id, p, false);
+    #[cfg(feature = "webview")]
+    if eng.tree.clippers.contains(&id) {
+        e = crate::webview::clipper(e, id);
+    } else if marks {
+        e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]));
+    }
+    e.key(rune_key(id, p))
+}
+
+fn build_kind(s: &Win, eng: &Engine, id: u32, n: &Node, p: &Props) -> El {
+    match n.kind {
         Kind::Row => children(s, eng, n, row()),
         Kind::Col | Kind::Window => children(s, eng, n, col()),
         Kind::Box => children(s, eng, n, el()),
         Kind::Text => text::build(p),
-        Kind::Input => return crate::input::build(s, id, p),
+        Kind::Input => crate::input::build(s, id, p),
         Kind::Image => media::image(eng, id, p),
         Kind::Icon => media::icon(p),
         Kind::Vector => media::vector(id, p),
@@ -54,14 +132,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         #[cfg(not(feature = "webview"))]
         Kind::Webview => el(),
         Kind::List => list(id, n),
-    };
-    let e = style::apply(e, p);
-    let mut e = handlers(e, id, p, false);
-    #[cfg(feature = "webview")]
-    if eng.tree.clippers.contains(&id) {
-        e = crate::webview::clipper(e, id);
     }
-    e.key(rune_key(id, p))
 }
 
 fn list(id: u32, n: &Node) -> El {

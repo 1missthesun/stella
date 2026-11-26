@@ -57,6 +57,8 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
     let maximized = cx.is_maximized();
     let full = cx.is_full_screen();
     let node = s.node;
+    #[cfg(feature = "webview")]
+    crate::webview::begin_build(node);
     let root = engine::read(|eng| {
         let mut root = col().key("stella-root").w_full().h_full().fill(s.bg.unwrap_or_else(|| bg(eng, node)));
         if let Some(n) = eng.tree.get(node).filter(|_| node != 0) {
@@ -75,6 +77,9 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
             root = crate::style::paint(root, &inner);
             root = crate::view::children(s, eng, n, root);
             for l in eng.tree.lifted_in(node) {
+                #[cfg(feature = "webview")]
+                let mut layer = if !eng.tree.web_above.is_empty() && !crate::webview::is_overlay(eng, l) { crate::view::build_over(s, eng, l) } else { build(s, eng, l) };
+                #[cfg(not(feature = "webview"))]
                 let mut layer = build(s, eng, l);
                 if eng.tree.get(l).is_some_and(|n| n.props.dir.is_none()) {
                     match eng.tree.dir_of(l) {
@@ -446,6 +451,8 @@ fn drain(polling: u32) {
         crate::webview::close(*n);
         #[cfg(feature = "webview")]
         crate::webview::forget_overlay(*n);
+        #[cfg(feature = "webview")]
+        crate::webview::forget_over(*n);
         crate::media::forget(*n);
         crate::surface::forget(*n);
         forget_selection(*n);
@@ -668,6 +675,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     #[cfg(feature = "webview")]
     if crate::webview::active() {
         crate::webview::retry_waiting();
+        crate::webview::refresh_all();
         crate::webview::pump();
         if crate::webview::needs_ticks() {
             tx.wake_after(Duration::from_millis(8));

@@ -124,7 +124,7 @@ export function ExtrasCard({ active, answered, canConnectGmail, onAnswer }: Extr
 
   if (!open) {
     return (
-      <col {...s.obcCard} {...((true) ? s.obcCardSettled : null)}>
+      <row {...s.obcCard} {...s.obcCardSettled}>
         <row {...s.obcCardSettledIcon}>
           <Check size={15} color={s.obcCardSettledIcon.color} />
         </row>
@@ -133,7 +133,7 @@ export function ExtrasCard({ active, answered, canConnectGmail, onAnswer }: Extr
             {t("onboarding.chat.extras.settledTitle")}
           </T>
         </col>
-      </col>
+      </row>
     );
   }
 

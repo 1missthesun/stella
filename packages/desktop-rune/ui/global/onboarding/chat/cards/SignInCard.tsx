@@ -379,7 +379,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
             ? t("onboarding.chat.signin.settledStella")
             : t("onboarding.chat.signin.settledNone");
     return (
-      <col {...s.obcCard} {...((true) ? s.obcCardSettled : null)}>
+      <row {...s.obcCard} {...s.obcCardSettled}>
         <row {...s.obcCardSettledIcon}>
           {anyConnected ? <Check size={15} color={s.obcCardSettledIcon.color} /> : <KeyRound size={15} color={s.obcCardSettledIcon.color} />}
         </row>
@@ -391,7 +391,7 @@ export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
               : t("onboarding.chat.signin.settledNoneDesc")}
           </T>
         </col>
-      </col>
+      </row>
     );
   }
 

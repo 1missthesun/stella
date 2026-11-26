@@ -361,7 +361,7 @@ export const NotificationBell = memo(function NotificationBell() {
           )}
         </TopbarButton>
       </box>
-      <Panel id="notification-panel" anchor="notification-bell" open={open} onClose={() => setNotificationPanelOpen(false)} w={Math.min(392, window.innerWidth - 16)} maxH={Math.min(480, window.innerHeight - 64)} label={t("shell.notifications.title")}>
+      <Panel id="notification-panel" anchor="notification-bell" focusSelf open={open} onClose={() => setNotificationPanelOpen(false)} w={Math.min(392, window.innerWidth - 16)} maxH={Math.min(480, window.innerHeight - 64)} label={t("shell.notifications.title")}>
         <row w="full" pt={12} px={PANEL_INSET} pb={6} gap={12} align="center" justify="between">
           <text {...HEAD} color={tk.c.textStrong}>{t("shell.notifications.title")}</text>
           {items.length > 1 ? <ClearAllButton /> : null}

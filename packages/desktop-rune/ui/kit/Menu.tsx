@@ -1,4 +1,5 @@
 import { createContext, isValidElement, useContext, type ReactNode } from "react";
+import { DismissLayer } from "./dismiss-layer";
 import { derive, font, fontSize, layer, look, mix, radius, type Tokens, useTokens } from "../theme";
 import { Icon, Icons, type IconData } from "./icons";
 
@@ -65,7 +66,7 @@ export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom",
             pad={6 + 1}
             {...s}
           >
-            {children}
+            <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
           </col>
         </MenuClose.Provider>
       ) : null}
@@ -321,7 +322,7 @@ export function Popover({ id, open, onOpenChange, trigger, side = "bottom", alig
             shadows={t.shadow.overlay}
             pad={padded ? 12 + 1 : 1}
           >
-            {children}
+            <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
           </col>
         </MenuClose.Provider>
       ) : null}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { layer, mixOklch, radius, derive, type Tokens, useTokens } from "../../theme";
 import { MenuCloseProvider } from "./menu-close";
+import { DismissLayer } from "../../kit/dismiss-layer";
 import { withStroke, type IconData } from "../../kit";
 
 /** Colours of `.shell-topbar-full__right` controls: muted at rest, 5% / 9% foreground fills. */
@@ -74,12 +75,14 @@ export type PanelProps = {
   label?: string;
   onHover?: (inside: boolean) => void;
   modal?: boolean;
+  /** Focus the panel itself on open rather than its first control (desktop-ui's `onOpenAutoFocus` focusing the content). */
+  focusSelf?: boolean;
   radius?: number;
   children: ReactNode;
 };
 
 /** desktop-ui's `PopoverContent` (`--overlay-surface-bg`, border-base, overlay shadow); opens and closes instantly. */
-export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end", gap = 8, w, h, maxH, label, onHover, modal = true, radius: r = radius.lg, children }: PanelProps) {
+export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end", gap = 8, w, h, maxH, label, onHover, modal = true, focusSelf = false, radius: r = radius.lg, children }: PanelProps) {
   const t = useTokens();
   if (!open) return null;
   return (
@@ -93,6 +96,8 @@ export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end
         modal={modal ? { clickOutside: true } : undefined}
         onDismiss={onClose}
         onHover={onHover}
+        focusable={focusSelf || undefined}
+        autoFocus={focusSelf || undefined}
         noWindowDrag
         w={w}
         minW={w ?? 200}
@@ -107,7 +112,7 @@ export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end
         shadows={t.shadow.overlay}
         pad={1}
       >
-        {children}
+        <DismissLayer.Provider value={onClose}>{children}</DismissLayer.Provider>
       </col>
     </MenuCloseProvider>
   );

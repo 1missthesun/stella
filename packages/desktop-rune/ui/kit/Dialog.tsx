@@ -3,6 +3,7 @@ import { font, fontSize, look, radius, useTokens } from "../theme";
 import { useT } from "../i18n";
 import { IconButton } from "./Button";
 import { Icon, Icons } from "./icons";
+import { DismissLayer } from "./dismiss-layer";
 
 const SIZES = { md: { w: 480, h: 512 }, lg: { w: 720, h: 512 }, xl: { w: 860, h: 640 }, page: { w: 1120, h: 820 } } as const;
 
@@ -61,7 +62,7 @@ export function Dialog({ id, open, onOpenChange, size = "md", fit = false, label
             exit={{ opacity: 0, scale: 0.96, dur: 0.15 }}
             onPress={() => {}}
           >
-            {children}
+            <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
           </col>
         </col>
       </col>

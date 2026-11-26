@@ -6,6 +6,7 @@ import { domEvent, useFormSubmit, type DomEvent } from "./press";
 import { T, useInk } from "./text";
 import { useTextBase } from "./scope";
 import { TimeInput } from "./time-input";
+import { useDismissLayer } from "../dismiss-layer";
 
 export type SwitchProps = Omit<Style, "id"> & {
   id?: string;
@@ -179,6 +180,7 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
   const base = useTextBase();
   const ink = useInk();
   const submit = useFormSubmit();
+  const dismissLayer = useDismissLayer();
   const [own, setOwn] = useState(defaultValue ?? "");
   const current = value ?? own;
   const [focused, setFocused] = useState(false);
@@ -225,7 +227,10 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
       {...(rowsHeight === undefined ? null : { h: rowsHeight })}
       opacity={disabled ? 0.5 : style.opacity}
       keys={onKeyDown ? KEYS : undefined}
-      onKey={(k) => onKeyDown?.(domEvent(current, { key: k.key, metaKey: k.mods?.meta, ctrlKey: k.mods?.ctrl, shiftKey: k.mods?.shift, altKey: k.mods?.alt }))}
+      onKey={(k) => {
+        onKeyDown?.(domEvent(current, { key: k.key, metaKey: k.mods?.meta, ctrlKey: k.mods?.ctrl, shiftKey: k.mods?.shift, altKey: k.mods?.alt }));
+        if (k.key === "Escape") dismissLayer?.();
+      }}
       onFocus={(next) => {
         setFocused(next);
         if (next) onFocus?.();

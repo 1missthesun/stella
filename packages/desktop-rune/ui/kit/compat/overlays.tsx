@@ -7,6 +7,7 @@ import { useT } from "../../i18n";
 import { Icon, Icons } from "../icons";
 import { Press, type DomEvent } from "./press";
 import { BODY_TEXT, TextScope } from "./scope";
+import { DismissLayer } from "../dismiss-layer";
 import { Ink, T } from "./text";
 
 type OpenState = { open: boolean; setOpen: (open: boolean) => void; id: string };
@@ -93,9 +94,11 @@ export function DialogContent({ size = "md", fit = false, frame, children, onEsc
             onPress={() => {}}
             {...panel}
           >
-            <SettingsScreenScope.Provider value={false}>
-              <TextScope base={BODY_TEXT}>{children}</TextScope>
-            </SettingsScreenScope.Provider>
+            <DismissLayer.Provider value={() => dismiss(false)}>
+              <SettingsScreenScope.Provider value={false}>
+                <TextScope base={BODY_TEXT}>{children}</TextScope>
+              </SettingsScreenScope.Provider>
+            </DismissLayer.Provider>
           </col>
         </col>
       </col>
@@ -241,7 +244,9 @@ export function DropdownMenuContent({ side = "bottom", align = "center", sideOff
       {...menuSurface(t)}
       {...style}
     >
-      <TextScope base={BODY_TEXT}>{children}</TextScope>
+      <DismissLayer.Provider value={() => setOpen(false)}>
+        <TextScope base={BODY_TEXT}>{children}</TextScope>
+      </DismissLayer.Provider>
     </col>
   );
 }
@@ -270,9 +275,11 @@ export function PopoverContent({ side = "bottom", align = "center", sideOffset =
       pad={1}
       {...style}
     >
-      <SettingsScreenScope.Provider value={false}>
-        <TextScope base={BODY_TEXT}>{children}</TextScope>
-      </SettingsScreenScope.Provider>
+      <DismissLayer.Provider value={() => setOpen(false)}>
+        <SettingsScreenScope.Provider value={false}>
+          <TextScope base={BODY_TEXT}>{children}</TextScope>
+        </SettingsScreenScope.Provider>
+      </DismissLayer.Provider>
     </col>
   );
 }

@@ -14,7 +14,7 @@ import { useRegisterViewerNav, useViewerDetailReporter } from "@/shell/workspace
 import { usePreviewParser } from "../../replace/shell/display/use-preview-parser";
 import { EmptyState, Icons, useRetainedSurfaceActive, type EmptyStateMotif } from "../../kit";
 import { CHAT_TEXT } from "../../kit";
-import { font, look, mixOklch, derive, useTokens, type Tokens } from "../../theme";
+import { alpha, font, look, mixOklch, derive, useTokens, type Tokens } from "../../theme";
 import { Markdown } from "../../chat/Markdown";
 import { mounted } from "../../app/mount";
 
@@ -200,9 +200,15 @@ function DelimitedTableView({ filePath, title, onRetry }: { filePath: string; ti
   const header = rows[0] ?? [];
   const body = rows.slice(1);
   const { actionStatus, handleSave, handleCopy } = useFilePreviewActions({ sourcePath: filePath, suggestedName: title ?? fileName(filePath) ?? "data.csv" });
+  const [tableW, setTableW] = useState(0);
+  const columnW = Math.max(TABLE_COLUMN, columnCount > 0 ? tableW / columnCount : 0);
+  const cellEdge = alpha(tk.c.border, 0.45);
+  const rowEdge = alpha(tk.c.border, 0.38);
+  const headerFill = mixOklch(tk.c.background, 92, tk.c.foreground);
   const cell = (value: string, key: number, strong: boolean) => (
-    <box key={key} w={TABLE_COLUMN} h={TABLE_ROW} px={10} align="center" shrink={false} borderSides={[0, 1, 1, 0]} border={tk.c.borderWeak} fill={strong ? tk.c.surfaceBase : undefined}>
-      <text {...look(12, strong ? 600 : 400)} color={strong ? tk.c.textStrong : tk.c.textBase} nowrap truncate>
+    <box key={key} w={columnW} h={TABLE_ROW} px={9} align="center" shrink={false} borderSides={[0, 1, 0, 0]} border={cellEdge}>
+      <box absolute={{ left: 0, right: 0, bottom: 0 }} h={1} fill={rowEdge} />
+      <text {...look(12, strong ? 600 : 400, { lh: 17 / 12 })} color={strong ? tk.c.textStrong : tk.c.foreground} nowrap truncate>
         {value}
       </text>
     </box>
@@ -227,12 +233,12 @@ function DelimitedTableView({ filePath, title, onRetry }: { filePath: string; ti
       ) : rows.length === 0 ? (
         <PreviewEmpty title={t("shell.display.preview.emptyTitle")} />
       ) : (
-        <col id="display-table-scroll" shrink minH={0} h={Math.min(480, (body.length + 1) * TABLE_ROW)} scrollX scrollY border={tk.c.borderWeak} radius={8} clip={8}>
-          <col w={columnCount * TABLE_COLUMN}>
-            <row sticky="top">{Array.from({ length: columnCount }, (_, i) => cell(header[i] || t("shell.display.spreadsheet.column", { index: i + 1 }), i, true))}</row>
+        <col id="display-table-scroll" shrink minH={0} h={Math.min(480, (body.length + 1) * TABLE_ROW) + 2} pad={1} scrollX scrollY fill={tk.c.card} border={tk.c.border} radius={8} clip={8} onLayout={(r) => setTableW((w) => (Math.abs(w - (r.w - 2)) < 0.5 ? w : r.w - 2))}>
+          <col w={columnCount * columnW}>
+            <row sticky="top" fill={headerFill}>{Array.from({ length: columnCount }, (_, i) => cell(header[i] || t("shell.display.spreadsheet.column", { index: i + 1 }), i, true))}</row>
             <list id="display-table-rows" estimate={TABLE_ROW} overscan={[8, 8]} growth={false}>
               {body.map((row, r) => (
-                <row key={r} id={`display-table-row-${r}`}>
+                <row key={r} id={`display-table-row-${r}`} hoverFill={alpha(tk.c.foreground, 0.04)}>
                   {Array.from({ length: columnCount }, (_, i) => cell(row[i] ?? "", i, false))}
                 </row>
               ))}

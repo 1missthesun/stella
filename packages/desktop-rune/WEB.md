@@ -32,6 +32,25 @@ local runtime), `#ott` sign-in handoff (`global/auth/services/auth-session.ts`),
 by index.html before the app). What the web can't do degrades as desktop-ui's web build does:
 other windows render nothing, native menus are DOM menus, tray and window commands are no-ops.
 
+## Measured against today's /chat-app
+
+`packages/website/scripts/perf-chat.mjs --variants today=…,rune=… --runs 9` (4× CPU, fast 4G,
+ABBA), today built with `--static-home`, medians:
+
+| | today | Rune |
+|---|---|---|
+| Cold: first typeable composer | 1196 ms (the static home) | 2690 ms |
+| Cold: the app's composer typeable | 3680 ms | 2690 ms |
+| Warm: the app's composer typeable | 611 ms | 744 ms |
+| Blocking time after typeable (cold) | 608 ms | 159 ms |
+| JS transferred / requests | 868 KB / 78 | 863 KB / 7 |
+| Build on disk (JS, brotli) | 8.6 MB (2.1 MB), 159 files | 3.1 MB (0.8 MB), 51 files |
+| Keystroke p90 | 80 ms | 80 ms |
+
+The Rune page lays out more (418 DOM nodes against 280; layout 100 ms against 26 ms cold), and
+on a cold load its composer starts docked and moves to the home position once the conversation
+is known empty (desktop-ui does the same under its static home).
+
 Not on the web: `--static-home` (desktop-ui's pre-rendered home, which hands its textarea to
 `textarea.chat-composer-textarea`). The Rune build shows the page's own launch background until
 the app renders.

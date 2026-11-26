@@ -1,5 +1,5 @@
 import { mixSrgbCss, parseColorOr, withAlpha } from "@stella/theme";
-import { mixOklchCss } from "@stella/theme/color";
+import { CSS_POWERLESS_CHROMA, mixOklchCss } from "@stella/theme/color";
 
 const byte = (v: number) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0");
 
@@ -14,6 +14,6 @@ export function hex(css: string): string {
 export const mix = (a: string, pct: number, b: string) => hex(mixSrgbCss(a, pct, b));
 
 /** `color-mix(in oklch, a pct%, b)`. */
-export const mixOklch = (a: string, pct: number, b: string) => hex(mixOklchCss(a, pct, b));
+export const mixOklch = (a: string, pct: number, b: string) => hex(mixOklchCss(a, pct, b, CSS_POWERLESS_CHROMA));
 
 export const alpha = (c: string, a: number) => hex(withAlpha(c, a));

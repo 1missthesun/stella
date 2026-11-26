@@ -71,10 +71,11 @@ These live on rune/desktop only and go to master at ship time:
   pushed change builds the per-user web renderer from the Rune `ui/` (WEB.md, "Per-user
   renderers"): its own inputs, uploaded ref `refs/stella/web-renderer-rune` and renderer id.
   Under Electron it builds desktop-ui exactly as before.
-- `packages/theme/color.ts`: `mixOklch` drops the hue of a colour below chroma 0.02, as
-  Chromium's `color-mix(in oklch)` does for sRGB colours (was 1e-4). `mixOklch(primary 18%,
-  #38383a)` is now blue like Electron's composer focus border instead of purple; the theme's
-  `panelSurfaceBorderHover` / `selectFill` / `selectBorder` tokens follow the browser the same way.
+- `packages/theme/color.ts`: `mixOklch` / `mixOklchCss` take an optional powerless-chroma
+  threshold and export `CSS_POWERLESS_CHROMA` (0.02), the chroma below which Chromium's
+  `color-mix(in oklch)` drops an sRGB colour's hue. `ui/theme`'s `mixOklch` passes it, so
+  `mixOklch(primary 18%, #38383a)` is blue like Electron's composer focus border instead of
+  purple. The default stays 1e-4, so the theme's derived tokens are unchanged.
 - `packages/website/scripts/perf-chat.mjs`: the composer probe also finds the Rune web build's
   composer (`[data-rid^="composer-input:"] > textarea`), so `--variants` compares the two builds.
 

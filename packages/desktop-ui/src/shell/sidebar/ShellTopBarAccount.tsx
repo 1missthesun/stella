@@ -179,7 +179,6 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem
-            data-variant="destructive"
             onClick={() => {
               pendingSignOutRef.current = true;
             }}

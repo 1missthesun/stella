@@ -1,11 +1,28 @@
 .settings-screen {
   --settings-hairline: color-mix(in oklch, var(--foreground) 7%, transparent);
   --settings-hairline-strong: color-mix(in oklch, var(--foreground) 13%, transparent);
+  --settings-pill-bg: color-mix(in oklch, var(--foreground) 6.5%, transparent);
+  --settings-pill-bg-hover: color-mix(in oklch, var(--foreground) 11%, transparent);
+  --settings-pill-bg-active: color-mix(in oklch, var(--foreground) 15%, transparent);
+  --settings-danger-bg: color-mix(in oklch, var(--destructive) 11%, transparent);
+  --settings-danger-bg-hover: color-mix(in oklch, var(--destructive) 17%, transparent);
+  --settings-danger-bg-active: color-mix(in oklch, var(--destructive) 22%, transparent);
+  --settings-danger-text: color-mix(in oklch, var(--destructive) 84%, var(--text-strong));
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
   background: transparent;
+}
+
+.dark .settings-screen {
+  --settings-pill-bg: color-mix(in oklch, var(--foreground) 9.5%, transparent);
+  --settings-pill-bg-hover: color-mix(in oklch, var(--foreground) 14.5%, transparent);
+  --settings-pill-bg-active: color-mix(in oklch, var(--foreground) 18.5%, transparent);
+  --settings-danger-bg: color-mix(in oklch, var(--destructive) 16%, transparent);
+  --settings-danger-bg-hover: color-mix(in oklch, var(--destructive) 23%, transparent);
+  --settings-danger-bg-active: color-mix(in oklch, var(--destructive) 29%, transparent);
+  --settings-danger-text: color-mix(in oklch, var(--destructive) 86%, #ffffff);
 }
 
 .settings-layout {
@@ -473,6 +490,20 @@
   color: var(--text-strong);
 }
 
+.settings-row-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-row-label-inline > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-row-sublabel {
   font-size: 13px;
   line-height: 1.45;
@@ -484,7 +515,7 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
 }
 
 .settings-row-control--stacked {
@@ -553,49 +584,189 @@
   border-radius: 6px;
 }
 
-/* Airy unboxed text actions & quiet selects scoped to Settings */
+/* Restrained soft-pill actions, quiet icon triggers & inline edits scoped to Settings */
 .settings-screen .pill-btn,
 .settings-screen .pill-btn[data-component="button"] {
   min-height: 28px;
-  padding: 5px 9px;
-  margin: -5px -9px;
+  height: 28px;
+  padding: 0 12px;
+  margin: 0;
   border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--interactive, var(--primary));
-  font-size: 14.5px;
+  border-radius: 8px;
+  background: var(--settings-pill-bg);
+  color: var(--text-strong);
+  font-size: 13px;
   font-weight: var(--weight-semibold);
-  letter-spacing: -0.012em;
-}
-
-.settings-screen .pill-btn + .pill-btn {
-  margin-left: 4px;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  gap: 6px;
 }
 
 .settings-screen .pill-btn:hover:not(:disabled),
 .settings-screen .pill-btn[data-component="button"]:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
-  color: var(--interactive, var(--primary));
+  background: var(--settings-pill-bg-hover);
+  color: var(--text-strong);
+}
+
+.settings-screen .pill-btn:active:not(:disabled),
+.settings-screen .pill-btn[data-component="button"]:active:not(:disabled) {
+  background: var(--settings-pill-bg-active);
+  color: var(--text-strong);
+}
+
+.settings-screen .pill-btn:disabled,
+.settings-screen .pill-btn[data-component="button"]:disabled {
+  opacity: 0.45;
+  background: var(--settings-pill-bg);
+  color: var(--text-weak);
 }
 
 .settings-screen .pill-btn--danger,
 .settings-screen .pill-btn--danger[data-component="button"] {
-  color: var(--destructive);
+  background: var(--settings-danger-bg);
+  color: var(--settings-danger-text);
 }
 
 .settings-screen .pill-btn--danger:hover:not(:disabled),
 .settings-screen .pill-btn--danger[data-component="button"]:hover:not(:disabled) {
-  color: var(--destructive);
-  background: color-mix(in oklch, var(--destructive) 9%, transparent);
+  background: var(--settings-danger-bg-hover);
+  color: var(--settings-danger-text);
+}
+
+.settings-screen .pill-btn--danger:active:not(:disabled),
+.settings-screen .pill-btn--danger[data-component="button"]:active:not(:disabled) {
+  background: var(--settings-danger-bg-active);
+  color: var(--settings-danger-text);
+}
+
+.settings-screen .pill-btn--danger:disabled,
+.settings-screen .pill-btn--danger[data-component="button"]:disabled {
+  background: var(--settings-danger-bg);
+  color: var(--settings-danger-text);
 }
 
 .settings-screen .pill-btn--primary,
 .settings-screen .pill-btn--primary[data-component="button"] {
+  min-height: 28px;
+  height: 28px;
   margin: 0;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--interactive);
-  color: var(--interactive-foreground);
+  padding: 0 13px;
+  border: none;
+  border-radius: 8px;
+  background: var(--interactive, var(--primary));
+  color: var(--interactive-foreground, var(--primary-foreground));
+}
+
+.settings-screen .pill-btn--primary:hover:not(:disabled),
+.settings-screen .pill-btn--primary[data-component="button"]:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 10%, var(--interactive, var(--primary)));
+  color: var(--interactive-foreground, var(--primary-foreground));
+}
+
+.settings-screen .pill-btn--primary:active:not(:disabled),
+.settings-screen .pill-btn--primary[data-component="button"]:active:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 16%, var(--interactive, var(--primary)));
+  color: var(--interactive-foreground, var(--primary-foreground));
+}
+
+.settings-icon-btn,
+.settings-icon-btn[data-component="button"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-weak);
+  cursor: default;
+  flex-shrink: 0;
+  transition: background 0.14s ease, color 0.14s ease, opacity 0.14s ease;
+}
+
+.settings-icon-btn:hover:not(:disabled),
+.settings-icon-btn[data-component="button"]:hover:not(:disabled),
+.settings-icon-btn[data-state="open"],
+.settings-icon-btn[data-component="button"][data-state="open"] {
+  background: var(--settings-pill-bg-hover, color-mix(in oklch, var(--foreground) 10%, transparent));
+  color: var(--text-strong);
+}
+
+.settings-icon-btn:active:not(:disabled),
+.settings-icon-btn[data-component="button"]:active:not(:disabled) {
+  background: var(--settings-pill-bg-active, color-mix(in oklch, var(--foreground) 14%, transparent));
+}
+
+.settings-icon-btn:focus-visible,
+.settings-icon-btn[data-component="button"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.settings-icon-btn:disabled,
+.settings-icon-btn[data-component="button"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--text-weak);
+}
+
+.settings-icon-btn--danger:hover:not(:disabled),
+.settings-icon-btn--danger[data-component="button"]:hover:not(:disabled) {
+  background: var(--settings-danger-bg, color-mix(in oklch, var(--destructive) 12%, transparent));
+  color: var(--settings-danger-text, var(--destructive));
+}
+
+.settings-icon-btn--danger:active:not(:disabled),
+.settings-icon-btn--danger[data-component="button"]:active:not(:disabled) {
+  background: var(--settings-danger-bg-active, color-mix(in oklch, var(--destructive) 22%, transparent));
+  color: var(--settings-danger-text, var(--destructive));
+}
+
+.settings-icon-btn__spin {
+  animation: settings-icon-spin 0.9s linear infinite;
+}
+
+@keyframes settings-icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.settings-inline-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-weaker);
+  cursor: default;
+  flex-shrink: 0;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.settings-inline-edit-btn:hover:not(:disabled) {
+  background: var(--settings-pill-bg-hover, color-mix(in oklch, var(--foreground) 10%, transparent));
+  color: var(--text-strong);
+}
+
+.settings-inline-edit-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.settings-inline-edit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .settings-screen .settings-row-control [data-slot="select-trigger"] {
@@ -677,9 +848,68 @@
 .settings-confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 8px;
   margin-top: 18px;
   padding: 0 24px 24px;
+}
+
+.settings-confirm-actions--flush {
+  padding: 0;
+}
+
+.settings-confirm-actions .pill-btn,
+.settings-confirm-actions .pill-btn[data-component="button"] {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.dark .settings-confirm-actions .pill-btn,
+.dark .settings-confirm-actions .pill-btn[data-component="button"] {
+  background: color-mix(in oklch, var(--foreground) 10%, transparent);
+}
+
+.settings-confirm-actions .pill-btn:hover:not(:disabled),
+.settings-confirm-actions .pill-btn[data-component="button"]:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 12%, transparent);
+  color: var(--text-strong);
+}
+
+.dark .settings-confirm-actions .pill-btn:hover:not(:disabled),
+.dark .settings-confirm-actions .pill-btn[data-component="button"]:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 15%, transparent);
+}
+
+.settings-confirm-actions .pill-btn--danger,
+.settings-confirm-actions .pill-btn--danger[data-component="button"] {
+  background: color-mix(in oklch, var(--destructive) 12%, transparent);
+  color: color-mix(in oklch, var(--destructive) 84%, var(--text-strong));
+}
+
+.dark .settings-confirm-actions .pill-btn--danger,
+.dark .settings-confirm-actions .pill-btn--danger[data-component="button"] {
+  background: color-mix(in oklch, var(--destructive) 18%, transparent);
+  color: color-mix(in oklch, var(--destructive) 86%, #ffffff);
+}
+
+.settings-confirm-actions .pill-btn--danger:hover:not(:disabled),
+.settings-confirm-actions .pill-btn--danger[data-component="button"]:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--destructive) 18%, transparent);
+}
+
+.dark .settings-confirm-actions .pill-btn--danger:hover:not(:disabled),
+.dark .settings-confirm-actions .pill-btn--danger[data-component="button"]:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--destructive) 25%, transparent);
 }
 
 [data-slot="dialog-content"].settings-confirm-dialog {

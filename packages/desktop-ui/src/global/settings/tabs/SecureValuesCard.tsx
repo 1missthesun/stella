@@ -6,6 +6,7 @@ import { formatJoinCode } from "@stella/contracts/saved-values-trust";
 import { useSavedValuesSync } from "@/features/saved-values/use-saved-values-sync";
 import { Switch } from "@/ui/switch";
 import { Button } from "@/ui/button";
+import { LogOut, Pencil, Trash2 } from "@/ui/icons";
 import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
 import { getElectronApi } from "@/platform/electron/electron";
@@ -211,7 +212,21 @@ export function SecureValuesCard() {
                   />
                 </form>
               ) : (
-                <div className="settings-row-label">{value.label}</div>
+                <div className="settings-row-label settings-row-label-inline">
+                  <span>{value.label}</span>
+                  <button
+                    type="button"
+                    className="settings-inline-edit-btn"
+                    disabled={busy !== null}
+                    aria-label={`${t("settings.secureValues.rename")} — ${value.label}`}
+                    title={t("settings.secureValues.rename")}
+                    onClick={() =>
+                      setRenaming({ id: value.id, label: value.label })
+                    }
+                  >
+                    <Pencil size={13} aria-hidden />
+                  </button>
+                </div>
               )}
               <div className="settings-row-sublabel">
                 {details.join(" · ")}
@@ -232,7 +247,7 @@ export function SecureValuesCard() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="pill-btn"
+                    className="pill-btn pill-btn--primary"
                     disabled={busy !== null || !renaming.label.trim()}
                     onClick={(event) => void rename(event)}
                   >
@@ -240,28 +255,17 @@ export function SecureValuesCard() {
                   </Button>
                 </>
               ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="pill-btn"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      setRenaming({ id: value.id, label: value.label })
-                    }
-                  >
-                    {t("settings.secureValues.rename")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="pill-btn pill-btn--danger"
-                    disabled={busy !== null}
-                    onClick={() => void remove({ id: value.id })}
-                  >
-                    {t("settings.secureValues.delete")}
-                  </Button>
-                </>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="settings-icon-btn settings-icon-btn--danger"
+                  disabled={busy !== null}
+                  aria-label={`${t("settings.secureValues.delete")} — ${value.label}`}
+                  title={t("settings.secureValues.delete")}
+                  onClick={() => void remove({ id: value.id })}
+                >
+                  <Trash2 size={15} aria-hidden />
+                </Button>
               )}
             </div>
           </div>
@@ -385,11 +389,13 @@ function SyncDevices({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="pill-btn pill-btn--danger"
+                    className="settings-icon-btn"
                     disabled={busy !== null}
+                    aria-label={`${t("settings.secureValues.removeDevice")} — ${device.name}`}
+                    title={t("settings.secureValues.removeDevice")}
                     onClick={() => void onAction(`device:${device.deviceId}`, { action: "remove", deviceId: device.deviceId })}
                   >
-                    {t("settings.secureValues.removeDevice")}
+                    <LogOut size={15} aria-hidden />
                   </Button>
                 </div>
               )}

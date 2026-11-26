@@ -1,6 +1,7 @@
 import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/ui/button";
+import { RotateCcw } from "@/ui/icons";
 import {
   useDesktopPermissions,
   type DesktopPermissionStatus,
@@ -295,6 +296,7 @@ function MacPermissionSettings() {
               !permissionsLoaded || resettingPermission === "accessibility"
             }
             onClick={() => void handlePermissionReset("accessibility")}
+            confirming={confirmingAccessibilityReset}
             label={
               confirmingAccessibilityReset
                 ? t("settings.permissions.restart.action")
@@ -385,7 +387,7 @@ function MacPermissionSettings() {
             <Button
               type="button"
               variant="ghost"
-              className="pill-btn pill-btn--danger"
+              className="pill-btn"
               disabled={isRestartingAfterPermissions}
               onClick={() => void handlePermissionRestart()}
             >
@@ -404,22 +406,39 @@ function PermissionResetButton({
   disabled,
   onClick,
   label,
+  confirming = false,
 }: {
   disabled: boolean;
   onClick: () => void;
   label: string;
+  confirming?: boolean;
 }) {
+  if (confirming) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        className="pill-btn pill-btn--danger"
+        disabled={disabled}
+        onClick={onClick}
+        aria-label={label}
+        title={label}
+      >
+        {label}
+      </Button>
+    );
+  }
   return (
     <Button
       type="button"
       variant="ghost"
-      className="pill-btn pill-btn--quiet pill-btn--danger"
+      className="settings-icon-btn"
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
       title={label}
     >
-      {label}
+      <RotateCcw size={14} aria-hidden />
     </Button>
   );
 }

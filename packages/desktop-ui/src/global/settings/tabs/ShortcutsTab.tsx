@@ -2,6 +2,7 @@ import { SettingsTabHeader } from "@/global/settings/AiryControls";
 import { useCallback, useEffect, useState } from "react";
 import { showToast } from "@/ui/toast";
 import { Button } from "@/ui/button";
+import { X } from "@/ui/icons";
 import { Keybind } from "@/ui/keybind";
 import { useT } from "@/shared/i18n";
 import { getSettingsErrorMessage } from "./shared";
@@ -262,7 +263,9 @@ export function ShortcutsTab() {
         <Button
           type="button"
           variant="ghost"
-          className="pill-btn"
+          className="settings-icon-btn"
+          aria-label={`${t("settings.shortcuts.clear")} — ${actionLabel(action)}`}
+          title={t("settings.shortcuts.clear")}
           disabled={
             !loaded ||
             savingShortcut !== null ||
@@ -271,7 +274,7 @@ export function ShortcutsTab() {
           }
           onClick={() => void saveShortcut(action, "")}
         >
-          {t("settings.shortcuts.clear")}
+          <X size={14} aria-hidden />
         </Button>
       </div>
     </div>

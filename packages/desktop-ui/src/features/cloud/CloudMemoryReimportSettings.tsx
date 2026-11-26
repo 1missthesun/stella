@@ -194,7 +194,7 @@ export function CloudMemoryReimportSettings() {
               erased. Skills are unaffected.
             </DialogDescription>
           </DialogHeader>
-          <div style={dialogActionsStyle}>
+          <div className="settings-confirm-actions settings-confirm-actions--flush" style={dialogActionsStyle}>
             <Button
               type="button"
               variant="ghost"
@@ -233,7 +233,7 @@ export function CloudMemoryReimportSettings() {
               undone.
             </DialogDescription>
           </DialogHeader>
-          <div style={dialogActionsStyle}>
+          <div className="settings-confirm-actions settings-confirm-actions--flush" style={dialogActionsStyle}>
             <Button
               type="button"
               variant="ghost"

@@ -467,6 +467,7 @@ export function ClaudeAccountsSection({
     items.push({
       key: "remove",
       label: t(`${K}.remove`),
+      destructive: true,
       onSelect: () =>
         void run(
           () => cloudEnginesApi.disconnect("anthropic", account.accountId),
@@ -629,6 +630,7 @@ export function ClaudeAccountsSection({
               {
                 key: "remove",
                 label: t(`${K}.remove`),
+                destructive: true,
                 onSelect: () => void run(() => local.signOut(config.configId)),
               },
             ]}
@@ -640,6 +642,7 @@ export function ClaudeAccountsSection({
             meta={t(`${C}.ownLoginHint`)}
             {...(chosenId === null ? { inUseLabel: t(`${K}.inUse`) } : {})}
             {...(chosenId !== null ? { onUse: () => choose(null), useLabel: t(`${K}.use`) } : {})}
+            reserveMenuSlot={accounts.length > 0 || unlistedLocal.length > 0 || signedOutExtras.length > 0}
             busy={disabled}
           />
         ) : null}

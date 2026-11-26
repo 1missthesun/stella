@@ -368,22 +368,44 @@
 
 .billing-text-action {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  margin: 0;
   border: none;
-  background: transparent;
-  padding: 6px 8px;
-  margin: -6px -8px;
-  border-radius: 7px;
-  color: var(--interactive, var(--primary));
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--foreground) 6.5%, transparent);
+  color: var(--text-strong);
   font: inherit;
-  font-size: 14.5px;
+  font-size: 13px;
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
   cursor: default;
   transition: background 0.14s ease, opacity 0.14s ease;
 }
 
+.dark .billing-text-action {
+  background: color-mix(in oklch, var(--foreground) 9.5%, transparent);
+}
+
 .billing-text-action:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  background: color-mix(in oklch, var(--foreground) 11%, transparent);
+}
+
+.dark .billing-text-action:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 14.5%, transparent);
+}
+
+.billing-text-action:active:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 15%, transparent);
+}
+
+.dark .billing-text-action:active:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 18.5%, transparent);
 }
 
 .billing-text-action:disabled {

@@ -40,10 +40,11 @@ export type UiHost = {
     /** Custom schemes the contents' session serves; without a contents (a UI-owned `<webview>`), the default session's. */
     schemes(contentsId?: number): string[];
     request(contentsId: number | undefined, request: WebviewRequest): void;
-    /** A navigation the page made; `mainFrame: false` (an iframe) is ignored, as in Electron. */
+    /** A navigation the page made; only one the engine marks `mainFrame` counts (WKWebView asks for iframes too and can't say which). */
     navigated(contentsId: number, url: string, mainFrame?: boolean): void;
     titled(contentsId: number, title: string): void;
-    loaded(contentsId: number, phase: string): void;
+    /** The page's main-frame load `started` (at `url`) or `finished`. */
+    loaded(contentsId: number, phase: string, url?: string): void;
     message(contentsId: number, data: unknown): void;
   };
   browser: {
@@ -205,14 +206,15 @@ export function createUiHost(): UiHost {
           })
           .catch((error) => respond(500, { "content-type": "text/plain" }, String(error)));
       },
-      navigated(contentsId, url, mainFrame = true) {
-        if (mainFrame) contentsById(contentsId)?.markNavigated(url);
+      navigated(contentsId, url, mainFrame) {
+        if (mainFrame === true) contentsById(contentsId)?.markNavigated(url);
       },
       titled(contentsId, title) {
         contentsById(contentsId)?.setTitle(title);
         hostWindows.changed();
       },
-      loaded(contentsId, phase) {
+      loaded(contentsId, phase, url) {
+        if (phase === "started" && url) contentsById(contentsId)?.markNavigated(url);
         if (phase === "finished") contentsById(contentsId)?.markLoaded();
       },
       message(_contentsId, data) {

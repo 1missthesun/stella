@@ -170,7 +170,7 @@ jobs:
           unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
           echo "BUN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
           ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$RUNNER_TEMP/bun-linux-x64/bun" install --frozen-lockfile \
-            --filter ./ --filter @stella/desktop --filter @stella/desktop-ui --filter @stella/desktop-rune
+            --filter ./ --filter @stella/desktop --filter @stella/desktop-ui --filter @stella/desktop-rune --filter @stella/runtime
 
       - name: Launch and screenshot
         env:
@@ -188,7 +188,7 @@ jobs:
           for _ in $(seq 100); do [ -e /tmp/.X11-unix/X93 ] && break; sleep 0.05; done
           t0=$(date +%s%3N)
           DISPLAY=:93 STELLA_RUNE_T0="$t0" STELLA_RUNE_ROOT="$GITHUB_WORKSPACE/packages/desktop-rune" STELLA_RUNE_BUN="$BUN" \
-            STELLA_RUNE_METRICS="$out/metrics.jsonl" STELLA_RUNE_W=1280 STELLA_RUNE_H=820 STELLA_RUNE_CTL_PORT=47321 \
+            STELLA_RUNE_METRICS="$out/metrics.jsonl" STELLA_RUNE_W=1280 STELLA_RUNE_H=820 \
             "$engine" > "$out/engine.log" 2>&1 &
           engine_pid=$!
           for _ in $(seq 300); do
@@ -203,17 +203,30 @@ jobs:
           ps -o rss=,vsz= -p "$engine_pid" | awk '{print "engine RSS MiB:", $1/1024}' | tee -a "$GITHUB_STEP_SUMMARY"
           head -c 4000 "$out/metrics.jsonl" || true
           tail -n 40 "$out/engine.log"
-          body='const a = new Audio("/sounds/message-chime.mp3"); a.volume = 0.5; const t0 = performance.now();
+
+      - name: Services session (audio playback, voice media page)
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
+          XVFB: /usr/bin/Xvfb
+          STELLA_RUNE_RUN: ci
+        working-directory: packages/desktop-rune
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/launch"
+          export BIN="$RUNNER_TEMP/engine/stella-engine-linux-x64"
+          trap '"$BUN" scripts/session.ts stop || true; cp /tmp/sr-ci/host.log "$out/services-host.log" 2>/dev/null || true' EXIT
+          "$BUN" scripts/session.ts start --account signed-out | tail -n 5
+          audio='const a = new Audio("/sounds/message-chime.mp3"); a.volume = 0.5; const t0 = performance.now();
             const ended = new Promise((resolve, reject) => { a.onended = () => resolve(performance.now() - t0); a.onerror = () => reject(new Error(a.error?.message ?? "error")); setTimeout(() => reject(new Error("no ended in 15 s")), 15000); });
             await a.play(); const playingMs = performance.now() - t0; const endedMs = await ended;
             const devices = (await navigator.mediaDevices.enumerateDevices()).map((d) => `${d.kind}: ${d.label}`);
             return { playingMs, endedMs, devices };'
-          curl -fsS -X POST --data-binary "$body" http://127.0.0.1:47321/eval | tee "$out/audio.json"
+          "$BUN" scripts/session.ts eval "$audio" | tee "$out/audio.json"
+          jq -r '"audio: playing after \(.value.playingMs|floor) ms, ended after \(.value.endedMs|floor) ms (message-chime.mp3 is 0.68 s); devices \(.value.devices)"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
           jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null
-          jq -r '"audio: playing after \(.value.playingMs|floor) ms, ended after \(.value.endedMs|floor) ms (message-chime.mp3 is 0.68 s); \(.value.devices|length) devices"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
           media='const t0 = performance.now(); const release = await stella.host.media.use(); const readyMs = performance.now() - t0; const caps = stella.host.media.caps; release(); return { readyMs, caps };'
-          curl -fsS -X POST --data-binary "$media" http://127.0.0.1:47321/eval | tee "$out/media-page.json"
-          jq -r '"media page (WebKitGTK): \(.value.caps // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json" || true
+          jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       - uses: actions/upload-artifact@v4
         if: always()

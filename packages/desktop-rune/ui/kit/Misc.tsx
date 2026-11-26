@@ -186,7 +186,7 @@ export function EmptyState({ id = "empty-state", motif, title, body, detail, act
         <MotifArt id={`${id}-front`} motif={motif} layer="front" art={art} live={live} />
       </box>
       <col align="center" gap={compact ? 4 : 6} maxW="100%" mt={compact ? 12 : 18}>
-        <text {...look(compact ? fontSize.lg : fontSize.xl, 600, { lh: 1.25, em: -0.015 })} color={t.c.textStrong} textAlign="center">
+        <text {...look(compact ? fontSize.lg : fontSize.xl, 600, { lh: 1.25, em: -0.015 })} color={t.c.textStrong} textAlign="center" balance>
           {title}
         </text>
         {detail ? (
@@ -197,7 +197,7 @@ export function EmptyState({ id = "empty-state", motif, title, body, detail, act
           </box>
         ) : null}
         {body ? (
-          <text {...look(compact ? fontSize.sm : fontSize.base, font.sansWeight, { lh: 1.45 })} color={t.c.textWeak} maxW={34 * MANROPE_CH * (compact ? fontSize.sm : fontSize.base)} textAlign="center">
+          <text {...look(compact ? fontSize.sm : fontSize.base, font.sansWeight, { lh: 1.45 })} color={t.c.textWeak} maxW={34 * MANROPE_CH * (compact ? fontSize.sm : fontSize.base)} textAlign="center" balance>
             {body}
           </text>
         ) : null}

@@ -142,10 +142,10 @@ function StatusBlock({ role, icon, boxedIcon = false, title, body, children }: {
       ) : (
         <Icon icon={icon} size={22} strokeWidth={1.75} color={tk.c.textWeak} />
       )}
-      <text {...look(fontSize.base, 600, { em: -0.01 })} color={tk.c.textStrong} textAlign="center">
+      <text {...look(fontSize.base, 600, { em: -0.01 })} color={tk.c.textStrong} textAlign="center" balance>
         {title}
       </text>
-      <text {...look(fontSize.sm, 400, { lh: 1.5 })} maxW={32 * MANROPE_CH * fontSize.sm} color={tk.c.textWeak} textAlign="center">
+      <text {...look(fontSize.sm, 400, { lh: 1.5 })} maxW={32 * MANROPE_CH * fontSize.sm} color={tk.c.textWeak} textAlign="center" balance>
         {body}
       </text>
       {children}

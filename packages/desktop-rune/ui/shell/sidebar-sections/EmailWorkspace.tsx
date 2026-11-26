@@ -1032,7 +1032,7 @@ export function EmailWorkspace({ state }: { state: EmailPageState }) {
             <text {...look(17, 600, { em: -0.018 })} color={tk.c.textStrong} textAlign="center" role="heading">
               {state.page.readAt ? t("email.workspace.empty.caughtUpTitle") : t("email.workspace.empty.firstReadTitle")}
             </text>
-            <text {...look(13.5, 400, { lh: 1.55 })} mt={6} color={tk.c.textWeak} textAlign="center">
+            <text {...look(13.5, 400, { lh: 1.55 })} mt={6} color={tk.c.textWeak} textAlign="center" balance>
               {state.page.readAt ? (state.nextReadAt ? t("email.workspace.empty.caughtUpNext", { time: formatWhen(state.nextReadAt, locale) }) : t("email.workspace.empty.caughtUpUrgent")) : t("email.workspace.empty.firstReadBody")}
             </text>
             <row mt={18}>

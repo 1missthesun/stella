@@ -15,7 +15,7 @@ export const useWhatsNew = sheet((c) => ({
   whatsNewPane: { grow: 1, shrink: true, minW: 0, minH: 0, pt: 44, pb: 40, px: 48, scrollY: true },
   whatsNewDetail: { maxW: 600, w: "full" },
   whatsNewDetailDate: { mb: 6, size: fontSize.sm, color: c.textWeak },
-  whatsNewDetailTitle: { mb: 22, family: font.display, size: fontSize["2xl"], weight: 600, em: -0.03, lh: 1.2, color: c.textStrong, role: "heading" },
+  whatsNewDetailTitle: { mb: 22, family: font.display, size: fontSize["2xl"], weight: 600, em: -0.03, lh: 1.2, color: c.textStrong, role: "heading", balance: true },
   whatsNewNotesHighlights: { gap: 14 },
   whatsNewNotesMore: { gap: 9 },
   whatsNewNote: { pl: 18, w: "full" },

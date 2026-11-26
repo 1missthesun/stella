@@ -127,10 +127,10 @@ function DeviceCodeSurface({ detail }: { detail: CloudBrowserDeviceCodeDetail })
   return (
     <col id="cloud-browser-takeover-device" grow={1} minW={0} align="center" justify="center" gap={10} py={28} px={22}>
       <Icon icon={Icons.stella.Lock} size={26} color={tk.c.textWeak} />
-      <text role="heading" {...look(fontSize.base, 700)} color={tk.c.textStrong} textAlign="center">
+      <text role="heading" {...look(fontSize.base, 700)} color={tk.c.textStrong} textAlign="center" balance>
         {t("cloudBrowser.deviceCode.title", { origin: detail.displayOrigin })}
       </text>
-      <text {...look(fontSize.base, 400, { lh: 1.5 })} maxW={34 * 7.4} color={tk.c.textWeak} textAlign="center">
+      <text {...look(fontSize.base, 400, { lh: 1.5 })} maxW={34 * 7.4} color={tk.c.textWeak} textAlign="center" balance>
         {t("cloudBrowser.deviceCode.body")}
       </text>
       <box py={9} px={12} radius={9} fill={mixOklch(tk.c.foreground, 7, "transparent")}>

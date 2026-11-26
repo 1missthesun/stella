@@ -36,6 +36,10 @@ const TAB_GAP = 2;
 const TAB_MAX = 152;
 const TAB_TIGHT = 104;
 const TAB_COMPACT = 60;
+const TAB_MIN = 40;
+const STRIP_PAD_RIGHT = 8;
+const STRIP_OVERHANG = -6;
+const NEW_TAB_WIDTH = 26;
 const TAB_LEAD = 10 + 18 + 6;
 const TAB_TRAIL = 26;
 const TAB_TRAIL_TIGHT = 10;
@@ -172,6 +176,13 @@ export function ShellTopBarTabs({ room }: { room: number }) {
     return tabs.some((tab) => Math.min(labelWidths[tab.id] ?? 0, labelRoom(TAB_MAX)) > fits + 0.5);
   }, [tabs, room, chatFull, labelWidths]);
 
+  const tabWidth = useMemo(() => {
+    if (tabs.length === 0 || room <= 0) return TAB_MAX;
+    const chatWidth = chatNeedsRoom ? 40 : chatFull;
+    const strip = room - chatWidth - CHAT_FULL_GAP - TAB_GAP - STRIP_PAD_RIGHT - STRIP_OVERHANG - TAB_GAP - NEW_TAB_WIDTH;
+    return Math.max(TAB_MIN, Math.min(TAB_MAX, (strip - TAB_GAP * (tabs.length - 1)) / tabs.length));
+  }, [tabs.length, room, chatNeedsRoom, chatFull]);
+
   useWindowKeys(TAB_CHORDS, (e) => {
     const key = e.chord.slice(4);
     if (key === "t") {
@@ -252,7 +263,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
 
   return (
     <row id="topbar-tabs" h="full" align="center" gap={2} minW={0} shrink>
-      <col hidden absolute={{ left: 0, top: 0 }} inert>
+      <col hidden absolute={{ left: 0, top: 0 }} align="start" inert>
         <text {...LABEL} nowrap onLayout={(r) => setLabelWidths((w) => (w["__chat"] === r.w ? w : { ...w, __chat: r.w }))}>Chat</text>
         {tabs.map((tab) => (
           <text key={tab.id} {...LABEL} nowrap onLayout={(r) => setLabelWidths((w) => (w[tab.id] === r.w ? w : { ...w, [tab.id]: r.w }))}>
@@ -284,7 +295,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
           {chatNeedsRoom ? null : <text {...LABEL} nowrap color={chatActive ? l.strong : l.rest} hoverColor={chatActive ? l.strong : l.hover}>Chat</text>}
         </row>
       </row>
-      <row id="topbar-tabs-strip" role="tablist" label="Tabs" h="full" align="stretch" gap={TAB_GAP} minW={0} shrink scrollX pr={8} mr={-6} noWindowDrag onLayout={(r) => { edges.current.stripRight = r.x + r.w; syncNotch(); }}>
+      <row id="topbar-tabs-strip" role="tablist" label="Tabs" h="full" align="stretch" gap={TAB_GAP} minW={0} shrink scrollX pr={STRIP_PAD_RIGHT} mr={STRIP_OVERHANG} noWindowDrag onLayout={(r) => { edges.current.stripRight = r.x + r.w; syncNotch(); }}>
         {tabs.map((tab, index) => {
           const active = tab.id === shownTabId;
           const title = titles.get(tab.id) ?? "";
@@ -303,9 +314,8 @@ export function ShellTopBarTabs({ room }: { room: number }) {
               key={tab.id}
               id={`topbar-tab-${tab.id}`}
               h="full"
-              w={TAB_MAX}
-              minW={40}
-              shrink
+              w={tabWidth}
+              shrink={false}
               align="center"
               hoverGroup
               raise={active || dragging ? 2 : undefined}

@@ -47,6 +47,7 @@ const STAGE_INSET = 20;
 const STAGE_RADIUS = 14;
 const STAGE_TOP = SHELL_TOPBAR_HEIGHT - 1;
 /** `@container file-viewer (min-width: 760px)`: the strip moves to the left edge and stands up. */
+/** `@container file-viewer (min-width: 760px)`, against the viewer's content box (inside its 1px border). */
 const WIDE_VIEWER = 760;
 const NARROW_VIEWER = 460;
 
@@ -666,7 +667,7 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
           onClose={() => fileViewer.close()}
         />
       ) : null}
-      <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width >= WIDE_VIEWER} idBase="file-viewer-docked" />
+      <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
       {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
       {stage ? <StageEdge fill={t.c.background} /> : null}
     </col>

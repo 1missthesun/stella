@@ -141,7 +141,7 @@ export type BoxProps = {
   onDropFiles?: (paths: string[]) => void;
   onDropHover?: (over: boolean) => void;
   onDrag?: (d: Drag) => void;
-  /** A ref gives the host instance; `nodeId(ref)` is its engine node. */
+  /** A ref gives the host instance (`HostElement`): `nodeId(ref)` is its engine node, and `ref.current.set({...})` changes props without a React render. */
   ref?: React.Ref<unknown>;
 };
 
@@ -156,6 +156,8 @@ export type TextProps = BoxProps & {
   selectable?: boolean;
   selectionColor?: Color;
   maxLines?: number; truncate?: boolean | "end" | "middle" | "head" | "fade"; nowrap?: boolean;
+  /** CSS `text-wrap: balance` (Chromium's): 2 to 6 wrapped lines break at the narrowest width that keeps their count; they still align in the element's width. */
+  balance?: boolean;
   textAlign?: "start" | "center" | "end"; textCase?: "upper" | "lower";
   onLink?: (href: string) => void;
 };

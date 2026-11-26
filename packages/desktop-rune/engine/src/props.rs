@@ -550,6 +550,7 @@ pub struct Props {
     pub max_lines: Option<usize>,
     pub truncate: Option<TruncateP>,
     pub nowrap: bool,
+    pub balance: bool,
     pub text_align: Option<String>,
     pub text_case: Option<String>,
 

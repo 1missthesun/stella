@@ -67,6 +67,7 @@ pub fn apply(mut e: El, p: &Props, content_len: usize) -> El {
         (Some(TruncateP::Mode(m)), _) if m == "fade" => e = e.truncate_fade(),
         (Some(TruncateP::Mode(_)), _) => e = e.truncate(),
         _ if p.nowrap => e = e.nowrap(),
+        _ if p.balance => e = e.wrap().wrap_balance(),
         _ => e = e.wrap(),
     }
     match p.text_align.as_deref() {

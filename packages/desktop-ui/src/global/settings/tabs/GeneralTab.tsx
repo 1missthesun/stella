@@ -1,6 +1,9 @@
 import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { lazy, Suspense } from "react";
-import { Select } from "@/ui/select";
+import {
+  AiryWordPicker,
+  SettingsTabHeader,
+} from "@/global/settings/AiryControls";
 import { LanguageSettingsRow } from "@/global/settings/LanguageSettingsRow";
 import {
   setReduceMotionPreference,
@@ -29,25 +32,23 @@ export function GeneralTab() {
 
   return (
     <div className="settings-tab-content">
+      <SettingsTabHeader titleKey="settings.tabs.general" />
       <LanguageSettingsRow />
       <div className="settings-card">
-        <SettingsCardTitle titleKey="settings.motion.title" />
         <div className="settings-row">
           <div className="settings-row-info">
-            <div className="settings-row-label">
-              {t("settings.motion.reduceMotion.label")}
-            </div>
-            <div className="settings-row-sublabel">
-              {t("settings.motion.reduceMotion.description")}
-            </div>
+            <SettingsCardTitle
+              titleKey="settings.motion.title"
+              labelKey="settings.motion.reduceMotion.label"
+              variant="row"
+            />
           </div>
           <div className="settings-row-control">
-            <Select
-              className="settings-runtime-select"
+            <AiryWordPicker
               value={reduceMotion}
-              aria-label={t("settings.motion.reduceMotion.label")}
-              onValueChange={(value) =>
-                setReduceMotionPreference(value as ReduceMotionPreference)
+              ariaLabel={t("settings.motion.reduceMotion.label")}
+              onChange={(next) =>
+                setReduceMotionPreference(next as ReduceMotionPreference)
               }
               options={[
                 {

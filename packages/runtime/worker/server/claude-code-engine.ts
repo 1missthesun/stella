@@ -18,7 +18,6 @@ import {
   claudeCodeResumableSessionId,
   closeClaudeCodeSessionWhenIdle,
   wakeClaudeCodeUsageLimitHolds,
-  CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   runClaudeCodeTurn,
 } from "../../kernel/integrations/claude-code-session-runtime.js";
 import {
@@ -38,6 +37,7 @@ import {
   type AuthorizedToolImage,
   type ToolResult,
 } from "../../kernel/tools/types.js";
+import { CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } from "@stella/contracts/context-handoff";
 import { noteClaudeCodeBackground } from "./claude-code-background.js";
 import { latestPromptSeq } from "./pi-journal.js";
 import type { OpenSession } from "./sessions.js";
@@ -288,7 +288,10 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         },
         toolSetAfterStep: () => spec.toolSetAfterStep(),
         onBackgroundWake: (wake) => spec.onBackgroundWake(wake),
-        onBackgroundTasks: (tasks) => noteClaudeCodeBackground(session.config.get().stellaDataDirPath, ref, tasks),
+        onBackgroundTasks: (tasks) => {
+          spec.onBackgroundTasks?.(tasks);
+          noteClaudeCodeBackground(session.config.get().stellaDataDirPath, ref, tasks);
+        },
         ...(spec.backgroundWake ? { backgroundWake: true } : {}),
         ...(syncs(ref)
           ? {

@@ -5,6 +5,7 @@ export type DisplayFileSource = {
     bytes: Uint8Array; mimeType: string; truncated?: boolean;
   }>;
   mediaUrl?: () => Promise<string>;
+  peekMediaUrl?: () => string | null;
   drivePath?: string;
 };
 export const DisplayFileSourceContext = createContext<DisplayFileSource | null>(null);

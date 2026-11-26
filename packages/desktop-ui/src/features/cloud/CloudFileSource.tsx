@@ -3,7 +3,10 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import type { DriveFileUrl } from "@stella/contracts/backend/drive";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
-import { backendClient } from "@/platform/backend/backend-client";
+import {
+  backendClient,
+  subscribeBackendAccount,
+} from "@/platform/backend/backend-client";
 import { driveFileVersions, useDriveFileRevision } from "./drive-file-versions";
 import {
   fetchWithInactivity,
@@ -26,31 +29,56 @@ const KEPT_READ_BYTES = 128 * 1024 * 1024;
 
 const JUST_FETCHED_MS = 10_000;
 
+type CachedLink = {
+  at: number;
+  value: Promise<DriveFileUrl>;
+  resolved: DriveFileUrl | null;
+};
+
 // @reloadable signed links and downloads; a newer copy asks again
-const links = new Map<string, { at: number; value: Promise<DriveFileUrl> }>();
+const links = new Map<string, CachedLink>();
 // @reloadable see above
 const reads = new Map<string, { value: Promise<DriveRead>; bytes: number }>();
+
+subscribeBackendAccount(() => {
+  links.clear();
+  reads.clear();
+});
+
+const isLinkFresh = (path: string, entry: CachedLink, link: DriveFileUrl): boolean => {
+  const known = driveFileVersions.version(path);
+  return (
+    link.expiresAt - LINK_MARGIN_MS > serverNow() &&
+    (known === link.version ||
+      (known === undefined && steadyNow() - entry.at < JUST_FETCHED_MS))
+  );
+};
+
+export const peekDriveFileLink = (path: string): DriveFileUrl | null => {
+  const entry = links.get(path);
+  if (!entry?.resolved) return null;
+  return isLinkFresh(path, entry, entry.resolved) ? entry.resolved : null;
+};
 
 export const driveFileLink = async (path: string): Promise<DriveFileUrl> => {
   const pending = links.get(path);
   if (pending) {
     const link = await pending.value.catch(() => null);
-    const known = driveFileVersions.version(path);
-    if (
-      link &&
-      link.expiresAt - LINK_MARGIN_MS > serverNow() &&
-      (known === link.version ||
-        (known === undefined && steadyNow() - pending.at < JUST_FETCHED_MS))
-    ) {
+    if (link && isLinkFresh(path, pending, link)) {
       return link;
     }
   }
   const value = backendClient.call("drive.fileUrl", { path });
-  const entry = { at: steadyNow(), value };
+  const entry: CachedLink = { at: steadyNow(), value, resolved: null };
   links.set(path, entry);
-  value.catch(() => {
-    if (links.get(path) === entry) links.delete(path);
-  });
+  value.then(
+    (link) => {
+      entry.resolved = link;
+    },
+    () => {
+      if (links.get(path) === entry) links.delete(path);
+    },
+  );
   return await value;
 };
 
@@ -118,14 +146,29 @@ export const readDriveFile = async (path: string, maxBytes: number): Promise<Dri
   return await value;
 };
 
+export const prefetchDriveFile = (
+  path: string,
+  options?: { readMaxBytes?: number },
+): void => {
+  driveFileVersions.track(path);
+  if (options?.readMaxBytes) {
+    void readDriveFile(path, options.readMaxBytes).catch(() => undefined);
+  } else {
+    void driveFileLink(path).catch(() => undefined);
+  }
+};
+
+const initialDriveTag = (path: string): string | null =>
+  driveFileVersions.version(path) ?? peekDriveFileLink(path)?.version ?? null;
+
 export function CloudFileSource({ path, children }: { path: string; children: ReactNode }) {
   const id = useId();
   const revision = useDriveFileRevision(path);
   const [base, setBase] = useState<{ path: string; tag: string | null }>(() => ({
     path,
-    tag: driveFileVersions.version(path) ?? null,
+    tag: initialDriveTag(path),
   }));
-  const current = base.path === path ? base : { path, tag: driveFileVersions.version(path) ?? null };
+  const current = base.path === path ? base : { path, tag: initialDriveTag(path) };
   if (current !== base) setBase(current);
   useEffect(() => {
     if (current.tag !== null) return;
@@ -151,6 +194,9 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
     drivePath: path,
     async mediaUrl() {
       return (await driveFileLink(path)).url;
+    },
+    peekMediaUrl() {
+      return peekDriveFileLink(path)?.url ?? null;
     },
     async read(filePath: string, maxBytes = 32 * 1024 * 1024) {
       return await readDriveFile(drivePathFor(path, filePath), maxBytes);

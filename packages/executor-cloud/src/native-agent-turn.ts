@@ -52,6 +52,8 @@ import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
 import type { ToolProcessIdentity } from "@stella/runtime/kernel/tools/types.js";
 import {
+  backgroundTaskListOf,
+  buildClaudeCodeInterruptRequest,
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   claudeCodeNativeToolMatcher,
   ClaudeCodeCompactionLoopError,
@@ -94,6 +96,8 @@ import {
   type NativeStateAttestation,
 } from "./native-state-integrity.js";
 import type { AgentInbox } from "./agent-inbox.js";
+import type { CloudAgentHandoff } from "./cloud-agent-handoff.js";
+import { isContextHandoffText } from "@stella/contracts/context-handoff";
 import type { ClaudeKeeperClient } from "./claude-keeper-client.js";
 import type { ClaudeKeeperState } from "./claude-keeper-protocol.js";
 import type { ClaudeCodeToolMcpHost } from "@stella/runtime/kernel/integrations/claude-code-tool-mcp-host.js";
@@ -121,6 +125,7 @@ type NativeCliTurnResult = Omit<
   sessionId: string;
   steered: string[];
   kept?: KeptClaude;
+  handedOff?: true;
 };
 
 type KeptClaude = {
@@ -748,6 +753,8 @@ export const runCloudClaude = async (options: {
     sealedMac?: string;
     threadId: string;
   };
+  handoff?: CloudAgentHandoff;
+  freshSessionId?: string;
 }): Promise<NativeCliTurnResult> => {
   const { profile, inbox } = options;
   const stateRoot = options.stateRoot;
@@ -774,7 +781,7 @@ export const runCloudClaude = async (options: {
     (text) => text.trim(),
     () => undefined,
   );
-  const resume = marked !== undefined;
+  const resume = marked !== undefined && options.freshSessionId === undefined;
   const quietReplyPath = path.join(stateRoot, QUIET_REPLY_MARKER);
   const resumeAt = resume && (await claudeCliResumesAtMessage())
     ? await readFile(quietReplyPath, "utf8").then(
@@ -784,9 +791,10 @@ export const runCloudClaude = async (options: {
     : undefined;
   await rm(quietReplyPath, { force: true });
   const sessionId =
-    marked && isClaudeSessionId(marked)
+    options.freshSessionId ??
+    (marked && isClaudeSessionId(marked)
       ? marked
-      : deterministicUuid(profile.sessionKey);
+      : deterministicUuid(profile.sessionKey));
   markTurnStep("claudeStateChecked");
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
   const hookScript = fileURLToPath(
@@ -1033,6 +1041,7 @@ export const runCloudClaude = async (options: {
     let quietResumeAt: string | undefined;
     let initVerdict: string | undefined;
     let initCount = 0;
+    let handoffInterrupted = false;
     const judgeInit = (): void => {
       const unavailable = initVerdict;
       initVerdict = undefined;
@@ -1156,6 +1165,9 @@ export const runCloudClaude = async (options: {
         }
         if (type === "system" && event.subtype === "background_tasks_changed") {
           liveBackgroundTasks = Array.isArray(event.tasks) ? event.tasks.length : 0;
+          options.handoff?.noteBackground(
+            (backgroundTaskListOf(event as never) ?? []).map((task) => task.description),
+          );
           return;
         }
         if (type === "system" && event.subtype === "task_notification" && heldForBackground) {
@@ -1191,7 +1203,12 @@ export const runCloudClaude = async (options: {
               : undefined;
           if (text !== undefined) {
             injected.delete(event.uuid as string);
-            steered.push(text);
+            if (!options.handoff?.isNudge(text)) steered.push(text);
+          }
+          if (options.handoff?.pending() && !handoffInterrupted && event.isReplay !== true) {
+            handoffInterrupted = true;
+            markTurnStep("claudeHandoffInterrupted");
+            stdin?.write(`${buildClaudeCodeInterruptRequest()}\n`);
           }
           return;
         }
@@ -1216,6 +1233,22 @@ export const runCloudClaude = async (options: {
         if (type === "assistant") {
           markTurnStep("claudeFirstAssistant");
           llmCalls += 1;
+          if (options.handoff && event.parent_tool_use_id == null) {
+            const usage = (event.message as { usage?: Record<string, unknown> } | undefined)?.usage ?? {};
+            options.handoff.noteContext(
+              numberAt(usage.input_tokens) +
+                numberAt(usage.cache_read_input_tokens) +
+                numberAt(usage.cache_creation_input_tokens) +
+                numberAt(usage.output_tokens),
+            );
+            const nudge = options.handoff.nudge();
+            if (nudge) {
+              markTurnStep("claudeHandoffNudged");
+              void serialInput(async () => {
+                if (!inputEnded && promptSent) writeMessages([nudge]);
+              });
+            }
+          }
           const texts = textBlocks(
             (event.message as { content?: unknown } | undefined)?.content,
           );
@@ -1245,11 +1278,17 @@ export const runCloudClaude = async (options: {
             finalText = profile.role === "orchestrator" ? answers.join("\n\n") : resultText;
           }
           addResultUsage(event);
+          if (options.handoff && event.modelUsage && typeof event.modelUsage === "object") {
+            for (const used of Object.values(event.modelUsage as Record<string, unknown>)) {
+              const window = numberAt((used as { contextWindow?: unknown } | null)?.contextWindow);
+              if (window > 0) options.handoff.noteWindow(window);
+            }
+          }
           if (typeof event.num_turns === "number") {
             reportedTurns += event.num_turns;
             llmCalls = reportedTurns;
           }
-          if (event.is_error === true) {
+          if (event.is_error === true && !options.handoff?.pending()) {
             const reported = Array.isArray(event.errors)
               ? event.errors
                   .map((entry) =>
@@ -1272,7 +1311,8 @@ export const runCloudClaude = async (options: {
                 ? `Claude Code reported an unsuccessful turn${subtype}: ${reported}`
                 : `Claude Code reported an unsuccessful turn${subtype}.`);
             void serialInput(async () => endInput());
-          } else if (!inbox) {
+          } else if (!inbox || options.handoff?.pending()) {
+            if (options.handoff?.pending()) markTurnStep("claudeHandedOff");
             void serialInput(async () => endInput());
           } else if (injected.size === 0) {
             void settleQuery();
@@ -1368,7 +1408,7 @@ export const runCloudClaude = async (options: {
     } else if (cancellation.aborted && !error) {
       error = cancellation.reason?.message || "Claude Code turn was canceled.";
     }
-    if (result.exitCode !== 0 && !error && !quiet) {
+    if (result.exitCode !== 0 && !error && !quiet && !(handoffInterrupted && options.handoff?.pending())) {
       error =
         result.stderr.trim().slice(-4_000) ||
         `Claude Code exited with status ${result.exitCode ?? "unknown"}.`;
@@ -1393,6 +1433,7 @@ export const runCloudClaude = async (options: {
       sessionId: initialized ? sessionId : "",
       steered,
       ...(kept ? { kept } : {}),
+      ...(options.handoff?.pending() && !error ? { handedOff: true as const } : {}),
     };
   } finally {
     toolsWait?.interruptUnsafe();
@@ -1495,7 +1536,17 @@ const writeHistorySession = async (args: {
   cwd: string;
   history: AgentHistoryRow[];
 }): Promise<string | undefined> => {
-  const messages = pruneAgentHistory(parseAuthoritativeAgentHistory(args.history), WRITTEN_SESSION_TOKEN_BUDGET);
+  const parsed = parseAuthoritativeAgentHistory(args.history);
+  const boundary = parsed.findLastIndex(
+    (message) =>
+      message.role === "user" &&
+      isContextHandoffText(
+        typeof message.content === "string"
+          ? message.content
+          : message.content.map((part) => (part.type === "text" ? part.text : "")).join(""),
+      ),
+  );
+  const messages = pruneAgentHistory(boundary < 0 ? parsed : parsed.slice(boundary), WRITTEN_SESSION_TOKEN_BUDGET);
   if (messages.length === 0) return undefined;
   const current = messages
     .filter((message) => message.role === "assistant")
@@ -1542,6 +1593,7 @@ export const runNativeAgentTurn = async (options: {
   quietEnd?: CloudClaudeQuietEnd;
   quiet?: boolean;
   keeper?: CloudClaudeKeeperInput;
+  handoff?: { controller: CloudAgentHandoff; task?: string; turn(): readonly string[] };
 }): Promise<NativeAgentTurnResult> => {
   const toolHost = options.claudeToolHost;
   if (!toolHost) {
@@ -1628,7 +1680,14 @@ export const runNativeAgentTurn = async (options: {
   const reusable = !adopted && !options.fresh && recoveryHistory === undefined;
   const sealedMac = reusable ? await sealedStateMac(stateRoot) : undefined;
   let keeper = options.keeper;
-  let record = createNativeTranscript({ prompt: options.prompt, inputPrompt, execution: options.execution });
+  const hidden = options.handoff ? (text: string) => options.handoff!.controller.isNudge(text) : undefined;
+  let record = createNativeTranscript({
+    prompt: options.prompt,
+    inputPrompt,
+    execution: options.execution,
+    ...(hidden ? { hidden } : {}),
+  });
+  let freshSessionId: string | undefined;
   const onStreamEvent = (event: ClaudeStreamJsonEvent) => {
     record.observe(event);
     options.onStreamEvent?.(event);
@@ -1647,6 +1706,8 @@ export const runNativeAgentTurn = async (options: {
       ...(options.inbox ? { inbox: options.inbox } : {}),
       ...(options.quietEnd ? { quietEnd: options.quietEnd } : {}),
       ...(options.quiet ? { quiet: true } : {}),
+      ...(options.handoff ? { handoff: options.handoff.controller } : {}),
+      ...(freshSessionId ? { freshSessionId } : {}),
       ...(keeper
         ? {
             keeper: {
@@ -1689,8 +1750,35 @@ export const runNativeAgentTurn = async (options: {
       ),
     )) > 0
   ) {
-    record = createNativeTranscript({ prompt: options.prompt, inputPrompt, execution: options.execution });
+    record = createNativeTranscript({
+      prompt: options.prompt,
+      inputPrompt,
+      execution: options.execution,
+      ...(hidden ? { hidden } : {}),
+    });
     result = await run();
+  }
+  while (options.handoff && result.handedOff && !result.error && !options.cancellation?.aborted) {
+    const handoffText = options.handoff.controller.take({
+      ...(options.handoff.task ? { task: options.handoff.task } : {}),
+      turn: options.handoff.turn(),
+    });
+    if (!handoffText) break;
+    await result.kept?.discard().catch(() => undefined);
+    const before = result;
+    freshSessionId = crypto.randomUUID();
+    inputPrompt = handoffText;
+    markTurnStep("claudeHandoffSession");
+    const after = await run();
+    result = {
+      ...after,
+      usage: {
+        inputTokens: before.usage.inputTokens + after.usage.inputTokens,
+        outputTokens: before.usage.outputTokens + after.usage.outputTokens,
+        llmCalls: before.usage.llmCalls + after.usage.llmCalls,
+      },
+      steered: [...before.steered, ...after.steered],
+    };
   }
   if (result.error && isClaudeLoginFailureText(result.error)) {
     console.warn(`[cloud-claude] Anthropic refused the Claude login: ${result.error.slice(0, 400)}`);

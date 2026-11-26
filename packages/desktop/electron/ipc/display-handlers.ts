@@ -51,10 +51,14 @@ import {
   PAGE_PREVIEW_CONTENT_TYPE,
   PAGE_PREVIEW_SOURCE_MAX_BYTES,
 } from "@stella/contracts/page-preview";
-import { readCanvasActionManifest } from "@stella/contracts/canvas-actions";
+import {
+  readCanvasActionManifest,
+  type CanvasAction,
+} from "@stella/contracts/canvas-actions";
 import {
   canvasActionsOfLocalFile,
   canvasUrlForLocalFile,
+  isRegisteredCanvasUrl,
   MAX_CANVAS_HTML_BYTES,
   registerCanvasHtml,
   setCanvasDocumentAssetReader,
@@ -1062,9 +1066,18 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     },
   );
 
+  const MAX_DRIVE_CANVAS_CACHE = 24;
+  const driveCanvasCache = new Map<
+    string,
+    { url: string; actions: CanvasAction[]; version: string }
+  >();
+
   handleIpc(
     IPC_DISPLAY_CANVAS_DRIVE_URL,
-    async (event, payload?: { drivePath?: unknown }) => {
+    async (
+      event,
+      payload?: { drivePath?: unknown; version?: unknown; forceRefresh?: unknown },
+    ) => {
       if (!options.assertPrivilegedSender(event, IPC_DISPLAY_CANVAS_DRIVE_URL)) {
         throw new Error(
           `Blocked untrusted ${IPC_DISPLAY_CANVAS_DRIVE_URL} request.`,
@@ -1079,11 +1092,36 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       }
       const locator = options.deviceFileLocator;
       if (!locator) throw new Error("Your Drive isn't available right now.");
-      locator.forgetCopyUrls(drivePath.slice(0, drivePath.lastIndexOf("/") + 1));
-      const file = await locator.copyUrl(drivePath);
-      if (file.sizeBytes > MAX_CANVAS_HTML_BYTES) {
+      const forceRefresh = payload?.forceRefresh === true;
+      const expectedVersion =
+        typeof payload?.version === "string" && payload.version.length > 0
+          ? payload.version
+          : null;
+      if (forceRefresh) {
+        locator.forgetCopyUrls(drivePath.slice(0, drivePath.lastIndexOf("/") + 1));
+      }
+      const file = await locator.copyUrl(drivePath, { fresh: forceRefresh });
+      const resolvedFile =
+        !forceRefresh && expectedVersion && file.version !== expectedVersion
+          ? (locator.forgetCopyUrls(drivePath.slice(0, drivePath.lastIndexOf("/") + 1)),
+            await locator.copyUrl(drivePath, { fresh: true }))
+          : file;
+      const cacheKey = `${drivePath}\0${resolvedFile.version}`;
+      if (!forceRefresh) {
+        const cached = driveCanvasCache.get(cacheKey);
+        if (cached && isRegisteredCanvasUrl(cached.url)) {
+          driveCanvasCache.delete(cacheKey);
+          driveCanvasCache.set(cacheKey, cached);
+          return {
+            url: cached.url,
+            ...(cached.actions.length > 0 ? { actions: cached.actions } : {}),
+            version: cached.version,
+          };
+        }
+      }
+      if (resolvedFile.sizeBytes > MAX_CANVAS_HTML_BYTES) {
         throw new Error(
-          `This page is too large to show here (${Math.round(file.sizeBytes / (1024 * 1024))} MB, limit ${MAX_CANVAS_HTML_BYTES / (1024 * 1024)} MB).`,
+          `This page is too large to show here (${Math.round(resolvedFile.sizeBytes / (1024 * 1024))} MB, limit ${MAX_CANVAS_HTML_BYTES / (1024 * 1024)} MB).`,
         );
       }
       const copy = await locator.readCopy(drivePath, MAX_CANVAS_HTML_BYTES);
@@ -1093,9 +1131,18 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         copy.bytes.byteLength,
       ).toString("utf8");
       const actions = readCanvasActionManifest(html);
+      const url = registerCanvasHtml(html, `/${drivePath}`, "drive");
+      driveCanvasCache.delete(cacheKey);
+      driveCanvasCache.set(cacheKey, { url, actions, version: resolvedFile.version });
+      while (driveCanvasCache.size > MAX_DRIVE_CANVAS_CACHE) {
+        const oldest = driveCanvasCache.keys().next().value;
+        if (oldest === undefined) break;
+        driveCanvasCache.delete(oldest);
+      }
       return {
-        url: registerCanvasHtml(html, `/${drivePath}`, "drive"),
+        url,
         ...(actions.length > 0 ? { actions } : {}),
+        version: resolvedFile.version,
       };
     },
   );

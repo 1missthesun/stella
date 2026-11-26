@@ -152,6 +152,7 @@ import {
   IPC_APP_SOURCE_APPLY_UPSTREAM,
   IPC_APP_SOURCE_GET_STATE,
   IPC_APP_SOURCE_SKIP,
+  IPC_APP_SOURCE_SET_AUTO_UPDATE,
   IPC_APP_SOURCE_STATE,
   IPC_APP_SOURCE_UNDO,
   IPC_AUTH_APPLY_SESSION_TOKEN,
@@ -947,8 +948,8 @@ export type IpcInvokeContract = {
     { url: string }
   >;
   [IPC_DISPLAY_CANVAS_DRIVE_URL]: Invoke<
-    [payload: { drivePath: string }],
-    { url: string; actions?: import("../canvas-actions.js").CanvasAction[] }
+    [payload: { drivePath: string; version?: string; forceRefresh?: boolean }],
+    { url: string; actions?: import("../canvas-actions.js").CanvasAction[]; version?: string }
   >;
   [IPC_DISPLAY_TRASH_LIST]: Invoke<
     [],
@@ -989,6 +990,7 @@ export type IpcInvokeContract = {
   [IPC_APP_SOURCE_APPLY_REMOTE]: Invoke<[], AppSourceActionResult>;
   [IPC_APP_SOURCE_APPLY_UPSTREAM]: Invoke<[targets?: string[] | null], AppSourceActionResult>;
   [IPC_APP_SOURCE_SKIP]: Invoke<[key: string], AppSourceActionResult>;
+  [IPC_APP_SOURCE_SET_AUTO_UPDATE]: Invoke<[on: boolean], AppSourceActionResult>;
 
   [IPC_CHAT_CONTEXT_GET]: Invoke<[], ChatContext | null>;
   [IPC_SCREENSHOT_CAPTURE]: Invoke<

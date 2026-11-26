@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type {
   AppSourceActionResult,
   AppSourceCommit,
@@ -40,6 +40,24 @@ const subscribe = (listener: () => void) => {
 
 export const useAppSourceState = () =>
   useSyncExternalStore(subscribe, () => snapshot);
+
+export const useAutoUpdate = () => {
+  const actual = useAppSourceState()?.autoUpdate ?? true;
+  const [asked, setAsked] = useState<boolean | null>(null);
+  useEffect(() => setAsked(null), [actual]);
+  const set = (on: boolean) => {
+    const api = window.electronAPI?.appSource;
+    if (!api) return;
+    setAsked(on);
+    void api
+      .setAutoUpdate(on)
+      .then((result) => {
+        if (!result.ok) setAsked(null);
+      })
+      .catch(() => setAsked(null));
+  };
+  return { on: asked ?? actual, set };
+};
 
 export const appSourceApi = () => window.electronAPI?.appSource ?? null;
 

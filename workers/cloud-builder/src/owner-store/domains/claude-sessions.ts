@@ -6,6 +6,7 @@ import {
   CLAUDE_SESSION_ENGINES,
   CLAUDE_SESSION_MAX_FILES,
   CLAUDE_SESSION_STALE_LEASE_REASON,
+  CLAUDE_SESSION_SUPERSEDES_MAX,
   claudeSessionChainInput,
   isClaudeSessionFilePath,
   isClaudeSessionId,
@@ -15,7 +16,7 @@ import {
   type ClaudeSessionManifest,
   type ClaudeSessionSyncTag,
 } from "@stella/contracts/backend/claude-sessions";
-import { literal, number, object, optional, string } from "../args.js";
+import { array, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDomain } from "../registry.js";
@@ -79,6 +80,19 @@ export const CLAUDE_SESSIONS_LEAN_MIGRATION = {
 export const CLAUDE_SESSIONS_CHUNK_ENCODING_MIGRATION = {
   id: "claude-sessions.3-chunk-encoding",
   statements: ["ALTER TABLE claude_session_chunks ADD COLUMN encoding TEXT"],
+};
+
+export const CLAUDE_SESSIONS_SUPERSEDED_MIGRATION = {
+  id: "claude-sessions.4-superseded",
+  statements: [
+    `CREATE TABLE claude_session_supersessions (
+       thread_id TEXT NOT NULL,
+       session_id TEXT NOT NULL,
+       superseded_by TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       PRIMARY KEY (thread_id, session_id)
+     )`,
+  ],
 };
 
 const GZIP_MIN_SAVING = 0.1;
@@ -541,6 +555,33 @@ const tagSession = (
   return null;
 };
 
+const supersedeSessions = (
+  ctx: OwnerContext,
+  args: ClaudeSessionCalls["claudeSessions.supersede"]["args"],
+): null => {
+  if (!isClaudeSessionId(args.sessionId)) {
+    throw new RpcError("BAD_REQUEST", "sessionId must be well-formed.");
+  }
+  const superseded = ctx.db.one<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM claude_session_supersessions WHERE thread_id = ? AND session_id = ?",
+    args.threadId,
+    args.sessionId,
+  );
+  if ((superseded?.count ?? 0) > 0) return null;
+  for (const older of new Set(args.supersedes)) {
+    if (older === args.sessionId || !isClaudeSessionId(older)) continue;
+    ctx.db.run(
+      `INSERT INTO claude_session_supersessions (thread_id, session_id, superseded_by, created_at)
+       VALUES (?, ?, ?, ?) ON CONFLICT (thread_id, session_id) DO NOTHING`,
+      args.threadId,
+      older,
+      args.sessionId,
+      ctx.now,
+    );
+  }
+  return null;
+};
+
 const latestSession = (
   ctx: OwnerContext,
   args: { threadId: string },
@@ -555,7 +596,11 @@ const latestSession = (
            WHERE f.thread_id = claude_sessions.thread_id
              AND f.session_id = claude_sessions.session_id
         )
-      ORDER BY updated_at DESC, session_id DESC
+      ORDER BY NOT EXISTS (
+          SELECT 1 FROM claude_session_supersessions s
+           WHERE s.thread_id = claude_sessions.thread_id
+             AND s.session_id = claude_sessions.session_id
+        ) DESC, updated_at DESC, session_id DESC
       LIMIT 1`,
     args.threadId,
   );
@@ -634,6 +679,7 @@ const purgeClaudeSessions = async (ctx: OwnerContext): Promise<{ pending: boolea
   ctx.db.run("DELETE FROM claude_session_chunks");
   ctx.db.run("DELETE FROM claude_session_files");
   ctx.db.run("DELETE FROM claude_sessions");
+  ctx.db.run("DELETE FROM claude_session_supersessions");
   const bucket = ctx.env.CONVERSATION_ARCHIVE;
   if (!bucket) return { pending: false };
   const listed = await bucket.list({ prefix: await ownerPrefix(ctx.ownerId), limit: 1_000 });
@@ -651,6 +697,7 @@ export const claudeSessionsDomain = {
     CLAUDE_SESSIONS_MIGRATION,
     CLAUDE_SESSIONS_LEAN_MIGRATION,
     CLAUDE_SESSIONS_CHUNK_ENCODING_MIGRATION,
+    CLAUDE_SESSIONS_SUPERSEDED_MIGRATION,
   ],
   calls: {
     "claudeSessions.append": {
@@ -663,6 +710,15 @@ export const claudeSessionsDomain = {
       scope: "owner",
       parse: object(tagShape),
       handler: tagSession,
+    },
+    "claudeSessions.supersede": {
+      scope: "owner",
+      parse: object({
+        threadId: threadIdArg,
+        sessionId: sessionIdArg,
+        supersedes: array(sessionIdArg, { max: CLAUDE_SESSION_SUPERSEDES_MAX }),
+      }),
+      handler: supersedeSessions,
     },
     "claudeSessions.latest": {
       scope: "owner",

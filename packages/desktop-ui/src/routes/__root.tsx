@@ -30,6 +30,7 @@ import { useUiState } from "@/context/ui-state";
 import { ChatColumn } from "@/app/chat/ChatColumn";
 import { OPEN_CONNECT_DIALOG_EVENT } from "@/global/integrations/connect-action";
 import { conversationTabs } from "@/features/chat/services/conversation-tabs-store";
+import { setNotificationAccountScope } from "@/features/notifications/notification-store";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useShellConversationSource } from "@/global/auth/hooks/use-shell-conversation-source";
 import {
@@ -74,6 +75,7 @@ import {
 } from "@/shell/display/default-tabs";
 import { FullShellDialogs } from "@/shell/full-shell-dialogs";
 import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
+import { WhatsNewDialogHost } from "@/features/whats-new/WhatsNewDialog";
 import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
@@ -297,6 +299,9 @@ function RootLayout() {
   const settledAccountScope = cloudSession.sessionGate.sessionIsLoading
     ? null
     : accountScope;
+  useLayoutEffect(() => {
+    setNotificationAccountScope(settledAccountScope);
+  }, [settledAccountScope]);
   useLayoutEffect(() => {
     refreshedMainConversationRef.current = null;
     setMainConversationFailure(null);
@@ -730,6 +735,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
       />
 
       <SettingsDialogHost />
+      <WhatsNewDialogHost />
 
       <FeedbackDialogHost />
 

@@ -27,6 +27,7 @@ import {
 import { STELLA_CODING_EXTENSION, StellaCoding, StellaCodingFiles } from "./stella/coding.ts";
 import type { StellaContextSources } from "./stella/context.ts";
 import { STELLA_AGENT_TOOLS, stellaToolExtensions, type StellaToolHost } from "./stella/host-tools.ts";
+import { stellaHandoffExtension } from "./stella/handoff.ts";
 import { createImageBudget } from "./stella/image-budget.ts";
 import { stellaPromptExtension } from "./stella/prompt-extension.ts";
 import { simulateSafeguardBlocks } from "./stella/safeguard-simulation.ts";
@@ -78,6 +79,7 @@ export type StellaHarnessOptions = {
   simulateSafeguardBlocks?: boolean;
   hostShell?: boolean;
   turnLimits?: TurnLimitsOptions;
+  handoffAtTokens?: number;
   onReport?: (error: unknown) => void;
 };
 
@@ -143,6 +145,13 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   registry.install(agents.extension);
   registry.install(agents.waitingExtension);
   registry.install(options.hostShell ? StellaCodingFiles : StellaCoding);
+  const runningCommands = options.agents.runningCommands?.bind(options.agents);
+  registry.install(
+    stellaHandoffExtension({
+      ...(runningCommands ? { runningCommands } : {}),
+      ...(options.handoffAtTokens !== undefined ? { atTokens: options.handoffAtTokens } : {}),
+    }),
+  );
   const refreshTools = () => {
     for (const extension of stellaToolExtensions(options.tools)) registry.install(extension);
   };

@@ -25,6 +25,8 @@ import {
   type ToolExecutionApi,
   type RunFailureReason,
   type SettledSubmissionRecord,
+  type ToolRegistration,
+  wrapTool,
 } from "@earendil-works/pi-durable";
 import {
   AGENT_MESSAGE_MAX_CHARS,
@@ -91,6 +93,7 @@ import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provid
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
 import { computerOnlyProviderOf } from "@stella/contracts/backend/providers";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
+import { CONTEXT_HANDOFF_AGENT_DESCRIPTION, CONTEXT_HANDOFF_TOOL } from "@stella/contracts/context-handoff";
 import {
   AGENT_MOVE_CLOUD,
   SWITCH_DESTINATION_TOOL_NAME,
@@ -416,6 +419,7 @@ export type StellaAgentsHost = {
   agentStopped?(agent: { threadId: string; description: string }, context: Context): Promise<void>;
   endAgentProcesses?(threadId: string): Promise<number>;
   endedCommands?(threadId: string): Promise<string | undefined>;
+  runningCommands?(threadId: string): Promise<{ id: string; command: string }[]>;
   wakeSources?(threadId: string): Promise<string[]>;
   directory?: AgentDirectoryHost;
   agentDirectory?(threadId: string): string;
@@ -736,6 +740,28 @@ const busyReader = (
   running: async (id) => (await store.snapshot(LiveDoc, id, context))?.run !== undefined,
   reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
 });
+
+export const runningHelpers = async (
+  store: Pick<ToolExecutionApi, "snapshot" | "commit">,
+  conversationId: ConversationId,
+  context: Context,
+): Promise<{ threadId: string; description: string }[]> => {
+  const read = busyReader(store, context);
+  const agents = Object.entries((await read.agents(conversationId))?.agents ?? {});
+  if (agents.length === 0) return [];
+  const carrying = new Set((await read.reporters(conversationId)).map((reporter) => reporter.input.threadId));
+  const running: { threadId: string; description: string }[] = [];
+  for (const [threadId, agent] of agents) {
+    if (wasStopped(agent)) continue;
+    const working = runsElsewhere(agent)
+      ? agent.outcome === undefined
+      : carrying.has(threadId) ||
+        agent.waiting !== undefined ||
+        (agent.conversationId >= 0 && (await read.running(agent.conversationId as ConversationId)));
+    if (working) running.push({ threadId, description: agent.description });
+  }
+  return running;
+};
 
 const localView = async (
   store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
@@ -1398,7 +1424,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }),
       prompt: str({
         description:
-          "The brief: the request and what the agent can't know. The user's standing rules are already in its context, so a brief that repeats one adds nothing.",
+          "The brief: the request and what the agent can't know.",
       }),
       model: opt(
         str({
@@ -3187,8 +3213,14 @@ export function stellaAgents(host: StellaAgentsHost) {
       ...(switchDestination ? [switchDestination] : []),
     ],
   });
-  // Kept, empty, so stored agents that name it still resolve.
-  const waitingExtension = defineExtension({ name: STELLA_AGENT_WAITING_EXTENSION, tools: [] });
+  // Kept so stored agents that name it still resolve; every agent selects it and the orchestrator never does.
+  const waitingExtension = defineExtension({
+    name: STELLA_AGENT_WAITING_EXTENSION,
+    tools: [],
+    wraps: [
+      wrapTool({ name: CONTEXT_HANDOFF_TOOL } as ToolRegistration, (tool) => ({ ...tool, description: CONTEXT_HANDOFF_AGENT_DESCRIPTION })),
+    ],
+  });
   return {
     extension,
     waitingExtension,

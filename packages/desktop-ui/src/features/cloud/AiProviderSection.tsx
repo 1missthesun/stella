@@ -36,7 +36,7 @@ export function AiProviderSection({
   return (
     <section className="settings-card ai-provider" data-ai-provider={id}>
       <div className="ai-provider__head">
-        <SettingsCardTitle titleKey={titleKey} />
+        <SettingsCardTitle titleKey={titleKey} variant="provider" />
         {action ? <div className="ai-provider__action">{action}</div> : null}
       </div>
       {children}

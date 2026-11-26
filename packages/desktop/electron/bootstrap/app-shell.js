@@ -15,7 +15,7 @@ import { getAllWindows, } from "./context.js";
 import { startDeferredStartup } from "./deferred-startup.js";
 import { getMainLogger } from "../observability/main-logger.js";
 import { noteStartupAppPainted, onceAppPainted } from "../observability/app-paint.js";
-import { heldFirstPage, pendingHold } from "../services/app-source/update-transition.js";
+import { heldFirstPage, pendingHold, takeRelaunchWindow } from "../services/app-source/update-transition.js";
 import { pruneRendererCache } from "../source/cache-prune.js";
 const STARTUP_APP_PAINT_FALLBACK_MS = 4_000;
 const RENDERER_CACHE_PRUNE_DELAY_MS = 5 * 60_000;
@@ -29,6 +29,16 @@ const initializeBootstrapLocalState = async (context) => {
     state.stellaWorkspacePath = stellaDataDir.workspacePath;
     services.securityPolicyService.setSecurityPolicyPath(path.join(stellaDataDir.statePath, "security_policy.json"));
 };
+const presentWindow = (context) => {
+    const shown = context.state.relaunchWindow;
+    context.state.relaunchWindow = null;
+    if (shown && shown !== "focused") {
+        getMainLogger()?.process("startup.window-kept-back", { shown });
+        context.state.windowManager.showWindowQuietly(shown);
+        return;
+    }
+    context.state.windowManager.showWindow();
+};
 const initializeWindowShell = (context) => {
     const { config, lifecycle, services, state } = context;
     const preloadPath = path.join(config.electronDir, "preload.js");
@@ -37,6 +47,7 @@ const initializeWindowShell = (context) => {
     });
     const hold = pendingHold(app.getPath("userData"));
     state.pendingUpdateHold = hold;
+    state.relaunchWindow = takeRelaunchWindow(app.getPath("userData"));
     state.rendererSource = serveRendererSource({
         partition: config.sessionPartition,
         sourceRoot: config.stellaAppDir,
@@ -143,7 +154,7 @@ const finalizeWindowLaunch = (context) => {
         void transition.resumeAfterRelaunch(fullWindow);
     }
     else {
-        state.windowManager.showWindow();
+        presentWindow(context);
     }
     context.state.processRuntime.setManagedTimeout(() => {
         triggerDeferredStartup("fallback");
@@ -180,7 +191,7 @@ export const createBootstrapInitialWindows = (context) => {
                 shownWith,
                 elapsedMs: Math.round(process.uptime() * 1000),
             });
-            context.state.windowManager.showWindow();
+            presentWindow(context);
         };
         fullWindow.once("ready-to-show", () => raise("first-page"));
         setTimeout(() => raise("timeout"), 800);

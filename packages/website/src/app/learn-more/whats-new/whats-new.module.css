@@ -44,33 +44,15 @@
 }
 
 .date {
-  font-family: var(--l-mono);
-  font-size: 13px;
-  letter-spacing: 0.02em;
+  font-family: var(--l-sans);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: rgba(10, 10, 13, 0.55);
 }
 
 .tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.tag {
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: #f1f1f4;
-  font-family: var(--l-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #2a2a31;
-}
-
-.tag[data-tag="New"] {
-  background: linear-gradient(90deg, #00b8ff, #5243ff 50%, #ff4ac0);
-  color: #fff;
+  color: rgba(10, 10, 13, 0.4);
 }
 
 .body {
@@ -134,18 +116,9 @@
 }
 
 .product {
-  display: inline-block;
-  margin-right: 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #0a0a0d;
-  font-family: var(--l-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  vertical-align: 0.15em;
-  color: #fff;
+  margin-right: 6px;
+  font-weight: 600;
+  color: #0a0a0d;
 }
 
 .more {
@@ -190,14 +163,8 @@
 }
 
 .count {
-  min-width: 24px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #f1f1f4;
-  font-family: var(--l-mono);
-  font-size: 12px;
-  text-align: center;
-  color: rgba(10, 10, 13, 0.6);
+  font-weight: 500;
+  color: rgba(10, 10, 13, 0.45);
 }
 
 .icon {
@@ -237,14 +204,7 @@
 
   .meta {
     position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 8px 14px;
-  }
-
-  .tags {
-    margin-top: 0;
+    gap: 8px;
   }
 }
 

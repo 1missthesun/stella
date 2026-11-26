@@ -24,6 +24,7 @@ import {
 import {
   cancelOrchestratorCliTurn,
   dispatchOrchestratorCliTurn,
+  steerOrchestratorCliTurn,
   OrchestratorCliPreviousTurnBusy,
   sameCliTurnIdentity,
   type BuildSessionEnv,
@@ -70,6 +71,7 @@ export type FrameAnswer = { status: number; body: unknown };
 
 const BUSY_RETRY_MS = 2_000;
 const BUSY_RETRIES = 10;
+const STEER_MAX_CHARS = 64_000;
 
 const attemptKey = (identity: CloudCliTurnIdentity): string => `${identity.turnId}#${identity.attemptGeneration}`;
 
@@ -295,6 +297,32 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
     if (adoptSession) adopting.delete(turn.conversationId);
     if (hydrateSession) hydrated.delete(spec.session.sessionKey);
     if (!spec.session.ephemeral) spec.onSessionId(identity.threadId);
+    let steering: Promise<void> = Promise.resolve();
+    spec.control({
+      inject: ({ text, images, onConsumed, onDropped }) => {
+        if (spec.compact || images.length > 0 || !text.trim() || text.length > STEER_MAX_CHARS || attempt.finished) return false;
+        steering = steering.then(async () => {
+          const accepted =
+            !attempt.finished &&
+            (await steerOrchestratorCliTurn({
+              env: host.env,
+              ownerId: turn.ownerId,
+              ownerGeneration: turn.ownerGeneration,
+              identity,
+              messageId: crypto.randomUUID(),
+              text,
+            }).catch((error: unknown) => {
+              host.log("claude_code_steer_failed", { turnId: turn.turnId, message: errorText(error) });
+              return false;
+            }));
+          host.log("claude_code_steered", { turnId: turn.turnId, attemptGeneration, accepted, chars: text.length });
+          if (accepted) onConsumed?.();
+          else onDropped?.();
+        });
+        return true;
+      },
+      endStep: () => false,
+    });
     host.log("claude_code_attempt_dispatched", {
       turnId: turn.turnId,
       attemptGeneration,
@@ -419,6 +447,8 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
           attempt.spec.onNativeToolEnd({ toolUseId: event.toolUseId, result: event.text, isError: event.isError === true });
         } else if (event.type === "models") {
           noteModels(event);
+        } else if (event.type === "background_tasks") {
+          attempt.spec.onBackgroundTasks?.(event.tasks);
         } else if (event.type === "compaction") {
           host.log("claude_code_compaction", { turnId: attempt.turn.turnId, summaryChars: event.summary.length });
           attempt.spec.onCompaction({

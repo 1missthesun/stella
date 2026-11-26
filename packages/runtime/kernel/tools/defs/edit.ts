@@ -12,6 +12,5 @@ export const editTool: ToolDefinition = {
   replay: EDIT_TOOL_REPLAY,
   description: EDIT_TOOL_DESCRIPTION,
   parameters: EDIT_TOOL_PARAMETERS,
-  promptSnippet: "Replace text inside an existing file",
   execute: (args, context) => handleEdit(args, context),
 };

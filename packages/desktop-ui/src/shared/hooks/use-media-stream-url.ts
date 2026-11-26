@@ -9,15 +9,25 @@ const filenameOf = (filePath: string): string =>
 export const useMediaStream = (filePath: string, noun: LocalMediaNoun) => {
   const source = useContext(DisplayFileSourceContext);
   const remote = source?.mediaUrl ?? null;
+  const peek = source?.peekMediaUrl ?? null;
   const local = useLocalMediaFailure(filePath, noun);
+  const key = `${source?.key ?? ""}\0${filePath}`;
+  const seeded = (): { key: string; url: string | null; failure: string | null } | null => {
+    const url = peek?.() ?? null;
+    return url ? { key, url, failure: null } : null;
+  };
   const [resolved, setResolved] = useState<{
     key: string;
     url: string | null;
     failure: string | null;
-  } | null>(null);
-  const key = `${source?.key ?? ""}\0${filePath}`;
+  } | null>(seeded);
   useEffect(() => {
     if (!remote) return;
+    const immediate = peek?.() ?? null;
+    if (immediate) {
+      setResolved({ key, url: immediate, failure: null });
+      return;
+    }
     let live = true;
     void remote().then(
       (url) => {
@@ -32,11 +42,11 @@ export const useMediaStream = (filePath: string, noun: LocalMediaNoun) => {
     return () => {
       live = false;
     };
-  }, [filePath, key, remote]);
+  }, [filePath, key, peek, remote]);
   if (!remote) {
     return { url: localMediaUrl(filePath), failure: local.failure, onError: local.onError };
   }
-  const current = resolved?.key === key ? resolved : null;
+  const current = resolved?.key === key ? resolved : seeded();
   return {
     url: current?.url ?? null,
     failure: current?.failure ?? null,

@@ -960,6 +960,9 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
       // background updaters would install second copies into the run's home.
       STELLA_CLAUDE_CLI_UPDATES: process.env.STELLA_CLAUDE_CLI_UPDATES?.trim() || "off",
       STELLA_ANTIGRAVITY_CLI_UPDATES: process.env.STELLA_ANTIGRAVITY_CLI_UPDATES?.trim() || "off",
+      ...(process.env.STELLA_HANDOFF_AT_TOKENS?.trim()
+        ? { STELLA_HANDOFF_AT_TOKENS: process.env.STELLA_HANDOFF_AT_TOKENS.trim() }
+        : {}),
       // Saved secure values go to the run's protected file, never the user's
       // login keychain or Secret Service.
       STELLA_SAVED_VALUES_STORE: "protected_file",

@@ -2734,6 +2734,7 @@
       "undoneJustNow": "Cofnięto przed chwilą",
       "update": "Aktualizuj",
       "updateAvailable": "Dostępna aktualizacja",
+      "updateOptions": "Opcje aktualizacji",
       "updatedAgo": "Zaktualizowano {ago}",
       "updatedJustNow": "Zaktualizowano przed chwilą",
       "updates": {
@@ -2764,7 +2765,6 @@
       "afterRecording": "Po nagraniu",
       "afterReply": "Gdy Stella skończy odpowiadać",
       "devices": {
-        "choose": "Wybierz komputery",
         "thisComputer": "Ten komputer",
         "offline": "Otrzyma ją po ponownym włączeniu",
         "updateThisOnly": "Zaktualizuj tylko ten komputer",
@@ -2778,6 +2778,10 @@
       "arrived": {
         "fromJustNow": "Zaktualizowano z {device} przed chwilą",
         "fromAgo": "Zaktualizowano z {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatyczne aktualizacje",
+        "detail": "Stella sama instaluje nowe wersje. Te, które uruchamiają Stellę ponownie, czekają, aż przełączysz się do innej aplikacji."
       }
     },
     "audioPlayer": {
@@ -3129,7 +3133,10 @@
       "title": "Powiadomienia",
       "bellNew": "Powiadomienia, nowe: {count}",
       "clear": "Wyczyść wszystko",
-      "empty": "Nic nowego",
+      "clearConfirm": "Wyczyścić wszystko?",
+      "empty": "Brak powiadomień",
+      "earlier": "Wcześniej",
+      "unread": "Nieprzeczytane",
       "dismiss": "Odrzuć",
       "later": "Zachowaj na później",
       "justNow": "Przed chwilą",
@@ -3147,7 +3154,19 @@
         "retrying": "Stella spróbuje ponownie za chwilę.",
         "stopped": "Przestano próbować. Otwórz ten czat ponownie, aby spróbować jeszcze raz."
       },
-      "modelNotOnPlan": "Model niedostępny w Twoim planie"
+      "modelNotOnPlan": "Model niedostępny w Twoim planie",
+      "stellaUpdated": "Stella została zaktualizowana",
+      "more": "Więcej"
+    },
+    "whatsNew": {
+      "title": "Co nowego",
+      "releases": "Wersje",
+      "moreInRelease": "Więcej w tej wersji",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Instalator",
+        "backend": "Chmura"
+      }
     }
   },
   "sidebar": {

@@ -32,6 +32,8 @@ export const antigravityHomeFor = (dataDir: string): string =>
 export const antigravityCliEnv = (home: string): Record<string, string> => ({
   GEMINI_HOME: home,
   AGY_CLI_DISABLE_AUTO_UPDATE: "1",
+  // Antigravity otherwise compacts at its server's default, well before Stella's own handoff.
+  AGY_CLI_AUTO_COMPACT_OVERRIDE: "90%",
   // A sign-in prints Google's page and takes its code, as it does over SSH.
   SSH_CONNECTION: process.env.SSH_CONNECTION || "127.0.0.1 0 127.0.0.1 0",
   BROWSER: process.platform === "win32" ? "rem" : "true",

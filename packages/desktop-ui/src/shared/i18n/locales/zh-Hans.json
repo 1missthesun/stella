@@ -2701,6 +2701,7 @@
       "undoneJustNow": "刚刚撤销",
       "update": "更新",
       "updateAvailable": "有可用更新",
+      "updateOptions": "更新选项",
       "updatedAgo": "{ago}更新",
       "updatedJustNow": "刚刚更新",
       "updates": {
@@ -2731,7 +2732,6 @@
       "afterRecording": "录制结束后",
       "afterReply": "等 Stella 回复完",
       "devices": {
-        "choose": "选择电脑",
         "thisComputer": "这台电脑",
         "offline": "重新开机后就会更新",
         "updateThisOnly": "只更新这台电脑",
@@ -2745,6 +2745,10 @@
       "arrived": {
         "fromJustNow": "刚刚从 {device} 更新",
         "fromAgo": "{ago}从 {device} 更新"
+      },
+      "autoUpdate": {
+        "label": "自动更新",
+        "detail": "Stella 会自行安装新版本。需要重启 Stella 的更新会等你切换到其他应用后再安装。"
       }
     },
     "audioPlayer": {
@@ -3073,7 +3077,10 @@
       "title": "通知",
       "bellNew": "通知，{count} 条新通知",
       "clear": "全部清除",
-      "empty": "没有新通知",
+      "clearConfirm": "全部清除？",
+      "empty": "还没有通知",
+      "earlier": "更早",
+      "unread": "未读",
       "dismiss": "忽略",
       "later": "稍后再看",
       "justNow": "刚刚",
@@ -3091,7 +3098,19 @@
         "retrying": "Stella 稍后会重试。",
         "stopped": "已停止重试。重新打开此聊天即可再试一次。"
       },
-      "modelNotOnPlan": "你的套餐不支持此模型"
+      "modelNotOnPlan": "你的套餐不支持此模型",
+      "stellaUpdated": "Stella 已更新",
+      "more": "更多"
+    },
+    "whatsNew": {
+      "title": "新功能",
+      "releases": "版本",
+      "moreInRelease": "此版本的更多内容",
+      "product": {
+        "mobile": "手机",
+        "launcher": "安装程序",
+        "backend": "云端"
+      }
     }
   },
   "sidebar": {

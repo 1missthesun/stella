@@ -24,6 +24,7 @@ import {
   IPC_APP_SOURCE_APPLY_UPSTREAM,
   IPC_APP_SOURCE_GET_STATE,
   IPC_APP_SOURCE_SKIP,
+  IPC_APP_SOURCE_SET_AUTO_UPDATE,
   IPC_APP_SOURCE_STATE,
   IPC_APP_SOURCE_UNDO,
   IPC_AUTH_APPLY_SESSION_TOKEN,
@@ -487,8 +488,15 @@ export const createElectronApi = (
           html,
           ...(options?.drivePath ? { drivePath: options.drivePath } : {}),
         }),
-      canvasDriveUrl: (drivePath: string) =>
-        ipc.invoke(IPC_DISPLAY_CANVAS_DRIVE_URL, { drivePath }),
+      canvasDriveUrl: (
+        drivePath: string,
+        options?: { version?: string; forceRefresh?: boolean },
+      ) =>
+        ipc.invoke(IPC_DISPLAY_CANVAS_DRIVE_URL, {
+          drivePath,
+          ...(options?.version ? { version: options.version } : {}),
+          ...(options?.forceRefresh ? { forceRefresh: true } : {}),
+        }),
       listTrash: invoker(IPC_DISPLAY_TRASH_LIST),
       forceDeleteTrash: invoker(IPC_DISPLAY_TRASH_FORCE_DELETE),
     },
@@ -540,6 +548,7 @@ export const createElectronApi = (
       applyRemote: invoker(IPC_APP_SOURCE_APPLY_REMOTE),
       applyUpstream: invoker(IPC_APP_SOURCE_APPLY_UPSTREAM),
       skip: invoker(IPC_APP_SOURCE_SKIP),
+      setAutoUpdate: invoker(IPC_APP_SOURCE_SET_AUTO_UPDATE),
     },
 
     capture: {

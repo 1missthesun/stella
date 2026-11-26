@@ -275,6 +275,14 @@ export class WindowManager {
             this.options.onMinimizeFullToTray?.();
         });
     }
+    showWindowQuietly(shown) {
+        const window = this.createFullWindow();
+        if (shown === "hidden")
+            return;
+        window.showInactive();
+        if (shown === "minimized")
+            window.minimize();
+    }
     showWindow() {
         const window = this.createFullWindow();
         if (window.isMinimized()) {

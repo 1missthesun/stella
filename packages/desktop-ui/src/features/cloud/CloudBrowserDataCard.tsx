@@ -42,12 +42,9 @@ function CloudBrowserDataCardImpl() {
   return (
     <>
       <div className="settings-card" data-cloud-browser-settings>
-        <SettingsCardTitle titleKey="cloudBrowser.settings.title" />
         <div className="settings-row">
           <div className="settings-row-info">
-            <div className="settings-row-label">
-              {t("cloudBrowser.settings.defaultProfile")}
-            </div>
+            <SettingsCardTitle titleKey="cloudBrowser.settings.title" variant="row" />
             <div className="settings-row-sublabel">
               {t("cloudBrowser.settings.description")}
             </div>

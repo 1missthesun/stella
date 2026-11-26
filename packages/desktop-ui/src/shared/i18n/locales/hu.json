@@ -2712,6 +2712,7 @@
       "undoneJustNow": "Épp most visszavonva",
       "update": "Frissítés",
       "updateAvailable": "Frissítés érhető el",
+      "updateOptions": "Frissítési beállítások",
       "updatedAgo": "Frissítve: {ago}",
       "updatedJustNow": "Épp most frissítve",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "A felvétel után",
       "afterReply": "Miután Stella befejezte a választ",
       "devices": {
-        "choose": "Számítógépek kiválasztása",
         "thisComputer": "Ez a számítógép",
         "offline": "Megkapja, amikor újra be lesz kapcsolva",
         "updateThisOnly": "Csak ennek a számítógépnek a frissítése",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "Frissítve innen: {device}, az imént",
         "fromAgo": "Frissítve innen: {device}, {ago}"
+      },
+      "autoUpdate": {
+        "label": "Automatikus frissítések",
+        "detail": "A Stella magától telepíti az új verziókat. Az újraindítást igénylők megvárják, amíg másik alkalmazásra váltasz."
       }
     },
     "audioPlayer": {
@@ -3093,7 +3097,10 @@
       "title": "Értesítések",
       "bellNew": "Értesítések, {count} új",
       "clear": "Az összes törlése",
-      "empty": "Nincs újdonság",
+      "clearConfirm": "Az összes törlése?",
+      "empty": "Még nincsenek értesítések",
+      "earlier": "Korábban",
+      "unread": "Olvasatlan",
       "dismiss": "Elvetés",
       "later": "Megtartás későbbre",
       "justNow": "Épp most",
@@ -3111,7 +3118,19 @@
         "retrying": "Stella egy pillanat múlva újra megpróbálja.",
         "stopped": "A próbálkozás leállt. Nyisd meg újra ezt a csevegést az újabb próbához."
       },
-      "modelNotOnPlan": "A modell nem érhető el a csomagodban"
+      "modelNotOnPlan": "A modell nem érhető el a csomagodban",
+      "stellaUpdated": "A Stella frissült",
+      "more": "Továbbiak"
+    },
+    "whatsNew": {
+      "title": "Újdonságok",
+      "releases": "Kiadások",
+      "moreInRelease": "További újdonságok ebben a kiadásban",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Telepítő",
+        "backend": "Felhő"
+      }
     }
   },
   "sidebar": {

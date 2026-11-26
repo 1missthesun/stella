@@ -23,6 +23,7 @@ import {
   ViewerItemContext,
   useRegisterViewerActions,
 } from "@/shell/workspace-stage/viewer-item-context";
+import { useRetainedSurfaceActive } from "@/ui/retained-surface";
 import "../media-tab.css";
 
 const mediaKindOf = (item: MediaTabItem): DisplayTabKind => {
@@ -180,8 +181,9 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
   }, [item.id]);
 
   const inViewer = useContext(ViewerItemContext) === item.id;
+  const active = useRetainedSurfaceActive();
   useViewerMediaActions(item, handleDelete);
-  usePrefetchNeighbours(neighbours.previous, neighbours.next, inViewer);
+  usePrefetchNeighbours(neighbours.previous, neighbours.next, inViewer && active);
 
   if (inViewer) {
     return (

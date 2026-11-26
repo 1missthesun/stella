@@ -5,129 +5,47 @@ description: Control Windows desktop apps through Stella's persistent Computer U
 
 # Stella Computer for Windows
 
-Use `code` for desktop-app work. The persistent JavaScript runtime is already initialized and exposes a frozen `sky` client. Bindings and delivered app instructions persist for this agent session.
+Use `code` for desktop-app work: its persistent runtime exposes a frozen `sky` client, and bindings and delivered app instructions persist for this agent session.
 
 ## Observe
 
 Start each desktop-app turn with fresh state:
 
 ```js
-var state = await sky.get_app_state({
-  app: "Spotify",
-  screenshot_policy: "auto",
-});
+var state = await sky.get_app_state({ app: "Spotify", screenshot_policy: "auto" });
 codeRuntime.write(state.text);
 if (state.screenshot) await codeRuntime.emitImage(state.screenshot.url);
 ```
 
-Every state includes an opaque semantic `state_id`, an immutable compound `observation_id`, `is_diff`, and, for a diff, `base_state_id`. A captured screenshot also has an independent `visual_state_id`; screenshot capture settings do not change `state_id`, while a different visual or resource generation changes `observation_id`. Treat a diff as valid only when its `base_state_id` matches the full state you are building on. Pass `disable_diff: true` whenever the base is unavailable or mismatched.
-
-Use `await sky.list_apps()` only when an app name cannot be resolved. Use `await sky.list_windows()` when the app has multiple top-level windows, then pass `window_id` instead of `app` to state and action calls.
-
-The default state is a UI Automation diff when sufficient. A screenshot is returned only when visual context is needed. Prefer numbered `element_index` values over coordinates.
-
-Pass `disable_diff: true` only when you need a complete recovery tree.
+- The state is a UI Automation diff when that suffices, with a screenshot only when visual context is needed. Prefer numbered `element_index` values over coordinates.
+- Every state has an opaque `state_id`, an immutable `observation_id`, `is_diff` and, for a diff, `base_state_id`; a screenshot adds `visual_state_id`. A diff is valid only on top of the full state its `base_state_id` names; pass `disable_diff: true` when that base is unavailable or you need the complete tree.
+- `list_apps()` only when an app name doesn't resolve. When the app has several top-level windows, call `list_windows()` and pass `window_id` instead of `app`.
+- Don't add sleeps: `get_app_state` settles adaptively, waiting longer only while UI Automation events show the app still changing.
 
 ## Act
 
-Actions return a receipt after dispatch without rebuilding state or capturing a screenshot. Every action requires the `state_id` from the fresh state it was derived from, including element clicks, secondary actions, scrolling, selection, value/focus actions, coordinates, drags, and keyboard input. Missing or stale provenance is rejected before native dispatch instead of targeting changed UI:
+Every action takes `app` (or `window_id`) and the `state_id` of the fresh state it was derived from; an action against a stale state is refused before anything is sent. Actions return a receipt, not a new state.
 
 ```js
-await sky.click({
-  app: "Spotify",
-  element_index: 42,
-  state_id: state.state_id,
-});
-await sky.set_value({
-  app: "Spotify",
-  element_index: 18,
-  value: "Daft Punk",
-  state_id: state.state_id,
-});
-await sky.perform_secondary_action({
-  app: "Spotify",
-  element_index: 9,
-  action: "Invoke",
-  state_id: state.state_id,
-});
-await sky.scroll({
-  app: "Spotify",
-  element_index: 55,
-  direction: "down",
-  pages: 1,
-  state_id: state.state_id,
-});
-await sky.drag({
-  app: "Spotify",
-  from_x: 420,
-  from_y: 310,
-  to_x: 720,
-  to_y: 310,
-  state_id: state.state_id,
-  observation_id: state.observation_id,
-});
-await sky.press_key({
-  app: "Spotify",
-  key: "Return",
-  state_id: state.state_id,
-});
-await sky.type_text({
-  app: "Spotify",
-  text: "hello",
-  state_id: state.state_id,
-});
+sky.click({ app, element_index, state_id })                 // or x, y + observation_id
+sky.set_value({ app, element_index, value, state_id })
+sky.perform_secondary_action({ app, element_index, action: "Invoke", state_id })
+sky.scroll({ app, element_index, direction: "down", pages: 1, state_id })
+sky.press_key({ app, key: "ctrl+shift+t", state_id })
+sky.type_text({ app, text, state_id })
+sky.select_text({ app, element_index, text, prefix?, suffix?, selection_type?, state_id })  // "text" | "cursor-before" | "cursor-after"
+sky.drag({ app, from_x, from_y, to_x, to_y, state_id, observation_id })                  // or path: [{ x, y }, …]
+sky.batch([{ type: "click", app, element_index, state_id }, …])
 ```
 
-`drag` also accepts `path: [{ x, y }, ...]` with at least two points. Drag
-coordinates must come from the latest screenshot; observe again after the drag.
+- After any action attempt, observe again before another standalone action: a failed or interrupted dispatch may still have changed the app. Ordered actions from one observation, with no result needed in between, go together in `batch`.
+- `wait_for_change({ app, after_state_id: state.state_id, after_visual_state_id?, timeout_ms })` when the next step depends on the change showing (pass `after_visual_state_id` when only pixels change), then re-derive indices.
+- `batch` validates every item first, so one stale item rejects the whole batch before anything runs. Give every item the same fresh `state_id`; never batch across a decision point or a permission prompt. After a failed or partial batch, observe again.
+- `select_text` works where the target exposes a UI Automation text range; prefix and suffix disambiguate repeated matches.
 
-After any action attempt, observe again before sending another standalone action; a failed or interrupted dispatch may still have changed the app, so its prior observation is invalidated. When several ordered actions need the same starting observation and no intermediate result is needed, send them together with `sky.batch([...])`. When the next step depends on a mutation becoming observable, call:
+## Coordinates and delivery
 
-```js
-var nextState = await sky.wait_for_change({
-  app: "Spotify",
-  after_state_id: state.state_id,
-  ...(state.visual_state_id
-    ? { after_visual_state_id: state.visual_state_id }
-    : {}),
-  timeout_ms: 10000,
-  screenshot_policy: "auto",
-});
-```
-
-It polls without advancing the saved diff baseline and returns a final diff anchored exactly to `after_state_id`. Pass `after_visual_state_id` when screenshot-only changes matter; omit it to wait only for semantic UI Automation changes. Then re-derive fresh indices. `sky.batch([...])` validates every action at the native dispatch boundary, then executes ordered actions. A stale action rejects the entire batch before command 0 is dispatched. Give every item the `state_id` from the same fresh starting state when they target the same app; do not batch across decision points, permission prompts, or navigation-policy boundaries. After any failed or partially completed batch, discard its starting state and observe again.
-
-## Text Selection
-
-Use semantic selection when the target exposes a UI Automation text range:
-
-```js
-await sky.select_text({
-  app: "Notepad",
-  element_index: 7,
-  text: "matching text",
-  prefix: "optional text before",
-  suffix: "optional text after",
-  selection_type: "text",
-  state_id: state.state_id,
-});
-```
-
-`selection_type` may be `text`, `cursor-before`, or `cursor-after`. Prefix and suffix disambiguate repeated matches.
-
-## Coordinates And Input
-
-For a visible control missing from the tree, use screenshot pixel coordinates from the latest attached screenshot:
-
-```js
-await sky.click({
-  window_id: 123456,
-  x: 620,
-  y: 412,
-  state_id: state.state_id,
-  observation_id: state.observation_id,
-});
-```
+For a visible control missing from the tree, click screenshot pixel coordinates from the latest screenshot.
 
 Coordinates are screenshot pixels and require a state captured with `screenshot_policy: "always"`, its semantic `state_id`, and its immutable `observation_id` from the latest observation of that window. They are relative to the window, so they still land right if the window moved. Before sending, Stella checks that the window has the same size and that the pixels around each point (and most of the window) look the same as in that screenshot; small animations pass, a dialog over the point or a different screen does not.
 
@@ -161,6 +79,4 @@ Nothing (or only what the message says) was delivered. Do not retry them blindly
 - `background_unavailable`: this window would ignore background input of this kind; the message names the reason and your options. Use an element (UI Automation) route or `set_value` if there is one, otherwise tell the user. Retry with `delivery: "foreground"` only if the user asked Stella to take over the screen.
 - Other refusals name their cause in the message: the app runs as administrator (Windows drops Stella's input to it), or Windows would not bring the window to the front for foreground input. Tell the user.
 
-Do not add sleeps. `get_app_state` performs adaptive settling and extends its wait only while UI Automation events indicate continued changes.
-
-Do not use PowerShell, registry edits, app-bundle paths, or app-specific scripting to drive desktop apps. Use `Bash` only to diagnose the Computer Use runtime itself.
+Don't drive desktop apps with PowerShell, registry edits, app-bundle paths or app-specific scripting; `Bash` is only for diagnosing the Computer Use runtime itself.

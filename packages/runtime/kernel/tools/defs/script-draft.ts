@@ -62,14 +62,14 @@ export const createScriptDraftTool = (
     ],
   },
   description:
-    "Author a watch check script: writes Bun/TypeScript to the schedule-scripts directory and immediately dry-runs it, returning the assigned scriptPath plus exitCode, stdout, and stderr. Watch contract at fire time: empty stdout + exit 0 = no change (silent); non-empty stdout = detected change details; non-zero exit = sensor failure. Keep the script deterministic (fetch + extract + diff against `<scriptPath>.state.json`), store the new baseline in the sidecar, and iterate here until the dry-run is clean — then register it with `schedule_add({ kind: 'watch', runsOn: 'computer', scriptPath })`. Use this only for a watch that needs this computer; a cloud watch takes `script` directly.",
+    "Write a check script for a watch that needs this computer and dry-run it at once, returning its scriptPath, exitCode, stdout and stderr. Iterate until the dry-run is clean, then register it with `schedule_add({ kind: 'watch', runsOn: 'computer', scriptPath })`. A cloud watch takes `script` directly instead.",
   parameters: {
     type: "object",
     properties: {
       code: {
         type: "string",
         description:
-          "Full TypeScript source for the check script. Print change details to stdout only when something changed (that output escalates to the assistant at fire time); print nothing when unchanged; exit non-zero on sensor failure. Read/write the sidecar `<scriptPath>.state.json` (via env STELLA_SCHEDULE_SCRIPT_PATH) for the last-seen baseline. Wall-clock cap: 30s per run.",
+          "Bun/TypeScript source. Print what changed to stdout only when something did (that output wakes the assistant); print nothing otherwise; exit non-zero when the check itself fails. Keep the last-seen baseline in `<scriptPath>.state.json` (the path is in env STELLA_SCHEDULE_SCRIPT_PATH). 30 s per run.",
       },
     },
     required: ["code"],

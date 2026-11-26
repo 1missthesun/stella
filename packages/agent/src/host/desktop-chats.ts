@@ -341,6 +341,8 @@ export type DesktopChatsOptions = {
   agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
   endAgentShells?(threadId: string): Promise<number>;
   endedCommands?(threadId: string): Promise<string | undefined>;
+  runningCommands?(threadId: string): Promise<{ id: string; command: string }[]>;
+  handoffAtTokens?: number;
   wakeSources?(threadId: string): Promise<string[]>;
   localLog?(conversationId: string): DesktopLocalLog | undefined;
   usageLimits?: {
@@ -1594,6 +1596,7 @@ export function desktopChats(options: DesktopChatsOptions) {
             storage,
             models,
             ...(options.simulateSafeguardBlocks ? { simulateSafeguardBlocks: true } : {}),
+            ...(options.handoffAtTokens !== undefined ? { handoffAtTokens: options.handoffAtTokens } : {}),
             sources: desktopContextSources({
               stellaHome: options.dataDir,
               backendUrl: options.siteAuth()?.baseUrl,
@@ -1627,6 +1630,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 dataDir: options.dataDir,
                 ...(options.endAgentShells ? { endAgentShells: options.endAgentShells } : {}),
                 ...(options.endedCommands ? { endedCommands: options.endedCommands } : {}),
+                ...(options.runningCommands ? { runningCommands: options.runningCommands } : {}),
                 ...(options.wakeSources ? { wakeSources: options.wakeSources } : {}),
                 execution: execution.host,
                 ...(agentLog && agentLogTransport

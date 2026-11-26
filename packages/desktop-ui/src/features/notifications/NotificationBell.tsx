@@ -7,6 +7,7 @@ import {
   clearNotifications,
   dismissNotification,
   endNotificationToast,
+  openNotificationLink,
   runNotificationAction,
   setNotificationPanelOpen,
   useNotificationPanelOpen,
@@ -31,6 +32,7 @@ const KIND_ICON: Record<NotificationKind, typeof Bell> = {
 
 const TOAST_MS = 6000;
 const TOAST_LEAVE_MS = 200;
+const CLEAR_CONFIRM_MS = 4000;
 
 const useMinuteNow = () => {
   const [now, setNow] = useState(() => Date.now());
@@ -41,15 +43,30 @@ const useMinuteNow = () => {
   return now;
 };
 
+const startOfDay = (time: number) => {
+  const date = new Date(time);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+};
+
 const whenText = (t: ReturnType<typeof useT>, locale: string, date: number, now: number) => {
   const minutes = Math.round((date - now) / 60_000);
   if (minutes > -1) return t("shell.notifications.justNow");
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-  if (Math.abs(minutes) < 60) return format.format(minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return format.format(hours, "hour");
-  return format.format(Math.round(hours / 24), "day");
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (Math.abs(minutes) < 60) return relative.format(minutes, "minute");
+  if (date >= startOfDay(now)) return relative.format(Math.round(minutes / 60), "hour");
+  const sameYear = new Date(date).getFullYear() === new Date(now).getFullYear();
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 };
+
+const fullDate = (locale: string, date: number) =>
+  new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" }).format(date);
 
 const NotificationRow = ({
   item,
@@ -67,47 +84,76 @@ const NotificationRow = ({
   const running = useNotificationRunning().has(item.id);
   const busy = running || item.busy === true;
   const Icon = KIND_ICON[item.kind];
-  const actions = item.actions ?? [];
+  const actions = (item.actions ?? []).filter((action) => variant === "panel" || !action.panelOnly);
+  const more = item.more;
+  const unread = variant === "panel" && item.unread;
   return (
-    <div className="notification-row" data-kind={item.kind} data-variant={variant}>
+    <div
+      className="notification-row"
+      data-kind={item.kind}
+      data-variant={variant}
+      data-unread={unread || undefined}
+      data-live={item.live || undefined}
+      data-testid={variant === "panel" ? "notification-row" : undefined}
+    >
+      {unread ? <span className="notification-row__dot" aria-hidden /> : null}
       <span className="notification-row__icon" aria-hidden>
         <Icon size={15} strokeWidth={1.9} />
       </span>
       <div className="notification-row__body">
-        <p className="notification-row__title">{item.title}</p>
-        {item.detail ? <p className="notification-row__detail">{item.detail}</p> : null}
-        <div className="notification-row__foot">
-          {variant === "panel" ? (
-            <span className="notification-row__time">{whenText(t, locale, item.createdAt, now)}</span>
-          ) : null}
-          <span className="notification-row__actions">
+        <p className="notification-row__title">
+          {unread ? <span className="sr-only">{t("shell.notifications.unread")}, </span> : null}
+          {item.title}
+        </p>
+        {more ? (
+          <div className="notification-row__line">
+            {item.detail ? <p className="notification-row__summary">{item.detail}</p> : null}
+            <button
+              type="button"
+              className="notification-row__more"
+              onClick={() => {
+                if (variant === "toast") onClose?.();
+                else setNotificationPanelOpen(false);
+                openNotificationLink(item.id, more);
+              }}
+              data-testid="notification-more"
+            >
+              {more.label}
+            </button>
+          </div>
+        ) : item.detail ? (
+          <p className="notification-row__detail">{item.detail}</p>
+        ) : null}
+        {variant === "panel" || actions.length > 0 ? (
+          <div className="notification-row__foot">
             {variant === "panel" ? (
-              <button
-                type="button"
-                className="notification-row__button"
-                onClick={() => dismissNotification(item.id)}
-                data-testid="notification-dismiss"
+              <time
+                className="notification-row__time"
+                dateTime={new Date(item.createdAt).toISOString()}
+                title={fullDate(locale, item.createdAt)}
               >
-                {t("shell.notifications.dismiss")}
-              </button>
+                {whenText(t, locale, item.createdAt, now)}
+              </time>
             ) : null}
-            {actions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className={`notification-row__button${action.primary ? " notification-row__button--primary" : ""}`}
-                disabled={busy || action.disabled}
-                onClick={() => {
-                  if (variant === "toast") onClose?.();
-                  void runNotificationAction(item.id, action);
-                }}
-                data-testid="notification-action"
-              >
-                {busy && action.primary && item.busyLabel ? item.busyLabel : action.label}
-              </button>
-            ))}
-          </span>
-        </div>
+            <span className="notification-row__actions">
+              {actions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className={`notification-row__button${action.primary ? " notification-row__button--primary" : ""}`}
+                  disabled={busy || action.disabled}
+                  onClick={() => {
+                    if (variant === "toast") onClose?.();
+                    void runNotificationAction(item.id, action);
+                  }}
+                  data-testid="notification-action"
+                >
+                  {busy && action.primary && item.busyLabel ? item.busyLabel : action.label}
+                </button>
+              ))}
+            </span>
+          </div>
+        ) : null}
       </div>
       {variant === "toast" ? (
         <button
@@ -120,7 +166,18 @@ const NotificationRow = ({
         >
           <X size={13} />
         </button>
-      ) : null}
+      ) : (
+        <button
+          type="button"
+          className="notification-row__close notification-row__remove"
+          aria-label={t("shell.notifications.dismiss")}
+          title={t("shell.notifications.dismiss")}
+          onClick={() => dismissNotification(item.id)}
+          data-testid="notification-dismiss"
+        >
+          <X size={13} />
+        </button>
+      )}
     </div>
   );
 };
@@ -225,6 +282,34 @@ const NotificationToast = ({ anchor }: { anchor: RefObject<HTMLButtonElement | n
   );
 };
 
+const ClearAllButton = () => {
+  const t = useT();
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = window.setTimeout(() => setConfirming(false), CLEAR_CONFIRM_MS);
+    return () => window.clearTimeout(timer);
+  }, [confirming]);
+  return (
+    <button
+      type="button"
+      className="notification-row__button"
+      data-confirming={confirming || undefined}
+      onClick={() => {
+        if (!confirming) {
+          setConfirming(true);
+          return;
+        }
+        setConfirming(false);
+        clearNotifications();
+      }}
+      data-testid="notification-clear"
+    >
+      {confirming ? t("shell.notifications.clearConfirm") : t("shell.notifications.clear")}
+    </button>
+  );
+};
+
 export const NotificationBell = memo(function NotificationBell() {
   const t = useT();
   const items = useNotifications();
@@ -232,6 +317,9 @@ export const NotificationBell = memo(function NotificationBell() {
   const open = useNotificationPanelOpen();
   const now = useMinuteNow();
   const bell = useRef<HTMLButtonElement>(null);
+  const unreadItems = items.filter((item) => item.unread);
+  const unreadCount = unreadItems.length;
+  const ordered = unreadCount > 0 ? [...unreadItems, ...items.filter((item) => !item.unread)] : items;
   const label =
     unseen > 0
       ? t("shell.notifications.bellNew", { count: unseen })
@@ -269,23 +357,20 @@ export const NotificationBell = memo(function NotificationBell() {
         >
           <div className="notification-panel__head">
             <h2 className="notification-panel__title">{t("shell.notifications.title")}</h2>
-            {items.length > 1 ? (
-              <button
-                type="button"
-                className="notification-row__button"
-                onClick={clearNotifications}
-                data-testid="notification-clear"
-              >
-                {t("shell.notifications.clear")}
-              </button>
-            ) : null}
+            {items.length > 1 ? <ClearAllButton /> : null}
           </div>
           {items.length === 0 ? (
             <p className="notification-panel__empty">{t("shell.notifications.empty")}</p>
           ) : (
-            <ul className="notification-panel__list">
-              {items.map((item) => (
-                <li key={item.id}>
+            <ul className="notification-panel__list" data-testid="notification-list">
+              {ordered.map((item, index) => (
+                <li
+                  key={item.id}
+                  data-earlier-start={index > 0 && index === unreadCount ? true : undefined}
+                >
+                  {index > 0 && index === unreadCount ? (
+                    <h3 className="notification-panel__group">{t("shell.notifications.earlier")}</h3>
+                  ) : null}
                   <NotificationRow item={item} variant="panel" now={now} />
                 </li>
               ))}

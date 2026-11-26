@@ -162,6 +162,17 @@ const parseCliEvent = (value: unknown): CloudOrchestratorEvent | null => {
             ...(value.isError === true ? { isError: true as const } : {}),
           }
         : null;
+    case "background_tasks":
+      return Array.isArray(value.tasks) && value.tasks.length <= 64
+        ? {
+            type: "background_tasks",
+            tasks: value.tasks.flatMap((task) => {
+              const id = isRecord(task) ? boundedString(task.id, 200) : undefined;
+              const description = isRecord(task) ? (boundedString(task.description, 400) ?? "") : "";
+              return id ? [{ id, description }] : [];
+            }),
+          }
+        : null;
     case "usage":
       return nonNegativeInteger(value.inputTokens) &&
         nonNegativeInteger(value.outputTokens) &&
@@ -325,7 +336,10 @@ export const dispatchOrchestratorCliTurn = async (args: {
         reason?: unknown;
       })
     | null;
-  if (response.status === 409 && body?.reason === "previous_turn_recovering") {
+  if (
+    response.status === 409 &&
+    (body?.reason === "previous_turn_recovering" || body?.reason === "cancellation_join_pending")
+  ) {
     throw new OrchestratorCliPreviousTurnBusy(
       "The previous Claude Code turn is still finishing.",
     );
@@ -351,6 +365,33 @@ export const dispatchOrchestratorCliTurn = async (args: {
       "The orchestrator session accepted a different attempt than the one dispatched.",
     );
   }
+};
+
+export const steerOrchestratorCliTurn = async (args: {
+  env: BuildSessionEnv;
+  ownerId: string;
+  ownerGeneration: string;
+  identity: CloudCliTurnIdentity;
+  messageId: string;
+  text: string;
+}): Promise<boolean> => {
+  const response = await buildSession(args.env, args.identity.threadId).fetch(
+    "https://build-session/steer",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ownerId: args.ownerId,
+        ownerGeneration: args.ownerGeneration,
+        turnId: args.identity.turnId,
+        attemptGeneration: args.identity.attemptGeneration,
+        messageId: args.messageId,
+        text: args.text,
+      }),
+    },
+  );
+  const body = (await response.json().catch(() => null)) as { accepted?: unknown } | null;
+  return response.ok && body?.accepted === true;
 };
 
 export const cancelOrchestratorCliTurn = async (args: {

@@ -216,9 +216,6 @@ export function PromptPresetCard() {
           <div className="settings-row-label">
             {t("settings.systemPrompt.agentLabel")}
           </div>
-          <div className="settings-row-sublabel">
-            {t("settings.systemPrompt.agentSublabel")}
-          </div>
         </div>
         <div className="settings-row-control">
           <Select
@@ -243,11 +240,6 @@ export function PromptPresetCard() {
         <div className="settings-row-info">
           <div className="settings-row-label">
             {t("settings.systemPrompt.activeLabel")}
-          </div>
-          <div className="settings-row-sublabel">
-            {usingDefault
-              ? t("settings.systemPrompt.usingDefault")
-              : t("settings.systemPrompt.usingCustom")}
           </div>
         </div>
         <div className="settings-row-control">

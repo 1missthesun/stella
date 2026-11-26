@@ -2723,6 +2723,7 @@
       "undoneJustNow": "בוטל הרגע",
       "update": "עדכן",
       "updateAvailable": "עדכון זמין",
+      "updateOptions": "אפשרויות עדכון",
       "updatedAgo": "עודכן {ago}",
       "updatedJustNow": "עודכן הרגע",
       "updates": {
@@ -2753,7 +2754,6 @@
       "afterRecording": "אחרי ההקלטה",
       "afterReply": "אחרי ש-Stella תסיים לענות",
       "devices": {
-        "choose": "בחירת מחשבים",
         "thisComputer": "המחשב הזה",
         "offline": "יקבל את זה כשיופעל שוב",
         "updateThisOnly": "לעדכן רק את המחשב הזה",
@@ -2767,6 +2767,10 @@
       "arrived": {
         "fromJustNow": "עודכן מ-{device} עכשיו",
         "fromAgo": "עודכן מ-{device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "עדכונים אוטומטיים",
+        "detail": "Stella מתקינה גרסאות חדשות בעצמה. עדכונים שמפעילים מחדש את Stella ממתינים עד שתעבור לאפליקציה אחרת."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,10 @@
       "title": "התראות",
       "bellNew": "התראות, חדשות: {count}",
       "clear": "ניקוי הכול",
-      "empty": "אין חדש",
+      "clearConfirm": "לנקות הכול?",
+      "empty": "אין עדיין התראות",
+      "earlier": "קודם לכן",
+      "unread": "לא נקראה",
       "dismiss": "סגירה",
       "later": "לשמור למועד מאוחר יותר",
       "justNow": "עכשיו",
@@ -3129,7 +3136,19 @@
         "retrying": "Stella תנסה שוב בעוד רגע.",
         "stopped": "הניסיונות הופסקו. יש לפתוח מחדש את הצ׳אט כדי לנסות שוב."
       },
-      "modelNotOnPlan": "המודל לא זמין בתוכנית שלך"
+      "modelNotOnPlan": "המודל לא זמין בתוכנית שלך",
+      "stellaUpdated": "Stella עודכנה",
+      "more": "עוד"
+    },
+    "whatsNew": {
+      "title": "מה חדש",
+      "releases": "גרסאות",
+      "moreInRelease": "עוד בגרסה הזו",
+      "product": {
+        "mobile": "טלפון",
+        "launcher": "תוכנת התקנה",
+        "backend": "ענן"
+      }
     }
   },
   "sidebar": {

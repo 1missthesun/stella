@@ -27,15 +27,25 @@ import { isPlainTextPath } from "@/features/workspace-display/path-to-viewer";
 import { usePreviewParser } from "./use-preview-parser";
 import { usePreviewWindow } from "./use-preview-window";
 import { PreviewEmpty, PreviewProblem } from "./preview-states";
+import { useRetainedSurfaceActive } from "@/ui/retained-surface";
 
-const PdfViewerCard = lazy(() =>
+const loadPdfViewerCard = () =>
   import("@/app/chat/PdfViewerCard").then((m) => ({
     default: m.PdfViewerCard,
-  })),
-);
-const Markdown = lazy(() =>
-  import("@/app/chat/Markdown").then((m) => ({ default: m.Markdown })),
-);
+  }));
+const loadMarkdown = () =>
+  import("@/app/chat/Markdown").then((m) => ({ default: m.Markdown }));
+
+export const preloadPdfViewer = () => {
+  void loadPdfViewerCard();
+};
+
+export const preloadMarkdownViewer = () => {
+  void loadMarkdown();
+};
+
+const PdfViewerCard = lazy(loadPdfViewerCard);
+const Markdown = lazy(loadMarkdown);
 const OfficeArtifactPanel = lazy(() =>
   import("./office-artifact-panel").then((m) => ({
     default: m.OfficeArtifactPanel,
@@ -122,7 +132,6 @@ const startOfficePreviewForPath = (
 export const OfficeFileTabContent = ({
   filePath,
   title,
-  refreshToken,
 }: {
   filePath: string;
   title?: string;
@@ -159,7 +168,7 @@ export const OfficeFileTabContent = ({
     return () => {
       cancelled = true;
     };
-  }, [filePath, title, refreshToken, cloudSource, attempt]);
+  }, [filePath, title, cloudSource, attempt]);
 
   if (previewRef) {
     return <OfficeTabContent previewRef={previewRef} />;
@@ -613,12 +622,14 @@ const formatRelativeTime = (timestamp: number, now: number): string => {
   return `${days}d`;
 };
 
-const useNowTick = (intervalMs: number): number => {
+const useNowTick = (intervalMs: number, active: boolean): number => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(id);
-  }, [intervalMs]);
+  }, [intervalMs, active]);
   return now;
 };
 
@@ -750,8 +761,9 @@ const SourceDiffBatchFiles = ({
 
 export const SourceDiffTabContent = () => {
   const t = useT();
+  const active = useRetainedSurfaceActive();
   const { batches, activeBatchId } = useSourceDiffBatches();
-  const now = useNowTick(30_000);
+  const now = useNowTick(30_000, active);
 
   const activeBatch = useMemo(() => {
     if (batches.length === 0) return null;

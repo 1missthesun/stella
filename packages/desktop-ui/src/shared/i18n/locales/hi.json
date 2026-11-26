@@ -2712,6 +2712,7 @@
       "undoneJustNow": "अभी पूर्ववत हुआ",
       "update": "अपडेट करें",
       "updateAvailable": "अपडेट उपलब्ध है",
+      "updateOptions": "अपडेट विकल्प",
       "updatedAgo": "{ago} अपडेट हुआ",
       "updatedJustNow": "अभी अपडेट हुआ",
       "updates": {
@@ -2742,7 +2743,6 @@
       "afterRecording": "आपकी रिकॉर्डिंग के बाद",
       "afterReply": "Stella का जवाब पूरा होने के बाद",
       "devices": {
-        "choose": "कंप्यूटर चुनें",
         "thisComputer": "यह कंप्यूटर",
         "offline": "फिर से चालू होने पर मिलेगा",
         "updateThisOnly": "सिर्फ़ इस कंप्यूटर को अपडेट करें",
@@ -2756,6 +2756,10 @@
       "arrived": {
         "fromJustNow": "अभी {device} से अपडेट हुआ",
         "fromAgo": "{device} से {ago} अपडेट हुआ"
+      },
+      "autoUpdate": {
+        "label": "अपने-आप अपडेट",
+        "detail": "Stella नए संस्करण खुद इंस्टॉल करती है। जिन अपडेट से Stella फिर से शुरू होती है, वे तब तक रुकते हैं जब तक आप किसी दूसरे ऐप पर नहीं जाते।"
       }
     },
     "audioPlayer": {
@@ -3093,7 +3097,10 @@
       "title": "सूचनाएँ",
       "bellNew": "सूचनाएँ, {count} नई",
       "clear": "सब साफ़ करें",
-      "empty": "कुछ नया नहीं",
+      "clearConfirm": "सब साफ़ करें?",
+      "empty": "अभी कोई सूचना नहीं",
+      "earlier": "पहले",
+      "unread": "अपठित",
       "dismiss": "हटाएँ",
       "later": "बाद के लिए रखें",
       "justNow": "अभी-अभी",
@@ -3111,7 +3118,19 @@
         "retrying": "Stella थोड़ी देर में फिर कोशिश करेगी।",
         "stopped": "कोशिश करना बंद कर दिया। फिर से कोशिश करने के लिए यह चैट दोबारा खोलें।"
       },
-      "modelNotOnPlan": "मॉडल आपके प्लान में उपलब्ध नहीं है"
+      "modelNotOnPlan": "मॉडल आपके प्लान में उपलब्ध नहीं है",
+      "stellaUpdated": "Stella अपडेट हो गई",
+      "more": "और"
+    },
+    "whatsNew": {
+      "title": "नया क्या है",
+      "releases": "रिलीज़",
+      "moreInRelease": "इस रिलीज़ में और",
+      "product": {
+        "mobile": "फ़ोन",
+        "launcher": "इंस्टॉलर",
+        "backend": "क्लाउड"
+      }
     }
   },
   "sidebar": {

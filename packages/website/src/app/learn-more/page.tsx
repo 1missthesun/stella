@@ -24,7 +24,12 @@ import { Finale } from "@/components/landing/closing";
 import { InView } from "@/components/landing/in-view";
 import { PageShell } from "@/components/landing/page-shell";
 import pg from "@/components/landing/page.module.css";
-import { changelogEntries } from "./changelog-entries";
+import {
+  noteText,
+  releaseDateLabel,
+  releaseKey,
+  stellaReleases,
+} from "@stella/contracts/stella-releases";
 import lm from "./learn-more.module.css";
 
 export const metadata: Metadata = {
@@ -136,7 +141,7 @@ const MODEL_LOGOS = [
 const DARK = { id: "default", dark: true };
 
 export default function LearnMore() {
-  const recent = changelogEntries.filter((entry) => entry.release).slice(0, 3);
+  const recent = stellaReleases.filter((entry) => entry.title).slice(0, 3);
 
   return (
     <PageShell
@@ -329,14 +334,14 @@ export default function LearnMore() {
         </div>
         <div className={lm.news}>
           {recent.map((entry) => (
-            <Link key={`${entry.release}-${entry.date}`} href="/learn-more/whats-new" className={lm.newsCard}>
+            <Link key={releaseKey(entry)} href="/learn-more/whats-new" className={lm.newsCard}>
               <span className={lm.newsMeta}>
-                <b>{entry.release}</b>
-                <span>{entry.date}</span>
+                <b>{entry.title}</b>
+                <span>{releaseDateLabel(entry)}</span>
               </span>
               <ul>
                 {(entry.highlights ?? []).slice(0, 2).map((item, i) => (
-                  <li key={i}>{typeof item === "string" ? item : item.text}</li>
+                  <li key={i}>{noteText(item)}</li>
                 ))}
               </ul>
             </Link>

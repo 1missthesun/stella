@@ -1,4 +1,5 @@
 import { agentIdentityText } from "@stella/contracts/agent-messaging";
+import { parseHandoffTokens } from "@stella/contracts/context-handoff";
 import {
   agentContainerSize,
   materializeAgentWorld,
@@ -376,6 +377,7 @@ export const steerContainerAgent = async (
   ) {
     return json({ error: "Invalid agent message." }, 400);
   }
+  const exact = body.turnId !== undefined || body.attemptGeneration !== undefined;
   const [turn, terminal] = await Promise.all([
     host.ctx.storage.get<TurnRequest>("turn"),
     host.ctx.storage.get<boolean>("terminal"),
@@ -383,7 +385,8 @@ export const steerContainerAgent = async (
   if (
     !turn ||
     turn.kind !== "agent" ||
-    turn.agentRole === "orchestrator" ||
+    (turn.agentRole === "orchestrator" && !exact) ||
+    (exact && (body.turnId !== turn.turnId || body.attemptGeneration !== turn.attemptGeneration)) ||
     !turn.threadId ||
     terminal !== false ||
     !Number.isSafeInteger(turn.attemptGeneration) ||
@@ -1415,6 +1418,9 @@ export const runAgentAttempt = async (
     host.env,
     turn,
   );
+  const handoffAtTokens = parseHandoffTokens(
+    (host.env as { STELLA_HANDOFF_AT_TOKENS?: string }).STELLA_HANDOFF_AT_TOKENS,
+  );
   const nativeStatePreviousIntegrityKeys = (
     await nativeStateIntegrityKeysFor(host.env, turn)
   ).filter((key) => key !== nativeStateIntegrityKey);
@@ -1564,6 +1570,7 @@ export const runAgentAttempt = async (
           }),
         },
         ...(claudeAccount ? { claudeAccount } : {}),
+        ...(handoffAtTokens !== undefined ? { handoffAtTokens } : {}),
         history: args.history,
         ...(cloudSkills ? { skills: cloudSkills } : {}),
         ...(turn.execution ? { execution: turn.execution } : {}),

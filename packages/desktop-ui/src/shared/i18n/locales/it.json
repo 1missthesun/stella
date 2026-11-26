@@ -2723,6 +2723,7 @@
       "undoneJustNow": "Annullato ora",
       "update": "Aggiorna",
       "updateAvailable": "Aggiornamento disponibile",
+      "updateOptions": "Opzioni di aggiornamento",
       "updatedAgo": "Aggiornato {ago}",
       "updatedJustNow": "Aggiornato ora",
       "updates": {
@@ -2753,7 +2754,6 @@
       "afterRecording": "Dopo la registrazione",
       "afterReply": "Quando Stella ha finito di rispondere",
       "devices": {
-        "choose": "Scegli i computer",
         "thisComputer": "Questo computer",
         "offline": "La riceverà quando sarà di nuovo acceso",
         "updateThisOnly": "Aggiorna solo questo computer",
@@ -2767,6 +2767,10 @@
       "arrived": {
         "fromJustNow": "Aggiornato da {device} proprio ora",
         "fromAgo": "Aggiornato da {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Aggiornamenti automatici",
+        "detail": "Stella installa da sola le nuove versioni. Quelle che riavviano Stella aspettano che passi a un'altra app."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,10 @@
       "title": "Notifiche",
       "bellNew": "Notifiche, {count} nuove",
       "clear": "Cancella tutto",
-      "empty": "Niente di nuovo",
+      "clearConfirm": "Cancellare tutto?",
+      "empty": "Ancora nessuna notifica",
+      "earlier": "Precedenti",
+      "unread": "Non letta",
       "dismiss": "Ignora",
       "later": "Tieni per dopo",
       "justNow": "Proprio ora",
@@ -3129,7 +3136,19 @@
         "retrying": "Stella riproverà tra un momento.",
         "stopped": "Tentativi interrotti. Riapri questa chat per riprovare."
       },
-      "modelNotOnPlan": "Modello non disponibile nel tuo piano"
+      "modelNotOnPlan": "Modello non disponibile nel tuo piano",
+      "stellaUpdated": "Stella è stata aggiornata",
+      "more": "Altro"
+    },
+    "whatsNew": {
+      "title": "Novità",
+      "releases": "Versioni",
+      "moreInRelease": "Altro in questa versione",
+      "product": {
+        "mobile": "Telefono",
+        "launcher": "Programma di installazione",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

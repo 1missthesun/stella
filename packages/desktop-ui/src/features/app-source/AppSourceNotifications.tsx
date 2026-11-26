@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
+import { releaseKey, releaseSummary } from "@stella/contracts/stella-releases";
 import type {
   AppSourceActionResult,
   AppSourceConflicts,
@@ -18,6 +19,8 @@ import {
   useRelayedAgents,
 } from "./app-source-store";
 import { addOffer, describeChange, deviceLabel, useNow } from "./AppSourceCards";
+import { releaseNewIn } from "@/features/whats-new/release-news";
+import { whatsNewDialog } from "@/features/whats-new/whats-new-store";
 
 const ARRIVED_SHOWN_MS = 12 * 60 * 60_000;
 
@@ -46,6 +49,8 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
   const relayed = useRelayedAgents(conversationId);
   const pending = usePendingAppSourceAction();
   const api = appSourceApi();
+  const arrivedSha = state?.arrived?.sha ?? null;
+  const news = useMemo(() => (arrivedSha ? releaseNewIn(arrivedSha) : null), [arrivedSha]);
   const items: NotificationInput[] = [];
 
   const act = (key: string, action: () => Promise<AppSourceActionResult>) => async () => {
@@ -69,12 +74,19 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
       items.push({
         id: `app-source:arrived:${arrived.sha}`,
         kind: "update",
-        title: t("shell.appSource.updates.newVersion"),
+        title: t("shell.notifications.stellaUpdated"),
         detail: arrived.undone
           ? t("shell.notifications.undone")
-          : arrived.from
-            ? t("shell.notifications.updatedFrom", { device: deviceLabel(arrived.from) })
-            : t("shell.notifications.updatedHere"),
+          : news
+            ? releaseSummary(news)
+            : arrived.from
+              ? t("shell.notifications.updatedFrom", { device: deviceLabel(arrived.from) })
+              : t("shell.appSource.updates.newVersionDetail"),
+        more: {
+          label: t("shell.notifications.more"),
+          lasting: news ? { open: "whats-new", release: releaseKey(news) } : { open: "whats-new" },
+          run: () => whatsNewDialog.open(news ? releaseKey(news) : undefined),
+        },
         createdAt: arrived.date,
         busy: pending === key,
         busyLabel: arrived.undone ? t("shell.appSource.updating") : t("shell.appSource.updates.undoing"),
@@ -82,8 +94,8 @@ export const AppSourceNotifications = memo(function AppSourceNotifications({
           ? [
               {
                 label: arrived.undone ? t("shell.appSource.update") : t("shell.appSource.undo"),
-                primary: true,
                 keep: true,
+                panelOnly: true,
                 disabled: blocked,
                 run: act(key, () => api.undo(arrived.flip)),
               },

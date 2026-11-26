@@ -3,78 +3,31 @@ name: x-api
 description: "Use X (Twitter) through Stella's connected account."
 ---
 
-# X (Twitter) API via Stella
+# X (Twitter) through Stella
 
-Use this skill when the user wants Stella to read from or act on their X/Twitter account.
+`stella-x-api` (on PATH in Stella shells) acts on the user's X account through Stella's own X app, whose tokens stay on Stella's backend. Never ask for, print or store X keys or tokens, and never read `~/.xurl` (another tool's live tokens).
 
-Stella owns the X OAuth app and stores the user's X tokens on the backend. Do not ask the user for X API keys, client IDs, or client secrets. Do not use or inspect `~/.xurl`.
-
-Use the first-party `stella-x-api` CLI. It is auto-injected into Stella shell commands and receives Stella auth from the runtime.
-
-## Setup
-
-Check connection status:
+## Connecting
 
 ```bash
 stella-x-api status
+stella-x-api connect                 # prints a URL for the user to approve
+stella-x-api finish ABCD-EFGH-JKLM   # the one-time code the page shows them
 ```
 
-If X is not connected, generate a Stella connect URL:
+Give the user the connect URL; after approving, they paste the code into the chat. The code works once, only for the Stella account that started it, for 10 minutes; if it fails or X reports the connection expired, run `connect` again.
+
+## Commands
 
 ```bash
-stella-x-api connect
-```
-
-Open the returned URL for the user, or give it to the user to approve in their browser. After they approve, the page shows a one-time code. Ask them to paste it into the chat, then finish and check:
-
-```bash
-stella-x-api finish ABCD-EFGH-JKLM
-stella-x-api status
 stella-x-api whoami --json
-```
-
-The code works once, only in the Stella account that started the connection, and expires after 10 minutes. If it fails, run `stella-x-api connect` again.
-
-## Common Commands
-
-```bash
-# Current connected X account
-stella-x-api whoami --json
-
-# Post
 stella-x-api post "Hello from Stella"
-
-# Read a post by ID or URL
-stella-x-api read 1234567890
-stella-x-api read https://x.com/user/status/1234567890
-
-# Search recent public posts
+stella-x-api read <post id or URL>
 stella-x-api search "from:XDevelopers API" -n 10
-
-# Raw X API v2 request
-stella-x-api request /2/users/me --query '{"user.fields":"id,name,username,description,public_metrics"}'
-
-# Raw POST
-stella-x-api request /2/tweets --method POST --body '{"text":"Hello from Stella"}'
+stella-x-api request /2/users/me --query '{"user.fields":"id,name,username"}'
+stella-x-api request /2/tweets --method POST --body '{"text":"Hello"}'
 ```
 
-All command responses are JSON except `status`, `connect` and `finish` without `--json`.
+Output is JSON except `status`, `connect` and `finish` (pass `--json` for those). `request` takes X API v2 paths on `api.x.com` only, with no authorization headers: Stella adds the user's token. Media upload isn't supported yet; offer a text-only post instead.
 
-## Raw API Rules
-
-- Use only X API v2 paths through `stella-x-api request`, such as `/2/users/me`, `/2/tweets/search/recent`, or `/2/tweets`.
-- Do not pass authorization headers. Stella injects the connected user's OAuth token server-side.
-- Prefer `--query` for query parameters and `--body` for JSON request bodies.
-- Use `--json` on `connect` or `status` when downstream parsing matters.
-
-## Current Limitations
-
-- Media upload is not part of the first `stella-x-api` surface. For posts with media, ask whether a text-only post is acceptable or use another approved media flow if one exists.
-- The helper targets X API v2 on `api.x.com`; it does not expose arbitrary hosts.
-- If the backend returns that X is not connected or expired, run `stella-x-api connect` and have the user re-approve.
-
-## Safety
-
-- Never ask for, print, or store X API keys, client IDs, client secrets, access tokens, refresh tokens, or bearer tokens.
-- Never inspect `~/.xurl`; it is unrelated to Stella's managed X connection and may contain live tokens from other tools.
-- Confirm before posting, replying, deleting, sending DMs, following, blocking, muting, or otherwise taking account-changing actions.
+Posting, replying, deleting, DMs, follows, blocks and other account changes need the user's go-ahead; a request for exactly that action is the go-ahead.

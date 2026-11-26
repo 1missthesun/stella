@@ -70,7 +70,12 @@ type OpenAssistant = {
   message: AgentMessage & { role: "assistant"; content: Block[] };
 };
 
-export const createNativeTranscript = (args: { prompt: string; inputPrompt: string; execution: Execution }) => {
+export const createNativeTranscript = (args: {
+  prompt: string;
+  inputPrompt: string;
+  execution: Execution;
+  hidden?: (text: string) => boolean;
+}) => {
   const messages: AgentMessage[] = [];
   const toolNames = new Map<string, string>();
   const assistants = new Map<string, OpenAssistant>();
@@ -134,6 +139,7 @@ export const createNativeTranscript = (args: { prompt: string; inputPrompt: stri
         promptEchoed = true;
         return;
       }
+      if (args.hidden?.(text)) return;
       messages.push({ role: "user", content: [{ type: "text", text }], timestamp: Date.now() } as AgentMessage);
       return;
     }

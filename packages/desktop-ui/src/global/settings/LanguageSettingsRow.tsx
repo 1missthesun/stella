@@ -17,10 +17,12 @@ export function LanguageSettingsRow() {
 
   return (
     <div className="settings-card">
-      <SettingsCardTitle titleKey="settings.language.title" />
       <div className="settings-row">
         <div className="settings-row-info">
-          <div className="settings-row-label">{t("common.language")}</div>
+          <SettingsCardTitle titleKey="settings.language.title" variant="row" />
+          <div className="settings-row-sublabel">
+            {t("settings.language.description")}
+          </div>
         </div>
         <div className="settings-row-control">
           <Select<Locale>
@@ -28,7 +30,7 @@ export function LanguageSettingsRow() {
             value={locale}
             onValueChange={(next) => setLocale(next)}
             options={localeOptions}
-            aria-label={t("common.language")}
+            aria-label={t("settings.language.title")}
           />
         </div>
       </div>

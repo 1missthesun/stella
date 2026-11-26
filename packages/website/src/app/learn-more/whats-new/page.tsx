@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import {
-  changelogEntries,
-  type ChangeItem,
-  type ChangelogEntry,
-} from "../changelog-entries";
+  noteProduct,
+  noteText,
+  releaseDateLabel,
+  releaseHeadline,
+  releaseKey,
+  stellaReleases,
+  type StellaReleaseNote,
+} from "@stella/contracts/stella-releases";
 import Link from "next/link";
 import { PageShell } from "@/components/landing/page-shell";
 import pg from "@/components/landing/page.module.css";
@@ -16,24 +20,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/learn-more/whats-new" },
 };
 
-function entryKey(entry: ChangelogEntry): string {
-  return `${entry.release ?? entry.era ?? "entry"}-${entry.date}`;
-}
+const PRODUCT_LABEL = { Mobile: "Phone", Launcher: "Installer", Backend: "Cloud" } as const;
 
-function entryHeadline(entry: ChangelogEntry): string {
-  return entry.release ?? entry.era ?? entry.date;
-}
-
-function ChangeRow({ item }: { item: ChangeItem }) {
-  if (typeof item === "string") {
-    return <li>{item}</li>;
-  }
+function ChangeRow({ item }: { item: StellaReleaseNote }) {
+  const product = noteProduct(item);
   return (
     <li>
-      <span className={w.product} aria-label={`${item.product} update`}>
-        {item.product}
-      </span>
-      {item.text}
+      {product ? <span className={w.product}>{PRODUCT_LABEL[product]}</span> : null}
+      {noteText(item)}
     </li>
   );
 }
@@ -59,23 +53,19 @@ export default function WhatsNew() {
 
       <section className={w.log} data-tone="light" data-bg="#ffffff" aria-label="Releases">
         <ol>
-          {changelogEntries.map((entry) => {
+          {stellaReleases.map((entry) => {
             const highlights = entry.highlights ?? [];
             const more = entry.more ?? [];
             return (
-              <li key={entryKey(entry)} className={w.entry}>
+              <li key={releaseKey(entry)} className={w.entry}>
                 <div className={w.meta}>
-                  <span className={w.release}>{entryHeadline(entry)}</span>
-                  <span className={w.date}>{entry.date}</span>
-                  {entry.tags && entry.tags.length > 0 ? (
-                    <span className={w.tags}>
-                      {entry.tags.map((tag) => (
-                        <span key={tag} className={w.tag} data-tag={tag}>
-                          {tag}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
+                  <span className={w.release}>{releaseHeadline(entry)}</span>
+                  <span className={w.date}>
+                    {releaseDateLabel(entry)}
+                    {entry.tags && entry.tags.length > 0 ? (
+                      <span className={w.tags}> · {entry.tags.join(" · ")}</span>
+                    ) : null}
+                  </span>
                 </div>
                 <div className={w.body}>
                   {highlights.length > 0 ? (

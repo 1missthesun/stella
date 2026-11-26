@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Check, CloudIcon, Monitor, Plus, Trash2 } from "@/ui/icons";
+import { CloudIcon, Monitor, Plus, Trash2 } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 import { showToast } from "@/ui/toast";
 import { selfHostDialogs, useDesktopServerState } from "./self-host-store";
@@ -140,7 +140,7 @@ export function ServerSettingsCard() {
                       : t("selfHost.settings.selfHostedSub", { host: hostOf(entry.origin) })}
                   </span>
                 </span>
-                {entry.active ? <Check size={16} className="server-list__check" /> : null}
+                {entry.active ? <span className="server-list__dot" aria-hidden="true" /> : null}
               </button>
               {entry.kind === "self-hosted" && !entry.active && state.canSwitch ? (
                 <button

@@ -147,6 +147,7 @@ type TurnState = {
   claimWaiters: Set<() => void>;
   given: Set<AntigravityMessage>;
   taking?: Promise<void>;
+  context?: { used: number; size: number };
 };
 
 type Proc = {
@@ -169,6 +170,7 @@ type Proc = {
   networkLost?: { at: number; quietSince: number; cancelCheck: () => void };
   exited: boolean;
   stderr: string;
+  context?: { used: number; size: number };
 };
 
 const thinkingTier = (level: ModelThinkingLevel): string => {
@@ -314,7 +316,13 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     turn.closeTimer = undefined;
     if (!turn.messageOpen) return;
     closeBlock(turn);
-    emit(turn, { type: "message_delta", delta: { stop_reason: stopReason }, ...(usage ? { usage } : {}) });
+    const context = turn.context;
+    emit(turn, {
+      type: "message_delta",
+      delta: { stop_reason: stopReason },
+      ...(usage ? { usage } : {}),
+      ...(context ? { context } : {}),
+    });
     emit(turn, { type: "message_stop" });
     turn.messageOpen = false;
   };
@@ -649,6 +657,14 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       case "tool_call_update":
         if (turn) toolEnded(turn, update);
         return;
+      case "usage_update": {
+        const used = Number(update.used);
+        const size = Number(update.size);
+        if (!Number.isFinite(used) || !(used > 0)) return;
+        proc.context = { used, size: Number.isFinite(size) && size > 0 ? size : (proc.context?.size ?? 0) };
+        if (turn) turn.context = proc.context;
+        return;
+      }
       case "config_option_update": {
         const model = (update.configOptions as any[] | undefined)?.find((option) => option?.id === "model");
         if (typeof model?.currentValue === "string") proc.currentModel = model.currentValue;
@@ -693,6 +709,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       }
     }
     const result = await proc.rpc.request("session/new", base);
+    delete proc.context;
     noteModels(proc, result);
     proc.sessionId = String(result?.sessionId ?? "");
     proc.sessionShape = shape;
@@ -767,6 +784,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       executing: 0,
       claimWaiters: new Set(),
       given: new Set(),
+      ...(live.context ? { context: live.context } : {}),
     };
     live.turn = turn;
     const onAbort = () => live.rpc.notify("session/cancel", { sessionId });

@@ -2723,6 +2723,7 @@
       "undoneJustNow": "Anulat chiar acum",
       "update": "Actualizează",
       "updateAvailable": "Actualizare disponibilă",
+      "updateOptions": "Opțiuni de actualizare",
       "updatedAgo": "Actualizat {ago}",
       "updatedJustNow": "Actualizat chiar acum",
       "updates": {
@@ -2753,7 +2754,6 @@
       "afterRecording": "După înregistrare",
       "afterReply": "După ce Stella termină răspunsul",
       "devices": {
-        "choose": "Alege computerele",
         "thisComputer": "Acest computer",
         "offline": "O primește când pornește din nou",
         "updateThisOnly": "Actualizează doar acest computer",
@@ -2767,6 +2767,10 @@
       "arrived": {
         "fromJustNow": "Actualizat de pe {device} chiar acum",
         "fromAgo": "Actualizat de pe {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Actualizări automate",
+        "detail": "Stella instalează singură versiunile noi. Cele care repornesc Stella așteaptă până treci la altă aplicație."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,10 @@
       "title": "Notificări",
       "bellNew": "Notificări, noi: {count}",
       "clear": "Șterge tot",
-      "empty": "Nimic nou",
+      "clearConfirm": "Ștergi tot?",
+      "empty": "Nicio notificare încă",
+      "earlier": "Mai devreme",
+      "unread": "Necitită",
       "dismiss": "Închide",
       "later": "Păstrează pentru mai târziu",
       "justNow": "Chiar acum",
@@ -3129,7 +3136,19 @@
         "retrying": "Stella va încerca din nou imediat.",
         "stopped": "S-a oprit din încercat. Redeschide acest chat pentru a încerca din nou."
       },
-      "modelNotOnPlan": "Modelul nu este disponibil în planul tău"
+      "modelNotOnPlan": "Modelul nu este disponibil în planul tău",
+      "stellaUpdated": "Stella a fost actualizată",
+      "more": "Mai mult"
+    },
+    "whatsNew": {
+      "title": "Noutăți",
+      "releases": "Versiuni",
+      "moreInRelease": "Mai multe în această versiune",
+      "product": {
+        "mobile": "Telefon",
+        "launcher": "Program de instalare",
+        "backend": "Cloud"
+      }
     }
   },
   "sidebar": {

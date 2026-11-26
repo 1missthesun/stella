@@ -2723,6 +2723,7 @@
       "undoneJustNow": "Desfeito agora mesmo",
       "update": "Atualizar",
       "updateAvailable": "Atualização disponível",
+      "updateOptions": "Opções de atualização",
       "updatedAgo": "Atualizado {ago}",
       "updatedJustNow": "Atualizado agora mesmo",
       "updates": {
@@ -2753,7 +2754,6 @@
       "afterRecording": "Depois da sua gravação",
       "afterReply": "Quando a Stella terminar de responder",
       "devices": {
-        "choose": "Escolher computadores",
         "thisComputer": "Este computador",
         "offline": "Vai recebê-la quando ligar de novo",
         "updateThisOnly": "Atualizar só este computador",
@@ -2767,6 +2767,10 @@
       "arrived": {
         "fromJustNow": "Atualizado a partir de {device} agora mesmo",
         "fromAgo": "Atualizado a partir de {device} {ago}"
+      },
+      "autoUpdate": {
+        "label": "Atualizações automáticas",
+        "detail": "A Stella instala as novas versões sozinha. As que reiniciam a Stella esperam até você mudar para outro app."
       }
     },
     "audioPlayer": {
@@ -3111,7 +3115,10 @@
       "title": "Notificações",
       "bellNew": "Notificações, {count} novas",
       "clear": "Limpar tudo",
-      "empty": "Nada de novo",
+      "clearConfirm": "Limpar tudo?",
+      "empty": "Ainda não há notificações",
+      "earlier": "Anteriores",
+      "unread": "Não lida",
       "dismiss": "Dispensar",
       "later": "Guardar para depois",
       "justNow": "Agora mesmo",
@@ -3129,7 +3136,19 @@
         "retrying": "A Stella vai tentar de novo em instantes.",
         "stopped": "Parou de tentar. Reabra este chat para tentar de novo."
       },
-      "modelNotOnPlan": "Modelo indisponível no seu plano"
+      "modelNotOnPlan": "Modelo indisponível no seu plano",
+      "stellaUpdated": "O Stella foi atualizado",
+      "more": "Mais"
+    },
+    "whatsNew": {
+      "title": "Novidades",
+      "releases": "Versões",
+      "moreInRelease": "Mais nesta versão",
+      "product": {
+        "mobile": "Telemóvel",
+        "launcher": "Instalador",
+        "backend": "Nuvem"
+      }
     }
   },
   "sidebar": {

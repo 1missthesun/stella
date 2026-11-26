@@ -1,4 +1,5 @@
 import { isScheduleGoneText, UNLISTED_SCHEDULES_WAKER } from "@stella/contracts/agent-waiting";
+import { parseHandoffTokens } from "@stella/contracts/context-handoff";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord/context";
 import type { Api, Message, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
@@ -330,6 +331,7 @@ export type PiRuntimeEnv = Pick<
     >
   > & {
     PI_UPGRADE_COPIES?: string;
+    STELLA_HANDOFF_AT_TOKENS?: string;
   };
 
 export type PiBrowserHandoff = {
@@ -1769,12 +1771,14 @@ export class PiConversationRuntime {
         this.#options.log("pi_tables_kept_before_upgrade", {});
       }
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
+      const handoffAt = parseHandoffTokens(this.#options.env.STELLA_HANDOFF_AT_TOKENS);
       let rootId: ConversationId | undefined;
       const { harness, turnLimits, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp, recheckWaiting } = await openStellaHarness(
         {
           storage,
           models: this.#models,
           ...(this.#options.simulateSafeguardBlocks ? { simulateSafeguardBlocks: true } : {}),
+          ...(handoffAt !== undefined ? { handoffAtTokens: handoffAt } : {}),
           sources: this.#sources(),
           agents: this.#agents(),
           tools: this.#tools(),

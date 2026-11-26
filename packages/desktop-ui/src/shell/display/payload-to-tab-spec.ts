@@ -1,4 +1,10 @@
-import { CloudFileSource } from "@/features/cloud/CloudFileSource";
+import {
+  CloudFileSource,
+  prefetchDriveFile,
+} from "@/features/cloud/CloudFileSource";
+import { prefetchDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
+import { MARKDOWN_PREVIEW_MAX_BYTES } from "./preview-parser";
+import { DELIMITED_PREVIEW_MAX_BYTES } from "./parse-delimited-rows";
 
 import { CloudAppViewer } from "@/features/cloud/CloudAppViewer";
 import { cloudAppTitles } from "@/features/cloud/cloud-app-title-store";
@@ -20,8 +26,14 @@ import {
   DelimitedTableTabContent,
   MediaTabContent,
   TrashTabContent,
+  preloadMarkdownViewer,
+  preloadPdfViewer,
 } from "./tab-content";
-import { CanvasTabContent } from "./canvas-tab/CanvasTabContent";
+import {
+  CanvasTabContent,
+  prefetchDriveCanvasUrl,
+  prefetchLocalCanvasUrl,
+} from "./canvas-tab/CanvasTabContent";
 import { FolderTabContent } from "./FolderTabContent";
 import {
   addCanvasHtmlItem,
@@ -255,6 +267,7 @@ const localPayloadToTabSpec = (
           filePath: payload.filePath,
           title: title || basenameOf(payload.filePath),
           createdAt: payload.createdAt,
+          cloudDrivePath: payload.cloudDrivePath,
         };
         return {
           id: canvasDisplayTabId(payload.filePath),
@@ -435,8 +448,18 @@ export const payloadToTabSpec = (payload: DisplayTabPayload): DisplayTabSpec => 
   const spec = { ...localPayloadToTabSpec(payload), payload };
   if (!payload.cloudDrivePath) return spec;
   const path = payload.cloudDrivePath;
-  const cloudSpec = { ...spec, id: `drive:${spec.id}`, render: () =>
-    createElement(CloudFileSource, { path, children: spec.render() }) };
+  const nativeDriveCanvas =
+    payload.kind === "canvas-html" &&
+    /\.html?$/iu.test(path) &&
+    typeof window !== "undefined" &&
+    typeof window.electronAPI?.display?.canvasDriveUrl === "function";
+  const cloudSpec = {
+    ...spec,
+    id: `drive:${spec.id}`,
+    render: nativeDriveCanvas
+      ? spec.render
+      : () => createElement(CloudFileSource, { path, children: spec.render() }),
+  };
   recordArtifactFileEntry({ id: cloudSpec.id, kind: cloudSpec.kind, title: cloudSpec.title,
     filePath: path, createdAt: ("createdAt" in payload ? payload.createdAt : null) ?? Date.now(), payload });
   return rememberInFiles(cloudSpec);
@@ -452,8 +475,52 @@ const appTabSpec = (id: string): DisplayTabSpec => {
   };
 };
 
+const DRIVE_PREFETCH_MAX_BYTES = 32 * 1024 * 1024;
+
+const prefetchPayload = (payload: DisplayTabPayload): void => {
+  const drivePath = payload.cloudDrivePath;
+  switch (payload.kind) {
+    case "canvas-html":
+      if (drivePath) prefetchDriveCanvasUrl(drivePath);
+      else if (payload.driveBacked) prefetchDriveCanvasUrl(payload.filePath);
+      else prefetchLocalCanvasUrl(payload.filePath);
+      return;
+    case "pdf":
+      preloadPdfViewer();
+      if (drivePath) prefetchDriveFile(drivePath, { readMaxBytes: DRIVE_PREFETCH_MAX_BYTES });
+      else prefetchDisplayFileBytes(payload.filePath);
+      return;
+    case "markdown":
+      preloadMarkdownViewer();
+      if (drivePath) prefetchDriveFile(drivePath, { readMaxBytes: MARKDOWN_PREVIEW_MAX_BYTES });
+      else prefetchDisplayFileBytes(payload.filePath, undefined, MARKDOWN_PREVIEW_MAX_BYTES);
+      return;
+    case "file-artifact":
+      if (payload.artifactKind === "delimited-table") {
+        if (drivePath) prefetchDriveFile(drivePath, { readMaxBytes: DELIMITED_PREVIEW_MAX_BYTES });
+        else prefetchDisplayFileBytes(payload.filePath, undefined, DELIMITED_PREVIEW_MAX_BYTES);
+      }
+      return;
+    case "media":
+      if (payload.asset.kind === "image") {
+        const first = payload.asset.filePaths[0];
+        if (drivePath) prefetchDriveFile(drivePath, { readMaxBytes: DRIVE_PREFETCH_MAX_BYTES });
+        else if (first) prefetchDisplayFileBytes(first);
+      } else if (
+        drivePath &&
+        (payload.asset.kind === "video" || payload.asset.kind === "audio")
+      ) {
+        prefetchDriveFile(drivePath);
+      }
+      return;
+    default:
+      return;
+  }
+};
+
 registerWorkspaceDisplayPayloadAdapter({
   appTabSpec,
   payloadToTabSpec,
   createSourceDiffTabSpec,
+  prefetchPayload,
 });

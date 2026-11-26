@@ -1,9 +1,8 @@
 export const APPLY_PATCH_TOOL_NAME = "apply_patch";
 
 export const APPLY_PATCH_TOOL_DESCRIPTION =
-  "Edit files via a *** Begin Patch / *** End Patch envelope. Supports Add File, Update File (with optional Move to), Delete File. Each Update File hunk is anchored by 3 lines of context above and below the change. File paths in the envelope MUST be absolute (e.g. /Users/you/projects/foo/bar.ts); relative paths are rejected and the file tools do NOT follow the shell's cwd. Required: input (the full patch text).";
+  "Edit files with a *** Begin Patch / *** End Patch envelope: Add File, Update File (optionally Move to), Delete File; each Update hunk carries 3 lines of context above and below. Paths in the envelope are absolute; file tools do not follow the shell's cwd.";
 
-export const APPLY_PATCH_TOOL_PROMPT_SNIPPET = "Edit files with patch envelopes";
 
 export const APPLY_PATCH_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",

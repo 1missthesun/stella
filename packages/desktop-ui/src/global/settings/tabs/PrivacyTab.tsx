@@ -13,6 +13,7 @@ import { CloudMemoryWipeSettings } from "@/features/cloud/CloudMemoryWipeSetting
 import { CloudMemoryReimportSettings } from "@/features/cloud/CloudMemoryReimportSettings";
 import { useT } from "@/shared/i18n";
 import { platformCapabilities } from "@/platform/capabilities";
+import { SettingsTabHeader } from "@/global/settings/AiryControls";
 import { SettingsToggleCard } from "./settings-toggle-card";
 import { CloudSyncCard } from "./CloudSyncCard";
 import { TelemetrySettingsCard } from "./TelemetrySettingsCard";
@@ -49,6 +50,7 @@ export function PrivacyTab() {
 
   return (
     <div className="settings-tab-content">
+      <SettingsTabHeader titleKey="settings.tabs.privacy" />
       {platformCapabilities.nativeSettings ? (
         <SettingsToggleCard
           titleKey="settings.chatStorage.title"

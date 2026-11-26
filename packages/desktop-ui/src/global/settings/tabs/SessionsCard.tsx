@@ -89,7 +89,7 @@ export function SessionsCard() {
                   ? `${deviceLabel(session)} · ${t("settings.sessions.current")}`
                   : deviceLabel(session)}
             </div>
-            <div className="settings-card-desc">
+            <div className="settings-row-sublabel">
               {[
                 session.ipAddress,
                 session.updatedAt

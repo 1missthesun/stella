@@ -19,7 +19,12 @@ export const preloadAuthDialog = () =>
   runOnce("auth", () => import("@/global/auth/AuthDialog"));
 
 export const preloadBillingScreen = () =>
-  runOnce("billing", () => import("@/global/billing/BillingScreen"));
+  runOnce("billing", () =>
+    Promise.all([
+      import("@/global/billing/PlanUsageDialog"),
+      import("@/global/billing/BillingScreen"),
+    ]),
+  );
 
 export const preloadModelsPicker = () =>
   runOnce("models-picker", async () => {

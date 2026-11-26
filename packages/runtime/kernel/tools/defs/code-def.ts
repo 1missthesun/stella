@@ -21,8 +21,6 @@ export const CODE_TOOL_CLOUD_AGENT_DESCRIPTION =
       "The call keeps the code cell open until then (it can take minutes) and returns { result, message }: result is approved, canceled, expired, or failed; on approved, browser.open the site again and carry on signed in.",
   });
 
-export const CODE_TOOL_PROMPT_SNIPPET =
-  "Run persistent JavaScript, orchestrate allowed Stella tools and connected services' actions, and control apps through the sky/browser globals";
 
 export const CODE_MAX_WAIT_MS = 600_000;
 

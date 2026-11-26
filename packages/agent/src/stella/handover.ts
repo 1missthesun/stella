@@ -2,6 +2,7 @@ import type { Context } from "@earendil-works/chord/context";
 import type { Message } from "@earendil-works/pi-ai";
 import { estimateMessageTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { CompactionEntry, type ContextView, type Conversation, type Harness } from "@earendil-works/pi-durable";
+import { isContextHandoffText } from "@stella/contracts/context-handoff";
 
 const HEADROOM = 0.8;
 const REPLY_RESERVE_TOKENS = 16_384;
@@ -18,7 +19,7 @@ export const isPiCompactionBoundary = (message: Message): boolean => {
     typeof message.content === "string"
       ? message.content
       : message.content.map((part) => (part.type === "text" ? part.text : "")).join("");
-  return text.startsWith(PI_SUMMARY_PREFIX) || text.startsWith(TRUNCATED_CONTEXT_NOTICE);
+  return text.startsWith(PI_SUMMARY_PREFIX) || text.startsWith(TRUNCATED_CONTEXT_NOTICE) || isContextHandoffText(text);
 };
 
 export type HandoverFit = { fit: "fits" | "compacted" | "truncated"; window: number; budget: number; tokens: number; attempts: number };

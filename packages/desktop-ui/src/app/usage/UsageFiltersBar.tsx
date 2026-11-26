@@ -41,14 +41,6 @@ export const UsageFiltersBar = memo(function UsageFiltersBar({
   onSearchChange,
 }: UsageFiltersBarProps) {
   const t = useT();
-  const rangeOptions = useMemo(
-    () =>
-      RANGE_OPTIONS.map((option) => ({
-        value: option.value,
-        label: t(option.labelKey),
-      })),
-    [t],
-  );
   const conversationOptions = useMemo(() => {
     const byId = new Map<string, string>();
     for (const record of records) {
@@ -103,56 +95,74 @@ export const UsageFiltersBar = memo(function UsageFiltersBar({
 
   return (
     <section
-      className="usage-filters"
+      className="usage-filters-wrap"
       aria-label={t("app.usage.filters.label")}
     >
-      <Select
-        value={range}
-        onValueChange={(value) =>
-          onSearchChange({ range: value as UsageRange })
-        }
-        options={rangeOptions}
+      <div
+        className="usage-range-picker"
+        role="radiogroup"
         aria-label={t("app.usage.filters.timeRange")}
-      />
-      <Select
-        value={conversation ?? ALL}
-        onValueChange={(value) =>
-          onSearchChange({
-            conversation: value === ALL ? undefined : value,
-            thread: undefined,
-          })
-        }
-        options={conversationOptions}
-        aria-label={t("app.usage.filters.conversation")}
-      />
-      <Select
-        value={thread ?? ALL}
-        onValueChange={(value) => {
-          const record = records.find((item) => item.threadId === value);
-          onSearchChange({
-            thread: value === ALL ? undefined : value,
-            ...(record ? { conversation: record.conversationId } : {}),
-          });
-        }}
-        options={threadOptions}
-        aria-label={t("app.usage.filters.thread")}
-      />
-      <Select
-        value={agent ?? ALL}
-        onValueChange={(value) =>
-          onSearchChange({ agent: value === ALL ? undefined : value })
-        }
-        options={agentOptions}
-        aria-label={t("app.usage.filters.agentType")}
-      />
-      <Select
-        value={model ?? ALL}
-        onValueChange={(value) =>
-          onSearchChange({ model: value === ALL ? undefined : value })
-        }
-        options={modelOptions}
-        aria-label={t("app.usage.filters.model")}
-      />
+      >
+        {RANGE_OPTIONS.map((option) => {
+          const active = range === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              data-active={active || undefined}
+              onClick={() => onSearchChange({ range: option.value })}
+            >
+              {t(option.labelKey)}
+            </button>
+          );
+        })}
+      </div>
+
+      {records.length > 0 ? (
+        <div className="usage-filters">
+          <Select
+            value={conversation ?? ALL}
+            onValueChange={(value) =>
+              onSearchChange({
+                conversation: value === ALL ? undefined : value,
+                thread: undefined,
+              })
+            }
+            options={conversationOptions}
+            aria-label={t("app.usage.filters.conversation")}
+          />
+          <Select
+            value={thread ?? ALL}
+            onValueChange={(value) => {
+              const record = records.find((item) => item.threadId === value);
+              onSearchChange({
+                thread: value === ALL ? undefined : value,
+                ...(record ? { conversation: record.conversationId } : {}),
+              });
+            }}
+            options={threadOptions}
+            aria-label={t("app.usage.filters.thread")}
+          />
+          <Select
+            value={agent ?? ALL}
+            onValueChange={(value) =>
+              onSearchChange({ agent: value === ALL ? undefined : value })
+            }
+            options={agentOptions}
+            aria-label={t("app.usage.filters.agentType")}
+          />
+          <Select
+            value={model ?? ALL}
+            onValueChange={(value) =>
+              onSearchChange({ model: value === ALL ? undefined : value })
+            }
+            options={modelOptions}
+            aria-label={t("app.usage.filters.model")}
+          />
+        </div>
+      ) : null}
     </section>
   );
 });

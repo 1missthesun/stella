@@ -161,6 +161,13 @@ export const CANVAS_BRIDGE_SCRIPT = String.raw`
     const fromHost = event.source === parent ||
       (Boolean(hostWindow) && event.source === hostWindow && event.origin === hostOrigin);
     if (!fromHost) return;
+    if (event.data && event.data.type === "stella:canvas-visibility" &&
+        event.data.active === false) {
+      for (const media of document.querySelectorAll("video, audio")) {
+        if (typeof media.pause === "function" && !media.paused) media.pause();
+      }
+      return;
+    }
     if (event.data && event.data.type === "stella:canvas-selection-clear") {
       window.getSelection()?.removeAllRanges();
       post();

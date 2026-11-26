@@ -5,158 +5,50 @@ description: Control macOS desktop apps through Stella's persistent Computer Use
 
 # Stella Computer for macOS
 
-Use `code` for desktop-app work. The persistent JavaScript runtime is already initialized and exposes a frozen `sky` client. Bindings and delivered app instructions persist for this agent session.
+Use `code` for desktop-app work: its persistent runtime exposes a frozen `sky` client, and bindings and delivered app instructions persist for this agent session. The `sky` methods are exactly `list_apps`, `list_windows`, `get_app_state`, `wait_for_change`, `click`, `drag`, `perform_secondary_action`, `press_key`, `scroll`, `select_text`, `set_value`, `type_text` and `batch`; there is no `documentation`, `activate_app` or `open_app`.
 
 ## Observe
 
-Start each desktop-app turn with fresh state for the named app:
+Start each desktop-app turn with fresh state for the app, by name:
 
 ```js
-var state = await sky.get_app_state({
-  app: "Spotify",
-  screenshot_policy: "auto",
-});
+var state = await sky.get_app_state({ app: "Spotify", screenshot_policy: "auto" });
 codeRuntime.write(state.text);
 if (state.screenshot) await codeRuntime.emitImage(state.screenshot.url);
 ```
 
-Every state includes an opaque semantic `state_id`, an immutable compound `observation_id`, `is_diff`, and, for a diff, `base_state_id`. A captured screenshot also has an independent `visual_state_id`; screenshot capture settings do not change `state_id`, while a different visual or resource generation changes `observation_id`. Treat a diff as valid only when its `base_state_id` matches the full state you are building on. Pass `disable_diff: true` whenever the base is unavailable or mismatched.
-
-Use the app name directly. Call `await sky.list_apps()` only when the requested app cannot be resolved.
-The `sky` methods are exactly `list_apps`, `list_windows`, `get_app_state`, `wait_for_change`, `click`, `drag`, `perform_secondary_action`, `press_key`, `scroll`, `select_text`, `set_value`, `type_text` and `batch`; there is no `documentation`, `activate_app` or `open_app`.
-When the same app runs more than once (two Chrome profiles, several simulators), pass `window_id` from `list_windows`; actions then go to the process that owns that window.
-A hidden or minimized app, or one with no window on the current Space, fails observation with a message saying so. Pass `raise: true` to `get_app_state` to unhide or restore it; that brings the window on screen, so use it only when the task needs that app. An app with no windows at all (Dock, a menu-bar app, Finder with every window closed) returns its app-level elements instead.
-Stella's own app and password or system-security apps are protected and always refused. To look at Stella's UI, use the verify-stella skill's isolated instance.
-Call `await sky.list_windows()` when window titles or native window IDs are needed to disambiguate several top-level windows.
-
-The default state is an accessibility-tree diff when that is sufficient. A screenshot is returned only when visual context is needed. Prefer the accessibility text and numbered `element_index` values; inspect the screenshot when the tree is sparse or the visible control is absent.
-
-Pass `disable_diff: true` only when you need a complete recovery tree.
+- The state is an accessibility-tree diff when that suffices, with a screenshot only when visual context is needed. Prefer its text and numbered `element_index` values; look at the screenshot when the tree is sparse or a visible control is missing from it.
+- Every state has an opaque `state_id`, an immutable `observation_id`, `is_diff` and, for a diff, `base_state_id`; a screenshot adds `visual_state_id`. A diff is valid only on top of the full state its `base_state_id` names; pass `disable_diff: true` when that base is unavailable or you need the complete tree.
+- `list_apps()` only when an app name doesn't resolve. When the app runs more than once or has several windows (two Chrome profiles, several simulators), pass `window_id` from `list_windows()`.
+- A hidden or minimized app, or one with no window on the current Space, fails observation saying so; `raise: true` unhides it and brings it on screen, so use it only when the task needs that app. An app with no windows at all (the Dock, a menu-bar app) returns its app-level elements.
+- Stella's own app and password or system-security apps are always refused. To look at Stella's UI, use the verify-stella skill's isolated instance.
+- Chromium/Electron apps can briefly expose a sparse tree. Don't add sleeps: `get_app_state` settles adaptively.
 
 ## Act
 
-Actions return a receipt after dispatch without rebuilding state or capturing a screenshot. Every action requires the `state_id` from the fresh state it was derived from, including element clicks, secondary actions, scrolling, selection, value/focus actions, coordinates, drags, and keyboard input. Missing or stale provenance is rejected before native dispatch instead of targeting changed UI:
+Every action takes `app` (or `window_id`) and the `state_id` of the fresh state it was derived from; an action against a stale state is refused before anything is sent. Actions return a receipt, not a new state.
 
 ```js
-await sky.click({
-  app: "Spotify",
-  element_index: 42,
-  state_id: state.state_id,
-});
-await sky.set_value({
-  app: "Spotify",
-  element_index: 18,
-  value: "Daft Punk",
-  state_id: state.state_id,
-});
-await sky.perform_secondary_action({
-  app: "Spotify",
-  element_index: 9,
-  action: "Show Menu",
-  state_id: state.state_id,
-});
-await sky.scroll({
-  app: "Spotify",
-  element_index: 55,
-  direction: "down",
-  pages: 1,
-  state_id: state.state_id,
-});
-await sky.drag({
-  app: "Spotify",
-  from_x: 420,
-  from_y: 310,
-  to_x: 720,
-  to_y: 310,
-  state_id: state.state_id,
-  observation_id: state.observation_id,
-});
-await sky.press_key({
-  app: "Spotify",
-  key: "Return",
-  state_id: state.state_id,
-});
-await sky.type_text({
-  app: "Spotify",
-  text: "hello",
-  state_id: state.state_id,
-});
+sky.click({ app, element_index, state_id })                 // or x, y + observation_id
+sky.set_value({ app, element_index, value, state_id })
+sky.perform_secondary_action({ app, element_index, action: "Show Menu", state_id })
+sky.scroll({ app, element_index, direction: "down", pages: 1, state_id })
+sky.press_key({ app, key: "cmd+shift+t", state_id })
+sky.type_text({ app, text, state_id })
+sky.select_text({ app, element_index, text, prefix?, suffix?, selection_type?, state_id })  // "text" | "cursor-before" | "cursor-after"
+sky.drag({ app, from_x, from_y, to_x, to_y, state_id, observation_id })                  // or path: [{ x, y }, …]
+sky.batch([{ type: "click", app, element_index, state_id }, …])
 ```
 
-`drag` also accepts `path: [{ x, y }, ...]` with at least two points. Drag
-coordinates must come from the latest screenshot; observe again after the drag.
+- Keys: `Return`, `Escape`, `Tab`, `Space`, `Delete`, `Up`/`ArrowUp`, `PageDown`, `F5`, a letter, digit or punctuation, with `cmd`, `ctrl`, `alt` or `shift` joined by `+`.
+- Use `select_text` rather than repeated arrow keys; prefix and suffix disambiguate repeated matches.
+- After acting, `wait_for_change({ app, after_state_id: state.state_id, after_visual_state_id?, timeout_ms })` when the next step depends on the change showing (pass `after_visual_state_id` when only pixels change); otherwise `get_app_state`. Always re-derive element indices from the latest state.
+- `batch` validates every item against its observation first, so one stale item rejects the whole batch before anything runs. Give every item the same fresh `state_id`, and never batch across a decision point, a permission prompt or a step whose result decides the next.
+- A rejection saying the app changed means nothing was sent: observe again and act with the new `state_id` straight away. If the app keeps changing (animations, loading), `wait_for_change` first. Retrying with the old `state_id` never succeeds.
+- A native dialog or sheet is listed first in the state, with a `[warning]` naming it: click its button, or press `Return` (default) or `Escape` (cancel), then observe again. A browser may ignore a click in the first instant after its dialog appears; if it's still there, act again.
 
-Perform one or more actions in one `code` call only when no intermediate result is needed. Then fetch settled state once:
+## Coordinates
 
-```js
-await sky.click({
-  app: "Spotify",
-  element_index: 18,
-  state_id: state.state_id,
-});
-var nextState = await sky.wait_for_change({
-  app: "Spotify",
-  after_state_id: state.state_id,
-  ...(state.visual_state_id
-    ? { after_visual_state_id: state.visual_state_id }
-    : {}),
-  timeout_ms: 10000,
-  screenshot_policy: "auto",
-});
-codeRuntime.write(nextState.text);
-if (nextState.screenshot) await codeRuntime.emitImage(nextState.screenshot.url);
-```
+Prefer elements. For a visible control missing from the tree, click screenshot pixel coordinates (not macOS screen points) from a state captured with `screenshot_policy: "always"`, passing its `state_id` and `observation_id`. Never reuse coordinates with a later observation, even when its `state_id` is unchanged. Coordinates, drags and keys can affect the active input, so use them only when no element route exists, and verify with one final state read.
 
-For a data-driven sequence, `sky.batch([...])` first validates every action against its supplied observation, then executes the actions in order. A stale action rejects the entire batch before any action is dispatched. Give every item the `state_id` from the same fresh starting state when they target the same app. Do not batch across a decision point, permission prompt, navigation-policy boundary, or any step whose result determines the next action.
-
-Use `wait_for_change` when the next step depends on a mutation becoming observable. It polls without advancing the saved diff baseline and returns a final diff anchored exactly to `after_state_id`. Pass `after_visual_state_id` when screenshot-only changes matter; omit it to wait only for semantic accessibility changes. Use `get_app_state` directly when no prior state is available or a change is not required. Always re-derive element indices from the latest state.
-
-## Dialogs, Sheets And Alerts
-
-A native modal dialog (a browser's "Leave site?", a save sheet, a permission alert) is listed first in the state, ahead of the window it blocks, and the state carries a `[warning]` naming it. Act on it like any other element: click its button with that state's `state_id`, or press `Return` (its default button) or `Escape` (its cancel button). Then observe again. A browser may ignore a click that lands in the first instant after its dialog appears; if the dialog is still there in the next state, act again with that new state.
-
-## When An Action Is Rejected
-
-A rejection saying the app changed after your state means nothing was sent. Observe again, re-derive the `element_index` from that state, and act with its `state_id` straight away. Do not reuse one state for several actions in a row unless you batch them. If the app keeps changing (animations, a page still loading), call `wait_for_change` so it settles, then act. Repeating the same call with the same old `state_id` never succeeds.
-
-Every `batch` item needs `type` (`click`, `drag`, `perform_secondary_action`, `press_key`, `scroll`, `select_text`, `set_value` or `type_text`) plus that method's arguments.
-
-Keys are written like `Return`, `Escape`, `Tab`, `Space`, `Delete`, `Up`/`ArrowUp`, `PageDown`, `F5`, a letter, digit or punctuation (`` ` ``, `-`, `/`), with modifiers `cmd`, `ctrl`, `alt` or `shift` joined by `+`, for example `cmd+shift+t`.
-
-## Text Selection
-
-Use semantic selection instead of repeated arrow-key commands:
-
-```js
-await sky.select_text({
-  app: "TextEdit",
-  element_index: 7,
-  text: "matching text",
-  prefix: "optional text before",
-  suffix: "optional text after",
-  selection_type: "text",
-  state_id: state.state_id,
-});
-```
-
-`selection_type` may be `text`, `cursor-before`, or `cursor-after`. Prefix and suffix disambiguate repeated matches.
-
-## Coordinates And Input
-
-Use accessibility elements whenever possible. For a visible control missing from the tree, use screenshot pixel coordinates from the latest attached screenshot:
-
-```js
-await sky.click({
-  app: "Spotify",
-  x: 620,
-  y: 412,
-  state_id: state.state_id,
-  observation_id: state.observation_id,
-});
-```
-
-Coordinates are screenshot pixels, not macOS screen points. They require a state captured with `screenshot_policy: "always"`, its semantic `state_id`, and its immutable `observation_id`. Never reuse coordinates with a later observation, even when its semantic `state_id` is unchanged. Coordinate and keyboard actions may affect the active input path. Use them only when the semantic accessibility route is unavailable, and verify with one final state read.
-
-Spotify and other Chromium/Electron apps can expose sparse state briefly. Do not add sleeps; `get_app_state` performs adaptive settling and waits longer only while the app continues changing.
-
-Do not use AppleScript, `osascript`, `open -a`, app-bundle internals, or shell commands to drive desktop apps. Use `Bash` only to diagnose the Computer Use runtime itself.
+Don't drive desktop apps with AppleScript, `osascript`, `open -a`, app-bundle internals or shell commands; `Bash` is only for diagnosing the Computer Use runtime itself.

@@ -55,7 +55,6 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
       <div className="usage-panel-heading">
         <div>
           <h2>{t("app.usage.timeline.title")}</h2>
-          <p>{t("app.usage.timeline.description")}</p>
         </div>
       </div>
       <div
@@ -72,13 +71,13 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
               <linearGradient id="usageCostFill" x1="0" y1="0" x2="0" y2="1">
                 <stop
                   offset="5%"
-                  stopColor="var(--accent, #7c6cf2)"
-                  stopOpacity={0.35}
+                  stopColor="var(--primary)"
+                  stopOpacity={0.28}
                 />
                 <stop
                   offset="95%"
-                  stopColor="var(--accent, #7c6cf2)"
-                  stopOpacity={0.02}
+                  stopColor="var(--primary)"
+                  stopOpacity={0.01}
                 />
               </linearGradient>
             </defs>
@@ -111,9 +110,10 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
               type="monotone"
               dataKey="totalCostUsd"
               name={t("app.usage.timeline.series.cost")}
-              stroke="var(--accent, #7c6cf2)"
+              stroke="var(--primary)"
               fill="url(#usageCostFill)"
               strokeWidth={2}
+              isAnimationActive={false}
             />
             <Line
               yAxisId="tokens"
@@ -123,6 +123,7 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({
               stroke="var(--foreground)"
               strokeWidth={1.5}
               dot={false}
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>

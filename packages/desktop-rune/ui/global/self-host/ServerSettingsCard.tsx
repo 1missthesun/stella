@@ -154,7 +154,7 @@ export function ServerSettingsCard() {
                 : null}
             </DialogTitle>
           </DialogHeader>
-          <DialogDescription {...sSettings.settingsConfirmDescription}>
+          <DialogDescription>
             {pending?.kind === "remove"
               ? t("selfHost.settings.removeBody")
               : t("selfHost.settings.switchBody")}

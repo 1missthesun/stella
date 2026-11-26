@@ -230,7 +230,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
           <DialogHeader>
             <DialogTitle>{deleteDialogTitle}</DialogTitle>
           </DialogHeader>
-          <DialogDescription {...s.settingsConfirmDescription}>
+          <DialogDescription>
             {deleteDialogDescription}
           </DialogDescription>
           <row {...s.settingsConfirmActions}>

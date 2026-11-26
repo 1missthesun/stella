@@ -50,7 +50,6 @@ export const useSettings = sheet((c, t) => ({
   settingsConfirmActions: { pb: 24, px: 24, mt: 18, justify: "end", gap: 10 },
   settingsConfirmDialog: { pad: 1, fill: c.overlayTop, gradient: t.gradient.overlay, border: c.borderWeak },
   settingsConfirmDialog_dialogHeader: { pt: 20, pb: 12, pr: 20, pl: 28 },
-  settingsConfirmDescription: { family: "sans", px: 28, color: c.textBase, size: 14, weight: 500, lh: 1.55, em: -0.01 },
   settingsSearchResults: { pb: 24, gap: 6, maxW: 720 },
   settingsSearchResultsHeader: { pt: 8, pb: 14, px: 4, size: 12, weight: 600, em: 0.06, textCase: "upper", color: mixOklch(c.textBase, 65, c.textWeak) },
   settingsSearchResultsHeaderQuery: { color: c.textStrong, textCase: undefined, em: 0, weight: 600 },

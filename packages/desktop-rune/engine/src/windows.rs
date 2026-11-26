@@ -62,6 +62,9 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
     let root = engine::read(|eng| {
         let mut root = col().key("stella-root").w_full().h_full().fill(s.bg.unwrap_or_else(|| bg(eng, node)));
         if let Some(n) = eng.tree.get(node).filter(|_| node != 0) {
+            if let Some(k) = n.props.zoom {
+                cx.zoom(k);
+            }
             if let Some(h) = n.props.titlebar {
                 let mut t = rune::Titlebar::new(h);
                 if let Some([x, y]) = n.props.traffic_lights {
@@ -116,15 +119,18 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         if s.node == 0 {
             return;
         }
-        let changed = engine::with(|e| {
+        // The root lays out in the zoomed view's points; the window's size is in its own.
+        let (w, h, changed) = engine::with(|e| {
+            let k = e.tree.get(s.node).and_then(|n| n.props.zoom).unwrap_or(1.0);
+            let (w, h) = (r[2] * k, r[3] * k);
             let slot = e.windows.entry(s.node).or_default();
-            let size = Some((r[2], r[3]));
+            let size = Some((w, h));
             let changed = slot.size != size;
             slot.size = size;
-            changed
+            (w, h, changed)
         });
         if changed {
-            window_event(s.node, "resize", json!({ "w": r[2], "h": r[3] }));
+            window_event(s.node, "resize", json!({ "w": w, "h": h }));
         }
     })
 }

@@ -64,6 +64,7 @@ export function HostWindow({ window: w, chrome, children }: { window: WindowSnap
       clickThrough={w.ignoreMouseEvents}
       visible={w.visible}
       bg={w.transparent ? "#00000000" : w.backgroundColor}
+      zoom={w.zoom === 1 ? undefined : w.zoom}
       {...chrome}
     >
       {children}

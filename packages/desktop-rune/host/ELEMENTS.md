@@ -48,7 +48,8 @@ unmounted. Render windows from anywhere with `windowPortal(<window …/>, key)` 
 `<window>` props: `id`, `kind` (`main` | `panel` | `overlay` | `background`), `title`, `w`, `h`, `minSize`,
 `maxSize`, `position`, `resizable`, `frameless`, `transparent`, `alwaysOnTop`, `clickThrough`,
 `visible`, `contentProtection` (left out of screen captures; macOS and Windows), `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
-its controls over it), `trafficLights` (macOS inset), `dark` (native chrome scheme), `dir`, `keys` +
+its controls over it), `trafficLights` (macOS inset), `dark` (native chrome scheme), `zoom` (page zoom
+factor, as Electron's `setZoomFactor`), `dir`, `keys` +
 `onKey` (window-level chords).
 
 `kind="background"` holds a page that must run as if shown (a media `<webview>`: mic, WebAudio,

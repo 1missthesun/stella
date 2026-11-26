@@ -404,12 +404,14 @@ export class MenuItem {
   toolTip: string;
   constructor(options: MenuItemOptions) {
     this.id = options.id ?? `mi${nextMenuItem++}`;
-    this.label = options.label ?? roleLabel(options.role);
+    const role = options.role ? roles[options.role.toLowerCase() as RoleId] : undefined;
+    this.label = options.label ?? role?.label() ?? "";
     this.sublabel = options.sublabel ?? "";
     this.role = options.role;
-    this.submenu = options.submenu instanceof Menu ? options.submenu : options.submenu ? Menu.buildFromTemplate(options.submenu) : null;
+    const submenu = options.submenu ?? role?.submenu?.();
+    this.submenu = submenu instanceof Menu ? submenu : submenu ? Menu.buildFromTemplate(submenu) : null;
     this.type = options.type ?? (this.submenu ? "submenu" : "normal");
-    this.accelerator = options.accelerator;
+    this.accelerator = options.accelerator ?? role?.accelerator;
     this.enabled = options.enabled ?? true;
     this.visible = options.visible ?? true;
     this.checked = options.checked ?? false;
@@ -425,28 +427,127 @@ export class MenuItem {
       id: this.id,
       label: this.label,
       accelerator: this.accelerator,
-      enabled: this.enabled,
+      enabled: this.enabled && roles[this.role?.toLowerCase() as RoleId]?.available !== false,
       visible: this.visible,
       checked: this.checked,
       type: this.type === "radio" ? "checkbox" : this.type,
+      role: this.role?.toLowerCase(),
       submenu: this.submenu?.items.map((i) => i.toEngine()),
     };
   }
 }
 
-const roleLabel = (role?: string) => role ? role.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase()) : "";
+const isMac = process.platform === "darwin";
+const isWindows = process.platform === "win32";
+const isLinux = process.platform === "linux";
 
-const runRole = (role: string, win: BrowserWindow | null) => {
-  switch (role.toLowerCase()) {
-    case "quit": app.quit(); break;
-    case "close": win?.close(); break;
-    case "minimize": win?.minimize(); break;
-    case "reload":
-    case "forcereload": win?.webContents.reload(); break;
-    case "togglefullscreen": win?.setFullScreen(!win.isFullScreen()); break;
-    default: break;
-  }
+type RoleId =
+  | "about" | "close" | "copy" | "cut" | "delete" | "forcereload" | "front" | "help" | "hide" | "hideothers"
+  | "minimize" | "paste" | "pasteandmatchstyle" | "quit" | "redo" | "reload" | "resetzoom" | "selectall"
+  | "services" | "recentdocuments" | "clearrecentdocuments" | "showsubstitutions" | "togglesmartquotes"
+  | "togglesmartdashes" | "toggletextreplacement" | "startspeaking" | "stopspeaking" | "toggledevtools"
+  | "togglefullscreen" | "undo" | "unhide" | "window" | "zoom" | "zoomin" | "zoomout" | "togglespellchecker"
+  | "appmenu" | "filemenu" | "editmenu" | "viewmenu" | "windowmenu" | "sharemenu";
+
+type Role = {
+  label(): string;
+  accelerator?: string;
+  submenu?(): MenuItemOptions[];
+  run?(win: BrowserWindow | null): void;
+  /** False where the host has nothing behind the role: its item shows disabled. */
+  available?: boolean;
 };
+
+const fixed = (label: string) => () => label;
+const sep: MenuItemOptions = { type: "separator" };
+const zoomBy = (win: BrowserWindow | null, step: number) => { if (win) win.webContents.zoomLevel = step === 0 ? 0 : win.webContents.zoomLevel + step; };
+
+// Electron 44's roles (lib/browser/api/menu-item-roles.ts): labels, accelerators and default submenus.
+const roles: Record<RoleId, Role> = {
+  about: { label: () => (isLinux ? "About" : `About ${app.getName()}`) },
+  close: { label: fixed(isMac ? "Close Window" : "Close"), accelerator: "CommandOrControl+W", run: (w) => w?.close() },
+  copy: { label: fixed("Copy"), accelerator: "CommandOrControl+C" },
+  cut: { label: fixed("Cut"), accelerator: "CommandOrControl+X" },
+  delete: { label: fixed("Delete") },
+  forcereload: { label: fixed("Force Reload"), accelerator: "Shift+CmdOrCtrl+R", run: (w) => w?.webContents.reloadIgnoringCache() },
+  front: { label: fixed("Bring All to Front") },
+  help: { label: fixed("Help") },
+  hide: { label: () => `Hide ${app.getName()}`, accelerator: "Command+H" },
+  hideothers: { label: fixed("Hide Others"), accelerator: "Command+Alt+H" },
+  minimize: { label: fixed("Minimize"), accelerator: "CommandOrControl+M", run: (w) => { if (w?.isMinimizable()) w.minimize(); } },
+  paste: { label: fixed("Paste"), accelerator: "CommandOrControl+V" },
+  pasteandmatchstyle: { label: fixed("Paste and Match Style"), accelerator: isMac ? "Cmd+Option+Shift+V" : "Shift+CommandOrControl+V" },
+  quit: { label: () => (isMac ? `Quit ${app.getName()}` : isWindows ? "Exit" : "Quit"), accelerator: isWindows ? undefined : "CommandOrControl+Q", run: () => app.quit() },
+  redo: { label: fixed("Redo"), accelerator: isWindows ? "Control+Y" : "Shift+CommandOrControl+Z" },
+  reload: { label: fixed("Reload"), accelerator: "CmdOrCtrl+R", run: (w) => w?.webContents.reload() },
+  resetzoom: { label: fixed("Actual Size"), accelerator: "CommandOrControl+0", run: (w) => zoomBy(w, 0) },
+  selectall: { label: fixed("Select All"), accelerator: "CommandOrControl+A" },
+  services: { label: fixed("Services") },
+  recentdocuments: { label: fixed("Open Recent") },
+  clearrecentdocuments: { label: fixed("Clear Menu") },
+  showsubstitutions: { label: fixed("Show Substitutions") },
+  togglesmartquotes: { label: fixed("Smart Quotes") },
+  togglesmartdashes: { label: fixed("Smart Dashes") },
+  toggletextreplacement: { label: fixed("Text Replacement") },
+  startspeaking: { label: fixed("Start Speaking") },
+  stopspeaking: { label: fixed("Stop Speaking") },
+  toggledevtools: { label: fixed("Toggle Developer Tools"), accelerator: isMac ? "Alt+Command+I" : "Ctrl+Shift+I", available: false },
+  togglefullscreen: { label: fixed("Toggle Full Screen"), accelerator: isMac ? "Control+Command+F" : "F11", run: (w) => w?.setFullScreen(!w.isFullScreen()) },
+  undo: { label: fixed("Undo"), accelerator: "CommandOrControl+Z" },
+  unhide: { label: fixed("Show All") },
+  window: { label: fixed("Window") },
+  zoom: { label: fixed("Zoom") },
+  zoomin: { label: fixed("Zoom In"), accelerator: "CommandOrControl+Plus", run: (w) => zoomBy(w, 0.5) },
+  zoomout: { label: fixed("Zoom Out"), accelerator: "CommandOrControl+-", run: (w) => zoomBy(w, -0.5) },
+  togglespellchecker: { label: fixed("Check Spelling While Typing") },
+  appmenu: {
+    label: () => app.getName(),
+    submenu: () => [{ role: "about" }, sep, { role: "services" }, sep, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, sep, { role: "quit" }],
+  },
+  filemenu: { label: fixed("File"), submenu: () => [isMac ? { role: "close" } : { role: "quit" }] },
+  editmenu: {
+    label: fixed("Edit"),
+    submenu: () => [
+      { role: "undo" }, { role: "redo" }, sep, { role: "cut" }, { role: "copy" }, { role: "paste" },
+      ...(isMac
+        ? [
+            { role: "pasteAndMatchStyle" }, { role: "delete" }, { role: "selectAll" }, sep,
+            { label: "Substitutions", submenu: [{ role: "showSubstitutions" }, sep, { role: "toggleSmartQuotes" }, { role: "toggleSmartDashes" }, { role: "toggleTextReplacement" }] },
+            { label: "Speech", submenu: [{ role: "startSpeaking" }, { role: "stopSpeaking" }] },
+          ]
+        : [{ role: "delete" }, sep, { role: "selectAll" }]),
+    ],
+  },
+  viewmenu: {
+    label: fixed("View"),
+    submenu: () => [
+      { role: "reload" }, { role: "forceReload" }, { role: "toggleDevTools" }, sep,
+      { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, sep, { role: "togglefullscreen" },
+    ],
+  },
+  windowmenu: {
+    label: fixed("Window"),
+    submenu: () => [{ role: "minimize" }, { role: "zoom" }, ...(isMac ? [sep, { role: "front" }] : [{ role: "close" }])],
+  },
+  sharemenu: { label: fixed("Share"), submenu: () => [] },
+};
+
+const runRole = (role: string, win: BrowserWindow | null) => roles[role.toLowerCase() as RoleId]?.run?.(win);
+
+let applicationMenuWasSet = false;
+
+// Electron's lib/browser/default-menu.ts, installed at will-finish-launching.
+const setDefaultApplicationMenu = () => {
+  if (applicationMenuWasSet) return;
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(isMac ? [{ role: "appMenu" }] : []),
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ]));
+};
+app.once("will-finish-launching", setDefaultApplicationMenu);
 
 export class Menu extends EventEmitter {
   static applicationMenu: Menu | null = null;
@@ -457,6 +558,7 @@ export class Menu extends EventEmitter {
     return menu;
   }
   static setApplicationMenu(menu: Menu | null) {
+    applicationMenuWasSet = true;
     Menu.applicationMenu = menu;
     app.applicationMenu = menu;
     void viaEngine("menu.setApplicationMenu", (e) => e.menu.setApplicationMenu(menu ? menu.items.map((i) => i.toEngine()) : null), () => {});
@@ -487,6 +589,12 @@ export class Menu extends EventEmitter {
   }
   closePopup() {}
 }
+
+onEngine("menu", (event) => {
+  const item = Menu.applicationMenu?.getMenuItemById(event.id);
+  if (!item) return;
+  void import("./browser-window").then(({ BrowserWindow }) => item.click({}, BrowserWindow.getFocusedWindow()));
+});
 
 const trays = new Map<string, Tray>();
 

@@ -347,5 +347,6 @@ export function Window(p: WindowProps) {
   const style: Css = {};
   const bg = p.bg ?? p.fill;
   if (bg) style.backgroundColor = bg;
+  if (p.zoom && p.zoom !== 1) style.zoom = p.zoom;
   return createElement("div", { className: "r win", style, dir: p.dir, "data-window": p.id }, p.children);
 }

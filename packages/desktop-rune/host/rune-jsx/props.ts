@@ -322,6 +322,8 @@ export type WindowProps = {
   trafficLights?: [number, number];
   /** Native chrome colour scheme; unset follows the system. */
   dark?: boolean;
+  /** Page zoom, as Electron's `setZoomFactor`: the content lays out `1 / zoom` as wide and draws `zoom` times larger. */
+  zoom?: number;
   dir?: "ltr" | "rtl";
   /** Window-level chords (fire `onKey` when nothing focused takes them). */
   keys?: string[];

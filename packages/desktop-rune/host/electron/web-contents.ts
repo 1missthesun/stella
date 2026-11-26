@@ -24,10 +24,15 @@ export type WebContentsHost = {
   onPopup?(opener: WebContents, targetId: string, url: string): void;
   onReload?(contents: WebContents): void;
   onFocus?(contents: WebContents): void;
+  onZoom?(contents: WebContents): void;
   evaluateWeb?(contents: WebContents, code: string): Promise<unknown>;
 };
 
 const all = new Map<number, WebContents>();
+
+const zoomOrigin = (url: string) => {
+  try { return new URL(url).host || null; } catch { return null; }
+};
 let nextId = 1;
 
 type DebuggerSession = Awaited<ReturnType<ChromiumPage["attachDebugger"]>>;
@@ -98,8 +103,7 @@ export class WebContents extends EventEmitter {
   readonly mainFrame: { url: string; origin: string; routingId: number; processId: number; frameTreeNodeId: number; executeJavaScript: (code: string) => Promise<unknown>; isDestroyed: () => boolean; send: (channel: string, ...args: unknown[]) => void; frames: unknown[]; framesInSubtree: unknown[] };
   owner: { id: number } | null = null;
   audioMuted = false;
-  zoomFactor = 1;
-  zoomLevel = 0;
+  private zoom = 0;
   private userAgent = "";
   backgroundThrottling = true;
   private url = "";
@@ -285,6 +289,20 @@ export class WebContents extends EventEmitter {
     this.userAgentSet = true;
     void this.livePage?.setUserAgent(ua).catch(() => {});
   }
+  // Chromium keeps one zoom level per host: every page of this one's origin takes it.
+  get zoomLevel() { return this.zoom; }
+  set zoomLevel(level: number) {
+    if (!Number.isFinite(level)) return;
+    const origin = zoomOrigin(this.url);
+    for (const contents of all.values()) {
+      if (contents !== this && (origin === null || zoomOrigin(contents.url) !== origin)) continue;
+      if (contents.zoom === level) continue;
+      contents.zoom = level;
+      WebContents.host.onZoom?.(contents);
+    }
+  }
+  get zoomFactor() { return 1.2 ** this.zoom; }
+  set zoomFactor(factor: number) { if (factor > 0) this.zoomLevel = Math.log(factor) / Math.log(1.2); }
   getZoomFactor() { return this.zoomFactor; }
   setZoomFactor(f: number) { this.zoomFactor = f; }
   getZoomLevel() { return this.zoomLevel; }

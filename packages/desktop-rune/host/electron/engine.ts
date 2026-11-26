@@ -30,6 +30,7 @@ export type EngineMenuItem = {
   checked?: boolean;
   visible?: boolean;
   type?: "normal" | "separator" | "checkbox" | "radio" | "submenu";
+  role?: string;
   submenu?: EngineMenuItem[];
 };
 

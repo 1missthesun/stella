@@ -138,15 +138,54 @@ fn menu_items(items: &[Value]) -> Vec<MenuItem<Win>> {
         .collect()
 }
 
+/// The roles Electron gives AppKit's own items on macOS (`electron_menu_controller.mm`): Rune's
+/// default menu bar already holds each one, where Electron's default menu has it.
+const NATIVE_ROLES: &[&str] = &[
+    "about", "hide", "hideothers", "unhide", "front", "undo", "redo", "cut", "copy", "paste", "delete",
+    "pasteandmatchstyle", "selectall", "showsubstitutions", "togglesmartquotes", "togglesmartdashes",
+    "toggletextreplacement", "startspeaking", "stopspeaking", "minimize", "close", "zoom", "quit", "services",
+];
+
+/// An Electron template without its native-role items, the submenus they leave empty and the
+/// separators left leading, trailing or doubled.
+fn without_native(items: &[Value]) -> Vec<Value> {
+    let mut out: Vec<Value> = Vec::new();
+    for it in items {
+        if NATIVE_ROLES.contains(&s(it, "role")) {
+            continue;
+        }
+        if s(it, "type") == "separator" {
+            if out.last().is_some_and(|l| s(l, "type") != "separator") {
+                out.push(it.clone());
+            }
+            continue;
+        }
+        let mut it = it.clone();
+        if let Some(sub) = it.get("submenu").and_then(Value::as_array) {
+            let sub = without_native(sub);
+            if sub.is_empty() {
+                continue;
+            }
+            it["submenu"] = Value::Array(sub);
+        }
+        out.push(it);
+    }
+    while out.last().is_some_and(|l| s(l, "type") == "separator") {
+        out.pop();
+    }
+    out
+}
+
 /// `menu.setApplicationMenu`: Electron's template, each top-level submenu becoming a menu-bar
-/// menu (`role: "appMenu"` is the app menu). macOS only; elsewhere the app draws its menus.
+/// menu (`role: "appmenu"` is the app menu). macOS only; elsewhere the app draws its menus.
 pub fn app_menu(v: &Value) -> Result<Value, String> {
     let app = APP.get().ok_or("no app")?;
     let top = v.get("items").and_then(|m| m.as_array()).cloned().unwrap_or_default();
     let mut items = Vec::new();
     for t in &top {
-        let app_menu = s(t, "role") == "appMenu";
-        for item in menu_items(t.get("submenu").and_then(|m| m.as_array()).map(Vec::as_slice).unwrap_or(&[])) {
+        let app_menu = s(t, "role").eq_ignore_ascii_case("appmenu");
+        let sub = without_native(t.get("submenu").and_then(|m| m.as_array()).map(Vec::as_slice).unwrap_or(&[]));
+        for item in menu_items(&sub) {
             items.push(if app_menu { item } else { item.menu(s(t, "label").to_owned()) });
         }
     }

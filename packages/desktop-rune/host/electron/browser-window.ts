@@ -38,6 +38,8 @@ export type WindowSnapshot = {
   windowKind: "main" | "panel" | "overlay";
   fullscreen: boolean;
   reloadToken: number;
+  /** The page's zoom factor (`webContents.setZoomFactor`). */
+  zoom: number;
   parentId: string | null;
   /** The window whose page opened this one with window.open, and the name it gave. */
   openerId: string | null;
@@ -362,6 +364,7 @@ export class BrowserWindow extends BaseWindow {
       windowKind: mode === "overlay" ? "overlay" : mode === "companion" || mode === "companion-panel" || o.type === "panel" ? "panel" : "main",
       fullscreen: this.state.fullscreen,
       reloadToken: this.state.reloadToken,
+      zoom: this.webContents.zoomFactor,
       parentId: this.parent?.hostId ?? null,
       openerId: this.opener?.window.hostId ?? null,
       frameName: this.opener?.frameName ?? null,
@@ -668,6 +671,7 @@ WebContents.host.onReload = (contents) => {
   const owner = BrowserWindow.getAllWindows().find((w) => w.webContents === contents);
   owner?.bumpReload();
 };
+WebContents.host.onZoom = () => hostWindows.changed();
 WebContents.host.onFocus = (contents) => {
   BrowserWindow.getAllWindows().find((w) => w.webContents === contents)?.focus();
 };

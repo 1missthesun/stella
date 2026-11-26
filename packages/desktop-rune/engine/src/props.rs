@@ -640,6 +640,8 @@ pub struct Props {
     pub titlebar: Option<f32>,
     pub traffic_lights: Option<[f32; 2]>,
     pub dark: Option<bool>,
+    /// The window's page zoom (Electron's `setZoomFactor`), 1 unzoomed.
+    pub zoom: Option<f32>,
 }
 
 impl Props {

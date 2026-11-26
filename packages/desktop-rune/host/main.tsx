@@ -166,6 +166,12 @@ onEngineEvent("ev", (e) => {
 // ---------------------------------------------------------------- services
 let control: ControlContext | null = null;
 if (services) {
+  const { WebContents, contentsKindOf } = await import("./electron/web-contents");
+  const reloadWindow = WebContents.host.onReload;
+  WebContents.host.onReload = (contents) => {
+    reloadWindow?.(contents);
+    if (contentsKindOf(contents.getURL()) === "app") void applySwap("reload", now());
+  };
   const { setUiSwapTarget } = await import("./services/renderer-source");
   setUiSwapTarget({
     async apply(paths) {

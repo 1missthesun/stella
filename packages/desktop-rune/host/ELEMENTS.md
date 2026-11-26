@@ -192,7 +192,7 @@ its own label.
 - Style: `size weight lineHeight tracking color mono family` (a registered font family, `sans`,
   `mono` or `system-mono`), `italic underline strike`. `antialias` only reaches the web build,
   where browser text is otherwise smoothed normally; the engine always draws it so.
-- Selection: `selectable`, `selectionColor`.
+- Selection: `selectable`, `selectionColor`. Selectable text without a `selectionColor` selects in Chromium's default colours (active and inactive).
 - Wrapping: `maxLines`, `truncate` (`true` | `end` | `middle` | `head` | `fade`), `nowrap`,
   `balance` (CSS `text-wrap: balance`: 2 to 6 lines break at the narrowest width that keeps their
   count, still aligned in the element's width), `textAlign`, `textCase`.

@@ -83,6 +83,7 @@ export function Text(raw: TextProps) {
   else if (p.nowrap) cls.push("nw");
   if (clamp) cls.push("ml");
   if (p.selectable) cls.push("sel");
+  if (p.selectionColor) cls.push("rsel");
   if (p.antialias) cls.push("aa");
   const h = useHost(p, cls.join(" "));
   const s = h.props.style;

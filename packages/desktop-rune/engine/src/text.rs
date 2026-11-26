@@ -58,6 +58,9 @@ pub fn apply(mut e: El, p: &Props, content_len: usize) -> El {
     }
     if let Some(c) = p.selection_color {
         e = e.selection_color(c.0);
+    } else if p.selectable {
+        // Selectable text without its own colour selects as Chromium's default `::selection`, as desktop-ui's does.
+        e = e.selection_style(rune::SelectionStyle::chromium());
     }
     match (&p.truncate, p.max_lines) {
         (_, Some(n)) => e = e.max_lines(n),

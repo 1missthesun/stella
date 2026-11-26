@@ -176,7 +176,7 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
       ...margin(s.codeMargin, [0, 12]), position: "relative", background: fill, borderRadius: px(radius && radius > 0 ? radius : 8),
       boxShadow: border ? `inset 0 0 0 1px ${border}` : undefined, padding: `${padTop}px ${padRight}px ${padBottom}px ${padX}px`,
     },
-  }, label, codeBody(s, source, codePadY, inside ? (s.codeBlockBorder as string | undefined) : undefined), actionRow);
+  }, label, actionRow, codeBody(s, source, codePadY, inside ? (s.codeBlockBorder as string | undefined) : undefined));
 }
 
 type LineNumbers = { font?: Font; color?: string; width?: number; gap?: number };
@@ -274,7 +274,7 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
     createElement("table", { style: { borderCollapse: "collapse", width: s.tableFullWidth ? "100%" : undefined, ...fontCss(s.tableFont as Font), border: s.tableOutline ? `1px solid ${s.tableOutline}` : undefined } },
       createElement("thead", null, rows[0] ? createElement("tr", null, cell(rows[0], 0)) : null),
       createElement("tbody", null, rows.slice(1).map((row, r) => createElement("tr", { key: r }, cell(row, r + 1))))));
-  return createElement("div", { key, className: actions ? "mdtable" : undefined, style: { ...margin(s.tableMargin, [16, 16]), position: actions ? "relative" : undefined } }, scroller, actions);
+  return createElement("div", { key, className: actions ? "mdtable" : undefined, style: { ...margin(s.tableMargin, [16, 16]), position: actions ? "relative" : undefined } }, actions, scroller);
 }
 
 function blocks(nodes: Md[] | undefined, c: Ctx, nested = false): ReactNode[] {
@@ -285,7 +285,9 @@ function block(n: Md, c: Ctx, key: number, nested: boolean): ReactNode {
   const { s } = c;
   switch (n.type) {
     case "paragraph":
-      return createElement("p", { key, style: nested ? { margin: 0 } : margin(s.paragraphMargin, [0, 12]) }, inlines(n.children, c));
+      // A list item's text sits in the item itself, as Streamdown's tight lists put it.
+      if (nested) return createElement(Fragment, { key }, inlines(n.children, c));
+      return createElement("p", { key, style: margin(s.paragraphMargin, [0, 12]) }, inlines(n.children, c));
     case "heading": {
       const level = Math.min(6, Math.max(1, n.depth ?? 1));
       const fonts = (Array.isArray(s.headings) ? s.headings : s.headingFont ? Object.values(s.headingFont) : []) as Font[];
@@ -342,8 +344,11 @@ export function Markdown(p: MarkdownProps) {
   st.color = s.text;
   // `selectionStyle: "chromium"` leaves the browser's own `::selection`, as Streamdown's page does.
   const native = s.selectionStyle === "chromium";
-  if (p.selectable) h.props.className += native ? " sel selnative" : " sel";
-  if (s.selection && !native) st["--rsel"] = s.selection;
+  if (p.selectable) h.props.className += " sel";
+  if (s.selection && !native) {
+    h.props.className += " rsel";
+    st["--rsel"] = s.selection;
+  }
   st["--md-link-hover"] = s.linkHover;
   st["--md-marker"] = s.muted;
   return h.wrap(createElement("div", h.props, content));

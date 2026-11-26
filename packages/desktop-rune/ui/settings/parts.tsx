@@ -1,7 +1,7 @@
 import { Children, Fragment, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { mixOklch, useTokens, type Style } from "../theme";
 import { T } from "../kit/compat";
-import { forgetCardPlace, noteCardPlace, usePulsingCard } from "./settings-card-targets";
+import { SettingsCardTitle, forgetCardPlace, noteCardPlace, usePulsingCard } from "./settings-card-targets";
 import { useSettings } from "./settings.styles";
 
 type TabContent = { account: boolean; place: (id: string, y: number | null) => void; last: string | null };
@@ -65,6 +65,23 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const cardId = `settings-card-${id}`;
   const [titleKey, setTitleKey] = useState<string | null>(null);
+  const hostedYs = useRef(new Map<number, Map<string, number>>());
+  const [hosted, setHosted] = useState<ReadonlyMap<number, readonly string[]>>(() => new Map());
+  const hostRow = useCallback((index: number, rowId: string, y: number | null) => {
+    const ys = hostedYs.current.get(index) ?? new Map<string, number>();
+    if (y === null) ys.delete(rowId);
+    else ys.set(rowId, y);
+    hostedYs.current.set(index, ys);
+    const order = [...ys.entries()].sort((p, q) => p[1] - q[1]).map(([id]) => id);
+    setHosted((prev) => {
+      const was = prev.get(index) ?? [];
+      if (was.length === order.length && was.every((id, k) => id === order[k])) return prev;
+      const next = new Map(prev);
+      if (order.length) next.set(index, order);
+      else next.delete(index);
+      return next;
+    });
+  }, []);
   const [lit, setLit] = useState(false);
   const pulse = usePulsingCard();
   const y = useRef<number | null>(null);
@@ -82,22 +99,32 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
   }, [titleKey, cardId]);
   const reg = useMemo(() => ({ setTitleKey, inHeader: false, account: tab?.account ?? false }), [tab?.account]);
   const kids = flatten(children);
+  const kindOf = (child: ReactNode, i: number): "row" | "host" | "absent" | "div" | "other" => {
+    if (!isValidElement(child)) return "other";
+    if (child.type === SettingsRow) return "row";
+    if (isRowHost(child)) return hosted.has(i) ? "host" : "absent";
+    return isDivLike(child) ? "div" : "other";
+  };
+  const kinds = kids.map(kindOf);
+  let lastIndex = kinds.length - 1;
+  while (lastIndex > 0 && kinds[lastIndex] === "absent") lastIndex--;
   let seenDiv = false;
   let prevRow = false;
-  const lastIndex = kids.length - 1;
+  const nextRowSlot = (last: boolean): RowSlot => {
+    const slot = { first: !seenDiv, divided: prevRow && !tab?.account, last };
+    seenDiv = true;
+    prevRow = true;
+    return slot;
+  };
   const laid = kids.map((child, i) => {
-    if (!isValidElement(child)) {
-      prevRow = false;
-      return child;
+    const kind = kinds[i];
+    if (kind === "absent" || kind === "host") {
+      const rows = hosted.get(i) ?? [];
+      const slots = new Map(rows.map((id, k) => [id, nextRowSlot(i === lastIndex && k === rows.length - 1)] as const));
+      return <RowSlotCtx.Provider key={keyOf(child, i)} value={{ index: i, slots, hostRow }}>{child}</RowSlotCtx.Provider>;
     }
-    const el = child as ReactElement<RowSlot>;
-    if (el.type === SettingsRow) {
-      const slot: RowSlot = { first: !seenDiv, divided: prevRow && !tab?.account, last: i === lastIndex };
-      seenDiv = true;
-      prevRow = true;
-      return cloneElement(el, slot);
-    }
-    if (isDivLike(el)) seenDiv = true;
+    if (kind === "row") return cloneElement(child as ReactElement<RowSlot>, nextRowSlot(i === lastIndex));
+    if (kind === "div") seenDiv = true;
     prevRow = false;
     return child;
   });
@@ -137,9 +164,27 @@ export function SettingsCardHeader({ children, ...style }: Style & { children?: 
   );
 }
 
+type RowSlotHost = { index: number; slots: ReadonlyMap<string, RowSlot>; hostRow: (index: number, rowId: string, y: number | null) => void };
+const RowSlotCtx = createContext<RowSlotHost | null>(null);
+
+/** A component child that may render `SettingsRow`s (or nothing); the rows it mounts take their slots in layout order. */
+const isRowHost = (el: ReactElement) =>
+  typeof el.type !== "string" && el.type !== Fragment && el.type !== T && el.type !== SettingsCardTitle && el.type !== SettingsCardHeader && el.type !== SettingsCardDesc && el.type !== SettingsCard && el.type !== SettingsTabItem;
+const keyOf = (child: ReactNode, i: number) => (isValidElement(child) && child.key != null ? child.key : `row-host-${i}`);
+
 /** `.settings-row`: info on the left, control on the right; its card decides dividers and edge padding. */
-export function SettingsRow({ children, first, divided, last, ...style }: Style & RowSlot & { children?: ReactNode }) {
+export function SettingsRow({ children, first: firstProp, divided: dividedProp, last: lastProp, ...style }: Style & RowSlot & { children?: ReactNode }) {
   const s = useSettings();
+  const host = useContext(RowSlotCtx);
+  const rowId = useId();
+  useEffect(() => {
+    if (!host) return;
+    return () => host.hostRow(host.index, rowId, null);
+  }, [host?.hostRow, host?.index, rowId]);
+  const hostSlot = host?.slots.get(rowId);
+  const first = firstProp ?? hostSlot?.first;
+  const divided = dividedProp ?? hostSlot?.divided;
+  const last = lastProp ?? hostSlot?.last;
   const t = useTokens();
   return (
     <row
@@ -149,6 +194,7 @@ export function SettingsRow({ children, first, divided, last, ...style }: Style 
       pb={last ? 0 : 12}
       {...(divided ? { border: mixOklch(t.c.foreground, 7, "transparent"), borderSides: [1, 0, 0, 0] as [number, number, number, number] } : null)}
       {...style}
+      onLayout={host ? (r) => host.hostRow(host.index, rowId, r.y) : undefined}
     >
       {children}
     </row>

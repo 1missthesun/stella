@@ -22,6 +22,11 @@ thread_local! {
     /// Nodes laid out from an image still decoding (an unsized `<image>`, a markdown picture):
     /// they build again once one lands.
     static SIZING: RefCell<HashMap<u32, Vec<rune::image::Image>>> = RefCell::new(HashMap::new());
+    /// The size each SVG `<image>` last drew at, by node: its drawing's longest side in points
+    /// and the device pixels to a point.
+    static DRAWN: RefCell<HashMap<u32, (f32, f32)>> = RefCell::new(HashMap::new());
+    /// SVG `<image>` nodes whose drawn size changed since they were built.
+    static RESIZED: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
 }
 
 const MAX_IMAGES: usize = 512;
@@ -85,8 +90,76 @@ pub fn load(eng: &Engine, src: &str, size: f32) -> Option<rune::image::Image> {
     Some(img)
 }
 
+/// Whether `src` is an SVG: a `.svg`/`.svgz` file, or blob bytes that are SVG markup or gzip.
+fn is_svg(eng: &Engine, src: &str) -> bool {
+    if let Some(id) = src.strip_prefix("blob:") {
+        let Some(bytes) = id.parse().ok().and_then(|id| eng.blobs.get(&id)) else { return false };
+        let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+        return bytes.starts_with(&[0x1f, 0x8b]) || bytes.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'<');
+    }
+    let path = src.strip_prefix("file://").unwrap_or(src);
+    std::path::Path::new(path).extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("svg") || e.eq_ignore_ascii_case("svgz"))
+}
+
+/// An SVG rasterized at the size `n` last drew it, as a browser rasterizes an `<img>`'s SVG at
+/// its drawn device pixels; `None` until it has drawn once.
+fn drawn_svg(eng: &Engine, n: u32, src: &str) -> Option<rune::image::Image> {
+    let (side, scale) = DRAWN.with(|d| d.borrow().get(&n).copied())?;
+    let key = format!("{src}\0{}", (side * scale).ceil());
+    if let Some(img) = IMAGES.with(|m| m.borrow().get(&key).cloned()) {
+        return Some(img);
+    }
+    let img = CACHE.with(|c| {
+        let c = c.borrow();
+        let cache = c.as_ref()?;
+        if let Some(id) = src.strip_prefix("blob:") {
+            let bytes: Arc<[u8]> = eng.blobs.get(&id.parse().ok()?)?.clone();
+            return Some(cache.load_scaled(bytes, side, scale));
+        }
+        Some(cache.file(src.strip_prefix("file://").unwrap_or(src), side, scale))
+    })?;
+    IMAGES.with(|m| {
+        let mut m = m.borrow_mut();
+        if m.len() >= MAX_IMAGES {
+            m.clear();
+        }
+        m.insert(key, img.clone());
+    });
+    Some(img)
+}
+
+/// Notes where SVG `<image>` `n` drew (`rect` in its view's points) and has it build again when
+/// that takes a raster of another size. `natural` is the drawing's own size, `cover` whether it
+/// fills its box (cropped or stretched) rather than fitting inside it.
+fn note_drawn(n: u32, window: u32, rect: [f32; 4], natural: [f32; 2], cover: bool, scale: f32) {
+    let [w, h] = natural;
+    if !(w > 0.0 && h > 0.0 && rect[2] > 0.0 && rect[3] > 0.0) {
+        return;
+    }
+    let (kw, kh) = (rect[2] / w, rect[3] / h);
+    let k = if cover { kw.max(kh) } else { kw.min(kh) };
+    // A zoomed view lays out in its own points: each is `zoom` of the window's.
+    let zoom = crate::engine::read(|e| e.tree.get(window).and_then(|node| node.props.zoom)).unwrap_or(1.0);
+    let drawn = (k * w.max(h), scale * zoom);
+    let changed = DRAWN.with(|d| {
+        let mut d = d.borrow_mut();
+        if d.len() >= MAX_IMAGES * 8 {
+            d.clear();
+        }
+        let px = |(side, scale): (f32, f32)| (side * scale).ceil();
+        let changed = d.get(&n).is_none_or(|was| px(*was) != px(drawn));
+        d.insert(n, drawn);
+        changed
+    });
+    if changed {
+        RESIZED.with(|r| r.borrow_mut().push(n));
+        crate::windows::wake_all();
+    }
+}
+
 /// An `<image>` with neither `w` nor `h` takes its image's natural size, fitted to its room and
-/// maximums with the ratio kept, as `<img>` does.
+/// maximums with the ratio kept, as `<img>` does. An SVG draws from a raster of the size it draws
+/// at once it has laid out, the first raster until that one lands.
 pub fn image(eng: &Engine, n: u32, p: &Props) -> El {
     let Some(src) = p.src.as_deref() else { return el() };
     let size = match &p.w {
@@ -94,10 +167,26 @@ pub fn image(eng: &Engine, n: u32, p: &Props) -> El {
         _ => 64.0,
     };
     let Some(img) = load(eng, src, size) else { return el() };
-    let mut e = match p.fit.as_deref() {
-        Some("stretch") => el().pixels(img.pixels()),
-        _ => el().pixels_fit(img.pixels(), fit(p)),
+    let svg = is_svg(eng, src);
+    let shown = match svg.then(|| drawn_svg(eng, n, src)).flatten() {
+        Some(sized) if sized.is_ready() => sized,
+        Some(sized) => {
+            rebuild_when_decoded(n, &sized);
+            img.clone()
+        }
+        None => img.clone(),
     };
+    let mut e = match p.fit.as_deref() {
+        Some("stretch") => el().pixels(shown.pixels()),
+        _ => el().pixels_fit(shown.pixels(), fit(p)),
+    };
+    if svg && let Some(natural) = img.intrinsic_size() {
+        let cover = !matches!(p.fit.as_deref(), Some("contain")) && (p.w.is_some() || p.h.is_some());
+        e = e.on_layout_tx(move |s: &mut crate::windows::Win, rect: [f32; 4], tx: &mut rune::Tx| {
+            tx.live_only();
+            note_drawn(n, s.node, rect, natural, cover, tx.scale());
+        });
+    }
     if let Some(t) = p.tint {
         e = e.pixels_tint(t.0);
     }
@@ -123,16 +212,19 @@ pub fn rebuild_when_decoded(n: u32, img: &rune::image::Image) {
     }
 }
 
-/// Nodes with an image that has decoded since they were built.
+/// Nodes with an image that has decoded since they were built, and SVG images that drew at
+/// another size.
 pub fn decoded_since_built() -> Vec<u32> {
-    SIZING.with(|m| {
+    let mut ready = SIZING.with(|m| {
         let mut m = m.borrow_mut();
         let ready: Vec<u32> = m.iter().filter(|(_, imgs)| imgs.iter().any(|i| i.is_ready())).map(|(n, _)| *n).collect();
         for n in &ready {
             m.remove(n);
         }
         ready
-    })
+    });
+    ready.extend(RESIZED.with(|r| std::mem::take(&mut *r.borrow_mut())));
+    ready
 }
 
 pub(crate) fn icon_of(name: &str, body: &str, view: f32) -> &'static Icon {

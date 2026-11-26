@@ -122,7 +122,7 @@ function ImageView({ filePaths, viewer, prompt, onSwipe }: { filePaths: string[]
             onSwipe(d.dx < 0 ? "next" : "previous");
           }}
         >
-          <image src={active.url} fit="contain" w="full" h="full" radius={6} scale={zoomed ? 2 : 1} motion={{ dur: 0.22 }} />
+          <image src={active.url} fit="contain" maxW="full" maxH="full" selfAlign="center" radius={6} scale={zoomed ? 2 : 1} motion={{ dur: 0.22 }} />
         </box>
       ) : missing[safeIndex] ? (
         <EmptyState motif="unavailable" title={t("shell.display.media.imageUnavailable")} body={missingMessages[safeIndex] ?? `${filenameOf(path)} was moved or deleted.`} />

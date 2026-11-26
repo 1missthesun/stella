@@ -46,13 +46,18 @@ struct View {
 
 /// The part of a placed webview that shows, in window coordinates: inside its clipping
 /// ancestors (`vis`, rounded by `round` where a rounded clip's corner reaches it), less the
-/// elements painted over it (`cuts`: rect and corner radii).
+/// elements painted over it (`cuts`: rect and corner radii). `hits`: boxes over it that draw
+/// nothing but take the pointer, as CSS boxes over a page do.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Shape {
     pub vis: [f32; 4],
     pub round: [f32; 4],
-    pub cuts: Vec<([f32; 4], [f32; 4])>,
+    pub cuts: Vec<Cut>,
+    pub hits: Vec<Cut>,
 }
+
+/// A rect over a view and its corner radii.
+pub type Cut = ([f32; 4], [f32; 4]);
 
 /// The clipped area of a view at `r` inside its clipping ancestors `chain`: the rect and the
 /// radius of each of its corners that a rounded clip's corner cuts (top-left, top-right,
@@ -83,6 +88,7 @@ struct Over {
     rect: Option<[f32; 4]>,
     corners: [f32; 4],
     build: u64,
+    paints: bool,
 }
 
 thread_local! {
@@ -123,16 +129,17 @@ fn build_of(window: u32) -> u64 {
     BUILDS.with(|b| b.borrow().get(&window).copied().unwrap_or(0))
 }
 
-/// An element painted over a webview: the native view leaves its drawn rect (rounded by its
-/// corners) to the engine, both in what shows and in what takes the pointer.
-pub fn over(e: El, window: u32, n: u32, corners: [f32; 4]) -> El {
+/// An element over a webview: the native view leaves its drawn rect (rounded by its corners)
+/// to the engine, in what takes the pointer and, when the element `paints`, in what shows.
+pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
     let build = build_of(window);
     OVER.with(|o| {
         let mut o = o.borrow_mut();
-        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build });
+        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build, paints });
         entry.window = window;
         entry.corners = corners;
         entry.build = build;
+        entry.paints = paints;
     });
     e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
         tx.live_only();
@@ -181,7 +188,7 @@ fn contains(outer: [f32; 4], inner: [f32; 4]) -> bool {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn shows(s: &Shape, x: f32, y: f32) -> bool {
     let within = |r: [f32; 4]| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
-    within(s.vis) && in_corners(x - s.vis[0], y - s.vis[1], s.vis[2], s.vis[3], s.round) && !s.cuts.iter().any(|(r, c)| within(*r) && in_corners(x - r[0], y - r[1], r[2], r[3], *c))
+    within(s.vis) && in_corners(x - s.vis[0], y - s.vis[1], s.vis[2], s.vis[3], s.round) && !s.cuts.iter().chain(&s.hits).any(|(r, c)| within(*r) && in_corners(x - r[0], y - r[1], r[2], r[3], *c))
 }
 
 /// Whether (x, y) inside a w×h box lies within its corner radii (top-left, top-right,
@@ -227,28 +234,29 @@ fn shape(n: u32, window: u32, r: [f32; 4]) -> Option<Shape> {
     let chain = engine::read(|e| e.tree.clip_of.get(&n).cloned()).unwrap_or_default();
     let (vis, round) = clipped(r, &chain)?;
     let build = build_of(window);
-    let mut cuts: Vec<([f32; 4], [f32; 4])> = OVER.with(|o| {
+    let mut all: Vec<(Cut, bool)> = OVER.with(|o| {
         o.borrow()
             .values()
             .filter(|x| x.window == window && x.build == build)
             .filter_map(|x| {
                 let rect = x.rect?;
                 let inside = intersect(rect, vis)?;
-                Some(if contains(vis, rect) { (rect, x.corners) } else { (inside, [0.0; 4]) })
+                Some((if contains(vis, rect) { (rect, x.corners) } else { (inside, [0.0; 4]) }, x.paints))
             })
             .collect()
     });
-    cuts.sort_by(|a, b| (b.0[2] * b.0[3]).total_cmp(&(a.0[2] * a.0[3])));
-    let mut kept: Vec<([f32; 4], [f32; 4])> = Vec::with_capacity(cuts.len());
-    for c in cuts {
-        if !kept.iter().any(|k| contains(k.0, c.0)) {
-            kept.push(c);
+    all.sort_by(|a, b| b.1.cmp(&a.1).then((b.0.0[2] * b.0.0[3]).total_cmp(&(a.0.0[2] * a.0.0[3]))));
+    let (mut cuts, mut hits): (Vec<Cut>, Vec<Cut>) = (Vec::new(), Vec::new());
+    for (c, paints) in all {
+        if cuts.iter().chain(&hits).any(|k| contains(k.0, c.0)) {
+            continue;
         }
+        if paints { cuts.push(c) } else { hits.push(c) }
     }
-    if kept.iter().any(|k| contains(k.0, vis)) {
+    if cuts.iter().any(|k| contains(k.0, vis)) {
         return None;
     }
-    Some(Shape { vis, round, cuts: kept })
+    Some(Shape { vis, round, cuts, hits })
 }
 
 /// The slot element: an empty box whose drawn rect the WebView follows, showing the page's
@@ -751,8 +759,9 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
 /// set as the view's window shape so it neither draws nor takes the pointer outside it.
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod native_shape {
-    /// Rows of the view's own rounded rect, of what its clips leave, and of what is cut out.
-    type Region<'a> = (&'a [[i32; 4]], &'a [[i32; 4]], &'a [[i32; 4]]);
+    /// Rows of the view's own rounded rect, of what its clips leave, of what is cut out, and of
+    /// what only takes the pointer from it.
+    type Region<'a> = (&'a [[i32; 4]], &'a [[i32; 4]], &'a [[i32; 4]], &'a [[i32; 4]]);
     /// Device-pixel rows `[x, y, w, h]` covering a rect with corner radii (top-left, top-right,
     /// bottom-right, bottom-left), relative to `origin`; rows with the same span are merged.
     fn rows(r: [f32; 4], c: [f32; 4], k: f32, origin: [i32; 2]) -> Vec<[i32; 4]> {
@@ -782,7 +791,7 @@ mod native_shape {
     /// The view at `r` shows `shape` (window coordinates), rounded by its own `corners`.
     pub fn apply(view: &wry::WebView, r: [f32; 4], shape: &super::Shape, corners: [f32; 4], k: f32) {
         let origin = [(r[0] * k).round() as i32, (r[1] * k).round() as i32];
-        let whole = shape.cuts.is_empty() && super::contains(shape.vis, r) && corners.iter().chain(&shape.round).all(|c| *c <= 0.0);
+        let whole = shape.cuts.is_empty() && shape.hits.is_empty() && super::contains(shape.vis, r) && corners.iter().chain(&shape.round).all(|c| *c <= 0.0);
         if whole {
             platform::set(view, None);
             return;
@@ -790,7 +799,8 @@ mod native_shape {
         let own = rows(r, corners, k, origin);
         let vis = rows(shape.vis, shape.round, k, origin);
         let cuts: Vec<[i32; 4]> = shape.cuts.iter().flat_map(|(c, radii)| rows(*c, *radii, k, origin)).collect();
-        platform::set(view, Some((&own, &vis, &cuts)));
+        let hits: Vec<[i32; 4]> = shape.hits.iter().flat_map(|(c, radii)| rows(*c, *radii, k, origin)).collect();
+        platform::set(view, Some((&own, &vis, &cuts, &hits)));
     }
 
     #[cfg(target_os = "linux")]
@@ -836,15 +846,16 @@ mod native_shape {
                         (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_INPUT, 0, 0, 0);
                     }
                 }
-                Some((own, vis, cuts)) => {
-                    let (a, b, c) = (make(own), make(vis), make(cuts));
+                Some((own, vis, cuts, hits)) => {
+                    let (a, b, c, d) = (make(own), make(vis), make(cuts), make(hits));
                     // SAFETY: as above; every region is created here and destroyed after use.
                     unsafe {
                         (x.XFixesIntersectRegion)(dpy, a, a, b);
                         (x.XFixesSubtractRegion)(dpy, a, a, c);
                         (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_BOUNDING, 0, 0, a);
+                        (x.XFixesSubtractRegion)(dpy, a, a, d);
                         (x.XFixesSetWindowShapeRegion)(dpy, win, SHAPE_INPUT, 0, 0, a);
-                        for r in [a, b, c] {
+                        for r in [a, b, c, d] {
                             (x.XFixesDestroyRegion)(dpy, r);
                         }
                     }
@@ -874,7 +885,9 @@ mod native_shape {
         }
 
         /// Sets the window region of wry's WebView2 container: Windows clips the container and
-        /// its child windows (the browser's) to it, in drawing and hit testing.
+        /// its child windows (the browser's) to it, in drawing and hit testing. A window region
+        /// can't take the pointer without hiding what it covers, so input-only boxes stay the
+        /// page's: its input belongs to the browser's own child windows, in another process.
         pub fn set(view: &wry::WebView, rows: Option<super::Region<'_>>) {
             let hwnd = view.hwnd();
             // SAFETY: `hwnd` is wry's live container; the system owns a region once it is set.
@@ -883,7 +896,7 @@ mod native_shape {
                     None => {
                         SetWindowRgn(hwnd, None, true);
                     }
-                    Some((own, vis, cuts)) => {
+                    Some((own, vis, cuts, _)) => {
                         let (a, b, c) = (region(own), region(vis), region(cuts));
                         CombineRgn(Some(a), Some(a), Some(b), RGN_AND);
                         CombineRgn(Some(a), Some(a), Some(c), RGN_DIFF);
@@ -1202,8 +1215,9 @@ mod mac {
             vis: [s.vis[0] - r[0], s.vis[1] - r[1], s.vis[2], s.vis[3]],
             round: s.round,
             cuts: s.cuts.iter().map(|(c, k)| ([c[0] - r[0], c[1] - r[1], c[2], c[3]], *k)).collect(),
+            hits: s.hits.iter().map(|(c, k)| ([c[0] - r[0], c[1] - r[1], c[2], c[3]], *k)).collect(),
         });
-        let whole = local.as_ref().is_none_or(|s| s.cuts.is_empty() && s.round.iter().all(|c| *c <= 0.0) && s.vis[0] <= 0.5 && s.vis[1] <= 0.5 && s.vis[2] >= r[2] - 0.5 && s.vis[3] >= r[3] - 0.5);
+        let whole = local.as_ref().is_none_or(|s| s.cuts.is_empty() && s.hits.is_empty() && s.round.iter().all(|c| *c <= 0.0) && s.vis[0] <= 0.5 && s.vis[1] <= 0.5 && s.vis[2] >= r[2] - 0.5 && s.vis[3] >= r[3] - 0.5);
         wk.setWantsLayer(true);
         let Some(layer) = wk.layer() else { return };
         CATransaction::begin();
@@ -1467,7 +1481,7 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
                 let covering: Vec<serde_json::Value> = OVERLAYS.with(|o| {
                     o.borrow().iter().filter(|(_, (win, r))| *win == w.window && overlaps(*r, w.rect)).map(|(k, (_, r))| json!({ "node": k, "rect": r })).collect()
                 });
-                json!({ "rect": w.rect, "shown": w.visible, "covered": w.covered, "covering": covering, "fits": fits(n, w.rect), "clip": clip, "shape": w.applied.as_ref().map(|a| json!({ "vis": a.0.vis, "round": a.0.round, "cuts": a.0.cuts })) })
+                json!({ "rect": w.rect, "shown": w.visible, "covered": w.covered, "covering": covering, "fits": fits(n, w.rect), "clip": clip, "shape": w.applied.as_ref().map(|a| json!({ "vis": a.0.vis, "round": a.0.round, "cuts": a.0.cuts, "hits": a.0.hits })) })
             });
         }
         "webview.url" => return with_view(n, |w| json!(w.view.url().ok().map(|u| scheme_url::from_view(&w.protocols, &u)))),

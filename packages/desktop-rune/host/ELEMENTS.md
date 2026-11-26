@@ -384,9 +384,12 @@ CSS would paint over it (positioned later siblings of it or of an ancestor, a hi
 layers) cut their drawn shape out of the native view, which then neither shows nor takes the pointer
 there, so a pill over a canvas draws and clicks while the page beside it stays live. A cut shows
 the engine's drawing, not the page: a translucent element over a webview shows what the engine
-draws under the view rather than the page through it. macOS masks the WKWebView's layer; Linux
-sets the X11 container's bounding and input shapes; Windows sets the WebView2 container's window
-region. While an overlay (an anchored popover or menu, or a lifted layer holding a `modal`)
+draws under the view rather than the page through it. Such elements that draw nothing (a row
+holding two pills, a resize edge) take the pointer from the page across their box, as CSS boxes
+do, while the page still shows through. macOS masks the WKWebView's layer and passes hits there to
+the engine; Linux sets the X11 container's bounding and input shapes; Windows sets the WebView2
+container's window region, which can't take the pointer without hiding the page, so on Windows the
+page keeps the pointer under elements that draw nothing. While an overlay (an anchored popover or menu, or a lifted layer holding a `modal`)
 overlaps a view, the view steps aside and its slot shows the page's last snapshot under the
 overlay, until the overlay goes (Windows: the slot is empty). `control.screenshot` and
 `control.record` draw each view's snapshot with the same clip and cuts.

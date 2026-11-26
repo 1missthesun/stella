@@ -90,13 +90,14 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         let e = crate::input::build(s, id, p);
         #[cfg(feature = "webview")]
         if OVER.get() && !p.hidden {
-            return crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]));
+            return crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), true);
         }
         return e;
     }
     let over = OVER.get();
     let unseen = p.hidden || p.opacity == Some(0.0);
     let marks = over && !unseen && paints(n.kind, p) && n.kind != Kind::Webview;
+    let hits = over && !unseen && !marks && n.kind != Kind::Webview;
     if over && (marks || unseen) {
         OVER.set(false);
     }
@@ -107,8 +108,8 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     #[cfg(feature = "webview")]
     if eng.tree.clippers.contains(&id) {
         e = crate::webview::clipper(e, id, if p.scroll_x || p.scroll_y { 0.0 } else { p.clip.unwrap_or(0.0) });
-    } else if marks {
-        e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]));
+    } else if marks || hits {
+        e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), marks);
     }
     e.key(rune_key(id, p))
 }

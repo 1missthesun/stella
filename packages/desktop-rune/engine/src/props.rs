@@ -104,6 +104,18 @@ pub struct Run {
     #[serde(default)]
     pub st: bool,
     pub href: Option<String>,
+    #[serde(rename = "box")]
+    pub bx: Option<RunBox>,
+}
+
+/// A run's `bg` drawn as a CSS inline background: the font's content area, widened by `pad`,
+/// with `margin` of room outside it, both taking room in the line.
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct RunBox {
+    pub pad: f32,
+    pub margin: f32,
+    pub radius: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
@@ -376,6 +388,7 @@ pub struct MarkP {
     pub color: Option<C>,
     pub radius: Option<f32>,
     pub pad: Option<f32>,
+    pub vpad: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
@@ -453,6 +466,8 @@ pub struct Props {
     /// Per-corner radii `[topLeft, topRight, bottomRight, bottomLeft]`.
     pub corners: Option<[f32; 4]>,
     pub clip: Option<f32>,
+    /// Soft clip `[left, top, right, bottom]`: content fades out over each width to the edge.
+    pub clip_fade: Option<[f32; 4]>,
     pub shadow: Option<(f32, f32, C)>,
     pub shadows: Option<Vec<ShadowP>>,
     pub opacity: Option<f32>,

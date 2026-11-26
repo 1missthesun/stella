@@ -92,10 +92,11 @@ pub struct Rich {
     pub spans: Vec<Span>,
     pub links: Vec<(usize, usize, String)>,
     pub strikes: Vec<(usize, usize)>,
+    pub boxes: Vec<(std::ops::Range<usize>, rune::SpanBox)>,
 }
 
 pub fn rich(runs: &[Run], whole: &Props) -> Rich {
-    let mut out = Rich { content: String::new(), spans: Vec::new(), links: Vec::new(), strikes: Vec::new() };
+    let mut out = Rich { content: String::new(), spans: Vec::new(), links: Vec::new(), strikes: Vec::new(), boxes: Vec::new() };
     for r in runs {
         let start = out.content.len();
         out.content.push_str(&r.t);
@@ -106,9 +107,17 @@ pub fn rich(runs: &[Run], whole: &Props) -> Rich {
         if r.st {
             out.strikes.push((start, end));
         }
+        let boxed = match (r.bg, r.bx) {
+            (Some(bg), Some(b)) if end > start => {
+                let style = rune::SpanBox::new().bg(bg.0).pad(b.pad).margin_x(b.margin, b.margin).pad_y(0.0).radius(b.radius);
+                out.boxes.push((start..end, style));
+                true
+            }
+            _ => false,
+        };
         let italic = r.i || whole.italic;
         let underline = r.u.map(|c| c.0).or(if whole.underline { whole.color.map(|c| c.0) } else { None });
-        if r.w.is_none() && r.c.is_none() && !r.m && r.bg.is_none() && !italic && underline.is_none() && r.s.is_none() {
+        if r.w.is_none() && r.c.is_none() && !r.m && (r.bg.is_none() || boxed) && !italic && underline.is_none() && r.s.is_none() {
             continue;
         }
         let mut s = Span::new(start, end);
@@ -116,7 +125,7 @@ pub fn rich(runs: &[Run], whole: &Props) -> Rich {
         s.color = r.c.map(|c| c.0);
         s.mono = r.m;
         s.size = r.s;
-        if let Some(bg) = r.bg {
+        if let Some(bg) = r.bg.filter(|_| !boxed) {
             s.bg = Some(bg.0);
             s.bg_pad = 3.0;
         }
@@ -138,6 +147,9 @@ pub fn build(p: &Props) -> El {
             }
             if !r.strikes.is_empty() {
                 e = e.strikes(r.strikes.into_iter().map(|(s, end)| (s, end, None)));
+            }
+            if !r.boxes.is_empty() {
+                e = e.span_boxes(r.boxes);
             }
             (e, len)
         }

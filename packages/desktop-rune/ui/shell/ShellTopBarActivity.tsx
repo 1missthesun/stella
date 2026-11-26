@@ -10,6 +10,7 @@ import { fontSize, look, useTokens } from "../theme";
 import { BODY_TEXT, TextScope } from "../kit/compat";
 import { mounted, Nothing } from "../app/mount";
 import { Panel } from "./topbar/chrome";
+import { CHAT_ACTIVITY_SHIMMER_GROUP, TextShimmer } from "../chat/TextShimmer";
 
 const ActivityOverview = mounted<{ onNavigate: () => void }>(import.meta.glob("./sidebar-sections/HomeSection.tsx", { eager: true }), "ActivityOverview", Nothing);
 
@@ -17,6 +18,7 @@ const HOVER_OPEN_DELAY_MS = 80;
 const HOVER_CLOSE_DELAY_MS = 220;
 const MARK_SIZE_PX = 22;
 const LABEL = look(fontSize.sm, 500, { lh: 1.3 });
+const LABEL_SHIMMER_MS = 1900;
 
 /** desktop-ui's `ShellTopBarActivity`: Stella's mark in the middle of the bar, what she's doing, and the activity menu. */
 export const ShellTopBarActivity = memo(function ShellTopBarActivity({ width }: { width: number }) {
@@ -98,7 +100,6 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity({ width }: 
         ? t("app.chat.activityPill.openActivity", { label: tPlural("app.chat.activityPill.tasksPaused", pausedCount) })
         : t("app.chat.activityPill.idle");
 
-  const color = open ? tk.c.textStrong : tk.c.textBase;
   return (
     <row id="shell-topbar-activity" w={width} h="full" minW={0} center windowDrag>
       <row
@@ -138,9 +139,9 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity({ width }: 
           <StellaCharacter size={MARK_SIZE_PX} state={markState} eyeColor={tk.c.surfaceBase} paused={!windowFocused} />
         </box>
         {busy && label && width > 96 ? (
-          <text key={label} {...LABEL} nowrap truncate minW={0} shrink color={color} hoverColor={tk.c.textStrong} enter={{ opacity: 0, dur: 0.18 }} exit={{ opacity: 0, dur: 0.12 }}>
-            {label}
-          </text>
+          <box key={label} minW={0} shrink enter={{ opacity: 0, dur: 0.18 }} exit={{ opacity: 0, dur: 0.12 }}>
+            <TextShimmer text={label} look={LABEL} durationMs={LABEL_SHIMMER_MS} exclusiveGroup={CHAT_ACTIVITY_SHIMMER_GROUP} exclusivePriority={30} />
+          </box>
         ) : null}
       </row>
       <Panel id="shell-topbar-activity-menu" anchor="shell-topbar-activity-trigger" open={open} onClose={closeMenu} align="center" gap={6} w={Math.min(352, window.innerWidth - 32)} maxH={Math.min(window.innerHeight * 0.6, 512)} onHover={onHover} modal={pinned}>

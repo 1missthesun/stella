@@ -194,6 +194,9 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
                 if let Some(pad) = m.pad {
                     h = h.pad(pad);
                 }
+                if let Some(vpad) = m.vpad {
+                    h = h.vpad(vpad);
+                }
                 h
             })
         }));

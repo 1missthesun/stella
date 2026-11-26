@@ -9,6 +9,8 @@ export type Run = {
   t: string; w?: number; c?: Color; m?: boolean; bg?: Color; i?: boolean; u?: Color; s?: number; st?: boolean;
   /** A link: pressing it calls the text's `onLink(href)`. */
   href?: string;
+  /** Draws `bg` as a CSS inline background: the font's content area, with `pad` (padding-inline) and `margin` (margin-inline) taking room in the line. */
+  box?: { pad?: number; margin?: number; radius?: number };
 };
 export type Shadow = { x?: number; y?: number; blur?: number; spread?: number; color: Color; inset?: boolean };
 export type Gradient = { angle?: number; stops: [number, Color][] };
@@ -67,6 +69,8 @@ export type BoxProps = {
   radius?: number; corners?: [number, number, number, number];
   /** Clip children to the rounded box (overflow:hidden). */
   clip?: number;
+  /** Clips to the box with each side fading out over `[left, top, right, bottom]` points (smoothstep), as a CSS mask-image gradient to transparent. */
+  clipFade?: [number, number, number, number];
   shadow?: [number, number, Color]; shadows?: Shadow[];
   opacity?: number; blur?: number; backdropBlur?: number;
   // States
@@ -183,7 +187,8 @@ export type InputProps = Omit<TextProps, "onKey"> & {
   /** Multiline: grow from `minLines` to `maxLines` (or `maxH`), then scroll inside with the caret kept in view. */
   minLines?: number;
   /** Highlights over UTF-16 ranges of the value (mentions, chips, matches). Paint only: no reshaping. */
-  marks?: { start: number; end: number; bg?: Color; color?: Color; radius?: number; pad?: number }[];
+  /** Highlights over UTF-16 ranges: `pad` widens each side, `vpad` reaches past the font's ascent and descent (both 0 for a CSS inline background). */
+  marks?: { start: number; end: number; bg?: Color; color?: Color; radius?: number; pad?: number; vpad?: number }[];
   /** A text paste at or over either threshold isn't inserted; it fires `onPaste` with its text instead. */
   pasteAsEvent?: { minChars?: number; minLines?: number };
   /** The value's laid-out line count, whenever it changes. */

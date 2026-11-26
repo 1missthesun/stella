@@ -53,10 +53,10 @@ const NO_KEYS: string[] = [];
 const INPUT_MAX_H = 200;
 const PASTE_AS_ATTACHMENT = { minChars: PASTE_AS_ATTACHMENT_MIN_CHARS, minLines: PASTE_AS_ATTACHMENT_MIN_LINES };
 
-/** `.model-mention-inline` in the field: primary text on a 14% primary wash, 3pt corners. */
+/** `.model-mention-inline` in the field: primary text on a 14% primary wash over the font's content area, 3pt corners. */
 const useMentionMarks = (message: string, tokens: ReturnType<typeof useTokens>) => {
   const look = derive(tokens, "model-mention-inline", (k) => ({ color: k.c.primary, bg: mixOklch(k.c.primary, 14, "transparent") }));
-  return findDelegatedModelMentions(message).map((mention) => ({ start: mention.start, end: mention.end, color: look.color, bg: look.bg, radius: 3 }));
+  return findDelegatedModelMentions(message).map((mention) => ({ start: mention.start, end: mention.end, color: look.color, bg: look.bg, radius: 3, pad: 0, vpad: 0 }));
 };
 
 type ComposerProps = {

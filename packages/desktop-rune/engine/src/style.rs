@@ -218,6 +218,9 @@ pub fn paint(mut e: El, p: &Props) -> El {
     if let Some(r) = p.clip {
         e = e.clip_rounded(r);
     }
+    if let Some([l, t, r, b]) = p.clip_fade {
+        e = e.clip_fade(l, t, r, b);
+    }
     if let Some((y, blur, c)) = p.shadow {
         e = e.shadow(y, blur, c.0);
     }

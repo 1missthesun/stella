@@ -20,13 +20,14 @@ interface TextShimmerProps {
 
 const easeInOut = (p: number) => (p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2);
 
-/** desktop-ui's `TextShimmer`: a 44%-wide window of lighter text sweeping across, then resting. */
+/** desktop-ui's `TextShimmer`: a 44%-wide window of lighter text sweeping across, then resting; its edges fade over half the window each side (`.text-shimmer__sweep`'s mask). */
 export function TextShimmer({ text, look, active = true, durationMs, exclusiveGroup, exclusivePriority = 0, color }: TextShimmerProps) {
   const t = useTokens();
   const [width, setWidth] = useState(0);
   const duration = useMemo(() => durationMs ?? Math.max(1400, Math.min(4000, text.length * 95)), [durationMs, text.length]);
   const shouldAnimate = useExclusiveAnimation(exclusiveGroup, active && width > 0, exclusivePriority);
   const base = color ?? t.c.textStrong;
+  const feather = (width * SHIMMER_WINDOW_FRACTION) / 2;
   const loops = useMemo(() => {
     if (!width) return null;
     const sweep = Math.min(2200, Math.max(1400, duration * 0.85));
@@ -53,7 +54,7 @@ export function TextShimmer({ text, look, active = true, durationMs, exclusiveGr
         {text}
       </text>
       {active && shouldAnimate && loops ? (
-        <box absolute={{ left: 0, top: 0, bottom: 0 }} w={width * SHIMMER_WINDOW_FRACTION} clip={0} loop={loops.window} inert>
+        <box absolute={{ left: 0, top: 0, bottom: 0 }} w={width * SHIMMER_WINDOW_FRACTION} clipFade={[feather, 0, feather, 0]} loop={loops.window} inert>
           <text {...look} color={t.c.textWeaker} nowrap w={width} loop={loops.inner}>
             {text}
           </text>

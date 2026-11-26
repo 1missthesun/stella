@@ -99,6 +99,9 @@ export function createUiLoader(options: UiLoaderOptions) {
 
   let generation = 0;
   let liveScope: UiScope | null = null;
+  const replaced: UiScope[] = [];
+  const alive = new Set<number>();
+  const collected = new FinalizationRegistry<number>((id) => alive.delete(id));
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   const settle = () => {
     if (settleTimer) clearTimeout(settleTimer);
@@ -118,11 +121,22 @@ export function createUiLoader(options: UiLoaderOptions) {
     },
     async load(): Promise<UiModule> {
       const code = await build();
-      const { value, scope } = evaluateInScope(() => evaluate(code, ++generation));
-      liveScope?.dispose();
+      const id = ++generation;
+      const { value, scope } = evaluateInScope(id, () => evaluate(code, id));
+      alive.add(id);
+      collected.register(value.Root ?? value.App ?? value, id);
+      if (liveScope) replaced.push(liveScope);
       liveScope = scope;
       settle();
       return value;
+    },
+    /** Undoes what replaced generations registered; call once the new generation's tree has replaced theirs (their unmount cleanups ran). */
+    retireReplaced() {
+      for (const scope of replaced.splice(0)) scope.dispose();
+    },
+    /** Generations not yet garbage collected: one after a settled swap, more means a leak. */
+    liveGenerations(): number[] {
+      return [...alive];
     },
     dispose() {
       if (idleTimer) clearTimeout(idleTimer);

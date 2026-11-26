@@ -119,13 +119,28 @@ function swapForUpdate(paths: string[]): Promise<boolean> {
   return applySwap(paths.join(", ") || "app-source", now());
 }
 
-async function applySwap(label: string, t0: number, mtime = t0): Promise<boolean> {
+let swapTail: Promise<unknown> = Promise.resolve();
+let swapWaiting: Promise<boolean> | null = null;
+/** One swap at a time, in order; requests made while one waits join it (it builds the newest files). */
+function applySwap(label: string, t0: number, mtime = t0): Promise<boolean> {
+  if (swapWaiting) return swapWaiting;
+  const run = swapTail.then(() => {
+    swapWaiting = null;
+    return runSwap(label, t0, mtime);
+  });
+  swapWaiting = run;
+  swapTail = run;
+  return run;
+}
+
+async function runSwap(label: string, t0: number, mtime: number): Promise<boolean> {
   try {
     const next = await loadApp();
     const t_built = now();
     app = next;
     store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
     render(root(), { t0, kind: 1 });
+    ui.retireReplaced();
     const t_committed = now();
     store.set({ lastSwapMs: Math.round(t_committed - t0) });
     console.error(`[ui] hot swap #${swapN} ${label}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render+send ${(t_committed - t_built).toFixed(1)} ms`);
@@ -239,7 +254,7 @@ const bench: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
     command({ cmd: "scrollTo", target: "chat-scroll", y: Number(q.get("y") ?? 0), spring: Number(q.get("spring") ?? 0) });
     return true;
   },
-  async stats() { return { ...stats, swaps: swapN, rss_mb: process.memoryUsage().rss / 1048576, heap_mb: process.memoryUsage().heapUsed / 1048576 }; },
+  async stats() { return { ...stats, swaps: swapN, liveGenerations: ui.liveGenerations(), rss_mb: process.memoryUsage().rss / 1048576, heap_mb: process.memoryUsage().heapUsed / 1048576 }; },
   async swap(q) {
     const n = Number(q.get("n") ?? 1);
     const rss = () => { Bun.gc(true); return Math.round(process.memoryUsage().rss / 1048576 * 10) / 10; };

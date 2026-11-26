@@ -4,6 +4,8 @@
 // dozens of commits without a render in between. This WebSocket hands its "message" listeners one
 // message per task, after the microtasks and immediates the previous one queued.
 
+import { ownByCaller } from "../services/ui-scope";
+
 type MessageListener = EventListenerOrEventListenerObject;
 
 export function installTaskWebSocket(): void {
@@ -20,6 +22,7 @@ export function installTaskWebSocket(): void {
 
     constructor(url: string | URL, protocols?: string | string[]) {
       super(url, protocols);
+      if (ownByCaller(TaskWebSocket, () => this.close()) === "retired") this.close();
       super.addEventListener("message", (event) => {
         this.#queue.push(event as MessageEvent);
         if (!this.#busy) this.#pump();

@@ -8,6 +8,7 @@ import { MemoryStorage, UiStateStorage, type UiStateBackend } from "./storage";
 import { audioDevices } from "../electron/audio-player";
 import { installIntlGlue } from "./intl";
 import { installMediaElements } from "./media-element";
+import { scopeCallbackScheduler } from "../services/ui-scope";
 import { installTaskWebSocket } from "./websocket";
 
 export type DomAppearance = { dark: boolean; reducedMotion?: boolean; highContrast?: boolean };
@@ -95,6 +96,8 @@ export function installDom(options: DomHostOptions): DomHost {
   defineViewport(g, env);
 
   installAnimationFrames(g);
+  scopeCallbackScheduler(g, "requestAnimationFrame", "cancelAnimationFrame");
+  scopeCallbackScheduler(g, "requestIdleCallback", "cancelIdleCallback");
   installObservers(g);
   installMediaElements(g, () => g.location.href);
   installElementClasses(g);

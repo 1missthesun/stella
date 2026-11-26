@@ -99,6 +99,8 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
     };
     note_state(node, dark, maximized, full, accent);
     settle_rect(node, cx);
+    // As in CSS, a change lands at once unless its element asks for motion (`motion`, `layout`).
+    let root = root.motion(rune::Spring::NONE);
     root.on_window_focus(move |s: &mut Win, focused: bool, _tx: &mut Tx| {
         if s.node != 0 {
             engine::with(|e| e.windows.entry(s.node).or_default().focused = focused);

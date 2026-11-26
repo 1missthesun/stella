@@ -128,7 +128,8 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 **Motion.**
 - Transforms: `x y scale rotate origin`.
 - `motion {dur, bounce}` is the spring every prop change rides. `layout` (s) animates layout
-  changes. `instant` makes changes land without motion.
+  changes. `instant` makes changes land without motion. Without `motion` or `layout` on the
+  element or an ancestor, a change lands at once, as in CSS.
 - `enter` / `exit`: a preset (`fade rise drop blur scale pop slide`) or `{opacity, scale, x, y,
   blur, dur, bounce}`.
 - `loop`: `opacity`, `rotation`, `slide`, or `sequence {period, delay, frames:[{at, x, y, scale,

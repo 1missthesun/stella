@@ -1344,8 +1344,8 @@ mod win {
         session.StartCapture().map_err(text)?;
         let mic = if want_mic { microphone(pcm.clone(), writer.clone(), t0, stopped.clone()) } else { None };
         let started_at = epoch_ms();
-        spawn_frames(id.clone(), latest, stopped.clone(), frames.clone(), PathBuf::from(frames_dir), Duration::from_millis(interval as u64), edge, quality);
         let pacer = spawn_pacer(writer.clone(), latest.clone(), stopped.clone(), t0, fps);
+        spawn_frames(id.clone(), latest, stopped.clone(), frames.clone(), PathBuf::from(frames_dir), Duration::from_millis(interval as u64), edge, quality);
         let has_mic = mic.is_some();
         RECORDINGS.lock().unwrap_or_else(|e| e.into_inner()).insert(id, Recording { session, pool, writer, pcm, stopped, frames, microphone: mic, pacer, file });
         Ok(json!({ "startedAt": started_at, "microphone": has_mic, "width": w, "height": h }))

@@ -26,7 +26,7 @@ export function UsageTable({ columns, rows, rowContentH, measureKey }: { columns
     });
   };
   return (
-    <col {...s.usageTableScroll}>
+    <col key={measureKey} {...s.usageTableScroll}>
       <row minW="full" align="start">
         <col absolute={{ left: 0, top: 0, right: 0 }}>
           <row w="full" h={headH} {...s.usageTableLine} />

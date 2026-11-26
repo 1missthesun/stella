@@ -6,7 +6,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { WindowSnapshot } from "../../host/electron/browser-window";
 import { MessageBoxes } from "./MessageBoxes";
-import { MediaWebView, useMediaWindow } from "./MediaWebView";
+import { MediaWindow } from "./MediaWebView";
 
 const noWindows: WindowSnapshot[] = [];
 const noSubscribe = () => () => {};
@@ -29,11 +29,11 @@ export type WindowChrome = { titlebar?: number; trafficLights?: [number, number]
 
 export function HostWindows({ renderApp, skip, chrome }: HostWindowsProps) {
   const windows = useHostWindows().filter((w) => !w.drawsNothing && !skip?.(w));
-  const mediaWindow = useMediaWindow(windows);
   return (
     <>
+      <MediaWindow />
       {windows.map((w) => (
-        <HostWindow key={w.id} window={w} chrome={w.kind === "app" ? chrome?.(w) : undefined} media={w.engineId === mediaWindow}>
+        <HostWindow key={w.id} window={w} chrome={w.kind === "app" ? chrome?.(w) : undefined}>
           {w.browser ? <HostBrowserView contentsId={w.contentsId} w="full" h="full" /> : w.kind === "app" ? renderApp(w) : <HostWebView window={w} />}
         </HostWindow>
       ))}
@@ -41,7 +41,7 @@ export function HostWindows({ renderApp, skip, chrome }: HostWindowsProps) {
   );
 }
 
-export function HostWindow({ window: w, chrome, media, children }: { window: WindowSnapshot; chrome?: WindowChrome; media?: boolean; children?: ReactNode }) {
+export function HostWindow({ window: w, chrome, children }: { window: WindowSnapshot; chrome?: WindowChrome; children?: ReactNode }) {
   useEffect(() => {
     stella.host?.mounted(w.engineId);
     return () => stella.host?.unmounted(w.engineId);
@@ -78,7 +78,6 @@ export function HostWindow({ window: w, chrome, media, children }: { window: Win
         />
       ))}
       <MessageBoxes windowId={w.id} isMain={w.engineId === "main"} />
-      {media ? <MediaWebView /> : null}
     </window>
   );
 }

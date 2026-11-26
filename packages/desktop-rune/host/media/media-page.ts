@@ -1,5 +1,5 @@
 // The media page's host side: mounts a system WebView on demand (ui/host/MediaWebView.tsx
-// renders it while `wanted()`), serves it the page built from host/media/page, and carries calls,
+// renders it in a background window while `wanted()`), serves it the page built from host/media/page, and carries calls,
 // events, host callbacks, pulled byte streams and analyser frames over its message channel.
 // The page stays while anything uses it and is dropped a minute after the last user leaves.
 
@@ -58,7 +58,6 @@ class MediaPage {
   private sampleTimer: ReturnType<typeof setInterval> | null = null;
   private lastSampleWanted = 0;
   caps: MediaPageCaps | null = null;
-  private hostWindow: string | null = null;
 
   readonly elementId = ELEMENT_ID;
   readonly scheme = SCHEME;
@@ -71,17 +70,6 @@ class MediaPage {
 
   wanted() {
     return this.mounted;
-  }
-
-  /**
-   * The window the page lives in for as long as it runs: the first one asked while the page is
-   * wanted, from the windows `visible` lists (WebKit starts no page and holds back microphone
-   * capture in a window that is not on screen).
-   */
-  windowFor(visible: readonly string[]): string | null {
-    if (!this.mounted) return null;
-    this.hostWindow ??= visible[0] ?? null;
-    return this.hostWindow;
   }
 
   /** The page has started and takes messages. */
@@ -133,7 +121,6 @@ class MediaPage {
     this.readyWaiter = null;
     this.readyPromise = null;
     this.caps = null;
-    this.hostWindow = null;
     this.setMounted(false);
   }
 

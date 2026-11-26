@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import { createStore, makeUseStore } from "../host/store";
 import { installSheet } from "./dom/sheet";
 import { onEngineEvent, startSelectionEvents, webEngine } from "./engine";
+import { removeLaunchSplash } from "../ui/shell/launch-splash";
+import { adoptStaticHome } from "./static-home/adopt";
 
 installSheet();
 const store = createStore({ dark: true, sidebarOpen: true, messages: [], draft: "", activeChat: "", error: null, swaps: 0, lastSwapMs: null, preview: null });
@@ -20,6 +22,10 @@ startSelectionEvents();
 
 if (import.meta.env.VITE_STELLA_WEB_BUILD === "1") {
   void import("@/platform/web-renderer-switch").then((m) => m.startWebRendererSwitch());
+}
+if (document.getElementById("stella-static-home")) {
+  removeLaunchSplash();
+  adoptStaticHome();
 }
 
 const { Root } = await import("../ui/App");

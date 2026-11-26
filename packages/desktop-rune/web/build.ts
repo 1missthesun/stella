@@ -1,6 +1,6 @@
 // The web build of ui/ (stella.sh/chat's /chat-app): the Rune UI on the DOM host (web/dom), with
 // desktop-ui's web page around it (index.html, public/, fonts, canvas host) and its web env.
-// bun packages/desktop-rune/web/build.ts [--out <dir>] [--script-src <source>]...
+// bun packages/desktop-rune/web/build.ts [--out <dir>] [--script-src <source>]... [--no-minify] [--no-static-home]
 
 import type { BunPlugin } from "bun";
 import { createHash } from "node:crypto";
@@ -8,7 +8,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { CANVAS_HOST_FILE, CANVAS_HOST_HTML } from "@stella/contracts/canvas-host";
 import { webBuildEnv } from "../../desktop/electron/source/build-web";
+import { getThemeById, resolveThemeColors } from "@stella/theme";
 import { replacementFor, resolveSpecifier, viteCompat } from "../host/vite-compat";
+import { Icons, withStroke } from "../ui/kit/icons";
+import { buildTokens } from "../ui/theme/tokens";
+import { STATIC_HOME_LOOK_KEY, staticHomeLook, type StaticHomeLook } from "./static-home/palette";
 
 const RUNE = path.resolve(import.meta.dir, "..");
 const REPO = path.resolve(RUNE, "../..");
@@ -131,7 +135,6 @@ const rel = (file: string) => path.relative(outDir, file).split(path.sep).join("
 const entry = app.outputs.find((o) => o.kind === "entry-point");
 const fontCss = fonts.outputs.find((o) => o.path.endsWith(".css"));
 if (!entry || !fontCss) throw new Error("The build produced no entry.");
-fs.writeFileSync(fontCss.path, fs.readFileSync(fontCss.path, "utf8").replace(/url\("?\.\/assets\//g, (m) => m.replace("./assets/", "./")));
 
 const fontOutputs = fonts.outputs.filter((o) => o.kind === "asset");
 const emitFile = (file: string) => {
@@ -145,6 +148,22 @@ const emitFile = (file: string) => {
   return name;
 };
 
+const fontSource = path.join(UI_ROOT, "src", "shared", "styles", "fonts.css");
+const fontFiles = [...fs.readFileSync(fontSource, "utf8").matchAll(/url\(\s*"?([^")]+)"?\s*\)/g)].map((m) => path.resolve(path.dirname(fontSource), m[1]!));
+/** Bun inlines small fonts as data URLs; the page preloads them as files, so the stylesheet points at those files instead. */
+const fileForDataUrl = (url: string) => {
+  const bytes = Buffer.from(url.slice(url.indexOf(",") + 1), "base64");
+  const file = fontFiles.find((f) => fs.existsSync(f) && fs.statSync(f).size === bytes.length && fs.readFileSync(f).equals(bytes));
+  return file ? `./${path.basename(emitFile(file))}` : url;
+};
+const fontCssText = fs
+  .readFileSync(fontCss.path, "utf8")
+  .replace(/url\(\s*("?)(data:font\/[^")]+)\1\s*\)/g, (_m, _q, url: string) => `url(${fileForDataUrl(url)})`)
+  .replace(/url\("?\.\/assets\//g, (m) => m.replace("./assets/", "./"));
+fs.rmSync(fontCss.path);
+const fontCssFile = `${ASSETS}/fonts-${createHash("sha256").update(fontCssText).digest("base64url").slice(0, 8)}.css`;
+fs.writeFileSync(path.join(outDir, fontCssFile), fontCssText);
+
 const originOf = (value: unknown) => {
   try {
     return typeof value === "string" && value.trim() ? new URL(value.trim()).origin : null;
@@ -153,20 +172,58 @@ const originOf = (value: unknown) => {
   }
 };
 const backend = originOf(env.VITE_STELLA_BACKEND_URL);
+
+const firstVisitLook = (isDark: boolean): StaticHomeLook => {
+  const custom = getThemeById("custom");
+  if (!custom) throw new Error("The theme catalog has no custom theme.");
+  const { colors, forcedMode, flat } = resolveThemeColors(custom, isDark, custom.base);
+  const dark = forcedMode ? forcedMode === "dark" : isDark;
+  return { ...staticHomeLook(buildTokens({ themeId: custom.id, colors, dark, flat })), dark: isDark };
+};
+
+const HOME_GREETINGS = /const FUN_GREETINGS = (\[[\s\S]*?\]);/;
+const HOME_GREETING_CHANCE = /const FUN_GREETING_CHANCE = ([0-9.]+);/;
+
+function staticHomeMarkup(): string {
+  const home = fs.readFileSync(path.join(RUNE, "ui", "shell", "home", "HomeContent.tsx"), "utf8");
+  const greetings = JSON.parse(HOME_GREETINGS.exec(home)?.[1]?.replace(/,\s*\]$/, "]") ?? "[]") as string[];
+  const chance = Number(HOME_GREETING_CHANCE.exec(home)?.[1] ?? 0);
+  const icon = (data: { body: string; name: string; view: number }) => withStroke(data, 1.75).body;
+  return fs.readFileSync(path.join(WEB, "static-home", "shell.html"), "utf8")
+    .replace("__STELLA_ICON_PLUS__", () => icon(Icons.stella.Plus))
+    .replace("__STELLA_ICON_MIC__", () => icon(Icons.stella.Mic))
+    .replace("__STELLA_ICON_SEND__", () => icon(Icons.stella.ArrowUp))
+    .replace("__STELLA_LOOK_KEY__", () => STATIC_HOME_LOOK_KEY)
+    .replace("__STELLA_FIRST_VISIT__", () => JSON.stringify({ dark: firstVisitLook(true), light: firstVisitLook(false) }))
+    .replace("__STELLA_FUN_GREETINGS__", () => JSON.stringify(greetings))
+    .replace("__STELLA_FUN_GREETING_CHANCE__", () => String(Number.isFinite(chance) ? chance : 0));
+}
+const staticHome = !process.argv.includes("--no-static-home");
 const publicDir = path.join(UI_ROOT, "public");
 let html = fs.readFileSync(path.join(UI_ROOT, "index.html"), "utf8");
 const entryTag = /<script\s+type="module"\s+src="([^"]+)"><\/script>/.exec(html);
 if (!entryTag) throw new Error("index.html has no module script entry.");
+const entryScript = `<script type="module" crossorigin src="./${rel(entry.path)}"></script>`;
+const entryPreload = `<link rel="modulepreload" crossorigin href="./${rel(entry.path)}">`;
+/** Runs the app once the static home has painted: a cached bundle would otherwise run before the first frame. */
+const entryAfterPaint = `<script>(()=>{let started=false;const start=()=>{if(started)return;started=true;const s=document.createElement("script");s.type="module";s.crossOrigin="anonymous";s.src=${JSON.stringify(`./${rel(entry.path)}`)};document.head.appendChild(s)};requestAnimationFrame(()=>setTimeout(start,0));setTimeout(start,100)})()</script>`;
+if (staticHome) {
+  const markup = staticHomeMarkup();
+  html = html.replace(/(\s*)<div id="root">/, (match, indent: string) => `${indent}${markup.trim().split("\n").join(indent)}${match}`);
+}
 html = html
   .replace(LAUNCH_RESCUE, "")
-  .replace(entryTag[0], () => `<script type="module" crossorigin src="./${rel(entry.path)}"></script>`)
+  .replace(entryTag[0], () => (staticHome ? "" : entryScript))
   .replace(/(url\(\s*"|href=")\/(src\/[^"]+)"/g, (_m, head: string, ref: string) => `${head}./${emitFile(path.join(UI_ROOT, ref))}"`)
   .replace(/(<(?:link|script|img)\b[^>]*?\s(?:href|src)=")\/([^"]*)"/g, (match, head: string, ref: string) => (fs.existsSync(path.join(publicDir, ref)) ? `${head}./${ref}"` : match))
   .replace("</head>", [
     ...(backend ? [`  <link rel="preconnect" href="${backend}" crossorigin="anonymous">`] : []),
-    `  <link rel="stylesheet" href="./${rel(fontCss.path)}">`,
+    `  <link rel="stylesheet" href="./${fontCssFile}">`,
+    ...(staticHome ? [`  ${entryPreload}`] : []),
     "</head>",
-  ].join("\n  "));
+  ].join("\n  "))
+  .replace("</body>", () => (staticHome ? `  ${entryAfterPaint}\n  </body>` : "</body>"));
+if (staticHome) scriptSources.push(...[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash("sha256").update(m[1]!).digest("base64")}'`));
 if (scriptSources.length) html = html.replace(/(<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*?script-src )/, (m) => `${m}${scriptSources.join(" ")} `);
 fs.writeFileSync(path.join(outDir, "index.html"), html);
 fs.writeFileSync(path.join(outDir, CANVAS_HOST_FILE), CANVAS_HOST_HTML);

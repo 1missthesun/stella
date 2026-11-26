@@ -304,13 +304,15 @@ const launchBrowser = async (chromePath, port, gpu) => {
         await Promise.race([cdp.send("Browser.close"), sleep(3000)]);
       } catch {}
       ws.close();
+      const exited = proc.exitCode !== null ? Promise.resolve() : new Promise((resolve) => proc.once("exit", resolve));
       proc.kill();
-      fs.rmSync(userDir, { recursive: true, force: true });
+      await Promise.race([exited, sleep(5000)]);
+      fs.rmSync(userDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 };
 
-const COMPOSER_FIELD = 'textarea.chat-composer-textarea, [data-rid^="composer-input:"] > textarea';
+const COMPOSER_FIELD = 'textarea.chat-composer-textarea, [data-rid^="composer-input:"] > textarea, #stella-static-home textarea';
 const APP_COMPOSER_FIELD = '#root textarea.chat-composer-textarea, #root [data-rid^="composer-input:"] > textarea';
 
 const probe = (token) => `(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { font, look, useTokens } from "../../theme";
 import { reportHomeGreetingTop } from "../../replace/shell/workspace-stage/viewer-geometry";
+import { useStaticHomeLook } from "./static-home";
 
 const FUN_GREETINGS = [
   "Welcome back!",
@@ -58,6 +59,9 @@ function timeBasedGreeting(date: Date) {
 }
 
 function initialGreeting(): GreetingState {
+  const fromStaticHome = (globalThis as { __stellaStaticGreeting?: { kind?: string; text?: unknown } }).__stellaStaticGreeting;
+  if (fromStaticHome?.kind === "fun" && typeof fromStaticHome.text === "string") return { kind: "fun", text: fromStaticHome.text };
+  if (fromStaticHome?.kind === "time") return { kind: "time" };
   if (Math.random() < FUN_GREETING_CHANCE) {
     return { kind: "fun", text: FUN_GREETINGS[Math.floor(Math.random() * FUN_GREETINGS.length)]! };
   }
@@ -87,11 +91,13 @@ export function HomeContent({ children, leaving = false }: { children?: ReactNod
   const greeting = useGreeting();
   const narrow = useSyncExternalStore(subscribeResize, isNarrow);
   const title = look(narrow ? 29 : 36, 600, { lh: 1.2, em: -0.03, family: font.display });
+  useStaticHomeLook(t);
   useEffect(() => () => reportHomeGreetingTop(null), []);
   return (
     <col id="home-content" grow={1} w="100%" maxW={780} px={24} py={48} align="center" justify="center" selfAlign="center">
       <text
         id="home-stella-title"
+        antialias
         {...title}
         color={t.c.textStrong}
         textAlign="center"

@@ -18,6 +18,7 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 - [ ] Agent browsing: in-app browser panel + CDP on an on-demand Chromium; Stella Browser extension bridge
   - macOS: an agent browses on the on-demand Chromium in a signed-in turn (~/.stella/outputs/stella-rune/host/agent-browsing-mac.txt, agent-browsing-chat-mac.png). Extension bridge not proven.
 - [ ] Show Stella capture (screen recording + talking + marks), meeting capture
+  - macOS: Show Stella records the screen, microphone and frames into a full capture, which lands in the composer (~/.stella/outputs/stella-rune/host/show-stella-mac.txt, show-stella-contact-sheet.png, show-stella-after-stop.png); desktopCapturer sources from ScreenCaptureKit; the global input hook delivers events. Ink/marks (needs Accessibility for the bundled engine) and meeting capture not proven.
 - [ ] Hot swap of `ui/` (zero Cargo, state kept, flat memory); host restart keeps windows
   - macOS: an app-source draft and its Undo hot-swap `ui/` with no relaunch or Cargo (~/.stella/outputs/stella-rune/host/app-source-hot-swap-mac.txt, app-source-*-mac.png). Host restart keeps windows not proven.
 - [ ] Linux X11 + Wayland, macOS, Windows builds; launcher starts the engine; Update flow

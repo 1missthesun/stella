@@ -67,6 +67,8 @@ pub fn route(v: Value) {
             crate::metrics::METRICS.lock().unwrap_or_else(|e| e.into_inner()).log(json!({ "mark": v.get("name"), "at": crate::metrics::epoch_ms() }));
         }
         "screen.displays" => reply(rid, Ok(displays())),
+        "capture.sources" | "capture.start" | "capture.stop" => crate::capture::command(&cmd, rid, &v),
+        "inputhook.start" | "inputhook.stop" => crate::inputhook::command(&cmd, rid, &v),
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "selection.get" => {
             let w = window_named(&v).or_else(windows::first_window);
@@ -140,7 +142,7 @@ fn fonts(v: &Value) -> Result<Value, String> {
 }
 
 /// Electron display ids are numbers; this one is stable for a monitor name and position.
-fn display_id(name: &str, at: (i32, i32)) -> u32 {
+pub(crate) fn display_id(name: &str, at: (i32, i32)) -> u32 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     (name, at).hash(&mut h);

@@ -77,7 +77,7 @@ These live on rune/desktop only and go to master at ship time:
 | powerMonitor, powerSaveBlocker | logind PrepareForSleep, /sys battery; systemd-inhibit / caffeinate |
 | utilityProcess | Bun fork with `process.parentPort` |
 | crashReporter, contentTracing, netLog, autoUpdater, TouchBar, inAppPurchase, … | no-ops |
-| desktopCapturer | returns no sources (see Show Stella below) |
+| desktopCapturer | macOS: ScreenCaptureKit through the engine (`capture.sources`): screens and windows, Electron ids, PNG thumbnails. Elsewhere no sources. |
 
 Renderer-only modules (`ipcRenderer`, `contextBridge`, `webFrame`) are undefined, as in main.
 
@@ -130,7 +130,7 @@ needs the engine's message loop, so it is engine work; the shim keeps a named pi
 | Devices and media access | `navigator.mediaDevices.enumerateDevices`, `systemPreferences` | macOS: CoreAudio devices in `MediaDeviceInfo` shape with `default` entries; `getMediaAccessStatus` from AVFoundation / CGPreflightScreenCaptureAccess. `askForMediaAccess` reports the status without prompting: the prompt needs the signed engine bundle with `NSMicrophoneUsageDescription` (DISTRIBUTION.md). |
 | Wakeword | `services/wakeword-service.ts` | Already a native helper; runs unchanged. |
 | Meeting capture | `services/meeting-capture-controller.ts` | Already a native helper; runs unchanged. macOS microphone status needs `systemPreferences.getMediaAccessStatus` from the engine. |
-| Show Stella recording (desktopCapturer + getUserMedia desktop + MediaRecorder) | `show-stella-controller.ts`, desktop-ui `show-stella-recorder.ts` | Native capture in the engine (PipeWire/xdg-desktop-portal ScreenCast, ScreenCaptureKit, Windows.Graphics.Capture), encoded by the existing screen-recording helper; `desktopCapturer.getSources` then lists the engine's displays. |
+| Show Stella recording (desktopCapturer + getUserMedia desktop + MediaRecorder) | `show-stella-controller.ts`, desktop-ui `show-stella-recorder.ts` | macOS: done. `ui/replace/features/show-stella/show-stella-recorder.ts` records through the engine (`engine/src/capture.rs`): ScreenCaptureKit into an H.264 MP4 with the microphone as AAC (macOS 15+), JPEG frames every interval, 16 kHz PCM for the WAV; it sends to the controller through the overlay window's own `showStella` API. Global input for the timeline and ink is `uiohook-napi` resolved to `electron/uiohook.ts` over the engine's listen-only CGEventTap (`engine/src/inputhook.rs`); the addon itself crashes Bun. Linux (PipeWire portal) and Windows (Windows.Graphics.Capture, a low-level input hook) still to do. |
 | Office / PDF previews, map route, canvas tab, cloud app panel, cloud browser takeover (iframes) | desktop-ui `app/chat/*Card`, `shell/display/*` | Engine `<webview>` element (system WebView) with the custom schemes served by `session.fetchProtocol`; PDF thumbnails through pdf.js in that WebView, or native pdfium. |
 | Auth challenge (Turnstile window) | `services/auth-service.ts` | An engine `<window>` holding a `<webview>` on the auth partition. |
 | Update transition still frame (capturePage) | `app-source/update-transition.ts` | Engine screenshot of its own surface. |

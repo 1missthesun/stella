@@ -124,9 +124,30 @@ export type EngineEvent =
   | { t: "rec"; result: unknown }
   /** A window's selection settled (a drag, double/triple-click, shift-extend or select-all released) with its line boxes' union in window points as scrolled, or cleared. */
   | { t: "selection"; window: string | null; n: number; text: string; rect: SelectionRect }
-  | { t: "selection"; window: string | null; n: number; cleared: true };
+  | { t: "selection"; window: string | null; n: number; cleared: true }
+  | { t: "capture"; id: string; kind: "frame"; at: number; path: string }
+  /** A global input event in uiohook's shape (see engine/src/inputhook.rs). */
+  | ({ t: "inputhook"; type: InputHookType } & InputHookEvent);
 
 export type SelectionRect = { x: number; y: number; w: number; h: number };
+
+export type InputHookType = "mousemove" | "mousedown" | "mouseup" | "wheel" | "keydown" | "keyup";
+export type InputHookEvent = {
+  x: number;
+  y: number;
+  time: number;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+  button?: number;
+  clicks?: number;
+  keycode?: number;
+  rawcode?: number;
+  rotation?: number;
+  direction?: number;
+  amount?: number;
+};
 
 type EventOf<T extends EngineEvent["t"]> = Extract<EngineEvent, { t: T }>;
 const listeners = new Map<string, Set<(e: any) => void>>();
@@ -192,6 +213,12 @@ export type ElementInfo = { key: string | null; path: string; role: string; labe
 export type FrameShot = { path: string; width: number; height: number; scale: number };
 export type FrameRecording = { dir: string; frames: number; asked: number; fps: number; errors: string[] };
 /** A Rune script event (`--script` format): move/down/up/tap/double-click/drag/scroll/wheel/key/type/paste/ime/drop_files… */
+export type CaptureSource = { id: string; name: string; display_id: string; thumbnail: string | null };
+export type CaptureStart = {
+  id: string; sourceId: string; width: number; height: number; fps: number; file: string; framesDir: string;
+  frameIntervalMs: number; frameEdge: number; jpegQuality: number; microphone: boolean;
+};
+
 export type InputEvent = Record<string, unknown> & { type?: string; t?: number };
 
 const win = <T = void>(id: string, cmd: string, args: Record<string, unknown> = {}) => request<T>(`window.${cmd}`, { ...args, window: id });
@@ -279,6 +306,17 @@ export const engine = {
     cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
   },
   appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
+  /** Screen capture (ScreenCaptureKit on macOS). */
+  capture: {
+    sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),
+    start: (o: CaptureStart) => request<{ startedAt: number; microphone: boolean; width: number; height: number }>("capture.start", o),
+    stop: (id: string) => request<{ file: string | null; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
+  },
+  /** Global input listening for the `uiohook-napi` module (macOS; rejects elsewhere or without Input Monitoring). */
+  inputHook: {
+    start: () => request<{ started: boolean }>("inputhook.start"),
+    stop: () => request<{ stopped: boolean }>("inputhook.stop"),
+  },
   shell: {
     openExternal: (url: string) => request("shell.openExternal", { url }),
     /** Resolves "" on success, else the error (Electron's contract). */

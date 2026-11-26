@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ShowStellaInk, ShowStellaOverlayState } from "@stella/contracts/desktop/show-stella";
-import { ShowStellaRecorder } from "@/features/show-stella/show-stella-recorder";
+import { ShowStellaRecorder } from "../../replace/features/show-stella/show-stella-recorder";
 import { viewAtom } from "@/platform/view-state/view-state";
 import { useT } from "@/shared/i18n";
 import { Icon, Icons } from "../../kit";
@@ -169,7 +169,7 @@ export function ShowStellaOverlay() {
       show.onOverlayState((next) => {
         setState(next);
         if (next.phase !== "recording" || recorder.current?.id === next.captureId) return;
-        const instance = new ShowStellaRecorder(next.recorder);
+        const instance = new ShowStellaRecorder(next.recorder, show);
         recorder.current = { id: next.captureId, recorder: instance };
         instance.begin().catch((error: unknown) => {
           if (recorder.current?.recorder === instance) recorder.current = null;

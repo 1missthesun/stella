@@ -5,7 +5,8 @@
 import { EventEmitter } from "node:events";
 import { fork, type ChildProcess } from "node:child_process";
 import path from "node:path";
-import { warnOnce } from "./engine";
+import { rmSync } from "node:fs";
+import { engine, warnOnce } from "./engine";
 import { nativeImage } from "./native-image";
 import { mediaAccessStatus } from "./macos-media";
 
@@ -69,10 +70,22 @@ class SystemPreferences extends EventEmitter {
 
 export const systemPreferences = new SystemPreferences();
 
+type DesktopCapturerSource = { id: string; name: string; thumbnail: ReturnType<typeof nativeImage.createEmpty>; display_id: string; appIcon: null };
+
 export const desktopCapturer = {
-  async getSources(_options: unknown) {
-    warnOnce("desktopCapturer", "desktopCapturer.getSources needs the engine's native screen capture (Show Stella / meeting capture)");
-    return [] as Array<{ id: string; name: string; thumbnail: ReturnType<typeof nativeImage.createEmpty>; display_id: string; appIcon: null }>;
+  async getSources(options: { types?: string[]; thumbnailSize?: { width: number; height: number } } = {}): Promise<DesktopCapturerSource[]> {
+    const e = engine();
+    if (!e) {
+      warnOnce("desktopCapturer", "desktopCapturer.getSources needs the engine");
+      return [];
+    }
+    const thumbnailSize = options.thumbnailSize ?? { width: 150, height: 150 };
+    const sources = await e.capture.sources({ types: options.types ?? ["screen"], thumbnailSize });
+    return sources.map((source) => {
+      const thumbnail = source.thumbnail ? nativeImage.createFromPath(source.thumbnail) : nativeImage.createEmpty();
+      if (source.thumbnail) rmSync(source.thumbnail, { force: true });
+      return { id: source.id, name: source.name, display_id: source.display_id, thumbnail, appIcon: null };
+    });
   },
 };
 

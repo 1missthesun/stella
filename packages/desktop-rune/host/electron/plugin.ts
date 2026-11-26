@@ -1,11 +1,12 @@
 // The Bun runtime plugin that lets master's Electron main run unchanged in the host: `electron`
-// (and electron/main, electron/common) resolve to the shim, `browser-script:` imports become the
+// (and electron/main, electron/common) and `uiohook-napi` resolve to the shim, `browser-script:` imports become the
 // bundled page script text, as esbuild's browser-script plugin builds them for Electron.
 
 import { plugin } from "bun";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { electronModule } from "./index";
+import * as uiohook from "./uiohook";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const ELECTRON_DIR = path.join(REPO_ROOT, "packages/desktop/electron");
@@ -65,6 +66,7 @@ export function installElectronPlugin() {
       for (const name of ["electron", "electron/main", "electron/common"]) {
         build.module(name, () => ({ exports, loader: "object" }));
       }
+      build.module("uiohook-napi", () => ({ exports: { ...uiohook, default: uiohook }, loader: "object" }));
       build.onLoad({ filter: ELECTRON_SOURCE }, (args) => {
         let source = applyOverrides(args.path, readFileSync(args.path, "utf8"));
         source = source.replaceAll("import.meta.dirname", JSON.stringify(BUNDLE_DIR));

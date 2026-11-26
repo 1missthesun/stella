@@ -6,6 +6,8 @@
 //! scrolling, hover, springs and painting stay native; only state changes cross the bridge.
 //! Events go back to the host as JSON lines. The protocol is in `host/ELEMENTS.md`.
 
+mod capture;
+mod inputhook;
 mod commands;
 mod control;
 mod engine;

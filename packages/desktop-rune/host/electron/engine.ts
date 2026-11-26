@@ -45,6 +45,7 @@ export type EngineEventOf = {
   shortcut: { t: "shortcut"; accel: string };
   appearance: { t: "appearance"; dark: boolean; accentColor?: string; reducedMotion?: boolean };
   display: { t: "display"; kind?: string };
+  inputhook: Extract<import("../bridge").EngineEvent, { t: "inputhook" }>;
 };
 
 type BridgeModule = {

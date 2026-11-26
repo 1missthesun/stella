@@ -184,8 +184,45 @@ let pressKeys = false;
 /** Whether the press being dispatched came from Return or Space on a focused control (a DOM `click` with `detail` 0), not the pointer. */
 export const pressedByKeys = () => pressKeys;
 
-setElementDispatch((e) => {
+type Rect = { x: number; y: number; w: number; h: number };
+/** The rect each `id`'d element last reported (`owner` is its instance; null when two live elements share the id). */
+const layoutById = new Map<string, { rect: Rect; owner: number | null }>();
+
+function noteLayout(inst: Instance, e: ElementEvent) {
+  const id = inst.react.id;
+  if (typeof id !== "string") return;
+  const seen = layoutById.get(id);
+  const owner = seen && seen.owner !== inst.id && seen.owner !== null && instances.has(seen.owner) ? null : inst.id;
+  layoutById.set(id, { rect: { x: Number(e.x), y: Number(e.y), w: Number(e.w), h: Number(e.h) }, owner });
+}
+
+/** Rune reports an element's layout when its rect changes under the same key, and an `id` is the
+ *  key: an element remounted under the same id in the same place (a hot swap) is never told its
+ *  rect. While `replayLayouts(true)` holds, each such element mounted is handed the rect its
+ *  predecessor last heard. */
+let fresh: Instance[] | null = null;
+export function replayLayouts(on: boolean) {
+  fresh = on ? [] : null;
+  if (!on) for (const [id, seen] of layoutById) if (seen.owner !== null && !instances.has(seen.owner)) layoutById.delete(id);
+}
+
+function replayFresh() {
+  const list = fresh;
+  if (!list?.length) return;
+  fresh = [];
+  for (const inst of list) {
+    const id = inst.react.id;
+    const seen = typeof id === "string" ? layoutById.get(id) : undefined;
+    if (!seen || seen.owner === null || seen.owner === inst.id || instances.has(seen.owner) || !inst.handlers.layout) continue;
+    layoutById.set(id, { rect: seen.rect, owner: inst.id });
+    dispatchElement({ t: "ev", n: inst.id, e: "layout", seq: 0, at: performance.timeOrigin + performance.now(), ...seen.rect });
+  }
+}
+
+setElementDispatch(dispatchElement);
+function dispatchElement(e: ElementEvent) {
   const inst = instances.get(e.n);
+  if (inst && e.e === "layout") noteLayout(inst, e);
   const fn = inst?.handlers[e.e];
   if (!fn) return;
   const discrete = DISCRETE.has(e.e);
@@ -205,7 +242,7 @@ setElementDispatch((e) => {
     currentPriority = previous;
     pressKeys = false;
   }
-});
+}
 
 let currentPriority = DefaultEventPriority;
 
@@ -234,6 +271,7 @@ const config: any = {
     ops.create(inst.id, type);
     inst.json = serialize(inst, props);
     ops.props(inst.id, inst.json);
+    if (fresh && typeof props.id === "string" && inst.handlers.layout) fresh.push(inst);
     return inst;
   },
   createTextInstance(text: string): Instance {
@@ -274,7 +312,10 @@ const config: any = {
   getChildHostContext: (ctx: object) => ctx,
   getPublicInstance: (i: Instance) => i,
   prepareForCommit: () => null,
-  resetAfterCommit: () => flushFrame(true),
+  resetAfterCommit: () => {
+    flushFrame(true);
+    if (fresh?.length) queueMicrotask(replayFresh);
+  },
   preparePortalMount() {},
   getCurrentUpdatePriority: () => currentPriority,
   setCurrentUpdatePriority: (p: number) => { currentPriority = p; },

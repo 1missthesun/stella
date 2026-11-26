@@ -7,7 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { createElement } from "react";
 import * as bridge from "./bridge";
 import { command, commitCtx, engine, listen, now, onEngineEvent, stats } from "./bridge";
-import { batched, pressedByKeys, render, windowPortal } from "./reconciler";
+import { batched, pressedByKeys, render, replayLayouts, windowPortal } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
@@ -15,6 +15,9 @@ import { scopeUiFacing } from "./services/ui-scope";
 import { installRendererErrorRouting } from "./services/renderer-errors";
 import type { RuneServices } from "./services/boot";
 import type { ControlContext } from "./services/control";
+
+const SWAP_QUIET_MS = 80;
+const SWAP_HOLD_MAX_MS = Number(process.env.STELLA_RUNE_SWAP_HOLD_MS ?? 1000);
 
 export async function runHost(options: { bundled?: boolean } = {}): Promise<void> {
   const t_boot = now();
@@ -142,21 +145,46 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
     return run;
   }
 
+  /** The new tree is shown once its commits have gone quiet (its data has loaded), the user acts, or the deadline passes. */
+  function settled(from: number): Promise<string> {
+    return new Promise((done) => {
+      const stopInput = onEngineEvent("ev", (e) => { if (e.input) finish("input"); });
+      const timer = setInterval(() => {
+        const t = now();
+        if (t - from > SWAP_HOLD_MAX_MS) finish("deadline");
+        else if (t - bridge.lastHeldAt() > SWAP_QUIET_MS) finish("quiet");
+      }, 8);
+      function finish(why: string) {
+        clearInterval(timer);
+        stopInput();
+        done(why);
+      }
+    });
+  }
+
   async function runSwap(label: string, t0: number, mtime: number): Promise<boolean> {
     try {
       const next = await loadApp();
       const t_built = now();
       app = next;
+      if (SWAP_HOLD_MAX_MS > 0) bridge.holdFrames();
+      replayLayouts(true);
       store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
       render(root(), { t0, kind: 1 });
       command({ cmd: "view.restore" });
       ui.retireReplaced();
+      const t_rendered = now();
+      const held = await settled(t_rendered);
+      bridge.releaseFrames();
+      replayLayouts(false);
       const t_committed = now();
       store.set({ lastSwapMs: Math.round(t_committed - t0) });
-      console.error(`[ui] hot swap #${swapN} ${label}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render+send ${(t_committed - t_built).toFixed(1)} ms`);
+      console.error(`[ui] hot swap #${swapN} ${label}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render ${(t_rendered - t_built).toFixed(1)} ms, held ${(t_committed - t_rendered).toFixed(1)} ms (${held})`);
       return true;
     } catch (err) {
       // A broken edit never takes the UI down: the old app keeps running, the error shows.
+      bridge.releaseFrames();
+      replayLayouts(false);
       console.error("[ui] hot swap failed, keeping the running UI:", err);
       store.set({ error: String((err as Error).message ?? err).slice(0, 400) });
       return false;

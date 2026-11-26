@@ -76,6 +76,9 @@ pub struct Engine {
     pub color_motion: Option<f32>,
     pub ts_dead: bool,
     pub first_commit: bool,
+    /// Until when (and while no user input arrives after `USER_INPUT` reads this count) commits
+    /// finishing a hot swap land without motion, so the new tree appears as it settled.
+    pub swap_settle: Option<(std::time::Instant, u64)>,
     pub child: Option<std::process::Child>,
     /// Each scroll viewport's last reported offset and range (`[x, y, max x, max y]`), by node.
     pub scrolled: HashMap<u32, [f32; 4]>,
@@ -99,6 +102,7 @@ impl Engine {
             color_motion: None,
             ts_dead: false,
             first_commit: false,
+            swap_settle: None,
             child: None,
             scrolled: HashMap::new(),
         }

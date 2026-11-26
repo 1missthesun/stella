@@ -438,6 +438,9 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
     }
 }
 
+/// How long after a hot swap lands its follow-up commits (layout-driven reveals) skip motion.
+const SWAP_SETTLE: std::time::Duration = std::time::Duration::from_millis(600);
+
 /// Drains the bridge: applies ops, runs global commands, queues window commands, and wakes the
 /// windows it dirtied.
 fn drain(polling: u32) {
@@ -466,6 +469,7 @@ fn drain(polling: u32) {
         engine::with(|e| {
             if ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
                 crate::swap_view::remember(e);
+                e.swap_settle = Some((std::time::Instant::now() + SWAP_SETTLE, crate::swap_view::USER_INPUT.load(std::sync::atomic::Ordering::Relaxed)));
             }
             for op in ops {
                 match op {
@@ -704,7 +708,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         return false;
     }
     let taken = engine::with(|e| {
-        let first = !e.first_commit;
+        let settling = e.swap_settle.is_some_and(|(until, input)| std::time::Instant::now() < until && crate::swap_view::USER_INPUT.load(std::sync::atomic::Ordering::Relaxed) == input);
         let slot = e.windows.get_mut(&node)?;
         let dirty = std::mem::take(&mut slot.dirty);
         let cmds = std::mem::take(&mut slot.cmds);
@@ -713,16 +717,16 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             slot.committed = true;
             e.first_commit = true;
         }
-        Some((dirty, cmds, first_commit, first))
+        Some((dirty, cmds, first_commit, settling))
     });
     let mut changed = false;
-    if let Some((dirty, cmds, first_commit, _)) = taken {
+    if let Some((dirty, cmds, first_commit, settling)) = taken {
         if dirty {
             apply_window_props(node, tx);
             sync_inputs(s);
             #[cfg(feature = "webview")]
             sync_webviews(node);
-            if first_commit || sized {
+            if first_commit || sized || settling {
                 tx.instant();
             } else {
                 tx.animated();
@@ -733,7 +737,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             changed = true;
         }
         apply_fonts(node, tx);
-        if !cmds.is_empty() && !first_commit {
+        if !cmds.is_empty() && !first_commit && !settling {
             tx.animated();
         }
         for WinCmd::Req(rid, v) in cmds {

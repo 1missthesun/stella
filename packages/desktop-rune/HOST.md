@@ -60,6 +60,22 @@ or a dependency change boots from source once and rebuilds in the background.
   loads a second copy of the module beside the bundled one.
 - `STELLA_RUNE_BOOT_TRACE=1` logs `[mark] <step> <ms since start>` through the boot.
 
+## Hot swap with no blank frame (`app.tsx` `runSwap`, `bridge.ts`, engine `windows.rs`)
+
+A swap mounts a new generation whose data (the chat feed, queries) lands over the next ~100 ms.
+The old tree stays on screen until then:
+
+- `bridge.holdFrames()` keeps every frame back from the swap's render on; `releaseFrames()` sends
+  them as one frame once frames carrying ops have stopped for 80 ms, on the user's first input,
+  or after 1 s (`STELLA_RUNE_SWAP_HOLD_MS`, 0 turns the hold off). Engine requests made meanwhile
+  wait with them.
+- The engine applies the swap without motion: for 600 ms after a swap commit (until the user's
+  first input), every commit is instant, so enter transitions and layout-driven reveals don't
+  play on a tree the user already saw.
+- Rune reports an element's layout only when its rect changes under the same key, and an `id` is
+  the key, so an `id`'d element remounted in place never hears its rect. During a swap,
+  `replayLayouts` hands each such new element the rect its predecessor last heard.
+
 ## How the plugin adapts master's sources
 
 - `electron`, `electron/main`, `electron/common` are virtual modules exporting the shim.

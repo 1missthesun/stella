@@ -263,7 +263,7 @@ jobs:
     name: launch (win-x64, WebView2)
     needs: engine
     runs-on: windows-2025
-    timeout-minutes: 25
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -287,6 +287,10 @@ jobs:
           echo "BUN=$bun" >> "$GITHUB_ENV"
           ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$bun" install --frozen-lockfile \
             --filter ./ --filter @stella/desktop --filter @stella/desktop-ui --filter @stella/desktop-rune --filter @stella/runtime
+
+      - name: Native helpers (meeting_capture, stella_show)
+        shell: pwsh
+        run: ./packages/native/build.ps1
 
       - name: Services session (window, audio, WebView2 media page)
         env:
@@ -325,6 +329,9 @@ jobs:
           jq -r '"capture: \(.value // .error | tojson)"' "$out/capture.json" | tee -a "$GITHUB_STEP_SUMMARY"
           mp4=$(jq -r '.value.capture.stopped.file // empty' "$out/capture.json"); [ -n "$mp4" ] && cp "$(cygpath -u "$mp4")" "$out/capture.mp4" || true
           jpg=$(jq -r '.value.capture.firstFrame // empty' "$out/capture.json"); [ -n "$jpg" ] && cp "$(cygpath -u "$jpg")" "$out/capture-frame.jpg" || true
+          "$BUN" scripts/session.ts eval "$(cat scripts/ci/meeting-show-check.js)" | tee "$out/meeting-show.json"
+          jq -r '"meeting capture and Show Stella: \(.value // .error | tojson)"' "$out/meeting-show.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          find "$run_dir/data" \( -path "*meetings*" -o -path "*captures*" \) -type f -printf "%s %p\n" | tee "$out/meeting-show-files.txt" || true
           ps -W | grep -iE "stella-engine|bun|msedgewebview2" | tee "$out/processes.txt" || true
           jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null && echo "audio ok" || echo "AUDIO FAILED" | tee -a "$GITHUB_STEP_SUMMARY"
           status=0

@@ -314,11 +314,11 @@ export const engine = {
     cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
   },
   appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
-  /** Screen capture (ScreenCaptureKit on macOS). */
+  /** Screen capture (ScreenCaptureKit on macOS, Windows.Graphics.Capture on Windows). */
   capture: {
     sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),
     start: (o: CaptureStart) => request<{ startedAt: number; microphone: boolean; width: number; height: number }>("capture.start", o),
-    stop: (id: string) => request<{ file: string | null; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
+    stop: (id: string) => request<{ file: string | null; mimeType?: string; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
   },
   /** Audio file playback (Linux and Windows; macOS plays through AVFoundation in the host). */
   audio: {
@@ -327,7 +327,7 @@ export const engine = {
     control: (o: { id: string; op: string; value?: unknown }) => request<{ playing: boolean }>("audio.control", o),
     devices: () => request<Array<{ deviceId: string; kind: "audioinput" | "audiooutput"; label: string; groupId: string }>>("audio.devices"),
   },
-  /** Global input listening for the `uiohook-napi` module (macOS; rejects elsewhere or without Input Monitoring). */
+  /** Global input listening for the `uiohook-napi` module (macOS CGEventTap, Windows low-level hooks; rejects elsewhere or without Input Monitoring). */
   inputHook: {
     start: () => request<{ started: boolean }>("inputhook.start"),
     stop: () => request<{ stopped: boolean }>("inputhook.stop"),

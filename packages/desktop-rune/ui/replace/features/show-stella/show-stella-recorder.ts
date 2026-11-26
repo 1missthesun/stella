@@ -94,12 +94,12 @@ export class ShowStellaRecorder {
     this.api?.sendFrame({ captureId: this.start.captureId, t, jpeg });
   }
 
-  private sendVideo(file: string): boolean {
+  private sendVideo(file: string, mimeType: string): boolean {
     const video = bytesOf(file);
     if (!video || video.byteLength === 0) return false;
     for (let at = 0; at < video.byteLength; at += VIDEO_CHUNK_BYTES) {
       const chunk = video.slice(at, Math.min(video.byteLength, at + VIDEO_CHUNK_BYTES));
-      this.api?.sendVideoChunk({ captureId: this.start.captureId, chunk, mimeType: "video/mp4" });
+      this.api?.sendVideoChunk({ captureId: this.start.captureId, chunk, mimeType });
     }
     return true;
   }
@@ -128,7 +128,8 @@ export class ShowStellaRecorder {
     if (stella && this.started) {
       try {
         const out = await stella.engine.capture.stop(this.start.captureId);
-        if (out.file && this.sendVideo(out.file)) videoMimeType = "video/mp4";
+        const mimeType = out.mimeType ?? "video/mp4";
+        if (out.file && this.sendVideo(out.file, mimeType)) videoMimeType = mimeType;
         if (out.pcm) wav = this.wavOf(out.pcm, out.pcmStartAt);
       } catch (error) {
         console.warn("[show-stella] the recording didn't finish:", (error as Error)?.message);

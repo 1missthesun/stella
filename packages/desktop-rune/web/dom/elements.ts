@@ -39,8 +39,10 @@ function runStyle(r: Run): Css | undefined {
   if (r.m) s.fontFamily = "var(--rune-mono)";
   if (r.bg) {
     s.backgroundColor = r.bg;
-    s.borderRadius = "3px";
+    s.borderRadius = `${r.box?.radius ?? 3}px`;
     s.boxDecorationBreak = "clone";
+    if (r.box?.pad) s.paddingInline = `${r.box.pad}px`;
+    if (r.box?.margin) s.marginInline = `${r.box.margin}px`;
   }
   if (r.i) s.fontStyle = "italic";
   if (r.u) {

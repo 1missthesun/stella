@@ -18,13 +18,14 @@ function marksOverlay(value: string, marks: NonNullable<InputProps["marks"]>, pa
     if (start > at) out.push(value.slice(at, start));
     if (m.end <= start) return;
     const pad = m.pad ?? 0;
+    const vpad = m.vpad ?? 0;
     out.push(createElement("mark", {
       key: i,
       style: {
         background: paintText ? "transparent" : m.bg ?? "transparent",
         color: paintText ? m.color ?? "transparent" : "transparent",
         borderRadius: m.radius ? `${m.radius}px` : undefined,
-        padding: pad ? `0 ${pad}px` : undefined,
+        padding: pad || vpad ? `${vpad}px ${pad}px` : undefined,
         margin: pad ? `0 ${-pad}px` : undefined,
         boxDecorationBreak: "clone",
       },

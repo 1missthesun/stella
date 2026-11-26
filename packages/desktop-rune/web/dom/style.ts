@@ -212,6 +212,13 @@ export function boxStyle(p: BoxProps, base: string): BoxStyle {
     s.overflow = "hidden";
     if (p.clip > 0 && !p.radius && !p.corners) s.borderRadius = px(p.clip);
   }
+  if (p.clipFade) {
+    s.overflow = "hidden";
+    const [l, t, r, b] = p.clipFade;
+    const fade = (dir: string, a: number, z: number) => `linear-gradient(${dir}, ${a ? `transparent, #000 ${px(a)}` : "#000"}, ${z ? `#000 calc(100% - ${px(z)}), transparent` : "#000"})`;
+    s.maskImage = `${fade("to right", l, r)}, ${fade("to bottom", t, b)}`;
+    s.maskComposite = "intersect";
+  }
   const shadows = borderLayers(p);
   if (p.border) s["--rb0"] = p.border;
   if (p.border && p.borderDash) {

@@ -2,14 +2,14 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--headless] [--offscreen] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--headless] [--show] [--name <run>]
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png>
 //   bun scripts/session.ts stop
 // With STELLA_LAUNCHER=1 and a socket on fd 3, the app gets that launcher channel, as from a launcher.
-// Linux runs the engine on a private Xvfb. macOS opens a real window that never takes focus: on
-// screen under a shared window slot (~/projects/rune-window-slot.sh), or with --offscreen beyond
-// every display, which needs no slot.
+// Linux runs the engine on a private Xvfb. macOS runs windows unseen (RUNE_UNSEEN: invisible,
+// click-through, never activated, still presenting for shot/record/input); --show puts a real
+// window on screen under a shared window slot (~/projects/rune-window-slot.sh), without focus.
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -33,16 +33,7 @@ const XVFB = process.env.XVFB ?? path.join(os.homedir(), ".cache/stella-verify/x
 const ENGINE = process.env.BIN ?? [path.join(os.homedir(), "projects/.rune-target/release/stella-engine"), path.join(ROOT, "engine/target/release/stella-engine")].find(existsSync) ?? "stella-engine";
 const SLOTS = path.join(os.homedir(), "projects/rune-window-slot.sh");
 
-type Run = { runDir: string; dataDir: string; userDataDir: string; homeDir: string; ctlPort: number; display?: string; slot?: string; offscreen?: boolean; pids: Record<string, number>; account?: { email: string; plan?: string }; headless: boolean; startedAt: string };
-
-/** Beyond every display: AppKit keeps a window placed there and still draws it. */
-const OFFSCREEN: [number, number] = [-30000, 200];
-
-/** AppKit keeps 40 pt of a window on a display; window captures (ScreenCaptureKit) still get all of it. */
-const park = (ctlPort: number) => fetch(`http://127.0.0.1:${ctlPort}/eval`, {
-  method: "POST",
-  body: `for (const w of electron.BrowserWindow.getAllWindows()) if (w.isVisible()) w.setPosition(${OFFSCREEN[0]}, ${OFFSCREEN[1]}); return true;`,
-}).catch(() => {});
+type Run = { runDir: string; dataDir: string; userDataDir: string; homeDir: string; ctlPort: number; display?: string; slot?: string; unseen?: boolean; pids: Record<string, number>; account?: { email: string; plan?: string }; headless: boolean; startedAt: string };
 
 const acquireSlot = () => {
   const r = spawnSync(SLOTS, ["acquire", `rune-session-${runName}`], { encoding: "utf8", timeout: 600_000 });
@@ -175,7 +166,7 @@ async function start() {
   const log = openSync(path.join(RUN_DIR, "host.log"), "a");
   let display: string | undefined;
   let slot: string | undefined;
-  const offscreen = has("--offscreen");
+  const unseen = MAC && !headless && !has("--show");
   if (headless) {
     const stdoutLog = openSync(path.join(RUN_DIR, "host.stdout"), "a");
     const child = spawn(BUN, [path.join(ROOT, "host/services/headless.ts")], { cwd: REPO, env, stdio: ["ignore", stdoutLog, log, ...(launcherChannel ? [3] : [])], detached: true });
@@ -187,7 +178,7 @@ async function start() {
     const h = Number(process.env.H ?? 940);
     if (MAC) {
       env.RUNE_OPEN_INACTIVE = "1";
-      if (offscreen) env.STELLA_RUNE_WINDOW = JSON.stringify({ position: OFFSCREEN });
+      if (unseen) env.RUNE_UNSEEN = "1";
       else slot = acquireSlot();
     } else {
       display = flag("--display") ?? freeDisplay();
@@ -219,7 +210,7 @@ async function start() {
     engine.unref();
   }
   closeSync(log);
-  const run: Run = { runDir: RUN_DIR, dataDir, userDataDir, homeDir, ctlPort, display, slot, offscreen: offscreen || undefined, pids, headless, account: minted ? { email: minted.email, plan: minted.plan } : undefined, startedAt: new Date().toISOString() };
+  const run: Run = { runDir: RUN_DIR, dataDir, userDataDir, homeDir, ctlPort, display, slot, unseen: unseen || undefined, pids, headless, account: minted ? { email: minted.email, plan: minted.plan } : undefined, startedAt: new Date().toISOString() };
   writeFileSync(POINTER, JSON.stringify(run, null, 1));
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
@@ -228,7 +219,6 @@ async function start() {
     await Bun.sleep(300);
   }
   const ready = await fetch(`http://127.0.0.1:${ctlPort}/health`).then((r) => r.ok).catch(() => false);
-  if (ready && offscreen && MAC) await park(ctlPort);
   console.log(JSON.stringify({ ...run, ready, log: path.join(RUN_DIR, "host.log") }, null, 1));
 }
 

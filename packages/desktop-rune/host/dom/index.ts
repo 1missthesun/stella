@@ -7,6 +7,7 @@ import { createMatchMedia, type MediaEnvironment } from "./media";
 import { MemoryStorage, UiStateStorage, type UiStateBackend } from "./storage";
 import { audioDevices } from "../electron/macos-media";
 import { installIntlGlue } from "./intl";
+import { installMediaElements } from "./media-element";
 
 export type DomAppearance = { dark: boolean; reducedMotion?: boolean; highContrast?: boolean };
 export type DomViewport = { width: number; height: number; devicePixelRatio: number; x?: number; y?: number };
@@ -20,7 +21,6 @@ export type DomHostOptions = {
   openExternal?: (url: string) => void;
   /** window.open; returns null like a blocked popup when absent or refused. */
   open?: (url: string, target: string, features: string) => unknown;
-  playSound?: (src: string, volume: number) => Promise<void>;
   reload?: () => void;
 };
 
@@ -94,9 +94,9 @@ export function installDom(options: DomHostOptions): DomHost {
 
   installAnimationFrames(g);
   installObservers(g);
+  installMediaElements(g, () => g.location.href);
   installElementClasses(g);
   installNavigator(g, options);
-  installAudio(g, options);
   g.CSS ??= { supports: () => false, escape: (value: string) => String(value).replace(/[^\w-]/g, (c) => `\\${c}`) };
 
   installed = {
@@ -299,33 +299,6 @@ function installNavigator(g: Record<string, any>, options: DomHostOptions) {
       const value = await this.data[type];
       return typeof value === "string" ? new Blob([value], { type }) : value;
     }
-  };
-}
-
-function installAudio(g: Record<string, any>, options: DomHostOptions) {
-  if (g.Audio) return;
-  g.Audio = class extends EventTarget {
-    src: string;
-    volume = 1;
-    muted = false;
-    loop = false;
-    paused = true;
-    currentTime = 0;
-    duration = NaN;
-    preload = "auto";
-    constructor(src?: string) { super(); this.src = src ?? ""; }
-    async play() {
-      this.paused = false;
-      try {
-        if (!this.muted && this.src) await options.playSound?.(this.src, this.volume);
-      } finally {
-        this.paused = true;
-        this.dispatchEvent(new Event("ended"));
-      }
-    }
-    pause() { this.paused = true; }
-    load() {}
-    canPlayType() { return "maybe"; }
   };
 }
 

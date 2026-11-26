@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { serverNow } from "@stella/contracts/server-clock";
 import { browserAttachmentUploads, useBrowserAttachmentUploads } from "@/features/cloud/browser-chat-attachments";
 import { cloudSendRecovery } from "@/features/cloud/cloud-send-recovery";
+import { APP_TRACKING } from "../kit/compat";
 import { radius, useTokens } from "../theme";
 
 export const isBrowserUploadId = (id: string | undefined): id is string => Boolean(id?.startsWith("upload-"));
 
-const MARK_TEXT = { size: 12, lineHeight: 17 };
+const MARK_TEXT = { size: 12, lineHeight: 17.4, tracking: APP_TRACKING };
 
 export function UploadFailedMark({ uploadId, at = { left: 4, bottom: 4 } }: { uploadId: string; at?: { left: number; bottom: number } }) {
   const t = useTokens();

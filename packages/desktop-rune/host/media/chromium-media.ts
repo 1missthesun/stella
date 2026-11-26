@@ -35,9 +35,10 @@ const CHROMIUM_ARGS = [
   "--no-service-autorun",
   "--disable-site-isolation-trials",
   "--renderer-process-limit=1",
-  "--in-process-gpu",
   "--disable-gpu",
 ];
+
+const NO_USABLE_SANDBOX = /No usable sandbox|apparmor-userns-restrictions/;
 
 export type ChromiumMediaCallbacks = {
   source(): Promise<string>;
@@ -56,17 +57,42 @@ export class ChromiumMediaHost {
   private launchedAt: number | null = null;
   private pageAt: number | null = null;
   private stage = "starting";
+  private launching = false;
+  private lastStderr = "";
 
   constructor(private readonly callbacks: ChromiumMediaCallbacks) {}
 
   start() {
-    void this.launch().catch((error: Error) => {
-      if (!this.stopped) this.callbacks.failed(`Chromium media page: ${error?.message ?? String(error)}`);
-      this.stop();
-    });
+    void this.run();
   }
 
-  private async launch() {
+  /**
+   * Chromium refuses to start where the kernel blocks its sandbox (Ubuntu 23.10+ AppArmor without a
+   * profile for that binary); the page then runs unsandboxed, as Playwright's Chromium does.
+   */
+  private async run() {
+    try {
+      await this.launch([]);
+    } catch (error) {
+      if (this.stopped) return;
+      if (!NO_USABLE_SANDBOX.test(this.lastStderr)) return this.fail(error as Error);
+      console.error("[media] Chromium has no usable sandbox here; starting it with --no-sandbox");
+      try {
+        await this.launch(["--no-sandbox"]);
+      } catch (retryError) {
+        if (!this.stopped) this.fail(retryError as Error);
+      }
+    }
+  }
+
+  private fail(error: Error) {
+    this.callbacks.failed(`Chromium media page: ${error?.message ?? String(error)}`);
+    this.stop();
+  }
+
+  private async launch(extraArgs: string[]) {
+    this.stage = "starting";
+    this.launching = true;
     const binary = resolveChromium();
     if (!binary) throw new Error("no Chromium or Chrome was found (set STELLA_RUNE_CHROMIUM or install Chrome)");
     this.profileDir = mkdtempSync(path.join(os.tmpdir(), "stella-media-"));
@@ -74,9 +100,10 @@ export class ChromiumMediaHost {
     const proc = new ChromiumProcess(profileDir, binary, (exit) => {
       rmSync(profileDir, { recursive: true, force: true });
       if (this.stopped) return;
-      console.error(`[media] chromium (${binary}) exited ${exit} at stage ${this.stage}; stderr:\n${proc.stderrTail()}`);
-      this.callbacks.failed(`Chromium media page exited (${exit})`);
-    }, CHROMIUM_ARGS);
+      this.lastStderr = proc.stderrTail();
+      console.error(`[media] chromium (${binary}) exited ${exit} at stage ${this.stage}; stderr:\n${this.lastStderr}`);
+      if (!this.launching) this.callbacks.failed(`Chromium media page exited (${exit})`);
+    }, [...CHROMIUM_ARGS, ...extraArgs]);
     this.proc = proc;
     const killOnExit = () => {
       if (!proc.exited) proc.child.kill("SIGKILL");
@@ -107,6 +134,7 @@ export class ChromiumMediaHost {
     if (this.stopped) return;
     this.stage = "navigating";
     await proc.send("Page.navigate", { url: `${ORIGIN}${PAGE_PATH}` }, sessionId);
+    this.launching = false;
   }
 
   private onEvent(m: CdpMessage) {

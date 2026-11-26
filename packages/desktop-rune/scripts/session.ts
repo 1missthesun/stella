@@ -2,7 +2,7 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--headless] [--show] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--name <run>]
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png>
 //   bun scripts/session.ts stop
@@ -82,7 +82,7 @@ const adminSecret = (): string | null => {
 const mint = async (mode: string) => {
   const secret = adminSecret();
   if (!secret) throw new Error("STELLA_ADMIN_API_SECRET is unavailable (env or workers/cloud-builder/.dev.vars).");
-  const body: Record<string, string> = { email: `agent-rune-${runName}-${Date.now().toString(36)}@test.stella.local` };
+  const body: Record<string, string> = { email: flag("--email") ?? `agent-rune-${runName}-${Date.now().toString(36)}@test.stella.local` };
   if (mode === "plus" || mode === "pro" || mode === "max") { body.plan = mode; body.usageMode = "unlimited"; }
   const site = (process.env.STELLA_BACKEND_URL?.trim() || DEV_BACKEND).replace(/\/+$/, "");
   const response = await fetch(`${site}/api/admin/test-accounts/session`, {
@@ -131,7 +131,7 @@ async function start() {
   const env: Record<string, string> = {};
   for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR"]) if (process.env[key]) env[key] = process.env[key]!;
   env.MIMALLOC_PURGE_DELAY = "0";
-  for (const [key, value] of Object.entries(process.env)) if (key.startsWith("MIMALLOC_") && value) env[key] = value;
+  for (const [key, value] of Object.entries(process.env)) if (/^(MIMALLOC_|RUNE_|STELLA_CHAT_FIXTURE_)/.test(key) && value) env[key] = value;
   const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();
   if (launcherChannel) env.STELLA_LAUNCHER = "1";
   env.PATH = (env.PATH ?? "").split(path.delimiter).filter((p) => path.basename(p) !== "shell-shims").join(path.delimiter);

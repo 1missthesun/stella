@@ -223,6 +223,11 @@ export type UsageLimitSummary = {
   stillLimited?: true;
 };
 
+export const usageLimitHoldsCloudReply = (pauses: UsageLimitPauses, now = serverNow()): boolean => {
+  const reply = pauses.held.get("");
+  return Boolean(reply && !reply.deviceId && (reply.until === undefined || reply.until > now));
+};
+
 export const summarizeUsageLimitPauses = (pauses: UsageLimitPauses): UsageLimitSummary | null => {
   if (pauses.held.size === 0) return null;
   const values = [...pauses.held.values()];

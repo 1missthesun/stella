@@ -1382,6 +1382,8 @@ const status = (ctx: {
     isAnonymous: false,
     identityLevel: identityLevel(row),
     plan: config.enabled ? plan(row) : "max",
+    cloudSandbox: cloudSandboxAccess(ctx),
+    ...(access.usageLimit ? { usageLimit: access.usageLimit } : {}),
     subscriptionStatus: row.subscription_status,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
     currentPeriodEnd: row.current_period_end > 0 ? row.current_period_end : null,

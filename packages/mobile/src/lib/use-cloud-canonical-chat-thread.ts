@@ -19,7 +19,6 @@ import {
 } from "react";
 import { AppState } from "react-native";
 import { useChatDraftSelector } from "./chat-draft-store";
-import { postJson } from "./http";
 import { notifySuccess } from "./haptics";
 import { ReplyArrivalHaptics } from "./reply-arrival-haptics";
 import { authClient } from "./auth-client";
@@ -83,6 +82,7 @@ import {
   settleUnlistedTasks,
 } from "./journal-tasks";
 import { useConversationAgentLedger } from "./use-conversation-agent-ledger";
+import { useComposerPrewarm } from "./use-composer-prewarm";
 import { mergeJournalTasks } from "./mobile-task-merge";
 import { planCloudTranscriptDisplay } from "./cloud-transcript-display";
 import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
@@ -555,14 +555,6 @@ export const useCloudCanonicalChatThread = (
   const clientAuthorityReady = authorityReady && !local.authorityIssue;
 
   const composing = useChatDraftSelector(local.draftStore, draftHasText);
-  useEffect(() => {
-    if (!composing) return;
-    void postJson(
-      `/conversations/${encodeURIComponent(authority.conversationId)}/prewarm`,
-      {},
-      { timeoutMs: 10_000 },
-    ).catch(() => undefined);
-  }, [composing, authority.conversationId]);
 
   const pendingSendIds = local.pendingSendIds;
   useEffect(() => {
@@ -998,6 +990,16 @@ export const useCloudCanonicalChatThread = (
     "devices.list",
     authority.conversationId ? {} : "skip",
   ).value?.devices;
+  useComposerPrewarm({
+    conversationId: authority.conversationId,
+    composing,
+    executionTarget,
+    access,
+    devices,
+    execution:
+      execution && executionTarget.mode !== "device" ? execution : undefined,
+    usageLimitRecords: journalWindow.view(USAGE_LIMIT_CARDS),
+  });
   const conversationTasks = useMemo(
     () => applyAgentLedger(foldedTasks, agentLedger, devices),
     [agentLedger, devices, foldedTasks],

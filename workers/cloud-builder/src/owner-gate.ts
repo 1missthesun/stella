@@ -216,6 +216,7 @@ import {
   log,
   isRecord,
   snapshotAllowsCloudSandbox,
+  snapshotAdmissionRefusal,
   refuse,
   dispatchSummary,
   fail,
@@ -243,7 +244,9 @@ export {
 } from "./owner-gate/constants.js";
 export {
   OwnerGateSnapshotError,
+  cloudTurnRefusal,
   executionUnavailableMessage,
+  snapshotAdmissionRefusal,
   snapshotAllowsExecution,
   snapshotAllowsCloudSandbox,
 } from "./owner-gate/support.js";
@@ -1311,20 +1314,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         false,
       );
     }
-    if (snapshot.enforcement?.status === "suspended") {
-      return refuse(
-        "owner_suspended",
-        "This account can't use Stella's cloud right now.",
-        false,
-      );
-    }
-    if (!snapshot.writable) {
-      return refuse(
-        "owner_purged",
-        "This account's cloud data is being reset or deleted.",
-        false,
-      );
-    }
+    const held = snapshotAdmissionRefusal(snapshot);
+    if (held) return held;
     if (
       input.lane === "agent" &&
       !input.deferCloudSandboxCheck &&

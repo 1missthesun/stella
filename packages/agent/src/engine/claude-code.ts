@@ -153,6 +153,9 @@ const CLAUDE_CODE_CONTEXT_WINDOW = 100_000_000;
 const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
+/** A context written from a handoff (its notes and what it kept), or the context its notes are written from, is the
+ * conversation itself rather than background for it, so it's rebuilt whole up to this much of the model's window. */
+const REBUILD_HANDOFF_MAX_CHARS = 1_600_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
 const SUPERSEDED_SETTLE_MS = 10_000;
 
@@ -442,7 +445,8 @@ const renderMessage = (message: Message): string | undefined => {
       const text = textOf(message.content).trim();
       const images = imagesOf(message.content).length;
       if (!text && images === 0) return undefined;
-      return `[user]\n${clip(text, UPDATE_MAX_MESSAGE_CHARS)}${images ? `\n[${images} image(s)]` : ""}`;
+      const kept = isContextBoundary(message) ? text : clip(text, UPDATE_MAX_MESSAGE_CHARS);
+      return `[user]\n${kept}${images ? `\n[${images} image(s)]` : ""}`;
     }
     case "assistant": {
       const said = textOf(message.content).trim();
@@ -503,11 +507,11 @@ const isContextBoundary = (message: Message): boolean => isPiCompactionBoundary(
 
 const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
 
-const rebuildPrompt = (messages: readonly Message[]): { text: string; images: ImageContent[] } => {
+const rebuildPrompt = (messages: readonly Message[], max = REBUILD_MAX_CHARS): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(messages);
   const earlier = messages.slice(0, start);
   const resident = residentContextAsOf(earlier) ?? "";
-  const history = renderBounded(earlier.filter(notResident), REBUILD_MAX_CHARS);
+  const history = renderBounded(earlier.filter(notResident), max);
   const request = userPrompt(users);
   const text = [
     resident,
@@ -660,6 +664,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const resolved = options.resolveModel?.(id) ?? id;
     return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(id) ?? flavor.contextWindow(resolved);
   };
+
+  const handoffRebuildMax = (id: string): number =>
+    Math.max(REBUILD_MAX_CHARS, Math.min(REBUILD_HANDOFF_MAX_CHARS, windowOf(id) * 2));
 
   const compactionWindowOf = (session: ClaudeCodeSessionRef, id: string): number => {
     const window = windowOf(id);
@@ -827,7 +834,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       : undefined;
     const fork = options.transport.forks === true && held !== undefined;
     const resumeSessionId = fork ? held : await written?.();
-    const rebuilt = rebuildPrompt(conversation);
+    const rebuilt = rebuildPrompt(conversation, handoffRebuildMax(modelInfo.id));
     const fitted = fitCodeDescriptionForClaudeCode(request.tools, request.systemPrompt);
     const rebuiltOnly = resumeSessionId === undefined;
     try {
@@ -1064,7 +1071,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const backgroundWake =
       !request.prompt && arrived.length > 0 && arrived.every((message) => wakes?.has(textOf(message.content).trim()) === true);
     if (backgroundWake) for (const message of arrived) wakes?.delete(textOf(message.content).trim());
-    const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
     const resumedDelta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
     const boundaryAt = conversation.findLastIndex(isContextBoundary);
@@ -1079,7 +1085,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       resumedDelta !== undefined &&
       (resumedDelta.some((message) => message.role === "assistant" && message.stopReason !== "aborted" && message.stopReason !== "error") ||
         (boundaryNew && !deferBoundary));
-    const delta = foreign ? undefined : resumedDelta;
     // A background handoff keeps the steps after its cutoff, which the session has already seen; a transport that
     // can't write a session starts over from the rebuilt context instead.
     const startedOver =
@@ -1088,6 +1093,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       (seenAt < 0 || options.transport.hydrate === undefined) &&
       boundaryNew &&
       !deferBoundary;
+    const delta = foreign || startedOver ? undefined : resumedDelta;
+    const rebuild = rebuildPrompt(conversation, boundaryAt >= 0 ? handoffRebuildMax(request.model.id) : REBUILD_MAX_CHARS);
     if (startedOver) {
       record.seen = [];
       delete record.undelivered;

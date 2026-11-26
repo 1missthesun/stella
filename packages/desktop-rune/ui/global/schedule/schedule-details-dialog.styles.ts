@@ -3,8 +3,8 @@ import { mixOklch, sheet } from "../../theme";
 export const useScheduleDetailsDialog = sheet((c) => ({
   scheduleDetailsDialog: { minH: 0 },
   scheduleDetailsDialog_dialogHeader: { pb: 6 },
-  scheduleDetailsDialog_dialogDescription: { pb: 4, px: 24 },
-  scheduleDetailsDialog_dialogBody: { pt: 12, pb: 20, px: 18 },
+  scheduleDetailsDialog_dialogDescription: { pb: 4, pl: 24, pr: 24, mt: 0 },
+  scheduleDetailsDialog_dialogBody: { pt: 12, pb: 20, pl: 18, pr: 18 },
   scheduleDetailsDialogRows: { pad: 0, gap: 10 },
   scheduleDetailsDialogEmpty: { size: 13, color: c.textWeak },
   scheduleDetailsDialogRow: { py: 15, px: 17, gap: 12, border: mixOklch(c.border, 55, "transparent"), radius: 10, fill: mixOklch(c.foreground, 2.5, "transparent") },

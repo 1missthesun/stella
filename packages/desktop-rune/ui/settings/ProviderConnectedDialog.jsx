@@ -126,17 +126,19 @@ export function ProviderConnectedDialog() {
     const { providerLabel, surfaces } = stage;
     return (<Dialog open onOpenChange={(open) => (open ? null : onClose())}>
       <DialogContent fit {...s.providerConnectedDialog}>
-        <DialogHeader>
-          <DialogTitle>
-            {t("settings.providerConnected.title", { provider: providerLabel })}
-          </DialogTitle>
-          <DialogDescription>
-            {t("settings.providerConnected.description", {
-                provider: providerLabel,
-            })}
-          </DialogDescription>
+        <DialogHeader {...s.providerConnectedDialog_dialogHeader}>
+          <col w="full">
+            <DialogTitle {...s.providerConnectedDialog_dialogTitle}>
+              {t("settings.providerConnected.title", { provider: providerLabel })}
+            </DialogTitle>
+            <DialogDescription {...s.providerConnectedDialog_dialogDescription}>
+              {t("settings.providerConnected.description", {
+                  provider: providerLabel,
+              })}
+            </DialogDescription>
+          </col>
         </DialogHeader>
-        <DialogBody {...s.providerConnectedDialogBody}>
+        <DialogBody {...s.providerConnectedDialog_dialogBody} {...s.providerConnectedDialogBody}>
           {surfaces.assistant ? (<row {...s.providerConnectedRow}>
               <Input type="checkbox" checked={assistant} onChange={(event) => setAssistant(event.target.checked)} />
               <row>

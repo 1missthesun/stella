@@ -98,8 +98,8 @@ export function ConnectDeviceDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent fit>
-        <DialogHeader>
+      <DialogContent fit {...s.dialog_selfHostDialog}>
+        <DialogHeader {...s.selfHostDialog_dialogHeader}>
           <DialogTitle>{t("selfHost.device.title")}</DialogTitle>
         </DialogHeader>
         <col {...s.selfHostDialogBody}>

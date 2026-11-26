@@ -92,8 +92,8 @@ export function ConnectServerDialog({
     <Dialog open onOpenChange={(open) => {
         if (!open && step.kind !== "restarting" && step.kind !== "connecting") onClose();
       }}>
-      <DialogContent fit>
-        <DialogHeader>
+      <DialogContent fit {...s.dialog_selfHostDialog}>
+        <DialogHeader {...s.selfHostDialog_dialogHeader}>
           <DialogTitle>
             {step.kind === "restarting"
               ? t("selfHost.connect.restartingTitle", { name: step.discovery.name })

@@ -7,6 +7,6 @@ export const useLegalDialog = sheet((c, t) => ({
   legalDialogHeader: { px: 24, gap: 6, textAlign: "center" },
   legalDialogTitle: { color: c.textStrong },
   legalDialogSub: { family: "sans", color: c.mutedForeground, size: 13, weight: 500, lh: 1.5, em: -0.01 },
-  legalDialogScroll: { pt: 13, pb: 4, px: 4, grow: 1, shrink: true, minW: 0, minH: 0, scrollY: true, border: mixOklch(c.border, 60, "transparent"), borderSides: [1, 0, 0, 0] },
+  legalDialogScroll: { pt: 13, pb: 4, px: 4, grow: 1, shrink: true, minW: 0, minH: 0, scrollY: true },
   legalDialogText: { family: "sans", pt: 8, pb: 16, px: 24, size: 13, lh: 1.7, em: -0.005, color: mixOklch(c.foreground, 82, "transparent") },
 }));

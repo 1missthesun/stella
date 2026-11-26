@@ -227,7 +227,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
       </SettingsTabItem>
       <Dialog open={pendingDeleteAction !== null} onOpenChange={closeDeleteDialog}>
         <DialogContent fit {...s.settingsConfirmDialog}>
-          <DialogHeader>
+          <DialogHeader {...s.settingsConfirmDialog_dialogHeader}>
             <DialogTitle>{deleteDialogTitle}</DialogTitle>
           </DialogHeader>
           <DialogDescription>

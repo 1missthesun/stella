@@ -65,11 +65,13 @@ export function SubscriptionUpgradeDialog() {
         return null;
     return (<Dialog open onOpenChange={(open) => (open ? null : onClose())}>
       <DialogContent fit {...s.subscriptionUpgradeDialog}>
-        <DialogHeader>
-          <DialogTitle>{message.title}</DialogTitle>
-          <DialogDescription>{message.description}</DialogDescription>
+        <DialogHeader {...s.subscriptionUpgradeDialog_dialogHeader}>
+          <col w="full">
+            <DialogTitle>{message.title}</DialogTitle>
+            <DialogDescription {...s.subscriptionUpgradeDialog_dialogDescription}>{message.description}</DialogDescription>
+          </col>
         </DialogHeader>
-        <DialogBody {...s.subscriptionUpgradeDialogBody}>
+        <DialogBody {...s.subscriptionUpgradeDialog_dialogBody} {...s.subscriptionUpgradeDialogBody}>
           <row {...s.subscriptionUpgradeActions}>
             <Button variant="primary" className="pill-btn pill-btn--primary" onClick={onClose}>
               {t("billing.upgradeDialog.cta")}

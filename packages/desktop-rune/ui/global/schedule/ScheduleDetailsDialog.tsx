@@ -277,14 +277,14 @@ export function ScheduleDetailsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Content size="md" fit {...s.scheduleDetailsDialog}>
-        <Dialog.Header>
+        <Dialog.Header {...s.scheduleDetailsDialog_dialogHeader}>
           <Dialog.Title>{title}</Dialog.Title>
           <Dialog.CloseButton />
         </Dialog.Header>
         {summary && (
-          <Dialog.Description>{summary}</Dialog.Description>
+          <Dialog.Description {...s.scheduleDetailsDialog_dialogDescription}>{summary}</Dialog.Description>
         )}
-        <Dialog.Body>
+        <Dialog.Body {...s.scheduleDetailsDialog_dialogBody}>
           {rows.length === 0 ? (
             <T w="full" {...s.scheduleDetailsDialogEmpty}>
               {t("global.schedule.missing")}

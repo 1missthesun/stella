@@ -1,14 +1,14 @@
 import { mixOklch, sheet } from "../../theme";
 
 export const useSelfHost = sheet((c, t) => ({
-  dialog_selfHostDialog: { pad: 1, maxW: "full", fill: c.overlayTop, gradient: t.gradient.overlay, border: c.borderWeak },
-  selfHostDialog_dialogHeader: { pt: 20, pb: 10, px: 24 },
+  dialog_selfHostDialog: { pad: 1, w: 460, maxW: "full", fill: c.overlayTop, gradient: t.gradient.overlay, border: c.borderWeak },
+  selfHostDialog_dialogHeader: { pt: 20, pr: 24, pb: 10, pl: 24 },
   selfHostDialogBody: { pb: 22, px: 24, selfAlign: "stretch", shrink: true, minW: 0, gap: 12 },
   selfHostDialogText: { family: "sans", size: 14, lh: 1.5, color: c.textBase },
   selfHostDialogNotice: { family: "sans", py: 10, px: 12, size: 12, lh: 1.5, color: c.textBase, radius: 10, fill: mixOklch(c.textStrong, 5, "transparent") },
   selfHostDialogMeta: { family: "sans", size: 12, lh: 1.5, color: c.textWeak, textAlign: "center" },
   selfHostDialogError: { family: "sans", size: 12, lh: 1.5, color: "#c2410c" },
-  selfHostDialog_selfHostDialogText: { pad: 0 },
+  selfHostDialog_selfHostDialogText: { pad: 0, pl: 0, pr: 0, pb: 0, mt: 0 },
   selfHostDialogInput: { py: 11, px: 13, w: "full", radius: 10, border: c.borderWeak, fill: mixOklch(c.textStrong, 3, "transparent"), color: c.textStrong, mono: true, size: 12, lh: 1.45, focusBorder: c.borderStrong },
   selfHostDialogActions: { mt: 6, justify: "end", gap: 8 },
   selfHostDialogProgress: { h: 3, radius: 999 },

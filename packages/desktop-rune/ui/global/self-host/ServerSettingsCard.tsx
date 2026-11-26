@@ -142,7 +142,7 @@ export function ServerSettingsCard() {
           if (!open && !busy) setPending(null);
         }}>
         <DialogContent fit {...sSettings.settingsConfirmDialog}>
-          <DialogHeader>
+          <DialogHeader {...sSettings.settingsConfirmDialog_dialogHeader}>
             <DialogTitle>
               {pending
                 ? t(

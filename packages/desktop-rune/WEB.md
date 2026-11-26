@@ -22,8 +22,9 @@ writes today's build.
 | `web/dom/host.ts` | Props every element shares: layout and paint (`style.ts`), enter/exit/layout motion, scroll (pinning, edge fades, `onAtBottom`), anchored and modal top-layer content, press/hover/focus/keys/focus groups, drag, file drop, tooltips, `ref.set(patch)`. |
 | `web/engine.ts` | `stella.engine`: scroll, focus, input selection, clipboard, file dialogs (a file input; picked files get virtual paths), downloads for saved files, notifications, popup menus (`dom/menu.ts`), fonts, page background, media and webview commands. |
 | `web/globals.ts`, `web/shims/` | `process`, `Buffer`, a small `Bun` and `node:` stand-ins for the modules `ui/` reaches through shared code. |
-| `web/replace/` | Stands in for a `packages/desktop-rune/<path>` module on the web: system fonts, font files, the backdrop PNG (an object URL) and `StellaCharacter` (desktop-ui's DOM rig, not the engine's SVG frames). |
-| `web/build.ts` | `Bun.build` of `web/entry.ts` with `host/vite-compat.ts`, then desktop-ui's `index.html` with the built entry, fonts stylesheet, preconnect and CSP sources, `canvas-host.html` and `public/`. |
+| `web/replace/` | Stands in for a `packages/desktop-rune/<path>` module on the web: system fonts, font files, the backdrop (a canvas painted once per theme and stretched by the compositor, or CSS radial gradients on low-power devices, as desktop-ui's `ShiftingGradient`), the static home's look writer and `StellaCharacter` (desktop-ui's DOM rig, not the engine's SVG frames). |
+| `web/static-home/` | The pre-rendered home: `shell.html` (markup, CSS and an inline script injected before `#root`), `palette.ts` (the look it paints, saved by the app in localStorage for the next load) and `adopt.ts` (hands the draft, selection and focus to the app's composer once it is stable, then fades out). |
+| `web/build.ts` | `Bun.build` of `web/entry.ts` with `host/vite-compat.ts`, then desktop-ui's `index.html` with the static home, the built entry (preloaded, run after the static home's first frame), fonts stylesheet, preconnect and CSP sources (including the inline scripts' hashes), `canvas-host.html` and `public/`. `--no-static-home` leaves the home out. |
 
 Behaviour that only the web has comes from the same desktop-ui modules the web build uses
 today, because `ui/` imports them: `VITE_STELLA_WEB_BUILD=1` capabilities (cloud execution, no
@@ -35,30 +36,35 @@ other windows render nothing, native menus are DOM menus, tray and window comman
 ## Measured against today's /chat-app
 
 `packages/website/scripts/perf-chat.mjs --variants today=…,rune=… --runs 9` (4× CPU, fast 4G,
-ABBA), today built with `--static-home`, medians:
+ABBA), both built with their static home, medians:
 
 | | today | Rune |
 |---|---|---|
-| Cold: first typeable composer | 1196 ms (the static home) | 2690 ms |
-| Cold: the app's composer typeable | 3680 ms | 2690 ms |
-| Warm: the app's composer typeable | 611 ms | 744 ms |
-| Blocking time after typeable (cold) | 608 ms | 159 ms |
-| JS transferred / requests | 868 KB / 78 | 863 KB / 7 |
-| Build on disk (JS, brotli) | 8.6 MB (2.1 MB), 159 files | 3.1 MB (0.8 MB), 51 files |
+| Cold: first typeable composer (the static home) | 1184 ms | 664 ms |
+| Cold: the app's composer typeable | 3378 ms | 2396 ms |
+| Warm: first typeable composer | 492 ms | 388 ms |
+| Warm: the app's composer typeable | 695 ms | 606 ms |
+| Composer moves on a cold load | 0 px | 0 px |
+| Blocking time after typeable (cold) | 412 ms | 82 ms |
+| DOM nodes on the home | 280 | 215 |
+| Style / layout (cold) | 94 / 24 ms | 34 / 41 ms |
+| JS transferred / requests | 868 KB / 78 | 869 KB / 7 |
 | Keystroke p90 | 80 ms | 80 ms |
 
-The Rune page lays out more (418 DOM nodes against 280; layout 100 ms against 26 ms cold), and
-on a cold load its composer starts docked and moves to the home position once the conversation
-is known empty (desktop-ui does the same under its static home).
+Cold layout is the one figure behind: 25 ms of it is the static home's first layout, which its
+autofocus forces before the first frame; the app's own layouts add about 16 ms.
 
-Not on the web: `--static-home` (desktop-ui's pre-rendered home, which hands its textarea to
-`textarea.chat-composer-textarea`). The Rune build shows the page's own launch background until
-the app renders.
+The static home (`web/static-home/`) is desktop-ui's `--static-home` for the Rune page: the
+greeting and composer in the look the app saved for the next load, typeable before the bundle
+runs. The app takes the draft, selection and focus over in place, and the home surface starts
+as the home when the last session left it there, so nothing moves.
 
 ## Per-user renderers
 
-A user's desktop builds their renderer when it pushes a change to their fork
-(`packages/desktop/electron/services/app-source/web-renderer.ts`), uploads it to
+A user's desktop builds their renderer whenever their fork holds its checkout's HEAD: after it
+pushes a change, and at launch when it fetches the fork
+(`packages/desktop/electron/services/app-source/web-renderer.ts`, from the app-source service's
+`onForkCurrent`). It uploads it to
 `PUT /api/app-source/web-renderer/<id>`, and the backend serves it at
 `/chat-app/u/<fork>/<id>/` (R2 `web-renderers/<fork>/<id>/`, immutable, current plus previous
 kept). The web app asks `appSource.webRenderer` and switches to it.
@@ -78,9 +84,14 @@ Migration:
 
 - Existing desktop-ui renderers stay where they are and keep serving; nothing on the backend or
   website changes (the id has the tree SHA's shape).
-- A user who moves to Rune gets a Rune renderer on their next push: the Rune ref is missing, so
-  the change is measured against upstream, which includes whatever they changed in desktop-ui.
-  The record then points at the Rune id and the backend retires the renderer before the previous.
+- A user who moves to Rune gets a Rune renderer at the next launch, without a new commit: the
+  checkout remembers which kind it last uploaded (git config `stella.webRendererKind`; an older
+  checkout without it counts as switched when it has the other kind's ref), and a kind that
+  differs from the running engine's builds and uploads even when HEAD hasn't moved. Moving back
+  re-uploads the other kind the same way, and the backend records it as current again. Otherwise
+  the change is measured against the kind's own ref, or upstream when it has none, which includes
+  whatever they changed in desktop-ui. The record then points at the new id and the backend
+  retires the renderer before the previous.
 - A user with no changes keeps the shared `/chat-app/`. That switches to the Rune build when the
   website's `build:chat` runs `packages/desktop-rune/web/build.ts` instead of
   `build-web-renderer.ts`, a ship-time step together with making Rune the default desktop.

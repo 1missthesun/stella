@@ -127,7 +127,7 @@ pub fn rich(runs: &[Run], whole: &Props) -> Rich {
 }
 
 pub fn build(p: &Props) -> El {
-    let (mut e, len) = match &p.spans {
+    let (e, len) = match &p.spans {
         Some(runs) => {
             let r = rich(runs, p);
             let len = r.content.len();
@@ -153,6 +153,5 @@ pub fn build(p: &Props) -> El {
             }
         }
     };
-    e = apply(e, p, len);
-    e
+    apply(e, p, len).shrink()
 }

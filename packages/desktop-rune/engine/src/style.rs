@@ -60,7 +60,7 @@ pub fn layout(mut e: El, p: &Props) -> El {
         e = e.max_h(v);
     }
     if let Some(v) = p.grow {
-        e = e.grow(v);
+        e = e.grow(v).basis_frac(0.0);
     }
     if p.shrink {
         e = e.shrink();

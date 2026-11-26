@@ -10,6 +10,7 @@ import { useChatRuntime } from "@/context/use-chat-runtime";
 import { useUiState } from "@/context/ui-state";
 import { OPEN_CONNECT_DIALOG_EVENT } from "@/global/integrations/connect-action";
 import { conversationTabs } from "@/features/chat/services/conversation-tabs-store";
+import { setNotificationAccountScope } from "@/features/notifications/notification-store";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useShellConversationSource } from "@/global/auth/hooks/use-shell-conversation-source";
 import { cloudConversationBelongsToOwnerSubject, resolveCloudConversationForShell, resolveCloudConversationRoute } from "@/features/cloud/cloud-conversation-selection";
@@ -52,6 +53,7 @@ const SignOutDialog = glob<object>(import.meta.glob("../../replace/global/auth/S
 const AccountSwitchGuard = glob<object>(import.meta.glob("../../replace/global/local-mode/AccountSwitchGuard.tsx", { eager: true }), "AccountSwitchGuard");
 const FullShellDialogs = glob<{ activeDialog: "auth" | "connect" | null; onDialogOpenChange: (open: boolean) => void }>(import.meta.glob("../../replace/shell/full-shell-dialogs.tsx", { eager: true }), "FullShellDialogs");
 const SettingsDialogHost = glob<object>(import.meta.glob("../../replace/shell/SettingsDialogHost.tsx", { eager: true }), "SettingsDialogHost");
+const WhatsNewDialogHost = glob<object>(import.meta.glob("../../replace/features/whats-new/WhatsNewDialog.tsx", { eager: true }), "WhatsNewDialogHost");
 const FeedbackDialogHost = glob<object>(import.meta.glob("../../replace/shell/FeedbackDialogHost.tsx", { eager: true }), "FeedbackDialogHost");
 const PlanUsageDialogHost = glob<object>(import.meta.glob("../../replace/shell/PlanUsageDialogHost.tsx", { eager: true }), "PlanUsageDialogHost");
 const ContextMenuHost = glob<object>(import.meta.glob("../../replace/platform/context-menu/ContextMenuHost.tsx", { eager: true }), "ContextMenuHost");
@@ -225,6 +227,9 @@ export function RootLayout() {
   const settledAccountScope = cloudSession.sessionGate.sessionIsLoading
     ? null
     : accountScope;
+  useLayoutEffect(() => {
+    setNotificationAccountScope(settledAccountScope);
+  }, [settledAccountScope]);
   useLayoutEffect(() => {
     refreshedMainConversationRef.current = null;
     setMainConversationFailure(null);
@@ -571,6 +576,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
       <FullShellDialogs activeDialog={activeDialog ?? null} onDialogOpenChange={handleDialogOpenChange} />
       <SettingsDialogHost />
+      <WhatsNewDialogHost />
       <FeedbackDialogHost />
       <ContextMenuHost />
       <PlanUsageDialogHost />

@@ -1,4 +1,3 @@
-import { BILLING_UNAVAILABLE_MESSAGE } from "@stella/contracts/stella-usage-limit";
 import {
   type AdmittedCloudChat,
   chatTurnFingerprintSource,
@@ -20,13 +19,12 @@ import {
   TURN_PLANE_PROTOCOL,
   TURN_PROMPT_MAX_CHARS,
 } from "@stella/contracts/turn-plane/turn-start";
-import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import {
   type OwnerGateAdmission,
   type OwnerGateAdmissionWithLease,
   type OwnerGateAdmitInput,
+  cloudTurnRefusal,
   snapshotAllowsCloudSandbox,
-  executionUnavailableMessage,
   snapshotAllowsExecution,
 } from "../owner-gate.js";
 import {
@@ -604,54 +602,23 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         (conversationExecution && allowed(conversationExecution)
           ? conversationExecution
           : snapshot.execution);
-      if (
-        execution.engine === "anthropic" &&
-        !snapshotAllowsCloudSandbox(snapshot)
-      ) {
-        return await refuse(
-          "subscription_required",
-          CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
-          false,
-        );
-      }
-      if (execution.engine === "anthropic" && lane !== "wake" && snapshot.usageLimit) {
-        log("info", "turn_refused_usage_limit", {
-          conversationId,
-          turnId,
-          lane,
-          reason: snapshot.usageLimit.reason,
-        });
-        return await refuse("usage_limit", snapshot.usageLimit.message, false);
-      }
-      if (!snapshotAllowsExecution(snapshot, execution)) {
-        return await refuse(
-          "execution_unavailable",
-          executionUnavailableMessage(execution),
-          false,
-        );
-      }
-      if (execution.engine === "stella" && lane !== "wake") {
-        if (snapshot.billingUnavailable) {
+      const refusal = cloudTurnRefusal(snapshot, execution, lane);
+      if (refusal) {
+        if (refusal.code === "usage_limit") {
+          log("info", "turn_refused_usage_limit", {
+            conversationId,
+            turnId,
+            lane,
+            reason: snapshot.usageLimit?.reason ?? null,
+          });
+        } else if (refusal.code === "billing_unavailable") {
           log("error", "turn_refused_billing_unavailable", {
             conversationId,
             turnId,
             lane,
           });
-          return await refuse(
-            "billing_unavailable",
-            BILLING_UNAVAILABLE_MESSAGE,
-            true,
-          );
         }
-        if (snapshot.usageLimit) {
-          log("info", "turn_refused_usage_limit", {
-            conversationId,
-            turnId,
-            lane,
-            reason: snapshot.usageLimit.reason,
-          });
-          return await refuse("usage_limit", snapshot.usageLimit.message, false);
-        }
+        return await refuse(refusal.code, refusal.message, refusal.retryable);
       }
 
       const now = Date.now();

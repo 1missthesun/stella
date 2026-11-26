@@ -405,8 +405,16 @@ WebKitGTK keeps one handler per scheme for the whole process; the engine routes 
 the view that asked, so any number of views can share a scheme.
 
 **Platform.** On Linux the engine runs on X11 (XWayland under Wayland) while the webview feature
-is built in, because WebKitGTK children need an X11 parent; `STELLA_RUNE_BACKEND=wayland` opts
-out. macOS uses WKWebView and Windows uses WebView2 as child views.
+is built in, because WebKitGTK children need an X11 parent. Electron Stella runs the same way
+(Hyprland lists it as an XWayland client). `STELLA_RUNE_BACKEND=wayland` opts out, and then a
+`<webview>` fires `error` ("webviews need the X11 backend") and its rect stays empty; no window
+maps. A child is impossible there: a `wl_subsurface` must belong to the parent's own client, and
+WebKitGTK draws through GTK's own `wl_display` connection, so the only Wayland link between two
+clients' surfaces is xdg-foreign, which parents toplevels, not children. Electron's iframes have
+no such problem because Chromium composites them into its own surface. Native Wayland webviews
+would need WebKit drawn offscreen (WPE or a GTK offscreen window) into a Rune image, with input
+synthesized the way `/control/input` already synthesizes GDK events. macOS uses WKWebView and
+Windows uses WebView2 as child views.
 
 ## Engine API (`engine` in `host/bridge.ts`)
 

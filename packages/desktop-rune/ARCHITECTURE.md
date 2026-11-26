@@ -30,8 +30,8 @@ stella-engine (Rust, Rune)                 bun host/main.tsx (one process)
 - Browser-only APIs (WebRTC voice, getUserMedia, pdf.js, office previews) run in an on-demand
   hidden WebView; agent browsing (CDP) runs in a Chromium started only when an agent browses.
 - HTML deliverables, canvases and Cloud Apps render unchanged in lazy OS WebViews (`<webview>`):
-  WKWebView (macOS), WebView2 (Windows), WebKitGTK child (Linux X11), separate window on Wayland
-  until a dmabuf path exists.
+  WKWebView (macOS), WebView2 (Windows), WebKitGTK child (Linux X11, XWayland under Wayland, as
+  Electron Stella runs); none on a forced native Wayland backend (see host/ELEMENTS.md).
 
 ## Bridge (host/bridge.ts ⇄ engine/src/protocol.rs)
 

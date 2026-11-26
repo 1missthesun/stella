@@ -619,7 +619,16 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
         };
     }
     let handle = handle_of(window).ok_or("the webview's window isn't open")?;
-    let view = handle.with_raw_handle(|raw| b.build_as_child(&raw).map_err(|e| e.to_string()))??;
+    let view = handle.with_raw_handle(|raw| {
+        // A Wayland surface can only parent surfaces of its own client, and WebKitGTK draws through
+        // GTK's own connection, so wry builds children on X11 only (`main::linux_backend` keeps
+        // the engine on XWayland unless STELLA_RUNE_BACKEND=wayland, as Electron Stella runs).
+        #[cfg(target_os = "linux")]
+        if matches!(raw.as_raw(), rune::raw_window_handle::RawWindowHandle::Wayland(_)) {
+            return Err("webviews need the X11 backend (STELLA_RUNE_BACKEND=wayland has none)".to_string());
+        }
+        b.build_as_child(&raw).map_err(|e| e.to_string())
+    })??;
     #[cfg(target_os = "linux")]
     {
         main_frame_navigations(n, &view);

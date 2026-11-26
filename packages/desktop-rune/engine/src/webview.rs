@@ -534,8 +534,91 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
             build(n, window, p, r, WebViewBuilder::new_with_web_context(context), &schemes)
         })
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    {
+        use wry::WebViewBuilderExtWindows;
+        let b = WebViewBuilder::new();
+        let b = match win_env::get() {
+            Some(env) => b.with_environment(env),
+            None => b,
+        };
+        build(n, window, p, r, b, &p.protocols)
+    }
+    #[cfg(target_os = "macos")]
     build(n, window, p, r, WebViewBuilder::new(), &p.protocols)
+}
+
+/// WebView2's environment (its browser process) takes seconds to start cold, and wry creates it
+/// inside `build_as_child`, blocking the UI thread. The engine starts it asynchronously with the
+/// options wry would set, holds views back until it is ready (they wait like views whose window
+/// has no native handle yet), and shares it among them. If it fails, wry makes its own.
+#[cfg(target_os = "windows")]
+mod win_env {
+    use std::cell::RefCell;
+
+    use webview2_com::Microsoft::Web::WebView2::Win32::{CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2Environment, ICoreWebView2EnvironmentOptions};
+    use webview2_com::{CoreWebView2EnvironmentOptions, CreateCoreWebView2EnvironmentCompletedHandler};
+    use windows::Win32::Globalization::{GetUserDefaultUILanguage, LCIDToLocaleName, LOCALE_ALLOW_NEUTRAL_NAMES, MAX_LOCALE_NAME};
+    use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
+    use windows::core::{HSTRING, PCWSTR};
+
+    enum State {
+        Idle,
+        Starting,
+        Ready(ICoreWebView2Environment),
+        Failed,
+    }
+
+    thread_local! {
+        static ENV: RefCell<State> = const { RefCell::new(State::Idle) };
+    }
+
+    /// Whether views can be built now; starts the environment on first ask.
+    pub fn ready() -> bool {
+        if ENV.with(|e| matches!(*e.borrow(), State::Idle)) {
+            start();
+        }
+        ENV.with(|e| !matches!(*e.borrow(), State::Starting))
+    }
+
+    pub fn get() -> Option<ICoreWebView2Environment> {
+        ENV.with(|e| match &*e.borrow() {
+            State::Ready(env) => Some(env.clone()),
+            _ => None,
+        })
+    }
+
+    fn start() {
+        ENV.with(|e| *e.borrow_mut() = State::Starting);
+        let t0 = std::time::Instant::now();
+        let done = CreateCoreWebView2EnvironmentCompletedHandler::create(Box::new(move |status, env| {
+            let ok = match (status, env) {
+                (Ok(()), Some(env)) => Some(env),
+                (status, _) => {
+                    eprintln!("stella-engine: WebView2 environment failed: {status:?}");
+                    None
+                }
+            };
+            eprintln!("stella-engine metric {{\"metric\":\"webview_environment\",\"ms\":{:.1}}}", t0.elapsed().as_secs_f64() * 1000.0);
+            ENV.with(|e| *e.borrow_mut() = ok.map_or(State::Failed, State::Ready));
+            Ok(())
+        }));
+        // Same arguments and language as wry's `create_environment` (no data directory, autoplay on).
+        let options = CoreWebView2EnvironmentOptions::default();
+        // SAFETY: COM calls on the UI thread, an STA like wry's; the handler runs from its message loop.
+        let started = unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            options.set_additional_browser_arguments("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required".to_string());
+            let mut lang = [0u16; MAX_LOCALE_NAME as usize];
+            let len = LCIDToLocaleName(u32::from(GetUserDefaultUILanguage()), Some(&mut lang), LOCALE_ALLOW_NEUTRAL_NAMES);
+            options.set_language(String::from_utf16_lossy(&lang[..(len.max(1) as usize - 1)]));
+            CreateCoreWebView2EnvironmentWithOptions(PCWSTR::null(), &HSTRING::new(), &ICoreWebView2EnvironmentOptions::from(options), &done)
+        };
+        if let Err(e) = started {
+            eprintln!("stella-engine: WebView2 environment failed: {e}");
+            ENV.with(|e| *e.borrow_mut() = State::Failed);
+        }
+    }
 }
 
 fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, schemes: &[String]) -> Result<WebView, String> {
@@ -698,10 +781,22 @@ fn enable_webrtc(view: &WebView) {
     }
 }
 
+/// Creates the WebView of node `n` in a hidden window, at `r` until the window shows and draws.
+pub fn place_hidden(n: u32, window: u32, r: [f32; 4]) {
+    if !VIEWS.with(|v| v.borrow().contains_key(&n)) && !WAITING.with(|w| w.borrow().contains_key(&n)) {
+        place(n, window, r);
+    }
+}
+
 /// Places (creating on first use) the WebView for node `n` at its slot's drawn rect.
 pub fn place(n: u32, window: u32, r: [f32; 4]) {
     let exists = VIEWS.with(|v| v.borrow().contains_key(&n));
-    if !exists && handle_of(window).is_none() {
+    if !exists && !handle_of(window).is_some_and(|h| h.with_raw_handle(|_| ()).is_ok()) {
+        WAITING.with(|w| w.borrow_mut().insert(n, (window, r)));
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    if !exists && !win_env::ready() {
         WAITING.with(|w| w.borrow_mut().insert(n, (window, r)));
         return;
     }

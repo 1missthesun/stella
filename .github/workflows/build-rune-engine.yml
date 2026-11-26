@@ -326,6 +326,10 @@ jobs:
           jq -r '"media page (WebView2): \(.value // .error | tojson)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
           ev 'const w = new electron.BrowserWindow({ width: 640, height: 420, show: true }); await w.loadURL("https://example.com/"); await new Promise((r) => setTimeout(r, 1500));
             const r = await w.webContents.executeJavaScript(`({ title: document.title, rtc: typeof RTCPeerConnection, secure: isSecureContext })`); return r;' web-window | tee "$out/web-window.json"
+          ev 'const w = new electron.BrowserWindow({ width: 440, height: 560, show: false }); await w.loadURL("https://example.com/");
+            const page = await Promise.race([w.webContents.executeJavaScript(`({ title: document.title, w: innerWidth, h: innerHeight })`), new Promise((r) => setTimeout(() => r("no answer in 20 s"), 20000))]);
+            const r = { page, visible: w.isVisible() }; w.close(); return r;' hidden-window | tee "$out/hidden-window.json"
+          jq -r '"hidden window (WebView2): \(.value // .error | tojson)"' "$out/hidden-window.json" | tee -a "$GITHUB_STEP_SUMMARY"
           diag='const m = stella.host.media; const use = m.use().then((release) => { release(); return "ready"; }, (e) => String(e?.message ?? e));
             await new Promise((r) => setTimeout(r, 8000));
             const state = await stella.engine.webview.state(m.elementId).catch((e) => `state failed: ${e.message}`);
@@ -344,6 +348,7 @@ jobs:
           jq -e '.ok and .value.capture.bytes > 10000 and .value.capture.frames > 0' "$out/capture.json" >/dev/null && echo "capture ok" || { echo "CAPTURE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
           jq -e '.ok and (.value.hookEvents.mousemove // 0) > 0 and (.value.hookEvents.keydown // 0) > 0' "$out/capture.json" >/dev/null && echo "input hook ok" || { echo "INPUT HOOK FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
           jq -e '.ok and .value.caps.rtc and .value.caps.secureContext and .value.loop.state == "connected" and .value.loop.inbound.bytes > 0' "$out/media-page.json" >/dev/null && echo "media page ok" || { echo "MEDIA PAGE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          jq -e '.ok and .value.page.title == "Example Domain" and .value.visible == false' "$out/hidden-window.json" >/dev/null && echo "hidden window ok" || { echo "HIDDEN WINDOW FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
           exit $status
 
       - uses: actions/upload-artifact@v4

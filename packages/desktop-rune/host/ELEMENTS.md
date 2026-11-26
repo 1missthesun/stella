@@ -59,8 +59,10 @@ task switchers and the accessibility tree. macOS: a non-activating NSPanel on ev
 Windows: `WS_EX_NOACTIVATE` + tool window. Linux X11: override-redirect, so the window manager
 never sees it (native Wayland has no such window).
 
-`visible={false}` at mount creates no native window until it turns true; turning it false later
-hides (unmaps) the window and keeps its state.
+`visible={false}` opens the native window hidden, as Electron's `show: false` does: its webviews
+load and run at the window's size (Turnstile solves before the window ever shows), and its
+first shown frame lays them out. Turning it false later hides (unmaps) the window and keeps its
+state.
 
 Close: the OS close button sends `window close-requested`; the window stays until TS unmounts it
 or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark drag regions and
@@ -414,7 +416,9 @@ clients' surfaces is xdg-foreign, which parents toplevels, not children. Electro
 no such problem because Chromium composites them into its own surface. Native Wayland webviews
 would need WebKit drawn offscreen (WPE or a GTK offscreen window) into a Rune image, with input
 synthesized the way `/control/input` already synthesizes GDK events. macOS uses WKWebView and
-Windows uses WebView2 as child views.
+Windows uses WebView2 as child views. WebView2's environment (its browser process) starts
+asynchronously on the first view, with wry's options, and is shared by every view; views wait
+for it rather than blocking the UI thread for the seconds a cold start takes.
 
 ## Engine API (`engine` in `host/bridge.ts`)
 

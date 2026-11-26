@@ -299,9 +299,6 @@ fn default_band(s: &Win, cx: &Cx<Win>) -> Option<f32> {
 
 pub fn decorate(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
     let mut app = app.on_close_request(close_request);
-    if p.visible == Some(false) {
-        app = app.windowless();
-    }
     if let Some(h) = p.titlebar {
         app = app.titlebar(rune::Titlebar::new(h));
     }
@@ -761,8 +758,17 @@ fn sync_webviews(node: u32) {
             .map(|(id, n)| (*id, (*n.props).clone()))
             .collect()
     });
-    for (id, p) in views {
-        crate::webview::sync(id, &p);
+    for (id, p) in &views {
+        crate::webview::sync(*id, p);
+    }
+    // A hidden window lays nothing out, yet its pages run as in Electron's `show: false` windows
+    // (Turnstile solves there before the window ever shows): its views open at the window's size,
+    // and its first shown frame places them.
+    let hidden = engine::read(|e| e.tree.get(node).filter(|n| n.props.visible == Some(false)).map(|n| size_of(&n.props)));
+    if let Some((w, h)) = hidden {
+        for (id, _) in &views {
+            crate::webview::place_hidden(*id, node, [0.0, 0.0, w, h]);
+        }
     }
 }
 

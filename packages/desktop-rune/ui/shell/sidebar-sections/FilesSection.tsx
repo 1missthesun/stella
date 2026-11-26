@@ -25,6 +25,7 @@ import type { DisplayTabKind } from "@/features/workspace-display/types";
 import { DisplayTabIcon } from "../../features/workspace-display/icons";
 import { fileFromPath } from "../../chat/attach-paths";
 import { EmptyState, Icon, Icons } from "../../kit";
+import { useDismissLayer } from "../../kit/dismiss-layer";
 import { fontSize, look, mixOklch, radius, useTokens } from "../../theme";
 import { AgentLifecycleStatusIcon, CompactChildState } from "../workspace/activity-rows";
 
@@ -356,6 +357,7 @@ export function WorkList({ section = "files", idleContent = null, embedded = fal
   }, []);
 
   const embeddedSearch = embedded && showSearch;
+  const dismissLayer = useDismissLayer();
 
   return (
     <col
@@ -389,7 +391,9 @@ export function WorkList({ section = "files", idleContent = null, embedded = fal
             }}
             onInput={setInputValue}
             onKey={(event) => {
-              if (event.key === "Escape") displaySearchStore.close();
+              if (event.key !== "Escape") return;
+              displaySearchStore.close();
+              dismissLayer?.();
             }}
           />
         </row>

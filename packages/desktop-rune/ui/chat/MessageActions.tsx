@@ -144,11 +144,11 @@ export const MessageActions = memo(function MessageActions({ text, messageKey, s
   return (
     <col w={24} selfAlign="stretch" shrink={false} onLayout={(r) => setRailH(r.h)}>
       {direction === "col" ? (
-        <col absolute={align === "end" ? { right: 0, bottom: 0 } : { left: 0, bottom: 0 }} gap={2} align="center" raise>
+        <col absolute={align === "end" ? { right: 0, bottom: 0 } : { left: 0, bottom: 0 }} gap={2} align="center" raise={1}>
           {buttons}
         </col>
       ) : (
-        <row absolute={align === "end" ? { right: 0, bottom: 0 } : { left: 0, bottom: 0 }} gap={2} align="center" dir={direction === "row-reverse" ? "rtl" : "ltr"} raise>
+        <row absolute={align === "end" ? { right: 0, bottom: 0 } : { left: 0, bottom: 0 }} gap={2} align="center" dir={direction === "row-reverse" ? "rtl" : "ltr"} raise={1}>
           {buttons}
         </row>
       )}

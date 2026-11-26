@@ -342,7 +342,7 @@ export const UserMessageRow = memo(
                   <box
                     key={reaction}
                     absolute={{ top: -14, left: -12 }}
-                    raise
+                    raise={1}
                     minW={28}
                     h={28}
                     px={5}

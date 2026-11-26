@@ -17,7 +17,7 @@ export function UploadFailedMark({ uploadId, at = { left: 4, bottom: 4 } }: { up
   return (
     <box
       absolute={at}
-      raise
+      raise={1}
       w={16}
       h={16}
       center

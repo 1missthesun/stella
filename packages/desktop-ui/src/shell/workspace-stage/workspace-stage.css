@@ -19,7 +19,7 @@
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: var(--workspace-stage-radius);
-  box-shadow: var(--shadow-lg);
+  box-shadow: none;
   container-type: inline-size;
   container-name: workspace-stage;
   transition: opacity 160ms ease-out;
@@ -66,9 +66,7 @@
   border: 1px solid var(--panel-surface-border, var(--border));
   border-radius: var(--workspace-stage-radius);
   background: var(--background);
-  box-shadow:
-    var(--shadow-xl, var(--shadow-lg)),
-    var(--panel-surface-highlight, 0 0 0 0 transparent);
+  box-shadow: none;
   container-type: inline-size;
   container-name: file-viewer;
   animation: file-viewer-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -76,7 +74,6 @@
 
 .file-viewer[data-mode="stage"] {
   z-index: 62;
-  box-shadow: var(--shadow-lg);
 }
 
 .workspace-stage,
@@ -91,7 +88,6 @@
     var(--topbar-open-tab-right, 0px) - var(--workspace-stage-inset)
   );
   border-color: transparent;
-  clip-path: inset(0 -120px -120px -120px);
   background:
     linear-gradient(var(--background), var(--background)) padding-box,
     linear-gradient(var(--stage-edge), var(--stage-edge)) 0 4px / 100% 100%
@@ -798,6 +794,10 @@ html[data-viewer-gesture="true"] {
   color: color-mix(in srgb, var(--text-strong, var(--foreground)) 30%, var(--destructive) 70%);
 }
 
+.file-viewer .file-preview-card {
+  box-shadow: none;
+}
+
 .file-viewer__edge {
   position: absolute;
   top: 50%;
@@ -812,9 +812,7 @@ html[data-viewer-gesture="true"] {
   border-radius: 50%;
   background: color-mix(in oklch, var(--background) 72%, transparent);
   color: var(--text-strong);
-  box-shadow:
-    0 0 0 1px var(--border),
-    var(--shadow-sm);
+  box-shadow: 0 0 0 1px var(--border);
   backdrop-filter: blur(10px);
   opacity: 0;
   transform: translateY(-50%);

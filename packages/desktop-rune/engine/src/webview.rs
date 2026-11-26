@@ -30,6 +30,9 @@ struct View {
     rect: [f32; 4],
     visible: bool,
     corners: [f32; 4],
+    /// An overlay (a modal layer, a popover, a menu) covers it: the native view is hidden and its
+    /// slot draws the page's last snapshot, so engine-drawn layers above it stay on top.
+    covered: bool,
 }
 
 thread_local! {
@@ -57,12 +60,127 @@ thread_local! {
     static CLIPS: RefCell<HashMap<u32, [f32; 4]>> = RefCell::new(HashMap::new());
 }
 
-/// The slot element: an empty box whose drawn rect the WebView follows.
+/// The slot element: an empty box whose drawn rect the WebView follows, showing the page's
+/// snapshot while an overlay covers it.
 pub fn slot(n: u32) -> El {
-    el().on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+    let e = match COVERS.with(|c| c.borrow().get(&n).cloned()) {
+        Some(pixels) => el().pixels(&pixels),
+        None => el(),
+    };
+    e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
         tx.live_only();
         place(n, s.node, r);
+        reconcile(s.node);
     })
+}
+
+thread_local! {
+    /// Drawn rects of the overlay layers (modal layers, anchored popovers and menus), by node.
+    static OVERLAYS: RefCell<HashMap<u32, (u32, [f32; 4])>> = RefCell::new(HashMap::new());
+    /// The snapshot each covered webview's slot draws.
+    static COVERS: RefCell<HashMap<u32, rune::Pixels>> = RefCell::new(HashMap::new());
+}
+
+/// A lifted layer, tracked as an overlay when it is anchored or holds a modal: native webviews
+/// draw above every engine layer, so one it overlaps steps aside for it.
+pub fn overlay(layer: El, eng: &engine::Engine, n: u32) -> El {
+    if !active() || !is_overlay(eng, n) {
+        return layer;
+    }
+    layer.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+        tx.live_only();
+        OVERLAYS.with(|o| o.borrow_mut().insert(n, (s.node, r)));
+        reconcile(s.node);
+    })
+}
+
+fn is_overlay(eng: &engine::Engine, n: u32) -> bool {
+    let Some(node) = eng.tree.get(n) else { return false };
+    node.props.anchor.is_some() || node.props.modal.is_some() || node.children.iter().any(|c| eng.tree.get(*c).is_some_and(|c| c.props.modal.is_some()))
+}
+
+pub fn forget_overlay(n: u32) {
+    let window = OVERLAYS.with(|o| o.borrow_mut().remove(&n)).map(|(w, _)| w);
+    if let Some(w) = window {
+        reconcile(w);
+    }
+}
+
+fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
+    a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3] && a[2] > 0.0 && a[3] > 0.0 && b[2] > 0.0 && b[3] > 0.0
+}
+
+/// Covers each of `window`'s webviews an overlay overlaps, and uncovers the rest.
+fn reconcile(window: u32) {
+    let overlays: Vec<[f32; 4]> = OVERLAYS.with(|o| o.borrow().values().filter(|(w, _)| *w == window).map(|(_, r)| *r).collect());
+    let changes: Vec<(u32, bool)> = VIEWS.with(|v| {
+        v.borrow()
+            .iter()
+            .filter(|(_, x)| x.window == window)
+            .filter_map(|(n, x)| {
+                let covered = overlays.iter().any(|o| overlaps(*o, x.rect));
+                (covered != x.covered).then_some((*n, covered))
+            })
+            .collect()
+    });
+    for (n, covered) in changes {
+        VIEWS.with(|v| {
+            if let Some(view) = v.borrow_mut().get_mut(&n) {
+                view.covered = covered;
+            }
+        });
+        if covered {
+            cover(n, window);
+        } else {
+            COVERS.with(|c| c.borrow_mut().remove(&n));
+            let rect = VIEWS.with(|v| v.borrow().get(&n).map(|x| x.rect));
+            if let Some(r) = rect {
+                place(n, window, r);
+            }
+            redraw(window);
+        }
+    }
+}
+
+fn cover(n: u32, window: u32) {
+    let hide = move || {
+        let still = VIEWS.with(|v| v.borrow().get(&n).is_some_and(|x| x.covered));
+        if !still {
+            return;
+        }
+        let rect = VIEWS.with(|v| v.borrow().get(&n).map(|x| x.rect));
+        if let Some(r) = rect {
+            place(n, window, r);
+        }
+        redraw(window);
+    };
+    #[cfg(target_os = "macos")]
+    {
+        let sent = with_view(n, |view| {
+            mac::snapshot(&view.view, move |image| {
+                if let Some(image) = image {
+                    let pixels = rune::Pixels::new();
+                    pixels.set(image.width(), image.height(), image.into_raw());
+                    COVERS.with(|c| c.borrow_mut().insert(n, pixels));
+                }
+                hide();
+            })
+        });
+        if sent.is_err() {
+            hide();
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    hide();
+}
+
+fn redraw(window: u32) {
+    engine::with(|e| {
+        if let Some(slot) = e.windows.get_mut(&window) {
+            slot.dirty = true;
+        }
+    });
+    engine::wake(window);
 }
 
 /// Records a scroll viewport's drawn rect and re-places the webviews inside it.
@@ -246,7 +364,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 #[cfg(target_os = "macos")]
                 mac::round(&view, corners(&p));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
-                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p) }));
+                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false }));
                 element_event(n, "ready", json!({}), None);
             }
             Err(e) => {
@@ -263,7 +381,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             let _ = view.view.set_bounds(rect(window, r));
             view.rect = r;
         }
-        let hidden = r[2] < 1.0 || r[3] < 1.0 || !fits(n, r);
+        let hidden = r[2] < 1.0 || r[3] < 1.0 || !fits(n, r) || view.covered;
         if view.visible == hidden {
             let _ = view.view.set_visible(!hidden);
             view.visible = !hidden;

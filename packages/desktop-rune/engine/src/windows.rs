@@ -75,7 +75,10 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
             root = crate::style::paint(root, &inner);
             root = crate::view::children(s, eng, n, root);
             for l in eng.tree.lifted_in(node) {
-                root = root.child(build(s, eng, l));
+                let layer = build(s, eng, l);
+                #[cfg(feature = "webview")]
+                let layer = crate::webview::overlay(layer, eng, l);
+                root = root.child(layer);
             }
         }
         root
@@ -431,6 +434,8 @@ fn drain() {
     for n in &removed {
         #[cfg(feature = "webview")]
         crate::webview::close(*n);
+        #[cfg(feature = "webview")]
+        crate::webview::forget_overlay(*n);
         crate::media::forget(*n);
         crate::surface::forget(*n);
         forget_selection(*n);

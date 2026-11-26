@@ -326,8 +326,12 @@ Only rows near the viewport are built. The list must sit inside a `scrollY` box.
 url`.
 
 The view is created on first layout, follows the element's rect and visibility, and is destroyed
-on unmount. A native view can't be clipped or rounded: inside a scroll box it shows only while it
-lies wholly in the viewport, so give webviews a panel of their own rather than scrolling content.
+on unmount. A native view can't be clipped: inside a scroll box it shows only while it lies wholly
+in the viewport, so give webviews a panel of their own rather than scrolling content. `radius` /
+`corners` round it (macOS); an ancestor's radius doesn't, so give the webview its panel's corners.
+A native view draws above every engine layer, so while an overlay (an anchored popover or menu, or
+a lifted layer holding a `modal`) overlaps it, the view steps aside and its slot shows the page's
+last snapshot (macOS; elsewhere the slot is empty) under the overlay, until the overlay goes.
 WebKitGTK keeps one handler per scheme for the whole process; the engine routes each request to
 the view that asked, so any number of views can share a scheme.
 

@@ -38,7 +38,8 @@ const useOtherComputers = (enabled: boolean): OtherComputer[] => {
   );
 };
 
-const LABEL = look(fontSize["2xs"], 600, { lh: 1 });
+/** `.app button` inherits weight and letter-spacing over the pill's semibold, so the label is 400 with the body's -0.15px. */
+const LABEL = look(fontSize["2xs"], 400, { lh: 1, em: -0.15 / fontSize["2xs"] });
 
 function pillLook(t: ReturnType<typeof useTokens>) {
   return derive(t, "update-pill", (t) => ({
@@ -108,13 +109,13 @@ const UpdateMenu = ({ computers, disabled, onUpdate }: { computers: OtherCompute
           {computers.map((computer) => (
             <MenuCheckboxItem key={computer.id} id={`topbar-update-target-${computer.id}`} keepOpen disabled={disabled} checked={!left.has(computer.id)} onCheckedChange={() => toggle(computer.id)}>
               <col minW={0} gap={1}>
-                <text {...look(fontSize.base, 500, { lh: 1.3 })} truncate>{computer.name}</text>
+                <text {...look(fontSize.base, 500, { lh: 1.3 })} color={tk.c.textBase} truncate>{computer.name}</text>
                 {computer.online ? null : <text {...look(fontSize["2xs"], 400)} color={tk.c.textWeak}>{t("shell.appSource.devices.offline")}</text>}
               </col>
             </MenuCheckboxItem>
           ))}
           <MenuSeparator />
-          <MenuItem id="topbar-update-targets-go" disabled={disabled} onSelect={() => onUpdate(chosen.map((computer) => computer.id))}>
+          <MenuItem id="topbar-update-targets-go" centered strong disabled={disabled} onSelect={() => onUpdate(chosen.map((computer) => computer.id))}>
             {chosen.length === 0 ? t("shell.appSource.devices.updateThisOnly") : t("shell.appSource.update")}
           </MenuItem>
           <MenuSeparator />
@@ -152,7 +153,7 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   return (
     <row
       id="shell-topbar-update-pill"
-      h={22 + 2}
+      h={22}
       align="stretch"
       radius={999}
       clip={999}

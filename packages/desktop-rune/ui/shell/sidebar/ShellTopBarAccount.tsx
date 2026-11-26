@@ -105,6 +105,7 @@ export const ShellTopBarAccount = ({ onSignIn }: { onSignIn?: () => void }) => {
         side="bottom"
         align="end"
         sideOffset={8}
+        minW={212}
         trigger={(trigger) => (
           <TopbarButton id={trigger.id} label={pausedLabel ? `${displayLabel}, ${pausedLabel}` : displayLabel} title={pausedLabel ? `${nameTitle} · ${pausedLabel}` : nameTitle} icon={false} active={open} onPress={trigger.toggle} onHover={(inside) => inside && preloadBillingScreen()}>
             {(color) => (

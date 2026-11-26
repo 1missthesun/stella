@@ -277,7 +277,9 @@ class PowerMonitor extends EventEmitter {
       }
     });
     this.sleepWatcher = child;
-    app.once("will-quit", () => { child.kill(); });
+    const stop = () => { if (child.exitCode === null) child.kill(); };
+    app.once("will-quit", stop);
+    process.once("exit", stop);
   }
   getSystemIdleTime() { return 0; }
   getSystemIdleState(_threshold: number) { return "active"; }

@@ -11,6 +11,7 @@
 // Linux runs the engine on a private Xvfb. macOS runs windows unseen (RUNE_UNSEEN: invisible,
 // click-through, never activated, still presenting for shot/record/input); --show puts a real
 // window on screen under a shared window slot (~/projects/rune-window-slot.sh), without focus.
+// Linux --show runs on the real display (Hyprland: floating, no initial focus, W×H at POS="x y").
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -113,6 +114,25 @@ const BUN = (() => {
   return existsSync(pinned) ? pinned : process.execPath;
 })();
 
+const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
+
+/** Linux `--show`: Hyprland execs the engine as a floating window that never takes focus; the wrapper records the engine's pid. */
+const showOnHyprland = async (env: Record<string, string>, w: number, h: number) => {
+  const pidFile = path.join(RUN_DIR, "engine.pid");
+  const script = path.join(RUN_DIR, "engine.sh");
+  const vars = Object.entries(env).map(([key, value]) => `${key}=${shellQuote(value)}`).join(" ");
+  const log = shellQuote(path.join(RUN_DIR, "host.log"));
+  writeFileSync(script, `#!/bin/sh\ncd ${shellQuote(REPO)} || exit 1\necho $$ > ${shellQuote(pidFile)}\nexec env -i ${vars} ${shellQuote(ENGINE)} >> ${log} 2>&1\n`, { mode: 0o700 });
+  const at = (process.env.POS ?? "80 80").trim();
+  const rules = `{ float = true, size = "${w} ${h}", move = "${at}", no_initial_focus = true }`;
+  const r = spawnSync("hyprctl", ["dispatch", `hl.dsp.exec_cmd([[${script}]], ${rules})`], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`hyprctl exec failed: ${r.stderr || r.stdout}`);
+  for (let i = 0; i < 200 && !existsSync(pidFile); i++) await Bun.sleep(20);
+  const pid = Number(readFileSync(pidFile, "utf8").trim());
+  if (!pid) throw new Error("The engine did not start.");
+  return pid;
+};
+
 async function start() {
   if (existsSync(POINTER)) {
     const old = readRun();
@@ -136,7 +156,7 @@ async function start() {
   const headless = has("--headless");
 
   const env: Record<string, string> = {};
-  for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR"]) if (process.env[key]) env[key] = process.env[key]!;
+  for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR", "XMODIFIERS"]) if (process.env[key]) env[key] = process.env[key]!;
   env.MIMALLOC_PURGE_DELAY = "0";
   for (const [key, value] of Object.entries(process.env)) if (/^(MIMALLOC_|RUNE_|STELLA_CHAT_FIXTURE_|STELLA_RUNE_(VOICE_HOST|CHROMIUM)$)/.test(key) && value) env[key] = value;
   const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();
@@ -194,6 +214,11 @@ async function start() {
       env.RUNE_OPEN_INACTIVE = "1";
       if (unseen) env.RUNE_UNSEEN = "1";
       else slot = acquireSlot();
+    } else if (has("--show")) {
+      for (const key of ["DISPLAY", "WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "HYPRLAND_INSTANCE_SIGNATURE", "XMODIFIERS", "GTK_IM_MODULE", "QT_IM_MODULE", "GDK_SCALE", "XCURSOR_THEME", "XCURSOR_SIZE", "XCURSOR_PATH"]) {
+        if (process.env[key]) env[key] = process.env[key]!;
+      }
+      if (process.env.STELLA_RUNE_BACKEND) env.STELLA_RUNE_BACKEND = process.env.STELLA_RUNE_BACKEND;
     } else {
       display = flag("--display") ?? freeDisplay();
       const xvfb = spawn(XVFB, [display, "-screen", "0", `${w + 40}x${h + 40}x24`, "-nolisten", "tcp"], { stdio: ["ignore", log, log], detached: true });
@@ -219,9 +244,12 @@ async function start() {
       STELLA_RUNE_SERVICES: has("--no-services") ? "0" : "1",
       ...(process.env.STELLA_RUNE_APP ? { STELLA_RUNE_APP: process.env.STELLA_RUNE_APP } : {}),
     });
-    const engine = spawn(ENGINE, [], { cwd: REPO, env, stdio: ["ignore", log, log, ...(launcherChannel ? [3] : [])], detached: true });
-    pids.engine = engine.pid!;
-    engine.unref();
+    if (!MAC && !WIN && has("--show")) pids.engine = await showOnHyprland(env, w, h);
+    else {
+      const engine = spawn(ENGINE, [], { cwd: REPO, env, stdio: ["ignore", log, log, ...(launcherChannel ? [3] : [])], detached: true });
+      pids.engine = engine.pid!;
+      engine.unref();
+    }
   }
   closeSync(log);
   const run: Run = { runDir: RUN_DIR, dataDir, userDataDir, homeDir, ctlPort, display, slot, unseen: unseen || undefined, pids, headless, account: minted ? { email: minted.email, plan: minted.plan } : undefined, startedAt: new Date().toISOString() };

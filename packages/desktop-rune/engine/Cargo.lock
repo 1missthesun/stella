@@ -4280,9 +4280,12 @@ dependencies = [
  "serde",
  "serde_json",
  "symphonia",
+ "wayland-client",
+ "wayland-protocols",
  "webkit2gtk",
  "windows 0.62.2",
  "wry",
+ "x11rb",
 ]
 
 [[package]]

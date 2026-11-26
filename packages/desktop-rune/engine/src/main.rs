@@ -29,6 +29,8 @@ mod tree;
 mod view;
 #[cfg(feature = "webview")]
 mod webview;
+#[cfg(all(target_os = "linux", feature = "webview"))]
+mod xwayland_scale;
 mod windows;
 
 use std::process::{Child, Command, Stdio};
@@ -188,8 +190,10 @@ fn spawn_ts() -> Boot {
 fn linux_backend() {
     let want = std::env::var("STELLA_RUNE_BACKEND").unwrap_or_default();
     if want != "wayland" && std::env::var_os("DISPLAY").is_some() {
+        let scale = std::env::var_os("WINIT_X11_SCALE_FACTOR").is_none().then(xwayland_scale::desktop_scale).flatten();
         // SAFETY: before any thread that reads the environment starts.
         unsafe {
+            if let Some(scale) = scale { std::env::set_var("WINIT_X11_SCALE_FACTOR", scale.to_string()); }
             std::env::remove_var("WAYLAND_DISPLAY");
             std::env::set_var("GDK_BACKEND", "x11");
         }
@@ -202,6 +206,9 @@ fn main() {
     rune::text::set_fallback_base(Some("Lucida Grande"));
     #[cfg(all(target_os = "linux", feature = "webview"))]
     linux_backend();
+    // Electron Stella's Wayland app_id is the root package name, so window rules and docks match both.
+    #[cfg(target_os = "linux")]
+    rune::set_app_id("stella-v2");
     // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.
     let boot = spawn_ts();
     engine::set_out(boot.to_host);

@@ -69,10 +69,13 @@ windows = { version = "0.62", features = [
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.19", optional = true }
 webkit2gtk = { version = "3", optional = true, features = ["v2_40"] }
+wayland-client = { version = "0.31", optional = true }
+wayland-protocols = { version = "0.32", optional = true, features = ["client", "unstable"] }
+x11rb = { version = "0.13", optional = true, features = ["randr"] }
 
 [features]
 default = ["webview"]
-webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk"]
+webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk", "dep:wayland-client", "dep:wayland-protocols", "dep:x11rb"]
 
 [patch.crates-io]
 wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }

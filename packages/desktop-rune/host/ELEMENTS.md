@@ -397,7 +397,10 @@ On Linux a `transparent` view's page background is the colour the engine draws u
 and its ancestors' fills down to the first opaque one): wry's X11 container is an opaque child
 window, so a page with no background of its own shows what it would in Electron.
 On Linux WebKitGTK lays pages out at GTK's integer scale; the engine zooms each view so a CSS
-pixel is one point at the window's scale, as in Electron (`webview.zoom` multiplies that).
+pixel is one point at the window's scale, as in Electron (`webview.zoom` multiplies that). A
+window's `zoom` zooms its views too, as Electron's page zoom does its iframes: the view keeps
+its box in the zoomed layout, and its page lays out in the same CSS pixels at `zoom` times the
+size.
 WebKitGTK keeps one handler per scheme for the whole process; the engine routes each request to
 the view that asked, so any number of views can share a scheme.
 

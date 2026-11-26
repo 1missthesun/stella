@@ -37,9 +37,10 @@ struct View {
     /// What of it shows, as last applied to the native view, with the rect, corners and scale
     /// it was applied for.
     applied: Option<(Shape, [f32; 4], [f32; 4], f32)>,
-    /// The page zoom TS asked for (`webview.zoom`), and the window scale it was applied at.
+    /// The page zoom TS asked for (`webview.zoom`), and the window scale and UI zoom it was
+    /// applied at.
     zoom: f64,
-    zoomed_at: f32,
+    zoomed_at: (f32, f32),
     #[cfg(target_os = "linux")]
     backdrop: Option<[u8; 4]>,
 }
@@ -221,11 +222,11 @@ pub fn at(window: u32, x: f32, y: f32) -> Option<(u32, [f32; 4])> {
     })
 }
 
-/// Runs `f` on view `n`'s native webview and its window's scale.
+/// Runs `f` on view `n`'s native webview and the device pixels per point of its window's view.
 #[cfg(target_os = "linux")]
 pub fn with_native<R>(n: u32, f: impl FnOnce(&WebView, f32) -> R) -> Option<R> {
     let window = VIEWS.with(|v| v.borrow().get(&n).map(|x| x.window))?;
-    let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32;
+    let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32 * ui_zoom(window);
     VIEWS.with(|v| v.borrow().get(&n).map(|x| f(&x.view, k)))
 }
 
@@ -400,6 +401,7 @@ fn fits(n: u32, r: [f32; 4]) -> bool {
 }
 
 fn rect(window: u32, r: [f32; 4]) -> Rect {
+    let r = r.map(|v| v * ui_zoom(window));
     if cfg!(target_os = "linux") {
         let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0);
         let p = |v: f32| (v as f64 * k).round();
@@ -410,6 +412,13 @@ fn rect(window: u32, r: [f32; 4]) -> Rect {
 
 fn handle_of(window: u32) -> Option<rune::WindowHandle> {
     engine::read(|e| e.windows.get(&window).and_then(|w| w.handle.clone()))
+}
+
+/// The window's UI zoom (`<window zoom>`), 1 unzoomed: webview rects and shapes are in the
+/// zoomed view's points, `zoom` window points each.
+fn ui_zoom(window: u32) -> f32 {
+    let z = engine::read(|e| e.tree.get(window).and_then(|n| n.props.zoom)).unwrap_or(1.0);
+    if z.is_finite() { z.clamp(0.1, 10.0) } else { 1.0 }
 }
 
 #[cfg(target_os = "linux")]
@@ -698,7 +707,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 mac::round(&view, corners(&p));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
-                    v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: 0.0, #[cfg(target_os = "linux")] backdrop: None })
+                    v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })
                 });
                 #[cfg(target_os = "linux")]
                 bridge_views();
@@ -715,15 +724,18 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
     VIEWS.with(|v| {
         let mut v = v.borrow_mut();
         let Some(view) = v.get_mut(&n) else { return };
-        if view.rect != r {
+        let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32;
+        let z = ui_zoom(window);
+        if view.rect != r || view.zoomed_at.1 != z {
             let _ = view.view.set_bounds(rect(window, r));
             view.rect = r;
         }
         let hidden = r[2] < 1.0 || r[3] < 1.0 || shape.is_none() || view.covered;
-        let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32;
-        if view.zoomed_at != k {
-            view.zoomed_at = k;
-            zoom(view, k);
+        if view.zoomed_at != (k, z) {
+            view.zoomed_at = (k, z);
+            zoom(view, k, z);
+            #[cfg(target_os = "macos")]
+            mac::round(&view.view, view.corners.map(|c| c * z));
         }
         #[cfg(target_os = "linux")]
         if let Some(color) = backdrop(n)
@@ -735,12 +747,12 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             webkit2gtk::WebViewExt::set_background_color(&view.view.webview(), &gtk::gdk::RGBA::new(r, g, b, a));
         }
         if !hidden && let Some(s) = shape {
-            let key = (s, r, view.corners, k);
+            let key = (s, r, view.corners, k * z);
             if view.applied.as_ref() != Some(&key) {
                 #[cfg(target_os = "macos")]
-                mac::mask(&view.view, r, Some(&key.0));
+                mac::mask(&view.view, r, Some(&key.0), z);
                 #[cfg(any(target_os = "linux", target_os = "windows"))]
-                native_shape::apply(&view.view, r, &key.0, view.corners, k);
+                native_shape::apply(&view.view, r, &key.0, view.corners, k * z);
                 view.applied = Some(key);
             }
         }
@@ -910,10 +922,11 @@ mod native_shape {
     }
 }
 
-/// Applies the view's page zoom at window scale `k`. WebKitGTK lays pages out at GTK's integer
-/// scale (GDK_SCALE), not the window's: its zoom makes up the difference, so a CSS pixel is one
-/// engine point as in Electron.
-fn zoom(view: &View, k: f32) {
+/// Applies the view's page zoom at window scale `k` and the window's UI zoom `z`: a CSS pixel is
+/// one engine point, which the UI zoom enlarges as Electron's page zoom does its iframes.
+/// WebKitGTK lays pages out at GTK's integer scale (GDK_SCALE), not the window's: its zoom
+/// makes up the difference.
+fn zoom(view: &View, k: f32, z: f32) {
     #[cfg(target_os = "linux")]
     let base = {
         use gtk::prelude::WidgetExt;
@@ -925,7 +938,7 @@ fn zoom(view: &View, k: f32) {
         let _ = k;
         1.0
     };
-    let _ = view.view.zoom(base * view.zoom);
+    let _ = view.view.zoom(base * f64::from(z) * view.zoom);
 }
 
 /// The webview's corner radii (top-left, top-right, bottom-right, bottom-left).
@@ -939,6 +952,8 @@ pub struct Shot {
     pub rect: [f32; 4],
     pub corners: [f32; 4],
     pub clip: Option<[f32; 4]>,
+    /// The corner radii a rounded clip gives `clip`.
+    pub clip_round: [f32; 4],
     pub cuts: Vec<([f32; 4], [f32; 4])>,
     pub image: image::RgbaImage,
 }
@@ -980,16 +995,20 @@ pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
             done(std::mem::take(&mut p.1));
         }
     };
+    // Captured frames are in window points.
+    let z = ui_zoom(window);
+    let at = |q: [f32; 4]| q.map(|v| v * z);
     for (n, rect, shape) in targets {
-        let c = engine::read(|e| e.tree.get(n).map(|node| corners(&node.props)).unwrap_or_default());
-        let (clip, cuts) = match shape {
-            Some(s) => (Some(s.vis), s.cuts),
-            None => (None, Vec::new()),
+        let c = engine::read(|e| e.tree.get(n).map(|node| corners(&node.props)).unwrap_or_default()).map(|v| v * z);
+        let (clip, clip_round, cuts) = match shape {
+            Some(s) => (Some(at(s.vis)), at(s.round), s.cuts.iter().map(|(q, k)| (at(*q), at(*k))).collect()),
+            None => (None, [0.0; 4], Vec::new()),
         };
+        let rect = at(rect);
         let pending = pending.clone();
         let sent = with_view(n, |view| {
             let pending = pending.clone();
-            snap(&view.view, move |image| answer(&pending, image.map(|image| Shot { rect, corners: c, clip, cuts, image })));
+            snap(&view.view, move |image| answer(&pending, image.map(|image| Shot { rect, corners: c, clip, clip_round, cuts, image })));
         });
         if sent.is_err() {
             answer(&pending, None);
@@ -1208,16 +1227,17 @@ mod mac {
 
     /// Shows only `shape` of the WKWebView placed at `r` (all of it with `None`), and lets the
     /// pointer through where it doesn't show.
-    pub fn mask(view: &wry::WebView, r: [f32; 4], shape: Option<&super::Shape>) {
+    pub fn mask(view: &wry::WebView, r: [f32; 4], shape: Option<&super::Shape>, z: f32) {
         let wk = view.webview();
         let key = objc2::rc::Retained::as_ptr(&wk) as usize;
+        let at = |q: [f32; 4]| [(q[0] - r[0]) * z, (q[1] - r[1]) * z, q[2] * z, q[3] * z];
         let local = shape.map(|s| super::Shape {
-            vis: [s.vis[0] - r[0], s.vis[1] - r[1], s.vis[2], s.vis[3]],
-            round: s.round,
-            cuts: s.cuts.iter().map(|(c, k)| ([c[0] - r[0], c[1] - r[1], c[2], c[3]], *k)).collect(),
-            hits: s.hits.iter().map(|(c, k)| ([c[0] - r[0], c[1] - r[1], c[2], c[3]], *k)).collect(),
+            vis: at(s.vis),
+            round: s.round.map(|c| c * z),
+            cuts: s.cuts.iter().map(|(c, k)| (at(*c), k.map(|v| v * z))).collect(),
+            hits: s.hits.iter().map(|(c, k)| (at(*c), k.map(|v| v * z))).collect(),
         });
-        let whole = local.as_ref().is_none_or(|s| s.cuts.is_empty() && s.hits.is_empty() && s.round.iter().all(|c| *c <= 0.0) && s.vis[0] <= 0.5 && s.vis[1] <= 0.5 && s.vis[2] >= r[2] - 0.5 && s.vis[3] >= r[3] - 0.5);
+        let whole = local.as_ref().is_none_or(|s| s.cuts.is_empty() && s.hits.is_empty() && s.round.iter().all(|c| *c <= 0.0) && s.vis[0] <= 0.5 && s.vis[1] <= 0.5 && s.vis[2] >= r[2] * z - 0.5 && s.vis[3] >= r[3] * z - 0.5);
         wk.setWantsLayer(true);
         let Some(layer) = wk.layer() else { return };
         CATransaction::begin();
@@ -1347,7 +1367,7 @@ pub fn sync(n: u32, p: &Props) {
         #[cfg(target_os = "macos")]
         if corners(p) != view.corners {
             view.corners = corners(p);
-            mac::round(&view.view, view.corners);
+            mac::round(&view.view, view.corners.map(|c| c * ui_zoom(view.window)));
         }
         if p.url.is_some() && p.url != view.url {
             if let Some(u) = &p.url {
@@ -1467,7 +1487,7 @@ pub fn command(cmd: &str, n: u32, v: &serde_json::Value, blobs: &HashMap<u32, st
                 let mut views = views.borrow_mut();
                 let w = views.get_mut(&n).ok_or("no such webview")?;
                 w.zoom = factor;
-                zoom(w, w.zoomed_at);
+                zoom(w, w.zoomed_at.0, w.zoomed_at.1);
                 Ok::<(), String>(())
             })?;
         }

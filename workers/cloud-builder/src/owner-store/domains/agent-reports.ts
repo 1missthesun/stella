@@ -1,4 +1,4 @@
-import { resultDone } from "@stella/contracts/agent-messaging";
+import { helperWait, helperWaitsOnYouText, INPUT_ON_ITS_WAY_WAKER, resultDone } from "@stella/contracts/agent-messaging";
 import {
   AGENT_REPORT_OFFER_MS,
   agentReportId,
@@ -9,7 +9,7 @@ import {
   silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
 import { agentReportRecipient, agentStanding, recordedAgentFacts } from "@stella/contracts/agent-rules";
-import { HANDED_ON_WAITING_FOR, resultWaitingFor, scheduleGoneText } from "@stella/contracts/agent-waiting";
+import { HANDED_ON_WAITING_FOR, resultWaitingFor, resultWakers, scheduleGoneText } from "@stella/contracts/agent-waiting";
 import {
   AGENT_STOPPED_REASON,
   LIVE_STORED_AGENT_STATUSES,
@@ -52,6 +52,7 @@ type ThreadRow = {
   thread_id: string;
   conversation_id: string;
   owner_generation: string | null;
+  idle_json?: string | null;
   parent_thread_id: string | null;
   origin_device_id: string | null;
   origin_conversation_id: string | null;
@@ -614,6 +615,123 @@ const deriveJobReports = (db: OwnerDb, threadId: string, now: number): void => {
 };
 
 agentChangeHooks.push(deriveJobReports);
+
+/**
+ * Which runtime runs a task's turns: a computer's own (its local tasks, and tasks placed on it), or
+ * the cloud orchestrator's pi runtime. Containers (cloud Claude Code) never run anyone else's.
+ */
+const runtimeOf = (db: OwnerDbReader, row: ThreadRow): string | null => {
+  const device = row.executor_device_id ?? (row.placement === "computer" ? row.origin_device_id : null);
+  if (device) return `device:${resolveCurrentDeviceId(db, device)}`;
+  return row.harness === "pi" ? "cloud-pi" : null;
+};
+
+/**
+ * A runtime keeps its own helpers' waits on its tasks (it reminds the lead at the lead's turn end,
+ * or wakes it when the wait starts after the lead went idle). Only a helper it spawned there itself
+ * is its own: one on a computer by that computer's runtime, one in the cloud orchestrator by it.
+ */
+const sameRuntime = (db: OwnerDbReader, lead: ThreadRow, helper: ThreadRow): boolean => {
+  if (helper.executor_device_id !== null) return false;
+  if (helper.placement !== "computer" && helper.harness !== "pi") return false;
+  const runtime = runtimeOf(db, helper);
+  return runtime !== null && runtime === runtimeOf(db, lead);
+};
+
+type RecordedWait = { waitingFor?: string; wakers?: string[]; key: string };
+
+/**
+ * What a task waits on now: its last turn ended waiting, or (a cloud task whose one attempt stays
+ * open across its waits) its last turn ended idle within the current attempt. `key` names this wait.
+ */
+const waitOf = (row: ThreadRow): RecordedWait | undefined => {
+  if (endedWaiting(row)) {
+    const waitingFor = resultWaitingFor(row.result_json);
+    const wakers = resultWakers(row.result_json);
+    return { ...(waitingFor !== undefined ? { waitingFor } : {}), ...(wakers ? { wakers } : {}), key: String(row.attempt_generation) };
+  }
+  if (row.status !== "running" || !row.idle_json) return undefined;
+  try {
+    const idle = JSON.parse(row.idle_json) as { idle?: unknown; attempt?: unknown; at?: unknown; waitingFor?: unknown; wakers?: unknown };
+    if (idle.idle !== true || idle.attempt !== row.attempt_generation || typeof idle.at !== "number") return undefined;
+    const wakers = Array.isArray(idle.wakers) ? idle.wakers.filter((waker): waker is string => typeof waker === "string") : undefined;
+    return {
+      ...(typeof idle.waitingFor === "string" ? { waitingFor: idle.waitingFor } : {}),
+      ...(wakers ? { wakers } : {}),
+      key: `${row.attempt_generation}:${idle.at}`,
+    };
+  } catch {
+    return undefined;
+  }
+};
+
+const waitOnStarter = (row: ThreadRow): RecordedWait | undefined => {
+  const wait = waitOf(row);
+  return wait && helperWait(wait).onStarter ? wait : undefined;
+};
+
+/** The lead's turn ended and nothing is queued for it, so no run of its own follows. */
+const leadIdle = (db: OwnerDbReader, lead: ThreadRow): boolean => {
+  const wait = waitOf(lead);
+  if (!wait || !lead.owner_generation) return false;
+  if (wait.wakers ? wait.wakers.includes(INPUT_ON_ITS_WAY_WAKER) : (wait.waitingFor ?? "").includes(INPUT_ON_ITS_WAY_WAKER)) {
+    return false;
+  }
+  return !db.one(
+    `SELECT 1 AS found WHERE EXISTS (SELECT 1 FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume')
+                                      AND COALESCE(outcome, '') <> '${HELD_WHILE_STOPPED}')
+        OR EXISTS (SELECT 1 FROM agent_report_outbox WHERE requester_kind = 'agent' AND requester_id = ? AND state IN ('pending', 'offered'))`,
+    lead.thread_id,
+    lead.thread_id,
+  );
+};
+
+const remindLead = (db: OwnerDb, lead: ThreadRow, helper: ThreadRow, wait: RecordedWait, now: number): void => {
+  const noteId = agentReportReceipt(`helper-waits-on-you:${helper.thread_id}:${wait.key}`);
+  if (readOutbox(db, noteId)) return;
+  queueAgentNote(
+    { db, now },
+    {
+      noteId,
+      parentThreadId: lead.thread_id,
+      conversationId: lead.conversation_id,
+      ownerGeneration: lead.owner_generation!,
+      fromThreadId: helper.thread_id,
+      text: helperWaitsOnYouText([{ threadId: helper.thread_id, description: helper.description || helper.thread_id }]),
+    },
+  );
+};
+
+/**
+ * A helper on another runtime that messaged its lead and ended waiting on the reply can only be
+ * woken by that lead. Its own runtime can't see the lead, and the lead's runtime only looks at its
+ * helpers when one of its own turns ends; so whichever of the two ends lands second here, with the
+ * lead idle, wakes the lead with the reminder. Once per wait of the helper (one attempt).
+ */
+const remindLeadsOfWaitingHelpers = (db: OwnerDb, threadId: string, now: number): void => {
+  const thread = readThread(db, threadId);
+  if (!thread || !waitOf(thread)) return;
+  const pairs: Array<[ThreadRow, ThreadRow, RecordedWait]> = [];
+  const own = thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id ? waitOnStarter(thread) : undefined;
+  if (own) {
+    const lead = readThread(db, thread.parent_thread_id!);
+    if (lead) pairs.push([lead, thread, own]);
+  }
+  for (const helper of db.all<ThreadRow>(
+    "SELECT * FROM agent_threads WHERE parent_thread_id = ? AND thread_id <> ? AND status IN ('completed', 'running') LIMIT 50",
+    thread.thread_id,
+    thread.thread_id,
+  )) {
+    const wait = waitOnStarter(helper);
+    if (wait) pairs.push([thread, helper, wait]);
+  }
+  for (const [lead, helper, wait] of pairs) {
+    if (sameRuntime(db, lead, helper) || !leadIdle(db, lead)) continue;
+    remindLead(db, lead, helper, wait, now);
+  }
+};
+
+agentChangeHooks.push(remindLeadsOfWaitingHelpers);
 
 const settle = (
   ctx: OwnerContext,

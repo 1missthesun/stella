@@ -387,6 +387,26 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               });
             });
           },
+          agentIdle: (event) => {
+            const now = Date.now();
+            void this.deferOwnerEvents([
+              {
+                v: OWNER_EVENT_VERSION,
+                key: `pi-idle:${event.threadId}:${now}`,
+                ownerId: event.authority.ownerId,
+                ownerGeneration: event.authority.ownerGeneration,
+                emittedAt: now,
+                kind: "thread.idle",
+                threadId: event.threadId,
+                idle: event.idle,
+                ...(event.waitingFor !== undefined ? { waitingFor: event.waitingFor } : {}),
+                ...(event.wakers ? { wakers: event.wakers } : {}),
+                at: now,
+              },
+            ]).catch((error: unknown) => {
+              log("error", "pi_agent_idle_failed", { threadId: event.threadId, message: errorMessage(error) });
+            });
+          },
           agentTools: (authority, browser, history, delivery) =>
             this.createPiAgentTools(authority, browser, history, delivery),
           ...(slack
@@ -786,7 +806,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         attemptGeneration: event.attempt,
         status: outcome,
         ...(outcome === "completed" && event.ended.waitingFor
-          ? { resultJson: waitingResultJson((text ?? "").slice(0, 30_000), event.ended.waitingFor) }
+          ? { resultJson: waitingResultJson((text ?? "").slice(0, 30_000), event.ended.waitingFor, undefined, event.ended.wakers) }
           : outcome === "completed" && text
             ? { resultJson: doneResultJson(text.slice(0, 30_000)) }
             : {}),

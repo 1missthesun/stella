@@ -13,8 +13,9 @@ const KIND_ORDER: Record<OwnerEvent["kind"], number> = {
   "thread.spawned": 2,
   "conversation.index": 3,
   "turn.event": 4,
-  "thread.completed": 5,
-  "conversation.deleted": 6,
+  "thread.idle": 5,
+  "thread.completed": 6,
+  "conversation.deleted": 7,
 };
 
 export const applyOwnerEventsToStore = (
@@ -41,6 +42,7 @@ export const applyOwnerEventsToStore = (
         applyAgentThreadEvent(db, event, effects, ctx.jobs);
         break;
       case "thread.spawned":
+      case "thread.idle":
       case "thread.completed":
         applyAgentThreadEvent(db, event, effects, ctx.jobs);
         break;

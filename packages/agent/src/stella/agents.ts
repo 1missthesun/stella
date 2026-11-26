@@ -81,6 +81,7 @@ import {
   SEND_MESSAGE_DONE_DESCRIPTION,
   silentEndReport,
   STARTER_REPLY_WAKER,
+  INPUT_ON_ITS_WAY_WAKER,
   type HelperWaitingOnYou,
 } from "@stella/contracts/agent-messaging";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
@@ -1231,9 +1232,12 @@ export function stellaAgents(host: StellaAgentsHost) {
                 ...(remind ? { nudge: true as const, after: settled.answer, ...(owes ? {} : { backstop: true as const }) } : {}),
                 ...(waitingOnYou.length > 0 ? { owed: waitingOnYou.map((helper) => helper.threadId) } : {}),
               });
-              return idle(["a message on its way to you"]);
+              return idle([INPUT_ON_ITS_WAY_WAKER]);
             }
-            if (quiet && nudged && !finished && reporter.input.backstop === true && live === false) {
+            // A helper waiting on its reply keeps it open: it isn't finished, and the wait is reminded again from where it is seen.
+            const owedHelpers =
+              (standingAtEnd?.elsewhereWaitingOnYou.length ?? 0) > 0 || (await helpersWaitingOnStarter(tx, agentConversationId)).length > 0;
+            if (quiet && nudged && !finished && !owedHelpers && reporter.input.backstop === true && live === false) {
               const result = withNote(silentEndReport(said?.lastWords));
               end = { answer: result };
               delete agent.waiting;
@@ -1241,7 +1245,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               return next(completedReport({ threadId, description, result, toParentAgent }), "completed");
             }
             // Reminded after its starter's message, it had nothing to send, and nothing of its own is live: it is done.
-            if (quiet && nudged && reporter.input.backstop !== true && live === false) agent.finished = true;
+            if (quiet && nudged && !owedHelpers && reporter.input.backstop !== true && live === false) agent.finished = true;
             return idle();
           }, context);
         } finally {
@@ -3081,12 +3085,15 @@ export function stellaAgents(host: StellaAgentsHost) {
         requestId = remind ? `placed:${args.runKey}:nudge` : `placed:${args.runKey}:waiting-on-you:${retry}`;
         continue;
       }
-      if (!turn.sent && nudged && backstop && !finished && wakers?.length === 0) {
+      const owedHelpers =
+        (standing?.elsewhereWaitingOnYou.length ?? 0) > 0 ||
+        (await harness.commit((tx) => helpersWaitingOnStarter(tx, agent.id), context)).length > 0;
+      if (!turn.sent && nudged && backstop && !finished && !owedHelpers && wakers?.length === 0) {
         await markFinished(true);
         return { threadId, status: "ok", finalText: silentEndReport(turn.lastWords) };
       }
       // Reminded after its starter's message, it had nothing to send, and nothing of its own is live: it is done.
-      if (!turn.sent && nudged && !backstop && wakers?.length === 0) await markFinished(true);
+      if (!turn.sent && nudged && !backstop && !owedHelpers && wakers?.length === 0) await markFinished(true);
       return { threadId, status: "ok", finalText: "", waitingFor: idleWaitingFor(wakers) };
     }
   };
@@ -3326,7 +3333,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         (tx) => inputComing(tx, starter, { threadId: role.threadId!, conversationId: agentConversationId }, { placed: opts.atEnd === true }),
         context,
       );
-      if (queued) found.push("a message on its way to you");
+      if (queued) found.push(INPUT_ON_ITS_WAY_WAKER);
     }
     if (role.askingStella) found.push("Stella's answer to your question");
     else {

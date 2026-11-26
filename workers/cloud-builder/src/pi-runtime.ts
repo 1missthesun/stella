@@ -267,7 +267,15 @@ export type PiAgentLedgerEvent = {
   depth: number;
   turnId: string;
   authority: PiAuthority;
-  ended?: { outcome: import("@stella/contracts/agent-status").AgentAttemptOutcome; text?: string; waitingFor?: string };
+  ended?: { outcome: import("@stella/contracts/agent-status").AgentAttemptOutcome; text?: string; waitingFor?: string; wakers?: string[] };
+};
+
+export type PiAgentIdleEvent = {
+  threadId: string;
+  authority: PiAuthority;
+  idle: boolean;
+  waitingFor?: string;
+  wakers?: string[];
 };
 
 export type PiAgentInfo = {
@@ -369,6 +377,8 @@ export type PiRuntimeOptions = {
   wakeSources?(threadId: string, authority: PiAuthority): Promise<string[]>;
   agentsChanged?(): void;
   agentLedger?(event: PiAgentLedgerEvent): void;
+  /** A task started from another place keeps one open attempt across its waits; its owner hears when it is idle. */
+  agentIdle?(event: PiAgentIdleEvent): void;
   deviceAgents?: PiDeviceAgents;
   threadAgents?: PiThreadAgents;
   agentDirectory?: {
@@ -1161,7 +1171,7 @@ export class PiConversationRuntime {
             authority,
             ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}`,
             context,
-            end?.waitingFor !== undefined ? { ...outcome, waitingFor: end.waitingFor } : outcome,
+            end?.waitingFor !== undefined ? { ...outcome, waitingFor: end.waitingFor, ...(end.wakers ? { wakers: end.wakers } : {}) } : outcome,
           ).catch((error: unknown) => this.#options.report(error));
         }
         if (end?.waitingFor !== undefined && run.parentConversationId === (await this.open()).root.id) {
@@ -1326,7 +1336,16 @@ export class PiConversationRuntime {
   ): Promise<void> {
     if (!this.#options.agentLedger) return;
     if (run.parentConversationId === (await this.open()).root.id) {
-      if ((await this.#agentInfo(run.threadId, context)).origin) return;
+      if ((await this.#agentInfo(run.threadId, context)).origin) {
+        const idle = ended?.outcome === "completed" && ended.waitingFor !== undefined;
+        this.#options.agentIdle?.({
+          threadId: run.threadId,
+          authority,
+          idle,
+          ...(idle ? { waitingFor: ended.waitingFor, ...(ended.wakers ? { wakers: ended.wakers } : {}) } : {}),
+        });
+        return;
+      }
     }
     this.#options.agentLedger({
       threadId: run.threadId,

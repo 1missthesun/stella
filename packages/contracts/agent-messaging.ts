@@ -85,6 +85,9 @@ export const agentIdentityText = (agent: {
 /** A task that messaged whoever started it (without done) and ended its turn waits on their reply. */
 export const STARTER_REPLY_WAKER = "a reply to the message you sent whoever started you";
 
+/** Something is already queued for the task (a message, report or reminder), so a run of its own follows. */
+export const INPUT_ON_ITS_WAY_WAKER = "a message on its way to you";
+
 /** A task that asked with ask_user or request_secure_input waits on that answer, which comes from Stella or the user. */
 export const QUESTION_ASKED_WAKER = "an answer to the question you put to whoever started you";
 

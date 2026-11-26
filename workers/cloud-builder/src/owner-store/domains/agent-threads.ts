@@ -63,7 +63,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
   type AgentTaskMessageResult,
 } from "@stella/contracts/backend/agent-threads";
-import { DONE_ACCEPTED_TEXT, doneNotToStarterText, doneResultJson, doneWhileHelpersWorkText } from "@stella/contracts/agent-messaging";
+import { DONE_ACCEPTED_TEXT, doneNotToStarterText, doneResultJson, doneWhileHelpersWorkText, helperWait } from "@stella/contracts/agent-messaging";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
 import { selectCloudModel } from "./engines.js";
@@ -83,6 +83,7 @@ import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { CloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
 import type {
   ThreadCompletedEvent,
+  ThreadIdleEvent,
   ThreadSpawnedEvent,
   TurnEventEvent,
   TurnStartedEvent,
@@ -128,6 +129,7 @@ type ThreadRow = {
   thread_id: string;
   conversation_id: string;
   owner_generation: string | null;
+  idle_json?: string | null;
   parent_turn_id: string | null;
   parent_thread_id: string | null;
   executor_device_id: string | null;
@@ -4449,6 +4451,7 @@ export type AgentThreadEvent =
   | TurnStartedEvent
   | TurnEventEvent
   | ThreadSpawnedEvent
+  | ThreadIdleEvent
   | ThreadCompletedEvent;
 
 export const USAGE_LIMIT_AGENT_JOB = "agentThreads.usageLimitResume";
@@ -4879,6 +4882,16 @@ const threadOutputFiles = (db: OwnerDbReader, threadId: string): unknown[] => {
 
 const ownerEventKey = (event: AgentThreadEvent): string => `owner-event:${event.kind}:${event.key}`;
 
+const threadIdleOf = (thread: Pick<ThreadRow, "idle_json">): { idle: boolean; at: number } | undefined => {
+  if (!thread.idle_json) return undefined;
+  try {
+    const parsed = JSON.parse(thread.idle_json) as { idle?: unknown; at?: unknown };
+    return typeof parsed.at === "number" ? { idle: parsed.idle === true, at: parsed.at } : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const applyAgentThreadEvent = (
   db: OwnerDb,
   event: AgentThreadEvent,
@@ -5042,6 +5055,36 @@ export const applyAgentThreadEvent = (
         ),
       );
       if (jobs) armLiveness(jobs, { ...thread, attempt_generation: event.attemptGeneration }, event.createdAt + LIVENESS_EVERY_MS);
+      return;
+    }
+    case "thread.idle": {
+      const thread = readThread(db, event.threadId);
+      if (!thread || thread.status !== "running") return;
+      const last = threadIdleOf(thread);
+      if (last && last.at >= event.at) return;
+      const marker = JSON.stringify({
+        idle: event.idle,
+        attempt: thread.attempt_generation,
+        at: event.at,
+        ...(event.idle && event.waitingFor !== undefined ? { waitingFor: event.waitingFor } : {}),
+        ...(event.idle && event.wakers ? { wakers: event.wakers } : {}),
+      });
+      if (!event.idle && !last?.idle) {
+        db.run("UPDATE agent_threads SET idle_json = ? WHERE thread_id = ?", marker, thread.thread_id);
+        return;
+      }
+      recordAgentChange(
+        db,
+        {
+          threadId: thread.thread_id,
+          kind: event.idle ? "idle" : "busy",
+          key: ownerEventKey(event),
+          source: `${thread.harness ?? "cloud"}:${thread.conversation_id}`,
+          ...(event.idle && event.waitingFor ? { detail: { waitingFor: event.waitingFor } } : {}),
+          now: event.at,
+        },
+        () => db.run("UPDATE agent_threads SET idle_json = ? WHERE thread_id = ?", marker, thread.thread_id),
+      );
       return;
     }
     case "thread.completed": {
@@ -5214,7 +5257,13 @@ const waitingWake = (db: OwnerDbReader, thread: ThreadRow, resultJson: string | 
     id,
     id,
   );
-  if (helpers.some((helper) => endedWaiting(helper))) return "live";
+  // A waiting helper wakes its lead only through something of its own; a wait on the lead's reply never does.
+  const helperLive = (helper: Pick<ThreadRow, "status" | "result_json">) => {
+    const waitingFor = resultWaitingFor(helper.result_json);
+    const wakers = resultWakers(helper.result_json);
+    return helperWait({ ...(waitingFor !== undefined ? { waitingFor } : {}), ...(wakers ? { wakers } : {}) }).live;
+  };
+  if (helpers.some((helper) => endedWaiting(helper) && helperLive(helper))) return "live";
   const queued = db.one<{ found: number }>(
     `SELECT 1 AS found WHERE EXISTS (SELECT 1 FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume'))
         OR EXISTS (SELECT 1 FROM agent_report_outbox WHERE requester_kind = 'agent' AND requester_id = ? AND state IN ('pending', 'offered'))
@@ -5528,6 +5577,10 @@ export const agentThreadsDomain = {
       ],
     },
     AGENT_HOSTED_TURNS_MIGRATION,
+    {
+      id: "agent-threads.18-idle",
+      statements: ["ALTER TABLE agent_threads ADD COLUMN idle_json TEXT"],
+    },
   ],
   calls: {
     "agentThreads.directory": {

@@ -107,7 +107,9 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 - Grid: `columns` on the container, `column` on the child.
 - Position: `absolute={{left,top,right,bottom}}` or `inset`. `left` and `right` are physical, as in CSS: they stay put under `dir="rtl"`. `fixed` pins to the window and paints
   in its top layer, keeping React context (scrims, dialogs, toasts). `raise` paints above later
-  siblings. `dir` (fixed and anchored layers take their tree ancestors' `dir`, as CSS direction reaches
+  siblings; a numeric `raise={n}` is CSS `z-index`. Top layers (`fixed`, and anchored elements
+  with a numeric `raise`) stack by that number, then tree order, as CSS stacks positioned portals
+  in the root stacking context: a menu (`raise={10000}`) covers a later dialog (`raise={51}`). `dir` (fixed and anchored layers take their tree ancestors' `dir`, as CSS direction reaches
   fixed descendants).
 
 **Paint.** `fill`, `gradient {angle, stops}`, `radial`, `border`, `borderWidth`, `borderSides

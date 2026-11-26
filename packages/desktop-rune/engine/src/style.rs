@@ -178,6 +178,7 @@ pub fn layout(mut e: El, p: &Props) -> El {
     }
     match p.raise {
         Some(RaiseP::On(true)) => e = e.raise(),
+        Some(RaiseP::Order(n)) if p.anchor.is_some() => e = e.raise().paint_order(n),
         Some(RaiseP::Order(n)) => e = e.paint_order(n),
         _ => {}
     }

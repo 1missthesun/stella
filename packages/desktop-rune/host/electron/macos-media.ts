@@ -36,7 +36,13 @@ function load() {
   const graphics = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", {
     CGPreflightScreenCaptureAccess: { args: [], returns: FFIType.bool },
   }).symbols;
-  return { coreAudio, coreFoundation, objc, graphics };
+  const send2 = dlopen("/usr/lib/libobjc.A.dylib", {
+    objc_msgSend: { args: [FFIType.u64, FFIType.u64, FFIType.u64, FFIType.u64], returns: FFIType.u64 },
+  }).symbols.objc_msgSend;
+  const accessibility = dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", {
+    AXIsProcessTrustedWithOptions: { args: [FFIType.u64], returns: FFIType.bool },
+  }).symbols;
+  return { coreAudio, coreFoundation, objc, graphics, send2, accessibility };
 }
 
 const cstr = (text: string) => ptr(Buffer.from(`${text}\0`, "utf8"));
@@ -123,3 +129,21 @@ export function mediaAccessStatus(type: string): MediaAccessStatus {
   return AV_STATUS[status] ?? "unknown";
 }
 
+
+/**
+ * Whether the responsible process (the engine) is trusted for Accessibility; with `prompt`, macOS
+ * shows its "would like to control this computer" alert and lists the engine's bundle in Privacy &
+ * Security > Accessibility. Prompts only from the engine's bundle (`STELLA_RUNE_MEDIA_PROMPTS=1`):
+ * from a bare binary the alert would name whichever app launched it.
+ */
+export function accessibilityTrusted(prompt: boolean): boolean {
+  const n = getNative();
+  if (!n) return true;
+  if (!prompt || process.env.STELLA_RUNE_MEDIA_PROMPTS !== "1") return n.accessibility.AXIsProcessTrustedWithOptions(0n);
+  const sel = (name: string) => BigInt(n.objc.sel_registerName(cstr(name)));
+  const NSString = BigInt(n.objc.objc_getClass(cstr("NSString")));
+  const key = BigInt(n.objc.objc_msgSend(NSString, sel("stringWithUTF8String:"), BigInt(cstr("AXTrustedCheckOptionPrompt"))));
+  const yes = BigInt(n.objc.objc_msgSend(BigInt(n.objc.objc_getClass(cstr("NSNumber"))), sel("numberWithBool:"), 1n));
+  const options = BigInt(n.send2(BigInt(n.objc.objc_getClass(cstr("NSDictionary"))), sel("dictionaryWithObject:forKey:"), yes, key));
+  return n.accessibility.AXIsProcessTrustedWithOptions(options);
+}

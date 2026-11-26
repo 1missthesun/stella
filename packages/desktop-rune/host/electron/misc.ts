@@ -8,7 +8,7 @@ import path from "node:path";
 import { rmSync } from "node:fs";
 import { engine, warnOnce } from "./engine";
 import { nativeImage } from "./native-image";
-import { mediaAccessStatus } from "./macos-media";
+import { accessibilityTrusted, mediaAccessStatus } from "./macos-media";
 
 const PARENT_PORT_PRELOAD = path.join(import.meta.dir, "utility-child.ts");
 
@@ -43,7 +43,7 @@ export const utilityProcess = {
 class SystemPreferences extends EventEmitter {
   getMediaAccessStatus(type: string) { return mediaAccessStatus(type); }
   async askForMediaAccess(type: string) { return mediaAccessStatus(type) === "granted"; }
-  isTrustedAccessibilityClient(_prompt: boolean) { return process.platform !== "darwin"; }
+  isTrustedAccessibilityClient(prompt: boolean) { return accessibilityTrusted(prompt); }
   getAccentColor() { return "0a84ffff"; }
   getColor() { return "#000000"; }
   getSystemColor() { return "#000000"; }

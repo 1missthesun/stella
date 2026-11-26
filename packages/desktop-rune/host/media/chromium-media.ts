@@ -38,6 +38,8 @@ const CHROMIUM_ARGS = [
   "--disable-gpu",
 ];
 
+/** Binaries that could not start sandboxed in this host process. */
+const UNSANDBOXED = new Set<string>();
 const NO_USABLE_SANDBOX = /No usable sandbox|apparmor-userns-restrictions|SUID sandbox|try using --no-sandbox/;
 
 export type ChromiumMediaCallbacks = {
@@ -71,12 +73,14 @@ export class ChromiumMediaHost {
    * profile for that binary); the page then runs unsandboxed, as Playwright's Chromium does.
    */
   private async run() {
+    const binary = resolveChromium();
     try {
-      await this.launch([]);
+      await this.launch(binary && UNSANDBOXED.has(binary) ? ["--no-sandbox"] : []);
     } catch (error) {
       if (this.stopped) return;
-      if (!NO_USABLE_SANDBOX.test(this.lastStderr)) return this.fail(error as Error);
+      if (!binary || UNSANDBOXED.has(binary) || !NO_USABLE_SANDBOX.test(this.lastStderr)) return this.fail(error as Error);
       console.error("[media] Chromium has no usable sandbox here; starting it with --no-sandbox");
+      UNSANDBOXED.add(binary);
       try {
         await this.launch(["--no-sandbox"]);
       } catch (retryError) {

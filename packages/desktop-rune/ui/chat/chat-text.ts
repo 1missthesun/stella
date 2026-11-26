@@ -31,12 +31,15 @@ export type ChatSurfaceLook = {
   assistant: { radius: number; maxW: `${number}%`; py: number; px: number };
 };
 
+/** Streamdown draws bold and table headers as `font-semibold`, over `.markdown strong`'s medium. */
+const STREAMDOWN_BOLD = 600;
+
 const textLook = (text: ChatText) => ({ size: text.size, weight: text.weight, lineHeight: Math.round(text.size * text.lineHeight * 100) / 100, tracking: 0 });
 
 const FULL_LOOK: ChatSurfaceLook = {
   text: CHAT_TEXT_LOOK,
   line: CHAT_LINE,
-  markdown: CHAT_TEXT,
+  markdown: { ...CHAT_TEXT, strongWeight: STREAMDOWN_BOLD },
   user: { radius: 18, maxW: "85%", py: 5 + 1, px: 12 + 1 },
   assistant: { radius: 18, maxW: "85%", py: 8, px: 14 },
 };
@@ -44,7 +47,7 @@ const FULL_LOOK: ChatSurfaceLook = {
 const SIDEBAR_LOOK: ChatSurfaceLook = {
   text: textLook(CHAT_TEXT_COMPACT),
   line: textLook(CHAT_TEXT_COMPACT).lineHeight,
-  markdown: CHAT_TEXT_COMPACT,
+  markdown: { ...CHAT_TEXT_COMPACT, strongWeight: STREAMDOWN_BOLD },
   user: { radius: 14, maxW: "88%", py: 5 + 1, px: 12 + 1 },
   assistant: { radius: 14, maxW: "85%", py: 6, px: 12 },
 };

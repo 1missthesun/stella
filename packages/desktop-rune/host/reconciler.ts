@@ -3,7 +3,7 @@
 // the engine wires only the ones an element has and reports them by node id.
 
 import Reconciler from "react-reconciler";
-import { DefaultEventPriority } from "react-reconciler/constants";
+import { ConcurrentRoot, ContinuousEventPriority, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { createContext, type ReactNode } from "react";
 import { blob, commitCtx, flushFrame, ops, setElementDispatch, type ElementEvent } from "./bridge";
 
@@ -100,15 +100,31 @@ function serialize(inst: Instance, props: Record<string, any>): string {
   return JSON.stringify(out);
 }
 
+/** Event priorities as React DOM assigns them: user actions commit before the handler returns,
+ *  pointer motion and scrolling batch per task, and everything the engine reports by itself
+ *  (layout, scroll position, page state) waits for the next default render. */
+const DISCRETE = new Set(["press", "doublePress", "dismiss", "input", "submit", "key", "keyRaw", "paste", "link", "linkContextMenu", "contextMenu", "dropFiles", "focus", "focusWithin", "selection"]);
+const CONTINUOUS = new Set(["hover", "scroll", "wheel", "pointer", "dropHover", "drag"]);
+
 setElementDispatch((e) => {
   const inst = instances.get(e.n);
   const fn = inst?.handlers[e.e];
   if (!fn) return;
-  batched(() => {
-    commitCtx.ack = e.seq;
-    commitCtx.t0 = e.at;
-    fn(...payload(e));
-  });
+  const discrete = DISCRETE.has(e.e);
+  const previous = currentPriority;
+  currentPriority = discrete ? DiscreteEventPriority : CONTINUOUS.has(e.e) ? ContinuousEventPriority : DefaultEventPriority;
+  try {
+    batched(() => {
+      if (discrete) {
+        commitCtx.ack = e.seq;
+        commitCtx.t0 = e.at;
+      }
+      fn(...payload(e));
+    });
+    if (discrete) reconciler.flushSyncWork();
+  } finally {
+    currentPriority = previous;
+  }
 });
 
 let currentPriority = DefaultEventPriority;
@@ -209,8 +225,9 @@ const reconciler = Reconciler(config) as ReturnType<typeof Reconciler> & {
   flushSyncWork(): void;
 };
 const container: Container = { id: 0 };
-// Legacy root: updates outside React events render synchronously, so one engine event = one commit.
-const root = reconciler.createContainer(container, 0, null, false, null, "", console.error, console.error, console.error, () => {}, null);
+// A concurrent root batches a task's updates into one render, as createRoot does in a browser;
+// discrete element events flush before returning, so each one is answered by its own commit.
+const root = reconciler.createContainer(container, ConcurrentRoot, null, false, null, "", console.error, console.error, console.error, () => {}, null);
 
 export function render(el: ReactNode, ctx?: Partial<typeof commitCtx>) {
   if (ctx) Object.assign(commitCtx, ctx);

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { derive, font, fontSize, mix, radiusUnset, type Tokens, useTokens } from "../theme";
 import { engine } from "./engine";
 import { Icons } from "./icons";
+import { TABLE_ACTIONS, useTableActions } from "./table-actions";
 
 type Font = { size: number; weight: number; lineHeight: number; tracking?: number; family?: string };
 
@@ -86,6 +88,7 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
       actionsAt: [6, 6],
       inside: { fill: c.surfaceInset, border: c.borderWeak, radius: 8, pad: [12, 10, 10] },
     },
+    tableFrame: { actions: TABLE_ACTIONS, actionColor: c.mutedForeground, actionHover: c.foreground, actionsOnHover: true, actionsAt: [6, 0], actionsFill: c.background, gap: 4, buttonPad: 4 },
   };
 }
 
@@ -123,5 +126,12 @@ const openExternal = (url: string) => (globalThis as { electronAPI?: { system?: 
 export function Markdown({ id, text, streaming = false, chat = CHAT_TEXT, highlight = false, onLink = openExternal }: MarkdownProps) {
   const t = useTokens();
   const style = derive(t, `markdown:${chat.size}:${chat.color ?? ""}:${highlight}`, (t) => markdownStyle(t, chat, highlight));
-  return <markdown id={id} src={text} streaming={streaming} selectable mdStyle={style} onLink={onLink} onCodeAction={codeAction} w="full" />;
+  const tables = useTableActions(id);
+  const withActions = useMemo(() => (tables.actions === TABLE_ACTIONS ? style : { ...style, tableFrame: { ...style.tableFrame, actions: tables.actions } }), [style, tables.actions]);
+  return (
+    <>
+      <markdown id={id} src={text} streaming={streaming} selectable mdStyle={withActions} onLink={onLink} onCodeAction={codeAction} onTableAction={tables.onTableAction} w="full" />
+      {tables.overlay}
+    </>
+  );
 }

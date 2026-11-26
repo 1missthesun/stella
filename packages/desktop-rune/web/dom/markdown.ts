@@ -9,7 +9,7 @@ import { FAMILY, type Css } from "./style";
 type Md = { type: string; children?: Md[]; value?: string; depth?: number; ordered?: boolean; start?: number | null; url?: string; alt?: string; lang?: string | null; align?: (string | null)[]; checked?: boolean | null };
 type Font = { size?: number; weight?: number; lineHeight?: number; tracking?: number; family?: string; features?: string };
 type Style = Record<string, any>;
-type Ctx = { s: Style; p: MarkdownProps; codeIndex: { n: number } };
+type Ctx = { s: Style; p: MarkdownProps; codeIndex: { n: number }; tableIndex: { n: number } };
 
 const parser = unified().use(remarkParse).use(remarkGfm);
 
@@ -161,6 +161,40 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
   }, createElement("code", null, source)), actionRow);
 }
 
+type TableActionP = { id: string; label?: string; svg?: string; view?: number; size?: number };
+
+function tableActions(n: Md, c: Ctx): ReactNode {
+  const { s, p } = c;
+  const frame = s.tableFrame as Style | undefined;
+  const actions = (frame?.actions ?? []) as TableActionP[];
+  if (!frame || !actions.length) return null;
+  const index = c.tableIndex.n++;
+  const [top, right] = pair(frame.actionsAt, [6, 0]);
+  const pad = frame.buttonPad ?? 4;
+  const fire = (a: TableActionP, button: HTMLElement | null) => {
+    const table = button?.closest(".mdtable")?.querySelector("table");
+    const rows = table ? [...table.rows].map((r) => [...r.cells].map((cell) => cell.textContent ?? "")) : [];
+    const align = (n.align ?? []).map((x) => (x === "center" ? "center" : x === "right" ? "end" : "start") as "start" | "center" | "end");
+    const b = button?.getBoundingClientRect();
+    p.onTableAction?.({ action: a.id, index, rows, align, rect: b && b.width ? { x: b.x, y: b.y, w: b.width, h: b.height } : null });
+  };
+  return createElement("div", {
+    className: frame.actionsOnHover === false ? "mdta" : "mdta hov",
+    style: { top: px(top), right: px(right), gap: px(frame.gap ?? 4), background: frame.actionsFill, color: frame.actionColor, "--mdca-hover": frame.actionHover } as Css,
+  }, actions.map((a) => {
+    const size = a.size ?? 14;
+    return createElement("button", {
+      key: a.id, type: "button", className: "mdtb", "aria-label": a.label ?? a.id, title: a.label ?? a.id,
+      style: { width: px(size + 2 * pad), height: px(size + 2 * pad) },
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        fire(a, e.currentTarget);
+      },
+      dangerouslySetInnerHTML: { __html: `<svg viewBox="0 0 ${a.view ?? 16} ${a.view ?? 16}" width="${size}" height="${size}" fill="none">${a.svg ?? ""}</svg>` },
+    });
+  }));
+}
+
 function table(n: Md, c: Ctx, key: number): ReactNode {
   const { s } = c;
   const [cellX, cellY] = pair(s.tableCellPadding, [12, 8]);
@@ -186,10 +220,12 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
     }
     return createElement(header ? "th" : "td", { key: i, style }, inlines(cellNode.children, c));
   });
-  return createElement("div", { key, style: { ...margin(s.tableMargin, [16, 16]), overflowX: "auto", scrollbarWidth: "thin" } },
+  const actions = tableActions(n, c);
+  const scroller = createElement("div", { style: { overflowX: "auto", scrollbarWidth: "thin" } },
     createElement("table", { style: { borderCollapse: "collapse", width: s.tableFullWidth ? "100%" : undefined, ...fontCss(s.tableFont as Font), outline: s.tableOutline ? `1px solid ${s.tableOutline}` : undefined } },
       createElement("thead", null, rows[0] ? createElement("tr", null, cell(rows[0], 0)) : null),
       createElement("tbody", null, rows.slice(1).map((row, r) => createElement("tr", { key: r }, cell(row, r + 1))))));
+  return createElement("div", { key, className: actions ? "mdtable" : undefined, style: { ...margin(s.tableMargin, [16, 16]), position: actions ? "relative" : undefined } }, scroller, actions);
 }
 
 function blocks(nodes: Md[] | undefined, c: Ctx, nested = false): ReactNode[] {
@@ -251,7 +287,7 @@ export function Markdown(p: MarkdownProps) {
       return { type: "root", children: [{ type: "paragraph", children: [{ type: "text", value: p.src }] }] } as Md;
     }
   }, [p.src]);
-  const content = useMemo(() => blocks(tree.children, { s, p, codeIndex: { n: 0 } }), [tree, s, p.onLink, p.onCodeAction, p.linkStyles, p.images]);
+  const content = useMemo(() => blocks(tree.children, { s, p, codeIndex: { n: 0 }, tableIndex: { n: 0 } }), [tree, s, p.onLink, p.onCodeAction, p.onTableAction, p.linkStyles, p.images]);
   const st = h.props.style;
   Object.assign(st, fontCss((s.body ?? s.bodyFont) as Font));
   st.color = s.text;

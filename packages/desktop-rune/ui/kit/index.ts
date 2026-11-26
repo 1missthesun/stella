@@ -4,6 +4,7 @@ export { DropdownMenu, MenuCheckboxItem, MenuItem, MenuLabel, MenuRadioItem, Men
 export { type EmptyStateMotif } from "./empty-state/MotifArt";
 export { Avatar, EmptyState, Keybind, MANROPE_CH, ManualCopyField, RetainedSurface, StellaMark, Tabs, WorkingDots, useRetainedSurfaceActive, type EmptyStateAction, type TabItem } from "./Misc";
 export { Markdown, markdownStyle, codeAction as markdownCodeAction, CHAT_TEXT, CHAT_TEXT_COMPACT, type ChatText } from "./Markdown";
+export { TABLE_ACTIONS, useTableActions } from "./table-actions";
 export { Switch, type SwitchProps } from "./Switch";
 export { TextField, type TextFieldProps } from "./TextField";
 export { ToastItem, ToastRegion, dismissToast, showToast, type ToastOptions } from "./Toast";

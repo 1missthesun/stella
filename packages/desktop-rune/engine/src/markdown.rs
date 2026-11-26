@@ -254,6 +254,22 @@ struct ActionP {
     label: Option<String>,
     svg: Option<String>,
     view: Option<f32>,
+    size: Option<f32>,
+}
+
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct TableFrameP {
+    actions: Vec<ActionP>,
+    action_color: Option<crate::props::C>,
+    action_hover: Option<crate::props::C>,
+    actions_on_hover: Option<bool>,
+    /// `[top, right]` from the table's top right corner.
+    actions_at: Option<[f32; 2]>,
+    /// Painted behind the action row so it covers the header text it floats over.
+    actions_fill: Option<crate::props::C>,
+    gap: Option<f32>,
+    button_pad: Option<f32>,
 }
 
 fn label(t: &str, size: f32, color: rune::Color) -> El {
@@ -319,6 +335,52 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
     })
 }
 
+/// `mdStyle.tableFrame`: actions floating at each table's top right (shown on hover unless
+/// `actionsOnHover: false`); pressing one fires `tableAction` with the table's cells and the
+/// button's window rect.
+fn table_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
+    let Ok(f) = serde_json::from_value::<TableFrameP>(v.clone()) else { return md };
+    md.table_frame_with(move |table, t| {
+        let color = f.action_color.map(|c| c.0).unwrap_or(parse_color("#8a8a8e").unwrap_or(rune::Color::TRANSPARENT));
+        let pad = f.button_pad.unwrap_or(4.0);
+        let mut actions = rune::row().gap(f.gap.unwrap_or(4.0)).items_center().pl(6.0).radius(6.0);
+        if let Some(c) = f.actions_fill {
+            actions = actions.fill(c.0);
+        }
+        let cells: std::rc::Rc<Vec<Vec<String>>> = std::rc::Rc::new(t.cells().into_iter().map(|r| r.into_iter().map(str::to_owned).collect()).collect());
+        let align: std::rc::Rc<Vec<&'static str>> = std::rc::Rc::new(t.align.iter().map(|a| match a {
+            rune::Align::Center => "center",
+            rune::Align::End => "end",
+            _ => "start",
+        }).collect());
+        for a in &f.actions {
+            let size = a.size.unwrap_or(14.0);
+            let side = size + 2.0 * pad;
+            let mut b = rune::el().key(a.id.clone()).size(side, side).center().cursor(rune::Cursor::Pointer).role("button").hover_group()
+                .label(a.label.clone().unwrap_or_else(|| a.id.clone()));
+            let mut icon = match &a.svg {
+                Some(svg) => crate::media::icon(&Props { svg: Some(svg.clone()), view: a.view, size: Some(size), color: Some(crate::props::C(color)), ..Default::default() }),
+                None => label(a.label.as_deref().unwrap_or(&a.id), 12.0, color),
+            };
+            if let Some(h) = f.action_hover {
+                icon = icon.group_color(h.0);
+            }
+            b = b.child(icon);
+            let (id, index, cells, align) = (a.id.clone(), t.index, cells.clone(), align.clone());
+            b = b.on_press_tx(move |_s: &mut crate::windows::Win, tx: &mut rune::Tx| {
+                let rect = tx.press_point().map(|p| serde_json::json!({ "x": p.window_x - p.x, "y": p.window_y - p.y, "w": side, "h": side }));
+                crate::engine::element_event(n, "tableAction", serde_json::json!({ "action": id, "index": index, "rows": *cells, "align": *align, "rect": rect }), Some(tx));
+            });
+            actions = actions.child(b);
+        }
+        if f.actions_on_hover.unwrap_or(true) {
+            actions = actions.group_opacity(0.0, 1.0);
+        }
+        let [top, right] = f.actions_at.unwrap_or([6.0, 0.0]);
+        rune::col().key(format!("table-{}", t.index)).w_full().hover_group().child(table).child(actions.pin(None, Some(top), Some(right), None).raise())
+    })
+}
+
 fn link_styles(md: Markdown, styles: Vec<crate::props::LinkStyleP>) -> Markdown {
     let styles = std::rc::Rc::new(styles);
     let find = |styles: &std::rc::Rc<Vec<crate::props::LinkStyleP>>, href: &str| styles.iter().position(|s| href.starts_with(&s.prefix));
@@ -364,6 +426,9 @@ pub fn build(n: u32, p: &Props) -> El {
     let mut md = Markdown::new(src).streaming(p.streaming).selectable(p.selectable || p.selection_group);
     if let Some(f) = p.md_style.as_ref().and_then(|v| v.get("codeFrame")) {
         md = code_frame(n, md, f);
+    }
+    if let Some(f) = p.md_style.as_ref().and_then(|v| v.get("tableFrame")) {
+        md = table_frame(n, md, f);
     }
     if p.listens("link") {
         md = md.on_link_tx(move |_s: &mut crate::windows::Win, href: &str, tx: &mut rune::Tx| {

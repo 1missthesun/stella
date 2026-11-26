@@ -10,7 +10,7 @@ import { cloudDriveEntry } from "@/features/workspace-display/derive-conversatio
 import { shouldUseBoundedMarkdownPlaintext } from "@/features/chat/streaming/markdown-chunks";
 import { translateNow } from "@/shared/i18n";
 import { derive, useTokens } from "../theme";
-import { markdownCodeAction, markdownStyle, type ChatText } from "../kit";
+import { markdownCodeAction, markdownStyle, TABLE_ACTIONS, useTableActions, type ChatText } from "../kit";
 import { fetchedImageSources, prepareChatMarkdown, stellaAppSlug, stellaFilePath } from "./markdown-source";
 import { BUBBLE_FEATURES, useChatSurfaceLook } from "./chat-text";
 import { rune } from "./engine";
@@ -51,12 +51,15 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
   const chat = chatOverride ?? surface.markdown;
   const [anonKey] = useState(() => `md-${Math.random().toString(36).slice(2)}`);
   const openFile = useOpenConversationFile();
+  const tables = useTableActions(`md:${cacheKey ?? anonKey}`);
   const style = derive(t, `chat-markdown:${chat.size}:${chat.color ?? ""}`, (t) => ({
     ...markdownStyle(t, chat, false),
     body: { ...markdownStyle(t, chat, false).body, features: BUBBLE_FEATURES },
     codeMargin: [16, 16],
     tableMargin: [16, 16],
+    tableFrame: { ...markdownStyle(t, chat, false).tableFrame, actionsFill: t.c.chatAssistantBubbleFillTop },
   }));
+  const mdStyle = useMemo(() => (tables.actions === TABLE_ACTIONS ? style : { ...style, tableFrame: { ...style.tableFrame, actions: tables.actions } }), [style, tables.actions]);
   const linkStyles = derive(t, "chat-markdown-links", (t) => [{ prefix: "stella-file:", color: t.c.textInteractive, underline: t.c.textInteractive }]);
   const hiddenKey = hiddenFilePaths?.join("\0") ?? "";
   const source = useMemo(
@@ -90,5 +93,10 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
       </text>
     );
   }
-  return <markdown id={`md:${cacheKey ?? anonKey}`} src={source} selectable mdStyle={style} linkStyles={linkStyles} images={images} imageRadius={6} onLink={onLink} onCodeAction={markdownCodeAction} onContextMenu={onContextMenu} w="fit" maxW="full" />;
+  return (
+    <>
+      <markdown id={`md:${cacheKey ?? anonKey}`} src={source} selectable mdStyle={mdStyle} linkStyles={linkStyles} images={images} imageRadius={6} onLink={onLink} onCodeAction={markdownCodeAction} onTableAction={tables.onTableAction} onContextMenu={onContextMenu} w="fit" maxW="full" />
+      {tables.overlay}
+    </>
+  );
 });

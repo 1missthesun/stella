@@ -161,6 +161,8 @@ export type TextProps = BoxProps & {
   family?: string;
   /** CSS `font-feature-settings`, e.g. `"'ss01' 1, 'tnum' 1"`. */
   features?: string;
+  /** Thin, grayscale-smoothed glyphs in a browser (`-webkit-font-smoothing: antialiased`), as the engine always draws them; browser text is otherwise smoothed normally. */
+  antialias?: boolean;
   italic?: boolean; underline?: boolean; strike?: boolean;
   selectable?: boolean;
   selectionColor?: Color;
@@ -233,13 +235,23 @@ export type IconProps = BoxProps & {
   spin?: number;
 };
 
+export type TableAction = {
+  action: string;
+  index: number;
+  rows: string[][];
+  align: ("start" | "center" | "end")[];
+  rect: { x: number; y: number; w: number; h: number } | null;
+};
+
 export type MarkdownProps = BoxProps & {
   src: string; streaming?: boolean; selectable?: boolean;
-  /** MarkdownStyle builders by camelCase name, plus `codeFrame` (host/ELEMENTS.md). */
+  /** MarkdownStyle builders by camelCase name, plus `codeFrame` and `tableFrame` (host/ELEMENTS.md). */
   mdStyle?: Record<string, unknown>;
   onLink?: (href: string) => void;
   /** A `mdStyle.codeFrame.actions` button was pressed on a code block. */
   onCodeAction?: (a: { action: string; index: number; language: string | null; source: string }) => void;
+  /** A `mdStyle.tableFrame.actions` button was pressed on a table: its cells (header row first), column alignment, and the button's window rect (null from the keyboard). */
+  onTableAction?: (a: TableAction) => void;
   /** Right-click (control-click) on a link, at window points. */
   onLinkContextMenu?: (e: { href: string; x: number; y: number }) => void;
   /** Looks for links whose href starts with `prefix`; the first match wins. */

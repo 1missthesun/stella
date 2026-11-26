@@ -25,6 +25,12 @@ export const engine = {
     await e.clipboard.writeText(text);
     return true;
   },
+  async writeHTML(html: string, text: string): Promise<boolean> {
+    const e = api();
+    if (!e) return false;
+    await e.clipboard.writeHTML(html, text);
+    return true;
+  },
   /** Asks where to save `text` and writes it there; false when cancelled or without the engine. */
   async saveText(text: string, defaultName: string): Promise<boolean> {
     const e = api();

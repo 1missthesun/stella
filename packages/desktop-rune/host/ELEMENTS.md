@@ -126,7 +126,7 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
 - `disabled`. `hidden` keeps the element's space but doesn't draw it, hit-test it or announce it.
 
 **Motion.**
-- Transforms: `x y scale rotate origin`.
+- Transforms: `x y scale rotate origin`. `rotate` (here and in `loop` frames) is in radians.
 - `motion {dur, bounce}` is the spring every prop change rides. `layout` (s) animates layout
   changes. `instant` makes changes land without motion. Without `motion` or `layout` on the
   element or an ancestor, a change lands at once, as in CSS.
@@ -190,7 +190,8 @@ its own label.
 - Content: `spans: [{t, w, c, m, bg, i, u, s, st, href}]`. The run fields are: text, weight,
   colour, mono, background, italic, underline colour, size, strike, and a link (`onLink(href)`).
 - Style: `size weight lineHeight tracking color mono family` (a registered font family, `sans`,
-  `mono` or `system-mono`), `italic underline strike`.
+  `mono` or `system-mono`), `italic underline strike`. `antialias` only reaches the web build,
+  where browser text is otherwise smoothed normally; the engine always draws it so.
 - Selection: `selectable`, `selectionColor`.
 - Wrapping: `maxLines`, `truncate` (`true` | `end` | `middle` | `head` | `fade`), `nowrap`,
   `balance` (CSS `text-wrap: balance`: 2 to 6 lines break at the narrowest width that keeps their
@@ -293,6 +294,15 @@ copy or download. `inside: {fill, border, radius, pad: [x, top, bottom]}` draws 
 the label row inside it (streamdown's layout): pair it with `codeBlock: ["transparent", "transparent"]`
 and `codeBlockPadding: [0, y]`. `actionsAt: [top, right]` floats the actions at that inset from
 the frame's top right corner instead of placing them in the label row.
+
+**`tableFrame`.** `{actions: [{id, label?, svg?, view?, size?}], actionColor, actionHover,
+actionsOnHover, actionsAt: [top, right], actionsFill, gap, buttonPad}` floats a row of actions at
+each table's top right (default inset `[6, 0]`), on `actionsFill` so it covers the header text
+beneath it, shown on hover unless `actionsOnHover: false`. Each button is `size + 2 × buttonPad`
+square. Pressing one fires `onTableAction({action, index, rows, align, rect})`: `rows` are the
+cells' plain text, header first; `align` is `start`/`center`/`end` per column; `rect` is the
+button in window points, `null` when pressed from the keyboard. TS does the copy, download and
+full-screen view.
 
 **Links and images.**
 - `linkStyles: [{prefix, color?, weight?, bg?, pad?, underline?, ring?: [color, width],

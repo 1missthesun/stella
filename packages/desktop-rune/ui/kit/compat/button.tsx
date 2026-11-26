@@ -37,7 +37,7 @@ function buttonLook(t: Tokens, key: string): Look {
   const off = disabled === "1";
   if (pill === "1" && inSettings === "1") {
     const text = { size: 14.5, weight: 600, em: -0.012, color: c.interactive };
-    const look: Look = { minH: 28, py: 5, px: 9, mx: -9, my: -5, gap: sz.gap, radius: 7, text, motion: { dur: 0.15 } };
+    const look: Look = { h: 28, py: 5, px: 9, mx: -9, my: -5, gap: sz.gap, radius: 7, text, motion: { dur: 0.15 } };
     if (tone === "primary") {
       const primary: Look = { ...look, mx: 0, my: 0, py: 6, px: 14, radius: radius.full, fill: c.interactive, text: { ...text, color: c.interactiveForeground } };
       return off ? { ...primary, opacity: 0.45 } : { ...primary, hover: mix(c.foreground, 10, c.interactive), press: mix(c.foreground, 16, c.interactive) };

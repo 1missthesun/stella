@@ -12,7 +12,7 @@ const usePillBase = sheet((c) => ({
 }));
 
 const usePillInSettings = sheet((c) => ({
-  pillBtn: { family: "sans", py: 5, px: 9, mx: -9, my: -5, align: "center", justify: "center", minH: 28, border: "#00000000", radius: 7, color: c.interactive, size: 14.5, weight: 600, em: -0.012, nowrap: true, motion: { dur: 0.15 }, hoverColor: c.interactive, hover: mixOklch(c.foreground, 6, "transparent"), press: mix(c.foreground, 10, "transparent") },
+  pillBtn: { family: "sans", py: 5, px: 9, mx: -9, my: -5, align: "center", justify: "center", h: 28, border: "#00000000", radius: 7, color: c.interactive, size: 14.5, weight: 600, em: -0.012, nowrap: true, motion: { dur: 0.15 }, hoverColor: c.interactive, hover: mixOklch(c.foreground, 6, "transparent"), press: mix(c.foreground, 10, "transparent") },
   pillBtnDisabled: { opacity: 0.45 },
   pillBtnLg: {},
   pillBtnActive: { fill: c.selectFill, color: c.selectText, hover: c.selectFill, hoverColor: c.selectText },

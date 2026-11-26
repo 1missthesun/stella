@@ -87,7 +87,9 @@ export const contextHandoffNotesRequest = (args: { tokens: number; threshold: nu
     "Reply with only your handoff notes as plain text, and call no tools.",
     [
       `Write them as the brief you'd give yourself to continue: ${NUDGE_NOTES_CONTENT}`,
-      "Stella adds your original task, this turn's earlier messages and the work still running, and the conversation from your next step on stays in the fresh context word for word; say which parts of the original task are done or superseded.",
+      "Keep word for word what the user told you that they may come back to: names, numbers, codes, preferences and facts.",
+      "Stella adds your original task, this turn's earlier messages and the work still running; say which parts of the original task are done or superseded.",
+      "Your step after the last message above, and everything after it, is already written and stays in the fresh context word for word, so your notes end where these messages end and that step is not your next action.",
       ...(args.agent ? [BE_COMPLETE] : []),
     ].join(" "),
     "</system-reminder>",

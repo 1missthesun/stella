@@ -355,8 +355,10 @@ fn applied_at_open(p: &Props) -> Applied {
 }
 
 /// Root children that appeared or left in this batch: bind the main window, open or close others.
-/// A `<window>` that replaces one with the same `id` in the same batch (a remount, as a hot swap
-/// does) takes over its native window, so the window is never unmapped and mapped again.
+/// A `<window>` that replaces one with the same `id` and open-time props in the same batch (a
+/// remount, as a hot swap does), or a main window replacing the main window, takes over its native
+/// window and its webviews, so the window is never unmapped and mapped again and its pages keep
+/// running.
 fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
     let mut freed: Vec<(u32, engine::WinSlot)> = Vec::new();
     for node in removed {
@@ -367,8 +369,6 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             e.windows.remove(&node)
         });
         if let Some(slot) = slot {
-            #[cfg(feature = "webview")]
-            crate::webview::close_window(node);
             window_event(node, "closed", json!({}));
             freed.push((node, slot));
         }
@@ -380,7 +380,8 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             (p, main)
         });
         let key = baked(&props);
-        if let Some(i) = freed.iter().position(|(_, s)| key.is_some() && s.handle.is_some() && s.baked == key && (s.is_main == bind_main)) {
+        let same = |s: &engine::WinSlot| s.handle.is_some() && if bind_main { s.is_main } else { !s.is_main && key.is_some() && s.baked == key };
+        if let Some(i) = freed.iter().position(|(_, s)| same(s)) {
             let (old, mut slot) = freed.swap_remove(i);
             slot.dirty = true;
             slot.committed = false;
@@ -398,6 +399,8 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             if focused {
                 window_event(node, "focus", json!({}));
             }
+            #[cfg(feature = "webview")]
+            crate::webview::take_over(old, node);
             if let Some(w) = waker {
                 w();
             }
@@ -421,7 +424,9 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             open(node, &props);
         }
     }
-    for (_, slot) in freed {
+    for (node, slot) in freed {
+        #[cfg(feature = "webview")]
+        crate::webview::close_window(node);
         if let Some(h) = slot.handle {
             if slot.is_main {
                 h.hide();

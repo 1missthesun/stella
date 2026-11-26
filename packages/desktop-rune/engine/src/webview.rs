@@ -25,6 +25,11 @@ use crate::windows::Win;
 struct View {
     view: WebView,
     window: u32,
+    /// The node it was created for, which its page's events and scheme requests name.
+    born: u32,
+    /// The element's `id` and the props fixed at creation, which a remount must match to keep it.
+    key: Option<String>,
+    baked: Baked,
     protocols: Arc<[String]>,
     url: Option<String>,
     html: Option<String>,
@@ -90,6 +95,56 @@ struct Over {
     corners: [f32; 4],
     build: u64,
     paints: bool,
+}
+
+/// Props a native view takes only when it is created.
+#[derive(Clone, PartialEq)]
+struct Baked {
+    protocols: Vec<String>,
+    preload: Option<String>,
+    user_agent: Option<String>,
+    microphone: bool,
+    transparent: bool,
+    devtools: bool,
+}
+
+fn baked(p: &Props) -> Baked {
+    Baked { protocols: p.protocols.clone(), preload: p.preload.clone(), user_agent: p.user_agent.clone(), microphone: p.microphone, transparent: p.transparent, devtools: p.devtools }
+}
+
+/// What a page has told its element so far, replayed to the element that keeps it.
+#[derive(Default)]
+struct Page {
+    node: u32,
+    title: Option<String>,
+    loaded: Option<String>,
+}
+
+/// Pages by the node their view was born for.
+static PAGES: Mutex<Option<HashMap<u32, Page>>> = Mutex::new(None);
+
+fn pages<R>(f: impl FnOnce(&mut HashMap<u32, Page>) -> R) -> R {
+    f(PAGES.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new))
+}
+
+/// The node now holding the view born for `born`.
+fn live(born: u32) -> u32 {
+    pages(|p| p.get(&born).map(|x| x.node)).unwrap_or(born)
+}
+
+/// An event of the page born for `born`, sent to the element holding it now.
+fn page_event(born: u32, name: &str, extra: serde_json::Value) {
+    let node = pages(|p| {
+        let page = p.entry(born).or_insert_with(|| Page { node: born, ..Page::default() });
+        match name {
+            "title" => page.title = extra.get("title").and_then(|t| t.as_str()).map(str::to_owned),
+            "load" if extra.get("phase").and_then(|v| v.as_str()) == Some("finished") => page.loaded = extra.get("url").and_then(|u| u.as_str()).map(str::to_owned),
+            "load" => page.loaded = None,
+            _ => {}
+        }
+        page.node
+    });
+    element_event(node, name, extra, None);
 }
 
 thread_local! {
@@ -681,15 +736,15 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
         .with_initialization_script(PARENT_SHIM)
         .with_ipc_handler(move |req: Request<String>| {
             let body: serde_json::Value = serde_json::from_str(req.body()).unwrap_or(serde_json::Value::Null);
-            element_event(n, "message", json!({ "data": body.get("data"), "targetOrigin": body.get("targetOrigin") }), None);
+            element_event(live(n), "message", json!({ "data": body.get("data"), "targetOrigin": body.get("targetOrigin") }), None);
         })
-        .with_document_title_changed_handler(move |title: String| element_event(n, "title", json!({ "title": title }), None))
+        .with_document_title_changed_handler(move |title: String| page_event(n, "title", json!({ "title": title })))
         .with_on_page_load_handler(move |ev: PageLoadEvent, url: String| {
             let phase = match ev {
                 PageLoadEvent::Started => "started",
                 PageLoadEvent::Finished => "finished",
             };
-            element_event(n, "load", json!({ "phase": phase, "url": scheme_url::from_view(&load_protocols, &url) }), None)
+            page_event(n, "load", json!({ "phase": phase, "url": scheme_url::from_view(&load_protocols, &url) }))
         });
     #[cfg(not(target_os = "linux"))]
     {
@@ -699,7 +754,7 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
             if let Some(main) = main_frame_only() {
                 ev["mainFrame"] = json!(main);
             }
-            element_event(n, "navigate", ev, None);
+            element_event(live(n), "navigate", ev, None);
             true
         });
     }
@@ -726,7 +781,7 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
         let name = scheme.clone();
         b = b.with_asynchronous_custom_protocol(name, move |id, req: Request<Vec<u8>>, responder: RequestAsyncResponder| {
             // Linux registers a scheme once for every view, so the asking view picks the node.
-            let n = id.strip_prefix("stella-").and_then(|v| v.parse().ok()).unwrap_or(n);
+            let n = live(id.strip_prefix("stella-").and_then(|v| v.parse().ok()).unwrap_or(n));
             let rid = NEXT_RID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             PENDING.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).insert(rid, responder);
             let headers: serde_json::Map<String, serde_json::Value> =
@@ -804,14 +859,14 @@ fn main_frame_navigations(n: u32, view: &WebView) {
         if r.is_main_frame_main_resource() {
             let url = r.response().and_then(|res| res.uri()).map(|u| u.to_string()).unwrap_or_default();
             *seen.borrow_mut() = url.clone();
-            element_event(n, "navigate", json!({ "url": url, "mainFrame": true }), None);
+            element_event(live(n), "navigate", json!({ "url": url, "mainFrame": true }), None);
         }
         false
     });
     web.connect_load_failed(move |_, _, uri, _| {
         if *reported.borrow() != uri {
             *reported.borrow_mut() = uri.to_owned();
-            element_event(n, "navigate", json!({ "url": uri, "mainFrame": true }), None);
+            element_event(live(n), "navigate", json!({ "url": uri, "mainFrame": true }), None);
         }
         false
     });
@@ -847,8 +902,9 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         WAITING.with(|w| w.borrow_mut().insert(n, (window, r)));
         return;
     }
+    let props = if exists { None } else { engine::read(|e| e.tree.get(n).map(|node| (*node.props).clone())) };
+    let exists = exists || props.as_ref().is_some_and(|p| claim_parked(n, window, p));
     if !exists {
-        let props = engine::read(|e| e.tree.get(n).map(|node| (*node.props).clone()));
         let Some(p) = props else { return };
         let t0 = std::time::Instant::now();
         match create(n, window, &p, r) {
@@ -860,7 +916,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 win_env::cool();
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
-                    v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })
+                    v.borrow_mut().insert(n, View { view, window, born: n, key: p.id.clone(), baked: baked(&p), protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })
                 });
                 #[cfg(target_os = "linux")]
                 bridge_views();
@@ -874,6 +930,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         }
     }
     let shape = shape(n, window, r);
+    let unseen = unseen(n);
     VIEWS.with(|v| {
         let mut v = v.borrow_mut();
         let Some(view) = v.get_mut(&n) else { return };
@@ -883,7 +940,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             let _ = view.view.set_bounds(rect(window, r));
             view.rect = r;
         }
-        let hidden = r[2] < 1.0 || r[3] < 1.0 || shape.is_none() || view.covered;
+        let hidden = r[2] < 1.0 || r[3] < 1.0 || shape.is_none() || view.covered || unseen;
         if view.zoomed_at != (k, z) {
             view.zoomed_at = (k, z);
             zoom(view, k, z);
@@ -918,6 +975,24 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             }
         }
     });
+}
+
+/// Whether `n` or an ancestor is `hidden` or fully transparent (a retained tab in the
+/// background), where the engine draws nothing and a page would still show.
+fn unseen(n: u32) -> bool {
+    engine::read(|e| {
+        let mut at = n;
+        while let Some(node) = e.tree.get(at) {
+            if node.props.hidden || node.props.opacity == Some(0.0) {
+                return true;
+            }
+            if node.parent == at || at == 0 {
+                return false;
+            }
+            at = node.parent;
+        }
+        false
+    })
 }
 
 /// What shows of a native view that can't be masked by layers: a region of device-pixel rects,
@@ -1537,24 +1612,138 @@ pub fn sync(n: u32, p: &Props) {
 }
 
 pub fn active() -> bool {
-    VIEWS.with(|v| !v.borrow().is_empty()) || WAITING.with(|w| !w.borrow().is_empty())
+    VIEWS.with(|v| !v.borrow().is_empty()) || WAITING.with(|w| !w.borrow().is_empty()) || PARKED.with(|p| !p.borrow().is_empty())
 }
 
 /// Whether the views need the loop to keep ticking without a frame of their own: WebKitGTK's
-/// events are pumped from it, and a view waiting for its window's native handle retries on it.
+/// events are pumped from it, a view waiting for its window's native handle retries on it, and
+/// parked views expire on it.
 pub fn needs_ticks() -> bool {
-    cfg!(target_os = "linux") || WAITING.with(|w| !w.borrow().is_empty())
+    cfg!(target_os = "linux") || WAITING.with(|w| !w.borrow().is_empty()) || PARKED.with(|p| !p.borrow().is_empty())
 }
 
 /// Creates the views whose window had no native handle yet when they were first placed (a
-/// launch window's handle arrives with its first frame on macOS).
+/// launch window's handle arrives with its first frame on macOS), and closes parked views that
+/// waited too long.
 pub fn retry_waiting() {
+    expire_parked();
     let waiting: Vec<(u32, (u32, [f32; 4]))> = WAITING.with(|w| w.borrow_mut().drain().collect());
     for (n, (window, r)) in waiting {
         if engine::read(|e| e.tree.get(n).is_some()) {
             place(n, window, r);
         }
     }
+}
+
+/// How long a view of a remounted window waits for its `<webview>` to mount again (one that waits
+/// on an async source, like a registered canvas URL).
+const PARK_FOR: std::time::Duration = std::time::Duration::from_secs(3);
+
+thread_local! {
+    /// Views of remounted windows that no remounted `<webview>` has claimed yet, hidden, with when
+    /// they were parked.
+    static PARKED: RefCell<Vec<(std::time::Instant, View)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Whether the remounted element with props `p` takes over `view`: the same `id` (without ids,
+/// the same page) and the same creation-time props.
+fn same_page(view: &View, p: &Props) -> bool {
+    baked(p) == view.baked
+        && match &view.key {
+            Some(k) => p.id.as_ref() == Some(k),
+            None => p.id.is_none() && p.url == view.url && p.html == view.html,
+        }
+}
+
+/// A window remounted onto its native window (`windows::windows_changed`) keeps its pages: each
+/// view of `old` moves to the remounted `window`'s `<webview>` that is the same page (`same_page`),
+/// now or when that element first lays out within `PARK_FOR`; the rest close then.
+pub fn take_over(old: u32, window: u32) {
+    let mut views: Vec<(u32, View)> = VIEWS.with(|v| {
+        let mut v = v.borrow_mut();
+        let ids: Vec<u32> = v.iter().filter(|(_, x)| x.window == old).map(|(n, _)| *n).collect();
+        ids.into_iter().filter_map(|n| v.remove(&n).map(|x| (n, x))).collect()
+    });
+    if views.is_empty() {
+        return;
+    }
+    views.sort_by_key(|v| v.0);
+    let mut fresh: Vec<(u32, Props)> = engine::read(|e| {
+        e.tree
+            .nodes
+            .iter()
+            .filter(|(id, n)| n.kind == crate::props::Kind::Webview && e.tree.window_of(**id) == Some(window))
+            .map(|(id, n)| (*id, (*n.props).clone()))
+            .collect()
+    });
+    fresh.retain(|(id, _)| VIEWS.with(|v| !v.borrow().contains_key(id)));
+    fresh.sort_by_key(|f| f.0);
+    let now = std::time::Instant::now();
+    for (n, mut view) in views {
+        view.window = window;
+        view.applied = None;
+        match fresh.iter().position(|(_, p)| same_page(&view, p)) {
+            Some(i) => {
+                let to = fresh.remove(i).0;
+                if let Some(pixels) = COVERS.with(|c| c.borrow_mut().remove(&n)) {
+                    COVERS.with(|c| c.borrow_mut().insert(to, pixels));
+                }
+                #[cfg(target_os = "linux")]
+                crate::webview_input::rekey(n, to);
+                adopt(to, view);
+            }
+            None => {
+                COVERS.with(|c| c.borrow_mut().remove(&n));
+                #[cfg(target_os = "linux")]
+                crate::webview_input::forget(n);
+                if view.visible {
+                    let _ = view.view.set_visible(false);
+                    view.visible = false;
+                }
+                PARKED.with(|p| p.borrow_mut().push((now, view)));
+            }
+        }
+    }
+}
+
+/// Node `to` holds `view` from now on and hears the page's state again (`ready`, its title, a
+/// finished load marked `kept`).
+fn adopt(to: u32, view: View) {
+    let born = view.born;
+    VIEWS.with(|v| v.borrow_mut().insert(to, view));
+    let (title, loaded) = pages(|p| {
+        let page = p.entry(born).or_insert_with(Page::default);
+        page.node = to;
+        (page.title.clone(), page.loaded.clone())
+    });
+    element_event(to, "ready", json!({}), None);
+    if let Some(title) = title {
+        element_event(to, "title", json!({ "title": title }), None);
+    }
+    if let Some(url) = loaded {
+        element_event(to, "load", json!({ "phase": "finished", "url": url, "kept": true }), None);
+    }
+}
+
+/// A parked view that `n` (in `window`, props `p`) is the same page as, now held by `n`.
+fn claim_parked(n: u32, window: u32, p: &Props) -> bool {
+    let view = PARKED.with(|parked| {
+        let mut parked = parked.borrow_mut();
+        let i = parked.iter().position(|(_, v)| v.window == window && same_page(v, p))?;
+        Some(parked.remove(i).1)
+    });
+    view.map(|v| adopt(n, v)).is_some()
+}
+
+/// Closes parked views nothing claimed in time.
+fn expire_parked() {
+    let gone: Vec<View> = PARKED.with(|parked| {
+        let mut parked = parked.borrow_mut();
+        let (old, keep): (Vec<_>, Vec<_>) = parked.drain(..).partition(|(at, _)| at.elapsed() >= PARK_FOR);
+        *parked = keep;
+        old.into_iter().map(|(_, v)| v).collect()
+    });
+    destroy(gone);
 }
 
 /// Drops the WebView (and its web process) of a removed node.
@@ -1575,7 +1764,13 @@ pub fn close_window(window: u32) {
         let ids: Vec<u32> = v.iter().filter(|(_, view)| view.window == window).map(|(n, _)| *n).collect();
         ids.into_iter().filter_map(|n| v.remove(&n)).collect()
     });
-    destroy(gone);
+    let parked: Vec<View> = PARKED.with(|p| {
+        let mut p = p.borrow_mut();
+        let (gone, keep): (Vec<_>, Vec<_>) = p.drain(..).partition(|(_, v)| v.window == window);
+        *p = keep;
+        gone.into_iter().map(|(_, v)| v).collect()
+    });
+    destroy(gone.into_iter().chain(parked).collect());
 }
 
 /// wry's X11 teardown destroys its container before GTK unmaps it, which GDK would treat as a
@@ -1584,6 +1779,7 @@ fn destroy(views: Vec<View>) {
     if views.is_empty() {
         return;
     }
+    pages(|p| views.iter().for_each(|v| drop(p.remove(&v.born))));
     #[cfg(target_os = "linux")]
     {
         gtk::gdk::error_trap_push();

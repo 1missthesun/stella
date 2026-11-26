@@ -179,6 +179,13 @@ pub fn route(window: u32, events: Vec<Value>) -> Vec<Value> {
 }
 
 /// Forgets a closed view.
+/// The view moved to node `to` (a remount kept it).
+pub fn rekey(from: u32, to: u32) {
+    if FOCUS.get() == Some(from) {
+        FOCUS.set(Some(to));
+    }
+}
+
 pub fn forget(n: u32) {
     if FOCUS.get() == Some(n) {
         FOCUS.set(None);

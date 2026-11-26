@@ -97,7 +97,7 @@ export function HostWebView({ window: w }: { window: WindowSnapshot }) {
       onRequest={(r) => web.request(w.contentsId, r)}
       onNavigate={(e) => web.navigated(w.contentsId, e.url, (e as { mainFrame?: boolean }).mainFrame)}
       onTitle={(title) => web.titled(w.contentsId, title)}
-      onLoad={(e) => web.loaded(w.contentsId, e.phase, e.url)}
+      onLoad={(e) => web.loaded(w.contentsId, e.phase, e.url, e.kept)}
       onMessage={(m) => web.message(w.contentsId, m.data)}
     />
   );

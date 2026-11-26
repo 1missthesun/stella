@@ -382,7 +382,11 @@ Only rows near the viewport are built. The list must sit inside a `scrollY` box.
 url`.
 
 The view is created on first layout, follows the element's rect and visibility, and is destroyed
-on unmount. It is clipped like any child: to its scroll viewports and `clip` ancestors (rounded by
+on unmount. A `<window>` remounted in the same batch (a hot swap) keeps its webviews: each moves to
+the remounted `<webview>` with the same `id` (without an `id`, the same `url`/`html`) and the same
+creation-time props (`protocols`, `preload`, `userAgent`, `microphone`, `transparent`,
+`devtools`); the page keeps running and the new element gets `onReady`, the page's title and,
+when it had finished loading, `onLoad({phase: "finished", url, kept: true})`. A view under a `hidden` or `opacity={0}` ancestor (a retained tab in the background) is hidden. It is clipped like any child: to its scroll viewports and `clip` ancestors (rounded by
 a rounded clip's corners where they reach it), and rounded by its own `radius` / `corners`. Elements
 CSS would paint over it (positioned later siblings of it or of an ancestor, a higher `raise`, fixed
 layers) cut their drawn shape out of the native view, which then neither shows nor takes the pointer

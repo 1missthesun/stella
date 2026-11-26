@@ -300,7 +300,8 @@ export type WebviewProps = BoxProps & {
   /** Navigations; `mainFrame` is false for a subframe's (macOS asks for those too). */
   onNavigate?: (e: { url: string; mainFrame?: boolean }) => void;
   onTitle?: (title: string) => void;
-  onLoad?: (e: { phase: "started" | "finished"; url: string }) => void;
+  /** `kept`: the element took over a live page on a remount, which reports its finished load again. */
+  onLoad?: (e: { phase: "started" | "finished"; url: string; kept?: boolean }) => void;
   onRequest?: (r: WebviewRequest) => void;
   onReady?: () => void;
   onError?: (error: string) => void;

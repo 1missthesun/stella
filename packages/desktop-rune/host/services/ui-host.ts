@@ -51,7 +51,8 @@ export type UiHost = {
     navigated(contentsId: number, url: string, mainFrame?: boolean): void;
     titled(contentsId: number, title: string): void;
     /** The page's main-frame load `started` (at `url`) or `finished`. */
-    loaded(contentsId: number, phase: string, url?: string): void;
+    /** `kept`: a remount kept the page; it reports its finished load again without loading. */
+    loaded(contentsId: number, phase: string, url?: string, kept?: boolean): void;
     message(contentsId: number, data: unknown): void;
   };
   browser: {
@@ -275,8 +276,9 @@ export function createUiHost(): UiHost {
         contentsById(contentsId)?.setTitle(title);
         hostWindows.changed();
       },
-      loaded(contentsId, phase, url) {
+      loaded(contentsId, phase, url, kept) {
         viewAppeared(contentsId);
+        if (kept) return;
         if (phase === "started" && url) contentsById(contentsId)?.markNavigated(url);
         if (phase === "finished") contentsById(contentsId)?.markLoaded();
       },

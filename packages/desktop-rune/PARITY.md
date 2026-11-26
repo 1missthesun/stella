@@ -56,15 +56,31 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 
 ## Global surfaces
 - [ ] Auth: sign-in screen, magic link, remembered account, sign-out dialog, browser handoff
+  - macOS: sign-in dialog matches in dark, light and Night Owl (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-*.jpg); remembered account (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-remembered-nightowl.jpg); sign-out dialog signed-in and signed-out (~/.stella/outputs/stella-rune/global/sbs/signout-*.jpg); signed-out home (~/.stella/outputs/stella-rune/global/sbs/signed-out-home-nightowl.jpg)
+  - macOS gap: the magic-link flow stops at Turnstile. The challenge page loads (host 476d27cad) but times out in a Rune window, so no link is issued and the sign-in recording is still owed. Browser handoff is not exercised (it opens the real browser).
 - [ ] Onboarding, local mode, permissions, mobile (get the app), legal dialog
+  - macOS: onboarding first screen (~/.stella/outputs/stella-rune/global/sbs/onboarding-1.jpg, `session.ts start --first-run`); local mode via 'Use without an account' (~/.stella/outputs/stella-rune/global/sbs/local-mode-nightowl.jpg); get the app (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); legal (~/.stella/outputs/stella-rune/global/sbs/legal-terms-*.jpg)
+  - macOS gap: later onboarding steps and the permission prompts are not compared. The greeting wraps one word early because chat Markdown inserts U+2066/2069 isolates.
 - [ ] Billing screen, plan & usage dialog, subscription upgrade, BYOK
-- [ ] Settings: nav, search, every tab (General, AI, Account, Privacy, Shortcuts, Audio, ...), theme picker, model pickers, voice catalog, devices, passkeys, sessions, secure values, sync, telemetry, companion, permissions
+  - macOS: plan & usage in 3 themes (~/.stella/outputs/stella-rune/global/sbs/plan-usage-*.jpg); upgrade dialog in Night Owl (~/.stella/outputs/stella-rune/global/sbs/upgrade-dialog-nightowl.jpg); BYOK rows in the Claude & ChatGPT tab (~/.stella/outputs/stella-rune/global/sbs/settings-claude-and-chatgpt-*.jpg)
+  - macOS gap: the billing screen is not compared
+- [x] Settings: nav, search, every tab (General, AI, Account, Privacy, Shortcuts, Audio, ...), theme picker, model pickers, voice catalog, devices, passkeys, sessions, secure values, sync, telemetry, companion, permissions
+  - macOS: every tab at 4 scroll positions in dark, light and Night Owl (~/.stella/outputs/stella-rune/global/sbs/settings-*.jpg); search jump recording (~/.stella/outputs/stella-rune/global/rec/settings-search-rune.mp4 vs settings-search-electron.mp4); theme picker and models popover (~/.stella/outputs/stella-rune/global/sbs/theme-picker-*.jpg, models-popover-*.jpg)
 - [ ] Usage app (summary cards, timeline chart, threads/calls tables, filters)
+  - macOS: summary, timeline and calls table from the usage fixture (~/.stella/outputs/stella-rune/global/sbs/usage-*.jpg)
+  - macOS gap: light theme and filter states not shot
 - [ ] Apps library + Cloud App panel/viewer, canvas share
+  - macOS: Apps library (~/.stella/outputs/stella-rune/global/sbs/apps-library-nightowl.jpg); opening a Cloud App, recorded with the webview composited (~/.stella/outputs/stella-rune/global/rec/open-cloud-app-rune.mp4, ~/.stella/outputs/stella-rune/global/shots/cloud-app-open-nightowl-rune-composited.png)
+  - macOS gap: a native webview draws above engine modals (seen with the sign-out dialog over an open Cloud App; reported to engine). Canvas share is not covered.
 - [ ] Execution placement (device work offer, remote execution consent), schedule, self-host, integrations connect dialog
-- [ ] Claude / ChatGPT / Antigravity account sections, login prompts, CLI install status
+  - macOS: where Stella works (~/.stella/outputs/stella-rune/global/sbs/where-stella-works-*.jpg); integrations connect (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); remote execution consent on Rune only (~/.stella/outputs/stella-rune/global/shots/remote-consent-nightowl-rune.png)
+  - macOS gap: schedule and self-host dialogs not compared against Electron
+- [x] Claude / ChatGPT / Antigravity account sections, login prompts, CLI install status
+  - macOS: tab in 3 themes (~/.stella/outputs/stella-rune/global/sbs/settings-claude-and-chatgpt-*.jpg); add-account menu and paste-code prompt (~/.stella/outputs/stella-rune/global/sbs/claude-add-account-nightowl.jpg, claude-login-cloud-nightowl.jpg)
 - [ ] App source: update cards, notifications, What's new (after the release batch lands)
 - [ ] Feedback dialog, i18n (every locale), themes (all of @stella/theme)
+  - macOS: feedback in 3 themes (~/.stella/outputs/stella-rune/global/sbs/feedback-*.jpg); `bun run i18n:parity` passes for every catalog; dark, light and Night Owl compared throughout
+  - macOS gap: themes other than those three, and non-English locales, not shot
 
 ## Web
 - [ ] stella.sh/chat renders the same `ui/` through the DOM host; per-user renderers still build

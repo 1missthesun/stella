@@ -46,6 +46,7 @@ export type EngineEventOf = {
   appearance: { t: "appearance"; dark: boolean; accentColor?: string; reducedMotion?: boolean };
   display: { t: "display"; kind?: string };
   inputhook: Extract<import("../bridge").EngineEvent, { t: "inputhook" }>;
+  audio: Extract<import("../bridge").EngineEvent, { t: "audio" }>;
 };
 
 type BridgeModule = {

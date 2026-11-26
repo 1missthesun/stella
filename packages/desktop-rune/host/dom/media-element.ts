@@ -1,14 +1,13 @@
 // HTMLMediaElement / HTMLAudioElement / Audio for audio files: playback through the native player
-// (AVPlayer on macOS) with Chromium's setSinkId semantics over CoreAudio output UIDs. Elsewhere,
-// play() ends at once, as before.
+// (AVPlayer on macOS, the engine's player elsewhere) with Chromium's setSinkId semantics over the
+// output device ids `enumerateDevices` lists. Without a player, play() ends at once.
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { audioDevices } from "../electron/macos-media";
-import { playAudioFile, type NativeAudioPlayback } from "../electron/macos-audio-player";
+import { audioDevices, playAudioFile, type AudioPlayback } from "../electron/audio-player";
 
 const PUBLIC_DIR = path.resolve(import.meta.dir, "../../../desktop-ui/public");
 const FETCHED_DIR = path.join(os.tmpdir(), "stella-rune-audio");
@@ -55,7 +54,7 @@ export function installMediaElements(g: Record<string, any>, baseUrl: () => stri
     #volume = 1;
     #muted = false;
     #sinkId = "";
-    #playback: NativeAudioPlayback | null = null;
+    #playback: AudioPlayback | null = null;
     #offset = 0;
 
     get volume() { return this.#volume; }
@@ -79,7 +78,7 @@ export function installMediaElements(g: Record<string, any>, baseUrl: () => stri
 
     async setSinkId(sinkId: string) {
       const id = String(sinkId ?? "");
-      if (outputUid(id) && !audioDevices().some((d) => d.kind === "audiooutput" && d.deviceId === id)) {
+      if (outputUid(id) && !(await audioDevices()).some((d) => d.kind === "audiooutput" && d.deviceId === id)) {
         throw new DOMException(`Requested device not found: ${id}`, "NotFoundError");
       }
       this.#sinkId = id;
@@ -106,7 +105,7 @@ export function installMediaElements(g: Record<string, any>, baseUrl: () => stri
         this.#fail(error);
         throw new DOMException("Failed to load because no supported source was found.", "NotSupportedError");
       }
-      const playback = playAudioFile(file, { volume: this.#muted ? 0 : this.#volume, deviceUid: outputUid(this.#sinkId) });
+      const playback = playAudioFile(file, { volume: this.#muted ? 0 : this.#volume, deviceId: outputUid(this.#sinkId) });
       if (!playback) {
         this.paused = true;
         this.ended = true;

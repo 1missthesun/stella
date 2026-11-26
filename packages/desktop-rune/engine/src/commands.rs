@@ -69,6 +69,7 @@ pub fn route(v: Value) {
         "screen.displays" => reply(rid, Ok(displays())),
         "capture.sources" | "capture.start" | "capture.stop" => crate::capture::command(&cmd, rid, &v),
         "inputhook.start" | "inputhook.stop" => crate::inputhook::command(&cmd, rid, &v),
+        "audio.play" | "audio.control" | "audio.devices" => crate::audio::command(&cmd, rid, &v),
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "selection.get" => {
             let w = window_named(&v).or_else(windows::first_window);

@@ -127,7 +127,8 @@ export type EngineEvent =
   | { t: "selection"; window: string | null; n: number; cleared: true }
   | { t: "capture"; id: string; kind: "frame"; at: number; path: string }
   /** A global input event in uiohook's shape (see engine/src/inputhook.rs). */
-  | ({ t: "inputhook"; type: InputHookType } & InputHookEvent);
+  | ({ t: "inputhook"; type: InputHookType } & InputHookEvent)
+  | { t: "audio"; id: string; kind: "ended" | "error"; message?: string };
 
 export type SelectionRect = { x: number; y: number; w: number; h: number };
 
@@ -311,6 +312,13 @@ export const engine = {
     sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),
     start: (o: CaptureStart) => request<{ startedAt: number; microphone: boolean; width: number; height: number }>("capture.start", o),
     stop: (id: string) => request<{ file: string | null; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
+  },
+  /** Audio file playback (Linux and Windows; macOS plays through AVFoundation in the host). */
+  audio: {
+    play: (o: { id: string; path: string; volume: number; device: string | null }) =>
+      request<{ device: string | null; sampleRate: number; channels: number; duration: number | null }>("audio.play", o),
+    control: (o: { id: string; op: string; value?: unknown }) => request<{ playing: boolean }>("audio.control", o),
+    devices: () => request<Array<{ deviceId: string; kind: "audioinput" | "audiooutput"; label: string; groupId: string }>>("audio.devices"),
   },
   /** Global input listening for the `uiohook-napi` module (macOS; rejects elsewhere or without Input Monitoring). */
   inputHook: {

@@ -5,7 +5,7 @@
 import { createDomDocument, DomElement, type DomDocument } from "./document";
 import { createMatchMedia, type MediaEnvironment } from "./media";
 import { MemoryStorage, UiStateStorage, type UiStateBackend } from "./storage";
-import { audioDevices } from "../electron/macos-media";
+import { audioDevices } from "../electron/audio-player";
 import { installIntlGlue } from "./intl";
 import { installMediaElements } from "./media-element";
 import { installTaskWebSocket } from "./websocket";
@@ -263,7 +263,7 @@ function installNavigator(g: Record<string, any>, options: DomHostOptions) {
   });
   define("permissions", { query: async () => ({ state: "prompt", addEventListener() {}, removeEventListener() {} }) });
   define("mediaDevices", {
-    enumerateDevices: async () => audioDevices().map((device) => ({ ...device, toJSON: () => device })),
+    enumerateDevices: async () => (await audioDevices()).map((device) => ({ ...device, toJSON: () => device })),
     getUserMedia: async () => { throw new DOMException("Media capture runs in the on-demand media WebView.", "NotSupportedError"); },
     getDisplayMedia: async () => { throw new DOMException("Screen capture runs in the on-demand media WebView.", "NotSupportedError"); },
     addEventListener() {},

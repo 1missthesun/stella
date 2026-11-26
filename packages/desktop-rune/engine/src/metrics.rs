@@ -48,8 +48,9 @@ pub struct Metrics {
     pub pending_events: HashMap<u32, (f64, f64, String)>,
     pending: Vec<Pending>,
     pub typing_input: Option<f64>,
-    /// Frame seq → input time, for the frames that drew a keystroke, until they present.
-    typing_frames: HashMap<u64, f64>,
+    /// Frame seq → (input, frame start, submit, targeted vsync), for the frames that drew a
+    /// keystroke, until they present.
+    typing_frames: HashMap<u64, [f64; 4]>,
     first_content: bool,
     commits_seen: u32,
     rec: Option<(String, Vec<FrameRow>)>,
@@ -145,16 +146,21 @@ impl Metrics {
             if self.typing_frames.len() >= 256 {
                 self.typing_frames.clear();
             }
-            self.typing_frames.insert(f.seq(), input);
+            let target = f.presents_at().map_or(f64::NAN, epoch_of);
+            self.typing_frames.insert(f.seq(), [input, started.unwrap_or(f64::NAN), at, target]);
         }
     }
 
     /// A keystroke's frame on screen: from the same input time as `typing` to the moment the
     /// display showed it (macOS Metal's presented time), as Chromium's EventLatency ends.
     pub fn on_presented(&mut self, p: &rune::FramePresented) {
-        let Some(input) = self.typing_frames.remove(&p.seq()) else { return };
+        let Some([input, started, submitted, target]) = self.typing_frames.remove(&p.seq()) else { return };
         let v = match p.presented_at() {
-            Some(at) => serde_json::json!({ "metric": "typing_presented", "input_to_present_ms": epoch_of(at) - input }),
+            Some(at) => serde_json::json!({
+                "metric": "typing_presented", "input_to_present_ms": epoch_of(at) - input,
+                "input_to_start_ms": started - input, "input_to_submit_ms": submitted - input,
+                "input_to_target_ms": target - input,
+            }),
             None => serde_json::json!({ "metric": "typing_presented", "skipped": true }),
         };
         self.log(v);

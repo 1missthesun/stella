@@ -83,6 +83,8 @@ default = ["webview"]
 webview = ["dep:wry", "dep:webview2-com", "dep:gtk", "dep:webkit2gtk", "dep:wayland-client", "dep:wayland-protocols", "dep:x11rb", "dep:gdkx11", "dep:x11-dl"]
 
 [patch.crates-io]
+# wry as published plus `vendor/wry.patch` (IPC from data: and about:blank pages); re-made by `scripts/vendor-wry.sh`.
+wry = { path = "vendor/wry" }
 wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "832bdb05c655157d0d9aac396b1ca172ebc23979" }
 naga = { git = "https://github.com/1missthesun/rune", rev = "832bdb05c655157d0d9aac396b1ca172ebc23979" }
 winit = { git = "https://github.com/1missthesun/rune", rev = "832bdb05c655157d0d9aac396b1ca172ebc23979" }

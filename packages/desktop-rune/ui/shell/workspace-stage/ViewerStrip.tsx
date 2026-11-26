@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo } from "react";
 import type { FileEntry } from "@/features/workspace-display/files-index";
 import type { DisplayTab } from "@/features/workspace-display/types";
 import { formatTimestampHeader } from "@/features/chat/lib/message-time-labels";
@@ -10,6 +10,7 @@ import { Icon, Icons } from "../../kit";
 import { look, mixOklch, derive, useTokens, type Tokens } from "../../theme";
 import { addContextMenu } from "../../replace/platform/context-menu/context-menu";
 import { registerSiblingNav } from "./sibling-nav";
+import { deferStripThumbnails, pngAspect, useDriveStripThumbnail, useStripThumbnail } from "./strip-thumbnails";
 
 const stripLook = (t: Tokens) =>
   derive(t, "viewer-strip", (t) => ({
@@ -58,12 +59,39 @@ const shortWhen = (ms: number, locale: string): string => {
 
 const itemId = (entry: FileEntry) => `viewer-strip-item-${entry.id}`;
 
-function StripItem({ entry, current, fromId, tooltip, size }: { entry: FileEntry; current: boolean; fromId: string; tooltip: string; size: number }) {
+function ThumbImage({ url }: { url: string | null }) {
+  const l = stripLook(useTokens());
+  return url ? <image src={url} fit="cover" w="full" h="full" /> : <box w="full" h="full" fill={l.empty} />;
+}
+
+function Thumb({ source }: { source: ThumbSource }) {
+  const local = useStripThumbnail(source.kind, source.filePath, !source.drivePath);
+  const drive = useDriveStripThumbnail(source.kind, source.drivePath ?? "", Boolean(source.drivePath));
+  return <ThumbImage url={source.drivePath ? drive : local} />;
+}
+
+/** desktop-ui crops a page thumbnail to its top square. */
+function PageThumb({ source, size }: { source: ThumbSource; size: number }) {
+  const local = useStripThumbnail(source.kind, source.filePath, !source.drivePath);
+  const drive = useDriveStripThumbnail(source.kind, source.drivePath ?? "", Boolean(source.drivePath));
+  const url = source.drivePath ? drive : local;
+  if (!url) return null;
+  const aspect = pngAspect(url);
+  return (
+    <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill="#ffffff" clip={0}>
+      {aspect && aspect > 1 ? <image src={url} w={size} h={size * aspect} /> : <image src={url} fit="cover" w="full" h="full" />}
+    </box>
+  );
+}
+
+/** desktop-ui's `useNearView` keeps off-screen items from making thumbnails; here, the items near the current one. */
+const NEAR_ITEMS = 16;
+
+function StripItem({ entry, current, fromId, tooltip, size, near }: { entry: FileEntry; current: boolean; fromId: string; tooltip: string; size: number; near: boolean }) {
   const t = useTokens();
   const l = stripLook(t);
   const source = thumbSourceOf(entry);
   const drivePath = entry.payload.cloudDrivePath ?? null;
-  const image = source?.kind === "image" && !source.drivePath ? source.filePath : null;
   const ext = source && source.kind !== "pdf" ? null : extensionOf(entry);
   return (
     <box
@@ -92,10 +120,8 @@ function StripItem({ entry, current, fromId, tooltip, size }: { entry: FileEntry
         return await fileMenu(path, { open, image: source?.kind === "image" })();
       }, { claims: ["image"] })}
     >
-      {image ? (
-        <image src={image} fit="cover" w="full" h="full" />
-      ) : source && source.kind !== "pdf" ? (
-        <box w="full" h="full" fill={l.empty} />
+      {source && source.kind !== "pdf" ? (
+        near ? <Thumb source={source} /> : <box w="full" h="full" fill={l.empty} />
       ) : (
         <col align="center" gap={2}>
           <DisplayTabIcon kind={entry.kind} size={16} color={t.c.textWeak} />
@@ -106,6 +132,7 @@ function StripItem({ entry, current, fromId, tooltip, size }: { entry: FileEntry
           ) : null}
         </col>
       )}
+      {source?.kind === "pdf" && near ? <PageThumb source={source} size={size} /> : null}
       {source?.kind === "video" ? (
         <box absolute={{ right: 3, bottom: 3 }} w={15} h={15} radius={8} center fill="#0000008c">
           <Icon icon={Icons.stella.Play} size={9} color="#ffffff" />
@@ -134,6 +161,10 @@ export function ViewerStrip({ item, vertical }: { item: DisplayTab; vertical: bo
   const show = index !== -1 && items.length > 1;
   const grouped = sets.length > 1;
   const size = vertical ? 52 : 44;
+
+  useLayoutEffect(() => {
+    deferStripThumbnails();
+  }, [item.id]);
 
   const nav = useMemo(() => {
     if (!show) return null;
@@ -228,7 +259,7 @@ export function ViewerStrip({ item, vertical }: { item: DisplayTab; vertical: bo
               shadows={grouped ? [{ x: 0, y: 0, blur: 0, spread: 1, color: isCurrent ? l.setCurrentRing : l.setRing, inset: true }] : undefined}
             >
               {items.slice(run.start, run.end).map((entry, offset) => (
-                <StripItem key={entry.id} entry={entry} current={entry.id === item.id} fromId={item.id} tooltip={tooltipFor(entry, run, run.start + offset)} size={size} />
+                <StripItem key={entry.id} entry={entry} current={entry.id === item.id} fromId={item.id} tooltip={tooltipFor(entry, run, run.start + offset)} size={size} near={Math.abs(run.start + offset - index) <= NEAR_ITEMS} />
               ))}
               {isCurrent && grouped ? (
                 <row absolute={{ left: 0, right: 0, bottom: -16 }} justify="center" inert>

@@ -233,7 +233,9 @@ jobs:
           "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json"
           jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
           jq -e '.ok and .value.caps.secureContext and .value.caps.getUserMedia and .value.caps.audioContext and .value.caps.mediaSource and .value.mic == "granted"' "$out/media-page.json" >/dev/null
+          ls -l /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome /snap/bin/chromium 2>&1 | tee "$out/chromium-candidates.txt" || true
           "$BUN" scripts/session.ts eval "$(cat scripts/ci/voice-check.js)" | tee "$out/voice-chromium.json"
+          jq -e '.ok' "$out/voice-chromium.json" >/dev/null || { sleep 8; "$BUN" scripts/session.ts eval "process.env.STELLA_RUNE_CHROMIUM = \"/usr/bin/google-chrome\"; $(cat scripts/ci/voice-check.js)" | tee "$out/voice-chromium.json"; echo "voice: the first Chromium failed, retried with google-chrome" | tee -a "$GITHUB_STEP_SUMMARY"; }
           jq -r '.value // .error | "voice (Chromium): host \(.host), ready \(.readyMs|floor) ms, \(.memory), loop \(.loop | tojson), sink inputs: \(.sinkInputs)"' "$out/voice-chromium.json" | tee -a "$GITHUB_STEP_SUMMARY"
           voice_pid=$(jq -r '.value.stats.pid' "$out/voice-chromium.json")
           sleep 8

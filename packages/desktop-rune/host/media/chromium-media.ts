@@ -71,9 +71,11 @@ export class ChromiumMediaHost {
     if (!binary) throw new Error("no Chromium or Chrome was found (set STELLA_RUNE_CHROMIUM or install Chrome)");
     this.profileDir = mkdtempSync(path.join(os.tmpdir(), "stella-media-"));
     const profileDir = this.profileDir;
-    const proc = new ChromiumProcess(profileDir, binary, () => {
+    const proc = new ChromiumProcess(profileDir, binary, (exit) => {
       rmSync(profileDir, { recursive: true, force: true });
-      if (!this.stopped) this.callbacks.failed("Chromium media page exited");
+      if (this.stopped) return;
+      console.error(`[media] chromium (${binary}) exited ${exit} at stage ${this.stage}; stderr:\n${proc.stderrTail()}`);
+      this.callbacks.failed(`Chromium media page exited (${exit})`);
     }, CHROMIUM_ARGS);
     this.proc = proc;
     const killOnExit = () => {

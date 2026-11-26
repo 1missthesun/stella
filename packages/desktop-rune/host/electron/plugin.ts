@@ -26,7 +26,7 @@ const OVERRIDES: Array<{ file: string; name: string; from: string }> = [
 
 const applyOverrides = (file: string, source: string) => {
   for (const o of OVERRIDES) {
-    if (path.join(ELECTRON_DIR, o.file) !== file) continue;
+    if (path.join(ELECTRON_DIR, o.file) !== path.normalize(file)) continue;
     const declaration = new RegExp(`export (const|let|class|function|async function) ${o.name}\\b`);
     if (!declaration.test(source)) throw new Error(`Rune override: ${o.file} no longer exports ${o.name}`);
     source = source.replace(declaration, (_m, kind: string) => `export ${kind} __electron_${o.name}`);
@@ -35,7 +35,7 @@ const applyOverrides = (file: string, source: string) => {
   return source;
 };
 
-const ELECTRON_SOURCE = new RegExp(`^${ELECTRON_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/(?!.*\\.page\\.ts$).*\\.(ts|js)$`);
+const ELECTRON_SOURCE = new RegExp(`^${ELECTRON_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\\\/](?!.*\\.page\\.ts$).*\\.(ts|js)$`);
 
 const browserScriptImports = (): Array<{ specifier: string; file: string }> => {
   const found: Array<{ specifier: string; file: string }> = [];

@@ -110,7 +110,7 @@ export class ChromiumProcess extends EventEmitter {
   private stderr = "";
   exited = false;
 
-  constructor(readonly profileDir: string, binary: string, private readonly onGone: () => void, extraArgs: string[] = []) {
+  constructor(readonly profileDir: string, binary: string, private readonly onGone: (exit: string) => void, extraArgs: string[] = []) {
     super();
     this.setMaxListeners(0);
     mkdirSync(profileDir, { recursive: true });
@@ -148,7 +148,7 @@ export class ChromiumProcess extends EventEmitter {
       for (const w of this.waiting.values()) w.reject(new Error(`Chromium exited (${code ?? signal})`));
       this.waiting.clear();
       this.emit("exit");
-      onGone();
+      onGone(String(code ?? signal));
     });
     console.error(`[chromium] started pid ${this.child.pid} (${path.basename(binary)}, profile ${profileDir})`);
   }

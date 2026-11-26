@@ -1219,6 +1219,7 @@ mod win {
         stopped: Arc<AtomicBool>,
         frames: Arc<AtomicU32>,
         microphone: Option<std::thread::JoinHandle<()>>,
+        pacer: std::thread::JoinHandle<()>,
         file: String,
     }
 
@@ -1309,7 +1310,7 @@ mod win {
         let t0 = Instant::now();
         let pool_size = Arc::new(Mutex::new((size.Width, size.Height)));
         {
-            let (writer, gpu, latest, d3d, pool_size) = (writer.clone(), gpu.clone(), latest.clone(), Device(d3d.clone()), pool_size.clone());
+            let (gpu, latest, d3d, pool_size) = (gpu.clone(), latest.clone(), Device(d3d.clone()), pool_size.clone());
             let handler = TypedEventHandler::<Direct3D11CaptureFramePool, windows::core::IInspectable>::new(move |pool, _| {
                 let Some(pool) = pool.as_ref() else { return Ok(()) };
                 let frame = pool.TryGetNextFrame()?;
@@ -1332,8 +1333,6 @@ mod win {
                         return Ok(());
                     }
                 };
-                let at = (t0.elapsed().as_secs_f64() * HNS) as i64;
-                writer.lock().unwrap_or_else(|e| e.into_inner()).video_frame(&picture, at);
                 *latest.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::new(picture));
                 Ok(())
             });
@@ -1346,9 +1345,33 @@ mod win {
         let mic = if want_mic { microphone(pcm.clone(), writer.clone(), t0, stopped.clone()) } else { None };
         let started_at = epoch_ms();
         spawn_frames(id.clone(), latest, stopped.clone(), frames.clone(), PathBuf::from(frames_dir), Duration::from_millis(interval as u64), edge, quality);
+        let pacer = spawn_pacer(writer.clone(), latest.clone(), stopped.clone(), t0, fps);
         let has_mic = mic.is_some();
-        RECORDINGS.lock().unwrap_or_else(|e| e.into_inner()).insert(id, Recording { session, pool, writer, pcm, stopped, frames, microphone: mic, file });
+        RECORDINGS.lock().unwrap_or_else(|e| e.into_inner()).insert(id, Recording { session, pool, writer, pcm, stopped, frames, microphone: mic, pacer, file });
         Ok(json!({ "startedAt": started_at, "microphone": has_mic, "width": w, "height": h }))
+    }
+
+    /// Writes the latest picture at the recording's frame rate: Windows.Graphics.Capture delivers
+    /// frames only when the screen changes, and a still screen must still fill the video's time.
+    fn spawn_pacer(writer: Arc<Mutex<Writer>>, latest: Arc<Mutex<Option<Arc<Pixels>>>>, stopped: Arc<AtomicBool>, t0: Instant, fps: f64) -> std::thread::JoinHandle<()> {
+        let every = Duration::from_secs_f64(1.0 / fps);
+        std::thread::spawn(move || {
+            let mut next = Instant::now();
+            while !stopped.load(Ordering::Relaxed) {
+                let picture = latest.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                if let Some(picture) = picture {
+                    let at = (t0.elapsed().as_secs_f64() * HNS) as i64;
+                    writer.lock().unwrap_or_else(|e| e.into_inner()).video_frame(&picture, at);
+                }
+                next += every;
+                let now = Instant::now();
+                if next > now {
+                    std::thread::sleep(next - now);
+                } else {
+                    next = now;
+                }
+            }
+        })
     }
 
     /// The part of the pool's texture the item fills.
@@ -1394,6 +1417,7 @@ mod win {
         recording.stopped.store(true, Ordering::Relaxed);
         let _ = recording.session.Close();
         let _ = recording.pool.Close();
+        let _ = recording.pacer.join();
         let had_mic = recording.microphone.is_some();
         if let Some(mic) = recording.microphone {
             let _ = mic.join();

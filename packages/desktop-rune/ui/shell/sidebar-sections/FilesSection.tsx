@@ -435,7 +435,9 @@ export function WorkList({ section = "files", idleContent = null, embedded = fal
 export function FilesSection() {
   return (
     <col id="work-section" grow={1} minH={0} minW={0} clip={0}>
-      <WorkList section="files" />
+      <col id="work-section-body" grow={1} minH={0} minW={0} w="full" maxW={880} px={20} selfAlign="center" clip={0}>
+        <WorkList section="files" />
+      </col>
     </col>
   );
 }

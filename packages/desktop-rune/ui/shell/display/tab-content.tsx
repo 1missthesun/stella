@@ -79,9 +79,13 @@ function PreviewHeader({ id, eyebrow, title, tooltip, actions, status }: { id: s
   );
 }
 
-function Rich({ id, pad = 12, children, fill }: { id: string; pad?: number; children: ReactNode; fill?: string }) {
+/** `.right-sidebar__rich` without a variant: `clamp(1rem, 2vw, 1.5rem)` around, 12 on top. */
+const richPad = () => Math.min(24, Math.max(16, window.innerWidth * 0.02));
+
+function Rich({ id, pad = 12, children, fill }: { id: string; pad?: number | "rich"; children: ReactNode; fill?: string }) {
+  const around = pad === "rich" ? richPad() : pad;
   return (
-    <col id={id} grow={1} minH={0} w="full" pad={pad} clip={0} fill={fill}>
+    <col id={id} grow={1} minH={0} w="full" pad={around} pt={pad === "rich" ? 12 : around} clip={0} fill={fill}>
       {children}
     </col>
   );
@@ -134,7 +138,7 @@ export const UrlTabContent = ({ url, title }: { url: string; title: string }) =>
 const OfficeArtifactPanel = mounted<{ previewRef: OfficePreviewRef }>(import.meta.glob("./office-artifact-panel.tsx", { eager: true }), "OfficeArtifactPanel", () => <PreviewProblem error="Office previews aren't drawn here yet." />);
 
 export const OfficeTabContent = ({ previewRef }: { previewRef: OfficePreviewRef }) => (
-  <Rich id="display-office">
+  <Rich id="display-office" pad="rich">
     <OfficeArtifactPanel previewRef={previewRef} />
   </Rich>
 );
@@ -174,7 +178,7 @@ export const OfficeFileTabContent = ({ filePath, title }: { filePath: string; ti
 
   if (previewRef) return <OfficeTabContent previewRef={previewRef} />;
   return (
-    <Rich id="display-office-file">
+    <Rich id="display-office-file" pad="rich">
       {error ? <PreviewProblem error={error} onRetry={cloudSource ? undefined : () => setAttempt((value) => value + 1)} /> : <Loading label={t("shell.display.office.preparing")} />}
     </Rich>
   );

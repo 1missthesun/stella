@@ -22,6 +22,8 @@ import { truncateChipLabel } from "@/features/chat/composer-context";
 import { primaryCopyAttachment } from "@/app/chat/message-copy-attachment";
 import { messageMenu } from "@/app/chat/message-context-menu";
 import { contextMenu } from "./context-menu";
+import { markdownPlainText } from "./markdown-plain-text";
+import { shouldUseBoundedMarkdownPlaintext } from "@/features/chat/streaming/markdown-chunks";
 import { useT } from "@/shared/i18n";
 import { eventRowEqual } from "@/features/chat/lib/row-equality";
 import { assistantRowHasVisibleContent, shownAgentLabelIds } from "@/features/chat/lib/assistant-row-content";
@@ -473,7 +475,7 @@ export const AssistantMessageRow = memo(
     );
     const inlineImageStrip = inlineImages.length > 0 ? <InlineGeneratedImageStrip conversationId={conversationId} payloads={inlineImages} /> : null;
     if (!assistantRowHasVisibleContent(row)) return null;
-    const menu = contextMenu(messageMenu({ text: hasBody ? text : "", messageKey: row.id, onReply: row.isIntraTurn ? null : reply, readAloud: !row.isIntraTurn }));
+    const menu = contextMenu(messageMenu({ text: hasBody ? text : "", messageKey: row.id, renderedText: () => (!hasBody ? null : shouldUseBoundedMarkdownPlaintext(bodyText.length) ? bodyText : markdownPlainText(bodyText)), onReply: row.isIntraTurn ? null : reply, readAloud: !row.isIntraTurn }));
     return (
       <col w="full" hoverGroup onContextMenu={menu}>
         <col w="full" gap={PART_GAP} origin={[0, 1]} enter={bubblePop(entrance.delayMs)}>

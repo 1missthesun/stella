@@ -184,6 +184,8 @@ fn linux_backend() {
 
 fn main() {
     metrics::mark_process_start();
+    #[cfg(target_os = "macos")]
+    rune::text::set_fallback_base(Some("Lucida Grande"));
     #[cfg(all(target_os = "linux", feature = "webview"))]
     linux_backend();
     // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.

@@ -377,7 +377,7 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
 }
 
 /// Drains the bridge: applies ops, runs global commands, queues window commands, and wakes the
-/// windows it dirtied, except `polling`, which reads its own dirty flag in the same poll.
+/// windows it dirtied.
 fn drain(polling: u32) {
     let mut batches = Vec::new();
     let disconnected = engine::with(|e| {
@@ -451,6 +451,12 @@ fn drain(polling: u32) {
     for v in cmds {
         crate::commands::route(v);
     }
+    wake_dirty(polling);
+}
+
+/// Marks the windows holding changed nodes dirty and wakes them, except `polling`, which reads
+/// its own dirty flag in the same poll.
+fn wake_dirty(polling: u32) {
     let dirty: Vec<u32> = engine::with(|e| {
         let d: Vec<u32> = e.tree.dirty.drain().collect();
         for w in &d {
@@ -599,6 +605,12 @@ fn sync_inputs(s: &mut Win) {
 pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     flush_outbox();
     drain(s.node);
+    let decoded = crate::media::decoded_since_built();
+    let sized = !decoded.is_empty();
+    if sized {
+        engine::with(|e| decoded.into_iter().for_each(|n| e.tree.touch(n)));
+        wake_dirty(s.node);
+    }
     if s.main && s.node == 0
         && let Some(m) = engine::read(|e| e.main_node)
     {
@@ -631,7 +643,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             sync_inputs(s);
             #[cfg(feature = "webview")]
             sync_webviews(node);
-            if first_commit {
+            if first_commit || sized {
                 tx.instant();
             } else {
                 tx.animated();

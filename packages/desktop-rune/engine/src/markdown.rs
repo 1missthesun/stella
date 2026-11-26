@@ -381,7 +381,9 @@ pub fn build(n: u32, p: &Props) -> El {
     if let Some(images) = p.images.clone() {
         md = md.images(move |src| {
             let to = images.get(src).map(String::as_str).unwrap_or(src);
-            crate::engine::read(|e| crate::media::load(e, to, 1024.0))
+            let img = crate::engine::read(|e| crate::media::load(e, to, 1024.0))?;
+            crate::media::rebuild_when_decoded(n, &img);
+            Some(img)
         });
     }
     let radius = p.image_radius;

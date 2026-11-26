@@ -216,7 +216,11 @@ its own label.
 ### image, icon, video
 
 - `image`: `src`, `fit` (`cover` | `contain` | `stretch`), `tint`, and any box paint (border,
-  radius, shadows).
+  radius, shadows). Without `w` and `h` it takes the image's natural size (1 image px = 1 pt; an
+  SVG's own size) once it has decoded, like `<img>`. It shrinks with the ratio kept to fit the
+  room its parent gives it and its own `maxW`/`maxH`, never grows past that size, and isn't
+  stretched across a row. With one side set, the other follows the image's ratio. Markdown
+  images also lay out again once they decode.
 - `icon`: `svg` (the inner body of an `<svg>`, `currentColor` allowed), `view` (viewBox size,
   default 24), `size`, `color`, `spin` (period in seconds). Each distinct body is cached for the
   life of the process, so use `vector` for anything that changes per frame.

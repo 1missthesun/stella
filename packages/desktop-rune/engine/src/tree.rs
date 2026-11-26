@@ -125,7 +125,7 @@ impl Tree {
         None
     }
 
-    fn touch(&mut self, mut id: u32) {
+    pub fn touch(&mut self, mut id: u32) {
         self.clock += 1;
         let v = self.clock;
         for _ in 0..4096 {

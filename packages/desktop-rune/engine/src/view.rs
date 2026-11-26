@@ -42,7 +42,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         Kind::Box => children(s, eng, n, el()),
         Kind::Text => text::build(p),
         Kind::Input => return crate::input::build(s, id, p),
-        Kind::Image => media::image(eng, p),
+        Kind::Image => media::image(eng, id, p),
         Kind::Icon => media::icon(p),
         Kind::Vector => media::vector(id, p),
         Kind::Surface => crate::surface::build(eng, id, p),

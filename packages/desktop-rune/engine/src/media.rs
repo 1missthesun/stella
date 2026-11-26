@@ -17,6 +17,9 @@ thread_local! {
     static PLAYERS: RefCell<HashMap<u32, (String, Player)>> = RefCell::new(HashMap::new());
     /// `<vector svg>` rasters by node, with the hash of what they show.
     static RASTERS: RefCell<HashMap<u32, (u64, rune::Pixels)>> = RefCell::new(HashMap::new());
+    /// Nodes laid out from an image still decoding (an unsized `<image>`, a markdown picture):
+    /// they build again once one lands.
+    static SIZING: RefCell<HashMap<u32, Vec<rune::image::Image>>> = RefCell::new(HashMap::new());
 }
 
 const MAX_IMAGES: usize = 512;
@@ -57,7 +60,9 @@ pub fn load(eng: &Engine, src: &str, size: f32) -> Option<rune::image::Image> {
     Some(img)
 }
 
-pub fn image(eng: &Engine, p: &Props) -> El {
+/// An `<image>` with neither `w` nor `h` takes its image's natural size, fitted to its room and
+/// maximums with the ratio kept, as `<img>` does.
+pub fn image(eng: &Engine, n: u32, p: &Props) -> El {
     let Some(src) = p.src.as_deref() else { return el() };
     let size = match &p.w {
         Some(crate::props::Size::Pt(w)) => *w,
@@ -71,7 +76,38 @@ pub fn image(eng: &Engine, p: &Props) -> El {
     if let Some(t) = p.tint {
         e = e.pixels_tint(t.0);
     }
+    if p.w.is_none() && p.h.is_none() {
+        match img.intrinsic_size() {
+            Some([w, h]) => e = e.pixels_natural(w, h),
+            None => rebuild_when_decoded(n, &img),
+        }
+    }
     e
+}
+
+/// Builds node `n` again once `img` has decoded, when it hasn't yet.
+pub fn rebuild_when_decoded(n: u32, img: &rune::image::Image) {
+    if !img.is_ready() {
+        SIZING.with(|m| {
+            let mut m = m.borrow_mut();
+            let waiting = m.entry(n).or_default();
+            if !waiting.iter().any(|w| w.id() == img.id()) {
+                waiting.push(img.clone());
+            }
+        });
+    }
+}
+
+/// Nodes with an image that has decoded since they were built.
+pub fn decoded_since_built() -> Vec<u32> {
+    SIZING.with(|m| {
+        let mut m = m.borrow_mut();
+        let ready: Vec<u32> = m.iter().filter(|(_, imgs)| imgs.iter().any(|i| i.is_ready())).map(|(n, _)| *n).collect();
+        for n in &ready {
+            m.remove(n);
+        }
+        ready
+    })
 }
 
 fn icon_of(name: &str, body: &str, view: f32) -> &'static Icon {
@@ -217,6 +253,7 @@ pub fn player(n: u32) -> Option<Player> {
 pub fn forget(n: u32) {
     PLAYERS.with(|m| m.borrow_mut().remove(&n));
     RASTERS.with(|m| m.borrow_mut().remove(&n));
+    SIZING.with(|m| m.borrow_mut().remove(&n));
 }
 
 pub fn markdown(n: u32, p: &Props) -> El {

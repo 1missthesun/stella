@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useT } from "@/shared/i18n";
 import { invalidateDictationRoute } from "@/features/dictation/services/dictation-transcriber";
 import { invalidateOnDeviceDictation, onDeviceDictationStatus, openSystemDictationSettings } from "@/features/dictation/services/on-device-dictation";
-import { Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../kit/compat";
+import { BODY_TEXT, Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../kit/compat";
 import { Icon, Icons } from "../kit";
 import { derive, font, fontSize, mixOklch, radius, useTokens } from "../theme";
 
@@ -24,7 +24,7 @@ export const requestDictationKey = (): boolean => {
 function LinkButton({ label, color, onPress }: { label: string; color: string; onPress: () => void }) {
   return (
     <box role="link" label={label} focusable cursor="pointer" selfAlign="start" onPress={onPress}>
-      <text size={fontSize.sm} lineHeight={fontSize.sm * 1.5} underline color={color}>
+      <text family={BODY_TEXT.family} size={fontSize.sm} lineHeight={fontSize.sm * 1.5} tracking={0} underline color={color}>
         {label}
       </text>
     </box>

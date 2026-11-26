@@ -12,8 +12,8 @@ export const CHAT_TEXT_LOOK = {
 /** One chat line: `--chat-text-size × --chat-text-line-height`. */
 export const CHAT_LINE = CHAT_TEXT_LOOK.lineHeight;
 
-/** `.chat-bubble-text`: no kerning, no ligatures. */
-export const BUBBLE_FEATURES = "'kern' 0, 'liga' 0, 'clig' 0";
+/** `.chat-bubble-text`: `font-kerning: none` and `font-variant-ligatures: none`, which also turns off contextual alternates. */
+export const BUBBLE_FEATURES = "'kern' 0, 'liga' 0, 'clig' 0, 'dlig' 0, 'hlig' 0, 'calt' 0";
 
 /** `--chat-text-color`: textStrong in the timeline, the bubble's text colour inside a bubble. */
 export const ChatTextColor = createContext<string | null>(null);

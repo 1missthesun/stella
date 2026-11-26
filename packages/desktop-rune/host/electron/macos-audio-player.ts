@@ -8,6 +8,8 @@ const OBJC = "/usr/lib/libobjc.A.dylib";
 const PUMP_MS = 30;
 const START_TIMEOUT_MS = 10_000;
 const STATUS_FAILED = 2;
+const READ_PERMISSION = 1;
+const ESTIMATED_DURATION = 0x65647572;
 
 type Objc = ReturnType<typeof load>;
 let objc: Objc | null | undefined;
@@ -23,6 +25,11 @@ function load() {
   const send1 = dlopen(OBJC, { objc_msgSend: { args: [FFIType.u64, FFIType.u64, FFIType.u64], returns: FFIType.u64 } }).symbols.objc_msgSend;
   const sendFloat = dlopen(OBJC, { objc_msgSend: { args: [FFIType.u64, FFIType.u64, FFIType.f32], returns: FFIType.void } }).symbols.objc_msgSend;
   const readFloat = dlopen(OBJC, { objc_msgSend: { args: [FFIType.u64, FFIType.u64], returns: FFIType.f32 } }).symbols.objc_msgSend;
+  const audioFile = dlopen("/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox", {
+    AudioFileOpenURL: { args: [FFIType.u64, FFIType.i8, FFIType.u32, FFIType.ptr], returns: FFIType.i32 },
+    AudioFileGetProperty: { args: [FFIType.u64, FFIType.u32, FFIType.ptr, FFIType.ptr], returns: FFIType.i32 },
+    AudioFileClose: { args: [FFIType.u64], returns: FFIType.i32 },
+  }).symbols;
   const runLoop = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", {
     CFRunLoopRunInMode: { args: [FFIType.u64, FFIType.f64, FFIType.bool], returns: FFIType.i32 },
   }).symbols;
@@ -43,6 +50,17 @@ function load() {
     setFloat: (target: bigint, name: string, value: number) => sendFloat(target, sel(name), value),
     getFloat: (target: bigint, name: string) => readFloat(target, sel(name)),
     pump: () => runLoop.CFRunLoopRunInMode(defaultMode, 0, true),
+    fileSeconds: (url: bigint) => {
+      const id = new BigUint64Array(1);
+      if (audioFile.AudioFileOpenURL(url, READ_PERMISSION, 0, ptr(id)) !== 0) return 0;
+      try {
+        const seconds = new Float64Array(1);
+        const size = new Uint32Array([8]);
+        return audioFile.AudioFileGetProperty(id[0]!, ESTIMATED_DURATION, ptr(size), ptr(seconds)) === 0 ? seconds[0]! : 0;
+      } finally {
+        audioFile.AudioFileClose(id[0]!);
+      }
+    },
   };
 }
 
@@ -76,10 +94,11 @@ export class NativeAudioPlayback {
   private readonly openedAt = performance.now();
   private playedMs = 0;
   private resumedAt = 0;
+  private endSignalled = false;
   readonly finished: Promise<PlaybackEnd>;
   readonly playing: Promise<boolean>;
 
-  constructor(private readonly o: Objc, private player: bigint | null) {
+  constructor(private readonly o: Objc, private player: bigint | null, private readonly duration: number) {
     this.finished = new Promise((resolve) => { this.settledEnd = resolve; });
     this.playing = new Promise((resolve) => { this.settledStart = resolve; });
   }
@@ -127,7 +146,11 @@ export class NativeAudioPlayback {
       }
       return;
     }
-    if (rate === 0 && !this.pausedByUser) this.finish("ended");
+    if (rate === 0 && !this.pausedByUser) return this.finish("ended");
+    if (!this.endSignalled && this.duration > 0 && this.elapsedSeconds >= this.duration) {
+      this.endSignalled = true;
+      this.settledEnd?.("ended");
+    }
   }
 
   private finish(end: PlaybackEnd) {
@@ -151,7 +174,7 @@ export function playAudioFile(filePath: string, options: { volume: number; devic
   const url = o.call1(o.cls("NSURL"), "fileURLWithPath:", o.string(filePath));
   const player = o.call1(o.call0(o.cls("AVPlayer"), "alloc"), "initWithURL:", url);
   if (!player) return null;
-  const playback = new NativeAudioPlayback(o, player);
+  const playback = new NativeAudioPlayback(o, player, o.fileSeconds(url));
   playback.setOutput(options.deviceUid);
   playback.setVolume(options.volume);
   o.call0(player, "play");

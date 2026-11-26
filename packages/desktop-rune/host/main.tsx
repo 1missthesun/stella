@@ -234,7 +234,11 @@ const bench: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
     await sleep(2600);
     return { swaps: swapN, rss_mb: samples, settled_rss_mb: rss() };
   },
-  async quit() { setTimeout(() => command({ cmd: "quit" }), 50); return true; },
+  async quit() {
+    if (services) { const { app } = await import("./electron/app"); setTimeout(() => app.quit(), 50); }
+    else setTimeout(() => command({ cmd: "quit" }), 50);
+    return true;
+  },
 };
 
 const port = Number(process.env.STELLA_RUNE_CTL_PORT ?? 0);

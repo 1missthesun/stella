@@ -14,7 +14,7 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
   - macOS: message sound plays through AVPlayer, setSinkId routes output: ~/.stella/outputs/stella-rune/host/audio-output-mac.txt
 - [ ] WebViews: HTML deliverables, canvases (bridge + actions), Cloud Apps, stella-media scheme
 - [ ] Browser-only APIs on demand: realtime voice (WebRTC), dictation/microphone, pdf/office previews
-  - macOS: dictation microphone (~/.stella/outputs/stella-rune/host/dictation-mic-mac.txt), media probe via master's fallbacks (~/.stella/outputs/stella-rune/host/media-probe-mac.txt). Realtime voice, WebAudio and MediaSource are still open.
+  - macOS: dictation microphone (~/.stella/outputs/stella-rune/host/dictation-mic-mac.txt), media probe via master's fallbacks (~/.stella/outputs/stella-rune/host/media-probe-mac.txt), realtime voice, voice cues and streaming read-aloud through the media page (~/.stella/outputs/stella-rune/host/voice-media-page-mac.txt, voice-session-mac.png). Open: voice with no Stella window on screen; xAI voice not run (BYOK key).
 - [ ] Agent browsing: in-app browser panel + CDP on an on-demand Chromium; Stella Browser extension bridge
   - macOS: an agent browses on the on-demand Chromium in a signed-in turn (~/.stella/outputs/stella-rune/host/agent-browsing-mac.txt, agent-browsing-chat-mac.png). Extension bridge not proven.
 - [ ] Show Stella capture (screen recording + talking + marks), meeting capture

@@ -7,6 +7,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { mounted, Nothing } from "./mount";
 import { AuxWindowProvider } from "../shell/aux-window";
 import { OverlayRoot } from "../shell/overlay/OverlayRoot";
+import { VoiceRuntimeRoot } from "@/features/voice/runtime/VoiceRuntimeRoot";
 
 const CompanionMarkRoot = mounted(import.meta.glob("../shell/companion/CompanionMarkRoot.tsx", { eager: true }), "CompanionMarkRoot", Nothing);
 const CompanionPanelRoot = mounted(import.meta.glob("../shell/companion/CompanionPanelRoot.tsx", { eager: true }), "CompanionPanelRoot", Nothing);
@@ -24,7 +25,7 @@ function AuxProviders({ children }: { children: ReactNode }) {
 }
 
 const bodyFor = (mode: string | null) => {
-  if (mode === "overlay") return <OverlayRoot />;
+  if (mode === "overlay") return <><VoiceRuntimeRoot /><OverlayRoot /></>;
   if (mode === "companion") return <CompanionMarkRoot />;
   if (mode === "companion-panel") return <CompanionPanelRoot />;
   return null;

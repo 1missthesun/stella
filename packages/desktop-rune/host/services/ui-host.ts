@@ -10,12 +10,15 @@ import { defaultSession, fetchProtocolIn } from "../electron/session";
 import { WebContents } from "../electron/web-contents";
 import type { PageKey, PagePointer, PageWheel } from "../electron/chromium-page";
 import { rendererApiFor, type ElectronApi } from "./renderer-api";
+import { mediaPage, type MediaPage } from "../media/media-page";
 
 export type HostMessageBox = Omit<HostDialogRequest, "resolve">;
 
 export type WebviewRequest = { rid: number; scheme: string; url: string; method: string; headers: Record<string, string>; body?: string | null };
 
 export type UiHost = {
+  /** The WebView running desktop-ui's WebRTC, WebAudio and MediaSource modules (ui/host/MediaWebView.tsx). */
+  media: MediaPage;
   windows: { subscribe(listener: () => void): () => void; snapshot(): WindowSnapshot[] };
   apiFor(windowId: string): ElectronApi | null;
   /** Focus changes of a host window (a DOM window's `focus` / `blur` for an aux window's tree); returns the stop. */
@@ -128,6 +131,7 @@ export function createUiHost(): UiHost {
   };
 
   return {
+    media: mediaPage,
     windows: { subscribe: hostWindows.subscribe, snapshot: hostWindows.snapshot },
     apiFor(windowId) {
       const win = hostWindows.get(windowId);

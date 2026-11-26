@@ -9,8 +9,9 @@ import { openExternalUrl } from "@/platform/electron/open-external";
 import { useI18n } from "@/shared/i18n";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { EmptyState, Icons } from "../../kit";
+import { EmailWorkspace } from "./EmailWorkspace";
 
-/** desktop-ui's `EmailSection` gates: sign in, connect Gmail, reconnect, turn email on. */
+/** desktop-ui's `EmailSection`: the sign-in, connect, reconnect and turn-on gates, then the workspace. */
 export function EmailSection({ active }: { active: boolean }) {
   return useEmailFeature() ? <EmailSectionBody active={active} /> : null;
 }
@@ -119,5 +120,5 @@ function EmailSectionBody({ active: selected }: { active: boolean }) {
     );
   }
 
-  return null;
+  return <EmailWorkspace state={value} />;
 }

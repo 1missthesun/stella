@@ -61,6 +61,11 @@ These live on rune/desktop only and go to master at ship time:
   `packages/desktop-rune/ui/`, so a Rune UI draft is added without a click and taken by the UI
   swap, and `relaunches()` also matches `packages/desktop-rune/host/` (the host's own code needs a
   new process). Under Electron both keep master's prefixes.
+- `packages/desktop-ui/src/platform/backend/view-fixtures.ts` (read by `useBackendView`): in DEV
+  builds only (`import.meta.env.DEV`, set by Electron's Vite dev renderer and by Rune's
+  vite-compat bundle), `globalThis.__stellaViewFixtures.set(view, value | "loading")` stands in a
+  value for a backend view and `clear(view?)` drops it. Verification stages the same view state in
+  both apps with it (the Email workspace side-by-sides); production builds never install it.
 
 ## Shim coverage (`host/electron`)
 

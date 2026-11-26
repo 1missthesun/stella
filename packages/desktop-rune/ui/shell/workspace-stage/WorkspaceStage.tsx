@@ -106,13 +106,14 @@ function TabStage({ visible }: { visible: boolean }) {
       fill={t.c.background}
       border={l.edge}
       radius={STAGE_RADIUS}
+      pad={1}
       opacity={visible ? 1 : 0}
       motion={{ dur: visible ? 0.16 : 0.12 }}
       hidden={hidden}
       inert={!visible}
       label={visible ? undefined : ""}
     >
-      <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS}>
+      <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
         <RetainedSurface active={visible} grow={1}>
           <SidebarSectionBody />
         </RetainedSurface>

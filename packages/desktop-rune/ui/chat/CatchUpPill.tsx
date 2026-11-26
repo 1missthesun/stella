@@ -10,7 +10,7 @@ import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useLocale, useT } from "@/shared/i18n";
 import { showToast } from "@/ui/toast";
 import { requestMessageJump } from "@/features/catch-up/message-jump";
-import { Popover, PopoverContent, PopoverTrigger } from "../kit/compat";
+import { APP_TEXT, BODY_TEXT, Popover, PopoverContent, PopoverTrigger } from "../kit/compat";
 import { Icon, Icons, withStroke, type IconData } from "../kit";
 import { derive, fontSize, mix, mixOklch, radius, useTokens, weight } from "../theme";
 import { panelSurface } from "./surfaces";
@@ -38,7 +38,10 @@ const PAGE_MAX_H = 448;
 const TNUM = "'tnum' 1";
 const PAGER_KEYS = ["ArrowLeft", "ArrowRight"];
 const SECTION_ICON = { done: Icons.stella.Check, ongoing: Icons.stella.CircleDot, waiting: Icons.stella.CircleQuestionMark } as const;
-const SHIMMER_LOOK = { size: fontSize.base, weight: weight.regular, lineHeight: fontSize.base * 1.45 };
+const APP_TRACKING = APP_TEXT.size * APP_TEXT.em;
+const FAMILY = BODY_TEXT.family;
+const body = (size: number) => ({ family: FAMILY, size, lineHeight: size * BODY_TEXT.lh });
+const SHIMMER_LOOK = { ...body(fontSize.base), weight: weight.regular };
 
 const useCatchUpLook = () =>
   derive(useTokens(), "chat:catch-up", (k) => ({
@@ -59,24 +62,24 @@ function Section({ kind, items, pageAt, onJump }: { kind: "done" | "ongoing" | "
     <col w="full" align="stretch">
       <row align="center" gap={6} mb={4}>
         <Icon icon={withStroke(SECTION_ICON[kind], 2.2)} size={13} color={titleColor} />
-        <text size={fontSize["2xs"]} weight={weight.semibold} tracking={fontSize["2xs"] * 0.02} textCase="upper" color={titleColor}>
+        <text {...body(fontSize["2xs"])} weight={weight.semibold} tracking={fontSize["2xs"] * 0.02} textCase="upper" color={titleColor}>
           {t(`app.chat.catchUp.${kind}`)}
         </text>
       </row>
       <col w="full" align="stretch">
         {rows.map((row, index) =>
           row.kind === "time" ? (
-            <text key={`time-${index}`} pt={4} pb={2} w="full" textAlign="center" size={fontSize["2xs"]} features={TNUM} color={c.mutedForeground}>
+            <text key={`time-${index}`} pt={4} pb={2} w="full" textAlign="center" {...body(fontSize["2xs"])} features={TNUM} color={c.mutedForeground}>
               {formatGap(locale, row.at, pageAt)}
             </text>
           ) : row.item.links[0] ? (
             <box key={index} role="button" label={row.item.text} focusable mx={-6} py={3} px={6} radius={radius.md} hoverFill={look.itemHover} focusRing={{ width: 2, offset: -2, color: c.ring }} onPress={() => onJump(row.item.links[0]!)}>
-              <text size={fontSize.base} lineHeight={fontSize.base * 1.4} color={c.chatAssistantBubbleText}>
+              <text family={FAMILY} size={fontSize.base} lineHeight={fontSize.base * 1.4} color={c.chatAssistantBubbleText}>
                 {row.item.text}
               </text>
             </box>
           ) : (
-            <text key={index} mx={-6} py={3} px={6} size={fontSize.base} lineHeight={fontSize.base * 1.4} color={c.chatAssistantBubbleText} selectable>
+            <text key={index} mx={-6} py={3} px={6} family={FAMILY} size={fontSize.base} lineHeight={fontSize.base * 1.4} color={c.chatAssistantBubbleText} selectable>
               {row.item.text}
             </text>
           ),
@@ -105,12 +108,12 @@ function CatchUpPage({ catchUp, newest, onJump, onRetry }: { catchUp: CatchUp; n
       ) : catchUp.state === "failed" ? (
         status(
           <>
-            <text size={fontSize.base} color={c.mutedForeground}>
+            <text {...body(fontSize.base)} color={c.mutedForeground}>
               {t("app.chat.catchUp.failed")}
             </text>
             {newest ? (
               <box role="button" label={t("app.chat.catchUp.retry")} focusable py={5} px={12} radius={radius.full} border={panel.border} hoverBorder={panel.hoverBorder} onPress={onRetry}>
-                <text size={fontSize.sm} color={c.textStrong}>
+                <text {...body(fontSize.sm)} color={c.textStrong}>
                   {t("app.chat.catchUp.retry")}
                 </text>
               </box>
@@ -119,7 +122,7 @@ function CatchUpPage({ catchUp, newest, onJump, onRetry }: { catchUp: CatchUp; n
         )
       ) : empty ? (
         status(
-          <text size={fontSize.base} color={c.mutedForeground}>
+          <text {...body(fontSize.base)} color={c.mutedForeground}>
             {t("app.chat.catchUp.empty")}
           </text>,
           false,
@@ -255,19 +258,19 @@ export const CatchUpPill = memo(function CatchUpPill({ conversationId }: { conve
           enter={{ opacity: 0, y: 4, dur: 0.18, bounce: 0 }}
         >
           <Icon icon={withStroke(Icons.stella.LayoutList, 2)} size={14} color={c.textWeak} />
-          <text size={fontSize.sm} lineHeight={fontSize.sm * 1.3} weight={weight.medium} color={open ? c.textStrong : c.textBase} nowrap>
+          <text size={fontSize.sm} lineHeight={fontSize.sm * 1.3} tracking={APP_TRACKING} weight={weight.medium} color={open ? c.textStrong : c.textBase} nowrap>
             {t("app.chat.catchUp.pill")}
           </text>
           {counted ? (
             <box minW={18} h={18} px={5} center radius={radius.full} fill={look.count}>
-              <text size={fontSize["2xs"]} weight={weight.semibold} features={TNUM} color={c.textStrong}>
+              <text size={fontSize["2xs"]} tracking={APP_TRACKING} weight={weight.semibold} features={TNUM} color={c.textStrong}>
                 {String(offer.count)}
               </text>
             </box>
           ) : null}
         </row>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" sideOffset={8} w={POPOVER_W} minW={0} maxW={POPOVER_W} pad={0} clip={radius["3xl"]} radius={radius["3xl"]} fill={c.background} gradient={tokens.gradient.assistantBubble}>
+      <PopoverContent side="top" align="start" sideOffset={8} w={POPOVER_W} minW={0} maxW={POPOVER_W} clip={radius["3xl"]} radius={radius["3xl"]} fill={c.background} gradient={tokens.gradient.assistantBubble}>
         <col
           role="group"
           label={t("app.chat.catchUp.title")}
@@ -279,13 +282,13 @@ export const CatchUpPill = memo(function CatchUpPill({ conversationId }: { conve
           onKey={(e) => goTo(shown + (e.key === "ArrowLeft" ? -1 : 1))}
         >
           <row align="center" gap={8} minH={40} pt={6} pr={8} pl={16}>
-            <text grow={1} minW={0} size={fontSize.base} weight={weight.semibold} color={c.textStrong} nowrap truncate>
+            <text grow={1} minW={0} {...body(fontSize.base)} weight={weight.semibold} color={c.textStrong} nowrap truncate>
               {page ? formatWhen(locale, page.createdAt) : t("app.chat.catchUp.title")}
             </text>
             {total > 1 ? (
               <row align="center" gap={2} shrink={false}>
                 <PagerButton label={t("common.previous")} icon={Icons.stella.ChevronLeft} disabled={shown === 0} onPress={() => goTo(shown - 1)} />
-                <text minW={fontSize.sm * 3.6} textAlign="center" size={fontSize.sm} features={TNUM} color={c.textWeak}>
+                <text minW={fontSize.sm * 3.6} textAlign="center" {...body(fontSize.sm)} features={TNUM} color={c.textWeak}>
                   {t("userAsk.question.progress", { current: shown + 1, total })}
                 </text>
                 <PagerButton label={t("common.next")} icon={Icons.stella.ChevronRight} disabled={shown === total - 1} onPress={() => goTo(shown + 1)} />

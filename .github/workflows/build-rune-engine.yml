@@ -230,18 +230,20 @@ jobs:
           media='const m = stella.host.media; const t0 = performance.now(); const release = await m.use(); const readyMs = performance.now() - t0; const caps = m.caps;
             let mic; try { const got = await m.invoke("acquireSharedMicrophone"); await m.invoke("releaseMicrophone", [got.lease, { immediate: true }]); mic = "granted"; } catch (error) { mic = String(error && error.message || error); }
             release(); return { readyMs, caps, mic };'
+          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json"
+          jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -e '.ok and .value.caps.secureContext and .value.caps.getUserMedia and .value.caps.audioContext and .value.caps.mediaSource and .value.mic == "granted"' "$out/media-page.json" >/dev/null
           lib=$(ldconfig -p | awk '/libwebkit2gtk-4.1.so.0 /{print $NF; exit}')
           { echo "webkit: $lib"; echo "RTCPeerConnection strings: $(strings "$lib" | grep -c RTCPeerConnection || true)";
             gst-inspect-1.0 webrtcbin >/dev/null 2>&1 && echo "gst webrtcbin: yes" || echo "gst webrtcbin: no";
-            gst-inspect-1.0 pulsesrc >/dev/null 2>&1 && echo "gst pulsesrc: yes" || echo "gst pulsesrc: no";
             pactl list short sources; } | tee "$out/webkit-media-env.txt" || true
           probe='const w = new electron.BrowserWindow({ width: 320, height: 240 }); await w.loadURL("https://example.com/");
             const r = await w.webContents.executeJavaScript(`(async () => ({ rtc: typeof RTCPeerConnection, secure: isSecureContext, devices: (await navigator.mediaDevices.enumerateDevices()).map((d) => d.kind + ":" + d.label) }))()`);
             w.destroy(); return r;'
           "$BUN" scripts/session.ts eval "$probe" | tee "$out/webview-probe.json" || true
-          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json"
-          jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
-          jq -e '.ok and .value.caps.secureContext and .value.caps.getUserMedia and .value.caps.rtc and .value.caps.audioContext and .value.caps.mediaSource and .value.mic == "granted"' "$out/media-page.json" >/dev/null
+          sleep 65
+          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page-after-probe.json" || true
+          jq -r '"media page again, after a web window closed: \(.value // .error)"' "$out/media-page-after-probe.json" | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -66,6 +66,17 @@ These live on rune/desktop only and go to master at ship time:
   vite-compat bundle), `globalThis.__stellaViewFixtures.set(view, value | "loading")` stands in a
   value for a backend view and `clear(view?)` drops it. Verification stages the same view state in
   both apps with it (the Email workspace side-by-sides); production builds never install it.
+- `packages/desktop/electron/services/app-source/web-renderer.ts`: with
+  `STELLA_LAUNCHER_ENGINE=rune` and `packages/desktop-rune/web/build.ts` in the checkout, a
+  pushed change builds the per-user web renderer from the Rune `ui/` (WEB.md, "Per-user
+  renderers"): its own inputs, uploaded ref `refs/stella/web-renderer-rune` and renderer id.
+  Under Electron it builds desktop-ui exactly as before.
+- `packages/theme/color.ts`: `mixOklch` drops the hue of a colour below chroma 0.02, as
+  Chromium's `color-mix(in oklch)` does for sRGB colours (was 1e-4). `mixOklch(primary 18%,
+  #38383a)` is now blue like Electron's composer focus border instead of purple; the theme's
+  `panelSurfaceBorderHover` / `selectFill` / `selectBorder` tokens follow the browser the same way.
+- `packages/website/scripts/perf-chat.mjs`: the composer probe also finds the Rune web build's
+  composer (`[data-rid^="composer-input:"] > textarea`), so `--variants` compares the two builds.
 
 ## Shim coverage (`host/electron`)
 

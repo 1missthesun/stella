@@ -208,7 +208,8 @@ function fromOklcha(c: Oklcha): Rgba {
   return { r: r * 255, g: g * 255, b: b * 255, a: c.a };
 }
 
-const POWERLESS_CHROMA = 1e-4;
+// Chromium drops the hue of an sRGB colour converted to oklch below this chroma (#38383a mixes with #0a84ff at #0a84ff's hue).
+const POWERLESS_CHROMA = 0.02;
 
 /**
  * `color-mix(in srgb, a <weightA>%, b)` — premultiplied-alpha interpolation of

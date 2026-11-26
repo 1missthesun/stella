@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,10 +11,35 @@ export type WebRendererDeps = {
   log: (event: string, data: Record<string, unknown>) => void;
 };
 
-const RENDERER_INPUTS = ["packages/desktop-ui/", "packages/contracts/", "packages/theme/", "bun.lock"];
-const UPLOADED_REF = "refs/stella/web-renderer";
+const SHARED_INPUTS = ["packages/desktop-ui/", "packages/contracts/", "packages/theme/", "bun.lock"];
 const UPSTREAM_REF = "refs/remotes/stella-upstream/main";
-const BUILD_SCRIPT = "packages/desktop/scripts/build-web-renderer.ts";
+
+type RendererKind = {
+  inputs: string[];
+  uploadedRef: string;
+  buildScript: string;
+  rendererId: (treeSha: string) => string;
+};
+
+const DESKTOP_UI_RENDERER: RendererKind = {
+  inputs: SHARED_INPUTS,
+  uploadedRef: "refs/stella/web-renderer",
+  buildScript: "packages/desktop/scripts/build-web-renderer.ts",
+  rendererId: (treeSha) => treeSha,
+};
+
+// The backend serves a renderer id as immutable, so the Rune UI's build of a tree needs an id of its own.
+const RUNE_RENDERER: RendererKind = {
+  inputs: [...SHARED_INPUTS, "packages/desktop-rune/", ":(exclude)packages/desktop-rune/engine/"],
+  uploadedRef: "refs/stella/web-renderer-rune",
+  buildScript: "packages/desktop-rune/web/build.ts",
+  rendererId: (treeSha) => createHash("sha1").update(`stella-rune-web\0${treeSha}`).digest("hex"),
+};
+
+const rendererKind = (cwd: string): RendererKind =>
+  process.env.STELLA_LAUNCHER_ENGINE === "rune" && fs.existsSync(path.join(cwd, RUNE_RENDERER.buildScript))
+    ? RUNE_RENDERER
+    : DESKTOP_UI_RENDERER;
 
 const verifiedRef = async (cwd: string, ref: string) => {
   const result = await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
@@ -55,26 +81,28 @@ export const tarDirectory = (root: string): Buffer => {
 };
 
 const uploadOnce = async (cwd: string, deps: WebRendererDeps) => {
+  const kind = rendererKind(cwd);
   const head = await git(cwd, ["rev-parse", "HEAD"]);
-  const base = (await verifiedRef(cwd, UPLOADED_REF)) ?? (await verifiedRef(cwd, UPSTREAM_REF));
+  const base = (await verifiedRef(cwd, kind.uploadedRef)) ?? (await verifiedRef(cwd, UPSTREAM_REF));
   if (base) {
-    const changed = await git(cwd, ["diff", "--name-only", base, head, "--", ...RENDERER_INPUTS]);
+    const changed = await git(cwd, ["diff", "--name-only", base, head, "--", ...kind.inputs]);
     if (!changed) return;
   }
   const baseUrl = deps.getBackendUrl()?.replace(/\/+$/, "");
   const token = await deps.getAuthToken();
   if (!baseUrl || !token) return;
   const treeSha = await git(cwd, ["rev-parse", "HEAD^{tree}"]);
+  const rendererId = kind.rendererId(treeSha);
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "stella-web-renderer-"));
   const startedAt = Date.now();
   try {
     const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
-    const build = await run(bun, [BUILD_SCRIPT, "--out", outDir], { cwd, timeoutMs: 10 * 60_000 });
+    const build = await run(bun, [kind.buildScript, "--out", outDir], { cwd, timeoutMs: 10 * 60_000 });
     if (build.code !== 0) {
       throw new Error(`The browser renderer didn't build: ${(build.stderr || build.stdout).trim().slice(-400)}`);
     }
     const archive = tarDirectory(outDir);
-    const response = await fetch(`${baseUrl}${WEB_RENDERER_UPLOAD_PREFIX}${treeSha}`, {
+    const response = await fetch(`${baseUrl}${WEB_RENDERER_UPLOAD_PREFIX}${rendererId}`, {
       method: "PUT",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/x-tar" },
       body: new Uint8Array(archive),
@@ -83,9 +111,10 @@ const uploadOnce = async (cwd: string, deps: WebRendererDeps) => {
     if (!response.ok) {
       throw new Error(`The browser renderer upload failed (${response.status}): ${(await response.text()).slice(0, 300)}`);
     }
-    await git(cwd, ["update-ref", UPLOADED_REF, head]);
+    await git(cwd, ["update-ref", kind.uploadedRef, head]);
     deps.log("app-source.web-renderer-uploaded", {
       treeSha,
+      rendererId,
       bytes: archive.byteLength,
       ms: Date.now() - startedAt,
     });

@@ -23,7 +23,7 @@ function resolveFile(base: string): string | undefined {
   return undefined;
 }
 
-function resolveSpecifier(spec: string, importer: string): string | undefined {
+export function resolveSpecifier(spec: string, importer: string): string | undefined {
   if (spec.startsWith("@/")) return resolveFile(join(DESKTOP_UI_SRC, spec.slice(2)));
   if (spec.startsWith("./") || spec.startsWith("../")) return resolveFile(resolve(dirname(importer), spec));
   if (spec.startsWith("/")) return resolveFile(spec);
@@ -31,7 +31,7 @@ function resolveSpecifier(spec: string, importer: string): string | undefined {
 }
 
 /** `ui/replace/<path>` stands in for desktop-ui's `src/<path>`, whatever either's extension, except to itself. */
-function replacementFor(path: string, importer: string): string | undefined {
+export function replacementFor(path: string, importer: string): string | undefined {
   if (!path.startsWith(DESKTOP_UI_SRC + sep)) return undefined;
   const base = join(REPLACE_DIR, relative(DESKTOP_UI_SRC, path)).replace(SOURCE, "");
   if (importer.replace(SOURCE, "") === base) return undefined;
@@ -41,7 +41,7 @@ function replacementFor(path: string, importer: string): string | undefined {
 
 function viteEnv(): Record<string, unknown> {
   const mode = uiBuildMode();
-  const env: Record<string, unknown> = { MODE: mode, DEV: mode === "development", PROD: mode === "production", SSR: false, BASE_URL: "/" };
+  const env: Record<string, unknown> = { MODE: mode, DEV: mode === "development", PROD: mode === "production", SSR: false, BASE_URL: process.env.STELLA_UI_BASE_URL ?? "/" };
   for (const [k, v] of Object.entries(process.env)) if (k.startsWith("VITE_")) env[k] = v;
   return env;
 }

@@ -26,6 +26,8 @@
     "demo/**/*.ts",
     "demo/**/*.tsx",
     "scripts/**/*.ts",
+    "web/**/*.ts",
+    "web/**/*.tsx",
     "../desktop-ui/src/shared/types/electron.d.ts"
   ],
   "exclude": ["node_modules", ".hot"]

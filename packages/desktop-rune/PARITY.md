@@ -12,9 +12,10 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 - [ ] Text selection across messages, IME, spellcheck, accessibility tree (AccessKit)
 - [ ] Notifications (OS), sounds (message sound)
   - macOS: message sound plays through AVPlayer, setSinkId routes output: ~/.stella/outputs/stella-rune/host/audio-output-mac.txt
+  - Linux/Windows: the engine's player (symphonia + cpal) decodes MP3/AAC/WAV/FLAC/Vorbis, resamples and ends on time, also with no output device (~/.stella/outputs/stella-rune/host/engine-audio-player.txt). Linux CI (PulseAudio null sink): the message chime plays and ends at 2.65 s (~/.stella/outputs/stella-rune/host/engine-audio-linux-ci.txt).
 - [ ] WebViews: HTML deliverables, canvases (bridge + actions), Cloud Apps, stella-media scheme
 - [ ] Browser-only APIs on demand: realtime voice (WebRTC), dictation/microphone, pdf/office previews
-  - macOS: dictation microphone (~/.stella/outputs/stella-rune/host/dictation-mic-mac.txt), media probe via master's fallbacks (~/.stella/outputs/stella-rune/host/media-probe-mac.txt), realtime voice, voice cues and streaming read-aloud through the media page (~/.stella/outputs/stella-rune/host/voice-media-page-mac.txt, voice-session-mac.png). Open: voice with no Stella window on screen; xAI voice not run (BYOK key).
+  - macOS: dictation microphone (~/.stella/outputs/stella-rune/host/dictation-mic-mac.txt), media probe via master's fallbacks (~/.stella/outputs/stella-rune/host/media-probe-mac.txt), realtime voice, voice cues and streaming read-aloud through the media page (~/.stella/outputs/stella-rune/host/voice-media-page-mac.txt, voice-session-mac.png). Voice with every Stella window hidden, the page in the engine's background window (~/.stella/outputs/stella-rune/host/voice-background-window-mac.txt). Linux CI: the media page on WebKitGTK is a secure context with getUserMedia, AudioContext and MediaSource (engine-audio-linux-ci.txt). Open: xAI voice not run (BYOK key); WebRTC on WebKitGTK; media page on WebView2.
 - [ ] Agent browsing: in-app browser panel + CDP on an on-demand Chromium; Stella Browser extension bridge
   - macOS: an agent browses on the on-demand Chromium in a signed-in turn (~/.stella/outputs/stella-rune/host/agent-browsing-mac.txt, agent-browsing-chat-mac.png). Extension bridge not proven.
 - [ ] Show Stella capture (screen recording + talking + marks), meeting capture
@@ -57,7 +58,8 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 ## Global surfaces
 - [ ] Auth: sign-in screen, magic link, remembered account, sign-out dialog, browser handoff
   - macOS: sign-in dialog matches in dark, light and Night Owl (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-*.jpg); remembered account (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-remembered-nightowl.jpg); sign-out dialog signed-in and signed-out (~/.stella/outputs/stella-rune/global/sbs/signout-*.jpg); signed-out home (~/.stella/outputs/stella-rune/global/sbs/signed-out-home-nightowl.jpg)
-  - macOS gap: the magic-link flow stops at Turnstile. The challenge page loads (host 476d27cad) but times out in a Rune window, so no link is issued and the sign-in recording is still owed. Browser handoff is not exercised (it opens the real browser).
+  - macOS: Turnstile in a `<window>` webview hands its token back through will-navigate as in Electron, and a magic-link sign-in on a dev test account completes from the UI (~/.stella/outputs/stella-rune/host/turnstile-magic-link-mac.txt, magic-link-signed-in-mac.png).
+  - macOS gap: the sign-in recording is still owed (global). Browser handoff is not exercised (it opens the real browser).
 - [ ] Onboarding, local mode, permissions, mobile (get the app), legal dialog
   - macOS: onboarding first screen (~/.stella/outputs/stella-rune/global/sbs/onboarding-1.jpg, `session.ts start --first-run`); local mode via 'Use without an account' (~/.stella/outputs/stella-rune/global/sbs/local-mode-nightowl.jpg); get the app (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); legal (~/.stella/outputs/stella-rune/global/sbs/legal-terms-*.jpg)
   - macOS gap: later onboarding steps and the permission prompts are not compared. The greeting wraps one word early because chat Markdown inserts U+2066/2069 isolates.

@@ -40,7 +40,7 @@ import { STELLA_SEND_MESSAGE_EVENT } from "@/shared/lib/stella-send-message";
 import { uiState } from "@/platform/ui-state";
 import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
 import { FOUND_VIA_CHOICE_KEY, finishNudge } from "@/features/nudges/usage-nudges-store";
-import { BrandIcon, Button, Input, Select, showToast } from "../kit/compat";
+import { APP_TRACKING, BrandIcon, Button, Input, Select, showToast } from "../kit/compat";
 import { Icon, Icons, type IconData } from "../kit";
 import { derive, mixOklch, radius, useTokens } from "../theme";
 
@@ -95,10 +95,10 @@ function NoticeFrame({
       label={label}
       w="full"
       maxW={compact ? undefined : 800}
-      pt={py}
-      pb={py}
-      pl={compact ? 10 : 14}
-      pr={compact ? 32 : 40}
+      pt={py + 1}
+      pb={py + 1}
+      pl={(compact ? 10 : 14) + 1}
+      pr={(compact ? 32 : 40) + 1}
       border={t.c.border}
       radius={compact ? radius.xl : radius["2xl"]}
       fill={t.c.surfaceInset}
@@ -113,7 +113,7 @@ function NoticeFrame({
           {children}
         </row>
       )}
-      <box absolute={{ top: dismiss.inset, right: dismiss.inset }} w={24} h={24} center radius={radius.full} hoverFill={l.dismissHover} hoverGroup role="button" focusable cursor="pointer" label={dismiss.label} onPress={dismiss.onPress}>
+      <box absolute={{ top: dismiss.inset + 1, right: dismiss.inset + 1 }} w={24} h={24} center radius={radius.full} hoverFill={l.dismissHover} hoverGroup role="button" focusable cursor="pointer" label={dismiss.label} onPress={dismiss.onPress}>
         <icon svg={Icons.stella.X.body} name={Icons.stella.X.name} view={Icons.stella.X.view} size={14} color={t.c.textWeak} hoverColor={t.c.textStrong} />
       </box>
     </box>
@@ -141,7 +141,7 @@ function NoticeTitle({ children, compact, lineHeight }: { children: ReactNode; c
   const t = useTokens();
   const size = compact ? 12.5 : 13;
   return (
-    <text size={size} weight={600} lineHeight={lineHeight ?? Math.round(size * 1.45)} color={t.c.textStrong}>
+    <text size={size} weight={600} lineHeight={lineHeight ?? Math.round(size * 1.45)} tracking={APP_TRACKING} color={t.c.textStrong}>
       {children}
     </text>
   );
@@ -151,7 +151,7 @@ function NoticeSub({ children, compact, mt = 2, grow }: { children: ReactNode; c
   const t = useTokens();
   const size = compact ? 11.5 : 12.5;
   return (
-    <text size={size} lineHeight={Math.round(size * 1.35 * 100) / 100} color={t.c.textWeak} maxLines={3} truncate mt={mt} grow={grow ? 1 : undefined} minW={0}>
+    <text size={size} lineHeight={Math.round(size * 1.35 * 100) / 100} tracking={APP_TRACKING} color={t.c.textWeak} maxLines={3} truncate mt={mt} grow={grow ? 1 : undefined} minW={0}>
       {children}
     </text>
   );
@@ -265,7 +265,7 @@ export function FoundViaNotice({ compact, onClose }: { compact: boolean; onClose
               motion={{ dur: 0.16, bounce: 0 }}
               onPress={() => answerFoundVia(choice, onClose)}
             >
-              <text size={12.5} lineHeight={15} color={tokens.c.textBase}>
+              <text size={12.5} lineHeight={15} tracking={APP_TRACKING} color={tokens.c.textBase}>
                 {t(`nudges.foundVia.answers.${choice}`)}
               </text>
             </box>

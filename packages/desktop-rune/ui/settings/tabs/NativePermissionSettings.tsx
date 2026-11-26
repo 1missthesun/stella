@@ -374,8 +374,9 @@ function PermissionResetButton({
   onClick: () => void;
   label: string;
 }) {
+  const sPill = usePill();
   return (
-    <Button variant="ghost" className="pill-btn pill-btn--quiet pill-btn--danger" disabled={disabled} onClick={onClick} aria-label={label} title={label}>
+    <Button variant="ghost" className="pill-btn pill-btn--quiet pill-btn--danger" ml={sPill.pillBtnAfterPill.ml} disabled={disabled} onClick={onClick} aria-label={label} title={label}>
       {label}
     </Button>
   );

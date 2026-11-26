@@ -37,6 +37,15 @@ electronAPI).
 - The launcher channel on fd 3 works: Bun's `new net.Socket({ fd })` closes at once, so
   `electron/fd-socket.ts` adopts the descriptor when a launcher started the app.
 
+## Master-code changes the Rune branch depends on
+
+These live on rune/desktop only and go to master at ship time:
+
+- `packages/runtime/kernel/computer-use/kernel-worker.ts`: under Bun, the code tool's hardened REPL
+  child preloads Node's builtins before it locks `process.binding` (Bun's `node:repl` loads them
+  lazily, and some call `process.binding`). Under Rune the REPL child is Bun, not
+  Electron-as-Node; without this every agent's `code` tool exits at start. Electron is unaffected.
+
 ## Shim coverage (`host/electron`)
 
 | Module | How |

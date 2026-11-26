@@ -54,9 +54,8 @@ const nodeReplWorkerMain = async (
   };
   const repl: typeof import("node:repl") =
     typeof replModule.start === "function" ? replModule : replModule.default!;
-  const { createRequire, syncBuiltinESMExports } = (await dynamicImport(
-    "node:module",
-  )) as typeof import("node:module");
+  const { builtinModules, createRequire, syncBuiltinESMExports } =
+    (await dynamicImport("node:module")) as typeof import("node:module");
   const { PassThrough, Writable } = (await dynamicImport(
     "node:stream",
   )) as typeof import("node:stream");
@@ -72,6 +71,16 @@ const nodeReplWorkerMain = async (
   }
 
   const kernelRequire = createRequire(workerData.moduleUrl);
+  // Bun's node:repl loads every builtin through its context's lazy getters, and some builtins
+  // call process.binding while loading, which the locks below block.
+  if (ipcProcess.versions.bun) {
+    for (const name of builtinModules) {
+      if (name.startsWith("_")) continue;
+      try {
+        kernelRequire(name);
+      } catch {}
+    }
+  }
   const BLOCKED_NODE_MODULES = new Set([
     "child_process",
     "node:child_process",

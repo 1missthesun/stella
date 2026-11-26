@@ -5,10 +5,10 @@
 
 import path from "node:path";
 import { buildFolder, currentBuild, discardFolder, recordBuild, stampAll, stampOf } from "./source-stamps";
-import { uiBuildMode } from "./ui-env";
+import { uiBuildMode } from "./ui-mode";
 
 const UI_CACHE_DIR = path.resolve(import.meta.dir, "../../.cache/ui");
-const BUILD_TOOLS = ["../vite-compat.ts", "ui-build-child.ts", "ui-cache.ts", "source-stamps.ts", "ui-env.ts", "../../tsconfig.build.json"].map((f) => path.resolve(import.meta.dir, f));
+const BUILD_TOOLS = ["../vite-compat.ts", "ui-build-child.ts", "ui-cache.ts", "source-stamps.ts", "ui-env.ts", "ui-mode.ts", "../../tsconfig.build.json"].map((f) => path.resolve(import.meta.dir, f));
 
 export type UiCacheSpec = { entry: string; tsconfig: string; external: string[] };
 

@@ -5,6 +5,7 @@
 import path from "node:path";
 import { viteCompat } from "../vite-compat";
 import { writeUiCache, type UiCacheSpec } from "./ui-cache";
+import { uiBuildMode } from "./ui-mode";
 
 export type UiBuildRequest = { id: number; entry: string; tsconfig: string; external: string[]; cache?: boolean };
 export type UiBuildReply =
@@ -22,6 +23,7 @@ const bundle = (spec: UiCacheSpec, extra: Record<string, unknown>) => Bun.build(
   format: "cjs",
   tsconfig: spec.tsconfig,
   plugins: [viteCompat],
+  jsx: { development: uiBuildMode() === "development" },
   metafile: true,
   ...extra,
 } as Parameters<typeof Bun.build>[0]);

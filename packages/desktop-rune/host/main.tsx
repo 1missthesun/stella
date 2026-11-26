@@ -5,8 +5,10 @@
 import "./services/stdio";
 import { bootMark } from "./services/boot-trace";
 import { currentHostBundle } from "./services/host-bundle";
+import { pinReactBuild } from "./services/ui-mode";
 
 bootMark("host-start");
+pinReactBuild();
 type Host = typeof import("./app");
 const fromBundle = (file: string): Host | null => {
   try {

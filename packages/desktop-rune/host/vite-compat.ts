@@ -5,7 +5,7 @@ import type { BunPlugin } from "bun";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { uiBuildMode } from "./services/ui-env";
+import { uiBuildMode } from "./services/ui-mode";
 
 const DESKTOP_UI_SRC = resolve(import.meta.dir, "../../desktop-ui/src");
 const REPLACE_DIR = resolve(import.meta.dir, "../ui/replace");
@@ -143,6 +143,12 @@ function rewriteGlobs(src: string, file: string): string {
 export const viteCompat: BunPlugin = {
   name: "stella-vite-compat",
   setup(build) {
+    // The UI is a client, as in Chromium; Bun's `bun` condition would make the router a server.
+    build.onResolve({ filter: /^@tanstack\/router-core\/isServer$/ }, (args) => {
+      const pkg = Bun.resolveSync("@tanstack/router-core/package.json", args.importer);
+      return { path: join(dirname(pkg), "dist/esm/isServer/client.js") };
+    });
+
     build.onResolve({ filter: /^@\// }, (args) => {
       const path = resolveSpecifier(args.path, args.importer);
       return path ? { path: replacementFor(path, args.importer) ?? path } : undefined;

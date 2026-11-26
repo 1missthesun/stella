@@ -4,10 +4,9 @@
 
 import path from "node:path";
 import { loadRendererEnv } from "../../../desktop/electron/source/env";
+import { uiBuildMode } from "./ui-mode";
 
 const DESKTOP_UI = path.resolve(import.meta.dir, "../../../desktop-ui");
-
-export const uiBuildMode = () => (process.env.STELLA_LAUNCHER === "1" ? "production" : "development");
 
 export function applyUiEnv() {
   const env = loadRendererEnv(DESKTOP_UI, uiBuildMode());

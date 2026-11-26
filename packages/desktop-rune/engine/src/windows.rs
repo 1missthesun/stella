@@ -595,6 +595,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         s.node = m;
     }
     let node = s.node;
+    crate::control::refresh_recording(node);
     if engine::read(|e| e.ts_dead && e.windows.is_empty()) {
         return false;
     }

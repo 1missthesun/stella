@@ -2,6 +2,7 @@
 //! element tree as Rune sees it (`control.elements`), and the PoC's scripted bench motions.
 
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use rune::Tx;
@@ -104,7 +105,29 @@ pub fn command(s: &mut Win, tx: &mut Tx, rid: Option<u64>, cmd: &str, v: &Value)
             let path = std::path::PathBuf::from(v.get("path").and_then(|p| p.as_str()).ok_or("control.screenshot: needs a path")?);
             let handle = engine::read(|e| e.windows.get(&s.node).and_then(|w| w.handle.clone())).ok_or("window not open")?;
             tx.wake_after(Duration::ZERO);
-            handle.capture_frame(move |frame| engine::reply_any_thread(rid, frame.and_then(|f| write_png(&path, &f))));
+            let joined: Arc<Mutex<Joined>> = Arc::new(Mutex::new((None, None)));
+            let finish = move |j: &mut Joined| {
+                if let (Some(_), Some(_)) = (&j.0, &j.1) {
+                    let (frame, shots) = (j.0.take().unwrap_or_else(|| Err(String::new())), j.1.take().unwrap_or_default());
+                    let path = path.clone();
+                    std::thread::spawn(move || engine::reply_any_thread(rid, frame.and_then(|mut f| {
+                        composite(&mut f, &shots);
+                        write_png(&path, &f)
+                    })));
+                }
+            };
+            let finish = Arc::new(Mutex::new(finish));
+            let (j, f) = (joined.clone(), finish.clone());
+            handle.capture_frame(move |frame| {
+                let mut j = j.lock().unwrap_or_else(|e| e.into_inner());
+                j.0 = Some(frame);
+                (f.lock().unwrap_or_else(|e| e.into_inner()))(&mut j);
+            });
+            snapshots(s.node, Box::new(move |shots| {
+                let mut j = joined.lock().unwrap_or_else(|e| e.into_inner());
+                j.1 = Some(shots);
+                (finish.lock().unwrap_or_else(|e| e.into_inner()))(&mut j);
+            }));
             Err(String::from("\u{0}pending"))
         }
         "control.record" => {
@@ -113,11 +136,132 @@ pub fn command(s: &mut Win, tx: &mut Tx, rid: Option<u64>, cmd: &str, v: &Value)
             let seconds = v.get("seconds").and_then(|x| x.as_f64()).unwrap_or(3.0).clamp(0.05, 120.0);
             let handle = engine::read(|e| e.windows.get(&s.node).and_then(|w| w.handle.clone())).ok_or("window not open")?;
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-            record(handle, dir, fps, seconds, rid);
+            let shots = Arc::new(Mutex::new(Arc::new(Vec::new())));
+            RECORDING.with(|r| r.borrow_mut().insert(s.node, Recording { every: Duration::from_secs_f64(1.0 / fps), last: None, busy: Arc::new(Mutex::new(false)), shots: shots.clone() }));
+            record(handle, s.node, dir, fps, seconds, shots, rid);
             Err(String::from("\u{0}pending"))
         }
         other => Err(format!("unknown command {other}")),
     }
+}
+
+type Joined = (Option<Result<rune::CapturedFrame, String>>, Option<Vec<Shot>>);
+
+struct Recording {
+    every: Duration,
+    last: Option<Instant>,
+    busy: Arc<Mutex<bool>>,
+    shots: Arc<Mutex<Arc<Vec<Shot>>>>,
+}
+
+thread_local! {
+    static RECORDING: RefCell<std::collections::HashMap<u32, Recording>> = RefCell::new(std::collections::HashMap::new());
+}
+static STOP_RECORDING: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+
+/// Keeps a recording window's webview snapshots fresh, at most once per recorded frame.
+pub fn refresh_recording(window: u32) {
+    let stopped = std::mem::take(&mut *STOP_RECORDING.lock().unwrap_or_else(|e| e.into_inner()));
+    let due = RECORDING.with(|r| {
+        let mut r = r.borrow_mut();
+        for w in stopped {
+            r.remove(&w);
+        }
+        let rec = r.get_mut(&window)?;
+        let mut busy = rec.busy.lock().unwrap_or_else(|e| e.into_inner());
+        if *busy || rec.last.is_some_and(|t| t.elapsed() < rec.every) {
+            return None;
+        }
+        *busy = true;
+        rec.last = Some(Instant::now());
+        Some((rec.busy.clone(), rec.shots.clone()))
+    });
+    if let Some((busy, shots)) = due {
+        snapshots(window, Box::new(move |s| {
+            *shots.lock().unwrap_or_else(|e| e.into_inner()) = Arc::new(s);
+            *busy.lock().unwrap_or_else(|e| e.into_inner()) = false;
+        }));
+    }
+}
+
+#[cfg(feature = "webview")]
+use crate::webview::{Shot, snapshots};
+
+#[cfg(not(feature = "webview"))]
+pub struct Shot {
+    rect: [f32; 4],
+    corners: [f32; 4],
+    clip: Option<[f32; 4]>,
+    image: image::RgbaImage,
+}
+
+#[cfg(not(feature = "webview"))]
+fn snapshots(_window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
+    done(Vec::new());
+}
+
+/// Draws each webview snapshot over the frame at its rect, inside its scroll viewport and
+/// rounded by its corner radii.
+fn composite(f: &mut rune::CapturedFrame, shots: &[Shot]) {
+    let k = f.scale as f32;
+    let (fw, fh) = (f.width as i64, f.height as i64);
+    for shot in shots {
+        let [x, y, w, h] = shot.rect.map(|v| v * k);
+        let (pw, ph) = (w.round().max(1.0) as u32, h.round().max(1.0) as u32);
+        let img = if shot.image.dimensions() == (pw, ph) {
+            std::borrow::Cow::Borrowed(&shot.image)
+        } else {
+            std::borrow::Cow::Owned(image::imageops::resize(&shot.image, pw, ph, image::imageops::FilterType::Triangle))
+        };
+        let clip = shot.clip.map(|c| c.map(|v| v * k)).unwrap_or([0.0, 0.0, fw as f32, fh as f32]);
+        let radii = shot.corners.map(|r| (r * k).min(w / 2.0).min(h / 2.0));
+        let (x0, y0) = (x.round() as i64, y.round() as i64);
+        for py in 0..ph as i64 {
+            let gy = y0 + py;
+            if gy < 0 || gy >= fh || (gy as f32) < clip[1] || (gy as f32) >= clip[1] + clip[3] {
+                continue;
+            }
+            for px in 0..pw as i64 {
+                let gx = x0 + px;
+                if gx < 0 || gx >= fw || (gx as f32) < clip[0] || (gx as f32) >= clip[0] + clip[2] {
+                    continue;
+                }
+                let cover = corner_cover(px as f32 + 0.5, py as f32 + 0.5, w, h, radii);
+                if cover <= 0.0 {
+                    continue;
+                }
+                let src = img.get_pixel(px as u32, py as u32).0;
+                let a = f32::from(src[3]) / 255.0 * cover;
+                let i = ((gy * fw + gx) * 4) as usize;
+                let dst = &mut f.rgba[i..i + 4];
+                let da = f32::from(dst[3]) / 255.0;
+                let oa = a + da * (1.0 - a);
+                for c in 0..3 {
+                    let v = if oa > 0.0 { (f32::from(src[c]) * a + f32::from(dst[c]) * da * (1.0 - a)) / oa } else { 0.0 };
+                    dst[c] = v.round().clamp(0.0, 255.0) as u8;
+                }
+                dst[3] = (oa * 255.0).round() as u8;
+            }
+        }
+    }
+}
+
+/// How much of the pixel centred at (x, y) lies inside a w×h box with corner radii
+/// (top-left, top-right, bottom-right, bottom-left).
+fn corner_cover(x: f32, y: f32, w: f32, h: f32, r: [f32; 4]) -> f32 {
+    let (r, cx, cy) = if x < r[0] && y < r[0] {
+        (r[0], r[0], r[0])
+    } else if x > w - r[1] && y < r[1] {
+        (r[1], w - r[1], r[1])
+    } else if x > w - r[2] && y > h - r[2] {
+        (r[2], w - r[2], h - r[2])
+    } else if x < r[3] && y > h - r[3] {
+        (r[3], r[3], h - r[3])
+    } else {
+        return 1.0;
+    };
+    let d = ((x - cx).powi(2) + (y - cy).powi(2)).sqrt();
+    (r - d + 0.5).clamp(0.0, 1.0)
 }
 
 /// The engine's mirrored tree under a window (what TS committed), for debugging.
@@ -138,7 +282,8 @@ fn write_png(path: &std::path::Path, f: &rune::CapturedFrame) -> Result<Value, S
 
 /// Captures the window's presented frames at `fps` for `seconds` into `dir/frame-NNNNN.png`,
 /// then replies with how many were written.
-fn record(handle: rune::WindowHandle, dir: std::path::PathBuf, fps: f64, seconds: f64, rid: Option<u64>) {
+#[allow(clippy::too_many_arguments)]
+fn record(handle: rune::WindowHandle, window: u32, dir: std::path::PathBuf, fps: f64, seconds: f64, shots: Arc<Mutex<Arc<Vec<Shot>>>>, rid: Option<u64>) {
     let spawned = std::thread::Builder::new().name("stella-record".into()).spawn(move || {
         let start = Instant::now();
         let step = Duration::from_secs_f64(1.0 / fps);
@@ -151,13 +296,19 @@ fn record(handle: rune::WindowHandle, dir: std::path::PathBuf, fps: f64, seconds
             }
             let path = dir.join(format!("frame-{asked:05}.png"));
             let done = done_tx.clone();
+            let shots = shots.clone();
             handle.capture_frame(move |frame| {
-                let _ = done.send(frame.and_then(|f| write_png(&path, &f)).map(|_| ()));
+                let shots = shots.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                let _ = done.send(frame.and_then(|mut f| {
+                    composite(&mut f, &shots);
+                    write_png(&path, &f)
+                }).map(|_| ()));
             });
             crate::windows::wake_all();
             asked += 1;
         }
         drop(done_tx);
+        STOP_RECORDING.lock().unwrap_or_else(|e| e.into_inner()).push(window);
         let mut written = 0usize;
         let mut errors = Vec::new();
         while let Ok(r) = done_rx.recv_timeout(Duration::from_secs(5)) {

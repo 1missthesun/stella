@@ -29,6 +29,7 @@ struct View {
     html: Option<String>,
     rect: [f32; 4],
     visible: bool,
+    corners: [f32; 4],
 }
 
 thread_local! {
@@ -120,6 +121,7 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
         .with_id(&id)
         .with_bounds(rect(window, r))
         .with_transparent(p.transparent)
+        .with_focused(false)
         .with_devtools(p.devtools || cfg!(debug_assertions))
         .with_initialization_script(PARENT_SHIM)
         .with_ipc_handler(move |req: Request<String>| {
@@ -236,8 +238,10 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         match create(n, window, &p, r) {
             Ok(view) => {
                 let _ = view.set_bounds(rect(window, r));
+                #[cfg(target_os = "macos")]
+                mac::round(&view, corners(&p));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
-                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, url: p.url.clone(), html: p.html.clone(), rect: r, visible: true }));
+                VIEWS.with(|v| v.borrow_mut().insert(n, View { view, window, url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p) }));
                 element_event(n, "ready", json!({}), None);
             }
             Err(e) => {
@@ -262,11 +266,128 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
     });
 }
 
-/// Follows prop changes (url, html) of live views.
+/// The webview's corner radii (top-left, top-right, bottom-right, bottom-left).
+fn corners(p: &Props) -> [f32; 4] {
+    p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4])
+}
+
+/// A shown webview's pixels at its placed rect, for drawing into a captured frame.
+pub struct Shot {
+    pub rect: [f32; 4],
+    pub corners: [f32; 4],
+    pub clip: Option<[f32; 4]>,
+    pub image: image::RgbaImage,
+}
+
+/// Snapshots still to come, those taken, and who hears them all.
+#[cfg(target_os = "macos")]
+type Gathering = (usize, Vec<Shot>, Option<Box<dyn FnOnce(Vec<Shot>) + Send>>);
+
+/// Snapshots every shown webview of `window` and hands them to `done` once all have answered.
+/// Only macOS can snapshot so far; elsewhere `done` gets none.
+pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
+    let targets: Vec<(u32, [f32; 4])> =
+        VIEWS.with(|v| v.borrow().iter().filter(|(_, x)| x.window == window && x.visible).map(|(n, x)| (*n, x.rect)).collect());
+    #[cfg(target_os = "macos")]
+    if !targets.is_empty() {
+        let pending = std::rc::Rc::new(RefCell::new((targets.len(), Vec::new(), Some(done))));
+        let answer = |pending: &std::rc::Rc<RefCell<Gathering>>, shot: Option<Shot>| {
+            let mut p = pending.borrow_mut();
+            p.0 -= 1;
+            p.1.extend(shot);
+            if p.0 == 0
+                && let Some(done) = p.2.take()
+            {
+                done(std::mem::take(&mut p.1));
+            }
+        };
+        for (n, rect) in targets {
+            let (c, clip) = engine::read(|e| {
+                let c = e.tree.get(n).map(|node| corners(&node.props)).unwrap_or_default();
+                let clip = e.tree.clip_of.get(&n).and_then(|c| CLIPS.with(|m| m.borrow().get(c).copied()));
+                (c, clip)
+            });
+            let pending = pending.clone();
+            let sent = with_view(n, |view| {
+                let pending = pending.clone();
+                mac::snapshot(&view.view, move |image| answer(&pending, image.map(|image| Shot { rect, corners: c, clip, image })));
+            });
+            if sent.is_err() {
+                answer(&pending, None);
+            }
+        }
+        return;
+    }
+    let _ = targets;
+    done(Vec::new());
+}
+
+#[cfg(target_os = "macos")]
+mod mac {
+    use std::cell::RefCell;
+
+    use block2::RcBlock;
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage};
+    use objc2_foundation::{NSDictionary, NSError};
+    use objc2_quartz_core::CACornerMask;
+    use wry::WebViewExtMacOS;
+
+    pub fn snapshot(view: &wry::WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
+        let done = RefCell::new(Some(done));
+        let block = RcBlock::new(move |img: *mut NSImage, _err: *mut NSError| {
+            if let Some(done) = done.borrow_mut().take() {
+                // SAFETY: WebKit passes a valid NSImage or null for the call's duration.
+                done(unsafe { img.as_ref() }.and_then(decode));
+            }
+        });
+        // SAFETY: called on the main thread; a nil configuration snapshots the visible bounds.
+        unsafe { view.webview().takeSnapshotWithConfiguration_completionHandler(None, &block) };
+    }
+
+    fn decode(img: &NSImage) -> Option<image::RgbaImage> {
+        let tiff = img.TIFFRepresentation()?;
+        let rep = NSBitmapImageRep::imageRepWithData(&tiff)?;
+        // SAFETY: an empty property dictionary is valid for PNG.
+        let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }?;
+        image::load_from_memory_with_format(&png.to_vec(), image::ImageFormat::Png).ok().map(|i| i.to_rgba8())
+    }
+
+    /// Rounds the WKWebView's own layer, which clips the page drawn in its sublayers.
+    pub fn round(view: &wry::WebView, c: [f32; 4]) {
+        let wk = view.webview();
+        let r = c.iter().copied().fold(0.0f32, f32::max);
+        if r <= 0.0 && wk.layer().is_none() {
+            return;
+        }
+        wk.setWantsLayer(true);
+        let Some(layer) = wk.layer() else { return };
+        let (tl, tr, bl, br) = if layer.contentsAreFlipped() {
+            (CACornerMask::LayerMinXMinYCorner, CACornerMask::LayerMaxXMinYCorner, CACornerMask::LayerMinXMaxYCorner, CACornerMask::LayerMaxXMaxYCorner)
+        } else {
+            (CACornerMask::LayerMinXMaxYCorner, CACornerMask::LayerMaxXMaxYCorner, CACornerMask::LayerMinXMinYCorner, CACornerMask::LayerMaxXMinYCorner)
+        };
+        let mut mask = CACornerMask::empty();
+        for (radius, corner) in [(c[0], tl), (c[1], tr), (c[2], br), (c[3], bl)] {
+            if radius > 0.0 {
+                mask |= corner;
+            }
+        }
+        layer.setCornerRadius(f64::from(r));
+        layer.setMaskedCorners(mask);
+        layer.setMasksToBounds(r > 0.0);
+    }
+}
+
+/// Follows prop changes (url, html, corners) of live views.
 pub fn sync(n: u32, p: &Props) {
     VIEWS.with(|v| {
         let mut v = v.borrow_mut();
         let Some(view) = v.get_mut(&n) else { return };
+        #[cfg(target_os = "macos")]
+        if corners(p) != view.corners {
+            view.corners = corners(p);
+            mac::round(&view.view, view.corners);
+        }
         if p.url.is_some() && p.url != view.url {
             if let Some(u) = &p.url {
                 let _ = view.view.load_url(u);

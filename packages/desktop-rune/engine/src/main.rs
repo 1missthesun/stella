@@ -195,7 +195,10 @@ fn main() {
     });
     let w = std::env::var("STELLA_RUNE_W").ok().and_then(|v| v.parse().ok()).unwrap_or(1280.0);
     let h = std::env::var("STELLA_RUNE_H").ok().and_then(|v| v.parse().ok()).unwrap_or(820.0);
-    let main_props: props::Props = std::env::var("STELLA_RUNE_WINDOW").ok().and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default();
+    let main_props: props::Props = std::env::var("STELLA_RUNE_WINDOW")
+        .ok()
+        .and_then(|j| serde_json::from_str(&j).map_err(|e| eprintln!("stella-engine: STELLA_RUNE_WINDOW: {e}")).ok())
+        .unwrap_or_default();
     let mut p = main_props.clone();
     if p.w.is_none() {
         p.w = Some(props::Size::Pt(w));

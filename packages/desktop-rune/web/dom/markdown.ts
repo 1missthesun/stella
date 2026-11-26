@@ -206,14 +206,14 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
   const align = n.align ?? [];
   const cell = (row: Md, r: number) => (row.children ?? []).map((cellNode, i) => {
     const header = r === 0;
+    const [x, y] = header ? [headX, headY] : [cellX, cellY];
+    const last = (row.children?.length ?? 0) - 1;
     const style: Css = {
       textAlign: (align[i] ?? "left") as Css["textAlign"],
-      padding: header ? `${headY}px ${headX / 2}px` : `${cellY}px ${cellX / 2}px`,
+      padding: flush ? `${y}px ${i === last ? 0 : 2 * x}px ${y}px 0` : `${y}px ${x}px`,
       borderBottom: header ? `1px solid ${s.tableHeaderRule ?? rules}` : r < rows.length - 1 ? `1px solid ${rules}` : undefined,
       verticalAlign: "top",
     };
-    if (flush && i === 0) style.paddingLeft = 0;
-    if (flush && i === (row.children?.length ?? 0) - 1) style.paddingRight = 0;
     if (header) {
       style.color = s.tableHeaderText;
       style.fontWeight = s.tableHeaderWeight ?? 600;

@@ -269,8 +269,10 @@ null).
 
 **`[a, b]` pairs.** `codeBlockPadding`, `list [indent, gap]`, `listNestedIndent`,
 `inlineCodeFont [scale, weight]`, and the `[top, bottom]` margins: `paragraphMargin codeMargin
-imageMargin listMargin quoteMargin ruleMargin tableMargin`. Also `tableCellPadding`,
-`tableHeaderPad`.
+imageMargin listMargin quoteMargin ruleMargin tableMargin`. Also `tableCellPadding` and
+`tableHeaderPad` as `[x, y]`: `x` on each side of a cell, `y` above and below. `tableFlushLeft`
+drops the first column's left padding; on the web it pads every cell on its right only (`2x`,
+none after the last column), as desktop-ui's table.
 
 **Numbers and switches.** `codeBlockRadius inlineCodePad strongWeight textWidth
 tableHeaderWeight`; booleans `listMarkersOutside tableFlushLeft tableFullWidth`.

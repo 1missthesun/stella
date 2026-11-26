@@ -818,6 +818,7 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
     {
         main_frame_navigations(n, &view);
         enable_webrtc(&view);
+        crate::webview_look::prepare(&view);
         match (&p.url, &p.html) {
             (Some(u), _) => view.load_url(u).map_err(|e| e.to_string())?,
             (None, Some(h)) => view.load_html(h).map_err(|e| e.to_string())?,
@@ -826,7 +827,15 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
     }
     #[cfg(target_os = "macos")]
     mac::track_main_frame(&view);
+    #[cfg(not(target_os = "linux"))]
+    crate::webview_look::prepare(&view);
     Ok(view)
+}
+
+/// Runs `f` on every open view.
+#[cfg(not(target_os = "linux"))]
+pub fn each(f: impl Fn(&WebView)) {
+    VIEWS.with(|v| v.borrow().values().for_each(|view| f(&view.view)));
 }
 
 /// WebView2's NavigationStarting is main-frame only; WKWebView's policy also asks for subframes,

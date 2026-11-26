@@ -50,6 +50,11 @@ pub fn route(v: Value) {
         "fonts" => reply(rid, fonts(&v)),
         #[cfg(feature = "webview")]
         "webview.respond" => reply(rid, engine::read(|e| crate::webview::command(&cmd, 0, &v, &e.blobs))),
+        #[cfg(feature = "webview")]
+        "webview.colorScheme" => {
+            crate::webview_look::set_color_scheme(v.get("dark").and_then(|d| d.as_bool()).unwrap_or(false));
+            reply(rid, Ok(Value::Null));
+        }
         "colorMotion" => {
             engine::with(|e| e.color_motion = f(&v, "dur").filter(|d| *d > 0.0));
             reply(rid, Ok(Value::Null));

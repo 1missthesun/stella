@@ -9,6 +9,9 @@ export const engine = {
   colorMotion(dur: number) {
     void api()?.colorMotion(dur);
   },
+  webviewColorScheme(dark: boolean) {
+    void api()?.webview.colorScheme(dark).catch(() => {});
+  },
   /** False where there is no engine yet (a module evaluated before the host bridge exists). */
   fonts(files: string[], sans: string, mono: string): boolean {
     const e = api();

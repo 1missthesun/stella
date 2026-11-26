@@ -394,6 +394,8 @@ export const engine = {
     focus: (target: string) => request("webview.focus", { target }),
     blur: (target: string) => request("webview.blur", { target }),
     zoom: (target: string, factor: number) => request("webview.zoom", { target, factor }),
+    /** Every page prefers this color scheme (the app's), as Chromium gives an iframe its owner's. */
+    colorScheme: (dark: boolean) => request("webview.colorScheme", { dark }),
     url: (target: string) => request<string | null>("webview.url", { target }),
     /** Why a native view shows or hides: its rect, whether it fits its scroll viewport (`clip`), and the overlays covering it. */
     state: (target: string) =>

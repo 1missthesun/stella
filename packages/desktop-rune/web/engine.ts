@@ -296,6 +296,7 @@ export const webEngine: Engine = {
     focus: async (id) => { frameOf(id)?.focus(); },
     blur: async (id) => { frameOf(id)?.blur(); },
     zoom: async () => {},
+    colorScheme: async () => {},
     url: async (id) => {
       const f = frameOf(id);
       try { return f?.contentWindow?.location.href ?? f?.src ?? null; } catch { return f?.src ?? null; }

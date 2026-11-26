@@ -15,6 +15,7 @@ function useSpringOnChange(tokens: Tokens, windowRoot = false) {
   if (last.current !== tokens) {
     if (last.current) engine.colorMotion(THEME_SPRING);
     if (windowRoot && last.current?.c.background !== tokens.c.background) engine.background(tokens.c.background);
+    if (windowRoot && last.current?.dark !== tokens.dark) engine.webviewColorScheme(tokens.dark);
     last.current = tokens;
   }
 }

@@ -46,7 +46,7 @@ export function Input(raw: InputProps) {
   latest.current = p;
   const reported = useRef<string | null>(null);
   const lines = useRef("");
-  const h = useHost({ ...p, onKey: undefined, onPaste: undefined, keys: undefined } as BoxProps, "rin");
+  const h = useHost({ ...p, onKey: undefined, onPaste: undefined, keys: undefined, keysPass: undefined } as BoxProps, "rin");
   const s = h.props.style;
   textStyle(p as TextProps, s);
   if (p.placeholderColor) s["--ph"] = p.placeholderColor;
@@ -155,6 +155,11 @@ export function Input(raw: InputProps) {
       const start = f.selectionStart ?? 0;
       q.onKey?.({ key: e.key, chord, mods: modsOf(e), value: f.value, start, end: f.selectionEnd ?? start, length: f.value.length });
       return;
+    }
+    const passed = matchChord(q.keysPass, native);
+    if (passed) {
+      const start = f.selectionStart ?? 0;
+      q.onKey?.({ key: e.key, chord: passed, mods: modsOf(e), value: f.value, start, end: f.selectionEnd ?? start, length: f.value.length });
     }
     if (e.key === "Enter" && q.onSubmit && !(multiline && e.shiftKey) && !e.altKey) {
       e.preventDefault();

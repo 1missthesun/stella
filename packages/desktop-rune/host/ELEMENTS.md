@@ -215,7 +215,8 @@ its own label.
   - `onPaste({files, image, text})`: fires for file and image pastes; `image` is a temp PNG path.
     With `pasteAsEvent: {minChars?, minLines?}`, a text paste at or over either threshold fires
     it too, and that text is not inserted.
-  - `onKey({key, chord, mods, value, start, end, length})`: for `keys` chords
+  - `onKey({key, chord, mods, value, start, end, length})`: for `keys` chords, and for `keysPass`
+    chords, which still do what they do (Tab moves focus, arrows move the caret)
   - `onLines({lines, height})`: the laid-out line count, whenever it changes
 - Growth (`multiline`): `minLines`, `maxLines` and/or `maxH` grow the field with its text, then
   scroll inside it with the caret kept in view. The box props (size, padding, paint) wrap that

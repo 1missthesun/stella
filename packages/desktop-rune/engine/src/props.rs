@@ -512,6 +512,7 @@ pub struct Props {
     pub auto_focus: bool,
     pub focus_group: bool,
     pub keys: Vec<String>,
+    pub keys_pass: Vec<String>,
     pub window_drag: bool,
     pub no_window_drag: bool,
     pub window_resize: Option<String>,

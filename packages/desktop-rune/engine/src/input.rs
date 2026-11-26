@@ -136,10 +136,16 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
             true
         });
     }
-    if !p.keys.is_empty() {
-        let chords = Chords::new(&p.keys);
+    if !p.keys.is_empty() || !p.keys_pass.is_empty() {
+        let (chords, pass) = (Chords::new(&p.keys), Chords::new(&p.keys_pass));
         e = e.on_input_key(move |s: &mut Win, ev: &rune::KeyEvent, tx: &mut Tx| {
-            let Some(chord) = chords.matching(ev) else { return false };
+            let (chord, takes) = match chords.matching(ev) {
+                Some(c) => (c, true),
+                None => match pass.matching(ev) {
+                    Some(c) => (c, false),
+                    None => return false,
+                },
+            };
             let st = state(s, n);
             let (a, b) = selection16(&st.edit);
             let len = st.edit.text.encode_utf16().count();
@@ -150,7 +156,7 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
                 json!({ "key": key, "chord": chord, "mods": mods_json(ev.mods), "value": st.edit.text, "start": a, "end": b, "length": len }),
                 Some(tx),
             );
-            true
+            takes
         });
     }
     if let Some(ph) = &p.placeholder {
@@ -230,5 +236,5 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
 
 /// The props that belong on the field itself when its box (size, padding, paint) wraps it.
 fn text_only(p: &Props) -> Props {
-    Props { id: p.id.clone(), keys: p.keys.clone(), modal: None, ..Default::default() }
+    Props { id: p.id.clone(), keys: p.keys.clone(), keys_pass: p.keys_pass.clone(), modal: None, ..Default::default() }
 }

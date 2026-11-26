@@ -188,6 +188,8 @@ export type InputProps = Omit<TextProps, "onKey"> & {
   /** Files or an image pasted, or text past `pasteAsEvent` (shorter text pastes natively). `image` is a PNG path. */
   onPaste?: (p: { files: string[]; image: string | null; text: string }) => void;
   onKey?: (e: InputKeyEvent) => void;
+  /** Chords reported through `onKey` that still do what they do (Tab moves focus, arrows move the caret), as a DOM `onKeyDown` that doesn't `preventDefault`. */
+  keysPass?: string[];
   /** Multiline: grow from `minLines` to `maxLines` (or `maxH`), then scroll inside with the caret kept in view. */
   minLines?: number;
   /** Highlights over UTF-16 ranges of the value (mentions, chips, matches). Paint only: no reshaping. */

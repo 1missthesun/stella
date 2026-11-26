@@ -172,7 +172,8 @@ export type InputProps = Style & {
   field?: boolean;
 };
 
-const KEYS = ["Escape", "ArrowUp", "ArrowDown", "Tab"];
+const KEYS = ["Escape"];
+const PASSED_KEYS = ["ArrowUp", "ArrowDown", "Tab", "shift+Tab"];
 
 /** An `<input>` / `<textarea>` with the DOM handler shapes desktop-ui passes (`onChange(e)`, `onKeyDown(e)`); Enter submits the enclosing form. */
 export function Input({ field = false, value, defaultValue, type, disabled, readOnly, autoFocus, multiline, onChange, onInput, onKeyDown, onFocus, onBlur, placeholder, placeholderColor, spellCheck, id, "aria-label": aria, className: _c, rows, maxLength, name: _n, autoComplete: _a, autoCorrect: _ac, autoCapitalize: _ap, inputMode: _im, min: _min, max: _max, step: _s, "aria-invalid": _ai, onPaste: _p, ...style }: InputProps) {
@@ -227,6 +228,7 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
       {...(rowsHeight === undefined ? null : { h: rowsHeight })}
       opacity={disabled ? 0.5 : style.opacity}
       keys={onKeyDown ? KEYS : undefined}
+      keysPass={onKeyDown ? PASSED_KEYS : undefined}
       onKey={(k) => {
         onKeyDown?.(domEvent(current, { key: k.key, metaKey: k.mods?.meta, ctrlKey: k.mods?.ctrl, shiftKey: k.mods?.shift, altKey: k.mods?.alt }));
         if (k.key === "Escape") dismissLayer?.();

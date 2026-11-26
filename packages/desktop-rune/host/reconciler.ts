@@ -5,7 +5,7 @@
 import Reconciler from "react-reconciler";
 import { ConcurrentRoot, ContinuousEventPriority, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { createContext, type ReactNode } from "react";
-import { blob, commitCtx, flushFrame, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
+import { blob, command, commitCtx, flushFrame, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
 
 type Handlers = Record<string, (...args: any[]) => void>;
 /** Props set through a ref, outside React. They stay over React's until set again. */
@@ -252,8 +252,8 @@ const config: any = {
     inst.json = JSON.stringify({ content: text });
     ops.props(inst.id, inst.json);
   },
-  finalizeInitialChildren: () => false,
-  commitMount() {},
+  finalizeInitialChildren: (_inst: Instance, _type: string, props: any) => props.autoFocus === true,
+  commitMount(inst: Instance) { command({ cmd: "focus", n: inst.id }); },
   resetTextContent() {},
   clearContainer() {},
   hideInstance(inst: Instance) { const j = JSON.parse(inst.json); j.hidden = true; ops.props(inst.id, JSON.stringify(j)); },

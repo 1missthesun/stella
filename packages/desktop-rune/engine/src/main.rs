@@ -209,7 +209,10 @@ fn main() {
     linux_backend();
     // Electron Stella's Wayland app_id is the root package name, so window rules and docks match both.
     #[cfg(target_os = "linux")]
-    rune::set_app_id("stella-v2");
+    {
+        rune::set_app_id("stella-v2");
+        let _ = rune_notify::register(&rune_notify::Identity::new("stella", "Stella"));
+    }
     // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.
     let boot = spawn_ts();
     engine::set_out(boot.to_host);

@@ -156,7 +156,7 @@ async function start() {
   const headless = has("--headless");
 
   const env: Record<string, string> = {};
-  for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR", "XMODIFIERS"]) if (process.env[key]) env[key] = process.env[key]!;
+  for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "XDG_RUNTIME_DIR", "TMPDIR", "XMODIFIERS", "DBUS_SESSION_BUS_ADDRESS"]) if (process.env[key]) env[key] = process.env[key]!;
   env.MIMALLOC_PURGE_DELAY = "0";
   for (const [key, value] of Object.entries(process.env)) if (/^(MIMALLOC_|RUNE_|STELLA_CHAT_FIXTURE_|STELLA_RUNE_(VOICE_HOST|CHROMIUM)$)/.test(key) && value) env[key] = value;
   const launcherChannel = (() => { try { return process.env.STELLA_LAUNCHER === "1" && fstatSync(3).isSocket(); } catch { return false; } })();

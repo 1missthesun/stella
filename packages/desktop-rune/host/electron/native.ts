@@ -261,10 +261,12 @@ class PowerMonitor extends EventEmitter {
     });
   }
   private watchSleep() {
-    const child = spawn("gdbus", ["monitor", "--system", "--dest", "org.freedesktop.login1", "--object-path", "/org/freedesktop/login1"], { stdio: ["ignore", "pipe", "ignore"] });
+    // gdbus runs under a shell that stops it when our end of its stdin closes, so it ends with the host however the host ends.
+    const monitor = "gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 & m=$!; read _; kill $m";
+    const child = spawn("sh", ["-c", monitor], { stdio: ["pipe", "pipe", "ignore"] });
     child.on("error", () => {});
     child.unref();
-    (child.stdout as NodeJS.ReadableStream & { unref?: () => void }).unref?.();
+    for (const stream of [child.stdin, child.stdout] as (NodeJS.Stream & { unref?: () => void })[]) stream.unref?.();
     let buffer = "";
     child.stdout!.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
@@ -277,7 +279,7 @@ class PowerMonitor extends EventEmitter {
       }
     });
     this.sleepWatcher = child;
-    const stop = () => { if (child.exitCode === null) child.kill(); };
+    const stop = () => { child.stdin?.end(); };
     app.once("will-quit", stop);
     process.once("exit", stop);
   }

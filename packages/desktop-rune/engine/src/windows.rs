@@ -189,36 +189,61 @@ fn leak(s: &str) -> &'static str {
 }
 
 fn size_of(p: &Props) -> (f32, f32) {
+    let (dw, dh) = if is_background(p) { (1.0, 1.0) } else { (800.0, 600.0) };
     let w = match &p.w {
         Some(crate::props::Size::Pt(v)) => *v,
-        _ => 800.0,
+        _ => dw,
     };
     let h = match &p.h {
         Some(crate::props::Size::Pt(v)) => *v,
-        _ => 600.0,
+        _ => dh,
     };
     (w, h)
 }
 
 pub fn options(p: &Props) -> WindowOptions {
     let overlay = p.kind.as_deref() == Some("overlay");
+    let background = is_background(p);
     WindowOptions {
-        transparent: p.transparent || overlay,
-        borderless: p.frameless || overlay,
-        click_through: p.click_through,
+        transparent: p.transparent || overlay || background,
+        borderless: p.frameless || overlay || background,
+        click_through: p.click_through || background,
         always_on_top: p.always_on_top || overlay,
         visible: p.visible.unwrap_or(true),
         logical_position: p.position.map(|[x, y]| (f64::from(x), f64::from(y))),
-        min_size: p.min_size.map(|[w, h]| (w, h)),
+        min_size: if background { Some((0.0, 0.0)) } else { p.min_size.map(|[w, h]| (w, h)) },
         max_size: p.max_size.map(|[w, h]| (w, h)),
-        resizable: p.resizable.unwrap_or(true),
+        resizable: p.resizable.unwrap_or(true) && !background,
         ..Default::default()
     }
 }
 
+/// A window that is on screen for the system (so a webview inside runs as a visible page)
+/// but shows nothing, takes no clicks or focus, and stays out of the Dock, task switchers and
+/// screen captures.
+fn is_background(p: &Props) -> bool {
+    p.kind.as_deref() == Some("background")
+}
+
+fn background_window(app: rune::App<Win>) -> rune::App<Win> {
+    const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
+    const STATIONARY: usize = 1 << 4;
+    const IGNORES_CYCLE: usize = 1 << 6;
+    const FULL_SCREEN_AUXILIARY: usize = 1 << 8;
+    app.macos_window(
+        rune::MacWindowOptions::default()
+            .nonactivating_panel(true)
+            .shadow(false)
+            .accepts_first_mouse(false)
+            .collection_behavior(CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY),
+    )
+    .windows_window(rune::WindowsWindowOptions::default().no_activate(true).tool_window(true))
+    .exclude_from_capture(true)
+}
+
 pub fn app_spec(p: &Props) -> AppSpec<Win> {
     let mut spec = AppSpec::new(leak(p.title.as_deref().unwrap_or("Stella")), size_of(p), Win::default, view);
-    spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((240.0, 160.0)));
+    spec.min_size = if is_background(p) { Some((0.0, 0.0)) } else { p.min_size.map(|[w, h]| (w, h)).or(Some((240.0, 160.0))) };
     spec.setup = Some(setup);
     spec.poll = Some(poll);
     spec.on_key = Some(on_key);
@@ -258,6 +283,11 @@ pub fn decorate(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
     if let Some([x, y]) = p.traffic_lights {
         app = app.chrome(rune::Chrome { traffic_lights: Some((x, y)), ..rune::Chrome::DEFAULT });
     }
+    if is_background(p) {
+        app = background_window(app);
+    } else if p.content_protection {
+        app = app.exclude_from_capture(true);
+    }
     app
 }
 
@@ -285,7 +315,8 @@ fn applied_at_open(p: &Props) -> Applied {
         position: p.position,
         dark: Some(p.dark),
         titlebar: p.titlebar,
-        click_through: Some(p.click_through),
+        click_through: Some(p.click_through || is_background(p)),
+        content_protection: Some(p.content_protection || is_background(p)),
     }
 }
 
@@ -453,7 +484,7 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
         let visible = Some(p.visible.unwrap_or(true));
         if visible != applied.visible {
             h.set_visible(visible == Some(true));
-            if visible == Some(true) && applied.visible.is_some() {
+            if visible == Some(true) && applied.visible.is_some() && !is_background(&p) {
                 h.focus();
             }
             next.visible = visible;
@@ -470,11 +501,19 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
             }
             next.position = p.position;
         }
-        if Some(p.click_through) != applied.click_through {
-            if let Err(e) = h.set_click_through(p.click_through) {
+        let click_through = p.click_through || is_background(&p);
+        if Some(click_through) != applied.click_through {
+            if let Err(e) = h.set_click_through(click_through) {
                 eprintln!("stella-engine: click-through: {e}");
             }
-            next.click_through = Some(p.click_through);
+            next.click_through = Some(click_through);
+        }
+        let protect = p.content_protection || is_background(&p);
+        if Some(protect) != applied.content_protection {
+            if applied.content_protection.is_some() || protect {
+                h.set_exclude_from_capture(protect);
+            }
+            next.content_protection = Some(protect);
         }
     }
     if Some(p.dark) != applied.dark {

@@ -45,11 +45,17 @@ Root children are `<window id>` elements. The first `main` (or kind-less) window
 native window the engine opened at launch; every other window opens when mounted and closes when
 unmounted. Render windows from anywhere with `windowPortal(<window …/>, key)` (keeps context).
 
-`<window>` props: `id`, `kind` (`main` | `panel` | `overlay`), `title`, `w`, `h`, `minSize`,
+`<window>` props: `id`, `kind` (`main` | `panel` | `overlay` | `background`), `title`, `w`, `h`, `minSize`,
 `maxSize`, `position`, `resizable`, `frameless`, `transparent`, `alwaysOnTop`, `clickThrough`,
-`visible`, `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
+`visible`, `contentProtection` (left out of screen captures; macOS and Windows), `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
 its controls over it), `trafficLights` (macOS inset), `dark` (native chrome scheme), `dir`, `keys` +
 `onKey` (window-level chords).
+
+`kind="background"` holds a page that must run as if shown (a media `<webview>`: mic, WebAudio,
+timers) with no Stella window on screen: a 1×1 (or `w`×`h`) transparent, borderless,
+click-through window that never takes focus, is left out of captures and stays off the Dock and
+task switchers. macOS: a non-activating NSPanel on every Space. Windows: `WS_EX_NOACTIVATE` +
+tool window. Linux: a transparent click-through window opened inactive.
 
 `visible={false}` at mount creates no native window until it turns true; turning it false later
 hides (unmaps) the window and keeps its state.

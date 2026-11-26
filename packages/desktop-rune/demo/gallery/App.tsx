@@ -403,16 +403,40 @@ function Main({ togglePanel, mountHidden }: { togglePanel: () => void; mountHidd
   );
 }
 
+const BACKGROUND_PAGE = `<body><script>
+let frames = 0, ticks = 0;
+const ctx = new AudioContext();
+const osc = ctx.createOscillator(), gain = ctx.createGain();
+gain.gain.value = 0; osc.connect(gain).connect(ctx.destination); osc.start();
+(function f() { frames++; requestAnimationFrame(f); })();
+setInterval(() => ticks++, 100);
+setInterval(() => {
+  window.parent.postMessage({ visibility: document.visibilityState, hidden: document.hidden, focus: document.hasFocus(), rafPerSec: frames, timerTicks: ticks, audio: ctx.state, audioTime: Math.round(ctx.currentTime * 10) / 10 }, "*");
+  frames = 0; ticks = 0;
+  if (ctx.state !== "running") void ctx.resume();
+}, 1000);
+</script></body>`;
+
+function BackgroundPage() {
+  return (
+    <window id="media" kind="background">
+      <webview id="g-media" w="full" h="full" html={BACKGROUND_PAGE} transparent
+        onMessage={(m) => console.error(`[gallery] background ${JSON.stringify(m.data)}`)} />
+    </window>
+  );
+}
+
 export function Root() {
   const [panel, setPanel] = useState<"off" | "shown" | "hidden">("off");
   const close = useCallback(() => setPanel("off"), []);
   useEffect(() => stella.on("open-url", (e) => console.error(`[gallery] open-url ${e.url} argv ${process.argv.slice(2).join(" ")}`)), []);
   return (
     <>
-      <window id="main" title="Rune engine gallery" bg={c.bg}>
+      <window id="main" title="Rune engine gallery" bg={c.bg} visible={process.env.STELLA_GALLERY_HIDE_MAIN ? false : undefined}>
         <Main togglePanel={() => setPanel((p) => (p === "shown" ? "hidden" : "shown"))} mountHidden={() => setPanel("hidden")} />
       </window>
       {panel !== "off" ? <Panel close={close} shown={panel === "shown"} /> : null}
+      {process.env.STELLA_GALLERY_BACKGROUND ? <BackgroundPage /> : null}
     </>
   );
 }

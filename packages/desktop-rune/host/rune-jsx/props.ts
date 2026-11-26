@@ -278,12 +278,15 @@ export type WindowProps = {
   /** Window id: the name for engine.window.* ops and window events. */
   id: string;
   children?: React.ReactNode;
-  kind?: "main" | "panel" | "overlay";
+  /** `background`: on screen for the system (a webview inside runs as a visible page, with media and timers) but shows nothing, takes no clicks or focus, and stays out of the Dock, task switchers and captures. 1×1 unless `w`/`h` say otherwise. */
+  kind?: "main" | "panel" | "overlay" | "background";
   title?: string;
   w?: number; h?: number; minSize?: [number, number]; maxSize?: [number, number];
   position?: [number, number];
   resizable?: boolean; frameless?: boolean; transparent?: boolean; alwaysOnTop?: boolean; clickThrough?: boolean;
   visible?: boolean;
+  /** Leaves the window out of screen captures and recordings (macOS sharingType none, Windows WDA_EXCLUDEFROMCAPTURE; Linux has none). */
+  contentProtection?: boolean;
   /** Window background (also `fill`). */
   bg?: Color; fill?: Color; gradient?: Gradient;
   /** Custom titlebar height: the app draws it, the window keeps its controls over it. */

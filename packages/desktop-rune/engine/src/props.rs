@@ -613,6 +613,7 @@ pub struct Props {
     pub frameless: bool,
     pub always_on_top: bool,
     pub click_through: bool,
+    pub content_protection: bool,
     pub visible: Option<bool>,
     pub bg: Option<C>,
     pub titlebar: Option<f32>,

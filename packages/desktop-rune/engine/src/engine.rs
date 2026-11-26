@@ -45,6 +45,7 @@ pub struct Applied {
     pub dark: Option<Option<bool>>,
     pub titlebar: Option<f32>,
     pub click_through: Option<bool>,
+    pub content_protection: Option<bool>,
 }
 
 pub struct Engine {

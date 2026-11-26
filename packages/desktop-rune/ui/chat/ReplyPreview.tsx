@@ -7,10 +7,11 @@ import { useThreadActivityRecords } from "@/features/chat/hooks/use-thread-activ
 import { useAgentCard } from "@/features/cloud/use-agent-title";
 import type { AgentCompletionSection } from "@/features/chat/lib/agent-completion";
 import { Icon, Icons, type IconData } from "../kit";
+import { APP_TRACKING } from "../kit/compat";
 import { derive, mix, radius, useTokens } from "../theme";
 
 const MAX_STACKED_PREVIEWS = 3;
-const SMALL = { size: 12, lineHeight: 16.2 };
+const SMALL = { size: 12, lineHeight: 16.2, tracking: APP_TRACKING };
 
 const STATUS_ICONS: Record<TaskLifecycleStatus, IconData> = {
   running: Icons.stella.CircleDot,

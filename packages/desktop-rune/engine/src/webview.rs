@@ -714,6 +714,12 @@ pub fn active() -> bool {
     VIEWS.with(|v| !v.borrow().is_empty()) || WAITING.with(|w| !w.borrow().is_empty())
 }
 
+/// Whether the views need the loop to keep ticking without a frame of their own: WebKitGTK's
+/// events are pumped from it, and a view waiting for its window's native handle retries on it.
+pub fn needs_ticks() -> bool {
+    cfg!(target_os = "linux") || WAITING.with(|w| !w.borrow().is_empty())
+}
+
 /// Creates the views whose window had no native handle yet when they were first placed (a
 /// launch window's handle arrives with its first frame on macOS).
 pub fn retry_waiting() {

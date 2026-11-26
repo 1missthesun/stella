@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { createStellaMark, VIEWBOX, type StellaCharacterShape, type StellaCharacterState, type StellaMarkHandle } from "@/ui/stella-character/rig";
+import type { HostElement } from "../../host/reconciler";
 import { useTokens } from "../theme";
 
 export type StellaCharacterProps = {
@@ -117,10 +118,11 @@ const serialize = (el: Node, resolve: (value: string) => string): string => {
   return `<${tag}${attrs}>${kids}</${tag}>`;
 };
 
-/** desktop-ui's `StellaCharacter`: its rig runs unchanged on a detached DOM, and each frame it draws is handed to the engine as one SVG. */
+/** desktop-ui's `StellaCharacter`: its rig runs unchanged on a detached DOM, and each frame it draws is handed to the engine as one SVG, set on the vector directly rather than through a render. */
 export function StellaCharacter({ size, state = "idle", shape = "star", ink = "aurora", eyeColor, glow = false, paused = false, followPointer = false, handleRef }: StellaCharacterProps) {
   const t = useTokens();
   const [svg, setSvg] = useState("");
+  const vector = useRef<HostElement | null>(null);
   const markRef = useRef<StellaMarkHandle | null>(null);
   const motion = useRef({ state, shape, paused });
   motion.current = { state, shape, paused };
@@ -159,10 +161,10 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const next = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}">${serialize(mark.el as unknown as Node, resolve)}</svg>`;
-      if (next !== last) {
-        last = next;
-        setSvg(next);
-      }
+      if (next === last) return;
+      last = next;
+      if (vector.current) vector.current.set({ svg: next });
+      else setSvg(next);
     };
     draw();
     return () => {
@@ -187,5 +189,5 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
   }, [paused]);
 
   const px = size ?? 22;
-  return svg ? <vector svg={svg} w={px} h={px} shrink={false} inert /> : <box w={px} h={px} shrink={false} />;
+  return svg ? <vector ref={vector} svg={svg} w={px} h={px} shrink={false} inert /> : <box w={px} h={px} shrink={false} />;
 }

@@ -56,6 +56,9 @@ function write(frame: Uint8Array) {
   while (off < frame.length) off += writeSync(fd, frame, off, frame.length - off);
 }
 
+/** Whether ops are waiting for the next frame. */
+export const opsPending = () => len > 4;
+
 /** Seals the pending ops as one frame and writes it. */
 export function flushFrame(commit = true) {
   if (commit) {

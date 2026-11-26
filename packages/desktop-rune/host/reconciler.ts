@@ -5,10 +5,41 @@
 import Reconciler from "react-reconciler";
 import { ConcurrentRoot, ContinuousEventPriority, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { createContext, type ReactNode } from "react";
-import { blob, commitCtx, flushFrame, ops, setElementDispatch, type ElementEvent } from "./bridge";
+import { blob, commitCtx, flushFrame, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
 
 type Handlers = Record<string, (...args: any[]) => void>;
-type Instance = { id: number; type: string; json: string; handlers: Handlers; blob?: { src: string; id: number } };
+/** Props set through a ref, outside React. They stay over React's until set again. */
+type Direct = Record<string, unknown>;
+
+class Instance {
+  json = "";
+  handlers: Handlers = {};
+  blob?: { src: string; id: number };
+  direct?: Direct;
+  react: Record<string, any> = {};
+  constructor(readonly id: number, readonly type: string) {}
+
+  /** Changes props without a React render, as code writing the DOM in rAF does: patches made in one task go to the engine as one frame. */
+  set(patch: Direct) {
+    if (!instances.has(this.id)) return;
+    this.direct = { ...this.direct, ...patch };
+    const json = serialize(this, this.react);
+    if (json === this.json) return;
+    this.json = json;
+    ops.props(this.id, json);
+    scheduleDirectFlush();
+  }
+}
+
+let directFlush = false;
+function scheduleDirectFlush() {
+  if (directFlush) return;
+  directFlush = true;
+  queueMicrotask(() => {
+    directFlush = false;
+    if (opsPending()) flushFrame(true);
+  });
+}
 type Container = { id: 0 };
 
 let nextId = 1;
@@ -64,9 +95,7 @@ function resolveSrc(inst: Instance, src: string): string {
   void fetchSrc(src).then(async (r) => {
     if (!r.ok || !instances.has(inst.id)) return;
     inst.blob = { src, id: blob(new Uint8Array(await r.arrayBuffer())) };
-    const json = JSON.parse(inst.json);
-    json.src = `blob:${inst.blob.id}`;
-    inst.json = JSON.stringify(json);
+    inst.json = serialize(inst, inst.react);
     ops.props(inst.id, inst.json);
     flushFrame(true);
   }).catch((err) => console.error("[ui] image fetch failed", src, err));
@@ -76,13 +105,15 @@ function resolveSrc(inst: Instance, src: string): string {
 /** Props where `false` differs from leaving them out. */
 const KEEPS_FALSE = new Set(["visible", "resizable", "spellcheck", "dark", "checked", "expanded", "selected", "growth"]);
 
-function serialize(inst: Instance, props: Record<string, any>): string {
+function serialize(inst: Instance, reactProps: Record<string, any>): string {
+  inst.react = reactProps;
+  const props = inst.direct ? { ...reactProps, ...inst.direct } : reactProps;
   const out: Record<string, unknown> = {};
   const on: string[] = [];
   inst.handlers = {};
   for (const k in props) {
     const v = props[k];
-    if (k === "children" || v === undefined || v === null || (v === false && !KEEPS_FALSE.has(k))) continue;
+    if (k === "children" || k === "ref" || v === undefined || v === null || (v === false && !KEEPS_FALSE.has(k))) continue;
     if (typeof v === "function" && k.length > 2 && k.startsWith("on") && k[2] === k[2].toUpperCase()) {
       const name = eventName(k);
       inst.handlers[name] = v;
@@ -149,7 +180,7 @@ const config: any = {
   HostTransitionContext: createContext(null),
 
   createInstance(type: string, props: any): Instance {
-    const inst: Instance = { id: nextId++, type, json: "", handlers: {} };
+    const inst = new Instance(nextId++, type);
     instances.set(inst.id, inst);
     ops.create(inst.id, type);
     inst.json = serialize(inst, props);
@@ -157,7 +188,8 @@ const config: any = {
     return inst;
   },
   createTextInstance(text: string): Instance {
-    const inst: Instance = { id: nextId++, type: "text", json: JSON.stringify({ content: text }), handlers: {} };
+    const inst = new Instance(nextId++, "text");
+    inst.json = JSON.stringify({ content: text });
     ops.create(inst.id, "text");
     ops.props(inst.id, inst.json);
     return inst;
@@ -241,6 +273,9 @@ export const batched = (fn: () => void) => reconciler.batchedUpdates(fn, null);
 export function windowPortal(children: ReactNode, key?: string | null): ReactNode {
   return reconciler.createPortal(children, container, null, key ?? null) as unknown as ReactNode;
 }
+
+/** What a ref to a host element gives. */
+export type HostElement = Pick<Instance, "id" | "set">;
 
 /** The engine node id of a host element (from a ref). */
 export const nodeId = (ref: unknown): number | undefined => (ref as Instance | null)?.id;

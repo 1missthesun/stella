@@ -86,6 +86,12 @@ A prop set to `false` is the same as leaving it out, except where `false` means 
 different: `visible`, `resizable`, `spellcheck`, `dark`, `checked`, `expanded`, `selected` and
 `growth`.
 
+**Direct updates.** A ref gives the element's host instance. `ref.current.set({ svg })` changes
+props without a React render, as code writing the DOM in `requestAnimationFrame` does. Every
+`set` in one task goes to the engine as one frame, and a prop set this way stays over the one
+React renders until it is set again. Use it for props that change every frame (a `vector`'s
+`svg`, an animated `x`), so idle animation costs no commits.
+
 **Identity.** `id` is the Rune key and the target for commands, anchors and the `control`
 dumps. An element with an `id` is memoized: it rebuilds only when it or something under it changed.
 
@@ -182,7 +188,8 @@ its own label.
   `mono` or `system-mono`), `italic underline strike`.
 - Selection: `selectable`, `selectionColor`.
 - Wrapping: `maxLines`, `truncate` (`true` | `end` | `middle` | `head` | `fade`), `nowrap`,
-  `textAlign`, `textCase`.
+  `balance` (CSS `text-wrap: balance`: 2 to 6 lines break at the narrowest width that keeps their
+  count, still aligned in the element's width), `textAlign`, `textCase`.
 
 ### input
 

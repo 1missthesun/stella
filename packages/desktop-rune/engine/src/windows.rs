@@ -376,8 +376,9 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
     }
 }
 
-/// Drains the bridge: applies ops, runs global commands, queues window commands, wakes windows.
-fn drain() {
+/// Drains the bridge: applies ops, runs global commands, queues window commands, and wakes the
+/// windows it dirtied, except `polling`, which reads its own dirty flag in the same poll.
+fn drain(polling: u32) {
     let mut batches = Vec::new();
     let disconnected = engine::with(|e| {
         let Some(rx) = e.rx.as_ref() else { return false };
@@ -459,7 +460,7 @@ fn drain() {
         }
         d
     });
-    for w in dirty {
+    for w in dirty.into_iter().filter(|w| *w != polling) {
         engine::wake(w);
     }
 }
@@ -597,7 +598,7 @@ fn sync_inputs(s: &mut Win) {
 
 pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     flush_outbox();
-    drain();
+    drain(s.node);
     if s.main && s.node == 0
         && let Some(m) = engine::read(|e| e.main_node)
     {
@@ -654,7 +655,9 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     if crate::webview::active() {
         crate::webview::retry_waiting();
         crate::webview::pump();
-        tx.wake_after(Duration::from_millis(8));
+        if crate::webview::needs_ticks() {
+            tx.wake_after(Duration::from_millis(8));
+        }
     }
     changed
 }

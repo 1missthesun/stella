@@ -77,8 +77,19 @@ export async function startChatFeed(api: ElectronApi, store: Store): Promise<Cha
     if (payload.conversationId !== conversationId) return;
     for (const event of payload.events) apply(event);
   });
-  await api.piChat.request({ op: "watch", conversationId });
-  publish();
+  const watch = async () => {
+    await api.piChat.request({ op: "watch", conversationId });
+    publish();
+  };
+  let runtimeReady = false;
+  const offAvailability = api.agent.onAvailability((snapshot) => {
+    const ready = snapshot.connected && snapshot.ready;
+    if (ready && !runtimeReady) {
+      void api.piChat.request({ op: "unwatch", conversationId }).catch(() => undefined).then(watch).catch((err) => console.error("[host] chat feed watch failed:", err));
+    }
+    runtimeReady = ready;
+  });
+  await watch().catch(() => undefined);
 
   return {
     conversationId,
@@ -87,6 +98,7 @@ export async function startChatFeed(api: ElectronApi, store: Store): Promise<Cha
     },
     dispose() {
       off();
+      offAvailability();
       void api.piChat.request({ op: "unwatch", conversationId });
     },
   };

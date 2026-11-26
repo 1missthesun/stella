@@ -1,13 +1,15 @@
 # Host services: Electron main on Bun
 
-The host is one Bun process. With `STELLA_RUNE_SERVICES=1`, `host/main.tsx` boots master's
-Electron main (`packages/desktop/electron`, unchanged) under an `electron` module served from
+The host is one Bun process. With `STELLA_RUNE_SERVICES=1`, `host/main.tsx` runs `host/app.tsx`
+(from the host bundle while it is current, see "Boot bundles"), which boots master's Electron
+main (`packages/desktop/electron`, unchanged) under an `electron` module served from
 `host/electron`, then loads the UI over it:
 
 1. `services/stdio.ts` (first import): every console method and `process.stdout` go to stderr.
    Bun writes `console.debug`, `dir`, `table` and others to stdout, which is the engine bridge.
 2. `services/ui-env.ts`: desktop-ui's `VITE_*` env, read with master's `loadRendererEnv`.
-3. The UI builder child is warmed (`services/ui-loader.ts`).
+3. The UI boot bundle is checked (`services/ui-cache.ts`); the UI builder child is spawned only
+   when it is stale, or later for the first UI swap (`services/ui-loader.ts`).
 4. `services/boot.ts` → `electron-main.ts`:
    - attaches the engine bridge, configures `app`, installs the plugin (`electron/plugin.ts`);
    - imports `packages/desktop/electron/main.ts` and fires `ready`.
@@ -34,6 +36,29 @@ prove those from a separate clone.
   `unhandledrejection` event, as a renderer error does in Chromium (`services/renderer-errors.ts`).
 - An app-source update takes the swap the file watcher already started for it, so one update
   builds the UI once.
+
+## Boot bundles (`.cache/`, gitignored)
+
+Two prebuilt files replace transpiling ~2,000 sources at every start. Each records the size and
+mtime of every file it was built from and of the folders holding them (`services/source-stamps.ts`,
+about 2 ms to check), and is used only while all of them match, so an Update, a self-modification
+or a dependency change boots from source once and rebuilds in the background.
+
+- **Host bundle** (`.cache/host`, `services/host-bundle.ts`): `host/app.tsx` with master's
+  Electron main and every package it imports, as one CJS file with Bun bytecode. Built by
+  `services/host-bundle-build.ts` in a child 10 s after a boot from source; the build plugin
+  (`hostBundlePlugin`) does at build time what the runtime plugin does. React and native addons
+  stay external (React is shared with the UI bundle). The sourcemap keeps stacks on the source
+  files; its `sourcesContent` is dropped, since Bun parses the whole map at the first `.stack`.
+  `STELLA_RUNE_HOST_BUNDLE=0` always runs the sources.
+- **UI boot bundle** (`.cache/ui`, `services/ui-cache.ts`): the last good UI build as bytecode,
+  written by the builder child after a build. Generation 0 loads it with the sourceURL of
+  generation 1, so UI frames stay recognisable (`ui-scope.ts`, `renderer-errors.ts`).
+  `STELLA_RUNE_UI_CACHE=0` always builds.
+- Host code still never hot-swaps: a host change relaunches (`update-plan.ts`), and that boot runs
+  from source. Keep host imports of master modules static or literal `require`s: a computed path
+  loads a second copy of the module beside the bundled one.
+- `STELLA_RUNE_BOOT_TRACE=1` logs `[mark] <step> <ms since start>` through the boot.
 
 ## How the plugin adapts master's sources
 

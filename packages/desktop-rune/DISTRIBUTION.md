@@ -62,7 +62,11 @@ What changes when it is on (Linux `stella-launcher.c`, Windows `stella-launcher.
 3. The launcher spawns `stella-engine` (no arguments, cwd = app source) with the usual Stella
    environment plus `STELLA_LAUNCHER_ENGINE=rune`, `STELLA_RUNE_ROOT=<app>/packages/desktop-rune`,
    `STELLA_RUNE_BUN=<runtimes>/bun-<v>/bun` and `STELLA_RUNE_SERVICES=1` (the host boots Stella's
-   services, not the demo UI). The engine starts the TS host with that Bun.
+   services, not the demo UI). The engine starts the TS host with that Bun. The first start after
+   an install or Update runs the host and UI from source and writes their bytecode bundles to
+   `packages/desktop-rune/.cache` (gitignored); later starts load those while they match the
+   sources (HOST.md, "Boot bundles"), so the app source must stay writable, as it is for
+   self-modification.
 4. The supervisor protocol is unchanged. On Linux and macOS the launcher's channel is fd 3, which
    the engine passes to the host (proven on Linux: the host process holds the launcher's
    socket on fd 3). On Windows the host connects to `STELLA_LAUNCHER_PIPE`; the pipe accepts the

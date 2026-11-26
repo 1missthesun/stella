@@ -4,15 +4,12 @@
 // master's page stays the fallback for what that decoder doesn't open.
 
 import { promises as fs } from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { engine } from "../bridge";
 
-const PROBE_MODULE = path.resolve(import.meta.dir, "../../../desktop/electron/services/offscreen-media-probe.ts");
-
 const master = () =>
-  createRequire(import.meta.url)(PROBE_MODULE) as {
+  require("../../../desktop/electron/services/offscreen-media-probe.ts") as {
     __electron_offscreenVideoPoster(filePath: string, boxWidth: number, boxHeight: number): Promise<string | null>;
     __electron_offscreenMediaDurationMs(filePath: string): Promise<number | null>;
   };

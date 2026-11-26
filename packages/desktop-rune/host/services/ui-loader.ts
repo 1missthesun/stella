@@ -9,6 +9,8 @@ import path from "node:path";
 import type { Subprocess } from "bun";
 import type { UiBuildReply, UiBuildRequest } from "./ui-build-child";
 import { evaluateInScope, type UiScope } from "./ui-scope";
+import { uiCacheKey, validUiCache } from "./ui-cache";
+import { bootMark } from "./boot-trace";
 
 const CHILD = path.join(import.meta.dir, "ui-build-child.ts");
 
@@ -26,6 +28,8 @@ export type UiLoaderOptions = {
   settleMs?: number;
   /** Quiet time after a build before the bundler process is stopped. */
   idleStopMs?: number;
+  /** Boot from the bytecode boot bundle while it matches the sources, and keep it current (ui-cache.ts). */
+  bootCache?: boolean;
 };
 
 type Child = { proc: Subprocess; ready: Promise<void>; builds: number; pending: Map<number, (reply: UiBuildReply) => void> };
@@ -80,7 +84,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     const id = ++nextId;
     const reply = await new Promise<UiBuildReply>((resolve) => {
       c.pending.set(id, resolve);
-      c.proc.send({ id, entry: options.entry, tsconfig: options.tsconfig, external: options.external } satisfies UiBuildRequest);
+      c.proc.send({ id, entry: options.entry, tsconfig: options.tsconfig, external: options.external, cache: options.bootCache } satisfies UiBuildRequest);
     });
     c.builds++;
     if (c.builds >= recycleAfter || reply.rssMb > recycleAboveMb) retire(c);
@@ -97,7 +101,17 @@ export function createUiLoader(options: UiLoaderOptions) {
     return module.exports;
   };
 
+  /** The boot bundle's generation-1 code: `?swap=1` is in its sourceURL footer (ui-cache.ts). */
+  const loadBootBundle = (file: string): UiModule => {
+    try {
+      return hostRequire(file) as UiModule;
+    } finally {
+      delete hostRequire.cache[file];
+    }
+  };
+
   let generation = 0;
+  let bootBundle: ReturnType<typeof validUiCache> | null = null;
   let liveScope: UiScope | null = null;
   const replaced: UiScope[] = [];
   const alive = new Set<number>();
@@ -115,14 +129,34 @@ export function createUiLoader(options: UiLoaderOptions) {
   process.once("exit", () => child?.proc.kill());
 
   return {
-    /** Spawns the bundler ahead of the first load. */
+    /** Checks the boot bundle, and spawns the bundler ahead of the first load when it can't be used. */
     warm() {
-      child ??= spawnChild();
+      if (generation > 0 || bootBundle) return;
+      bootBundle = options.bootCache ? validUiCache().catch(() => null) : Promise.resolve(null);
+      void bootBundle.then((found) => { if (!found && generation === 0) child ??= spawnChild(); });
     },
     async load(): Promise<UiModule> {
-      const code = await build();
-      const id = ++generation;
-      const { value, scope } = evaluateInScope(id, () => evaluate(code, id));
+      if (generation === 0 && !bootBundle) this.warm();
+      const found = generation === 0 ? await bootBundle : null;
+      const boot = found && found.key === uiCacheKey(options) ? found.file : null;
+      let loaded: { value: UiModule; scope: UiScope } | null = null;
+      let id = 0;
+      if (boot) {
+        id = ++generation;
+        try {
+          loaded = evaluateInScope(id, () => loadBootBundle(boot));
+          bootMark("ui-boot-bundle");
+        } catch (error) {
+          console.error("[ui] boot bundle failed, building the UI:", error);
+        }
+      }
+      if (!loaded) {
+        const code = await build();
+        bootMark("ui-built");
+        id = ++generation;
+        loaded = evaluateInScope(id, () => evaluate(code, id));
+      }
+      const { value, scope } = loaded;
       alive.add(id);
       collected.register(value.Root ?? value.App ?? value, id);
       if (liveScope) replaced.push(liveScope);

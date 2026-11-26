@@ -11,9 +11,9 @@ import { attachEngine, engine, onEngine } from "../electron/engine";
 import { nativeTheme } from "../electron/native";
 import { applyUiEnv } from "./ui-env";
 import { applyRuneProcessEnv } from "./process-env";
+import { bootMark } from "./boot-trace";
 
 export const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
-const ELECTRON_ENTRY = path.join(REPO_ROOT, "packages/desktop/electron/main.ts");
 
 export type ElectronMainOptions = {
   /** The engine bridge module (host/bridge.ts); absent when the host runs headless. */
@@ -32,7 +32,9 @@ export async function bootElectronMain(options: ElectronMainOptions): Promise<vo
   applyUiEnv();
   applyRuneProcessEnv();
   installFdSockets();
+  bootMark("main-env");
   installElectronPlugin();
+  bootMark("plugin");
 
   const live = engine();
   if (live) {
@@ -45,7 +47,9 @@ export async function bootElectronMain(options: ElectronMainOptions): Promise<vo
   }
   onEngine("appearance", (a) => nativeTheme.setSystemAppearance(a.dark));
 
-  await import(ELECTRON_ENTRY);
+  bootMark("engine-settled");
+  await import("../../../desktop/electron/main.ts");
+  bootMark("electron-entry-imported");
   await new Promise((resolve) => setImmediate(resolve));
   app.markReady();
   console.error(`[host] Electron main evaluated in ${(performance.now() - started).toFixed(0)} ms`);

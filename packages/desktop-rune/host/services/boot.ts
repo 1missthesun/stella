@@ -12,6 +12,7 @@ import { RendererIpc } from "../electron/ipc";
 import { installQuitHandling } from "./quit";
 import { bootElectronMain, type ElectronMainOptions } from "./electron-main";
 import { scopeDisposerMethod } from "./ui-scope";
+import { bootMark } from "./boot-trace";
 import { firstAppWindow, rendererApiFor, uiStateSnapshot, type ElectronApi } from "./renderer-api";
 
 export type RuneServices = { api: ElectronApi; window: BrowserWindow; dom: DomHost };
@@ -25,7 +26,9 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
   scopeDisposerMethod(RendererIpc.prototype, "on");
   await bootElectronMain(options);
   installQuitHandling();
+  bootMark("main-ready");
   const win = await firstAppWindow();
+  bootMark("first-window");
   if (engine()) hostWindows.bindMain(win);
   const contents = win.webContents;
   const api = rendererApiFor(contents);
@@ -69,5 +72,6 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
   win.on("resize", () => dom.setViewport(viewportOf(win)));
   win.on("move", () => dom.setViewport(viewportOf(win)));
 
+  bootMark("dom");
   return { api, window: win, dom };
 }

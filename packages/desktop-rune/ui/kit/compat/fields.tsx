@@ -1,4 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
+import { parseColorOr } from "@stella/theme";
 import { Select as KitSelect, type SelectProps as KitSelectProps } from "../Menu";
 import { derive, font, fontSize, look, mix, radius, useTokens, type Style } from "../../theme";
 import { domEvent, useFormSubmit, type DomEvent } from "./press";
@@ -323,6 +324,23 @@ export function TextField({ label, hideLabel, description, error, variant = "nor
 }
 
 /** A native `<input type="checkbox">` as Chromium draws it: 13pt, tinted with `accent` (CSS `accent-color`) when checked. */
+const CHROMIUM_DARK_CHECK = "#3b3b3b";
+
+const luminance = (css: string) => {
+  const c = parseColorOr(css);
+  const lin = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+};
+
+/** Chromium draws the check of an accent-coloured checkbox dark when white would contrast less with the accent. */
+const checkColorOn = (fill: string, light: string) => {
+  const l = luminance(fill);
+  return 1.05 / (l + 0.05) >= (l + 0.05) / (luminance(CHROMIUM_DARK_CHECK) + 0.05) ? light : CHROMIUM_DARK_CHECK;
+};
+
 export function NativeCheckbox({ checked, onChange, disabled, accent, label, ...style }: Style & { checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; accent?: string; label?: string }) {
   const t = useTokens();
   const c = t.c;
@@ -348,7 +366,7 @@ export function NativeCheckbox({ checked, onChange, disabled, accent, label, ...
       opacity={disabled ? 0.5 : undefined}
       {...style}
     >
-      {checked ? <icon svg='<path d="M2.5 6.5l2.5 2.5 5-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' name="compat/native-check" view={13} size={13} color={c.primaryForeground} /> : null}
+      {checked ? <icon svg='<path d="M2.5 6.5l2.5 2.5 5-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' name="compat/native-check" view={13} size={13} color={accent ? checkColorOn(fill, c.primaryForeground) : c.primaryForeground} /> : null}
     </box>
   );
 }

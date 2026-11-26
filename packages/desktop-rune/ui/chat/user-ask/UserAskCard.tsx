@@ -6,12 +6,13 @@ import { useT } from "@/shared/i18n";
 import { settingsPlace } from "@/global/settings/settings-place";
 import { answerUserAsk, declineUserAsk, recordUserAskAnswer, useUserAskRemainingMs } from "@/features/user-ask/user-ask-store";
 import { formatRemaining } from "@/features/user-ask/format-remaining";
-import { Button, Form, NativeCheckbox, Select, TextField } from "../../kit/compat";
+import { APP_TRACKING, Button, Form, NativeCheckbox, Select, T, TextField } from "../../kit/compat";
 import { Icon, Icons } from "../../kit";
 import { derive, fontSize, mix, mixOklch, useTokens } from "../../theme";
 import { panelSurface } from "../surfaces";
 
 const NARROW_W = 600;
+const ACTION_TEXT = { size: fontSize.md, weight: 500, lineHeight: 24, tracking: 0 };
 
 export const useUserAskLook = () => {
   const t = useTokens();
@@ -76,7 +77,7 @@ export function UserAskError({ children, size = fontSize.base }: { children: Rea
   return (
     <row role="alert" align="center" gap={6}>
       <Icon icon={Icons.stella.AlertCircle} size={size} color={t.c.danger} />
-      <text size={fontSize.base} color={t.c.danger}>
+      <text size={fontSize.base} lineHeight={fontSize.base * 1.45} tracking={APP_TRACKING} color={t.c.danger}>
         {children}
       </text>
     </row>
@@ -146,14 +147,14 @@ function UserAskHeader({ ask, title, detail, narrow }: { ask: UserAsk; title: st
         <Icon icon={Icons.stella.Lock} size={16} color={tokens.c.textStrong} />
       </box>
       <col grow={1} minW={0}>
-        <text size={fontSize.base} weight={500} color={tokens.c.textWeak}>
+        <text size={fontSize.base} weight={500} lineHeight={fontSize.base * 1.45} tracking={APP_TRACKING} color={tokens.c.textWeak}>
           {ask.agentLabel ?? t("userAsk.eyebrow.secureInput")}
         </text>
         <text mt={2} size={fontSize.xl} weight={600} lineHeight={fontSize.xl * 1.35} tracking={-0.17} color={tokens.c.textStrong} role="heading">
           {title}
         </text>
         {detail ? (
-          <text mt={6} size={fontSize.md} lineHeight={fontSize.md * 1.5} color={tokens.c.textWeak}>
+          <text mt={6} size={fontSize.md} lineHeight={fontSize.md * 1.5} tracking={APP_TRACKING} color={tokens.c.textWeak}>
             {detail}
           </text>
         ) : null}
@@ -175,7 +176,7 @@ function PrivacyBadge({ sensitive, relayed }: { sensitive: boolean; relayed: boo
       title={t(sensitive ? (relayed ? "userAsk.secureInput.relayedPrivateNote" : "userAsk.secureInput.privateNote") : "userAsk.secureInput.sharedNote")}
     >
       <Icon icon={sensitive ? Icons.stella.Lock : Icons.stella.Eye} size={11} color={color} />
-      <text size={fontSize.sm} color={color} nowrap>
+      <text size={fontSize.sm} lineHeight={fontSize.sm * 1.45} tracking={APP_TRACKING} color={color} nowrap>
         {t(sensitive ? "userAsk.secureInput.privateBadge" : "userAsk.secureInput.sharedBadge")}
       </text>
     </row>
@@ -189,8 +190,8 @@ function UserAskFieldRow({ field, value, busy, relayed, onValueChange }: { field
   const input = inputPropsForField(field);
   return (
     <col gap={5} minW={0} grow={1}>
-      <row w="full" wrap align="end" justify="between" gap={8} rowGap={2} minW={0}>
-        <text size={fontSize.sm} weight={500} color={tokens.c.textBase} truncate nowrap shrink={false} maxW="full">
+      <row w="full" wrap align="start" justify="between" gap={8} rowGap={2} minW={0}>
+        <text mt={1.2} size={fontSize.sm} weight={500} lineHeight={fontSize.sm * 1.45} tracking={APP_TRACKING} color={tokens.c.textBase} truncate nowrap shrink={false} maxW="full">
           {label}
         </text>
         <PrivacyBadge sensitive={field.sensitive} relayed={relayed} />
@@ -335,10 +336,10 @@ function UserAskSecureInputBody({
         </row>
         <row w="full" align="center" justify="end" gap={6} wrap>
           {offersRemember ? (
+            <row grow={1} minW={0} shrink>
             <row
               align="center"
               gap={7}
-              grow={1}
               minW={0}
               shrink
               cursor="pointer"
@@ -349,10 +350,11 @@ function UserAskSecureInputBody({
               }
               onPress={busy ? undefined : () => setRemember((on) => !on)}
             >
-              <NativeCheckbox checked={remember} disabled={busy} accent={tokens.c.textStrong} onChange={setRemember} label={t(relayed ? "userAsk.secureInput.rememberRelayed" : "userAsk.secureInput.remember")} />
-              <text size={fontSize.sm} color={tokens.c.textBase} truncate nowrap minW={0}>
+              <NativeCheckbox w={14} h={14} checked={remember} disabled={busy} accent={tokens.c.textStrong} onChange={setRemember} label={t(relayed ? "userAsk.secureInput.rememberRelayed" : "userAsk.secureInput.remember")} />
+              <text size={fontSize.sm} lineHeight={fontSize.sm * 1.45} tracking={APP_TRACKING} color={tokens.c.textBase} truncate nowrap minW={0}>
                 {t(relayed ? "userAsk.secureInput.rememberRelayed" : "userAsk.secureInput.remember")}
               </text>
+            </row>
             </row>
           ) : null}
           <row align="center" gap={6} shrink={false}>
@@ -371,10 +373,14 @@ function UserAskSecureInputBody({
               color={tokens.c.textBase}
               onClick={() => onDecline(note.trim())}
             >
-              {t("userAsk.secureInput.decline")}
+              <T {...ACTION_TEXT} nowrap>
+                {t("userAsk.secureInput.decline")}
+              </T>
             </Button>
             <Button type="submit" variant="primary" className="pill-btn pill-btn--primary" disabled={busy} minH={32} h={32} px={16 + 1}>
-              {busy ? t("userAsk.secureInput.submitting") : t("userAsk.secureInput.submit")}
+              <T {...ACTION_TEXT} nowrap>
+                {busy ? t("userAsk.secureInput.submitting") : t("userAsk.secureInput.submit")}
+              </T>
             </Button>
           </row>
         </row>

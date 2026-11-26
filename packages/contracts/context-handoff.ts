@@ -88,6 +88,7 @@ export const contextHandoffNotesRequest = (args: { tokens: number; threshold: nu
     [
       `Write them as the brief you'd give yourself to continue: ${NUDGE_NOTES_CONTENT}`,
       "Keep word for word what the user told you that they may come back to: names, numbers, codes, preferences and facts.",
+      "Notes from an earlier handoff above are replaced too, so carry forward everything in them that still matters.",
       "Stella adds your original task, this turn's earlier messages and the work still running; say which parts of the original task are done or superseded.",
       "Your step after the last message above, and everything after it, is already written and stays in the fresh context word for word, so your notes end where these messages end and that step is not your next action.",
       ...(args.agent ? [BE_COMPLETE] : []),

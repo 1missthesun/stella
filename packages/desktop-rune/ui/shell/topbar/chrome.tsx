@@ -97,6 +97,7 @@ export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end
         onDismiss={onClose}
         onHover={onHover}
         focusable={focusSelf || undefined}
+        tabIndex={focusSelf ? -1 : undefined}
         autoFocus={focusSelf || undefined}
         noWindowDrag
         w={w}

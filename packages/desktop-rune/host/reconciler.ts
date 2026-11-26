@@ -179,12 +179,18 @@ function serialize(inst: Instance, reactProps: Record<string, any>): string {
 const DISCRETE = new Set(["press", "doublePress", "dismiss", "input", "submit", "key", "keyRaw", "paste", "link", "linkContextMenu", "contextMenu", "dropFiles", "focus", "focusWithin", "selection"]);
 const CONTINUOUS = new Set(["hover", "scroll", "wheel", "pointer", "dropHover", "drag"]);
 
+let pressKeys = false;
+
+/** Whether the press being dispatched came from Return or Space on a focused control (a DOM `click` with `detail` 0), not the pointer. */
+export const pressedByKeys = () => pressKeys;
+
 setElementDispatch((e) => {
   const inst = instances.get(e.n);
   const fn = inst?.handlers[e.e];
   if (!fn) return;
   const discrete = DISCRETE.has(e.e);
   const previous = currentPriority;
+  pressKeys = e.e === "press" && e.keys === true;
   currentPriority = discrete ? DiscreteEventPriority : CONTINUOUS.has(e.e) ? ContinuousEventPriority : DefaultEventPriority;
   try {
     batched(() => {
@@ -197,6 +203,7 @@ setElementDispatch((e) => {
     if (discrete) reconciler.flushSyncWork();
   } finally {
     currentPriority = previous;
+    pressKeys = false;
   }
 });
 

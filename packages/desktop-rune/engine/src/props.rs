@@ -190,6 +190,8 @@ pub struct ModalP {
     pub click_outside: bool,
     /// Background wheel dismisses the modal (menus).
     pub wheel_outside: bool,
+    /// `false`: closing leaves nothing focused instead of returning focus to what had it.
+    pub return_focus: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

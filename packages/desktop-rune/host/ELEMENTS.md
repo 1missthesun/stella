@@ -171,7 +171,7 @@ its own label.
 **Overlays.**
 - `anchor {to: "<id>", side, align, gap, fit}` places the element against another element, in
   the window's top layer (popovers, menus).
-- `modal {clickOutside, wheelOutside}` traps focus and makes the rest of the window inert.
+- `modal {clickOutside, wheelOutside, returnFocus}` traps focus and makes the rest of the window inert; `returnFocus: false` leaves nothing focused as it closes instead of returning focus to what had it.
   Escape, or a press outside when `clickOutside` is set, fires `onDismiss`.
 
 **Events.** Every `on*` function prop is wired only when present.

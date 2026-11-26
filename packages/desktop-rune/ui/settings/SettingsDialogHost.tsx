@@ -22,7 +22,7 @@ export const SettingsDialogHost = memo(function SettingsDialogHost() {
 
   return (
     <Dialog open onOpenChange={(next) => settingsDialog.setOpen(next)}>
-      <DialogContent size="page" aria-label={t("settings.title")} enter={undefined} exit={undefined}>
+      <DialogContent size="page" focusSelf aria-label={t("settings.title")} enter={undefined} exit={undefined}>
         <DialogCloseButton absolute={{ top: 14, right: 14 }} raise />
         <DialogBody scrollY={false}>
           <Suspense fallback={null}>

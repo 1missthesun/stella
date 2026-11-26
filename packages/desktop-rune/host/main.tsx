@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { createElement } from "react";
 import * as bridge from "./bridge";
 import { command, commitCtx, engine, listen, now, onEngineEvent, stats } from "./bridge";
-import { batched, render, windowPortal } from "./reconciler";
+import { batched, pressedByKeys, render, windowPortal } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
@@ -65,8 +65,8 @@ let app = await loadApp();
 const store = createStore(app.initialState?.() ?? {});
 const g = globalThis as any;
 // Everything the UI reaches through `stella` is owned by the generation that called it (ui-scope.ts).
-const READS = ["get", "useStore", "now", "snapshot"];
-g.stella = scopeUiFacing({ store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal }, READS);
+const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys"];
+g.stella = scopeUiFacing({ store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys }, READS);
 if (services) g.stella.host = scopeUiFacing((await import("./services/ui-host")).createUiHost(), READS);
 
 /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */

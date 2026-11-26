@@ -361,7 +361,8 @@ mod mac {
     fn grab(filter: &SCContentFilter, width: usize, height: usize, done: impl FnOnce(Result<image::RgbaImage, String>) + Send + 'static) {
         type Done = Box<dyn FnOnce(Result<image::RgbaImage, String>) + Send>;
         let done: Arc<Mutex<Option<Done>>> = Arc::new(Mutex::new(Some(Box::new(done))));
-        let held: Arc<Mutex<Option<Shared<(Retained<SCStream>, Retained<CaptureOutput>)>>>> = Arc::new(Mutex::new(None));
+        type Held = Option<Shared<(Retained<SCStream>, Retained<CaptureOutput>)>>;
+        let held: Arc<Mutex<Held>> = Arc::new(Mutex::new(None));
         let finish = {
             let (done, held) = (done.clone(), held.clone());
             Arc::new(move |result: Result<image::RgbaImage, String>| {
@@ -596,10 +597,11 @@ mod mac {
                         if let Some((rate, mono)) = mono_of(buffer) {
                             pcm.lock().unwrap_or_else(|e| e.into_inner()).push(rate, &mono, epoch_ms());
                         }
-                        if let (Some(start), Some(audio), false) = (w.session_start, w.audio.as_ref(), w.failed) {
-                            if pts >= start && unsafe { audio.isReadyForMoreMediaData() } {
-                                unsafe { audio.appendSampleBuffer(buffer) };
-                            }
+                        if let (Some(start), Some(audio), false) = (w.session_start, w.audio.as_ref(), w.failed)
+                            && pts >= start
+                            && unsafe { audio.isReadyForMoreMediaData() }
+                        {
+                            unsafe { audio.appendSampleBuffer(buffer) };
                         }
                     }
                 })

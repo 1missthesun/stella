@@ -201,7 +201,11 @@ fn growth_spec(g: &crate::props::GrowthSpecP) -> GrowthSpec {
 pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
     for name in &p.on {
         e = match name.as_str() {
-            "press" => e.on_press_tx(move |_s: &mut Win, tx: &mut Tx| element_event(n, "press", json!({}), Some(tx))),
+            // Return presses a focused control as Space does, as a DOM button's does.
+            "press" => e.on_press_tx(move |_s: &mut Win, tx: &mut Tx| {
+                let keys = tx.by_keys();
+                element_event(n, "press", json!({ "keys": keys }), Some(tx))
+            }).press_on_return(),
             "doublePress" => e.on_double_press_tx(move |_s: &mut Win, tx: &mut Tx| element_event(n, "doublePress", json!({}), Some(tx))),
             "contextMenu" => e.on_secondary_press(move |_s: &mut Win, at: rune::PointerPress, tx: &mut Tx| {
                 element_event(n, "contextMenu", json!({ "x": at.x, "y": at.y }), Some(tx))
@@ -270,6 +274,9 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
         });
         if m.wheel_outside {
             e = e.modal_wheel_outside(true);
+        }
+        if m.return_focus == Some(false) {
+            e = e.modal_return_focus(false);
         }
     }
     if !p.keys.is_empty() && !is_input {

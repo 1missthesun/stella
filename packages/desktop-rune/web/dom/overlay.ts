@@ -166,7 +166,8 @@ export function pushModal(el: HTMLElement, get: ModalEntry["get"]): () => void {
   el.dataset.runeModal = "";
   queueMicrotask(() => {
     if (el.contains(document.activeElement)) return;
-    const auto = el.querySelector<HTMLElement>("[data-autofocus]") ?? el.querySelector<HTMLElement>("input, textarea") ;
+    const firstItem = el.getAttribute("role") === "menu" ? el.querySelector<HTMLElement>("[tabindex]:not([tabindex='-1'])") : null;
+    const auto = el.hasAttribute("data-autofocus") ? el : el.querySelector<HTMLElement>("[data-autofocus]") ?? el.querySelector<HTMLElement>("input, textarea") ?? firstItem;
     if (auto) auto.focus({ preventScroll: true });
     else {
       if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
@@ -177,6 +178,10 @@ export function pushModal(el: HTMLElement, get: ModalEntry["get"]): () => void {
     const i = modals.indexOf(entry);
     if (i >= 0) modals.splice(i, 1);
     const restore = entry.restore;
+    if (get().modal.returnFocus === false) {
+      if (el.contains(document.activeElement) && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      return;
+    }
     if (restore instanceof HTMLElement && restore.isConnected && (el.contains(document.activeElement) || document.activeElement === document.body)) restore.focus({ preventScroll: true });
   };
 }

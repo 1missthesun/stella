@@ -13,6 +13,19 @@ const FOCUSABLE = "[tabindex]:not([tabindex='-1']), input:not([disabled]), texta
 const DRAG_THRESHOLD = 3;
 const AT_BOTTOM_PX = 4;
 
+let pressKeys = false;
+
+/** Whether the press being handled came from Return or Space (a `click` with `detail` 0), as the native host's `stella.pressedByKeys`; it holds until React DOM has flushed the press's render. */
+export const pressedByKeys = () => pressKeys;
+
+function pressFrom(keys: boolean, press: () => void) {
+  pressKeys = keys;
+  queueMicrotask(() => {
+    pressKeys = false;
+  });
+  press();
+}
+
 const effectFrame = (e: Effect, base: string | undefined): Keyframe => ({
   opacity: e.opacity ?? 1,
   transform: `${base ? `${base} ` : ""}translate(${e.x ?? 0}px, ${e.y ?? 0}px) scale(${e.scale ?? 1})`,
@@ -261,7 +274,7 @@ export function useHost(p: BoxProps, base: string): Host {
       const q = latest.current;
       if (!q.onPress || q.disabled) return;
       e.stopPropagation();
-      q.onPress();
+      pressFrom(e.detail === 0, q.onPress);
     };
   }
   if (p.onDoublePress) {
@@ -316,7 +329,7 @@ export function useHost(p: BoxProps, base: string): Host {
       if (q.onPress && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && !q.disabled) {
         e.preventDefault();
         e.stopPropagation();
-        q.onPress();
+        pressFrom(true, q.onPress);
         return;
       }
       if (q.focusGroup && el.current) moveFocusInGroup(el.current, e, typed.current);

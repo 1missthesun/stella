@@ -14,6 +14,8 @@ declare global {
     now: () => number;
     /** Renders a `<window>` as a root child from anywhere in the tree, keeping context. */
     windowPortal: typeof import("../host/reconciler").windowPortal;
+    /** Whether the press being handled came from Return or Space, not the pointer (a menu the keys opened focuses its first item). */
+    pressedByKeys: () => boolean;
     /** The runtime's default conversation, when the host runs Stella's services. */
     chat?: { conversationId: string; send(text: string): Promise<void> };
     /** Electron main's windows, their electronAPI and message boxes, when the host runs Stella's services. */

@@ -40,7 +40,7 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl" frame={{ w: 880, h: 720 }} enter={undefined} exit={undefined}>
+      <DialogContent size="xl" frame={{ w: 880, h: 720 }} focusSelf enter={undefined} exit={undefined}>
         <DialogHeader {...s.planUsageDialogHeader}>
           <VisuallyHidden asChild>
             <DialogTitle>Plan &amp; usage</DialogTitle>

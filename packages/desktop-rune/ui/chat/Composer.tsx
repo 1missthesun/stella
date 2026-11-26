@@ -242,6 +242,7 @@ function ComposerImpl({
     : { gap: COMPOSER_GAP, pt: COMPOSER_PAD_TOP, pb: 10, px: narrow ? 8 : COMPOSER_PAD_X };
   const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2;
   const addMenu = <ComposerAddMenu title={t("app.chat.composer.add")} setChatContext={setChatContext} />;
+  const hiddenFileInput = <ComposerAddMenu setChatContext={setChatContext} buttonHidden />;
   const field = (
     <box key="field" grow={1} minW={0} w={isExpanded ? "full" : undefined} selfAlign={isExpanded ? "stretch" : "center"} onLayout={isExpanded ? undefined : (r) => pill.notePillFieldW(r.w)}>
       {pill.measure}
@@ -274,7 +275,6 @@ function ComposerImpl({
         }}
         onPaste={onPaste}
         onFocus={(isFocused) => {
-          setFocused(isFocused);
           if (isFocused) dictation.prewarm();
           else setModelMentionTrigger(null);
         }}
@@ -329,8 +329,9 @@ function ComposerImpl({
         <BrowserAttachmentTray />
         <col w="full" gap={isExpanded ? 8 : 0} role="form" label="chat-composer">
           <row w="full" align="center" gap={8} minH={isExpanded ? undefined : 44} py={isExpanded ? 0 : 6} px={isExpanded ? 0 : sidebar ? 6 : 8}>
-            {isExpanded ? null : <box key="add">{addMenu}</box>}
+            {isExpanded ? hiddenFileInput : <box key="add">{addMenu}</box>}
             {field}
+            {isExpanded ? null : hiddenFileInput}
             {isExpanded ? null : rightControls}
           </row>
           {isExpanded ? (

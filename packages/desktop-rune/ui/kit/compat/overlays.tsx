@@ -1,7 +1,7 @@
 import { SettingsScreenScope } from "../../global/shared/pill.styles";
 import { Children, cloneElement, createContext, isValidElement, useContext, useId, useState, type ReactElement, type ReactNode } from "react";
 import { Scrim } from "../Dialog";
-import { menuSurface } from "../Menu";
+import { menuSurface, useMenuEntryFocus } from "../Menu";
 import { font, fontSize, layer, look, mix, radius, useTokens, type Style } from "../../theme";
 import { useT } from "../../i18n";
 import { Icon, Icons } from "../icons";
@@ -46,6 +46,8 @@ export type DialogContentProps = Omit<Style, "size"> & {
   className?: string;
   children?: ReactNode;
   onOpenAutoFocus?: (e: DomEvent) => void;
+  /** Focus the dialog itself on open (an `onOpenAutoFocus` that prevents the default and focuses `currentTarget`). */
+  focusSelf?: boolean;
   onEscapeKeyDown?: (e: DomEvent) => void;
   onPointerDownOutside?: (e: DomEvent) => void;
   onInteractOutside?: (e: DomEvent) => void;
@@ -54,7 +56,7 @@ export type DialogContentProps = Omit<Style, "size"> & {
 };
 
 /** desktop-ui's `DialogContent`: scrim, and an overlay-surface panel 480×512 (md), 720 (lg), 860×640 (xl) or 1120×820 (page), its text in the portal's body face. */
-export function DialogContent({ size = "md", fit = false, frame, children, onEscapeKeyDown, onPointerDownOutside, onInteractOutside, className: _c, onOpenAutoFocus: _f, "aria-describedby": _d, "aria-label": label, ...panel }: DialogContentProps) {
+export function DialogContent({ size = "md", fit = false, frame, focusSelf = false, children, onEscapeKeyDown, onPointerDownOutside, onInteractOutside, className: _c, onOpenAutoFocus: _f, "aria-describedby": _d, "aria-label": label, ...panel }: DialogContentProps) {
   const t = useTokens();
   const { open, setOpen, id } = useContext(DialogState);
   if (!open) return null;
@@ -77,6 +79,9 @@ export function DialogContent({ size = "md", fit = false, frame, children, onEsc
             id={`dlg${id}`}
             role="dialog"
             label={label}
+            focusable={focusSelf || undefined}
+            tabIndex={focusSelf ? -1 : undefined}
+            autoFocus={focusSelf || undefined}
             w="full"
             h={sized === "page" ? "full" : undefined}
             maxH="100%"
@@ -225,9 +230,19 @@ export type FloatingContentProps = Style & {
 
 /** desktop-ui's `DropdownMenuContent`: the glass menu surface anchored to its trigger, closing on choice, Escape or a press outside. */
 export function DropdownMenuContent({ side = "bottom", align = "center", sideOffset = 4, children, className: _c, collisionPadding: _p, forceMount: _f, onOpenAutoFocus: _o, onCloseAutoFocus: _cl, onEscapeKeyDown: _e, onInteractOutside: _i, avoidCollisions: _a, "aria-label": label, ...style }: FloatingContentProps) {
-  const t = useTokens();
-  const { open, setOpen, id } = useFloating();
+  const { open } = useFloating();
   if (!open) return null;
+  return (
+    <FloatingMenu side={side} align={align} sideOffset={sideOffset} label={label} style={style}>
+      {children}
+    </FloatingMenu>
+  );
+}
+
+function FloatingMenu({ side, align, sideOffset, label, style, children }: { side: Side; align: "start" | "center" | "end"; sideOffset: number; label?: string; style: Style; children?: ReactNode }) {
+  const t = useTokens();
+  const { setOpen, id } = useFloating();
+  const entry = useMenuEntryFocus();
   return (
     <col
       id={`fl${id}-content`}
@@ -238,6 +253,7 @@ export function DropdownMenuContent({ side = "bottom", align = "center", sideOff
       modal={{ clickOutside: true }}
       onDismiss={() => setOpen(false)}
       focusGroup
+      {...entry}
       minW={180}
       scrollY
       pad={6 + 1}

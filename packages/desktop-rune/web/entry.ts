@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { createStore, makeUseStore } from "../host/store";
 import { installSheet } from "./dom/sheet";
+import { pressedByKeys } from "./dom/host";
 import { onEngineEvent, startSelectionEvents, webEngine } from "./engine";
 import { removeLaunchSplash } from "../ui/shell/launch-splash";
 import { adoptStaticHome } from "./static-home/adopt";
@@ -17,6 +18,7 @@ const store = createStore({ dark: true, sidebarOpen: true, messages: [], draft: 
   engine: webEngine,
   on: onEngineEvent,
   windowPortal: () => null,
+  pressedByKeys,
 };
 startSelectionEvents();
 

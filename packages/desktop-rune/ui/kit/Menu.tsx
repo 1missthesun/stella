@@ -1,4 +1,4 @@
-import { createContext, isValidElement, useContext, type ReactNode } from "react";
+import { createContext, isValidElement, useContext, useState, type ReactNode } from "react";
 import { DismissLayer } from "./dismiss-layer";
 import { derive, font, fontSize, layer, look, mix, radius, type Tokens, useTokens } from "../theme";
 import { Icon, Icons, type IconData } from "./icons";
@@ -24,6 +24,16 @@ export function menuSurface(t: Tokens) {
   } as const;
 }
 
+/**
+ * How a Radix menu takes focus as it opens (`MenuContent`'s `onEntryFocus`): the menu itself when
+ * the pointer opened it, so arrows then reach the first or last item, and its first item when
+ * Return or Space did. Call it in a component that mounts with the menu.
+ */
+export function useMenuEntryFocus() {
+  const [byKeys] = useState(() => stella.pressedByKeys());
+  return { focusable: true, tabIndex: -1, autoFocus: !byKeys } as const;
+}
+
 export type DropdownMenuProps = {
   id: string;
   open: boolean;
@@ -36,13 +46,13 @@ export type DropdownMenuProps = {
   maxW?: number;
   maxH?: number;
   matchTriggerWidth?: boolean;
+  /** `false`: closing leaves nothing focused (an `onCloseAutoFocus` that prevents the return to the trigger). */
+  returnFocus?: boolean;
   children: ReactNode;
 };
 
 /** desktop-ui's `DropdownMenu` (Radix): a trigger and an anchored, modal menu that closes on choice, Escape or outside click. Radix lays menu content left to right unless a DirectionProvider says otherwise, and desktop-ui has none. */
-export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom", align = "start", sideOffset = 4, minW = 180, maxW, maxH, matchTriggerWidth, children }: DropdownMenuProps) {
-  const t = useTokens();
-  const s = menuSurface(t);
+export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom", align = "start", sideOffset = 4, minW = 180, maxW, maxH, matchTriggerWidth, returnFocus, children }: DropdownMenuProps) {
   const triggerId = `${id}-trigger`;
   const close = () => onOpenChange(false);
   return (
@@ -50,27 +60,38 @@ export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom",
       {trigger({ id: triggerId, open, toggle: () => onOpenChange(!open) })}
       {open ? (
         <MenuClose.Provider value={close}>
-          <col
-            id={`${id}-content`}
-            role="menu"
-            dir="ltr"
-            anchor={{ to: triggerId, side, align, gap: sideOffset, fit: matchTriggerWidth }}
-            raise={layer.menu}
-            modal={{ clickOutside: true }}
-            onDismiss={close}
-            focusGroup
-            minW={minW}
-            maxW={maxW}
-            maxH={maxH}
-            scrollY
-            pad={6 + 1}
-            {...s}
-          >
-            <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
-          </col>
+          <MenuPanel id={id} triggerId={triggerId} side={side} align={align} sideOffset={sideOffset} minW={minW} maxW={maxW} maxH={maxH} matchTriggerWidth={matchTriggerWidth} returnFocus={returnFocus} close={close}>
+            {children}
+          </MenuPanel>
         </MenuClose.Provider>
       ) : null}
     </>
+  );
+}
+
+function MenuPanel({ id, triggerId, side, align, sideOffset, minW, maxW, maxH, matchTriggerWidth, returnFocus, close, children }: Omit<DropdownMenuProps, "open" | "onOpenChange" | "trigger"> & { triggerId: string; close: () => void }) {
+  const t = useTokens();
+  const entry = useMenuEntryFocus();
+  return (
+    <col
+      id={`${id}-content`}
+      role="menu"
+      dir="ltr"
+      anchor={{ to: triggerId, side, align, gap: sideOffset, fit: matchTriggerWidth }}
+      raise={layer.menu}
+      modal={{ clickOutside: true, returnFocus }}
+      onDismiss={close}
+      focusGroup
+      {...entry}
+      minW={minW}
+      maxW={maxW}
+      maxH={maxH}
+      scrollY
+      pad={6 + 1}
+      {...menuSurface(t)}
+    >
+      <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
+    </col>
   );
 }
 

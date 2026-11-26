@@ -266,6 +266,10 @@ export const engine = {
     saveFile: (o: DialogOptions = {}) => request<string | null>("dialog.saveFile", o),
   },
   notify: (n: { id: string; title: string; body?: string; icon?: string; silent?: boolean; actions?: { id: string; label: string }[] }) => request("notify", n),
+  app: {
+    /** The app badge: macOS shows `label` on the Dock icon ("3", "99+"; null or "" clears it); Windows shows the count over the main window's taskbar button. Resolves false where nothing shows it (Linux). */
+    setBadge: (label: string | null, count?: number) => request<boolean>("app.setBadge", { label: label ?? "", count }),
+  },
   menu: {
     /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */
     popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) =>

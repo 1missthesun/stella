@@ -1,4 +1,4 @@
-//! App-wide native services: notifications, tray icons, global shortcuts.
+//! App-wide native services: notifications, tray icons, global shortcuts, the app badge.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -206,5 +206,28 @@ pub fn shortcut(cmd: &str, v: &Value) -> Result<Value, String> {
             }
             Ok(Value::Null)
         }
+    }
+}
+
+/// `app.setBadge`: Electron's `app.dock.setBadge` / `app.setBadgeCount`. macOS shows `label` as
+/// given on the Dock icon; Windows shows its count over the main window's taskbar button (Rune's
+/// overlay reads "9+" above 9); Linux has no badge yet.
+pub fn badge(v: &Value) -> Result<Value, String> {
+    let label = s(v, "label");
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::NSApplication;
+        let mtm = objc2::MainThreadMarker::new().ok_or("app.setBadge: not on the main thread")?;
+        let tile = NSApplication::sharedApplication(mtm).dockTile();
+        let text = (!label.is_empty()).then(|| objc2_foundation::NSString::from_str(label));
+        tile.setBadgeLabel(text.as_deref());
+        Ok(json!(true))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let count = v.get("count").and_then(|c| c.as_u64()).or_else(|| label.trim_end_matches('+').parse().ok()).unwrap_or(0);
+        let handle = crate::engine::read(|e| e.main_handle.clone()).ok_or("app.setBadge: no main window")?;
+        handle.set_taskbar(rune::Taskbar::new().badge(count.min(u64::from(u32::MAX)) as u32, label));
+        Ok(json!(cfg!(target_os = "windows")))
     }
 }

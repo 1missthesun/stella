@@ -350,6 +350,8 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
 - `notify({id, title, body, actions})`; clicks come back as `notification` events
 - `menu.popup(items, {window, x, y, anchor})` resolves with the picked id
 - `tray.*`: create, setMenu, setTooltip, setIcon, destroy
+- `app.setBadge(label, count?)`: the Dock badge as given on macOS ("3", "99+", null clears);
+  the count over the main window's taskbar button on Windows; nothing yet on Linux (resolves false)
 - `shortcut.*`: register, unregister, unregisterAll. These are global and take Electron
   accelerators.
 - `screen.displays()`, `screen.primary()`

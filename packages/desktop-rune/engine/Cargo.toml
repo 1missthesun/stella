@@ -10,9 +10,9 @@ name = "stella-engine"
 path = "src/main.rs"
 
 [dependencies]
-rune = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570", features = ["tooling"] }
-rune-kit = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570", features = ["markdown", "mermaid"] }
-rune-notify = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
+rune = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9", features = ["tooling"] }
+rune-kit = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9", features = ["markdown", "mermaid"] }
+rune-notify = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
@@ -26,7 +26,7 @@ objc2 = "0.6"
 block2 = "0.6"
 dispatch2 = "0.3"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSError", "NSObject", "NSString", "NSURL", "NSValue"] }
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSView", "NSResponder", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics", "objc2-quartz-core"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSDockTile", "NSView", "NSResponder", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics", "objc2-quartz-core"] }
 objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
 objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer"] }
 objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "block2", "objc2-app-kit", "WKFrameInfo", "WKNavigationAction", "WKNavigationDelegate", "WKWebView", "WKSnapshotConfiguration"] }
@@ -50,14 +50,14 @@ default = ["webview"]
 webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk"]
 
 [patch.crates-io]
-wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-naga = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-winit = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-parley_engine = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
-accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "20250cf3f66c0276c03a4870930b2b69af7a0570" }
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "889f03e3f71acfb9fce100c55106df06ab1c3eb9" }
 
 [profile.release]
 codegen-units = 16

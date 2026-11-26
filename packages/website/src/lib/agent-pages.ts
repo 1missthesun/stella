@@ -13,6 +13,7 @@ import {
 } from "@/lib/legal-text";
 import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PLAN_CATALOG, PLAN_ORDER, planPriceLabel } from "@/lib/plans";
 import { howLlmsFull, howLlmsSections } from "@/lib/problems/markdown";
+import { PRODUCT_DOCS, renderProductDoc } from "@/lib/product-docs";
 import { getSiteUrl } from "@/lib/site-url";
 
 const MARKDOWN_HEADERS: HeadersInit = {
@@ -75,6 +76,7 @@ Models & providers: OpenAI, Anthropic, Google, xAI, DeepSeek, Moonshot AI.
 - Learn More: ${abs("/learn-more.md")}
 - One chat: ${abs("/one-chat.md")}
 - Voice: ${abs("/voice.md")}
+- Product docs (how each feature works): ${abs("/docs.md")}
 - Pricing: ${abs("/pricing.md")}
 - Stella compared and explained: ${abs("/ai.md")}
 - How-to guides: ${abs("/how.md")}
@@ -130,7 +132,7 @@ Dictation isn't just for Stella. Use it in any app on your computer and the
 words drop straight into whatever you're typing — email, notes, chat, anywhere.
 
 ## It works on every computer
-Use dictation in the desktop app on Windows and Mac.
+Use dictation in the desktop app on Mac, Windows and Linux, and in the phone app.
 
 ## Just say "Hey Stella"
 Flip on the wake word and start talking with no clicking and no keyboard. It
@@ -199,21 +201,24 @@ conversation instead of becoming the project manager for your assistant.
 - **Listen and speak** — Use in-app dictation, OS-wide dictation, read-aloud, and realtime voice. Wake-word activation is optional. Dictation, read-aloud and wake word are on every plan; realtime voice comes with every paid plan.
 - **Run routines** — Create reminders, recurring check-ins, scheduled work, and automations from plain English.
 - **Connect apps** — Use supported services, including the Stella mobile app, Google Workspace, and Store-backed integrations.
-- **Choose your model** — Use Stella's managed provider, bring your own keys, use local models, pick OpenRouter-style options where supported, or select Claude Code as the engine.
+- **Choose your model** — Use your ChatGPT, Claude or Gemini plan, Stella's own models, your own keys (OpenRouter included), or local models.
+- **Show Stella your screen** — Record your screen while you talk and draw on it, and Stella sees what you mean.
+- **Sort your email** — Stella reads your Gmail, keeps what needs you with a drafted reply, and handles the rest when you say so.
+- **Change Stella itself** — Ask, and Stella rewrites any part of its own app; keep the change or undo it.
 
 ## Ways to reach Stella
 - **Browser** — Open Stella in your browser to chat, start tasks, and work with files. No installation needed.
 - **Desktop app** — Use Stella on macOS, Windows, or Linux, with access to your computer and desktop apps.
 - **Mobile app** — Chat and manage tasks from your phone. Connect the desktop app when you want Stella to work on that computer.
 - **Quick access on desktop** — Capture, chat, add context, or start voice from the app or page you are already using.
-- **Mini window on desktop** — Keep a smaller Stella window nearby for quick asks without taking over your screen.
+- **Desktop companion** — A small Stella floating over your desktop for quick asks, dictation and voice, without opening the main window.
 - **Voice and dictation** — Dictate into Stella or talk in realtime. The desktop app also supports dictation into other apps.
 
 ## Your privacy
 Read our Privacy Policy for details on how Stella handles your information
 and the choices available to you: ${abs("/privacy.md")}
 
-## Use Stella, BYOK, local models, or Claude Code
+## Use Stella, your own plan, BYOK, or local models
 Stella has a managed path for convenience and a provider-control path for people
 who want to bring their own providers. Stella Provider lets you start using strong models without setting up accounts everywhere. Requests
 pass through Stella's infrastructure in transit so billing and limits can work,
@@ -221,8 +226,8 @@ and responses may be buffered briefly to support stream recovery. The model
 providers that fulfill requests may process and retain submitted data under
 their own policies and Stella's configuration.
 
-You can also add your own provider credentials, use local runtimes, and use
-Claude Code directly as the assistant engine. Provider and engine options depend on the client you use.
+You can also use your own ChatGPT, Claude (through Claude Code) or Gemini plan,
+add your own provider credentials, or use local runtimes. Provider and engine options depend on the client you use.
 
 ## Get started
 Open Stella in your browser at ${abs("/chat")}, download the desktop app, or
@@ -444,7 +449,8 @@ const SUMMARY = [
   "Key facts:",
   `- Price: ${PRICE_LINE} Stella sets no limit of its own on that use; it counts against your ChatGPT, Claude or Gemini plan. ${TRIAL_LINE} ${PAID_LINE} No credit card.`,
   "- Old prices: the plans today are Free, Plus, Pro and Max. There is no Go plan any more; older pages and directories that list one are out of date.",
-  "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
+  "- Computer use: Stella sees the screen, clicks and types in your apps on macOS, Windows and Linux (Hyprland desktops such as Omarchy), and works in your own browser through its Stella for Chrome extension.",
+  "- Features: background tasks, memory and standing rules, Stella Drive across devices, tasks in the cloud, Show Stella screen recording, dictation in any app, \"Hey Stella\", live voice, a desktop companion, documents, canvases and apps, image, video, music and 3D, Gmail sorting with reply drafts, reminders, scheduled tasks and watches, 120+ connectors and MCP servers, and encrypted saved logins. How each one works: https://stella.sh/docs.md (a short index; fetch only the topic file you need).",
   "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source code on your computer.",
   "- Your data: signed out, the desktop app keeps your conversations, memory and files on your computer, and nothing about your conversations goes to Stella's servers. Signing in is optional on desktop (needed for the phone app, sync, cloud tasks and Stella's own models); then conversations and task records are stored, encrypted, on Stella's servers. Stella doesn't sell your information, use conversations for ads or train AI models on them. Privacy policy: https://stella.sh/privacy.md.",
   "- Safety: Stella acts for you (files, apps, browser), so it is as powerful as the access you give it. Download it only from stella.sh, the App Store or Google Play. In Chrome it works through its own Stella Browser extension in a separate tab group.",
@@ -461,6 +467,12 @@ export function renderLlmsTxt(): string {
   for (const page of AGENT_PAGES) {
     lines.push(`- [${page.label}](${abs(page.mdPath)}): ${page.description}`);
   }
+  lines.push(
+    "",
+    "## Product docs",
+    `- [Stella product docs](${abs("/docs.md")}): How Stella works, feature by feature. A short index; each topic is its own small file.`,
+    ...PRODUCT_DOCS.map((doc) => `- [${doc.title}](${abs(`/docs/${doc.slug}.md`)}): ${doc.covers}`),
+  );
   lines.push(
     "",
     "## Run your own server",
@@ -489,6 +501,7 @@ export function renderLlmsFull(): string {
     if (skip.has(page.mdPath)) continue;
     parts.push(page.markdown.trim(), "");
   }
+  for (const doc of PRODUCT_DOCS) parts.push(renderProductDoc(doc).trim(), "");
   parts.push("# Stella compared and explained", "");
   for (const page of ANSWER_PAGES) parts.push(renderAnswerPage(page));
   parts.push(...howLlmsFull());

@@ -49,7 +49,7 @@ function Vacuum({ vacuum, onDone }: { vacuum: VacuumState; onDone: () => void })
       inert
       origin={origin}
       scale={collapsed ? 0.02 : 1}
-      rotate={collapsed ? 14 : 0}
+      rotate={collapsed ? (14 * Math.PI) / 180 : 0}
       opacity={collapsed ? 0 : 1}
       motion={{ dur: VACUUM_MS / 1000, bounce: 0 }}
     />

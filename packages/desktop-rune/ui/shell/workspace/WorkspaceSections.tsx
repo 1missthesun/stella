@@ -41,7 +41,7 @@ import { agentPauseKey, agentPauseLabel, type AgentPause } from "@stella/contrac
 import { DisplayTabIcon } from "../../features/workspace-display/icons";
 import { Icon, Icons } from "../../kit";
 import { fontSize, look, mixOklch, useTokens } from "../../theme";
-import { ActivityTaskLabel, AgentAssistantUpdates, CompactChildState, META_TEXT, ROW_TEXT, TaskStatusIcon, stripLook } from "./activity-rows";
+import { ActivityTaskLabel, AgentAssistantUpdates, CompactChildState, META_TEXT, ROW_TEXT, TaskStatusIcon, stripLook, useInheritedLook } from "./activity-rows";
 
 const SECTION_CAPS = {
   strip: { activity: 8, files: 5, schedule: 4 },
@@ -66,7 +66,7 @@ function WorkspaceSection({ title, sectionId, hideHeader = false, children }: { 
     <col shrink={false} pt={10} px={12} pb={12} layout={0.18}>
       {!hideHeader ? (
         <row minH={18} mb={6} align="center">
-          <box role="button" label={title} expanded={!sectionCollapsed} grow={1} minW={0} py={3} px={6} mx={-6} radius={6} hoverFill={l.hover} motion={{ dur: 0.12 }} onPress={() => sectionCollapseStore.toggle(sectionId)}>
+          <box role="button" focusable label={title} expanded={!sectionCollapsed} grow={1} minW={0} py={3} px={6} mx={-6} radius={6} hoverFill={l.hover} motion={{ dur: 0.12 }} onPress={() => sectionCollapseStore.toggle(sectionId)}>
             <text {...look(fontSize.base, 500, { em: 0 })} color={t.c.textStrong}>
               {title}
             </text>
@@ -87,10 +87,11 @@ const taskSourceLabel = (task: TaskItem): string | undefined => (task.source ===
 function FileRow({ file, onOpen }: { file: ConversationFileEntry; onOpen: (file: ConversationFileEntry) => void }) {
   const t = useTokens();
   const l = stripLook(t);
+  const rowText = useInheritedLook(ROW_TEXT);
   return (
-    <row role="button" label={basenameOf(file.path)} title={file.path} align="center" gap={8} minW={0} py={4} px={6} mx={-6} radius={6} hoverFill={l.hover} focusFill={l.hover} motion={{ dur: 0.12 }} onPress={() => onOpen(file)} hoverGroup>
+    <row role="button" focusable label={basenameOf(file.path)} title={file.path} align="center" gap={8} minW={0} py={4} px={6} mx={-6} my={-1} radius={6} hoverFill={l.hover} focusFill={l.hover} motion={{ dur: 0.12 }} onPress={() => onOpen(file)} hoverGroup>
       <DisplayTabIcon kind={displayTabKindForPayload(file.payload)} size={15} />
-      <text {...ROW_TEXT} features="'tnum' 1" color={t.c.textBase} hoverColor={t.c.textStrong} grow={1} minW={0} nowrap truncate>
+      <text {...rowText} features="'tnum' 1" color={t.c.textBase} hoverColor={t.c.textStrong} grow={1} minW={0} nowrap truncate>
         {basenameOf(file.path)}
       </text>
     </row>
@@ -127,6 +128,7 @@ const TaskRow = memo(function TaskRow({
   const l = stripLook(t);
   const windowFocused = useWindowFocus();
   const [hovered, setHovered] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
   const label = task.description.trim();
   const sourceLabel = taskSourceLabel(task);
   const hasSubagents = Boolean(compactChildren);
@@ -150,7 +152,8 @@ const TaskRow = memo(function TaskRow({
   const compactMotionActive = windowFocused && task.status === "running" && (compactSummary?.runningCount ?? 0) > 0;
   const hasDetail = Boolean(childContent) || Boolean(parentDetail) || hasAgentUpdates || hasFiles;
   const detailOpen = expanded && hasDetail;
-  const showCaret = hasDetail && (hovered || expanded);
+  const showCaret = hasDetail && (hovered || focusWithin || expanded);
+  const toggleText = useInheritedLook(look(fontSize.xs, 500, { lh: 1.35 }), true);
   const title =
     paused && task.paused ? `${label} — ${agentPauseLabel(task.paused)}` : waiting && task.statusText ? `${label} — ${task.statusText}` : task.longCall && metaText ? `${label} — ${metaText}` : label;
   const dimCompact = task.status === "completed" || task.status === "canceled";
@@ -167,9 +170,9 @@ const TaskRow = memo(function TaskRow({
   );
   return (
     <col minW={0} title={title} enter={ROW_ENTER} exit={ROW_EXIT}>
-      <row align="center" gap={2} minW={0} onHover={setHovered}>
+      <row align="center" gap={2} minW={0} onHover={setHovered} onFocusWithin={setFocusWithin}>
         <box
-          role="button"
+          role="button" focusable
           label={task.source === "claude-native" ? "View Claude conversation" : "View activity"}
           grow={1}
           minW={0}
@@ -211,7 +214,7 @@ const TaskRow = memo(function TaskRow({
         </box>
         {hasDetail ? (
           <box
-            role="button"
+            role="button" focusable
             label={`${label || "Activity"} — ${expanded ? "collapse" : "expand"}`}
             expanded={expanded}
             absolute={{ right: 2 }}
@@ -226,7 +229,7 @@ const TaskRow = memo(function TaskRow({
             motion={{ dur: 0.12 }}
             onPress={() => onToggle(task.id, !expanded)}
           >
-            <box rotate={expanded ? 90 : 0} motion={{ dur: 0.12 }}>
+            <box rotate={expanded ? Math.PI / 2 : 0} motion={{ dur: 0.12 }}>
               <Icon icon={Icons.stella.ChevronRight} size={14} strokeWidth={2} color={t.c.textWeak} />
             </box>
           </box>
@@ -243,21 +246,21 @@ const TaskRow = memo(function TaskRow({
             <col gap={4} minW={0}>
               {hasAgentUpdates ? <AgentAssistantUpdates messages={agentUpdates} max={AGENT_UPDATE_CAP} /> : null}
               {hasFiles ? (
-                <col gap={2} pt={4}>
+                <col gap={2}>
                   {previewFiles.map((file) => (
                     <FileRow key={file.path} file={file} onOpen={onOpenFile} />
                   ))}
                 </col>
               ) : null}
               {extraFiles.length > 0 ? (
-                <row role="button" expanded={filesExpanded} py={4} px={6} mx={-6} radius={6} hoverFill={l.hover} motion={{ dur: 0.12 }} onPress={() => setFilesExpanded((value) => !value)} hoverGroup>
-                  <text {...look(fontSize.xs, 500, { lh: 1.35 })} color={t.c.textWeak} hoverColor={t.c.textStrong} nowrap truncate>
+                <row role="button" focusable expanded={filesExpanded} py={4} px={6} mx={-6} my={-4} radius={6} hoverFill={l.hover} motion={{ dur: 0.12 }} onPress={() => setFilesExpanded((value) => !value)} hoverGroup>
+                  <text {...toggleText} color={t.c.textWeak} hoverColor={t.c.textStrong} nowrap truncate>
                     {tPlural("shell.workspace.moreFiles", extraFiles.length)}
                   </text>
                 </row>
               ) : null}
               {extraFiles.length > 0 && filesExpanded ? (
-                <col gap={2} pt={4} mt={-4} enter={{ opacity: 0, dur: 0.2 }}>
+                <col gap={2} mt={-4} enter={{ opacity: 0, dur: 0.2 }}>
                   {extraFiles.map((file) => (
                     <FileRow key={file.path} file={file} onOpen={onOpenFile} />
                   ))}
@@ -356,7 +359,7 @@ function CloudBrowserNeedsYouList({ interactions, onNavigate }: { interactions: 
         return (
           <row
             key={interaction.interactionId}
-            role="button"
+            role="button" focusable
             label={origin}
             align="center"
             gap={9}
@@ -420,6 +423,7 @@ export const WorkspaceSections = memo(function WorkspaceSections({
 } = {}) {
   const t = useT();
   const tk = useTokens();
+  const scheduleRowText = useInheritedLook(ROW_TEXT);
   const chat = useChatRuntime();
   const { state } = useUiState();
 
@@ -636,8 +640,8 @@ export const WorkspaceSections = memo(function WorkspaceSections({
           <WorkspaceSection title="Schedule" sectionId="schedule">
             <col gap={2}>
               {upNext.map((entry) => (
-                <row key={`${entry.kind}:${entry.id}`} role="button" label={entry.name.trim()} align="center" gap={8} minW={0} py={4} px={6} mx={-6} radius={6} hoverFill={stripLook(tk).hover} motion={{ dur: 0.12 }} onPress={() => setOpenScheduleEntry(entry)} hoverGroup>
-                  <text {...ROW_TEXT} color={tk.c.textBase} hoverColor={tk.c.textStrong} grow={1} minW={0} nowrap truncate>
+                <row key={`${entry.kind}:${entry.id}`} role="button" focusable label={entry.name.trim()} align="center" gap={8} minW={0} py={4} px={6} mx={-6} my={-1} radius={6} hoverFill={stripLook(tk).hover} motion={{ dur: 0.12 }} onPress={() => setOpenScheduleEntry(entry)} hoverGroup>
+                  <text {...scheduleRowText} color={tk.c.textBase} hoverColor={tk.c.textStrong} grow={1} minW={0} nowrap truncate>
                     {entry.name.trim()}
                   </text>
                   <text {...look(fontSize.xs, 500, { em: 0 })} color={tk.c.textWeak} shrink={false} nowrap>

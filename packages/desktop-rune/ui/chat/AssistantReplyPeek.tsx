@@ -1,5 +1,6 @@
 import { useT } from "@/shared/i18n";
 import { Icon, Icons } from "../kit";
+import { APP_TRACKING } from "../kit/compat";
 import { derive, fontSize, mixOklch, radius, useTokens } from "../theme";
 import { panelSurface } from "./surfaces";
 
@@ -25,8 +26,8 @@ export function AssistantReplyPeek({ text, onJumpToBottom, onDismiss }: Assistan
       y={0}
       enter={{ opacity: 0, y: 4, dur: 0.16, bounce: 0 }}
     >
-      <box role="button" focusable grow={1} minW={0} title={t("app.chat.replyPeek.jumpToLatest")} pt={8 + 1} pr={10} pb={8 + 1} pl={12 + 1} hoverFill={hover} justify="center" focusRing={{ color: tokens.c.ring, width: 2, offset: -2 }} onPress={onJumpToBottom}>
-        <text size={fontSize.base} lineHeight={fontSize.base * 1.25} color={tokens.c.textBase} nowrap truncate>
+      <box role="button" focusable grow={1} minW={0} title={t("app.chat.replyPeek.jumpToLatest")} pt={8 + 1} pr={10} pb={8 + 1} pl={12 + 1} hoverFill={hover} align="center" focusRing={{ color: tokens.c.ring, width: 2, offset: -2 }} onPress={onJumpToBottom}>
+        <text size={fontSize.base} lineHeight={fontSize.base * 1.25} tracking={APP_TRACKING} color={tokens.c.textBase} nowrap truncate>
           {text}
         </text>
       </box>

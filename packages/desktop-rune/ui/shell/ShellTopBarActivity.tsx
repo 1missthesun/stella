@@ -7,6 +7,7 @@ import { useWindowFocus } from "@/shared/hooks/use-window-focus";
 import { useT, useTPlural } from "@/shared/i18n";
 import { StellaCharacter } from "../kit/StellaCharacter";
 import { fontSize, look, useTokens } from "../theme";
+import { BODY_TEXT, TextScope } from "../kit/compat";
 import { mounted, Nothing } from "../app/mount";
 import { Panel } from "./topbar/chrome";
 
@@ -144,7 +145,9 @@ export const ShellTopBarActivity = memo(function ShellTopBarActivity({ width }: 
       </row>
       <Panel id="shell-topbar-activity-menu" anchor="shell-topbar-activity-trigger" open={open} onClose={closeMenu} align="center" gap={6} w={Math.min(352, window.innerWidth - 32)} maxH={Math.min(window.innerHeight * 0.6, 512)} onHover={onHover} modal={pinned}>
         <col w="full" maxH={Math.min(window.innerHeight * 0.6, 512)} clip={0}>
-          <ActivityOverview onNavigate={closeMenu} />
+          <TextScope base={BODY_TEXT}>
+            <ActivityOverview onNavigate={closeMenu} />
+          </TextScope>
         </col>
       </Panel>
     </row>

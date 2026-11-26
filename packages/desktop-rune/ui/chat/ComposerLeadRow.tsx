@@ -12,11 +12,15 @@ export const ComposerLeadRow = memo(function ComposerLeadRow({
   maxW?: number;
 }) {
   return (
-    <box w="full" maxW={maxW}>
-      {replyPeek ? <AssistantReplyPeek {...replyPeek} /> : null}
+    <col w="full" maxW={maxW}>
+      {replyPeek ? (
+        <box w="full" h={0}>
+          <AssistantReplyPeek {...replyPeek} />
+        </box>
+      ) : null}
       <row w="full" align="center" gap={6} pl={12}>
         {catchUpConversationId ? <CatchUpPill conversationId={catchUpConversationId} /> : null}
       </row>
-    </box>
+    </col>
   );
 });

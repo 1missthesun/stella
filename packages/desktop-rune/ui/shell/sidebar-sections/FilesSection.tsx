@@ -153,7 +153,7 @@ function AgentGroupRow({ hierarchy, conversationId, expanded, onToggle, onPick }
         onPress={onToggle}
         leading={
           <>
-            <box shrink={false} rotate={expanded ? 90 : 0} motion={{ dur: 0.12 }}>
+            <box shrink={false} rotate={expanded ? Math.PI / 2 : 0} motion={{ dur: 0.12 }}>
               <Icon icon={Icons.stella.ChevronRight} size={14} strokeWidth={2} color={tk.c.textBase} />
             </box>
             <AgentLifecycleStatusIcon status={owner.status} size={17} strokeWidth={1.75} color={tk.c.textWeak} />

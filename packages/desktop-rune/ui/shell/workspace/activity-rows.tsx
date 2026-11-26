@@ -4,11 +4,19 @@ import { selectLatestAgentAssistantMessage } from "@/features/chat/lib/agent-ass
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 import { useT } from "@/shared/i18n";
 import { Icon, Icons, type IconData } from "../../kit";
-import { derive, fontSize, look, mixOklch, useTokens, type Tokens } from "../../theme";
+import { useTextBase } from "../../kit/compat";
+import { derive, fontSize, look, mixOklch, useTokens, type TextLook, type Tokens } from "../../theme";
 import { TextShimmer } from "../../chat/TextShimmer";
 
 export const ROW_TEXT = look(fontSize.base, 400, { lh: 1.35 });
 export const META_TEXT = look(fontSize.xs, 400, { lh: 1.4, em: 0.01 });
+
+/** `look` with the letter-spacing (and, for text outside a `.chat-workspace-strip__row`, the face) the strip inherits: `.app`'s under the shell, `body`'s in a portal. */
+export function useInheritedLook(base: TextLook, inheritFamily = false): TextLook {
+  const scope = useTextBase();
+  const tracking = scope.size * scope.em;
+  return inheritFamily && scope.family ? { ...base, tracking, family: scope.family } : { ...base, tracking };
+}
 
 /** `.chat-workspace-strip__*` colours shared by the activity rows. */
 export const stripLook = (t: Tokens) =>
@@ -48,9 +56,10 @@ export function TaskStatusIcon({ status, waiting, paused }: { status: TaskItem["
 
 /** desktop-ui's `ActivityTaskShimmer`: a top-level task still working shimmers its label. */
 export function ActivityTaskLabel({ task, text, isTopLevel, color }: { task: TaskItem; text: string; isTopLevel: boolean; color: string }) {
-  if (isTopLevel && isActivityTaskWorking(task)) return <TextShimmer text={text} look={ROW_TEXT} durationMs={2000} color={color} />;
+  const rowText = useInheritedLook(ROW_TEXT);
+  if (isTopLevel && isActivityTaskWorking(task)) return <TextShimmer text={text} look={rowText} durationMs={2000} color={color} />;
   return (
-    <text {...ROW_TEXT} color={color} nowrap truncate minW={0}>
+    <text {...rowText} color={color} nowrap truncate minW={0}>
       {text}
     </text>
   );

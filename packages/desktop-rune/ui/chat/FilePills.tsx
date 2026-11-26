@@ -117,7 +117,7 @@ export const FilePills = ({ files, variant = "row" }: { files: ConversationFileE
           focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
           onPress={() => setExpanded((value) => !value)}
         >
-          <box rotate={expanded ? 180 : 0} motion={{ dur: 0.2, bounce: 0 }}>
+          <box rotate={expanded ? Math.PI : 0} motion={{ dur: 0.2, bounce: 0 }}>
             <Icon icon={withStroke(Icons.stella.ChevronDown, 2)} size={13} color={tokens.c.textWeak} />
           </box>
           <text size={fontSize.xs} weight={500} color={tokens.c.textWeak} hoverColor={tokens.c.textStrong}>

@@ -681,7 +681,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                 </T>) : null}
               {!open && sectionHoldsSelection ? (<Check size={12} strokeWidth={2} {...s.modelPickerGroupCheck} color={s.modelPickerGroupCheck.color} />) : null}
               <col grow={1} />
-              <box shrink={false} rotate={open ? 180 : 0} motion={s.modelPickerGroupChevron.motion}>
+              <box shrink={false} rotate={open ? Math.PI : 0} motion={s.modelPickerGroupChevron.motion}>
                 <ChevronDown size={13} strokeWidth={1.75} color={s.modelPickerGroupChevron.color} />
               </box>
             </Press>) : hideProviderLabel ? null : (<>
@@ -813,7 +813,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             {extra.badge ? (<T {...tx(s.modelPickerGroupToggle)} {...s.modelPickerGroupNote}>{extra.badge}</T>) : null}
             {!open && extra.selected ? (<Check size={12} strokeWidth={2} {...s.modelPickerGroupCheck} color={s.modelPickerGroupCheck.color} />) : null}
             <col grow={1} />
-              <box shrink={false} rotate={open ? 180 : 0} motion={s.modelPickerGroupChevron.motion}>
+              <box shrink={false} rotate={open ? Math.PI : 0} motion={s.modelPickerGroupChevron.motion}>
                 <ChevronDown size={13} strokeWidth={1.75} color={s.modelPickerGroupChevron.color} />
               </box>
           </Press>

@@ -80,7 +80,9 @@ export type BoxProps = {
   /** Laid out but not drawn, hit-tested or announced (visibility:hidden). */
   hidden?: boolean;
   // Transform and motion
-  x?: number; y?: number; scale?: number; rotate?: number; origin?: [number, number];
+  x?: number; y?: number; scale?: number; origin?: [number, number];
+  /** Radians, clockwise; `Frame.rotate` too. */
+  rotate?: number;
   /** The spring every prop change on this element moves on. */
   motion?: { dur?: number; bounce?: number };
   /** Animate layout changes on a spring of this duration (s). */

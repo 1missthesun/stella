@@ -40,6 +40,8 @@ struct View {
     /// The page zoom TS asked for (`webview.zoom`), and the window scale it was applied at.
     zoom: f64,
     zoomed_at: f32,
+    #[cfg(target_os = "linux")]
+    backdrop: Option<[u8; 4]>,
 }
 
 /// The part of a placed webview that shows, in window coordinates: inside its clipping
@@ -173,6 +175,51 @@ fn intersect(a: [f32; 4], b: [f32; 4]) -> Option<[f32; 4]> {
 fn contains(outer: [f32; 4], inner: [f32; 4]) -> bool {
     let eps = 0.5;
     inner[0] >= outer[0] - eps && inner[1] >= outer[1] - eps && inner[0] + inner[2] <= outer[0] + outer[2] + eps && inner[1] + inner[3] <= outer[1] + outer[3] + eps
+}
+
+/// Whether window point (x, y) falls on what shows of a view with this shape.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn shows(s: &Shape, x: f32, y: f32) -> bool {
+    let within = |r: [f32; 4]| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
+    within(s.vis) && in_corners(x - s.vis[0], y - s.vis[1], s.vis[2], s.vis[3], s.round) && !s.cuts.iter().any(|(r, c)| within(*r) && in_corners(x - r[0], y - r[1], r[2], r[3], *c))
+}
+
+/// Whether (x, y) inside a w×h box lies within its corner radii (top-left, top-right,
+/// bottom-right, bottom-left).
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn in_corners(x: f32, y: f32, w: f32, h: f32, c: [f32; 4]) -> bool {
+    let c = c.map(|r| r.min(w / 2.0).min(h / 2.0));
+    let corner = if x < c[0] && y < c[0] {
+        Some((c[0], c[0], c[0]))
+    } else if x > w - c[1] && y < c[1] {
+        Some((c[1], w - c[1], c[1]))
+    } else if x > w - c[2] && y > h - c[2] {
+        Some((c[2], w - c[2], h - c[2]))
+    } else if x < c[3] && y > h - c[3] {
+        Some((c[3], c[3], h - c[3]))
+    } else {
+        None
+    };
+    corner.is_none_or(|(r, cx, cy)| (x - cx).powi(2) + (y - cy).powi(2) <= r * r)
+}
+
+/// The shown webview of `window` under window point (x, y): its node and placed rect.
+#[cfg(target_os = "linux")]
+pub fn at(window: u32, x: f32, y: f32) -> Option<(u32, [f32; 4])> {
+    VIEWS.with(|v| {
+        v.borrow()
+            .iter()
+            .find(|(_, view)| view.window == window && view.visible && view.applied.as_ref().is_some_and(|a| shows(&a.0, x, y)))
+            .map(|(n, view)| (*n, view.rect))
+    })
+}
+
+/// Runs `f` on view `n`'s native webview and its window's scale.
+#[cfg(target_os = "linux")]
+pub fn with_native<R>(n: u32, f: impl FnOnce(&WebView, f32) -> R) -> Option<R> {
+    let window = VIEWS.with(|v| v.borrow().get(&n).map(|x| x.window))?;
+    let k = handle_of(window).and_then(|h| h.scale()).unwrap_or(1.0) as f32;
+    VIEWS.with(|v| v.borrow().get(&n).map(|x| f(&x.view, k)))
 }
 
 /// What of view `n` at `r` in `window` shows; `None` when nothing does.
@@ -429,7 +476,7 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
     let mut b = b
         .with_id(&id)
         .with_bounds(rect(window, r))
-        .with_transparent(p.transparent)
+        .with_transparent(p.transparent && cfg!(not(target_os = "linux")))
         .with_focused(false)
         .with_devtools(p.devtools || cfg!(debug_assertions))
         .with_initialization_script(PARENT_SHIM)
@@ -591,7 +638,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 mac::round(&view, corners(&p));
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
-                    v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: 0.0 })
+                    v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: 0.0, #[cfg(target_os = "linux")] backdrop: None })
                 });
                 element_event(n, "ready", json!({}), None);
             }
@@ -616,6 +663,15 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             view.zoomed_at = k;
             zoom(view, k);
         }
+        #[cfg(target_os = "linux")]
+        if let Some(color) = backdrop(n)
+            && view.backdrop != Some(color)
+        {
+            use wry::WebViewExtUnix;
+            view.backdrop = Some(color);
+            let [r, g, b, a] = color.map(|c| c as f64 / 255.0);
+            webkit2gtk::WebViewExt::set_background_color(&view.view.webview(), &gtk::gdk::RGBA::new(r, g, b, a));
+        }
         if !hidden && let Some(s) = shape {
             let key = (s, r, view.corners, k);
             if view.applied.as_ref() != Some(&key) {
@@ -629,6 +685,10 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         if view.visible == hidden {
             let _ = view.view.set_visible(!hidden);
             view.visible = !hidden;
+            // Showing wry's GTK toplevel again restores the size it had when it was hidden.
+            if !hidden {
+                let _ = view.view.set_bounds(rect(window, r));
+            }
         }
     });
 }
@@ -1031,29 +1091,6 @@ mod mac {
         static HOLES: RefCell<HashMap<usize, super::Shape>> = RefCell::new(HashMap::new());
     }
 
-    fn inside(s: &super::Shape, x: f32, y: f32) -> bool {
-        let within = |r: [f32; 4]| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
-        within(s.vis) && in_corners(x - s.vis[0], y - s.vis[1], s.vis[2], s.vis[3], s.round) && !s.cuts.iter().any(|(r, c)| within(*r) && in_corners(x - r[0], y - r[1], r[2], r[3], *c))
-    }
-
-    /// Whether (x, y) inside a w×h box lies within its corner radii (top-left, top-right,
-    /// bottom-right, bottom-left).
-    fn in_corners(x: f32, y: f32, w: f32, h: f32, c: [f32; 4]) -> bool {
-        let c = c.map(|r| r.min(w / 2.0).min(h / 2.0));
-        let corner = if x < c[0] && y < c[0] {
-            Some((c[0], c[0], c[0]))
-        } else if x > w - c[1] && y < c[1] {
-            Some((c[1], w - c[1], c[1]))
-        } else if x > w - c[2] && y > h - c[2] {
-            Some((c[2], w - c[2], h - c[2]))
-        } else if x < c[3] && y > h - c[3] {
-            Some((c[3], c[3], h - c[3]))
-        } else {
-            None
-        };
-        corner.is_none_or(|(r, cx, cy)| (x - cx).powi(2) + (y - cy).powi(2) <= r * r)
-    }
-
     type HitTest = unsafe extern "C-unwind" fn(&AnyObject, Sel, CGPoint) -> *mut AnyObject;
     static SUPER_HIT: OnceLock<HitTest> = OnceLock::new();
 
@@ -1071,7 +1108,7 @@ mod mac {
             let (bounds, flipped): (CGRect, bool) = unsafe { (objc2::msg_send![this, bounds], objc2::msg_send![this, isFlipped]) };
             let x = (local.x - bounds.origin.x) as f32;
             let y = if flipped { local.y - bounds.origin.y } else { bounds.origin.y + bounds.size.height - local.y } as f32;
-            if x >= 0.0 && y >= 0.0 && x < bounds.size.width as f32 && y < bounds.size.height as f32 && !inside(&shape, x, y) {
+            if x >= 0.0 && y >= 0.0 && x < bounds.size.width as f32 && y < bounds.size.height as f32 && !super::shows(&shape, x, y) {
                 return std::ptr::null_mut();
             }
         }
@@ -1205,6 +1242,35 @@ mod mac {
     }
 }
 
+/// A transparent view's page background on Linux: what the engine draws under it (its own and its
+/// ancestors' fills down to the first opaque one, over Electron's default white). wry's X11
+/// container is an opaque child window, and a WebKitGTK view made transparent redraws only its
+/// last damage on a full repaint, leaving the rest black.
+#[cfg(target_os = "linux")]
+fn backdrop(n: u32) -> Option<[u8; 4]> {
+    engine::read(|e| {
+        if !e.tree.get(n)?.props.transparent {
+            return None;
+        }
+        let mut layers = Vec::new();
+        let mut at = n;
+        while let Some(node) = e.tree.get(at) {
+            if let Some(c) = node.props.fill.as_ref().map(|c| c.0).filter(|c| c.a > 0.0) {
+                layers.push(c);
+                if c.a >= 1.0 {
+                    break;
+                }
+            }
+            if at == 0 || node.parent == at {
+                break;
+            }
+            at = node.parent;
+        }
+        let rgb = layers.iter().rev().fold([1.0f32; 3], |under, c| [0, 1, 2].map(|i| [c.r, c.g, c.b][i] * c.a + under[i] * (1.0 - c.a)));
+        Some([rgb[0], rgb[1], rgb[2], 1.0].map(|v| (rune::color::srgb_encode(v).clamp(0.0, 1.0) * 255.0).round() as u8))
+    })
+}
+
 /// Follows prop changes (url, html, corners) of live views.
 pub fn sync(n: u32, p: &Props) {
     VIEWS.with(|v| {
@@ -1253,6 +1319,8 @@ pub fn retry_waiting() {
 /// Drops the WebView (and its web process) of a removed node.
 pub fn close(n: u32) {
     let gone = VIEWS.with(|v| v.borrow_mut().remove(&n));
+    #[cfg(target_os = "linux")]
+    crate::webview_input::forget(n);
     if gone.is_some() {
         destroy(gone.into_iter().collect());
         eprintln!("stella-engine: webview {n} closed");

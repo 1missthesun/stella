@@ -111,6 +111,8 @@ export class ChromiumPage extends EventEmitter {
   private readonly offSession: () => void;
   private readonly onBrowserEvent: (m: CdpMessage) => void;
   private screencastListener: ((frame: ScreencastFrame) => void) | null = null;
+  /** The screencast asked for, and whether Chromium took it: a page that hasn't committed its first document yet refuses one ("Not attached to an active page"), so it starts again on the main frame's next commit. */
+  private screencast: { params: Record<string, unknown>; running: boolean } | null = null;
   private viewport = { width: 1280, height: 720 };
   private titlePoll: ReturnType<typeof setInterval> | null = null;
   private schemes: SchemeServer | null = null;
@@ -172,6 +174,7 @@ export class ChromiumPage extends EventEmitter {
       case "Page.frameNavigated":
         if (!p.frame?.parentId) {
           this.mainFrameId = p.frame.id;
+          if (this.screencast && !this.screencast.running) void this.sendScreencast();
           this.emit("navigated", this.hostUrl(p.frame.url + (p.frame.urlFragment ?? "")), false, 200);
         }
         break;
@@ -411,14 +414,27 @@ export class ChromiumPage extends EventEmitter {
       this.titlePoll = setInterval(() => this.refreshTitle(), TITLE_POLL_MS);
       this.titlePoll.unref();
     }
-    await this.send("Page.startScreencast", {
-      format: "jpeg", quality: 80, everyNthFrame: 1,
-      maxWidth: maxSize?.width ?? this.viewport.width, maxHeight: maxSize?.height ?? this.viewport.height,
-    });
+    this.screencast = {
+      params: { format: "jpeg", quality: 80, everyNthFrame: 1, maxWidth: maxSize?.width ?? this.viewport.width, maxHeight: maxSize?.height ?? this.viewport.height },
+      running: false,
+    };
+    await this.sendScreencast();
+  }
+
+  private async sendScreencast() {
+    const wanted = this.screencast;
+    if (!wanted || this.closed) return;
+    try {
+      await this.send("Page.startScreencast", wanted.params);
+      wanted.running = true;
+    } catch {
+      wanted.running = false;
+    }
   }
 
   async stopScreencast() {
     this.screencastListener = null;
+    this.screencast = null;
     if (this.titlePoll) { clearInterval(this.titlePoll); this.titlePoll = null; }
     if (!this.closed) await this.send("Page.stopScreencast").catch(() => {});
   }

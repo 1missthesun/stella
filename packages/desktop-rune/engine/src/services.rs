@@ -183,7 +183,12 @@ pub fn shortcut(cmd: &str, v: &Value) -> Result<Value, String> {
             }
             let sc: Shortcut = accelerator(&accel).parse().map_err(|e| format!("{e:?}"))?;
             let name = accel.clone();
-            match app.register_shortcut(sc, move |_s: &mut Win, _tx| crate::engine::send(json!({ "t": "shortcut", "accelerator": name, "accel": name }))) {
+            let fire = move |_s: &mut Win, _tx: &mut rune::Tx| crate::engine::send(json!({ "t": "shortcut", "accelerator": name, "accel": name }));
+            let registered = match (v.get("id").and_then(Value::as_str), v.get("description").and_then(Value::as_str)) {
+                (None, None) => app.register_shortcut(sc, fire),
+                (id, description) => app.register_shortcut_named(sc, id.unwrap_or(""), description.unwrap_or(""), fire),
+            };
+            match registered {
                 Ok(id) => {
                     map.insert(accel, id);
                     Ok(json!(true))

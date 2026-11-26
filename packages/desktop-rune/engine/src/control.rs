@@ -95,9 +95,17 @@ pub fn command(s: &mut Win, tx: &mut Tx, rid: Option<u64>, cmd: &str, v: &Value)
             Err(String::from("\u{0}pending"))
         }
         "control.input" => {
-            let events = v.get("events").cloned().unwrap_or(Value::Array(Vec::new()));
+            let events = match v.get("events") {
+                Some(Value::Array(list)) => list.clone(),
+                _ => Vec::new(),
+            };
+            #[cfg(all(target_os = "linux", feature = "webview"))]
+            let events = crate::webview_input::route(s.node, events);
+            if events.is_empty() {
+                return Ok(Value::Null);
+            }
             let handle = engine::read(|e| e.windows.get(&s.node).and_then(|w| w.handle.clone())).ok_or("window not open")?;
-            handle.inject_script(events).map_err(|e| e.to_string())?;
+            handle.inject_script(Value::Array(events)).map_err(|e| e.to_string())?;
             Ok(Value::Null)
         }
         "control.tree" => Ok(engine::read(|e| tree_json(e, s.node))),

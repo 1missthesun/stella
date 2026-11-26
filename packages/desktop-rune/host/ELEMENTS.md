@@ -387,6 +387,9 @@ region. While an overlay (an anchored popover or menu, or a lifted layer holding
 overlaps a view, the view steps aside and its slot shows the page's last snapshot under the
 overlay, until the overlay goes (Windows: the slot is empty). `control.screenshot` and
 `control.record` draw each view's snapshot with the same clip and cuts.
+On Linux a `transparent` view's page background is the colour the engine draws under it (its own
+and its ancestors' fills down to the first opaque one): wry's X11 container is an opaque child
+window, so a page with no background of its own shows what it would in Electron.
 On Linux WebKitGTK lays pages out at GTK's integer scale; the engine zooms each view so a CSS
 pixel is one point at the window's scale, as in Electron (`webview.zoom` multiplies that).
 WebKitGTK keeps one handler per scheme for the whole process; the engine routes each request to
@@ -441,6 +444,10 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
   - `{type:"type", text}`, `{type:"key", name:"k", cmd:true}` (flags `shift ctrl alt logo cmd`; `cmd` is the primary modifier, Ctrl off macOS, and matches `mod+…` chords)
   - `{type:"drag", key, dx, dy}`, `{type:"wheel", …}`, `{paste:"text"}`, `{focus:true}`
   - `t` is seconds from now
+  - Linux: pointer events on what shows of a native webview, and keys while the last injected
+    press landed in one, go to that view as X events would (trusted, with click counts and
+    focus), without moving the real pointer or the system's focus; the rest go to Rune. Windows
+    and macOS still send everything to Rune, so a script can't drive a page there.
 - `engine.control.elements(window?, key?)` lists every drawn element: key, path, role, label,
   text, rect, opacity, focused, focusable, inert, fill, textColor.
 - With `STELLA_RUNE_CTL_PORT=<port>`, the host serves the same over loopback HTTP:

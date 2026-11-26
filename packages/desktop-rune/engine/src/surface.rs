@@ -69,9 +69,9 @@ fn pixels_for(eng: &Engine, n: u32, src: &str) -> rune::Pixels {
         let mut m = m.borrow_mut();
         let s = m.entry(n).or_insert_with(|| Surface { src: String::new(), pixels: rune::Pixels::new(), latest: Arc::new(AtomicU64::new(0)) });
         if s.src != src {
-            s.src = src.to_owned();
             let bytes = src.strip_prefix("blob:").and_then(|id| id.parse().ok()).and_then(|id| eng.blobs.get(&id).cloned());
             if let Some(bytes) = bytes {
+                s.src = src.to_owned();
                 let frame = s.latest.fetch_add(1, Ordering::AcqRel) + 1;
                 let _ = decoder().send(Job { bytes, pixels: s.pixels.clone(), latest: s.latest.clone(), frame });
             }

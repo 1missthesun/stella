@@ -30,6 +30,8 @@ mod view;
 #[cfg(feature = "webview")]
 mod webview;
 #[cfg(all(target_os = "linux", feature = "webview"))]
+mod webview_input;
+#[cfg(all(target_os = "linux", feature = "webview"))]
 mod xwayland_scale;
 mod windows;
 

@@ -19,7 +19,6 @@ const cssShadow = (shadows: Shadow[]) => shadows.map((s) => `${s.inset ? "inset 
 export function pdfPageTheme(tokens: Tokens): string {
   const vars: Record<string, string> = {
     ...tokens.vars,
-    "--shadow-sm": cssShadow(tokens.shadow.sm),
     "--focus-ring": cssShadow(tokens.shadow.focusRing),
     "--radius-sm": "6px",
     "--font-size-xs": "11px",
@@ -43,7 +42,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--background);-web
 .scroll{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:16px;background:var(--background)}
 .document{display:flex;flex-direction:column;align-items:center;gap:16px}
 .page-wrap{width:100%;display:flex;justify-content:center}
-.page{background:white;box-shadow:var(--shadow-sm);border-radius:var(--radius-sm);overflow:hidden;flex:none}
+.page{background:white;box-shadow:0 0 0 1px var(--border);border-radius:var(--radius-sm);overflow:hidden;flex:none}
 canvas{display:block}
 @media (max-width:594px){.rail{display:none}}
 `;

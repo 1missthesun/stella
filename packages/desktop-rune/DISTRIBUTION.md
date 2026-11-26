@@ -101,6 +101,27 @@ voice reports that it cannot start; nothing downloads one for voice alone. Where
 AppArmor user-namespace restriction blocks Chromium's sandbox for that binary, the page is
 started again with `--no-sandbox` (it loads only Stella's own page).
 
+## Linux: media needs GStreamer plugins
+
+Electron carries its own codecs; on Linux the engine plays `<video>`/`<audio>` through GStreamer
+(Rune's `gstreamer` backend), as WebKitGTK does. The engine links `libgstreamer`, `libgstapp`,
+`libgstvideo` and `libgstpbutils`, which WebKitGTK 4.1 already depends on (Arch
+`gst-plugins-base-libs`, Debian `libgstreamer-plugins-base1.0-0`), so it adds no library. Decoding
+needs the plugins: `gst-plugins-base` (Ogg, Vorbis, Theora, Opus, WAV), `gst-plugins-good`
+(WebM/Matroska, MP4, VP8/VP9, FLAC) and `gst-libav` (H.264, HEVC, AAC, MP3). WebKitGTK lists the
+same ones as optional, and desktop installs usually have them. A clip whose plugin is missing
+fails with a message naming it and the package (`media.state` → `error`), and the viewer shows its
+placeholder. Bundling plugins was rejected: they must match the system GStreamer's ABI and
+registry, and they pull codec libraries (libvpx, FFmpeg) per distro. Routing decoding through the
+on-demand voice Chromium was rejected too: it exists only while voice runs and draws no frames
+into the engine.
+
+Packages when Rune ships on Linux: the AUR package lists them as optional (`gst-plugins-good`,
+`gst-libav`); the install script, which today installs only what the launcher's window needs,
+should add `gst-plugins-good gst-libav` (pacman), `gstreamer1.0-plugins-good gstreamer1.0-libav`
+(apt), `gstreamer1-plugins-good gstreamer1-plugin-libav` (dnf) or
+`gstreamer-plugins-good gstreamer-plugins-libav` (zypper) once the launcher starts Rune by default.
+
 ## macOS bundle and media access
 
 TCC decides microphone and screen access for the *responsible* process. The launcher spawns the

@@ -378,7 +378,10 @@ export const engine = {
     pause: (target: string) => request("media.pause", { target }),
     seek: (target: string, time: number) => request("media.seek", { target, time }),
     state: (target: string) =>
-      request<{ time: number; duration: number | null; playing: boolean; buffered: [number, number][] }>("media.state", { target }),
+      request<{ time: number; duration: number | null; playing: boolean; buffered: [number, number][]; error: string | null }>("media.state", { target }),
+    /** A clip's length and, with `poster`, a cover-cropped JPEG frame written to `poster.out`. */
+    probe: (path: string, poster?: { width: number; height: number; out: string }) =>
+      request<{ duration: number; size: { width: number; height: number } | null; poster: string | null }>("media.probe", { path, poster }),
   },
   webview: {
     post: (target: string, data: unknown, origin?: string) => request("webview.post", { target, data, origin }),

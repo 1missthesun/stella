@@ -275,8 +275,9 @@ export const webEngine: Engine = {
       const m = mediaOf(id);
       const buffered: [number, number][] = [];
       for (let i = 0; m && i < m.buffered.length; i++) buffered.push([m.buffered.start(i), m.buffered.end(i)]);
-      return { time: m?.currentTime ?? 0, duration: m && Number.isFinite(m.duration) ? m.duration : null, playing: !!m && !m.paused, buffered };
+      return { time: m?.currentTime ?? 0, duration: m && Number.isFinite(m.duration) ? m.duration : null, playing: !!m && !m.paused, buffered, error: m?.error ? m.error.message || `media error ${m.error.code}` : null };
     },
+    probe: () => unsupported("media.probe"),
   },
   webview: {
     post: async (id, data, origin) => { frameOf(id)?.contentWindow?.postMessage(data, origin ?? "*"); },

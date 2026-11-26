@@ -20,22 +20,18 @@ export const WaveformTile = ({ peaks, filePath, durationLabel }: { peaks: number
 
   useEffect(() => {
     if (!armed) return;
-    void rune()
-      .media.play(id)
-      .catch(() => {
-        setPlaying(false);
-        onError();
-      });
-  }, [armed, id, onError]);
-
-  useEffect(() => {
-    if (!armed) return;
     let live = true;
     const timer = setInterval(() => {
       void rune()
         .media.state(id)
         .then((state) => {
           if (!live) return;
+          if (state.error) {
+            clearInterval(timer);
+            setPlaying(false);
+            onError();
+            return;
+          }
           const ended = !state.playing && playingRef.current && state.duration !== null && state.time >= state.duration - 0.05;
           playingRef.current = state.playing;
           setPlaying(state.playing);
@@ -47,7 +43,7 @@ export const WaveformTile = ({ peaks, filePath, durationLabel }: { peaks: number
       live = false;
       clearInterval(timer);
     };
-  }, [armed, id]);
+  }, [armed, id, onError]);
 
   const step = peaks.length > 0 ? plotW / peaks.length : 0;
   const barW = Math.max(1, step - BAR_GAP);
@@ -94,7 +90,7 @@ export const WaveformTile = ({ peaks, filePath, durationLabel }: { peaks: number
           {durationLabel}
         </text>
       ) : null}
-      {armed ? <audio id={id} src={filePath} w={0} h={0} /> : null}
+      {armed ? <audio id={id} src={filePath} autoplay w={0} h={0} /> : null}
     </row>
   );
 };

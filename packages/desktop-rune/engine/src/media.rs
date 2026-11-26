@@ -15,6 +15,8 @@ thread_local! {
     static IMAGES: RefCell<HashMap<String, rune::image::Image>> = RefCell::new(HashMap::new());
     static ICONS: RefCell<HashMap<(String, u64), &'static Icon>> = RefCell::new(HashMap::new());
     static PLAYERS: RefCell<HashMap<u32, (String, Player)>> = RefCell::new(HashMap::new());
+    /// Players of removed nodes, paused, for an element remounted by a hot swap to take back.
+    static PARKED: RefCell<Vec<Parked>> = const { RefCell::new(Vec::new()) };
     /// `<vector svg>` rasters by node, with the hash of what they show.
     static RASTERS: RefCell<HashMap<u32, (u64, rune::Pixels)>> = RefCell::new(HashMap::new());
     /// Nodes laid out from an image still decoding (an unsized `<image>`, a markdown picture):
@@ -23,6 +25,29 @@ thread_local! {
 }
 
 const MAX_IMAGES: usize = 512;
+/// How long a removed node's player waits for its remounted element.
+const PARK_FOR: std::time::Duration = std::time::Duration::from_secs(3);
+
+struct Parked {
+    src: String,
+    playing: bool,
+    at: std::time::Instant,
+    player: Player,
+}
+
+/// The player a hot swap left for an element showing `src`, playing again if it was.
+fn reclaim(src: &str, audio: bool) -> Option<Player> {
+    PARKED.with(|p| {
+        let mut p = p.borrow_mut();
+        p.retain(|e| e.at.elapsed() < PARK_FOR);
+        let i = p.iter().position(|e| e.src == src && e.player.is_audio() == audio)?;
+        let e = p.remove(i);
+        if e.playing {
+            e.player.play();
+        }
+        Some(e.player)
+    })
+}
 
 /// Images decode on Rune's workers; when one lands every window redraws.
 pub fn init(waker: rune::Waker) {
@@ -205,10 +230,13 @@ pub fn video(n: u32, p: &Props) -> El {
         match m.get(&n) {
             Some((cur, pl)) if *cur == src => pl.clone(),
             _ => {
-                let pl = if src.starts_with("http://") || src.starts_with("https://") { Player::url(&src) } else { Player::file(src.strip_prefix("file://").unwrap_or(&src)) };
-                if p.autoplay {
-                    pl.play();
-                }
+                let pl = reclaim(&src, false).unwrap_or_else(|| {
+                    let pl = if src.starts_with("http://") || src.starts_with("https://") { Player::url(&src) } else { Player::file(src.strip_prefix("file://").unwrap_or(&src)) };
+                    if p.autoplay {
+                        pl.play();
+                    }
+                    pl
+                });
                 m.insert(n, (src.clone(), pl.clone()));
                 pl
             }
@@ -232,10 +260,13 @@ pub fn audio(n: u32, p: &Props) -> El {
                 } else {
                     rune::MediaSource::File(src.strip_prefix("file://").unwrap_or(&src).into())
                 };
-                let pl = Player::audio(source);
-                if p.autoplay {
-                    pl.play();
-                }
+                let pl = reclaim(&src, true).unwrap_or_else(|| {
+                    let pl = Player::audio(source);
+                    if p.autoplay {
+                        pl.play();
+                    }
+                    pl
+                });
                 m.insert(n, (src.clone(), pl.clone()));
                 pl
             }
@@ -251,11 +282,56 @@ pub fn player(n: u32) -> Option<Player> {
 }
 
 pub fn forget(n: u32) {
-    PLAYERS.with(|m| m.borrow_mut().remove(&n));
+    if let Some((src, player)) = PLAYERS.with(|m| m.borrow_mut().remove(&n)) {
+        let playing = player.is_playing();
+        player.pause();
+        PARKED.with(|p| {
+            let mut p = p.borrow_mut();
+            p.retain(|e| e.at.elapsed() < PARK_FOR);
+            p.push(Parked { src, playing, at: std::time::Instant::now(), player });
+        });
+    }
     RASTERS.with(|m| m.borrow_mut().remove(&n));
     SIZING.with(|m| m.borrow_mut().remove(&n));
 }
 
 pub fn markdown(n: u32, p: &Props) -> El {
     crate::markdown::build(n, p)
+}
+
+/// `media.probe {path, poster?: {width, height, out}}`, off the UI thread: a clip's length (and
+/// picture size), as a `<video>` reads its metadata, and with `poster` a frame from 0.6 s in (a
+/// quarter into a shorter clip) cover-cropped to that box and saved as JPEG at `out`, as master's
+/// offscreen probe draws it.
+pub fn probe(rid: Option<u64>, v: &serde_json::Value) {
+    let path = v.get("path").and_then(|p| p.as_str()).unwrap_or_default().to_owned();
+    let poster = v.get("poster").and_then(|p| {
+        let n = |k: &str| p.get(k).and_then(|x| x.as_u64()).map(|x| x.clamp(1, 4096) as u32);
+        Some((n("width")?, n("height")?, std::path::PathBuf::from(p.get("out")?.as_str()?)))
+    });
+    std::thread::spawn(move || crate::engine::reply_any_thread(rid, probe_clip(&path, poster)));
+}
+
+fn probe_clip(path: &str, poster: Option<(u32, u32, std::path::PathBuf)>) -> Result<serde_json::Value, String> {
+    let source = rune::MediaSource::File(path.into());
+    let info = source.probe()?;
+    let size = info.size.map(|(w, h)| serde_json::json!({ "width": w, "height": h }));
+    let mut out = serde_json::json!({ "duration": info.duration, "size": size, "poster": null });
+    if let (Some((width, height, file)), Some((sw, sh))) = (poster, info.size) {
+        let cover = (width as f64 / sw as f64).max(height as f64 / sh as f64).min(1.0);
+        let longest = (sw.max(sh) as f64 * cover).ceil() as u32;
+        let strip = rune::Thumbnails::request(source).at((info.duration / 4.0).min(0.6)).max_size(longest.max(1)).start();
+        strip.wait();
+        let frame = strip.frame(0).ok_or("no frame")?;
+        if let Some(e) = frame.error() {
+            return Err(e.to_owned());
+        }
+        let (fw, fh, rgba) = frame.pixels().to_rgba().ok_or("no picture")?;
+        let picture = image::RgbaImage::from_raw(fw, fh, rgba).ok_or("bad picture")?;
+        let boxed = image::DynamicImage::ImageRgba8(picture).resize_to_fill(width, height, image::imageops::FilterType::Triangle).to_rgb8();
+        let writer = std::io::BufWriter::new(std::fs::File::create(&file).map_err(|e| format!("{}: {e}", file.display()))?);
+        image::codecs::jpeg::JpegEncoder::new_with_quality(writer, 78).encode_image(&boxed).map_err(|e| e.to_string())?;
+        out["poster"] = serde_json::json!(file.to_string_lossy());
+    }
+    Ok(out)
 }

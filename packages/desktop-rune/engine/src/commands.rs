@@ -70,6 +70,7 @@ pub fn route(v: Value) {
         "capture.sources" | "capture.start" | "capture.stop" => crate::capture::command(&cmd, rid, &v),
         "inputhook.start" | "inputhook.stop" => crate::inputhook::command(&cmd, rid, &v),
         "audio.play" | "audio.control" | "audio.devices" => crate::audio::command(&cmd, rid, &v),
+        "media.probe" => crate::media::probe(rid, &v),
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "selection.get" => {
             let w = window_named(&v).or_else(windows::first_window);
@@ -461,7 +462,11 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                     "media.seek" => p.seek(v.get("time").and_then(|t| t.as_f64()).unwrap_or(0.0)),
                     _ => {}
                 }
-                return Ok(json!({ "time": p.time(), "duration": p.duration(), "playing": p.is_playing(), "buffered": p.buffered() }));
+                let error = match p.state() {
+                    rune::PlayerState::Failed(e) => Some(e),
+                    _ => None,
+                };
+                return Ok(json!({ "time": p.time(), "duration": p.duration(), "playing": p.is_playing(), "buffered": p.buffered(), "error": error }));
             }
             c if c.starts_with("webview.") => {
                 #[cfg(feature = "webview")]

@@ -19,7 +19,9 @@ depends=('webkit2gtk-4.1' 'gtk3' 'glib2' 'cairo' 'openssl' 'glibc'
          'git' 'curl' 'unzip' 'libsecret'
          'nss' 'alsa-lib' 'libcups' 'mesa' 'at-spi2-core' 'libxkbcommon'
          'libxcomposite' 'libxdamage' 'libxrandr')
-optdepends=('xdg-utils: open links in your browser')
+optdepends=('xdg-utils: open links in your browser'
+            'gst-plugins-good: video and audio in the Rune engine'
+            'gst-libav: H.264 and AAC media in the Rune engine')
 install=stella-desktop-bin.install
 options=('!strip' '!debug')
 _base="https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/releases/${pkgver}"

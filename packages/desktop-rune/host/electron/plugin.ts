@@ -22,6 +22,8 @@ const OVERRIDES: Array<{ file: string; name: string; from: string }> = [
   { file: "services/in-app-browser/offscreen-tabs.ts", name: "OffscreenTabs", from: path.resolve(import.meta.dir, "../services/offscreen-tabs.ts") },
   { file: "bootstrap/context.js", name: "createBootstrapContext", from: path.resolve(import.meta.dir, "../services/main-context.ts") },
   { file: "services/app-source/update-transition.ts", name: "UpdateTransition", from: path.resolve(import.meta.dir, "../services/update-transition.ts") },
+  { file: "services/offscreen-media-probe.ts", name: "offscreenVideoPoster", from: path.resolve(import.meta.dir, "../services/media-probe.ts") },
+  { file: "services/offscreen-media-probe.ts", name: "offscreenMediaDurationMs", from: path.resolve(import.meta.dir, "../services/media-probe.ts") },
 ];
 
 const applyOverrides = (file: string, source: string) => {

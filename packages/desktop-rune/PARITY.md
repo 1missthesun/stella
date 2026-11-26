@@ -26,11 +26,17 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 ## Shell
 - [ ] Launch splash, crash surface, error boundary, route error recovery
 - [ ] Top bar: tabs (open-tab notch, reorder, pinned Chat, tight/compact), activity mark, update pill + menu, models control, execution target control, settings menu, notification bell + toasts, window controls
+  - macOS: tabs, notch and pinned Chat match Electron in light/dark/Midnight (~/.stella/outputs/stella-rune/shell/sbs/home-*.jpg, files-*.jpg); drag reorder with the neighbour shift and settle (~/.stella/outputs/stella-rune/shell/clips/tab-reorder-and-stage.mp4); settings menu → Connectors popover (~/.stella/outputs/stella-rune/shell/rune-connectors-popover-nightowl.png). Tight/compact tabs, update pill, bell + toasts and window controls not proven here.
 - [ ] Chat sidebar + sidebar sections (collapse, conversations, agents/activity, files)
+  - macOS: Files section (empty and listed) matches Electron, centred 880 body (~/.stella/outputs/stella-rune/shell/sbs/files-nightowl.jpg, files-list-nightowl.jpg, files-dark.jpg); chat display tab opens with its own composer (~/.stella/outputs/stella-rune/shell/rune-chat-panel-tab-dark.png; sidebar text/composer sizes wait on chat's `variant="sidebar"`). Email section not ported.
 - [ ] Workspace stage + display: tabs, file viewer (images, video, audio, PDF, office, code/source diff, HTML), strip thumbnails, search, detached windows
-- [ ] Right sidebar / document viewer widths (`clamp(380px,34vw,520px)`, expanded `min(960px,100%-48px)`)
+  - macOS: image viewer matches Electron in light/dark/Midnight (~/.stella/outputs/stella-rune/shell/sbs/viewer-image-*.jpg; its drop shadow waits on the engine's clip+shadow fix); open/close/expand (~/.stella/outputs/stella-rune/shell/clips/viewer-open-close-expand.mp4); detach to its own window and dock back (~/.stella/outputs/stella-rune/shell/clips/viewer-detach.mp4, rune-detached-viewer-window-dark.png); PDF (~/.stella/outputs/stella-rune/shell/rune-pdf-dark.png); strip thumbnails (~/.stella/outputs/stella-rune/shell/rune-strip-thumbnails-dark.png). Video, audio, code/diff and HTML viewers not proven here.
+- [x] Right sidebar / document viewer widths (`clamp(380px,34vw,520px)`, expanded `min(960px,100%-48px)`)
+  - Today's Electron draws no `.right-sidebar`; the stage and floating viewer replaced it. Their rects match Electron at 1400×940: stage 20,37 → 1380,872, viewer 320,48 760×500 (~/.stella/outputs/stella-rune/shell/sbs/viewer-image-*.jpg, files-dark.jpg); expanded to the stage (~/.stella/outputs/stella-rune/shell/clips/viewer-open-close-expand.mp4).
 - [ ] Companion window, overlay window, selection (screen selection), background
-- [ ] Home (empty state greeting + centred composer)
+  - macOS: companion mark + expanded panel (~/.stella/outputs/stella-rune/shell/rune-companion-expanded-dark.png); overlay region capture (~/.stella/outputs/stella-rune/shell/rune-overlay-region-capture-dark.png); theme backdrop matches Electron's canvas byte for byte, Midnight included (~/.stella/outputs/stella-rune/shell/sbs/backdrop-settings-nightowl.jpg, home-nightowl.jpg; on-screen saturation differs until the engine tags its layer sRGB). Ask Stella selection chip waits on engine selection rect/events.
+- [x] Home (empty state greeting + centred composer)
+  - macOS, 1400×940: greeting and composer (shell 636 wide at x=382) match Electron in light, dark and Midnight (~/.stella/outputs/stella-rune/shell/sbs/home-light.jpg, home-dark.jpg, home-nightowl.jpg).
 
 ## Chat
 - [ ] Timeline: message rows, time dividers, pagination/history, follow/scroll management, catch-up pill, jump to message

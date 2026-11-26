@@ -12,7 +12,12 @@ export type PiBrainRecord = PiBrainHost & {
   leaseExpiresAt?: number;
   acquired?: "claimed" | "moved" | "home" | "takeover";
   previous?: PiBrainHost & { epoch: number };
+  failedOver?: PiBrainFailedOver;
 };
+
+export type PiBrainFailedOver = { deviceId: string; presenceSessionId?: string };
+
+export type PiBrainHome = Extract<PiBrainHost, { host: "device" }> & { presenceSessionId?: string };
 
 export const PI_BRAIN_LEASE_MS = 2 * 60_000;
 
@@ -56,7 +61,17 @@ export const parsePiBrainRecord = (value: unknown): PiBrainRecord | null => {
       ? { acquired: record.acquired }
       : {}),
     ...(previous ? { previous } : {}),
+    ...parseFailedOver(record.failedOver),
   };
+};
+
+const parseFailedOver = (value: unknown): { failedOver?: PiBrainFailedOver } => {
+  if (!value || typeof value !== "object") return {};
+  const from = value as Record<string, unknown>;
+  const deviceId = typeof from.deviceId === "string" ? from.deviceId.trim() : "";
+  if (!deviceId || deviceId.length > 256) return {};
+  const session = typeof from.presenceSessionId === "string" ? from.presenceSessionId.trim().slice(0, 256) : "";
+  return { failedOver: { deviceId, ...(session ? { presenceSessionId: session } : {}) } };
 };
 
 export const samePiBrainHost = (left: PiBrainHost, right: PiBrainHost): boolean =>
@@ -100,6 +115,25 @@ export const takeOverPiBrain = (prior: PiBrainRecord, claimant: PiBrainHost, now
   ...movePiBrain(prior, claimant, now),
   acquired: "takeover",
 });
+
+export const failOverPiBrain = (
+  prior: PiBrainRecord | null | undefined,
+  claimant: Extract<PiBrainHost, { host: "device" }>,
+  now: number,
+  from?: PiBrainFailedOver,
+): PiBrainRecord => ({
+  ...movePiBrain(prior, claimant, now),
+  acquired: "takeover",
+  ...(from ? { failedOver: from } : {}),
+});
+
+export const piBrainHomeIsBack = (
+  record: PiBrainRecord | null | undefined,
+  home: { deviceId: string; presenceSessionId?: string },
+): boolean =>
+  record?.failedOver?.deviceId !== home.deviceId ||
+  record.failedOver.presenceSessionId === undefined ||
+  (home.presenceSessionId !== undefined && home.presenceSessionId !== record.failedOver.presenceSessionId);
 
 export const renewPiBrainLease = (record: PiBrainRecord, seenAt: number): PiBrainRecord | undefined => {
   if (record.host !== "device") return undefined;

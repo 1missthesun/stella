@@ -5,7 +5,7 @@ import {
   type CloudChatPreparation,
 } from "../cloud-chat-admission.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
-import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import type { PiBrainClaimDecision, PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { TERMINAL_DISPATCH_STATES } from "@stella/contracts/turn-plane/placement";
 import type {
   ConversationCreatedEvent,
@@ -322,15 +322,25 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         }
       } else if (brain?.host === "device") {
         const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
-        let claim = await this.claimPiBrain({
-          claimant: { host: "cloud" },
-          claimEpoch: null,
-          holder: { forEpoch: brain.epoch, ...holder },
-        });
-        const placeOn =
-          claim.decision.kind === "elsewhere" &&
-          claim.record?.host === "device" &&
-          !(claim.record.epoch === brain.epoch && holder.refusal)
+        const failsOver =
+          (holder.gone === true || holder.refusal !== undefined) &&
+          (await this.piBrainFailsOver(ownerId, brain.deviceId));
+        let claim: {
+          decision: PiBrainClaimDecision;
+          record: PiBrainRecord | null;
+          takenOver: boolean;
+        } = failsOver
+          ? { decision: { kind: "elsewhere", reason: "holder_live" }, record: brain, takenOver: false }
+          : await this.claimPiBrain({
+              claimant: { host: "cloud" },
+              claimEpoch: null,
+              holder: { forEpoch: brain.epoch, ...holder },
+            });
+        const placeOn = failsOver
+          ? brain
+          : claim.decision.kind === "elsewhere" &&
+              claim.record?.host === "device" &&
+              !(claim.record.epoch === brain.epoch && holder.refusal)
             ? claim.record
             : undefined;
         if (placeOn) {
@@ -350,6 +360,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               deviceId: placeOn.deviceId,
               epoch: placeOn.epoch,
               dispatchId,
+              ...(failsOver ? { failover: true } : {}),
             });
             await this.followPlacedChat({
               clientMsgId: start.clientMsgId,

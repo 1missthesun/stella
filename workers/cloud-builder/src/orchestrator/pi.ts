@@ -16,13 +16,16 @@ import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
   claimFreePiBrain,
   decidePiBrainClaim,
+  failOverPiBrain,
   homePiBrain,
+  piBrainHomeIsBack,
   samePiBrainHost,
   movePiBrain,
   piBrainHandoffPrompt,
   renewPiBrainLease,
   takeOverPiBrain,
   type PiBrainClaimDecision,
+  type PiBrainHome,
   type PiBrainHost,
   type PiBrainRecord,
 } from "@stella/contracts/turn-plane/pi-brain";
@@ -1451,6 +1454,59 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return record;
   }
 
+  protected async failOverPiBrainTo(
+    ownerId: string,
+    claimant: Extract<PiBrainHost, { host: "device" }>,
+  ): Promise<PiBrainRecord> {
+    const prior = (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
+    if (prior && samePiBrainHost(prior, claimant)) {
+      const renewed = renewPiBrainLease(prior, Date.now());
+      if (renewed) await this.storePiBrain(renewed);
+      return renewed ?? prior;
+    }
+    const from =
+      prior?.host === "device"
+        ? await this.ownerGate(ownerId)
+            .devices()
+            .then((listed) => listed.devices.find((entry) => entry.deviceId === prior.deviceId))
+            .catch(() => undefined)
+        : undefined;
+    const record = failOverPiBrain(
+      prior,
+      claimant,
+      Date.now(),
+      prior?.host === "device"
+        ? {
+            deviceId: prior.deviceId,
+            ...(from?.online && from.presenceSessionId ? { presenceSessionId: from.presenceSessionId } : {}),
+          }
+        : undefined,
+    );
+    await this.storePiBrain(record);
+    this.notePiBrainLease("taken_over", record, {
+      reason: "failover",
+      ...(from ? { holderOnline: from.online } : {}),
+    });
+    if (prior) await this.settleTakenOverTurn(prior);
+    return record;
+  }
+
+  protected async piBrainFailsOver(ownerId: string, holderDeviceId: string): Promise<boolean> {
+    const listed = await this.ownerGate(ownerId)
+      .devices()
+      .catch(() => undefined);
+    return Boolean(
+      listed?.devices.some(
+        (device) =>
+          device.deviceId !== holderDeviceId &&
+          device.online &&
+          device.remoteExecutionEnabled &&
+          device.availability?.ready === true &&
+          device.availability.capabilities.includes("chat-failover"),
+      ),
+    );
+  }
+
   protected async piBrainHolderState(
     ownerId: string,
     deviceId: string,
@@ -1483,7 +1539,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
     turnId?: string;
     claimFree?: boolean;
-    home?: Extract<PiBrainHost, { host: "device" }>;
+    home?: PiBrainHome;
   }): Promise<{
     decision: PiBrainClaimDecision;
     record: PiBrainRecord | null;
@@ -1593,7 +1649,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
 
   protected async piBrainHome(
     ownerId: string,
-  ): Promise<Extract<PiBrainHost, { host: "device" }> | undefined> {
+  ): Promise<PiBrainHome | undefined> {
     const listed = await this.ownerGate(ownerId)
       .devices()
       .catch(() => undefined);
@@ -1603,16 +1659,18 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       host: "device",
       deviceId: home.deviceId,
       ...(home.label?.trim() ? { label: home.label.trim() } : {}),
+      ...(home.presenceSessionId ? { presenceSessionId: home.presenceSessionId } : {}),
     };
   }
 
   protected async bringPiBrainHome(
-    home: Extract<PiBrainHost, { host: "device" }>,
+    home: PiBrainHome,
     turnId?: string,
   ): Promise<PiBrainRecord | null> {
     const record =
       (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
     if (record && samePiBrainHost(record, home)) return record;
+    if (!piBrainHomeIsBack(record, home)) return record;
     const busy =
       record?.host === "cloud"
         ? this.current !== null

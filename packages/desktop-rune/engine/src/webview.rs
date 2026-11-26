@@ -181,14 +181,19 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
     let view = handle.with_raw_handle(|raw| b.build_as_child(&raw).map_err(|e| e.to_string()))??;
     #[cfg(target_os = "linux")]
     main_frame_navigations(n, &view);
+    #[cfg(target_os = "macos")]
+    mac::track_main_frame(&view);
     Ok(view)
 }
 
-/// WebView2's NavigationStarting is main-frame only; WKWebView's policy also asks for subframes
-/// and wry doesn't say which, so the flag is left out there.
+/// WebView2's NavigationStarting is main-frame only; WKWebView's policy also asks for subframes,
+/// so there the flag is the frame of the action being decided.
 #[cfg(not(target_os = "linux"))]
 fn main_frame_only() -> Option<bool> {
-    cfg!(target_os = "windows").then_some(true)
+    #[cfg(target_os = "macos")]
+    return mac::deciding_main_frame();
+    #[cfg(not(target_os = "macos"))]
+    Some(true)
 }
 
 /// WebKitGTK asks navigation policy for subframes too without saying which frame; the response
@@ -324,13 +329,61 @@ pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
 
 #[cfg(target_os = "macos")]
 mod mac {
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
+    use std::sync::OnceLock;
+
+    use objc2::runtime::{AnyObject, Imp, Sel};
+    use objc2::sel;
+    use objc2_web_kit::WKNavigationAction;
 
     use block2::RcBlock;
     use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage};
     use objc2_foundation::{NSDictionary, NSError};
     use objc2_quartz_core::CACornerMask;
     use wry::WebViewExtMacOS;
+
+    thread_local! {
+        static DECIDING: Cell<Option<bool>> = const { Cell::new(None) };
+    }
+
+    type Decide = unsafe extern "C-unwind" fn(&AnyObject, Sel, *mut AnyObject, *mut WKNavigationAction, *mut AnyObject);
+    static WRY_DECIDE: OnceLock<Decide> = OnceLock::new();
+
+    /// Whether the navigation whose policy is being decided targets a main frame, while wry's
+    /// navigation handler runs inside that decision.
+    pub fn deciding_main_frame() -> Option<bool> {
+        DECIDING.get()
+    }
+
+    unsafe extern "C-unwind" fn decide(this: &AnyObject, sel: Sel, web: *mut AnyObject, action: *mut WKNavigationAction, handler: *mut AnyObject) {
+        // SAFETY: WebKit passes a valid action (or null) for the call's duration.
+        let main = unsafe { action.as_ref() }.map(|a| unsafe { a.targetFrame() }.is_some_and(|f| unsafe { f.isMainFrame() }));
+        let outer = DECIDING.replace(main);
+        if let Some(wry_decide) = WRY_DECIDE.get() {
+            // SAFETY: the original implementation of this selector, called with its own arguments.
+            unsafe { wry_decide(this, sel, web, action, handler) };
+        }
+        DECIDING.set(outer);
+    }
+
+    /// wry's navigation handler is given only the URL, so its delegate's policy method is wrapped
+    /// once (all wry views share the delegate class) to expose the action's target frame.
+    pub fn track_main_frame(view: &wry::WebView) {
+        if WRY_DECIDE.get().is_some() {
+            return;
+        }
+        // SAFETY: called on the main thread with a live WKWebView.
+        let Some(delegate) = (unsafe { view.webview().navigationDelegate() }) else { return };
+        let object: &AnyObject = delegate.as_ref();
+        let Some(method) = object.class().instance_method(sel!(webView:decidePolicyForNavigationAction:decisionHandler:)) else { return };
+        // SAFETY: `decide` has the selector's exact signature and forwards to the replaced IMP,
+        // which is stored before any decision can run on this (the main) thread.
+        unsafe {
+            let wrapped: Imp = std::mem::transmute::<Decide, Imp>(decide);
+            let original = method.set_implementation(wrapped);
+            let _ = WRY_DECIDE.set(std::mem::transmute::<Imp, Decide>(original));
+        }
+    }
 
     pub fn snapshot(view: &wry::WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
         let done = RefCell::new(Some(done));

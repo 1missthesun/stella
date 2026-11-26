@@ -106,6 +106,25 @@ const elementId = (contentsId: number) => `web-${contentsId}`;
 
 const pendingEvals = new Map<string, { resolve(value: unknown): void; reject(error: Error): void }>();
 let nextEval = 1;
+const VIEW_WAIT_MS = 30_000;
+const viewWaiters = new Map<number, Set<() => void>>();
+
+function viewAppeared(contentsId: number) {
+  const waiters = viewWaiters.get(contentsId);
+  if (!waiters) return;
+  viewWaiters.delete(contentsId);
+  for (const wake of waiters) wake();
+}
+
+function nextViewEvent(contentsId: number): Promise<void> {
+  return new Promise((resolve) => {
+    const waiters = viewWaiters.get(contentsId) ?? new Set();
+    viewWaiters.set(contentsId, waiters);
+    const wake = () => { clearTimeout(timer); waiters.delete(wake); resolve(); };
+    const timer = setTimeout(wake, VIEW_WAIT_MS);
+    waiters.add(wake);
+  });
+}
 
 export function createUiHost(): UiHost {
   let dialogCache: HostMessageBox[] | null = null;
@@ -117,18 +136,26 @@ export function createUiHost(): UiHost {
   const onRequest = () => dialogsChanged();
 
   WebContents.host.onNavigate = () => hostWindows.changed();
-  WebContents.host.evaluateWeb = (contents, code) => {
+  WebContents.host.evaluateWeb = async (contents, code) => {
     const e = engine();
-    if (!e) return Promise.reject(new Error("No engine to run page scripts in."));
+    if (!e) throw new Error("No engine to run page scripts in.");
     const id = `e${nextEval++}`;
-    const wrapped = `(async () => { let m; try { m = { __runeEval: ${JSON.stringify(id)}, ok: true, value: await (0, eval)(${JSON.stringify(code)}) }; } catch (error) { m = { __runeEval: ${JSON.stringify(id)}, ok: false, error: String(error && error.message || error) }; } try { window.ipc.postMessage(JSON.stringify(m)); } catch (_) { m.value = null; window.ipc.postMessage(JSON.stringify(m)); } })();`;
-    return new Promise((resolve, reject) => {
-      pendingEvals.set(id, { resolve, reject });
-      e.webview.eval(elementId(contents.id), wrapped).catch((error: Error) => {
-        pendingEvals.delete(id);
-        reject(error);
-      });
-    });
+    const wrapped = `(async () => { let m; try { m = { __runeEval: ${JSON.stringify(id)}, ok: true, value: await (0, eval)(${JSON.stringify(code)}) }; } catch (error) { m = { __runeEval: ${JSON.stringify(id)}, ok: false, error: String(error && error.message || error) }; } const send = () => window.ipc.postMessage(JSON.stringify({ data: m, targetOrigin: "*" })); try { send(); } catch (_) { m.value = null; send(); } })();`;
+    const result = new Promise<unknown>((resolve, reject) => pendingEvals.set(id, { resolve, reject }));
+    const deadline = Date.now() + VIEW_WAIT_MS;
+    for (;;) {
+      try {
+        await e.webview.eval(elementId(contents.id), wrapped);
+        return await result;
+      } catch (error) {
+        const missing = (error as Error).message === "no such webview";
+        if (!missing || contents.isDestroyed() || Date.now() >= deadline) {
+          pendingEvals.delete(id);
+          throw error;
+        }
+        await nextViewEvent(contents.id);
+      }
+    }
   };
 
   return {
@@ -214,6 +241,7 @@ export function createUiHost(): UiHost {
         hostWindows.changed();
       },
       loaded(contentsId, phase, url) {
+        viewAppeared(contentsId);
         if (phase === "started" && url) contentsById(contentsId)?.markNavigated(url);
         if (phase === "finished") contentsById(contentsId)?.markLoaded();
       },

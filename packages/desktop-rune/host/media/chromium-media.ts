@@ -38,7 +38,7 @@ const CHROMIUM_ARGS = [
   "--disable-gpu",
 ];
 
-const NO_USABLE_SANDBOX = /No usable sandbox|apparmor-userns-restrictions/;
+const NO_USABLE_SANDBOX = /No usable sandbox|apparmor-userns-restrictions|SUID sandbox|try using --no-sandbox/;
 
 export type ChromiumMediaCallbacks = {
   source(): Promise<string>;

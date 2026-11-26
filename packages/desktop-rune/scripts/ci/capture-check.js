@@ -35,13 +35,28 @@ const off = stella.on("inputhook", (ev) => events.push({ type: ev.type, rawcode:
 try {
   result.hookStart = await e.inputHook.start();
   await new Promise((r) => setTimeout(r, 300));
-  const ps = `Add-Type -Namespace W -Name U -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, System.UIntPtr e); [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, System.UIntPtr e);';
-    [W.U]::SetCursorPos(200, 300); foreach ($i in 1..10) { [W.U]::mouse_event(0x0001, 5, 0, 0, [System.UIntPtr]::Zero); Start-Sleep -Milliseconds 20 }
-    [W.U]::keybd_event(0x41, 0x1E, 0, [System.UIntPtr]::Zero); Start-Sleep -Milliseconds 30; [W.U]::keybd_event(0x41, 0x1E, 2, [System.UIntPtr]::Zero);
-    Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("b");
-    [W.U]::mouse_event(0x0800, 0, 0, 120, [System.UIntPtr]::Zero)`;
+  const ps = `Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices; using System.Text;
+public static class U {
+  [StructLayout(LayoutKind.Sequential)] public struct MI { public int dx, dy; public uint data, flags, time; public IntPtr extra; }
+  [StructLayout(LayoutKind.Sequential)] public struct KI { public ushort vk, scan; public uint flags, time; public IntPtr extra; }
+  [StructLayout(LayoutKind.Explicit)] public struct IN { [FieldOffset(0)] public uint type; [FieldOffset(8)] public MI mi; [FieldOffset(8)] public KI ki; }
+  [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint n, IN[] inputs, int size);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  public static string Mouse(uint flags, int dx, uint data) { var i = new IN[1]; i[0].type = 0; i[0].mi.dx = dx; i[0].mi.flags = flags; i[0].mi.data = data; var n = SendInput(1, i, Marshal.SizeOf(typeof(IN))); return n + "/" + Marshal.GetLastWin32Error(); }
+  public static string Key(ushort vk, uint flags) { var i = new IN[1]; i[0].type = 1; i[0].ki.vk = vk; i[0].ki.flags = flags; var n = SendInput(1, i, Marshal.SizeOf(typeof(IN))); return n + "/" + Marshal.GetLastWin32Error(); }
+  public static string Foreground() { var h = GetForegroundWindow(); var s = new StringBuilder(256); GetWindowText(h, s, 256); return h + " " + s; }
+}
+'@
+    [U]::SetCursorPos(200, 300) | Out-Null; foreach ($i in 1..10) { [U]::Mouse(1, 5, 0) | Out-Null; Start-Sleep -Milliseconds 20 }
+    "size " + [System.Runtime.InteropServices.Marshal]::SizeOf([type][U+IN])
+    "foreground " + [U]::Foreground()
+    "keydown " + [U]::Key(0x41, 0); Start-Sleep -Milliseconds 30; "keyup " + [U]::Key(0x41, 2)
+    "wheel " + [U]::Mouse(0x0800, 0, 120)`;
   const run = spawnSync("powershell", ["-NoProfile", "-Command", ps], { encoding: "utf8" });
-  result.synth = { status: run.status, stderr: run.stderr.slice(0, 500) };
+  result.synth = { status: run.status, stdout: run.stdout.trim().split(/\r?\n/), stderr: run.stderr.slice(0, 500) };
   await new Promise((r) => setTimeout(r, 500));
   result.hookStop = await e.inputHook.stop();
 } catch (error) {

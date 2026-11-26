@@ -10,7 +10,7 @@ const readyMs = performance.now() - t0;
 try {
   const host = voice.chromiumHost;
   const loop = host ? await host.evaluate(`(async () => {
-    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     const track = mic.getAudioTracks()[0];
     const a = new RTCPeerConnection(), b = new RTCPeerConnection();
     const candidates = { a: [], b: [] };

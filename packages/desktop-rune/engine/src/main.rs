@@ -120,30 +120,60 @@ pub fn end_host(mut c: std::process::Child) {
     let _ = c.wait();
 }
 
+#[cfg(unix)]
+const QUIT_SIGNALS: [libc::c_int; 3] = [libc::SIGTERM, libc::SIGINT, libc::SIGHUP];
+
+/// Leaves the quit signals to `end_host_on_signals`' thread: called first in `main`, so every
+/// thread the process starts blocks them too.
+#[cfg(unix)]
+fn block_quit_signals() {
+    // SAFETY: plain sigset calls on a local set, then the calling thread's mask.
+    unsafe {
+        let mut set: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut set);
+        for sig in QUIT_SIGNALS {
+            libc::sigaddset(&mut set, sig);
+        }
+        libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut());
+    }
+}
+
 /// A launcher's terminate (SIGTERM), Ctrl+C or a closed terminal gives the host's whole group
-/// the same grace as a quit (`HOST_QUIT_GRACE`), then kills what is left and exits.
+/// the same grace as a quit (`HOST_QUIT_GRACE`), then kills what is left and exits. The wait runs
+/// on its own thread, so the windows keep answering the compositor (no "not responding" prompt)
+/// and close as soon as the host has quit.
 #[cfg(unix)]
 fn end_host_on_signals() {
-    extern "C" fn on_signal(sig: libc::c_int) {
-        let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
-        // SAFETY: killpg, nanosleep and _exit are async-signal-safe.
-        unsafe {
-            if g > 0 {
-                libc::killpg(g, libc::SIGTERM);
-                let step = libc::timespec { tv_sec: 0, tv_nsec: 20_000_000 };
-                let mut waited = std::time::Duration::ZERO;
-                while waited < HOST_QUIT_GRACE && libc::killpg(g, 0) == 0 {
-                    libc::nanosleep(&step, std::ptr::null_mut());
-                    waited += std::time::Duration::from_millis(20);
-                }
-                libc::killpg(g, libc::SIGKILL);
+    let spawned = std::thread::Builder::new().name("stella-quit-signals".into()).spawn(|| {
+        // SAFETY: sigwait on a local set of the signals every thread blocks.
+        let sig = unsafe {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            for sig in QUIT_SIGNALS {
+                libc::sigaddset(&mut set, sig);
             }
-            libc::_exit(128 + sig);
+            let mut sig: libc::c_int = 0;
+            libc::sigwait(&set, &mut sig);
+            sig
+        };
+        let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
+        if g > 0 {
+            // SAFETY: signals the process group this process created.
+            unsafe { libc::killpg(g, libc::SIGTERM) };
+            let until = std::time::Instant::now() + HOST_QUIT_GRACE;
+            // The host leads its group (pid = group id); reaping it here ends the wait as soon as
+            // it has quit, and what it leaves behind in the group is killed below.
+            // SAFETY: a non-blocking wait on this process's own child.
+            while std::time::Instant::now() < until && unsafe { libc::waitpid(g, std::ptr::null_mut(), libc::WNOHANG) } == 0 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            // SAFETY: as above.
+            unsafe { libc::killpg(g, libc::SIGKILL) };
         }
-    }
-    for sig in [libc::SIGTERM, libc::SIGINT, libc::SIGHUP] {
-        // SAFETY: installs a handler that only calls async-signal-safe functions.
-        unsafe { libc::signal(sig, on_signal as *const () as libc::sighandler_t) };
+        std::process::exit(128 + sig);
+    });
+    if let Err(e) = spawned {
+        eprintln!("stella-engine: no quit-signal thread: {e}");
     }
 }
 
@@ -202,6 +232,8 @@ fn linux_backend() {
 }
 
 fn main() {
+    #[cfg(unix)]
+    block_quit_signals();
     metrics::mark_process_start();
     #[cfg(target_os = "macos")]
     rune::text::set_fallback_base(Some("Lucida Grande"));

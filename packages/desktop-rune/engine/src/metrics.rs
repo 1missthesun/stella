@@ -142,7 +142,7 @@ impl Metrics {
             }
         }
         if let Some(input) = self.typing_input.take() {
-            self.log(serde_json::json!({ "metric": "typing", "input_to_frame_ms": at - input }));
+            self.log(serde_json::json!({ "metric": "typing", "input_at": input, "input_to_frame_ms": at - input, "input_to_start_ms": started.map(|s| s - input) }));
             if self.typing_frames.len() >= 256 {
                 self.typing_frames.clear();
             }

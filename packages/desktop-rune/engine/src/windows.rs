@@ -667,8 +667,9 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             tx.animated();
         }
         for WinCmd::Req(rid, v) in cmds {
+            let inspects = v.get("cmd").and_then(serde_json::Value::as_str).is_some_and(|c| c.starts_with("control."));
             crate::commands::run(s, tx, rid, v);
-            changed = true;
+            changed |= !inspects;
         }
     }
     crate::control::tick(s, tx);

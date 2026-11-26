@@ -278,7 +278,8 @@ fn main() {
     }
     let mut spec = windows::app_spec(&p);
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
-    let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
+    // Electron's globalShortcut takes a bare key (Show Stella's Escape discard).
+    let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running().allow_unmodified_shortcuts();
     let app = windows::decorate_main(app, &p).window_options(windows::options(&p));
     #[cfg(target_os = "linux")]
     let app = {

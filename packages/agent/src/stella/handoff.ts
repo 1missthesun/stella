@@ -60,6 +60,8 @@ export const contextSizeOf = (message: AssistantMessage): { tokens: number; wind
   const details = message.diagnostics?.findLast((diagnostic) => diagnostic.type === CONTEXT_SIZE_DIAGNOSTIC)?.details;
   const tokens = details?.tokens;
   if (typeof tokens !== "number" || !(tokens > 0)) return undefined;
+  // Measured on a CLI session still holding context a newer boundary replaced: it says nothing about this one.
+  if (details?.stale === true) return undefined;
   const window = details?.window;
   return { tokens, ...(typeof window === "number" && window > 0 ? { window } : {}) };
 };
@@ -289,7 +291,10 @@ export const stellaHandoffExtension = (host: StellaHandoffHost): StellaHandoff =
       if (cutoffAt < since) return undefined;
       const replaced = messages.slice(since, cutoffAt);
       if (!replaced.some((message) => message.role === "assistant")) return undefined;
-      const replacedTokens = replaced.reduce((sum, message) => sum + estimateMessageTokens(message), 0);
+      const replacedTokens = replaced.reduce(
+        (sum, message) => sum + ((message.role as string) === "system" ? 0 : estimateMessageTokens(message)),
+        0,
+      );
       if (replacedTokens < sized.threshold * MIN_PREFIX_FRACTION) return undefined;
       const role = await api.snapshot(StellaAgentDoc, conversationId, context);
       const runFirst = (await api.snapshot(LiveDoc, conversationId, context))?.run?.first;

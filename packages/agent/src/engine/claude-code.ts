@@ -254,6 +254,21 @@ type CallRecord = {
   name: string;
   native: boolean;
   truncated?: string;
+  /** A native call whose result has come back from the CLI. */
+  settled?: true;
+};
+
+/** Whether a queued CLI event begins a tool call. */
+const startsTool = (event: Record<string, any>): boolean => {
+  if (event.type === "stream_event") {
+    const source = event.event;
+    return source?.type === "content_block_start" && source.content_block?.type === "tool_use";
+  }
+  if (event.type === "assistant") {
+    const content = event.message?.content;
+    return Array.isArray(content) && content.some((block: any) => block?.type === "tool_use");
+  }
+  return false;
 };
 
 type NativeResult = { text: string; isError: boolean };
@@ -283,6 +298,10 @@ type Turn = {
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   carried?: Message[];
   relaunched?: true;
+  /** The newest context boundary the CLI session's context reflects. */
+  holds?: string;
+  /** The session still holds context a newer boundary replaced, so its sizes no longer describe the conversation. */
+  stale?: boolean;
 };
 
 type TurnRequest = {
@@ -648,6 +667,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   };
 
   const settleNative = (toolUseId: string, result: NativeResult) => {
+    const call = calls.get(toolUseId);
+    if (call) call.settled = true;
     const waiters = nativeWaiters.get(toolUseId);
     if (waiters) {
       nativeWaiters.delete(toolUseId);
@@ -1049,6 +1070,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const boundaryAt = conversation.findLastIndex(isContextBoundary);
     const boundary = boundaryAt >= 0 ? messageKey(conversation[boundaryAt]!) : undefined;
     const boundaryNew = boundary !== undefined && boundary !== record.boundary && !record.seen.includes(boundary);
+    const priorBoundary = record.boundary;
     // Background work the CLI is running can't follow it into a fresh session: until it ends, the session carries on
     // and the new boundary waits, unseen, for a turn that can take it.
     const deferBoundary = boundaryNew && (session.background?.length ?? 0) > 0;
@@ -1155,6 +1177,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       toolSet: { tools: request.tools, nativeTools: request.nativeTools },
       ...(relaunched ? { relaunched: true as const } : {}),
     };
+    const holds = boundaryNew && (deferBoundary || steering) ? priorBoundary : boundary;
+    if (holds !== undefined) turn.holds = holds;
+    if (holds !== boundary) turn.stale = true;
     session.turn = turn;
     session.lastSignAt = performance.now();
     if (!record.open) {
@@ -1347,7 +1372,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const window = reportedWindow ?? compactionWindowOf(turn.session.binding.session, modelInfo.id);
       output.diagnostics = [
         ...(output.diagnostics ?? []).filter((diagnostic) => diagnostic.type !== CONTEXT_SIZE_DIAGNOSTIC),
-        { type: CONTEXT_SIZE_DIAGNOSTIC, timestamp: Date.now(), details: { tokens: contextTokens, window } },
+        {
+          type: CONTEXT_SIZE_DIAGNOSTIC,
+          timestamp: Date.now(),
+          details: { tokens: contextTokens, window, ...(turn.stale ? { stale: true } : {}) },
+        },
       ];
     };
     const closeMessageUsage = () => {
@@ -1568,10 +1597,13 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   /**
    * Whether a running CLI turn should give way to a background handoff placed since it started: its session still
    * holds the context the handoff replaced, so a fresh one is written from the new context and the run carries on
-   * there. Waits while the CLI runs background work, which can't follow it, or has already moved past this step.
+   * there. Waits while the CLI runs background work, which can't follow it, or has already started a tool or finished
+   * the turn past this step; a reply it has only begun streaming is dropped and written again in the fresh session.
    */
   const takesHandoff = (session: Session, turn: Turn, conversation: readonly Message[]): boolean => {
-    if (turn.done || turn.queue.length > 0 || (session.background?.length ?? 0) > 0) return false;
+    if (turn.done || (session.background?.length ?? 0) > 0) return false;
+    if (turn.queue.some((item) => item.kind === "end" || startsTool(item.event))) return false;
+    for (const record of calls.values()) if (record.turn === turn && record.native && !record.settled) return false;
     if (options.transport.hydrate === undefined) return false;
     const record = session.record;
     const at = conversation.findLastIndex(isContextBoundary);
@@ -1645,6 +1677,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
       const stopped = turn.abort.signal.aborted;
       const replaced = !ours || stopped || (turn.done && turn.queue.length === 0) || takesHandoff(session, turn, conversation);
+      if (!replaced) {
+        const boundaryAt = conversation.findLastIndex(isContextBoundary);
+        const newest = boundaryAt >= 0 ? messageKey(conversation[boundaryAt]!) : undefined;
+        if (newest !== undefined && newest !== turn.holds) turn.stale = true;
+      }
       const moved = !replaced && !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
       if (moved) {
         turn.nextToolSet = toolSet;

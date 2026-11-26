@@ -7,7 +7,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { ChromiumProcess, resolveChromium, type CdpMessage } from "../electron/chromium";
+import { ChromiumProcess, ensureChromium, type CdpMessage } from "../electron/chromium";
 import type { ToPage } from "./protocol";
 import { pageHtml } from "./media-page";
 
@@ -73,12 +73,19 @@ export class ChromiumMediaHost {
    * profile for that binary); the page then runs unsandboxed, as Playwright's Chromium does.
    */
   private async run() {
-    const binary = resolveChromium();
+    let binary: string;
+    try {
+      binary = await ensureChromium();
+    } catch (error) {
+      if (!this.stopped) this.fail(error as Error);
+      return;
+    }
+    if (this.stopped) return;
     try {
       await this.launch(binary && UNSANDBOXED.has(binary) ? ["--no-sandbox"] : []);
     } catch (error) {
       if (this.stopped) return;
-      if (!binary || UNSANDBOXED.has(binary) || !NO_USABLE_SANDBOX.test(this.lastStderr)) return this.fail(error as Error);
+      if (UNSANDBOXED.has(binary) || !NO_USABLE_SANDBOX.test(this.lastStderr)) return this.fail(error as Error);
       console.error("[media] Chromium has no usable sandbox here; starting it with --no-sandbox");
       UNSANDBOXED.add(binary);
       try {
@@ -97,8 +104,7 @@ export class ChromiumMediaHost {
   private async launch(extraArgs: string[]) {
     this.stage = "starting";
     this.launching = true;
-    const binary = resolveChromium();
-    if (!binary) throw new Error("no Chromium or Chrome was found (set STELLA_RUNE_CHROMIUM or install Chrome)");
+    const binary = await ensureChromium();
     this.profileDir = mkdtempSync(path.join(os.tmpdir(), "stella-media-"));
     const profileDir = this.profileDir;
     const proc = new ChromiumProcess(profileDir, binary, (exit) => {

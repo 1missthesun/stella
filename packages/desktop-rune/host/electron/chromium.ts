@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
+import { installManagedChrome, managedChrome, managedChromeAvailable } from "./chrome-runtime";
 
 export type CdpMessage = { id?: number; method?: string; params?: Record<string, unknown>; result?: any; error?: { code: number; message: string }; sessionId?: string };
 
@@ -27,16 +28,26 @@ const CANDIDATES: Record<string, string[]> = {
   ],
 };
 
-/** A managed Chrome for Testing under Stella's runtimes or the stella-browser CLI's, else a Chrome/Chromium on the system. */
+/**
+ * STELLA_RUNE_CHROMIUM (a path, or "managed" for Stella's own download only), else the Chrome
+ * Stella downloaded, the stella-browser CLI's, or a Chrome/Chromium on the system.
+ */
 export function resolveChromium(): string | null {
   const configured = process.env.STELLA_RUNE_CHROMIUM?.trim();
+  if (configured === "managed") return managedChrome();
   if (configured) return existsSync(configured) ? configured : null;
-  const runtimes = path.join(os.homedir(), process.platform === "darwin" ? "Library/Application Support/Stella/runtimes" : process.platform === "win32" ? "AppData/Local/Stella/runtimes" : ".local/share/stella/runtimes");
-  const managed = process.platform === "darwin"
-    ? "chrome/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
-    : process.platform === "win32" ? "chrome/chrome.exe" : "chrome/chrome";
-  if (existsSync(path.join(runtimes, managed))) return path.join(runtimes, managed);
-  return stellaBrowserChrome() ?? (CANDIDATES[process.platform] ?? []).find((p) => existsSync(p)) ?? null;
+  return managedChrome() ?? stellaBrowserChrome() ?? (CANDIDATES[process.platform] ?? []).find((p) => existsSync(p)) ?? null;
+}
+
+/** A Chromium to run, downloading Stella's Chrome when the computer has none (Electron brings its own). */
+export async function ensureChromium(): Promise<string> {
+  const found = resolveChromium();
+  if (found) return found;
+  const configured = process.env.STELLA_RUNE_CHROMIUM?.trim();
+  if (configured && configured !== "managed") throw new Error(`STELLA_RUNE_CHROMIUM is ${configured}, which doesn't exist.`);
+  const installed = await installManagedChrome();
+  majorVersion = undefined;
+  return installed;
 }
 
 /** The newest Chrome for Testing the stella-browser CLI installed (`~/.stella-browser/browsers/chrome-<version>`). */
@@ -229,15 +240,14 @@ const processes = new Map<string, ChromiumProcess>();
 let exitHooked = false;
 
 export function chromiumAvailable() {
-  return resolveChromium() !== null;
+  return resolveChromium() !== null || managedChromeAvailable();
 }
 
 /** The Chromium for `profileDir`, started if it isn't running. */
 export async function chromiumFor(profileDir: string): Promise<ChromiumProcess> {
   const existing = processes.get(profileDir);
   if (existing && !existing.exited) return existing;
-  const binary = resolveChromium();
-  if (!binary) throw new Error("No Chromium or Chrome was found for the in-app browser (set STELLA_RUNE_CHROMIUM or install Chrome).");
+  const binary = await ensureChromium();
   if (!exitHooked) {
     exitHooked = true;
     process.once("exit", () => { for (const p of processes.values()) if (!p.exited) p.child.kill("SIGKILL"); });

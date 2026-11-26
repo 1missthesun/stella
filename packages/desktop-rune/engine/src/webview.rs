@@ -336,17 +336,25 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
             );
         });
     }
-    b = match (&p.url, &p.html) {
-        (Some(u), _) => b.with_url(scheme_url::to_view(&protocols, u)),
-        (None, Some(h)) => b.with_html(h),
-        (None, None) => b.with_url("about:blank"),
-    };
+    #[cfg(not(target_os = "linux"))]
+    {
+        b = match (&p.url, &p.html) {
+            (Some(u), _) => b.with_url(scheme_url::to_view(&protocols, u)),
+            (None, Some(h)) => b.with_html(h),
+            (None, None) => b.with_url("about:blank"),
+        };
+    }
     let handle = handle_of(window).ok_or("the webview's window isn't open")?;
     let view = handle.with_raw_handle(|raw| b.build_as_child(&raw).map_err(|e| e.to_string()))??;
     #[cfg(target_os = "linux")]
     {
         main_frame_navigations(n, &view);
         enable_webrtc(&view);
+        match (&p.url, &p.html) {
+            (Some(u), _) => view.load_url(u).map_err(|e| e.to_string())?,
+            (None, Some(h)) => view.load_html(h).map_err(|e| e.to_string())?,
+            (None, None) => {}
+        }
     }
     #[cfg(target_os = "macos")]
     mac::track_main_frame(&view);
@@ -396,7 +404,8 @@ fn main_frame_navigations(n: u32, view: &WebView) {
     });
 }
 
-/// WebKitGTK ships WebRTC off; Chromium (Electron) and WKWebView have it on.
+/// WebKitGTK ships WebRTC off (Chromium and WKWebView have it on) and reads the setting when a
+/// document is created, so it is set before the view's first load.
 #[cfg(target_os = "linux")]
 fn enable_webrtc(view: &WebView) {
     use webkit2gtk::{SettingsExt, WebViewExt};

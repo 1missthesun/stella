@@ -35,6 +35,7 @@ export function applyRuneProcessEnv() {
   });
 
   process.env.STELLA_HOST_EXECUTABLE_PATH = process.execPath;
+  process.env.STELLA_LAUNCHER_ENGINE = "rune";
 
   const isolatedData = process.env.STELLA_LAUNCHER_USER_DATA_DIR?.trim() ? process.env.STELLA_DATA_DIR?.trim() : undefined;
   if (isolatedData) {

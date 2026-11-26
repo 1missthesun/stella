@@ -274,10 +274,16 @@ imageMargin listMargin quoteMargin ruleMargin tableMargin`. Also `tableCellPaddi
 drops the first column's left padding; on the web it pads every cell on its right only (`2x`,
 none after the last column), as desktop-ui's table.
 
-**Numbers and switches.** `codeBlockRadius inlineCodePad strongWeight textWidth
-tableHeaderWeight`, and the table's line widths `tableHeaderRuleWidth tableRuleWidth
+**Numbers and switches.** `codeBlockRadius inlineCodePad inlineCodePadY strongWeight textWidth
+tableHeaderWeight`, `inlineCodeSize` (inline code at this size in headings too, in place of
+`inlineCodeFont`'s scale), `taskAfterMarker` (task items keep their list marker and put the
+checkbox this many px before the text), and the table's line widths `tableHeaderRuleWidth tableRuleWidth
 tableOutlineWidth` (0.5 by default); booleans `listMarkersOutside tableFlushLeft tableFullWidth`, and `tableTabular` (tabular figures
 in cells, on by default).
+
+**Task checkbox.** `taskCheckbox { size radius left top fillOn mark markSize fillOff borderOff }`;
+`top` is from the item's first line top (centred when absent), `left` is unused with
+`taskAfterMarker`.
 
 **Selection.** `selectionStyle: "chromium"` paints a selection as Chromium's default
 `::selection` (active and inactive) in place of `selection`. `pageCopy: [code, table]` copies a

@@ -761,7 +761,7 @@ fn settle_rect(window: u32, cx: &mut Cx<Win>) {
     if !SETTLES.with(|m| m.borrow().get(&window).is_some_and(|s| s.settled)) {
         return;
     }
-    let rect = cx.selection_rects().into_iter().reduce(|a, b| {
+    let rect = cx.selection_client_rects().into_iter().reduce(|a, b| {
         let (x, y) = (a[0].min(b[0]), a[1].min(b[1]));
         [x, y, (a[0] + a[2]).max(b[0] + b[2]) - x, (a[1] + a[3]).max(b[1] + b[3]) - y]
     });

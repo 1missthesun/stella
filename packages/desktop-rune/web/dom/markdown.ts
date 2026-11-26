@@ -64,8 +64,8 @@ function inline(n: Md, c: Ctx, key: number): ReactNode {
       return createElement("code", {
         key,
         style: {
-          fontFamily: "var(--rune-mono)", fontSize: px((body.size ?? 14) * scale), fontWeight: weight, lineHeight: 20 / 14,
-          background: s.inlineCodeBg, color: s.inlineCodeText, padding: `2px ${s.inlineCodePad ?? 4}px`, borderRadius: "4px",
+          fontFamily: "var(--rune-mono)", fontSize: px(typeof s.inlineCodeSize === "number" ? s.inlineCodeSize : (body.size ?? 14) * scale), fontWeight: weight, lineHeight: 20 / 14,
+          background: s.inlineCodeBg, color: s.inlineCodeText, padding: `${s.inlineCodePadY ?? 2}px ${s.inlineCodePad ?? 4}px`, borderRadius: "4px",
           boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone",
         },
       }, n.value);
@@ -311,7 +311,7 @@ function block(n: Md, c: Ctx, key: number, nested: boolean): ReactNode {
         key, start: n.ordered && n.start && n.start !== 1 ? n.start : undefined,
         style: { ...(nested ? { marginTop: "4px", marginBottom: "4px" } : { ...margin(s.listMargin, [16, 16]), paddingTop: px(pair(s.listPadding, [0, 0])[0]), paddingBottom: px(pair(s.listPadding, [0, 0])[1]) }), paddingLeft: px(nested ? nestedIndent : indent), listStyleType: n.ordered ? "decimal" : nested ? "circle" : "disc", listStylePosition: s.listMarkersOutside === false ? "inside" : "outside", "--md-marker": s.muted } as Css,
       }, (n.children ?? []).map((li, i) => createElement("li", { key: i, style: { marginTop: i ? px(gap) : 0 } },
-        li.checked !== null && li.checked !== undefined ? createElement("input", { type: "checkbox", checked: li.checked, readOnly: true, style: { marginRight: "6px" } }) : null,
+        li.checked !== null && li.checked !== undefined ? createElement("input", { type: "checkbox", checked: li.checked, disabled: true, style: { marginRight: px(typeof s.taskAfterMarker === "number" ? s.taskAfterMarker : 6) } }) : null,
         blocks(li.children, c, tight))));
     }
     case "thematicBreak":

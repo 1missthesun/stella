@@ -130,7 +130,7 @@ fn style(v: &Value) -> MarkdownStyle {
     {
         s = s.table_header_pad_edges(x as f32, top as f32, bottom as f32);
     }
-    let nums: [(&str, Set<f32>); 10] = [
+    let nums: [(&str, Set<f32>); 11] = [
         ("codeBlockRadius", MarkdownStyle::code_block_radius),
         ("tableRadius", MarkdownStyle::table_radius),
         ("tableHeaderRuleWidth", MarkdownStyle::table_header_rule_width),
@@ -138,6 +138,7 @@ fn style(v: &Value) -> MarkdownStyle {
         ("tableOutlineWidth", MarkdownStyle::table_outline_width),
         ("wideFade", MarkdownStyle::wide_fade),
         ("inlineCodePad", MarkdownStyle::inline_code_pad),
+        ("inlineCodePadY", MarkdownStyle::inline_code_pad_y),
         ("strongWeight", MarkdownStyle::strong_weight),
         ("textWidth", MarkdownStyle::text_width),
         ("tableHeaderWeight", MarkdownStyle::table_header_weight),
@@ -221,6 +222,20 @@ fn style(v: &Value) -> MarkdownStyle {
     }
     if let Some(on) = v.get("tableFullWidth").and_then(|b| b.as_bool()) {
         s = s.table_full_width(on);
+    }
+    if let Some(size) = num(v, "inlineCodeSize") {
+        s = s.inline_code_size(Some(size));
+    }
+    if let Some(t) = v.get("taskCheckbox")
+        && let (Some(size), Some(fill_on), Some(mark), Some(fill_off), Some(border_off)) = (num(t, "size"), col(t, "fillOn"), col(t, "mark"), col(t, "fillOff"), col(t, "borderOff"))
+    {
+        s = s.task_checkbox(size, num(t, "radius").unwrap_or(2.0), num(t, "left").unwrap_or(0.0), num(t, "top"), fill_on, mark, fill_off, border_off);
+    }
+    if let Some(size) = v.get("taskCheckbox").and_then(|t| num(t, "markSize")) {
+        s = s.task_mark_size(size);
+    }
+    if let Some(gap) = num(v, "taskAfterMarker") {
+        s = s.task_after_marker(gap);
     }
     if let Some(Value::Object(m)) = v.get("syntax").or_else(|| v.get("syntaxTheme")) {
         for (k, c) in m {

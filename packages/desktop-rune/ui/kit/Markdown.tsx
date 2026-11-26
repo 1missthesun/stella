@@ -14,6 +14,12 @@ const LINE_NUMBER_SIZE = 13;
 export const CHAT_TEXT: ChatText = { size: fontSize.lg, weight: 400, strongWeight: 500, lineHeight: 1.5 };
 export const CHAT_TEXT_COMPACT: ChatText = { ...CHAT_TEXT, size: fontSize.base };
 
+/** Chromium's disabled native checkbox, as measured in Electron. */
+const CHECKBOX = {
+  dark: { size: 13, radius: 2, top: 3, markSize: 12, fillOn: "#757575", mark: "#3b3b3b", fillOff: "#3b3b3b", borderOff: "#626262" },
+  light: { size: 13, radius: 2, top: 3, markSize: 12, fillOn: "rgba(196, 196, 196, 0.78)", mark: "rgba(234, 234, 234, 0.91)", fillOff: "rgba(245, 245, 245, 0.68)", borderOff: "rgba(186, 186, 186, 0.67)" },
+};
+
 const GITHUB = {
   light: { keyword: "#d73a49", string: "#032f62", number: "#005cc5", comment: "#6a737d", type: "#6f42c1", function: "#6f42c1", property: "#005cc5", inserted: "#22863a", deleted: "#b31d28" },
   dark: { keyword: "#f97583", string: "#9ecbff", number: "#79b8ff", comment: "#6a737d", type: "#b392f0", function: "#b392f0", property: "#79b8ff", inserted: "#85e89d", deleted: "#fdaeb7" },
@@ -42,7 +48,10 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     inlineCodeBg: c.surfaceInset,
     inlineCodeText: c.textStrong,
     inlineCodeFont: [fontSize.sm / chat.size, 500],
+    // Streamdown's `text-sm` on `code`: the same size in a heading as in a paragraph.
+    inlineCodeSize: fontSize.sm,
     inlineCodePad: 4,
+    inlineCodePadY: 2,
     codeBlockFill: "#00000000",
     codeBlockBorder: "#00000000",
     codeBlockPadding: [0, 0],
@@ -60,6 +69,9 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     strongWeight: chat.strongWeight,
     list: [24, 4 + 2 * 4],
     listNestedIndent: [16, 16],
+    // GFM task items keep their bullet, with Chromium's disabled checkbox (13px, `margin-right: 8px`) on the text's baseline.
+    taskCheckbox: t.dark ? CHECKBOX.dark : CHECKBOX.light,
+    taskAfterMarker: 8,
     listMarkersOutside: true,
     paragraphMargin: [0, 12],
     headingMargins: [[16, 6.4], [16, 6.4], [16, 6.4], [16, 6.4]],

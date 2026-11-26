@@ -36,7 +36,7 @@ export function UserMessageBody({ text }: { text: string }) {
       </col>
       {showToggle ? (
         <box selfAlign="end" mt={6} py={2} radius={radius.sm} hoverFill={c.toggleHover} hoverGroup role="button" focusable label={expanded ? t("app.chat.userMessage.showLess") : t("app.chat.userMessage.showMore")} expanded={expanded} onPress={() => setExpanded((v) => !v)}>
-          <text size={fontSize.sm} weight={500} lineHeight={fontSize.sm} color={c.toggle} hoverColor={tokens.c.chatUserBubbleText}>
+          <text size={fontSize.sm} weight={500} lineHeight={fontSize.sm} color={c.toggle} hoverColor={tokens.c.chatUserBubbleText} selectable>
             {expanded ? t("app.chat.userMessage.showLess") : t("app.chat.userMessage.showMore")}
           </text>
         </box>

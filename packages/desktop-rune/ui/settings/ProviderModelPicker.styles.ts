@@ -63,7 +63,7 @@ export const useProviderModelPicker = sheet((c, t) => ({
   modelPickerModelName: { weight: 500, truncate: true, nowrap: true },
   modelPickerModelSub: { size: 11, color: c.textWeak, truncate: true, nowrap: true },
   modelPickerModelCheck: { color: c.textStrong },
-  modelPickerGroupHeadCollapsible: { py: 2, pr: 4, gap: 6 },
+  modelPickerGroupHeadCollapsible: { pt: 2, pb: 2, pr: 4, pl: 0, gap: 6 },
   modelPickerGroupToggle: { pr: 8, pl: 10, grow: 1, shrink: true, minW: 0, align: "center", gap: 8, minH: 30, radius: 6, textAlign: "start", motion: { dur: 0.12 }, hover: mixOklch(c.foreground, 4, "transparent") },
   modelPickerGroupCheck: { color: c.textWeak },
   modelPickerGroupChevron: { color: c.textWeaker, motion: { dur: 0.14 } },

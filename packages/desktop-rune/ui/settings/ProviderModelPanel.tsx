@@ -1,9 +1,12 @@
 import { BrandIcon, Check, ChevronDown, DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger, Input, KeyRound, Lightbulb, LogIn, LogOut, Press, RefreshCw, Search, Star, T, X, tx } from "../kit/compat";
 import { useProviderModelPicker } from "./ProviderModelPicker.styles";
+import { useAgentModelPicker } from "./AgentModelPicker.styles";
+import { InAgentModelPicker } from "./model-picker-scope";
 import { useEnginePlace } from "../global/execution-placement/engine-place.styles";
 import {
   memo,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useId,
@@ -182,6 +185,8 @@ export function buildProviderTabs(groups: readonly ProviderGroup[], visibleProvi
 }
 export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, onSelect, disabled = false, reasoningEffort, onSelectReasoning, restrictStellaPicks = false, restrictedPlanLabel, ariaLabel, hideDefaultRow = false, selectedHeaderKicker, hideSelectedTitle = false, hideSearch = false, hideSelectionCheck = false, disableNonStellaProviders = false, disabledProviderReason, hideProviderLabel = false, visibleProviders, hiddenProviders, favoriteScope, hideGroupHead = false, headerActionsTarget, authOpenRequest = 0, onRequestSearchClose, collapsibleGroups = false, activeSectionKey = null, focusSection = null, extraSections = [], sectionOrder = null, onExtraSectionExpanded, onRefresh, refreshing = false, catalogError = null, selectedRowExtra = null, destination, }: ProviderModelPanelProps) {
   const s = useProviderModelPicker();
+  const sAgent = useAgentModelPicker();
+  const inAgentPicker = useContext(InAgentModelPicker);
   const sEnginePlace = useEnginePlace();
     const t = useT();
     const credentials = useLlmCredentials();
@@ -460,14 +465,14 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
     const trimmedQuery = query.trim();
     const isDefaultSelected = !value;
     const inlineProviderActions = searchVisible && hideSelectedTitle && hideProviderLabel && tabs.length === 1;
-    const renderSearchBar = () => (<row {...s.modelPickerSearch}>
+    const renderSearchBar = () => (<row {...s.modelPickerSearch} {...(inlineProviderActions || onRefresh ? s.modelPickerSearchRow_modelPickerSearch : null)}>
         <Search size={13} strokeWidth={1.75} color={s.modelPickerSearch.color} />
         <Input id={searchInputId} type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => {
             if (e.key === "Escape") {
                 setQuery("");
                 onRequestSearchClose?.();
             }
-        }} placeholder={t("settings.modelPicker.searchPlaceholder")} spellCheck={false} autoComplete="off" label={t("settings.modelPicker.searchAriaLabel")} disabled={disabled} />
+        }} placeholder={t("settings.modelPicker.searchPlaceholder")} spellCheck={false} autoComplete="off" label={t("settings.modelPicker.searchAriaLabel")} disabled={disabled} {...s.modelPickerSearch_input} />
         {onRequestSearchClose ? (<Press text={tx(s.modelPickerSearch)} {...s.modelPickerSearchClose} label={t("settings.modelPicker.closeSearch")} onPress={() => {
                 setQuery("");
                 onRequestSearchClose();
@@ -653,7 +658,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             ? isDefaultSelected || (value ?? "").startsWith("stella/")
             : models.some((model) => model.id === value);
         return (<col {...s.modelPickerGroup} key={tab.key} role="group" label={tab.label}>
-        {showGroupHead ? (<row {...s.modelPickerGroupHead} title={disabledProviderSet.has(tab.key)
+        {showGroupHead ? (<row w="full" {...s.modelPickerGroupHead} title={disabledProviderSet.has(tab.key)
                 ? disabledProviderReason
                 : undefined} {...(((!collapsibleGroups && hideProviderLabel) || undefined) ? s.modelPickerGroupHeadLabelHidden : null)} {...((collapsibleGroups || undefined) ? s.modelPickerGroupHeadCollapsible : null)}>
           {collapsibleGroups ? (<Press {...s.modelPickerGroupToggle} expanded={open} onPress={() => {
@@ -675,7 +680,10 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                   {t("settings.engineAccounts.whereComputer")}
                 </T>) : null}
               {!open && sectionHoldsSelection ? (<Check size={12} strokeWidth={2} {...s.modelPickerGroupCheck} color={s.modelPickerGroupCheck.color} />) : null}
-              <ChevronDown size={13} strokeWidth={1.75} {...s.modelPickerGroupChevron} data-open={open || undefined} color={s.modelPickerGroupChevron.color} />
+              <col grow={1} />
+              <box shrink={false} rotate={open ? 180 : 0} motion={s.modelPickerGroupChevron.motion}>
+                <ChevronDown size={13} strokeWidth={1.75} color={s.modelPickerGroupChevron.color} />
+              </box>
             </Press>) : hideProviderLabel ? null : (<>
               <row {...s.modelPickerGroupIcon}>
                 <BrandIcon brand={tab.key} size={13} />
@@ -773,7 +781,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                 </col>
                 {!hideSelectionCheck && isDefaultSelected ? (<Check size={13} {...s.modelPickerModelCheck} color={s.modelPickerModelCheck.color} />) : null}
               </Press>) : null}
-            {showDefaultRow && isDefaultSelected && selectedRowExtra ? (<T w="full" {...s.modelPickerSelectedExtra}>{selectedRowExtra}</T>) : null}
+            {showDefaultRow && isDefaultSelected && selectedRowExtra ? (<row w="full" {...s.modelPickerSelectedExtra}>{selectedRowExtra}</row>) : null}
             {models.map((model) => {
                 const selected = isDefaultSelected
                     ? resolveDefaultToModel && modelMatchesDefault(model, currentLabel)
@@ -786,7 +794,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                     <ModelRow model={model} selected={selected} rowRestricted={rowRestricted} restrictedPlanLabel={restrictedPlanLabel ?? null} restrictedReason={rowRestricted && !restrictedPlanLabel
                         ? (disabledProviderReason ?? null)
                         : null} onPick={handleRowPick} disabled={sectionDisabled} favorite={favorites.includes(model.id)} showFavorite={Boolean(favoriteScope)} onToggleFavorite={toggleFavorite} reasoningEffort={reasoningEffort} onSelectReasoning={onSelectReasoning} hideSelectionCheck={hideSelectionCheck} />
-                    {selected && selectedRowExtra ? (<T w="full" {...s.modelPickerSelectedExtra}>{selectedRowExtra}</T>) : null}
+                    {selected && selectedRowExtra ? (<row w="full" {...s.modelPickerSelectedExtra}>{selectedRowExtra}</row>) : null}
                   </col>);
             })}
           </col>
@@ -796,7 +804,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
     const renderExtraSection = (extra: ProviderModelExtraSection) => {
         const open = openSections.has(extra.key);
         return (<col {...s.modelPickerGroup} key={extra.key} role="group" label={extra.label}>
-        <row {...s.modelPickerGroupHead} {...((true) ? s.modelPickerGroupHeadCollapsible : null)}>
+        <row w="full" {...s.modelPickerGroupHead} {...s.modelPickerGroupHeadCollapsible}>
           <Press {...s.modelPickerGroupToggle} expanded={open} onPress={() => toggleSection(extra.key)}>
             <row {...s.modelPickerGroupIcon}>
               <BrandIcon brand={extra.brandKey ?? extra.key} size={13} />
@@ -804,7 +812,10 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             <T {...tx(s.modelPickerGroupToggle)} {...s.modelPickerGroupLabel}>{extra.label}</T>
             {extra.badge ? (<T {...tx(s.modelPickerGroupToggle)} {...s.modelPickerGroupNote}>{extra.badge}</T>) : null}
             {!open && extra.selected ? (<Check size={12} strokeWidth={2} {...s.modelPickerGroupCheck} color={s.modelPickerGroupCheck.color} />) : null}
-            <ChevronDown size={13} strokeWidth={1.75} {...s.modelPickerGroupChevron} data-open={open || undefined} color={s.modelPickerGroupChevron.color} />
+            <col grow={1} />
+              <box shrink={false} rotate={open ? 180 : 0} motion={s.modelPickerGroupChevron.motion}>
+                <ChevronDown size={13} strokeWidth={1.75} color={s.modelPickerGroupChevron.color} />
+              </box>
           </Press>
         </row>
         {open ? extra.content() : null}
@@ -832,7 +843,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         }
         return entries;
     }, [extraSections, sections, sectionOrder, trimmedQuery]);
-    return (<col {...s.modelPickerShell} role="group" label={ariaLabel}>
+    return (<col {...s.modelPickerShell} {...(inAgentPicker ? sAgent.agentModelPicker_modelPickerShell : { h: Math.min(480, Math.max(360, window.innerHeight * 0.6)) })} role="group" label={ariaLabel}>
       <col {...s.modelPickerPaneInner}>
         {hideSelectedTitle ? null : (<row {...s.modelPickerPaneHeader}>
             <row {...s.modelPickerPaneTitle}>
@@ -908,7 +919,7 @@ const ModelRow = memo(function ModelRow({ model, selected, rowRestricted, restri
                 ? (restrictedReason ?? undefined)
                 : undefined} onPress={() => onPick(model.id)} disabled={disabled || rowRestricted} {...((selected || undefined) ? s.modelPickerModelSelected : null)} {...((rowRestricted || undefined) ? s.modelPickerModelRestricted : null)}>
         <col {...s.modelPickerModelText}>
-          <T {...tx(s.modelPickerModel)} {...s.modelPickerModelName}>{displayName}</T>
+          <T {...tx(selected ? { ...s.modelPickerModel, ...s.modelPickerModelSelected } : s.modelPickerModel)} {...s.modelPickerModelName}>{displayName}</T>
         </col>
         {!hideSelectionCheck && selected ? (<Check size={13} {...s.modelPickerModelCheck} color={s.modelPickerModelCheck.color} />) : null}
       </Press>

@@ -4,6 +4,7 @@ import { useEnginePlace } from "../global/execution-placement/engine-place.style
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProviderModelPanel } from "./ProviderModelPanel";
 import { EngineScopedModelList } from "./EngineScopedModelList";
+import { InAgentModelPicker } from "./model-picker-scope";
 import { ProviderOnlyPicker, type ProviderOption, } from "./ProviderOnlyPicker";
 import { VoiceCatalogPicker } from "./VoiceCatalogPicker";
 import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
@@ -819,7 +820,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
     }, [claudeCodeCatalog, claudeCodeSectionOpen, committedEngine, refresh]);
     const restrictedStellaPicks = isRestrictedModelOverrideAudience(audience);
     const restrictedPlanLabel = audience ? getPlanLabel(audience) : null;
-    const tabButton = (key: string, label: string, title: string, isActive: boolean) => (<Press {...s.agentModelPickerToggleBtn} key={key} role="tab" selected={isActive} onPress={() => {
+    const tabButton = (key: string, label: string, title: string, isActive: boolean) => (<Press {...s.agentModelPickerToggleBtn} {...(surface === "settings" ? s.agentModelPickerToggleSurfaceSettings_agentModelPickerToggleBtn : null)} key={key} role="tab" selected={isActive} onPress={() => {
             if (oauthPendingProvider) {
                 void cancelPendingOAuth();
             }
@@ -835,7 +836,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
       </row>);
     return (<col {...s.agentModelPicker}>
       <row {...s.agentModelPickerHeader}>
-          <T {...s.agentModelPickerToggle} role="tablist" label={t("settings.agentModelPicker.surfaceAriaLabel")} /* VARIANT data-surface=surface: SurfaceSettings→s.agentModelPickerToggleSurfaceSettings */>
+          <row {...s.agentModelPickerToggle} {...(surface === "settings" ? s.agentModelPickerToggleSurfaceSettings : null)} role="tablist" label={t("settings.agentModelPicker.surfaceAriaLabel")}>
             {surface === "settings"
             ? [
                 ...configurableAgents.map((agent) => tabButton(agent.key, agent.label, agent.desc, agent.key === activeAgent)),
@@ -851,10 +852,11 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                     ? [tabButton(VOICE_TARGET, t("settings.agentModelPicker.tabs.voice"), t("settings.agentModelPicker.tabs.voiceTitle"), activeVoice)]
                     : []),
             ]}
-          </T>
+          </row>
         </row>
 
-      <col {...s.agentModelPickerBody}>
+      <InAgentModelPicker.Provider value>
+      <col {...s.agentModelPickerBody} scrollY={activeImage || activeVoice}>
         {pendingAgent === ENGINE_PENDING_TARGET && oauthPendingProvider ? (<T w="full" {...s.agentModelPickerConnection} role="status">
             {t("settings.agentModelPicker.waitingForChatGpt")}{" "}
             <Press text={tx(s.agentModelPickerConnection)} onPress={() => void cancelPendingOAuth()}>
@@ -921,6 +923,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
           </>)}
 
       </col>
+      </InAgentModelPicker.Provider>
 
     </col>);
 }

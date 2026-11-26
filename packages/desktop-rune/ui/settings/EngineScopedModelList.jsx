@@ -25,7 +25,7 @@ export function EngineScopedModelList({ engineLabel, models, value, onSelect, lo
                   </col>
                   {selected ? (<Check size={13} {...s.engineScopedModelListCheck} color={s.engineScopedModelListCheck.color} />) : null}
                 </Press>
-                {selected && selectedRowExtra ? (<T w="full" {...sProviderModelPicker.modelPickerSelectedExtra}>{selectedRowExtra}</T>) : null}
+                {selected && selectedRowExtra ? (<row w="full" {...sProviderModelPicker.modelPickerSelectedExtra}>{selectedRowExtra}</row>) : null}
               </col>);
         }))}
       </col>

@@ -53,8 +53,8 @@ async function render(req: Omit<GradientRequest, "id">): Promise<GradientReply> 
  */
 export function ThemeBackdrop({ id = "theme-backdrop", mode = "soft", colorMode = "relative" }: { id?: string; mode?: GradientMode; colorMode?: GradientColor }) {
   const t = useTokens();
-  const size = useRef<{ w: number; h: number } | null>(null);
-  const [measured, setMeasured] = useState(false);
+  const size = useRef<{ w: number; h: number } | null>(window.innerWidth > 0 && window.innerHeight > 0 ? { w: window.innerWidth, h: window.innerHeight } : null);
+  const [measured, setMeasured] = useState(size.current !== null);
   const [image, setImage] = useState<string | null>(null);
   const latest = useRef(0);
   const flat = t.flat;

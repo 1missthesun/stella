@@ -88,9 +88,9 @@ export function RememberedAccountSignIn({
         <T {...tx(sAuthDialog.authDialogHero)} w="full" {...sAuthDialog.authDialogSub}>{t("global.signedOut.body")}</T>
       </col>
       <row {...sAuthDialog.authRememberedAccount}>
-        <T {...sAuthDialog.authRememberedAvatar}>
-          {(hint.name ?? account).trim().charAt(0).toUpperCase()}
-        </T>
+        <row {...sAuthDialog.authRememberedAvatar}>
+          <T {...tx(sAuthDialog.authRememberedAvatar)}>{(hint.name ?? account).trim().charAt(0).toUpperCase()}</T>
+        </row>
         <col {...sAuthDialog.authRememberedWho}>
           {hint.name ? <T {...sAuthDialog.authRememberedName}>{hint.name}</T> : null}
           <T {...sAuthDialog.authRememberedEmail}>{account}</T>

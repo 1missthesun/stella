@@ -2,13 +2,16 @@
 //! and ink, the dictation Option-tap).
 //!
 //! - `inputhook.start`: starts listening; fails when the OS refuses (macOS without Input
-//!   Monitoring / Accessibility, or a platform without a hook).
+//!   Monitoring / Accessibility, or a platform without a hook). macOS listens with a CGEventTap,
+//!   Windows with low-level mouse and keyboard hooks (`WH_MOUSE_LL`, `WH_KEYBOARD_LL`) on their own
+//!   thread; neither consumes an event. Linux has none, as Electron Stella uses none there.
 //! - `inputhook.stop`: stops it.
 //!
 //! Each event is `{t:"inputhook", type, x, y, button, clicks, keycode, rawcode, rotation,
 //! direction, amount, shiftKey, ctrlKey, altKey, metaKey, time}` in uiohook's shape: global
-//! top-left points, buttons 1 left / 2 right / 3 middle, libuiohook `VC_*` key codes, wheel
-//! direction 3 vertical / 4 horizontal.
+//! top-left points (physical pixels on Windows, as libuiohook reports them), buttons 1 left /
+//! 2 right / 3 middle / 4-5 extra, libuiohook `VC_*` key codes, wheel direction 3 vertical /
+//! 4 horizontal.
 
 use serde_json::Value;
 
@@ -20,8 +23,210 @@ pub fn command(cmd: &str, rid: Option<u64>, v: &Value) {
         "inputhook.stop" => mac::stop(rid),
         _ => crate::engine::reply(rid, Err(format!("{cmd}: unknown input hook command"))),
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    match cmd {
+        "inputhook.start" => win::start(rid),
+        "inputhook.stop" => win::stop(rid),
+        _ => crate::engine::reply(rid, Err(format!("{cmd}: unknown input hook command"))),
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     crate::engine::reply(rid, Err(format!("{cmd}: global input listening is not available on this platform")));
+}
+
+#[cfg(windows)]
+mod win {
+    use serde_json::{Value, json};
+    use std::cell::RefCell;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows::Win32::System::Threading::GetCurrentThreadId;
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, GetMessageW, GetSystemMetrics, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, PostThreadMessageW,
+        SM_CXDOUBLECLK, SM_CYDOUBLECLK, SetWindowsHookExW, UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP,
+        WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT,
+        WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    };
+
+    const WHEEL_DELTA: f64 = 120.0;
+    const LLKHF_EXTENDED: u32 = 0x01;
+
+    static THREAD: AtomicU32 = AtomicU32::new(0);
+
+    #[derive(Default)]
+    struct State {
+        shift: [bool; 2],
+        ctrl: [bool; 2],
+        alt: [bool; 2],
+        meta: [bool; 2],
+        held: [bool; 6],
+        last_down: Option<(i64, u32, i32, i32)>,
+        clicks: i64,
+    }
+
+    thread_local! {
+        static STATE: RefCell<State> = RefCell::new(State::default());
+    }
+
+    pub fn start(rid: Option<u64>) {
+        if THREAD.load(Ordering::SeqCst) != 0 {
+            return crate::engine::reply(rid, Ok(json!({ "started": true })));
+        }
+        std::thread::Builder::new()
+            .name("inputhook".into())
+            .spawn(move || unsafe {
+                let module = GetModuleHandleW(None).ok().map(|m| HINSTANCE(m.0));
+                let mouse = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), module, 0);
+                let keyboard = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), module, 0);
+                let (mouse, keyboard) = match (mouse, keyboard) {
+                    (Ok(m), Ok(k)) => (m, k),
+                    (m, k) => {
+                        let error = m.as_ref().err().or(k.as_ref().err()).map(|e| e.message()).unwrap_or_default();
+                        for hook in [m.ok(), k.ok()].into_iter().flatten() {
+                            let _ = UnhookWindowsHookEx(hook);
+                        }
+                        return crate::engine::reply_any_thread(rid, Err(format!("the system refused a low-level input hook: {error}")));
+                    }
+                };
+                THREAD.store(GetCurrentThreadId(), Ordering::SeqCst);
+                crate::engine::reply_any_thread(rid, Ok(json!({ "started": true })));
+                let mut msg = MSG::default();
+                while GetMessageW(&mut msg, None, 0, 0).0 > 0 {}
+                let _ = UnhookWindowsHookEx(mouse);
+                let _ = UnhookWindowsHookEx(keyboard);
+            })
+            .map(|_| ())
+            .unwrap_or_else(|e| crate::engine::reply(rid, Err(format!("inputhook thread: {e}"))));
+    }
+
+    pub fn stop(rid: Option<u64>) {
+        let thread = THREAD.swap(0, Ordering::SeqCst);
+        if thread != 0 {
+            let _ = unsafe { PostThreadMessageW(thread, WM_QUIT, WPARAM(0), LPARAM(0)) };
+        }
+        crate::engine::reply(rid, Ok(json!({ "stopped": true })));
+    }
+
+    unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code == HC_ACTION as i32 && lparam.0 != 0 {
+            let info = unsafe { &*(lparam.0 as *const MSLLHOOKSTRUCT) };
+            if let Some(event) = STATE.with_borrow_mut(|state| mouse_event(state, wparam.0 as u32, info)) {
+                crate::windows::send_any_thread(event);
+            }
+        }
+        unsafe { CallNextHookEx(None::<HHOOK>, code, wparam, lparam) }
+    }
+
+    unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code == HC_ACTION as i32 && lparam.0 != 0 {
+            let info = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+            if let Some(event) = STATE.with_borrow_mut(|state| key_event(state, wparam.0 as u32, info)) {
+                crate::windows::send_any_thread(event);
+            }
+        }
+        unsafe { CallNextHookEx(None::<HHOOK>, code, wparam, lparam) }
+    }
+
+    fn base(state: &State, kind: &str, x: i32, y: i32) -> Value {
+        let either = |pair: [bool; 2]| pair[0] || pair[1];
+        json!({
+            "t": "inputhook",
+            "type": kind,
+            "x": x,
+            "y": y,
+            "time": crate::metrics::epoch_ms() as u64,
+            "shiftKey": either(state.shift),
+            "ctrlKey": either(state.ctrl),
+            "altKey": either(state.alt),
+            "metaKey": either(state.meta),
+        })
+    }
+
+    fn mouse_event(state: &mut State, message: u32, info: &MSLLHOOKSTRUCT) -> Option<Value> {
+        let (x, y) = (info.pt.x, info.pt.y);
+        let extra = || if (info.mouseData >> 16) & 0xFFFF == 1 { 4 } else { 5 };
+        let (down, button) = match message {
+            WM_MOUSEMOVE => {
+                let button = state.held.iter().position(|&h| h).unwrap_or(0);
+                let mut out = base(state, "mousemove", x, y);
+                out["button"] = button.into();
+                return Some(out);
+            }
+            WM_LBUTTONDOWN => (true, 1),
+            WM_LBUTTONUP => (false, 1),
+            WM_RBUTTONDOWN => (true, 2),
+            WM_RBUTTONUP => (false, 2),
+            WM_MBUTTONDOWN => (true, 3),
+            WM_MBUTTONUP => (false, 3),
+            WM_XBUTTONDOWN => (true, extra()),
+            WM_XBUTTONUP => (false, extra()),
+            WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
+                let delta = ((info.mouseData >> 16) & 0xFFFF) as u16 as i16;
+                if delta == 0 {
+                    return None;
+                }
+                let vertical = message == WM_MOUSEWHEEL;
+                let mut out = base(state, "wheel", x, y);
+                out["direction"] = if vertical { 3 } else { 4 }.into();
+                let notches = f64::from(delta) / WHEEL_DELTA;
+                out["rotation"] = json!(if vertical { -notches } else { notches });
+                out["amount"] = 3.into();
+                return Some(out);
+            }
+            _ => return None,
+        };
+        state.held[button as usize] = down;
+        if down {
+            let window = i64::from(unsafe { GetDoubleClickTime() });
+            let (slop_x, slop_y) = unsafe { (GetSystemMetrics(SM_CXDOUBLECLK) / 2, GetSystemMetrics(SM_CYDOUBLECLK) / 2) };
+            let now = i64::from(info.time);
+            let repeat = state.last_down.is_some_and(|(at, b, px, py)| b == button as u32 && now - at <= window && (x - px).abs() <= slop_x && (y - py).abs() <= slop_y);
+            state.clicks = if repeat { state.clicks + 1 } else { 1 };
+            state.last_down = Some((now, button as u32, x, y));
+        }
+        let mut out = base(state, if down { "mousedown" } else { "mouseup" }, x, y);
+        out["button"] = button.into();
+        out["clicks"] = state.clicks.max(1).into();
+        Some(out)
+    }
+
+    fn key_event(state: &mut State, message: u32, info: &KBDLLHOOKSTRUCT) -> Option<Value> {
+        let down = match message {
+            WM_KEYDOWN | WM_SYSKEYDOWN => true,
+            WM_KEYUP | WM_SYSKEYUP => false,
+            _ => return None,
+        };
+        match info.vkCode {
+            0xA0 => state.shift[0] = down,
+            0xA1 => state.shift[1] = down,
+            0xA2 => state.ctrl[0] = down,
+            0xA3 => state.ctrl[1] = down,
+            0xA4 => state.alt[0] = down,
+            0xA5 => state.alt[1] = down,
+            0x5B => state.meta[0] = down,
+            0x5C => state.meta[1] = down,
+            _ => {}
+        }
+        let mut out = base(state, if down { "keydown" } else { "keyup" }, 0, 0);
+        out["rawcode"] = info.vkCode.into();
+        out["keycode"] = vc(info.vkCode, info.scanCode, info.flags.0 & LLKHF_EXTENDED != 0).into();
+        Some(out)
+    }
+
+    /// A key's libuiohook `VC_*` code: its set-1 scan code, `0x0E00 |` for extended keys and
+    /// `0xE000 |` for the arrow keys, with the keys whose scan codes Windows reports differently.
+    fn vc(vk: u32, scan: u32, extended: bool) -> u32 {
+        let scan = scan & 0xFF;
+        match vk {
+            0x90 => 0x0045,
+            0x13 => 0x0E45,
+            0xA1 => 0x0036,
+            _ if extended && matches!(scan, 0x48 | 0x4B | 0x4D | 0x50) => 0xE000 | scan,
+            _ if extended => 0x0E00 | scan,
+            _ => scan,
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]

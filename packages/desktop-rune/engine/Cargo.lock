@@ -4281,6 +4281,7 @@ dependencies = [
  "serde_json",
  "symphonia",
  "webkit2gtk",
+ "windows 0.62.2",
  "wry",
 ]
 

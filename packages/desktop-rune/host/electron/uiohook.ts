@@ -29,7 +29,7 @@ class InputHook extends EventEmitter {
 
   start(): void {
     const e = engine();
-    if (!e || process.platform !== "darwin") throw new Error("global input listening is not available on this platform");
+    if (!e || (process.platform !== "darwin" && process.platform !== "win32")) throw new Error("global input listening is not available on this platform");
     if (this.unsubscribe) return;
     this.unsubscribe = onEngine("inputhook", ({ t: _t, type, ...event }) => {
       this.emit("input", event);

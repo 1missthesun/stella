@@ -414,6 +414,16 @@ fn handle_of(window: u32) -> Option<rune::WindowHandle> {
     engine::read(|e| e.windows.get(&window).and_then(|w| w.handle.clone()))
 }
 
+#[cfg(target_os = "windows")]
+fn hwnd_of(window: u32) -> windows::Win32::Foundation::HWND {
+    use rune::raw_window_handle::RawWindowHandle;
+    let raw = handle_of(window).and_then(|h| h.with_raw_handle(|raw| match raw.as_raw() {
+        RawWindowHandle::Win32(w) => Some(w.hwnd.get()),
+        _ => None,
+    }).ok().flatten());
+    windows::Win32::Foundation::HWND(raw.unwrap_or_default() as *mut _)
+}
+
 /// The window's UI zoom (`<window zoom>`), 1 unzoomed: webview rects and shapes are in the
 /// zoomed view's points, `zoom` window points each.
 fn ui_zoom(window: u32) -> f32 {
@@ -548,16 +558,20 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
     build(n, window, p, r, WebViewBuilder::new(), &p.protocols)
 }
 
-/// WebView2's environment (its browser process) takes seconds to start cold, and wry creates it
-/// inside `build_as_child`, blocking the UI thread. The engine starts it asynchronously with the
-/// options wry would set, holds views back until it is ready (they wait like views whose window
-/// has no native handle yet), and shares it among them. If it fails, wry makes its own.
+/// WebView2 takes seconds to start cold: its environment, then the browser and renderer the
+/// first controller brings up. wry would do both inside `build_as_child`, blocking the UI thread,
+/// so the engine starts the environment asynchronously with the options wry would set, warms it
+/// with a hidden controller in the view's window, and holds views back until then (they wait
+/// like views whose window has no native handle yet). Views share the environment; the warm
+/// controller closes once the first view is up. If the environment fails, wry makes its own.
 #[cfg(target_os = "windows")]
 mod win_env {
     use std::cell::RefCell;
+    use std::time::Instant;
 
-    use webview2_com::Microsoft::Web::WebView2::Win32::{CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2Environment, ICoreWebView2EnvironmentOptions};
-    use webview2_com::{CoreWebView2EnvironmentOptions, CreateCoreWebView2EnvironmentCompletedHandler};
+    use webview2_com::Microsoft::Web::WebView2::Win32::{CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2Controller, ICoreWebView2Environment, ICoreWebView2EnvironmentOptions};
+    use webview2_com::{CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler, CreateCoreWebView2EnvironmentCompletedHandler};
+    use windows::Win32::Foundation::HWND;
     use windows::Win32::Globalization::{GetUserDefaultUILanguage, LCIDToLocaleName, LOCALE_ALLOW_NEUTRAL_NAMES, MAX_LOCALE_NAME};
     use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
     use windows::core::{HSTRING, PCWSTR};
@@ -565,7 +579,7 @@ mod win_env {
     enum State {
         Idle,
         Starting,
-        Ready(ICoreWebView2Environment),
+        Ready(ICoreWebView2Environment, Option<ICoreWebView2Controller>),
         Failed,
     }
 
@@ -573,39 +587,54 @@ mod win_env {
         static ENV: RefCell<State> = const { RefCell::new(State::Idle) };
     }
 
-    /// Whether views can be built now; starts the environment on first ask.
-    pub fn ready() -> bool {
+    /// Whether views can be built now; on first ask, starts the environment, warmed in `parent`.
+    pub fn ready(parent: HWND) -> bool {
         if ENV.with(|e| matches!(*e.borrow(), State::Idle)) {
-            start();
+            start(parent);
         }
         ENV.with(|e| !matches!(*e.borrow(), State::Starting))
     }
 
     pub fn get() -> Option<ICoreWebView2Environment> {
         ENV.with(|e| match &*e.borrow() {
-            State::Ready(env) => Some(env.clone()),
+            State::Ready(env, _) => Some(env.clone()),
             _ => None,
         })
     }
 
-    fn start() {
+    /// Closes the warm controller once a view keeps the browser up.
+    pub fn cool() {
+        let warm = ENV.with(|e| match &mut *e.borrow_mut() {
+            State::Ready(_, warm) => warm.take(),
+            _ => None,
+        });
+        if let Some(c) = warm {
+            // SAFETY: on the UI thread that created it.
+            let _ = unsafe { c.Close() };
+        }
+    }
+
+    fn metric(name: &str, t0: Instant) {
+        eprintln!("stella-engine metric {{\"metric\":\"{name}\",\"ms\":{:.1}}}", t0.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    fn start(parent: HWND) {
         ENV.with(|e| *e.borrow_mut() = State::Starting);
-        let t0 = std::time::Instant::now();
+        let t0 = Instant::now();
         let done = CreateCoreWebView2EnvironmentCompletedHandler::create(Box::new(move |status, env| {
-            let ok = match (status, env) {
-                (Ok(()), Some(env)) => Some(env),
+            metric("webview_environment", t0);
+            match (status, env) {
+                (Ok(()), Some(env)) => warm(env, parent, t0),
                 (status, _) => {
                     eprintln!("stella-engine: WebView2 environment failed: {status:?}");
-                    None
+                    ENV.with(|e| *e.borrow_mut() = State::Failed);
                 }
-            };
-            eprintln!("stella-engine metric {{\"metric\":\"webview_environment\",\"ms\":{:.1}}}", t0.elapsed().as_secs_f64() * 1000.0);
-            ENV.with(|e| *e.borrow_mut() = ok.map_or(State::Failed, State::Ready));
+            }
             Ok(())
         }));
         // Same arguments and language as wry's `create_environment` (no data directory, autoplay on).
         let options = CoreWebView2EnvironmentOptions::default();
-        // SAFETY: COM calls on the UI thread, an STA like wry's; the handler runs from its message loop.
+        // SAFETY: COM calls on the UI thread, an STA like wry's; handlers run from its message loop.
         let started = unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             options.set_additional_browser_arguments("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required".to_string());
@@ -617,6 +646,24 @@ mod win_env {
         if let Err(e) = started {
             eprintln!("stella-engine: WebView2 environment failed: {e}");
             ENV.with(|e| *e.borrow_mut() = State::Failed);
+        }
+    }
+
+    fn warm(env: ICoreWebView2Environment, parent: HWND, t0: Instant) {
+        let shared = env.clone();
+        let done = CreateCoreWebView2ControllerCompletedHandler::create(Box::new(move |status, controller| {
+            metric("webview_warm", t0);
+            let warm = status.ok().and(controller);
+            if let Some(c) = &warm {
+                // SAFETY: on the UI thread, in the controller's completion.
+                let _ = unsafe { c.SetIsVisible(false) };
+            }
+            ENV.with(|e| *e.borrow_mut() = State::Ready(shared, warm));
+            Ok(())
+        }));
+        // SAFETY: on the UI thread; `parent` is the view's live window.
+        if unsafe { env.CreateCoreWebView2Controller(parent, &done) }.is_err() {
+            ENV.with(|e| *e.borrow_mut() = State::Ready(env, None));
         }
     }
 }
@@ -796,7 +843,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         return;
     }
     #[cfg(target_os = "windows")]
-    if !exists && !win_env::ready() {
+    if !exists && !win_env::ready(hwnd_of(window)) {
         WAITING.with(|w| w.borrow_mut().insert(n, (window, r)));
         return;
     }
@@ -809,6 +856,8 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 let _ = view.set_bounds(rect(window, r));
                 #[cfg(target_os = "macos")]
                 mac::round(&view, corners(&p));
+                #[cfg(target_os = "windows")]
+                win_env::cool();
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
                     v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })

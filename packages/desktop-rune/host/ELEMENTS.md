@@ -417,9 +417,10 @@ clients' surfaces is xdg-foreign, which parents toplevels, not children. Electro
 no such problem because Chromium composites them into its own surface. Native Wayland webviews
 would need WebKit drawn offscreen (WPE or a GTK offscreen window) into a Rune image, with input
 synthesized the way `/control/input` already synthesizes GDK events. macOS uses WKWebView and
-Windows uses WebView2 as child views. WebView2's environment (its browser process) starts
-asynchronously on the first view, with wry's options, and is shared by every view; views wait
-for it rather than blocking the UI thread for the seconds a cold start takes.
+Windows uses WebView2 as child views. WebView2's environment starts asynchronously on the first
+view, with wry's options, and is warmed by a hidden controller in that view's window (the cold
+browser and renderer start); views wait for it rather than blocking the UI thread for the seconds
+that takes, and share it.
 
 ## Engine API (`engine` in `host/bridge.ts`)
 

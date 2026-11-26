@@ -12,6 +12,7 @@ import { batched, render, windowPortal } from "./reconciler";
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
+import { installRendererErrorRouting } from "./services/renderer-errors";
 import type { RuneServices } from "./services/boot";
 import type { ControlContext } from "./services/control";
 
@@ -21,6 +22,7 @@ const APP_ENTRY = resolve(ROOT, process.env.STELLA_RUNE_APP ?? "ui/App.tsx");
 const APP_DIR = dirname(APP_ENTRY);
 const SERVICES = process.env.STELLA_RUNE_SERVICES === "1";
 
+installRendererErrorRouting();
 applyUiEnv();
 const ui = createUiLoader({
   entry: APP_ENTRY,

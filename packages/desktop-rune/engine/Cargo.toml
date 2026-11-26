@@ -10,9 +10,9 @@ name = "stella-engine"
 path = "src/main.rs"
 
 [dependencies]
-rune = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1", features = ["tooling"] }
-rune-kit = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1", features = ["markdown", "mermaid"] }
-rune-notify = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
+rune = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a", features = ["tooling"] }
+rune-kit = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a", features = ["markdown", "mermaid"] }
+rune-notify = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
@@ -75,14 +75,14 @@ default = ["webview"]
 webview = ["dep:wry", "dep:gtk", "dep:webkit2gtk"]
 
 [patch.crates-io]
-wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-naga = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-winit = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-parley_engine = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
-accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "9ba4b743f75f33b8d1b01dbba56a41e3eed1a5e1" }
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "1c48299a987a8a488bc3f16685a3f8a14d1b1b3a" }
 
 [profile.release]
 codegen-units = 16

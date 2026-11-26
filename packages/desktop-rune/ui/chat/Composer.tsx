@@ -19,6 +19,7 @@ import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility"
 import { useT } from "@/shared/i18n";
 import type { InputKeyEvent } from "../../host/rune-jsx/props";
 import { derive, fontSize, mixOklch, useTokens } from "../theme";
+import { APP_TRACKING } from "../kit/compat";
 import { ComposerContextRow } from "./ComposerContextRow";
 import { ComposerLeadRow } from "./ComposerLeadRow";
 import type { AssistantReplyPeekProps } from "./AssistantReplyPeek";
@@ -104,7 +105,7 @@ function usePillExpansion(message: string) {
   const expanded = message.length > 0 && pillFieldW > 0 && pillTextH > LINE + 0.5;
   const measure =
     pillFieldW > 0 && message.length > 0 ? (
-      <text absolute={{ left: 0, top: 0 }} w={pillFieldW - PILL_INPUT_PAD_X * 2} size={fontSize.md} lineHeight={LINE} hidden inert onLayout={(r) => setPillTextH(r.h)}>
+      <text absolute={{ left: 0, top: 0 }} w={pillFieldW - PILL_INPUT_PAD_X * 2} size={fontSize.md} lineHeight={LINE} tracking={APP_TRACKING} hidden inert onLayout={(r) => setPillTextH(r.h)}>
         {message.endsWith("\n") ? `${message} ` : message}
       </text>
     ) : null;

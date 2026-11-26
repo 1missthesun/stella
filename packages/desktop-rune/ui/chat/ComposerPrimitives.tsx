@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { InputKeyEvent } from "../../host/rune-jsx/props";
 import { Icon, Icons, withStroke, type IconData } from "../kit";
+import { APP_TRACKING } from "../kit/compat";
 import { derive, fontSize, mix, mixOklch, useTokens } from "../theme";
 
 const BUTTON = 32;
@@ -166,6 +167,7 @@ export function ComposerTextarea({ tone = "default", disabled, color, ...props }
       readOnly={disabled}
       size={fontSize.md}
       lineHeight={fontSize.md * 1.5}
+      tracking={APP_TRACKING}
       color={color ?? (tone === "orb" ? tokens.c.foreground : tokens.c.textStrong)}
       placeholderColor={tokens.c.textWeaker}
       caretColor={tokens.c.textStrong}

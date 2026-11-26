@@ -455,7 +455,7 @@ that takes, and share it.
     selection settles (release of a drag, double/triple-click, shift-extend, select-all), and
     `{window, n, cleared: true}` when the window's selection clears.
   - `copy(window?)`.
-  - `lookUp(window?)`: macOS dictionary. Not wired yet; it returns false.
+  - `lookUp(window?)`: macOS dictionary popover for the window's selection, drawn at its first glyph in that text's font, as Chromium's `showDefinitionForSelection` does; true when shown. ⌃⌘D and a force click or three-finger tap on the selection show it too. False with no selection, and off macOS.
 - `input.*`, `media.*`, `webview.*`
 - `control.*`, `quit()`
 

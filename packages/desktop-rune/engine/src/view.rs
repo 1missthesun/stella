@@ -241,8 +241,8 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
         e = e.selection_group(true);
     }
     if (p.selection_group || p.selectable) && !is_input {
-        e = e.on_selection_change(move |s: &mut Win, change: &rune::SelectionChange, _tx: &mut Tx| {
-            crate::windows::note_selection_change(s.node, n, change);
+        e = e.on_selection_change(move |s: &mut Win, change: &rune::SelectionChange, tx: &mut Tx| {
+            crate::windows::note_selection_change(s.node, n, change, tx);
         });
     }
     if p.scroll_x || p.scroll_y {

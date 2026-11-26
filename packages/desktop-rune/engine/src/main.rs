@@ -18,6 +18,7 @@ mod desktop_fonts;
 mod engine;
 mod input;
 mod keys;
+mod look_up;
 mod markdown;
 mod media;
 mod metrics;

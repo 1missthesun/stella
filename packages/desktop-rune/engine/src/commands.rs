@@ -80,7 +80,7 @@ pub fn route(v: Value) {
                 None => json!({ "text": t }),
             })));
         }
-        "selection.lookUp" => reply(rid, Ok(json!(false))),
+        "selection.lookUp" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(crate::look_up::show)))),
         "window.isFocused" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(|w| engine::read(|e| e.windows.get(&w).is_some_and(|s| s.focused)))))),
         "menu.setApplicationMenu" => reply(rid, crate::services::app_menu(&v)),
         "screen.cursorPoint" => reply(rid, Err("screen.cursorPoint: Rune doesn't report the pointer outside its windows".into())),

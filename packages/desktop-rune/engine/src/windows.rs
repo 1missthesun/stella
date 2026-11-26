@@ -179,6 +179,9 @@ fn note_state(node: u32, dark: bool, maximized: bool, full: bool, accent: String
 }
 
 pub fn on_key(s: &mut Win, ev: &rune::KeyEvent, tx: &mut Tx) -> bool {
+    if crate::look_up::is_shortcut(ev) && crate::look_up::show(s.node) {
+        return true;
+    }
     let keys = engine::read(|e| e.tree.get(s.node).map(|n| n.props.keys.clone()).unwrap_or_default());
     if keys.is_empty() {
         return false;
@@ -195,6 +198,7 @@ fn close_request(s: &mut Win, _tx: &mut Tx) -> CloseResponse {
 }
 
 pub fn setup(s: &mut Win, waker: Waker) {
+    crate::look_up::install();
     WAKERS.lock().unwrap_or_else(|e| e.into_inner()).push(waker.clone());
     if s.main {
         let slot = engine::read(|e| e.main_waker.clone());
@@ -797,6 +801,11 @@ struct Settle {
     settled: bool,
     pending: bool,
     rect: Option<[f32; 4]>,
+    rects: Vec<[f32; 4]>,
+    /// For Look Up: the font of the text the selection starts in, and how far below its first
+    /// line box's top the line's baseline sits.
+    font: Option<rune::ResolvedTextStyle>,
+    baseline: Option<f32>,
 }
 
 thread_local! {
@@ -805,7 +814,7 @@ thread_local! {
 
 /// Tracks a window's selection between a press making it and its release, and reports the
 /// settled selection with its box from the next view run, or that it cleared.
-pub fn note_selection_change(window: u32, element: u32, change: &rune::SelectionChange) {
+pub fn note_selection_change(window: u32, element: u32, change: &rune::SelectionChange, tx: &mut Tx) {
     note_selection(window, element, change.selection().map(|t| t.text().to_owned()));
     let any = selected_text(window).is_some();
     let was = SETTLES.with(|m| {
@@ -820,6 +829,17 @@ pub fn note_selection_change(window: u32, element: u32, change: &rune::Selection
         }
         was
     });
+    let start = change.selection().filter(|_| any && !change.dragging()).and_then(|t| t.texts().iter().find(|t| !t.range().is_empty()).map(|t| t.path().to_owned()));
+    if let Some(path) = start {
+        tx.read_elements(move |_: &mut Win, els, _| {
+            let font = els.iter().find(|e| e.path == path).and_then(|e| e.text_style.clone());
+            SETTLES.with(|m| m.borrow_mut().entry(window).or_default().font = font);
+        });
+        tx.selection_lines(move |_: &mut Win, lines, _| {
+            let baseline = lines.first().map(|l| l.baseline - l.rect[1]);
+            SETTLES.with(|m| m.borrow_mut().entry(window).or_default().baseline = baseline);
+        });
+    }
     if !any && was {
         engine::send(json!({ "t": "selection", "window": window_id(window), "n": window, "cleared": true }));
     }
@@ -833,7 +853,8 @@ fn settle_rect(window: u32, cx: &mut Cx<Win>) {
     if !SETTLES.with(|m| m.borrow().get(&window).is_some_and(|s| s.settled)) {
         return;
     }
-    let rect = cx.selection_client_rects().into_iter().reduce(|a, b| {
+    let rects = cx.selection_client_rects();
+    let rect = rects.iter().copied().reduce(|a, b| {
         let (x, y) = (a[0].min(b[0]), a[1].min(b[1]));
         [x, y, (a[0] + a[2]).max(b[0] + b[2]) - x, (a[1] + a[3]).max(b[1] + b[3]) - y]
     });
@@ -841,6 +862,7 @@ fn settle_rect(window: u32, cx: &mut Cx<Win>) {
         let mut m = m.borrow_mut();
         let st = m.entry(window).or_default();
         st.rect = rect;
+        st.rects = rects;
         let emit = st.pending && rect.is_some();
         if emit {
             st.pending = false;
@@ -859,6 +881,12 @@ fn rect_json(r: [f32; 4]) -> serde_json::Value {
 /// The union of `window`'s settled selection line boxes, in window points as scrolled.
 pub fn selection_rect(window: u32) -> Option<serde_json::Value> {
     SETTLES.with(|m| m.borrow().get(&window).and_then(|s| s.rect)).map(rect_json)
+}
+
+/// `window`'s settled selection for Look Up.
+pub fn look_up_target(window: u32) -> Option<crate::look_up::Target> {
+    let text = selected_text(window)?;
+    SETTLES.with(|m| m.borrow().get(&window).and_then(|s| crate::look_up::Target::new(text, s.font.clone()?, s.baseline?, s.rects.clone())))
 }
 
 pub fn note_selection(window: u32, element: u32, text: Option<String>) {

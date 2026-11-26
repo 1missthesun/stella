@@ -68,26 +68,28 @@ const MapCard = ({ map }: { map: MapArtifact }) => {
   );
   return (
     <col w="full" maxW={560} radius={radius["2xl"]} clip={radius["2xl"]} fill={tokens.c.surfaceInset} border={tokens.c.border}>
-      <box w="full" h={selfHosted ? 72 : 280} fill={look.frame} mt={1} mx={1}>
-        {selfHosted ? (
-          offline(
-            <text size={12.5} color={tokens.c.textWeak}>
-              {map.markers.map((marker) => marker.name).join(" · ")}
-            </text>,
-          )
-        ) : frameFailed ? (
-          offline(
-            <>
-              <Icon icon={Icons.stella.AlertCircle} size={15} color={tokens.c.textWeak} />
+      <col w="full" pt={1} px={1}>
+        <box w="full" h={selfHosted ? 72 : 280} fill={look.frame}>
+          {selfHosted ? (
+            offline(
               <text size={12.5} color={tokens.c.textWeak}>
-                {t("app.chat.mapCard.previewFailed")}
-              </text>
-            </>,
-          )
-        ) : (
-          <webview absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} corners={[radius["2xl"] - 1, radius["2xl"] - 1, 0, 0]} url={embedUrl} label={t("app.chat.mapCard.frameTitle", { title })} onError={() => setFrameFailed(true)} />
-        )}
-      </box>
+                {map.markers.map((marker) => marker.name).join(" · ")}
+              </text>,
+            )
+          ) : frameFailed ? (
+            offline(
+              <>
+                <Icon icon={Icons.stella.AlertCircle} size={15} color={tokens.c.textWeak} />
+                <text size={12.5} color={tokens.c.textWeak}>
+                  {t("app.chat.mapCard.previewFailed")}
+                </text>
+              </>,
+            )
+          ) : (
+            <webview absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} corners={[radius["2xl"] - 1, radius["2xl"] - 1, 0, 0]} url={embedUrl} label={t("app.chat.mapCard.frameTitle", { title })} onError={() => setFrameFailed(true)} />
+          )}
+        </box>
+      </col>
       <row align="center" justify="between" gap={12} py={9} px={12 + 1} pb={9 + 1} borderSides={[1, 0, 0, 0]} border={tokens.c.border}>
         <row align="end" gap={8} minW={0} shrink>
           <text size={13} weight={600} tracking={APP_TRACKING} color={tokens.c.textStrong} title={title} minW={0} nowrap truncate>

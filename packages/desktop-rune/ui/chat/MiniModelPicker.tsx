@@ -14,7 +14,7 @@ import { modelBlockedAt, planOfModel, useModelDestination } from "@/features/exe
 import { enginePlaceBadge } from "@/features/execution-placement/EnginePlace";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
-import { BrandIcon, Popover, PopoverContent, PopoverTrigger } from "../kit/compat";
+import { APP_TRACKING, BODY_TEXT, BrandIcon, Popover, PopoverContent, PopoverTrigger } from "../kit/compat";
 import { Icon, Icons } from "../kit";
 import { derive, fontSize, look, mixOklch, radius, useTokens } from "../theme";
 import { panelSurface } from "./surfaces";
@@ -24,7 +24,8 @@ type RecentRow = ReturnType<typeof buildRecentModelRows>[number];
 
 const ASSISTANT_AGENT_KEYS = ["orchestrator", "general"];
 const NO_EXCLUDED_IDS = new Set<string>();
-const XS_MEDIUM = look(fontSize.xs, 500, { em: 0 });
+const XS_MEDIUM = look(fontSize.xs, 500, { em: BODY_TEXT.em, lh: BODY_TEXT.lh, family: BODY_TEXT.family });
+const TRIGGER_LABEL = { ...look(fontSize.xs, 400), tracking: APP_TRACKING };
 const TRIGGER_MAX_W = 180;
 const POPOVER_W = 292;
 
@@ -191,7 +192,7 @@ export function MiniModelPicker() {
           <box opacity={0.85} shrink={false}>
             <BrandIcon brand={triggerBrand} size={13} />
           </box>
-          <text {...XS_MEDIUM} color={open ? c.textStrong : c.textWeak} minW={0} shrink nowrap truncate>
+          <text {...TRIGGER_LABEL} color={open ? c.textStrong : c.textWeak} minW={0} shrink nowrap truncate>
             {triggerLabel}
           </text>
         </row>
@@ -221,6 +222,7 @@ export function MiniModelPicker() {
                   gradient={active ? panel.gradient : undefined}
                   border={active ? panel.border : undefined}
                   hoverFill={reasoningDisabled || active ? undefined : l.hover}
+                  focusFill={reasoningDisabled || active ? undefined : l.hover}
                   hoverColor={reasoningDisabled ? undefined : c.textStrong}
                   opacity={reasoningDisabled ? 0.5 : undefined}
                   onPress={reasoningDisabled ? undefined : () => handleReasoningEffortSelect(option.id)}
@@ -256,7 +258,7 @@ export function MiniModelPicker() {
             })}
           </col>
         ) : null}
-        <col w="full" mt={5} pt={5} borderSides={[1, 0, 0, 0]} border={c.borderWeak} align="stretch">
+        <col w="full" mt={5} pt={5 + 1} borderSides={[1, 0, 0, 0]} border={c.borderWeak} align="stretch">
           <ModelRow label={t("app.chat.miniModelPicker.moreModels")} more onPress={handleOpenFullPicker} />
         </col>
       </PopoverContent>

@@ -158,6 +158,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   extraTail,
   indicator,
   list,
+  alignItemsAtEnd = false,
   estimatedItemSize = 120,
   contentContainerStyle,
   takesMessageJumps = false,
@@ -313,7 +314,7 @@ export const ChatTimeline = memo(function ChatTimeline({
         markReady();
       }}
     >
-      <col w="full" maxW={maxW} selfAlign="center" {...padding}>
+      <col w="full" maxW={maxW} selfAlign="center" {...(alignItemsAtEnd ? { minH: "full", justify: "end" } : {})} {...padding}>
         {children}
       </col>
     </col>

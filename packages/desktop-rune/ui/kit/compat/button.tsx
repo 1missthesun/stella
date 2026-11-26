@@ -44,7 +44,7 @@ function buttonLook(t: Tokens, key: string): Look {
       text: { size: large ? 12 : sz.size, weight: 500, em: 0, color: c.textWeak },
       motion: { dur: 0.15 },
     };
-    if (off) return { ...look, opacity: 0.45 };
+    if (off) return { ...look, opacity: 0.45, border: active === "1" ? c.selectBorder : tone === "primary" ? c.interactive : look.border };
     if (active === "1") return { ...look, fill: c.selectFill, border: c.selectBorder, hover: c.selectFill, hoverBorder: c.selectBorder, text: { ...look.text, color: c.selectText } };
     if (tone === "primary") {
       const hover = mix(c.foreground, 10, c.interactive);

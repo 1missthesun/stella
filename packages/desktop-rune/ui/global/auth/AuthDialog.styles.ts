@@ -1,4 +1,4 @@
-import { mixOklch, sheet } from "../../theme";
+import { font, mixOklch, sheet } from "../../theme";
 
 export const useAuthDialog = sheet((c, t) => ({
   authDialogContent: { pad: 1, clip: 0, fill: c.glassTop, gradient: t.gradient.glass, border: c.borderWeak },
@@ -8,13 +8,12 @@ export const useAuthDialog = sheet((c, t) => ({
   authDialogGoogle: { family: "sans", pad: 1, align: "center", justify: "center", gap: 10, w: "full", minH: 44, border: c.border, radius: 999, fill: mixOklch(c.foreground, 4, c.card), color: c.textStrong, size: 14, weight: 600, em: 0, motion: { dur: 0.16 }, hoverBorder: mixOklch(c.foreground, 18, c.border), hover: mixOklch(c.foreground, 6, c.card) },
   authDialogGoogleDisabled: { opacity: 0.65 },
   authDialogGoogleIcon: { w: 18, h: 18 },
-  authDialogMethodDivider: { align: "center", gap: 12, color: c.mutedForeground, mono: true, size: 10, weight: 500, em: 0, textCase: "upper" },
+  authDialogMethodDivider: { align: "center", gap: 12, color: c.mutedForeground, mono: true, size: 10, weight: 500, em: 0, textCase: "upper", w: "full" },
+  authDialogMethodDividerLine: { grow: 1, h: 1, fill: c.borderWeak },
   authDialogHero: { align: "center", gap: 8, textAlign: "center" },
-  authDialogHeadline: { color: c.textStrong, maxW: 360 },
+  authDialogHeadline: { color: c.textStrong, family: font.display, size: 20, weight: 600, lh: 1.2, em: -0.03, maxW: 360 },
   authDialogSub: { family: "sans", color: c.mutedForeground, size: 13, weight: 500, lh: 1.5, em: -0.01, maxW: 320 },
   authDialogForm: { gap: 10, w: "full" },
-  authDialogInput_inputWrapper: { fill: mixOklch(c.foreground, 4, c.card), border: c.border },
-  authDialogInput_inputInput: { h: 40, size: 14 },
   authDialogCta: { w: "full", justify: "center" },
   authDialogError: { family: "sans", py: 10, px: 12, mt: 2, radius: 8, fill: mixOklch(c.destructive, 10, "transparent"), color: c.destructive, size: 12, weight: 500, lh: 1.4, textAlign: "center" },
   authDialogExtras: { opacity: 0, motion: { dur: 0.28 } },

@@ -199,9 +199,11 @@ export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
       <GoogleAuthButton loginHint={accountHint} />
       <PasskeyAuthButton />
       <row {...s.authDialogMethodDivider}>
+        <box {...s.authDialogMethodDividerLine} />
         <T {...tx(s.authDialogMethodDivider)}>{t("global.auth.orUseEmail")}</T>
+        <box {...s.authDialogMethodDividerLine} />
       </row>
-      <MagicLinkAuthFlow hideEmailLabel inputVariant="normal" emailPlaceholder={t("global.auth.emailPlaceholder")} autoFocus buttonClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-cta" buttonVariant="primary" buttonSize="large" submitLabel={t("common.continue")} sendingLabel={t("global.auth.sending")} resendLabel={t("global.auth.resendEmail")} sentMessage={t("global.auth.magicLinkSentDesktop")} openInboxClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-open-inbox" styles={{ form: s.authDialogForm, inputWrapper: s.authDialogInput_inputWrapper, input: s.authDialogInput_inputInput, button: s.authDialogCta, extras: s.authDialogExtras, extrasOpen: s.authDialogExtrasOpen, extrasInner: s.authDialogExtrasInner, sent: s.authDialogSent, openInbox: s.authDialogOpenInbox, error: s.authDialogError }} />
+      <MagicLinkAuthFlow hideEmailLabel inputVariant="normal" emailPlaceholder={t("global.auth.emailPlaceholder")} autoFocus buttonClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-cta" buttonVariant="primary" buttonSize="large" submitLabel={t("common.continue")} sendingLabel={t("global.auth.sending")} resendLabel={t("global.auth.resendEmail")} sentMessage={t("global.auth.magicLinkSentDesktop")} openInboxClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-open-inbox" styles={{ form: s.authDialogForm, button: s.authDialogCta, extras: s.authDialogExtras, extrasOpen: s.authDialogExtrasOpen, extrasInner: s.authDialogExtrasInner, sent: s.authDialogSent, openInbox: s.authDialogOpenInbox, error: s.authDialogError }} />
     </>
   );
 }

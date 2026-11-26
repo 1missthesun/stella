@@ -287,7 +287,7 @@ export function TextField({ label, hideLabel, description, error, variant = "nor
           minW={0}
           minH={32}
           px={12}
-          py={multiline ? 6 : 2}
+          py={multiline ? 6 : (32 - Math.round((inputStyle?.size ?? fontSize.md) * 1.43)) / 2}
           {...inputStyle}
           onFocus={() => {
             setFocused(true);

@@ -6,6 +6,7 @@ import {
   revokeAccountSession,
 } from "@/global/auth/services/auth";
 import { Button } from "@/ui/button";
+import { LoaderCircle, LogOut } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 
 const deviceLabel = (session: AccountSessionSummary): string => {
@@ -105,13 +106,21 @@ export function SessionsCard() {
               <Button
                 type="button"
                 variant="ghost"
-                className="pill-btn pill-btn--danger"
+                className="settings-icon-btn"
                 disabled={revoking === session.id}
+                aria-label={`${t("settings.sessions.revoke")} — ${deviceLabel(session)}`}
+                title={
+                  revoking === session.id
+                    ? t("settings.sessions.revoking")
+                    : t("settings.sessions.revoke")
+                }
                 onClick={() => revoke(session.id)}
               >
-                {revoking === session.id
-                  ? t("settings.sessions.revoking")
-                  : t("settings.sessions.revoke")}
+                {revoking === session.id ? (
+                  <LoaderCircle size={15} className="settings-icon-btn__spin" aria-hidden />
+                ) : (
+                  <LogOut size={15} aria-hidden />
+                )}
               </Button>
             ) : null}
           </div>

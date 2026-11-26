@@ -155,8 +155,9 @@ export function EngineAccountRowView({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="pill-btn"
+                className="settings-icon-btn"
                 aria-label={t(`${K}.moreLabel`, { name: title })}
+                title={t(`${K}.moreLabel`, { name: title })}
                 disabled={busy}
               >
                 <MoreHorizontal size={16} aria-hidden />

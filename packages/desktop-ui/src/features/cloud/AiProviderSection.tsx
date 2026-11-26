@@ -128,7 +128,12 @@ export function AiDetailsGroup({ label, children }: { label: string; children: R
   );
 }
 
-export type AiMenuItem = { key: string; label: string; onSelect: () => void };
+export type AiMenuItem = {
+  key: string;
+  label: string;
+  onSelect: () => void;
+  destructive?: boolean;
+};
 
 export function AiRow({
   name,
@@ -138,6 +143,7 @@ export function AiRow({
   useLabel,
   menuLabel,
   menu = [],
+  reserveMenuSlot = false,
   busy,
   children,
   extra,
@@ -149,6 +155,7 @@ export function AiRow({
   useLabel?: string;
   menuLabel?: string;
   menu?: AiMenuItem[];
+  reserveMenuSlot?: boolean;
   busy?: boolean;
   children?: ReactNode;
   extra?: ReactNode;
@@ -171,18 +178,31 @@ export function AiRow({
         {menu.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" className="pill-btn" aria-label={menuLabel} disabled={busy}>
+              <Button
+                type="button"
+                variant="ghost"
+                className="settings-icon-btn"
+                aria-label={menuLabel}
+                title={menuLabel}
+                disabled={busy}
+              >
                 <MoreHorizontal size={16} aria-hidden />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12}>
               {menu.map((item) => (
-                <DropdownMenuItem key={item.key} onSelect={item.onSelect}>
+                <DropdownMenuItem
+                  key={item.key}
+                  data-variant={item.destructive ? "destructive" : undefined}
+                  onSelect={item.onSelect}
+                >
                   {item.label}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : reserveMenuSlot ? (
+          <span className="ai-row__menu-spacer" aria-hidden="true" />
         ) : null}
       </div>
     </div>

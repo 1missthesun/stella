@@ -332,6 +332,7 @@ export function ChatGptAccountsSection({
       menu.push({
         key: "remove",
         label: t(`${K}.remove`),
+        destructive: true,
         onSelect: () =>
           void run(async () => {
             if (local) await chatgpt.remove(local.id);

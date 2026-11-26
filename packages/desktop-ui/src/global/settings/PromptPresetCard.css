@@ -39,6 +39,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  margin-top: 10px;
 }
 
 .prompt-preset-actions-spacer {

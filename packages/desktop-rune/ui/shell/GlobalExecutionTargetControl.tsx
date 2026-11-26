@@ -31,7 +31,7 @@ const TRIGGER_LABEL = "Where Stella works";
 const moveErrorMessage = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error)).replace(/^Error invoking remote method '[^']*': (?:\w*Error: )?/u, "");
 
-const OPTION_TEXT = look(fontSize.base, 400);
+const OPTION_TEXT = look(16, 400, { lh: 1.5, em: 0 });
 const OPTION_SMALL = look(fontSize.xs, 400);
 
 /** `.execution-target-option`: icon, label, then a check or a small note. */
@@ -41,11 +41,11 @@ function TargetOption({ id, icon, label, trailing, disabled, onPress }: { id: st
   const color = disabled ? t.c.textWeak : t.c.textBase;
   return (
     <row id={id} role="menuitem" focusable={!disabled} disabled={disabled} w="full" minH={36} px={9} py={7} gap={9} align="center" radius={radius.md} hover={disabled ? undefined : hover} opacity={disabled ? 0.65 : undefined} onPress={disabled ? undefined : onPress}>
-      <box w={18} center>
+      <box w={18} align="start">
         <GroupIcon icon={icon} size={16} color={color} />
       </box>
       <text {...OPTION_TEXT} color={color} grow={1} shrink minW={0} truncate>{label}</text>
-      {trailing ? ("check" in trailing ? <GroupIcon icon={Icons.stella.Check} size={15} color={color} /> : <text {...OPTION_SMALL} color={t.c.textWeak}>{trailing.note}</text>) : null}
+      {trailing ? "check" in trailing ? <GroupIcon icon={Icons.stella.Check} size={15} color={color} /> : <text {...OPTION_SMALL} color={t.c.textWeak}>{trailing.note}</text> : <box />}
     </row>
   );
 }
@@ -104,7 +104,7 @@ export function GlobalExecutionTargetControl() {
         {(color) => <GroupIcon icon={target.mode === "cloud" ? Icons.stella.Globe : Icons.stella.Monitor} size={18} strokeWidth={1.5} color={color} hoverColor={strong} opacity={moving ? 0.6 : 1} />}
       </TopbarButton>
       <Panel id="execution-target-popover" anchor="execution-target-button" open={open} onClose={() => setOpen(false)} w={280} label={TRIGGER_LABEL}>
-        <col w="full" gap={2} pad={4} focusGroup>
+        <col w="full" gap={2} pad={12} focusGroup>
           <TargetOption id="execution-target-automatic" icon={platformCapabilities.website ? Icons.stella.Globe : Icons.stella.Monitor} label={platformCapabilities.automaticExecutionLabel} trailing={target.mode === "automatic" ? { check: true } : undefined} onPress={() => choose({ mode: "automatic" })} />
           <TargetOption
             id="execution-target-cloud"

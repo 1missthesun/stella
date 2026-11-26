@@ -68,7 +68,7 @@ fn list(id: u32, n: &Node) -> El {
     let est = n.props.estimate.unwrap_or(64.0);
     let mut e = col();
     match &n.props.growth {
-        Some(crate::props::GrowthP::On(false)) => {}
+        Some(crate::props::GrowthP::On(false)) => e = e.growth(GrowthSpec { spring: crate::style::spring(0.0, 0.0), edge: rune::edge::NO_MASK }),
         Some(crate::props::GrowthP::Spec(g)) => e = e.growth(growth_spec(g)),
         _ => e = e.growth(GrowthSpec::default()),
     }

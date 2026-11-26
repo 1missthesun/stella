@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fontSize, look, radius, useTokens } from "../../theme";
 import type { SurfacePointer } from "../../../host/rune-jsx/props";
+import { systemFontFamily } from "../../theme/system-font";
 import { useWindowKeys } from "../window-keys";
 import { useAuxWindow } from "../aux-window";
 
@@ -214,7 +215,7 @@ export function RegionCapture() {
       ) : null}
       {vacuum ? <Vacuum key={vacuum.thumbnail} vacuum={vacuum} onDone={finishVacuum} /> : null}
       <box absolute={{ left: 16, top: 16 }} py={8 + 1} px={12 + 1} radius={radius.md} border={tokens.c.border} fill={tokens.c.card} shadows={tokens.shadow.overlay} inert>
-        <text {...look(fontSize.sm, 400, { em: 0.2 / fontSize.sm })} color={tokens.c.textBase} nowrap>
+        <text {...look(fontSize.sm, 400, { em: 0.2 / fontSize.sm, family: systemFontFamily() })} lineHeight={18} color={tokens.c.textBase} nowrap>
           Click to capture window - drag to capture region - Right-click or Esc to cancel
         </text>
       </box>

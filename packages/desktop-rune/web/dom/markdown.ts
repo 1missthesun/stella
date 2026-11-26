@@ -223,7 +223,7 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
   });
   const actions = tableActions(n, c);
   const scroller = createElement("div", { style: { overflowX: "auto", scrollbarWidth: "thin" } },
-    createElement("table", { style: { borderCollapse: "collapse", width: s.tableFullWidth ? "100%" : undefined, ...fontCss(s.tableFont as Font), outline: s.tableOutline ? `1px solid ${s.tableOutline}` : undefined } },
+    createElement("table", { style: { borderCollapse: "collapse", width: s.tableFullWidth ? "100%" : undefined, ...fontCss(s.tableFont as Font), border: s.tableOutline ? `1px solid ${s.tableOutline}` : undefined } },
       createElement("thead", null, rows[0] ? createElement("tr", null, cell(rows[0], 0)) : null),
       createElement("tbody", null, rows.slice(1).map((row, r) => createElement("tr", { key: r }, cell(row, r + 1))))));
   return createElement("div", { key, className: actions ? "mdtable" : undefined, style: { ...margin(s.tableMargin, [16, 16]), position: actions ? "relative" : undefined } }, scroller, actions);

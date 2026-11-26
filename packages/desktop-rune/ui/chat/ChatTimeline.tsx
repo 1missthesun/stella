@@ -239,12 +239,13 @@ export const ChatTimeline = memo(function ChatTimeline({
   }, [flashItemId]);
 
   const laidOutRef = useRef(false);
-  const readyKeyRef = useRef<string | undefined | null>(null);
+  const reportedRef = useRef<{ dataKey: string | undefined; onReady: (() => void) | undefined } | null>(null);
   const onReady = list?.onReady;
   const dataKey = list?.dataKey;
   const markReady = useCallback(() => {
-    if (!laidOutRef.current || readyKeyRef.current === dataKey) return;
-    readyKeyRef.current = dataKey;
+    const reported = reportedRef.current;
+    if (!laidOutRef.current || (reported && reported.dataKey === dataKey && reported.onReady === onReady)) return;
+    reportedRef.current = { dataKey, onReady };
     onReady?.();
   }, [dataKey, onReady]);
   useEffect(markReady, [markReady]);

@@ -25,8 +25,6 @@ import {
   type ToolExecutionApi,
   type RunFailureReason,
   type SettledSubmissionRecord,
-  type ToolRegistration,
-  wrapTool,
 } from "@earendil-works/pi-durable";
 import {
   AGENT_MESSAGE_MAX_CHARS,
@@ -93,7 +91,6 @@ import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provid
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
 import { computerOnlyProviderOf } from "@stella/contracts/backend/providers";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
-import { CONTEXT_HANDOFF_AGENT_DESCRIPTION, CONTEXT_HANDOFF_TOOL } from "@stella/contracts/context-handoff";
 import {
   AGENT_MOVE_CLOUD,
   SWITCH_DESTINATION_TOOL_NAME,
@@ -3217,9 +3214,6 @@ export function stellaAgents(host: StellaAgentsHost) {
   const waitingExtension = defineExtension({
     name: STELLA_AGENT_WAITING_EXTENSION,
     tools: [],
-    wraps: [
-      wrapTool({ name: CONTEXT_HANDOFF_TOOL } as ToolRegistration, (tool) => ({ ...tool, description: CONTEXT_HANDOFF_AGENT_DESCRIPTION })),
-    ],
   });
   return {
     extension,

@@ -146,18 +146,18 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   registry.install(agents.waitingExtension);
   registry.install(options.hostShell ? StellaCodingFiles : StellaCoding);
   const runningCommands = options.agents.runningCommands?.bind(options.agents);
-  registry.install(
-    stellaHandoffExtension({
-      ...(runningCommands ? { runningCommands } : {}),
-      ...(options.handoffAtTokens !== undefined ? { atTokens: options.handoffAtTokens } : {}),
-    }),
-  );
+  const report = options.onReport ?? ((error: unknown) => console.error("[stella-agent]", error));
+  const handoff = stellaHandoffExtension({
+    ...(runningCommands ? { runningCommands } : {}),
+    ...(options.handoffAtTokens !== undefined ? { atTokens: options.handoffAtTokens } : {}),
+    report,
+  });
+  registry.install(handoff.extension);
   const refreshTools = () => {
     for (const extension of stellaToolExtensions(options.tools)) registry.install(extension);
   };
   refreshTools();
   for (const extension of options.extensions ?? []) registry.install(extension);
-  const report = options.onReport ?? ((error: unknown) => console.error("[stella-agent]", error));
   const turnLimits = createTurnLimits(options.turnLimits ?? {}, report);
   registry.install(turnLimits.extension);
   const base = options.settings ?? stellaHarnessSettings();
@@ -185,6 +185,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     context,
   );
   imageBudget.bind(harness);
+  handoff.bind(harness, settings);
   return {
     harness,
     registry,

@@ -32,6 +32,9 @@ type Capture = { at: Point; contributions: Contribution[] };
 const BUILD_TIMEOUT_MS = 260;
 const isMac = process.platform === "darwin";
 
+/** Rune has no DOM under the press: shared builders that look for an element (link, code, image, tab) find none, and elements contribute their own items. */
+const NO_DOM_TARGET = { closest: () => null } as unknown as Element;
+
 const globals = new Map<string, GlobalBuilder>();
 let capture: Capture | null = null;
 
@@ -106,7 +109,7 @@ async function flush() {
   const selection = (await selectionText()).trim();
   const claimed = new Set<string>();
   for (const c of current.contributions) for (const claim of c.claims) claimed.add(claim);
-  const context: MenuContext = { target: document.body as unknown as Element, selectionText: selection, isEditable: false, claimed };
+  const context: MenuContext = { target: NO_DOM_TARGET, selectionText: selection, isEditable: false, claimed };
   const own = await Promise.all(current.contributions.map((c) => runBuilder(c.build, context)));
   const shared = await Promise.all([...globals.values()].filter((g) => g.slot === "sections").map((g) => runBuilder(g.build, context)));
   const selectionExtras = await Promise.all([...globals.values()].filter((g) => g.slot === "selection").map((g) => runBuilder(g.build, context)));

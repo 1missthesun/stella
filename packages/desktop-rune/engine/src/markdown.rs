@@ -258,6 +258,24 @@ struct CodeFrameP {
     /// `[top, right]`: the actions float at this inset from the frame's top right corner
     /// instead of sitting in the label row.
     actions_at: Option<[f32; 2]>,
+    /// Painted behind the action row, which then takes `actionsPad` `[x, y]` and `actionsRadius`.
+    actions_fill: Option<crate::props::C>,
+    actions_pad: Option<[f32; 2]>,
+    actions_radius: Option<f32>,
+    gap: Option<f32>,
+    /// Square buttons of the icon's size plus this on each side, instead of 22 high with 4 each side.
+    button_pad: Option<f32>,
+    /// One block's action shown with another icon, such as the check after a copy.
+    swap: Option<SwapP>,
+}
+
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct SwapP {
+    index: usize,
+    id: String,
+    svg: String,
+    view: Option<f32>,
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -310,21 +328,36 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
         let size = f.label_size.unwrap_or(12.0);
         let mut head = rune::row().w_full().items_center().justify_between().h(f.label_height.unwrap_or(22.0)).pl(f.label_inset.unwrap_or(0.0));
         head = head.child(label(c.language.unwrap_or(""), size, weak, f.label_family.as_deref()));
-        let mut actions = rune::row().gap(2.0).items_center();
+        let mut actions = rune::row().gap(f.gap.unwrap_or(2.0)).items_center();
+        if let Some(c) = f.actions_fill {
+            let [x, y] = f.actions_pad.unwrap_or([0.0, 0.0]);
+            actions = actions.fill(c.0).px(x).py(y).radius(f.actions_radius.unwrap_or(0.0));
+        }
         for a in &f.actions {
             let color = f.action_color.map(|c| c.0).unwrap_or(weak);
-            let mut b = rune::el().key(a.id.clone()).h(22.0).px(4.0).radius(6.0).center().cursor(rune::Cursor::Pointer).role("button");
-            if let Some(h) = f.action_hover {
-                b = b.hover(h.0);
-            }
+            let icon_size = a.size.unwrap_or(14.0);
+            let mut b = rune::el().key(a.id.clone()).center().cursor(rune::Cursor::Pointer).role("button");
+            b = match f.button_pad {
+                Some(pad) => b.size(icon_size + 2.0 * pad, icon_size + 2.0 * pad).hover_group(),
+                None => b.h(22.0).px(4.0).radius(6.0),
+            };
+            let swapped = f.swap.as_ref().filter(|s| s.index == c.index && s.id == a.id);
             b = match (&a.svg, &a.label) {
                 (Some(svg), _) => {
-                    let ip = Props { svg: Some(svg.clone()), view: a.view, size: Some(14.0), color: Some(crate::props::C(color)), ..Default::default() };
-                    b.child(crate::media::icon(&ip)).label(a.label.clone().unwrap_or_else(|| a.id.clone()))
+                    let (svg, view) = swapped.map_or((svg, a.view), |s| (&s.svg, s.view.or(a.view)));
+                    let ip = Props { svg: Some(svg.clone()), view, size: Some(icon_size), color: Some(crate::props::C(color)), ..Default::default() };
+                    let mut icon = crate::media::icon(&ip);
+                    if let (Some(h), Some(_)) = (f.action_hover, f.button_pad) {
+                        icon = icon.group_color(h.0);
+                    }
+                    b.child(icon).label(a.label.clone().unwrap_or_else(|| a.id.clone()))
                 }
                 (None, Some(l)) => b.child(label(l, size, color, None)),
                 (None, None) => b.child(label(&a.id, size, color, None)),
             };
+            if let (Some(h), None) = (f.action_hover, f.button_pad) {
+                b = b.hover(h.0);
+            }
             let (id, index, language, source) = (a.id.clone(), c.index, c.language.map(str::to_owned), c.source.to_owned());
             b = b.on_press_tx(move |_s: &mut crate::windows::Win, tx: &mut rune::Tx| {
                 crate::engine::element_event(n, "codeAction", serde_json::json!({ "action": id, "index": index, "language": language, "source": source }), Some(tx));

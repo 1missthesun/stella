@@ -10,7 +10,7 @@ import { cloudDriveEntry } from "@/features/workspace-display/derive-conversatio
 import { shouldUseBoundedMarkdownPlaintext } from "@/features/chat/streaming/markdown-chunks";
 import { translateNow } from "@/shared/i18n";
 import { derive, useTokens } from "../theme";
-import { markdownCodeAction, markdownStyle, useTableActions, type ChatText } from "../kit";
+import { markdownStyle, useCodeActions, useTableActions, type ChatText } from "../kit";
 import { fetchedImageSources, prepareChatMarkdown, stellaAppSlug, stellaFilePath } from "./markdown-source";
 import { BUBBLE_FEATURES, CHAT_TABLE_HEADER_WEIGHT, useChatSurfaceLook } from "./chat-text";
 import { rune } from "./engine";
@@ -60,7 +60,8 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
     tableHeaderWeight: CHAT_TABLE_HEADER_WEIGHT,
     tableFrame: { ...markdownStyle(t, chat, false).tableFrame, actionsFill: t.c.chatAssistantBubbleFillTop },
   }));
-  const mdStyle = useMemo(() => tables.withFrame(style), [style, tables.withFrame]);
+  const code = useCodeActions();
+  const mdStyle = useMemo(() => code.withCopied(tables.withFrame(style)), [style, tables.withFrame, code.withCopied]);
   const linkStyles = derive(t, "chat-markdown-links", (t) => [{ prefix: "stella-file:", color: t.c.textInteractive, underline: t.c.textInteractive }]);
   const hiddenKey = hiddenFilePaths?.join("\0") ?? "";
   const source = useMemo(
@@ -96,7 +97,7 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
   }
   return (
     <>
-      <markdown id={`md:${cacheKey ?? anonKey}`} src={source} selectable mdStyle={mdStyle} linkStyles={linkStyles} images={images} imageRadius={6} onLink={onLink} onCodeAction={markdownCodeAction} onTableAction={tables.onTableAction} onContextMenu={onContextMenu} w="fit" maxW="full" />
+      <markdown id={`md:${cacheKey ?? anonKey}`} src={source} selectable mdStyle={mdStyle} linkStyles={linkStyles} images={images} imageRadius={6} onLink={onLink} onCodeAction={code.onCodeAction} onTableAction={tables.onTableAction} onContextMenu={onContextMenu} w="fit" maxW="full" />
       {tables.overlay}
     </>
   );

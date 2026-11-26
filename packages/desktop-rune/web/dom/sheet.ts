@@ -73,7 +73,7 @@ svg.ri { display: block; overflow: visible; }
 .rmd h1, .rmd h2, .rmd h3, .rmd h4, .rmd h5, .rmd h6 { font-weight: 600; }
 .rmd .mdca.hov { opacity: 0; transition: opacity 120ms ease; }
 .rmd .mdcode:hover .mdca.hov, .rmd .mdcode:focus-within .mdca.hov { opacity: 1; }
-.rmd .mdcb { all: unset; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; color: inherit; }
+.rmd .mdcb { all: unset; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; color: inherit; transition: color 150ms ease; }
 .rmd .mdcb:hover { color: var(--mdca-hover, inherit); }
 .rmd .mdta { position: absolute; z-index: 1; display: flex; align-items: center; padding-left: 6px; border-radius: 6px; transition: opacity 120ms ease; }
 @media (hover: hover) { .rmd .mdta.hov { opacity: 0; } .rmd .mdtable:is(:hover, :focus-within) .mdta.hov { opacity: 1; } }

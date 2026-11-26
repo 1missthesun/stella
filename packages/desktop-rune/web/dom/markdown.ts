@@ -64,7 +64,7 @@ function inline(n: Md, c: Ctx, key: number): ReactNode {
       return createElement("code", {
         key,
         style: {
-          fontFamily: "var(--rune-mono)", fontSize: px((body.size ?? 14) * scale), fontWeight: weight,
+          fontFamily: "var(--rune-mono)", fontSize: px((body.size ?? 14) * scale), fontWeight: weight, lineHeight: 20 / 14,
           background: s.inlineCodeBg, color: s.inlineCodeText, padding: `2px ${s.inlineCodePad ?? 4}px`, borderRadius: "4px",
           boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone",
         },
@@ -129,7 +129,10 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
   const padRight = inside?.padRight ?? padX;
   const language = n.lang ?? null;
   const source = n.value ?? "";
-  const actions = (frame.actions ?? []) as { id: string; label?: string; svg?: string; view?: number }[];
+  const actions = (frame.actions ?? []) as { id: string; label?: string; svg?: string; view?: number; size?: number }[];
+  const swap = (frame.swap ?? null) as { index: number; id: string; svg: string; view?: number } | null;
+  const [pillX, pillY] = (frame.actionsPad ?? [0, 0]) as [number, number];
+  const buttonPad = frame.buttonPad as number | undefined;
   const at = (frame.actionsAt ?? null) as [number, number] | null;
   const fill = inside?.fill ?? s.codeBlockFill ?? (Array.isArray(s.codeBlock) ? s.codeBlock[0] : undefined);
   const border = inside?.border ?? s.codeBlockBorder ?? (Array.isArray(s.codeBlock) ? s.codeBlock[1] : undefined);
@@ -137,15 +140,26 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
   const actionRow = actions.length
     ? createElement("div", {
       className: frame.actionsOnHover ? "mdca hov" : "mdca",
-      style: { position: "absolute", top: px(at?.[0] ?? padTop), right: px(at?.[1] ?? padRight), display: "flex", gap: "2px", color: frame.actionColor, "--mdca-hover": frame.actionHover } as Css,
-    }, actions.map((a) => createElement("button", {
-      key: a.id, type: "button", className: "mdcb", "aria-label": a.label ?? a.id, title: a.label ?? (a.id === "copy" ? "Copy" : a.id === "download" ? "Download" : a.id),
-      onClick: (e: React.MouseEvent) => {
-        e.stopPropagation();
-        p.onCodeAction?.({ action: a.id, index, language, source });
-      },
-      dangerouslySetInnerHTML: a.svg ? { __html: `<svg viewBox="0 0 ${a.view ?? 24} ${a.view ?? 24}" width="14" height="14" fill="none">${a.svg}</svg>` } : undefined,
-    }, a.svg ? undefined : a.label)))
+      style: {
+        position: "absolute", top: px(at?.[0] ?? padTop), right: px(at?.[1] ?? padRight), display: "flex", alignItems: "center", gap: px(frame.gap ?? 2), color: frame.actionColor, "--mdca-hover": frame.actionHover,
+        ...(frame.actionsFill ? { background: frame.actionsFill, padding: `${pillY}px ${pillX}px`, borderRadius: px(frame.actionsRadius ?? 0) } : {}),
+      } as Css,
+    }, actions.map((a) => {
+      const swapped = swap && swap.index === index && swap.id === a.id ? swap : null;
+      const svg = swapped?.svg ?? a.svg;
+      const view = swapped?.view ?? a.view ?? 24;
+      const size = a.size ?? 14;
+      const side = buttonPad === undefined ? undefined : size + 2 * buttonPad;
+      return createElement("button", {
+        key: a.id, type: "button", className: "mdcb", "aria-label": a.label ?? a.id, title: a.label ?? (a.id === "copy" ? "Copy" : a.id === "download" ? "Download" : a.id),
+        style: side === undefined ? undefined : { width: px(side), height: px(side), borderRadius: 0 },
+        onClick: (e: React.MouseEvent) => {
+          e.stopPropagation();
+          p.onCodeAction?.({ action: a.id, index, language, source });
+        },
+        dangerouslySetInnerHTML: svg ? { __html: `<svg viewBox="0 0 ${view} ${view}" width="${size}" height="${size}" fill="none">${svg}</svg>` } : undefined,
+      }, svg ? undefined : a.label);
+    }))
     : null;
   const label = language && frame.label
     ? createElement("div", {
@@ -162,18 +176,20 @@ function codeBlock(n: Md, c: Ctx, key: number): ReactNode {
       ...margin(s.codeMargin, [0, 12]), position: "relative", background: fill, borderRadius: px(radius && radius > 0 ? radius : 8),
       boxShadow: border ? `inset 0 0 0 1px ${border}` : undefined, padding: `${padTop}px ${padRight}px ${padBottom}px ${padX}px`,
     },
-  }, label, codeBody(s, source, codePadY), actionRow);
+  }, label, codeBody(s, source, codePadY, inside ? (s.codeBlockBorder as string | undefined) : undefined), actionRow);
 }
 
 type LineNumbers = { font?: Font; color?: string; width?: number; gap?: number };
 
-function codeBody(s: Style, source: string, padY: number): ReactNode {
+/** `cardBorder`: inside a frame, the engine's code card keeps its 1px `codeBlockBorder`, as Streamdown's code body does. */
+function codeBody(s: Style, source: string, padY: number, cardBorder: string | undefined): ReactNode {
   const code = { family: "mono", ...(s.codeBlockFont as Font) };
   const pre = createElement("pre", {
     style: { margin: 0, padding: `${padY}px 0`, overflowX: "auto", whiteSpace: "pre", ...fontCss(code), color: s.codeBlockText, scrollbarWidth: "thin", flex: 1, minWidth: 0 },
   }, createElement("code", null, source));
   const numbers = s.codeLineNumbers as LineNumbers | undefined;
-  if (!numbers) return pre;
+  const shift = cardBorder ? { border: `1px solid ${cardBorder}` } : {};
+  if (!numbers) return cardBorder ? createElement("div", { style: shift }, pre) : pre;
   const lines = source.replace(/\n$/, "").split("\n").length;
   const gutter = createElement("div", {
     "aria-hidden": true,
@@ -182,7 +198,7 @@ function codeBody(s: Style, source: string, padY: number): ReactNode {
       padding: `${padY}px 0`, textAlign: "right", whiteSpace: "pre", userSelect: "none", flexShrink: 0,
     },
   }, Array.from({ length: lines }, (_, i) => i + 1).join("\n"));
-  return createElement("div", { style: { display: "flex", alignItems: "flex-start" } }, gutter, pre);
+  return createElement("div", { style: { display: "flex", alignItems: "flex-start", ...shift } }, gutter, pre);
 }
 
 type TableActionP = { id: string; label?: string; svg?: string; view?: number; size?: number };

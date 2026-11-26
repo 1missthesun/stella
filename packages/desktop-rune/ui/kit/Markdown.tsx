@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { derive, font, fontSize, mix, radiusUnset, type Tokens, useTokens } from "../theme";
 import { engine } from "./engine";
-import { Icons } from "./icons";
+import { STREAMDOWN_ICON } from "./streamdown-icons";
 import { TABLE_ACTIONS, useTableActions } from "./table-actions";
 
 type Font = { size: number; weight: number; lineHeight: number; tracking?: number; family?: string };
@@ -93,24 +93,32 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
       labelSize: fontSize.sm,
       labelHeight: 16,
       labelFamily: font.mono,
-      labelInset: 3.5,
-      labelGap: 4.5,
+      labelInset: 4,
+      labelGap: 4,
       actions: CODE_ACTIONS,
-      actionColor: c.textWeak,
-      actionHover: c.textStrong,
+      actionColor: c.mutedForeground,
+      actionHover: c.foreground,
       actionsOnHover: true,
-      actionsAt: [6, 6],
-      // Electron's 1px border plus 10/12 padding, and the code body's own transparent 1px border, less the code frame's 0.5 layout border.
-      inside: { fill: c.surfaceInset, border: c.borderWeak, radius: 8, pad: [13.5, 11, 11.5], padRight: 13.5 },
+      // Streamdown's pill: 6 inside the frame's 1px border, its own transparent 1px border around 4/6 padding.
+      actionsAt: [7, 7],
+      actionsFill: mix(c.surfaceInset, 88, "transparent"),
+      actionsPad: [7, 5],
+      actionsRadius: 8,
+      gap: 8,
+      buttonPad: 4,
+      // Electron's 1px border plus 10/12 padding: the frame's border is drawn inside it and takes no layout.
+      inside: { fill: c.surfaceInset, border: c.borderWeak, radius: 8, pad: [13, 11, 11], padRight: 13 },
     },
     tableFrame: { actions: TABLE_ACTIONS, actionColor: c.mutedForeground, actionHover: c.foreground, actionsOnHover: true, actionsAt: [6, 0], actionsFill: c.background, gap: 4, buttonPad: 4 },
   };
 }
 
 const CODE_ACTIONS = [
-  { id: "copy", svg: Icons.stella.Copy.body, view: Icons.stella.Copy.view },
-  { id: "download", svg: Icons.stella.Download.body, view: Icons.stella.Download.view },
+  { id: "download", label: "Download file", svg: STREAMDOWN_ICON.download, view: 16, size: 16 },
+  { id: "copy", label: "Copy Code", svg: STREAMDOWN_ICON.copy, view: 16, size: 16 },
 ];
+
+const COPIED_MS = 2000;
 
 const EXTENSIONS: Record<string, string> = { typescript: "ts", javascript: "js", python: "py", bash: "sh", shell: "sh", zsh: "sh", rust: "rs", markdown: "md", text: "txt", plaintext: "txt", yaml: "yml", ruby: "rb", golang: "go", kotlin: "kt", csharp: "cs" };
 
@@ -120,6 +128,29 @@ export async function codeAction(a: { action: string; language: string | null; s
     const lang = a.language?.toLowerCase() ?? "txt";
     await engine.saveText(a.source, `code.${EXTENSIONS[lang] ?? lang}`);
   }
+}
+
+type CodeAction = { action: string; index: number; language: string | null; source: string };
+
+/** Code block actions with Streamdown's copied state: the block copied last shows a check on its copy button for two seconds. */
+export function useCodeActions(): { onCodeAction: (a: CodeAction) => void; withCopied: <S extends { codeFrame: object }>(style: S) => S } {
+  const [copied, setCopied] = useState<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+  const onCodeAction = useCallback((a: CodeAction) => {
+    void codeAction(a).then(() => {
+      if (a.action !== "copy") return;
+      if (timer.current) clearTimeout(timer.current);
+      setCopied(a.index);
+      timer.current = setTimeout(() => setCopied(null), COPIED_MS);
+    });
+  }, []);
+  const withCopied = useCallback(
+    <S extends { codeFrame: object }>(style: S): S =>
+      copied === null ? style : { ...style, codeFrame: { ...style.codeFrame, swap: { index: copied, id: "copy", svg: STREAMDOWN_ICON.check, view: 16 } } },
+    [copied],
+  );
+  return { onCodeAction, withCopied };
 }
 
 export type MarkdownProps = {
@@ -142,10 +173,11 @@ export function Markdown({ id, text, streaming = false, chat = CHAT_TEXT, highli
   const t = useTokens();
   const style = derive(t, `markdown:${chat.size}:${chat.color ?? ""}:${highlight}`, (t) => markdownStyle(t, chat, highlight));
   const tables = useTableActions(id);
-  const withActions = useMemo(() => tables.withFrame(style), [style, tables.withFrame]);
+  const code = useCodeActions();
+  const withActions = useMemo(() => code.withCopied(tables.withFrame(style)), [style, tables.withFrame, code.withCopied]);
   return (
     <>
-      <markdown id={id} src={text} streaming={streaming} selectable mdStyle={withActions} onLink={onLink} onCodeAction={codeAction} onTableAction={tables.onTableAction} w="full" />
+      <markdown id={id} src={text} streaming={streaming} selectable mdStyle={withActions} onLink={onLink} onCodeAction={code.onCodeAction} onTableAction={tables.onTableAction} w="full" />
       {tables.overlay}
     </>
   );

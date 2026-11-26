@@ -289,13 +289,17 @@ tableHeaderWeight`; booleans `listMarkersOutside tableFlushLeft tableFullWidth`.
 **`syntaxHighlight`** (boolean) turns colouring off. **`syntax`.** `{keyword, string, number, comment, type, function, property, punctuation,
 operator, inserted, deleted}` colours. `dark` picks the neutral base.
 
-**`codeFrame`.** `{label, labelSize, labelGap, actions: [{id, label?, svg?, view?}], actionColor,
+**`codeFrame`.** `{label, labelSize, labelGap, actions: [{id, label?, svg?, view?, size?}], actionColor,
 actionHover, actionsOnHover}` adds a language row above each code block, with actions at its top
 right. Pressing an action fires `onCodeAction({action, index, language, source})`; TS does the
 copy or download. `inside: {fill, border, radius, pad: [x, top, bottom]}` draws the block's frame itself with
 the label row inside it (streamdown's layout): pair it with `codeBlock: ["transparent", "transparent"]`
 and `codeBlockPadding: [0, y]`. `actionsAt: [top, right]` floats the actions at that inset from
-the frame's top right corner instead of placing them in the label row.
+the frame's top right corner instead of placing them in the label row. `actionsFill` paints a pill
+behind them (`actionsPad: [x, y]`, `actionsRadius`), `gap` spaces them, and `buttonPad` makes each
+button `size + 2 × buttonPad` square with `actionHover` as the icon's hover colour (without it,
+buttons are 22 high and `actionHover` is a hover fill). `swap: {index, id, svg, view?}` draws block
+`index`'s action `id` with another icon, such as Streamdown's check after a copy.
 
 **`tableFrame`.** `{actions: [{id, label?, svg?, view?, size?}], actionColor, actionHover,
 actionsOnHover, actionsAt: [top, right], actionsFill, gap, buttonPad}` floats a row of actions at

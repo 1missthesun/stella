@@ -273,7 +273,9 @@ export const webEngine: Engine = {
     },
     state: async (id) => {
       const m = mediaOf(id);
-      return { time: m?.currentTime ?? 0, duration: m && Number.isFinite(m.duration) ? m.duration : null, playing: !!m && !m.paused };
+      const buffered: [number, number][] = [];
+      for (let i = 0; m && i < m.buffered.length; i++) buffered.push([m.buffered.start(i), m.buffered.end(i)]);
+      return { time: m?.currentTime ?? 0, duration: m && Number.isFinite(m.duration) ? m.duration : null, playing: !!m && !m.paused, buffered };
     },
   },
   webview: {

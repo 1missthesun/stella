@@ -461,7 +461,7 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                     "media.seek" => p.seek(v.get("time").and_then(|t| t.as_f64()).unwrap_or(0.0)),
                     _ => {}
                 }
-                return Ok(json!({ "time": p.time(), "duration": p.duration(), "playing": p.is_playing() }));
+                return Ok(json!({ "time": p.time(), "duration": p.duration(), "playing": p.is_playing(), "buffered": p.buffered() }));
             }
             c if c.starts_with("webview.") => {
                 #[cfg(feature = "webview")]

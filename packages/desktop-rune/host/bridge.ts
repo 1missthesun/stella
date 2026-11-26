@@ -377,7 +377,8 @@ export const engine = {
     play: (target: string) => request("media.play", { target }),
     pause: (target: string) => request("media.pause", { target }),
     seek: (target: string, time: number) => request("media.seek", { target, time }),
-    state: (target: string) => request<{ time: number; duration: number | null; playing: boolean }>("media.state", { target }),
+    state: (target: string) =>
+      request<{ time: number; duration: number | null; playing: boolean; buffered: [number, number][] }>("media.state", { target }),
   },
   webview: {
     post: (target: string, data: unknown, origin?: string) => request("webview.post", { target, data, origin }),

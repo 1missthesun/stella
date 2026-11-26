@@ -24,11 +24,13 @@ const formatTime = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-type Clock = { playing: boolean; current: number; duration: number };
+type Clock = { playing: boolean; current: number; duration: number; buffered: [number, number][] };
+
+const sameRanges = (a: [number, number][], b: [number, number][]) => a.length === b.length && a.every((r, i) => r[0] === b[i]![0] && r[1] === b[i]![1]);
 
 /** The engine player's position, read often while it plays and rarely while it rests. */
 function useMediaClock(id: string): [Clock, (next: Partial<Clock>) => void] {
-  const [clock, setClock] = useState<Clock>({ playing: false, current: 0, duration: 0 });
+  const [clock, setClock] = useState<Clock>({ playing: false, current: 0, duration: 0, buffered: [] });
   const playingRef = useRef(false);
   useEffect(() => {
     let live = true;
@@ -41,8 +43,9 @@ function useMediaClock(id: string): [Clock, (next: Partial<Clock>) => void] {
           playingRef.current = state.playing;
           setClock((prev) => {
             const duration = state.duration ?? prev.duration;
-            const next = { playing: state.playing, current: state.time, duration };
-            return prev.playing === next.playing && prev.current === next.current && prev.duration === next.duration ? prev : next;
+            const buffered = sameRanges(prev.buffered, state.buffered ?? []) ? prev.buffered : (state.buffered ?? []);
+            const next = { playing: state.playing, current: state.time, duration, buffered };
+            return prev.playing === next.playing && prev.current === next.current && prev.duration === next.duration && prev.buffered === next.buffered ? prev : next;
           });
         })
         .catch(() => undefined)
@@ -173,6 +176,25 @@ export function AudioPlayer({ id, src }: { id: string; src: string }) {
 }
 
 const CHROME_LABEL = look(13.2, 400, { family: systemFontFamily() });
+const CHROME_THUMB_RADIUS = 6;
+
+/** Chromium's timeline segments (`MediaControlTimelineElement::RenderBarSegments`): what has played, and after it the loaded range that holds the playhead. */
+function timelineSegments({ current, duration, playing, buffered }: Clock, width: number) {
+  if (!(duration > 0) || !Number.isFinite(duration)) return { played: 0, loadedLeft: 0, loadedWidth: 0 };
+  let played = current / duration;
+  if (width > 0 && played !== 0 && playing) {
+    const offset = CHROME_THUMB_RADIUS / width;
+    played += offset - 2 * offset * played;
+  }
+  let loadedLeft = 0;
+  let loadedWidth = 0;
+  const range = buffered.find(([start, end]) => start <= current && end >= current);
+  if (range) {
+    if (played > range[0] / duration) loadedLeft = played;
+    loadedWidth = Math.max(0, range[1] / duration - loadedLeft);
+  }
+  return { played, loadedLeft, loadedWidth };
+}
 
 function ChromeButton({ svg, size, label, onPress }: { svg: string; size: number; label: string; onPress: () => void }) {
   return (
@@ -189,7 +211,6 @@ export function VideoPlayer({ id, src, onFullSize, onMore }: { id: string; src: 
   const [muted, setMuted] = useState(false);
   const [awake, setAwake] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const barW = useRef(0);
   const wake = useCallback(() => {
     setAwake(true);
     if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -197,7 +218,8 @@ export function VideoPlayer({ id, src, onFullSize, onMore }: { id: string; src: 
   }, []);
   useEffect(() => () => void (idleTimer.current && clearTimeout(idleTimer.current)), []);
   const shown = !clock.playing || awake;
-  const progress = clock.duration > 0 ? Math.min(1, clock.current / clock.duration) : 0;
+  const [barWidth, setBarWidth] = useState(0);
+  const { played, loadedLeft, loadedWidth } = timelineSegments(clock, barWidth);
   return (
     <box
       grow={1}
@@ -248,14 +270,15 @@ export function VideoPlayer({ id, src, onFullSize, onMore }: { id: string; src: 
           h={4}
           radius={radius.full}
           fill="rgba(255,255,255,0.3)"
-          onLayout={(r) => (barW.current = r.w)}
+          onLayout={(r) => setBarWidth(r.w)}
           onDrag={(d) => {
             wake();
-            seekRatio(d.x / (barW.current || 1));
+            seekRatio(d.x / (barWidth || 1));
           }}
         >
           <box absolute={{ left: 0, right: 0, top: -8, bottom: -8 }} />
-          <box absolute={{ left: 0, top: 0, bottom: 0 }} w={`${progress * 100}%`} radius={radius.full} fill="#ffffff" instant />
+          <box absolute={{ left: Math.max(0, loadedLeft * barWidth - 2), top: 0, bottom: 0 }} w={loadedWidth * barWidth + Math.min(2, loadedLeft * barWidth)} corners={loadedLeft * barWidth > 2 ? [0, 2, 2, 0] : [2, 2, 2, 2]} fill="rgba(255,255,255,0.54)" instant />
+          <box absolute={{ left: 0, top: 0, bottom: 0 }} w={`${played * 100}%`} radius={radius.full} fill="#ffffff" instant />
         </box>
       </col>
     </box>

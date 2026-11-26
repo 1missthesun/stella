@@ -44,7 +44,7 @@ html[data-native-font-smoothing="on"], html[data-native-font-smoothing="on"] bod
 .rt.tm { display: flex; white-space: pre; overflow: hidden; }
 .rt.tm > .tmh { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 .rt.tm > .tmt { flex: 0 0 auto; white-space: pre; }
-.sel::selection, .sel *::selection { background: var(--rsel, Highlight); }
+.sel:not(.selnative)::selection, .sel *:not(.selnative, .selnative *)::selection { background: var(--rsel, Highlight); }
 .rt.ml { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
 .rt a, .rt .lk { color: inherit; text-decoration: none; cursor: pointer; }
 .ri { display: flex; position: relative; box-sizing: border-box; flex-shrink: 0; }

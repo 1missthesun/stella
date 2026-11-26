@@ -143,6 +143,8 @@ function fullscreenStyle(t: Tokens) {
     tableHeaderPad: [16, 8],
     tableHeaderPadEdges: [16, 8, 8],
     tableHeaderRuleWidth: 0,
+    tableRuleWidth: 1,
+    tableOutlineWidth: 1,
     tableFlushLeft: false,
     tableCellsFlushLeft: false,
     tableFlushRight: false,

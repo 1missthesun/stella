@@ -275,7 +275,17 @@ drops the first column's left padding; on the web it pads every cell on its righ
 none after the last column), as desktop-ui's table.
 
 **Numbers and switches.** `codeBlockRadius inlineCodePad strongWeight textWidth
-tableHeaderWeight`; booleans `listMarkersOutside tableFlushLeft tableFullWidth`.
+tableHeaderWeight`, and the table's line widths `tableHeaderRuleWidth tableRuleWidth
+tableOutlineWidth` (0.5 by default); booleans `listMarkersOutside tableFlushLeft tableFullWidth`, and `tableTabular` (tabular figures
+in cells, on by default).
+
+**Selection.** `selectionStyle: "chromium"` paints a selection as Chromium's default
+`::selection` (active and inactive) in place of `selection`. `pageCopy: [code, table]` copies a
+selection as Chromium copies Streamdown's page instead of as Markdown: no list markers, one
+newline after a block (two after a paragraph or heading whose bottom margin is at least half
+its size), the code label on its own line, and `code`/`table` more newlines before a code
+block's and a table's text. `joinSelection: true` puts a selectable Markdown's texts in the
+`selectionGroup` around it instead of a group of its own, so a selection runs across messages.
 
 **Compound values.**
 - `codeBlock [fill, border]` (or `codeBlockFill` + `codeBlockBorder`)

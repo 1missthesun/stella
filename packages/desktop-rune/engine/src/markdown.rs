@@ -130,10 +130,12 @@ fn style(v: &Value) -> MarkdownStyle {
     {
         s = s.table_header_pad_edges(x as f32, top as f32, bottom as f32);
     }
-    let nums: [(&str, Set<f32>); 8] = [
+    let nums: [(&str, Set<f32>); 10] = [
         ("codeBlockRadius", MarkdownStyle::code_block_radius),
         ("tableRadius", MarkdownStyle::table_radius),
         ("tableHeaderRuleWidth", MarkdownStyle::table_header_rule_width),
+        ("tableRuleWidth", MarkdownStyle::table_rule_width),
+        ("tableOutlineWidth", MarkdownStyle::table_outline_width),
         ("wideFade", MarkdownStyle::wide_fade),
         ("inlineCodePad", MarkdownStyle::inline_code_pad),
         ("strongWeight", MarkdownStyle::strong_weight),
@@ -152,10 +154,19 @@ fn style(v: &Value) -> MarkdownStyle {
         ("tableCellsFlushLeft", MarkdownStyle::table_cells_flush_left),
         ("tableFlushRight", MarkdownStyle::table_flush_right),
         ("syntaxHighlight", MarkdownStyle::syntax_highlight),
+        ("tableTabular", MarkdownStyle::table_tabular_figures),
     ] {
         if let Some(on) = v.get(k).and_then(|b| b.as_bool()) {
             s = f(s, on);
         }
+    }
+    if let Some(a) = v.get("pageCopy").and_then(|a| a.as_array())
+        && let [Some(code), Some(table)] = [0, 1].map(|i| a.get(i).and_then(Value::as_u64))
+    {
+        s = s.page_copy(code.min(8) as u8, table.min(8) as u8);
+    }
+    if v.get("selectionStyle").and_then(Value::as_str) == Some("chromium") {
+        s = s.selection_style(rune::SelectionStyle::chromium());
     }
     let code_block = v.get("codeBlock").and_then(|a| a.as_array()).map(|a| (a.first().and_then(|c| c.as_str()).and_then(parse_color), a.get(1).and_then(|c| c.as_str()).and_then(parse_color)));
     if let Some((Some(f), Some(b))) = code_block.or(Some((col(v, "codeBlockFill"), col(v, "codeBlockBorder")))) {
@@ -327,7 +338,7 @@ fn code_frame(n: u32, md: Markdown, v: &Value) -> Markdown {
         let weak = f.label.map(|c| c.0).unwrap_or(parse_color("#8a8a8e").unwrap_or(rune::Color::TRANSPARENT));
         let size = f.label_size.unwrap_or(12.0);
         let mut head = rune::row().w_full().items_center().justify_between().h(f.label_height.unwrap_or(22.0)).pl(f.label_inset.unwrap_or(0.0));
-        head = head.child(label(c.language.unwrap_or(""), size, weak, f.label_family.as_deref()));
+        head = head.child(c.select(label(c.language.unwrap_or(""), size, weak, f.label_family.as_deref())));
         let mut actions = rune::row().gap(f.gap.unwrap_or(2.0)).items_center();
         if let Some(c) = f.actions_fill {
             let [x, y] = f.actions_pad.unwrap_or([0.0, 0.0]);
@@ -484,6 +495,9 @@ pub fn build(n: u32, p: &Props) -> El {
     let mut md = Markdown::new(src).streaming(p.streaming).selectable(p.selectable || p.selection_group);
     if p.md_style.as_ref().and_then(|v| v.get("scrollWide")).and_then(Value::as_bool) == Some(true) {
         md = md.scroll_wide(true);
+    }
+    if p.md_style.as_ref().and_then(|v| v.get("joinSelection")).and_then(Value::as_bool) == Some(true) {
+        md = md.joins_selection(true);
     }
     if let Some(f) = p.md_style.as_ref().and_then(|v| v.get("codeFrame")) {
         md = code_frame(n, md, f);

@@ -22,6 +22,8 @@ interface MarkdownProps {
   hiddenFilePaths?: readonly string[];
   chat?: ChatText;
   onContextMenu?: (at: { x: number; y: number }) => void;
+  /** Inside the timeline's selection group: a selection runs on across messages, as the page's does. */
+  joinSelection?: boolean;
 }
 
 const openWeb = (url: string) => {
@@ -45,7 +47,7 @@ const openLocal = (filePath: string) => {
 };
 
 /** desktop-ui's chat `Markdown` (Streamdown, static) on the engine's Markdown, with Stella's file and app links. */
-export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalRules = false, hiddenFilePaths, chat: chatOverride, onContextMenu }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalRules = false, hiddenFilePaths, chat: chatOverride, onContextMenu, joinSelection = false }: MarkdownProps) {
   const t = useTokens();
   const surface = useChatSurfaceLook();
   const chat = chatOverride ?? surface.markdown;
@@ -61,7 +63,10 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
     tableFrame: { ...markdownStyle(t, chat, false).tableFrame, actionsFill: t.c.chatAssistantBubbleFillTop },
   }));
   const code = useCodeActions();
-  const mdStyle = useMemo(() => code.withCopied(tables.withFrame(style)), [style, tables.withFrame, code.withCopied]);
+  const mdStyle = useMemo(() => {
+    const framed = code.withCopied(tables.withFrame(style));
+    return joinSelection ? { ...framed, joinSelection } : framed;
+  }, [style, tables.withFrame, code.withCopied, joinSelection]);
   const linkStyles = derive(t, "chat-markdown-links", (t) => [{ prefix: "stella-file:", color: t.c.textInteractive, underline: t.c.textInteractive }]);
   const hiddenKey = hiddenFilePaths?.join("\0") ?? "";
   const source = useMemo(

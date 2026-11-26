@@ -340,8 +340,10 @@ export function Markdown(p: MarkdownProps) {
   const st = h.props.style;
   Object.assign(st, fontCss((s.body ?? s.bodyFont) as Font));
   st.color = s.text;
-  if (p.selectable) h.props.className += " sel";
-  if (s.selection) st["--rsel"] = s.selection;
+  // `selectionStyle: "chromium"` leaves the browser's own `::selection`, as Streamdown's page does.
+  const native = s.selectionStyle === "chromium";
+  if (p.selectable) h.props.className += native ? " sel selnative" : " sel";
+  if (s.selection && !native) st["--rsel"] = s.selection;
   st["--md-link-hover"] = s.linkHover;
   st["--md-marker"] = s.muted;
   return h.wrap(createElement("div", h.props, content));

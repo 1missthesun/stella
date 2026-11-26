@@ -86,7 +86,12 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     tableFlushRight: true,
     tableFont: { ...body, lineHeight: lh(chat.size, 20 / 14) },
     tableFullWidth: true,
+    tableRuleWidth: 1,
+    tableTabular: false,
     selection: mix(c.primary, 30, "transparent"),
+    selectionStyle: "chromium",
+    // Chromium copies a newline for each empty box around a code block's text (after its label) and a table's.
+    pageCopy: [2, 3],
     syntax: highlight ? (t.dark ? GITHUB.dark : GITHUB.light) : plainSyntax(text),
     codeFrame: {
       label: c.textWeak,

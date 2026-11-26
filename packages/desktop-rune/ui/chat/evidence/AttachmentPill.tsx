@@ -4,6 +4,7 @@ import { openLocalPathOrExplain } from "@/features/chat/lib/open-local-path";
 import { fileMenu } from "@/platform/context-menu";
 import { contextMenu } from "../context-menu";
 import { Icon, Icons, type IconData } from "../../kit";
+import { APP_TRACKING } from "../../kit/compat";
 import { derive, fontSize, mix, radius, useTokens } from "../../theme";
 import { useChatTextColor } from "../chat-text";
 
@@ -49,7 +50,7 @@ export const AttachmentPill = ({ card }: { card: EvidenceCard }) => {
       <box shrink={false} opacity={0.8}>
         <Icon icon={glyphFor(card)} size={13} color={color} />
       </box>
-      <text size={fontSize.base} weight={500} lineHeight={fontSize.base * 1.4} color={color} nowrap truncate>
+      <text size={fontSize.base} weight={400} tracking={APP_TRACKING} lineHeight={fontSize.base * 1.4} color={color} nowrap truncate>
         {card.sourcePaths[0] ? fileDisplayName(card.sourcePaths[0]) : card.title}
       </text>
     </row>

@@ -485,7 +485,7 @@ export const AssistantMessageRow = memo(
           {row.scheduleNotice ? <ScheduleNotices first={row.scheduleNotice} run={row.scheduleNoticeRun} /> : null}
           {hasBody ? (
             <row w="full" minW={0} align="start" gap={4}>
-              <col w="fit" maxW={surface.assistant.maxW} minW={0} gap={PART_GAP} py={surface.assistant.py} px={surface.assistant.px} radius={surface.assistant.radius} fill={tokens.c.chatAssistantBubbleFillTop} gradient={tokens.gradient.assistantBubble}>
+              <col w="fit" maxW={surface.assistant.maxW} minW={0} py={surface.assistant.py} px={surface.assistant.px} radius={surface.assistant.radius} fill={tokens.c.chatAssistantBubbleFillTop} gradient={tokens.gradient.assistantBubble}>
                 <ChatTextColor.Provider value={tokens.c.chatAssistantBubbleText}>
                   <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules hiddenFilePaths={hiddenFileKeys} onContextMenu={menu} />
                   {evidencePaths.length > 0 ? <MessageAttachments filePaths={evidencePaths} part="documents" /> : null}

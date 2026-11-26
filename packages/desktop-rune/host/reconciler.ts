@@ -85,11 +85,7 @@ function resolveSrc(inst: Instance, src: string): string {
   if (!BYTES_SRC.test(src) && !APP_SCHEME_SRC.test(src)) return src;
   if (inst.blob?.src === src) return `blob:${inst.blob.id}`;
   if (src.startsWith("data:")) {
-    const comma = src.indexOf(",");
-    const meta = src.slice(5, comma);
-    const body = src.slice(comma + 1);
-    const data = meta.endsWith(";base64") ? Uint8Array.from(atob(body), (c) => c.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(body));
-    inst.blob = { src, id: blob(data) };
+    inst.blob = { src, id: blob(bytesOf(src)) };
     return `blob:${inst.blob.id}`;
   }
   void fetchSrc(src).then(async (r) => {
@@ -100,6 +96,51 @@ function resolveSrc(inst: Instance, src: string): string {
     flushFrame(true);
   }).catch((err) => console.error("[ui] image fetch failed", src, err));
   return "";
+}
+
+function bytesOf(src: string): Uint8Array {
+  const comma = src.indexOf(",");
+  const meta = src.slice(5, comma);
+  const body = src.slice(comma + 1);
+  return meta.endsWith(";base64") ? Uint8Array.from(atob(body), (c) => c.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(body));
+}
+
+const fetchedImages = new Map<string, number | null>();
+const imageWaiters = new Map<string, Set<Instance>>();
+
+/** `<markdown images>` targets the engine can't read itself load as blobs, as `<image src>` does, once per source. */
+function resolveImages(inst: Instance, images: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [written, target] of Object.entries(images)) {
+    if (typeof target !== "string" || (!BYTES_SRC.test(target) && !APP_SCHEME_SRC.test(target))) {
+      out[written] = target;
+      continue;
+    }
+    if (!fetchedImages.has(target)) {
+      if (target.startsWith("data:")) fetchedImages.set(target, blob(bytesOf(target)));
+      else {
+        fetchedImages.set(target, null);
+        imageWaiters.set(target, new Set());
+        void fetchSrc(target)
+          .then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            fetchedImages.set(target, blob(new Uint8Array(await r.arrayBuffer())));
+            for (const waiting of imageWaiters.get(target) ?? []) {
+              if (!instances.has(waiting.id)) continue;
+              waiting.json = serialize(waiting, waiting.react);
+              ops.props(waiting.id, waiting.json);
+            }
+            flushFrame(true);
+          })
+          .catch((err) => console.error("[ui] image fetch failed", target, err))
+          .finally(() => imageWaiters.delete(target));
+      }
+    }
+    const id = fetchedImages.get(target);
+    if (id === null || id === undefined) imageWaiters.get(target)?.add(inst);
+    else out[written] = `blob:${id}`;
+  }
+  return out;
 }
 
 /** Props where `false` differs from leaving them out. */
@@ -128,6 +169,7 @@ function serialize(inst: Instance, reactProps: Record<string, any>): string {
     if (t !== undefined) out.content = t;
   }
   if (inst.type === "image" && typeof out.src === "string") out.src = resolveSrc(inst, out.src);
+  if (inst.type === "markdown" && out.images && typeof out.images === "object") out.images = resolveImages(inst, out.images as Record<string, unknown>);
   return JSON.stringify(out);
 }
 

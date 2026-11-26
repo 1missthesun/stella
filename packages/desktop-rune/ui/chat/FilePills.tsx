@@ -10,6 +10,7 @@ import { fileMenu } from "@/platform/context-menu";
 import { contextMenu } from "./context-menu";
 import { translateNow, useT, useTPlural } from "@/shared/i18n";
 import { Icon, Icons, withStroke } from "../kit";
+import { APP_TRACKING } from "../kit/compat";
 import { derive, fontSize, mix, radius, useTokens } from "../theme";
 import { useChatTextColor } from "./chat-text";
 import { OpenWithMenu } from "./OpenWithMenu";
@@ -41,7 +42,7 @@ const FilePillView = ({ entry, onOpen, localFilePath }: { entry: ConversationFil
         <box shrink={false} opacity={0.8}>
           <Icon icon={Icons.display[kind as keyof typeof Icons.display] ?? Icons.display.text} size={14} color={color} />
         </box>
-        <text size={fontSize.base} weight={500} lineHeight={fontSize.base * 1.2} color={color} nowrap truncate>
+        <text size={fontSize.base} weight={400} tracking={APP_TRACKING} lineHeight={fontSize.base * 1.2} color={color} nowrap truncate>
           {pillName(entry)}
         </text>
       </row>

@@ -11,7 +11,7 @@ import { shouldUseBoundedMarkdownPlaintext } from "@/features/chat/streaming/mar
 import { translateNow } from "@/shared/i18n";
 import { derive, useTokens } from "../theme";
 import { markdownCodeAction, markdownStyle, type ChatText } from "../kit";
-import { prepareChatMarkdown, stellaAppSlug, stellaFilePath } from "./markdown-source";
+import { fetchedImageSources, prepareChatMarkdown, stellaAppSlug, stellaFilePath } from "./markdown-source";
 import { BUBBLE_FEATURES, useChatSurfaceLook } from "./chat-text";
 import { rune } from "./engine";
 
@@ -56,13 +56,14 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
     body: { ...markdownStyle(t, chat, false).body, features: BUBBLE_FEATURES },
     codeMargin: [16, 16],
     tableMargin: [16, 16],
-    linkStyles: [{ prefix: "stella-file:", underline: t.c.textInteractive }],
   }));
+  const linkStyles = derive(t, "chat-markdown-links", (t) => [{ prefix: "stella-file:", color: t.c.textInteractive, underline: t.c.textInteractive }]);
   const hiddenKey = hiddenFilePaths?.join("\0") ?? "";
   const source = useMemo(
     () => prepareChatMarkdown(text, { hideHorizontalRules, hiddenFilePaths: hiddenKey ? hiddenKey.split("\0") : [] }),
     [hiddenKey, hideHorizontalRules, text],
   );
+  const images = useMemo(() => fetchedImageSources(source), [source]);
   const onLink = useCallback(
     (href: string) => {
       const slug = stellaAppSlug(href);
@@ -89,5 +90,5 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
       </text>
     );
   }
-  return <markdown id={`md:${cacheKey ?? anonKey}`} src={source} selectable mdStyle={style} onLink={onLink} onCodeAction={markdownCodeAction} onContextMenu={onContextMenu} w="fit" maxW="full" />;
+  return <markdown id={`md:${cacheKey ?? anonKey}`} src={source} selectable mdStyle={style} linkStyles={linkStyles} images={images} imageRadius={6} onLink={onLink} onCodeAction={markdownCodeAction} onContextMenu={onContextMenu} w="fit" maxW="full" />;
 });

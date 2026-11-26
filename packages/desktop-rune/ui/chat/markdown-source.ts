@@ -9,6 +9,15 @@ import { basenameOf } from "@/features/workspace-display/path-to-viewer";
 export const STELLA_FILE_SCHEME = "stella-file:";
 export const STELLA_APP_SCHEME = "stella-app:";
 
+const MARKDOWN_IMAGE = /!\[[^\]]*\]\(\s*<?((?:https?|data):[^)\s>]+)/gi;
+
+/** Each `![alt](src)` whose src the host fetches for the engine (http(s) and data URLs), mapped to itself. */
+export const fetchedImageSources = (markdown: string): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const match of markdown.matchAll(MARKDOWN_IMAGE)) out[match[1]!] = match[1]!;
+  return out;
+};
+
 type Node = {
   type: string;
   url?: string;

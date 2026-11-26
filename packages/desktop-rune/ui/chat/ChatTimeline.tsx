@@ -169,6 +169,8 @@ export const ChatTimeline = memo(function ChatTimeline({
   const [replyHandoffController] = useState(createReplyHandoffController);
   const askRecords = useConversationUserAskRecords(conversationId);
   const [indicatorVacated, setIndicatorVacated] = useState(false);
+  const [tailFilled, setTailFilled] = useState(false);
+  const tailPulledUp = Boolean(indicator && indicatorVacated && extraTail);
   const listItems = useMemo<TimelineListItem[]>(() => {
     const items = buildChatTimelineItems({ rows, includeWorkingIndicator: Boolean(indicator), askRecords });
     const timeHeaders = timestampHeaders(items.flatMap((item) => (item.type === "message" ? [{ id: item.id, timestampMs: item.row.timestampMs }] : [])));
@@ -176,11 +178,12 @@ export const ChatTimeline = memo(function ChatTimeline({
       const next = items[index + 1];
       const timeHeaderMs = item.type === "message" ? timeHeaders.get(item.id) : undefined;
       if (!next) return { ...item, gapAfter: 0, timeHeaderMs };
-      if (item.type === "message") return { ...item, gapAfter: gapAfterRow(item.row, next.type === "message" ? next.row : undefined), timeHeaderMs };
       if (item.type === "working-indicator") return { ...item, gapAfter: 0 };
-      return { ...item, gapAfter: ROW_GAP };
+      const gap = item.type === "message" ? gapAfterRow(item.row, next.type === "message" ? next.row : undefined) : ROW_GAP;
+      const gapAfter = tailPulledUp && next.type === "working-indicator" ? gap - EXTRA_TAIL_GAP : gap;
+      return item.type === "message" ? { ...item, gapAfter, timeHeaderMs } : { ...item, gapAfter };
     });
-  }, [askRecords, indicator, rows]);
+  }, [askRecords, indicator, rows, tailPulledUp]);
   const latestMediaRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
@@ -270,7 +273,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   };
 
   const tail = extraTail ? (
-    <col w="full" gap={6} mt={indicatorVacated ? 0 : EXTRA_TAIL_GAP}>
+    <col w="full" gap={6} mt={!tailPulledUp && tailFilled ? EXTRA_TAIL_GAP : 0} onLayout={(r) => setTailFilled(r.h > 0)}>
       {extraTail}
     </col>
   ) : null;

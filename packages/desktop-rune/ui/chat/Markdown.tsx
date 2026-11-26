@@ -54,6 +54,8 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
   const style = derive(t, `chat-markdown:${chat.size}:${chat.color ?? ""}`, (t) => ({
     ...markdownStyle(t, chat, false),
     body: { ...markdownStyle(t, chat, false).body, features: BUBBLE_FEATURES },
+    codeMargin: [16, 16],
+    tableMargin: [16, 16],
     linkStyles: [{ prefix: "stella-file:", underline: t.c.textInteractive }],
   }));
   const hiddenKey = hiddenFilePaths?.join("\0") ?? "";

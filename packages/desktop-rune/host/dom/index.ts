@@ -6,6 +6,7 @@ import { createDomDocument, DomElement, type DomDocument } from "./document";
 import { createMatchMedia, type MediaEnvironment } from "./media";
 import { MemoryStorage, UiStateStorage, type UiStateBackend } from "./storage";
 import { audioDevices } from "../electron/macos-media";
+import { installIntlGlue } from "./intl";
 
 export type DomAppearance = { dark: boolean; reducedMotion?: boolean; highContrast?: boolean };
 export type DomViewport = { width: number; height: number; devicePixelRatio: number; x?: number; y?: number };
@@ -47,6 +48,7 @@ export function domHost(): DomHost | null {
 
 export function installDom(options: DomHostOptions): DomHost {
   if (installed) return installed;
+  installIntlGlue();
   const g = globalThis as Record<string, any>;
   const env: MediaEnvironment = {
     appearance: { reducedMotion: false, highContrast: false, ...options.appearance },

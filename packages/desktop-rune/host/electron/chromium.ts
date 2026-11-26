@@ -65,6 +65,12 @@ const PLATFORM = process.platform === "darwin"
   ? { token: "Macintosh; Intel Mac OS X 10_15_7", name: "macOS" }
   : process.platform === "win32" ? { token: "Windows NT 10.0; Win64; x64", name: "Windows" } : { token: "X11; Linux x86_64", name: "Linux" };
 
+/** macOS evaluates TLS trust through the account's keychains, found from HOME, so every https load
+ * hangs under an isolated HOME. A run with its own HOME names the account's home in
+ * STELLA_RUNE_ACCOUNT_HOME, and Chrome then stays off the login keychain. */
+const accountHome = process.platform === "darwin" ? process.env.STELLA_RUNE_ACCOUNT_HOME?.trim() || null : null;
+const chromiumEnv = (): NodeJS.ProcessEnv => (accountHome ? { ...process.env, HOME: accountHome } : process.env);
+
 /** Chrome's reduced user agent for the installed Chromium (headless Chromium calls itself HeadlessChrome). */
 export function chromeUserAgent() {
   const major = chromiumMajorVersion() ?? "0";
@@ -115,8 +121,9 @@ export class ChromiumProcess extends EventEmitter {
       "--hide-scrollbars",
       "--force-device-scale-factor=1",
       "--window-size=1280,720",
+      ...(accountHome ? ["--use-mock-keychain", "--password-store=basic"] : []),
       "about:blank",
-    ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
+    ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"], env: chromiumEnv() });
     this.writer = this.child.stdio[3] as NodeJS.WritableStream;
     const reader = this.child.stdio[4] as NodeJS.ReadableStream;
     let pending: Buffer = Buffer.alloc(0);

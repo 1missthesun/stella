@@ -150,6 +150,7 @@ async function start() {
   }
   Object.assign(env, {
     HOME: homeDir,
+    STELLA_RUNE_ACCOUNT_HOME: realHome,
     NODE_ENV: "development",
     STELLA_DATA_DIR: dataDir,
     STELLA_V2_DEV_DATA_DIR: dataDir,
@@ -237,9 +238,15 @@ async function evaluate(body: string) {
   console.log(JSON.stringify(await response.json(), null, 1));
 }
 
-function shot(file: string) {
+async function shot(file: string) {
   const run = readRun();
-  if (MAC) throw new Error("macOS: take a Stella computer-use screenshot of the window (never /usr/sbin/screencapture).");
+  if (MAC) {
+    const target = path.resolve(file);
+    const response = await fetch(`http://127.0.0.1:${run.ctlPort}/control/screenshot?path=${encodeURIComponent(target)}`);
+    if (!response.ok) throw new Error(`screenshot failed: ${response.status} ${await response.text()}`);
+    console.log(target);
+    return;
+  }
   const r = spawnSync("import", ["-window", "root", file], { env: { ...process.env, DISPLAY: ownDisplay(run) }, stdio: "inherit" });
   if (r.status !== 0) throw new Error("screenshot failed");
   console.log(file);
@@ -296,7 +303,7 @@ async function stop() {
 const [command, ...rest] = args;
 if (command === "start") await start();
 else if (command === "eval") await evaluate(rest.join(" "));
-else if (command === "shot") shot(rest[0] ?? path.join(RUN_DIR, "shot.png"));
+else if (command === "shot") await shot(rest[0] ?? path.join(RUN_DIR, "shot.png"));
 else if (command === "stop") await stop();
 else if (command === "dir") console.log(RUN_DIR);
 else { console.error("usage: session.ts start|eval|shot|stop|dir"); process.exit(2); }

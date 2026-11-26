@@ -5,6 +5,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { app } from "../electron/app";
+import { stopAllChromium } from "../electron/chromium";
 import { mainContext } from "./main-context";
 import { REPO_ROOT } from "./electron-main";
 
@@ -21,6 +22,8 @@ export function installQuitHandling() {
     if (isRelaunching()) return;
     await state.stellaHostRunner?.stop({ shutdownRuntime: true, quit: true, exitTimeoutMs: RUNTIME_EXIT_TIMEOUT_MS });
   });
+
+  app.on("will-quit", () => stopAllChromium());
 
   let signalled = false;
   for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {

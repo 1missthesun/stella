@@ -6,13 +6,14 @@
 
 import { EventEmitter } from "node:events";
 import { RendererIpc } from "./ipc";
-import { sessionFor, type Session } from "./session";
+import { defaultSession, fetchProtocolIn, sessionFor, type Session } from "./session";
 import { warnOnce } from "./engine";
 import { ChromiumPage, type PageKey, type PagePointer, type PageWheel, type ScreencastFrame } from "./chromium-page";
 import { chromiumTargetFor } from "./chromium-profiles";
 import { nativeImage } from "./native-image";
 
 export const APP_SCHEME = "stella-app:";
+const BROWSER_SCHEMES = new Set(["http", "https", "file", "about", "data", "blob", "chrome", "devtools", "javascript"]);
 
 export type ContentsKind = "app" | "web";
 
@@ -162,6 +163,7 @@ export class WebContents extends EventEmitter {
         throw new Error("WebContents was destroyed");
       }
       this.bindPage(page);
+      await page.serveSchemes(this.schemeServer()).catch(() => {});
       if (this.viewport) await page.setViewport(this.viewport.width, this.viewport.height).catch(() => {});
       await page.setUserAgent(this.userAgentSet ? this.userAgent : this.session.getUserAgent()).catch(() => {});
       return page;
@@ -407,8 +409,15 @@ export class WebContents extends EventEmitter {
     this.finishLoad();
   }
 
+  private schemeServer() {
+    const schemes = [...new Set([...this.session.protocol.handlers.keys(), ...defaultSession().protocol.handlers.keys()])].filter((s) => !BROWSER_SCHEMES.has(s));
+    return { schemes, fetch: (request: Request) => fetchProtocolIn(this.session, request) };
+  }
+
   private async loadInChromium(url: string) {
     const page = await this.chromiumPage();
+    const scheme = url.slice(0, Math.max(0, url.indexOf(":"))).toLowerCase();
+    if (!BROWSER_SCHEMES.has(scheme) && !page.servesScheme(scheme) && this.schemeServer().schemes.includes(scheme)) await page.serveSchemes(this.schemeServer());
     const event = { url, isMainFrame: true, isSameDocument: false, frame: this.mainFrame, preventDefault() {} };
     this.emit("did-start-navigation", event, url, false, true);
     await new Promise<void>((resolve, reject) => {

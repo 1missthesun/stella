@@ -84,7 +84,10 @@ const shareLook = (t: Tokens) =>
   }));
 
 const TEXT = look(fontSize.sm, 400);
-const TEXT_MEDIUM = look(fontSize.sm, 500);
+// `.canvas-share__popover` inherits the body's 1.5 line height; only hints set 1.45.
+const TEXT_POPOVER = look(fontSize.sm, 400, { lh: 1.5 });
+const TEXT_MEDIUM = look(fontSize.sm, 500, { lh: 1.5 });
+const META = look(fontSize.xs, 400, { lh: 1.5 });
 
 const useCopyLink = () => {
   const t = useT();
@@ -123,8 +126,8 @@ function PillButton({ id, icon, label, text, primary = false, iconOnly = false, 
       expanded={open}
       focusable={!disabled}
       disabled={disabled}
-      minH={30}
-      w={iconOnly ? 30 : undefined}
+      minH={28}
+      w={iconOnly ? 28 : undefined}
       px={iconOnly ? 0 : 11}
       py={iconOnly ? 0 : 5}
       gap={6}
@@ -153,7 +156,7 @@ function PillButton({ id, icon, label, text, primary = false, iconOnly = false, 
 }
 
 /** `.canvas-share__copy` / `.canvas-share__icon-btn`: a square outlined icon button. */
-function SquareButton({ id, icon, label, size = 32, iconSize = 14, danger = false, disabled = false, busy = false, onPress }: { id: string; icon: IconData; label: string; size?: number; iconSize?: number; danger?: boolean; disabled?: boolean; busy?: boolean; onPress: () => void }) {
+function SquareButton({ id, icon, label, size = 30, iconSize = 14, danger = false, disabled = false, busy = false, onPress }: { id: string; icon: IconData; label: string; size?: number; iconSize?: number; danger?: boolean; disabled?: boolean; busy?: boolean; onPress: () => void }) {
   const t = useTokens();
   const l = shareLook(t);
   return (
@@ -187,7 +190,7 @@ function State({ error = false, children }: { error?: boolean; children: ReactNo
   return (
     <row align="center" gap={8} py={4} px={2}>
       {error ? null : <Icon icon={Icons.stella.LoaderCircle} size={15} strokeWidth={2} color={t.c.textWeak} spin={0.8} />}
-      <text {...TEXT} color={error ? l.error : t.c.textWeak}>
+      <text {...TEXT_POPOVER} color={error ? l.error : t.c.textWeak}>
         {children}
       </text>
     </row>
@@ -281,7 +284,7 @@ function CanvasLinkPanel({ item }: { item: CanvasHtmlItem }) {
         {t(isPublic ? "shell.display.canvasShare.publicHint" : "shell.display.canvasShare.privateHint")}
       </text>
       <row align="center" gap={6}>
-        <input id="canvas-share-url" grow={1} minW={0} h={32} px={11} radius={radius.md} border={l.fieldBorder} fill={l.fieldFill} {...TEXT} color={tk.c.textBase} value={link.url} readOnly selectOnFocus spellcheck={false} label={linkLabel} focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: radius.md }} />
+        <input id="canvas-share-url" grow={1} minW={0} h={30} px={11} radius={radius.md} border={l.fieldBorder} fill={l.fieldFill} {...TEXT} color={tk.c.textBase} value={link.url} readOnly selectOnFocus spellcheck={false} label={linkLabel} focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: radius.md }} />
         <SquareButton id="canvas-share-copy" icon={copied === link.url ? Icons.stella.Check : Icons.stella.Copy} label={t("shell.display.canvasShare.copyLink")} onPress={() => void copy(link.url)} />
       </row>
       <row wrap align="center" gap={6}>
@@ -297,7 +300,7 @@ function CanvasLinkPanel({ item }: { item: CanvasHtmlItem }) {
         <PillButton id="canvas-share-open" icon={Icons.stella.ExternalLink} text={t("shell.display.canvasShare.openInBrowser")} disabled={pending !== null} busy={pending === "open"} onPress={() => void onOpen()} />
       </row>
       {link.expiresAt ? (
-        <text {...look(fontSize.xs, 400)} color={tk.c.textWeak}>
+        <text {...META} color={tk.c.textWeak}>
           {t("shell.display.canvasShare.expires", { date: formatDate(link.expiresAt) })}
         </text>
       ) : null}
@@ -360,18 +363,18 @@ function SharedLinksPanel() {
                   <text {...TEXT_MEDIUM} color={tk.c.textStrong} nowrap truncate>
                     {link.title?.trim() || t("shell.display.canvasShare.untitled")}
                   </text>
-                  <text {...TEXT} color={tk.c.textWeak} nowrap truncate>
+                  <text {...TEXT_POPOVER} color={tk.c.textWeak} nowrap truncate>
                     {link.url}
                   </text>
-                  <text {...look(fontSize.xs, 400)} color={tk.c.textWeak}>
+                  <text {...META} color={tk.c.textWeak}>
                     {link.expiresAt
                       ? t("shell.display.canvasShare.sharedWithExpiry", { shared: formatDate(link.createdAt), expires: formatDate(link.expiresAt) })
                       : t("shell.display.canvasShare.shared", { date: formatDate(link.createdAt) })}
                   </text>
                 </col>
                 <row shrink={false} align="center" gap={4}>
-                  <SquareButton id={`canvas-share-copy-${link.slug}`} icon={copied === link.url ? Icons.stella.Check : Icons.stella.Copy} iconSize={13} size={28} label={t("shell.display.canvasShare.copyLink")} onPress={() => void copy(link.url)} />
-                  <SquareButton id={`canvas-share-take-down-${link.slug}`} icon={link.canvas ? Icons.stella.Lock : Icons.stella.Trash2} iconSize={13} size={28} danger label={takeDown} disabled={busy === link.slug} busy={busy === link.slug} onPress={() => void onTakeDown(link)} />
+                  <SquareButton id={`canvas-share-copy-${link.slug}`} icon={copied === link.url ? Icons.stella.Check : Icons.stella.Copy} iconSize={13} size={26} label={t("shell.display.canvasShare.copyLink")} onPress={() => void copy(link.url)} />
+                  <SquareButton id={`canvas-share-take-down-${link.slug}`} icon={link.canvas ? Icons.stella.Lock : Icons.stella.Trash2} iconSize={13} size={26} danger label={takeDown} disabled={busy === link.slug} busy={busy === link.slug} onPress={() => void onTakeDown(link)} />
                 </row>
               </row>
             );

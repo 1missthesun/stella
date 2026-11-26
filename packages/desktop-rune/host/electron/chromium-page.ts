@@ -38,6 +38,34 @@ type ElectronInput = {
 
 const TITLE_POLL_MS = 1500;
 
+/** Answers a request to one of the host's custom schemes (`protocol.handle`), or null. */
+export type SchemeServer = { schemes: readonly string[]; fetch(request: Request): Promise<Response | null> };
+
+/**
+ * Chromium knows nothing of the host's custom schemes, so a page loads `scheme://host/path` from
+ * `https://host.scheme.localhost/path` (a secure origin per scheme host, which relative URLs keep)
+ * and the host answers those requests through CDP Fetch.
+ */
+const standInHost = (scheme: string, host: string) => `${host}.${scheme}.localhost`;
+const LABEL = /^[a-z0-9-]+$/;
+
+const toStandIn = (url: string, schemes: readonly string[]): string => {
+  let u: URL;
+  try { u = new URL(url); } catch { return url; }
+  const scheme = u.protocol.slice(0, -1).toLowerCase();
+  if (!schemes.includes(scheme) || !LABEL.test(scheme) || !LABEL.test(u.hostname)) return url;
+  return `https://${standInHost(scheme, u.hostname)}${u.pathname}${u.search}${u.hash}`;
+};
+
+const fromStandIn = (url: string, schemes: readonly string[]): string => {
+  let u: URL;
+  try { u = new URL(url); } catch { return url; }
+  if (u.protocol !== "https:") return url;
+  const scheme = schemes.find((s) => u.hostname.endsWith(`.${s}.localhost`));
+  if (!scheme) return url;
+  return `${scheme}://${u.hostname.slice(0, -`.${scheme}.localhost`.length)}${u.pathname}${u.search}${u.hash}`;
+};
+
 const NET_ERRORS: Record<string, number> = {
   ERR_FAILED: -2, ERR_ABORTED: -3, ERR_TIMED_OUT: -7, ERR_FILE_NOT_FOUND: -6, ERR_ACCESS_DENIED: -10, ERR_BLOCKED_BY_CLIENT: -20,
   ERR_BLOCKED_BY_RESPONSE: -27, ERR_CONNECTION_CLOSED: -100, ERR_CONNECTION_RESET: -101, ERR_CONNECTION_REFUSED: -102,
@@ -85,6 +113,7 @@ export class ChromiumPage extends EventEmitter {
   private screencastListener: ((frame: ScreencastFrame) => void) | null = null;
   private viewport = { width: 1280, height: 720 };
   private titlePoll: ReturnType<typeof setInterval> | null = null;
+  private schemes: SchemeServer | null = null;
 
   static async open(options: { profileDir: string; url?: string; targetId?: string; browserContextId?: string }): Promise<ChromiumPage> {
     const proc = await chromiumFor(options.profileDir);
@@ -136,19 +165,19 @@ export class ChromiumPage extends EventEmitter {
       case "Page.frameRequestedNavigation":
         if (p.frameId === this.mainFrameId) {
           let prevented = false;
-          this.emit("requestedNavigation", p.url, () => { prevented = true; });
+          this.emit("requestedNavigation", this.hostUrl(p.url), () => { prevented = true; });
           if (prevented) void this.send("Page.stopLoading").catch(() => {});
         }
         break;
       case "Page.frameNavigated":
         if (!p.frame?.parentId) {
           this.mainFrameId = p.frame.id;
-          this.emit("navigated", p.frame.url + (p.frame.urlFragment ?? ""), false, 200);
+          this.emit("navigated", this.hostUrl(p.frame.url + (p.frame.urlFragment ?? "")), false, 200);
         }
         break;
       case "Page.navigatedWithinDocument":
         if (p.frameId === this.mainFrameId) {
-          this.emit("navigated", p.url, true, 200);
+          this.emit("navigated", this.hostUrl(p.url), true, 200);
           this.refreshTitle();
         }
         break;
@@ -165,6 +194,9 @@ export class ChromiumPage extends EventEmitter {
         break;
       case "Inspector.targetCrashed":
         this.emit("crashed");
+        break;
+      case "Fetch.requestPaused":
+        void this.answerScheme(p.requestId as string, p.request as { url: string; method: string; headers: Record<string, string>; postData?: string });
         break;
       case "Page.javascriptDialogOpening":
         setTimeout(() => {
@@ -224,11 +256,48 @@ export class ChromiumPage extends EventEmitter {
 
   get isClosed() { return this.closed; }
 
-  async navigate(url: string): Promise<{ sameDocument: boolean }> {
+  /** Loads the host's custom schemes in this page from now on. */
+  async serveSchemes(server: SchemeServer) {
+    const schemes = server.schemes.filter((s) => LABEL.test(s));
+    this.schemes = { schemes, fetch: server.fetch };
+    if (schemes.length === 0) return;
+    await this.send("Fetch.enable", { patterns: schemes.map((s) => ({ urlPattern: `https://*.${s}.localhost/*`, requestStage: "Request" })) });
+  }
+
+  servesScheme(scheme: string) {
+    return this.schemes?.schemes.includes(scheme) ?? false;
+  }
+
+  private hostUrl(url: string) {
+    return this.schemes ? fromStandIn(url, this.schemes.schemes) : url;
+  }
+
+  private async answerScheme(requestId: string, request: { url: string; method: string; headers: Record<string, string>; postData?: string }) {
+    const server = this.schemes;
+    const fail = () => this.send("Fetch.failRequest", { requestId, errorReason: "Failed" }).catch(() => {});
+    if (!server) return void fail();
+    try {
+      const body = request.postData !== undefined && request.method !== "GET" && request.method !== "HEAD" ? request.postData : undefined;
+      const response = await server.fetch(new Request(fromStandIn(request.url, server.schemes), { method: request.method, headers: request.headers, body }));
+      if (!response) return void fail();
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      await this.send("Fetch.fulfillRequest", {
+        requestId,
+        responseCode: response.status,
+        responseHeaders: [...response.headers].map(([name, value]) => ({ name, value })),
+        body: Buffer.from(bytes).toString("base64"),
+      });
+    } catch {
+      await fail();
+    }
+  }
+
+  async navigate(hostUrl: string): Promise<{ sameDocument: boolean }> {
+    const url = this.schemes ? toStandIn(hostUrl, this.schemes.schemes) : hostUrl;
     const r = await this.send<{ errorText?: string; loaderId?: string }>("Page.navigate", { url });
     if (r.errorText && r.errorText !== "net::ERR_ABORTED") {
       const name = r.errorText.replace(/^net::/, "");
-      this.emit("loadFailed", NET_ERRORS[name] ?? -2, name, url);
+      this.emit("loadFailed", NET_ERRORS[name] ?? -2, name, hostUrl);
     }
     return { sameDocument: !r.errorText && !r.loaderId };
   }

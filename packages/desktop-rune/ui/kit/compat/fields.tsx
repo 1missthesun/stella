@@ -180,7 +180,9 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
   const submit = useFormSubmit();
   const [own, setOwn] = useState(defaultValue ?? "");
   const current = value ?? own;
-  const { lh, em, size, weight, family, ...box } = style;
+  const [focused, setFocused] = useState(false);
+  const { lh, em, size, weight, family, focusBorder, focusFill, ...rest } = style;
+  const box = focused ? { ...rest, border: focusBorder ?? rest.border, fill: focusFill ?? rest.fill } : rest;
   const text = field
     ? look(size ?? fontSize.md, weight ?? font.sansWeight, { lh: lh ?? 1.43, em: em ?? font.sansTrackingEm, family: family ?? "sans" })
     : look(size ?? base.size, weight ?? base.weight, { lh: lh ?? base.lh, em: em ?? base.em, family: family ?? base.family ?? font.sans });
@@ -223,7 +225,11 @@ export function Input({ field = false, value, defaultValue, type, disabled, read
       opacity={disabled ? 0.5 : style.opacity}
       keys={onKeyDown ? KEYS : undefined}
       onKey={(k) => onKeyDown?.(domEvent(current, { key: k.key, metaKey: k.mods?.meta, ctrlKey: k.mods?.ctrl, shiftKey: k.mods?.shift, altKey: k.mods?.alt }))}
-      onFocus={(focused) => (focused ? onFocus?.() : onBlur?.())}
+      onFocus={(next) => {
+        setFocused(next);
+        if (next) onFocus?.();
+        else onBlur?.();
+      }}
       onInput={(next) => {
         const capped = maxLength ? next.slice(0, maxLength) : next;
         if (value === undefined) setOwn(capped);

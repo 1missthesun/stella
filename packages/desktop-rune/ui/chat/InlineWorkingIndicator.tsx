@@ -10,7 +10,7 @@ import { useT } from "@/shared/i18n";
 import { fontSize, radius, useTokens } from "../theme";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { useReplyHandoffController } from "@/app/chat/reply-handoff";
-import { CHAT_LINE } from "./chat-text";
+import { useChatSurfaceLook } from "./chat-text";
 
 export type { InlineWorkingIndicatorMountProps, InlineWorkingIndicatorProps } from "@/features/chat/working-indicator-state";
 
@@ -19,7 +19,6 @@ export const ENTER_ANIMATION_MS = 320;
 const LEAVE_MS = 220;
 const MIN_VISIBLE_MS = INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS;
 const SHOW_DELAY_MS = INLINE_WORKING_INDICATOR_SHOW_DELAY_MS;
-const MIN_HEIGHT = CHAT_LINE + 16;
 
 function newReasoningSeed(): string {
   return `${Date.now()}-${Math.random()}`;
@@ -192,12 +191,13 @@ export function InlineWorkingIndicator({
   const phase: InlineIndicatorPhase = leaving ? (handingOff ? "handoff" : "leaving") : showInner ? (entering ? "entering" : "shown") : reserving ? "reserved" : "vacated";
   useLayoutEffect(() => onPhase?.(phase), [onPhase, phase]);
 
+  const minHeight = useChatSurfaceLook().line + 16;
   const leaveLook = handingOff ? { opacity: 0, y: -5, scale: 0.97 } : { opacity: 0, y: -3, scale: 0.94, blur: 2 };
   return (
     <row
       w="full"
       align="center"
-      minH={leaving && !handingOff ? 0 : MIN_HEIGHT}
+      minH={leaving && !handingOff ? 0 : minHeight}
       h={leaving && !handingOff ? 0 : undefined}
       clip={leaving && !handingOff ? 0 : undefined}
       origin={handingOff ? [0, 0.5] : [0, 0]}

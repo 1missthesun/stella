@@ -76,7 +76,11 @@ type ComposerProps = {
   replyPeek?: AssistantReplyPeekProps | null;
   catchUp?: boolean;
   suggestionsActive?: boolean;
+  /** `.chat-sidebar-composer` / `.chat-sidebar-form` (chat-sidebar.css); `sidebar-wide` is `.chat-panel-tab--wide`. */
+  variant?: ComposerVariant;
 };
+
+export type ComposerVariant = "full" | "sidebar" | "sidebar-wide";
 
 /** `.composer-shell`'s look: panel surface, primary-tinted border while focused, a glow ring on file drag. */
 export const composerShellLook = (t: ReturnType<typeof useTokens>) =>
@@ -124,12 +128,15 @@ function ComposerImpl({
   isDragOver = false,
   replyPeek,
   catchUp = false,
-  suggestionsActive = true,
+  suggestionsActive: suggestionsRequested = true,
+  variant = "full",
 }: ComposerProps) {
+  const sidebar = variant !== "full";
+  const suggestionsActive = suggestionsRequested && !sidebar;
   const t = useT();
   const tokens = useTokens();
   const { state: uiState } = useUiState();
-  const voiceVisible = useRealtimeVoiceVisible();
+  const voiceVisible = useRealtimeVoiceVisible() && !sidebar;
   const inputId = `composer-input:${useId()}`;
   const modelMentionMenuRef = useRef<ComposerModelMentionMenuHandle | null>(null);
   const [modelMentionTrigger, setModelMentionTrigger] = useState<ComposerModelMentionTrigger | null>(null);
@@ -161,7 +168,7 @@ function ComposerImpl({
     onSend();
   };
 
-  const composerState = deriveComposerState({ message, chatContext, selectedText, conversationId, requireConversationId: true });
+  const composerState = deriveComposerState({ message, chatContext, selectedText, conversationId, requireConversationId: !sidebar });
   const placeholder = t(composerState.placeholderKey);
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = canSubmit || dictationInFlight;
@@ -169,7 +176,7 @@ function ComposerImpl({
   const hasText = message.trim().length > 0;
   const dictationBelow = dictation.isRecordingVisible;
   const dictationOwnsControls = dictationBelow && dictation.showControls;
-  const modelPinned = useComposerModelPinned();
+  const modelPinned = useComposerModelPinned() && !sidebar;
   const isExpanded = pill.expanded || dictation.isRecordingVisible || modelPinned;
 
   useEffect(() => {
@@ -229,6 +236,10 @@ function ComposerImpl({
   const look = composerShellLook(tokens);
   const mentionMarks = useMentionMarks(message, tokens);
   const narrow = composerW > 0 && composerW < COMPOSER_NARROW_W;
+  const shellMaxW = variant === "sidebar" || (variant === "full" && narrow) ? undefined : composerShellMaxW(composerW);
+  const column = sidebar
+    ? { gap: 6, pt: 4, pb: 8, px: variant === "sidebar-wide" ? COMPOSER_PAD_X : window.innerWidth <= COMPOSER_NARROW_W ? 6 : 12 }
+    : { gap: COMPOSER_GAP, pt: COMPOSER_PAD_TOP, pb: 10, px: narrow ? 8 : COMPOSER_PAD_X };
   const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2;
   const addMenu = <ComposerAddMenu title={t("app.chat.composer.add")} setChatContext={setChatContext} />;
   const field = (
@@ -239,9 +250,9 @@ function ComposerImpl({
         value={message}
         placeholder={placeholder}
         disabled={!conversationId && !platformCapabilities.website}
-        minH={isExpanded ? 36 : 28}
-        pt={isExpanded ? 10 : 3.5}
-        pb={isExpanded ? 2 : 3.5}
+        minH={isExpanded ? 36 : sidebar ? 26 : 28}
+        pt={isExpanded ? 10 : sidebar ? 2 : 3.5}
+        pb={isExpanded ? 2 : sidebar ? 2 : 3.5}
         px={isExpanded ? 16 : PILL_INPUT_PAD_X}
         maxH={INPUT_MAX_H}
         marks={mentionMarks}
@@ -294,11 +305,11 @@ function ComposerImpl({
   );
 
   return (
-    <col w="full" shrink={false} align="center" justify="end" gap={COMPOSER_GAP} pt={COMPOSER_PAD_TOP} px={narrow ? 8 : COMPOSER_PAD_X} pb={10} onLayout={(r) => setComposerW(r.w)}>
-      <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp ? conversationId : null} maxW={narrow ? undefined : composerShellMaxW(composerW)} />
+    <col w="full" shrink={false} align="center" justify="end" {...column} onLayout={(r) => setComposerW(r.w)}>
+      <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp && !sidebar ? conversationId : null} maxW={shellMaxW} />
       <col
         w="full"
-        maxW={narrow ? undefined : composerShellMaxW(composerW)}
+        maxW={shellMaxW}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
         radius={radius}
         clip={radius}
@@ -316,7 +327,7 @@ function ComposerImpl({
         ) : null}
         <BrowserAttachmentTray />
         <col w="full" role="form" label="chat-composer">
-          <row w="full" align="center" gap={8} minH={isExpanded ? undefined : 44} py={isExpanded ? 0 : 6} px={isExpanded ? 0 : 8}>
+          <row w="full" align="center" gap={8} minH={isExpanded ? undefined : 44} py={isExpanded ? 0 : 6} px={isExpanded ? 0 : sidebar ? 6 : 8}>
             {isExpanded ? null : <box key="add">{addMenu}</box>}
             {field}
             {isExpanded ? null : rightControls}

@@ -3,7 +3,7 @@ import { useT } from "@/shared/i18n";
 import { isUserMessageOverflowing, shouldShowUserMessageToggle } from "@/app/chat/user-message-clamp";
 import { derive, fontSize, mix, radius, useTokens } from "../theme";
 import { modelMentionRuns } from "./ModelMentionText";
-import { BUBBLE_FEATURES, CHAT_TEXT_LOOK } from "./chat-text";
+import { BUBBLE_FEATURES, useChatSurfaceLook } from "./chat-text";
 
 const CLAMP_LINES = 4;
 
@@ -27,7 +27,7 @@ export function UserMessageBody({ text }: { text: string }) {
   if (!expanded && overflowing !== wasOverflowing && fullH > 0 && clampedH > 0) setWasOverflowing(overflowing);
   const showToggle = shouldShowUserMessageToggle({ overflowing: expanded ? wasOverflowing : overflowing, expanded });
   const runs = modelMentionRuns(text, c.mention);
-  const look = { ...CHAT_TEXT_LOOK, color: tokens.c.chatUserBubbleText, features: BUBBLE_FEATURES };
+  const look = { ...useChatSurfaceLook().text, color: tokens.c.chatUserBubbleText, features: BUBBLE_FEATURES };
   return (
     <col w="full" minW={0}>
       <col w="full" minW={0} align="stretch">

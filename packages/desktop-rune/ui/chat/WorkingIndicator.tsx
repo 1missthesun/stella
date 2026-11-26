@@ -20,7 +20,7 @@ import {
 import { radius, useTokens } from "../theme";
 import { SwapText } from "./SwapText";
 import { CHAT_ACTIVITY_SHIMMER_GROUP } from "./TextShimmer";
-import { CHAT_LINE, CHAT_TEXT_LOOK } from "./chat-text";
+import { useChatSurfaceLook } from "./chat-text";
 
 const INDICATOR_MARK_SIZE_PX = 24;
 
@@ -94,26 +94,27 @@ export function WorkingIndicator({
   previousPoseRef.current = liveDisplay.characterState;
   const held = useMinimumVisibleValue(liveDisplay, liveDisplay.reasoning ? 0 : minimumVisibleMs, (a, b) => a.status === b.status && a.characterState === b.characterState);
   const dotsOnly = held.characterState === "thinking" && !held.status && !compacting;
+  const surface = useChatSurfaceLook();
 
   return (
     <row
       align="center"
       gap={dotsOnly ? 0 : 8}
-      px={14}
-      py={8}
-      radius={radius["3xl"]}
+      px={surface.assistant.px}
+      py={surface.assistant.py}
+      radius={surface.assistant.radius}
       fill={t.c.chatAssistantBubbleFillTop}
       gradient={t.gradient.assistantBubble}
       maxW="full"
       minW={0}
     >
-      <box w={INDICATOR_MARK_SIZE_PX} h={CHAT_LINE} center shrink={false}>
+      <box w={INDICATOR_MARK_SIZE_PX} h={surface.line} center shrink={false}>
         <StellaCharacter size={INDICATOR_MARK_SIZE_PX} state={held.characterState} eyeColor={t.c.background} paused={animationPaused} />
       </box>
       {dotsOnly ? null : (
         <SwapText
           text={compacting ? WORKING_INDICATOR_COMPACTING_TEXT : held.status}
-          look={{ ...CHAT_TEXT_LOOK, weight: 500 }}
+          look={{ ...surface.text, weight: 500 }}
           active={animationActive}
           animateInitial={false}
           shimmerGroup={CHAT_ACTIVITY_SHIMMER_GROUP}

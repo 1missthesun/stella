@@ -10,9 +10,9 @@ import { cloudDriveEntry } from "@/features/workspace-display/derive-conversatio
 import { shouldUseBoundedMarkdownPlaintext } from "@/features/chat/streaming/markdown-chunks";
 import { translateNow } from "@/shared/i18n";
 import { derive, useTokens } from "../theme";
-import { CHAT_TEXT, markdownCodeAction, markdownStyle, type ChatText } from "../kit";
+import { markdownCodeAction, markdownStyle, type ChatText } from "../kit";
 import { prepareChatMarkdown, stellaAppSlug, stellaFilePath } from "./markdown-source";
-import { BUBBLE_FEATURES, CHAT_TEXT_LOOK } from "./chat-text";
+import { BUBBLE_FEATURES, useChatSurfaceLook } from "./chat-text";
 import { rune } from "./engine";
 
 interface MarkdownProps {
@@ -45,8 +45,10 @@ const openLocal = (filePath: string) => {
 };
 
 /** desktop-ui's chat `Markdown` (Streamdown, static) on the engine's Markdown, with Stella's file and app links. */
-export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalRules = false, hiddenFilePaths, chat = CHAT_TEXT, onContextMenu }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalRules = false, hiddenFilePaths, chat: chatOverride, onContextMenu }: MarkdownProps) {
   const t = useTokens();
+  const surface = useChatSurfaceLook();
+  const chat = chatOverride ?? surface.markdown;
   const [anonKey] = useState(() => `md-${Math.random().toString(36).slice(2)}`);
   const openFile = useOpenConversationFile();
   const style = derive(t, `chat-markdown:${chat.size}:${chat.color ?? ""}`, (t) => ({
@@ -80,7 +82,7 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
   );
   if (shouldUseBoundedMarkdownPlaintext(text.length)) {
     return (
-      <text {...CHAT_TEXT_LOOK} color={t.c.chatAssistantBubbleText} features={BUBBLE_FEATURES} selectable onContextMenu={onContextMenu}>
+      <text {...surface.text} color={t.c.chatAssistantBubbleText} features={BUBBLE_FEATURES} selectable onContextMenu={onContextMenu}>
         {text}
       </text>
     );

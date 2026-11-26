@@ -5,19 +5,22 @@ import { GALLERY_THEMES } from "../../gallery/spec";
 import { ThemeBackdrop, ThemeScope } from "../../theme";
 import { useChatScrollManagement } from "../use-chat-scroll-management";
 import { ComposerShell } from "../ComposerShell";
+import { ChatVariantContext } from "../chat-text";
 import { CHAT_FIXTURE_CONTENT_STYLE, CHAT_FIXTURE_REPLY, chatFixtureMessage, chatFixtureMessages } from "./messages";
 
 const ROWS = Number(process.env.STELLA_CHAT_FIXTURE_ROWS ?? 40);
+const SIDEBAR = process.env.STELLA_CHAT_FIXTURE_VARIANT === "sidebar";
+const SIDEBAR_CONTENT_STYLE = { paddingLeft: 12, paddingRight: 12, paddingTop: 48, paddingBottom: 12 };
 
 function Fixture() {
   const [messages, setMessages] = useState(() => chatFixtureMessages(ROWS));
   const [draft, setDraft] = useState("");
   const scroll = useChatScrollManagement({ paginationKey: "fixture" });
-  return (
+  const column = (
     <col w="full" h="full">
       <ThemeBackdrop id="chat-fixture-backdrop" />
       <box grow={1} minH={0} w="full">
-        <ConversationEvents messages={messages} conversationId="fixture" list={scroll.list as never} contentContainerStyle={CHAT_FIXTURE_CONTENT_STYLE} estimatedItemSize={140} />
+        <ConversationEvents messages={messages} conversationId="fixture" list={scroll.list as never} contentContainerStyle={SIDEBAR ? SIDEBAR_CONTENT_STYLE : CHAT_FIXTURE_CONTENT_STYLE} estimatedItemSize={140} />
       </box>
       <ComposerShell
         value={draft}
@@ -31,6 +34,15 @@ function Fixture() {
         }}
       />
     </col>
+  );
+  return SIDEBAR ? (
+    <ChatVariantContext.Provider value="sidebar">
+      <row w="full" h="full" justify="end">
+        <col w={480} h="full">{column}</col>
+      </row>
+    </ChatVariantContext.Provider>
+  ) : (
+    column
   );
 }
 

@@ -30,7 +30,7 @@ import { derive, fontSize, radius, useTokens } from "../theme";
 import { ContextPill, FileAttachmentChip, ImageAttachmentChip, fileAttachmentTypeLabelKey } from "./ComposerContextChips";
 import { AttachmentTileRow, PastedTextTile, type AttachmentTileItem } from "./AttachmentTiles";
 import { ChipPreview, useHoverPreview } from "./HoverPreview";
-import { ChatTextColor } from "./chat-text";
+import { ChatTextColor, useChatSurfaceLook } from "./chat-text";
 import { Markdown } from "./Markdown";
 import { MessageActions } from "./MessageActions";
 import { UserMessageBody } from "./UserMessageBody";
@@ -263,6 +263,7 @@ export const UserMessageRow = memo(
   function UserMessageRow({ row }: { row: UserRowViewModel }) {
     const t = useT();
     const tokens = useTokens();
+    const surface = useChatSurfaceLook();
     const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
     const reply = useMessageReply();
     const { text, windowLabel, attachments, channelEnvelope } = row;
@@ -324,13 +325,13 @@ export const UserMessageRow = memo(
             <MessageActions text={text} messageKey={row.id} align="end" timestampMs={row.timestampMs} copyAttachment={copyAttachment ?? undefined} onReply={reply ?? undefined} />
             {text.trim() ? (
               <col
-                maxW="85%"
+                maxW={surface.user.maxW}
                 minW={0}
                 w="fit"
                 mt={reaction ? 14 : 0}
-                py={5 + 1}
-                px={12 + 1}
-                radius={radius["3xl"]}
+                py={surface.user.py}
+                px={surface.user.px}
+                radius={surface.user.radius}
                 fill={tokens.c.chatUserBubbleFill}
                 origin={[1, 1]}
                 enter={bubblePop(entrance.delayMs)}
@@ -386,6 +387,7 @@ function useReplyArrival(justArrived: boolean, finalAnswer: boolean) {
 export const AssistantMessageRow = memo(
   function AssistantMessageRow({ row, conversationId, latestMedia = false }: { row: AssistantRowViewModel; conversationId?: string | null; latestMedia?: boolean }) {
     const tokens = useTokens();
+    const surface = useChatSurfaceLook();
     const reply = useMessageReply();
     const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
     useReplyArrival(entrance.delayMs !== null, !row.isIntraTurn);
@@ -481,7 +483,7 @@ export const AssistantMessageRow = memo(
           {row.scheduleNotice ? <ScheduleNotices first={row.scheduleNotice} run={row.scheduleNoticeRun} /> : null}
           {hasBody ? (
             <row w="full" minW={0} align="start" gap={4}>
-              <col w="fit" maxW="85%" minW={0} gap={PART_GAP} py={8} px={14} radius={radius["3xl"]} fill={tokens.c.chatAssistantBubbleFillTop} gradient={tokens.gradient.assistantBubble}>
+              <col w="fit" maxW={surface.assistant.maxW} minW={0} gap={PART_GAP} py={surface.assistant.py} px={surface.assistant.px} radius={surface.assistant.radius} fill={tokens.c.chatAssistantBubbleFillTop} gradient={tokens.gradient.assistantBubble}>
                 <ChatTextColor.Provider value={tokens.c.chatAssistantBubbleText}>
                   <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules hiddenFilePaths={hiddenFileKeys} onContextMenu={menu} />
                   {evidencePaths.length > 0 ? <MessageAttachments filePaths={evidencePaths} part="documents" /> : null}

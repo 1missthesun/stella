@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { ChatVariantContext, type ChatVariant } from "./chat-text";
 import type { ChatListBinding } from "./use-chat-scroll-management";
 import { buildChatTimelineItems, type ChatTimelineItem } from "@/features/chat/lib/chat-timeline-items";
 import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
@@ -44,6 +45,8 @@ type ChatTimelineProps = {
   contentContainerStyle?: LegendContentStyle;
   takesMessageJumps?: boolean;
   onLoadOlder?: () => boolean | void | Promise<boolean>;
+  /** The sidebar look (`.chat-conversation-surface--sidebar`); unset inherits ChatVariantContext. */
+  variant?: ChatVariant;
 };
 
 export const CHAT_DRAW_DISTANCE_COLD_PX = 300;
@@ -159,6 +162,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   contentContainerStyle,
   takesMessageJumps = false,
   onLoadOlder,
+  variant,
 }: ChatTimelineProps) {
   const t = useT();
   const tokens = useTokens();
@@ -315,7 +319,7 @@ export const ChatTimeline = memo(function ChatTimeline({
     );
   }
 
-  return (
+  const timeline = (
     <ReplyHandoffContext.Provider value={replyHandoffController}>
       {viewport(
         <>
@@ -332,4 +336,5 @@ export const ChatTimeline = memo(function ChatTimeline({
       )}
     </ReplyHandoffContext.Provider>
   );
+  return variant ? <ChatVariantContext.Provider value={variant}>{timeline}</ChatVariantContext.Provider> : timeline;
 });

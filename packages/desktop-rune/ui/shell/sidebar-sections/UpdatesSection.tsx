@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import type { AppSourceCommit, AppSourceWaiting } from "@stella/contracts/desktop/app-source";
 import { useLocale, useT } from "@/shared/i18n";
-import { appSourceApi, useAppSourceState } from "@/features/app-source/app-source-store";
+import { appSourceApi, useAppSourceState, useAutoUpdate } from "@/features/app-source/app-source-store";
+import { whatsNewDialog } from "@/features/whats-new/whats-new-store";
 import { addOffer, ago, describeChange, deviceLabel, useAppSourceAction, useNow } from "@/features/app-source/AppSourceCards";
-import { EmptyState, Icon, Icons } from "../../kit";
+import { EmptyState, Icon, Icons, Switch } from "../../kit";
 import { fontSize, look, mixOklch, useTokens } from "../../theme";
 
 const SMALL = look(fontSize.sm, 400);
@@ -132,6 +133,40 @@ export function UpdatesHeading({ children, first = false }: { children: string; 
   );
 }
 
+/** `.updates-section__auto`: whether updates are added without asking. */
+function AutoUpdateRow() {
+  const t = useT();
+  const tk = useTokens();
+  const auto = useAutoUpdate();
+  return (
+    <row id="updates-auto-update" align="center" gap={12} minH={44} mb={6} py={8} px={10}>
+      <col grow={1} minW={0}>
+        <text {...look(fontSize.sm, 500)} color={tk.c.textStrong} nowrap truncate>
+          {t("shell.appSource.autoUpdate.label")}
+        </text>
+        <text {...XS} pt={1} color={tk.c.textWeak}>
+          {t("shell.appSource.autoUpdate.detail")}
+        </text>
+      </col>
+      <Switch id="updates-auto-update-switch" checked={auto.on} onCheckedChange={auto.set} label={t("shell.appSource.autoUpdate.label")} hideLabel />
+    </row>
+  );
+}
+
+/** `.updates-section__whats-new`: opens What's new from the history heading. */
+function WhatsNewLink() {
+  const t = useT();
+  const tk = useTokens();
+  const label = t("shell.whatsNew.title");
+  return (
+    <box id="updates-whats-new" role="button" label={label} focusable mt={10} mb={4} px={4} radius={6} hoverGroup focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 6 }} onPress={() => whatsNewDialog.open()}>
+      <text {...look(12, 500)} color={tk.c.textWeak} hoverColor={tk.c.textStrong} nowrap>
+        {label}
+      </text>
+    </box>
+  );
+}
+
 function Note({ id, children }: { id: string; children: string }) {
   const t = useTokens();
   return (
@@ -150,7 +185,16 @@ export function UpdatesSection() {
   const api = appSourceApi();
   const { pending, run } = useAppSourceAction();
   if (!state || !api || (state.waiting.length === 0 && state.skipped.length === 0 && state.recent.length === 0)) {
-    return <EmptyState motif="updates" title={t("shell.appSource.updates.upToDateTitle")} body={t("shell.appSource.updates.upToDateBody")} />;
+    const empty = <EmptyState motif="updates" title={t("shell.appSource.updates.upToDateTitle")} body={t("shell.appSource.updates.upToDateBody")} />;
+    if (!state || !api || state.developerCheckout) return empty;
+    return (
+      <col id="updates-section" grow={1} minH={0} gap={4} pt={14} px={14} pb={20}>
+        <col grow={1} minH={0}>
+          {empty}
+        </col>
+        <AutoUpdateRow />
+      </col>
+    );
   }
   const blocked = state.busy || pending !== null || state.merging !== undefined;
   return (
@@ -159,7 +203,8 @@ export function UpdatesSection() {
         <Note id="updates-developer-checkout">{t("shell.appSource.updates.developerCheckout")}</Note>
       ) : (
         <>
-          <UpdatesHeading first>{t("shell.appSource.updates.waiting")}</UpdatesHeading>
+          <AutoUpdateRow />
+          <UpdatesHeading>{t("shell.appSource.updates.waiting")}</UpdatesHeading>
           {state.waiting.length === 0 ? (
             <row align="center" gap={8} pad={10}>
               <Icon icon={Icons.stella.Check} size={14} strokeWidth={2} color={tk.c.textWeak} />
@@ -189,7 +234,10 @@ export function UpdatesSection() {
       {state.notShared ? <Note id="updates-not-shared">{state.notShared === "conflict" ? t("shell.appSource.updates.notSharedConflict") : t("shell.appSource.updates.notSharedBuild")}</Note> : null}
       {state.recent.length > 0 ? (
         <>
-          <UpdatesHeading>{t("shell.appSource.updates.history")}</UpdatesHeading>
+          <row align="start" justify="between" gap={8}>
+            <UpdatesHeading>{t("shell.appSource.updates.history")}</UpdatesHeading>
+            <WhatsNewLink />
+          </row>
           <col id="updates-history" role="list" gap={2}>
             {state.recent.map((commit) => (
               <HistoryItem key={commit.sha} commit={commit} now={now} pending={pending === `undo:${commit.sha}`} blocked={blocked} onUndo={!state.developerCheckout ? () => void run(`undo:${commit.sha}`, () => api.undo(commit.sha)) : null} />

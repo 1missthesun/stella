@@ -62,7 +62,6 @@ const DockIcon = glyph("dock", ["M10 5.25H7A2.75 2.75 0 0 0 4.25 8v9A2.75 2.75 0
 const stageLook = (t: Tokens) =>
   derive(t, "workspace-stage", (t) => ({
     edge: t.vars["--panel-surface-border"] ?? t.c.borderBase,
-    highlight: t.vars["--panel-surface-highlight-color"] ?? "#00000000",
     actionHover: mixOklch(t.c.foreground, 7, "transparent"),
     edgeFill: mixOklch(t.c.background, 72, "transparent"),
     divider: t.c.borderWeak,
@@ -106,7 +105,6 @@ function TabStage({ visible }: { visible: boolean }) {
       fill={t.c.background}
       border={l.edge}
       radius={STAGE_RADIUS}
-      shadows={t.shadow.lg}
       opacity={visible ? 1 : 0}
       motion={{ dur: visible ? 0.16 : 0.12 }}
       hidden={hidden}
@@ -461,7 +459,7 @@ function EdgeArrows({ nav, idBase }: { nav: ViewerNav | null; idBase: string }) 
         fill={l.edgeFill}
         hover={tk.c.background}
         backdropBlur={10}
-        shadows={[{ x: 0, y: 0, blur: 0, spread: 1, color: tk.c.borderBase }, ...tk.shadow.sm]}
+        shadows={[{ x: 0, y: 0, blur: 0, spread: 1, color: tk.c.borderBase }]}
         hoverOpacity={enabled ? [0, 1] : [0, 0]}
         motion={{ dur: 0.15 }}
         onPress={enabled ? run : undefined}
@@ -651,7 +649,6 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
       border={l.edge}
       radius={STAGE_RADIUS}
       clip={STAGE_RADIUS}
-      shadows={stage ? t.shadow.lg : [...t.shadow.xl, { x: 0, y: 1, blur: 0, spread: 0, color: l.highlight, inset: true }]}
       hidden={hidden}
       inert={hidden}
       enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
@@ -712,23 +709,89 @@ type PlacedBody = { item: DisplayTab; surface: ViewerSurface; active: boolean };
 
 const NO_IDS: readonly string[] = [];
 
-/** Documents and apps with a tab keep running once shown, until it closes. */
-const useKeptIds = (fileId: string | null, sidebarTabs: readonly SidebarTab[]): readonly string[] => {
-  const [kept, setKept] = useState(NO_IDS);
-  const open = useMemo(() => new Set(sidebarTabs.filter(isDocumentTab).map((tab) => tab.location as string)), [sidebarTabs]);
-  const current = kept.filter((id) => open.has(id));
-  const next = fileId && open.has(fileId) && !current.includes(fileId) ? [...current, fileId] : current;
-  if (next.length !== kept.length || next.some((id, i) => id !== kept[i])) setKept(next);
-  return next;
+const MAX_WARM_VIEWERS = 8;
+const MAX_WARM_FRAMES = 3;
+const MAX_WARM_PDFS = 3;
+const MAX_WARM_MEDIA = 2;
+
+const warmBucketOf = (kind: DisplayTab["kind"]): "skip" | "frame" | "pdf" | "media" | "light" => {
+  switch (kind) {
+    case "app":
+    case "chat":
+    case "home":
+    case "trash":
+      return "skip";
+    case "canvas":
+    case "url":
+      return "frame";
+    case "pdf":
+      return "pdf";
+    case "video":
+    case "audio":
+      return "media";
+    default:
+      return "light";
+  }
+};
+
+const sameIdList = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((id, index) => id === b[index]);
+
+const trimWarmPool = (recent: readonly string[], openDocIds: ReadonlySet<string>, kindOf: (id: string) => DisplayTab["kind"] | null): readonly string[] => {
+  const kept: string[] = [];
+  let warmCount = 0;
+  let frames = 0;
+  let pdfs = 0;
+  let media = 0;
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const id = recent[i]!;
+    const kind = kindOf(id);
+    if (!kind) continue;
+    if (openDocIds.has(id)) {
+      kept.push(id);
+      continue;
+    }
+    const bucket = warmBucketOf(kind);
+    if (bucket === "skip" || warmCount >= MAX_WARM_VIEWERS) continue;
+    if (bucket === "frame" && frames >= MAX_WARM_FRAMES) continue;
+    if (bucket === "pdf" && pdfs >= MAX_WARM_PDFS) continue;
+    if (bucket === "media" && media >= MAX_WARM_MEDIA) continue;
+    kept.push(id);
+    warmCount += 1;
+    if (bucket === "frame") frames += 1;
+    else if (bucket === "pdf") pdfs += 1;
+    else if (bucket === "media") media += 1;
+  }
+  kept.reverse();
+  return kept;
+};
+
+/** Open document tabs plus a bounded pool of recently viewed items stay mounted, suspended in DOCKED, so reopening and sibling switches are instant. */
+const useKeptIds = (fileId: string | null, detached: readonly { name: string; fileId: string }[], tabs: readonly DisplayTab[], sidebarTabs: readonly SidebarTab[]): readonly string[] => {
+  const [recent, setRecent] = useState(NO_IDS);
+  const prevDetachedRef = useRef<readonly string[]>(NO_IDS);
+  const openDocIds = useMemo(() => new Set(sidebarTabs.filter(isDocumentTab).map((tab) => tab.location as string)), [sidebarTabs]);
+  const detachedIds = useMemo(() => new Set(detached.map((viewer) => viewer.fileId)), [detached]);
+  const closedDetached = new Set<string>();
+  for (const prevId of prevDetachedRef.current) {
+    if (!detachedIds.has(prevId) && prevId !== fileId) closedDetached.add(prevId);
+  }
+  prevDetachedRef.current = detached.map((viewer) => viewer.fileId);
+  const kindById = useMemo(() => new Map(tabs.map((tab) => [tab.id, tab.kind] as const)), [tabs]);
+  let next = recent.filter((id) => kindById.has(id) && !closedDetached.has(id));
+  if (fileId && kindById.has(fileId)) next = [...next.filter((id) => id !== fileId), fileId];
+  const trimmed = trimWarmPool(next, openDocIds, (id) => kindById.get(id) ?? null);
+  if (!sameIdList(trimmed, recent)) setRecent(trimmed);
+  return trimmed;
 };
 
 function Viewers({ hiddenForExclusiveTab }: { hiddenForExclusiveTab: boolean }) {
-  const { fileId, detached } = useFileViewer();
+  const { fileId, mode, detached } = useFileViewer();
   const { tabs } = useDisplayTabList();
   const sidebarTabs = useSidebarOpenTabs();
-  const kept = useKeptIds(fileId, sidebarTabs);
+  const kept = useKeptIds(fileId, detached, tabs, sidebarTabs);
   const itemOf = (id: string) => tabs.find((tab) => tab.id === id) ?? null;
   const item = fileId ? itemOf(fileId) : null;
+  const dockedVisible = Boolean(item) && (mode === "stage" || !hiddenForExclusiveTab);
 
   useEffect(() => {
     void reopenViewerWindows();
@@ -750,7 +813,7 @@ function Viewers({ hiddenForExclusiveTab }: { hiddenForExclusiveTab: boolean }) 
   for (const id of dockedIds) {
     const shown = itemOf(id);
     if (!shown || bodies.some((body) => body.item.id === id)) continue;
-    bodies.push({ item: shown, surface: DOCKED, active: id === fileId });
+    bodies.push({ item: shown, surface: DOCKED, active: id === fileId && dockedVisible });
   }
   bodies.sort((a, b) => a.item.ord - b.item.ord);
   const tearing = useSyncExternalStore(viewerTear.subscribe, viewerTear.get);

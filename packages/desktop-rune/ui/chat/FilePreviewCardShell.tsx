@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
+import { ViewerItemContext } from "@/shell/workspace-stage/viewer-item-context";
 import { useT } from "@/shared/i18n";
 import { derive, fontSize, mix, radius, useTokens } from "../theme";
 import { panelSurface } from "./surfaces";
@@ -34,8 +35,9 @@ export function FilePreviewCardShell({ eyebrow, title, titlePath, meta, actionSt
   const t = useT();
   const tokens = useTokens();
   const surface = panelSurface(tokens);
+  const inViewer = useContext(ViewerItemContext) !== null;
   return (
-    <col w="full" mt={mt} {...(grow ? { grow: 1, minH: 0 } : {})} radius={radius.lg} clip={radius.lg} gradient={surface.gradient} border={surface.border} shadows={surface.shadows}>
+    <col w="full" mt={mt} {...(grow ? { grow: 1, minH: 0 } : {})} radius={radius.lg} clip={radius.lg} gradient={surface.gradient} border={surface.border} shadows={inViewer ? undefined : surface.shadows}>
       <row shrink={false} align={headerAlign} justify="between" gap={12} pt={12 + 1} px={14 + 1} pb={12 + 1} fill={tokens.c.surfaceInset} borderSides={[0, 0, 1, 0]} border={tokens.c.border}>
         <col minW={0}>
           <text mb={4} size={fontSize.xs} weight={600} tracking={fontSize.xs * 0.08} textCase="upper" color={tokens.c.mutedForeground}>

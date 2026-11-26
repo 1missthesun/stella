@@ -4,6 +4,7 @@ import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
 import { dispatchComposeText } from "@/shared/lib/stella-orb-chat";
 import { useViewerWindow } from "@/shell/workspace-stage/viewer-item-context";
 import type { Layout, WebviewMessage, WebviewRequest } from "../../../../host/rune-jsx/props";
+import { useRetainedSurfaceActive } from "../../../kit";
 import { publishCanvasSelection } from "../../selection/AskStellaSelectionChip";
 
 export type CanvasFrameSource = { src: string } | { html: string };
@@ -121,6 +122,13 @@ export function CanvasFrame({
   const frameRect = useRef<Layout | null>(null);
   const showsChip = useRef(false);
   const isMain = viewerWindow === window;
+  const active = useRetainedSurfaceActive();
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
+  useEffect(() => {
+    host.post({ type: "stella:canvas-visibility", active });
+  }, [active, host]);
 
   useEffect(
     () => () => {
@@ -134,6 +142,7 @@ export function CanvasFrame({
       if (e.phase !== "finished") return;
       const saved = scrollMemory.get(id);
       if (loads.current === 0 && saved) host.post({ type: "stella:canvas-scroll", ...saved });
+      if (!activeRef.current) host.post({ type: "stella:canvas-visibility", active: false });
       latest.current.onDocument?.(host);
       loads.current += 1;
       if (loads.current > 1) {

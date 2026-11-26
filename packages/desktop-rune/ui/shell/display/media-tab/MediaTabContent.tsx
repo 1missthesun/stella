@@ -1,4 +1,4 @@
-import { useCallback, useContext, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { MediaAsset } from "@stella/contracts/desktop/display-payload";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 import { fileViewer } from "@/features/workspace-display/file-viewer-store";
@@ -12,7 +12,7 @@ import { copyImageBlob } from "@/shell/media-clipboard";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { useT } from "@/shared/i18n";
 import { ViewerItemContext, useRegisterViewerActions } from "@/shell/workspace-stage/viewer-item-context";
-import { Button, EmptyState } from "../../../kit";
+import { Button, EmptyState, useRetainedSurfaceActive } from "../../../kit";
 import { look, useTokens } from "../../../theme";
 
 const filenameOf = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
@@ -156,10 +156,19 @@ function ImageView({ filePaths, viewer, prompt, onSwipe }: { filePaths: string[]
   );
 }
 
+/** A video or audio whose surface is hidden stops playing, as the viewer pauses its media when it isn't shown. */
+function usePauseWhenHidden(id: string) {
+  const active = useRetainedSurfaceActive();
+  useEffect(() => {
+    if (!active) void stella.engine.media.pause(id).catch(() => {});
+  }, [active, id]);
+}
+
 function VideoView({ filePath, viewer }: { filePath: string; viewer: boolean }) {
   const t = useT();
   const tk = useTokens();
   const { url, failure } = useMediaStream(filePath, "video");
+  usePauseWhenHidden(`media-video-${filePath}`);
   const remote = url && !url.startsWith("stella-media:") ? url : null;
   return (
     <col grow={1} minH={0} w="full" gap={10}>
@@ -184,6 +193,7 @@ function AudioView({ filePath, viewer }: { filePath: string; viewer: boolean }) 
   const t = useT();
   const tk = useTokens();
   const { url, failure } = useMediaStream(filePath, "audio file");
+  usePauseWhenHidden(`media-audio-${filePath}`);
   const remote = url && !url.startsWith("stella-media:") ? url : null;
   return (
     <col w="full" maxW={560} gap={8} py={4} px={2}>

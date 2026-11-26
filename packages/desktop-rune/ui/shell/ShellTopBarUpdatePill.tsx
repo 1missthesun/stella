@@ -4,7 +4,7 @@ import { friendlyDeviceName } from "@stella/contracts/device-files";
 import { useT } from "@/shared/i18n";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { getDeviceIdOrNull } from "@/platform/electron/device-id";
-import { appSourceApi, useAppSourceState, versionOffer } from "@/features/app-source/app-source-store";
+import { appSourceApi, useAppSourceState, useAutoUpdate, versionOffer } from "@/features/app-source/app-source-store";
 import { addOffer, deviceLabel, useAppSourceAction } from "@/features/app-source/AppSourceCards";
 import { DropdownMenu, Icons, MenuCheckboxItem, MenuItem, MenuSeparator } from "../kit";
 import { derive, fontSize, look, mixOklch, useTokens } from "../theme";
@@ -51,10 +51,11 @@ function pillLook(t: ReturnType<typeof useTokens>) {
   }));
 }
 
-const UpdateTargets = ({ computers, disabled, onUpdate }: { computers: OtherComputer[]; disabled: boolean; onUpdate: (targets: string[]) => void }) => {
+const UpdateMenu = ({ computers, disabled, onUpdate }: { computers: OtherComputer[]; disabled: boolean; onUpdate: (targets: string[]) => void }) => {
   const t = useT();
   const tk = useTokens();
   const l = pillLook(tk);
+  const auto = useAutoUpdate();
   const [open, setOpen] = useState(false);
   const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set());
   const chosen = computers.filter((computer) => !left.has(computer.id));
@@ -79,10 +80,9 @@ const UpdateTargets = ({ computers, disabled, onUpdate }: { computers: OtherComp
         <box
           id={trigger.id}
           role="button"
-          label={t("shell.appSource.devices.choose")}
-          title={t("shell.appSource.devices.choose")}
-          disabled={disabled}
-          focusable={!disabled}
+          label={t("shell.appSource.updateOptions")}
+          title={t("shell.appSource.updateOptions")}
+          focusable
           w={20}
           h="full"
           pl={2}
@@ -94,32 +94,40 @@ const UpdateTargets = ({ computers, disabled, onUpdate }: { computers: OtherComp
           hover={l.moreHover}
           opacity={open ? 1 : 0.72}
           motion={{ dur: 0.12 }}
-          onPress={disabled ? undefined : trigger.toggle}
+          onPress={trigger.toggle}
         >
           <GroupIcon icon={Icons.stella.ChevronDown} size={11} strokeWidth={2.2} color={tk.c.textStrong} />
         </box>
       )}
     >
-      <MenuCheckboxItem checked disabled onCheckedChange={() => {}}>
-        {t("shell.appSource.devices.thisComputer")}
+      {computers.length > 0 ? (
+        <>
+          <MenuCheckboxItem checked disabled onCheckedChange={() => {}}>
+            {t("shell.appSource.devices.thisComputer")}
+          </MenuCheckboxItem>
+          {computers.map((computer) => (
+            <MenuCheckboxItem key={computer.id} id={`topbar-update-target-${computer.id}`} keepOpen disabled={disabled} checked={!left.has(computer.id)} onCheckedChange={() => toggle(computer.id)}>
+              <col minW={0} gap={1}>
+                <text {...look(fontSize.base, 500, { lh: 1.3 })} truncate>{computer.name}</text>
+                {computer.online ? null : <text {...look(fontSize["2xs"], 400)} color={tk.c.textWeak}>{t("shell.appSource.devices.offline")}</text>}
+              </col>
+            </MenuCheckboxItem>
+          ))}
+          <MenuSeparator />
+          <MenuItem id="topbar-update-targets-go" disabled={disabled} onSelect={() => onUpdate(chosen.map((computer) => computer.id))}>
+            {chosen.length === 0 ? t("shell.appSource.devices.updateThisOnly") : t("shell.appSource.update")}
+          </MenuItem>
+          <MenuSeparator />
+        </>
+      ) : null}
+      <MenuCheckboxItem id="topbar-auto-update" keepOpen checked={auto.on} onCheckedChange={(checked) => auto.set(checked)}>
+        {t("shell.appSource.autoUpdate.label")}
       </MenuCheckboxItem>
-      {computers.map((computer) => (
-        <MenuCheckboxItem key={computer.id} id={`topbar-update-target-${computer.id}`} keepOpen checked={!left.has(computer.id)} onCheckedChange={() => toggle(computer.id)}>
-          <col minW={0} gap={1}>
-            <text {...look(fontSize.base, 500, { lh: 1.3 })} truncate>{computer.name}</text>
-            {computer.online ? null : <text {...look(fontSize["2xs"], 400)} color={tk.c.textWeak}>{t("shell.appSource.devices.offline")}</text>}
-          </col>
-        </MenuCheckboxItem>
-      ))}
-      <MenuSeparator />
-      <MenuItem id="topbar-update-targets-go" onSelect={() => onUpdate(chosen.map((computer) => computer.id))}>
-        {chosen.length === 0 ? t("shell.appSource.devices.updateThisOnly") : t("shell.appSource.update")}
-      </MenuItem>
     </DropdownMenu>
   );
 };
 
-/** desktop-ui's `ShellTopBarUpdatePill`: Update, or what holds it, with a menu of other computers to update too. */
+/** desktop-ui's `ShellTopBarUpdatePill`: Update, or what holds it, with a menu of other computers to update too and the automatic-update switch. */
 export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   const t = useT();
   const tk = useTokens();
@@ -138,7 +146,8 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         : t("shell.appSource.updating")
     : t("shell.appSource.update");
   const blocked = updating || state.busy || pending !== null;
-  const choose = !updating && !offer.draft && computers.length > 0 && appSourceApi() !== null;
+  const menu = appSourceApi() !== null;
+  const choose = menu && !updating && !offer.draft && computers.length > 0;
 
   return (
     <row
@@ -164,7 +173,7 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         focusable={!blocked}
         h="full"
         pl={13}
-        pr={choose ? 9 : 16}
+        pr={menu ? 9 : 16}
         gap={6}
         align="center"
         focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 999 }}
@@ -173,7 +182,7 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         <GroupIcon icon={Icons.stella.Download} size={12} strokeWidth={2} color={tk.c.textStrong} opacity={0.88} />
         <text {...LABEL} nowrap color={tk.c.textStrong}>{label}</text>
       </row>
-      {choose ? <UpdateTargets computers={computers} disabled={blocked} onUpdate={(targets) => void run(offer.key, () => addOffer(offer, targets))} /> : null}
+      {menu ? <UpdateMenu computers={choose ? computers : []} disabled={blocked} onUpdate={(targets) => void run(offer.key, () => addOffer(offer, targets))} /> : null}
     </row>
   );
 });

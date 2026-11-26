@@ -12,7 +12,7 @@ import { sourceDiffBatches, useSourceDiffBatches, type SourceDiffBatch } from "@
 import { isPlainTextPath } from "@/features/workspace-display/path-to-viewer";
 import { useRegisterViewerNav, useViewerDetailReporter } from "@/shell/workspace-stage/viewer-item-context";
 import { usePreviewParser } from "../../replace/shell/display/use-preview-parser";
-import { EmptyState, Icons, type EmptyStateMotif } from "../../kit";
+import { EmptyState, Icons, useRetainedSurfaceActive, type EmptyStateMotif } from "../../kit";
 import { CHAT_TEXT } from "../../kit";
 import { font, look, mixOklch, derive, useTokens, type Tokens } from "../../theme";
 import { Markdown } from "../../chat/Markdown";
@@ -139,7 +139,7 @@ export const OfficeTabContent = ({ previewRef }: { previewRef: OfficePreviewRef 
   </Rich>
 );
 
-export const OfficeFileTabContent = ({ filePath, title, refreshToken }: { filePath: string; title?: string; refreshToken?: number }) => {
+export const OfficeFileTabContent = ({ filePath, title }: { filePath: string; title?: string; refreshToken?: number }) => {
   const t = useT();
   const cloudSource = useContext(DisplayFileSourceContext);
   const [previewRef, setPreviewRef] = useState<OfficePreviewRef | null>(null);
@@ -170,7 +170,7 @@ export const OfficeFileTabContent = ({ filePath, title, refreshToken }: { filePa
     return () => {
       cancelled = true;
     };
-  }, [filePath, title, refreshToken, cloudSource, attempt]);
+  }, [filePath, title, cloudSource, attempt]);
 
   if (previewRef) return <OfficeTabContent previewRef={previewRef} />;
   return (
@@ -244,6 +244,10 @@ function DelimitedTableView({ filePath, title, onRetry }: { filePath: string; ti
     </Rich>
   );
 }
+
+/** The PDF and Markdown viewers load with this module, so there is nothing to fetch ahead. */
+export const preloadPdfViewer = () => {};
+export const preloadMarkdownViewer = () => {};
 
 const PdfViewerCard = mounted<{ filePath: string; title?: string; pageRail?: boolean; onPageChange?: (page: number, total: number) => void }>(import.meta.glob("./PdfViewerCard.tsx", { eager: true }), "PdfViewerCard", ({ filePath }) => <PreviewProblem error={`${fileName(filePath)} can't be shown here yet.`} />);
 
@@ -389,12 +393,14 @@ const formatRelativeTime = (timestamp: number, now: number): string => {
   return `${Math.round(hours / 24)}d`;
 };
 
-const useNowTick = (intervalMs: number): number => {
+const useNowTick = (intervalMs: number, active: boolean): number => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(id);
-  }, [intervalMs]);
+  }, [intervalMs, active]);
   return now;
 };
 
@@ -513,8 +519,9 @@ function SourceDiffBatchFiles({ payloads, wide }: { payloads: SourceDiffPayload[
 
 export const SourceDiffTabContent = () => {
   const t = useT();
+  const active = useRetainedSurfaceActive();
   const { batches, activeBatchId } = useSourceDiffBatches();
-  const now = useNowTick(30_000);
+  const now = useNowTick(30_000, active);
   const [width, setWidth] = useState(0);
   const activeBatch = useMemo(() => (batches.length === 0 ? null : (batches.find((entry) => entry.id === activeBatchId) ?? batches[0]!)), [batches, activeBatchId]);
   const headerLabel = activeBatch

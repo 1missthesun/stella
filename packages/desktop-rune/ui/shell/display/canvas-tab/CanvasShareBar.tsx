@@ -42,7 +42,7 @@ const publishFailureReason = (error: unknown): string | null => {
 };
 
 const drivePathOf = (item: CanvasHtmlItem, source: DisplayFileSource | null): string | null => {
-  const path = source?.drivePath ?? (item.driveBacked ? item.filePath.replace(/^\/+/u, "") : null);
+  const path = item.cloudDrivePath ?? source?.drivePath ?? (item.driveBacked ? item.filePath.replace(/^\/+/u, "") : null);
   return path && /\.html?$/iu.test(path) ? path : null;
 };
 

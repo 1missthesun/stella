@@ -159,10 +159,10 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 ## Measured vs Electron (same machine, same window)
 - [ ] Cold start, RSS/PSS, idle CPU, active CPU, input latency, scroll/resize/animation fps, hot-swap latency, memory after 50 swaps
   - Linux (omarchy real display, 1100×760, the same 28-turn seeded chat; ~/.stella/outputs/stella-rune/linux/measure/summary.json, harness in measure/harness):
-    - Cold start to the first content frame: 478 ms, against Electron's 512 ms to its first app paint.
-    - Whole-tree PSS: 402 MB against 591 MB; RSS: 609 MB against 1276 MB.
-    - Idle CPU: 3.0% against 4.7%.
+    - Cold start to the first content frame: 160 ms with the boot bundles (478 ms from source), against Electron's 512 ms to its first app paint. The window maps at 94 ms. Measured 2026-11-26, rune/desktop 8556daaab, n=5.
+    - Whole-tree PSS: 352 MB (engine ~125, host ~117, runtime worker ~99) against 591 MB; RSS: 507 MB against 1276 MB. No WebView runs at launch or idle (dictation captures the mic natively).
+    - Idle CPU: 1.2% in the first minute and 0.3–0.4% settled (engine 0.0, host 0.15, runtime worker 0.13–0.15), against 4.7%.
     - Scrolling at 2400 px/s: 240 fps with p95 5.1 ms and 46% CPU, against 238 fps with p95 4.2 ms and 46% CPU.
     - Key to frame submitted: p95 4.3 ms. Electron's key to presented is p95 16.9 ms. The two aren't comparable: the engine has no presented time on Linux.
     - Resize: 372 fps at 62 changes/s and 218 fps at 125/s, but 28 fps at 250/s, and the UI freezes at 500/s. Electron reaches 186 fps at 442/s. Gap (engine).
-    - Hot swap: 600 ms per swap at the median before the host fix; after it, 259 ms p50 / 514 p95 (Xvfb burst) and 203 / 283 ms swap-to-frame (real display, paced); memory after 50 swaps as above.
+    - Hot swap: the old frame stays painted until the new tree has its data, then the change lands in one frame (no blank or fade). Swap to frame: 347 ms p50, 445 ms max over 50 swaps (Xvfb, held frame included). Memory after 50 swaps: 372 MB total PSS (engine 125, flat; host 139, levels off after ~50; the builder exits 20 s after the last swap).

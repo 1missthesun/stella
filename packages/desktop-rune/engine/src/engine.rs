@@ -33,6 +33,11 @@ pub struct WinSlot {
     pub families_applied: u64,
     pub size: Option<(f32, f32)>,
     pub focused: bool,
+    /// What had focus at the window's last poll.
+    pub focus: Option<crate::swap_view::Seen>,
+    /// Fields the user typed into, with the text each last reported.
+    pub typed: HashMap<u32, String>,
+    pub swap_view: Option<crate::swap_view::View>,
     /// What a `<window>` replacing this one (same `id`, same options fixed at open) must share
     /// to take over its native window instead of opening another.
     pub baked: Option<String>,
@@ -139,6 +144,9 @@ pub fn send(v: serde_json::Value) {
 /// acknowledge it (input-to-photon metrics).
 pub fn element_event(node: u32, name: &str, extra: serde_json::Value, tx: Option<&mut Tx>) {
     let input = tx.and_then(|t| t.input_time()).map(epoch_of);
+    if input.is_some() {
+        crate::swap_view::USER_INPUT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
     let now = epoch_ms();
     let seq = {
         let mut m = METRICS.lock().unwrap_or_else(|e| e.into_inner());

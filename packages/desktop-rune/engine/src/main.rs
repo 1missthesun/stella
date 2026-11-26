@@ -26,6 +26,7 @@ mod protocol;
 mod services;
 mod style;
 mod surface;
+mod swap_view;
 mod text;
 mod tree;
 mod view;

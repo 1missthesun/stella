@@ -140,6 +140,7 @@ async function runSwap(label: string, t0: number, mtime: number): Promise<boolea
     app = next;
     store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
     render(root(), { t0, kind: 1 });
+    command({ cmd: "view.restore" });
     ui.retireReplaced();
     const t_committed = now();
     store.set({ lastSwapMs: Math.round(t_committed - t0) });

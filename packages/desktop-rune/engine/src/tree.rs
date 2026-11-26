@@ -84,8 +84,18 @@ impl Tree {
     }
 
     /// The node whose `id` prop is `key`.
+    /// The node with `id` `key`, one shown in a window over one React holds detached.
     pub fn find_key(&self, key: &str) -> Option<u32> {
-        self.nodes.iter().find(|(_, n)| n.props.id.as_deref() == Some(key)).map(|(id, _)| *id)
+        let mut detached = None;
+        for (id, n) in &self.nodes {
+            if n.props.id.as_deref() == Some(key) {
+                if self.window_of(*id).is_some() {
+                    return Some(*id);
+                }
+                detached.get_or_insert(*id);
+            }
+        }
+        detached
     }
 
     /// Recomputes `live_above` after the tree's shape changed.

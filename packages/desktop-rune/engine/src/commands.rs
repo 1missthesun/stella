@@ -89,6 +89,13 @@ pub fn route(v: Value) {
         "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" => reply(rid, crate::services::tray(&cmd, &v)),
         "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" => reply(rid, crate::services::shortcut(&cmd, &v)),
         "quit" => quit(),
+        "view.restore" => {
+            let marked: Vec<u32> = engine::read(|e| e.windows.iter().filter(|(_, s)| s.swap_view.is_some()).map(|(w, _)| *w).collect());
+            for w in marked {
+                windows::queue(w, None, v.clone());
+            }
+            reply(rid, Ok(Value::Null));
+        }
         _ => {
             let w = window_named(&v).or_else(windows::first_window);
             match w {
@@ -285,7 +292,11 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
             "stopScroll" => tx.stop_scroll(tkey.clone().ok_or("no target")?),
             "scrollKeyTo" => tx.scroll_key_to(v.get("key").and_then(|k| k.as_str()).ok_or("scrollKeyTo: needs a key")?, f(&v, "at").unwrap_or(0.0)),
             "keepOnScreen" => tx.keep_on_screen(v.get("key").and_then(|k| k.as_str()).ok_or("keepOnScreen: needs a key")?),
-            "focus" => tx.focus(tkey.clone().ok_or("focus: no target")?, v.get("ring").and_then(|r| r.as_bool()).unwrap_or(false)),
+            "focus" => match tkey.clone() {
+                Some(key) => tx.focus(key, v.get("ring").and_then(|r| r.as_bool()).unwrap_or(false)),
+                None => return Ok(json!(false)),
+            },
+            "view.restore" => crate::swap_view::arm(st, tx),
             "blur" => tx.blur(),
             "selectText" => {
                 let key = tkey.clone().ok_or("no target")?;
@@ -295,7 +306,9 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                 }
             }
             "input.set" | "input.select" | "input.get" => {
-                let n = target(&v).ok_or("no target")?;
+                let Some(n) = target(&v) else {
+                    return if cmd == "input.get" { Err("no target".into()) } else { Ok(Value::Null) };
+                };
                 let state = st.inputs.get_mut(&n).ok_or("no such input")?;
                 if cmd == "input.set" {
                     let value = s(&v, "value").to_owned();

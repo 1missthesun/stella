@@ -58,6 +58,12 @@ impl InputState {
         self.sent.clear();
     }
 
+    /// Puts back text a hot swap took, reported as typed so the UI's echo of it changes nothing.
+    pub fn restore(&mut self, v: &str) {
+        self.set(v, None);
+        self.report();
+    }
+
     fn report(&mut self) -> String {
         let v = self.edit.text.clone();
         self.sent.push_back(v.clone());
@@ -98,6 +104,7 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
         .on_edit(move |s: &mut Win| &mut state(s, n).edit)
         .on_input_change(move |s: &mut Win, tx: &mut Tx| {
             let v = state(s, n).report();
+            crate::swap_view::typed(s.node, n, &v);
             crate::metrics::METRICS.lock().unwrap_or_else(|e| e.into_inner()).typing_input = tx.input_time().map(crate::metrics::epoch_of);
             element_event(n, "input", json!({ "value": v }), Some(tx));
         });

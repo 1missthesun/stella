@@ -403,6 +403,7 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             continue;
         }
         if bind_main {
+            let swap_view = freed.iter_mut().find(|(_, s)| s.is_main).and_then(|(_, s)| s.swap_view.take());
             engine::with(|e| {
                 e.main_node = Some(node);
                 let handle = e.main_handle.clone();
@@ -413,6 +414,7 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
                 slot.is_main = true;
                 slot.dirty = true;
                 slot.applied = Applied { dark: Some(None), ..Applied::default() };
+                slot.swap_view = swap_view;
             });
         } else {
             open(node, &props);
@@ -455,6 +457,9 @@ fn drain(polling: u32) {
     let mut gone = Vec::new();
     for Msg::Batch(ops, received_at) in batches {
         engine::with(|e| {
+            if ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
+                crate::swap_view::remember(e);
+            }
             for op in ops {
                 match op {
                     Op::Commit { generation, ack, t0, kind } => {
@@ -678,6 +683,14 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         s.node = n;
     }
     let node = s.node;
+    let focus = crate::swap_view::seen(s, tx);
+    engine::with(|e| {
+        if let Some(slot) = e.windows.get_mut(&node)
+            && slot.focus != focus
+        {
+            slot.focus = focus;
+        }
+    });
     crate::control::refresh_recording(node);
     if engine::read(|e| e.ts_dead && e.windows.is_empty()) {
         return false;
@@ -719,6 +732,9 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             let inspects = v.get("cmd").and_then(serde_json::Value::as_str).is_some_and(|c| c.starts_with("control."));
             crate::commands::run(s, tx, rid, v);
             changed |= !inspects;
+        }
+        if crate::swap_view::waiting(node) {
+            crate::swap_view::place(s, tx, dirty);
         }
     }
     crate::control::tick(s, tx);

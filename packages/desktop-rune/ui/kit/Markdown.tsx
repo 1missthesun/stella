@@ -14,8 +14,6 @@ const LINE_NUMBER_SIZE = 13;
 export const CHAT_TEXT: ChatText = { size: fontSize.lg, weight: 400, strongWeight: 500, lineHeight: 1.5 };
 export const CHAT_TEXT_COMPACT: ChatText = { ...CHAT_TEXT, size: fontSize.base };
 
-const plainSyntax = (color: string) => Object.fromEntries(Object.keys(GITHUB.light).concat("punctuation", "operator").map((k) => [k, color]));
-
 const GITHUB = {
   light: { keyword: "#d73a49", string: "#032f62", number: "#005cc5", comment: "#6a737d", type: "#6f42c1", function: "#6f42c1", property: "#005cc5", inserted: "#22863a", deleted: "#b31d28" },
   dark: { keyword: "#f97583", string: "#9ecbff", number: "#79b8ff", comment: "#6a737d", type: "#b392f0", function: "#b392f0", property: "#79b8ff", inserted: "#85e89d", deleted: "#fdaeb7" },
@@ -92,7 +90,8 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     selectionStyle: "chromium",
     // Chromium copies a newline for each empty box around a code block's text (after its label) and a table's.
     pageCopy: [2, 3],
-    syntax: highlight ? (t.dark ? GITHUB.dark : GITHUB.light) : plainSyntax(text),
+    syntaxHighlight: highlight,
+    syntax: t.dark ? GITHUB.dark : GITHUB.light,
     codeFrame: {
       label: c.textWeak,
       labelSize: fontSize.sm,

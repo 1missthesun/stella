@@ -239,6 +239,10 @@ fn main() {
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running();
     let app = windows::decorate_main(app, &p).window_options(windows::options(&p));
+    // Chromium on Linux draws text through FreeType's light autohint (fontconfig's `hintslight`)
+    // on subpixel pens.
+    #[cfg(target_os = "linux")]
+    let app = app.font_smoothing(rune::FontSmoothing::HintedGpu);
     let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));

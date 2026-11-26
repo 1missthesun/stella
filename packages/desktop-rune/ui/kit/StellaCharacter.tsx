@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { createStellaMark, VIEWBOX, type StellaCharacterShape, type StellaCharacterState, type StellaMarkHandle } from "@/ui/stella-character/rig";
 import { useTokens } from "../theme";
 
@@ -11,6 +11,7 @@ export type StellaCharacterProps = {
   glow?: boolean;
   paused?: boolean;
   followPointer?: boolean;
+  handleRef?: MutableRefObject<StellaMarkHandle | null>;
 };
 
 type Node = {
@@ -117,7 +118,7 @@ const serialize = (el: Node, resolve: (value: string) => string): string => {
 };
 
 /** desktop-ui's `StellaCharacter`: its rig runs unchanged on a detached DOM, and each frame it draws is handed to the engine as one SVG. */
-export function StellaCharacter({ size, state = "idle", shape = "star", ink = "aurora", eyeColor, glow = false, paused = false, followPointer = false }: StellaCharacterProps) {
+export function StellaCharacter({ size, state = "idle", shape = "star", ink = "aurora", eyeColor, glow = false, paused = false, followPointer = false, handleRef }: StellaCharacterProps) {
   const t = useTokens();
   const [svg, setSvg] = useState("");
   const markRef = useRef<StellaMarkHandle | null>(null);
@@ -148,6 +149,7 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
       document.createElementNS = createElementNS;
     }
     markRef.current = mark;
+    if (handleRef) handleRef.current = mark;
     const resolve = (value: string) =>
       value.includes("var(")
         ? value.replace(/var\((--[\w-]+)(?:,\s*([^)]+))?\)/g, (_m, name: string, fallback?: string) => colours.current[name] ?? fallback?.trim() ?? "#000")
@@ -166,9 +168,10 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
     return () => {
       cancelAnimationFrame(raf);
       markRef.current = null;
+      if (handleRef?.current === mark) handleRef.current = null;
       mark.destroy();
     };
-  }, [size, ink, glow, eyeColor, followPointer]);
+  }, [size, ink, glow, eyeColor, followPointer, handleRef]);
 
   useEffect(() => {
     markRef.current?.setState(state);

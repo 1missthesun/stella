@@ -18,6 +18,9 @@ export type WebviewRequest = { rid: number; scheme: string; url: string; method:
 export type UiHost = {
   windows: { subscribe(listener: () => void): () => void; snapshot(): WindowSnapshot[] };
   apiFor(windowId: string): ElectronApi | null;
+  /** Focus changes of a host window (a DOM window's `focus` / `blur` for an aux window's tree); returns the stop. */
+  onFocusChange(windowId: string, listener: (focused: boolean) => void): () => void;
+  isFocused(windowId: string): boolean;
   /** window.open from the page in `openerId` (a viewer window, an auth popup); main's open handler decides. */
   open(openerId: string, url: string, frameName?: string, features?: string): string | null;
   /** The UI mounted / unmounted the `<window>` with this engine id. */
@@ -130,6 +133,19 @@ export function createUiHost(): UiHost {
       const win = hostWindows.get(windowId);
       return win ? rendererApiFor(win.webContents) : null;
     },
+    onFocusChange(windowId, listener) {
+      const win = hostWindows.get(windowId);
+      if (!win) return () => {};
+      const focus = () => listener(true);
+      const blur = () => listener(false);
+      win.on("focus", focus);
+      win.on("blur", blur);
+      return () => {
+        win.off("focus", focus);
+        win.off("blur", blur);
+      };
+    },
+    isFocused: (windowId) => hostWindows.get(windowId)?.isFocused() ?? false,
     open(openerId, url, frameName = "", features = "") {
       const opener = hostWindows.get(openerId);
       return opener ? openWindowFrom(opener, url, frameName, features)?.hostId ?? null : null;

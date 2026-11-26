@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 import { fontSize, useTokens } from "../theme";
-import { ComposerAddButton, ComposerSubmitButton, ComposerTextarea } from "./ComposerPrimitives";
+import { ComposerAddButton, ComposerSubmitButton, ComposerTextarea, type ComposerTextareaProps } from "./ComposerPrimitives";
 import { COMPOSER_MAX_W, composerShellLook, MIN_COMPOSER_SHELL_HEIGHT } from "./Composer";
 
 const LINE = fontSize.md * 1.5;
@@ -18,26 +18,34 @@ export type ComposerShellProps = {
   inputId?: string;
   leading?: ReactNode;
   trailing?: ReactNode;
+  /** The shell alone, without `.composer`'s padded column (the companion's composer). */
+  bare?: boolean;
+  /** Above the field, inside the shell (attachment tiles). */
+  header?: ReactNode;
+  /** In place of the field and its buttons (the dictation recording bar). */
+  replace?: ReactNode;
+  keys?: string[];
+  onKey?: ComposerTextareaProps["onKey"];
 };
 
 /**
  * desktop-ui's bare `.composer > .composer-shell > form.composer-form`: the pill that springs to a
  * two-row card once the text wraps, with an add button (`leading`) and the animated submit button.
  */
-export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled = false, canSubmit, inputId, leading, trailing }: ComposerShellProps) {
+export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled = false, canSubmit, inputId, leading, trailing, bare = false, header, replace, keys, onKey }: ComposerShellProps) {
   const tokens = useTokens();
   const fallbackId = `composer-shell-input:${useId()}`;
   const id = inputId ?? fallbackId;
   const [focused, setFocused] = useState(false);
   const [pillFieldW, setPillFieldW] = useState(0);
   const [pillTextH, setPillTextH] = useState(0);
-  const expanded = value.length > 0 && pillFieldW > 0 && pillTextH > LINE + 0.5;
+  const expanded = !replace && value.length > 0 && pillFieldW > 0 && pillTextH > LINE + 0.5;
   const look = composerShellLook(tokens);
   const submittable = canSubmit ?? (!disabled && value.trim().length > 0);
   const lead = leading ?? <ComposerAddButton disabled />;
   const trail = trailing ?? <ComposerSubmitButton disabled={!submittable} animated onPress={onSubmit} />;
   return (
-    <col w="full" shrink={false} align="center" justify="end" gap={8} pt={4} px={24} pb={10}>
+    <col w="full" shrink={false} align="center" justify="end" gap={8} {...(bare ? {} : { pt: 4, px: 24, pb: 10 })}>
       <col
         w="full"
         maxW={COMPOSER_MAX_W}
@@ -51,6 +59,8 @@ export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled
         layout={SHELL_SPRING.dur}
         onFocusWithin={setFocused}
       >
+        {header}
+        {replace ?? (
         <row w="full" align="center" gap={8} minH={expanded ? undefined : 44} py={expanded ? 0 : 6} px={expanded ? 0 : 8}>
           {expanded ? null : <box key="lead">{lead}</box>}
           <box key="field" grow={1} minW={0} selfAlign={expanded ? "stretch" : "center"} onLayout={expanded ? undefined : (r) => setPillFieldW(r.w)}>
@@ -72,11 +82,14 @@ export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled
               onSubmit={() => {
                 if (submittable) onSubmit();
               }}
+              {...(keys ? { keys } : {})}
+              {...(onKey ? { onKey } : {})}
             />
           </box>
           {expanded ? null : <box key="trail">{trail}</box>}
         </row>
-        {expanded ? (
+        )}
+        {expanded && !replace ? (
           <row w="full" align="center" justify="between" pt={2} px={8} pb={6}>
             <row align="center" gap={4}>
               {lead}

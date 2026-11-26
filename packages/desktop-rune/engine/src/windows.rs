@@ -88,6 +88,7 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         None => root,
     };
     note_state(node, dark, maximized, full, accent);
+    settle_rect(node, cx);
     root.on_window_focus(move |s: &mut Win, focused: bool, _tx: &mut Tx| {
         if s.node != 0 {
             engine::with(|e| e.windows.entry(s.node).or_default().focused = focused);
@@ -207,7 +208,7 @@ pub fn options(p: &Props) -> WindowOptions {
         click_through: p.click_through,
         always_on_top: p.always_on_top || overlay,
         visible: p.visible.unwrap_or(true),
-        position: p.position.map(|[x, y]| (x, y)),
+        logical_position: p.position.map(|[x, y]| (f64::from(x), f64::from(y))),
         min_size: p.min_size.map(|[w, h]| (w, h)),
         max_size: p.max_size.map(|[w, h]| (w, h)),
         resizable: p.resizable.unwrap_or(true),
@@ -462,8 +463,10 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
             next.on_top = Some(p.always_on_top);
         }
         if p.position.is_some() && p.position != applied.position {
-            if let Some([x, y]) = p.position {
-                h.set_position((x, y));
+            if let Some([x, y]) = p.position
+                && let Some(k) = h.scale()
+            {
+                h.set_position(((f64::from(x) * k).round() as i32, (f64::from(y) * k).round() as i32));
             }
             next.position = p.position;
         }
@@ -638,6 +641,75 @@ pub fn queue(window: u32, rid: Option<u64>, v: serde_json::Value) -> bool {
 thread_local! {
     /// The text selected in each window, by the selectable element or group holding it.
     static SELECTIONS: std::cell::RefCell<HashMap<u32, HashMap<u32, String>>> = std::cell::RefCell::new(HashMap::new());
+}
+
+#[derive(Default)]
+struct Settle {
+    settled: bool,
+    pending: bool,
+    rect: Option<[f32; 4]>,
+}
+
+thread_local! {
+    static SETTLES: std::cell::RefCell<HashMap<u32, Settle>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// Tracks a window's selection between a press making it and its release, and reports the
+/// settled selection with its box from the next view run, or that it cleared.
+pub fn note_selection_change(window: u32, element: u32, change: &rune::SelectionChange) {
+    note_selection(window, element, change.selection().map(|t| t.text().to_owned()));
+    let any = selected_text(window).is_some();
+    let was = SETTLES.with(|m| {
+        let mut m = m.borrow_mut();
+        let st = m.entry(window).or_default();
+        let was = st.settled || st.rect.is_some();
+        if !any || change.dragging() {
+            *st = Settle::default();
+        } else if change.selection().is_some() {
+            st.settled = true;
+            st.pending = true;
+        }
+        was
+    });
+    if !any && was {
+        engine::send(json!({ "t": "selection", "window": window_id(window), "n": window, "cleared": true }));
+    }
+}
+
+fn window_id(window: u32) -> Option<String> {
+    engine::read(|e| e.tree.get(window).and_then(|n| n.props.id.clone()))
+}
+
+fn settle_rect(window: u32, cx: &mut Cx<Win>) {
+    if !SETTLES.with(|m| m.borrow().get(&window).is_some_and(|s| s.settled)) {
+        return;
+    }
+    let rect = cx.selection_rects().into_iter().reduce(|a, b| {
+        let (x, y) = (a[0].min(b[0]), a[1].min(b[1]));
+        [x, y, (a[0] + a[2]).max(b[0] + b[2]) - x, (a[1] + a[3]).max(b[1] + b[3]) - y]
+    });
+    let emit = SETTLES.with(|m| {
+        let mut m = m.borrow_mut();
+        let st = m.entry(window).or_default();
+        st.rect = rect;
+        let emit = st.pending && rect.is_some();
+        if emit {
+            st.pending = false;
+        }
+        emit.then_some(rect).flatten()
+    });
+    if let (Some(r), Some(text)) = (emit, selected_text(window)) {
+        engine::send(json!({ "t": "selection", "window": window_id(window), "n": window, "text": text, "rect": rect_json(r) }));
+    }
+}
+
+fn rect_json(r: [f32; 4]) -> serde_json::Value {
+    json!({ "x": r[0], "y": r[1], "w": r[2], "h": r[3] })
+}
+
+/// The union of `window`'s settled selection line boxes, in window points as scrolled.
+pub fn selection_rect(window: u32) -> Option<serde_json::Value> {
+    SETTLES.with(|m| m.borrow().get(&window).and_then(|s| s.rect)).map(rect_json)
 }
 
 pub fn note_selection(window: u32, element: u32, text: Option<String>) {

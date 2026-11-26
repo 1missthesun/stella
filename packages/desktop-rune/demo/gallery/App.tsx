@@ -238,6 +238,10 @@ function Overlays({ togglePanel, mountHidden }: { togglePanel: () => void; mount
 
 function Docs() {
   const [action, setAction] = useState("");
+  const [selection, setSelection] = useState("");
+  useEffect(() => stella.on("selection", (e) => {
+    setSelection("cleared" in e ? "selection cleared" : `selected ${e.text.length} chars at ${Math.round(e.rect.x)},${Math.round(e.rect.y)} ${Math.round(e.rect.w)}×${Math.round(e.rect.h)}`);
+  }), []);
   return (
     <Section title="Markdown">
       <row id="g-bubble-row" w="full" justify="end">
@@ -266,6 +270,7 @@ function Docs() {
         <markdown id="g-bubble" w="fit" maxW={420} src={BUBBLE} fill={c.raised} radius={14} px={12} py={8} mdStyle={{ dark: true, text: c.text, body: { size: 14, lineHeight: 21 } }} />
       </row>
       <text size={12} color={c.weaker}>{action || "Hover the code block for Copy"}</text>
+      <text id="g-sel-status" size={12} color={c.weaker}>{selection || "Select text for its settled rect"}</text>
     </Section>
   );
 }

@@ -71,7 +71,11 @@ pub fn route(v: Value) {
         "selection.get" => {
             let w = window_named(&v).or_else(windows::first_window);
             let text = w.and_then(windows::selected_text);
-            reply(rid, Ok(text.map_or(Value::Null, |t| json!({ "text": t }))));
+            let rect = w.and_then(windows::selection_rect);
+            reply(rid, Ok(text.map_or(Value::Null, |t| match rect {
+                Some(r) => json!({ "text": t, "rect": r }),
+                None => json!({ "text": t }),
+            })));
         }
         "selection.lookUp" => reply(rid, Ok(json!(false))),
         "window.isFocused" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(|w| engine::read(|e| e.windows.get(&w).is_some_and(|s| s.focused)))))),

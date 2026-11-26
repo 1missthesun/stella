@@ -350,8 +350,13 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
   keepOnScreen (`key`, across the next commit)
 - `focus(id)`, `blur()`
 - `selection.*`:
-  - `get(window?)` → `{text}` or null: the window's selected text, as copying takes it, from a
-    `selectionGroup` or selectable `text`/`markdown`.
+  - `get(window?)` → `{text, rect?}` or null: the window's selected text, as copying takes it, from a
+    `selectionGroup` or selectable `text`/`markdown`. `rect` `{x,y,w,h}` is the union of the
+    settled selection's line boxes in window points as scrolled; absent while a press is still
+    making it.
+  - Event `selection` (`onEngineEvent("selection", …)`): `{window, n, text, rect}` once a
+    selection settles (release of a drag, double/triple-click, shift-extend, select-all), and
+    `{window, n, cleared: true}` when the window's selection clears.
   - `copy(window?)`.
   - `lookUp(window?)`: macOS dictionary. Not wired yet; it returns false.
 - `input.*`, `media.*`, `webview.*`

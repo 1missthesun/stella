@@ -121,7 +121,12 @@ export type EngineEvent =
   | { t: "appearance"; dark: boolean; accentColor?: string }
   /** A link the system opened with the app (macOS Apple Event; Windows/Linux the launch's own `stella://` arguments). Later launches' links come through the host's single-instance lock. */
   | { t: "open-url"; url: string }
-  | { t: "rec"; result: unknown };
+  | { t: "rec"; result: unknown }
+  /** A window's selection settled (a drag, double/triple-click, shift-extend or select-all released) with its line boxes' union in window points as scrolled, or cleared. */
+  | { t: "selection"; window: string | null; n: number; text: string; rect: SelectionRect }
+  | { t: "selection"; window: string | null; n: number; cleared: true };
+
+export type SelectionRect = { x: number; y: number; w: number; h: number };
 
 type EventOf<T extends EngineEvent["t"]> = Extract<EngineEvent, { t: T }>;
 const listeners = new Map<string, Set<(e: any) => void>>();
@@ -297,7 +302,7 @@ export const engine = {
   },
   selection: {
     /** The text selected in a window (its `selectionGroup` or selectable texts), as copying takes it; null when nothing is. */
-    get: (window?: string) => request<{ text: string } | null>("selection.get", { window }),
+    get: (window?: string) => request<{ text: string; rect?: SelectionRect } | null>("selection.get", { window }),
     /** Copies the window's selection; false when nothing is selected. */
     copy: async (window?: string) => {
       const s = await request<{ text: string } | null>("selection.get", { window });

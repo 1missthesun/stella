@@ -30,11 +30,9 @@ import type { WakeReport, ChatTurnRequest } from "./types.js";
 import {
   LIVE_TOOL_LIMIT,
   LOCAL_TURN_LEASE_KEY,
-  PI_BRAIN_KEY,
 } from "./constants.js";
 import type { ComposerPrewarmRequest } from "@stella/contracts/composer-prewarm";
 import { cloudTurnRefusal, snapshotAdmissionRefusal } from "../owner-gate/support.js";
-import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { json, log, previewArgs } from "./support.js";
 import { OrchestratorTools } from "./tools.js";
 import { ownerGateStub } from "../rpc-release.js";
@@ -222,10 +220,9 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     if (refusal) return refusal.code;
     if (snapshot.cloudClaudeLoginEnded) return "claude_login_ended";
     if (request.target === "cloud") return null;
-    const brain = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
-    if (brain?.host !== "device") return null;
-    const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
-    return holder.gone || holder.refusal ? null : "computer_holds_conversation";
+    return (await this.piBrainPlacesChat(ownerId))
+      ? "computer_holds_conversation"
+      : null;
   }
 
   private claudeUsageLimitHeldHere(): boolean {

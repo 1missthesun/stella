@@ -1511,6 +1511,33 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return record;
   }
 
+  /** Read-only twin of turn-start's user chat placement: whether the next
+   * chat turn would be placed on a computer instead of running here. Mirrors
+   * bringing the brain home, failover, lease renewal, the claim decision and
+   * the refused-holder fallback, without storing anything. */
+  protected async piBrainPlacesChat(ownerId: string): Promise<boolean> {
+    let record =
+      (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
+    const home = await this.piBrainHome(ownerId);
+    if (home && !(record && samePiBrainHost(record, home)) && piBrainHomeIsBack(record, home)) {
+      record = homePiBrain(record, home, Date.now());
+    }
+    if (record?.host !== "device") return false;
+    const holder = await this.piBrainHolderState(ownerId, record.deviceId);
+    if (holder.gone === true || holder.refusal !== undefined) {
+      if (await this.piBrainFailsOver(ownerId, record.deviceId)) return true;
+    }
+    if (holder.seenAt !== undefined) record = renewPiBrainLease(record, holder.seenAt) ?? record;
+    const decision = decidePiBrainClaim({
+      record,
+      claimant: { host: "cloud" },
+      claimEpoch: null,
+      ...(holder.gone ? { holderGone: true } : {}),
+      now: Date.now(),
+    });
+    return decision.kind === "elsewhere" && holder.refusal === undefined;
+  }
+
   protected async piBrainFailsOver(ownerId: string, holderDeviceId: string): Promise<boolean> {
     const listed = await this.ownerGate(ownerId)
       .devices()

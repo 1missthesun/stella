@@ -211,6 +211,9 @@ jobs:
           curl -fsS -X POST --data-binary "$body" http://127.0.0.1:47321/eval | tee "$out/audio.json"
           jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null
           jq -r '"audio: playing after \(.value.playingMs|floor) ms, ended after \(.value.endedMs|floor) ms (message-chime.mp3 is 0.68 s); \(.value.devices|length) devices"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          media='const t0 = performance.now(); const release = await stella.host.media.use(); const readyMs = performance.now() - t0; const caps = stella.host.media.caps; release(); return { readyMs, caps };'
+          curl -fsS -X POST --data-binary "$media" http://127.0.0.1:47321/eval | tee "$out/media-page.json"
+          jq -r '"media page (WebKitGTK): \(.value.caps // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()

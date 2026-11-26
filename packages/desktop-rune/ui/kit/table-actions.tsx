@@ -152,6 +152,7 @@ function fullscreenStyle(t: Tokens) {
     tableFont: cell,
     tableFullWidth: true,
     tableMargin: [0, 0],
+    tableFrame: undefined,
   };
 }
 

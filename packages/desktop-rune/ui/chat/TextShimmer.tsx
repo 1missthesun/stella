@@ -53,7 +53,7 @@ export function TextShimmer({ text, look, active = true, durationMs, exclusiveGr
         {text}
       </text>
       {active && shouldAnimate && loops ? (
-        <box absolute={{ left: 0, top: 0, bottom: 0 }} w={width * SHIMMER_WINDOW_FRACTION} clip={0} x={-width} loop={loops.window} inert>
+        <box absolute={{ left: 0, top: 0, bottom: 0 }} w={width * SHIMMER_WINDOW_FRACTION} clip={0} loop={loops.window} inert>
           <text {...look} color={t.c.textWeaker} nowrap w={width} loop={loops.inner}>
             {text}
           </text>

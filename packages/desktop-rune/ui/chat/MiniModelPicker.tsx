@@ -212,6 +212,7 @@ export function MiniModelPicker() {
                   focusable={!reasoningDisabled}
                   disabled={reasoningDisabled}
                   grow={1}
+                  basis="auto"
                   shrink={false}
                   minH={26}
                   py={4 + 1}

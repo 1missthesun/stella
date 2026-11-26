@@ -320,7 +320,15 @@ fn open(node: u32, p: &Props) {
         slot.handle = Some(handle);
         slot.dirty = true;
         slot.applied = applied_at_open(p);
+        slot.baked = baked(p);
     });
+}
+
+/// The `<window>` props a native window keeps from its open, with the window's `id`; `None` for
+/// a window without an `id`, which is never taken over.
+fn baked(p: &Props) -> Option<String> {
+    let id = p.id.as_deref()?;
+    Some(format!("{id}|{:?}|{}|{}|{}|{:?}|{:?}|{:?}", p.kind, p.transparent, p.frameless, p.content_protection, p.visible == Some(false), p.titlebar, p.traffic_lights))
 }
 
 fn applied_at_open(p: &Props) -> Applied {
@@ -338,7 +346,10 @@ fn applied_at_open(p: &Props) -> Applied {
 }
 
 /// Root children that appeared or left in this batch: bind the main window, open or close others.
+/// A `<window>` that replaces one with the same `id` in the same batch (a remount, as a hot swap
+/// does) takes over its native window, so the window is never unmapped and mapped again.
 fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
+    let mut freed: Vec<(u32, engine::WinSlot)> = Vec::new();
     for node in removed {
         let slot = engine::with(|e| {
             if e.main_node == Some(node) {
@@ -349,14 +360,8 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
         if let Some(slot) = slot {
             #[cfg(feature = "webview")]
             crate::webview::close_window(node);
-            if let Some(h) = slot.handle {
-                if slot.is_main {
-                    h.hide();
-                } else {
-                    h.close();
-                }
-            }
             window_event(node, "closed", json!({}));
+            freed.push((node, slot));
         }
     }
     for node in added {
@@ -365,6 +370,30 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             let main = e.main_node.is_none() && matches!(p.kind.as_deref(), None | Some("main"));
             (p, main)
         });
+        let key = baked(&props);
+        if let Some(i) = freed.iter().position(|(_, s)| key.is_some() && s.handle.is_some() && s.baked == key && (s.is_main == bind_main)) {
+            let (old, mut slot) = freed.swap_remove(i);
+            slot.dirty = true;
+            slot.committed = false;
+            slot.size = None;
+            slot.cmds.clear();
+            let (focused, waker) = (slot.focused, slot.waker.clone());
+            engine::with(|e| {
+                if slot.is_main {
+                    e.main_node = Some(node);
+                } else {
+                    e.rebound.insert(old, node);
+                }
+                e.windows.insert(node, slot);
+            });
+            if focused {
+                window_event(node, "focus", json!({}));
+            }
+            if let Some(w) = waker {
+                w();
+            }
+            continue;
+        }
         if bind_main {
             engine::with(|e| {
                 e.main_node = Some(node);
@@ -379,6 +408,15 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
             });
         } else {
             open(node, &props);
+        }
+    }
+    for (_, slot) in freed {
+        if let Some(h) = slot.handle {
+            if slot.is_main {
+                h.hide();
+            } else {
+                h.close();
+            }
         }
     }
 }
@@ -627,6 +665,9 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     }
     if s.main && let Some(m) = engine::read(|e| e.main_node) && s.node != m {
         s.node = m;
+    }
+    while !s.main && let Some(n) = engine::with(|e| e.rebound.remove(&s.node)) {
+        s.node = n;
     }
     let node = s.node;
     crate::control::refresh_recording(node);

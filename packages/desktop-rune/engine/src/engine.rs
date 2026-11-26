@@ -33,6 +33,9 @@ pub struct WinSlot {
     pub families_applied: u64,
     pub size: Option<(f32, f32)>,
     pub focused: bool,
+    /// What a `<window>` replacing this one (same `id`, same options fixed at open) must share
+    /// to take over its native window instead of opening another.
+    pub baked: Option<String>,
 }
 
 #[derive(Default, PartialEq, Clone)]
@@ -54,6 +57,8 @@ pub struct Engine {
     pub windows: HashMap<u32, WinSlot>,
     /// The `<window>` node shown in the window the engine opened at launch.
     pub main_node: Option<u32>,
+    /// Windows a replacing `<window>` took over: old node to new, read by the window's next poll.
+    pub rebound: HashMap<u32, u32>,
     pub main_handle: Option<WindowHandle>,
     pub main_waker: Arc<Mutex<Option<Waker>>>,
     pub blobs: HashMap<u32, Arc<[u8]>>,
@@ -72,6 +77,7 @@ impl Engine {
             tree: Tree::new(),
             rx: None,
             windows: HashMap::new(),
+            rebound: HashMap::new(),
             main_node: None,
             main_handle: None,
             main_waker: Arc::new(Mutex::new(None)),

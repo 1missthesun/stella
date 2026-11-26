@@ -244,6 +244,8 @@ async function start() {
       STELLA_RUNE_SERVICES: has("--no-services") ? "0" : "1",
       ...(process.env.STELLA_RUNE_APP ? { STELLA_RUNE_APP: process.env.STELLA_RUNE_APP } : {}),
     });
+    // Rune's own diagnostics (RUNE_FRAME_LOG, RUNE_LOOP_CHECK) reach the engine as set.
+    for (const [key, value] of Object.entries(process.env)) if (key.startsWith("RUNE_") && key !== "RUNE_RUN" && value) env[key] ??= value;
     if (!MAC && !WIN && has("--show")) pids.engine = await showOnHyprland(env, w, h);
     else {
       const engine = spawn(ENGINE, [], { cwd: REPO, env, stdio: ["ignore", log, log, ...(launcherChannel ? [3] : [])], detached: true });

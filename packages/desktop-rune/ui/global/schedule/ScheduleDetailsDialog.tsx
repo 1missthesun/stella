@@ -204,7 +204,7 @@ function ScheduleDialogRow({
     : t("global.schedule.paused");
 
   return (
-    <col {...s.scheduleDetailsDialogRow} /* VARIANT data-enabled=row.enabled: EnabledFalse→s.scheduleDetailsDialogRowEnabledFalse */>
+    <col {...s.scheduleDetailsDialogRow} {...(row.enabled ? null : s.scheduleDetailsDialogRowEnabledFalse)}>
       <col {...s.scheduleDetailsDialogRowMain}>
         <T {...s.scheduleDetailsDialogRowName}>{row.name}</T>
         <row {...s.scheduleDetailsDialogRowMeta}>

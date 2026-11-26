@@ -45,7 +45,7 @@ export function ExecutionDevicesCard() {
       <col w="full" {...s.connectList}>
         {devices.map((device) => (
           <row {...s.connectDevice} key={device.deviceId}>
-            <row {...s.connectDeviceDot} /* VARIANT data-device-presence=device.online ? "online" : "offline": DevicePresenceOnline→s.connectDeviceDotDevicePresenceOnline */ />
+            <row {...s.connectDeviceDot} {...(device.online ? s.connectDeviceDotDevicePresenceOnline : null)} />
             <col {...s.connectDeviceText}>
               <row {...s.connectDeviceName}>
                 <T {...s.connectDeviceLabel}>{label(device)}</T>

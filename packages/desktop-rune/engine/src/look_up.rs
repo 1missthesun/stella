@@ -49,6 +49,9 @@ fn show_at(window: u32, at: Option<[f32; 2]>) -> bool {
     imp::present(window, &target, z)
 }
 
+#[cfg(target_os = "macos")]
+pub use imp::window_of;
+
 /// Hooks `quickLookWithEvent:` on winit's view class, once.
 pub fn install() {
     imp::install();
@@ -116,6 +119,11 @@ mod imp {
         true
     }
 
+    /// The window whose content view `view` is.
+    pub fn window_of(view: *mut AnyObject) -> Option<u32> {
+        engine::read(|e| e.windows.keys().copied().collect::<Vec<_>>()).into_iter().find(|w| view_of(*w) == Some(view))
+    }
+
     type QuickLookImp = unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut AnyObject);
 
     static ORIGINAL: std::sync::OnceLock<Option<QuickLookImp>> = std::sync::OnceLock::new();
@@ -127,8 +135,7 @@ mod imp {
             let local: CGPoint = msg_send![this, convertPoint: point, fromView: std::ptr::null::<AnyObject>()];
             let (bounds, flipped): (CGRect, bool) = (msg_send![this, bounds], msg_send![this, isFlipped]);
             let y = if flipped { local.y } else { bounds.size.height - local.y };
-            let window = engine::read(|e| e.windows.keys().copied().collect::<Vec<_>>()).into_iter().find(|w| view_of(*w) == Some(this));
-            window.is_some_and(|w| super::show_at(w, Some([local.x as f32, y as f32])))
+            window_of(this).is_some_and(|w| super::show_at(w, Some([local.x as f32, y as f32])))
         };
         if !shown && let Some(Some(original)) = ORIGINAL.get() {
             // SAFETY: the method this one replaced, with its own arguments.

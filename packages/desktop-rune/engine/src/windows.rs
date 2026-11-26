@@ -199,6 +199,7 @@ fn close_request(s: &mut Win, _tx: &mut Tx) -> CloseResponse {
 
 pub fn setup(s: &mut Win, waker: Waker) {
     crate::look_up::install();
+    crate::text_services::install();
     WAKERS.lock().unwrap_or_else(|e| e.into_inner()).push(waker.clone());
     if s.main {
         let slot = engine::read(|e| e.main_waker.clone());
@@ -690,6 +691,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     }
     let node = s.node;
     let focus = crate::swap_view::seen(s, tx);
+    crate::text_services::note(s, tx);
     engine::with(|e| {
         if let Some(slot) = e.windows.get_mut(&node)
             && slot.focus != focus

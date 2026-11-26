@@ -29,6 +29,7 @@ mod style;
 mod surface;
 mod swap_view;
 mod text;
+mod text_services;
 mod tree;
 mod view;
 #[cfg(feature = "webview")]

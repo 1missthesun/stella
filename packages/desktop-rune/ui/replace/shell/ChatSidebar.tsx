@@ -9,6 +9,9 @@ import { useChatScrollManagement } from "@/shell/use-chat-scroll-management";
 import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
 import { ComposerNotice } from "@/app/chat/ComposerNotice";
 import { Composer } from "../../chat/Composer";
+import { setSelectionHideZone } from "../../shell/selection/AskStellaSelectionChip";
+import { useRetainedSurfaceActive } from "../../kit";
+import type { Layout } from "../../../host/rune-jsx/props";
 import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
 import { deriveComposerState } from "@/features/chat/composer-context";
 import { buildInlineWorkingIndicatorProps } from "@/features/chat/working-indicator-state";
@@ -216,8 +219,15 @@ function AccountScopedChatPanelTab({
     [conversationId, extraTail, isStreaming],
   );
 
+  const shown = useRetainedSurfaceActive();
+  const [panelRect, setPanelRect] = useState<Layout | null>(null);
+  useEffect(() => {
+    setSelectionHideZone("chat-panel-tab", shown ? panelRect : null);
+    return () => setSelectionHideZone("chat-panel-tab", null);
+  }, [panelRect, shown]);
+
   return (
-    <col id="chat-panel-tab" w="full" h="full" grow={1} minH={0} {...dropHandlers}>
+    <col id="chat-panel-tab" w="full" h="full" grow={1} minH={0} {...dropHandlers} onLayout={setPanelRect}>
       <col grow={1} minH={0} w="full">
         <CompactConversationSurface
           className="chat-sidebar-messages"

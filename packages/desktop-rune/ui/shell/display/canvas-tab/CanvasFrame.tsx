@@ -3,7 +3,8 @@ import { injectCanvasActionBridge } from "@stella/contracts/canvas-actions";
 import { injectCanvasBridge } from "@stella/contracts/canvas-bridge";
 import { dispatchComposeText } from "@/shared/lib/stella-orb-chat";
 import { useViewerWindow } from "@/shell/workspace-stage/viewer-item-context";
-import type { WebviewMessage, WebviewRequest } from "../../../../host/rune-jsx/props";
+import type { Layout, WebviewMessage, WebviewRequest } from "../../../../host/rune-jsx/props";
+import { publishCanvasSelection } from "../../selection/AskStellaSelectionChip";
 
 export type CanvasFrameSource = { src: string } | { html: string };
 
@@ -60,6 +61,18 @@ const messageData = (m: WebviewMessage): { type?: unknown; [key: string]: unknow
   return data && typeof data === "object" ? (data as { type?: unknown }) : null;
 };
 
+const canvasSelection = (data: { [key: string]: unknown }, frame: Layout | null, host: CanvasFrameHost) => {
+  if (!data.selected || !frame || typeof data.text !== "string") return null;
+  const rect = data.rect && typeof data.rect === "object" ? (data.rect as Record<string, unknown>) : null;
+  const { left, top, width, height } = rect ?? {};
+  if (typeof left !== "number" || typeof top !== "number" || typeof width !== "number" || typeof height !== "number") return null;
+  return {
+    text: data.text,
+    rect: { x: frame.x + left, y: frame.y + top, w: width, h: height },
+    clear: () => host.post({ type: "stella:canvas-selection-clear" }),
+  };
+};
+
 /** The page side of a canvas frame: post to it, or hand it the action port. */
 export type CanvasFrameHost = {
   post: (data: unknown) => void;
@@ -105,6 +118,16 @@ export function CanvasFrame({
   const web = stella.host?.web;
   const protocols = useMemo(() => web?.schemes() ?? [], [web]);
   const html = "html" in source ? source.html : undefined;
+  const frameRect = useRef<Layout | null>(null);
+  const showsChip = useRef(false);
+  const isMain = viewerWindow === window;
+
+  useEffect(
+    () => () => {
+      if (showsChip.current) publishCanvasSelection(null);
+    },
+    [],
+  );
 
   const onLoad = useCallback(
     (e: { phase: "started" | "finished" }) => {
@@ -132,13 +155,21 @@ export function CanvasFrame({
       if (data.type === "stella:canvas-scrolled") {
         const { x, y } = data as { x?: unknown; y?: unknown };
         if (typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)) scrollMemory.set(id, { x, y });
-      } else if (data.type === "stella:canvas-compose" && viewerWindow !== window && typeof data.text === "string" && data.text.trim()) {
+      } else if (data.type === "stella:canvas-compose" && typeof data.text === "string" && data.text.trim()) {
+        if (isMain && showsChip.current) {
+          showsChip.current = false;
+          publishCanvasSelection(null);
+        }
         dispatchComposeText({ text: data.text.trim(), selectedText: null });
-        window.electronAPI?.window?.show?.();
+        if (!isMain) window.electronAPI?.window?.show?.();
+      } else if (data.type === "stella:canvas-selection" && isMain) {
+        const selection = canvasSelection(data, frameRect.current, host);
+        if (selection || showsChip.current) publishCanvasSelection(selection);
+        showsChip.current = selection !== null;
       }
       latest.current.onMessage?.(data, host);
     },
-    [host, id, viewerWindow],
+    [host, id, isMain],
   );
 
   return (
@@ -155,6 +186,9 @@ export function CanvasFrame({
       onRequest={(r: WebviewRequest) => web?.request(undefined, r)}
       onLoad={onLoad}
       onMessage={onPageMessage}
+      onLayout={(r) => {
+        frameRect.current = r;
+      }}
     />
   );
 }

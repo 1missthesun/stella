@@ -75,6 +75,7 @@ Not done yet (ship-time work):
 - macOS identity: Electron runs inside a signed `Stella.app` (`ElectronIdentity`); the engine
   needs the same (a signed, notarized bundle so the Dock, menu bar, TCC prompts and notifications
   say Stella). Windows needs the engine Authenticode-signed with the launcher's certificate.
+- macOS media access (microphone, screen) needs that bundle; see "macOS bundle and media access".
 - Rune is private: an outside builder can't compile the engine until the mirror is public or the
   engine ships only as a binary.
 - The Linux launcher's log is still `logs/electron.log` for both.
@@ -84,3 +85,49 @@ Not done yet (ship-time work):
 - Proven on Linux (omarchy, Xvfb): `stella-launcher --self-test --engine-bin <dist engine>` clones
   the source, installs Bun and deps, starts the engine, gets `ready` 0.5-10 s after spawn, sends
   `quit`, gets `exiting 0`, exits 0; the runtime worker then stops by itself.
+
+## macOS bundle and media access
+
+TCC decides microphone and screen access for the *responsible* process. The launcher spawns the
+engine with responsibility disclaimed (`Supervisor.swift`), so the engine is responsible for
+itself and for everything below it: the Bun host, the runtime worker, `mic_capture`, the media
+WebView's WebContent process and ScreenCaptureKit streams. A bare `stella-engine` binary has no
+Info.plist, and TCC kills a process that touches the microphone without a usage string. So until
+the engine ships as a bundle, the host only reports access (`askForMediaAccess` returns the
+current status and never prompts), and capture works only where some other app is responsible
+(a run from Terminal or Stella).
+
+The engine ships as `Stella.app/Contents/MacOS/stella-engine`, the same identity Electron Stella
+has (`ElectronIdentity` in `Prepare.swift`, `build-electron-identity.yml`), so access already
+granted to Stella carries over:
+
+| Info.plist key | Value |
+|---|---|
+| `CFBundleIdentifier` | `com.stella.app` |
+| `CFBundleExecutable` | `stella-engine` |
+| `CFBundleName`, `CFBundleDisplayName` | `Stella` |
+| `NSMicrophoneUsageDescription` | `ElectronIdentity.microphoneUsage` ("Stella uses your microphone for voice conversations and screen recordings.") |
+| `NSSpeechRecognitionUsageDescription` | `ElectronIdentity.speechRecognitionUsage` |
+| `LSMinimumSystemVersion` | `12.3` (ScreenCaptureKit) |
+| `NSHighResolutionCapable` | `true` |
+
+- Signing: Developer ID with the launcher's team, so the designated requirement is the one
+  `ElectronIdentity.requirement` checks (`anchor apple generic and identifier "com.stella.app" and
+  certificate leaf[subject.OU] = <team>`). TCC keys grants on that requirement: an ad-hoc or
+  differently signed engine starts with no grants and prompts again.
+- Hardened runtime: Electron's identity is signed without it (`codesign --deep`, no
+  `--options runtime`) and is not notarized; the launcher downloads it without quarantine. If the
+  engine is signed the same way it needs no entitlements. If it is signed with
+  `--options runtime` (needed for notarization), it needs `com.apple.security.device.audio-input`
+  (without it microphone access is refused without a prompt) and, if video capture is ever
+  used, `com.apple.security.device.camera`. ScreenCaptureKit has no entitlement or usage string:
+  it is the "Screen & System Audio Recording" grant, keyed to the same requirement.
+  No JIT entitlements: the engine runs no JavaScript itself (Bun is a separate binary, WebKit's
+  JIT runs in its own XPC processes).
+- Screen recording: macOS 15 re-asks monthly ("continue to allow") for apps that capture without
+  `SCContentSharingPicker`; the grant survives engine updates only while the requirement holds.
+- Prompting: once the engine runs from that bundle it sets `STELLA_RUNE_MEDIA_PROMPTS=1` for the
+  host, and `systemPreferences.askForMediaAccess` asks for real: the microphone through an engine
+  command that calls `AVCaptureDevice requestAccessForMediaType:completionHandler:` (a block, so it
+  belongs in the engine's objc2 code, not Bun FFI), the screen through
+  `CGRequestScreenCaptureAccess`. Without the variable the host keeps reporting status only.

@@ -23,6 +23,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { mounted, Nothing } from "./mount";
 import { FullShell } from "../shell/FullShell";
 import { LaunchSplash } from "../shell/LaunchSplash";
+import { UpdateTransitionLayer, useUpdateTransitionAppLook } from "../shell/update-transition/UpdateTransitionLayer";
 
 const RemoteExecutionConsentLayer = mounted(import.meta.glob("../replace/global/execution/RemoteExecutionConsentLayer.tsx", { eager: true }), "RemoteExecutionConsentLayer", Nothing);
 const DeviceWorkOfferLayer = mounted(import.meta.glob("../replace/global/execution/DeviceWorkOfferLayer.tsx", { eager: true }), "DeviceWorkOfferLayer", Nothing);
@@ -53,8 +54,8 @@ function AppProviders({ children }: { children: ReactNode }) {
         <ToastProvider>
           {platformCapabilities.nativeBridges ? (
             <>
-              <VoiceErrorToastListener />
-              <CaptureErrorToastListener />
+                <VoiceErrorToastListener />
+                <CaptureErrorToastListener />
             </>
           ) : null}
           <BootstrapStateProvider>
@@ -76,8 +77,10 @@ function App() {
     const timer = window.setTimeout(() => window.sessionStorage.removeItem(AUTO_REPAIR_SIGNATURE_KEY), 20_000);
     return () => window.clearTimeout(timer);
   }, []);
+  const transitionLook = useUpdateTransitionAppLook();
   return (
-    <col id="app" w="full" h="full" fill={t.c.background} dir={document.documentElement.dir === "rtl" ? "rtl" : "ltr"}>
+    <>
+    <col id="app" w="full" h="full" fill={t.c.background} dir={document.documentElement.dir === "rtl" ? "rtl" : "ltr"} {...transitionLook}>
       <ChatStoreProvider>
         <AppBootstrap />
         <CloudMemoryPreferenceBridge />
@@ -93,6 +96,8 @@ function App() {
       </ChatStoreProvider>
       <LaunchSplash />
     </col>
+    <UpdateTransitionLayer />
+    </>
   );
 }
 

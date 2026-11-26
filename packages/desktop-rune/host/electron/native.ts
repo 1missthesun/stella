@@ -6,7 +6,9 @@ import { EventEmitter } from "node:events";
 import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { engine, onEngine, viaEngine, warnOnce, type EngineMenuItem } from "./engine";
+import { engine, onEngine, viaEngine, warnOnce, type EngineApi, type EngineMenuItem } from "./engine";
+import { request } from "../bridge";
+import { portalShortcut } from "./portal-shortcut-ids";
 import { NativeImage, nativeImage } from "./native-image";
 import { app } from "./app";
 import type { BrowserWindow } from "./browser-window";
@@ -342,7 +344,9 @@ export const globalShortcut = {
     const key = normalizeAccel(accelerator);
     if (shortcuts.has(key)) return false;
     shortcuts.set(key, callback);
-    void viaEngine("shortcut.register", (e) => e.shortcut.register(accelerator), () => true).then((ok) => {
+    const named = process.platform === "linux" ? portalShortcut(accelerator) : null;
+    const registered = (e: EngineApi) => (named ? request<boolean>("shortcut.register", { accelerator, ...named }) : e.shortcut.register(accelerator));
+    void viaEngine("shortcut.register", registered, () => true).then((ok) => {
       if (!ok) {
         shortcuts.delete(key);
         console.error(`[globalShortcut] ${accelerator} is taken by another application`);

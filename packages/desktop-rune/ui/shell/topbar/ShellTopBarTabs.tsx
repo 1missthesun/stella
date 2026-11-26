@@ -271,122 +271,124 @@ export function ShellTopBarTabs({ room }: { room: number }) {
           </text>
         ))}
       </col>
-      <row id="topbar-tab-chat" h="full" align="center" mr={6} shrink={false} hoverGroup noWindowDrag onLayout={(r) => { edges.current.chatRight = r.x + r.w; syncNotch(); }}>
-        <box absolute={{ left: 0, right: 0, top: 6, bottom: 6 }} radius={7} fill={l.hoverFill} hoverOpacity={[0, 1]} inert />
-        <row
-          id="topbar-tab-chat-target"
-          role="tab"
-          selected={chatActive}
-          label="Chat"
-          title="Chat (⌘1)"
-          titleSide="bottom"
-          focusable
-          h={26}
-          w={chatNeedsRoom ? 40 : undefined}
-          px={chatNeedsRoom ? 0 : 10}
-          gap={6}
-          align="center"
-          justify="center"
-          radius={7}
-          focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 7 }}
-          onPress={showChat}
-        >
-          <GroupIcon icon={Icons.stella.MessageSquare} size={18} strokeWidth={1.5} color={chatActive ? l.strong : l.rest} hoverColor={chatActive ? l.strong : l.hover} />
-          {chatNeedsRoom ? null : <text {...LABEL} nowrap color={chatActive ? l.strong : l.rest} hoverColor={chatActive ? l.strong : l.hover}>Chat</text>}
+      <row id="topbar-tablist" role="tablist" label="Tabs" h="full" align="center" gap={2} minW={0} shrink>
+        <row id="topbar-tab-chat" h="full" align="center" mr={6} shrink={false} hoverGroup noWindowDrag onLayout={(r) => { edges.current.chatRight = r.x + r.w; syncNotch(); }}>
+          <box absolute={{ left: 0, right: 0, top: 6, bottom: 6 }} radius={7} fill={l.hoverFill} hoverOpacity={[0, 1]} inert />
+          <row
+            id="topbar-tab-chat-target"
+            role="tab"
+            selected={chatActive}
+            label="Chat"
+            title="Chat (⌘1)"
+            titleSide="bottom"
+            focusable
+            h={26}
+            w={chatNeedsRoom ? 40 : undefined}
+            px={chatNeedsRoom ? 0 : 10}
+            gap={6}
+            align="center"
+            justify="center"
+            radius={7}
+            focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 7 }}
+            onPress={showChat}
+          >
+            <GroupIcon icon={Icons.stella.MessageSquare} size={18} strokeWidth={1.5} color={chatActive ? l.strong : l.rest} hoverColor={chatActive ? l.strong : l.hover} />
+            {chatNeedsRoom ? null : <text {...LABEL} nowrap color={chatActive ? l.strong : l.rest} hoverColor={chatActive ? l.strong : l.hover}>Chat</text>}
+          </row>
         </row>
-      </row>
-      <row id="topbar-tabs-strip" role="tablist" label="Tabs" h="full" align="stretch" gap={TAB_GAP} minW={0} shrink scrollX pr={STRIP_PAD_RIGHT} mr={STRIP_OVERHANG} noWindowDrag onLayout={(r) => { edges.current.stripRight = r.x + r.w; syncNotch(); }}>
-        {tabs.map((tab, index) => {
-          const active = tab.id === shownTabId;
-          const title = titles.get(tab.id) ?? "";
-          const width = sizes[tab.id] ?? TAB_MAX;
-          const compact = width < TAB_COMPACT;
-          const tight = !compact && width < TAB_TIGHT;
-          const dragging = drag?.id === tab.id;
-          const viewing = !active && isOpenElsewhere(tab);
-          const color = active || viewing || dragging ? l.strong : l.rest;
-          const closeAlways = active && !compact && !tight && !drag;
-          const closeOnHover = !drag && (!compact || active);
-          const iconSwaps = !drag && ((compact && active) || tight);
-          const unreadDot = tab.unread || (tab.kind === "email" && !active && emailUnseen > 0);
-          return (
-            <row
-              key={tab.id}
-              id={`topbar-tab-${tab.id}`}
-              h="full"
-              w={tabWidth}
-              shrink={false}
-              align="center"
-              hoverGroup
-              raise={active || dragging ? 2 : undefined}
-              x={shiftFor(index)}
-              motion={{ dur: 0.16 }}
-              instant={!(drag && !(dragging && !drag.settling))}
-              onLayout={(r) => {
-                widths.current.set(tab.id, { x: r.x, w: r.w });
-                if (tab.id === shownTabId) syncNotch();
-                setSizes((s) => (Math.abs((s[tab.id] ?? -1) - r.w) < 0.5 ? s : { ...s, [tab.id]: r.w }));
-              }}
-            >
-              {active ? (
-                <OpenTabSurface t={tk} />
-              ) : (
-                <box
-                  absolute={{ left: 0, right: 0, top: 6, bottom: 6 }}
-                  radius={7}
-                  fill={dragging ? l.draggingFill : viewing ? l.viewingFill : l.hoverFill}
-                  hoverOpacity={dragging || viewing ? undefined : drag ? [0, 0] : [0, 1]}
-                  inert
-                />
-              )}
+        <row id="topbar-tabs-strip" h="full" align="stretch" gap={TAB_GAP} minW={0} shrink scrollX pr={STRIP_PAD_RIGHT} mr={STRIP_OVERHANG} noWindowDrag onLayout={(r) => { edges.current.stripRight = r.x + r.w; syncNotch(); }}>
+          {tabs.map((tab, index) => {
+            const active = tab.id === shownTabId;
+            const title = titles.get(tab.id) ?? "";
+            const width = sizes[tab.id] ?? TAB_MAX;
+            const compact = width < TAB_COMPACT;
+            const tight = !compact && width < TAB_TIGHT;
+            const dragging = drag?.id === tab.id;
+            const viewing = !active && isOpenElsewhere(tab);
+            const color = active || viewing || dragging ? l.strong : l.rest;
+            const closeAlways = active && !compact && !tight && !drag;
+            const closeOnHover = !drag && (!compact || active);
+            const iconSwaps = !drag && ((compact && active) || tight);
+            const unreadDot = tab.unread || (tab.kind === "email" && !active && emailUnseen > 0);
+            return (
               <row
-                id={`topbar-tab-${tab.id}-target`}
-                role="tab"
-                selected={active}
-                label={title}
-                title={tab.unread ? `${title} · new from Stella` : title}
-                titleSide="bottom"
-                focusable
-                grow={1}
-                minW={0}
-                h={26}
-                pl={compact ? 0 : 10}
-                pr={compact ? 0 : tight ? TAB_TRAIL_TIGHT : TAB_TRAIL}
-                gap={6}
+                key={tab.id}
+                id={`topbar-tab-${tab.id}`}
+                h="full"
+                w={tabWidth}
+                shrink={false}
                 align="center"
-                justify={compact ? "center" : "start"}
-                radius={7}
-                focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 7 }}
-                onPress={() => openTab(tab)}
-                onDrag={(d) => onTabDrag(tab, index, d)}
+                hoverGroup
+                raise={active || dragging ? 2 : undefined}
+                x={shiftFor(index)}
+                motion={{ dur: 0.16 }}
+                instant={!(drag && !(dragging && !drag.settling))}
+                onLayout={(r) => {
+                  widths.current.set(tab.id, { x: r.x, w: r.w });
+                  if (tab.id === shownTabId) syncNotch();
+                  setSizes((s) => (Math.abs((s[tab.id] ?? -1) - r.w) < 0.5 ? s : { ...s, [tab.id]: r.w }));
+                }}
               >
-                <box hoverOpacity={iconSwaps ? [1, 0] : undefined}>
-                  {renderIcon(tab, color, false)}
-                  {unreadDot ? dot("dot") : null}
+                {active ? (
+                  <OpenTabSurface t={tk} />
+                ) : (
+                  <box
+                    absolute={{ left: 0, right: 0, top: 6, bottom: 6 }}
+                    radius={7}
+                    fill={dragging ? l.draggingFill : viewing ? l.viewingFill : l.hoverFill}
+                    hoverOpacity={dragging || viewing ? undefined : drag ? [0, 0] : [0, 1]}
+                    inert
+                  />
+                )}
+                <row
+                  id={`topbar-tab-${tab.id}-target`}
+                  role="tab"
+                  selected={active}
+                  label={title}
+                  title={tab.unread ? `${title} · new from Stella` : title}
+                  titleSide="bottom"
+                  focusable
+                  grow={1}
+                  minW={0}
+                  h={26}
+                  pl={compact ? 0 : 10}
+                  pr={compact ? 0 : tight ? TAB_TRAIL_TIGHT : TAB_TRAIL}
+                  gap={6}
+                  align="center"
+                  justify={compact ? "center" : "start"}
+                  radius={7}
+                  focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 7 }}
+                  onPress={() => openTab(tab)}
+                  onDrag={(d) => onTabDrag(tab, index, d)}
+                >
+                  <box hoverOpacity={iconSwaps ? [1, 0] : undefined}>
+                    {renderIcon(tab, color, false)}
+                    {unreadDot ? dot("dot") : null}
+                  </box>
+                  {compact ? null : <text {...LABEL} nowrap truncate="fade" grow={1} shrink minW={0} color={color} hoverColor={active || viewing ? undefined : l.hover}>{title}</text>}
+                </row>
+                <box
+                  id={`topbar-tab-${tab.id}-close`}
+                  role="button"
+                  label={`Close ${title}`}
+                  title={`Close ${title}`}
+                  absolute={compact ? { top: 11, left: width / 2 - 8 } : tight ? { top: 11, left: 9 } : { top: 11, right: 6 }}
+                  w={16}
+                  h={16}
+                  radius={5}
+                  center
+                  hover={l.closeHover}
+                  hoverOpacity={closeAlways ? undefined : closeOnHover ? [0, 1] : [0, 0]}
+                  opacity={closeAlways ? 1 : undefined}
+                  inert={!closeAlways && !closeOnHover}
+                  onPress={() => sidebarSections.closeTab(tab.id)}
+                >
+                  <GroupIcon icon={Icons.stella.X} size={11} strokeWidth={2} color={tk.c.textWeak} />
                 </box>
-                {compact ? null : <text {...LABEL} nowrap truncate="fade" grow={1} shrink minW={0} color={color} hoverColor={active || viewing ? undefined : l.hover}>{title}</text>}
               </row>
-              <box
-                id={`topbar-tab-${tab.id}-close`}
-                role="button"
-                label={`Close ${title}`}
-                title={`Close ${title}`}
-                absolute={compact ? { top: 11, left: width / 2 - 8 } : tight ? { top: 11, left: 9 } : { top: 11, right: 6 }}
-                w={16}
-                h={16}
-                radius={5}
-                center
-                hover={l.closeHover}
-                hoverOpacity={closeAlways ? undefined : closeOnHover ? [0, 1] : [0, 0]}
-                opacity={closeAlways ? 1 : undefined}
-                inert={!closeAlways && !closeOnHover}
-                onPress={() => sidebarSections.closeTab(tab.id)}
-              >
-                <GroupIcon icon={Icons.stella.X} size={11} strokeWidth={2} color={tk.c.textWeak} />
-              </box>
-            </row>
-          );
-        })}
+            );
+          })}
+        </row>
       </row>
       <NewTabMenu open={menuOpen} onOpenChange={setMenuOpen} anchorFill={l} emailDot={!emailTabOpen && emailUnseen > 0} dot={dot} />
     </row>

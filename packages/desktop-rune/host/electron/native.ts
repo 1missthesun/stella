@@ -263,9 +263,14 @@ class PowerMonitor extends EventEmitter {
     });
   }
   private watchSleep() {
-    // gdbus runs under a shell that stops it when our end of its stdin closes, so it ends with the host however the host ends.
-    const monitor = "gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 & m=$!; read _; kill $m";
-    const child = spawn("sh", ["-c", monitor], { stdio: ["pipe", "pipe", "ignore"] });
+    // gdbus has to end with the host however the host ends, including the engine signalling the
+    // host's whole process group: the kernel's parent-death signal (setpriv) does that; a shell
+    // that stops it when our end of its stdin closes is the fallback. gdbus blocks SIGTERM.
+    const monitor = ["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1", "--object-path", "/org/freedesktop/login1"];
+    const setpriv = Bun.which("setpriv");
+    const child = setpriv
+      ? spawn(setpriv, ["--pdeathsig", "KILL", ...monitor], { stdio: ["pipe", "pipe", "ignore"] })
+      : spawn("sh", ["-c", `${monitor.join(" ")} & m=$!; read _; kill -9 $m`], { stdio: ["pipe", "pipe", "ignore"] });
     child.on("error", () => {});
     child.unref();
     for (const stream of [child.stdin, child.stdout] as ({ unref?: () => void } | null)[]) stream?.unref?.();
@@ -281,7 +286,7 @@ class PowerMonitor extends EventEmitter {
       }
     });
     this.sleepWatcher = child;
-    const stop = () => { child.stdin?.end(); };
+    const stop = () => { child.stdin?.end(); if (setpriv) child.kill("SIGKILL"); };
     app.once("will-quit", stop);
     process.once("exit", stop);
   }

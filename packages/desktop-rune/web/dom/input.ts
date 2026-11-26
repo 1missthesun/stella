@@ -54,7 +54,8 @@ export function Input(raw: InputProps) {
 
   useImperativeHandle((p as { ref?: React.Ref<unknown> }).ref, () => ({ set() {} }), []);
 
-  const grow = () => {
+  const grown = useRef("");
+  const grow = (force = false) => {
     const f = field.current;
     if (!f || !(f instanceof HTMLTextAreaElement)) return;
     const q = latest.current;
@@ -62,6 +63,9 @@ export function Input(raw: InputProps) {
     const maxByLines = q.maxLines ? q.maxLines * lh : Infinity;
     const maxH = typeof q.maxH === "number" ? q.maxH - (q.pt ?? q.py ?? q.pad ?? 0) - (q.pb ?? q.py ?? q.pad ?? 0) : Infinity;
     const max = Math.min(maxByLines, maxH);
+    const inputs = `${f.value}\0${min}\0${max}`;
+    if (!force && inputs === grown.current) return;
+    grown.current = inputs;
     f.style.height = "0px";
     const content = f.scrollHeight;
     const height = Math.max(min, Math.min(content, max));
@@ -98,7 +102,14 @@ export function Input(raw: InputProps) {
   useLayoutEffect(() => {
     const f = field.current;
     if (!f || !multiline) return;
-    const ro = new ResizeObserver(() => grow());
+    let width = -1;
+    const ro = new ResizeObserver(([entry]) => {
+      const next = entry?.contentRect.width ?? -1;
+      if (next === width) return;
+      const first = width < 0;
+      width = next;
+      if (!first) grow(true);
+    });
     ro.observe(f.parentElement ?? f);
     return () => ro.disconnect();
   }, [multiline]);

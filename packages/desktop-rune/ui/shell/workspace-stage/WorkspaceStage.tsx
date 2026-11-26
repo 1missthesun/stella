@@ -99,6 +99,8 @@ function TabStage({ visible }: { visible: boolean }) {
   const l = stageLook(t);
   const geo = useGeometry();
   const hidden = useDelayedHidden(visible, 120);
+  const [opened, setOpened] = useState(visible);
+  if (visible && !opened) setOpened(true);
   return (
     <col
       id="workspace-stage"
@@ -115,7 +117,7 @@ function TabStage({ visible }: { visible: boolean }) {
     >
       <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
         <RetainedSurface active={visible} grow={1}>
-          <SidebarSectionBody />
+          {opened ? <SidebarSectionBody /> : null}
         </RetainedSurface>
       </col>
       <StageEdge fill={t.c.background} />

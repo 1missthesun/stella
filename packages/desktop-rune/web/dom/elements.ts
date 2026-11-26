@@ -81,6 +81,7 @@ export function Text(raw: TextProps) {
   else if (p.nowrap) cls.push("nw");
   if (clamp) cls.push("ml");
   if (p.selectable) cls.push("sel");
+  if (p.antialias) cls.push("aa");
   const h = useHost(p, cls.join(" "));
   const s = h.props.style;
   textStyle(p, s);
@@ -120,8 +121,8 @@ export function Icon(raw: IconProps) {
   if (p.color) s.color = p.color;
   if (p.spin) s.animation = `rune-spin ${Math.max(0.05, p.spin)}s linear infinite`;
   const view = p.view ?? 24;
-  const html = useMemo(() => ({ __html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${view} ${view}" fill="none" aria-hidden="true">${p.svg}</svg>` }), [p.svg, view]);
-  return h.wrap(createElement("span", { ...h.props, dangerouslySetInnerHTML: html }));
+  const html = useMemo(() => ({ __html: p.svg }), [p.svg]);
+  return h.wrap(createElement("svg", { ...h.props, xmlns: "http://www.w3.org/2000/svg", viewBox: `0 0 ${view} ${view}`, fill: "none", "aria-hidden": h.props.role || h.props["aria-label"] ? undefined : true, dangerouslySetInnerHTML: html }));
 }
 
 function vectorHtml(p: VectorProps): string {

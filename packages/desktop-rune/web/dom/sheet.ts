@@ -2,7 +2,8 @@ const BASE = `
 @property --rbc { syntax: "*"; inherits: false; }
 @property --rbw { syntax: "*"; inherits: false; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
-body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+html[data-native-font-smoothing="on"], html[data-native-font-smoothing="on"] body, .aa { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.aa { text-rendering: optimizeLegibility; }
 #root { position: fixed; inset: 0; display: flex; }
 .r { display: flex; position: relative; box-sizing: border-box; flex-shrink: 0; margin: 0; padding: 0; border: 0; outline: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
 .r.col, .r.win { flex-direction: column; }
@@ -47,6 +48,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .rt.ml { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
 .rt a, .rt .lk { color: inherit; text-decoration: none; cursor: pointer; }
 .ri { display: flex; position: relative; box-sizing: border-box; flex-shrink: 0; }
+svg.ri { display: block; overflow: visible; }
 .ri > svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .rin { display: flex; position: relative; box-sizing: border-box; flex-shrink: 0; font-family: var(--rune-sans); font-kerning: normal; }
 .rin > .f { flex: 1 1 auto; min-width: 0; width: 100%; margin: 0; padding: 0; border: 0; outline: none; background: transparent; font: inherit; letter-spacing: inherit; line-height: inherit; color: inherit; resize: none; box-sizing: border-box; font-family: inherit; text-align: inherit; }
@@ -73,6 +75,10 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .rmd .mdcode:hover .mdca.hov, .rmd .mdcode:focus-within .mdca.hov { opacity: 1; }
 .rmd .mdcb { all: unset; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; color: inherit; }
 .rmd .mdcb:hover { color: var(--mdca-hover, inherit); }
+.rmd .mdta { position: absolute; z-index: 1; display: flex; align-items: center; padding-left: 6px; border-radius: 6px; transition: opacity 120ms ease; }
+@media (hover: hover) { .rmd .mdta.hov { opacity: 0; } .rmd .mdtable:is(:hover, :focus-within) .mdta.hov { opacity: 1; } }
+.rmd .mdtb { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; cursor: pointer; color: inherit; transition: color 150ms ease; }
+.rmd .mdtb:hover { color: var(--mdca-hover, inherit); }
 .rmd pre::-webkit-scrollbar { height: 6px; }
 .rune-tip { position: fixed; z-index: 2147483000; pointer-events: none; box-sizing: border-box; max-width: 280px; padding: 5px 8px; border-radius: 7px; font: 500 12px/1.35 var(--rune-sans); letter-spacing: -0.1px; white-space: pre-wrap; background: var(--rune-tip-bg, #1f1f1c); color: var(--rune-tip-fg, #f4f3ee); box-shadow: 0 4px 16px rgba(0,0,0,.18), 0 0 0 0.5px rgba(255,255,255,.06); opacity: 0; transform: translateY(2px); transition: opacity .12s ease, transform .12s ease; }
 .rune-tip.on { opacity: 1; transform: none; }

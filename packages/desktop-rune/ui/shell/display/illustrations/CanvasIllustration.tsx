@@ -43,11 +43,11 @@ const SPARKLE_LOOP: Loop = {
   frames: [
     { at: 0, scale: 0, rotate: 0, opacity: 0 },
     { at: 0.4, scale: 0, rotate: 0, opacity: 0 },
-    { at: 0.45, scale: 1.2, rotate: 90, opacity: 1 },
-    { at: 0.5, scale: 1, rotate: 180, opacity: 1 },
-    { at: 0.8, scale: 1, rotate: 180, opacity: 1 },
-    { at: 0.85, scale: 0, rotate: 270, opacity: 0 },
-    { at: 1, scale: 0, rotate: 270, opacity: 0 },
+    { at: 0.45, scale: 1.2, rotate: Math.PI / 2, opacity: 1 },
+    { at: 0.5, scale: 1, rotate: Math.PI, opacity: 1 },
+    { at: 0.8, scale: 1, rotate: Math.PI, opacity: 1 },
+    { at: 0.85, scale: 0, rotate: (3 * Math.PI) / 2, opacity: 0 },
+    { at: 1, scale: 0, rotate: (3 * Math.PI) / 2, opacity: 0 },
   ],
 };
 

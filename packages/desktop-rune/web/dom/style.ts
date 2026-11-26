@@ -56,7 +56,7 @@ export function transformCss(p: { x?: number; y?: number; scale?: number; rotate
   const parts: string[] = [];
   if (p.x || p.y) parts.push(`translate(${px(p.x ?? 0)}, ${px(p.y ?? 0)})`);
   if (p.scale !== undefined && p.scale !== 1) parts.push(`scale(${p.scale})`);
-  if (p.rotate) parts.push(`rotate(${p.rotate}deg)`);
+  if (p.rotate) parts.push(`rotate(${p.rotate}rad)`);
   return parts.length ? parts.join(" ") : undefined;
 }
 
@@ -67,13 +67,15 @@ export function springCurve(bounce = 0): string {
 
 const TRANSITIONED = "transform, opacity, background-color, box-shadow, color, width, height, min-width, max-width, min-height, max-height, filter, border-radius, left, top, right, bottom, padding, margin";
 
-function loopAnimation(l: Loop): string | undefined {
+function loopAnimation(l: Loop, base = ""): string | undefined {
+  const pre = base ? `${base} ` : "";
   const period = Math.max(0.01, l.period);
   const iterations = l.times ? String(l.times) : "infinite";
   const delay = l.delay ? `${l.delay}s` : "0s";
   let name: string;
   if (l.kind === "rotation") {
-    name = "rune-spin";
+    name = base ? `rl-r-${hash(base)}` : "rune-spin";
+    if (base) ensureRule(name, `@keyframes ${name} { from { transform: ${pre}rotate(0deg); } to { transform: ${pre}rotate(360deg); } }`);
     return `${name} ${period}s linear ${delay} ${iterations}`;
   }
   if (l.kind === "opacity") {
@@ -87,8 +89,8 @@ function loopAnimation(l: Loop): string | undefined {
     const xy = (v: number | [number, number] | undefined) => (Array.isArray(v) ? v : [v ?? 0, 0]);
     const [fx, fy] = xy(l.from);
     const [tx, ty] = xy(l.to);
-    name = `rl-s-${hash(`${fx}:${fy}:${tx}:${ty}`)}`;
-    ensureRule(name, `@keyframes ${name} { from { transform: translate(${px(fx)}, ${px(fy)}); } to { transform: translate(${px(tx)}, ${px(ty)}); } }`);
+    name = `rl-s-${hash(`${pre}${fx}:${fy}:${tx}:${ty}`)}`;
+    ensureRule(name, `@keyframes ${name} { from { transform: ${pre}translate(${px(fx)}, ${px(fy)}); } to { transform: ${pre}translate(${px(tx)}, ${px(ty)}); } }`);
     return `${name} ${period}s linear ${delay} ${iterations}`;
   }
   if (l.kind === "sequence" && l.frames && l.frames.length >= 2) {
@@ -98,7 +100,7 @@ function loopAnimation(l: Loop): string | undefined {
       const scale = f.scale ?? (f.scaleX !== undefined || f.scaleY !== undefined ? undefined : 1);
       const sx = f.scaleX ?? scale ?? 1;
       const sy = f.scaleY ?? scale ?? 1;
-      return `${Math.min(100, Math.max(0, at * 100)).toFixed(3)}% { opacity: ${f.opacity ?? 1}; transform: translate(${px(f.x ?? 0)}, ${px(f.y ?? 0)}) scale(${sx}, ${sy}) rotate(${f.rotate ?? 0}deg); }`;
+      return `${Math.min(100, Math.max(0, at * 100)).toFixed(3)}% { opacity: ${f.opacity ?? 1}; transform: ${pre}translate(${px(f.x ?? 0)}, ${px(f.y ?? 0)}) scale(${sx}, ${sy}) rotate(${f.rotate ?? 0}rad); }`;
     });
     const body = frames.join(" ");
     name = `rl-q-${hash(body)}`;
@@ -262,7 +264,7 @@ export function boxStyle(p: BoxProps, base: string): BoxStyle {
     s.transition = `width ${p.layout}s ${springCurve()}, height ${p.layout}s ${springCurve()}, transform ${p.layout}s ${springCurve()}`;
   }
   if (p.loop) {
-    const anim = loopAnimation(p.loop);
+    const anim = loopAnimation(p.loop, transform);
     if (anim) {
       s.animation = anim;
       if (p.loop.origin) s.transformOrigin = `${p.loop.origin[0] * 100}% ${p.loop.origin[1] * 100}%`;

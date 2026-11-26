@@ -183,6 +183,33 @@ pub fn video(n: u32, p: &Props) -> El {
     el().video(&player, fit(p))
 }
 
+/// `<audio>`: a player with no picture, loaded at mount so its duration is known before it plays.
+pub fn audio(n: u32, p: &Props) -> El {
+    let Some(src) = p.src.clone() else { return el() };
+    let player = PLAYERS.with(|m| {
+        let mut m = m.borrow_mut();
+        match m.get(&n) {
+            Some((cur, pl)) if *cur == src => pl.clone(),
+            _ => {
+                let source = if src.starts_with("http://") || src.starts_with("https://") {
+                    rune::MediaSource::Url(src.clone())
+                } else {
+                    rune::MediaSource::File(src.strip_prefix("file://").unwrap_or(&src).into())
+                };
+                let pl = Player::audio(source);
+                if p.autoplay {
+                    pl.play();
+                }
+                m.insert(n, (src.clone(), pl.clone()));
+                pl
+            }
+        }
+    });
+    player.set_muted(p.muted);
+    player.set_looping(p.loop_media);
+    el()
+}
+
 pub fn player(n: u32) -> Option<Player> {
     PLAYERS.with(|m| m.borrow().get(&n).map(|(_, p)| p.clone()))
 }

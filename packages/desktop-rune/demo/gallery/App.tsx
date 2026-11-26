@@ -439,6 +439,7 @@ export function Root() {
       </window>
       {panel !== "off" ? <Panel close={close} shown={panel === "shown"} /> : null}
       {process.env.STELLA_GALLERY_BACKGROUND ? <BackgroundPage /> : null}
+      {process.env.STELLA_GALLERY_AUDIO ? <window id="audio-host" kind="background"><audio id="g-audio" src={process.env.STELLA_GALLERY_AUDIO} /></window> : null}
     </>
   );
 }

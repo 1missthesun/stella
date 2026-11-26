@@ -19,6 +19,7 @@ pub enum Kind {
     List,
     Markdown,
     Video,
+    Audio,
     Vector,
     Surface,
 }
@@ -36,7 +37,8 @@ impl Kind {
             "webview" => Kind::Webview,
             "list" => Kind::List,
             "markdown" => Kind::Markdown,
-            "video" | "audio" => Kind::Video,
+            "video" => Kind::Video,
+            "audio" => Kind::Audio,
             "vector" => Kind::Vector,
             "surface" => Kind::Surface,
             _ => Kind::Col,

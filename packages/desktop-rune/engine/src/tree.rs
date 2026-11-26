@@ -157,7 +157,7 @@ impl Tree {
     pub fn apply(&mut self, op: Op) {
         match op {
             Op::Create { id, kind } => {
-                if matches!(kind, Kind::Input | Kind::Video | Kind::Webview) {
+                if matches!(kind, Kind::Input | Kind::Video | Kind::Audio | Kind::Webview) {
                     self.live.insert(id);
                 }
                 self.nodes.insert(id, Node { kind, ..Default::default() });

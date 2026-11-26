@@ -17,7 +17,7 @@ pub fn rune_key(n: u32, p: &Props) -> String {
 
 pub fn build(s: &Win, eng: &Engine, id: u32) -> El {
     let Some(n) = eng.tree.get(id) else { return el() };
-    if n.props.id.is_some() && !eng.tree.live_above.contains(&id) && !matches!(n.kind, Kind::Input | Kind::Video | Kind::Webview) {
+    if n.props.id.is_some() && !eng.tree.live_above.contains(&id) && !matches!(n.kind, Kind::Input | Kind::Video | Kind::Audio | Kind::Webview) {
         let key = rune_key(id, &n.props);
         return rune::memo::memo_with_hash(key, n.ver, || build_node(s, eng, id, n));
     }
@@ -47,6 +47,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         Kind::Vector => media::vector(id, p),
         Kind::Surface => crate::surface::build(eng, id, p),
         Kind::Video => media::video(id, p),
+        Kind::Audio => media::audio(id, p),
         Kind::Markdown => media::markdown(id, p),
         #[cfg(feature = "webview")]
         Kind::Webview => crate::webview::slot(id),

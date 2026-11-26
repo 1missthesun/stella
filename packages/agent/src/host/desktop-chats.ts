@@ -142,7 +142,7 @@ import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import { desktopExecution, type DesktopBrain, type DesktopDevices, type DesktopExecution } from "./desktop-execution.ts";
-import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import { PI_BRAIN_ELSEWHERE_CODE, piBrainHomeIsBack, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import type { LiveProviderModel } from "@stella/contracts/provider-live-models";
 import { journalMirror, journalTurnGate, placedTaskGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
@@ -588,7 +588,16 @@ export function desktopChats(options: DesktopChatsOptions) {
       host?.host === "device" || options.deviceId
         ? await options.devices?.(conversationId)?.devices().catch(() => undefined)
         : undefined;
-    const home = listed?.find((entry) => entry.brainHome && entry.online && entry.availability?.ready === true);
+    const home = listed?.find(
+      (entry) =>
+        entry.brainHome &&
+        entry.online &&
+        entry.availability?.ready === true &&
+        piBrainHomeIsBack(record, {
+          deviceId: entry.deviceId,
+          ...(entry.presenceSessionId ? { presenceSessionId: entry.presenceSessionId } : {}),
+        }),
+    );
     if (home && home.deviceId === options.deviceId) {
       host = null;
     } else if (home && !(host?.host === "device" && host.deviceId === home.deviceId)) {
@@ -620,6 +629,18 @@ export function desktopChats(options: DesktopChatsOptions) {
     const host = await hostOfRecord(conversationId, known.record);
     rememberBrain(conversationId, { record: known.record, host }, known.at);
     return host;
+  };
+  const failOverHere = async (conversationId: string): Promise<void> => {
+    const brain = options.brain?.(conversationId);
+    if (!brain || !options.deviceId) return;
+    try {
+      const record = await brain.set({ host: "device", deviceId: options.deviceId }, { failover: true });
+      rememberBrain(conversationId, { record, host: null });
+      console.info(`[pi-chat] ${conversationId} failed over to this computer from ${record.failedOver?.deviceId ?? "its last computer"}.`);
+    } catch (error) {
+      expireBrain(conversationId);
+      options.report(error);
+    }
   };
   const brainPlacement = async (conversationId: string): Promise<PiChatBrainResult> =>
     placementOfHost(await brainHost(conversationId));
@@ -1072,7 +1093,31 @@ export function desktopChats(options: DesktopChatsOptions) {
     return ref;
   };
 
-  const pickedModel = (): Promise<ModelRef> => modelOfPick(parseModelPick(options.stellaModel?.()), "orchestrator");
+  const engineProblem = async (engine: string): Promise<string | undefined> => {
+    if (!cliEngineOf(engine)) return `${engine} doesn't run on this computer.`;
+    const check =
+      engine === ANTIGRAVITY_CLI_PROVIDER_ID
+        ? options.antigravityCliProblem
+        : engine === CLAUDE_CODE_PROVIDER_ID
+          ? options.claudeCodeProblem
+          : undefined;
+    return await check?.().catch(() => undefined);
+  };
+
+  const pickedModel = async (): Promise<ModelRef> => {
+    const pick = parseModelPick(options.stellaModel?.());
+    if (pick?.kind !== "engine") return await modelOfPick(pick, "orchestrator");
+    const problem = await engineProblem(pick.engine);
+    if (!problem) return await modelOfPick(pick, "orchestrator");
+    if (pick.engine === CLAUDE_CODE_PROVIDER_ID || (await engineProblem(CLAUDE_CODE_PROVIDER_ID))) {
+      return await modelOfPick(pick, "orchestrator");
+    }
+    console.info("[pi-chat] The picked model can't run on this computer; Claude Code answers here.", {
+      picked: `${pick.engine}/${pick.modelId}`,
+      problem,
+    });
+    return await modelOfPick({ kind: "engine", engine: CLAUDE_CODE_PROVIDER_ID, modelId: "opus" }, "orchestrator");
+  };
 
   const agentModel = async (
     conversationId: string,
@@ -2139,11 +2184,13 @@ export function desktopChats(options: DesktopChatsOptions) {
     conversationId: string,
     requestId: string,
     content: UserInput,
-    sent: { locale?: string; followSender?: boolean; timezone?: string } = {},
+    sent: { locale?: string; followSender?: boolean; failover?: boolean; timezone?: string } = {},
   ) => {
     if (!sent.followSender) {
       const placement = await brainPlacement(conversationId);
       if (!placement.here) throw new Error(elsewhere(placement));
+    } else if (sent.failover) {
+      await failOverHere(conversationId);
     }
     const chat = await open(conversationId);
     await followPickedModel(chat);
@@ -2407,6 +2454,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       rejectIfBusy?: boolean;
       steers?: boolean;
       placementRunId?: string;
+      failover?: boolean;
       observe?: (events: PiChatEvent[]) => void;
     },
   ): Promise<
@@ -2419,6 +2467,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!where.here) {
         return { status: "error", finalText: "", error: elsewhere(where), code: PI_BRAIN_ELSEWHERE_CODE };
       }
+    } else if (turn.failover) {
+      await failOverHere(conversationId);
     }
     const placement: Placement = {};
     if (placementRunId) placements.set(placementRunId, placement);

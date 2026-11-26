@@ -177,6 +177,7 @@ export type PiChatSend = {
   agentType?: string;
   storageMode?: "cloud" | "local";
   followSender?: boolean;
+  failover?: boolean;
 };
 
 export type PiChatPlacedResult = {

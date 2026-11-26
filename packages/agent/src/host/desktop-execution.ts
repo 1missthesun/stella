@@ -37,7 +37,7 @@ export const httpDevices = (
 
 export type DesktopBrain = {
   read(): Promise<PiBrainRecord | null>;
-  set(host: PiBrainHost): Promise<PiBrainRecord>;
+  set(host: PiBrainHost, options?: { failover?: true }): Promise<PiBrainRecord>;
   handOff(host: PiBrainHost, brief: string): Promise<void>;
   note(host: PiBrainHost, note: { id: string; text: string }): Promise<boolean>;
   setHome?(deviceId: string | null): Promise<void>;

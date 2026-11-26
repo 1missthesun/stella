@@ -52,7 +52,7 @@ function pillLook(t: ReturnType<typeof useTokens>) {
   }));
 }
 
-const UpdateMenu = ({ computers, disabled, onUpdate }: { computers: OtherComputer[]; disabled: boolean; onUpdate: (targets: string[]) => void }) => {
+const UpdateMenu = ({ computers, disabled, onUpdate, onOpenChange }: { computers: OtherComputer[]; disabled: boolean; onUpdate: (targets: string[]) => void; onOpenChange: (open: boolean) => void }) => {
   const t = useT();
   const tk = useTokens();
   const l = pillLook(tk);
@@ -73,6 +73,7 @@ const UpdateMenu = ({ computers, disabled, onUpdate }: { computers: OtherCompute
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        onOpenChange(next);
         if (next) setLeft(new Set());
       }}
       align="end"
@@ -137,6 +138,7 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
   const { pending, run } = useAppSourceAction();
   const offer = state ? versionOffer(state) : null;
   const computers = useOtherComputers(offer !== null && !offer.draft);
+  const [menuOpen, setMenuOpen] = useState(false);
   if (!state || !offer) return null;
   const updating = offer.adding || pending === offer.key || state.merging !== undefined;
   const label = updating
@@ -157,8 +159,8 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
       align="stretch"
       radius={999}
       clip={999}
-      fill={l.readyFill}
-      border={l.readyBorder}
+      fill={menuOpen && !updating ? l.hoverFill : l.readyFill}
+      border={menuOpen && !updating ? l.hoverBorder : l.readyBorder}
       hoverFill={updating ? undefined : l.hoverFill}
       hoverBorder={updating ? undefined : l.hoverBorder}
       opacity={updating ? 0.7 : 1}
@@ -183,7 +185,7 @@ export const ShellTopBarUpdatePill = memo(function ShellTopBarUpdatePill() {
         <GroupIcon icon={Icons.stella.Download} size={12} strokeWidth={2} color={tk.c.textStrong} opacity={0.88} />
         <text {...LABEL} nowrap color={tk.c.textStrong}>{label}</text>
       </row>
-      {menu ? <UpdateMenu computers={choose ? computers : []} disabled={blocked} onUpdate={(targets) => void run(offer.key, () => addOffer(offer, targets))} /> : null}
+      {menu ? <UpdateMenu computers={choose ? computers : []} disabled={blocked} onUpdate={(targets) => void run(offer.key, () => addOffer(offer, targets))} onOpenChange={setMenuOpen} /> : null}
     </row>
   );
 });

@@ -138,6 +138,9 @@ export function StellaMark({ id, size = 16, label }: { id?: string; size?: numbe
   return <Icon id={id} icon={size <= 20 ? Icons.mark.stellaSmall : Icons.mark.stella} size={size} title={label} />;
 }
 
+/** Manrope's `ch` (the width of "0") per pixel of font size, for desktop-ui's `ch` max-widths. */
+export const MANROPE_CH = 0.61;
+
 const MARK_SPOT: Partial<Record<EmptyStateMotif, [number, number]>> = {
   files: [0, 15],
   mail: [0, 15],
@@ -194,7 +197,7 @@ export function EmptyState({ id = "empty-state", motif, title, body, detail, act
           </box>
         ) : null}
         {body ? (
-          <text {...look(compact ? fontSize.sm : fontSize.base, font.sansWeight, { lh: 1.45 })} color={t.c.textWeak} maxW={compact ? 228 : 248} textAlign="center">
+          <text {...look(compact ? fontSize.sm : fontSize.base, font.sansWeight, { lh: 1.45 })} color={t.c.textWeak} maxW={34 * MANROPE_CH * (compact ? fontSize.sm : fontSize.base)} textAlign="center">
             {body}
           </text>
         ) : null}

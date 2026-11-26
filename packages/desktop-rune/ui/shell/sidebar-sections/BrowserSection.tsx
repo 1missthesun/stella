@@ -11,7 +11,7 @@ import { copyText } from "@/platform/context-menu";
 import { normalizedHttpUrl } from "@/features/chat/lib/stella-web-links";
 import agentCursor from "../../../../desktop-ui/public/stella-agent-cursor.png";
 import { contextMenu } from "../../chat/context-menu";
-import { Icon, Icons, type IconData } from "../../kit";
+import { Icon, Icons, MANROPE_CH, type IconData } from "../../kit";
 import { Button } from "../../kit/compat";
 import { fontSize, look, mixOklch, radius, useTokens } from "../../theme";
 
@@ -145,7 +145,7 @@ function StatusBlock({ role, icon, boxedIcon = false, title, body, children }: {
       <text {...look(fontSize.base, 600, { em: -0.01 })} color={tk.c.textStrong} textAlign="center">
         {title}
       </text>
-      <text {...look(fontSize.sm, 400, { lh: 1.5 })} maxW={32 * 6.9} color={tk.c.textWeak} textAlign="center">
+      <text {...look(fontSize.sm, 400, { lh: 1.5 })} maxW={32 * MANROPE_CH * fontSize.sm} color={tk.c.textWeak} textAlign="center">
         {body}
       </text>
       {children}

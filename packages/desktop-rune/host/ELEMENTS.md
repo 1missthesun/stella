@@ -372,6 +372,10 @@ out. macOS uses WKWebView and Windows uses WebView2 as child views.
 - `engine.control.screenshot(path, window?)` draws a frame and writes what the window presents
   to `path` as a PNG, in physical pixels (`{path, width, height, scale}`). It reads the GPU's
   drawable, so native WebViews (drawn by the OS over the window) are not in it.
+- `RUNE_UNSEEN=1` in the engine's environment (macOS) keeps every window open and presenting on
+  the display's clock but invisible: alpha 0, click-through, no Dock or app-switcher entry, never
+  activated. Screenshots, recordings, input and frame metrics work as on a visible window.
+  `RUNE_OPEN_INACTIVE=1` alone shows the windows but never takes focus.
 - `engine.control.record(dir, {fps, seconds, window})` writes the presented frames to
   `dir/frame-NNNNN.png` and replies `{frames, asked, errors}` once all are written.
 - `STELLA_RUNE_APP=<path.tsx>` swaps the app entry (`demo/gallery/App.tsx` exercises everything

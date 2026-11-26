@@ -112,15 +112,28 @@ fn fonts(v: &Value) -> Result<Value, String> {
     let mut errors = Vec::new();
     let files: Vec<String> = v.get("files").and_then(|f| f.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect()).unwrap_or_default();
     let mut loaded = Vec::new();
+    let mut count = 0;
     for path in files {
+        let stamp = std::fs::metadata(&path).map(|m| (m.len(), m.modified().ok()));
+        if stamp.as_ref().is_ok_and(|s| engine::read(|e| e.font_files.get(&path) == Some(s))) {
+            count += 1;
+            continue;
+        }
         match std::fs::read(&path) {
-            Ok(bytes) => loaded.push(std::sync::Arc::<[u8]>::from(bytes)),
+            Ok(bytes) => {
+                count += 1;
+                loaded.push((path, stamp.ok(), std::sync::Arc::<[u8]>::from(bytes)));
+            }
             Err(e) => errors.push(format!("{path}: {e}")),
         }
     }
-    let count = loaded.len();
     engine::with(|e| {
-        e.fonts.extend(loaded);
+        for (path, stamp, bytes) in loaded {
+            if let Some(stamp) = stamp {
+                e.font_files.insert(path, stamp);
+            }
+            e.fonts.push(bytes);
+        }
         let sans = v.get("sans").and_then(|x| x.as_str());
         let mono = v.get("mono").and_then(|x| x.as_str());
         if sans.is_some() || mono.is_some() {

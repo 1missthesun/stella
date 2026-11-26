@@ -63,6 +63,9 @@ pub struct Engine {
     pub main_waker: Arc<Mutex<Option<Waker>>>,
     pub blobs: HashMap<u32, Arc<[u8]>>,
     pub fonts: Vec<Arc<[u8]>>,
+    /// The font files in `fonts`, by path, with the size and modified time they were read at:
+    /// a UI generation sends its fonts again, and an unchanged file is not added twice.
+    pub font_files: HashMap<String, (u64, Option<std::time::SystemTime>)>,
     pub families: Option<(String, String)>,
     pub families_gen: u64,
     pub color_motion: Option<f32>,
@@ -83,6 +86,7 @@ impl Engine {
             main_waker: Arc::new(Mutex::new(None)),
             blobs: HashMap::new(),
             fonts: Vec::new(),
+            font_files: HashMap::new(),
             families: None,
             families_gen: 0,
             color_motion: None,

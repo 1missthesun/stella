@@ -3,7 +3,7 @@ import { useFilePreviewActions } from "@/features/chat/hooks/use-file-preview-ac
 import { useRegisterViewerNav } from "@/shell/workspace-stage/viewer-item-context";
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { useT } from "@/shared/i18n";
-import { fontSize, useTokens } from "../../theme";
+import { fontSize, look, useTokens } from "../../theme";
 import { FilePreviewCardShell } from "../../chat/FilePreviewCardShell";
 import type { WebviewMessage, WebviewRequest } from "../../../host/rune-jsx/props";
 import { PreviewBoundary, PreviewProblem } from "./preview-states";
@@ -132,7 +132,7 @@ function PdfViewerCardContent({ filePath, title, pageRail = false, onPageChange,
       titlePath={filePath}
       meta={
         status === "ready" && numPages > 0 ? (
-          <text shrink={false} size={fontSize.sm} color={tokens.c.mutedForeground} features="'tnum' 1">
+          <text shrink={false} {...look(fontSize.sm, 400)} color={tokens.c.mutedForeground} features="'tnum' 1">
             {`${currentPage} / ${numPages}`}
           </text>
         ) : null
@@ -147,7 +147,7 @@ function PdfViewerCardContent({ filePath, title, pageRail = false, onPageChange,
       ) : bytes ? (
         <webview id={viewId} grow={1} minH={0} w="full" label={headerTitle} url={url} protocols={PROTOCOLS} fill={tokens.c.background} onRequest={onRequest} onMessage={onMessage} />
       ) : (
-        <text py={28} px={16} textAlign="center" size={fontSize.base} color={tokens.c.mutedForeground}>
+        <text py={28} px={16} textAlign="center" {...look(fontSize.base, 400)} color={tokens.c.mutedForeground}>
           {t("app.chat.pdfViewer.loading")}
         </text>
       )}

@@ -202,7 +202,7 @@ export type SelectProps<T extends string = string> = {
   maxW?: number;
   radius?: number;
   /** A descendant rule's trigger height and fill (e.g. `.usage-filters [data-slot="select-trigger"]`). */
-  trigger?: { h?: number; fill?: string };
+  trigger?: { h?: number; fill?: string; px?: number; hover?: string; color?: string };
 };
 
 /** desktop-ui's `Select`: a 32pt field-like trigger with a chevron, opening a radio menu at least as wide as itself. */
@@ -239,19 +239,19 @@ export function Select<T extends string = string>({ id, value, onValueChange, op
             minW={w === "fit" ? minW : undefined}
             maxW={w === "fit" ? maxW : undefined}
             h={triggerStyle?.h ?? 32}
-            px={10 + 1}
+            px={triggerStyle?.px ?? 10 + 1}
             gap={8}
             align="center"
             justify="between"
             radius={triggerRadius}
             border={c.border}
             fill={trig.open ? sel.open : (triggerStyle?.fill ?? c.background)}
-            hover={disabled ? undefined : sel.hover}
+            hover={disabled ? undefined : (triggerStyle?.hover ?? sel.hover)}
             opacity={disabled ? 0.5 : undefined}
             motion={{ dur: 0.12 }}
             onPress={disabled ? undefined : trig.toggle}
           >
-            <text {...text} color={c.foreground} grow={1} shrink={w !== "fit"} truncate={w !== "fit"} nowrap>
+            <text {...text} color={triggerStyle?.color ?? c.foreground} grow={1} shrink={w !== "fit"} truncate={w !== "fit"} nowrap>
               {selected?.label ?? placeholder ?? ""}
             </text>
             <Icon icon={Icons.stella.ChevronDown} size={14} color={c.mutedForeground} />

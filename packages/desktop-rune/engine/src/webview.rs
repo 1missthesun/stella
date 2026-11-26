@@ -1704,6 +1704,7 @@ pub fn retry_waiting() {
 const PARK_FOR: std::time::Duration = std::time::Duration::from_secs(3);
 /// WebKitGTK closes a page and lets its web process go over several turns of the GLib loop after
 /// the view is dropped; the loop keeps turning this long after the last view goes.
+#[cfg(target_os = "linux")]
 const TEARDOWN_FOR: std::time::Duration = std::time::Duration::from_secs(3);
 
 thread_local! {

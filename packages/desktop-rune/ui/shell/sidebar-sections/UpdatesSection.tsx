@@ -8,7 +8,7 @@ import { EmptyState, Icon, Icons, Switch } from "../../kit";
 import { fontSize, look, mixOklch, useTokens } from "../../theme";
 
 const SMALL = look(fontSize.sm, 400);
-const XS = look(12, 400);
+const XS = look(fontSize.xs, 400);
 
 /** `.updates-section__button` (and its `[data-primary]` form). */
 export function UpdateButton({ id, label, primary = false, disabled, onPress }: { id: string; label: string; primary?: boolean; disabled: boolean; onPress: () => void }) {
@@ -127,7 +127,7 @@ function HistoryItem({ commit, now, pending, blocked, onUndo }: { commit: AppSou
 export function UpdatesHeading({ children, first = false }: { children: string; first?: boolean }) {
   const t = useTokens();
   return (
-    <text role="heading" {...look(12, 500, { em: 0.02 })} mt={first ? 0 : 10} mb={4} mx={4} color={t.c.textWeak}>
+    <text role="heading" {...look(fontSize.xs, 500, { em: 0.02 })} mt={first ? 0 : 10} mb={4} mx={4} color={t.c.textWeak}>
       {children}
     </text>
   );
@@ -160,7 +160,7 @@ function WhatsNewLink() {
   const label = t("shell.whatsNew.title");
   return (
     <box id="updates-whats-new" role="button" label={label} focusable mt={10} mb={4} px={4} radius={6} hoverGroup focusRing={{ width: 2, offset: 0, color: tk.c.ring, radius: 6 }} onPress={() => whatsNewDialog.open()}>
-      <text {...look(12, 500)} color={tk.c.textWeak} hoverColor={tk.c.textStrong} nowrap>
+      <text {...look(fontSize.xs, 400)} color={tk.c.textWeak} hoverColor={tk.c.textStrong} nowrap>
         {label}
       </text>
     </box>
@@ -198,7 +198,7 @@ export function UpdatesSection() {
   }
   const blocked = state.busy || pending !== null || state.merging !== undefined;
   return (
-    <col id="updates-section" grow={1} minH={0} scrollY gap={4} pt={14} px={14} pb={20}>
+    <col id="updates-section" grow={1} minH={0} scrollY gap={4} pt={8} px={10} pb={14}>
       {state.developerCheckout ? (
         <Note id="updates-developer-checkout">{t("shell.appSource.updates.developerCheckout")}</Note>
       ) : (

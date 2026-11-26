@@ -70,12 +70,18 @@ import {
   DONE_ALREADY_SENT,
   doneNotToStarterText,
   DONE_ONLY_FOR_AGENTS,
+  doneWhileHelpersWaitText,
   doneWhileHelpersWorkText,
+  helperWait,
+  helperWaitsOnYouText,
   IDLE_STOP_NUDGE,
   idleWaitingFor,
   isIdleStopNudge,
+  QUESTION_ASKED_WAKER,
   SEND_MESSAGE_DONE_DESCRIPTION,
   silentEndReport,
+  STARTER_REPLY_WAKER,
+  type HelperWaitingOnYou,
 } from "@stella/contracts/agent-messaging";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
 import { longToolCall, longToolCallText, type CurrentToolCall } from "@stella/contracts/long-tool-call";
@@ -139,8 +145,10 @@ type AgentRecord = {
   away?: true;
   placedAs?: string;
   catchUp?: true;
-  waiting?: { waitingFor: string; at: number; wakers?: string[] };
+  waiting?: { waitingFor: string; at: number; wakers?: string[]; told?: true };
   owesStarter?: true;
+  finished?: true;
+  toldWaitingAt?: number;
 };
 
 export type AgentOrigin = { agentThread: true };
@@ -610,6 +618,7 @@ type ReporterInput = {
   nudge?: true;
   backstop?: true;
   after?: number;
+  owed?: string[];
 };
 
 const reporterSender = (input: Pick<ReporterInput, "fromUser" | "report" | "note" | "wake">): AgentInputSender =>
@@ -683,6 +692,48 @@ const agentsBusy = async (read: BusyReader, conversationId: ConversationId, dept
     if (depth + 1 < MAX_AGENT_DEPTH && (await agentsBusy(read, id, depth + 1))) return true;
   }
   return false;
+};
+
+/**
+ * Helpers of the task whose conversation this is that ended their turn waiting on its reply (they
+ * messaged it and stopped), read inside the transaction so a helper's turn end and its starter's
+ * turn end always see each other. `except` leaves out a helper's own reporter while it is settling;
+ * `untold` leaves out waits the starter was already reminded of.
+ */
+const helpersWaitingOnStarter = async (
+  tx: Tx,
+  conversationId: ConversationId,
+  opts: { except?: number; untold?: boolean } = {},
+): Promise<HelperWaitingOnYou[]> => {
+  const waiting = Object.entries((await tx.doc(StellaAgentsDoc, conversationId)).agents).filter(
+    ([, agent]) =>
+      agent.waiting !== undefined &&
+      !wasStopped(agent) &&
+      !runsElsewhere(agent) &&
+      agent.conversationId >= 0 &&
+      !(opts.untold && agent.waiting.told) &&
+      helperWait(agent.waiting).onStarter,
+  );
+  if (waiting.length === 0) return [];
+  const carrying = new Set(
+    (await liveReporters(tx, conversationId)).filter((reporter) => reporter.id !== opts.except).map((reporter) => reporter.input.threadId),
+  );
+  const found: HelperWaitingOnYou[] = [];
+  for (const [threadId, agent] of waiting) {
+    if (carrying.has(threadId)) continue;
+    if ((await tx.doc(LiveDoc, agent.conversationId as ConversationId)).run !== undefined) continue;
+    found.push({ threadId, description: agent.description });
+  }
+  return found;
+};
+
+const markHelpersTold = async (tx: Tx, conversationId: ConversationId, threadIds: readonly string[]): Promise<void> => {
+  if (threadIds.length === 0) return;
+  const state = await tx.doc(StellaAgentsDoc, conversationId);
+  for (const threadId of threadIds) {
+    const waiting = state.agents[threadId]?.waiting;
+    if (waiting) waiting.told = true;
+  }
 };
 
 const wakeWaitingStarter = async (
@@ -866,6 +917,30 @@ export function stellaAgents(host: StellaAgentsHost) {
     const reporter = await tx.createTask(Reporter, input, { ownership: { kind: "conversation" }, background: true, conversationId: home });
     (await tx.doc(StellaAgentsDoc, home)).calls[`turn:${reporter}`] = { threadId: input.threadId, reporter };
   };
+  /**
+   * A helper's turn ended waiting on its starter's reply. A starter that is running, or has an input
+   * on its way, is reminded at the end of that turn; an idle one would never hear of it (it took the
+   * helper's message in a turn that ended before the helper's did), so it is woken with the reminder
+   * now. Both ends run in one transaction each, so exactly one of them reminds.
+   */
+  const remindIdleStarter = async (tx: Tx, own: ConversationId, starter: StellaAgentRole, settling: number): Promise<void> => {
+    const home = starter.parentConversationId as ConversationId | undefined;
+    if (starter.agentType === "orchestrator" || home === undefined || !starter.threadId) return;
+    const record = (await tx.doc(StellaAgentsDoc, home)).agents[starter.threadId];
+    if (!record || wasStopped(record)) return;
+    if ((await tx.doc(LiveDoc, own)).run !== undefined) return;
+    if (await inputComing(tx, home, { threadId: starter.threadId, conversationId: own }, { placed: true })) return;
+    const waitingOnIt = await helpersWaitingOnStarter(tx, own, { except: settling, untold: true });
+    if (waitingOnIt.length === 0) return;
+    await markHelpersTold(tx, own, waitingOnIt.map((helper) => helper.threadId));
+    await nextTurn(tx, home, {
+      threadId: starter.threadId,
+      conversationId: own,
+      message: helperWaitsOnYouText(waitingOnIt),
+      wake: true,
+      owed: waitingOnIt.map((helper) => helper.threadId),
+    });
+  };
   const Reporter = defineTask<ReporterInput, ReporterState, null>({
     name: "stella.agent-reporter",
     version: 1,
@@ -885,6 +960,17 @@ export function stellaAgents(host: StellaAgentsHost) {
             if (!agent?.held?.length && !agent?.moved && (await takeStellaReply(tx, agentConversationId, message))) {
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }
+            const owed = reporter.input.owed;
+            if (owed?.length) {
+              // A reminder that helpers wait on this task's reply goes only while one of them still does.
+              const still = new Set((await helpersWaitingOnStarter(tx, agentConversationId)).map((helper) => helper.threadId));
+              const helpers = (await tx.doc(StellaAgentsDoc, agentConversationId)).agents;
+              const waitingOnIt = owed.some((id) => {
+                const helper = helpers[id];
+                return still.has(id) || (helper !== undefined && runsElsewhere(helper));
+              });
+              if (!waitingOnIt && !reporter.input.nudge) return { status: "terminal", outcome: { status: "completed", result: null } };
+            }
             if (reporter.input.nudge) {
               const coming = await inputComing(
                 tx,
@@ -894,6 +980,15 @@ export function stellaAgents(host: StellaAgentsHost) {
               );
               if (coming || (await tookInputAfter(tx, agentConversationId, reporter.input.after))) {
                 if (coming && agent && !reporter.input.backstop) agent.owesStarter = true;
+                // The input that overtook it ends a turn of its own, which reminds of these waits again.
+                if (owed?.length) {
+                  const helpers = (await tx.doc(StellaAgentsDoc, agentConversationId)).agents;
+                  for (const id of owed) {
+                    const helper = helpers[id];
+                    if (helper?.waiting) delete helper.waiting.told;
+                    if (helper) delete helper.toldWaitingAt;
+                  }
+                }
                 return { status: "terminal", outcome: { status: "completed", result: null } };
               }
             }
@@ -903,6 +998,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               delete agent.stopped;
               delete agent.paused;
               delete agent.waiting;
+              if (reporterSender(reporter.input) !== "other") delete agent.finished;
             }
             const role = await tx.doc(StellaAgentDoc, agentConversationId);
             if (role.waiting) delete role.waiting;
@@ -1020,13 +1116,14 @@ export function stellaAgents(host: StellaAgentsHost) {
               return undefined;
             }, context);
           }
-          const wakersAtEnd =
+          const standingAtEnd =
             answered !== undefined
-              ? await wakersOf(taskStore(runtime), agentConversationId, context, { atEnd: true }).catch((error: unknown) => {
+              ? await waitStanding(taskStore(runtime), agentConversationId, context, { atEnd: true }).catch((error: unknown) => {
                   console.warn("[stella-agents] checking what can wake a task failed", { threadId, error });
                   return undefined;
                 })
               : undefined;
+          const wakersAtEnd = standingAtEnd?.wakers;
           const hostNote = answered !== undefined ? await host.runNote?.(run, context).catch(() => undefined) : undefined;
           await runtime.commit(async (tx) => {
             const send = await settleNotes(tx, agentConversationId);
@@ -1058,6 +1155,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               if (agent) {
                 delete agent.waiting;
                 delete agent.owesStarter;
+                agent.finished = true;
                 if (answered !== undefined && !agent.reported.includes(answered)) agent.reported.push(answered);
               }
               return next(
@@ -1109,6 +1207,8 @@ export function stellaAgents(host: StellaAgentsHost) {
             const live = wakersAtEnd === undefined ? undefined : wakersAtEnd.length > 0;
             const said = turn as Awaited<ReturnType<typeof turnToStarter>> | undefined;
             const owes = said !== undefined && (said.tookStarter || agent.owesStarter === true);
+            // Its report is already in and nothing from its starter came since (a teammate's note woke it): a quiet end owes nothing.
+            const finished = agent.finished === true && !owes;
             delete agent.owesStarter;
             const coming = await inputComing(
               tx,
@@ -1117,26 +1217,31 @@ export function stellaAgents(host: StellaAgentsHost) {
               { placed: true, except: Number(reporter.id) },
             );
             if (said && !said.sent && owes && coming) agent.owesStarter = true;
-            if (said && !said.sent && !coming && !reporter.input.fromUser) {
-              if (!nudged && (owes || live === false)) {
-                await nextTurn(tx, runtime.conversationId, {
-                  threadId,
-                  conversationId: reporter.input.conversationId,
-                  message: IDLE_STOP_NUDGE,
-                  wake: true,
-                  nudge: true,
-                  after: settled.answer,
-                  ...(owes ? {} : { backstop: true as const }),
-                });
-                return idle(["a message on its way to you"]);
-              }
-              if (nudged && reporter.input.backstop === true && live === false) {
-                const result = withNote(silentEndReport(said.lastWords));
-                end = { answer: result };
-                delete agent.waiting;
-                return next(completedReport({ threadId, description, result, toParentAgent }), "completed");
-              }
+            const quiet = said !== undefined && !said.sent && !coming && !reporter.input.fromUser;
+            const remind = quiet && !nudged && !finished && (owes || live === false);
+            const waitingOnYou = coming
+              ? []
+              : await takeWaitingOnYou(tx, agentConversationId, standingAtEnd?.elsewhereWaitingOnYou ?? [], said?.messaged ?? []);
+            if (remind || waitingOnYou.length > 0) {
+              await nextTurn(tx, runtime.conversationId, {
+                threadId,
+                conversationId: reporter.input.conversationId,
+                message: [waitingOnYou.length > 0 ? helperWaitsOnYouText(waitingOnYou) : "", remind ? IDLE_STOP_NUDGE : ""].filter(Boolean).join("\n\n"),
+                wake: true,
+                ...(remind ? { nudge: true as const, after: settled.answer, ...(owes ? {} : { backstop: true as const }) } : {}),
+                ...(waitingOnYou.length > 0 ? { owed: waitingOnYou.map((helper) => helper.threadId) } : {}),
+              });
+              return idle(["a message on its way to you"]);
             }
+            if (quiet && nudged && !finished && reporter.input.backstop === true && live === false) {
+              const result = withNote(silentEndReport(said?.lastWords));
+              end = { answer: result };
+              delete agent.waiting;
+              agent.finished = true;
+              return next(completedReport({ threadId, description, result, toParentAgent }), "completed");
+            }
+            // Reminded after its starter's message, it had nothing to send, and nothing of its own is live: it is done.
+            if (quiet && nudged && reporter.input.backstop !== true && live === false) agent.finished = true;
             return idle();
           }, context);
         } finally {
@@ -1167,7 +1272,11 @@ export function stellaAgents(host: StellaAgentsHost) {
           }
         }
         if (waiting) {
-          await runtime.commit(async () => ({ status: "terminal", outcome: { status: "completed", result: null } }), context);
+          const starter = await roleOf(runtime, runtime.conversationId, context);
+          await runtime.commit(async (tx) => {
+            await remindIdleStarter(tx, runtime.conversationId as ConversationId, starter, Number(reporter.id));
+            return { status: "terminal", outcome: { status: "completed", result: null } };
+          }, context);
           return;
         }
         const status: AgentAttemptOutcome | undefined = stopped
@@ -1619,14 +1728,22 @@ export function stellaAgents(host: StellaAgentsHost) {
     return stellaStarted && (to.toLowerCase() === STELLA_MESSAGE_TARGET || (stellaThread !== undefined && to === stellaThread));
   };
 
-  const helpersAtWork = async (store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> }, conversationId: ConversationId, context: Context): Promise<string[]> => {
+  const helpersAtWork = async (
+    store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+    conversationId: ConversationId,
+    context: Context,
+  ): Promise<{ working: string[]; waitingOnYou: HelperWaitingOnYou[] }> => {
     const read = busyReader(store, context);
     const helpers = await store.snapshot(StellaAgentsDoc, conversationId, context);
     const named = (agent: AgentRecord) => `your helper "${agent.description.replace(/\s+/g, " ").trim().slice(0, 80)}"`;
     const working = Object.entries(helpers?.agents ?? {}).filter(([, agent]) => !wasStopped(agent));
     const found: string[] = [];
+    const waitingOnYou = await store.commit((tx) => helpersWaitingOnStarter(tx, conversationId), context);
     for (const helper of await helpersElsewhere(helpers, working.filter(([, agent]) => runsElsewhere(agent)), context)) {
       if (helper.atWork) found.push(named(helper.record));
+      else if (helper.waitingFor && helperWait({ waitingFor: helper.waitingFor, ...(helper.wakers ? { wakers: helper.wakers } : {}) }).onStarter) {
+        waitingOnYou.push({ threadId: helper.threadId, description: helper.record.description });
+      }
     }
     const carrying = new Set((await read.reporters(conversationId)).map((reporter) => reporter.input.threadId));
     for (const [threadId, agent] of working) {
@@ -1634,7 +1751,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       const id = agent.conversationId as ConversationId;
       if (carrying.has(threadId) || (await read.running(id)) || (await agentsBusy(read, id, 1))) found.push(named(agent));
     }
-    return found;
+    return { working: found, waitingOnYou };
   };
 
   const inputCrossedDone = async (tx: Tx, conversationId: ConversationId, callIds: readonly string[]): Promise<boolean> => {
@@ -1665,8 +1782,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       throw new Error(doneNotToStarterText(self.startedBy && self.startedBy.label !== "Stella" ? self.startedBy.threadId : undefined));
     }
     assertMessageSize(message);
-    const working = await helpersAtWork(api, api.conversationId, context);
+    const { working, waitingOnYou } = await helpersAtWork(api, api.conversationId, context);
     if (working.length > 0) throw new Error(doneWhileHelpersWorkText(working));
+    if (waitingOnYou.length > 0) throw new Error(doneWhileHelpersWaitText(waitingOnYou));
     const already = await api.commit(async (tx) => {
       const role = await tx.doc(StellaAgentDoc, api.conversationId);
       if (role.done?.callIds.includes(api.callId)) return false;
@@ -1802,7 +1920,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     requestId: string,
     answer: EntryId,
     stellaThread: string | undefined,
-  ): Promise<{ tookStarter: boolean; sent: boolean; lastWords: string }> => {
+  ): Promise<{ tookStarter: boolean; sent: boolean; lastWords: string; messaged: string[] }> => {
     const role = await tx.doc(StellaAgentDoc, conversationId);
     const from = (await tx.submissionByRequest(conversationId, requestId))?.entry;
     const inputs: string[] = [];
@@ -1833,6 +1951,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       tookStarter: starter !== undefined,
       sent: targets.some((to) => to.toLowerCase() === STELLA_MESSAGE_TARGET || starters.has(to)),
       lastWords,
+      messaged: targets,
     };
   };
 
@@ -1975,7 +2094,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     state: Readonly<StellaAgents> | undefined,
     helpers: ReadonlyArray<[string, AgentRecord]>,
     context: Context,
-  ): Promise<Array<{ threadId: string; record: AgentRecord; atWork: boolean; waitingFor?: string }>> => {
+  ): Promise<Array<{ threadId: string; record: AgentRecord; atWork: boolean; waitingFor?: string; wakers?: string[]; updatedAt?: number }>> => {
     if (helpers.length === 0) return [];
     const listed = await host.directory
       ?.list(context, { threadIds: helpers.map(([threadId]) => threadId).slice(0, DIRECTORY_THREAD_IDS_MAX) })
@@ -1989,6 +2108,8 @@ export function stellaAgents(host: StellaAgentsHost) {
           record,
           atWork: isLiveAgentStatus(row.status) && row.status !== "waiting",
           ...(row.status === "waiting" && row.waitingFor ? { waitingFor: row.waitingFor } : {}),
+          ...(row.status === "waiting" && row.wakers ? { wakers: row.wakers } : {}),
+          updatedAt: row.updatedAt,
         };
       }
       const lastHeard = record.remote && state ? remoteRunOf(record, callsFor(state as StellaAgents, threadId)) : undefined;
@@ -2817,6 +2938,14 @@ export function stellaAgents(host: StellaAgentsHost) {
       }, context);
     let nudged = false;
     let backstop = false;
+    let tookStarter = false;
+    const markFinished = (finished: boolean) =>
+      harness.commit(async (tx) => {
+        const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
+        if (current && finished) current.finished = true;
+        else if (current) delete current.finished;
+        return undefined;
+      }, context);
     let content = [...carried, args.prompt].join("\n\n");
     let requestId = `placed:${args.runKey}`;
     for (let retry = 1; ; retry += 1) {
@@ -2894,7 +3023,10 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (settled.status !== "done" || settled.type !== "input") {
         await settle();
         const done = await takeDone();
-        if (done !== undefined) return { threadId, status: "ok", finalText: done };
+        if (done !== undefined) {
+          await markFinished(true);
+          return { threadId, status: "ok", finalText: done };
+        }
         return { threadId, status: "error", error: settled.status === "unanswered" ? unansweredText(settled) : "The agent did not answer." };
       }
       const move = await takeMove(harness, agent.id, context);
@@ -2918,21 +3050,43 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       await settle();
       const done = await takeDone();
-      if (done !== undefined) return { threadId, status: "ok", finalText: done };
+      if (done !== undefined) {
+        await markFinished(true);
+        return { threadId, status: "ok", finalText: done };
+      }
       const answer = await harness.commit(async (tx) => tx.entry(AssistantEntry, settled.answer), context);
       const message = answer?.model?.[0] as AssistantMessage | undefined;
       if (message?.stopReason === "error") return { threadId, status: "error", error: agentFailureText(message) };
       const stella = await host.directory?.conversationId(context).catch(() => undefined);
       const turn = await harness.commit((tx) => turnToStarter(tx, agent.id, requestId, settled.answer, stella), context);
-      const wakers = await wakersOf(harness, agent.id, context, { atEnd: true }).catch(() => undefined);
-      if (!turn.sent && !nudged && (turn.tookStarter || wakers?.length === 0)) {
-        nudged = true;
-        backstop = !turn.tookStarter;
-        content = IDLE_STOP_NUDGE;
-        requestId = `placed:${args.runKey}:nudge`;
+      if (turn.tookStarter) {
+        tookStarter = true;
+        await markFinished(false);
+      }
+      const standing = await waitStanding(harness, agent.id, context, { atEnd: true }).catch(() => undefined);
+      const wakers = standing?.wakers;
+      const waitingOnYou = await harness.commit(
+        (tx) => takeWaitingOnYou(tx, agent.id, standing?.elsewhereWaitingOnYou ?? [], turn.messaged),
+        context,
+      );
+      // Its report is already in and nothing from its starter came since (a teammate's note woke it): a quiet end owes nothing.
+      const finished = !tookStarter && (await harness.snapshot(StellaAgentsDoc, root.id, context))?.agents[threadId]?.finished === true;
+      const remind = !turn.sent && !nudged && !finished && (turn.tookStarter || wakers?.length === 0);
+      if (remind || waitingOnYou.length > 0) {
+        if (remind) {
+          nudged = true;
+          backstop = !turn.tookStarter;
+        }
+        content = [waitingOnYou.length > 0 ? helperWaitsOnYouText(waitingOnYou) : "", remind ? IDLE_STOP_NUDGE : ""].filter(Boolean).join("\n\n");
+        requestId = remind ? `placed:${args.runKey}:nudge` : `placed:${args.runKey}:waiting-on-you:${retry}`;
         continue;
       }
-      if (!turn.sent && nudged && backstop && wakers?.length === 0) return { threadId, status: "ok", finalText: silentEndReport(turn.lastWords) };
+      if (!turn.sent && nudged && backstop && !finished && wakers?.length === 0) {
+        await markFinished(true);
+        return { threadId, status: "ok", finalText: silentEndReport(turn.lastWords) };
+      }
+      // Reminded after its starter's message, it had nothing to send, and nothing of its own is live: it is done.
+      if (!turn.sent && nudged && !backstop && wakers?.length === 0) await markFinished(true);
       return { threadId, status: "ok", finalText: "", waitingFor: idleWaitingFor(wakers) };
     }
   };
@@ -3096,7 +3250,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     agentConversationId: ConversationId,
     role: StellaAgentRole,
     context: Context,
-  ): Promise<boolean> =>
+  ): Promise<"messaged" | "asked" | false> =>
     store.commit(async (tx) => {
       let cursor: Parameters<Tx["scanEntries"]>[2];
       for (let pages = 0; pages < 8; pages += 1) {
@@ -3108,15 +3262,15 @@ export function stellaAgents(host: StellaAgentsHost) {
             continue;
           }
           if (entry.kind !== "pi.assistant") continue;
-          for (const part of (message as AssistantMessage | undefined)?.content ?? []) {
+          for (const part of [...((message as AssistantMessage | undefined)?.content ?? [])].reverse()) {
             if (part.type !== "toolCall") continue;
-            if (part.name === "ask_user" || part.name === "request_secure_input") return true;
+            if (part.name === "ask_user" || part.name === "request_secure_input") return "asked";
             if (part.name !== "send_message") continue;
             const args = part.arguments as { thread_id?: unknown; done?: unknown } | undefined;
             const to = args?.thread_id;
             if (typeof to !== "string") continue;
             if (args?.done === true) return false;
-            if (to.trim().toLowerCase() === STELLA_MESSAGE_TARGET || to.trim() === role.startedBy?.threadId) return true;
+            if (to.trim().toLowerCase() === STELLA_MESSAGE_TARGET || to.trim() === role.startedBy?.threadId) return "messaged";
           }
         }
         cursor = page.next;
@@ -3125,16 +3279,25 @@ export function stellaAgents(host: StellaAgentsHost) {
       return false;
     }, context);
 
-  const wakersOf = async (
+  type ElsewhereWaitingOnYou = HelperWaitingOnYou & { updatedAt: number };
+
+  /**
+   * What can wake a task now, and which of its helpers on other computers wait on its reply. A
+   * waiting helper wakes its starter only through something of its own that is still live: one
+   * that waits on nothing, or only on the starter's own reply, can never wake it, so it is not
+   * listed (a wait on the starter is a debt, reminded at the starter's turn end).
+   */
+  const waitStanding = async (
     store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
     agentConversationId: ConversationId,
     context: Context,
     opts: { atEnd?: boolean } = {},
-  ): Promise<string[] | undefined> => {
+  ): Promise<{ wakers: string[]; elsewhereWaitingOnYou: ElsewhereWaitingOnYou[] } | undefined> => {
     if (!host.wakeSources) return undefined;
     const role = await roleOf(store, agentConversationId, context);
     if (role.agentType === "orchestrator" || !role.threadId) return undefined;
     const found: string[] = [];
+    const elsewhereWaitingOnYou: ElsewhereWaitingOnYou[] = [];
     const read = busyReader(store, context);
     const helpers = await store.snapshot(StellaAgentsDoc, agentConversationId, context);
     const carrying = new Set((await read.reporters(agentConversationId)).map((reporter) => reporter.input.threadId));
@@ -3142,14 +3305,20 @@ export function stellaAgents(host: StellaAgentsHost) {
     const working = Object.entries(helpers?.agents ?? {}).filter(([, agent]) => !wasStopped(agent));
     for (const helper of await helpersElsewhere(helpers, working.filter(([, agent]) => runsElsewhere(agent)), context)) {
       if (helper.atWork) found.push(`${named(helper.record)} at work elsewhere`);
-      else if (helper.waitingFor) found.push(`${named(helper.record)}, itself waiting for ${helper.waitingFor}`);
+      else if (helper.waitingFor) {
+        const wait = helperWait({ waitingFor: helper.waitingFor, ...(helper.wakers ? { wakers: helper.wakers } : {}) });
+        if (wait.live) found.push(`${named(helper.record)}, itself waiting for ${helper.waitingFor}`);
+        if (wait.onStarter) {
+          elsewhereWaitingOnYou.push({ threadId: helper.threadId, description: helper.record.description, updatedAt: helper.updatedAt ?? 0 });
+        }
+      }
     }
     for (const [threadId, agent] of working) {
       const name = named(agent);
       if (runsElsewhere(agent) || agent.conversationId < 0) continue;
       const id = agent.conversationId as ConversationId;
       if (carrying.has(threadId) || (await read.running(id)) || (await agentsBusy(read, id, 1))) found.push(`${name} at work`);
-      else if (agent.waiting) found.push(`${name}, itself waiting for ${agent.waiting.waitingFor}`);
+      else if (agent.waiting && helperWait(agent.waiting).live) found.push(`${name}, itself waiting for ${agent.waiting.waitingFor}`);
     }
     const starter = role.parentConversationId as ConversationId | undefined;
     if (starter !== undefined) {
@@ -3160,11 +3329,47 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (queued) found.push("a message on its way to you");
     }
     if (role.askingStella) found.push("Stella's answer to your question");
-    else if (await askedStarter(store, agentConversationId, role, context).catch(() => false)) {
-      found.push("an answer to the question you put to whoever started you");
+    else {
+      const asked = await askedStarter(store, agentConversationId, role, context).catch(() => false as const);
+      if (asked === "messaged") found.push(STARTER_REPLY_WAKER);
+      else if (asked === "asked") found.push(QUESTION_ASKED_WAKER);
     }
     found.push(...(await host.wakeSources(role.threadId).catch(() => [UNLISTED_WORK_WAKER])));
-    return found;
+    return { wakers: found, elsewhereWaitingOnYou };
+  };
+
+  const wakersOf = async (
+    store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+    agentConversationId: ConversationId,
+    context: Context,
+    opts: { atEnd?: boolean } = {},
+  ): Promise<string[] | undefined> => (await waitStanding(store, agentConversationId, context, opts))?.wakers;
+
+  /**
+   * At a task's turn end: its helpers that wait on its reply and haven't been reminded of that wait
+   * yet, marked reminded. Helpers here are read in the transaction, so a message sent to one this
+   * turn has already cleared its wait; helpers on other computers come from the directory read
+   * before it (so those messaged this turn are left out), and their last reminded wait is kept on
+   * their record.
+   */
+  const takeWaitingOnYou = async (
+    tx: Tx,
+    agentConversationId: ConversationId,
+    elsewhere: readonly ElsewhereWaitingOnYou[],
+    messagedThisTurn: readonly string[],
+  ): Promise<HelperWaitingOnYou[]> => {
+    const messaged = new Set(messagedThisTurn);
+    const here = await helpersWaitingOnStarter(tx, agentConversationId, { untold: true });
+    await markHelpersTold(tx, agentConversationId, here.map((helper) => helper.threadId));
+    const helpers = await tx.doc(StellaAgentsDoc, agentConversationId);
+    const away: HelperWaitingOnYou[] = [];
+    for (const helper of elsewhere) {
+      const record = helpers.agents[helper.threadId];
+      if (!record || wasStopped(record) || messaged.has(helper.threadId) || record.toldWaitingAt === helper.updatedAt) continue;
+      record.toldWaitingAt = helper.updatedAt;
+      away.push({ threadId: helper.threadId, description: helper.description });
+    }
+    return [...here, ...away];
   };
 
   const recheckWaiting = async (

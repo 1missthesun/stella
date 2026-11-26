@@ -68,6 +68,7 @@ import { starterMessageSender } from "@stella/contracts/agent-waiting";
 import {
   IDLE_STOP_NUDGE,
   idleWaitingFor,
+  STARTER_REPLY_WAKER,
   silentEndReport,
 } from "@stella/contracts/agent-messaging";
 import {
@@ -1089,7 +1090,7 @@ export const explicitEnding = (turn: {
 }): { finalText: string; waitingFor?: string } => {
   if (turn.report !== undefined) return { finalText: turn.report };
   if (turn.nudged && !turn.sentToStarter) return { finalText: silentEndReport(turn.lastWords) };
-  return { finalText: turn.lastWords, waitingFor: idleWaitingFor([]) };
+  return { finalText: turn.lastWords, waitingFor: idleWaitingFor(turn.sentToStarter ? [STARTER_REPLY_WAKER] : []) };
 };
 
 const lastAssistantText = (messages: readonly AgentMessage[]): string => {

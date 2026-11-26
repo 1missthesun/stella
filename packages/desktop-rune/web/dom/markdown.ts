@@ -279,14 +279,16 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
 }
 
 function blocks(nodes: Md[] | undefined, c: Ctx, nested = false): ReactNode[] {
-  return (nodes ?? []).map((n, i) => block(n, c, i, nested));
+  // Streamdown's items set `[&>p]:inline`, so an item's paragraphs run on one line with the space their whitespace renders.
+  return (nodes ?? []).map((n, i, all) => nested && n.type === "paragraph" && all[i - 1]?.type === "paragraph"
+    ? createElement(Fragment, { key: i }, " ", block(n, c, i, nested))
+    : block(n, c, i, nested));
 }
 
 function block(n: Md, c: Ctx, key: number, nested: boolean): ReactNode {
   const { s } = c;
   switch (n.type) {
     case "paragraph":
-      // A list item's text sits in the item itself, as Streamdown's tight lists put it.
       if (nested) return createElement(Fragment, { key }, inlines(n.children, c));
       return createElement("p", { key, style: margin(s.paragraphMargin, [0, 12]) }, inlines(n.children, c));
     case "heading": {
@@ -306,13 +308,12 @@ function block(n: Md, c: Ctx, key: number, nested: boolean): ReactNode {
       const [indent, gap] = pair(s.list, [24, 4]);
       const [nestedIndent] = pair(s.listNestedIndent, [indent, indent]);
       const tag = n.ordered ? "ol" : "ul";
-      const tight = (n.children ?? []).every((li) => (li.children ?? []).length <= 1 || (li.children ?? []).every((x) => x.type !== "paragraph" || true));
       return createElement(tag, {
         key, start: n.ordered && n.start && n.start !== 1 ? n.start : undefined,
         style: { ...(nested ? { marginTop: "4px", marginBottom: "4px" } : { ...margin(s.listMargin, [16, 16]), paddingTop: px(pair(s.listPadding, [0, 0])[0]), paddingBottom: px(pair(s.listPadding, [0, 0])[1]) }), paddingLeft: px(nested ? nestedIndent : indent), listStyleType: n.ordered ? "decimal" : nested ? "circle" : "disc", listStylePosition: s.listMarkersOutside === false ? "inside" : "outside", "--md-marker": s.muted } as Css,
       }, (n.children ?? []).map((li, i) => createElement("li", { key: i, style: { marginTop: i ? px(gap) : 0 } },
         li.checked !== null && li.checked !== undefined ? createElement("input", { type: "checkbox", checked: li.checked, disabled: true, style: { marginRight: px(typeof s.taskAfterMarker === "number" ? s.taskAfterMarker : 6) } }) : null,
-        blocks(li.children, c, tight))));
+        blocks(li.children, c, true))));
     }
     case "thematicBreak":
       return createElement("hr", { key, style: { ...margin(s.ruleMargin, [24, 24]), border: "none", height: 0, borderTop: `1px solid ${s.rule}` } });

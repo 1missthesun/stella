@@ -69,6 +69,34 @@ const NUDGE_MARK = "Stella hands work to a fresh context at";
 
 export const isContextHandoffNudge = (text: string): boolean => text.includes(NUDGE_MARK);
 
+const NOTES_REQUEST_MARK = "Stella is handing your work to a fresh context in the background";
+
+export const isContextHandoffNotesRequest = (text: string): boolean => text.includes(NOTES_REQUEST_MARK);
+
+/**
+ * The request a background handoff appends to the context as it stood before the latest step, so the notes are written
+ * on the same cached prefix the conversation's own requests use. The conversation carries on meanwhile; from that step
+ * on it stays in the fresh context as it happened.
+ */
+export const contextHandoffNotesRequest = (args: { tokens: number; threshold: number; agent: boolean }): string => {
+  const step = Math.max(1, Math.floor(args.threshold * NUDGE_STEP_FRACTION));
+  const shown = Math.floor(args.tokens / step) * step;
+  return [
+    "<system-reminder>",
+    `Your context is about ${kilo(shown)} tokens. ${NOTES_REQUEST_MARK} while the conversation carries on; this request only writes your notes for it, and nobody sees this reply.`,
+    "Reply with only your handoff notes as plain text, and call no tools.",
+    [
+      `Write them as the brief you'd give yourself to continue: ${NUDGE_NOTES_CONTENT}`,
+      "Keep word for word what the user told you that they may come back to: names, numbers, codes, preferences and facts.",
+      "Notes from an earlier handoff above are replaced too, so carry forward everything in them that still matters.",
+      "Stella adds your original task, this turn's earlier messages and the work still running; say which parts of the original task are done or superseded.",
+      "Your step after the last message above, and everything after it, is already written and stays in the fresh context word for word, so your notes end where these messages end and that step is not your next action.",
+      ...(args.agent ? [BE_COMPLETE] : []),
+    ].join(" "),
+    "</system-reminder>",
+  ].join("\n");
+};
+
 export const contextHandoffNudge = (args: { tokens: number; threshold: number; agent: boolean; blocked?: string }): string => {
   const step = Math.max(1, Math.floor(args.threshold * NUDGE_STEP_FRACTION));
   const shown = Math.floor(args.tokens / step) * step;
@@ -103,6 +131,7 @@ export const contextHandoffText = (args: {
   task?: string;
   turn: readonly string[];
   running: readonly ContextHandoffRunning[];
+  kept?: boolean;
 }): string => {
   const parts = [CONTEXT_HANDOFF_PREFIX, "", "<handoff_notes>", args.notes.trim(), "</handoff_notes>"];
   const task = args.task?.trim();
@@ -125,7 +154,9 @@ export const contextHandoffText = (args: {
     ...(args.running.length > running.length ? [`- …and ${args.running.length - running.length} more`] : []),
     "</still_running>",
     "",
-    "Continue the work from these notes.",
+    args.kept
+      ? "The conversation continues below, word for word, from where these notes leave off."
+      : "Continue the work from these notes.",
   );
   return parts.join("\n");
 };

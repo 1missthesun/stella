@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { GradientColor, GradientMode } from "@stella/theme";
-import type { GradientReply, GradientRequest } from "./gradient-worker";
+import { renderGradientFile, type GradientReply, type GradientRequest } from "./gradient-file";
 import { useTokens } from "./ThemeProvider";
 
 const RENDER_SCALE = 0.6;
+const WORKER_ANSWER_MS = 4000;
 
 let worker: Worker | null = null;
 let nextId = 0;
-const waiting = new Map<number, (r: GradientReply) => void>();
+const waiting = new Map<number, (r: GradientReply | null) => void>();
 
-function render(req: Omit<GradientRequest, "id">): Promise<GradientReply> {
+const dropWorker = () => {
+  worker?.terminate();
+  worker = null;
+  for (const answer of waiting.values()) answer(null);
+  waiting.clear();
+};
+
+function inWorker(req: GradientRequest): Promise<GradientReply | null> {
   if (!worker) {
     const root = process.env.STELLA_RUNE_ROOT;
     worker = new Worker(root ? `${root}/ui/theme/gradient-worker.ts` : new URL("./gradient-worker.ts", import.meta.url).href);
@@ -17,12 +25,25 @@ function render(req: Omit<GradientRequest, "id">): Promise<GradientReply> {
       waiting.get(e.data.id)?.(e.data);
       waiting.delete(e.data.id);
     };
+    worker.onerror = dropWorker;
   }
-  const id = ++nextId;
+  const sent = worker;
   return new Promise((resolve) => {
-    waiting.set(id, resolve);
-    worker!.postMessage({ ...req, id });
+    const timer = setTimeout(() => {
+      if (waiting.delete(req.id)) resolve(null);
+      if (worker === sent && waiting.size === 0) dropWorker();
+    }, WORKER_ANSWER_MS);
+    waiting.set(req.id, (reply) => {
+      clearTimeout(timer);
+      resolve(reply);
+    });
+    sent.postMessage(req);
   });
+}
+
+async function render(req: Omit<GradientRequest, "id">): Promise<GradientReply> {
+  const full = { ...req, id: ++nextId };
+  return (await inWorker(full)) ?? renderGradientFile(full);
 }
 
 /**
@@ -36,7 +57,7 @@ export function ThemeBackdrop({ id = "theme-backdrop", mode = "soft", colorMode 
   const [measured, setMeasured] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const latest = useRef(0);
-  const flat = t.flat || mode === "flat";
+  const flat = t.flat;
 
   useEffect(() => {
     if (flat || !size.current) return;

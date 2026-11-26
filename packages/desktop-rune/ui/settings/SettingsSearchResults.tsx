@@ -70,12 +70,12 @@ export function SettingsSearchResults({
 
   return (
     <col {...s.settingsSearchResults} role="listbox" label={t(ariaKey, { count: resultsCount })}>
-      <T w="full" {...s.settingsSearchResultsHeader}>
-        {t(countKey, { count: resultsCount })}{" "}
+      <row w="full" wrap {...s.settingsSearchResultsHeader}>
+        <T {...tx(s.settingsSearchResultsHeader)}>{`${t(countKey, { count: resultsCount })}\u00a0`}</T>
         <T {...tx(s.settingsSearchResultsHeader)} {...s.settingsSearchResultsHeaderQuery}>
           {trimmedQuery}
         </T>
-      </T>
+      </row>
       <col {...s.settingsSearchResultsList}>
         {results.map((entry, index) => (
           <col w="full" key={`${entry.tab}:${entry.title}`}>

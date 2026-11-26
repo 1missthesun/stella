@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { Select as KitSelect } from "../Menu";
+import { Select as KitSelect, type SelectProps as KitSelectProps } from "../Menu";
 import { derive, font, fontSize, look, mix, radius, useTokens, type Style } from "../../theme";
 import { domEvent, useFormSubmit, type DomEvent } from "./press";
 import { T, useInk } from "./text";
@@ -105,7 +105,7 @@ export type SelectProps<V extends string = string> = Style & {
   hideLabel?: boolean;
   id?: string;
   name?: string;
-  trigger?: { h?: number; fill?: string };
+  trigger?: KitSelectProps["trigger"];
 };
 
 /** desktop-ui's `Select`; `settings-runtime-select` is the fit-width (120–240) round trigger Settings rows use. */

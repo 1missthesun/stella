@@ -67,7 +67,7 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
   const [titleKey, setTitleKey] = useState<string | null>(null);
   const [lit, setLit] = useState(false);
   const pulse = usePulsingCard();
-  const y = useRef(0);
+  const y = useRef<number | null>(null);
   useEffect(() => {
     if (!pulse || pulse.key !== titleKey) return;
     setLit(true);
@@ -77,7 +77,7 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
   useEffect(() => () => tab?.place(cardId, null), [tab?.place, cardId]);
   useEffect(() => {
     if (!titleKey) return;
-    noteCardPlace(titleKey, cardId, y.current);
+    if (y.current !== null) noteCardPlace(titleKey, cardId, y.current);
     return () => forgetCardPlace(titleKey, cardId);
   }, [titleKey, cardId]);
   const reg = useMemo(() => ({ setTitleKey, inHeader: false, account: tab?.account ?? false }), [tab?.account]);

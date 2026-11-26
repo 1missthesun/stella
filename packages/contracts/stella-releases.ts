@@ -56,6 +56,19 @@ export const releaseDateLabel = (
 
 export const stellaReleases: readonly StellaRelease[] = [
   {
+    date: "2026-11-26",
+    title: "Helpers no longer get stuck waiting",
+    summary: "When a helper asks the task that started it a question, that task now hears it and answers, wherever each of them runs.",
+    tags: ["Polish", "Fixes"],
+    highlights: [
+      "A helper that asks its task for an answer and pauses no longer waits forever: the task is reminded and replies, whether they run on the same computer, on different computers or in the cloud.",
+      "A finished helper that gets a note from a teammate no longer shows up as having ended without reporting.",
+    ],
+    more: [
+      "Buttons in Settings are quieter and more consistent, with red kept only for things that really delete.",
+    ],
+  },
+  {
     date: "2026-11-25",
     title: "Chats carry on from your other computers",
     summary: "When the computer a chat runs on is away, Stella carries on from another of your computers before turning to the cloud.",

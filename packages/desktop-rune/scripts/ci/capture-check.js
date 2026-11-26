@@ -55,8 +55,8 @@ public static class U {
     "foreground " + [U]::Foreground()
     "keydown " + [U]::Key(0x41, 0); Start-Sleep -Milliseconds 30; "keyup " + [U]::Key(0x41, 2)
     "wheel " + [U]::Mouse(0x0800, 0, 120)`;
-  const run = spawnSync("powershell", ["-NoProfile", "-Command", ps], { encoding: "utf8" });
-  result.synth = { status: run.status, stdout: run.stdout.trim().split(/\r?\n/), stderr: run.stderr.slice(0, 500) };
+  const run = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", ps], { encoding: "utf8", timeout: 90_000, stdio: ["ignore", "pipe", "pipe"] });
+  result.synth = { status: run.status, signal: run.signal, stdout: (run.stdout ?? "").trim().split(/\r?\n/), stderr: (run.stderr ?? "").slice(0, 500) };
   await new Promise((r) => setTimeout(r, 500));
   result.hookStop = await e.inputHook.stop();
 } catch (error) {

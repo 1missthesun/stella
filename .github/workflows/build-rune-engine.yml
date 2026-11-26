@@ -296,6 +296,7 @@ jobs:
         run: ./build.ps1
 
       - name: Services session (window, audio, WebView2 media page)
+        timeout-minutes: 20
         env:
           STELLA_RUNE_RUN: ci
         working-directory: packages/desktop-rune
@@ -305,34 +306,36 @@ jobs:
           mkdir -p "$out"
           export BIN="$RUNNER_TEMP/engine/stella-engine-win-x64.exe"
           run_dir=$(cygpath -u "$("$BUN" scripts/session.ts dir)")
-          trap '"$BUN" scripts/session.ts stop || true; cp "$run_dir/host.log" "$out/services-host.log" 2>/dev/null || true; cp "$run_dir/metrics.jsonl" "$out/metrics.jsonl" 2>/dev/null || true; find "$run_dir" -name "runtime.log*" -exec cp {} "$out/" \; 2>/dev/null || true' EXIT
-          "$BUN" scripts/session.ts start --account signed-out | tee "$out/start.json"
+          ev() { echo "== $(date +%T) eval $2" >&2; timeout 300 "$BUN" scripts/session.ts eval "$1"; }
+          trap 'echo "== $(date +%T) stop" >&2; timeout 120 "$BUN" scripts/session.ts stop || echo "session stop failed or timed out" | tee -a "$GITHUB_STEP_SUMMARY"; cp "$run_dir/host.log" "$out/services-host.log" 2>/dev/null || true; cp "$run_dir/metrics.jsonl" "$out/metrics.jsonl" 2>/dev/null || true; find "$run_dir" -name "runtime.log*" -exec cp {} "$out/" \; 2>/dev/null || true' EXIT
+          echo "== $(date +%T) start" >&2
+          timeout 300 "$BUN" scripts/session.ts start --account signed-out | tee "$out/start.json"
           jq -e '.ready' "$out/start.json" >/dev/null || { echo "session did not get ready"; tail -n 120 "$run_dir/host.log"; exit 1; }
           sleep 3
           grep -m1 '"first_content_frame"' "$run_dir/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY" || true
-          "$BUN" scripts/session.ts shot "$out/window.png" || echo "engine screenshot failed" | tee -a "$GITHUB_STEP_SUMMARY"
+          timeout 60 "$BUN" scripts/session.ts shot "$out/window.png" || echo "engine screenshot failed" | tee -a "$GITHUB_STEP_SUMMARY"
           pwsh -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$i=New-Object System.Drawing.Bitmap \$b.Width,\$b.Height; [System.Drawing.Graphics]::FromImage(\$i).CopyFromScreen(\$b.Location,[System.Drawing.Point]::Empty,\$b.Size); \$i.Save('$(cygpath -w "$out/desktop.png")')" || true
           audio='const a = new Audio("/sounds/message-chime.mp3"); a.volume = 0.5; const t0 = performance.now();
             const ended = new Promise((resolve, reject) => { a.onended = () => resolve(performance.now() - t0); a.onerror = () => reject(new Error(a.error?.message ?? "error")); setTimeout(() => reject(new Error("no ended in 15 s")), 15000); });
             await a.play(); const playingMs = performance.now() - t0; const endedMs = await ended;
             const devices = (await navigator.mediaDevices.enumerateDevices()).map((d) => `${d.kind}: ${d.label}`);
             return { playingMs, endedMs, devices };'
-          "$BUN" scripts/session.ts eval "$audio" | tee "$out/audio.json"
+          ev "$audio" audio | tee "$out/audio.json"
           jq -r '"audio: \(.value // .error)"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
-          "$BUN" scripts/session.ts eval "$(cat scripts/ci/media-webview-check.js)" | tee "$out/media-page.json"
+          ev "$(cat scripts/ci/media-webview-check.js)" media-page | tee "$out/media-page.json"
           jq -r '"media page (WebView2): \(.value // .error | tojson)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
-          "$BUN" scripts/session.ts eval 'const w = new electron.BrowserWindow({ width: 640, height: 420, show: true }); await w.loadURL("https://example.com/"); await new Promise((r) => setTimeout(r, 1500));
-            const r = await w.webContents.executeJavaScript(`({ title: document.title, rtc: typeof RTCPeerConnection, secure: isSecureContext })`); return r;' | tee "$out/web-window.json"
+          ev 'const w = new electron.BrowserWindow({ width: 640, height: 420, show: true }); await w.loadURL("https://example.com/"); await new Promise((r) => setTimeout(r, 1500));
+            const r = await w.webContents.executeJavaScript(`({ title: document.title, rtc: typeof RTCPeerConnection, secure: isSecureContext })`); return r;' web-window | tee "$out/web-window.json"
           diag='const m = stella.host.media; const use = m.use().then((release) => { release(); return "ready"; }, (e) => String(e?.message ?? e));
             await new Promise((r) => setTimeout(r, 8000));
             const state = await stella.engine.webview.state(m.elementId).catch((e) => `state failed: ${e.message}`);
             return { wanted: m.wanted(), state, use: await use };'
-          "$BUN" scripts/session.ts eval "$diag" | tee "$out/media-page-diag.json"
-          "$BUN" scripts/session.ts eval "$(cat scripts/ci/capture-check.js)" | tee "$out/capture.json"
+          ev "$diag" media-diag | tee "$out/media-page-diag.json"
+          ev "$(cat scripts/ci/capture-check.js)" capture | tee "$out/capture.json"
           jq -r '"capture: \(.value // .error | tojson)"' "$out/capture.json" | tee -a "$GITHUB_STEP_SUMMARY"
           mp4=$(jq -r '.value.capture.stopped.file // empty' "$out/capture.json"); [ -n "$mp4" ] && cp "$(cygpath -u "$mp4")" "$out/capture.mp4" || true
           jpg=$(jq -r '.value.capture.firstFrame // empty' "$out/capture.json"); [ -n "$jpg" ] && cp "$(cygpath -u "$jpg")" "$out/capture-frame.jpg" || true
-          "$BUN" scripts/session.ts eval "$(cat scripts/ci/meeting-show-check.js)" | tee "$out/meeting-show.json"
+          ev "$(cat scripts/ci/meeting-show-check.js)" meeting-show | tee "$out/meeting-show.json"
           jq -r '"meeting capture and Show Stella: \(.value // .error | tojson)"' "$out/meeting-show.json" | tee -a "$GITHUB_STEP_SUMMARY"
           find "$run_dir/data" \( -path "*meetings*" -o -path "*captures*" \) -type f -printf "%s %p\n" | tee "$out/meeting-show-files.txt" || true
           ps -W | grep -iE "stella-engine|bun|msedgewebview2" | tee "$out/processes.txt" || true

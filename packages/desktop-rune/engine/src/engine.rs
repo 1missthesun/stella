@@ -77,6 +77,8 @@ pub struct Engine {
     pub ts_dead: bool,
     pub first_commit: bool,
     pub child: Option<std::process::Child>,
+    /// Each scroll viewport's last reported offset and range (`[x, y, max x, max y]`), by node.
+    pub scrolled: HashMap<u32, [f32; 4]>,
 }
 
 impl Engine {
@@ -98,6 +100,7 @@ impl Engine {
             ts_dead: false,
             first_commit: false,
             child: None,
+            scrolled: HashMap::new(),
         }
     }
 }

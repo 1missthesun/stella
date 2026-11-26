@@ -259,6 +259,7 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
                 return;
             }
             last.set(now);
+            crate::swap_view::scrolled(n, now, matches!(pos.source, rune::ScrollSource::Direct));
             crate::control::note_scroll_max(&key, pos.max[1]);
             if listens {
                 element_event(n, "scroll", json!({ "x": pos.offset[0], "y": pos.offset[1], "maxX": pos.max[0], "maxY": pos.max[1], "viewport": pos.viewport }), None);

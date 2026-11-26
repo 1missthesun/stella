@@ -14,6 +14,8 @@ export type AppState = {
   swaps: number;
   lastSwapMs: number | null;
   preview: string | null;
+  /** The launch splash has gone: it shows once a run, as desktop-ui's `#stella-launch` does, not again per swap. */
+  launched?: boolean;
 };
 
 type Listener = () => void;

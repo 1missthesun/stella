@@ -7,19 +7,23 @@ const RESCUE_DELAY_MS = 8_000;
 
 export type LaunchSplashPhase = "showing" | "rescue" | "exiting" | "gone";
 
-let phase: LaunchSplashPhase = "showing";
+let phase: LaunchSplashPhase = globalThis.stella?.store.get().launched ? "gone" : "showing";
 let holdTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 const set = (next: LaunchSplashPhase) => {
   if (phase === next) return;
   phase = next;
+  if (next === "gone") globalThis.stella?.store.set({ launched: true });
   for (const l of [...listeners]) l();
 };
 
-const rescueTimer = setTimeout(() => {
-  if (phase === "showing") set("rescue");
-}, RESCUE_DELAY_MS);
+const rescueTimer =
+  phase === "gone"
+    ? undefined
+    : setTimeout(() => {
+        if (phase === "showing") set("rescue");
+      }, RESCUE_DELAY_MS);
 
 const clearHoldTimer = () => {
   if (holdTimer === null) return;

@@ -105,9 +105,10 @@ function inline(n: Md, c: Ctx, key: number): ReactNode {
     }
     case "image": {
       const src = p.images?.[n.url ?? ""] ?? n.url ?? "";
+      // Its own line with the image margins, as the engine lifts it and Streamdown's `.markdown img` blocks it.
       return createElement("img", {
         key, src, alt: n.alt ?? "", loading: "lazy",
-        style: { maxWidth: "100%", borderRadius: px(p.imageRadius ?? 0), display: "inline-block", cursor: p.onImage ? "pointer" : undefined, verticalAlign: "middle" },
+        style: { ...margin(c.s.imageMargin, [16, 16]), maxWidth: "100%", height: "auto", borderRadius: px(p.imageRadius ?? 0), display: "block", cursor: p.onImage ? "pointer" : undefined },
         onClick: p.onImage ? (e: React.MouseEvent) => { e.stopPropagation(); p.onImage?.({ src: n.url ?? "", alt: n.alt ?? "" }); } : undefined,
       });
     }

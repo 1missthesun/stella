@@ -158,7 +158,8 @@ export type EngineEvent =
   | { t: "capture"; id: string; kind: "frame"; at: number; path: string }
   /** A global input event in uiohook's shape (see engine/src/inputhook.rs). */
   | ({ t: "inputhook"; type: InputHookType } & InputHookEvent)
-  | { t: "audio"; id: string; kind: "ended" | "error"; message?: string };
+  | { t: "audio"; id: string; kind: "ended" | "error"; message?: string }
+  | { t: "mic"; gen: number; kind: "live" | "audio" | "ended" | "failed"; ms?: number; pcm?: string; message?: string };
 
 export type SelectionRect = { x: number; y: number; w: number; h: number };
 
@@ -353,6 +354,11 @@ export const engine = {
       request<{ device: string | null; sampleRate: number; channels: number; duration: number | null }>("audio.play", o),
     control: (o: { id: string; op: string; value?: unknown }) => request<{ playing: boolean }>("audio.control", o),
     devices: () => request<Array<{ deviceId: string; kind: "audioinput" | "audiooutput"; label: string; groupId: string }>>("audio.devices"),
+  },
+  /** The default microphone as 16 kHz mono s16le, for dictation (Linux, Windows): `mic` events per generation. */
+  mic: {
+    start: (gen: number) => command({ cmd: "mic.start", gen }),
+    stop: (gen: number) => command({ cmd: "mic.stop", gen }),
   },
   /** Global input listening for the `uiohook-napi` module (macOS CGEventTap, Windows low-level hooks; rejects elsewhere or without Input Monitoring). */
   inputHook: {

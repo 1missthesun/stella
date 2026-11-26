@@ -1673,7 +1673,10 @@ pub fn sync(n: u32, p: &Props) {
 }
 
 pub fn active() -> bool {
-    VIEWS.with(|v| !v.borrow().is_empty()) || WAITING.with(|w| !w.borrow().is_empty()) || PARKED.with(|p| !p.borrow().is_empty())
+    VIEWS.with(|v| !v.borrow().is_empty())
+        || WAITING.with(|w| !w.borrow().is_empty())
+        || PARKED.with(|p| !p.borrow().is_empty())
+        || TEARDOWN.with(|t| t.get().is_some_and(|until| std::time::Instant::now() < until))
 }
 
 /// Whether the views need the loop to keep ticking without a frame of their own: WebKitGTK's
@@ -1699,8 +1702,12 @@ pub fn retry_waiting() {
 /// How long a view of a remounted window waits for its `<webview>` to mount again (one that waits
 /// on an async source, like a registered canvas URL).
 const PARK_FOR: std::time::Duration = std::time::Duration::from_secs(3);
+/// WebKitGTK closes a page and lets its web process go over several turns of the GLib loop after
+/// the view is dropped; the loop keeps turning this long after the last view goes.
+const TEARDOWN_FOR: std::time::Duration = std::time::Duration::from_secs(3);
 
 thread_local! {
+    static TEARDOWN: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
     /// Views of remounted windows that no remounted `<webview>` has claimed yet, hidden, with when
     /// they were parked.
     static PARKED: RefCell<Vec<(std::time::Instant, View)>> = const { RefCell::new(Vec::new()) };
@@ -1851,6 +1858,7 @@ fn destroy(views: Vec<View>) {
         }
         gtk::gdk::error_trap_pop_ignored();
         bridge_views();
+        TEARDOWN.with(|t| t.set(Some(std::time::Instant::now() + TEARDOWN_FOR)));
     }
     #[cfg(target_os = "macos")]
     for v in &views {

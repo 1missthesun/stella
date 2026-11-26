@@ -86,6 +86,10 @@ The old tree stays on screen until then:
   - the desktop-ui Chromium source worker never runs (it cost ~600 MB);
   - media and canvas protocols are still served;
   - interface changes reach the UI swap.
+- `MicrophoneCapture` is replaced (`services/microphone-capture.ts`): on Linux and Windows the
+  engine captures dictation's microphone (`engine/src/mic.rs`, 16 kHz mono s16le as master's
+  macOS helper streams), so dictation and its prewarm on composer focus start no WebView; macOS
+  keeps master's helper. `ui/replace/.../native-microphone.ts` reports native capture everywhere.
 - The launcher channel on fd 3 works: Bun's `new net.Socket({ fd })` closes at once, so
   `electron/fd-socket.ts` adopts the descriptor when a launcher started the app.
 
@@ -102,6 +106,9 @@ These live on rune/desktop only and go to master at ship time:
   `packages/desktop-rune/ui/`, so a Rune UI draft is added without a click and taken by the UI
   swap, and `relaunches()` also matches `packages/desktop-rune/host/` (the host's own code needs a
   new process). Under Electron both keep master's prefixes.
+- `packages/desktop/electron/ipc/dictation-handlers.js`: with `STELLA_LAUNCHER_ENGINE=rune`, the
+  native microphone is allowed off macOS too (Rune's `MicrophoneCapture` covers Linux and
+  Windows). Under Electron it stays macOS-only.
 - `packages/desktop-ui/src/platform/backend/view-fixtures.ts` (read by `useBackendView`): in DEV
   builds only (`import.meta.env.DEV`, set by Electron's Vite dev renderer and by Rune's
   vite-compat bundle), `globalThis.__stellaViewFixtures.set(view, value | "loading")` stands in a

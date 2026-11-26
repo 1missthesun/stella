@@ -177,6 +177,7 @@ export const webEngine: Engine = {
   appearance: { get: async () => ({ dark: dark() }) },
   capture: { sources: async () => [], start: () => unsupported("capture"), stop: () => unsupported("capture") },
   audio: { play: () => unsupported("audio"), control: () => unsupported("audio"), devices: async () => [] },
+  mic: { start: () => {}, stop: () => {} },
   inputHook: { start: () => unsupported("inputhook"), stop: async () => ({ stopped: true }) },
   shell: {
     openExternal: async (url) => { window.open(url, "_blank", "noopener,noreferrer"); },

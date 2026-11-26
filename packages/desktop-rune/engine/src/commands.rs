@@ -75,6 +75,7 @@ pub fn route(v: Value) {
         "capture.sources" | "capture.start" | "capture.stop" => crate::capture::command(&cmd, rid, &v),
         "inputhook.start" | "inputhook.stop" => crate::inputhook::command(&cmd, rid, &v),
         "audio.play" | "audio.control" | "audio.devices" => crate::audio::command(&cmd, rid, &v),
+        "mic.start" | "mic.stop" => crate::mic::command(&cmd, rid, &v),
         "media.probe" => crate::media::probe(rid, &v),
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "selection.get" => {

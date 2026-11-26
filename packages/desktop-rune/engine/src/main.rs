@@ -22,6 +22,7 @@ mod look_up;
 mod markdown;
 mod media;
 mod metrics;
+mod mic;
 mod props;
 mod protocol;
 mod services;

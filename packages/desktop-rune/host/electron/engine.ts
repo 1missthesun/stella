@@ -48,6 +48,7 @@ export type EngineEventOf = {
   display: { t: "display"; kind?: string };
   inputhook: Extract<import("../bridge").EngineEvent, { t: "inputhook" }>;
   audio: Extract<import("../bridge").EngineEvent, { t: "audio" }>;
+  mic: Extract<import("../bridge").EngineEvent, { t: "mic" }>;
 };
 
 type BridgeModule = {

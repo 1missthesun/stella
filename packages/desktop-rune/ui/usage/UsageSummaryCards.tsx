@@ -22,7 +22,7 @@ export const UsageSummaryCards = memo(function UsageSummaryCards({ layout, summa
   return (
     <box {...s.usageSummary} columns={cols} label={t("app.usage.summary.label")}>
       {cards.map((card) => (
-        <col key={card.label} {...s.usageSummaryCard} {...(layout.wide ? s.usageSummaryCardWide : null)}>
+        <col key={card.label} {...s.usageSummaryItem}>
           <T {...s.usageSummaryLabel}>{card.label}</T>
           <T {...s.usageSummaryValue}>{card.value}</T>
           <T {...s.usageSummaryNote}>{card.note}</T>

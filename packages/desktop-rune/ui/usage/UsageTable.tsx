@@ -36,13 +36,14 @@ export function UsageTable({ columns, rows, rowContentH, measureKey }: { columns
         </col>
         {columns.map((column, index) => {
           const natural = widths[index];
+          const edge = { ...(index === 0 ? { pl: 0 } : null), ...(index === columns.length - 1 ? { pr: 0 } : null) };
           return (
             <col key={column.head} w={natural} grow={natural ?? 0} shrink={false} onLayout={(r) => measure(index, r.w)} align={column.end ? "end" : "start"}>
-              <col h={headH} {...s.usageTableHead} align={column.end ? "end" : "start"}>
+              <col h={headH} {...s.usageTableHead} {...edge} align={column.end ? "end" : "start"}>
                 <T {...s.usageTableHead} px={0}>{column.head}</T>
               </col>
               {column.cells.map((cell, row) => (
-                <col key={row} h={rowH(row === rows - 1)} {...s.usageTableCell} align={column.end ? "end" : "start"}>
+                <col key={row} h={rowH(row === rows - 1)} {...s.usageTableCell} {...edge} align={column.end ? "end" : "start"}>
                   {cell}
                 </col>
               ))}
@@ -54,7 +55,7 @@ export function UsageTable({ columns, rows, rowContentH, measureKey }: { columns
   );
 }
 
-/** A table cell's plain text: the table's 11px tabular figures. */
+/** A table cell's plain text: the table's tabular figures. */
 export function UsageCellText({ children, ...style }: { children: ReactNode } & Parameters<typeof T>[0]) {
   const s = useUsage();
   return (
@@ -64,15 +65,15 @@ export function UsageCellText({ children, ...style }: { children: ReactNode } & 
   );
 }
 
-/** desktop-ui's `.usage-panel` with its heading: a title and a one-line description over the panel's content. */
-export function UsagePanel({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+/** desktop-ui's `.usage-panel` with its heading: a title, and an optional description, over the panel's content. */
+export function UsagePanel({ title, description, afterSummary = false, children }: { title: string; description?: string; afterSummary?: boolean; children: ReactNode }) {
   const s = useUsage();
   return (
-    <col {...s.usagePanel}>
+    <col {...s.usagePanel} {...(afterSummary ? s.usagePanelAfterSummary : null)}>
       <row {...s.usagePanelHeading}>
         <col shrink minW={0}>
           <T role="heading" {...s.usagePanelTitle}>{title}</T>
-          <T {...s.usagePanelDescription}>{description}</T>
+          {description ? <T {...s.usagePanelDescription}>{description}</T> : null}
         </col>
       </row>
       {children}

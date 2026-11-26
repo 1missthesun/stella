@@ -1,4 +1,4 @@
-import { Select } from "../kit/compat";
+import { Press, Select, T } from "../kit/compat";
 import { useUsage, type UsageLayout } from "./usage.styles";
 import { memo, useMemo } from "react";
 import type { LocalModelUsageRecord } from "@stella/contracts/local-chat";
@@ -45,14 +45,6 @@ export const UsageFiltersBar = memo(function UsageFiltersBar({
 }: UsageFiltersBarProps) {
   const s = useUsage();
   const t = useT();
-  const rangeOptions = useMemo(
-    () =>
-      RANGE_OPTIONS.map((option) => ({
-        value: option.value,
-        label: t(option.labelKey),
-      })),
-    [t],
-  );
   const conversationOptions = useMemo(() => {
     const byId = new Map<string, string>();
     for (const record of records) {
@@ -105,10 +97,9 @@ export const UsageFiltersBar = memo(function UsageFiltersBar({
     [records, t],
   );
 
-  const cols = layout.narrow ? 1 : layout.widest ? 5 : layout.wide ? 3 : 2;
-  const trigger = { h: s.usageFilterTrigger.h as number, fill: s.usageFilterTrigger.fill };
+  const cols = layout.narrow ? 1 : layout.wide ? 4 : 2;
+  const trigger = { h: s.usageFilterTrigger.h as number, fill: s.usageFilterTrigger.fill as string, border: s.usageFilterTrigger.border as string, size: s.usageFilterTrigger.size as number };
   const selects = [
-    <Select key="range" trigger={trigger} value={range} onValueChange={(value) => onSearchChange({ range: value as UsageRange })} options={rangeOptions} aria-label={t("app.usage.filters.timeRange")} />,
     <Select key="conversation" trigger={trigger} value={conversation ?? ALL} onValueChange={(value) => onSearchChange({ conversation: value === ALL ? undefined : value, thread: undefined })} options={conversationOptions} aria-label={t("app.usage.filters.conversation")} />,
     <Select
       key="thread"
@@ -126,12 +117,27 @@ export const UsageFiltersBar = memo(function UsageFiltersBar({
   ];
 
   return (
-    <box {...s.usageFilters} columns={cols} label={t("app.usage.filters.label")}>
-      {selects.map((select, index) => (
-        <col key={select.key ?? index} minW={0}>
-          {select}
-        </col>
-      ))}
-    </box>
+    <col {...s.usageFiltersWrap} label={t("app.usage.filters.label")}>
+      <row {...s.usageRangePicker} role="radiogroup" label={t("app.usage.filters.timeRange")}>
+        {RANGE_OPTIONS.map((option) => {
+          const active = range === option.value;
+          return (
+            <Press key={option.value} {...s.usageRangeItem} {...(active ? s.usageRangeItemActive : null)} role="radio" checked={active} onPress={() => onSearchChange({ range: option.value })}>
+              <T size={s.usageRangeItem.size} weight={s.usageRangeItem.weight} em={s.usageRangeItem.em}>{t(option.labelKey)}</T>
+              <box {...s.usageRangeDot} opacity={active ? 1 : 0} scale={active ? 1 : 0} />
+            </Press>
+          );
+        })}
+      </row>
+      {records.length > 0 ? (
+        <box {...s.usageFilters} columns={cols}>
+          {selects.map((select, index) => (
+            <col key={select.key ?? index} minW={0}>
+              {select}
+            </col>
+          ))}
+        </box>
+      ) : null}
+    </col>
   );
 });

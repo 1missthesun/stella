@@ -1,13 +1,14 @@
 import { Press, T, tx, useTextBase } from "../kit/compat";
 import { useUsage } from "./usage.styles";
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import type { LocalModelUsageRecord } from "@stella/contracts/local-chat";
 import { useT } from "@/shared/i18n";
 import { executionLabel } from "@/app/usage/usage-data";
 import { formatCallTime, formatCost, formatTokens } from "@/app/usage/format";
 import { UsageCellText, UsagePanel, UsageTable } from "./UsageTable";
 
-const VISIBLE_CALLS = 500;
+const INITIAL_CALLS = 100;
+const MAX_VISIBLE_CALLS = 500;
 
 type UsageCallsTableProps = {
   records: LocalModelUsageRecord[];
@@ -18,7 +19,12 @@ export const UsageCallsTable = memo(function UsageCallsTable({ records, onSelect
   const s = useUsage();
   const t = useT();
   const lh = useTextBase().lh;
-  const visible = records.slice(0, VISIBLE_CALLS);
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_CALLS);
+  useEffect(() => {
+    setVisibleLimit(INITIAL_CALLS);
+  }, [records]);
+  const cappedTotal = Math.min(records.length, MAX_VISIBLE_CALLS);
+  const visible = records.slice(0, visibleLimit);
   const size = (style: { size?: unknown }) => style.size as number;
   const rowContentH =
     size(s.usageCallProvider) * lh + (s.usageCallProvider.mb as number) + size(s.usageCallModel) * lh + (s.usageCallApi.mt as number) + size(s.usageCallApi) * lh;
@@ -92,10 +98,15 @@ export const UsageCallsTable = memo(function UsageCallsTable({ records, onSelect
           },
         ]}
       />
-      {records.length > VISIBLE_CALLS ? (
-        <row {...s.usageTableNote}>
-          <T {...tx(s.usageTableNote)}>{t("app.usage.calls.truncatedNote", { count: records.length.toLocaleString() })}</T>
+      {visible.length < cappedTotal ? (
+        <row {...s.usageTableMore}>
+          <Press {...s.usageTextAction} onPress={() => setVisibleLimit(MAX_VISIBLE_CALLS)}>
+            <T {...tx(s.usageTextAction)}>{`${t("settings.nav.more")} (${cappedTotal - visible.length})`}</T>
+          </Press>
         </row>
+      ) : null}
+      {records.length > MAX_VISIBLE_CALLS ? (
+        <T {...s.usageTableNote}>{t("app.usage.calls.truncatedNote", { count: records.length.toLocaleString() })}</T>
       ) : null}
     </UsagePanel>
   );

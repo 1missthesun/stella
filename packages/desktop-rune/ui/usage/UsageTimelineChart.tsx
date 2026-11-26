@@ -7,14 +7,12 @@ import type { UsageTimelinePoint } from "@/app/usage/usage-data";
 import { useT } from "@/shared/i18n";
 import { formatCost, formatTokens } from "@/app/usage/format";
 
-const PAD_X = 8;
-const PAD_BOTTOM = 8;
 const MARGIN_TOP = 10;
 const MARGIN_RIGHT = 8;
 const LEFT_AXIS_W = 58;
 const RIGHT_AXIS_W = 54;
 const X_AXIS_H = 30;
-const LEGEND_H = 26;
+const LEGEND_H = 24;
 const TICK_GAP = 8;
 const MIN_TICK_GAP = 24;
 const TICK_COUNT = 5;
@@ -108,8 +106,8 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({ timeline, h
   const [active, setActive] = useState<number | null>(null);
 
   const plot = useMemo(() => {
-    const innerW = Math.max(0, width - PAD_X * 2);
-    const innerH = height - PAD_BOTTOM;
+    const innerW = Math.max(0, width);
+    const innerH = height;
     const left = LEFT_AXIS_W;
     const right = innerW - MARGIN_RIGHT - RIGHT_AXIS_W;
     const top = MARGIN_TOP;
@@ -134,23 +132,23 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({ timeline, h
     const costPath = monotonePath(timeline.map((p, i): Point => [xs[i], yCost(p.totalCostUsd)]));
     const tokenPath = monotonePath(timeline.map((p, i): Point => [xs[i], yTokens(p.totalTokens)]));
     const area = costPath ? `<path d="${costPath}L${xs[xs.length - 1]},${bottom}L${xs[0]},${bottom}Z" fill="url(#usageCostFill)"/>` : "";
-    const costLine = costPath ? `<path d="${costPath}" fill="none" ${svgColor(c.accent, "stroke")} stroke-width="2"/>` : "";
+    const costLine = costPath ? `<path d="${costPath}" fill="none" ${svgColor(c.primary, "stroke")} stroke-width="2"/>` : "";
     const tokenLine = tokenPath ? `<path d="${tokenPath}" fill="none" ${svgColor(c.foreground, "stroke")} stroke-width="1.5"/>` : "";
     const cursor = active !== null && xs[active] !== undefined ? `<line x1="${xs[active]}" x2="${xs[active]}" y1="${plot.top}" y2="${bottom}" stroke="#cccccc"/>` : "";
     const dots =
       active !== null && timeline[active]
-        ? `<circle cx="${xs[active]}" cy="${yCost(timeline[active].totalCostUsd)}" r="4" ${svgColor(c.accent, "fill")} stroke="#fff" stroke-width="2"/><circle cx="${xs[active]}" cy="${yTokens(timeline[active].totalTokens)}" r="4" ${svgColor(c.foreground, "fill")} stroke="#fff" stroke-width="2"/>`
+        ? `<circle cx="${xs[active]}" cy="${yCost(timeline[active].totalCostUsd)}" r="4" ${svgColor(c.primary, "fill")} stroke="#fff" stroke-width="2"/><circle cx="${xs[active]}" cy="${yTokens(timeline[active].totalTokens)}" r="4" ${svgColor(c.foreground, "fill")} stroke="#fff" stroke-width="2"/>`
         : "";
-    const gradient = `<defs><linearGradient id="usageCostFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" ${svgColor(c.accent, "stop-color")} stop-opacity="0.35"/><stop offset="95%" ${svgColor(c.accent, "stop-color")} stop-opacity="0.02"/></linearGradient></defs>`;
+    const gradient = `<defs><linearGradient id="usageCostFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" ${svgColor(c.primary, "stop-color")} stop-opacity="0.28"/><stop offset="95%" ${svgColor(c.primary, "stop-color")} stop-opacity="0.01"/></linearGradient></defs>`;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${plot.innerW}" height="${plot.innerH}" viewBox="0 0 ${plot.innerW} ${plot.innerH}">${gradient}${grid}${cursor}${area}${costLine}${tokenLine}${dots}</svg>`;
-  }, [plot, timeline, active, c.accent, c.borderWeak, c.foreground]);
+  }, [plot, timeline, active, c.primary, c.borderWeak, c.foreground]);
 
   const xTicks = useMemo(() => visibleXTicks(timeline.map((p) => p.label), plot.xs), [timeline, plot.xs]);
   const point = active !== null ? timeline[active] : undefined;
   const tick = { ...s.usageChartTick, nowrap: true } as const;
 
   return (
-    <UsagePanel title={t("app.usage.timeline.title")} description={t("app.usage.timeline.description")}>
+    <UsagePanel title={t("app.usage.timeline.title")} afterSummary>
       <col w="full" {...s.usageChart} role="img" label={t("app.usage.timeline.chartLabel")} onLayout={(r) => setWidth(r.w)}>
         {svg ? (
           <col w={plot.innerW} h={plot.innerH}>
@@ -175,14 +173,14 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({ timeline, h
                 <box key={p.label + i} grow={1} shrink minW={0} w={0} h="full" onHover={(inside) => inside && setActive(i)} />
               ))}
             </row>
-            <row absolute={{ left: 0, top: plot.innerH - LEGEND_H + 4 }} w="full" justify="center" gap={10}>
+            <row absolute={{ left: 0, top: plot.innerH - LEGEND_H }} w={plot.innerW - MARGIN_RIGHT} h={LEGEND_H} justify="center" gap={10}>
               {[
-                { label: t("app.usage.timeline.series.cost"), color: c.accent },
+                { label: t("app.usage.timeline.series.cost"), color: c.primary },
                 { label: t("app.usage.timeline.series.tokens"), color: c.foreground },
               ].map((item) => (
                 <row key={item.label} align="center" gap={4}>
                   <icon svg={legendIcon(item.color)} name={`usage/legend-${item.color}`} view={32} size={14} inert />
-                  <T size={13} color={item.color}>{item.label}</T>
+                  <T size={16} lh={1.5} em={-0.01} color={item.color}>{item.label}</T>
                 </row>
               ))}
             </row>

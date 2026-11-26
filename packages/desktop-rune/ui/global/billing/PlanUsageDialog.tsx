@@ -1,6 +1,8 @@
-import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, Press, VisuallyHidden } from "../../kit/compat";
+import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, Press, T, VisuallyHidden } from "../../kit/compat";
 import { usePlanUsageDialog } from "./plan-usage-dialog.styles";
-import { lazy, Suspense, useState } from "react";
+import { useBillingScreen } from "./BillingScreen.styles";
+import { preloadUsageSurface } from "../../usage/usage-cache";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 const BillingPanel = lazy(() =>
   import("./BillingScreen").then((module) => ({
@@ -27,28 +29,48 @@ type PlanUsageDialogProps = {
 
 export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
   const s = usePlanUsageDialog();
+  const b = useBillingScreen();
   const [tab, setTab] = useState<PlanUsageTab>("plan");
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => preloadUsageSurface("7d"), 120);
+    return () => window.clearTimeout(timer);
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl" frame={{ h: 700 }}>
-        {/* The tabs name the surface, so the title would only repeat them.
-            Keep it for the accessible name and give the row to the tabs. */}
-        <DialogHeader>
+      <DialogContent size="xl" frame={{ w: 880, h: 720 }} enter={undefined} exit={undefined}>
+        <DialogHeader {...s.planUsageDialogHeader}>
           <VisuallyHidden asChild>
             <DialogTitle>Plan &amp; usage</DialogTitle>
           </VisuallyHidden>
           <row {...s.planUsageTabs} role="tablist" label="Plan and usage">
-            {TABS.map(({ key, label }) => (
-              <Press {...s.planUsageTabsItem} key={key} role="tab" id={`plan-usage-tab-${key}`} selected={tab === key} onPress={() => setTab(key)} {...((tab === key || undefined) ? s.planUsageTabsItemActive : null)}>
-                {label}
-              </Press>
-            ))}
+            {TABS.map(({ key, label }) => {
+              const active = tab === key;
+              const preload = key === "usage" ? () => preloadUsageSurface("7d") : undefined;
+              return (
+                <Press
+                  {...s.planUsageTabsItem}
+                  {...(active ? s.planUsageTabsItemActive : null)}
+                  key={key}
+                  role="tab"
+                  id={`plan-usage-tab-${key}`}
+                  selected={active}
+                  onHover={preload ? (inside: boolean) => { if (inside) preload(); } : undefined}
+                  onFocus={preload ? (focused: boolean) => { if (focused) preload(); } : undefined}
+                  onPress={() => setTab(key)}
+                >
+                  <T size={s.planUsageTabsItem.size} weight={s.planUsageTabsItem.weight} em={s.planUsageTabsItem.em} lh={s.planUsageTabsItem.lh}>{label}</T>
+                  <box {...s.planUsageTabsDot} opacity={active ? 1 : 0} scale={active ? 1 : 0} />
+                </Press>
+              );
+            })}
           </row>
           <DialogCloseButton />
         </DialogHeader>
         <DialogBody {...s.planUsageDialogBody} role="tabpanel" id={`plan-usage-panel-${tab}`} aria-labelledby={`plan-usage-tab-${tab}`}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<col {...b.billingPanel} {...b.billingPanelLoading} aria-busy="true" />}>
             {tab === "plan" ? <BillingPanel /> : <UsagePanel />}
           </Suspense>
         </DialogBody>

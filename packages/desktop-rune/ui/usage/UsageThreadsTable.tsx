@@ -1,4 +1,4 @@
-import { Press, T, tx, useTextBase } from "../kit/compat";
+import { Press, T, useTextBase } from "../kit/compat";
 import { useUsage } from "./usage.styles";
 import { memo } from "react";
 import { useT } from "@/shared/i18n";
@@ -16,11 +16,10 @@ export const UsageThreadsTable = memo(function UsageThreadsTable({ threads, onSe
   const t = useT();
   const lh = useTextBase().lh;
   const link = s.usageThreadLink;
-  const pillH = (s.usagePill.size as number) * lh + (s.usagePill.py as number) * 2;
-  const rowContentH = (link.pad as number) * 2 + pillH + (link.gap as number) * 2 + (s.usageThreadLinkName.size as number) * lh + (s.usageThreadLinkId.size as number) * lh;
+  const rowContentH = (link.py as number) * 2 + (link.gap as number) * 2 + ((s.usageThreadLinkKind.size as number) + (s.usageThreadLinkName.size as number) + (s.usageThreadLinkId.size as number)) * lh;
   const measureKey = threads.map((thread) => thread.threadId).join("|");
   return (
-    <UsagePanel title={t("app.usage.threads.title")} description={t("app.usage.threads.description")}>
+    <UsagePanel title={t("app.usage.threads.title")}>
       <UsageTable
         measureKey={measureKey}
         rows={threads.length}
@@ -30,9 +29,7 @@ export const UsageThreadsTable = memo(function UsageThreadsTable({ threads, onSe
             head: t("app.usage.threads.columns.execution"),
             cells: threads.map((thread) => (
               <Press {...link} vertical onPress={() => onSelectThread(thread.conversationId, thread.threadId)}>
-                <row {...s.usagePill}>
-                  <T {...tx(s.usagePill)}>{executionLabel(thread)}</T>
-                </row>
+                <T {...s.usageThreadLinkKind}>{executionLabel(thread)}</T>
                 <T {...s.usageThreadLinkName}>{threadLabel(thread)}</T>
                 <T {...s.usageThreadLinkId} title={thread.threadId}>
                   {shortId(thread.threadId)}

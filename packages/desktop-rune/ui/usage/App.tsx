@@ -13,6 +13,7 @@ import {
   type UsageRange,
 } from "@/app/usage/usage-data";
 import { threadLabel } from "@/app/usage/format";
+import { fetchUsagePage, readCachedUsagePage } from "./usage-cache";
 import { UsageFiltersBar, type UsageSearchPatch } from "./UsageFiltersBar";
 import { UsageSummaryCards } from "./UsageSummaryCards";
 import { UsageTimelineChart } from "./UsageTimelineChart";
@@ -33,50 +34,68 @@ export function UsagePanel() {
   const s = useUsage();
   const t = useT();
   const [filters, setFilters] = useState<UsageFiltersState>({ range: "7d" });
-  const [basePage, setBasePage] = useState<LocalModelUsagePage>(EMPTY_PAGE);
+  const initialCached = readCachedUsagePage("7d");
+  const [basePage, setBasePage] = useState<LocalModelUsagePage>(() => initialCached ?? EMPTY_PAGE);
   const [scoped, setScoped] = useState<{
     key: string;
     page: LocalModelUsagePage;
   } | null>(null);
-  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
+  const [phase, setPhase] = useState<"loading" | "ready" | "error">(() => (initialCached ? "ready" : "loading"));
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [width, setWidth] = useState(0);
-  const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
   const fetchingRef = useRef(false);
+  const forceNextRef = useRef(false);
+  const refresh = useCallback(() => {
+    forceNextRef.current = true;
+    setRefreshKey((value) => value + 1);
+  }, []);
   const isActive = true;
   const isActiveRef = useRef(isActive);
   const pendingWhileHiddenRef = useRef(false);
   const refreshRef = useRef<() => void>(() => {});
 
   const range = filters.range;
-  const load = useCallback(async () => {
-    const api = window.electronAPI?.localChat;
-    if (!api?.listModelUsage) {
-      setError(t("app.usage.desktopOnly"));
-      setPhase("error");
-      return;
-    }
-    setPhase((current) => (current === "ready" ? current : "loading"));
-    fetchingRef.current = true;
-    try {
-      const next = await api.listModelUsage({
-        fromMs: rangeStartMs(range),
-        limit: 10_000,
-      });
-      setBasePage(next);
-      setError("");
-      setPhase("ready");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      setPhase("error");
-    } finally {
-      fetchingRef.current = false;
-    }
-  }, [range, t]);
+  const load = useCallback(
+    async (force = false) => {
+      const api = window.electronAPI?.localChat;
+      if (!api?.listModelUsage) {
+        setError(t("app.usage.desktopOnly"));
+        setPhase("error");
+        return;
+      }
+      const cached = readCachedUsagePage(range);
+      if (cached) {
+        setBasePage(cached);
+        setPhase("ready");
+      } else {
+        setPhase("loading");
+      }
+      fetchingRef.current = true;
+      setRefreshing(true);
+      try {
+        const next = await fetchUsagePage(range, { force });
+        setBasePage(next);
+        setError("");
+        setPhase("ready");
+      } catch (cause) {
+        if (!cached) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+          setPhase("error");
+        }
+      } finally {
+        fetchingRef.current = false;
+        setRefreshing(false);
+      }
+    },
+    [range, t],
+  );
 
   useEffect(() => {
-    void load();
+    const force = forceNextRef.current;
+    forceNextRef.current = false;
+    void load(force);
   }, [load, refreshKey]);
 
   const scopedKey = `${filters.conversation ?? ""}|${filters.thread ?? ""}|${range}`;
@@ -128,6 +147,7 @@ export function UsagePanel() {
         timeout = window.setTimeout(refresh, 2000);
         return;
       }
+      forceNextRef.current = true;
       setRefreshKey((value) => value + 1);
     };
     refreshRef.current = refresh;
@@ -197,8 +217,8 @@ export function UsagePanel() {
   const usage = usageLayout(width);
   const base = useTextBase();
   const retry = (
-    <Press {...s.usageStateButton} onPress={() => void load()}>
-      <T {...tx(s.usageStateButton)}>{t("app.usage.tryAgain")}</T>
+    <Press {...s.usageTextAction} onPress={() => void load(true)}>
+      <T {...tx(s.usageTextAction)}>{t("app.usage.tryAgain")}</T>
     </Press>
   );
 
@@ -209,12 +229,12 @@ export function UsagePanel() {
           {usage.narrow ? (
             <col {...s.usageHeader} {...s.usageHeaderNarrow}>
               <T {...s.usageHeaderText}>{t("app.usage.intro")}</T>
-              <RefreshButton onPress={refresh} narrow />
+              <RefreshButton onPress={refresh} refreshing={refreshing} narrow />
             </col>
           ) : (
             <row {...s.usageHeader}>
               <T {...s.usageHeaderText}>{t("app.usage.intro")}</T>
-              <RefreshButton onPress={refresh} />
+              <RefreshButton onPress={refresh} refreshing={refreshing} />
             </row>
           )}
 
@@ -246,7 +266,7 @@ export function UsagePanel() {
               ) : null}
 
               <UsageSummaryCards layout={usage} summary={summary} />
-              <UsageTimelineChart timeline={timeline} height={usage.wide ? 260 : 220} />
+              <UsageTimelineChart timeline={timeline} height={usage.wide ? 230 : 210} />
               <UsageThreadsTable threads={threads} onSelectThread={selectThread} />
               <UsageCallsTable records={records} onSelectThread={selectThread} />
             </>
@@ -257,13 +277,13 @@ export function UsagePanel() {
   );
 }
 
-function RefreshButton({ onPress, narrow = false }: { onPress: () => void; narrow?: boolean }) {
+function RefreshButton({ onPress, refreshing, narrow = false }: { onPress: () => void; refreshing: boolean; narrow?: boolean }) {
   const s = useUsage();
   const t = useT();
   return (
-    <Press {...s.usageRefresh} {...(narrow ? s.usageRefreshNarrow : null)} onPress={onPress} label={t("app.usage.refreshLabel")} title={t("app.usage.refreshLabel")}>
-      <RefreshCw size={16} color={s.usageRefresh.color} />
-      <T {...tx(s.usageRefresh)}>{t("app.usage.refresh")}</T>
+    <Press {...s.usageTextAction} {...(refreshing ? s.usageRefreshing : null)} {...(narrow ? s.usageRefreshNarrow : null)} onPress={onPress} label={t("app.usage.refreshLabel")} title={t("app.usage.refreshLabel")}>
+      <RefreshCw size={14} color={s.usageTextAction.color} />
+      <T {...tx(s.usageTextAction)}>{t("app.usage.refresh")}</T>
     </Press>
   );
 }
@@ -275,12 +295,12 @@ function UsageSelection({ layout, record, onViewAll }: { layout: UsageLayout; re
   return (
     <Box {...s.usageSelection} {...(layout.wide ? s.usageSelectionWide : null)} label={t("app.usage.selectedThread")}>
       <row {...s.usageSelectionInfo} {...(layout.wide ? s.usageSelectionInfoWide : null)}>
-        <T {...s.usagePill}>{executionLabel(record)}</T>
+        <T {...s.usageSelectionKind}>{executionLabel(record)}</T>
         <T {...s.usageSelectionName}>{threadLabel(record)}</T>
         <T {...s.usageSelectionId} {...(layout.wide ? s.usageSelectionIdWide : null)}>{record.threadId}</T>
       </row>
-      <Press {...s.usageSelectionButton} onPress={onViewAll}>
-        <T {...tx(s.usageSelectionButton)}>{t("app.usage.viewAllThreads")}</T>
+      <Press {...s.usageTextAction} onPress={onViewAll}>
+        <T {...tx(s.usageTextAction)}>{t("app.usage.viewAllThreads")}</T>
       </Press>
     </Box>
   );

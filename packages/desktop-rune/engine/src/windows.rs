@@ -236,8 +236,8 @@ pub fn options(p: &Props) -> WindowOptions {
 }
 
 /// A window that is on screen for the system (so a webview inside runs as a visible page)
-/// but shows nothing, takes no clicks or focus, and stays out of the Dock, task switchers and
-/// screen captures.
+/// but shows nothing, takes no clicks or focus, and stays out of the Dock, task switchers,
+/// screen captures and the accessibility tree.
 fn is_background(p: &Props) -> bool {
     p.kind.as_deref() == Some("background")
 }
@@ -255,7 +255,9 @@ fn background_window(app: rune::App<Win>) -> rune::App<Win> {
             .collection_behavior(CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY),
     )
     .windows_window(rune::WindowsWindowOptions::default().no_activate(true).tool_window(true))
+    .linux_window(rune::LinuxWindowOptions::default().unmanaged(true))
     .exclude_from_capture(true)
+    .accessible(false)
 }
 
 pub fn app_spec(p: &Props) -> AppSpec<Win> {

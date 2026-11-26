@@ -53,9 +53,10 @@ its controls over it), `trafficLights` (macOS inset), `dark` (native chrome sche
 
 `kind="background"` holds a page that must run as if shown (a media `<webview>`: mic, WebAudio,
 timers) with no Stella window on screen: a 1×1 (or `w`×`h`) transparent, borderless,
-click-through window that never takes focus, is left out of captures and stays off the Dock and
-task switchers. macOS: a non-activating NSPanel on every Space. Windows: `WS_EX_NOACTIVATE` +
-tool window. Linux: a transparent click-through window opened inactive.
+click-through window that never takes focus, is left out of captures and stays off the Dock,
+task switchers and the accessibility tree. macOS: a non-activating NSPanel on every Space.
+Windows: `WS_EX_NOACTIVATE` + tool window. Linux X11: override-redirect, so the window manager
+never sees it (native Wayland has no such window).
 
 `visible={false}` at mount creates no native window until it turns true; turning it false later
 hides (unmaps) the window and keeps its state.

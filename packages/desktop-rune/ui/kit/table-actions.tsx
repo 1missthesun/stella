@@ -186,8 +186,10 @@ function Fullscreen({ id, table, onClose }: { id: string; table: Table; onClose:
   );
 }
 
-/** Streamdown's table controls for a `<markdown>`: pass `onTableAction` to it, `actions` as its `mdStyle.tableFrame.actions`, and render `overlay` beside it. */
-export function useTableActions(id: string): { onTableAction: (a: TableAction) => void; actions: typeof TABLE_ACTIONS; overlay: ReactNode } {
+type TableFrameStyle = { actions: typeof TABLE_ACTIONS; actionsOnHover?: boolean };
+
+/** Streamdown's table controls for a `<markdown>`: pass `onTableAction` to it, its `mdStyle` through `withFrame`, and render `overlay` beside it. */
+export function useTableActions(id: string): { onTableAction: (a: TableAction) => void; withFrame: <S extends { tableFrame: TableFrameStyle }>(style: S) => S; overlay: ReactNode } {
   const [state, setState] = useState<{ table: Table; menu: Menu | null; fullscreen: boolean } | null>(null);
   const [copied, markCopied] = useCopied();
   const onTableAction = useCallback(
@@ -206,5 +208,11 @@ export function useTableActions(id: string): { onTableAction: (a: TableAction) =
   ) : state.menu ? (
     <FormatMenu id={`${id}-table`} menu={state.menu} table={state.table} onClose={close} onCopied={markCopied} />
   ) : null;
-  return { onTableAction, actions: copied ? COPIED_ACTIONS : TABLE_ACTIONS, overlay };
+  const pinned = !!state?.menu;
+  const withFrame = useCallback(
+    <S extends { tableFrame: TableFrameStyle }>(style: S): S =>
+      copied || pinned ? { ...style, tableFrame: { ...style.tableFrame, actions: copied ? COPIED_ACTIONS : style.tableFrame.actions, actionsOnHover: pinned ? false : style.tableFrame.actionsOnHover } } : style,
+    [copied, pinned],
+  );
+  return { onTableAction, withFrame, overlay };
 }

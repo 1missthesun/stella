@@ -34,6 +34,9 @@ export type ChatSurfaceLook = {
 /** Streamdown draws bold and table headers as `font-semibold`, over `.markdown strong`'s medium. */
 const STREAMDOWN_BOLD = 600;
 
+/** Assistant table headers take `--chat-text-strong-weight` (medium), over Streamdown's semibold. */
+export const CHAT_TABLE_HEADER_WEIGHT = 500;
+
 const textLook = (text: ChatText) => ({ size: text.size, weight: text.weight, lineHeight: Math.round(text.size * text.lineHeight * 100) / 100, tracking: 0 });
 
 const FULL_LOOK: ChatSurfaceLook = {

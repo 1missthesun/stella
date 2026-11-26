@@ -73,7 +73,7 @@ export function markdownStyle(t: Tokens, chat: ChatText = CHAT_TEXT, highlight =
     tableCellPadding: [24, 10],
     tableHeaderPad: [24, 8],
     tableFlushLeft: true,
-    tableFont: body,
+    tableFont: { ...body, lineHeight: lh(chat.size, 20 / 14) },
     tableFullWidth: true,
     selection: mix(c.primary, 30, "transparent"),
     syntax: highlight ? (t.dark ? GITHUB.dark : GITHUB.light) : plainSyntax(text),
@@ -127,7 +127,7 @@ export function Markdown({ id, text, streaming = false, chat = CHAT_TEXT, highli
   const t = useTokens();
   const style = derive(t, `markdown:${chat.size}:${chat.color ?? ""}:${highlight}`, (t) => markdownStyle(t, chat, highlight));
   const tables = useTableActions(id);
-  const withActions = useMemo(() => (tables.actions === TABLE_ACTIONS ? style : { ...style, tableFrame: { ...style.tableFrame, actions: tables.actions } }), [style, tables.actions]);
+  const withActions = useMemo(() => tables.withFrame(style), [style, tables.withFrame]);
   return (
     <>
       <markdown id={id} src={text} streaming={streaming} selectable mdStyle={withActions} onLink={onLink} onCodeAction={codeAction} onTableAction={tables.onTableAction} w="full" />

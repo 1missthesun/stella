@@ -10,9 +10,9 @@ import { cloudDriveEntry } from "@/features/workspace-display/derive-conversatio
 import { shouldUseBoundedMarkdownPlaintext } from "@/features/chat/streaming/markdown-chunks";
 import { translateNow } from "@/shared/i18n";
 import { derive, useTokens } from "../theme";
-import { markdownCodeAction, markdownStyle, TABLE_ACTIONS, useTableActions, type ChatText } from "../kit";
+import { markdownCodeAction, markdownStyle, useTableActions, type ChatText } from "../kit";
 import { fetchedImageSources, prepareChatMarkdown, stellaAppSlug, stellaFilePath } from "./markdown-source";
-import { BUBBLE_FEATURES, useChatSurfaceLook } from "./chat-text";
+import { BUBBLE_FEATURES, CHAT_TABLE_HEADER_WEIGHT, useChatSurfaceLook } from "./chat-text";
 import { rune } from "./engine";
 
 interface MarkdownProps {
@@ -57,9 +57,10 @@ export const Markdown = memo(function Markdown({ text, cacheKey, hideHorizontalR
     body: { ...markdownStyle(t, chat, false).body, features: BUBBLE_FEATURES },
     codeMargin: [16, 16],
     tableMargin: [16, 16],
+    tableHeaderWeight: CHAT_TABLE_HEADER_WEIGHT,
     tableFrame: { ...markdownStyle(t, chat, false).tableFrame, actionsFill: t.c.chatAssistantBubbleFillTop },
   }));
-  const mdStyle = useMemo(() => (tables.actions === TABLE_ACTIONS ? style : { ...style, tableFrame: { ...style.tableFrame, actions: tables.actions } }), [style, tables.actions]);
+  const mdStyle = useMemo(() => tables.withFrame(style), [style, tables.withFrame]);
   const linkStyles = derive(t, "chat-markdown-links", (t) => [{ prefix: "stella-file:", color: t.c.textInteractive, underline: t.c.textInteractive }]);
   const hiddenKey = hiddenFilePaths?.join("\0") ?? "";
   const source = useMemo(

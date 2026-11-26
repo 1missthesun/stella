@@ -213,6 +213,7 @@ function table(n: Md, c: Ctx, key: number): ReactNode {
       verticalAlign: "top",
     };
     if (flush && i === 0) style.paddingLeft = 0;
+    if (flush && i === (row.children?.length ?? 0) - 1) style.paddingRight = 0;
     if (header) {
       style.color = s.tableHeaderText;
       style.fontWeight = s.tableHeaderWeight ?? 600;

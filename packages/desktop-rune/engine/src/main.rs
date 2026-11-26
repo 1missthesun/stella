@@ -245,6 +245,8 @@ fn main() {
     #[cfg(target_os = "linux")]
     {
         rune::set_app_id("stella-v2");
+        // Chromium names the AT-SPI application after argv[0], and the launcher runs Electron's own binary.
+        rune::set_accessibility_app_name("electron");
         let _ = rune_notify::register(&rune_notify::Identity::new("stella", "Stella"));
     }
     // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.

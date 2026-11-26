@@ -412,8 +412,60 @@ fn ensure_gtk() {
             // SAFETY: set once on the UI thread before GTK/WebKit start any threads.
             unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1") };
         }
+        gtk::glib::set_prgname(Some("electron"));
         let _ = gtk::init();
+        atk_bridge::set(false);
     }
+}
+
+/// GTK's AT-SPI bridge registers the process as an accessibility application of its own beside
+/// AccessKit's, holding the views' pages. It runs only while a view sits in a shown window:
+/// Electron exposes nothing of a hidden window, such as the media page's background one.
+#[cfg(target_os = "linux")]
+mod atk_bridge {
+    use std::cell::Cell;
+    use std::ffi::{CStr, c_char, c_int};
+
+    thread_local! {
+        static ON: Cell<bool> = const { Cell::new(true) };
+    }
+
+    fn symbol(name: &CStr) -> *mut libc::c_void {
+        // SAFETY: a lookup in the symbols already loaded (GTK links libatk-bridge).
+        unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) }
+    }
+
+    pub fn set(on: bool) {
+        if ON.get() == on {
+            return;
+        }
+        if on {
+            let init = symbol(c"atk_bridge_adaptor_init");
+            if init.is_null() {
+                return;
+            }
+            // SAFETY: at-spi2-atk's `int atk_bridge_adaptor_init(int *argc, char ***argv)`, which
+            // takes null arguments, called on GTK's thread.
+            let init: unsafe extern "C" fn(*mut c_int, *mut *mut *mut c_char) -> c_int = unsafe { std::mem::transmute(init) };
+            unsafe { init(std::ptr::null_mut(), std::ptr::null_mut()) };
+        } else {
+            let cleanup = symbol(c"atk_bridge_adaptor_cleanup");
+            if cleanup.is_null() {
+                return;
+            }
+            // SAFETY: at-spi2-atk's `void atk_bridge_adaptor_cleanup(void)`, on GTK's thread.
+            let cleanup: unsafe extern "C" fn() = unsafe { std::mem::transmute(cleanup) };
+            unsafe { cleanup() };
+        }
+        ON.set(on);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn bridge_views() {
+    let windows: Vec<u32> = VIEWS.with(|v| v.borrow().values().map(|view| view.window).collect());
+    let shown = engine::read(|e| windows.iter().any(|w| e.tree.get(*w).is_some_and(|n| n.props.kind.as_deref() != Some("background"))));
+    atk_bridge::set(shown);
 }
 
 /// WebView2 serves a custom scheme only as `https://<scheme>.<host>/…` (wry's mapping, which also
@@ -640,6 +692,8 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 VIEWS.with(|v| {
                     v.borrow_mut().insert(n, View { view, window, protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: 0.0, #[cfg(target_os = "linux")] backdrop: None })
                 });
+                #[cfg(target_os = "linux")]
+                bridge_views();
                 element_event(n, "ready", json!({}), None);
             }
             Err(e) => {
@@ -1352,6 +1406,7 @@ fn destroy(views: Vec<View>) {
             d.sync();
         }
         gtk::gdk::error_trap_pop_ignored();
+        bridge_views();
     }
     #[cfg(target_os = "macos")]
     for v in &views {

@@ -59,10 +59,11 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 - [ ] Auth: sign-in screen, magic link, remembered account, sign-out dialog, browser handoff
   - macOS: sign-in dialog matches in dark, light and Night Owl (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-*.jpg); remembered account (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-remembered-nightowl.jpg); sign-out dialog signed-in and signed-out (~/.stella/outputs/stella-rune/global/sbs/signout-*.jpg); signed-out home (~/.stella/outputs/stella-rune/global/sbs/signed-out-home-nightowl.jpg)
   - macOS: Turnstile in a `<window>` webview hands its token back through will-navigate as in Electron, and a magic-link sign-in on a dev test account completes from the UI (~/.stella/outputs/stella-rune/host/turnstile-magic-link-mac.txt, magic-link-signed-in-mac.png).
-  - macOS gap: the sign-in recording is still owed (global). Browser handoff is not exercised (it opens the real browser).
+  - macOS: sign-in flow recorded end to end in Night Owl: Sign in → email → Continue → Turnstile → link sent → link confirmed → signed-in home (~/.stella/outputs/stella-rune/global/rec/signin-rune.mp4); focus ring matches Electron (~/.stella/outputs/stella-rune/global/sbs/signin-focusring-nightowl-rune-over-electron.png)
+  - macOS gap: browser handoff (Continue with Google) is not exercised because it opens the real browser. At fps=30 `/control/record` slows the JS bridge enough that Turnstile times out, so the recording was captured at 8 fps (reported to engine).
 - [ ] Onboarding, local mode, permissions, mobile (get the app), legal dialog
   - macOS: onboarding first screen (~/.stella/outputs/stella-rune/global/sbs/onboarding-1.jpg, `session.ts start --first-run`); local mode via 'Use without an account' (~/.stella/outputs/stella-rune/global/sbs/local-mode-nightowl.jpg); get the app (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); legal (~/.stella/outputs/stella-rune/global/sbs/legal-terms-*.jpg)
-  - macOS gap: later onboarding steps and the permission prompts are not compared. The greeting wraps one word early because chat Markdown inserts U+2066/2069 isolates.
+  - macOS gap: later onboarding steps and the permission prompts are not compared. The isolates are gone, but the greeting still wraps one word early: Rune lays the line about 4px wider than Chromium in the same 611px box (~/.stella/outputs/stella-rune/global/sbs/onboarding-greeting-wrap-rune-over-electron.png; reported to engine).
 - [ ] Billing screen, plan & usage dialog, subscription upgrade, BYOK
   - macOS: plan & usage in 3 themes (~/.stella/outputs/stella-rune/global/sbs/plan-usage-*.jpg); upgrade dialog in Night Owl (~/.stella/outputs/stella-rune/global/sbs/upgrade-dialog-nightowl.jpg); BYOK rows in the Claude & ChatGPT tab (~/.stella/outputs/stella-rune/global/sbs/settings-claude-and-chatgpt-*.jpg)
   - macOS gap: the billing screen is not compared
@@ -73,7 +74,8 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
   - macOS gap: light theme and filter states not shot
 - [ ] Apps library + Cloud App panel/viewer, canvas share
   - macOS: Apps library (~/.stella/outputs/stella-rune/global/sbs/apps-library-nightowl.jpg); opening a Cloud App, recorded with the webview composited (~/.stella/outputs/stella-rune/global/rec/open-cloud-app-rune.mp4, ~/.stella/outputs/stella-rune/global/shots/cloud-app-open-nightowl-rune-composited.png)
-  - macOS gap: a native webview draws above engine modals (seen with the sign-out dialog over an open Cloud App; reported to engine). Canvas share is not covered.
+  - macOS: the Cloud App webview steps aside under dialogs, so the sign-out dialog and scrim sit over a dimmed app as in Electron (~/.stella/outputs/stella-rune/global/shots/webview-under-signout-nightowl-rune.png)
+  - macOS gap: canvas share is not covered.
 - [ ] Execution placement (device work offer, remote execution consent), schedule, self-host, integrations connect dialog
   - macOS: where Stella works (~/.stella/outputs/stella-rune/global/sbs/where-stella-works-*.jpg); integrations connect (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); remote execution consent on Rune only (~/.stella/outputs/stella-rune/global/shots/remote-consent-nightowl-rune.png)
   - macOS gap: schedule and self-host dialogs not compared against Electron

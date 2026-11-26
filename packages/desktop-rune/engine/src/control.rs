@@ -280,29 +280,50 @@ fn write_png(path: &std::path::Path, f: &rune::CapturedFrame) -> Result<Value, S
     Ok(json!({ "path": path.to_string_lossy(), "width": f.width, "height": f.height, "scale": f.scale }))
 }
 
-/// Captures the window's presented frames at `fps` for `seconds` into `dir/frame-NNNNN.png`,
-/// then replies with how many were written.
+/// Frames a recording reads back and encodes at once; a tick that finds this many still going
+/// is dropped, so encodes that fall behind cost frames instead of piling onto the host's and
+/// WebKit's CPU.
+const MAX_IN_FLIGHT: usize = 8;
+
+fn write_png_fast(path: &std::path::Path, f: &rune::CapturedFrame) -> Result<(), String> {
+    use image::ImageEncoder;
+    let file = std::fs::File::create(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    image::codecs::png::PngEncoder::new_with_quality(std::io::BufWriter::new(file), image::codecs::png::CompressionType::Fast, image::codecs::png::FilterType::Sub)
+        .write_image(&f.rgba, f.width, f.height, image::ExtendedColorType::Rgba8)
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Captures the window's presented frames at `fps` for `seconds` into `dir/frame-NNNNN.png`
+/// (numbered without gaps; `dropped` counts ticks skipped while encodes were behind), then
+/// replies with how many were written.
 #[allow(clippy::too_many_arguments)]
 fn record(handle: rune::WindowHandle, window: u32, dir: std::path::PathBuf, fps: f64, seconds: f64, shots: Arc<Mutex<Arc<Vec<Shot>>>>, rid: Option<u64>) {
     let spawned = std::thread::Builder::new().name("stella-record".into()).spawn(move || {
         let start = Instant::now();
         let step = Duration::from_secs_f64(1.0 / fps);
         let (done_tx, done_rx) = std::sync::mpsc::channel::<Result<(), String>>();
-        let mut asked = 0usize;
+        let in_flight = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (mut asked, mut dropped, mut tick) = (0usize, 0usize, 0u32);
         while start.elapsed().as_secs_f64() < seconds {
-            let at = start + step * asked as u32;
+            let at = start + step * tick;
+            tick += 1;
             if let Some(wait) = at.checked_duration_since(Instant::now()) {
                 std::thread::sleep(wait);
             }
+            if in_flight.load(std::sync::atomic::Ordering::Acquire) >= MAX_IN_FLIGHT {
+                dropped += 1;
+                continue;
+            }
+            in_flight.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
             let path = dir.join(format!("frame-{asked:05}.png"));
-            let done = done_tx.clone();
-            let shots = shots.clone();
+            let (done, shots, in_flight) = (done_tx.clone(), shots.clone(), in_flight.clone());
             handle.capture_frame(move |frame| {
                 let shots = shots.lock().unwrap_or_else(|e| e.into_inner()).clone();
                 let _ = done.send(frame.and_then(|mut f| {
                     composite(&mut f, &shots);
-                    write_png(&path, &f)
-                }).map(|_| ()));
+                    write_png_fast(&path, &f)
+                }));
+                in_flight.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
             });
             crate::windows::wake_all();
             asked += 1;
@@ -318,7 +339,7 @@ fn record(handle: rune::WindowHandle, window: u32, dir: std::path::PathBuf, fps:
                 Err(_) => {}
             }
         }
-        engine::reply_any_thread(rid, Ok(json!({ "dir": dir.to_string_lossy(), "frames": written, "asked": asked, "fps": fps, "errors": errors })));
+        engine::reply_any_thread(rid, Ok(json!({ "dir": dir.to_string_lossy(), "frames": written, "asked": asked, "dropped": dropped, "fps": fps, "errors": errors })));
     });
     if let Err(e) = spawned {
         engine::reply_any_thread(rid, Err(e.to_string()));

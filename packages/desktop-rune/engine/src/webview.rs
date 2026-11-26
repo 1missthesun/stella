@@ -262,13 +262,34 @@ mod scheme_url {
     }
 }
 
+#[cfg(target_os = "linux")]
+thread_local! {
+    static CONTEXT: RefCell<Option<wry::WebContext>> = const { RefCell::new(None) };
+}
+
+/// Linux views share one WebKit context, like Electron's default session: WebKitGTK answers a
+/// custom scheme with the first handler registered in the process, so a scheme registered by a
+/// view whose own context was freed would go unanswered for every later view.
 fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String> {
     #[cfg(target_os = "linux")]
-    ensure_gtk();
+    {
+        ensure_gtk();
+        CONTEXT.with(|c| {
+            let mut c = c.borrow_mut();
+            let context = c.get_or_insert_with(wry::WebContext::default);
+            let schemes: Vec<String> = p.protocols.iter().filter(|s| !context.is_custom_protocol_registered(s)).cloned().collect();
+            build(n, window, p, r, WebViewBuilder::new_with_web_context(context), &schemes)
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    build(n, window, p, r, WebViewBuilder::new(), &p.protocols)
+}
+
+fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, schemes: &[String]) -> Result<WebView, String> {
     let id = format!("stella-{n}");
     let protocols: Arc<[String]> = p.protocols.clone().into();
     let load_protocols = protocols.clone();
-    let mut b = WebViewBuilder::new()
+    let mut b = b
         .with_id(&id)
         .with_bounds(rect(window, r))
         .with_transparent(p.transparent)
@@ -317,11 +338,11 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
     if let Some(js) = &p.preload {
         b = b.with_initialization_script(js.clone());
     }
-    for scheme in &p.protocols {
+    for scheme in schemes {
         let scheme = scheme.clone();
         let name = scheme.clone();
-        // WebKitGTK keeps a scheme's first handler for the whole process, so route by the asking view.
         b = b.with_asynchronous_custom_protocol(name, move |id, req: Request<Vec<u8>>, responder: RequestAsyncResponder| {
+            // Linux registers a scheme once for every view, so the asking view picks the node.
             let n = id.strip_prefix("stella-").and_then(|v| v.parse().ok()).unwrap_or(n);
             let rid = NEXT_RID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             PENDING.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).insert(rid, responder);
@@ -522,9 +543,15 @@ mod mac {
     use objc2::sel;
     use objc2_web_kit::WKNavigationAction;
 
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     use block2::RcBlock;
-    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage};
-    use objc2_foundation::{NSDictionary, NSError};
+    use dispatch2::DispatchQueue;
+    use objc2_app_kit::NSImage;
+    use objc2_core_foundation::{CGPoint, CGRect, CGSize};
+    use objc2_core_graphics::{CGBitmapContextCreate, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo, CGImageByteOrderInfo, kCGColorSpaceSRGB};
+    use objc2_foundation::NSError;
     use objc2_quartz_core::CACornerMask;
     use wry::WebViewExtMacOS;
 
@@ -571,24 +598,66 @@ mod mac {
         }
     }
 
+    type Done = Box<dyn FnOnce(Option<image::RgbaImage>)>;
+
+    thread_local! {
+        static WAITING: RefCell<HashMap<u64, Done>> = RefCell::new(HashMap::new());
+    }
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+
+    struct Image(objc2::rc::Retained<CGImage>);
+    // SAFETY: a CGImage is immutable, and Quartz allows reading one from any thread.
+    unsafe impl Send for Image {}
+
+    /// The page's pixels as `done` gets them on the main thread; the decode runs on a worker, so
+    /// a recording's snapshot every frame leaves the main thread to WebKit and the host.
     pub fn snapshot(view: &wry::WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
-        let done = RefCell::new(Some(done));
+        let id = NEXT.fetch_add(1, Ordering::Relaxed);
+        WAITING.with(|w| w.borrow_mut().insert(id, Box::new(done)));
         let block = RcBlock::new(move |img: *mut NSImage, _err: *mut NSError| {
-            if let Some(done) = done.borrow_mut().take() {
-                // SAFETY: WebKit passes a valid NSImage or null for the call's duration.
-                done(unsafe { img.as_ref() }.and_then(decode));
+            // SAFETY: WebKit passes a valid NSImage or null for the call's duration; a null rect
+            // asks for the image's own size.
+            let cg = unsafe { img.as_ref() }.and_then(|i| unsafe { i.CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None) }).map(Image);
+            let spawned = std::thread::Builder::new().name("stella-snapshot".into()).spawn(move || {
+                let decoded = cg.and_then(|c| decode(&c.0));
+                DispatchQueue::main().exec_async(move || {
+                    if let Some(done) = WAITING.with(|w| w.borrow_mut().remove(&id)) {
+                        done(decoded);
+                    }
+                });
+            });
+            if spawned.is_err()
+                && let Some(done) = WAITING.with(|w| w.borrow_mut().remove(&id))
+            {
+                done(None);
             }
         });
         // SAFETY: called on the main thread; a nil configuration snapshots the visible bounds.
         unsafe { view.webview().takeSnapshotWithConfiguration_completionHandler(None, &block) };
     }
 
-    fn decode(img: &NSImage) -> Option<image::RgbaImage> {
-        let tiff = img.TIFFRepresentation()?;
-        let rep = NSBitmapImageRep::imageRepWithData(&tiff)?;
-        // SAFETY: an empty property dictionary is valid for PNG.
-        let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }?;
-        image::load_from_memory_with_format(&png.to_vec(), image::ImageFormat::Png).ok().map(|i| i.to_rgba8())
+    fn decode(cg: &CGImage) -> Option<image::RgbaImage> {
+        let (w, h) = (CGImage::width(Some(cg)), CGImage::height(Some(cg)));
+        if w == 0 || h == 0 {
+            return None;
+        }
+        let mut px = vec![0u8; w * h * 4];
+        // SAFETY: a static CoreGraphics constant.
+        let space = CGColorSpace::with_name(Some(unsafe { kCGColorSpaceSRGB }))?;
+        let info = CGImageAlphaInfo::PremultipliedLast.0 | CGImageByteOrderInfo::Order32Big.0;
+        // SAFETY: `px` holds `h` rows of `w * 4` bytes and outlives the context.
+        let ctx = unsafe { CGBitmapContextCreate(px.as_mut_ptr().cast(), w, h, 8, w * 4, Some(&space), info) }?;
+        CGContext::draw_image(Some(&ctx), CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(w as f64, h as f64)), Some(cg));
+        drop(ctx);
+        for p in px.as_chunks_mut::<4>().0 {
+            let a = u16::from(p[3]);
+            if a > 0 && a < 255 {
+                for c in &mut p[..3] {
+                    *c = ((u16::from(*c) * 255 + a / 2) / a).min(255) as u8;
+                }
+            }
+        }
+        image::RgbaImage::from_raw(w as u32, h as u32, px)
     }
 
     /// Rounds the WKWebView's own layer, which clips the page drawn in its sublayers.

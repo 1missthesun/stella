@@ -4267,6 +4267,7 @@ dependencies = [
  "objc2-av-foundation",
  "objc2-core-audio-types",
  "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-core-media",
  "objc2-core-video",
  "objc2-foundation 0.3.2",

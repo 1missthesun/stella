@@ -76,8 +76,13 @@ console.error(`[ui] boot ${(t_loaded - t_boot).toFixed(1)} ms load+bundle, first
 let pending: ReturnType<typeof setTimeout> | null = null;
 let changed = "";
 let t_seen = 0;
+const builtMtime = new Map<string, number>();
 watch(APP_DIR, { recursive: true }, (_ev, file) => {
   if (!file || !/\.(tsx?|json)$/.test(file)) return;
+  let mtime = -1;
+  try { mtime = statSync(join(APP_DIR, file)).mtimeMs; } catch {}
+  if (!pending && builtMtime.get(file) === mtime) return;
+  builtMtime.set(file, mtime);
   if (!pending) t_seen = now();
   changed = file;
   if (pending) clearTimeout(pending);

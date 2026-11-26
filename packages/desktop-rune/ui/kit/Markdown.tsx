@@ -14,10 +14,13 @@ const LINE_NUMBER_SIZE = 13;
 export const CHAT_TEXT: ChatText = { size: fontSize.lg, weight: 400, strongWeight: 500, lineHeight: 1.5 };
 export const CHAT_TEXT_COMPACT: ChatText = { ...CHAT_TEXT, size: fontSize.base };
 
-/** Chromium's disabled native checkbox, as measured in Electron. */
+/** Chromium's checkbox mark (NativeThemeBase::PaintCheckbox) in its 13px box: a stroke 0.16 of the box from 0.2 in to 0.8 across. */
+const CHECK_MARK = { markSize: 13, markView: 13, markSvg: '<path d="M2.6 6.5l2.6 2.6L10.4 2.6" fill="none" stroke="currentColor" stroke-width="2.08"/>' };
+
+/** Chromium's disabled native checkbox, as measured in Electron: unchecked, its outline is stroked half a pixel in, so its outer corners round 0.5 more. */
 const CHECKBOX = {
-  dark: { size: 13, radius: 2, top: 3, markSize: 12, fillOn: "#757575", mark: "#3b3b3b", fillOff: "#3b3b3b", borderOff: "#626262" },
-  light: { size: 13, radius: 2, top: 3, markSize: 12, fillOn: "rgba(196, 196, 196, 0.78)", mark: "rgba(234, 234, 234, 0.91)", fillOff: "rgba(245, 245, 245, 0.68)", borderOff: "rgba(186, 186, 186, 0.67)" },
+  dark: { size: 13, radius: 2, radiusOff: 2.5, top: 3, ...CHECK_MARK, fillOn: "#757575", mark: "#3b3b3b", fillOff: "#3b3b3b", borderOff: "#626262" },
+  light: { size: 13, radius: 2, radiusOff: 2.5, top: 3, ...CHECK_MARK, fillOn: "rgba(196, 196, 196, 0.78)", mark: "rgba(234, 234, 234, 0.91)", fillOff: "rgba(245, 245, 245, 0.68)", borderOff: "rgba(186, 186, 186, 0.67)" },
 };
 
 const GITHUB = {

@@ -135,7 +135,7 @@ pub fn decoded_since_built() -> Vec<u32> {
     })
 }
 
-fn icon_of(name: &str, body: &str, view: f32) -> &'static Icon {
+pub(crate) fn icon_of(name: &str, body: &str, view: f32) -> &'static Icon {
     let h = {
         use std::hash::{Hash, Hasher};
         let mut s = std::collections::hash_map::DefaultHasher::new();

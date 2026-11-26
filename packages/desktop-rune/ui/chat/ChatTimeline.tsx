@@ -349,8 +349,9 @@ export const ChatTimeline = memo(function ChatTimeline({
           {isLoadingOlder && hasOlderEvents ? <HistoryStatus /> : null}
           <list w="full" estimate={estimatedItemSize}>
             {listItems.map((item) => (
-              <col key={item.id} id={`chat-row:${item.id}`} w="full" pb={item.gapAfter} arrivesWhole={item.type === "message"}>
+              <col key={item.id} id={`chat-row:${item.id}`} w="full" arrivesWhole={item.type === "message"}>
                 {renderItem(item)}
+                {item.gapAfter > 0 ? <box h={item.gapAfter} /> : null}
               </col>
             ))}
           </list>

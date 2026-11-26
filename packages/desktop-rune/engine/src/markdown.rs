@@ -234,6 +234,14 @@ fn style(v: &Value) -> MarkdownStyle {
     if let Some(size) = v.get("taskCheckbox").and_then(|t| num(t, "markSize")) {
         s = s.task_mark_size(size);
     }
+    if let Some(t) = v.get("taskCheckbox")
+        && let Some(body) = t.get("markSvg").and_then(Value::as_str)
+    {
+        s = s.task_check(crate::media::icon_of("md-task-check", body, num(t, "markView").unwrap_or(16.0)));
+    }
+    if let Some(radius) = v.get("taskCheckbox").and_then(|t| num(t, "radiusOff")) {
+        s = s.task_unchecked_radius(radius);
+    }
     if let Some(gap) = num(v, "taskAfterMarker") {
         s = s.task_after_marker(gap);
     }

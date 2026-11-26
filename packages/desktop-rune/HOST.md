@@ -67,10 +67,11 @@ These live on rune/desktop only and go to master at ship time:
   value for a backend view and `clear(view?)` drops it. Verification stages the same view state in
   both apps with it (the Email workspace side-by-sides); production builds never install it.
 - `packages/desktop/electron/services/app-source/web-renderer.ts`: with
-  `STELLA_LAUNCHER_ENGINE=rune` and `packages/desktop-rune/web/build.ts` in the checkout, a
-  pushed change builds the per-user web renderer from the Rune `ui/` (WEB.md, "Per-user
-  renderers"): its own inputs, uploaded ref `refs/stella/web-renderer-rune` and renderer id.
-  Under Electron it builds desktop-ui exactly as before.
+  `STELLA_LAUNCHER_ENGINE=rune` and `packages/desktop-rune/web/build.ts` in the checkout, the
+  per-user web renderer builds from the Rune `ui/` (WEB.md, "Per-user renderers"): its own inputs,
+  uploaded ref `refs/stella/web-renderer-rune` and renderer id. Under Electron it builds
+  desktop-ui. Either way it runs whenever the fork holds HEAD (`onForkCurrent`, after a push and
+  at launch) and rebuilds when the engine changed since the last upload.
 - `packages/theme/color.ts`: `mixOklch` / `mixOklchCss` take an optional powerless-chroma
   threshold and export `CSS_POWERLESS_CHROMA` (0.02), the chroma below which Chromium's
   `color-mix(in oklch)` drops an sRGB colour's hue. `ui/theme`'s `mixOklch` passes it, so

@@ -13,6 +13,8 @@ export type WebRendererDeps = {
 
 const SHARED_INPUTS = ["packages/desktop-ui/", "packages/contracts/", "packages/theme/", "bun.lock"];
 const UPSTREAM_REF = "refs/remotes/stella-upstream/main";
+/** The renderer kind (its uploaded ref) the backend last recorded for this checkout, so a desktop that changes engine uploads its own build even when HEAD hasn't moved. */
+const LAST_KIND_KEY = "stella.webRendererKind";
 
 type RendererKind = {
   inputs: string[];
@@ -83,8 +85,12 @@ export const tarDirectory = (root: string): Buffer => {
 const uploadOnce = async (cwd: string, deps: WebRendererDeps) => {
   const kind = rendererKind(cwd);
   const head = await git(cwd, ["rev-parse", "HEAD"]);
+  const otherRef = kind === RUNE_RENDERER ? DESKTOP_UI_RENDERER.uploadedRef : RUNE_RENDERER.uploadedRef;
+  const lastKind =
+    (await gitRaw(cwd, ["config", "--get", LAST_KIND_KEY])).stdout.trim() || ((await verifiedRef(cwd, otherRef)) ? otherRef : null);
+  const switched = lastKind !== null && lastKind !== kind.uploadedRef;
   const base = (await verifiedRef(cwd, kind.uploadedRef)) ?? (await verifiedRef(cwd, UPSTREAM_REF));
-  if (base) {
+  if (base && !switched) {
     const changed = await git(cwd, ["diff", "--name-only", base, head, "--", ...kind.inputs]);
     if (!changed) return;
   }
@@ -112,7 +118,9 @@ const uploadOnce = async (cwd: string, deps: WebRendererDeps) => {
       throw new Error(`The browser renderer upload failed (${response.status}): ${(await response.text()).slice(0, 300)}`);
     }
     await git(cwd, ["update-ref", kind.uploadedRef, head]);
+    await git(cwd, ["config", LAST_KIND_KEY, kind.uploadedRef]);
     deps.log("app-source.web-renderer-uploaded", {
+      kind: kind.uploadedRef,
       treeSha,
       rendererId,
       bytes: archive.byteLength,

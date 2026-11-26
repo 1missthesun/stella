@@ -236,6 +236,7 @@ fn main() {
         });
     })
     .on_frame_encoded(|f| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_frame(f))
+    .on_frame_presented(|p| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_presented(p))
     .on_quit(|_s: &mut Win, _| {
         if let Some(c) = engine::with(|e| e.child.take()) {
             end_host(c);

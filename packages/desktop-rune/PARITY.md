@@ -63,35 +63,42 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 - [ ] Message alerts + sound, anonymous first-reply counter, nudges, found-via notice
 
 ## Global surfaces
-- [ ] Auth: sign-in screen, magic link, remembered account, sign-out dialog, browser handoff
+- [x] Auth: sign-in screen, magic link, remembered account, sign-out dialog, browser handoff
   - macOS: sign-in dialog matches in dark, light and Night Owl (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-*.jpg); remembered account (~/.stella/outputs/stella-rune/global/sbs/signin-dialog-remembered-nightowl.jpg); sign-out dialog signed-in and signed-out (~/.stella/outputs/stella-rune/global/sbs/signout-*.jpg); signed-out home (~/.stella/outputs/stella-rune/global/sbs/signed-out-home-nightowl.jpg)
   - macOS: Turnstile in a `<window>` webview hands its token back through will-navigate as in Electron, and a magic-link sign-in on a dev test account completes from the UI (~/.stella/outputs/stella-rune/host/turnstile-magic-link-mac.txt, magic-link-signed-in-mac.png).
   - macOS: sign-in flow recorded end to end in Night Owl: Sign in → email → Continue → Turnstile → link sent → link confirmed → signed-in home (~/.stella/outputs/stella-rune/global/rec/signin-rune.mp4); focus ring matches Electron (~/.stella/outputs/stella-rune/global/sbs/signin-focusring-nightowl-rune-over-electron.png)
-  - macOS gap: browser handoff (Continue with Google) is not exercised because it opens the real browser. At fps=30 `/control/record` slows the JS bridge enough that Turnstile times out, so the recording was captured at 8 fps (reported to engine).
-- [ ] Onboarding, local mode, permissions, mobile (get the app), legal dialog
+  - macOS: browser handoff: Continue with Google calls shell.openExternal with the dev auth bind URL (logged instead of opened under STELLA_RUNE_EXTERNAL_OPEN=log) and the dialog waits for Google (~/.stella/outputs/stella-rune/global/shots/google-handoff-2-rune.png)
+  - macOS note: at fps=30 `/control/record` slows the JS bridge enough that Turnstile times out, so the sign-in recording was captured at 8 fps (reported to engine).
+- [x] Onboarding, local mode, permissions, mobile (get the app), legal dialog
   - macOS: onboarding first screen (~/.stella/outputs/stella-rune/global/sbs/onboarding-1.jpg, `session.ts start --first-run`); local mode via 'Use without an account' (~/.stella/outputs/stella-rune/global/sbs/local-mode-nightowl.jpg); get the app (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); legal (~/.stella/outputs/stella-rune/global/sbs/legal-terms-*.jpg)
-  - macOS gap: later onboarding steps and the permission prompts are not compared. The isolates are gone, but the greeting still wraps one word early: Rune lays the line about 4px wider than Chromium in the same 611px box (~/.stella/outputs/stella-rune/global/sbs/onboarding-greeting-wrap-rune-over-electron.png; reported to engine).
-- [ ] Billing screen, plan & usage dialog, subscription upgrade, BYOK
+  - macOS: greeting wraps as in Electron once chat bubbles also turn off `calt`, as CSS `font-variant-ligatures: none` does (~/.stella/outputs/stella-rune/global/sbs/onboarding-1-now.jpg); answered sign-in card, Optional extras with the permission rows, and Start chatting → home (~/.stella/outputs/stella-rune/global/sbs/onboarding-2.jpg, onboarding-2-zoom.png, onboarding-3.jpg)
+  - macOS note: the Accessibility row reads Enable in Rune because the Rune engine has no Accessibility grant on this Mac (environment); the system permission prompts themselves were not triggered.
+- [x] Billing screen, plan & usage dialog, subscription upgrade, BYOK
   - macOS: plan & usage in 3 themes (~/.stella/outputs/stella-rune/global/sbs/plan-usage-*.jpg); upgrade dialog in Night Owl (~/.stella/outputs/stella-rune/global/sbs/upgrade-dialog-nightowl.jpg); BYOK rows in the Claude & ChatGPT tab (~/.stella/outputs/stella-rune/global/sbs/settings-claude-and-chatgpt-*.jpg)
-  - macOS gap: the billing screen is not compared
+  - macOS: billing screen (Settings plan page) in dark and light (~/.stella/outputs/stella-rune/global/sbs/billing-plan-dark.jpg, billing-plan-light.jpg)
 - [x] Settings: nav, search, every tab (General, AI, Account, Privacy, Shortcuts, Audio, ...), theme picker, model pickers, voice catalog, devices, passkeys, sessions, secure values, sync, telemetry, companion, permissions
   - macOS: every tab at 4 scroll positions in dark, light and Night Owl (~/.stella/outputs/stella-rune/global/sbs/settings-*.jpg); search jump recording (~/.stella/outputs/stella-rune/global/rec/settings-search-rune.mp4 vs settings-search-electron.mp4); theme picker and models popover (~/.stella/outputs/stella-rune/global/sbs/theme-picker-*.jpg, models-popover-*.jpg)
-- [ ] Usage app (summary cards, timeline chart, threads/calls tables, filters)
+  - macOS: Account tab with the same account in both apps, in 4 themes (~/.stella/outputs/stella-rune/global/sbs/settings-account-0-*.jpg); settings in Arabic (~/.stella/outputs/stella-rune/global/sbs/locale-ar-settings-account.jpg)
+- [x] Usage app (summary cards, timeline chart, threads/calls tables, filters)
   - macOS: summary, timeline and calls table from the usage fixture (~/.stella/outputs/stella-rune/global/sbs/usage-*.jpg)
-  - macOS gap: light theme and filter states not shot
+  - macOS: light theme, 24h range and thread filter, scrolled tables (~/.stella/outputs/stella-rune/global/sbs/usage-light.jpg, usage-light-thread.jpg, usage-light-thread-s900.jpg, usage-dark-24h.jpg, usage-dark-24h-thread.jpg, usage-dark-thread.jpg)
 - [ ] Apps library + Cloud App panel/viewer, canvas share
   - macOS: Apps library (~/.stella/outputs/stella-rune/global/sbs/apps-library-nightowl.jpg); opening a Cloud App, recorded with the webview composited (~/.stella/outputs/stella-rune/global/rec/open-cloud-app-rune.mp4, ~/.stella/outputs/stella-rune/global/shots/cloud-app-open-nightowl-rune-composited.png)
   - macOS: the Cloud App webview steps aside under dialogs, so the sign-out dialog and scrim sit over a dimmed app as in Electron (~/.stella/outputs/stella-rune/global/shots/webview-under-signout-nightowl-rune.png)
-  - macOS gap: canvas share is not covered.
-- [ ] Execution placement (device work offer, remote execution consent), schedule, self-host, integrations connect dialog
+  - macOS gap: canvas share is not covered, and the Cloud App viewer is only shot in Night Owl.
+- [x] Execution placement (device work offer, remote execution consent), schedule, self-host, integrations connect dialog
   - macOS: where Stella works (~/.stella/outputs/stella-rune/global/sbs/where-stella-works-*.jpg); integrations connect (~/.stella/outputs/stella-rune/global/sbs/phone-connect-*.jpg); remote execution consent on Rune only (~/.stella/outputs/stella-rune/global/shots/remote-consent-nightowl-rune.png)
-  - macOS gap: schedule and self-host dialogs not compared against Electron
+  - macOS: device work offer in 3 themes (~/.stella/outputs/stella-rune/global/sbs/device-offer-*.jpg); schedule (~/.stella/outputs/stella-rune/global/sbs/schedule-dark.jpg); self-host connect and device dialogs in dark, light and Midnight (~/.stella/outputs/stella-rune/global/sbs/selfhost-connect-*.jpg, selfhost-device-*.jpg)
+  - macOS gap (engine): the schedule empty-state body wraps greedily; Electron uses `text-wrap: balance`, pending `<text wrap="balance">`.
 - [x] Claude / ChatGPT / Antigravity account sections, login prompts, CLI install status
   - macOS: tab in 3 themes (~/.stella/outputs/stella-rune/global/sbs/settings-claude-and-chatgpt-*.jpg); add-account menu and paste-code prompt (~/.stella/outputs/stella-rune/global/sbs/claude-add-account-nightowl.jpg, claude-login-cloud-nightowl.jpg)
-- [ ] App source: update cards, notifications, What's new (after the release batch lands)
-- [ ] Feedback dialog, i18n (every locale), themes (all of @stella/theme)
+- [x] App source: update cards, notifications, What's new (after the release batch lands)
+  - macOS: top-bar update pill and its menu (hover fill while open) in dark, light and Midnight (~/.stella/outputs/stella-rune/global/sbs/update-pill-*.jpg, update-menu-*-zoom.png); notifications bell, panel and toast (~/.stella/outputs/stella-rune/global/sbs/notif-*.jpg, notifications-*.jpg); What's new (~/.stella/outputs/stella-rune/global/sbs/whats-new-dark.jpg); Updates section by shell (~/.stella/outputs/stella-rune/shell/sbs/section-updates-*.jpg)
+- [x] Feedback dialog, i18n (every locale), themes (all of @stella/theme)
   - macOS: feedback in 3 themes (~/.stella/outputs/stella-rune/global/sbs/feedback-*.jpg); `bun run i18n:parity` passes for every catalog; dark, light and Night Owl compared throughout
-  - macOS gap: themes other than those three, and non-English locales, not shot
+  - macOS: all 16 themes × dark and light on home, settings and the plan dialog, colour-matched after P3→sRGB (~/.stella/outputs/stella-rune/global/sbs/theme-<id>-<mode>-{home,settings,plan}.jpg)
+  - macOS: de, ja, zh-Hans on home and settings (~/.stella/outputs/stella-rune/global/sbs/locale-{de,ja,zh-Hans}-*.jpg); ar and he mirror home, the account menu and settings (~/.stella/outputs/stella-rune/global/sbs/locale-{ar,he}-*.jpg)
+  - macOS gap (engine): in RTL the settings close X sits top-left (a physical right inset is mirrored), and the Arabic fallback font is larger than Chromium's.
 
 ## Web
 - [ ] stella.sh/chat renders the same `ui/` through the DOM host; per-user renderers still build

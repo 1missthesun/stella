@@ -61,6 +61,7 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
   nativeTheme.on("updated", () => dom.setAppearance({ dark: nativeTheme.shouldUseDarkColors }));
   win.on("focus", () => dom.setFocused(true));
   win.on("blur", () => dom.setFocused(false));
+  dom.setFocused(win.isFocused());
   win.on("show", () => dom.setVisible(true));
   win.on("hide", () => dom.setVisible(false));
   win.on("minimize", () => dom.setVisible(false));

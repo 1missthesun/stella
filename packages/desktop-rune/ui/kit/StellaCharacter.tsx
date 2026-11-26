@@ -126,6 +126,7 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
   const markRef = useRef<StellaMarkHandle | null>(null);
   const motion = useRef({ state, shape, paused });
   motion.current = { state, shape, paused };
+  const resumeDrawing = useRef(() => {});
   const colours = useRef<Record<string, string>>({});
   colours.current = { ...t.vars, "--fg": t.c.foreground };
 
@@ -159,7 +160,7 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
     let last = "";
     let raf = 0;
     const draw = () => {
-      raf = requestAnimationFrame(draw);
+      raf = motion.current.paused ? 0 : requestAnimationFrame(draw);
       const next = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}">${serialize(mark.el as unknown as Node, resolve)}</svg>`;
       if (next === last) return;
       last = next;
@@ -167,7 +168,9 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
       else setSvg(next);
     };
     draw();
+    resumeDrawing.current = () => { if (!raf) draw(); };
     return () => {
+      resumeDrawing.current = () => {};
       cancelAnimationFrame(raf);
       markRef.current = null;
       if (handleRef?.current === mark) handleRef.current = null;
@@ -187,6 +190,8 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
     if (paused) markRef.current?.pause();
     else markRef.current?.resume();
   }, [paused]);
+
+  useEffect(() => resumeDrawing.current());
 
   const px = size ?? 22;
   return svg ? <vector ref={vector} svg={svg} w={px} h={px} shrink={false} inert /> : <box w={px} h={px} shrink={false} />;

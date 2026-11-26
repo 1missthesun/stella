@@ -564,12 +564,7 @@ export class BrowserWindow extends BaseWindow {
   }
   focus() {
     if (this.destroyed || !this.state.focusable) return;
-    for (const other of BrowserWindow.getAllWindows()) if (other !== this && other.state.focused) other.handleEngineEvent("blur");
-    if (!this.state.focused) {
-      this.state.focused = true;
-      this.webContents.markFocused(true);
-      this.emit("focus");
-    }
+    // Focus is the window manager's to grant (Hyprland, GNOME and macOS may refuse it): only the engine's focus event marks it.
     this.engineCall("focus", (e, id) => e.window.focus(id));
   }
   blur() { if (this.state.focused) this.handleEngineEvent("blur"); }

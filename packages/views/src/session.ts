@@ -107,6 +107,8 @@ export class ViewSession {
   private loadStartedAt = 0;
   private disposed = false;
   private unsubscribeStorage: (() => void) | null = null;
+  /** Storage changes heard while no run was there to take them (one is starting), newest per key. */
+  private storageWhileStarting = new Map<string, unknown>();
   readonly logs: ViewLog[] = [];
 
   constructor(options: ViewSessionOptions) {
@@ -121,7 +123,8 @@ export class ViewSession {
           if (value === undefined || value === null) delete this.storageCache[key];
           else this.storageCache[key] = value;
         }
-        this.deliver({ t: "storage", key, value });
+        if (this.run) this.run.deliver([{ t: "storage", key, value }]);
+        else this.storageWhileStarting.set(key, value);
       }) ?? null;
   }
 
@@ -222,6 +225,11 @@ export class ViewSession {
         return;
       }
       this.run = run;
+      // The run started from the storage as it was when it began; what changed since comes after.
+      if (this.storageWhileStarting.size > 0) {
+        run.deliver([...this.storageWhileStarting].map(([key, value]) => ({ t: "storage", key, value }) as const));
+        this.storageWhileStarting.clear();
+      }
     } catch (caught) {
       if (token !== this.runToken) return;
       const message = caught instanceof Error ? caught.message : String(caught);

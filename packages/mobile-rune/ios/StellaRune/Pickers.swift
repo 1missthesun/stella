@@ -24,6 +24,17 @@ final class Pickers: NSObject, PHPickerViewControllerDelegate, UIDocumentPickerD
     case "clipboard.readText":
       Pickers.reply(rid, UIPasteboard.general.string ?? "")
       return true
+    case "clipboard.read":
+      // The bridge's `clipboard.read`/`readText`/`readHTML` shape (desktop-rune/host/bridge.ts ClipboardRead).
+      let pb = UIPasteboard.general
+      let text = pb.string ?? ""
+      let html = (pb.data(forPasteboardType: UTType.html.identifier)).flatMap { String(data: $0, encoding: .utf8) }
+      var formats: [String] = []
+      if !text.isEmpty { formats.append("text/plain") }
+      if html != nil { formats.append("text/html") }
+      if pb.hasImages { formats.append("image/png") }
+      Pickers.reply(rid, ["text": text, "html": html ?? NSNull(), "files": [String](), "image": NSNull(), "formats": formats] as [String: Any])
+      return true
     case "dialog.openFile":
       openFile(rid: rid, multi: (m["multi"] as? Bool) ?? false)
       return true

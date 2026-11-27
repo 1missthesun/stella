@@ -110,6 +110,12 @@ class JSRuntime(private val context: Context) {
     ready.await()
   }
 
+  /** Dev builds' driver: runs `code` in the runtime; its errors go to the log. */
+  fun evalDev(code: String) {
+    if (!BuildConfig.STELLA_DEV) return
+    perform { v8.getExecutor(code).setResourceName("driver.js").executeVoid() }
+  }
+
   /** Runs `block` on the JS thread. */
   fun perform(block: () -> Unit) {
     handler.post {

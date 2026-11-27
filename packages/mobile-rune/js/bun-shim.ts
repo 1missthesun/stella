@@ -38,21 +38,34 @@ g.TextDecoder = class extends Decoder {
   }
 };
 
+const MIME: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", heic: "image/heic", pdf: "application/pdf",
+  txt: "text/plain", md: "text/markdown", json: "application/json", csv: "text/csv", html: "text/html", mp4: "video/mp4", mov: "video/quicktime", mp3: "audio/mpeg", m4a: "audio/mp4", wav: "audio/wav",
+};
+
+/**
+ * Bun's `BunFile`: a Blob over a file, read when its bytes are asked for. Being a real Blob
+ * matters: `new File([Bun.file(path)], name)` (the composer's attachments) copies a Blob's
+ * bytes, where any other object becomes the text "[object Object]".
+ */
+class BunFile extends (g.Blob as { new (parts?: unknown[], opts?: { type?: string }): any }) {
+  readonly name: string;
+  constructor(path: string) {
+    const ext = path.includes(".") ? path.split(".").pop()!.toLowerCase() : "";
+    super([], { type: MIME[ext] ?? "" });
+    this.name = path;
+    // BlobPoly keeps its bytes in `_bytes`; here they're the file's, read on each use.
+    Object.defineProperty(this, "_bytes", { get: () => this.read() ?? new Uint8Array(), configurable: true });
+  }
+  private read(): Uint8Array | null { return __native.readFile(this.name); }
+  get lastModified() { return Date.now(); }
+  async exists() { return this.read() !== null; }
+  async json() { return JSON.parse(await this.text()); }
+}
+
 const file = (p: string | number | URL) => {
   if (typeof p === "number") return { stream: () => eventStream };
-  const path = String(p).replace(/^file:\/\//, "");
-  const read = () => __native.readFile(path);
-  return {
-    name: path,
-    get size() { return read()?.length ?? 0; },
-    type: "",
-    exists: async () => read() !== null,
-    bytes: async () => read() ?? new Uint8Array(),
-    arrayBuffer: async () => (read() ?? new Uint8Array()).slice().buffer,
-    text: async () => new TextDecoder().decode(read() ?? new Uint8Array()),
-    json: async () => JSON.parse(new TextDecoder().decode(read() ?? new Uint8Array())),
-    stream: () => new ReadableStream({ start(c: any) { c.enqueue(read() ?? new Uint8Array()); c.close(); } }),
-  };
+  return new BunFile(String(p).replace(/^file:\/\//, ""));
 };
 
 g.Bun = {

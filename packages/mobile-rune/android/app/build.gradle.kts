@@ -65,4 +65,8 @@ dependencies {
   // V8 (with Intl) for the JS thread: JIT, ES2024+, the engine Chrome runs.
   implementation("com.caoccao.javet:javet-v8-android-i18n:6.0.4")
   implementation("com.squareup.okhttp3:okhttp:5.5.1")
+  // The photo picker and result contracts (ComponentActivity), Custom Tabs, FileProvider.
+  implementation("androidx.activity:activity:1.13.0")
+  implementation("androidx.browser:browser:1.10.0")
+  implementation("androidx.core:core:1.19.1")
 }

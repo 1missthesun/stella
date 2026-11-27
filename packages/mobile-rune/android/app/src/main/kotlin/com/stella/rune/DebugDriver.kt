@@ -24,6 +24,7 @@ import java.io.File
  *   focusonly?x=&y=              focus the field there without the keyboard
  *   settext?x=&y=&text=          set the text of the field there without focusing it
  *   snapfield[?x=&y=]            draw the focused field (or the one there) alone to files/field.png
+ *   js?code=                     run JavaScript in the app's runtime (results go to the log)
  */
 object DebugDriver {
   private val main = Handler(Looper.getMainLooper())
@@ -107,6 +108,7 @@ object DebugDriver {
         u.getQueryParameter("start")?.let { App.command(org.json.JSONObject().put("cmd", "perf.start").put("label", it)) }
         u.getQueryParameter("stop")?.let { App.command(org.json.JSONObject().put("cmd", "perf.stop").put("label", it)) }
       }
+      "/js" -> App.js?.evalDev(u.getQueryParameter("code") ?: return true)
       "/focusonly" -> {
         // Focus the field under x,y without asking for the keyboard.
         NativeFields.fieldAt(num("x", 0.0).toFloat(), num("y", 0.0).toFloat())?.requestFocus()

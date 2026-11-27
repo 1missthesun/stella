@@ -58,7 +58,7 @@ pub fn route(v: Value) {
         }
         // What only the app can answer (its pickers, the clipboard's contents): the app replies
         // to the rid itself, straight to TS (`{t:"reply", rid, ok, value}`).
-        "dialog.openFile" | "clipboard.readText" => {
+        "dialog.openFile" | "clipboard.read" | "clipboard.readText" => {
             let mut m = v.clone();
             m["t"] = json!("cmd");
             crate::native::send(m);

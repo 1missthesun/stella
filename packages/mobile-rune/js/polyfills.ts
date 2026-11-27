@@ -522,9 +522,14 @@ g.File ??= FilePoly;
 g.FormData ??= FormDataPoly;
 const blobRegistry = (() => {
   const map = new Map<string, BlobPoly>();
-  let n = 0;
   return {
-    add(b: BlobPoly) { const u = `blob:stella-rune/${++n}`; map.set(u, b); return u; },
+    // `blob:<uuid>` as browsers and Bun mint them: the reconciler loads `<image src>` object URLs of that form.
+    add(b: BlobPoly) {
+      const h = Array.from(N.random(16), (x: number) => x.toString(16).padStart(2, "0")).join("");
+      const u = `blob:${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+      map.set(u, b);
+      return u;
+    },
     get(u: string) { return map.get(u); },
     revoke(u: string) { map.delete(u); },
   };
@@ -783,6 +788,94 @@ g.fetch = async (input: string | URLPoly | RequestPoly, init: any = {}): Promise
     N.fetch(id, { url, method: req.method, headers: req.headers.toObject(), redirect: req.redirect }, body);
   });
 };
+
+class ProgressEventPoly extends EventPoly {
+  readonly lengthComputable: boolean; readonly loaded: number; readonly total: number;
+  constructor(type: string, init: { lengthComputable?: boolean; loaded?: number; total?: number } = {}) { super(type); this.lengthComputable = !!init.lengthComputable; this.loaded = init.loaded ?? 0; this.total = init.total ?? 0; }
+}
+g.ProgressEvent ??= ProgressEventPoly;
+
+/** An event target that also calls its `on<type>` property, as XHR's do. */
+class XhrTargetPoly extends EventTargetPoly {
+  [k: string]: any;
+  /** @internal */ _fire(type: string, init?: { loaded?: number; total?: number }) {
+    const e = init ? new ProgressEventPoly(type, { lengthComputable: (init.total ?? 0) > 0, ...init }) : new EventPoly(type);
+    try { this[`on${type}`]?.call(this, e); } catch (err) { console.error(err); }
+    this.dispatchEvent(e);
+  }
+}
+
+/**
+ * XMLHttpRequest over the app's fetch (the web app's attachment uploads use it for progress).
+ * The body goes to the app whole, so upload progress arrives as one event once it's sent.
+ */
+class XMLHttpRequestPoly extends XhrTargetPoly {
+  static readonly UNSENT = 0; static readonly OPENED = 1; static readonly HEADERS_RECEIVED = 2; static readonly LOADING = 3; static readonly DONE = 4;
+  readonly UNSENT = 0; readonly OPENED = 1; readonly HEADERS_RECEIVED = 2; readonly LOADING = 3; readonly DONE = 4;
+  readonly upload = new XhrTargetPoly();
+  readyState = 0; status = 0; statusText = ""; responseURL = ""; responseType = ""; timeout = 0; withCredentials = false;
+  response: any = null;
+  private _method = "GET"; private _url = ""; private _headers: Record<string, string> = {};
+  private _res: ResponsePoly | null = null; private _abort: AbortControllerPoly | null = null; private _text = "";
+  get responseText() { return this._text; }
+  open(method: string, url: string | URLPoly) {
+    this._method = String(method).toUpperCase(); this._url = String(url); this._headers = {};
+    this._res = null; this.status = 0; this.response = null; this._text = "";
+    this._state(1);
+  }
+  setRequestHeader(k: string, v: string) { this._headers[k] = this._headers[k] ? `${this._headers[k]}, ${v}` : String(v); }
+  getResponseHeader(k: string) { return this._res?.headers.get(k) ?? null; }
+  getAllResponseHeaders() {
+    let out = "";
+    this._res?.headers.forEach((v: string, k: string) => { out += `${k}: ${v}\r\n`; });
+    return out;
+  }
+  overrideMimeType() {}
+  abort() {
+    if (!this._abort) return;
+    this._abort.abort();
+  }
+  private _state(n: number) { this.readyState = n; this._fire("readystatechange"); }
+  send(body?: unknown) {
+    const ctrl = new AbortControllerPoly();
+    this._abort = ctrl;
+    let timedOut = false;
+    const timer = this.timeout > 0 ? setTimeout(() => { timedOut = true; ctrl.abort(); }, this.timeout) : null;
+    const size = body == null ? 0 : body instanceof BlobPoly ? body.size : typeof body === "string" ? body.length : (body as ArrayBufferView).byteLength ?? 0;
+    this._fire("loadstart", { loaded: 0, total: 0 });
+    if (size > 0) this.upload._fire("loadstart", { loaded: 0, total: size });
+    const finish = (kind: "load" | "error" | "timeout" | "abort") => {
+      if (timer) clearTimeout(timer);
+      this._abort = null;
+      if (kind !== "load") { this.status = 0; this._state(4); }
+      this._fire(kind, { loaded: 0, total: 0 });
+      this._fire("loadend", { loaded: 0, total: 0 });
+    };
+    void g.fetch(this._url, { method: this._method, headers: this._headers, body: body ?? undefined, signal: ctrl.signal, credentials: this.withCredentials ? "include" : "same-origin" })
+      .then(async (res: ResponsePoly) => {
+        if (size > 0) {
+          this.upload._fire("progress", { loaded: size, total: size });
+          this.upload._fire("load", { loaded: size, total: size });
+          this.upload._fire("loadend", { loaded: size, total: size });
+        }
+        this._res = res; this.status = res.status; this.statusText = res.statusText ?? ""; this.responseURL = res.url ?? this._url;
+        this._state(2);
+        this._state(3);
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        this._text = this.responseType === "" || this.responseType === "text" || this.responseType === "json" ? new TextDecoderPoly().decode(bytes) : "";
+        this.response =
+          this.responseType === "arraybuffer" ? bytes.buffer
+          : this.responseType === "blob" ? new BlobPoly([bytes], { type: res.headers.get("content-type") ?? "" })
+          : this.responseType === "json" ? (() => { try { return JSON.parse(this._text); } catch { return null; } })()
+          : this._text;
+        this._fire("progress", { loaded: bytes.length, total: bytes.length });
+        this._state(4);
+        finish("load");
+      })
+      .catch(() => finish(timedOut ? "timeout" : ctrl.signal.aborted ? "abort" : "error"));
+  }
+}
+g.XMLHttpRequest ??= XMLHttpRequestPoly;
 g.Headers ??= HeadersPoly;
 g.Request ??= RequestPoly;
 g.Response ??= ResponsePoly;

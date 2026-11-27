@@ -3,8 +3,6 @@ package com.stella.rune
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.UiModeManager
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
@@ -17,7 +15,11 @@ import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.webkit.MimeTypeMap
 import android.widget.FrameLayout
+import androidx.activity.ComponentActivity
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.content.FileProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -86,33 +88,23 @@ object App {
       (k.contains("error") || k.contains("warning")) && Build.VERSION.SDK_INT >= 30 -> HapticFeedbackConstants.REJECT
       k.contains("selection") -> HapticFeedbackConstants.CLOCK_TICK
       k.contains("heavy") || k.contains("rigid") -> HapticFeedbackConstants.LONG_PRESS
+      k.contains("light") || k.contains("soft") -> HapticFeedbackConstants.KEYBOARD_TAP
       else -> HapticFeedbackConstants.VIRTUAL_KEY
     }
-    v.performHapticFeedback(c)
+    val done = v.performHapticFeedback(c)
+    if (traceNative) AppLog.write("debug", "haptic '$kind' → feedback $c (${if (done) "played" else "off"})")
   }
 
   /** Commands from TS (through the engine's `native` commands or `__native.post`). */
   fun command(m: JSONObject) {
     val a = activity ?: return
+    if (Pickers.handle(m)) return
     val cmd = m.optString("cmd").ifEmpty { m.optString("t") }
     when (cmd) {
-      "clipboard.writeText", "clipboard.writeHTML" -> {
-        a.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Stella", m.optString("text")))
-      }
-      "shell.openExternal", "openURL" -> {
-        val u = m.optString("url").ifEmpty { return }
-        try {
-          a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)))
-        } catch (e: Throwable) {
-          AppLog.write("warn", "no app opens $u")
-        }
-      }
-      "share" -> {
-        val text = listOfNotNull(m.optString("text").ifEmpty { null }, m.optString("url").ifEmpty { null }).joinToString("\n")
-        if (text.isEmpty()) return
-        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-        a.startActivity(Intent.createChooser(send, null))
-      }
+      "clipboard.writeText" -> Pickers.write(m.optString("text"), null)
+      "clipboard.writeHTML" -> Pickers.write(m.optString("text"), m.optString("html").ifEmpty { null })
+      "shell.openExternal", "openURL" -> openURL(a, m.optString("url").ifEmpty { return }, m.optBoolean("inApp", false))
+      "share" -> share(a, m)
       "haptic" -> haptic(m.optString("kind").ifEmpty { m.optString("style") })
       "app.setBadge" -> {}
       "firstContent" -> if (firstContentMs == 0.0) {
@@ -132,6 +124,45 @@ object App {
     }
   }
 
+  /** A web page in a Custom Tab over the app when `inApp`, else whichever app handles the URL. */
+  private fun openURL(a: MainActivity, url: String, inApp: Boolean) {
+    val u = Uri.parse(url)
+    try {
+      if (inApp && (u.scheme == "http" || u.scheme == "https")) {
+        CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(a, u)
+      } else {
+        a.startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE))
+      }
+    } catch (e: Throwable) {
+      AppLog.write("warn", "no app opens $url")
+    }
+  }
+
+  /** The share sheet for text, a URL or a file (through the app's FileProvider). */
+  private fun share(a: MainActivity, m: JSONObject) {
+    val text = listOfNotNull(m.optString("text").ifEmpty { null }, m.optString("url").ifEmpty { null }).joinToString("\n")
+    val path = m.optString("path").ifEmpty { null }
+    val send = Intent(Intent.ACTION_SEND)
+    if (path != null) {
+      val file = File(path)
+      val uri = try {
+        FileProvider.getUriForFile(a, "${a.packageName}.files", file)
+      } catch (e: Throwable) {
+        AppLog.write("warn", "share: $path is outside the shareable folders")
+        return
+      }
+      val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+      send.setType(type).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      send.clipData = android.content.ClipData.newRawUri(file.name, uri)
+      if (text.isNotEmpty()) send.putExtra(Intent.EXTRA_TEXT, text)
+    } else {
+      if (text.isEmpty()) return
+      send.setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+      m.optString("title").ifEmpty { null }?.let { send.putExtra(Intent.EXTRA_TITLE, it) }
+    }
+    a.startActivity(Intent.createChooser(send, m.optString("title").ifEmpty { null }))
+  }
+
   private fun writePerf(label: String) {
     val r = rune ?: return
     val a = activity ?: return
@@ -148,7 +179,7 @@ object App {
   }
 }
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
   private lateinit var root: FrameLayout
   private lateinit var rune: RuneView
   private val js by lazy { JSRuntime(applicationContext) }
@@ -157,6 +188,7 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     App.activity = this
     AppLog.open(this)
+    Pickers.register(this)
     window.setDecorFitsSystemWindows(false)
     window.statusBarColor = Color.TRANSPARENT
     window.navigationBarColor = Color.TRANSPARENT

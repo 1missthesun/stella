@@ -14,6 +14,12 @@ export const recordPresentMessage = (messageId: string): boolean => {
   return true;
 };
 
+/** A sent message the runtime accepted under a new id is the same bubble: it keeps its arrival. */
+export const carryMessageArrival = (fromId: string, toId: string): void => {
+  const arrivedAt = arrivals.get(fromId);
+  if (arrivedAt !== undefined && !arrivals.has(toId)) arrivals.set(toId, arrivedAt);
+};
+
 export const messageArrivedAt = (messageId: string): number | undefined => {
   const arrivedAt = arrivals.get(messageId);
   return arrivedAt === undefined || arrivedAt === Number.NEGATIVE_INFINITY

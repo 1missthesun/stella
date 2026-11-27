@@ -27,6 +27,7 @@ import {
   retryHeldSend,
 } from "@/features/chat/held-send";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
+import { carryMessageArrival } from "@/features/chat/lib/message-entry-animation-state";
 
 type UseStreamingChatOptions = {
   conversationId: string | null;
@@ -125,6 +126,7 @@ export function useStreamingChatCore({
   const reconcileAcceptedUserMessage = useCallback(
     (optimisticId: string, acceptedId: string) => {
       if (optimisticId === acceptedId) return;
+      carryMessageArrival(optimisticId, acceptedId);
       setOptimisticEvents((current) =>
         current.map((event) =>
           event._id === optimisticId ? { ...event, _id: acceptedId } : event,

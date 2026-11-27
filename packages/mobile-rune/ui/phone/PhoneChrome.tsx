@@ -25,16 +25,18 @@ import { tabIcon } from "./icons";
 export const PHONE_TOPBAR_H = 52;
 const BUTTON = 44;
 const EDGE = 10;
-const BAR_ROW = 58;
-const BAR_MAX_W = 360;
+const BAR_ROW = 50;
+const BAR_MAX_W = 480;
+const BAR_FADE = 10;
 const PILL_W = 62;
-const PILL_H = 40;
+const PILL_H = 38;
 const SHEET_RAISE = 40;
 
 /** The bottom bar's capsule floats this far above the window bottom (packages/mobile `bottomBarPadding`). */
-export const barLift = (safeBottom: number) => Math.max(safeBottom - 10, 8);
+/** The bar's padding under its row, over the home indicator (the RN app's `bottomBarPadding`). */
+export const barPad = (safeBottom: number) => Math.max(safeBottom - 6, 4);
 /** What a page keeps free at its bottom for the bar. */
-export const barSpace = (i: PhoneInsets) => (i.keyboard > 0 ? i.keyboard : BAR_ROW + barLift(i.bottom) + 6);
+export const barSpace = (i: PhoneInsets) => (i.keyboard > 0 ? i.keyboard : BAR_ROW + barPad(i.bottom));
 
 /** packages/mobile's drawer travel: three quarters of the window, 320–400pt. */
 const drawerWidth = (w: number) => Math.round(Math.max(Math.min(w * 0.75, 320), Math.min(w * 0.6, 400)));
@@ -98,26 +100,28 @@ function TopBar({ width, insets, tab, onWidth }: { width: number; insets: PhoneI
 
 function BottomBar({ insets, tab }: { insets: PhoneInsets; tab: PhoneTab }) {
   const t = useTokens();
-  const m = chromeGlass(t).controls;
-  const backdrop = useGlassBackdrop();
+  const pad = barPad(insets.bottom);
+  const bg = t.c.background;
   const pill = alpha(t.c.foreground, t.dark ? 0.12 : 0.07);
+  // The React Native app's bar: flush with the bottom edge over the app's own background,
+  // which fades in over its top 10 points; no glass.
   return (
-    <row id="phone-bottom-bar-dock" fixed absolute={{ left: 0, right: 0, bottom: barLift(insets.bottom) }} h={BAR_ROW} justify="center" px={24} raise={SHEET_RAISE + 1} hidden={insets.keyboard > 0}>
-      <AdaptiveGlass>
-        <row id="phone-bottom-bar" role="tablist" w="full" maxW={BAR_MAX_W} h={BAR_ROW} radius={BAR_ROW / 2} align="center" justify="around" px={6} fx={m.fx} fill={m.fill} border={m.border} onBackdrop={backdrop}>
-          <GlassSheen radius={BAR_ROW / 2} />
-          {PHONE_TABS.map((id) => {
-            const on = id === tab;
-            return (
-              <box key={id} id={`phone-tab-${id}`} role="tab" selected={on} label={id} focusable w={PILL_W} h={PILL_H} center onPress={() => phoneNav.selectTab(id)} pressScale={0.92}>
-                {on ? <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} radius={PILL_H / 2} fill={pill} matched="phone-tab-pill" matchedInPlace motion={{ dur: 0.35, bounce: 0.18 }} /> : null}
+    <col id="phone-bottom-bar-dock" fixed absolute={{ left: 0, right: 0, bottom: 0 }} h={BAR_ROW + pad} pb={pad} raise={SHEET_RAISE + 1} hidden={insets.keyboard > 0}>
+      <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} gradient={{ angle: 180, stops: [[0, alpha(bg, 0)], [BAR_FADE / (BAR_ROW + pad), bg], [1, bg]] }} />
+      <row id="phone-bottom-bar" role="tablist" w="full" maxW={BAR_MAX_W} selfAlign="center" h={BAR_ROW} px={34} align="center" justify="center">
+        {PHONE_TABS.map((id) => {
+          const on = id === tab;
+          return (
+            <box key={id} grow={1} h="full" center>
+              <box id={`phone-tab-${id}`} role="tab" selected={on} label={id} focusable w={PILL_W} h={PILL_H} center onPress={() => phoneNav.selectTab(id)} pressFill={alpha(t.c.foreground, t.dark ? 0.08 : 0.05)}>
+                {on ? <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} radius={PILL_H / 2} fill={pill} /> : null}
                 <Icon icon={tabIcon(id, on)} size={21} color={on ? t.c.foreground : alpha(t.c.textMuted, t.dark ? 0.9 : 0.85)} />
               </box>
-            );
-          })}
-        </row>
-      </AdaptiveGlass>
-    </row>
+            </box>
+          );
+        })}
+      </row>
+    </col>
   );
 }
 

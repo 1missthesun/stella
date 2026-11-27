@@ -328,6 +328,8 @@ export function useChatScrollManagement({
     return m ? Math.max(0, m.maxY - m.y) : null;
   };
   const getShouldFollowSend = useCallback(() => {
+    // On a phone a sent message always comes into view, as in the phone app.
+    if ((globalThis as { stella?: { phone?: unknown } }).stella?.phone) return true;
     const d = distanceFromBottom();
     return d === null ? followRef.current : shouldFollowSend({ distanceFromBottomPx: d, isFollowingLatest: followRef.current });
   }, []);

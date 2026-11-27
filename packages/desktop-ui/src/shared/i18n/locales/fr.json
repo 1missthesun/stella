@@ -1049,22 +1049,7 @@
     },
     "localMode": {
       "banner": "Vos conversations restent sur cet ordinateur. Connectez-vous pour utiliser Stella sur votre téléphone et tout garder synchronisé.",
-      "choiceBodyBoth": "Pendant que vous utilisiez Stella ici sans compte : {messages} et {notes}. Les ajouter les place dans votre compte. Rien n'y est remplacé.",
-      "choiceBodyChat": "Pendant que vous utilisiez Stella ici sans compte : {messages}. Les ajouter les place à la fin de votre conversation. Rien n'y est remplacé.",
-      "choiceBodyMemory": "Pendant que vous utilisiez Stella ici sans compte : {notes}. Les ajouter les copie dans votre mémoire. Rien n'y est remplacé.",
-      "choiceFailed": "Impossible d'enregistrer ce choix. Réessayez.",
-      "choiceTitle": "Ajouter ce que vous avez fait sans compte ?",
-      "keep": "Les garder seulement sur cet ordinateur",
-      "messages": {
-        "one": "1 message",
-        "other": "{count} messages"
-      },
       "needsAccount": "Cela fonctionne dans le cloud de Stella et nécessite donc un compte Stella.",
-      "notes": {
-        "one": "1 note de mémoire",
-        "other": "{count} notes de mémoire"
-      },
-      "sync": "Ajouter à ma conversation",
       "syncFailed": "Impossible d'ajouter cette conversation à votre compte. Elle est toujours sur cet ordinateur.",
       "synced": "Cette conversation a été ajoutée à votre compte."
     },

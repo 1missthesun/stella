@@ -1049,22 +1049,7 @@
     },
     "localMode": {
       "banner": "Suas conversas ficam neste computador. Entre para usar a Stella no celular e manter tudo sincronizado.",
-      "choiceBodyBoth": "Enquanto usou a Stella aqui sem conta: {messages} e {notes}. Ao adicionar, passam para a sua conta. Nada é substituído.",
-      "choiceBodyChat": "Enquanto usou a Stella aqui sem conta: {messages}. Ao adicionar, ficam no fim do seu chat. Nada é substituído.",
-      "choiceBodyMemory": "Enquanto usou a Stella aqui sem conta: {notes}. Ao adicionar, são copiadas para a sua memória. Nada é substituído.",
-      "choiceFailed": "Não foi possível salvar essa escolha. Tente de novo.",
-      "choiceTitle": "Adicionar o que fez sem conta?",
-      "keep": "Manter só neste computador",
-      "messages": {
-        "one": "1 mensagem",
-        "other": "{count} mensagens"
-      },
       "needsAccount": "Isso roda na nuvem da Stella, então precisa de uma conta Stella.",
-      "notes": {
-        "one": "1 nota de memória",
-        "other": "{count} notas de memória"
-      },
-      "sync": "Adicionar ao meu chat",
       "syncFailed": "Não foi possível adicionar esta conversa à sua conta. Ela continua neste computador.",
       "synced": "Esta conversa foi adicionada à sua conta."
     },

@@ -1040,22 +1040,7 @@
     },
     "localMode": {
       "banner": "Chattene dine blir på denne datamaskinen. Logg inn for å bruke Stella på telefonen og holde alt synkronisert.",
-      "choiceBodyBoth": "Mens du brukte Stella her uten konto: {messages} og {notes}. Når du legger dem til, havner de i kontoen din. Ingenting der erstattes.",
-      "choiceBodyChat": "Mens du brukte Stella her uten konto: {messages}. Når du legger dem til, havner de sist i chatten din. Ingenting der erstattes.",
-      "choiceBodyMemory": "Mens du brukte Stella her uten konto: {notes}. Når du legger dem til, kopieres de til minnet ditt. Ingenting der erstattes.",
-      "choiceFailed": "Kunne ikke lagre valget. Prøv igjen.",
-      "choiceTitle": "Legge til det du gjorde uten konto?",
-      "keep": "Behold dem bare på denne datamaskinen",
-      "messages": {
-        "one": "1 melding",
-        "other": "{count} meldinger"
-      },
       "needsAccount": "Dette kjører i Stellas sky og krever derfor en Stella-konto.",
-      "notes": {
-        "one": "1 minnenotat",
-        "other": "{count} minnenotater"
-      },
-      "sync": "Legg til i chatten min",
       "syncFailed": "Kunne ikke legge chatten til i kontoen din. Den er fortsatt på denne datamaskinen.",
       "synced": "Chatten er lagt til i kontoen din."
     },

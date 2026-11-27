@@ -1031,22 +1031,7 @@
     },
     "localMode": {
       "banner": "채팅은 이 컴퓨터에 남아 있어요. 로그인하면 휴대폰에서도 Stella를 쓰고 모든 것을 동기화할 수 있어요.",
-      "choiceBodyBoth": "계정 없이 여기서 Stella를 사용하는 동안: {messages}, {notes}. 추가하면 계정으로 들어가요. 계정의 내용은 바뀌지 않아요.",
-      "choiceBodyChat": "계정 없이 여기서 Stella를 사용하는 동안: {messages}. 추가하면 채팅 끝에 들어가요. 계정의 내용은 바뀌지 않아요.",
-      "choiceBodyMemory": "계정 없이 여기서 Stella를 사용하는 동안: {notes}. 추가하면 메모리에 복사돼요. 계정의 내용은 바뀌지 않아요.",
-      "choiceFailed": "선택을 저장하지 못했어요. 다시 시도해 주세요.",
-      "choiceTitle": "계정 없이 한 내용을 추가할까요?",
-      "keep": "이 컴퓨터에만 보관",
-      "messages": {
-        "one": "메시지 1개",
-        "other": "메시지 {count}개"
-      },
       "needsAccount": "이 기능은 Stella 클라우드에서 실행되므로 Stella 계정이 필요해요.",
-      "notes": {
-        "one": "메모리 노트 1개",
-        "other": "메모리 노트 {count}개"
-      },
-      "sync": "내 채팅에 추가",
       "syncFailed": "이 채팅을 계정에 추가하지 못했어요. 이 컴퓨터에는 그대로 있어요.",
       "synced": "이 채팅을 계정에 추가했어요."
     },

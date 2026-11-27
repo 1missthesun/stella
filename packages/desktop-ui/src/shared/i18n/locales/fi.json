@@ -1040,22 +1040,7 @@
     },
     "localMode": {
       "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään, niin voit käyttää Stellaa puhelimellasi ja kaikki pysyy ajan tasalla.",
-      "choiceBodyBoth": "Kun käytit Stellaa täällä ilman tiliä: {messages} ja {notes}. Lisääminen siirtää ne tilillesi. Mitään ei korvata.",
-      "choiceBodyChat": "Kun käytit Stellaa täällä ilman tiliä: {messages}. Lisääminen siirtää ne keskustelusi loppuun. Mitään ei korvata.",
-      "choiceBodyMemory": "Kun käytit Stellaa täällä ilman tiliä: {notes}. Lisääminen kopioi ne muistiisi. Mitään ei korvata.",
-      "choiceFailed": "Valintaa ei voitu tallentaa. Yritä uudelleen.",
-      "choiceTitle": "Lisätäänkö se, mitä teit ilman tiliä?",
-      "keep": "Pidä ne vain tällä tietokoneella",
-      "messages": {
-        "one": "1 viesti",
-        "other": "{count} viestiä"
-      },
       "needsAccount": "Tämä toimii Stellan pilvessä, joten se vaatii Stella-tilin.",
-      "notes": {
-        "one": "1 muistimerkintä",
-        "other": "{count} muistimerkintää"
-      },
-      "sync": "Lisää keskusteluuni",
       "syncFailed": "Keskustelua ei voitu lisätä tiliisi. Se on yhä tällä tietokoneella.",
       "synced": "Keskustelu lisättiin tiliisi."
     },

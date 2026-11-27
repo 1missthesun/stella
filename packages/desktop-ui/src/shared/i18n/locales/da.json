@@ -1040,22 +1040,7 @@
     },
     "localMode": {
       "banner": "Dine chats bliver på denne computer. Log ind for at bruge Stella på din telefon og holde alt synkroniseret.",
-      "choiceBodyBoth": "Mens du brugte Stella her uden konto: {messages} og {notes}. Når du tilføjer dem, kommer de ind på din konto. Intet der erstattes.",
-      "choiceBodyChat": "Mens du brugte Stella her uden konto: {messages}. Når du tilføjer dem, kommer de sidst i din chat. Intet der erstattes.",
-      "choiceBodyMemory": "Mens du brugte Stella her uden konto: {notes}. Når du tilføjer dem, kopieres de til din hukommelse. Intet der erstattes.",
-      "choiceFailed": "Valget kunne ikke gemmes. Prøv igen.",
-      "choiceTitle": "Tilføj det, du lavede uden konto?",
-      "keep": "Behold dem kun på denne computer",
-      "messages": {
-        "one": "1 besked",
-        "other": "{count} beskeder"
-      },
       "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
-      "notes": {
-        "one": "1 hukommelsesnote",
-        "other": "{count} hukommelsesnoter"
-      },
-      "sync": "Tilføj til min chat",
       "syncFailed": "Chatten kunne ikke føjes til din konto. Den er stadig på denne computer.",
       "synced": "Chatten er føjet til din konto."
     },

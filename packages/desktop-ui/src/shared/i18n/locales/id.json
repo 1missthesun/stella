@@ -1031,22 +1031,7 @@
     },
     "localMode": {
       "banner": "Obrolanmu tetap di komputer ini. Masuk untuk memakai Stella di ponselmu dan menjaga semuanya tetap sinkron.",
-      "choiceBodyBoth": "Selama kamu memakai Stella di sini tanpa akun: {messages} dan {notes}. Menambahkannya akan memindahkannya ke akunmu. Tidak ada yang diganti.",
-      "choiceBodyChat": "Selama kamu memakai Stella di sini tanpa akun: {messages}. Menambahkannya akan menaruhnya di akhir obrolanmu. Tidak ada yang diganti.",
-      "choiceBodyMemory": "Selama kamu memakai Stella di sini tanpa akun: {notes}. Menambahkannya akan menyalinnya ke memorimu. Tidak ada yang diganti.",
-      "choiceFailed": "Pilihan itu tidak bisa disimpan. Coba lagi.",
-      "choiceTitle": "Tambahkan yang kamu lakukan tanpa akun?",
-      "keep": "Simpan hanya di komputer ini",
-      "messages": {
-        "one": "1 pesan",
-        "other": "{count} pesan"
-      },
       "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
-      "notes": {
-        "one": "1 catatan memori",
-        "other": "{count} catatan memori"
-      },
-      "sync": "Tambahkan ke obrolanku",
       "syncFailed": "Tidak bisa menambahkan obrolan ini ke akunmu. Obrolan masih ada di komputer ini.",
       "synced": "Obrolan ini sudah ditambahkan ke akunmu."
     },

@@ -48,6 +48,7 @@ import {
   type GeneralAgentPromptSkills,
 } from "./general-agent-prompt.js";
 import { cloudGeneralToolNames } from "./cloud-general-tools.js";
+import { CLOUD_VIEW_PATH, type CloudViewRequest, type CloudViewResponse } from "./cloud-view-protocol.js";
 import { createBrokerConnectClient } from "./cloud-code-services.js";
 import { createBrokerCloudBrowser } from "./cloud-browser-client.js";
 import { CODE_TOOL_CLOUD_AGENT_DESCRIPTION } from "@stella/runtime/kernel/tools/defs/code-def.js";
@@ -561,6 +562,14 @@ export const runAgentTurn = (
             askUser: userAsks.handlers.askUser,
             requestSecureInput: userAsks.handlers.requestSecureInput,
             useSecureValue: userAsks.handlers.useSecureValue,
+            // A task's views go into the user's chat through the turn broker.
+            publishView: async (view) => {
+              const request: CloudViewRequest = { turnId: input.turnId, ...view };
+              const response = await postJson(CLOUD_VIEW_PATH, request);
+              const body = (await response.json().catch(() => null)) as CloudViewResponse | null;
+              if (!body) return { error: `the chat didn't answer (${response.status})` };
+              return body.ok ? { posted: body.posted } : { error: body.error };
+            },
             agentHistoryQuery: async (args) => {
               const response = await postJson("/api/cloud/history", { turnId: input.turnId, args });
               const body = (await response.json().catch(() => null)) as { ok?: boolean; result?: unknown; error?: string } | null;

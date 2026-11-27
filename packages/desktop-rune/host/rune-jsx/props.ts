@@ -368,6 +368,8 @@ export type WindowProps = {
   w?: number; h?: number; minSize?: [number, number]; maxSize?: [number, number];
   position?: [number, number];
   resizable?: boolean; frameless?: boolean; transparent?: boolean; alwaysOnTop?: boolean; clickThrough?: boolean;
+  /** A click-through window still hears the pointer move over it (Electron's `setIgnoreMouseEvents(true, { forward: true })`). Windows only; macOS and Linux deliver no moves to it. */
+  forwardMouse?: boolean;
   visible?: boolean;
   /** Leaves the window out of screen captures and recordings (macOS sharingType none, Windows WDA_EXCLUDEFROMCAPTURE; Linux has none). */
   contentProtection?: boolean;

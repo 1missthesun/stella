@@ -561,6 +561,8 @@ fn drain(polling: u32) {
         crate::webview::forget_overlay(*n);
         #[cfg(feature = "webview")]
         crate::webview::forget_over(*n);
+        #[cfg(all(feature = "webview", target_os = "windows"))]
+        crate::webview::forward_pointer(*n, false);
         crate::media::forget(*n);
         crate::surface::forget(*n);
         forget_selection(*n);
@@ -644,6 +646,8 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
             }
             next.click_through = Some(click_through);
         }
+        #[cfg(all(feature = "webview", target_os = "windows"))]
+        crate::webview::forward_pointer(node, click_through && p.forward_mouse);
         let protect = p.content_protection || is_background(&p);
         if Some(protect) != applied.content_protection {
             if applied.content_protection.is_some() || protect {

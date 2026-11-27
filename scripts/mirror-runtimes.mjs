@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 const BUCKET = "stella-files";
-const PUBLIC_BASE = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev";
+const PUBLIC_BASE = "https://dl.stella.sh";
 const PREFIX = "runtimes/github/";
 const root = path.resolve(import.meta.dirname, "..");
 const dryRun = process.argv.includes("--dry-run");

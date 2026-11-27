@@ -90,7 +90,7 @@ export function isElectronBinaryHealthy() {
   }
 }
 
-const DEFAULT_RELEASES_URL = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev";
+const DEFAULT_RELEASES_URL = "https://dl.stella.sh";
 const ELECTRON_GITHUB = "https://github.com/electron/electron/releases/download/";
 
 // Stella's mirror of Electron's GitHub releases first, then GitHub itself.

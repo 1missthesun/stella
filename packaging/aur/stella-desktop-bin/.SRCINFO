@@ -41,9 +41,9 @@ pkgbase = stella-desktop-bin
 	sha256sums = 7cff97ff5a6830846cd387cc703f67630293de498b0d6e45a4df38518f16206c
 	sha256sums = b2f5794f1c5d880e5e1fd3c3570940252e8942cbb5831319eb9bc056b8fbde22
 	sha256sums = ef601514393aa1674bb2cfc4dcea36d5b1c7d46f4d84ed704eef84cf037feb89
-	source_x86_64 = stella-launcher-77-x86_64::https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/releases/77/stella-launcher-linux-x64
+	source_x86_64 = stella-launcher-77-x86_64::https://dl.stella.sh/launcher/releases/77/stella-launcher-linux-x64
 	sha256sums_x86_64 = 27cf9b2d442b46c535a1be292d6ed417af85e79d73fee8476ce823efb0f77ddb
-	source_aarch64 = stella-launcher-77-aarch64::https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/releases/77/stella-launcher-linux-arm64
+	source_aarch64 = stella-launcher-77-aarch64::https://dl.stella.sh/launcher/releases/77/stella-launcher-linux-arm64
 	sha256sums_aarch64 = 6d4c3fb69920568ca408227347620fa27813f6f8d7c1877d8ec816fc0245ff7b
 
 pkgname = stella-desktop-bin

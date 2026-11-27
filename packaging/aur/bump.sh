@@ -3,7 +3,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 pkg="$here/stella-desktop-bin"
-releases="https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher"
+releases="https://dl.stella.sh/launcher"
 push=0
 version=""
 for arg in "$@"; do

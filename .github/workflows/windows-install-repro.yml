@@ -62,7 +62,7 @@ jobs:
             Copy-Item "$env:RUNNER_TEMP\built\Stella.exe" "$dir\Stella.exe"
             Write-Host "Using the launcher built from this ref"
           } else {
-            $base = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/stable"
+            $base = "https://dl.stella.sh/launcher/stable"
             Invoke-WebRequest "$base/Stella.exe" -OutFile "$dir\Stella.exe"
             $sums = (Invoke-WebRequest "$base/SHA256SUMS").Content
             Write-Host "VERSION: $((Invoke-WebRequest "$base/VERSION").Content)"

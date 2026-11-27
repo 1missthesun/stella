@@ -241,34 +241,57 @@ const claudeRoute = async () => {
   ]);
   if (!cli) finish(false, "claude-code", "Claude Code isn't installed on this computer.");
   if (!(await online("https://api.anthropic.com"))) finish(false, "claude-code", "Repair needs the internet, and this computer is offline.");
-  // The login Stella's turns use: Claude Code's own config, else one Stella added.
-  const dirs = [null];
+  // The login Stella's turns use, which Stella records in claude-accounts/active.json: the
+  // account chosen in Stella's settings, else the one Stella last used, else Claude Code's own
+  // login, else one Stella added (the order of claude-local-accounts.ts activeConfig).
+  const accountsDir = path.join(dataDir, "claude-accounts");
+  const active = readJson(path.join(accountsDir, "active.json")) ?? {};
+  const lower = (value) => (typeof value === "string" && value.trim() ? value.trim().toLowerCase() : undefined);
+  const configs = [{ configId: "default", dir: null }];
   try {
-    // Real paths: Claude Code keys its Keychain login by the config dir's path.
-    for (const entry of fs.readdirSync(path.join(dataDir, "claude-accounts"))) {
+    for (const entry of fs.readdirSync(accountsDir).sort()) {
+      if (!/^[a-f0-9]{6,64}$/.test(entry)) continue;
       try {
-        dirs.push(fs.realpathSync(path.join(dataDir, "claude-accounts", entry)));
+        // Real paths: Claude Code keys its Keychain login by the config dir's path.
+        const dir = fs.realpathSync(path.join(accountsDir, entry));
+        if (fs.statSync(dir).isDirectory()) configs.push({ configId: entry, dir });
       } catch {}
     }
   } catch {}
-  let configDir;
-  for (const dir of dirs) {
-    const env = { ...process.env };
-    if (dir) env.CLAUDE_CONFIG_DIR = dir;
-    const status = spawnSync(cli, ["auth", "status", "--json"], { env, encoding: "utf8", timeout: 20_000, windowsHide: true });
-    try {
-      if (JSON.parse(status.stdout).loggedIn === true) {
-        configDir = dir;
-        break;
-      }
-    } catch {}
-  }
-  if (configDir === undefined) finish(false, "claude-code", "Claude Code isn't signed in.");
+  const statusOf = ({ configId, dir }) =>
+    new Promise((resolve) => {
+      const env = { ...process.env };
+      if (dir) env.CLAUDE_CONFIG_DIR = dir;
+      const child = spawn(cli, ["auth", "status", "--json"], { env, stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+      let out = "";
+      const timer = setTimeout(() => child.kill(), 20_000);
+      child.stdout.on("data", (chunk) => (out += chunk));
+      child.on("error", () => {});
+      child.on("close", () => {
+        clearTimeout(timer);
+        let status = {};
+        try {
+          status = JSON.parse(out);
+        } catch {}
+        const stored = readJson(path.join(dir ?? process.env.CLAUDE_CONFIG_DIR?.trim() ?? home, ".claude.json"));
+        resolve({ configId, dir, loggedIn: status.loggedIn === true, email: lower(status.email) ?? lower(stored?.oauthAccount?.emailAddress) });
+      });
+    });
+  const signedIn = (await Promise.all(configs.map(statusOf))).filter((config) => config.loggedIn);
+  const wanted = lower(active.chosenEmail);
+  const chosen =
+    (wanted && signedIn.find((config) => config.email === wanted)) ||
+    signedIn.find((config) => config.configId === active.configId) ||
+    signedIn.find((config) => config.dir === null) ||
+    signedIn[0];
+  if (!chosen) finish(false, "claude-code", "Claude Code isn't signed in.");
+  if (wanted && chosen.email !== wanted) say(`the Claude account chosen in Stella (${wanted}) isn't signed in here`);
+  const configDir = chosen.dir;
   const env = { ...process.env };
   for (const key of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"]) delete env[key];
   if (configDir) env.CLAUDE_CONFIG_DIR = configDir;
   const model = (prefs.claudeCodeModel || "opus").trim();
-  say(`claude-code (${model}) in ${app}`);
+  say(`claude-code (${model}) as ${chosen.email ?? chosen.configId} in ${app}`);
   return await runBounded(cli, ["-p", "--permission-mode", "bypassPermissions", "--model", model, "--output-format", "text"], {
     env,
     input: prompt,

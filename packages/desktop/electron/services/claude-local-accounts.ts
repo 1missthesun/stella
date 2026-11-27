@@ -23,6 +23,8 @@ import type { EngineAccountAccess } from "./engine-account-access.js";
 
 const ACCOUNTS_DIR = "claude-accounts";
 const DEFAULT_CONFIG_ID = "default";
+/** The login Stella last used, for the launcher's Repair (launcher-repair.mjs). */
+const ACTIVE_FILE = "active.json";
 const LOGIN_TIMEOUT_MS = 15 * 60_000;
 const LOGIN_URL_TIMEOUT_MS = 30_000;
 const STATUS_TIMEOUT_MS = 20_000;
@@ -833,10 +835,43 @@ export class ClaudeLocalAccounts {
   }
 
   private broadcastIfChanged(): void {
-    const key = JSON.stringify(this.state());
+    const state = this.state();
+    const key = JSON.stringify(state);
     if (key === this.lastBroadcast) return;
     this.lastBroadcast = key;
+    this.rememberActive(state);
     this.options.onChanged();
+  }
+
+  /**
+   * Records which login Stella's turns use, for the launcher's Repair: it
+   * runs while Stella can't start, so it can't ask Stella or reach the
+   * account settings. The chosen email is kept while the settings aren't
+   * loaded (offline, signed out of Stella).
+   */
+  private rememberActive(state: ClaudeLocalAccountsState): void {
+    if (!this.configs || this.configs.some((config) => !config.known)) return;
+    const file = path.join(this.accountsDir, ACTIVE_FILE);
+    let previous: { chosenEmail?: unknown } = {};
+    try {
+      previous = JSON.parse(fs.readFileSync(file, "utf8")) as { chosenEmail?: unknown };
+    } catch {}
+    const chosenEmail = this.options.engineAccounts.settings()
+      ? state.chosenEmail
+      : text(previous.chosenEmail);
+    const active = this.configs.find((config) => config.configId === state.activeConfigId);
+    const record = {
+      configId: state.activeConfigId,
+      ...(active?.email ? { email: active.email } : {}),
+      ...(chosenEmail ? { chosenEmail } : {}),
+    };
+    try {
+      if (JSON.stringify(previous) === JSON.stringify(record)) return;
+      fs.mkdirSync(this.accountsDir, { recursive: true });
+      const temp = `${file}.${process.pid}.tmp`;
+      fs.writeFileSync(temp, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+      fs.renameSync(temp, file);
+    } catch {}
   }
 
   private async reportIfChanged(): Promise<void> {

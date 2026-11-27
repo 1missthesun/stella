@@ -21,7 +21,7 @@ const option = (name) => {
   const at = args.indexOf(name);
   return at >= 0 ? args[at + 1] : undefined;
 };
-const base = (option("--base") ?? `${process.env.STELLA_RELEASES_URL || "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev"}/runtimes/stella-engine`).replace(/\/+$/, "");
+const base = (option("--base") ?? `${process.env.STELLA_RELEASES_URL || "https://dl.stella.sh"}/runtimes/stella-engine`).replace(/\/+$/, "");
 const version =
   option("--version") ??
   execFileSync("git", ["rev-parse", "HEAD:packages/desktop-rune/engine"], { cwd: root, encoding: "utf8" }).trim().slice(0, 12);

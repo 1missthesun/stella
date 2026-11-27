@@ -56,7 +56,7 @@ const backend = option("backend", NAMESPACE_BACKENDS[namespace]);
 // The launchers fetch the Bun a tree's launcher.json asks for from Stella's R2
 // mirror first (runtimes/github/<GitHub path>), falling back to GitHub. A
 // publish mirrors any it lacks; that failing costs speed, not the release.
-const MIRROR_BASE = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/runtimes/github/";
+const MIRROR_BASE = "https://dl.stella.sh/runtimes/github/";
 const ensureBunMirrored = async (dir) => {
   const assets = Object.values(
     JSON.parse(readFileSync(path.join(dir, "packages/desktop/launcher.json"), "utf8")).bun?.assets ?? {},

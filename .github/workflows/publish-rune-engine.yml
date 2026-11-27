@@ -29,7 +29,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  PUBLIC_BASE: ${{ vars.STELLA_RELEASES_URL || 'https://pub-a319aaada8144dc9be5a83625033769c.r2.dev' }}/runtimes/stella-engine
+  PUBLIC_BASE: ${{ vars.STELLA_RELEASES_URL || 'https://dl.stella.sh' }}/runtimes/stella-engine
   APPLE_TEAM: ${{ vars.STELLA_APPLE_TEAM_ID || '7UVYHQ763X' }}
 
 jobs:

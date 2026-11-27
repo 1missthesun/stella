@@ -1,4 +1,5 @@
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { ORCHESTRATOR_CODE_ONLY_TOOLS } from "@stella/contracts/code-nested-tools";
 import {
   collectVisibleDemotedTools,
   executeModelToolCall,
@@ -79,8 +80,9 @@ const offeredTools = (
 
 const runIdFor = (owner: string) => `pi-${owner.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 
-const codeReachableDemoted = (offered: readonly ToolMetadata[]) =>
-  offered.filter((tool) => tool.demoted && !toolRequiresExplicitApproval(tool.approval));
+const codeOnly = (agentType: PiToolAgentType, tool: ToolMetadata): boolean =>
+  Boolean(tool.demoted || (agentType === "orchestrator" && ORCHESTRATOR_CODE_ONLY_TOOLS.has(tool.name))) &&
+  !toolRequiresExplicitApproval(tool.approval);
 
 export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
   ...(context.cliBridgeSocketPath ? { cliBridgeSocketPath: context.cliBridgeSocketPath } : {}),
@@ -108,20 +110,17 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
   },
   specs: (agentType) => {
     const offered = offeredTools(context, agentType);
+    const inCode = offered.filter((tool) => codeOnly(agentType, tool));
     return offered.map((tool) => ({
       name: tool.name,
       description:
         tool.name === CODE_TOOL_NAME
-          ? `${agentType === "orchestrator" ? CODE_TOOL_ORCHESTRATOR_DESCRIPTION : tool.description}${buildDemotedCodeSuffix(codeReachableDemoted(offered))}`
+          ? `${agentType === "orchestrator" ? CODE_TOOL_ORCHESTRATOR_DESCRIPTION : tool.description}${buildDemotedCodeSuffix(inCode)}`
           : tool.description,
       parameters: tool.parameters,
       ...(tool.replay ? { replay: tool.replay } : {}),
-      ...(tool.demoted && !toolRequiresExplicitApproval(tool.approval)
-        ? {
-            codeOnly: {
-              ...(tool.demoted.searchTerms ? { searchTerms: tool.demoted.searchTerms } : {}),
-            },
-          }
+      ...(codeOnly(agentType, tool)
+        ? { codeOnly: { ...(tool.demoted?.searchTerms ? { searchTerms: tool.demoted.searchTerms } : {}) } }
         : {}),
     }));
   },

@@ -1,3 +1,4 @@
+import { ORCHESTRATOR_CODE_ONLY_TOOLS } from "@stella/contracts/code-nested-tools";
 import type { IntegrationConnection } from "@stella/contracts/backend/integrations";
 import { AgentHome } from "../agent-home.js";
 import { createWorldMemory, ownerMemoryWorld } from "../world-memory.js";
@@ -279,6 +280,10 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           ),
       }),
     ];
+    // The orchestrator calls these only inside `code`, as on the desktop.
+    const orchestratorTools = tools.map((tool) =>
+      ORCHESTRATOR_CODE_ONLY_TOOLS.has(tool.name) && !tool.demoted ? { ...tool, demoted: {} } : tool,
+    );
     const memory =
       memoryEnabled && worldBinding
         ? createWorldMemory(
@@ -288,13 +293,13 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         : undefined;
     const codeTool = await createCloudCodeAgentTool({
       loader: this.env.LOADER,
-      tools,
+      tools: orchestratorTools,
       executionScope: `${turn.ownerGeneration}:${turn.conversationId}:${turn.turnId}`,
       connect: createCloudConnectClient(connectors),
       ...(memory ? { memory } : {}),
       ...(memoryEnabled ? { history: this.historyClient() } : {}),
     });
-    return { catalog: [codeTool, ...tools] };
+    return { catalog: [codeTool, ...orchestratorTools] };
   }
 
   private historyClient() {

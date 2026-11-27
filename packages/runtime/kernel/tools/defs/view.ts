@@ -22,12 +22,17 @@ export type PublishedView = {
 /** Puts a task's view into the user's chat; resolves to an error message when it couldn't. */
 export type ViewPublisher = (view: PublishedView, context: ToolContext) => Promise<{ posted: boolean } | { error: string }>;
 
+/** Records a version of one of Stella's own views in the account's view index (the Apps list). */
+export type ViewIndexer = (view: PublishedView, context: ToolContext) => Promise<void>;
+
 export type ViewToolOptions = {
   stellaDataDir: string;
   /** Whether this host draws views itself (the Rune desktop); the cloud doesn't. */
   rendersHere: boolean;
   /** How a task's view reaches the user's chat (Stella's own views ride in her tool calls). */
   publish?: ViewPublisher;
+  /** How Stella's own views reach the Apps list (a task's go there with its view card). */
+  index?: ViewIndexer;
   /** How long to wait for an open view to run the new source. */
   statusWaitMs?: number;
 };
@@ -87,6 +92,26 @@ async function restoredSinceLastCall(dataDir: string, filePath: string, source: 
   };
 }
 
+/** Stella's own views on this computer reach the account's Apps list through the user's Stella Cloud session. */
+export const cloudSessionViewIndexer =
+  (getCloudBackendAuth: () => { baseUrl: string; authToken: string } | null): ViewIndexer =>
+  async (view, context) => {
+    const auth = getCloudBackendAuth();
+    if (!auth || !context.conversationId) return;
+    const client = new BackendClient({
+      baseUrl: auth.baseUrl,
+      getToken: async () => getCloudBackendAuth()?.authToken ?? auth.authToken,
+      fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(INDEX_TIMEOUT_MS) }),
+    });
+    try {
+      await client.call("viewIndex.record", { conversationId: context.conversationId, ...view });
+    } finally {
+      client.dispose();
+    }
+  };
+
+const INDEX_TIMEOUT_MS = 15_000;
+
 export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
   const { stellaDataDir } = options;
   return {
@@ -142,6 +167,12 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
         task && options.publish && problems.length === 0
           ? await options.publish({ filePath, slug, title, source, ...(args.data !== undefined ? { data: args.data } : {}), createdAt }, context)
           : null;
+      // Stella's own good versions go to the Apps list in the background: the chat doesn't wait on it.
+      if (!task && options.index && problems.length === 0) {
+        void options.index({ filePath, slug, title, source, ...(args.data !== undefined ? { data: args.data } : {}), createdAt }, context).catch((error: unknown) => {
+          console.error(`[views] couldn't add "${title}" to Apps: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      }
       const where = `${filePath}${args.data !== undefined ? ` (data in ${slug}.data.json)` : ""}`;
       const chat =
         !task || problems.length > 0

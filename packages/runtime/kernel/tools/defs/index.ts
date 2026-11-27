@@ -12,7 +12,7 @@ import { editTool } from "./edit.js";
 import { createExecCommandTool } from "./exec-command.js";
 import { grepTool } from "./grep.js";
 import { createHtmlTool } from "./html.js";
-import { cloudSessionViewPublisher, createViewTool, hostRendersViews } from "./view.js";
+import { cloudSessionViewIndexer, cloudSessionViewPublisher, createViewTool, hostRendersViews } from "./view.js";
 import { createDriveTool } from "./drive.js";
 import { createDriveTransferTools } from "./drive-transfer.js";
 import { createImageGenTool } from "./image-gen.js";
@@ -133,6 +133,7 @@ export const buildBuiltinTools = (
         stellaDataDir: options.stellaDataDir,
         rendersHere: hostRendersViews(),
         ...(publish ? { publish } : {}),
+        ...(options.getCloudBackendAuth ? { index: cloudSessionViewIndexer(options.getCloudBackendAuth) } : {}),
       }),
     );
   }

@@ -192,6 +192,9 @@ pub struct ModalP {
     pub wheel_outside: bool,
     /// `false`: closing leaves nothing focused instead of returning focus to what had it.
     pub return_focus: Option<bool>,
+    /// Native pages under it stay live and take their own presses, as under a non-modal Radix
+    /// popover, instead of showing their snapshot.
+    pub live_pages: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

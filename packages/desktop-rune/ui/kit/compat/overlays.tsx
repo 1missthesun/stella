@@ -279,7 +279,7 @@ export function PopoverContent({ side = "bottom", align = "center", sideOffset =
       label={label}
       anchor={{ to: anchorTo ?? `fl${id}-trigger`, side, align, gap: sideOffset }}
       raise={layer.popover}
-      modal={{ clickOutside: true }}
+      modal={{ clickOutside: true, livePages: true }}
       onDismiss={() => setOpen(false)}
       minW={200}
       maxW={320}

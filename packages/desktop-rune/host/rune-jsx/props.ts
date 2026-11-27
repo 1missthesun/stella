@@ -137,7 +137,7 @@ export type BoxProps = {
   // Overlays
   anchor?: { to: string; side?: Side; align?: "start" | "center" | "end"; gap?: number; fit?: boolean };
   /** Escape and (optionally) an outside click call `onDismiss`; traps focus, makes the rest inert. */
-  modal?: { clickOutside?: boolean; wheelOutside?: boolean; /** `false`: closing leaves nothing focused (a Radix `onCloseAutoFocus` that prevents the return). */ returnFocus?: boolean };
+  modal?: { clickOutside?: boolean; wheelOutside?: boolean; /** `false`: closing leaves nothing focused (a Radix `onCloseAutoFocus` that prevents the return). */ returnFocus?: boolean; /** Native pages under it stay live and take their own presses, as under a non-modal Radix popover. */ livePages?: boolean };
   // Events
   onPress?: () => void;
   onDoublePress?: () => void;

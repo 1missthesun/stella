@@ -39,6 +39,9 @@ struct View {
     /// An overlay (a modal layer, a popover, a menu) covers it: the native view is hidden and its
     /// slot draws the page's last snapshot, so engine-drawn layers above it stay on top.
     covered: bool,
+    /// A layer that leaves the page live overlaps it: its slot draws the page's snapshot under
+    /// the live view, for what that layer and the elements cut into the page blur and blend over.
+    backed: bool,
     /// What of it shows, as last applied to the native view, with the rect, corners and scale
     /// it was applied for.
     applied: Option<(Shape, [f32; 4], [f32; 4], f32)>,
@@ -208,6 +211,9 @@ pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
             }
         });
         refresh(s.node);
+        if BACKERS.with(|b| b.borrow().contains(&n)) {
+            reconcile(s.node);
+        }
     })
     .on_drawn_shows(move |s: &mut Win, on: bool, tx: &mut rune::Tx| {
         tx.live_only();
@@ -223,6 +229,7 @@ pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
 pub fn forget_over(n: u32) {
     if let Some(gone) = OVER.with(|o| o.borrow_mut().remove(&n)) {
         refresh(gone.window);
+        reconcile(gone.window);
     }
 }
 
@@ -328,7 +335,7 @@ fn shape(n: u32, window: u32, r: [f32; 4]) -> Option<Shape> {
 }
 
 /// The slot element: an empty box whose drawn rect the WebView follows, showing the page's
-/// snapshot while an overlay covers it.
+/// snapshot while an overlay covers or backs it.
 pub fn slot(n: u32) -> El {
     let e = match COVERS.with(|c| c.borrow().get(&n).cloned()) {
         Some(pixels) => el().pixels(&pixels),
@@ -344,14 +351,24 @@ pub fn slot(n: u32) -> El {
 thread_local! {
     /// Drawn rects of the overlay layers (modal layers, anchored popovers and menus), by node.
     static OVERLAYS: RefCell<HashMap<u32, (u32, [f32; 4])>> = RefCell::new(HashMap::new());
-    /// The snapshot each covered webview's slot draws.
+    /// The layers that leave the pages under them live (popovers): elements over the webviews,
+    /// whose drawn rects `OVER` holds.
+    static BACKERS: RefCell<std::collections::HashSet<u32>> = RefCell::new(std::collections::HashSet::new());
+    /// The snapshot each covered or backed webview's slot draws.
     static COVERS: RefCell<HashMap<u32, rune::Pixels>> = RefCell::new(HashMap::new());
 }
 
 /// A lifted layer, tracked as an overlay when it is anchored or holds a modal: native webviews
 /// draw above every engine layer, so one it overlaps steps aside for it.
 pub fn overlay(layer: El, eng: &engine::Engine, n: u32) -> El {
-    if !active() || !is_overlay(eng, n) {
+    if !active() {
+        return layer;
+    }
+    if leaves_pages_live(eng, n) {
+        BACKERS.with(|b| b.borrow_mut().insert(n));
+        return layer;
+    }
+    if !is_overlay(eng, n) {
         return layer;
     }
     layer.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
@@ -361,12 +378,23 @@ pub fn overlay(layer: El, eng: &engine::Engine, n: u32) -> El {
     })
 }
 
+fn leaves_pages_live(eng: &engine::Engine, n: u32) -> bool {
+    eng.tree.get(n).and_then(|node| node.props.modal).is_some_and(|m| m.live_pages)
+}
+
 pub fn is_overlay(eng: &engine::Engine, n: u32) -> bool {
+    if leaves_pages_live(eng, n) {
+        return false;
+    }
     let Some(node) = eng.tree.get(n) else { return false };
     node.props.anchor.is_some() || node.props.modal.is_some() || node.children.iter().any(|c| eng.tree.get(*c).is_some_and(|c| c.props.modal.is_some()))
 }
 
 pub fn forget_overlay(n: u32) {
+    if BACKERS.with(|b| b.borrow_mut().remove(&n)) {
+        let windows: std::collections::HashSet<u32> = VIEWS.with(|v| v.borrow().values().map(|x| x.window).collect());
+        windows.into_iter().for_each(reconcile);
+    }
     let window = OVERLAYS.with(|o| o.borrow_mut().remove(&n)).map(|(w, _)| w);
     if let Some(w) = window {
         reconcile(w);
@@ -377,27 +405,36 @@ fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
     a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3] && a[2] > 0.0 && a[3] > 0.0 && b[2] > 0.0 && b[3] > 0.0
 }
 
-/// Covers each of `window`'s webviews an overlay overlaps, and uncovers the rest.
+/// Covers each of `window`'s webviews an overlay overlaps, backs the live ones a layer that
+/// leaves pages live overlaps, and uncovers the rest.
 fn reconcile(window: u32) {
     let overlays: Vec<[f32; 4]> = OVERLAYS.with(|o| o.borrow().values().filter(|(w, _)| *w == window).map(|(_, r)| *r).collect());
-    let changes: Vec<(u32, bool)> = VIEWS.with(|v| {
+    let backers: Vec<[f32; 4]> = BACKERS.with(|b| {
+        let b = b.borrow();
+        OVER.with(|o| o.borrow().iter().filter(|(n, x)| b.contains(n) && x.window == window).filter_map(|(_, x)| x.rect).collect())
+    });
+    let changes: Vec<(u32, bool, bool)> = VIEWS.with(|v| {
         v.borrow()
             .iter()
             .filter(|(_, x)| x.window == window)
             .filter_map(|(n, x)| {
                 let covered = overlays.iter().any(|o| overlaps(*o, x.rect));
-                (covered != x.covered).then_some((*n, covered))
+                let backed = !covered && backers.iter().any(|o| overlaps(*o, x.rect));
+                (covered != x.covered || backed != x.backed).then_some((*n, covered, backed))
             })
             .collect()
     });
-    for (n, covered) in changes {
+    for (n, covered, backed) in changes {
         VIEWS.with(|v| {
             if let Some(view) = v.borrow_mut().get_mut(&n) {
                 view.covered = covered;
+                view.backed = backed;
             }
         });
         if covered {
             cover(n, window);
+        } else if backed {
+            back(n, window);
         } else {
             COVERS.with(|c| c.borrow_mut().remove(&n));
             let rect = VIEWS.with(|v| v.borrow().get(&n).map(|x| x.rect));
@@ -434,6 +471,20 @@ fn cover(n: u32, window: u32) {
     if sent.is_err() {
         hide();
     }
+}
+
+fn back(n: u32, window: u32) {
+    let _ = with_view(n, |view| {
+        snap(&view.view, move |image| {
+            let still = VIEWS.with(|v| v.borrow().get(&n).is_some_and(|x| x.backed));
+            if let (true, Some(image)) = (still, image) {
+                let pixels = rune::Pixels::new();
+                pixels.set(image.width(), image.height(), image.into_raw());
+                COVERS.with(|c| c.borrow_mut().insert(n, pixels));
+                redraw(window);
+            }
+        })
+    });
 }
 
 fn redraw(window: u32) {
@@ -977,7 +1028,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 win_env::cool();
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
-                    v.borrow_mut().insert(n, View { view, window, born: n, key: p.id.clone(), baked: baked(&p), protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })
+                    v.borrow_mut().insert(n, View { view, window, born: n, key: p.id.clone(), baked: baked(&p), protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, backed: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })
                 });
                 #[cfg(target_os = "linux")]
                 bridge_views();

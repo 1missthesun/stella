@@ -36,6 +36,8 @@ pub struct Tree {
     pub clippers: HashSet<u32>,
     /// Ancestors of webviews, up to their window: where siblings drawn over a native view are found.
     pub web_above: HashSet<u32>,
+    /// Nodes with effect props (`fx`, `light`, `lit`): their windows draw through `fx::Comp`.
+    pub fx: HashSet<u32>,
     live_moved: bool,
 }
 
@@ -174,6 +176,7 @@ impl Tree {
         if let Some(n) = self.nodes.remove(&id) {
             self.removed.push(id);
             self.lifted.remove(&id);
+            self.fx.remove(&id);
             if self.live.remove(&id) {
                 self.live_moved = true;
             }
@@ -203,6 +206,11 @@ impl Tree {
             Op::Props { id, props } => {
                 if self.live_above.contains(&id) {
                     self.live_moved = true;
+                }
+                if crate::fx::has_fx(&props) {
+                    self.fx.insert(id);
+                } else {
+                    self.fx.remove(&id);
                 }
                 if props.lifted() {
                     self.lifted.insert(id);

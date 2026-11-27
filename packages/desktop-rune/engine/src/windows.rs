@@ -347,7 +347,7 @@ fn default_band(s: &Win, cx: &Cx<Win>) -> Option<f32> {
 
 /// `node` is None for the main window, whose node the tree names later.
 pub fn decorate(app: rune::App<Win>, p: &Props, node: Option<u32>) -> rune::App<Win> {
-    let mut app = app.on_close_request(close_request).on_visibility(visibility).on_moved(move |h| moved(node, h));
+    let mut app = app.on_close_request(close_request).on_visibility(visibility).on_moved(move |h| moved(node, h)).compositor(crate::fx::Comp::new(node));
     if let Some(h) = p.titlebar {
         app = app.titlebar(titlebar(h));
     }

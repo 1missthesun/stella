@@ -38,6 +38,51 @@ export type Layout = { x: number; y: number; w: number; h: number };
 export type ScrollPos = { x: number; y: number; maxX: number; maxY: number; viewport: [number, number] };
 export type Drag = { phase: "start" | "move" | "end"; dx: number; dy: number; x: number; y: number };
 
+/** A Liquid Glass lens: refracts and lenses what is painted behind the element, with a bevelled rim catching the light. */
+export type Glass = {
+  /** Width of the rounded rim that bends light, points (14). */ bevel?: number;
+  /** How far the rim pushes the backdrop, points (16). */ depth?: number;
+  /** Colour fringing at the rim, 0..1 (0.14). */ dispersion?: number;
+  /** Magnifies the backdrop under the flat centre (1.04). */ magnification?: number;
+  /** 0..1: the glass materialises by lensing rather than fading (1). */ presence?: number;
+  /** 0..1 backdrop blur, frosted glass (0); `frostSigma` is the blur at 1, points (18). */ frost?: number; frostSigma?: number;
+  /** Contact shadow under the slab, 0..1 (0.35). */ shadow?: number;
+  /** Edge highlight strength (1.6) and the light's angle, radians (-2.09: from the top left). */ rim?: number; lightAngle?: number;
+  /** Multiplies the backdrop by `tint` by `tintAmount`; `veil` (0..1) mixes the body toward `tint` so labels stay legible over busy content. */
+  tint?: Color; tintAmount?: number; veil?: number;
+  /** A second shape the glass flows into (a gooey merge), in the element's points; `unionK` is the merge radius (22), `morph` 0..1 moves toward it alone. */
+  merge?: { x: number; y: number; w: number; h: number; radius?: number }; unionK?: number; morph?: number;
+};
+type FxLayerBase = {
+  /** `under` (default): painted after the element's own fill and before its children. `over`: painted over the children. */
+  place?: "under" | "over";
+  /** Shrinks the layer inside the element's box, points. */ inset?: number;
+  opacity?: number; seed?: number;
+  blend?: "normal" | "multiply" | "screen" | "overlay" | "softLight";
+};
+/** Every rune-fx fill also takes `border` (points: paint only a band inside the edge) and `intensity` (0..1). */
+type FillCommon = { preset?: string; border?: number; intensity?: number };
+export type LiquidMetal = FillCommon & { fill: "liquidMetal"; preset?: "chrome" | "gold" | "rose" | "gunmetal"; tint?: Color; light?: Color; flow?: number; scale?: number; speed?: number; bevel?: number; dome?: number; angle?: number; iridescence?: number; contrast?: number; anchor?: "world" | "element" };
+export type FlutedGlass = FillCommon & { fill: "flutedGlass"; preset?: "reeded" | "fine" | "frosted" | "wide"; rib?: number; angle?: number; refraction?: number; frost?: number; dispersion?: number; highlight?: number; tint?: Color; tintAmount?: number };
+export type Metaballs = FillCommon & { fill: "metaballs"; preset?: "lava" | "mint"; colors?: Color[]; base?: Color; count?: number; size?: number; speed?: number; gloss?: number };
+/** Any other rune-fx fill by catalog id (`meshGradient`, `dither`, `grainGradient`, `swirl`, `voronoi`, `waves`, `halftone`, `plastic`) with its params by name. */
+export type OtherFill = FillCommon & { fill: "meshGradient" | "dither" | "grainGradient" | "swirl" | "voronoi" | "waves" | "halftone" | "plastic"; [param: string]: unknown };
+export type FxLayer = FxLayerBase & ({ glass: true | Glass } | LiquidMetal | FlutedGlass | Metaballs | OtherFill);
+/** A light over the element, in its own points; `z` is its height above the UI (80). */
+export type LightSource = {
+  x: number; y: number; z?: number; color?: Color; intensity?: number;
+  /** Source size (soft shadows, broad highlights) and where it fades out (600), points. */ radius?: number; range?: number;
+  bulb?: number; specular?: number; softness?: number; shafts?: number;
+  spot?: { axis: [number, number, number]; angle: number };
+};
+export type Lighting = {
+  lights: LightSource[];
+  /** Linear ambient light: 1 shows the UI exactly as designed (0.55). */ ambient?: number | [number, number, number];
+  exposure?: number; contactAo?: number; rim?: number; backgroundGloss?: number; backgroundRoughness?: number; albedoFloor?: number; shaftsOver?: number;
+};
+/** How an element stands under its enclosing `light`, in points. */
+export type Lit = { raised?: number; floating?: [number, number]; bevel?: [number, number]; gloss?: [number, number]; emissive?: Color; unlit?: boolean };
+
 export type BoxProps = {
   /** Stable identity: Rune key, memo id, anchor target and command target. */
   id?: string;
@@ -77,6 +122,12 @@ export type BoxProps = {
   clipFade?: [number, number, number, number];
   shadow?: [number, number, Color]; shadows?: Shadow[];
   opacity?: number; blur?: number; backdropBlur?: number;
+  /** GPU effect layers on a `col`/`row`/`box` (ELEMENTS.md "Effects"): Liquid Glass, liquid metal, fluted glass, metaballs and the other rune-fx fills. */
+  fx?: FxLayer | FxLayer[];
+  /** Lights this container's contents with rune-light: shadows, bevel highlights and glow from `lit` children. */
+  light?: Lighting;
+  /** This element casts shadows and catches light under an enclosing `light`. */
+  lit?: Lit;
   // States
   hover?: Color; press?: Color; hoverFill?: Color; pressFill?: Color; hoverBorder?: Color; pressBorder?: Color;
   /** This element's colour while its nearest hover group is hovered. */

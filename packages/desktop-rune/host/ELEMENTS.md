@@ -84,6 +84,8 @@ or calls `engine.window.close(id)`. Inside, `windowDrag` / `noWindowDrag` mark d
 | `list` | virtualized column (only rows near the viewport are built); inside a `scrollY` box |
 | `webview` | lazy OS webview (wry) in this element's rect |
 
+Containers also take GPU effects (`fx`, `light`, `lit`): see Effects below.
+
 ### Common props (every element)
 
 A prop set to `false` is the same as leaving it out, except where `false` means something
@@ -190,6 +192,65 @@ its own label.
 | `onDismiss()` | none |
 | `onDropFiles(paths)`, `onDropHover(over)` | paths, boolean |
 | `onDrag({phase, dx, dy, x, y})` | drag |
+
+### Effects: fx, light, lit
+
+GPU effects from rune-fx and rune-light, as props on a `col`, `row` or `box`. The engine reads
+them from the tree every frame, so a hot swap or a `ref.current.set({ fx })` changes them with
+no engine rebuild. A window draws exactly as before until one of its elements sets one of
+these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lighting`, `Lit`);
+`demo/gallery/Fx.tsx` shows each one (`STELLA_RUNE_APP=demo/gallery/Fx.tsx`).
+
+**`fx`**: one layer or an array of them, painted in the element's shape (`radius`/`corners`).
+
+- Liquid Glass: `{ glass: true }` or `{ glass: { … } }` refracts and lenses whatever is painted
+  behind the element (images, text, content scrolling under it), with a bevelled rim catching the
+  light and a contact shadow. Keys: `bevel` (14), `depth` (16), `dispersion` (0.14),
+  `magnification` (1.04), `presence` (1), `frost` 0..1 and `frostSigma` (18), `shadow` (0.35),
+  `rim` (1.6), `lightAngle` (radians, -2.09), `tint` + `tintAmount`, `veil` (0..1: mixes the
+  body toward `tint` so labels stay legible), `merge: {x,y,w,h,radius}` + `unionK` (22) + `morph`
+  (a second shape it flows into, in the element's points).
+- Fills: `{ fill: "<id>", preset?, …params }`. `liquidMetal` (presets `chrome` `gold` `rose`
+  `gunmetal`; `tint light flow scale speed bevel dome angle iridescence contrast`, `anchor:
+  "world" | "element"`), `flutedGlass` (presets `reeded` `fine` `frosted` `wide`; `rib angle
+  refraction frost dispersion highlight tint tintAmount`; refracts the backdrop), `metaballs`
+  (presets `lava` `mint`; `colors base count size speed gloss`), and `meshGradient` `dither`
+  `grainGradient` `swirl` `voronoi` `waves` `halftone` `plastic` with their own params by name.
+  Every fill takes `border` (paint only a band this wide inside the edge) and `intensity`. Ids
+  and param names are camelCase or snake_case. An unknown id, preset or param logs
+  `stella-engine: fx: …` and drops that layer.
+- Every layer: `place` (`"under"`, the default: after the element's own fill and before its
+  children, so labels stay on top; `"over"`: over the children), `inset`, `opacity`, `seed`,
+  `blend` (`normal` `multiply` `screen` `overlay` `softLight`).
+- Animated fills (liquid metal, metaballs, …) keep the window drawing at the display's refresh
+  while on screen and hold still under the system's reduced motion. Glass and other static
+  layers draw only when something under or around them changes.
+
+```tsx
+<row h={48} radius={24} px={18} align="center" fx={{ glass: { veil: 0.2, tint: c.bg } }}>
+  <text weight={600}>New chat</text>
+</row>
+<box w={220} h={64} radius={32} fx={{ fill: "liquidMetal", preset: "chrome" }} />
+<col w={222} h={332} fx={{ fill: "flutedGlass", preset: "reeded" }} />
+```
+
+**`light`**: lights the element's contents with rune-light: soft shadows from `lit` children,
+bevel highlights and glow. `{ lights: [{ x, y, z?, color?, intensity?, radius?, range?, bulb?,
+specular?, softness?, shafts?, spot?: { axis: [x,y,z], angle } }], ambient?, exposure?,
+contactAo?, rim?, backgroundGloss?, backgroundRoughness?, albedoFloor?, shaftsOver? }`. Light
+positions are in the element's points; `z` is the height above the UI (80) and `ambient` 1
+shows the UI as designed (0.55). Move a light with `ref.current.set({ light })` each frame.
+Text inside is lit with the surface it sits on.
+
+**`lit`**: how an element stands under its enclosing `light`: `raised` (height, points),
+`floating: [base, top]`, `bevel: [width, height]`, `gloss: [gloss, roughness]`, `emissive`
+(a colour it glows with), `unlit` (ignores the light).
+
+```tsx
+<col ref={lamp} fill="#26262b" light={{ ambient: 0.35, lights: [{ x: 180, y: 120, color: "#ffe2bd", intensity: 2 }] }}>
+  <col w={140} h={110} radius={16} fill="#3a3a40" lit={{ raised: 10, bevel: [8, 3] }} />
+</col>
+```
 
 ### text
 

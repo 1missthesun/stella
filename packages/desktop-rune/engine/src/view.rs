@@ -122,9 +122,9 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
 
 fn build_kind(s: &Win, eng: &Engine, id: u32, n: &Node, p: &Props) -> El {
     match n.kind {
-        Kind::Row => children(s, eng, n, row()),
-        Kind::Col | Kind::Window => children(s, eng, n, col()),
-        Kind::Box => children(s, eng, n, el()),
+        Kind::Row => crate::fx::over(children(s, eng, n, crate::fx::under(row(), id, p)), id, p),
+        Kind::Col | Kind::Window => crate::fx::over(children(s, eng, n, crate::fx::under(col(), id, p)), id, p),
+        Kind::Box => crate::fx::over(children(s, eng, n, crate::fx::under(el(), id, p)), id, p),
         Kind::Text => text::build(p),
         Kind::Input => crate::input::build(s, id, p),
         Kind::Image => media::image(eng, id, p),

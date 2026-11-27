@@ -17,6 +17,7 @@ mod control;
 mod desktop_fonts;
 mod display_watch;
 mod engine;
+mod fx;
 mod input;
 mod keys;
 mod look_up;

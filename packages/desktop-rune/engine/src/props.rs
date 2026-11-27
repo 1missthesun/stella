@@ -480,6 +480,12 @@ pub struct Props {
     pub opacity: Option<f32>,
     pub blur: Option<f32>,
     pub backdrop_blur: Option<f32>,
+    /// Effect layers (`crate::fx`): Liquid Glass lenses and rune-fx fills, under or over the children.
+    pub fx: Option<crate::fx::FxList>,
+    /// Lights over the element's box (`crate::fx`), lighting what is painted inside it.
+    pub light: Option<Box<crate::fx::LightSpec>>,
+    /// How the element stands under an enclosing `light`.
+    pub lit: Option<crate::fx::LitSpec>,
 
     // State styles
     pub hover: Option<C>,

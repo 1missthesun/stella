@@ -901,6 +901,68 @@
         "discard": "Descartar"
       },
       "tagline": "Habla y dibuja para mostrarle a Stella lo que quieres decir."
+    },
+    "welcomeDemos": {
+      "play": "Reproducir esta demo",
+      "replay": "Volver a ver esta demo",
+      "errands": {
+        "title": "El recorrido rápido",
+        "tablist": "Demos de lo que puedo hacer",
+        "chapters": {
+          "errands": {
+            "word": "Recados",
+            "title": "Pídelo una vez. Considéralo hecho.",
+            "caption": "Encuentro el sitio correcto, relleno el formulario y lo añado a tu calendario, igual que lo harías tú."
+          },
+          "shopping": {
+            "word": "Compras",
+            "title": "Puedo comprar cosas, con tu permiso.",
+            "caption": "Lo encuentro y lo llevo hasta el pago. Tú confirmas el total y yo hago el pedido."
+          },
+          "work": {
+            "word": "Trabajo",
+            "title": "Archivos reales. Varias tareas a la vez.",
+            "caption": "Trabajo dentro de las aplicaciones reales de este ordenador y puedo hacer más de una tarea a la vez."
+          },
+          "build": {
+            "word": "Crear",
+            "title": "Dilo. Yo lo creo.",
+            "caption": "Apps y sitios web a medida. Descríbelo con tus palabras y lo creo, lo pongo en marcha y lo publico."
+          },
+          "routines": {
+            "word": "Rutinas",
+            "title": "Pídelo una vez. Ocurre cada día.",
+            "caption": "Programa lo que quieras y lo haré a su hora, incluso mientras duermes."
+          }
+        }
+      },
+      "customize": {
+        "title": "Puedo cambiarme a mí misma",
+        "body": "¿Te falta una función o quieres que algo funcione de otra manera? Solo pídelo. Reescribiré mi propio código, te dejaré probarlo y tú decides si te lo quedas.",
+        "hint": "Los cambios se quedan en este ordenador.",
+        "steps": {
+          "ask": {
+            "title": "Pedir",
+            "body": "Describe el cambio con palabras sencillas."
+          },
+          "preview": {
+            "title": "Vista previa",
+            "body": "Una tarea lo construye y abre una vista previa en vivo."
+          },
+          "update": {
+            "title": "Actualizar",
+            "body": "Un clic para aplicarlo. Deshaz cuando quieras."
+          }
+        }
+      },
+      "memory": {
+        "title": "Una sola conversación",
+        "titleChatbot": "Esto ya lo conoces",
+        "bodyChatbot": "Un chat nuevo cada vez, una barra lateral llena de chats viejos y ningún recuerdo de lo que dijiste la semana pasada.",
+        "titleStella": "Conmigo es una sola conversación",
+        "bodyStella": "Sin chats nuevos ni hilos. Todo lo que me has dicho está en el mismo lugar, así que cuando preguntas por la semana pasada, voy y lo encuentro.",
+        "showStella": "Ahora pregúntame"
+      }
     }
   },
   "global": {

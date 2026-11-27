@@ -893,6 +893,68 @@
         "discard": "Kasta"
       },
       "tagline": "Prata och rita för att visa Stella vad du menar."
+    },
+    "welcomeDemos": {
+      "play": "Spela upp den här demon",
+      "replay": "Spela upp demon igen",
+      "errands": {
+        "title": "Den snabba rundturen",
+        "tablist": "Demos av vad jag kan",
+        "chapters": {
+          "errands": {
+            "word": "Ärenden",
+            "title": "Fråga en gång. Saken är klar.",
+            "caption": "Jag hittar rätt ställe, fyller i formuläret och lägger in det i din kalender, precis som du skulle göra."
+          },
+          "shopping": {
+            "word": "Shopping",
+            "title": "Jag kan köpa saker, med ditt OK.",
+            "caption": "Jag hittar det och tar det hela vägen till kassan. Du bekräftar summan, och jag lägger beställningen."
+          },
+          "work": {
+            "word": "Arbete",
+            "title": "Riktiga filer. Flera jobb samtidigt.",
+            "caption": "Jag arbetar i de riktiga apparna på den här datorn, och jag kan köra fler än ett jobb åt gången."
+          },
+          "build": {
+            "word": "Bygg",
+            "title": "Säg det. Jag bygger det.",
+            "caption": "Appar och webbplatser på beställning. Beskriv det med vanliga ord så bygger jag det, kör det och lägger ut det på nätet."
+          },
+          "routines": {
+            "word": "Rutiner",
+            "title": "Fråga en gång. Det händer varje dag.",
+            "caption": "Schemalägg vad som helst så gör jag det i tid, även medan du sover."
+          }
+        }
+      },
+      "customize": {
+        "title": "Jag kan ändra mig själv",
+        "body": "Saknar du en funktion, eller vill du att något ska fungera annorlunda? Fråga bara. Jag skriver om min egen kod, du får prova den, och du bestämmer om du vill behålla den.",
+        "hint": "Ändringar stannar på den här datorn.",
+        "steps": {
+          "ask": {
+            "title": "Fråga",
+            "body": "Beskriv ändringen med vanliga ord."
+          },
+          "preview": {
+            "title": "Förhandsvisa",
+            "body": "En uppgift bygger den och öppnar en live-förhandsvisning."
+          },
+          "update": {
+            "title": "Uppdatera",
+            "body": "Ett klick för att tillämpa den. Ångra när du vill."
+          }
+        }
+      },
+      "memory": {
+        "title": "Ett samtal",
+        "titleChatbot": "Det här känner du igen",
+        "bodyChatbot": "En ny chatt varje gång, ett sidofält fullt av gamla och inget minne av vad du sa förra veckan.",
+        "titleStella": "Med mig är det ett samtal",
+        "bodyStella": "Inga nya chattar, inga trådar. Allt du någonsin har berättat för mig finns på samma ställe, så när du frågar om förra veckan letar jag upp det.",
+        "showStella": "Fråga mig nu"
+      }
     }
   },
   "global": {

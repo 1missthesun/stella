@@ -893,6 +893,68 @@
         "discard": "Discard"
       },
       "tagline": "Talk and draw to show Stella what you mean."
+    },
+    "welcomeDemos": {
+      "play": "Play this demo",
+      "replay": "Replay this demo",
+      "errands": {
+        "title": "The quick tour",
+        "tablist": "Capability demos",
+        "chapters": {
+          "errands": {
+            "word": "Errands",
+            "title": "Ask once. Consider it handled.",
+            "caption": "I find the right place, fill in the form, and put it on your calendar, the same way you would."
+          },
+          "shopping": {
+            "word": "Shopping",
+            "title": "I can buy things, with your OK.",
+            "caption": "I find it and get it to checkout. You confirm the total, and I place the order."
+          },
+          "work": {
+            "word": "Work",
+            "title": "Real files. Several jobs at once.",
+            "caption": "I work inside the real apps on this computer, and I can run more than one job at a time."
+          },
+          "build": {
+            "word": "Build",
+            "title": "Say it. I'll build it.",
+            "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online."
+          },
+          "routines": {
+            "word": "Routines",
+            "title": "Ask once. It happens every day.",
+            "caption": "Schedule anything and I'll do it on time, even while you sleep."
+          }
+        }
+      },
+      "customize": {
+        "title": "I can change myself",
+        "body": "Missing a feature, or want something to work differently? Just ask. I'll rewrite my own code, let you try it, and you decide whether to keep it.",
+        "hint": "Changes stay on this computer.",
+        "steps": {
+          "ask": {
+            "title": "Ask",
+            "body": "Describe the change in plain words."
+          },
+          "preview": {
+            "title": "Preview",
+            "body": "A task builds it and opens a live preview."
+          },
+          "update": {
+            "title": "Update",
+            "body": "One click to apply it. Undo any time."
+          }
+        }
+      },
+      "memory": {
+        "title": "One conversation",
+        "titleChatbot": "You know this one",
+        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
+        "titleStella": "With me it's one conversation",
+        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
+        "showStella": "Now ask me"
+      }
     }
   },
   "global": {

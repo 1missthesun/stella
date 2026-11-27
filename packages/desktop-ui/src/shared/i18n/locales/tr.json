@@ -893,6 +893,68 @@
         "discard": "Vazgeç"
       },
       "tagline": "Ne demek istediğini Stella'ya göstermek için konuş ve çiz."
+    },
+    "welcomeDemos": {
+      "play": "Bu demoyu oynat",
+      "replay": "Demoyu yeniden oynat",
+      "errands": {
+        "title": "Kısa tur",
+        "tablist": "Yetenek demoları",
+        "chapters": {
+          "errands": {
+            "word": "İşler",
+            "title": "Bir kez iste. Hallolmuş say.",
+            "caption": "Doğru yeri bulurum, formu doldururum ve takvimine eklerim, tıpkı senin yaptığın gibi."
+          },
+          "shopping": {
+            "word": "Alışveriş",
+            "title": "Onayınla bir şeyler satın alabilirim.",
+            "caption": "Bulurum ve ödeme adımına kadar getiririm. Sen toplamı onaylarsın, ben siparişi veririm."
+          },
+          "work": {
+            "word": "Çalışma",
+            "title": "Gerçek dosyalar. Aynı anda birkaç iş.",
+            "caption": "Bu bilgisayardaki gerçek uygulamaların içinde çalışırım ve aynı anda birden fazla işi yürütebilirim."
+          },
+          "build": {
+            "word": "Oluştur",
+            "title": "Söyle. Ben yapayım.",
+            "caption": "Siparişe göre uygulamalar ve web siteleri. Sade kelimelerle anlat; ben yapayım, çalıştırayım ve yayına alayım."
+          },
+          "routines": {
+            "word": "Rutinler",
+            "title": "Bir kez söyle. Her gün olsun.",
+            "caption": "İstediğini zamanla, ben tam vaktinde yapayım, sen uyurken bile."
+          }
+        }
+      },
+      "customize": {
+        "title": "Kendimi değiştirebilirim",
+        "body": "Bir özellik mi eksik, ya da bir şeyin farklı çalışmasını mı istiyorsun? Sadece iste. Kendi kodumu yeniden yazarım, denemene izin veririm, tutup tutmayacağına sen karar verirsin.",
+        "hint": "Değişiklikler bu bilgisayarda kalır.",
+        "steps": {
+          "ask": {
+            "title": "İste",
+            "body": "Değişikliği sade kelimelerle anlat."
+          },
+          "preview": {
+            "title": "Önizle",
+            "body": "Bir görev onu oluşturur ve canlı bir önizleme açar."
+          },
+          "update": {
+            "title": "Güncelle",
+            "body": "Uygulamak için tek tık. İstediğin zaman geri al."
+          }
+        }
+      },
+      "memory": {
+        "title": "Tek bir sohbet",
+        "titleChatbot": "Bunu bilirsin",
+        "bodyChatbot": "Her seferinde yeni bir sohbet, eski sohbetlerle dolu bir kenar çubuğu ve geçen hafta söylediklerine dair hiçbir hafıza.",
+        "titleStella": "Benimle tek bir sohbet",
+        "bodyStella": "Yeni sohbet yok, başlık yok. Bana söylediğin her şey aynı yerde; geçen haftayı sorduğunda gidip bulurum.",
+        "showStella": "Şimdi bana sor"
+      }
     }
   },
   "global": {

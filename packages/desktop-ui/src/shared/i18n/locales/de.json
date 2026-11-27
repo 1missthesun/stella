@@ -893,6 +893,68 @@
         "discard": "Verwerfen"
       },
       "tagline": "Sprich und zeichne, um Stella zu zeigen, was du meinst."
+    },
+    "welcomeDemos": {
+      "play": "Diese Demo abspielen",
+      "replay": "Demo erneut abspielen",
+      "errands": {
+        "title": "Die kurze Tour",
+        "tablist": "Demos der Fähigkeiten",
+        "chapters": {
+          "errands": {
+            "word": "Erledigungen",
+            "title": "Einmal fragen. Schon erledigt.",
+            "caption": "Ich finde die richtige Seite, fülle das Formular aus und trage es in deinen Kalender ein, genau wie du es tun würdest."
+          },
+          "shopping": {
+            "word": "Einkaufen",
+            "title": "Ich kann Dinge kaufen, mit deinem OK.",
+            "caption": "Ich finde es und bringe es bis zur Kasse. Du bestätigst den Betrag, und ich gebe die Bestellung auf."
+          },
+          "work": {
+            "word": "Arbeit",
+            "title": "Echte Dateien. Mehrere Aufgaben gleichzeitig.",
+            "caption": "Ich arbeite in den echten Apps auf diesem Computer und kann mehrere Aufgaben gleichzeitig ausführen."
+          },
+          "build": {
+            "word": "Bauen",
+            "title": "Sag es. Ich baue es.",
+            "caption": "Apps und Websites nach Maß. Beschreib es in einfachen Worten, und ich baue es, starte es und stelle es online."
+          },
+          "routines": {
+            "word": "Routinen",
+            "title": "Einmal fragen. Jeden Tag erledigt.",
+            "caption": "Plane irgendetwas, und ich erledige es pünktlich, auch während du schläfst."
+          }
+        }
+      },
+      "customize": {
+        "title": "Ich kann mich selbst verändern",
+        "body": "Dir fehlt eine Funktion, oder du möchtest, dass etwas anders funktioniert? Sag es einfach. Ich schreibe meinen eigenen Code um, lasse dich es ausprobieren, und du entscheidest, ob du es behältst.",
+        "hint": "Änderungen bleiben auf diesem Computer.",
+        "steps": {
+          "ask": {
+            "title": "Fragen",
+            "body": "Beschreibe die Änderung in einfachen Worten."
+          },
+          "preview": {
+            "title": "Vorschau",
+            "body": "Eine Aufgabe baut es und öffnet eine Live-Vorschau."
+          },
+          "update": {
+            "title": "Update",
+            "body": "Ein Klick zum Anwenden. Jederzeit rückgängig."
+          }
+        }
+      },
+      "memory": {
+        "title": "Ein Gespräch",
+        "titleChatbot": "Das kennst du",
+        "bodyChatbot": "Jedes Mal ein neuer Chat, eine Seitenleiste voller alter Chats und keine Erinnerung an das, was du letzte Woche gesagt hast.",
+        "titleStella": "Mit mir ist es ein Gespräch",
+        "bodyStella": "Keine neuen Chats, keine Threads. Alles, was du mir je gesagt hast, ist an einem Ort. Fragst du nach letzter Woche, suche ich es heraus.",
+        "showStella": "Jetzt frag mich"
+      }
     }
   },
   "global": {

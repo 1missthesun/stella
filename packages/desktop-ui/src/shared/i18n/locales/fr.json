@@ -901,6 +901,68 @@
         "discard": "Supprimer"
       },
       "tagline": "Parlez et dessinez pour montrer à Stella ce que vous voulez dire."
+    },
+    "welcomeDemos": {
+      "play": "Lire cette démo",
+      "replay": "Revoir cette démo",
+      "errands": {
+        "title": "Le tour rapide",
+        "tablist": "Démos des capacités",
+        "chapters": {
+          "errands": {
+            "word": "Démarches",
+            "title": "Demandez une fois. C'est réglé.",
+            "caption": "Je trouve la bonne page, je remplis le formulaire et je l'ajoute à votre agenda, comme vous le feriez."
+          },
+          "shopping": {
+            "word": "Achats",
+            "title": "Je peux acheter des choses, avec votre accord.",
+            "caption": "Je le trouve et je l'amène jusqu'au paiement. Vous confirmez le total, et je passe la commande."
+          },
+          "work": {
+            "word": "Travail",
+            "title": "De vrais fichiers. Plusieurs tâches à la fois.",
+            "caption": "Je travaille dans les vraies applications de cet ordinateur, et je peux mener plusieurs tâches en parallèle."
+          },
+          "build": {
+            "word": "Créer",
+            "title": "Dites-le. Je le crée.",
+            "caption": "Des apps et des sites web sur mesure. Décrivez-le avec vos mots, et je le crée, je le lance et je le mets en ligne."
+          },
+          "routines": {
+            "word": "Routines",
+            "title": "Demandez une fois. Cela se fait chaque jour.",
+            "caption": "Planifiez ce que vous voulez et je m'en occupe à l'heure, même pendant votre sommeil."
+          }
+        }
+      },
+      "customize": {
+        "title": "Je peux me modifier moi-même",
+        "body": "Il vous manque une fonctionnalité, ou vous voulez que quelque chose fonctionne autrement ? Demandez simplement. Je réécris mon propre code, vous l'essayez, et vous décidez de le garder ou non.",
+        "hint": "Les modifications restent sur cet ordinateur.",
+        "steps": {
+          "ask": {
+            "title": "Demander",
+            "body": "Décrivez le changement avec vos propres mots."
+          },
+          "preview": {
+            "title": "Aperçu",
+            "body": "Une tâche le construit et ouvre un aperçu en direct."
+          },
+          "update": {
+            "title": "Mettre à jour",
+            "body": "Un clic pour l'appliquer. Annulez à tout moment."
+          }
+        }
+      },
+      "memory": {
+        "title": "Une seule conversation",
+        "titleChatbot": "Vous connaissez ça",
+        "bodyChatbot": "Un nouveau chat à chaque fois, une barre latérale pleine d'anciens, et aucun souvenir de ce que vous avez dit la semaine dernière.",
+        "titleStella": "Avec moi, c'est une seule conversation",
+        "bodyStella": "Pas de nouveaux chats, pas de fils. Tout ce que vous m'avez dit est au même endroit : quand vous parlez de la semaine dernière, je vais le retrouver.",
+        "showStella": "Maintenant, demandez-moi"
+      }
     }
   },
   "global": {

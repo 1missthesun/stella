@@ -901,6 +901,68 @@
         "discard": "Renunță"
       },
       "tagline": "Vorbește și desenează ca să-i arăți Stellei ce vrei să spui."
+    },
+    "welcomeDemos": {
+      "play": "Redă această demonstrație",
+      "replay": "Redă din nou demo-ul",
+      "errands": {
+        "title": "Turul rapid",
+        "tablist": "Demonstrații ale capacităților",
+        "chapters": {
+          "errands": {
+            "word": "Treburi",
+            "title": "Ceri o dată. Consideră că e rezolvat.",
+            "caption": "Găsesc locul potrivit, completez formularul și îl pun în calendar, exact cum ai face tu."
+          },
+          "shopping": {
+            "word": "Cumpărături",
+            "title": "Pot cumpăra lucruri, cu acordul tău.",
+            "caption": "Îl găsesc și îl duc până la plată. Tu confirmi totalul, iar eu plasez comanda."
+          },
+          "work": {
+            "word": "Muncă",
+            "title": "Fișiere reale. Mai multe sarcini deodată.",
+            "caption": "Lucrez în aplicațiile reale de pe acest computer și pot rula mai multe sarcini în același timp."
+          },
+          "build": {
+            "word": "Construiește",
+            "title": "Spune-o. O construiesc eu.",
+            "caption": "Aplicații și site-uri la comandă. Descrie-le în cuvinte simple și le construiesc, le pornesc și le pun online."
+          },
+          "routines": {
+            "word": "Rutine",
+            "title": "Cere o dată. Se întâmplă în fiecare zi.",
+            "caption": "Programează orice și o fac la timp, chiar și în timp ce dormi."
+          }
+        }
+      },
+      "customize": {
+        "title": "Mă pot schimba singură",
+        "body": "Îți lipsește o funcție sau vrei ca ceva să funcționeze altfel? Cere-mi. Îmi rescriu propriul cod, te las să-l încerci, iar tu decizi dacă îl păstrezi.",
+        "hint": "Modificările rămân pe acest computer.",
+        "steps": {
+          "ask": {
+            "title": "Cere",
+            "body": "Descrie schimbarea cu cuvinte simple."
+          },
+          "preview": {
+            "title": "Previzualizează",
+            "body": "O sarcină o construiește și deschide o previzualizare live."
+          },
+          "update": {
+            "title": "Actualizează",
+            "body": "Un clic pentru a o aplica. Poți anula oricând."
+          }
+        }
+      },
+      "memory": {
+        "title": "O singură conversație",
+        "titleChatbot": "Știi cum e",
+        "bodyChatbot": "Un chat nou de fiecare dată, o bară laterală plină de chaturi vechi și nicio amintire despre ce ai spus săptămâna trecută.",
+        "titleStella": "Cu mine e o singură conversație",
+        "bodyStella": "Fără chaturi noi, fără fire. Tot ce mi-ai spus vreodată e în același loc, așa că atunci când întrebi de săptămâna trecută, mă duc și găsesc.",
+        "showStella": "Acum întreabă-mă pe mine"
+      }
     }
   },
   "global": {

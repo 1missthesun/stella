@@ -893,6 +893,68 @@
         "discard": "Elvetés"
       },
       "tagline": "Beszélj és rajzolj, hogy megmutasd Stellának, mire gondolsz."
+    },
+    "welcomeDemos": {
+      "play": "A bemutató lejátszása",
+      "replay": "Bemutató újrajátszása",
+      "errands": {
+        "title": "A gyors körút",
+        "tablist": "Bemutatók arról, mit tudok",
+        "chapters": {
+          "errands": {
+            "word": "Ügyintézés",
+            "title": "Kérd egyszer. Elintézve.",
+            "caption": "Megkeresem a megfelelő oldalt, kitöltöm az űrlapot, és felveszem a naptáradba, pont úgy, ahogy te tennéd."
+          },
+          "shopping": {
+            "word": "Vásárlás",
+            "title": "Tudok vásárolni, a jóváhagyásoddal.",
+            "caption": "Megkeresem, és elviszem a pénztárig. Te jóváhagyod a végösszeget, én pedig leadom a rendelést."
+          },
+          "work": {
+            "word": "Munka",
+            "title": "Valódi fájlok. Több feladat egyszerre.",
+            "caption": "A számítógép valódi alkalmazásaiban dolgozom, és egyszerre több feladatot is tudok futtatni."
+          },
+          "build": {
+            "word": "Építés",
+            "title": "Mondd ki. Megépítem.",
+            "caption": "Alkalmazások és weboldalak megrendelésre. Írd le egyszerű szavakkal, és megépítem, elindítom, majd felteszem az internetre."
+          },
+          "routines": {
+            "word": "Rutinok",
+            "title": "Kérd meg egyszer. Minden nap megtörténik.",
+            "caption": "Ütemezz bármit, és időben elvégzem, még akkor is, amikor alszol."
+          }
+        }
+      },
+      "customize": {
+        "title": "Át tudom alakítani magamat",
+        "body": "Hiányzik egy funkció, vagy valamit másképp szeretnél? Csak kérd. Átírom a saját kódomat, kipróbálhatod, és te döntöd el, megtartod-e.",
+        "hint": "A módosítások ezen a számítógépen maradnak.",
+        "steps": {
+          "ask": {
+            "title": "Kérés",
+            "body": "Írd le a változtatást egyszerű szavakkal."
+          },
+          "preview": {
+            "title": "Előnézet",
+            "body": "Egy feladat megépíti, és megnyit egy élő előnézetet."
+          },
+          "update": {
+            "title": "Frissítés",
+            "body": "Egy kattintással alkalmazod. Bármikor visszavonhatod."
+          }
+        }
+      },
+      "memory": {
+        "title": "Egyetlen beszélgetés",
+        "titleChatbot": "Ezt ismered",
+        "bodyChatbot": "Minden alkalommal új chat, egy oldalsáv tele régiekkel, és semmi emlék arról, amit múlt héten mondtál.",
+        "titleStella": "Velem ez egyetlen beszélgetés",
+        "bodyStella": "Nincsenek új chatek, nincsenek szálak. Minden, amit valaha mondtál nekem, egy helyen van, így ha a múlt hétről kérdezel, megkeresem.",
+        "showStella": "Most kérdezz engem"
+      }
     }
   },
   "global": {

@@ -901,6 +901,68 @@
         "discard": "Scarta"
       },
       "tagline": "Parla e disegna per mostrare a Stella cosa intendi."
+    },
+    "welcomeDemos": {
+      "play": "Riproduci questa demo",
+      "replay": "Rivedi questa demo",
+      "errands": {
+        "title": "Il giro veloce",
+        "tablist": "Demo delle funzioni",
+        "chapters": {
+          "errands": {
+            "word": "Commissioni",
+            "title": "Chiedi una volta. Consideralo fatto.",
+            "caption": "Trovo il posto giusto, compilo il modulo e lo metto nel tuo calendario, proprio come faresti tu."
+          },
+          "shopping": {
+            "word": "Acquisti",
+            "title": "Posso comprare cose, con il tuo OK.",
+            "caption": "Lo trovo e lo porto fino al pagamento. Tu confermi il totale e io effettuo l'ordine."
+          },
+          "work": {
+            "word": "Lavoro",
+            "title": "File veri. Più attività insieme.",
+            "caption": "Lavoro dentro le vere app di questo computer e posso portare avanti più attività alla volta."
+          },
+          "build": {
+            "word": "Crea",
+            "title": "Dillo. Lo creo io.",
+            "caption": "App e siti web su misura. Descrivilo con parole semplici e io lo creo, lo avvio e lo metto online."
+          },
+          "routines": {
+            "word": "Routine",
+            "title": "Chiedi una volta. Succede ogni giorno.",
+            "caption": "Pianifica qualsiasi cosa e la farò in orario, anche mentre dormi."
+          }
+        }
+      },
+      "customize": {
+        "title": "Posso cambiare me stessa",
+        "body": "Ti manca una funzione, o vuoi che qualcosa funzioni in modo diverso? Chiedi e basta. Riscrivo il mio codice, tu lo provi e decidi se tenerlo.",
+        "hint": "Le modifiche restano su questo computer.",
+        "steps": {
+          "ask": {
+            "title": "Chiedi",
+            "body": "Descrivi la modifica con parole semplici."
+          },
+          "preview": {
+            "title": "Anteprima",
+            "body": "Un’attività la crea e apre un'anteprima dal vivo."
+          },
+          "update": {
+            "title": "Aggiorna",
+            "body": "Un clic per applicarla. Annulla in qualsiasi momento."
+          }
+        }
+      },
+      "memory": {
+        "title": "Una sola conversazione",
+        "titleChatbot": "Questa la conosci",
+        "bodyChatbot": "Una chat nuova ogni volta, una barra laterale piena di chat vecchie e nessun ricordo di ciò che hai detto la settimana scorsa.",
+        "titleStella": "Con me è una sola conversazione",
+        "bodyStella": "Niente chat nuove, niente thread. Tutto quello che mi hai detto è nello stesso posto, quindi quando chiedi della settimana scorsa vado a ritrovarlo.",
+        "showStella": "Ora chiedi a me"
+      }
     }
   },
   "global": {

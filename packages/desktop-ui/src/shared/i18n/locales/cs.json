@@ -909,6 +909,68 @@
         "discard": "Zahodit"
       },
       "tagline": "Mluvte a kreslete, ať Stella vidí, co myslíte."
+    },
+    "welcomeDemos": {
+      "play": "Přehrát tuto ukázku",
+      "replay": "Přehrát ukázku znovu",
+      "errands": {
+        "title": "Rychlá prohlídka",
+        "tablist": "Ukázky toho, co umím",
+        "chapters": {
+          "errands": {
+            "word": "Pochůzky",
+            "title": "Stačí jednou říct. Je to vyřízené.",
+            "caption": "Najdu správné místo, vyplním formulář a přidám to do tvého kalendáře, stejně jako bys to udělal ty."
+          },
+          "shopping": {
+            "word": "Nákupy",
+            "title": "Umím nakupovat, s tvým souhlasem.",
+            "caption": "Najdu to a dovedu to až k pokladně. Ty potvrdíš částku a já odešlu objednávku."
+          },
+          "work": {
+            "word": "Práce",
+            "title": "Skutečné soubory. Několik úloh najednou.",
+            "caption": "Pracuju ve skutečných aplikacích na tomto počítači a zvládnu víc než jednu úlohu najednou."
+          },
+          "build": {
+            "word": "Tvorba",
+            "title": "Řekni to. Já to postavím.",
+            "caption": "Aplikace a weby na míru. Popiš to obyčejnými slovy a já to postavím, spustím a dám na internet."
+          },
+          "routines": {
+            "word": "Rutiny",
+            "title": "Řekni to jednou. Stane se to každý den.",
+            "caption": "Naplánuj cokoli a udělám to načas, i když budeš spát."
+          }
+        }
+      },
+      "customize": {
+        "title": "Můžu měnit sama sebe",
+        "body": "Chybí ti funkce, nebo chceš, aby něco fungovalo jinak? Stačí říct. Přepíšu svůj vlastní kód, nechám tě to vyzkoušet a ty rozhodneš, jestli to necháš.",
+        "hint": "Změny zůstávají na tomto počítači.",
+        "steps": {
+          "ask": {
+            "title": "Zeptej se",
+            "body": "Popiš změnu jednoduchými slovy."
+          },
+          "preview": {
+            "title": "Náhled",
+            "body": "Úloha to vytvoří a otevře živý náhled."
+          },
+          "update": {
+            "title": "Aktualizovat",
+            "body": "Jedno kliknutí to použije. Kdykoli můžeš vrátit zpět."
+          }
+        }
+      },
+      "memory": {
+        "title": "Jedna konverzace",
+        "titleChatbot": "Tohle znáš",
+        "bodyChatbot": "Pokaždé nový chat, postranní panel plný starých a žádná paměť na to, co jsi říkal minulý týden.",
+        "titleStella": "Se mnou je to jedna konverzace",
+        "bodyStella": "Žádné nové chaty, žádná vlákna. Všechno, co jsi mi kdy řekl, je na jednom místě, takže když se zeptáš na minulý týden, dohledám to.",
+        "showStella": "Teď se zeptej mě"
+      }
     }
   },
   "global": {

@@ -901,6 +901,68 @@
         "discard": "Descartar"
       },
       "tagline": "Fale e desenhe para mostrar à Stella o que quer dizer."
+    },
+    "welcomeDemos": {
+      "play": "Reproduzir esta demonstração",
+      "replay": "Rever esta demo",
+      "errands": {
+        "title": "O tour rápido",
+        "tablist": "Demos do que posso fazer",
+        "chapters": {
+          "errands": {
+            "word": "Tarefas",
+            "title": "Peça uma vez. Considere feito.",
+            "caption": "Encontro o lugar certo, preencho o formulário e coloco na sua agenda, do mesmo jeito que você faria."
+          },
+          "shopping": {
+            "word": "Compras",
+            "title": "Posso comprar coisas, com o seu OK.",
+            "caption": "Eu encontro e levo até o checkout. Você confirma o total, e eu faço o pedido."
+          },
+          "work": {
+            "word": "Trabalho",
+            "title": "Arquivos reais. Várias tarefas ao mesmo tempo.",
+            "caption": "Trabalho dentro dos apps reais deste computador e posso executar mais de uma tarefa por vez."
+          },
+          "build": {
+            "word": "Criar",
+            "title": "Diga. Eu crio.",
+            "caption": "Apps e sites sob medida. Descreva com suas palavras e eu crio, coloco para rodar e publico."
+          },
+          "routines": {
+            "word": "Rotinas",
+            "title": "Peça uma vez. Acontece todos os dias.",
+            "caption": "Agende qualquer coisa e eu faço na hora certa, até enquanto você dorme."
+          }
+        }
+      },
+      "customize": {
+        "title": "Posso mudar a mim mesma",
+        "body": "Sente falta de um recurso, ou quer que algo funcione de outro jeito? É só pedir. Eu reescrevo meu próprio código, deixo você testar e você decide se quer manter.",
+        "hint": "As alterações ficam neste computador.",
+        "steps": {
+          "ask": {
+            "title": "Peça",
+            "body": "Descreva a mudança em palavras simples."
+          },
+          "preview": {
+            "title": "Prévia",
+            "body": "Uma tarefa cria e abre uma prévia ao vivo."
+          },
+          "update": {
+            "title": "Atualizar",
+            "body": "Um clique para aplicar. Desfaça quando quiser."
+          }
+        }
+      },
+      "memory": {
+        "title": "Uma só conversa",
+        "titleChatbot": "Você já conhece isto",
+        "bodyChatbot": "Um chat novo toda vez, uma barra lateral cheia de chats antigos e nenhuma lembrança do que você disse na semana passada.",
+        "titleStella": "Comigo é uma só conversa",
+        "bodyStella": "Sem chats novos, sem threads. Tudo o que você já me disse fica no mesmo lugar, então quando você pergunta sobre a semana passada, eu vou lá e encontro.",
+        "showStella": "Agora me pergunte"
+      }
     }
   },
   "global": {

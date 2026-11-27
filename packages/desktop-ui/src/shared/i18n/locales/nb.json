@@ -893,6 +893,68 @@
         "discard": "Forkast"
       },
       "tagline": "Snakk og tegn for å vise Stella hva du mener."
+    },
+    "welcomeDemos": {
+      "play": "Spill av denne demoen",
+      "replay": "Spill av demoen på nytt",
+      "errands": {
+        "title": "Den raske omvisningen",
+        "tablist": "Demoer av det jeg kan",
+        "chapters": {
+          "errands": {
+            "word": "Ærender",
+            "title": "Spør én gang. Så er det ordnet.",
+            "caption": "Jeg finner riktig sted, fyller ut skjemaet og legger det i kalenderen, på samme måte som du ville gjort det."
+          },
+          "shopping": {
+            "word": "Handling",
+            "title": "Jeg kan kjøpe ting, med ditt OK.",
+            "caption": "Jeg finner det og tar det helt til kassen. Du bekrefter beløpet, og jeg legger inn bestillingen."
+          },
+          "work": {
+            "word": "Arbeid",
+            "title": "Ekte filer. Flere oppgaver samtidig.",
+            "caption": "Jeg jobber i de ekte appene på denne datamaskinen, og jeg kan kjøre mer enn én oppgave om gangen."
+          },
+          "build": {
+            "word": "Bygg",
+            "title": "Si det. Jeg bygger det.",
+            "caption": "Apper og nettsider etter mål. Beskriv det med vanlige ord, så bygger jeg det, kjører det og legger det ut på nett."
+          },
+          "routines": {
+            "word": "Rutiner",
+            "title": "Be om det én gang. Det skjer hver dag.",
+            "caption": "Planlegg hva som helst, så gjør jeg det i tide, selv mens du sover."
+          }
+        }
+      },
+      "customize": {
+        "title": "Jeg kan endre meg selv",
+        "body": "Mangler du en funksjon, eller vil du at noe skal fungere annerledes? Bare spør. Jeg skriver om min egen kode, lar deg prøve den, og du bestemmer om den skal beholdes.",
+        "hint": "Endringer blir på denne datamaskinen.",
+        "steps": {
+          "ask": {
+            "title": "Spør",
+            "body": "Beskriv endringen med vanlige ord."
+          },
+          "preview": {
+            "title": "Forhåndsvis",
+            "body": "En oppgave bygger den og åpner en levende forhåndsvisning."
+          },
+          "update": {
+            "title": "Oppdater",
+            "body": "Ett klikk for å ta den i bruk. Angre når som helst."
+          }
+        }
+      },
+      "memory": {
+        "title": "Én samtale",
+        "titleChatbot": "Denne kjenner du",
+        "bodyChatbot": "En ny chat hver gang, et sidepanel fullt av gamle, og ingen hukommelse om hva du sa forrige uke.",
+        "titleStella": "Med meg er det én samtale",
+        "bodyStella": "Ingen nye chatter, ingen tråder. Alt du noen gang har fortalt meg, er på samme sted, så når du spør om forrige uke, finner jeg det.",
+        "showStella": "Spør meg nå"
+      }
     }
   },
   "global": {

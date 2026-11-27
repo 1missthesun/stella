@@ -11,6 +11,10 @@ const PUBLIC_BASE = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev";
 const PREFIX = "runtimes/github/";
 const root = path.resolve(import.meta.dirname, "..");
 const dryRun = process.argv.includes("--dry-run");
+// The launchers' own pins and launcher.json's Bun only: the Electron assets need node_modules.
+const launcherOnly = process.argv.includes("--launcher-only");
+// With the R2 S3 credentials (CI's publish job) uploads go through the aws CLI; else wrangler.
+const s3 = ["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_ENDPOINT"].every((key) => process.env[key]);
 
 const read = (file) => readFileSync(path.join(root, file), "utf8");
 
@@ -92,7 +96,7 @@ const mirrored = async (key, sha256) => {
   }
 };
 
-const assets = new Map([...launcherAssets(), ...electronAssets()]);
+const assets = new Map([...launcherAssets(), ...(launcherOnly ? [] : electronAssets())]);
 const work = mkdtempSync(path.join(tmpdir(), "stella-mirror-"));
 let failed = 0;
 try {
@@ -111,14 +115,31 @@ try {
       const bytes = await fetchVerified(url, sha256);
       const file = path.join(work, path.basename(key));
       writeFileSync(file, bytes);
-      const put = spawnSync(
-        "bunx",
-        ["wrangler", "r2", "object", "put", `${BUCKET}/${key}`, "--file", file, "--remote",
-          "--content-type", "application/octet-stream", "--cache-control", "public, max-age=31536000, immutable"],
-        { cwd: root, stdio: ["ignore", "ignore", "inherit"] },
-      );
+      const cacheControl = "public, max-age=31536000, immutable";
+      const put = s3
+        ? spawnSync(
+            "aws",
+            ["s3", "cp", file, `s3://${process.env.R2_BUCKET}/${key}`, "--endpoint-url", process.env.R2_ENDPOINT,
+              "--content-type", "application/octet-stream", "--cache-control", cacheControl, "--only-show-errors"],
+            {
+              cwd: root,
+              stdio: ["ignore", "ignore", "inherit"],
+              env: {
+                ...process.env,
+                AWS_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+                AWS_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+                AWS_DEFAULT_REGION: "auto",
+              },
+            },
+          )
+        : spawnSync(
+            "bunx",
+            ["wrangler", "r2", "object", "put", `${BUCKET}/${key}`, "--file", file, "--remote",
+              "--content-type", "application/octet-stream", "--cache-control", cacheControl],
+            { cwd: root, stdio: ["ignore", "ignore", "inherit"] },
+          );
       rmSync(file, { force: true });
-      if (put.status !== 0) throw new Error(`wrangler r2 object put exited ${put.status}`);
+      if (put.status !== 0) throw new Error(`${s3 ? "aws s3 cp" : "wrangler r2 object put"} exited ${put.status}`);
       if (!(await mirrored(key, sha256))) throw new Error("the mirrored copy does not match after upload");
       console.log(`ok ${key}`);
     } catch (error) {

@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 
@@ -5,6 +6,8 @@ struct Options {
     var selfTest = false
     var startNow = false
     var showWindow = false
+    /// The window with its Start, rollback and reinstall controls instead of starting Stella.
+    var recovery = false
     var holdWindow: URL?
     var source: String?
     var sourceRef: String?
@@ -34,6 +37,7 @@ struct Options {
 
 enum RecoveryChoice: String {
     case returnToKnownGood = "return"
+    case repair
     case reinstall
     case retry
     case quit
@@ -79,6 +83,10 @@ final class Launcher {
     private var hydrationStepName = "pending"
     private var engine: (bin: URL, version: String)?
     private var recoveryCount = 0
+    /// Repair runs once per launcher run.
+    private var repairUsed = false
+    /// Set when a repair saved a fix: a failure after it reads "still".
+    private var repaired = false
     private var identityRetry: String?
     private var crashTimes: [Date] = []
     private var outsideChanges: OutsideChanges?
@@ -108,23 +116,37 @@ final class Launcher {
         ui.onShutdown = { [weak self] in self?.current?.events.post(.timer("shutdown")) }
         updater.start()
         let facts = installFacts()
-        ui.update(show: options.startNow && !options.showWindow ? .keep : .front) { [startNow = options.startNow] in
-            $0.phase = startNow ? .starting : .idle
+        // Opening Stella starts it: the window stays hidden unless there is something to show
+        // (a first install, an update or install step, a failure), or --recovery asks for it.
+        let autoStart = !options.recovery
+        let firstInstall = !FileManager.default.fileExists(atPath: paths.app.path)
+        let show: LauncherWindow.Show = !autoStart || (options.startNow && options.showWindow) || firstInstall || options.selfTest ? .front : .keep
+        ui.update(show: show) {
+            $0.phase = autoStart ? .starting : .idle
+            if firstInstall { $0.status = "Downloading Stella…" }
             $0.version = facts.version
             $0.hasKnownGood = facts.hasKnownGood
         }
-        if options.startNow { commands.post(.start) }
-        if options.selfTest {
-            ui.capture("home.png", after: 1) { [ui] in ui.perform("start", after: 0) }
-        }
+        if autoStart { commands.post(.start) }
+        if options.selfTest { ui.capture("home.png", after: 1) }
+        log("launcher: \(autoStart ? "starting Stella" : "recovery window: waiting for a choice")")
 
         var closeCode: Int32 = 0
+        var firstStart = autoStart && !options.startNow
         while let command = commands.next(until: nil) {
             switch command {
             case .close:
                 return closeCode
             case .start:
-                if !options.startNow || recoveryCount > 0 { updateBeforeStart() }
+                if firstStart || !options.startNow || recoveryCount > 0 { updateBeforeStart(quiet: firstStart) }
+            case .repair:
+                ui.capture("repairing.png", after: 1.5)
+                if let failure = repair() {
+                    closeCode = 1
+                    recover(reason: failure.reason, output: failure.output, kind: .start, title: failure.title)
+                    firstStart = false
+                    continue
+                }
             case .returnToKnownGood:
                 do { try returnToKnownGood() } catch { log("recovery: return failed: \(error)") }
             case .acceptOutsideChanges:
@@ -142,12 +164,50 @@ final class Launcher {
                 continue
             }
             closeCode = 1
-            recover(reason: failure.reason, output: failure.output, kind: failure.kind)
+            recover(reason: failure.reason, output: failure.output, kind: failure.kind,
+                    title: repaired && failure.kind == .start ? "Stella still couldn’t start" : "")
+            firstStart = false
         }
         return 1
     }
 
-    private func updateBeforeStart() {
+    /// Opening Stella while it runs brings Stella forward instead of this window.
+    func reopened() {
+        let pid = current?.pid
+        ui.reopen {
+            // Holding Option opens the launcher's own window (Shut down, recovery) instead.
+            guard !NSEvent.modifierFlags.contains(.option),
+                  let pid, let app = NSRunningApplication(processIdentifier: pid) else { return false }
+            log("launcher: reopened while Stella runs; bringing Stella forward")
+            return app.activate(options: [.activateAllWindows])
+        }
+    }
+
+    /// quiet: the start that opening Stella makes by itself. A launcher update already
+    /// downloaded takes over; a check still running is left for the next start rather than
+    /// shown or waited on.
+    private func updateBeforeStart(quiet: Bool = false) {
+        if quiet {
+            switch updater.waitForFirstCheck(timeout: 1.5, progress: { _, _, _ in }) {
+            case let .staged(version):
+                ui.update(show: .reveal) {
+                    $0.phase = .starting
+                    $0.status = "Starting the updated Stella…"
+                    $0.progress = 0.95
+                    $0.progressTo = 1
+                }
+                if updater.handOver(to: version, hold: nil, showWindow: true) {
+                    log("launcher: exit 0 (handed over to \(version) at start)")
+                    exit(0)
+                }
+                log("launcher: handing over to \(version) failed; starting the current version")
+            case .timedOut:
+                log("launcher: the update check is still running; starting the current version")
+            case .off, .current, .failed:
+                break
+            }
+            return
+        }
         let progress: (String, Double, Double) -> Void = { [ui] status, from, to in
             ui.update(show: .reveal) {
                 $0.phase = .starting
@@ -890,15 +950,18 @@ final class Launcher {
         _ = try signer.acceptOutsideChanges(seen, git: git, app: paths.app)
     }
 
-    private func recover(reason: String, output: [String], kind: FailureKind = .start) {
+    private func recover(reason: String, output: [String], kind: FailureKind = .start, title: String = "") {
         recoveryCount += 1
         hold.hide(after: 0)
         log("launcher: failure: \(reason)")
+        lastFailure = (reason, output)
         let facts = installFacts()
+        let canRepair = kind == .start && !repairUsed && facts.version != ""
         ui.update(show: .front) {
             $0.phase = .failed
-            $0.title = kind == .download ? "Couldn’t download Stella" : ""
+            $0.title = kind == .download ? "Couldn’t download Stella" : title
             $0.offerRecovery = kind == .start
+            $0.canRepair = canRepair
             $0.reason = reason
             $0.output = output
             $0.hasKnownGood = facts.hasKnownGood
@@ -909,6 +972,7 @@ final class Launcher {
         if let choice = options.recoveryChoice, recoveryCount == 1 {
             switch choice {
             case .returnToKnownGood: ui.perform(facts.hasKnownGood ? "return" : "reinstall", after: 2)
+            case .repair: ui.perform(canRepair ? "repair" : "close", after: 2)
             case .reinstall: ui.perform("reinstall", after: 2)
             case .retry: ui.perform("start", after: 2)
             case .quit: ui.perform("close", after: 2)
@@ -917,6 +981,89 @@ final class Launcher {
             log("launcher: self-test failed: \(reason)")
             ui.perform("close", after: 1.5)
         }
+    }
+
+    private var lastFailure: (reason: String, output: [String])?
+
+    // MARK: - Repair
+    //
+    // One bounded pass of the user's own model at the checkout (packages/desktop/scripts/
+    // launcher-repair.mjs, copied out of the last version that started so a broken checkout
+    // can't break its own repair). It commits its fix; the launcher signs it and starts Stella.
+
+    private func repair() -> (reason: String, output: [String], title: String)? {
+        repairUsed = true
+        let fail = { (message: String) -> (reason: String, output: [String], title: String) in
+            log("repair: \(message)")
+            return (message, [], "Repair didn’t work")
+        }
+        let fm = FileManager.default
+        let work = paths.root.appendingPathComponent("repair")
+        let git: GitTool, signer: TreeSigner, bunBin: URL
+        do {
+            (git, signer) = try tools()
+            if let known = bun?.bin ?? runtimes?.bunBin {
+                bunBin = known
+            } else {
+                bunBin = try Install.ensureBun(paths: paths, baseEnv: baseEnvironment(), localBun: options.localBun, progress: { _ in }).0
+            }
+            try fm.createDirectory(at: work, withIntermediateDirectories: true)
+        } catch {
+            return fail("Repair couldn’t set itself up: \(error)")
+        }
+        let app = paths.app
+        let knownGood = hasKnownGood() ? ((try? git.run(["rev-parse", Launcher.knownGoodRef], cwd: app)) ?? "") : ""
+        // The runner from the last version that started, else the current one.
+        let script = work.appendingPathComponent("launcher-repair.mjs")
+        var source = ""
+        for ref in [knownGood, "HEAD"] where !ref.isEmpty {
+            if let text = try? git.run(["show", "\(ref):packages/desktop/scripts/launcher-repair.mjs"], cwd: app), !text.isEmpty {
+                source = ref == "HEAD" ? "HEAD" : String(ref.prefix(12))
+                try? Data((text + "\n").utf8).write(to: script)
+                break
+            }
+        }
+        guard !source.isEmpty else { return fail("This version of Stella can’t repair itself.") }
+        let failureFile = work.appendingPathComponent("failure.txt")
+        let failureText = ([lastFailure?.reason ?? ""] + ["", "Output:"] + (lastFailure?.output ?? [])).joined(separator: "\n")
+        try? Data(failureText.utf8).write(to: failureFile)
+        let resultFile = work.appendingPathComponent("result.json")
+        try? fm.removeItem(at: resultFile)
+        let userData = paths.isolated
+            ? paths.isolatedUserData
+            : fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent(ElectronIdentity.appName)
+        let electron = electronEnvironment()
+        let dataDir = electron["STELLA_DATA_DIR"].flatMap { $0.isEmpty ? nil : $0 }
+            ?? fm.homeDirectoryForCurrentUser.appendingPathComponent(".stella").path
+        var env = baseEnvironment()
+        for (key, value) in git.runtimeEnv { env[key] = value }
+        if let server = electron["STELLA_LAUNCHER_SERVER_ID"] { env["STELLA_LAUNCHER_SERVER_ID"] = server }
+        let timeout = Options.seconds("STELLA_LAUNCHER_REPAIR_SECONDS", 180)
+        let args = [script.path, "--app", app.path, "--data-dir", dataDir, "--user-data", userData.path,
+                    "--work", work.path, "--failure", failureFile.path, "--log", paths.electronLog.path,
+                    "--known-good", knownGood, "--backend", backend, "--timeout", String(Int(timeout)),
+                    "--result", resultFile.path]
+        log("repair: running the repair from \(source) (\(Int(timeout))s)")
+        let started = Date()
+        do {
+            _ = try Shell.run(bunBin.path, args, cwd: app, env: env,
+                              outputFile: paths.logs.appendingPathComponent("repair.log"), timeout: timeout + 60)
+        } catch {
+            return fail("Repair ran out of time.")
+        }
+        guard let data = try? Data(contentsOf: resultFile),
+              let result = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return fail("Repair stopped without an answer.") }
+        let message = (result["message"] as? String) ?? ""
+        log("repair: \(result["route"] as? String ?? "?") finished in \(Int(Date().timeIntervalSince(started)))s: \(message)")
+        guard result["ok"] as? Bool == true else { return fail(message.isEmpty ? "Repair couldn’t fix it." : message) }
+        do {
+            try signer.signHead(git: git, app: app, expected: nil)
+        } catch {
+            return fail("Repair couldn’t save its fix: \(error)")
+        }
+        repaired = true
+        return nil
     }
 
     private func returnToKnownGood() throws {

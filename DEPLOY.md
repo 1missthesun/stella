@@ -682,6 +682,17 @@ after the app-source publish; stella.sh after the website deploy.
    or the Electron version, run
    `env -u CLOUDFLARE_API_TOKEN node scripts/mirror-runtimes.mjs` (skips what
    is already mirrored). A missing mirror only costs the GitHub fallback.
+   Two steps now do this on their own: the launcher workflow's `publish` job
+   runs `mirror-runtimes.mjs --launcher-only` (the launchers' pins and
+   `launcher.json`'s Bun, through the R2 S3 secrets) before it uploads, and
+   `publish-app-source.mjs` (without `--out`) checks every `launcher.json` Bun
+   asset on the mirror and mirrors the missing ones; both only warn on failure.
+   `launcher.log` names the host each download came from and how long it took
+   (`install: bun-….zip from pub-….r2.dev (40 MB, sha256 checked) in 1.9s`).
+   `STELLA_LAUNCHER_MIRROR_URL=<base>` points a launcher at another mirror (a
+   test server serving `runtimes/github/…`), `off` turns it off. r2.dev is
+   rate-limited and not edge-cached; a Cloudflare custom domain on the bucket
+   would cache it at the edge.
 3. **Electron version bump**: the push of `package.json` runs
    `build-electron-identity.yml`, which publishes the Developer ID-signed
    `Stella.app` for that Electron version. Let it finish before publishing app

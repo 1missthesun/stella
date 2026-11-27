@@ -8,14 +8,17 @@ if CommandLine.arguments.dropFirst().contains("--version") {
 }
 
 let usage = """
-usage: StellaLauncher [--start [--show]] [--version] [--self-test] [--source <path|git url>]
+usage: StellaLauncher [--start [--show]] [--recovery] [--version] [--self-test] [--source <path|git url>]
                       [--source-ref <ref>] [--backend <url>] [--bun <path>] [--hold <seconds>]
-                      [--recovery-choice return|retry|quit] [--capture-dir <dir>]
+                      [--recovery-choice return|repair|retry|quit] [--capture-dir <dir>]
                       [--engine electron|rune] [--engine-bin <path>]
 
---start starts Stella right away with the window hidden (a launcher taking
-over after an update), and --show keeps the window up while it does;
---version prints the launcher's build number.
+Opening the launcher starts Stella right away; its window shows only for an
+install or update step, or when Stella can't start. --recovery (or holding
+Option while opening Stella) shows the window with its Start, rollback and
+reinstall controls instead. --start is a launcher taking over after an update
+(--show keeps the window up while it does); --version prints the launcher's
+build number.
 
 Environment: STELLA_LAUNCHER_ROOT (install root, for testing),
 STELLA_LAUNCHER_KEY_FILE (0600 PEM instead of the keychain),
@@ -49,6 +52,7 @@ func parseOptions() -> Options {
         case "--self-test": options.selfTest = true
         case "--start": options.startNow = true
         case "--show": options.showWindow = true
+        case "--recovery": options.recovery = true
         case "--hold-window": options.holdWindow = URL(fileURLWithPath: value(arg))
         case "--source": options.source = value(arg)
         case "--source-ref": options.sourceRef = value(arg)
@@ -78,7 +82,9 @@ func parseOptions() -> Options {
 let paths = LauncherPaths.resolve()
 try? FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
 Logger.shared = Logger(url: paths.launcherLog)
-let options = parseOptions()
+var options = parseOptions()
+// Holding Option while opening Stella opens the launcher's own window instead of starting it.
+if !options.selfTest, !options.startNow, NSEvent.modifierFlags.contains(.option) { options.recovery = true }
 
 if !InstanceLock.acquire(paths.lockFile, wait: options.startNow ? 10 : 0) {
     log("launcher: another launcher owns \(paths.root.path); exiting")
@@ -113,7 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         log("launcher: reopened")
-        launcher.ui.update(show: .front) { _ in }
+        launcher.reopened()
         return false
     }
 }

@@ -366,6 +366,24 @@ jobs:
             -in "$RUNNER_TEMP/update-message" -sigfile "$RUNNER_TEMP/update.sig"
           base64 -w0 "$RUNNER_TEMP/update.sig" > SHA256SUMS.sig
 
+      # The launchers fetch Bun (and their other GitHub runtimes) from this mirror
+      # first, so every pin they ship is mirrored before they go out. A failure
+      # here only costs speed: the launchers fall back to GitHub.
+      - uses: actions/checkout@v4
+        if: env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' && env.R2_ENDPOINT != ''
+        with:
+          path: source
+
+      - uses: actions/setup-node@v4
+        if: env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' && env.R2_ENDPOINT != ''
+        with:
+          node-version: 22
+
+      - name: Mirror the launchers' runtimes to R2 runtimes/github/
+        if: env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' && env.R2_ENDPOINT != ''
+        continue-on-error: true
+        run: node source/scripts/mirror-runtimes.mjs --launcher-only
+
       - name: Upload to R2 launcher/stable/
         if: env.R2_ACCESS_KEY_ID != '' && env.R2_SECRET_ACCESS_KEY != '' && env.R2_BUCKET != '' && env.R2_ENDPOINT != ''
         run: |

@@ -919,7 +919,17 @@
         "thisComputerInline": "这台电脑",
         "rowNotChosen": "使用 {email}，而不是 {chosen}",
         "rowEnded": "登录已过期",
-        "rowEnding": "登录将于 {date} 过期"
+        "rowEnding": "登录将于 {date} 过期",
+        "automaticHint": "使用每台电脑上 Claude Code 已登录的账号",
+        "chooseNote": "你选择的账号会在你的所有电脑和云端上使用。",
+        "inUseTitle": "当前使用",
+        "missingChosen": "{email} 未在此处登录。",
+        "missingChosenFallback": "{email} 未在此处登录，因此使用此处自己的登录。",
+        "ownLoginNote": "这台电脑自己的 Claude Code 登录：{email}",
+        "reasonCloudLogin": "云端的登录",
+        "reasonOtherLogin": "在 Stella 中添加",
+        "reasonOwnLogin": "这台电脑自己的 Claude Code 登录",
+        "reasonSelected": "在 Stella 中选择"
       },
       "claudeLogin": {
         "whereCloud": "正在你的云端登录 Claude Code。",

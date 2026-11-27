@@ -919,7 +919,17 @@
         "thisComputerInline": "คอมพิวเตอร์เครื่องนี้",
         "rowNotChosen": "ใช้ {email} ไม่ใช่ {chosen}",
         "rowEnded": "การลงชื่อเข้าใช้หมดอายุ",
-        "rowEnding": "การลงชื่อเข้าใช้หมดอายุ {date}"
+        "rowEnding": "การลงชื่อเข้าใช้หมดอายุ {date}",
+        "automaticHint": "ใช้บัญชีที่ Claude Code ลงชื่อเข้าใช้อยู่แล้วบนคอมพิวเตอร์แต่ละเครื่อง",
+        "chooseNote": "บัญชีที่คุณเลือกจะใช้บนคอมพิวเตอร์ทุกเครื่องของคุณและในคลาวด์",
+        "inUseTitle": "กำลังใช้อยู่",
+        "missingChosen": "{email} ยังไม่ได้ลงชื่อเข้าใช้ที่นี่",
+        "missingChosenFallback": "{email} ยังไม่ได้ลงชื่อเข้าใช้ที่นี่ จึงใช้การเข้าสู่ระบบของเครื่องนี้แทน",
+        "ownLoginNote": "การเข้าสู่ระบบ Claude Code ของคอมพิวเตอร์เครื่องนี้: {email}",
+        "reasonCloudLogin": "การเข้าสู่ระบบของคลาวด์",
+        "reasonOtherLogin": "เพิ่มใน Stella",
+        "reasonOwnLogin": "การเข้าสู่ระบบ Claude Code ของคอมพิวเตอร์เครื่องนี้",
+        "reasonSelected": "เลือกใน Stella"
       },
       "claudeLogin": {
         "whereCloud": "กำลังลงชื่อเข้าใช้ Claude Code ในคลาวด์ของคุณ",

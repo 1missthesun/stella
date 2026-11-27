@@ -920,7 +920,17 @@
         "thisComputerInline": "यह कंप्यूटर",
         "rowNotChosen": "{email} का उपयोग करता है, {chosen} का नहीं",
         "rowEnded": "साइन-इन समाप्त",
-        "rowEnding": "साइन-इन {date} को समाप्त होगा"
+        "rowEnding": "साइन-इन {date} को समाप्त होगा",
+        "automaticHint": "हर कंप्यूटर पर Claude Code में पहले से जो खाता साइन इन है, उसी का उपयोग करता है",
+        "chooseNote": "आप जो खाता चुनते हैं, उसका उपयोग आपके सभी कंप्यूटरों और क्लाउड में होता है।",
+        "inUseTitle": "अभी उपयोग में",
+        "missingChosen": "{email} यहाँ साइन इन नहीं है।",
+        "missingChosenFallback": "{email} यहाँ साइन इन नहीं है, इसलिए यहाँ का अपना लॉगिन उपयोग होता है।",
+        "ownLoginNote": "इस कंप्यूटर का अपना Claude Code लॉगिन: {email}",
+        "reasonCloudLogin": "क्लाउड का लॉगिन",
+        "reasonOtherLogin": "Stella में जोड़ा गया",
+        "reasonOwnLogin": "इस कंप्यूटर का अपना Claude Code लॉगिन",
+        "reasonSelected": "Stella में चुना गया"
       },
       "claudeLogin": {
         "whereCloud": "आपके क्लाउड में Claude Code में साइन इन किया जा रहा है।",

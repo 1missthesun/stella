@@ -2182,7 +2182,17 @@
         "thisComputerInline": "acest computer",
         "rowNotChosen": "Folosește {email}, nu {chosen}",
         "rowEnded": "Conectarea a expirat",
-        "rowEnding": "Conectarea expiră pe {date}"
+        "rowEnding": "Conectarea expiră pe {date}",
+        "automaticHint": "Folosește contul cu care Claude Code este deja conectat pe fiecare computer",
+        "chooseNote": "Contul pe care îl alegi este folosit pe toate computerele tale și în cloud.",
+        "inUseTitle": "În uz acum",
+        "missingChosen": "{email} nu este conectat aici.",
+        "missingChosenFallback": "{email} nu este conectat aici, așa că se folosește conectarea proprie.",
+        "ownLoginNote": "Conectarea proprie a acestui computer la Claude Code: {email}",
+        "reasonCloudLogin": "Conectarea din cloud",
+        "reasonOtherLogin": "Adăugat în Stella",
+        "reasonOwnLogin": "Conectarea proprie a acestui computer la Claude Code",
+        "reasonSelected": "Ales în Stella"
       },
       "claudeLogin": {
         "approve": "Aprobă pe pagina Anthropic care s-a deschis și conectarea se încheie singură.",

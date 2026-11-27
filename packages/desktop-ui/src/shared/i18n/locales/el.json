@@ -2172,7 +2172,17 @@
         "thisComputerInline": "αυτός ο υπολογιστής",
         "rowNotChosen": "Χρησιμοποιεί {email}, όχι {chosen}",
         "rowEnded": "Η σύνδεση έληξε",
-        "rowEnding": "Η σύνδεση λήγει {date}"
+        "rowEnding": "Η σύνδεση λήγει {date}",
+        "automaticHint": "Χρησιμοποιεί τον λογαριασμό με τον οποίο είναι ήδη συνδεδεμένο το Claude Code σε κάθε υπολογιστή",
+        "chooseNote": "Ο λογαριασμός που επιλέγετε χρησιμοποιείται σε όλους τους υπολογιστές σας και στο cloud.",
+        "inUseTitle": "Σε χρήση τώρα",
+        "missingChosen": "Ο λογαριασμός {email} δεν είναι συνδεδεμένος εδώ.",
+        "missingChosenFallback": "Ο λογαριασμός {email} δεν είναι συνδεδεμένος εδώ, οπότε χρησιμοποιείται η δική του σύνδεση.",
+        "ownLoginNote": "Η σύνδεση αυτού του υπολογιστή στο Claude Code: {email}",
+        "reasonCloudLogin": "Η σύνδεση του cloud",
+        "reasonOtherLogin": "Προστέθηκε στο Stella",
+        "reasonOwnLogin": "Η σύνδεση αυτού του υπολογιστή στο Claude Code",
+        "reasonSelected": "Επιλέχθηκε στη Stella"
       },
       "claudeLogin": {
         "approve": "Εγκρίνετε στη σελίδα της Anthropic που άνοιξε και η σύνδεση θα ολοκληρωθεί αυτόματα.",

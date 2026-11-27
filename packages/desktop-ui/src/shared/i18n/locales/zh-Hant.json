@@ -2162,7 +2162,17 @@
         "thisComputerInline": "這台電腦",
         "rowNotChosen": "使用 {email}，而不是 {chosen}",
         "rowEnded": "登入已過期",
-        "rowEnding": "登入將於 {date} 過期"
+        "rowEnding": "登入將於 {date} 過期",
+        "automaticHint": "使用每台電腦上 Claude Code 已登入的帳號",
+        "chooseNote": "你選擇的帳號會在你的所有電腦和雲端上使用。",
+        "inUseTitle": "目前使用中",
+        "missingChosen": "{email} 未在此處登入。",
+        "missingChosenFallback": "{email} 未在此處登入，因此使用此處自己的登入。",
+        "ownLoginNote": "這台電腦自己的 Claude Code 登入：{email}",
+        "reasonCloudLogin": "雲端的登入",
+        "reasonOtherLogin": "在 Stella 中新增",
+        "reasonOwnLogin": "這台電腦自己的 Claude Code 登入",
+        "reasonSelected": "在 Stella 中選擇"
       },
       "claudeLogin": {
         "approve": "在開啟的 Anthropic 頁面上核准，登入會自動完成。",

@@ -2192,7 +2192,17 @@
         "thisComputerInline": "этот компьютер",
         "rowNotChosen": "Использует {email}, а не {chosen}",
         "rowEnded": "Срок входа истёк",
-        "rowEnding": "Срок входа истекает {date}"
+        "rowEnding": "Срок входа истекает {date}",
+        "automaticHint": "Используется аккаунт, в который Claude Code уже вошёл на каждом компьютере",
+        "chooseNote": "Выбранный аккаунт используется на всех ваших компьютерах и в облаке.",
+        "inUseTitle": "Сейчас используется",
+        "missingChosen": "{email}: вход здесь не выполнен.",
+        "missingChosenFallback": "{email}: вход здесь не выполнен, поэтому используется собственный вход.",
+        "ownLoginNote": "Собственный вход этого компьютера в Claude Code: {email}",
+        "reasonCloudLogin": "Вход облака",
+        "reasonOtherLogin": "Добавлено в Stella",
+        "reasonOwnLogin": "Собственный вход этого компьютера в Claude Code",
+        "reasonSelected": "Выбран в Stella"
       },
       "claudeLogin": {
         "approve": "Подтвердите на открывшейся странице Anthropic, и вход завершится сам.",

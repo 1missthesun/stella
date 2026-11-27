@@ -2172,7 +2172,17 @@
         "thisComputerInline": "deze computer",
         "rowNotChosen": "Gebruikt {email}, niet {chosen}",
         "rowEnded": "Login verlopen",
-        "rowEnding": "Login verloopt op {date}"
+        "rowEnding": "Login verloopt op {date}",
+        "automaticHint": "Gebruikt het account waarmee Claude Code op elke computer al is ingelogd",
+        "chooseNote": "Het account dat je kiest, wordt gebruikt op al je computers en in de cloud.",
+        "inUseTitle": "Nu in gebruik",
+        "missingChosen": "{email} is hier niet ingelogd.",
+        "missingChosenFallback": "{email} is hier niet ingelogd, dus wordt de eigen login gebruikt.",
+        "ownLoginNote": "Eigen Claude Code-login van deze computer: {email}",
+        "reasonCloudLogin": "De login van de cloud",
+        "reasonOtherLogin": "Toegevoegd in Stella",
+        "reasonOwnLogin": "De eigen Claude Code-login van deze computer",
+        "reasonSelected": "Gekozen in Stella"
       },
       "claudeLogin": {
         "approve": "Keur goed op de geopende pagina van Anthropic, dan wordt het vanzelf afgerond.",

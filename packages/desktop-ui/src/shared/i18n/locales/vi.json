@@ -2162,7 +2162,17 @@
         "thisComputerInline": "máy tính này",
         "rowNotChosen": "Dùng {email}, không phải {chosen}",
         "rowEnded": "Phiên đăng nhập đã hết hạn",
-        "rowEnding": "Phiên đăng nhập hết hạn vào {date}"
+        "rowEnding": "Phiên đăng nhập hết hạn vào {date}",
+        "automaticHint": "Dùng tài khoản mà Claude Code đã đăng nhập sẵn trên từng máy tính",
+        "chooseNote": "Tài khoản bạn chọn được dùng trên tất cả máy tính của bạn và trên đám mây.",
+        "inUseTitle": "Đang dùng",
+        "missingChosen": "{email} chưa đăng nhập ở đây.",
+        "missingChosenFallback": "{email} chưa đăng nhập ở đây, nên máy này dùng đăng nhập riêng.",
+        "ownLoginNote": "Đăng nhập Claude Code riêng của máy tính này: {email}",
+        "reasonCloudLogin": "Đăng nhập của đám mây",
+        "reasonOtherLogin": "Đã thêm trong Stella",
+        "reasonOwnLogin": "Đăng nhập Claude Code riêng của máy tính này",
+        "reasonSelected": "Đã chọn trong Stella"
       },
       "claudeLogin": {
         "approve": "Phê duyệt trên trang Anthropic vừa mở, việc đăng nhập sẽ tự hoàn tất.",

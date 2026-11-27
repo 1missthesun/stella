@@ -920,7 +920,17 @@
         "thisComputerInline": "bu bilgisayar",
         "rowNotChosen": "{chosen} değil, {email} kullanılıyor",
         "rowEnded": "Oturum sona erdi",
-        "rowEnding": "Oturum {date} tarihinde sona erecek"
+        "rowEnding": "Oturum {date} tarihinde sona erecek",
+        "automaticHint": "Her bilgisayarda Claude Code'da zaten açık olan hesabı kullanır",
+        "chooseNote": "Seçtiğin hesap tüm bilgisayarlarında ve bulutta kullanılır.",
+        "inUseTitle": "Şu anda kullanımda",
+        "missingChosen": "{email} burada oturum açmamış.",
+        "missingChosenFallback": "{email} burada oturum açmamış, bu yüzden kendi oturumu kullanılıyor.",
+        "ownLoginNote": "Bu bilgisayarın kendi Claude Code oturumu: {email}",
+        "reasonCloudLogin": "Bulutun oturumu",
+        "reasonOtherLogin": "Stella'da eklendi",
+        "reasonOwnLogin": "Bu bilgisayarın kendi Claude Code oturumu",
+        "reasonSelected": "Stella'da seçildi"
       },
       "claudeLogin": {
         "whereCloud": "Bulutunda Claude Code'da oturum açılıyor.",

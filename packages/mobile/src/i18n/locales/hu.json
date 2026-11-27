@@ -920,7 +920,17 @@
         "thisComputerInline": "ez a számítógép",
         "rowNotChosen": "{email} fiókot használ, nem ezt: {chosen}",
         "rowEnded": "A bejelentkezés lejárt",
-        "rowEnding": "A bejelentkezés lejár: {date}"
+        "rowEnding": "A bejelentkezés lejár: {date}",
+        "automaticHint": "Azt a fiókot használja, amellyel a Claude Code az adott számítógépen már be van jelentkezve",
+        "chooseNote": "A kiválasztott fiókot az összes számítógépeden és a felhőben is használjuk.",
+        "inUseTitle": "Most használatban",
+        "missingChosen": "{email} itt nincs bejelentkezve.",
+        "missingChosenFallback": "{email} itt nincs bejelentkezve, ezért a saját bejelentkezés használatos.",
+        "ownLoginNote": "Ennek a számítógépnek a saját Claude Code-bejelentkezése: {email}",
+        "reasonCloudLogin": "A felhő bejelentkezése",
+        "reasonOtherLogin": "Stellában hozzáadva",
+        "reasonOwnLogin": "Ennek a számítógépnek a saját Claude Code-bejelentkezése",
+        "reasonSelected": "Kiválasztva a Stellában"
       },
       "claudeLogin": {
         "whereCloud": "Bejelentkezés a Claude Code-ba a felhődben.",

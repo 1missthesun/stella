@@ -2172,7 +2172,17 @@
         "thisComputerInline": "this computer",
         "rowNotChosen": "Uses {email}, not {chosen}",
         "rowEnded": "Sign-in ended",
-        "rowEnding": "Sign-in ends {date}"
+        "rowEnding": "Sign-in ends {date}",
+        "automaticHint": "Uses whatever Claude Code is already signed in to on each computer",
+        "chooseNote": "The account you choose is used on all your computers and in the cloud.",
+        "inUseTitle": "In use now",
+        "missingChosen": "{email} isn't signed in here.",
+        "missingChosenFallback": "{email} isn't signed in here, so this uses its own login.",
+        "ownLoginNote": "This computer's own Claude Code login: {email}",
+        "reasonCloudLogin": "The cloud's login",
+        "reasonOtherLogin": "Added in Stella",
+        "reasonOwnLogin": "This computer's own Claude Code login",
+        "reasonSelected": "Chosen in Stella"
       },
       "claudeLogin": {
         "approve": "Approve on Anthropic's page that opened, and it finishes by itself.",

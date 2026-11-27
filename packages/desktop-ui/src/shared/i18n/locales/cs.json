@@ -2192,7 +2192,17 @@
         "thisComputerInline": "tento počítač",
         "rowNotChosen": "Používá {email}, ne {chosen}",
         "rowEnded": "Přihlášení skončilo",
-        "rowEnding": "Přihlášení skončí {date}"
+        "rowEnding": "Přihlášení skončí {date}",
+        "automaticHint": "Použije účet, ke kterému je Claude Code na daném počítači už přihlášený",
+        "chooseNote": "Vybraný účet se použije na všech vašich počítačích i v cloudu.",
+        "inUseTitle": "Právě používáno",
+        "missingChosen": "{email} tu není přihlášený.",
+        "missingChosenFallback": "{email} tu není přihlášený, proto se používá vlastní přihlášení.",
+        "ownLoginNote": "Vlastní přihlášení tohoto počítače ke Claude Code: {email}",
+        "reasonCloudLogin": "Přihlášení cloudu",
+        "reasonOtherLogin": "Přidáno ve Stella",
+        "reasonOwnLogin": "Vlastní přihlášení tohoto počítače ke Claude Code",
+        "reasonSelected": "Vybráno ve Stella"
       },
       "claudeLogin": {
         "approve": "Schvalte to na stránce Anthropic, která se otevřela, a přihlášení se dokončí samo.",

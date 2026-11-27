@@ -2212,7 +2212,17 @@
         "thisComputerInline": "هذا الكمبيوتر",
         "rowNotChosen": "يستخدم {email}، وليس {chosen}",
         "rowEnded": "انتهى تسجيل الدخول",
-        "rowEnding": "ينتهي تسجيل الدخول في {date}"
+        "rowEnding": "ينتهي تسجيل الدخول في {date}",
+        "automaticHint": "يستخدم أي حساب سُجّل الدخول به في Claude Code على كل كمبيوتر",
+        "chooseNote": "يُستخدم الحساب الذي تختاره على جميع أجهزة الكمبيوتر لديك وفي السحابة.",
+        "inUseTitle": "قيد الاستخدام الآن",
+        "missingChosen": "لم يتم تسجيل الدخول باستخدام {email} هنا.",
+        "missingChosenFallback": "لم يتم تسجيل الدخول باستخدام {email} هنا، لذا يُستخدم تسجيل الدخول الخاص بهذا الجهاز.",
+        "ownLoginNote": "تسجيل الدخول الخاص بهذا الكمبيوتر إلى Claude Code: {email}",
+        "reasonCloudLogin": "تسجيل دخول السحابة",
+        "reasonOtherLogin": "أُضيف في Stella",
+        "reasonOwnLogin": "تسجيل الدخول الخاص بهذا الكمبيوتر إلى Claude Code",
+        "reasonSelected": "مُختار في Stella"
       },
       "claudeLogin": {
         "approve": "وافق في صفحة Anthropic التي فُتحت، وسيكتمل تسجيل الدخول تلقائيًا.",

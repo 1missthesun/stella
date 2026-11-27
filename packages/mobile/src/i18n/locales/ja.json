@@ -919,7 +919,17 @@
         "thisComputerInline": "このコンピュータ",
         "rowNotChosen": "{chosen} ではなく {email} を使用",
         "rowEnded": "サインインの期限切れ",
-        "rowEnding": "サインインは {date} に期限切れ"
+        "rowEnding": "サインインは {date} に期限切れ",
+        "automaticHint": "各コンピュータの Claude Code で既にサインインしているアカウントを使います",
+        "chooseNote": "選んだアカウントは、すべてのコンピュータとクラウドで使われます。",
+        "inUseTitle": "現在使用中",
+        "missingChosen": "{email} はここではサインインしていません。",
+        "missingChosenFallback": "{email} はここではサインインしていないため、このコンピュータのログインを使います。",
+        "ownLoginNote": "このコンピュータの Claude Code ログイン：{email}",
+        "reasonCloudLogin": "クラウドのログイン",
+        "reasonOtherLogin": "Stella で追加",
+        "reasonOwnLogin": "このコンピュータの Claude Code ログイン",
+        "reasonSelected": "Stella で選択"
       },
       "claudeLogin": {
         "whereCloud": "クラウドの Claude Code にサインインしています。",

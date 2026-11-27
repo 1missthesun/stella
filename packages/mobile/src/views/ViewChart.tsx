@@ -35,7 +35,7 @@ export function ViewChart({ p, colors, paint }: { p: Record<string, unknown>; co
   const xKey = String(p.x ?? "x");
   const series = (Array.isArray(p.y) ? p.y : [p.y]).filter((s): s is string => typeof s === "string");
   const height = typeof p.height === "number" ? p.height : 200;
-  const base5 = [colors.accent, colors.info, colors.ok, colors.warning, colors.danger];
+  const base5 = [colors.accent, colors.ok, colors.warning, colors.danger, "#bf5af2"];
   const palette = Array.isArray(p.colors) && p.colors.length ? (p.colors as string[]).map((c) => paint(c) ?? c) : [...base5, ...base5.map((c) => mix(c, 55, colors.background))];
   const format = typeof p.format === "string" ? p.format : undefined;
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0);

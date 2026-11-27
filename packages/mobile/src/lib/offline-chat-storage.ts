@@ -438,6 +438,7 @@ function parseStoredViews(value: unknown): ChatViewRef[] {
     const v = entry as Record<string, unknown>;
     if (typeof v.slug !== "string" || typeof v.source !== "string" || typeof v.toolCallId !== "string") return [];
     return [{
+      filePath: typeof v.filePath === "string" && v.filePath ? v.filePath : `${v.slug}.view.tsx`,
       slug: v.slug,
       title: typeof v.title === "string" ? v.title : v.slug,
       source: v.source,

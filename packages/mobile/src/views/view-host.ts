@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ViewSession, type ViewSnapshot, type ViewStorage } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
+import { viewFileName, viewKey } from "@stella/views/paths";
 import type { ChatMessage, ChatViewRef } from "../types";
 import { nativeViewVm } from "./native-vm";
 import { viewCapabilities } from "./view-capabilities";
@@ -20,7 +21,7 @@ let newest = new Map<string, Newest>();
 let lastMessages: readonly ChatMessage[] | null = null;
 const newestListeners = new Set<() => void>();
 
-/** Reads every view the conversation's replies made; the newest reply per slug holds its live card. */
+/** Reads every view the conversation's replies made; the newest reply per file holds its live card. */
 export function publishConversationViews(conversationId: string, messages: readonly ChatMessage[]) {
   if (messages === lastMessages && conversationId === scope) return;
   lastMessages = messages;
@@ -30,14 +31,14 @@ export function publishConversationViews(conversationId: string, messages: reado
     if (!message.views) continue;
     for (let v = message.views.length - 1; v >= 0; v -= 1) {
       const ref = message.views[v]!;
-      if (!next.has(ref.slug)) next.set(ref.slug, { messageId: message.id, ref });
+      if (!next.has(ref.filePath)) next.set(ref.filePath, { messageId: message.id, ref });
     }
   }
   const changed =
     conversationId !== scope ||
     next.size !== newest.size ||
-    [...next].some(([slug, entry]) => {
-      const prior = newest.get(slug);
+    [...next].some(([file, entry]) => {
+      const prior = newest.get(file);
       return !prior || prior.messageId !== entry.messageId || prior.ref !== entry.ref;
     });
   if (!changed) return;
@@ -49,7 +50,7 @@ export function publishConversationViews(conversationId: string, messages: reado
   }
   scope = conversationId;
   newest = next;
-  for (const [slug, entry] of next) entries.get(slug)?.load(entry.ref);
+  for (const [file, entry] of next) entries.get(file)?.load(entry.ref);
   for (const listener of newestListeners) listener();
 }
 
@@ -58,21 +59,21 @@ const subscribeNewest = (listener: () => void) => {
   return () => void newestListeners.delete(listener);
 };
 
-/** Whether `messageId` is the newest reply that made or changed the view `slug`. */
-export function useIsLiveView(slug: string, messageId: string): boolean {
-  return useSyncExternalStore(subscribeNewest, () => newest.get(slug)?.messageId === messageId);
+/** Whether `messageId` is the newest reply that made or changed the view at `file`. */
+export function useIsLiveView(file: string, messageId: string): boolean {
+  return useSyncExternalStore(subscribeNewest, () => newest.get(file)?.messageId === messageId);
 }
 
-export function useNewestView(slug: string | null): ChatViewRef | null {
-  return useSyncExternalStore(subscribeNewest, () => (slug ? (newest.get(slug)?.ref ?? null) : null));
+export function useNewestView(file: string | null): ChatViewRef | null {
+  return useSyncExternalStore(subscribeNewest, () => (file ? (newest.get(file)?.ref ?? null) : null));
 }
 
 // ------------------------------------------------------------------ storage
 
-const storageKey = (slug: string) => `stella-views:v1:${scope}:${slug}`;
+const storageKey = (file: string) => `stella-views:v1:${viewKey(file)}`;
 
-function phoneStorage(slug: string): ViewStorage {
-  const key = storageKey(slug);
+function phoneStorage(file: string): ViewStorage {
+  const key = storageKey(file);
   let values: Record<string, unknown> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const write = () => {
@@ -121,29 +122,29 @@ class Entry {
   private loaded: ChatViewRef | null = null;
 
   constructor(
-    readonly slug: string,
+    readonly file: string,
     ref: ChatViewRef,
     theme: ViewTheme,
   ) {
     this.session = new ViewSession({
-      id: slug,
+      id: file,
       title: ref.title,
       vm: nativeViewVm,
-      storage: phoneStorage(slug),
+      storage: phoneStorage(file),
       capabilities: viewCapabilities,
       theme,
       data: ref.data ?? null,
       requestFrame,
       now,
       onLog: (log) => {
-        if (__DEV__ || log.level === "error") console.log(`[view ${slug}] ${log.level}: ${log.text}`);
+        if (__DEV__ || log.level === "error") console.log(`[view ${viewFileName(file)}] ${log.level}: ${log.text}`);
       },
     });
     if (__DEV__) {
       let seen = { first: null as number | null, swap: null as number | null };
       this.session.subscribe((s) => {
-        if (s.firstRenderMs !== null && s.firstRenderMs !== seen.first) console.log(`[views] ${slug} first tree in ${s.firstRenderMs.toFixed(1)} ms`);
-        if (s.swapMs !== null && s.swapMs !== seen.swap) console.log(`[views] ${slug} new source to tree in ${s.swapMs.toFixed(1)} ms`);
+        if (s.firstRenderMs !== null && s.firstRenderMs !== seen.first) console.log(`[views] ${viewFileName(file)} first tree in ${s.firstRenderMs.toFixed(1)} ms`);
+        if (s.swapMs !== null && s.swapMs !== seen.swap) console.log(`[views] ${viewFileName(file)} new source to tree in ${s.swapMs.toFixed(1)} ms`);
         seen = { first: s.firstRenderMs, swap: s.swapMs };
       });
     }
@@ -155,7 +156,7 @@ class Entry {
     const prior = this.loaded;
     this.loaded = ref;
     if (prior && JSON.stringify(prior.data ?? null) !== JSON.stringify(ref.data ?? null)) this.session.setData(ref.data ?? null);
-    void this.session.load(ref.source, `${ref.slug}.view.tsx`);
+    void this.session.load(ref.source, viewFileName(ref.filePath));
   }
 
   acquire() {
@@ -170,7 +171,7 @@ class Entry {
     this.closeTimer = setTimeout(() => {
       if (this.refs > 0) return;
       this.dispose();
-      entries.delete(this.slug);
+      entries.delete(this.file);
     }, KEEP_ALIVE_MS);
   }
 
@@ -182,21 +183,21 @@ class Entry {
 
 const entries = new Map<string, Entry>();
 
-/** The running session of the view `slug` (its newest source) while the caller is mounted. */
-export function useViewSession(slug: string, theme: ViewTheme): { session: ViewSession | null; snapshot: ViewSnapshot | null } {
-  const hasRef = useSyncExternalStore(subscribeNewest, () => newest.has(slug));
+/** The running session of the view at `file` (its newest source) while the caller is mounted. */
+export function useViewSession(file: string, theme: ViewTheme): { session: ViewSession | null; snapshot: ViewSnapshot | null } {
+  const hasRef = useSyncExternalStore(subscribeNewest, () => newest.has(file));
   const scopeGeneration = useSyncExternalStore(subscribeNewest, () => generation);
   const [session, setSession] = useState<ViewSession | null>(null);
   const [snapshot, setSnapshot] = useState<ViewSnapshot | null>(null);
   const themeRef = useRef(theme);
   themeRef.current = theme;
   useEffect(() => {
-    const current = newest.get(slug)?.ref;
+    const current = newest.get(file)?.ref;
     if (!hasRef || !current) return;
-    let entry = entries.get(slug);
+    let entry = entries.get(file);
     if (!entry) {
-      entry = new Entry(slug, current, themeRef.current);
-      entries.set(slug, entry);
+      entry = new Entry(file, current, themeRef.current);
+      entries.set(file, entry);
     }
     entry.acquire();
     const held = entry;
@@ -207,7 +208,7 @@ export function useViewSession(slug: string, theme: ViewTheme): { session: ViewS
       off();
       held.release();
     };
-  }, [slug, hasRef, scopeGeneration]);
+  }, [file, hasRef, scopeGeneration]);
   useEffect(() => {
     session?.setTheme(theme);
   }, [session, theme]);
@@ -218,8 +219,8 @@ export function useViewSession(slug: string, theme: ViewTheme): { session: ViewS
 
 let fullScreen: string | null = null;
 const fullScreenListeners = new Set<() => void>();
-const setFullScreen = (slug: string | null) => {
-  fullScreen = slug;
+const setFullScreen = (file: string | null) => {
+  fullScreen = file;
   for (const listener of fullScreenListeners) listener();
 };
 const subscribeFullScreen = (listener: () => void) => {
@@ -227,6 +228,6 @@ const subscribeFullScreen = (listener: () => void) => {
   return () => void fullScreenListeners.delete(listener);
 };
 
-export const openViewFullScreen = (slug: string) => setFullScreen(slug);
+export const openViewFullScreen = (file: string) => setFullScreen(file);
 export const closeViewFullScreen = () => setFullScreen(null);
 export const useFullScreenView = () => useSyncExternalStore(subscribeFullScreen, () => fullScreen);

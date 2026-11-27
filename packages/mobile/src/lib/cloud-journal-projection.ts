@@ -1,3 +1,5 @@
+import { VIEW_TOOL, viewFromToolEvent } from "@stella/views/conversation";
+import { VIEW_FILE_RE, viewFileName, viewTitle } from "@stella/views/paths";
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { WELCOME_CARD_TYPE, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
@@ -111,39 +113,38 @@ const toolCalls = (
   });
 };
 
-/** The Stella Views an assistant message's `view` calls made, the last version per slug. */
+/** The Stella Views an assistant message's `view` calls made, the last version per file. */
 const viewRefs = (
   record: JournalMessageRecord,
   toolResults: ReadonlyMap<string, { error: boolean; payload: Record<string, unknown> }>,
   createdAt: number,
 ): ChatViewRef[] => {
   if (!Array.isArray(record.payload.content)) return [];
-  const bySlug = new Map<string, ChatViewRef>();
+  const byFile = new Map<string, ChatViewRef>();
   for (const value of record.payload.content) {
     const block = asRecord(value);
     if (!block || block.type !== "toolCall" || typeof block.id !== "string") continue;
     const name = typeof block.name === "string" ? block.name.split("__").at(-1) : "";
-    if (name !== "view") continue;
+    if (name !== VIEW_TOOL) continue;
     const result = toolResults.get(block.id);
-    if (!result || result.error) continue;
-    const details = asRecord(result.payload.details);
-    const args = asRecord(block.arguments);
-    const source = typeof details?.source === "string" ? details.source : typeof args?.source === "string" ? args.source : "";
-    const slug = typeof details?.slug === "string" ? details.slug : typeof args?.slug === "string" ? args.slug : "";
-    if (!source.trim() || !slug) continue;
-    const title = typeof details?.title === "string" && details.title ? details.title : typeof args?.title === "string" && args.title ? args.title : slug;
-    const data = details && "data" in details ? details.data : args && "data" in args ? args.data : undefined;
-    bySlug.delete(slug);
-    bySlug.set(slug, {
-      slug,
-      title,
-      source,
-      ...(data !== undefined ? { data } : {}),
-      createdAt: typeof details?.createdAt === "number" ? details.createdAt : createdAt,
+    if (!result) continue;
+    const view = viewFromToolEvent(
+      { type: "tool_result", timestamp: createdAt, payload: { ...result.payload, toolName: VIEW_TOOL, ...(result.error ? { error: true } : {}) } },
+      asRecord(block.arguments),
+    );
+    if (!view) continue;
+    byFile.delete(view.filePath);
+    byFile.set(view.filePath, {
+      filePath: view.filePath,
+      slug: view.slug ?? viewFileName(view.filePath).replace(VIEW_FILE_RE, ""),
+      title: view.title || viewTitle(view.filePath),
+      source: view.source,
+      ...(view.hasData ? { data: view.data } : {}),
+      createdAt: view.createdAt,
       toolCallId: block.id,
     });
   }
-  return [...bySlug.values()];
+  return [...byFile.values()];
 };
 
 const stringList = (value: unknown): string[] =>

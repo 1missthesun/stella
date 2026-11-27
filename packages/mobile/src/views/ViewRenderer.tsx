@@ -863,7 +863,7 @@ function ViewTabs({ p, onChange }: { p: Record<string, unknown>; onChange?: (v: 
         {optionList(p.tabs).map((tab) => {
           const on = tab.value === value;
           return (
-            <Pressable key={tab.value} onPress={() => (on ? undefined : onChange?.(tab.value))} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ paddingTop: 8, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: on ? colors.accent : "transparent" }}>
+            <Pressable key={tab.value} onPress={() => (on ? undefined : onChange?.(tab.value))} accessibilityRole="button" accessibilityLabel={tab.label} accessibilityState={{ selected: on }} style={{ paddingTop: 8, paddingBottom: 10, borderBottomWidth: 2, borderBottomColor: on ? colors.accent : "transparent" }}>
               <Text style={{ fontFamily: on ? fonts.sans.semiBold : fonts.sans.medium, fontSize: 15, color: on ? colors.text : colors.textMuted }}>{tab.label}</Text>
             </Pressable>
           );

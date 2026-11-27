@@ -1255,7 +1255,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           style={[styles.artifactGroup, hasText && styles.artifactGroupSpaced]}
         >
           {views.map((view) => (
-            <ChatMessageView key={`view:${view.slug}`} slug={view.slug} title={view.title} messageId={item.id} />
+            <ChatMessageView key={`view:${view.filePath}`} file={view.filePath} title={view.title} messageId={item.id} />
           ))}
           {linkedAppSlugs.map((slug) => (
             <AppPreviewCard key={`app:${slug}`} slug={slug} colors={colors} />

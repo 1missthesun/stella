@@ -84,13 +84,13 @@ function ViewBody({ session, snapshot, colors, dark, covered, scroll, onArea }: 
 }
 
 /** A view live in a chat reply: the newest reply that made or changed it. */
-export function ViewChatCard({ slug, title }: { slug: string; title: string }) {
+export function ViewChatCard({ file, title }: { file: string; title: string }) {
   const t = useT();
   const colors = useColors();
   const theme = useViewTheme();
   const open = useFullScreenView();
-  const covered = open === slug;
-  const { session, snapshot } = useViewSession(slug, theme);
+  const covered = open === file;
+  const { session, snapshot } = useViewSession(file, theme);
   const area = useRef<{ w: number; h: number } | null>(null);
   const report = useCallback(
     (w: number, h: number) => {
@@ -102,7 +102,7 @@ export function ViewChatCard({ slug, title }: { slug: string; title: string }) {
   useEffect(() => {
     if (!covered && area.current) report(area.current.w, area.current.h);
   }, [covered, report]);
-  if (!viewsAvailable()) return <ViewChip slug={slug} title={title} />;
+  if (!viewsAvailable()) return <ViewChip file={file} title={title} />;
   return (
     <View style={{ alignSelf: "stretch", borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.background, overflow: "hidden" }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16, paddingRight: 8, minHeight: 42, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
@@ -112,7 +112,7 @@ export function ViewChatCard({ slug, title }: { slug: string; title: string }) {
         <Pressable
           onPress={() => {
             selectionTick();
-            openViewFullScreen(slug);
+            openViewFullScreen(file);
           }}
           hitSlop={8}
           accessibilityRole="button"
@@ -128,13 +128,13 @@ export function ViewChatCard({ slug, title }: { slug: string; title: string }) {
 }
 
 /** An older reply's view: a chip that opens the view's newest version full screen. */
-export function ViewChip({ slug, title }: { slug: string; title: string }) {
+export function ViewChip({ file, title }: { file: string; title: string }) {
   const colors = useColors();
   const available = viewsAvailable();
   return (
     <Pressable
       disabled={!available}
-      onPress={() => openViewFullScreen(slug)}
+      onPress={() => openViewFullScreen(file)}
       accessibilityRole="button"
       style={({ pressed }) => ({ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: pressed ? mix(colors.text, 6, colors.background) : colors.background })}
     >
@@ -165,24 +165,24 @@ function FullScreenFrame({ title, onClose, children }: { title: string; onClose:
   );
 }
 
-function FullScreenBody({ slug }: { slug: string }) {
+function FullScreenBody({ file }: { file: string }) {
   const colors = useColors();
   const theme = useViewTheme();
-  const { session, snapshot } = useViewSession(slug, theme);
+  const { session, snapshot } = useViewSession(file, theme);
   const report = useCallback((w: number, h: number) => session?.setViewport(Math.round(w - CARD_PAD * 2), Math.round(h - CARD_PAD * 2)), [session]);
   return <ViewBody session={session} snapshot={snapshot} colors={colors} dark={theme.dark} covered={false} scroll="fill" onArea={report} />;
 }
 
 /** The open view, full screen over the chat; mounted once beside the chat list. */
 export function ViewFullScreenHost() {
-  const slug = useFullScreenView();
-  const ref = useNewestView(slug);
-  const visible = slug !== null && ref !== null;
+  const file = useFullScreenView();
+  const ref = useNewestView(file);
+  const visible = file !== null && ref !== null;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"} onRequestClose={closeViewFullScreen}>
       {visible ? (
         <FullScreenFrame title={ref.title} onClose={closeViewFullScreen}>
-          <FullScreenBody slug={slug} />
+          <FullScreenBody file={file} />
         </FullScreenFrame>
       ) : null}
     </Modal>
@@ -190,7 +190,7 @@ export function ViewFullScreenHost() {
 }
 
 /** A view a reply made or changed: live when this is the newest such reply, a chip otherwise. */
-export function ChatMessageView({ slug, title, messageId }: { slug: string; title: string; messageId: string }) {
-  const live = useIsLiveView(slug, messageId);
-  return live ? <ViewChatCard slug={slug} title={title} /> : <ViewChip slug={slug} title={title} />;
+export function ChatMessageView({ file, title, messageId }: { file: string; title: string; messageId: string }) {
+  const live = useIsLiveView(file, messageId);
+  return live ? <ViewChatCard file={file} title={title} /> : <ViewChip file={file} title={title} />;
 }

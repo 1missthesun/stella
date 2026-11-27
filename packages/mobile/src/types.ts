@@ -202,6 +202,8 @@ export type ChatMessage = {
 
 /** One version of a Stella View: the whole `.view.tsx` source, run on the phone itself. */
 export type ChatViewRef = {
+  /** Where the agent's computer keeps the view; names it across replies and devices. */
+  filePath: string;
   slug: string;
   title: string;
   source: string;

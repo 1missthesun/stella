@@ -11,6 +11,7 @@
     "./attached-tool-protocol": "./src/attached-tool-protocol.ts",
     "./cloud-agent-move-protocol": "./src/cloud-agent-move-protocol.ts",
     "./cloud-agent-message-protocol": "./src/cloud-agent-message-protocol.ts",
+    "./cloud-view-protocol": "./src/cloud-view-protocol.ts",
     "./cloud-code-connect-protocol": "./src/cloud-code-connect-protocol.ts",
     "./cloud-browser-broker-protocol": "./src/cloud-browser-broker-protocol.ts"
   },

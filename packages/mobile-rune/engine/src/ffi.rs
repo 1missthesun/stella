@@ -217,6 +217,7 @@ fn host<'a>(h: *mut Host) -> Option<&'a mut Host> {
 pub extern "C" fn sme_frame(h: *mut Host) -> SmeFrame {
     let Some(h) = host(h) else { return SmeFrame { drew: false, animating: false, wake_after: -1.0, cpu_us: 0 } };
     let f = h.host.frame();
+    crate::view_frames::after_frame();
     let haptics = h.host.take_haptics();
     for hp in haptics {
         crate::native::send(json!({ "t": "haptic", "kind": format!("{hp:?}") }));

@@ -29,8 +29,11 @@ import { emailDomain } from "./domains/email.js";
 import { emailDigestLegacyDomain } from "./domains/email-digest-legacy.js";
 import { mcpServersDomain } from "./domains/mcp-servers.js";
 import { catchUpsDomain } from "./domains/catch-ups.js";
+import { viewsDomain } from "./domains/views.js";
 import { deviceOfflineDomain } from "./domains/device-offline.js";
 import { savedValuesDomain } from "./domains/saved-values.js";
+import { viewStorageDomain } from "./domains/view-storage.js";
+import { viewIndexDomain } from "./domains/view-index.js";
 import { RATE_LIMIT_MIGRATION } from "./rate-limit.js";
 import { createOwnerRegistry, type OwnerDomain } from "./registry.js";
 
@@ -80,6 +83,9 @@ export const ownerDomains: OwnerDomain[] = [
   catchUpsDomain,
   deviceOfflineDomain,
   savedValuesDomain,
+  viewStorageDomain,
+  viewsDomain,
+  viewIndexDomain,
 ];
 
 export const ownerRegistry = createOwnerRegistry(ownerDomains);

@@ -26,6 +26,7 @@ import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import {
   collectTurnSourceDiffPayloads,
   deriveTurnInlineImagePayloads,
+  deriveTurnViewPayloads,
   deriveTurnResource,
 } from "@/features/chat/lib/derive-turn-resource";
 import {
@@ -749,6 +750,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           { developerResourcesEnabled: developerResourcePreviewsEnabled },
         );
         const inlineImagePayloads = deriveTurnInlineImagePayloads(ownToolEvents);
+        const viewPayloads = deriveTurnViewPayloads(ownToolEvents);
         const mapArtifacts = deriveTurnMapArtifacts(toolEvents);
         const askRecords = deriveTurnAskRecords(toolEvents);
         const sourceDiffPayloads = collectTurnSourceDiffPayloads(ownToolEvents, {
@@ -790,6 +792,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           ...(officePreviewRef ? { officePreviewRef } : {}),
           ...(linkedFiles.length > 0 ? { linkedFiles } : {}),
           ...(resourcePayload ? { resourcePayload } : {}),
+          ...(viewPayloads.length > 0 ? { viewPayloads } : {}),
           ...(inlineImagePayloads.length > 0 ? { inlineImagePayloads } : {}),
           ...(mapArtifacts.length > 0 ? { mapArtifacts } : {}),
           ...(askRecords.length > 0 ? { askRecords } : {}),

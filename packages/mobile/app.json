@@ -141,7 +141,16 @@
       "./plugins/withStellaCarPlay",
       "./plugins/withStellaReactFlags",
       "./plugins/withStellaNotificationService",
-      "expo-sqlite"
+      "./plugins/withStellaAndroidNdk",
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Stella uses your location when a view you open asks for it, for things like local weather or nearby places.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ]
     ],
     "extra": {
       "router": {},

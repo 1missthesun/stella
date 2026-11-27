@@ -481,6 +481,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         push_inputs(s);
     }
     crate::native::check_covers::<Win>(tx);
+    crate::view_frames::poll(tx);
     changed
 }
 

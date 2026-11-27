@@ -9,6 +9,7 @@ import {
   placementAliases,
 } from "@stella/contracts/placement-thread-id";
 import { ReplyViewer } from "./ReplyViewer";
+import { publishConversationViews } from "../views/view-host";
 import { type ReplyAgentStatus } from "./ReplyPreview";
 import {
   createMobileReplyContexts,
@@ -736,6 +737,9 @@ export function ChatPane({
       }),
     [filterVisibleMessages, messages, replyContexts, onOpenArtifact],
   );
+  useEffect(() => {
+    if (conversationId) publishConversationViews(conversationId, messages);
+  }, [conversationId, messages]);
   const [carryQuotes] = useState(createCompletionQuoteCarry);
   const quoteCarry = useMemo(
     () =>

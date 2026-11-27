@@ -21,6 +21,7 @@ mod engine;
 mod fx;
 mod input;
 mod keys;
+mod location;
 mod look_up;
 mod markdown;
 mod media;
@@ -37,6 +38,7 @@ mod text_services;
 mod trim;
 mod tree;
 mod view;
+mod views;
 #[cfg(feature = "webview")]
 mod webview;
 #[cfg(feature = "webview")]
@@ -359,7 +361,10 @@ fn main() {
             }
         });
     })
-    .on_frame_encoded(|f| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_frame(f))
+    .on_frame_encoded(|f| {
+        METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_frame(f);
+        crate::views::on_frame(f);
+    })
     .on_frame_presented(|p| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_presented(p))
     .on_quit(|_s: &mut Win, _| {
         if let Some(c) = engine::with(|e| e.child.take()) {

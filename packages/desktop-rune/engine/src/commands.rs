@@ -94,6 +94,12 @@ pub fn route(v: Value) {
         "audio.play" | "audio.control" | "audio.devices" => crate::audio::command(&cmd, rid, &v),
         "mic.start" | "mic.stop" => crate::mic::command(&cmd, rid, &v),
         "media.probe" => crate::media::probe(rid, &v),
+        "views.start" | "views.deliver" | "views.stop" | "views.pause" | "views.resume" => crate::views::command(&cmd, rid, &v),
+        "location.get" => crate::location::command(rid, &v),
+        "views.frame" => {
+            crate::views::want_frame();
+            reply(rid, Ok(Value::Null));
+        }
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "selection.get" => {
             let w = window_for(&v);

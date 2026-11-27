@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["StellaViewsModule"]
+  },
+  "android": {
+    "modules": ["com.stella.views.StellaViewsModule"]
+  }
+}

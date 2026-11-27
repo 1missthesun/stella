@@ -7,6 +7,7 @@ import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import { parseWelcomeCard, welcomeAssistantMessage, welcomeMarkOf } from "@stella/contracts/welcome-message";
+import { parseViewCard, viewRestoreAssistantMessage } from "@stella/contracts/view-card";
 import {
   isOpusModel,
   isSafeguardBlock,
@@ -2238,6 +2239,18 @@ export class PiConversationRuntime {
               record.createdAtMs ?? Date.now(),
               welcomeMarkOf(welcome),
             ) as JournalMessage["message"],
+          });
+          continue;
+        }
+        // The user restored an earlier version of a view: Stella's own view calls hold an older one.
+        const viewCard = record.kind === "card" ? parseViewCard(record.card) : null;
+        if (viewCard?.restoredFrom !== undefined) {
+          messages.push({
+            seq: record.seq,
+            turnId: record.turnId,
+            role: "assistant",
+            hidden: false,
+            message: viewRestoreAssistantMessage(viewCard, record.createdAtMs ?? Date.now()) as JournalMessage["message"],
           });
           continue;
         }

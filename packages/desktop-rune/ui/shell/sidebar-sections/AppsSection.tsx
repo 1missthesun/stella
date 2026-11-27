@@ -5,22 +5,25 @@ import { useCloudApps, type CloudAppsState } from "@/features/cloud/use-cloud-ap
 import { useT } from "@/shared/i18n";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { dispatchComposeText } from "@/shared/lib/stella-orb-chat";
+import type { IndexedView } from "@stella/contracts/backend/view-index";
+import { useBackendView } from "@/platform/backend/use-backend-view";
 import { CloudAppsLibrary } from "../../apps/CloudAppsLibrary";
+import { ViewsLibrary } from "../../apps/ViewsLibrary";
 import { EmptyState, Icon, Icons } from "../../kit";
 import { Press, T, tx } from "../../kit/compat";
 import { useAppsSection } from "../../global/shared/apps-section.styles";
 
-const SESSION_STALL_MS = 15_000;
 const LOADING_REVEAL_MS = 400;
 
-/** desktop-ui's `AppsSection`: the Cloud Apps library, or why it is empty. */
+/** The Apps list: the account's Stella Views, then its Cloud Apps while it has any, or why it is empty. */
 export function AppsSection() {
   const s = useAppsSection();
   const cloudApps = useCloudApps();
+  const views = useBackendView("viewIndex.list", cloudApps.signedIn ? {} : "skip", { keepPreviousValue: true });
   return (
     <col id="apps-section" {...s.appsSectionBody}>
-      <col {...s.appsSectionLibrary}>
-        <AppsLibraryBody state={cloudApps} />
+      <col {...s.appsSectionLibrary} scrollY>
+        <AppsLibraryBody state={cloudApps} views={views.value} viewsFailed={views.status === "error"} />
       </col>
       <CloudAppsSync state={cloudApps} />
     </col>
@@ -38,19 +41,21 @@ function useDelayed(active: boolean, ms: number) {
   return active && elapsed;
 }
 
-function AppsLibraryBody({ state }: { state: CloudAppsState }) {
+function AppsLibraryBody({ state, views, viewsFailed }: { state: CloudAppsState; views: readonly IndexedView[] | undefined; viewsFailed: boolean }) {
   const t = useT();
   const s = useAppsSection();
-  const starting = state.phase === "disabled" && state.signedIn && !state.sessionFailed;
-  const stalled = useDelayed(starting, SESSION_STALL_MS);
-  const loading = state.signedIn && state.apps.length === 0 && !(state.sessionFailed || state.phase === "error" || stalled) && state.phase !== "ready";
+  const hasViews = (views?.length ?? 0) > 0;
+  // Views lead: the list shows as soon as they are in; Cloud Apps join below when an account still has them.
+  const loading = state.signedIn && !hasViews && state.apps.length === 0 && ((views === undefined && !viewsFailed) || state.phase === "loading");
   const showLoading = useDelayed(loading, LOADING_REVEAL_MS);
 
   if (!state.signedIn) return <EmptyState motif="apps" title={t("app.apps.signedOutTitle")} body={t("app.apps.signedOutBody")} action={{ label: t("common.signIn"), icon: Icons.stella.LogIn, onClick: SIGN_IN_TOAST_ACTION.onClick }} />;
-  if (state.apps.length > 0) {
+  if (hasViews || state.apps.length > 0) {
+    const both = hasViews && state.apps.length > 0;
     return (
       <>
-        <CloudAppsLibrary state={{ ...state, phase: "ready" } as CloudAppsState} />
+        {views ? <ViewsLibrary views={views} {...(both ? { heading: t("app.apps.viewsHeading") } : {})} /> : null}
+        {state.apps.length > 0 ? <CloudAppsLibrary state={{ ...state, phase: "ready" } as CloudAppsState} heading={t("app.apps.cloudAppsHeading")} /> : null}
         {state.phase === "error" ? (
           <row {...s.appsSectionRefreshError} role="alert">
             <T {...tx(s.appsSectionRefreshError)}>{t("app.apps.refreshError")}</T>
@@ -62,10 +67,10 @@ function AppsLibraryBody({ state }: { state: CloudAppsState }) {
       </>
     );
   }
-  if (state.sessionFailed || state.phase === "error" || stalled) {
+  if (!loading && viewsFailed) {
     return <EmptyState motif="apps" title={t("app.apps.loadErrorTitle")} body={t("app.apps.loadErrorBody")} action={{ label: t("app.apps.retry"), icon: Icons.stella.RefreshCw, onClick: state.retry }} />;
   }
-  if (state.phase === "ready") return <AppsEmpty />;
+  if (!loading) return <AppsEmpty />;
   return (
     <row {...s.appsSectionLoading} role="status" opacity={showLoading ? 1 : 0} motion={{ dur: 0.2 }}>
       <Icon icon={Icons.stella.LoaderCircle} size={15} strokeWidth={2} color={s.appsSectionLoading.color} spin={1.1} />

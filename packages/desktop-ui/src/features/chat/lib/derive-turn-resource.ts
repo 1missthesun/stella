@@ -96,7 +96,7 @@ const orchestratorHtmlPayload = (
   for (let index = toolEvents.length - 1; index >= 0; index -= 1) {
     const event = toolEvents[index];
     if (!isToolResult(event)) continue;
-    if (event.payload.toolName !== "html" || event.payload.error) continue;
+    if ((event.payload.toolName !== "html" && event.payload.toolName !== "view") || event.payload.error) continue;
     if (event.payload.agentType !== "orchestrator") {
       continue;
     }
@@ -126,8 +126,52 @@ const orchestratorHtmlPayload = (
   return null;
 };
 
+/**
+ * Every Stella View a reply made or changed (its orchestrator `view` calls, a task's view cards),
+ * one per file in the order the reply first touched each, carrying the newest version's title.
+ * A reply can make several views, and each shows its own card.
+ */
+export const deriveTurnViewPayloads = (
+  toolEvents: readonly EventRecord[],
+): CanvasHtmlPayload[] => {
+  const byFile = new Map<string, CanvasHtmlPayload>();
+  for (const event of toolEvents) {
+    if (!isToolResult(event)) continue;
+    if (event.payload.toolName !== "view" || event.payload.error) continue;
+    if (event.payload.agentType !== "orchestrator") continue;
+    const candidate =
+      event.payload.details && typeof event.payload.details === "object"
+        ? event.payload.details
+        : event.payload.result;
+    if (!candidate || typeof candidate !== "object") continue;
+    const record = candidate as Record<string, unknown>;
+    const filePath = asNonEmptyString(record.filePath);
+    if (!filePath || !VIEW_PATH_RE.test(filePath)) continue;
+    const title = asNonEmptyString(record.title) ?? undefined;
+    const slug = asNonEmptyString(record.slug) ?? undefined;
+    const createdAt =
+      typeof record.createdAt === "number" && Number.isFinite(record.createdAt)
+        ? record.createdAt
+        : event.timestamp;
+    byFile.set(filePath, {
+      kind: "canvas-html",
+      filePath,
+      ...(title ? { title } : {}),
+      ...(slug ? { slug } : {}),
+      createdAt,
+      ...(record.driveBacked === true ? { driveBacked: true } : {}),
+    });
+  }
+  return [...byFile.values()];
+};
+
 const HTML_OUTPUT_PATH_RE =
   /(?:^|\/)(?:\.stella|state)\/outputs\/(?:.+\/)?([^/]+)\.html$/;
+
+/** A Stella View (`name.view.tsx`), drawn natively where canvases open when the host runs views (Rune). */
+const VIEW_PATH_RE = /(?:^|[\\/])([^\\/]+)\.view\.(?:tsx|ts|jsx|js)$/i;
+const hostRendersViews = (): boolean =>
+  Boolean((globalThis as { stella?: { views?: unknown } }).stella?.views);
 const titleFromHtmlSlug = (slug: string): string => {
   const trimmed = slug.trim();
   if (!trimmed) return "Canvas";
@@ -203,6 +247,17 @@ export const buildPayloadFromBarePath = (
     patch?: string;
   },
 ): DisplayPayload | null => {
+  const viewMatch = VIEW_PATH_RE.exec(filePath);
+  if (viewMatch && hostRendersViews()) {
+    const slug = viewMatch[1];
+    return {
+      kind: "canvas-html",
+      filePath,
+      title: titleFromHtmlSlug(slug),
+      slug,
+      createdAt,
+    };
+  }
   const htmlMatch = HTML_OUTPUT_PATH_RE.exec(filePath);
   if (htmlMatch) {
     const slug = htmlMatch[1];

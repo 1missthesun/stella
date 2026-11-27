@@ -1,6 +1,7 @@
 import { sha256BytesHex } from "../hash.js";
 import { serveAgentMoveRequest } from "./agent-move.js";
 import { serveAgentMessageRequest } from "./agent-message.js";
+import { serveAgentViewRequest } from "./agent-view.js";
 import { serveAgentCodeConnectRequest } from "./agent-connect.js";
 import { serveAgentBrowserRequest } from "./agent-browser.js";
 import {
@@ -982,6 +983,9 @@ const handleBrokerLocalRequest = async (
     if (target.kind === "agent-message") {
       return await serveAgentMessageRequest(host.env, turn, body);
     }
+    if (target.kind === "view") {
+      return await serveAgentViewRequest(host.env, turn, body);
+    }
     if (target.kind === "code-connect") {
       return await serveAgentCodeConnectRequest(host.env, turn, body);
     }
@@ -1196,6 +1200,7 @@ export const handleTurnBroker = async (
       claimed.target.kind === "drive" ||
       claimed.target.kind === "search" ||
       claimed.target.kind === "user-ask" ||
+      claimed.target.kind === "view" ||
       claimed.target.kind === "agent-move" ||
       claimed.target.kind === "agent-message" ||
       claimed.target.kind === "code-connect" ||

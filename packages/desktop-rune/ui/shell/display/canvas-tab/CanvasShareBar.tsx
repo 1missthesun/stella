@@ -1,7 +1,7 @@
-import { useCallback, useContext, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { showToast } from "@/ui/toast";
-import { canvasLinkKey, useCanvasLink, useCanvasShare, useSharedCanvasLinks, type CanvasLinkVisibility, type SharedCanvasLink } from "@/features/canvas-share/canvas-share-context";
+import { canvasLinkKey, useCanvasLink, useCanvasShare, useSharedCanvasLinks, useViewLink, type CanvasLinkVisibility, type SharedCanvasLink } from "@/features/canvas-share/canvas-share-context";
 import type { CanvasHtmlItem } from "@/shell/display/canvas-tab/canvas-items";
 import { useT } from "@/shared/i18n";
 import { deviceFileMissingMessage } from "@stella/contracts/device-files";
@@ -270,14 +270,40 @@ function CanvasLinkPanel({ item }: { item: CanvasHtmlItem }) {
     );
   }
 
+  return <LinkDetails link={link} pending={pending} copied={copied} copy={copy} setVisibility={setVisibility} onOpen={onOpen} liveLabel={t("shell.display.canvasShare.live")} publicLinkLabel={t("shell.display.canvasShare.publicLink")} />;
+}
+
+/** A link's state, URL and actions: the same for a canvas and a view. */
+function LinkDetails({
+  link,
+  pending,
+  copied,
+  copy,
+  setVisibility,
+  onOpen,
+  liveLabel,
+  publicLinkLabel,
+}: {
+  liveLabel: string;
+  publicLinkLabel: string;
+  link: SharedCanvasLink;
+  pending: Pending;
+  copied: string | null;
+  copy: (url: string) => Promise<void>;
+  setVisibility: (visibility: CanvasLinkVisibility) => Promise<void>;
+  onOpen: () => Promise<void>;
+}) {
+  const t = useT();
+  const tk = useTokens();
+  const l = shareLook(tk);
   const isPublic = isPublicLink(link);
-  const linkLabel = t(isPublic ? "shell.display.canvasShare.publicLink" : "shell.display.canvasShare.privateLink");
+  const linkLabel = isPublic ? publicLinkLabel : t("shell.display.canvasShare.privateLink");
   return (
     <col gap={10}>
       <row align="center" gap={6}>
         <Icon icon={isPublic ? Icons.stella.Globe : Icons.stella.Lock} size={14} strokeWidth={1.6} color={tk.c.textStrong} />
         <text {...TEXT_MEDIUM} color={tk.c.textStrong}>
-          {t(isPublic ? "shell.display.canvasShare.live" : "shell.display.canvasShare.privateLink")}
+          {isPublic ? liveLabel : t("shell.display.canvasShare.privateLink")}
         </text>
       </row>
       <text {...TEXT} color={tk.c.textWeak}>
@@ -324,7 +350,7 @@ function SharedLinksPanel() {
       if (!share) return;
       setBusy(link.slug);
       try {
-        if (link.canvas) {
+        if (link.canvas || link.view) {
           await share.setVisibility({ slug: link.slug, visibility: "private" });
           showToast(t("shell.display.canvasShare.toasts.madePrivate"));
         } else {
@@ -332,7 +358,7 @@ function SharedLinksPanel() {
           showToast(t("shell.display.canvasShare.toasts.revoked"));
         }
       } catch {
-        showToast(t(link.canvas ? "shell.display.canvasShare.toasts.visibilityFailed" : "shell.display.canvasShare.toasts.revokeFailed"));
+        showToast(t(link.canvas || link.view ? "shell.display.canvasShare.toasts.visibilityFailed" : "shell.display.canvasShare.toasts.revokeFailed"));
       } finally {
         setBusy(null);
       }
@@ -356,7 +382,8 @@ function SharedLinksPanel() {
       ) : (
         <col role="list" gap={4} maxH={320} scrollY>
           {links.map((link) => {
-            const takeDown = t(link.canvas ? "shell.display.canvasShare.makePrivate" : "shell.display.canvasShare.revoke");
+            const keeps = Boolean(link.canvas || link.view);
+            const takeDown = t(keeps ? "shell.display.canvasShare.makePrivate" : "shell.display.canvasShare.revoke");
             return (
               <row key={link.slug} role="listitem" align="center" gap={8} pad={8} radius={radius.md} hover={l.rowHover}>
                 <col grow={1} minW={0} gap={2}>
@@ -374,7 +401,7 @@ function SharedLinksPanel() {
                 </col>
                 <row shrink={false} align="center" gap={4}>
                   <SquareButton id={`canvas-share-copy-${link.slug}`} icon={copied === link.url ? Icons.stella.Check : Icons.stella.Copy} iconSize={13} size={26} label={t("shell.display.canvasShare.copyLink")} onPress={() => void copy(link.url)} />
-                  <SquareButton id={`canvas-share-take-down-${link.slug}`} icon={link.canvas ? Icons.stella.Lock : Icons.stella.Trash2} iconSize={13} size={26} danger label={takeDown} disabled={busy === link.slug} busy={busy === link.slug} onPress={() => void onTakeDown(link)} />
+                  <SquareButton id={`canvas-share-take-down-${link.slug}`} icon={keeps ? Icons.stella.Lock : Icons.stella.Trash2} iconSize={13} size={26} danger label={takeDown} disabled={busy === link.slug} busy={busy === link.slug} onPress={() => void onTakeDown(link)} />
                 </row>
               </row>
             );
@@ -427,3 +454,154 @@ export const CanvasShareBar = ({ item }: { item: CanvasHtmlItem }) => {
     </row>
   );
 };
+
+// ------------------------------------------------------------------ Stella Views
+
+/** The synced identity (`<conversationId>/<slug>`) of the view running from `filePath`, once its host knows it. */
+export function useViewId(filePath: string): string | null {
+  const read = useCallback(() => globalThis.stella.views?.syncState(filePath)?.viewId ?? null, [filePath]);
+  const [viewId, setViewId] = useState<string | null>(read);
+  useEffect(() => {
+    setViewId(read());
+    if (read()) return;
+    // The host binds a view to its conversation when the conversation's messages reach it.
+    const timer = setInterval(() => {
+      const next = read();
+      if (!next) return;
+      setViewId(next);
+      clearInterval(timer);
+    }, 500);
+    return () => clearInterval(timer);
+  }, [read]);
+  return viewId;
+}
+
+function ViewLinkPanel({ viewId }: { viewId: string | null }) {
+  const t = useT();
+  const tk = useTokens();
+  const share = useCanvasShare();
+  const linkView = useViewLink(share ? viewId : null);
+  const link = linkView.value;
+  const [pending, setPending] = useState<Pending>(null);
+  const [failed, setFailed] = useState<{ reason: string | null } | null>(null);
+  const { copied, copy } = useCopyLink();
+
+  const setVisibility = useCallback(
+    async (visibility: CanvasLinkVisibility) => {
+      if (!share || !viewId) return;
+      setPending(visibility);
+      setFailed(null);
+      try {
+        if (link) await share.setVisibility({ slug: link.slug, visibility });
+        else await share.saveView({ viewId, visibility });
+        showToast(t(visibility === "public" ? "shell.display.canvasShare.toasts.madePublic" : "shell.display.canvasShare.toasts.madePrivate"));
+      } catch (error) {
+        setFailed({ reason: publishFailureReason(error) });
+        showToast(t("shell.display.canvasShare.toasts.visibilityFailed"));
+      } finally {
+        setPending(null);
+      }
+    },
+    [share, link, viewId, t],
+  );
+
+  const onOpen = useCallback(async () => {
+    if (!share || !link) return;
+    setPending("open");
+    try {
+      const url = await share.viewLink({ slug: link.slug });
+      if (window.electronAPI?.system.openExternal) openInSystemBrowser(url);
+      else window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      showToast(t("shell.display.canvasShare.toasts.openFailed"));
+    } finally {
+      setPending(null);
+    }
+  }, [share, link, t]);
+
+  if (!viewId) return <State error>{t("shell.display.viewShare.notSynced")}</State>;
+  if (link === undefined && linkView.status !== "error") return <State>{t("common.loading")}</State>;
+  if (!link) {
+    return (
+      <col gap={10}>
+        <text {...TEXT} color={tk.c.textWeak}>
+          {t("shell.display.viewShare.noLink")}
+        </text>
+        {failed ? <State error>{failed.reason ?? t("shell.display.canvasShare.publishFailed")}</State> : null}
+        <row wrap align="center" gap={6}>
+          <PillButton id="view-share-make-public" icon={Icons.stella.Globe} text={t("shell.display.canvasShare.makePublic")} primary disabled={pending !== null} busy={pending === "public"} onPress={() => void setVisibility("public")} />
+          <PillButton id="view-share-make-private" icon={Icons.stella.Lock} text={t("shell.display.viewShare.makePrivateLink")} disabled={pending !== null} busy={pending === "private"} onPress={() => void setVisibility("private")} />
+        </row>
+      </col>
+    );
+  }
+  return <LinkDetails link={link} pending={pending} copied={copied} copy={copy} setVisibility={setVisibility} onOpen={onOpen} liveLabel={t("shell.display.viewShare.live")} publicLinkLabel={t("shell.display.viewShare.publicLink")} />;
+}
+
+/** Share and the shared-links list over a view open in the panel, as over a canvas. */
+/** Share and the shared-links list for a view's tab, in its actions row beside Undo and History. */
+export const ViewShareBar = ({ filePath }: { filePath: string }) => {
+  const t = useT();
+  const share = useCanvasShare();
+  const viewId = useViewId(filePath);
+  const link = useViewLink(share ? viewId : null).value;
+  const [shareOpen, setShareOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
+
+  if (!share) return null;
+  const isPublic = link ? isPublicLink(link) : false;
+  const key = filePath.replace(/[^\w-]/gu, "_").slice(-60);
+
+  return (
+    <row id={`view-share-${key}`} align="center" gap={6} noWindowDrag>
+      <Popover
+        id={`view-share-link-${key}`}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        side="bottom"
+        align="end"
+        sideOffset={8}
+        width={320}
+        trigger={({ id, open, toggle }) => <PillButton id={id} icon={Icons.stella.Globe} text={t(isPublic ? "shell.display.canvasShare.public" : "shell.display.canvasShare.share")} primary open={open} onPress={toggle} />}
+      >
+        {shareOpen ? <ViewLinkPanel viewId={viewId} /> : null}
+      </Popover>
+      <Popover
+        id={`view-share-links-${key}`}
+        open={linksOpen}
+        onOpenChange={setLinksOpen}
+        side="bottom"
+        align="end"
+        sideOffset={8}
+        width={360}
+        trigger={({ id, open, toggle }) => <PillButton id={id} icon={Icons.stella.Link} label={t("shell.display.canvasShare.sharedLinks")} iconOnly open={open} onPress={toggle} />}
+      >
+        {linksOpen ? <SharedLinksPanel /> : null}
+      </Popover>
+    </row>
+  );
+};
+
+/** A view card's Share: an icon in its header opening the same link panel. */
+export function ViewShareButton({ filePath, renderTrigger }: { filePath: string; renderTrigger: (p: { id: string; open: boolean; toggle: () => void; label: string }) => ReactNode }) {
+  const t = useT();
+  const share = useCanvasShare();
+  const viewId = useViewId(filePath);
+  const [open, setOpen] = useState(false);
+  if (!share) return null;
+  const key = filePath.replace(/[^\w-]/gu, "_").slice(-60);
+  return (
+    <Popover
+      id={`view-card-share-${key}`}
+      open={open}
+      onOpenChange={setOpen}
+      side="bottom"
+      align="end"
+      sideOffset={6}
+      width={320}
+      trigger={({ id, open, toggle }) => renderTrigger({ id, open, toggle, label: t("shell.display.canvasShare.share") })}
+    >
+      {open ? <ViewLinkPanel viewId={viewId} /> : null}
+    </Popover>
+  );
+}

@@ -871,6 +871,14 @@
       "problem": "无法核对你的设备",
       "startOverTitle": "重新开始？",
       "startOverBody": "这会新建一个只有这部手机的列表。你的其他设备都需要重新允许。"
+    },
+    "views": {
+      "share": "分享",
+      "publicLinkTitle": "公开链接",
+      "shareLink": "分享链接",
+      "makePrivate": "设为私密",
+      "shareFailed": "无法更改链接",
+      "missing": "此视图已不在你的应用中。"
     }
   },
   "settings": {
@@ -976,9 +984,27 @@
           "openFailed": "无法打开链接"
         }
       },
+      "media": {
+        "expand": "展开"
+      },
       "folder": {
         "emptyTitle": "此文件夹为空",
         "truncated": "仅显示前 {count} 项。"
+      },
+      "viewHistory": {
+        "title": "版本历史",
+        "stella": "Stella",
+        "task": "一个任务",
+        "you": "你",
+        "current": "当前",
+        "restoredFrom": "已恢复 {time} 的版本",
+        "undo": "撤销上次更改",
+        "back": "回到当前版本",
+        "restore": "恢复",
+        "ask": "请 Stella 找回它",
+        "askMessage": "把视图“{title}”在 {time} 的版本找回来，并调整为能配合它现在保存的数据使用。",
+        "restoredHere": "已仅在此设备上恢复 {time} 的版本",
+        "restoreFailed": "无法恢复此版本"
       }
     },
     "sidebar": {

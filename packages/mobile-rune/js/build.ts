@@ -113,6 +113,8 @@ const mobilePlugin: BunPlugin = {
     build.onResolve({ filter: /^rune-jsx\/jsx-(dev-)?runtime$/ }, (a) => ({ path: resolveFrom(a.path.replace(/^rune-jsx/, "react"), UI_ROOT) }));
     // One React for everything (desktop-ui's), and the reconciler next to it.
     build.onResolve({ filter: /^(react|react-dom|react-reconciler)(\/.*)?$/ }, (a) => ({ path: resolveFrom(a.path, a.path.startsWith("react-reconciler") ? RUNE : UI_ROOT) }));
+    // The phone's own files use the desktop's workspace packages (`@stella/views`, `@stella/contracts`), linked under desktop-rune.
+    build.onResolve({ filter: /^@stella\// }, (a) => (a.importer.startsWith(MOBILE + path.sep) ? { path: resolveFrom(a.path, RUNE) } : undefined));
     build.onResolve({ filter: /^bun:/ }, () => ({ path: path.join(JS, "shims", "bun-ffi.ts") }));
     build.onResolve({ filter: /^(node:)?(fs|fs\/promises|crypto|child_process|os|url|path|events|buffer|util)$/ }, (a) => {
       if (a.importer.includes(`${path.sep}node_modules${path.sep}`) && !a.path.startsWith("node:")) return undefined;

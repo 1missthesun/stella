@@ -4,6 +4,7 @@ import path from "node:path";
 const CONTRACT = "packages/contracts/canvas-host.ts";
 const HEADERS = "packages/website/public/_headers";
 const ROUTE = "/chat-app/canvas-host.html";
+const WORKER = "packages/website/worker.mjs";
 
 const stringsIn = (text) => [...text.matchAll(/"([^"\\]*)"|`([^`\\]*)`/g)].map((m) => m[1] ?? m[2]);
 
@@ -35,5 +36,8 @@ export async function check(root) {
   const sent = block.find((line) => line.startsWith("Content-Security-Policy:"))?.slice("Content-Security-Policy:".length).trim();
   if (!block.includes("! Content-Security-Policy")) return [`${HEADERS}: ${ROUTE} must drop the chat's Content-Security-Policy`];
   if (sent !== expected) return [`${HEADERS}: ${ROUTE} Content-Security-Policy must be the canvas policy from ${CONTRACT}:\n  ${expected}`];
+  // A user's own renderer's canvas host is proxied through the website worker, which sets its policy.
+  const worker = readFileSync(path.join(root, WORKER), "utf8").match(/const CANVAS_HOST_POLICY =\s*"([^"]*)";/)?.[1];
+  if (worker !== expected) return [`${WORKER}: CANVAS_HOST_POLICY must be the canvas policy from ${CONTRACT}:\n  ${expected}`];
   return [];
 }

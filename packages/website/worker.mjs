@@ -43,6 +43,11 @@ const GOOGLE_MAPS = {
   frame: ["https://*.google.com"],
 };
 const DESKTOP_RENDERER = "stella-app:";
+// The canvas host of a user's own renderer (/chat-app/u/<fork>/<id>/canvas-host.html, proxied from
+// the backend) runs canvases under the canvas policy, as public/_headers gives the shared one; keep
+// this equal to packages/contracts/canvas-host.ts (scripts/invariants checks it).
+const CANVAS_HOST_POLICY =
+  "sandbox allow-scripts allow-forms; default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com https://esm.sh; style-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com https://esm.sh; font-src data: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com https://esm.sh; img-src https: data: blob:; media-src https: data: blob:; connect-src https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com https://esm.sh; frame-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'";
 
 const backendOrigins = (env) =>
   String(env?.CSP_BACKEND_ORIGINS ?? "")
@@ -135,6 +140,9 @@ const securityHeaders = (pathname, env) => {
   }
   if (pathname === "/chat" || pathname === "/chat/") {
     return { "Content-Security-Policy": chatShellPolicy(), "X-Frame-Options": "SAMEORIGIN" };
+  }
+  if (pathname.startsWith("/chat-app/") && pathname.endsWith("/canvas-host.html")) {
+    return { "Content-Security-Policy": CANVAS_HOST_POLICY, "X-Frame-Options": "SAMEORIGIN" };
   }
   if (pathname === "/chat-app" || pathname.startsWith("/chat-app/")) {
     return { "Content-Security-Policy": chatAppPolicy(), "X-Frame-Options": "SAMEORIGIN" };

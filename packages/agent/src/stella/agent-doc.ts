@@ -16,6 +16,8 @@ export type StellaAgentRole = {
   stellaReplied?: { tool: string; at: number };
   askingStella?: { key: string; reply?: string };
   workspace?: "large";
+  /** Tool calls (newest last) whose starter was already told they ran past `LONG_TOOL_CALL_MS`. */
+  longCallsTold?: string[];
 };
 
 export type StellaPendingNote = {

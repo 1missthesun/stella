@@ -1,4 +1,4 @@
-import type { Context } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT, type Context } from "@earendil-works/chord/context";
 import type { AssistantMessage, ModelThinkingLevel, TextContent } from "@earendil-works/pi-ai";
 import { bool, lit, obj, opt, str } from "@earendil-works/pi-schema";
 import {
@@ -85,7 +85,15 @@ import {
   type HelperWaitingOnYou,
 } from "@stella/contracts/agent-messaging";
 import { isDeviceOfflineError } from "@stella/contracts/device-offline";
-import { longToolCall, longToolCallText, type CurrentToolCall } from "@stella/contracts/long-tool-call";
+import {
+  LONG_TOOL_CALL_MS,
+  LONG_TOOL_CALL_OUTPUT_CHARS,
+  longToolCall,
+  longToolCallText,
+  longToolCallWakeText,
+  waitsForUser,
+  type CurrentToolCall,
+} from "@stella/contracts/long-tool-call";
 import {
   isSafeguardBlock,
   isSafeguardBlockText,
@@ -517,7 +525,6 @@ const messageText = (message: { content?: unknown } | undefined): string =>
 
 
 const LATEST_PREVIEW_CHARS = 300;
-const LONG_CALL_OUTPUT_CHARS = 400;
 
 const currentToolCall = async (
   store: { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
@@ -1886,6 +1893,112 @@ export function stellaAgents(host: StellaAgentsHost) {
     },
   });
 
+  /**
+   * A task's tool call that runs past `LONG_TOOL_CALL_MS` (other than one waiting on the user) wakes whoever started the
+   * task, once per call, with what `agent_status` shows for it: the starter decides whether to stop and resume it. The
+   * timer lives in memory with the call (a restart interrupts the call anyway); the told mark on the task makes it once.
+   */
+  let boundHarness: Harness | undefined;
+  const longCallTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const LONG_CALLS_TOLD_KEPT = 16;
+  const longCallKey = (conversationId: ConversationId, callId: string) => `${conversationId}\u0000${callId}`;
+
+  const longCallHook = hook(ToolTask, {
+    beforeTool: async (call, api, context) => {
+      if (call.parent || waitsForUser(call.name)) return undefined;
+      const key = longCallKey(api.conversationId, call.id);
+      if (longCallTimers.has(key)) return undefined;
+      const role = await api.snapshot(StellaAgentDoc, api.conversationId, context).catch(() => undefined);
+      if (!role?.threadId || role.agentType === "orchestrator" || role.longCallsTold?.includes(call.id)) return undefined;
+      const conversationId = api.conversationId;
+      const timer = setTimeout(() => {
+        longCallTimers.delete(key);
+        void wakeStarterOfLongCall(conversationId, call.id).catch((error: unknown) => {
+          console.warn("[stella-agents] telling a starter about a long tool call failed", { conversationId, callId: call.id, error });
+        });
+      }, LONG_TOOL_CALL_MS);
+      (timer as { unref?: () => void }).unref?.();
+      longCallTimers.set(key, timer);
+      return undefined;
+    },
+    afterTool: (call, _result, api) => {
+      const key = longCallKey(api.conversationId, call.id);
+      clearTimeout(longCallTimers.get(key));
+      longCallTimers.delete(key);
+      return undefined;
+    },
+  });
+
+  const wakeStarterOfLongCall = async (conversationId: ConversationId, callId: string): Promise<void> => {
+    const harness = boundHarness;
+    if (!harness) return;
+    const context = BACKGROUND_CONTEXT;
+    const live = await harness.snapshot(LiveDoc, conversationId, context);
+    const slot = live?.run === undefined ? undefined : live.tools?.find((tool) => tool.callId === callId && tool.status === "running");
+    const taskId = slot?.taskId;
+    if (!slot || taskId === undefined) return;
+    const since = await harness.commit(async (tx) => (await tx.task(taskId))?.startedAt, context);
+    const call = since === undefined ? undefined : longToolCall({ tool: slot.name, since });
+    if (!call) return;
+    const self = await roleOf(harness, conversationId, context);
+    const threadId = self.threadId;
+    if (!threadId || self.agentType === "orchestrator") return;
+    const home = self.parentConversationId as ConversationId | undefined;
+    const record = home === undefined ? undefined : (await harness.snapshot(StellaAgentsDoc, home, context))?.agents[threadId];
+    if (record && wasStopped(record)) return;
+    const first = await harness.commit(async (tx) => {
+      const role = await tx.doc(StellaAgentDoc, conversationId);
+      if (role.longCallsTold?.includes(callId)) return false;
+      role.longCallsTold = [...(role.longCallsTold ?? []), callId].slice(-LONG_CALLS_TOLD_KEPT);
+      return true;
+    }, context);
+    if (!first) return;
+    const text = longToolCallWakeText({
+      threadId,
+      description: self.description ?? record?.description ?? threadId,
+      call,
+      ...(slot.output ? { output: slot.output } : {}),
+    });
+    const key = `long-call:${threadId}:${callId}`;
+    const reader = { conversationId, snapshot: harness.snapshot.bind(harness) };
+    const { root, parentThreadId } = await chainOf(reader, context);
+    const stellaThread = await host.directory?.conversationId(context).catch(() => undefined);
+    const lead =
+      parentThreadId !== undefined && parentThreadId !== stellaThread && parentThreadId.toLowerCase() !== STELLA_MESSAGE_TARGET
+        ? parentThreadId
+        : undefined;
+    if (lead === undefined) {
+      const route = await stellaRoute(reader, context);
+      if (!route?.root || !route.from) return;
+      await deliverNote(
+        route.root,
+        { callId, key, message: text, from: route.from, ...(route.remote ? { remote: true as const } : {}) },
+        context,
+        (id) => harness.conversation(id, context),
+      );
+      return;
+    }
+    // To a lead, as a helper's note would go: a running lead reads it before its next step, an idle one wakes, and a
+    // stopped one holds it like any other note.
+    const from = senderOf(self, stellaThread ?? STELLA_MESSAGE_TARGET);
+    const target = root === undefined ? undefined : (await agentTree(harness, root, context)).find((agent) => agent.threadId === lead);
+    if (target && !target.record.origin && target.reports && !runsElsewhere(target.record) && target.record.conversationId >= 0) {
+      await harness.commit(async (tx) => {
+        const state = await tx.doc(StellaAgentsDoc, target.parentConversationId);
+        if (state.calls[key]) return undefined;
+        const reporter = await tx.createTask(
+          Reporter,
+          { threadId: lead, conversationId: target.record.conversationId, message: formatAgentMessage(from, text), note: true },
+          { ownership: { kind: "conversation" }, background: true, conversationId: target.parentConversationId },
+        );
+        state.calls[key] = { threadId: lead, reporter };
+        return undefined;
+      }, context);
+      return;
+    }
+    await host.directory?.message({ key, to: lead, text, from }, context);
+  };
+
   const settleNotes = async (tx: Tx, agentConversationId: ConversationId): Promise<StellaPendingNote[]> => {
     const role = await tx.doc(StellaAgentDoc, agentConversationId);
     const notes = (role.notes ?? []).map((note) => ({ ...note, from: { ...note.from } }));
@@ -2164,7 +2277,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       ...(long
         ? {
             long_call: longToolCallText(long),
-            ...(long.output ? { long_call_output_tail: long.output.slice(-LONG_CALL_OUTPUT_CHARS) } : {}),
+            ...(long.output ? { long_call_output_tail: long.output.slice(-LONG_TOOL_CALL_OUTPUT_CHARS) } : {}),
           }
         : {}),
       ...(text ? { latest_message_preview: text.length > LATEST_PREVIEW_CHARS ? `${text.slice(0, LATEST_PREVIEW_CHARS)}…` : text } : {}),
@@ -3416,7 +3529,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const extension = defineExtension({
     name: STELLA_AGENTS_EXTENSION,
     tasks: [Anchor, Reporter],
-    hooks: [endedCommandsHook],
+    hooks: [endedCommandsHook, longCallHook],
     wraps: stellaFirstWraps({ tellStella }),
     tools: [
       spawnAgent,
@@ -3434,6 +3547,9 @@ export function stellaAgents(host: StellaAgentsHost) {
   return {
     extension,
     waitingExtension,
+    bind: (harness: Harness) => {
+      boundHarness = harness;
+    },
     startAgent,
     agentRecords,
     messageAgent,

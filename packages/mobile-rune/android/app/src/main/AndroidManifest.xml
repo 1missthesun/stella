@@ -26,6 +26,13 @@
         <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="stella-rune" />
       </intent-filter>
+      <!-- A computer's pairing link (its QR code): stella://p2p?c=<code>. -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="stella" android:host="p2p" />
+      </intent-filter>
     </activity>
     <!-- Files the share sheet hands to other apps (picks, downloads, the app's documents). -->
     <provider

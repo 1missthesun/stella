@@ -197,6 +197,12 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
         tf.keyboardType = .emailAddress
         tf.autocapitalizationType = .none
         tf.autocorrectionType = .no
+      } else if hint.contains("pairing") {
+        // A computer's pairing code: letters and digits, typed as shown (`K7M-49PX`).
+        tf.keyboardType = .asciiCapable
+        tf.autocapitalizationType = .allCharacters
+        tf.autocorrectionType = .no
+        tf.spellCheckingType = .no
       } else if hint.contains("code") {
         tf.textContentType = .oneTimeCode
         tf.keyboardType = .numberPad

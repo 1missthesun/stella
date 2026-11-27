@@ -23,7 +23,8 @@ object Engine {
     fun wake()
   }
 
-  @JvmStatic external fun nativeInit(callbacks: Callbacks)
+  /** `context`: the application's, for native code that reaches Android's Java APIs (the device link's DNS). */
+  @JvmStatic external fun nativeInit(callbacks: Callbacks, context: android.content.Context)
   @JvmStatic external fun nativePush(frame: ByteArray, len: Int)
   /** Frames straight from V8's memory: `len` bytes at `offset` of a direct buffer (no copy on the way). */
   @JvmStatic external fun nativePushDirect(buffer: java.nio.ByteBuffer, offset: Int, len: Int)

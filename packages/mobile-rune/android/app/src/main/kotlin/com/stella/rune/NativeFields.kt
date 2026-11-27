@@ -265,6 +265,8 @@ object NativeFields {
           type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
           autofill = View.AUTOFILL_HINT_EMAIL_ADDRESS
         }
+        // A computer's pairing code: letters and digits, typed as shown (`K7M-49PX`).
+        hint.contains("pairing") -> type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         hint.contains("code") -> {
           type = InputType.TYPE_CLASS_NUMBER
           autofill = "smsOTPCode"

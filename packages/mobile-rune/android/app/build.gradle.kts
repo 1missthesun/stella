@@ -69,4 +69,6 @@ dependencies {
   implementation("androidx.activity:activity:1.13.0")
   implementation("androidx.browser:browser:1.10.0")
   implementation("androidx.core:core:1.19.1")
+  // Scanning a computer's pairing QR code: Google's code scanner (Play services' own camera UI).
+  implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 }

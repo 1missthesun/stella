@@ -13,7 +13,7 @@
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
   <key>CFBundleURLTypes</key>
-  <array><dict><key>CFBundleURLSchemes</key><array><string>stella-rune</string></array></dict></array>
+  <array><dict><key>CFBundleURLSchemes</key><array><string>stella-rune</string><string>stella</string></array></dict></array>
   <key>LSRequiresIPhoneOS</key><true/>
   <key>MinimumOSVersion</key><string>17.0</string>
   <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
@@ -25,6 +25,6 @@
   <key>UIViewControllerBasedStatusBarAppearance</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Stella listens while you dictate a message.</string>
   <key>NSPhotoLibraryUsageDescription</key><string>Stella attaches the photos you pick to your message.</string>
-  <key>NSCameraUsageDescription</key><string>Stella attaches the photos you take to your message.</string>
+  <key>NSCameraUsageDescription</key><string>Stella uses the camera for the photos you take and to scan your computer's pairing code.</string>
 </dict>
 </plist>

@@ -105,7 +105,7 @@ object App {
   /** Commands from TS (through the engine's `native` commands or `__native.post`). */
   fun command(m: JSONObject) {
     val a = activity ?: return
-    if (Pickers.handle(m) || Menus.handle(m)) return
+    if (Pickers.handle(m) || Menus.handle(m) || Scanner.handle(m)) return
     val cmd = m.optString("cmd").ifEmpty { m.optString("t") }
     when (cmd) {
       "clipboard.writeText" -> Pickers.write(m.optString("text"), null)
@@ -238,7 +238,7 @@ class MainActivity : ComponentActivity() {
         App.native(m)
       }
       override fun wake() = rune.wake()
-    })
+    }, applicationContext)
     rune.onFirstFrame = {
       App.firstFrameMs = SystemClock.uptimeMillis() - App.processStartMs
       AppLog.write("info", String.format("first frame %.1f ms after process start", App.firstFrameMs))
@@ -269,6 +269,8 @@ class MainActivity : ComponentActivity() {
       "env" to stellaEnv,
     )
     js.start(File(res, "app.js"), env)
+    // Opened by a link (a computer's pairing QR code): TS hears it once the bundle has run.
+    intent?.data?.let { u -> if (!(BuildConfig.STELLA_DEV && u.host == "debug")) js.deliver(JSONObject().put("t", "open-url").put("url", u.toString()).toString()) }
     // Back goes to TS, which closes what is on top (a menu or dialog, a drawer, a full-screen view),
     // returns to the Chat tab, or asks to leave (`app.background`).
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {

@@ -71,12 +71,12 @@ function GlassButton({ id, icon, label, onPress, iconSize = 19 }: { id: string; 
 
 const TITLE_KEYS: Record<Exclude<PhoneTab, "chat">, string> = { schedule: "Schedule", apps: "Apps", files: "Files" };
 
-function TopBar({ width, insets, tab }: { width: number; insets: PhoneInsets; tab: PhoneTab }) {
+function TopBar({ width, insets, tab, onWidth }: { width: number; insets: PhoneInsets; tab: PhoneTab; onWidth: (w: number) => void }) {
   const t = useTokens();
   const tr = useT();
   const middle = Math.max(0, width - 2 * (EDGE + BUTTON + 8));
   return (
-    <row id="phone-topbar" fixed absolute={{ left: 0, right: 0, top: insets.top }} h={PHONE_TOPBAR_H} align="center" px={EDGE} gap={8} raise={SHEET_RAISE + 1}>
+    <row id="phone-topbar" fixed absolute={{ left: 0, right: 0, top: insets.top }} h={PHONE_TOPBAR_H} align="center" px={EDGE} gap={8} raise={SHEET_RAISE + 1} onLayout={(r) => onWidth(r.w)}>
       <GlassButton id="phone-account-button" icon={Icons.stella.User} label={tr("settings.title")} onPress={() => phoneNav.openDrawer("account")} />
       <row grow={1} minW={0} h="full" center>
         {tab === "chat" ? (
@@ -228,9 +228,8 @@ export const ShellTopBarFull = memo(function PhoneChrome(_props: { onSignIn?: ()
   const [width, setWidth] = useState(__native.env.width);
   return (
     <>
-      <box fixed inset={0} inert onLayout={(r) => setWidth((w) => (Math.abs(w - r.w) < 0.5 ? w : r.w))} />
       <TabPages insets={insets} tab={tab} />
-      <TopBar width={width} insets={insets} tab={tab} />
+      <TopBar width={width} insets={insets} tab={tab} onWidth={(w) => setWidth((old) => (Math.abs(old - w) < 0.5 ? old : w))} />
       <BottomBar insets={insets} tab={tab} />
       <AccountDrawer open={drawer === "account"} width={drawerWidth(width)} insets={insets} />
       <ChatSettingsDrawer open={drawer === "chat-settings"} width={drawerWidth(width)} insets={insets} />

@@ -30,9 +30,21 @@ enum DebugDriver {
     let q = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []).map { ($0.name, $0.value ?? "") })
     let num = { (k: String, d: Double) in Double(q[k] ?? "") ?? d }
     switch url.path {
+    case "/open":
+      // Opens the URL in Documents/open-url.txt (then deletes it) the way an app does: no
+      // "Open in …?" prompt, unlike `simctl openurl`. For handing another app a sign-in link.
+      let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("open-url.txt")
+      if let s = try? String(contentsOf: file, encoding: .utf8), let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)) {
+        try? FileManager.default.removeItem(at: file)
+        UIApplication.shared.open(u)
+      }
     case "/tap":
       let p = CGPoint(x: num("x", 0), y: num("y", 0))
-      if let field = app.hitTest(p, with: nil), field !== app {
+      // A native field takes the tap itself (its hit view may be one of its own subviews).
+      var hit = app.hitTest(p, with: nil)
+      while let v = hit, v !== app, !(v is UITextView), !(v is UITextField) { hit = v.superview }
+      if let field = hit, field !== app {
+        NativeFields.shared.lastTouchEnd = CACurrentMediaTime()
         field.becomeFirstResponder()
         return true
       }

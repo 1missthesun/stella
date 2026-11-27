@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { memo, useEffect, type ReactNode } from "react";
 import { BackendAuthProvider } from "@/global/auth/BackendAuthProvider";
 import { I18nProvider } from "@/shared/i18n/RemoteI18nProvider";
 import { useLocale } from "@/shared/i18n/I18nProvider";
@@ -110,7 +110,7 @@ function App() {
 }
 
 /** desktop-ui's `AppRoot` for the full window. */
-export function FullWindow() {
+export const FullWindow = memo(function FullWindow() {
   bootOnce();
   return (
     <ErrorBoundary>
@@ -121,4 +121,4 @@ export function FullWindow() {
       </BackendAuthProvider>
     </ErrorBoundary>
   );
-}
+});

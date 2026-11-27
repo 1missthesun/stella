@@ -109,9 +109,24 @@ class HostWindows {
     return () => { this.listeners.delete(listener); };
   };
 
-  /** Stable between changes, for useSyncExternalStore. */
+  private readonly kept = new Map<string, { json: string; snapshot: WindowSnapshot }>();
+  private list: WindowSnapshot[] = [];
+
+  /** Stable between changes, for useSyncExternalStore. A window whose snapshot didn't change keeps
+   *  its object (and the list its array), so resizing one window re-renders only what reads it. */
   snapshot = (): WindowSnapshot[] => {
-    this.cached ??= this.all().map((w) => w.snapshot());
+    if (this.cached) return this.cached;
+    const next = this.all().map((w) => {
+      const fresh = w.snapshot();
+      const json = JSON.stringify(fresh);
+      const kept = this.kept.get(fresh.id);
+      if (kept?.json === json) return kept.snapshot;
+      this.kept.set(fresh.id, { json, snapshot: fresh });
+      return fresh;
+    });
+    for (const id of this.kept.keys()) if (!this.byId.has(id)) this.kept.delete(id);
+    const same = next.length === this.list.length && next.every((s, i) => s === this.list[i]);
+    this.cached = this.list = same ? this.list : next;
     return this.cached;
   };
 }

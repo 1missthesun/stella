@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { LocalI18nProvider } from "@/shared/i18n/I18nProvider";
 import { UiStateProvider } from "@/context/ui-state";
 import type { WindowSnapshot } from "../../host/electron/browser-window";
@@ -32,7 +32,7 @@ const bodyFor = (mode: string | null) => {
 };
 
 /** An app window other than the full shell, by its mode: desktop-ui's overlay and companion entries. */
-export function AuxWindow({ snapshot }: { snapshot: WindowSnapshot }) {
+export const AuxWindow = memo(function AuxWindow({ snapshot }: { snapshot: WindowSnapshot }) {
   const api = useMemo(() => stella.host?.apiFor(snapshot.id) ?? null, [snapshot.id]);
   const aux = useMemo(() => ({ snapshot, api }), [snapshot, api]);
   const body = bodyFor(snapshot.mode);
@@ -42,4 +42,4 @@ export function AuxWindow({ snapshot }: { snapshot: WindowSnapshot }) {
       <AuxProviders>{body}</AuxProviders>
     </AuxWindowProvider>
   );
-}
+});

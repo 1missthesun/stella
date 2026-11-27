@@ -116,6 +116,8 @@ const ELECTRON_SYSTEM_ENV_KEYS = [
   // Points anonymous counts at a local telemetry worker instead of dev.
   "STELLA_ANONYMOUS_COUNTS_ENDPOINT",
   "STELLA_APP_SOURCE_INSTALLED",
+  // Gives the run's orchestrator the `view` tool (Stella Views), for proving views on the phone.
+  "STELLA_VIEWS",
   // Proxy claims: Electron main routes fetch through these only when one is set.
   "HTTP_PROXY",
   "HTTPS_PROXY",

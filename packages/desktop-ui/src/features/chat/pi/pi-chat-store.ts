@@ -290,6 +290,14 @@ export const importLocalPiChat = async (conversationId: string, fromConversation
   return result?.imported ?? 0;
 };
 
+// Null when Stella's runtime isn't reachable yet, so the caller can try again.
+export const seedPiChatWelcome = async (conversationId: string): Promise<boolean | null> => {
+  const chat = api();
+  if (!chat) return null;
+  const result = (await chat.request({ op: "welcome", conversationId })) as { seeded?: boolean } | undefined;
+  return result?.seeded === true;
+};
+
 export const abortPiChat = (conversationId: string): void => {
   const dispatchIds = (watched.get(conversationId)?.state.remote ?? []).flatMap((turn) =>
     turn.clientMsgId ? [turn.clientMsgId] : [],

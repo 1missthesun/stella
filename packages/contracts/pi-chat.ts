@@ -208,7 +208,10 @@ export type PiChatRequest =
       fresh?: boolean;
     }
   | { op: "move"; conversationId: string; target: PiChatMoveTarget }
-  | { op: "importLocal"; conversationId: string; fromConversationId: string };
+  | { op: "importLocal"; conversationId: string; fromConversationId: string }
+  | { op: "welcome"; conversationId: string };
+
+export type PiChatWelcomeResult = { seeded: boolean };
 
 export type PiChatImportLocalResult = { imported: number };
 

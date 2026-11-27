@@ -181,6 +181,7 @@ const piLocalLog = (
                       streamStartedAtMs: message.timestamp,
                       ...(message.followedByToolCall ? { followedByToolCall: true } : {}),
                     },
+                    ...(message.welcome ? { welcome: message.welcome } : {}),
                   },
           },
           timestamp: message.timestamp,

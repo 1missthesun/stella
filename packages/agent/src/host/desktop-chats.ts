@@ -20,6 +20,7 @@ import {
   ConversationBusy,
   type ContextEdit,
   defineDoc,
+  InboxDoc,
   LiveDoc,
   type Agent,
   type Conversation,
@@ -63,6 +64,7 @@ import {
   type PiChatAgentsResult,
   type PiChatBrainResult,
   type PiChatImportLocalResult,
+  type PiChatWelcomeResult,
   type PiChatMoveTarget,
   type PiChatOlderResult,
   type PiChatRequest,
@@ -72,6 +74,7 @@ import {
   type PiUserMessage,
 } from "@stella/contracts/pi-chat";
 import type { AgentReportEnvelope } from "@stella/contracts/agent-wake-prompt";
+import { isWelcomeAssistantMessage, welcomeAssistantMessage } from "@stella/contracts/welcome-message";
 import type { DeviceSigner } from "@stella/node-shared/home/device";
 import {
   offersAgentTools,
@@ -2083,6 +2086,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         for (const entry of page.items) {
           const message = entry.model?.[0];
           if (!message || (entry.data as { localOnly?: unknown } | undefined)?.localOnly === true) continue;
+          if (isWelcomeAssistantMessage(message)) continue;
           if (entry.kind === "pi.user" && message.role === "user") {
             const journaled = piJournalUserMessage(message as PiUserMessage);
             if (journaled.hidden) continue;
@@ -2121,6 +2125,23 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await flush();
     return { imported: records.length };
+  };
+
+  // A chat kept on this computer opens with Stella's welcome. Only a chat with
+  // nothing in it yet gets one; the account's chat gets its own from the cloud,
+  // so importLocal leaves this one behind.
+  const welcome = async (conversationId: string): Promise<PiChatWelcomeResult> => {
+    if (!conversationId.startsWith("local_")) return { seeded: false };
+    const chat = await open(conversationId);
+    await chat.localLog?.importNow().catch((error: unknown) => options.report(error));
+    const seeded = await chat.harness.commit(async (tx) => {
+      if ((await tx.scanEntries({ conversationId: chat.root.id, order: "descending" }, 1)).items.length > 0) return false;
+      if ((await tx.doc(LiveDoc, chat.root.id)).run !== undefined) return false;
+      if ((await tx.doc(InboxDoc, chat.root.id)).items.length > 0) return false;
+      await tx.appendEntry(chat.root.id, { kind: "pi.assistant", model: [welcomeAssistantMessage(Date.now()) as Message] });
+      return true;
+    }, context);
+    return { seeded };
   };
 
   const linkedFiles = async (conversationId: string): Promise<{ paths: string[] }> => {
@@ -3039,6 +3060,8 @@ export function desktopChats(options: DesktopChatsOptions) {
           return moveBrain(request.conversationId, request.target);
         case "importLocal":
           return importLocal(request.conversationId, request.fromConversationId);
+        case "welcome":
+          return welcome(request.conversationId);
       }
     },
     async terminateCommands(): Promise<void> {

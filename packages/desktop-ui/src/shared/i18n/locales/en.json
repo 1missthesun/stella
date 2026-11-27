@@ -977,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Your chats stay on this computer. Sign in to use Stella on your phone and keep everything in sync.",
       "needsAccount": "This runs in Stella's cloud, so it needs a Stella account.",
       "syncFailed": "Couldn't add this chat to your account. It's still on this computer.",
       "synced": "This chat was added to your account."

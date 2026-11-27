@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { MEET_STELLA_GUIDE_HTML } from "@stella/contracts/meet-stella-guide";
 import { MEET_STELLA_GUIDE_SLUG, MEET_STELLA_GUIDE_TITLE } from "@stella/contracts/welcome-message";
-import { readCanvasActionManifest } from "@stella/contracts/canvas-actions";
+import { readCanvasActionManifest, type CanvasActionEvent } from "@stella/contracts/canvas-actions";
+import { sendCanvasActionToChat } from "@/shell/display/canvas-tab/use-canvas-actions";
+import { closeMeetStellaGuide } from "@/features/welcome/open-meet-stella-guide";
 import { useT } from "@/shared/i18n";
 import { CanvasFrame, useHtmlCanvasSource } from "../../shell/display/canvas-tab/CanvasFrame";
 import { useCanvasActions } from "../../shell/display/canvas-tab/use-canvas-frame-bridge";
@@ -9,12 +11,20 @@ import { PreviewProblem } from "../../shell/display/preview-states";
 
 const IDENTITY = { canvas: MEET_STELLA_GUIDE_SLUG, title: MEET_STELLA_GUIDE_TITLE };
 
+// desktop-ui's: a "try this" button sends its request, then the guide steps
+// aside so the chat behind it shows what came of it.
+const sendAndClose = async (event: CanvasActionEvent) => {
+  const sent = await sendCanvasActionToChat(event);
+  closeMeetStellaGuide();
+  return sent ? ("sent" as const) : ("failed" as const);
+};
+
 /** desktop-ui's `MeetStellaGuideView`: the guide in the same frame as any canvas, its buttons canvas actions that send the request to the chat. */
 export default function MeetStellaGuideView() {
   const t = useT();
   const actions = useMemo(() => readCanvasActionManifest(MEET_STELLA_GUIDE_HTML), []);
   const { source, error } = useHtmlCanvasSource(MEET_STELLA_GUIDE_HTML);
-  const { onFrameLoad } = useCanvasActions({ actions, identity: IDENTITY });
+  const { onFrameLoad } = useCanvasActions({ actions, identity: IDENTITY, onAction: sendAndClose });
   if (error) {
     return (
       <col grow={1} center pad={24}>

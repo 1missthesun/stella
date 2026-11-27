@@ -21,7 +21,6 @@ import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat
 import { useComposerMessage, type ComposerMessageStore } from "@/features/chat/hooks/use-composer-message-state";
 import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
-import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
 import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
 import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
 import { Icon, Icons, withStroke } from "../kit";
@@ -278,7 +277,6 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
     <row w="full" h="full" grow={1} minW={0} minH={0} align="stretch">
       <row grow={1} minW={0} minH={0} align="stretch">
         <col grow={1} minW={0} minH={0} {...dropHandlers}>
-          <SignedOutBanner />
           <SessionPausedBanner />
           <box grow={1} minH={0} w="full" clip={0} mb={-COMPOSER_OVERLAP}>
             <box w="full" h="full" hidden={scroll.isOpeningScroll} inert={Boolean(focus)}>

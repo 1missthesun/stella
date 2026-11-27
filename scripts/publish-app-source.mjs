@@ -40,6 +40,11 @@ const option = (name, fallback) => {
 const namespace = option("namespace", "stella-app-dev");
 const ref = option("ref", "HEAD");
 const outDir = option("out", "");
+// Dependency seeds (scripts/build-deps-seeds.mjs) go to the public R2 bucket,
+// so they're opt-in: --deps-seed builds them, uploads them unless --out is
+// given, and points the tree's packages/desktop/deps-seed.json at them.
+const depsSeed = args.includes("--deps-seed");
+const depsSeedBaseUrl = option("deps-seed-base-url", "");
 
 const NAMESPACE_BACKENDS = {
   "stella-app-dev": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
@@ -157,6 +162,22 @@ const shapeInstallManifest = (dir) => {
   run("bun", ["install", "--lockfile-only"], { cwd: dir });
 };
 
+// A first install without a seed still works (a plain bun install), so a
+// failure here never stops the publish.
+// With --out the seeds stay beside the tree (<out>.deps-seed/<lock>/) to serve.
+const addDepsSeed = (dir) => {
+  const seedOut = outDir ? `${path.resolve(outDir)}.deps-seed` : mkdtempSync(path.join(tmpdir(), "stella-deps-seed-"));
+  try {
+    const seedArgs = ["scripts/build-deps-seeds.mjs", "--tree", dir, "--out", seedOut, "--write-manifest"];
+    if (!outDir) seedArgs.push("--upload");
+    if (depsSeedBaseUrl) seedArgs.push("--base-url", depsSeedBaseUrl);
+    const built = spawnSync("bun", seedArgs, { cwd: repoRoot, stdio: "inherit" });
+    if (built.status !== 0) console.warn("Dependency seeds failed; this version installs without them.");
+  } finally {
+    if (!outDir) rmSync(seedOut, { recursive: true, force: true });
+  }
+};
+
 const sourceSha = run("git", ["rev-parse", ref], { cwd: repoRoot });
 const workDir = mkdtempSync(path.join(tmpdir(), "stella-app-source-"));
 let publishedTip;
@@ -184,6 +205,7 @@ try {
   for (const name of ["AGENTS.md", "CLAUDE.md"]) {
     writeFileSync(path.join(workDir, name), installGuide);
   }
+  if (depsSeed) addDepsSeed(workDir);
   if (outDir) {
     cpSync(workDir, path.resolve(outDir), { recursive: true, verbatimSymlinks: true });
     console.log(`Wrote the install tree for ${sourceSha.slice(0, 12)} to ${path.resolve(outDir)}.`);

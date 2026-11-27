@@ -34,22 +34,6 @@
   cursor: pointer;
 }
 
-.local-mode-banner__close {
-  flex: none;
-  display: inline-flex;
-  margin: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.local-mode-banner__close:hover {
-  color: var(--text-base);
-}
-
 .local-mode-choice-actions {
   display: flex;
   justify-content: flex-end;

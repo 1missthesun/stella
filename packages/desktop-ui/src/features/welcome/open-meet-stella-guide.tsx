@@ -27,3 +27,8 @@ export const openMeetStellaGuide = (): void => {
   });
   showInViewer(MEET_STELLA_GUIDE_TAB_ID);
 };
+
+/** Puts the guide away, so a "try this" button shows its request in the chat. */
+export const closeMeetStellaGuide = (): void => {
+  displayTabs.closeTab(MEET_STELLA_GUIDE_TAB_ID);
+};

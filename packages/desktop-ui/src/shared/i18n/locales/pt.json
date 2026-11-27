@@ -986,7 +986,6 @@
       }
     },
     "localMode": {
-      "banner": "Suas conversas ficam neste computador. Entre para usar a Stella no celular e manter tudo sincronizado.",
       "needsAccount": "Isso roda na nuvem da Stella, então precisa de uma conta Stella.",
       "syncFailed": "Não foi possível adicionar esta conversa à sua conta. Ela continua neste computador.",
       "synced": "Esta conversa foi adicionada à sua conta."

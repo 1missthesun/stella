@@ -977,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään, niin voit käyttää Stellaa puhelimellasi ja kaikki pysyy ajan tasalla.",
       "needsAccount": "Tämä toimii Stellan pilvessä, joten se vaatii Stella-tilin.",
       "syncFailed": "Keskustelua ei voitu lisätä tiliisi. Se on yhä tällä tietokoneella.",
       "synced": "Keskustelu lisättiin tiliisi."

@@ -968,7 +968,6 @@
       }
     },
     "localMode": {
-      "banner": "你的聊天保留在這台電腦上。登入後即可在手機上使用 Stella，並讓一切保持同步。",
       "needsAccount": "此功能在 Stella 雲端執行，因此需要 Stella 帳戶。",
       "syncFailed": "無法將這段聊天加入你的帳號。它仍在這台電腦上。",
       "synced": "這段聊天已加入你的帳號。"

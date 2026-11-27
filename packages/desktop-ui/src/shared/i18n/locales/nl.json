@@ -977,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Je chats blijven op deze computer. Log in om Stella op je telefoon te gebruiken en alles gesynchroniseerd te houden.",
       "needsAccount": "Dit draait in Stella's cloud en heeft dus een Stella-account nodig.",
       "syncFailed": "Kan deze chat niet aan je account toevoegen. Hij staat nog op deze computer.",
       "synced": "Deze chat is aan je account toegevoegd."

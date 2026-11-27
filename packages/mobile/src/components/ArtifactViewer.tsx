@@ -25,8 +25,9 @@ import {
   withCanvasPolicy,
 } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
-import { readCanvasActionManifest } from "@stella/contracts/canvas-actions";
-import { useCanvasActionChannel, type CanvasIdentity } from "../lib/canvas-actions";
+import { canvasActionMessage, readCanvasActionManifest, type CanvasActionEvent } from "@stella/contracts/canvas-actions";
+import { useCanvasActionChannel, type CanvasActionOutcome, type CanvasIdentity } from "../lib/canvas-actions";
+import { sendToChat } from "../lib/chat-send-queue";
 import { TopSheet } from "./TopSheet";
 import { FileViewerFooter } from "./FileViewerPanel";
 import { TopSheetDragHandle } from "./TopSheet";
@@ -302,10 +303,12 @@ function CanvasDocumentWebView({
   identity,
   onOpenLink,
   onContentHeight,
+  onAction,
 }: {
   html: string;
   style: object;
   identity: CanvasIdentity;
+  onAction?: (event: CanvasActionEvent) => Promise<CanvasActionOutcome>;
   location: CanvasDocumentLocation | null;
   onOpenLink: (link: CanvasLink) => void;
   onContentHeight?: (height: number) => void;
@@ -319,7 +322,7 @@ function CanvasDocumentWebView({
     [html],
   );
   const actions = useMemo(() => readCanvasActionManifest(html), [html]);
-  const { receiverKey, handleMessage: handleActionMessage, onLoaded } = useCanvasActionChannel({ webViewRef, token, actions, identity });
+  const { receiverKey, handleMessage: handleActionMessage, onLoaded } = useCanvasActionChannel({ webViewRef, token, actions, identity, onAction });
   const bridgeScript = useMemo(
     () => canvasBridgeScript(token, receiverKey),
     [token, receiverKey],
@@ -747,6 +750,16 @@ export function ArtifactViewerContent({
   );
   const canvas =
     artifact.payload.kind === "canvas-html" ? artifact.payload : null;
+  // A "try this" button on the Meet Stella guide sends its request, then the
+  // guide steps aside so the request and Stella's answer show in the chat.
+  const sendGuideAction = useCallback(
+    async (event: CanvasActionEvent): Promise<CanvasActionOutcome> => {
+      const sent = await sendToChat(canvasActionMessage(event));
+      if (sent) onClose();
+      return sent ? "sent" : "failed";
+    },
+    [onClose],
+  );
   const canvasIdentity = useMemo(
     () => ({
       canvas: canvas
@@ -1393,6 +1406,7 @@ export function ArtifactViewerContent({
               location={canvasLocation}
               identity={canvasIdentity}
               onOpenLink={openCanvasLink}
+              onAction={canvas?.filePath === MEET_STELLA_GUIDE_PATH ? sendGuideAction : undefined}
             />
           ) : loaded?.kind === "html-document" ? (
             <DocumentWebView

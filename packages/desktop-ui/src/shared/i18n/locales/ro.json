@@ -986,7 +986,6 @@
       }
     },
     "localMode": {
-      "banner": "Conversațiile tale rămân pe acest computer. Conectează-te ca să folosești Stella pe telefon și să păstrezi totul sincronizat.",
       "needsAccount": "Funcționează în cloudul Stella, deci are nevoie de un cont Stella.",
       "syncFailed": "Conversația nu a putut fi adăugată în contul tău. Este încă pe acest computer.",
       "synced": "Conversația a fost adăugată în contul tău."

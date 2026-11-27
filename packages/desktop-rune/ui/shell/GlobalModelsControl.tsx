@@ -6,21 +6,10 @@ import { composerModelPin, useComposerModelPinned } from "@/features/chat/compos
 import { preloadModelsPicker } from "@/shell/topbar/nav-surface-preloads";
 import { Icons, Switch } from "../kit";
 import { fontSize, look, useTokens } from "../theme";
-import { mounted } from "../app/mount";
+import { lazyScreen, useLazyReady } from "../kit/lazy";
 import { GroupIcon, Panel, TopbarButton } from "./topbar/chrome";
 
-type AgentModelPickerProps = { active: boolean; focusSection?: unknown };
-
-function PickerLoading() {
-  const t = useTokens();
-  return (
-    <col grow={1} center>
-      <text {...look(fontSize.base, 400)} color={t.c.textWeak}>Loading…</text>
-    </col>
-  );
-}
-
-const AgentModelPicker = mounted<AgentModelPickerProps>(import.meta.glob("../replace/global/settings/AgentModelPicker.tsx", { eager: true }), "AgentModelPicker", PickerLoading);
+const AgentModelPicker = lazyScreen(() => import("../replace/global/settings/AgentModelPicker"), (module) => module.AgentModelPicker);
 
 /** desktop-ui's `GlobalModelsControl` in the top bar: "Models" and its picker popover. */
 export function GlobalModelsControl({ visible = true }: { visible?: boolean; placement?: "footer" | "topbar" }) {
@@ -28,6 +17,7 @@ export function GlobalModelsControl({ visible = true }: { visible?: boolean; pla
   const open = useEngineOverlayOpen();
   const modelPinned = useComposerModelPinned();
   const focus = useEngineOverlayFocus();
+  const ready = useLazyReady(open && visible, AgentModelPicker);
 
   useEffect(() => {
     if (visible && open) preloadModelsPicker();
@@ -56,7 +46,7 @@ export function GlobalModelsControl({ visible = true }: { visible?: boolean; pla
           </>
         )}
       </TopbarButton>
-      <Panel id="models-popover" anchor="work-models-button" open={open} onClose={() => engineOverlay.setOpen(false)} w={Math.min(380, window.innerWidth * 0.92)} h={Math.min(560, window.innerHeight * 0.72)} label="Models">
+      <Panel id="models-popover" anchor="work-models-button" open={open && ready} onClose={() => engineOverlay.setOpen(false)} w={Math.min(380, window.innerWidth * 0.92)} h={Math.min(560, window.innerHeight * 0.72)} label="Models">
         <col grow={1} minH={0} pad={12}>
           <col grow={1} minH={0} minW={0} clip={0}>
             <AgentModelPicker active={open} focusSection={focus} />

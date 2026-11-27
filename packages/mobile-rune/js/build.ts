@@ -125,11 +125,12 @@ const mobilePlugin: BunPlugin = {
       return { path: SHIMS[a.path.replace(/^node:/, "")]! };
     });
     build.onResolve({ filter: /^node:/ }, () => ({ path: path.join(JS, "shims", "node-empty.ts") }));
+    // The phone's own files reach desktop-rune by relative paths too, and get its replacements.
     build.onResolve({ filter: /^\.\.?\// }, (a) => {
-      if (!a.importer.startsWith(RUNE + path.sep)) return undefined;
+      if (!a.importer.startsWith(RUNE + path.sep) && !a.importer.startsWith(MOBILE + path.sep)) return undefined;
       const file = resolveRelative(a.path, a.importer);
       const replacement = file && replacementOf(file);
-      return replacement ? { path: replacement } : undefined;
+      return replacement && replacement !== a.importer ? { path: replacement } : undefined;
     });
     // Assets ship in the app bundle: an import is its path there.
     build.onLoad({ filter: ASSET }, async (a) => {

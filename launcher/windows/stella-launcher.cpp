@@ -653,7 +653,7 @@ static HANDLE openNul() {
 }
 
 static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const Env &env, const wstring &outputFile = L"",
-                        double timeoutSeconds = 0, const wstring &rawCmdline = L"") {
+                        double timeoutSeconds = 0, const wstring &rawCmdline = L"", bool keepBackground = false) {
     CmdResult r;
     SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
     HANDLE nul = openNul();
@@ -674,7 +674,11 @@ static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const E
     HANDLE job = CreateJobObjectW(nullptr, nullptr);
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
     ZeroMemory(&limits, sizeof(limits));
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    // The job ends whatever the command left running when it returns, unless
+    // the command leaves work in the background on purpose (install-deps.mjs
+    // installs Claude Code and Antigravity while Stella opens); a timeout
+    // still ends all of it.
+    if (!keepBackground) limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
 
     PROCESS_INFORMATION pi;
@@ -2965,7 +2969,7 @@ static wstring prepare() {
         env[L"STELLA_SKIP_OFFICE_HYDRATE"] = L"1";
         vector<wstring> argv = seeded ? vector<wstring>{gBunBin, installDeps}
                                       : vector<wstring>{gBunBin, L"install", L"--frozen-lockfile"};
-        CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60);
+        CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60, L"", seeded);
         if (r.timedOut) fail("bun install timed out after 30 minutes:\n" + lastLines(r.err, 20));
         if (r.code != 0) fail(format("bun install failed (exit %lu):\n", r.code) + lastLines(r.err, 20));
         LOG("prepare: bun install finished in %ds", (int)((GetTickCount64() - started) / 1000));

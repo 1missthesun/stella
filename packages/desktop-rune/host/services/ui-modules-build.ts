@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { viteCompat } from "../vite-compat";
 import { uiBuildMode } from "./ui-mode";
-import { DEPS_KEY, MODULES_LINES, type DepsInfo, type ImportTag, type ModuleNode, type ModulesBuild, type ModulesLines, type ModulesRequest } from "./ui-modules-format";
+import { declaredExports, DEPS_KEY, HELPERS_KEY, type HelpersInfo, MODULES_LINES, type DepsInfo, type ImportTag, type ModuleNode, type ModulesBuild, type ModulesLines, type ModulesRequest } from "./ui-modules-format";
 
 export type UiBuildSpec = { entry: string; tsconfig: string; external: string[] };
 
@@ -157,6 +157,7 @@ export async function buildModules(spec: UiBuildSpec, request: ModulesRequest): 
   const needed = sources.filter((file) => request.have[file] !== graph[file]!.hash);
   const code: Record<string, string> = {};
   const names: Record<string, string[]> = {};
+  const exports: Record<string, string[]> = {};
   if (needed.length > 0) {
     const externals = {
       name: "stella-registry-externals",
@@ -181,8 +182,11 @@ export async function buildModules(spec: UiBuildSpec, request: ModulesRequest): 
       const prepared = withLocalComponents(factoryOf(text));
       code[file] = prepared.source;
       if (prepared.names.length > 0) names[file] = prepared.names;
+      const declared = declaredExports(prepared.source);
+      if (declared.length > 0) exports[file] = declared;
     }
   }
+  const helpers = shareHelpers(code, request.helpers ?? null);
 
   let depsCode: string | undefined;
   if (request.deps !== depsHash) {
@@ -204,9 +208,72 @@ export async function buildModules(spec: UiBuildSpec, request: ModulesRequest): 
     graph,
     code,
     names,
+    exports,
+    helpers,
     deps: { hash: depsHash, entries, code: depsCode },
     inputs,
   };
+}
+
+const FACTORY_HEAD = "(function(exports, require, module, __filename, __dirname) {";
+type Prelude = { statements: Array<{ name: string; text: string; bare: boolean }>; rest: string };
+
+/** The helper declarations Bun opens every CJS output with, and what follows them. */
+function splitPrelude(source: string): Prelude | null {
+  if (!source.startsWith(FACTORY_HEAD)) return null;
+  const lines = source.slice(FACTORY_HEAD.length).split("\n");
+  const statements: Prelude["statements"] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const name = /^(?:var|function) (__[\w$]+)/.exec(lines[i]!)?.[1];
+    if (!name) break;
+    let text = lines[i++]!;
+    while (i < lines.length && /^(\s|[}\]);])/.test(lines[i]!)) text += `\n${lines[i++]}`;
+    statements.push({ name, text, bare: /^var __[\w$]+;$/.test(text) });
+  }
+  return statements.length > 0 ? { statements, rest: lines.slice(i).join("\n") } : null;
+}
+
+const helperHash = (text: string) => Bun.hash(text).toString(36);
+
+/**
+ * Takes the helper preludes out of `code`'s factories where every helper is one the host shares
+ * (`known`; null: the ones these factories agree on, sent along as code). A factory then reads
+ * them from `require.helpers`.
+ */
+function shareHelpers(code: Record<string, string>, known: Record<string, string> | null): HelpersInfo {
+  const preludes = new Map<string, Prelude>();
+  for (const [file, source] of Object.entries(code)) {
+    const prelude = splitPrelude(source);
+    if (prelude) preludes.set(file, prelude);
+  }
+  let shared: Record<string, string>;
+  let helpersCode: string | undefined;
+  if (known) {
+    shared = known;
+  } else {
+    const texts = new Map<string, { text: string; bare: boolean }>();
+    const differs = new Set<string>();
+    for (const prelude of preludes.values()) {
+      for (const { name, text, bare } of prelude.statements) {
+        const seen = texts.get(name);
+        if (!seen) texts.set(name, { text, bare });
+        else if (seen.text !== text) differs.add(name);
+      }
+    }
+    for (const name of differs) texts.delete(name);
+    shared = Object.fromEntries([...texts].map(([name, { text }]) => [name, helperHash(text)]));
+    const values = [...texts].filter(([, { bare }]) => !bare).map(([name]) => name);
+    helpersCode = `(function() {\n${[...texts.values()].map(({ text }) => text).join("\n")}\nreturn { ${values.join(", ")} };\n})`;
+  }
+  for (const [file, { statements, rest }] of preludes) {
+    if (!statements.every(({ name, text }) => shared[name] === helperHash(text))) continue;
+    const bare = statements.filter((s) => s.bare).map((s) => s.name);
+    if (bare.some((name) => rest.includes(name))) continue;
+    const values = statements.filter((s) => !s.bare).map((s) => s.name);
+    code[file] = `${FACTORY_HEAD}var { ${values.join(", ")} } = require.helpers;\n${rest}`;
+  }
+  return { hashes: shared, code: helpersCode };
 }
 
 /** The `(function (exports, require, module, __filename, __dirname) {...})` of a Bun CJS output, its dynamic imports through the registry. */
@@ -274,10 +341,12 @@ export async function writeModulesFiles(build: ModulesBuild, outdir: string): Pr
     `deps: ${JSON.stringify({ hash: build.deps.hash, entries: build.deps.entries })},`,
     `lazy: ${JSON.stringify(lazy)},`,
     `names: ${JSON.stringify(build.names)},`,
-    `factories: ${object(bootFiles, [`${JSON.stringify(DEPS_KEY)}: ${build.deps.code}`])}`,
+    `exports: ${JSON.stringify(build.exports ?? {})},`,
+    `helpers: ${JSON.stringify(build.helpers?.hashes ?? {})},`,
+    `factories: ${object(bootFiles, [`${JSON.stringify(DEPS_KEY)}: ${build.deps.code}`, ...(build.helpers?.code ? [`${JSON.stringify(HELPERS_KEY)}: ${build.helpers.code}`] : [])])}`,
     `};`,
   ].join("\n");
-  const files: Array<{ name: string; source: string; modules: string[] }> = [{ name: "boot.js", source: bootSource, modules: [DEPS_KEY, ...bootFiles] }];
+  const files: Array<{ name: string; source: string; modules: string[] }> = [{ name: "boot.js", source: bootSource, modules: [DEPS_KEY, HELPERS_KEY, ...bootFiles] }];
   groups.forEach((group, n) => files.push({ name: `lazy-${n}.js`, source: `module.exports = ${object(group)};`, modules: group }));
 
   const src = path.join(outdir, ".src");

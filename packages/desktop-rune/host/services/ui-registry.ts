@@ -17,7 +17,7 @@
 import type * as ReactNS from "react";
 import path from "node:path";
 import { evaluateInScope, mapFileLines, type UiScope } from "./ui-scope";
-import { DEPS_KEY, type DepsInfo, type ModuleNode } from "./ui-modules-format";
+import { declaredExports, DEPS_KEY, type DepsInfo, type ModuleNode } from "./ui-modules-format";
 
 type React = typeof ReactNS;
 type Factory = (exports: object, require: Require, module: { exports: any }, filename: string, dirname: string) => void;
@@ -29,6 +29,8 @@ export type RegistryBuild = {
   graph: { [file: string]: ModuleNode };
   code: { [file: string]: ModuleCode };
   names: { [file: string]: string[] };
+  exports?: { [file: string]: string[] };
+  helpers?: { hashes: { [name: string]: string }; code?: ModuleCode };
   deps: DepsInfo & { code?: ModuleCode };
 };
 
@@ -50,6 +52,8 @@ type Entry = {
   hash: string;
   code: ModuleCode | null;
   names: string[];
+  /** Its declared export names, from the build (null: read them from its code). */
+  exports: string[] | null;
   instance: Instance | null;
   /** Its instance is out of date: the next require evaluates it again. */
   pending: boolean;
@@ -93,6 +97,8 @@ export function createUiRegistry(options: UiRegistryOptions) {
   let importers = new Map<string, Set<string>>();
   let entryFile = "";
   let deps: { info: DepsInfo; exports: any; scope: UiScope | null; gen: number } | null = null;
+  /** Bun's runtime helpers the factories share (ui-modules-build.ts `shareHelpers`). */
+  let helpers: { hashes: { [name: string]: string }; value: object } | null = null;
   const depValues = new Map<string, unknown>();
   let refreshEpoch = 0;
   let remountEpoch = 0;
@@ -145,7 +151,8 @@ export function createUiRegistry(options: UiRegistryOptions) {
       if (!/^[A-Z]/.test(value.name || name)) return null;
       const proto = (value as { prototype?: object }).prototype;
       if (proto && ((proto as any).isReactComponent || Object.getOwnPropertyNames(proto).length > 1)) return null;
-      if (/^class[\s{]/.test(Function.prototype.toString.call(value))) return null;
+      // A class's prototype is read-only (and toString would keep its source text alive).
+      if (Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false) return null;
       return "function";
     }
     const type = (value as { $$typeof?: symbol }).$$typeof;
@@ -248,7 +255,7 @@ export function createUiRegistry(options: UiRegistryOptions) {
     if (!entry) {
       const facade = {};
       Object.defineProperty(facade, "__esModule", { value: true });
-      entry = { file, hash: "", code: null, names: [], instance: null, pending: false, facade, families: new Map(), cjs: false };
+      entry = { file, hash: "", code: null, names: [], exports: null, instance: null, pending: false, facade, families: new Map(), cjs: false };
       entries.set(file, entry);
     }
     return entry;
@@ -260,15 +267,6 @@ export function createUiRegistry(options: UiRegistryOptions) {
   };
 
   /** Export names a Bun factory declares up front (`__export(exports_x, { a: () => a, ... })`), so a cycle sees them early. */
-  const declaredExports = (source: string): string[] => {
-    const at = source.indexOf("__export(exports_");
-    if (at < 0) return [];
-    const open = source.indexOf("{", at);
-    const close = open < 0 ? -1 : source.slice(open).search(/\n\s*\}\);/);
-    if (open < 0 || close < 0) return [];
-    return [...source.slice(open, open + close).matchAll(/^\s*(?:"([^"]+)"|([\w$]+)): \(\) =>/gm)].map((m) => m[1] ?? m[2]!);
-  };
-
   const syncFacade = (entry: Entry) => {
     const exports = entry.instance?.module.exports;
     entry.cjs = exports == null || (typeof exports !== "object" && typeof exports !== "function") || !exports.__esModule;
@@ -334,6 +332,7 @@ export function createUiRegistry(options: UiRegistryOptions) {
   const requireFor = (entry: Entry, instance: () => Instance): Require =>
     Object.assign((id: string) => resolve(id), {
       dynamic,
+      helpers: helpers?.value,
       component(value: unknown, name: string) {
         const own = instance();
         if (entry.instance !== own) return families.get(`${entry.file}#${name}`)?.standIn ?? value;
@@ -375,7 +374,8 @@ export function createUiRegistry(options: UiRegistryOptions) {
     const before = entry.instance;
     entry.instance = instance;
     entry.pending = false;
-    for (const name of declaredExports(typeof code === "function" ? Function.prototype.toString.call(code) : code)) defineKey(entry, name);
+    // Never toString a boot factory here: JSC caches the text on the function for as long as it lives.
+    for (const name of entry.exports ?? (typeof code === "string" ? declaredExports(code) : [])) defineKey(entry, name);
     try {
       const { scope } = evaluateInScope(gen, () => factory.call(module.exports, module.exports, instance.require, module, entry.file, path.dirname(entry.file)));
       instance.scope = scope;
@@ -388,9 +388,9 @@ export function createUiRegistry(options: UiRegistryOptions) {
     return instance;
   };
 
-  let txn: { touched: Map<Entry, { instance: Instance | null; code: ModuleCode | null; names: string[]; hash: string; pending: boolean }>; evaluated: Set<Entry> } | null = null;
+  let txn: { touched: Map<Entry, { instance: Instance | null; code: ModuleCode | null; names: string[]; exports: string[] | null; hash: string; pending: boolean }>; evaluated: Set<Entry> } | null = null;
   const touch = (entry: Entry) => {
-    if (txn && !txn.touched.has(entry)) txn.touched.set(entry, { instance: entry.instance, code: entry.code, names: entry.names, hash: entry.hash, pending: entry.pending });
+    if (txn && !txn.touched.has(entry)) txn.touched.set(entry, { instance: entry.instance, code: entry.code, names: entry.names, exports: entry.exports, hash: entry.hash, pending: entry.pending });
   };
 
   const ensure = (entry: Entry) => {
@@ -530,6 +530,7 @@ export function createUiRegistry(options: UiRegistryOptions) {
       entry.instance = old.instance;
       entry.code = old.code;
       entry.names = old.names;
+      entry.exports = old.exports;
       entry.hash = old.hash;
       entry.pending = old.pending;
       if (fresh && fresh !== old.instance) fresh.scope?.dispose();
@@ -547,7 +548,7 @@ export function createUiRegistry(options: UiRegistryOptions) {
       const out: { [file: string]: string } = {};
       // A module whose code is still in an unopened lazy file counts: the builder need not send it.
       for (const [file, entry] of entries) if (entry.hash) out[file] = entry.hash;
-      return { have: out, deps: deps?.info.hash ?? null };
+      return { have: out, deps: deps?.info.hash ?? null, helpers: helpers?.hashes ?? null };
     },
     /** Whether `build` can swap into this registry (its packages are the same). */
     accepts(build: RegistryBuild) {
@@ -555,6 +556,10 @@ export function createUiRegistry(options: UiRegistryOptions) {
     },
     /** Lines of a `?swapfile` file of factories (the boot file), for ui-scope. */
     mapFile,
+    sharedHelpers: () => helpers,
+    adoptHelpers(other: { sharedHelpers(): typeof helpers }) {
+      helpers ??= other.sharedHelpers();
+    },
     /** Applies a build: the first one boots, later ones swap what changed. */
     apply(build: RegistryBuild): SwapResult {
       const booting = !deps;
@@ -562,6 +567,11 @@ export function createUiRegistry(options: UiRegistryOptions) {
         if (!build.deps.code) throw new Error("the first UI build has no packages bundle");
         entryFile = build.entry;
         loadDeps(build.deps, build.deps.code);
+        if (build.helpers?.code) {
+          const code = build.helpers.code;
+          const make = (typeof code === "function" ? code : (0, eval)(`${code}\n//# sourceURL=stella-ui-helpers.js`)) as () => object;
+          helpers = { hashes: build.helpers.hashes, value: make() };
+        }
       } else if (build.deps.hash !== deps!.info.hash) {
         throw new Error("the UI's packages changed; it needs a fresh registry");
       }
@@ -573,6 +583,7 @@ export function createUiRegistry(options: UiRegistryOptions) {
         const code = build.code[file];
         if (code === undefined) {
           entry.hash ||= node.hash;
+          if (entry.code === null && build.exports?.[file]) entry.exports = build.exports[file]!;
           continue;
         }
         if (entry.hash === node.hash && entry.code !== null) continue;
@@ -580,6 +591,7 @@ export function createUiRegistry(options: UiRegistryOptions) {
         entry.hash = node.hash;
         entry.code = code;
         entry.names = build.names[file] ?? [];
+        entry.exports = build.exports ? (build.exports[file] ?? []) : null;
         if (entry.instance) {
           entry.pending = true;
           changed.push(entry);

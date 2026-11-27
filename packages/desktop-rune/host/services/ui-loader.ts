@@ -20,7 +20,7 @@ import { holdBuild } from "./source-stamps";
 import { bootMark } from "./boot-trace";
 import { uiBuildMode } from "./ui-mode";
 import { createUiRegistry, type SwapResult, type UiRegistry } from "./ui-registry";
-import { DEPS_KEY, MODULES_LINES, type ModulesBootFile, type ModulesBuild, type ModulesLines } from "./ui-modules-format";
+import { DEPS_KEY, HELPERS_KEY, MODULES_LINES, type ModulesBootFile, type ModulesBuild, type ModulesLines } from "./ui-modules-format";
 
 const CHILD = path.join(import.meta.dir, "ui-build-child.ts");
 /** Quiet time after a build before the boot bundle is written. */
@@ -208,20 +208,26 @@ export function createUiLoader(options: UiLoaderOptions) {
     });
     const own = lines["boot.js"];
     if (own) reg.mapFile(own.url, own.starts);
-    const { [DEPS_KEY]: depsCode, ...code } = boot.factories;
-    lastSwap = reg.apply({ entry: boot.entry, graph: boot.graph, code: code as Record<string, any>, names: boot.names, deps: { ...boot.deps, code: depsCode as any } });
+    const { [DEPS_KEY]: depsCode, [HELPERS_KEY]: helpersCode, ...code } = boot.factories;
+    lastSwap = reg.apply({ entry: boot.entry, graph: boot.graph, code: code as Record<string, any>, names: boot.names, exports: boot.exports, helpers: helpersCode ? { hashes: boot.helpers ?? {}, code: helpersCode as any } : undefined, deps: { ...boot.deps, code: depsCode as any } });
     return reg;
   };
 
   /** A module build into the live registry, or into a fresh one when the packages changed (the old one retires after the new tree mounts). */
   const applyModules = (modules: ModulesBuild): UiModule => {
+    let previous: UiRegistry | null = null;
     if (registry && !registry.accepts(modules)) {
       replacedRegistries.push(registry);
       track(registry.entry());
+      previous = registry;
       registry = null;
     }
     const fresh = !registry;
-    registry ??= newRegistry();
+    if (!registry) {
+      registry = newRegistry();
+      // The build left out the helpers the old registry shares (it asked with its hashes).
+      if (previous) registry.adoptHelpers(previous);
+    }
     lastSwap = registry.apply(modules);
     lastKind = fresh ? "fresh" : lastSwap.kind === "boot" ? "fresh" : lastSwap.kind;
     return registry.entry();

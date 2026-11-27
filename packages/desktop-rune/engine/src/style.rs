@@ -387,6 +387,12 @@ pub fn motion(mut e: El, p: &Props) -> El {
     if p.instant {
         e = e.instant_changes();
     }
+    if let Some(id) = &p.matched {
+        e = e.matched(id.clone());
+        if p.matched_in_place {
+            e = e.matched_in_place();
+        }
+    }
     e
 }
 

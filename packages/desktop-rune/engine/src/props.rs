@@ -516,6 +516,12 @@ pub struct Props {
     #[serde(rename = "loop")]
     pub loop_: Option<LoopP>,
     pub instant: bool,
+    /// Shared-element motion (`El::matched`): mounting with the id of an element that leaves in
+    /// the same commit, it starts where that one was drawn and springs (on `motion`) to its place.
+    pub matched: Option<String>,
+    /// The `matched` element flies in its destination's paint order and clips (a selection pill
+    /// staying under the labels drawn after it) rather than above the window.
+    pub matched_in_place: bool,
 
     // Interaction
     pub cursor: Option<String>,

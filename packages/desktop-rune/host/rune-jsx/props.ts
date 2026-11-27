@@ -162,6 +162,10 @@ export type BoxProps = {
   loop?: Loop;
   /** Changes inside land at once (search results). */
   instant?: boolean;
+  /** Shared-element motion: mounting in the commit that removes another element with this id, it starts where that one was drawn and springs (on `motion`) to its own place. A selection pill rendered only in the selected segment slides between them. */
+  matched?: string;
+  /** The `matched` element moves in its destination's paint order and clips (under the labels drawn after it) rather than above the window. */
+  matchedInPlace?: boolean;
   // Interaction
   cursor?: Cursor;
   /** pointer-events:none for the whole subtree. */

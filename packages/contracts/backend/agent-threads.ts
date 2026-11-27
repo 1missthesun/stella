@@ -223,6 +223,8 @@ export type AgentThreadCalls = {
       text: string;
       from: AgentMessageSender;
       framed?: boolean;
+      /** From the agent's starter: the model it runs on from this message on, as for spawn_agent. */
+      model?: string;
     };
     result: AgentMessageDelivery;
   };
@@ -280,6 +282,8 @@ export type AgentThreadCalls = {
       prompt: string;
       requesterThreadId?: string;
       execution?: CloudExecutionSelection;
+      /** The model it runs on where it moves, as for spawn_agent. */
+      model?: string;
     };
     result: AgentMoveResult;
   };

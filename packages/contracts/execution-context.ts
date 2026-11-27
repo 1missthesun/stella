@@ -33,6 +33,41 @@ export const deviceEngineSignIns = (capabilities: readonly unknown[] | undefined
     ? DEVICE_ENGINES.filter((engine) => capabilities.includes(engine))
     : undefined;
 
+/** The sign-in a computer needs to run `model` (a spawn_agent model string), if it needs one. */
+export const deviceEngineOfModel = (model: string): DeviceEngine | undefined => {
+  const pick = model.trim().replace(/:(?:low|medium|high|xhigh|max)$/u, "").toLowerCase();
+  if (/^claude-code(?:\/|$)/u.test(pick)) return "claude-code";
+  if (/^antigravity(?:\/|$)/u.test(pick)) return "antigravity";
+  if (/^(?:chatgpt|codex|codex-cli)\//u.test(pick)) return "chatgpt";
+  return undefined;
+};
+
+const DEVICE_ENGINE_SIGN_IN: Record<DeviceEngine, string> = {
+  "claude-code": "Claude Code",
+  chatgpt: "ChatGPT",
+  antigravity: "Google Antigravity",
+};
+
+/**
+ * Why `device` can't run `model` now, or undefined when it can (or when it is offline or too old to
+ * say which sign-ins it has, so only it can tell).
+ */
+export const deviceModelRefusal = (
+  device: Pick<DeviceDestination, "deviceId" | "label" | "online" | "availability"> | undefined,
+  model: string,
+): string | undefined => {
+  const engine = deviceEngineOfModel(model);
+  if (!engine || !device?.online) return undefined;
+  const capabilities: readonly unknown[] | undefined = device.availability?.capabilities;
+  const runs =
+    engine === "claude-code"
+      ? !capabilities || capabilities.includes("claude-code")
+      : (deviceEngineSignIns(capabilities)?.includes(engine) ?? true);
+  if (runs) return undefined;
+  const name = device.label?.trim() || device.deviceId;
+  return `${name} isn't signed in to ${DEVICE_ENGINE_SIGN_IN[engine]}, so "${model}" can't run there. Pick a model that runs there (see the devices list), or ask the user to sign in on ${name} (Settings › Claude and ChatGPT there).`;
+};
+
 const knownEngines = (value: unknown): DeviceEngine[] | undefined =>
   Array.isArray(value) ? DEVICE_ENGINES.filter((engine) => value.includes(engine)) : undefined;
 
@@ -253,8 +288,8 @@ export const renderExecutionDevices = (
       ? ["The connected device list is currently unavailable."]
       : []),
     reader === "agent"
-      ? 'To move yourself to one of these, pass its device_id (or "cloud") to switch_destination.'
-      : 'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. A running agent can move itself to any of these with switch_destination, keeping its conversation.',
+      ? 'To move yourself to one of these, pass its device_id (or "cloud") to switch_to.'
+      : 'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. A running agent can move itself to any of these with switch_to, keeping its conversation.',
   ].join("\n");
 
 export const renderExecutionDestination = (

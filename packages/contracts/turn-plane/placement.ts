@@ -113,6 +113,7 @@ export const EXECUTION_CAPABILITIES = [
   "engine-sign-ins",
   "email-page",
   "chat-failover",
+  "agent-model-switch",
 ] as const;
 export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
 

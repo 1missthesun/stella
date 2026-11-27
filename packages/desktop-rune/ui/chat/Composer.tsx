@@ -31,6 +31,7 @@ import { BrowserAttachmentTray } from "./BrowserAttachmentTray";
 import { panelSurface } from "./surfaces";
 import { attachPathsToContext } from "./attach-paths";
 import { rune } from "./engine";
+import { onPhone } from "../shell/phone";
 
 const MemoComposerMicButton = memo(ComposerMicButton);
 const MemoComposerSubmitButton = memo(ComposerSubmitButton);
@@ -305,6 +306,7 @@ function ComposerImpl({
     </row>
   );
 
+  const phone = onPhone();
   return (
     <col w="full" shrink={false} align="center" justify="end" {...column} onLayout={(r) => setComposerW(r.w)}>
       <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp && !sidebar ? conversationId : null} maxW={shellMaxW} />
@@ -321,8 +323,12 @@ function ComposerImpl({
         onBackdrop={glassBackdrop}
         border={isDragOver ? look.dragBorder : chromeGlass(tokens).composer.border}
         shadows={isDragOver ? look.dragRing : undefined}
-        motion={SHELL_SPRING}
-        layout={SHELL_SPRING.dur}
+        // On the phone the field is a native text view placed over this box each frame; a box that
+        // springs to its new height would hold the view short of its text (pasted lines scrolling
+        // under its top edge) for the spring's length, so it changes size in the frame its text
+        // does, as the React Native app's composer does.
+        motion={phone ? undefined : SHELL_SPRING}
+        layout={phone ? undefined : SHELL_SPRING.dur}
       >
         {hasAttachedChips ? (
           <row w="full" wrap pt={8} px={14}>

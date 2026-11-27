@@ -13,7 +13,12 @@
       "loadErrorTitle": "無法載入你的 App",
       "loadErrorBody": "Stella 目前無法連線到伺服器。請檢查網路連線後再試一次。",
       "refreshError": "無法重新整理你的 App。",
-      "retry": "重試"
+      "retry": "重試",
+      "viewsHeading": "檢視",
+      "cloudAppsHeading": "雲端應用程式",
+      "removeView": "從應用程式中移除",
+      "viewOpenFailed": "無法開啟此檢視。",
+      "viewRemoveFailed": "無法移除此檢視。"
     },
     "chat": {
       "activityPill": {
@@ -1802,6 +1807,14 @@
       "problem": "無法核對你的裝置",
       "startOverTitle": "重新開始？",
       "startOverBody": "這會建立一份只有這支手機的新清單。你的其他裝置都需要重新允許。"
+    },
+    "views": {
+      "share": "分享",
+      "publicLinkTitle": "公開連結",
+      "shareLink": "分享連結",
+      "makePrivate": "設為私人",
+      "shareFailed": "無法變更連結",
+      "missing": "此檢視已不在你的應用程式中。"
     }
   },
   "onboarding": {
@@ -3030,6 +3043,12 @@
         "restored": "已還原 {time} 的版本",
         "restoredHere": "已僅在此裝置上還原 {time} 的版本",
         "restoreFailed": "無法還原此版本"
+      },
+      "viewShare": {
+        "notSynced": "此檢視尚未同步到你的帳戶。請稍後再試。",
+        "noLink": "分享一個可在任何瀏覽器中執行此檢視的連結。訪客儲存的內容只會留在他們自己的瀏覽器中。",
+        "makePrivateLink": "私人連結",
+        "madeWithStella": "以 Stella 製作"
       }
     },
     "displayPanel": {

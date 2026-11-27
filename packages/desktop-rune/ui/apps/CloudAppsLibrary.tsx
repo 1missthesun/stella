@@ -6,7 +6,7 @@ import { translateNow } from "@/shared/i18n";
 import { openCloudAppPanel } from "@/features/cloud/open-cloud-app-panel";
 import type { CloudAppsState } from "@/features/cloud/use-cloud-apps";
 
-export function CloudAppsLibrary({ state }: { state: CloudAppsState }) {
+export function CloudAppsLibrary({ state, heading = "Apps" }: { state: CloudAppsState; heading?: string }) {
   const s = useAppsSection();
   const sPrimitives = usePrimitives();
   if (state.phase === "disabled") return null;
@@ -30,7 +30,7 @@ export function CloudAppsLibrary({ state }: { state: CloudAppsState }) {
   return (
     <col w="full" {...s.cloudAppsLibrary}>
       <row {...s.cloudAppsLibraryHeading}>
-        <T {...tx(s.cloudAppsLibraryHeading)} id="cloud-apps-title">Apps</T>
+        <T {...tx(s.cloudAppsLibraryHeading)} id="cloud-apps-title">{heading}</T>
         <T {...tx(s.cloudAppsLibraryHeading)}>{state.apps.length}</T>
       </row>
       <col {...s.appsSectionGrid} {...s.cloudAppsLibraryGrid}>

@@ -13,7 +13,12 @@
       "loadErrorTitle": "无法加载你的应用",
       "loadErrorBody": "Stella 目前无法连接到服务器。请检查网络连接后重试。",
       "refreshError": "无法刷新你的应用。",
-      "retry": "重试"
+      "retry": "重试",
+      "viewsHeading": "视图",
+      "cloudAppsHeading": "云应用",
+      "removeView": "从应用中移除",
+      "viewOpenFailed": "无法打开此视图。",
+      "viewRemoveFailed": "无法移除此视图。"
     },
     "chat": {
       "activityPill": {
@@ -1802,6 +1807,14 @@
       "problem": "无法核对你的设备",
       "startOverTitle": "重新开始？",
       "startOverBody": "这会新建一个只有这部手机的列表。你的其他设备都需要重新允许。"
+    },
+    "views": {
+      "share": "分享",
+      "publicLinkTitle": "公开链接",
+      "shareLink": "分享链接",
+      "makePrivate": "设为私密",
+      "shareFailed": "无法更改链接",
+      "missing": "此视图已不在你的应用中。"
     }
   },
   "onboarding": {
@@ -3030,6 +3043,12 @@
         "restored": "已恢复 {time} 的版本",
         "restoredHere": "已仅在此设备上恢复 {time} 的版本",
         "restoreFailed": "无法恢复此版本"
+      },
+      "viewShare": {
+        "notSynced": "此视图尚未同步到你的账户。请稍后再试。",
+        "noLink": "分享一个可在任何浏览器中运行此视图的链接。访客保存的内容只留在他们自己的浏览器中。",
+        "makePrivateLink": "私密链接",
+        "madeWithStella": "用 Stella 制作"
       }
     },
     "displayPanel": {

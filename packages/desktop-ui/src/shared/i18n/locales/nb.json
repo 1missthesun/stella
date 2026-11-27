@@ -13,7 +13,12 @@
       "loadErrorTitle": "Kunne ikke laste inn appene dine",
       "loadErrorBody": "Stella får ikke kontakt med serverne sine akkurat nå. Sjekk tilkoblingen og prøv igjen.",
       "refreshError": "Kunne ikke oppdatere appene dine.",
-      "retry": "Prøv igjen"
+      "retry": "Prøv igjen",
+      "viewsHeading": "Visninger",
+      "cloudAppsHeading": "Skyapper",
+      "removeView": "Fjern fra Apper",
+      "viewOpenFailed": "Kunne ikke åpne denne visningen.",
+      "viewRemoveFailed": "Kunne ikke fjerne denne visningen."
     },
     "chat": {
       "activityPill": {
@@ -1812,6 +1817,14 @@
       "problem": "Kan ikke sjekke enhetene dine",
       "startOverTitle": "Starte på nytt?",
       "startOverBody": "Dette starter en ny liste med bare denne telefonen. Hver av de andre enhetene dine må tillates på nytt."
+    },
+    "views": {
+      "share": "Del",
+      "publicLinkTitle": "Offentlig lenke",
+      "shareLink": "Del lenke",
+      "makePrivate": "Gjør privat",
+      "shareFailed": "Kunne ikke endre lenken",
+      "missing": "Denne visningen er ikke lenger i appene dine."
     }
   },
   "onboarding": {
@@ -3048,6 +3061,12 @@
         "restored": "Gjenopprettet versjonen fra {time}",
         "restoredHere": "Gjenopprettet versjonen fra {time} bare på denne enheten",
         "restoreFailed": "Kunne ikke gjenopprette denne versjonen"
+      },
+      "viewShare": {
+        "notSynced": "Denne visningen har ikke kommet til kontoen din ennå. Prøv igjen om et øyeblikk.",
+        "noLink": "Del en lenke som kjører denne visningen i en hvilken som helst nettleser. Det besøkende lagrer, blir i deres egen nettleser.",
+        "makePrivateLink": "Privat lenke",
+        "madeWithStella": "Laget med Stella"
       }
     },
     "displayPanel": {

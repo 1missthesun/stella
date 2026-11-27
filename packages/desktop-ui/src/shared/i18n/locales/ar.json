@@ -13,7 +13,12 @@
       "loadErrorTitle": "تعذّر تحميل تطبيقاتك",
       "loadErrorBody": "لا يمكن لـ Stella الوصول إلى خوادمها الآن. تحقق من اتصالك وحاول مرة أخرى.",
       "refreshError": "تعذّر تحديث تطبيقاتك.",
-      "retry": "حاول مرة أخرى"
+      "retry": "حاول مرة أخرى",
+      "viewsHeading": "العروض",
+      "cloudAppsHeading": "تطبيقات السحابة",
+      "removeView": "إزالة من التطبيقات",
+      "viewOpenFailed": "تعذّر فتح هذا العرض.",
+      "viewRemoveFailed": "تعذّرت إزالة هذا العرض."
     },
     "chat": {
       "activityPill": {
@@ -1852,6 +1857,14 @@
       "problem": "تعذّر التحقق من أجهزتك",
       "startOverTitle": "البدء من جديد؟",
       "startOverBody": "يبدأ هذا قائمة جديدة فيها هذا الهاتف فقط. وسيلزم السماح لكل جهاز من أجهزتك الأخرى مجددًا."
+    },
+    "views": {
+      "share": "مشاركة",
+      "publicLinkTitle": "رابط عام",
+      "shareLink": "مشاركة الرابط",
+      "makePrivate": "جعله خاصًا",
+      "shareFailed": "تعذّر تغيير الرابط",
+      "missing": "لم يعد هذا العرض ضمن تطبيقاتك."
     }
   },
   "onboarding": {
@@ -3112,6 +3125,12 @@
         "restored": "تمت استعادة إصدار {time}",
         "restoredHere": "تمت استعادة إصدار {time} على هذا الجهاز فقط",
         "restoreFailed": "تعذّرت استعادة هذا الإصدار"
+      },
+      "viewShare": {
+        "notSynced": "لم يصل هذا العرض إلى حسابك بعد. حاول مرة أخرى بعد لحظة.",
+        "noLink": "شارك رابطًا يشغّل هذا العرض في أي متصفح. ما يحفظه الزوار يبقى في متصفحهم.",
+        "makePrivateLink": "رابط خاص",
+        "madeWithStella": "صُنع باستخدام Stella"
       }
     },
     "displayPanel": {

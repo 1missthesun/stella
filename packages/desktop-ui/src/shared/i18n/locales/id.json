@@ -13,7 +13,12 @@
       "loadErrorTitle": "Tidak dapat memuat aplikasimu",
       "loadErrorBody": "Stella tidak dapat menjangkau servernya saat ini. Periksa koneksimu dan coba lagi.",
       "refreshError": "Tidak dapat memperbarui aplikasimu.",
-      "retry": "Coba lagi"
+      "retry": "Coba lagi",
+      "viewsHeading": "Tampilan",
+      "cloudAppsHeading": "Aplikasi cloud",
+      "removeView": "Hapus dari Aplikasi",
+      "viewOpenFailed": "Tidak dapat membuka tampilan ini.",
+      "viewRemoveFailed": "Tidak dapat menghapus tampilan ini."
     },
     "chat": {
       "activityPill": {
@@ -1802,6 +1807,14 @@
       "problem": "Tidak bisa memeriksa perangkat Anda",
       "startOverTitle": "Mulai ulang?",
       "startOverBody": "Ini memulai daftar baru yang hanya berisi ponsel ini. Setiap perangkat Anda yang lain perlu diizinkan lagi."
+    },
+    "views": {
+      "share": "Bagikan",
+      "publicLinkTitle": "Tautan publik",
+      "shareLink": "Bagikan tautan",
+      "makePrivate": "Jadikan pribadi",
+      "shareFailed": "Tidak dapat mengubah tautan",
+      "missing": "Tampilan ini sudah tidak ada di Aplikasimu."
     }
   },
   "onboarding": {
@@ -3030,6 +3043,12 @@
         "restored": "Versi {time} dipulihkan",
         "restoredHere": "Versi {time} dipulihkan hanya di perangkat ini",
         "restoreFailed": "Tidak dapat memulihkan versi ini"
+      },
+      "viewShare": {
+        "notSynced": "Tampilan ini belum sampai ke akunmu. Coba lagi sebentar lagi.",
+        "noLink": "Bagikan tautan yang menjalankan tampilan ini di browser mana pun. Apa yang disimpan pengunjung tetap ada di browser mereka sendiri.",
+        "makePrivateLink": "Tautan pribadi",
+        "madeWithStella": "Dibuat dengan Stella"
       }
     },
     "displayPanel": {

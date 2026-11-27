@@ -13,7 +13,12 @@
       "loadErrorTitle": "アプリを読み込めませんでした",
       "loadErrorBody": "Stella が今サーバーに接続できません。接続を確認して、もう一度お試しください。",
       "refreshError": "アプリを更新できませんでした。",
-      "retry": "再試行"
+      "retry": "再試行",
+      "viewsHeading": "ビュー",
+      "cloudAppsHeading": "クラウドアプリ",
+      "removeView": "アプリから削除",
+      "viewOpenFailed": "このビューを開けませんでした。",
+      "viewRemoveFailed": "このビューを削除できませんでした。"
     },
     "chat": {
       "activityPill": {
@@ -1802,6 +1807,14 @@
       "problem": "デバイスを確認できません",
       "startOverTitle": "最初からやり直しますか？",
       "startOverBody": "このスマートフォンだけの新しいリストになります。ほかのデバイスはそれぞれもう一度許可する必要があります。"
+    },
+    "views": {
+      "share": "共有",
+      "publicLinkTitle": "公開リンク",
+      "shareLink": "リンクを共有",
+      "makePrivate": "非公開にする",
+      "shareFailed": "リンクを変更できませんでした",
+      "missing": "このビューはもうアプリにありません。"
     }
   },
   "onboarding": {
@@ -3030,6 +3043,12 @@
         "restored": "{time} のバージョンを復元しました",
         "restoredHere": "{time} のバージョンをこのデバイスでのみ復元しました",
         "restoreFailed": "このバージョンを復元できませんでした"
+      },
+      "viewShare": {
+        "notSynced": "このビューはまだアカウントに届いていません。少ししてからもう一度お試しください。",
+        "noLink": "このビューをどのブラウザでも動かせるリンクを共有します。訪問者が保存した内容はその人のブラウザに残ります。",
+        "makePrivateLink": "非公開リンク",
+        "madeWithStella": "Stella で作成"
       }
     },
     "displayPanel": {

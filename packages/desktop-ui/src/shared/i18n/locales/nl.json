@@ -13,7 +13,12 @@
       "loadErrorTitle": "Je apps konden niet worden geladen",
       "loadErrorBody": "Stella kan haar servers nu niet bereiken. Controleer je verbinding en probeer het opnieuw.",
       "refreshError": "Je apps konden niet worden vernieuwd.",
-      "retry": "Opnieuw proberen"
+      "retry": "Opnieuw proberen",
+      "viewsHeading": "Weergaven",
+      "cloudAppsHeading": "Cloud-apps",
+      "removeView": "Verwijderen uit Apps",
+      "viewOpenFailed": "Kan deze weergave niet openen.",
+      "viewRemoveFailed": "Kan deze weergave niet verwijderen."
     },
     "chat": {
       "activityPill": {
@@ -1812,6 +1817,14 @@
       "problem": "Kan je apparaten niet controleren",
       "startOverTitle": "Opnieuw beginnen?",
       "startOverBody": "Dit begint een nieuwe lijst met alleen deze telefoon. Je andere apparaten moeten elk opnieuw worden toegestaan."
+    },
+    "views": {
+      "share": "Delen",
+      "publicLinkTitle": "Openbare link",
+      "shareLink": "Link delen",
+      "makePrivate": "Privé maken",
+      "shareFailed": "Kan de link niet wijzigen",
+      "missing": "Deze weergave staat niet meer in je apps."
     }
   },
   "onboarding": {
@@ -3048,6 +3061,12 @@
         "restored": "Versie van {time} hersteld",
         "restoredHere": "Versie van {time} alleen op dit apparaat hersteld",
         "restoreFailed": "Kon deze versie niet herstellen"
+      },
+      "viewShare": {
+        "notSynced": "Deze weergave is nog niet in je account aangekomen. Probeer het zo opnieuw.",
+        "noLink": "Deel een link die deze weergave in elke browser draait. Wat bezoekers opslaan, blijft in hun eigen browser.",
+        "makePrivateLink": "Privélink",
+        "madeWithStella": "Gemaakt met Stella"
       }
     },
     "displayPanel": {

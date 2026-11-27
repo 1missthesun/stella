@@ -13,7 +13,12 @@
       "loadErrorTitle": "Nie udało się wczytać twoich aplikacji",
       "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
       "refreshError": "Nie udało się odświeżyć twoich aplikacji.",
-      "retry": "Spróbuj ponownie"
+      "retry": "Spróbuj ponownie",
+      "viewsHeading": "Widoki",
+      "cloudAppsHeading": "Aplikacje w chmurze",
+      "removeView": "Usuń z aplikacji",
+      "viewOpenFailed": "Nie udało się otworzyć tego widoku.",
+      "viewRemoveFailed": "Nie udało się usunąć tego widoku."
     },
     "chat": {
       "activityPill": {
@@ -1832,6 +1837,14 @@
       "problem": "Nie można sprawdzić twoich urządzeń",
       "startOverTitle": "Zacząć od nowa?",
       "startOverBody": "Powstanie nowa lista tylko z tym telefonem. Na każde z pozostałych urządzeń trzeba będzie zezwolić ponownie."
+    },
+    "views": {
+      "share": "Udostępnij",
+      "publicLinkTitle": "Link publiczny",
+      "shareLink": "Udostępnij link",
+      "makePrivate": "Ustaw jako prywatny",
+      "shareFailed": "Nie udało się zmienić linku",
+      "missing": "Tego widoku nie ma już w Twoich aplikacjach."
     }
   },
   "onboarding": {
@@ -3080,6 +3093,12 @@
         "restored": "Przywrócono wersję z {time}",
         "restoredHere": "Wersję z {time} przywrócono tylko na tym urządzeniu",
         "restoreFailed": "Nie udało się przywrócić tej wersji"
+      },
+      "viewShare": {
+        "notSynced": "Ten widok nie dotarł jeszcze do Twojego konta. Spróbuj ponownie za chwilę.",
+        "noLink": "Udostępnij link, który uruchamia ten widok w dowolnej przeglądarce. To, co zapiszą odwiedzający, zostaje w ich własnej przeglądarce.",
+        "makePrivateLink": "Link prywatny",
+        "madeWithStella": "Stworzone w Stelli"
       }
     },
     "displayPanel": {

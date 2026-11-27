@@ -12,6 +12,8 @@ import { IconButton, Icons, showToast } from "../kit";
 import { font, fontSize, look, mix, radius, useTokens } from "../theme";
 import { PreviewProblem } from "../shell/display/preview-states";
 import { ViewHistoryButton, ViewPreviewBar, ViewUndoButton, useViewHistory } from "./ViewHistory";
+import { ViewShareBar, ViewShareButton } from "../shell/display/canvas-tab/CanvasShareBar";
+import { useCanvasShare } from "@/features/canvas-share/canvas-share-context";
 import { ViewRoot } from "./ViewRenderer";
 
 const PROBLEM = look(fontSize.sm, 400, { lh: 1.5, em: 0, family: font.mono });
@@ -67,6 +69,7 @@ function ViewSurface({ filePath, card }: { filePath: string; card?: { title: str
 
   const dispatch = useCallback((handler: number, value?: unknown) => views?.dispatch(target, handler, value), [views, target]);
   const onSize = useCallback((w: number, h: number) => views?.viewport(target, Math.round(w), Math.round(h)), [views, target]);
+  const canShare = useCanvasShare() !== null;
   const scope = useMemo(() => `view-${card ? "card-" : ""}${filePath.replace(/[^\w-]/gu, "_").slice(-60)}`, [filePath, card]);
 
   if (!views) return card ? null : <PreviewProblem error={t("shell.display.preview.unavailable")} />;
@@ -83,6 +86,7 @@ function ViewSurface({ filePath, card }: { filePath: string; card?: { title: str
           </text>
           <ViewUndoButton filePath={filePath} scope={scope} compact />
           <ViewHistoryButton filePath={filePath} scope={scope} />
+          <ViewShareButton filePath={filePath} renderTrigger={(p) => <IconButton id={p.id} icon={Icons.stella.Share} label={p.label} size={26} active={p.open} onPress={p.toggle} />} />
           <IconButton id={`${scope}-open`} icon={Icons.stella.Maximize2} label={t("app.chat.endResource.openInPanel")} size={26} onPress={card.onOpen} />
         </row>
         {bar}
@@ -91,10 +95,11 @@ function ViewSurface({ filePath, card }: { filePath: string; card?: { title: str
     ) : (
       <col grow={1} minH={0} w="full" fill={tk.c.background}>
         {bar ??
-          (versions.length > 1 ? (
+          (versions.length > 1 || canShare ? (
             <row id={`${scope}-actions`} shrink={false} w="full" align="center" justify="end" gap={4} px={8} pt={6}>
               <ViewUndoButton filePath={filePath} scope={scope} />
               <ViewHistoryButton filePath={filePath} scope={scope} />
+              <ViewShareBar filePath={filePath} />
             </row>
           ) : null)}
         {body}

@@ -13,7 +13,12 @@
       "loadErrorTitle": "Dine apps kunne ikke indlæses",
       "loadErrorBody": "Stella kan ikke nå sine servere lige nu. Tjek din forbindelse, og prøv igen.",
       "refreshError": "Dine apps kunne ikke opdateres.",
-      "retry": "Prøv igen"
+      "retry": "Prøv igen",
+      "viewsHeading": "Visninger",
+      "cloudAppsHeading": "Cloud-apps",
+      "removeView": "Fjern fra Apps",
+      "viewOpenFailed": "Kunne ikke åbne denne visning.",
+      "viewRemoveFailed": "Kunne ikke fjerne denne visning."
     },
     "chat": {
       "activityPill": {
@@ -1812,6 +1817,14 @@
       "problem": "Kan ikke tjekke dine enheder",
       "startOverTitle": "Start forfra?",
       "startOverBody": "Det starter en ny liste med kun denne telefon. Dine andre enheder skal hver især tillades igen."
+    },
+    "views": {
+      "share": "Del",
+      "publicLinkTitle": "Offentligt link",
+      "shareLink": "Del link",
+      "makePrivate": "Gør privat",
+      "shareFailed": "Kunne ikke ændre linket",
+      "missing": "Denne visning er ikke længere i dine apps."
     }
   },
   "onboarding": {
@@ -3048,6 +3061,12 @@
         "restored": "Gendannede versionen fra {time}",
         "restoredHere": "Gendannede versionen fra {time} kun på denne enhed",
         "restoreFailed": "Kunne ikke gendanne denne version"
+      },
+      "viewShare": {
+        "notSynced": "Denne visning er ikke nået til din konto endnu. Prøv igen om et øjeblik.",
+        "noLink": "Del et link, der kører denne visning i enhver browser. Det, besøgende gemmer, bliver i deres egen browser.",
+        "makePrivateLink": "Privat link",
+        "madeWithStella": "Lavet med Stella"
       }
     },
     "displayPanel": {

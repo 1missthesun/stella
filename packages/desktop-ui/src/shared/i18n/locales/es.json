@@ -13,7 +13,12 @@
       "loadErrorTitle": "No se pudieron cargar tus apps",
       "loadErrorBody": "Stella no puede conectar con sus servidores ahora mismo. Revisa tu conexión e inténtalo de nuevo.",
       "refreshError": "No se pudieron actualizar tus apps.",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "viewsHeading": "Vistas",
+      "cloudAppsHeading": "Apps en la nube",
+      "removeView": "Quitar de Apps",
+      "viewOpenFailed": "No se pudo abrir esta vista.",
+      "viewRemoveFailed": "No se pudo quitar esta vista."
     },
     "chat": {
       "activityPill": {
@@ -1822,6 +1827,14 @@
       "problem": "No se pueden comprobar tus dispositivos",
       "startOverTitle": "¿Empezar de nuevo?",
       "startOverBody": "Esto crea una lista nueva solo con este teléfono. Habrá que volver a permitir cada uno de tus otros dispositivos."
+    },
+    "views": {
+      "share": "Compartir",
+      "publicLinkTitle": "Enlace público",
+      "shareLink": "Compartir enlace",
+      "makePrivate": "Hacer privado",
+      "shareFailed": "No se pudo cambiar el enlace",
+      "missing": "Esta vista ya no está en tus apps."
     }
   },
   "onboarding": {
@@ -3064,6 +3077,12 @@
         "restored": "Se restauró la versión de las {time}",
         "restoredHere": "Se restauró la versión de las {time} solo en este dispositivo",
         "restoreFailed": "No se pudo restaurar esta versión"
+      },
+      "viewShare": {
+        "notSynced": "Esta vista aún no ha llegado a tu cuenta. Vuelve a intentarlo en un momento.",
+        "noLink": "Comparte un enlace que ejecuta esta vista en cualquier navegador. Lo que guarden los visitantes se queda en su propio navegador.",
+        "makePrivateLink": "Enlace privado",
+        "madeWithStella": "Hecho con Stella"
       }
     },
     "displayPanel": {

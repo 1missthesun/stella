@@ -160,9 +160,19 @@ function ViewText({ node, paint, t }: { node: ViewNode; paint: Paint; t: Tokens 
   if (nested || typeof p.href === "string") {
     const runs: Run[] = [];
     textRuns([node], paint, {}, runs);
-    return <text {...style} spans={runs} onLink={(href: string) => void (globalThis as { stella?: { engine?: { shell: { openExternal(u: string): Promise<void> } } } }).stella?.engine?.shell.openExternal(href)} />;
+    return <text {...style} spans={runs} onLink={openViewLink} />;
   }
   return <text {...style}>{(node.c ?? []).join("")}</text>;
+}
+
+/** A link in a view: the engine opens it where there is one; a page alone (a shared view) opens web, mail and phone links. */
+function openViewLink(href: string): void {
+  const engine = (globalThis as { stella?: { engine?: { shell: { openExternal(u: string): Promise<void> } } } }).stella?.engine;
+  if (engine) {
+    void engine.shell.openExternal(href);
+    return;
+  }
+  if (/^(https?:|mailto:|tel:)/iu.test(href)) window.open(href, "_blank", "noopener,noreferrer");
 }
 
 // ------------------------------------------------------------------ icons
@@ -184,6 +194,15 @@ const subscribeCatalog = (listener: () => void) => {
   return () => void catalogListeners.delete(listener);
 };
 const catalogReady = () => catalog !== null;
+
+/** A Lucide icon by name as Stella draws it in views (the Apps list shows each view's first icon). */
+export function useViewIcon(name: string | null | undefined): IconData | null {
+  useEffect(() => {
+    if (name) loadIconCatalog();
+  }, [name]);
+  useSyncExternalStore(subscribeCatalog, catalogReady);
+  return name ? iconNamed(name) : null;
+}
 
 let kitIndex: Map<string, IconData> | null = null;
 const lucideIcons = new Map<string, IconData>();

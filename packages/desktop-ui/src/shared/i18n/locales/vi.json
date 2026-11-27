@@ -13,7 +13,12 @@
       "loadErrorTitle": "Không tải được ứng dụng của bạn",
       "loadErrorBody": "Stella hiện không kết nối được với máy chủ. Hãy kiểm tra kết nối rồi thử lại.",
       "refreshError": "Không làm mới được ứng dụng của bạn.",
-      "retry": "Thử lại"
+      "retry": "Thử lại",
+      "viewsHeading": "Chế độ xem",
+      "cloudAppsHeading": "Ứng dụng đám mây",
+      "removeView": "Xóa khỏi Ứng dụng",
+      "viewOpenFailed": "Không thể mở chế độ xem này.",
+      "viewRemoveFailed": "Không thể xóa chế độ xem này."
     },
     "chat": {
       "activityPill": {
@@ -1802,6 +1807,14 @@
       "problem": "Không kiểm tra được các thiết bị của bạn",
       "startOverTitle": "Bắt đầu lại?",
       "startOverBody": "Thao tác này tạo danh sách mới chỉ có điện thoại này. Từng thiết bị khác của bạn sẽ cần được cho phép lại."
+    },
+    "views": {
+      "share": "Chia sẻ",
+      "publicLinkTitle": "Liên kết công khai",
+      "shareLink": "Chia sẻ liên kết",
+      "makePrivate": "Đặt riêng tư",
+      "shareFailed": "Không thể thay đổi liên kết",
+      "missing": "Chế độ xem này không còn trong Ứng dụng của bạn."
     }
   },
   "onboarding": {
@@ -3030,6 +3043,12 @@
         "restored": "Đã khôi phục phiên bản lúc {time}",
         "restoredHere": "Đã khôi phục phiên bản lúc {time} chỉ trên thiết bị này",
         "restoreFailed": "Không thể khôi phục phiên bản này"
+      },
+      "viewShare": {
+        "notSynced": "Chế độ xem này chưa đến tài khoản của bạn. Hãy thử lại sau giây lát.",
+        "noLink": "Chia sẻ liên kết chạy chế độ xem này trong mọi trình duyệt. Những gì khách truy cập lưu sẽ ở lại trong trình duyệt của họ.",
+        "makePrivateLink": "Liên kết riêng tư",
+        "madeWithStella": "Tạo bằng Stella"
       }
     },
     "displayPanel": {

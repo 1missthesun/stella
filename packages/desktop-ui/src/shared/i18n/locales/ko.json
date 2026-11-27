@@ -13,7 +13,12 @@
       "loadErrorTitle": "앱을 불러오지 못했어요",
       "loadErrorBody": "Stella가 지금 서버에 연결할 수 없어요. 연결을 확인하고 다시 시도해 주세요.",
       "refreshError": "앱을 새로 고치지 못했어요.",
-      "retry": "다시 시도"
+      "retry": "다시 시도",
+      "viewsHeading": "뷰",
+      "cloudAppsHeading": "클라우드 앱",
+      "removeView": "앱에서 제거",
+      "viewOpenFailed": "이 뷰를 열 수 없습니다.",
+      "viewRemoveFailed": "이 뷰를 제거할 수 없습니다."
     },
     "chat": {
       "activityPill": {
@@ -1802,6 +1807,14 @@
       "problem": "기기를 확인할 수 없음",
       "startOverTitle": "처음부터 다시 할까요?",
       "startOverBody": "이 휴대폰만 있는 새 목록을 시작합니다. 다른 기기는 각각 다시 허용해야 합니다."
+    },
+    "views": {
+      "share": "공유",
+      "publicLinkTitle": "공개 링크",
+      "shareLink": "링크 공유",
+      "makePrivate": "비공개로 전환",
+      "shareFailed": "링크를 변경할 수 없습니다",
+      "missing": "이 뷰는 더 이상 앱에 없습니다."
     }
   },
   "onboarding": {
@@ -3030,6 +3043,12 @@
         "restored": "{time} 버전을 복원했어요",
         "restoredHere": "{time} 버전을 이 기기에서만 복원했어요",
         "restoreFailed": "이 버전을 복원할 수 없어요"
+      },
+      "viewShare": {
+        "notSynced": "이 뷰가 아직 계정에 도착하지 않았습니다. 잠시 후 다시 시도하세요.",
+        "noLink": "어떤 브라우저에서든 이 뷰를 실행하는 링크를 공유하세요. 방문자가 저장한 내용은 각자의 브라우저에 남습니다.",
+        "makePrivateLink": "비공개 링크",
+        "madeWithStella": "Stella로 제작"
       }
     },
     "displayPanel": {

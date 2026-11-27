@@ -3,6 +3,7 @@
 // notifications, downloads and file picker, the Web Share sheet and geolocation, and the chat.
 import type { ViewCapabilities } from "@stella/views/session";
 import { STELLA_SEND_MESSAGE_EVENT, type StellaSendMessageDetail } from "@/shared/lib/stella-send-message";
+import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[?::1\]?$|\[?f[cd][0-9a-f]{2}:|0\.0\.0\.0)/iu;
 const MAX_BODY = 8 * 1024 * 1024;
@@ -30,8 +31,27 @@ function pick(accept: string[]): Promise<File | null> {
   });
 }
 
-export function browserCapabilities(): ViewCapabilities {
+/** How often one view may ask, on top of the backend's hourly limit per account. */
+const ASK_PER_VIEW_PER_MINUTE = 10;
+
+export function browserCapabilities(notice: (viewId: string, kind: "copied") => void): ViewCapabilities {
+  const asked = new Map<string, number[]>();
   return {
+    ask: async ([prompt, options], context) => {
+      const text = string(prompt).trim();
+      const system = string((options as { system?: unknown } | undefined)?.system ?? "").trim();
+      if (!text) throw new Error("ask needs a prompt");
+      if (text.length > VIEW_ASK_LIMITS.maxPromptChars) throw new Error(`ask takes up to ${VIEW_ASK_LIMITS.maxPromptChars / 1000}k characters of prompt`);
+      if (system.length > VIEW_ASK_LIMITS.maxSystemChars) throw new Error(`ask takes up to ${VIEW_ASK_LIMITS.maxSystemChars / 1000}k characters of system prompt`);
+      const at = performance.now();
+      const recent = (asked.get(context.viewId) ?? []).filter((t) => at - t < 60_000);
+      if (recent.length >= ASK_PER_VIEW_PER_MINUTE) throw new Error(`ask is limited to ${ASK_PER_VIEW_PER_MINUTE} calls a minute per view`);
+      asked.set(context.viewId, [...recent, at]);
+      // The web has no model of its own: Stella's backend answers (owner-store `views.ask`).
+      const { backendClient } = await import("@/platform/backend/backend-client");
+      const reply = await backendClient.call("views.ask", { prompt: text, ...(system ? { system } : {}) }, { timeoutMs: VIEW_ASK_LIMITS.timeoutMs + 10_000 });
+      return reply.text.trim();
+    },
     fetch: async ([url, init]) => {
       const target = new URL(string(url));
       if (target.protocol !== "https:" && target.protocol !== "http:") throw new Error(`fetch can reach only http(s) URLs, not ${target.protocol}`);
@@ -81,7 +101,7 @@ export function browserCapabilities(): ViewCapabilities {
     haptic: async () => {
       navigator.vibrate?.(10);
     },
-    share: async ([content]) => {
+    share: async ([content], context) => {
       const c = (content ?? {}) as { text?: string; url?: string; title?: string };
       const data = { ...(c.title ? { title: string(c.title) } : {}), ...(c.text ? { text: string(c.text) } : {}), ...(c.url ? { url: string(c.url) } : {}) };
       if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
@@ -94,7 +114,10 @@ export function browserCapabilities(): ViewCapabilities {
         return;
       }
       // No share sheet (most desktop browsers): copy what would have been shared.
-      await navigator.clipboard.writeText([data.title, data.text, data.url].filter(Boolean).join("\n"));
+      const text = [data.title, data.text, data.url].filter(Boolean).join("\n");
+      if (!text) throw new Error("share needs text, a url or a title");
+      await navigator.clipboard.writeText(text);
+      notice(context.viewId, "copied");
     },
     send: async ([text]) => {
       const message = string(text).trim();

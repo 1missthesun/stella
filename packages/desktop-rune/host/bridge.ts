@@ -367,6 +367,8 @@ export const engine = {
     start: (gen: number) => command({ cmd: "mic.start", gen }),
     stop: (gen: number) => command({ cmd: "mic.stop", gen }),
   },
+  /** Where the device is, from the OS location service (GeoClue on Linux); rejects where there is none. Accuracy in metres. */
+  location: (timeoutMs?: number) => request<{ latitude: number; longitude: number; accuracy: number; source: string }>("location.get", timeoutMs ? { timeoutMs } : {}),
   /** Stella Views' programs, each a PsychoScript live run on its own engine thread (engine/src/views.rs); `views` events carry their posts. */
   views: {
     start: (o: { id: string; program: string; input: unknown; sliceMs?: number; heapBytes?: number }) => request<{ gen: number }>("views.start", o),

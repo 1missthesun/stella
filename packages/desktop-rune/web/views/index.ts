@@ -57,6 +57,18 @@ export const webViews = {
   theme: (filePath: string, theme: ViewTheme) => host?.theme(filePath, theme),
   restart: (filePath: string) => host?.restart(filePath),
   logs: (filePath: string) => host?.logs(filePath) ?? [],
+  onNotice(listener: (notice: { filePath: string; kind: "copied" }) => void): () => void {
+    if (host) return host.onNotice(listener);
+    let release: (() => void) | null = null;
+    let released = false;
+    void load().then((h) => {
+      if (!released) release = h.onNotice(listener);
+    }, () => undefined);
+    return () => {
+      released = true;
+      release?.();
+    };
+  },
   reload: (filePath: string) => host?.reload(filePath),
   syncState: (filePath: string) => host?.syncState(filePath) ?? null,
   /** The signed-in account's backend, which views' storage syncs through. */

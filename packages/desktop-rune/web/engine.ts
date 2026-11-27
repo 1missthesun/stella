@@ -283,6 +283,7 @@ export const webEngine: Engine = {
     probe: () => unsupported("media.probe"),
   },
   views: createEngineViews(emit),
+  location: () => unsupported("location.get"),
   webview: {
     post: async (id, data, origin) => { frameOf(id)?.contentWindow?.postMessage(data, origin ?? "*"); },
     eval: () => unsupported("webview.eval"),

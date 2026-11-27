@@ -22,6 +22,8 @@ import {
   type ViewStorageDisk,
 } from "@stella/views/storage-sync";
 import type { engine as BridgeEngine, onEngineEvent as BridgeOn } from "../bridge";
+import { mainContext } from "../services/main-context";
+import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
 
 type Engine = typeof BridgeEngine;
 type On = typeof BridgeOn;
@@ -237,9 +239,95 @@ function identityIndex() {
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[?::1\]?$|\[?f[cd][0-9a-f]{2}:|0\.0\.0\.0)/iu;
 
-function capabilities(engine: Engine): ViewCapabilities {
+/** Caps on `stella.ask`: the backend's (`views.ask`, which the web and phones call), and a per-view rate. */
+const ASK = { ...VIEW_ASK_LIMITS, perViewPerMinute: 10 } as const;
+const ASK_SYSTEM = "You answer a request from a small app the user is using inside Stella. Reply with only what the app asked for: no preamble, no follow-up questions.";
+/** IP location is city-level at best. */
+const IP_ACCURACY_M = 25_000;
+const LOCATION_TTL_MS = 5 * 60_000;
+
+type Runner = { runOneShotCompletion(request: { agentType: string; systemPrompt?: string; userText: string; maxOutputTokens?: number; reasoningEffort?: "low" }): Promise<{ text: string }> };
+
+/** Calls per key within a sliding window. */
+function rateLimiter() {
+  const calls = new Map<string, number[]>();
+  return (key: string, limit: number, windowMs: number): boolean => {
+    const at = performance.now();
+    const recent = (calls.get(key) ?? []).filter((t) => at - t < windowMs);
+    if (recent.length >= limit) return false;
+    recent.push(at);
+    calls.set(key, recent);
+    return true;
+  };
+}
+
+/** A notice for the surfaces showing a view (what a capability did without a window of its own). */
+export type ViewNotice = { filePath: string; kind: "copied" };
+
+function capabilities(engine: Engine, notice: (viewId: string, kind: ViewNotice["kind"]) => void): ViewCapabilities {
   const string = (v: unknown) => (typeof v === "string" ? v : String(v ?? ""));
+  const allowed = rateLimiter();
+  let located: { at: number; value: { latitude: number; longitude: number; accuracy: number } } | null = null;
+  const ipLocation = async (): Promise<{ latitude: number; longitude: number; accuracy: number } | null> => {
+    const sources: Array<[string, (j: Record<string, unknown>) => [unknown, unknown]]> = [
+      ["https://ipapi.co/json/", (j) => [j.latitude, j.longitude]],
+      ["https://ipwho.is/", (j) => [j.latitude, j.longitude]],
+    ];
+    for (const [url, read] of sources) {
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { accept: "application/json" } });
+        if (!response.ok) continue;
+        const [latitude, longitude] = read((await response.json()) as Record<string, unknown>);
+        if (typeof latitude === "number" && typeof longitude === "number") return { latitude, longitude, accuracy: IP_ACCURACY_M };
+      } catch {
+        // The next source.
+      }
+    }
+    return null;
+  };
   return {
+    ask: async ([prompt, options], context) => {
+      const text = string(prompt).trim();
+      const system = string((options as { system?: unknown } | undefined)?.system ?? "").trim();
+      if (!text) throw new Error("ask needs a prompt");
+      if (text.length > ASK.maxPromptChars) throw new Error(`ask takes up to ${ASK.maxPromptChars / 1000}k characters of prompt`);
+      if (system.length > ASK.maxSystemChars) throw new Error(`ask takes up to ${ASK.maxSystemChars / 1000}k characters of system prompt`);
+      if (!allowed(`view:${context.viewId}`, ASK.perViewPerMinute, 60_000)) throw new Error(`ask is limited to ${ASK.perViewPerMinute} calls a minute per view`);
+      if (!allowed("all", ASK.perHour, 3_600_000)) throw new Error(`ask is limited to ${ASK.perHour} calls an hour`);
+      const runner = mainContext()?.state.stellaHostRunner as Runner | null | undefined;
+      if (!runner) throw new Error("Stella's model isn't ready yet");
+      const reply = await Promise.race([
+        runner.runOneShotCompletion({
+          agentType: "general",
+          systemPrompt: system ? `${ASK_SYSTEM}\n\n${system}` : ASK_SYSTEM,
+          userText: text,
+          maxOutputTokens: ASK.maxOutputTokens,
+          reasoningEffort: "low",
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Stella's model didn't answer within ${ASK.timeoutMs / 1000} s`)), ASK.timeoutMs).unref?.()),
+      ]);
+      return reply.text.trim();
+    },
+    share: async ([content], context) => {
+      // No desktop here has a share sheet a view can open, so what would be shared is copied.
+      const c = (content ?? {}) as { text?: unknown; url?: unknown; title?: unknown };
+      const text = [c.title, c.text, c.url].map((v) => (v === undefined || v === null ? "" : string(v).trim())).filter(Boolean).join("\n");
+      if (!text) throw new Error("share needs text, a url or a title");
+      await engine.clipboard.writeText(text);
+      notice(context.viewId, "copied");
+    },
+    location: async () => {
+      if (located && performance.now() - located.at < LOCATION_TTL_MS) return located.value;
+      let value: { latitude: number; longitude: number; accuracy: number } | null = null;
+      try {
+        const fix = await engine.location(10_000);
+        value = { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy };
+      } catch {
+        value = await ipLocation();
+      }
+      if (value) located = { at: performance.now(), value };
+      return value;
+    },
     fetch: async ([url, init]) => {
       const target = new URL(string(url));
       if (target.protocol !== "https:" && target.protocol !== "http:") throw new Error(`fetch can reach only http(s) URLs, not ${target.protocol}`);
@@ -364,7 +452,11 @@ export function createViewsHost(engine: Engine, on: On) {
     void entry.storage.move(sync.storage(viewId, async () => readLegacy(filePath)));
   };
   const vm = engineVm(engine, on);
-  const caps = capabilities(engine);
+  const noticeListeners = new Set<(notice: ViewNotice) => void>();
+  const caps = capabilities(engine, (viewId, kind) => {
+    const entry = [...entries.values()].find((e) => e.session.id === viewId);
+    if (entry) for (const listener of noticeListeners) listener({ filePath: entry.filePath, kind });
+  });
   const now = () => performance.now();
   const requestFrame = displayFrameClock(engine, on, now);
 
@@ -578,6 +670,11 @@ export function createViewsHost(engine: Engine, on: On) {
       if (!entry) return null;
       const target = entry.storage.target as { synced?: boolean };
       return { viewId: entry.viewId, connected: sync.connected, synced: target.synced ?? true };
+    },
+    /** What a view's capabilities did that its surfaces should say (a share copied); returns the release. */
+    onNotice(listener: (notice: ViewNotice) => void): () => void {
+      noticeListeners.add(listener);
+      return () => noticeListeners.delete(listener);
     },
     /** Loads a source without a file (the gallery, previews of a view an agent is writing). */
     reload: (filePath: string) => withEntry(filePath, (e) => {

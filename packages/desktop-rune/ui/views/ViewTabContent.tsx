@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ViewSnapshot } from "@stella/views/session";
 import { useT } from "@/shared/i18n";
-import { IconButton, Icons } from "../kit";
+import { IconButton, Icons, showToast } from "../kit";
 import { font, fontSize, look, mix, radius, useTokens } from "../theme";
 import { PreviewProblem } from "../shell/display/preview-states";
 import { ViewRoot } from "./ViewRenderer";
@@ -43,6 +43,14 @@ function ViewSurface({ filePath, card }: { filePath: string; card?: { title: str
   useEffect(() => {
     views?.theme(filePath, theme);
   }, [views, filePath, theme]);
+  // What the view's capabilities did out of sight, said once however many surfaces show it.
+  useEffect(
+    () =>
+      views?.onNotice?.((notice) => {
+        if (notice.filePath === filePath && notice.kind === "copied") showToast({ title: t("app.chat.messageActions.copied"), variant: "success" });
+      }),
+    [views, filePath, t],
+  );
 
   const dispatch = useCallback((handler: number, value?: unknown) => views?.dispatch(filePath, handler, value), [views, filePath]);
   const onSize = useCallback((w: number, h: number) => views?.viewport(filePath, Math.round(w), Math.round(h)), [views, filePath]);

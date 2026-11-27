@@ -50,7 +50,11 @@ export function createWebViewsHost() {
     void entry.storage.move(syncedStorage(entry.filePath, viewId));
   };
   const vm = createWasmVm();
-  const caps = browserCapabilities();
+  const noticeListeners = new Set<(notice: { filePath: string; kind: "copied" }) => void>();
+  const caps = browserCapabilities((viewId, kind) => {
+    const entry = [...entries.values()].find((e) => e.session.id === viewId);
+    if (entry) for (const listener of noticeListeners) listener({ filePath: entry.filePath, kind });
+  });
   const now = () => performance.now();
   const requestFrame = (fn: (time: number) => void) => {
     requestAnimationFrame(() => fn(now()));
@@ -154,6 +158,10 @@ export function createWebViewsHost() {
     theme: (filePath: string, theme: ViewTheme) => withEntry(filePath, (e) => e.session.setTheme(asWeb(theme))),
     restart: (filePath: string) => withEntry(filePath, (e) => void e.session.restart()),
     logs: (filePath: string) => entries.get(filePath)?.session.logs.slice() ?? [],
+    onNotice(listener: (notice: { filePath: string; kind: "copied" }) => void): () => void {
+      noticeListeners.add(listener);
+      return () => noticeListeners.delete(listener);
+    },
     reload: (filePath: string) =>
       withEntry(filePath, (e) => {
         e.source = null;

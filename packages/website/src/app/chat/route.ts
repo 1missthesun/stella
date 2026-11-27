@@ -97,7 +97,7 @@ const renderChatShell = () => {
     `<style>${STYLE}</style>`,
     "</head>",
     "<body>",
-    `<iframe id="${CHAT_FRAME_ID}" title="Stella chat" allow="microphone; clipboard-read; clipboard-write"></iframe>`,
+    `<iframe id="${CHAT_FRAME_ID}" title="Stella chat" allow="microphone; clipboard-read; clipboard-write; geolocation; web-share"></iframe>`,
     `<script>${CHAT_FRAME_BOOT_SCRIPT}</script>`,
     ...(GOOGLE_ADS_ID ? [`<script>${googleAdsScript(GOOGLE_ADS_ID)}</script>`] : []),
     "</body>",

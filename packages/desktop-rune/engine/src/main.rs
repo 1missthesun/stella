@@ -21,6 +21,7 @@ mod engine;
 mod fx;
 mod input;
 mod keys;
+mod location;
 mod look_up;
 mod markdown;
 mod media;

@@ -2024,6 +2024,71 @@ static int extract_zip(const char *archive, const char *dir) {
     return ok ? 0 : -1;
 }
 
+/* Downloads Bun <version> into runtimes/bun-<version>/bun. Also run on a
+ * thread while the app source clones (bun_prefetch), so nothing here may
+ * touch the UI. */
+static int install_bun(const char *version, const char *url, const char *sha, const char *member) {
+    char *dir = xasprintf("%s/bun-%s", P.runtimes, version);
+    char *bin = xasprintf("%s/bun", dir);
+    char *archive = xasprintf("%s/bun-%s.zip", P.runtimes, version);
+    char *staging = xasprintf("%s/.bun-%s.partial", P.runtimes, version);
+    char *member_path = NULL;
+    int rc = -1;
+    LOG("install: downloading bun %s from %s", version, url);
+    mkdirs(P.runtimes, 0755);
+    if (download(url, archive, sha) != 0) goto out;
+    remove_tree(staging);
+    if (extract_zip(archive, staging) != 0) goto out;
+    member_path = xasprintf("%s/%s", staging, member ? member : "bun");
+    mkdirs(dir, 0755);
+    unlink(bin);
+    if (rename(member_path, bin) != 0) {
+        set_error("Bun's archive has no %s.", member ? member : "bun");
+        goto out;
+    }
+    chmod(bin, 0755);
+    remove_tree(staging);
+    LOG("install: bun %s ready", version);
+    rc = 0;
+out:
+    unlink(archive);
+    free(member_path); free(archive); free(staging); free(dir); free(bin);
+    return rc;
+}
+
+/* The launcher's own Bun pin is almost always the one the app source asks
+ * for, so a first install fetches it while git clones. */
+static pthread_t g_bun_prefetch;
+static int g_bun_prefetching;
+
+static void *bun_prefetch_main(void *arg) {
+    size_t i;
+    const char *key = platform_key();
+    (void)arg;
+    for (i = 0; i < sizeof(BUN_ASSETS) / sizeof(BUN_ASSETS[0]); i++)
+        if (!strcmp(BUN_ASSETS[i].key, key)) {
+            if (install_bun(BUN_VERSION, BUN_ASSETS[i].url, BUN_ASSETS[i].sha256, BUN_ASSETS[i].member) != 0)
+                LOG("install: early bun download failed (%s); trying again after the clone", last_error());
+            break;
+        }
+    return NULL;
+}
+
+static void start_bun_prefetch(void) {
+    char *bin;
+    if (O.local_bun || g_bun_prefetching) return;
+    bin = xasprintf("%s/bun-%s/bun", P.runtimes, BUN_VERSION);
+    if (!is_executable(bin) && pthread_create(&g_bun_prefetch, NULL, bun_prefetch_main, NULL) == 0)
+        g_bun_prefetching = 1;
+    free(bin);
+}
+
+static void join_bun_prefetch(void) {
+    if (!g_bun_prefetching) return;
+    pthread_join(g_bun_prefetch, NULL);
+    g_bun_prefetching = 0;
+}
+
 static int ensure_bun(void) {
     const char *key = platform_key();
     const char *version = BUN_VERSION, *url = NULL, *sha = NULL, *member = NULL;
@@ -2081,32 +2146,13 @@ static int ensure_bun(void) {
         goto out;
     }
 
+    join_bun_prefetch();
     dir = xasprintf("%s/bun-%s", P.runtimes, version);
     bin = xasprintf("%s/bun", dir);
     if (!is_executable(bin)) {
-        char *archive = xasprintf("%s/bun-%s.zip", P.runtimes, version);
-        char *staging = xasprintf("%s/.bun-%s.partial", P.runtimes, version);
-        char *member_path;
-        if (!url || !sha) { set_error("No Bun %s for %s.", version, key); free(archive); free(staging); goto out; }
+        if (!url || !sha) { set_error("No Bun %s for %s.", version, key); goto out; }
         progress_show("Getting things ready…", 0.30, 0.40);
-        LOG("install: downloading bun %s from %s", version, url);
-        mkdirs(P.runtimes, 0755);
-        if (download(url, archive, sha) != 0) { free(archive); free(staging); goto out; }
-        remove_tree(staging);
-        if (extract_zip(archive, staging) != 0) { free(archive); free(staging); goto out; }
-        member_path = xasprintf("%s/%s", staging, member ? member : "bun");
-        mkdirs(dir, 0755);
-        unlink(bin);
-        if (rename(member_path, bin) != 0) {
-            set_error("Bun's archive has no %s.", member ? member : "bun");
-            free(member_path); free(archive); free(staging);
-            goto out;
-        }
-        chmod(bin, 0755);
-        remove_tree(staging);
-        unlink(archive);
-        free(member_path); free(archive); free(staging);
-        LOG("install: bun %s ready", version);
+        if (install_bun(version, url, sha, member) != 0) goto out;
     }
     free(g_bun_bin); g_bun_bin = xstrdup(bin);
     free(g_bun_version); g_bun_version = xstrdup(version);
@@ -2268,15 +2314,27 @@ static char *prepare(void) {
     if (!lock_hash) goto out;
     if (!S.bun_lock_hash || strcmp(S.bun_lock_hash, lock_hash) != 0 || !file_exists(electron_pkg)) {
         StrList env = base_environment();
-        char *argv[] = {g_bun_bin, "install", "--frozen-lockfile", NULL};
+        /* install-deps.mjs (newer app sources) starts bun's cache from a
+         * per-platform seed and fetches Electron and the prepare-install
+         * helpers alongside; older sources get a plain bun install. */
+        char *install_deps = xasprintf("%s/packages/desktop/scripts/install-deps.mjs", P.app);
+        int seeded = file_exists(install_deps);
+        char *plain_argv[] = {g_bun_bin, "install", "--frozen-lockfile", NULL};
+        char *seeded_argv[] = {g_bun_bin, install_deps, NULL};
+        char **argv = seeded ? seeded_argv : plain_argv;
         CmdResult r;
         double started = now_seconds();
         progress_show("Installing Stella…", 0.40, 0.82);
-        LOG("prepare: bun install --frozen-lockfile (lock %.12s)", lock_hash);
+        LOG("prepare: %s (lock %.12s)", seeded ? "install-deps.mjs" : "bun install --frozen-lockfile", lock_hash);
         env_set(&env, "STELLA_SKIP_BROWSER_HYDRATE", "1");
         env_set(&env, "STELLA_SKIP_OFFICE_HYDRATE", "1");
-        if (run_cmd(argv, P.app, env.items, P.install_log, 30 * 60, &r) != 0) { sl_free(&env); goto out; }
+        if (run_cmd(argv, P.app, env.items, P.install_log, 30 * 60, &r) != 0) {
+            sl_free(&env);
+            free(install_deps);
+            goto out;
+        }
         sl_free(&env);
+        free(install_deps);
         if (r.timed_out || r.code != 0) {
             char *tail = last_lines(r.err, 20);
             if (r.timed_out) set_error("bun install timed out after 30 minutes:\n%s", tail);
@@ -3181,6 +3239,7 @@ static char *prepare_for_launch(void) {
     mkdirs(P.root, 0755);
     mkdirs(P.logs, 0755);
     mkdirs(P.runtimes, 0755);
+    start_bun_prefetch();
     if (ensure_git() != 0) return NULL;
     if (!g_signer && !(g_signer = signer_create())) return NULL;
     follow_server_file();

@@ -9,8 +9,13 @@ if (skipDesktopSetup) {
   process.exit(0);
 }
 
+// install-deps.mjs fetches Electron alongside bun install and sets this.
+const skipElectron = process.env.STELLA_SKIP_ELECTRON_BINARY === "1";
+
 const steps = [
-  ["packages/desktop/scripts/postinstall-electron-binary.mjs"],
+  ...(skipElectron
+    ? []
+    : [["packages/desktop/scripts/postinstall-electron-binary.mjs"]]),
   [
     "packages/desktop/scripts/ensure-stella-browser.mjs",
     "--allow-build-fallback",

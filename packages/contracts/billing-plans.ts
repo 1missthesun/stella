@@ -39,8 +39,8 @@ export type PlanDefinition = {
     modelRequestsAtOnce: number;
     modelRequestsPerMinute: number;
     modelBudgetChunkUsd: number;
+    /** Drive is limited by total size only; there is no per-plan file count. */
     driveBytes: number;
-    driveFiles: number;
     driveFileBytes: number;
     crewPreviewBytes: number;
     scheduleFiresPerDay: number;
@@ -54,6 +54,25 @@ const MODEL_REQUESTS_AT_ONCE = 64;
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
+const TB = 1024 * GB;
+
+/** "2 TB", "500 GB", "2 GB", "25 MB": plan storage sizes as people read them. */
+export const formatStorageSize = (bytes: number): string => {
+  const unit = (size: number, label: string) => `${Math.round((bytes / size) * 10) / 10} ${label}`;
+  if (bytes >= TB) return unit(TB, "TB");
+  if (bytes >= GB) return unit(GB, "GB");
+  return unit(MB, "MB");
+};
+
+const DRIVE_BYTES = {
+  free: 2 * GB,
+  plus: 100 * GB,
+  pro: 500 * GB,
+  max: 2 * TB,
+} as const;
+
+const driveLine = (plan: keyof typeof DRIVE_BYTES): string =>
+  `${formatStorageSize(DRIVE_BYTES[plan])} of Drive storage`;
 
 const paidBudget = (monthlyUsd: number): PlanBudget => ({
   rollingUsd: Math.round(monthlyUsd * 0.2 * 100) / 100,
@@ -83,8 +102,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 40,
       modelBudgetChunkUsd: 0.25,
-      driveBytes: 256 * MB,
-      driveFiles: 200,
+      driveBytes: DRIVE_BYTES.free,
       driveFileBytes: 25 * MB,
       crewPreviewBytes: 250 * MB,
       scheduleFiresPerDay: 24,
@@ -94,6 +112,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     includes: [
       "Dictation and read-aloud",
       "Bring your own models and keys",
+      driveLine("free"),
     ],
   },
   plus: {
@@ -109,8 +128,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 80,
       modelBudgetChunkUsd: 1,
-      driveBytes: 10 * GB,
-      driveFiles: 1_000,
+      driveBytes: DRIVE_BYTES.plus,
       driveFileBytes: 100 * MB,
       crewPreviewBytes: 1 * GB,
       scheduleFiresPerDay: 60,
@@ -119,7 +137,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     tagline: "More usage",
     includes: [
       "Image, video, music and 3D generation",
-      "10 GB of Drive storage",
+      driveLine("plus"),
     ],
   },
   pro: {
@@ -135,8 +153,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 120,
       modelBudgetChunkUsd: 2,
-      driveBytes: 50 * GB,
-      driveFiles: 5_000,
+      driveBytes: DRIVE_BYTES.pro,
       driveFileBytes: 250 * MB,
       crewPreviewBytes: 5 * GB,
       scheduleFiresPerDay: 120,
@@ -145,7 +162,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     tagline: "Higher usage",
     includes: [
       "Image, video, music and 3D generation",
-      "50 GB of Drive storage",
+      driveLine("pro"),
     ],
   },
   max: {
@@ -161,8 +178,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
       modelRequestsAtOnce: MODEL_REQUESTS_AT_ONCE,
       modelRequestsPerMinute: 180,
       modelBudgetChunkUsd: 4,
-      driveBytes: 100 * GB,
-      driveFiles: 10_000,
+      driveBytes: DRIVE_BYTES.max,
       driveFileBytes: 500 * MB,
       crewPreviewBytes: 10 * GB,
       scheduleFiresPerDay: 240,
@@ -171,7 +187,7 @@ export const PLAN_CATALOG: Readonly<Record<BillingPlan, PlanDefinition>> = {
     tagline: "Highest usage",
     includes: [
       "Image, video, music and 3D generation",
-      "100 GB of Drive storage",
+      driveLine("max"),
     ],
   },
 };

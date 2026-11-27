@@ -982,6 +982,9 @@
           "openFailed": "Odkaz se nepodařilo otevřít"
         }
       },
+      "media": {
+        "expand": "Rozbalit"
+      },
       "folder": {
         "emptyTitle": "Tato složka je prázdná",
         "truncated": "Zobrazuje se jen prvních {count}."

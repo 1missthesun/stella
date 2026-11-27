@@ -976,6 +976,9 @@
           "openFailed": "링크를 열 수 없습니다"
         }
       },
+      "media": {
+        "expand": "확대"
+      },
       "folder": {
         "emptyTitle": "이 폴더는 비어 있습니다",
         "truncated": "처음 {count}개만 표시됩니다."

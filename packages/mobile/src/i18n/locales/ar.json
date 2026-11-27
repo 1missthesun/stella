@@ -986,6 +986,9 @@
           "openFailed": "تعذّر فتح الرابط"
         }
       },
+      "media": {
+        "expand": "توسيع"
+      },
       "folder": {
         "emptyTitle": "هذا المجلد فارغ",
         "truncated": "يتم عرض أول {count} فقط."

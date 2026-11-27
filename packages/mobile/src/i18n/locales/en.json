@@ -978,6 +978,9 @@
           "openFailed": "Couldn't open the link"
         }
       },
+      "media": {
+        "expand": "Expand"
+      },
       "folder": {
         "emptyTitle": "This folder is empty",
         "truncated": "Only the first {count} are shown."

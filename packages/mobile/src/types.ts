@@ -178,6 +178,8 @@ export type ChatMessage = {
   role: "assistant" | "user";
   text: string;
   artifacts?: ChatArtifact[];
+  /** Stella Views this reply made or changed (the orchestrator's `view` tool). */
+  views?: ChatViewRef[];
   toolSteps?: ToolStep[];
   tasks?: MobileTask[];
   hasImage?: boolean;
@@ -196,6 +198,16 @@ export type ChatMessage = {
   sentWhileBusy?: boolean;
   stopped?: boolean;
   cloudFallback?: boolean;
+};
+
+/** One version of a Stella View: the whole `.view.tsx` source, run on the phone itself. */
+export type ChatViewRef = {
+  slug: string;
+  title: string;
+  source: string;
+  data?: unknown;
+  createdAt: number;
+  toolCallId: string;
 };
 
 export type MobileTask = {

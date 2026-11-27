@@ -978,6 +978,9 @@
           "openFailed": "Linket kunne ikke åbnes"
         }
       },
+      "media": {
+        "expand": "Udvid"
+      },
       "folder": {
         "emptyTitle": "Denne mappe er tom",
         "truncated": "Kun de første {count} vises."

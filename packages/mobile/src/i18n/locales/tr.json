@@ -978,6 +978,9 @@
           "openFailed": "Bağlantı açılamadı"
         }
       },
+      "media": {
+        "expand": "Genişlet"
+      },
       "folder": {
         "emptyTitle": "Bu klasör boş",
         "truncated": "Yalnızca ilk {count} öğe gösteriliyor."

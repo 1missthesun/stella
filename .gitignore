@@ -94,3 +94,7 @@ packages/runtime/kernel/exec/.exec-worker-cache/
 
 .env.local
 /.selfhost/
+
+# Stella Views: the PsychoScript VM, built by modules/stella-views/scripts/psychoscript.sh
+/packages/mobile/modules/stella-views/ios/vendor/
+/packages/mobile/modules/stella-views/android/vendor/

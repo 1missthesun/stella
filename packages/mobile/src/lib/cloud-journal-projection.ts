@@ -16,7 +16,7 @@ import {
   type JournalView,
 } from "./journal-index";
 import { cloudFileArtifact } from "./cloud-file-payload";
-import type { ChatArtifact, ChatMessage } from "../types";
+import type { ChatArtifact, ChatMessage, ChatViewRef } from "../types";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
   journalMessageTimestamp as timestampOf,
@@ -109,6 +109,41 @@ const toolCalls = (
       { id, name, ...(args && Object.keys(args).length ? { args } : {}) },
     ];
   });
+};
+
+/** The Stella Views an assistant message's `view` calls made, the last version per slug. */
+const viewRefs = (
+  record: JournalMessageRecord,
+  toolResults: ReadonlyMap<string, { error: boolean; payload: Record<string, unknown> }>,
+  createdAt: number,
+): ChatViewRef[] => {
+  if (!Array.isArray(record.payload.content)) return [];
+  const bySlug = new Map<string, ChatViewRef>();
+  for (const value of record.payload.content) {
+    const block = asRecord(value);
+    if (!block || block.type !== "toolCall" || typeof block.id !== "string") continue;
+    const name = typeof block.name === "string" ? block.name.split("__").at(-1) : "";
+    if (name !== "view") continue;
+    const result = toolResults.get(block.id);
+    if (!result || result.error) continue;
+    const details = asRecord(result.payload.details);
+    const args = asRecord(block.arguments);
+    const source = typeof details?.source === "string" ? details.source : typeof args?.source === "string" ? args.source : "";
+    const slug = typeof details?.slug === "string" ? details.slug : typeof args?.slug === "string" ? args.slug : "";
+    if (!source.trim() || !slug) continue;
+    const title = typeof details?.title === "string" && details.title ? details.title : typeof args?.title === "string" && args.title ? args.title : slug;
+    const data = details && "data" in details ? details.data : args && "data" in args ? args.data : undefined;
+    bySlug.delete(slug);
+    bySlug.set(slug, {
+      slug,
+      title,
+      source,
+      ...(data !== undefined ? { data } : {}),
+      createdAt: typeof details?.createdAt === "number" ? details.createdAt : createdAt,
+      toolCallId: block.id,
+    });
+  }
+  return [...bySlug.values()];
 };
 
 const stringList = (value: unknown): string[] =>
@@ -423,6 +458,7 @@ const projectTurn = (
         createdAt,
       }),
     ];
+    const views = viewRefs(record, toolResults, createdAt);
     const askRecords = toolCalls(record).flatMap((call): UserAskRecord[] => {
       if (call.name !== "ask_user" && call.name !== "request_secure_input") return [];
       const result = toolResults.get(call.id);
@@ -454,6 +490,7 @@ const projectTurn = (
       ...(spawnedThreadIds.length ? { spawnedThreadIds } : {}),
       ...(spawnedDescriptions.length ? { spawnedDescriptions } : {}),
       ...(artifacts.length ? { artifacts } : {}),
+      ...(views.length ? { views } : {}),
       ...(askRecords.length ? { askRecords } : {}),
     });
   }

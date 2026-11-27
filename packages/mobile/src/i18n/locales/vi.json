@@ -976,6 +976,9 @@
           "openFailed": "Không thể mở liên kết"
         }
       },
+      "media": {
+        "expand": "Mở rộng"
+      },
       "folder": {
         "emptyTitle": "Thư mục này trống",
         "truncated": "Chỉ hiển thị {count} mục đầu tiên."

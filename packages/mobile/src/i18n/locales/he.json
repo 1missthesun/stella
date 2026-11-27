@@ -980,6 +980,9 @@
           "openFailed": "לא ניתן לפתוח את הקישור"
         }
       },
+      "media": {
+        "expand": "הרחבה"
+      },
       "folder": {
         "emptyTitle": "התיקייה הזו ריקה",
         "truncated": "מוצגים רק {count} הראשונים."

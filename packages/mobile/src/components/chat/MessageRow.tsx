@@ -49,6 +49,7 @@ import { MESSAGE_PRESS_SCALE } from "../MessageContextMenu";
 import { MessageEvidenceStrip } from "../evidence/MessageEvidenceStrip";
 import { AppPreviewCard } from "../AppPreviewCard";
 import { MapRouteCard } from "../MapRouteCard";
+import { ChatMessageView } from "../../views/ViewSurface";
 import type { AnchorRect } from "./PlusMenu";
 import { assistantBubbleNeedsBoundedWidth } from "../../lib/assistant-bubble-layout";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
@@ -1099,7 +1100,9 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   );
   const showGeneratedImages = !isStandIn && generatedImages.length > 0;
   const showEvidence = !isStandIn && evidencePaths.length > 0;
+  const views = item.role === "assistant" ? (item.views ?? []) : [];
   const showArtifacts =
+    views.length > 0 ||
     showMapArtifacts ||
     (showGeneratedImages && !hasText) ||
     linkedAppSlugs.length > 0;
@@ -1251,6 +1254,9 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         <View
           style={[styles.artifactGroup, hasText && styles.artifactGroupSpaced]}
         >
+          {views.map((view) => (
+            <ChatMessageView key={`view:${view.slug}`} slug={view.slug} title={view.title} messageId={item.id} />
+          ))}
           {linkedAppSlugs.map((slug) => (
             <AppPreviewCard key={`app:${slug}`} slug={slug} colors={colors} />
           ))}

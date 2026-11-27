@@ -980,6 +980,9 @@
           "openFailed": "No se pudo abrir el enlace"
         }
       },
+      "media": {
+        "expand": "Ampliar"
+      },
       "folder": {
         "emptyTitle": "Esta carpeta está vacía",
         "truncated": "Solo se muestran los primeros {count}."

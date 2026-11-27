@@ -978,6 +978,9 @@
           "openFailed": "Kunde inte öppna länken"
         }
       },
+      "media": {
+        "expand": "Förstora"
+      },
       "folder": {
         "emptyTitle": "Den här mappen är tom",
         "truncated": "Endast de första {count} visas."

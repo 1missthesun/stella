@@ -978,6 +978,9 @@
           "openFailed": "Nem sikerült megnyitni a linket"
         }
       },
+      "media": {
+        "expand": "Kibontás"
+      },
       "folder": {
         "emptyTitle": "Ez a mappa üres",
         "truncated": "Csak az első {count} látható."

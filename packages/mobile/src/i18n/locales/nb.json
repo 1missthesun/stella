@@ -978,6 +978,9 @@
           "openFailed": "Kunne ikke åpne lenken"
         }
       },
+      "media": {
+        "expand": "Utvid"
+      },
       "folder": {
         "emptyTitle": "Denne mappen er tom",
         "truncated": "Bare de første {count} vises."

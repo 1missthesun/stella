@@ -978,6 +978,9 @@
           "openFailed": "लिंक नहीं खुल सका"
         }
       },
+      "media": {
+        "expand": "बड़ा करें"
+      },
       "folder": {
         "emptyTitle": "यह फ़ोल्डर खाली है",
         "truncated": "केवल पहले {count} दिखाए जा रहे हैं।"

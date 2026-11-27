@@ -982,6 +982,9 @@
           "openFailed": "Nie udało się otworzyć linku"
         }
       },
+      "media": {
+        "expand": "Rozwiń"
+      },
       "folder": {
         "emptyTitle": "Ten folder jest pusty",
         "truncated": "Wyświetlono tylko pierwsze {count}."

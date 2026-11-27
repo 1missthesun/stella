@@ -976,6 +976,9 @@
           "openFailed": "リンクを開けませんでした"
         }
       },
+      "media": {
+        "expand": "拡大"
+      },
       "folder": {
         "emptyTitle": "このフォルダは空です",
         "truncated": "最初の {count} 件のみ表示しています。"

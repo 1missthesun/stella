@@ -976,6 +976,9 @@
           "openFailed": "無法開啟連結"
         }
       },
+      "media": {
+        "expand": "展開"
+      },
       "folder": {
         "emptyTitle": "此資料夾是空的",
         "truncated": "僅顯示前 {count} 項。"

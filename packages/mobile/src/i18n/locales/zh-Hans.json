@@ -976,6 +976,9 @@
           "openFailed": "无法打开链接"
         }
       },
+      "media": {
+        "expand": "展开"
+      },
       "folder": {
         "emptyTitle": "此文件夹为空",
         "truncated": "仅显示前 {count} 项。"

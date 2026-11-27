@@ -980,6 +980,9 @@
           "openFailed": "Nu s-a putut deschide linkul"
         }
       },
+      "media": {
+        "expand": "Extinde"
+      },
       "folder": {
         "emptyTitle": "Acest dosar este gol",
         "truncated": "Sunt afișate doar primele {count}."

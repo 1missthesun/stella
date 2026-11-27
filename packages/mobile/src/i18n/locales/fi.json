@@ -978,6 +978,9 @@
           "openFailed": "Linkkiä ei voitu avata"
         }
       },
+      "media": {
+        "expand": "Laajenna"
+      },
       "folder": {
         "emptyTitle": "Tämä kansio on tyhjä",
         "truncated": "Vain ensimmäiset {count} näytetään."

@@ -978,6 +978,9 @@
           "openFailed": "Kan de link niet openen"
         }
       },
+      "media": {
+        "expand": "Uitvouwen"
+      },
       "folder": {
         "emptyTitle": "Deze map is leeg",
         "truncated": "Alleen de eerste {count} worden getoond."

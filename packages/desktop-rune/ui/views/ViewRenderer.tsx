@@ -4,6 +4,7 @@
 // web through the DOM host.
 import { createContext, memo, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { ViewChild, ViewNode } from "@stella/views/protocol";
+import { VIEW_CENTRE_PROP, centreViewContent } from "@stella/views/layout";
 import { Button, Dialog, DialogBody, DialogCloseButton, DialogHeader, DialogTitle, Icon, Icons, ImageLightbox, Markdown, Select, Switch, Tabs, TextField, type IconData } from "../kit";
 import { font, fontSize, hex, look, mix, radius as radii, useTokens, type Tokens } from "../theme";
 import type { Cursor } from "../rune";
@@ -89,6 +90,8 @@ function boxProps(p: Record<string, unknown>, t: Tokens, paint: Paint): Record<s
   if (typeof p.enter === "string") out.enter = p.enter;
   if (typeof p.exit === "string") out.exit = p.exit;
   if (typeof p.tooltip === "string") out.title = p.tooltip;
+  // The view's content column, narrower than the surface: in the middle of it.
+  if (p[VIEW_CENTRE_PROP] === true) out.selfAlign = "center";
   return out;
 }
 
@@ -593,10 +596,12 @@ export function ViewRoot({ tree, dispatch, scope, onSize, maxHeight }: { tree: V
   // In the panel the view fills its room; elsewhere (a chat card) it is as tall as its content
   // up to maxHeight, then scrolls.
   const sizing = maxHeight === undefined ? { grow: 1, minH: 0 } : { maxH: maxHeight };
+  // A narrow-first view sits in the middle of a wider card or panel.
+  const shown = useMemo(() => centreViewContent(tree), [tree]);
   return (
     <RenderCtx.Provider value={ctx}>
       <col id={`${scope}-root`} {...sizing} w="full" scrollY {...(onSize ? { onLayout: (r: { w: number; h: number }) => onSize(r.w, r.h) } : {})}>
-        {tree === null ? null : <ViewNodeView node={tree} path="" />}
+        {shown === null ? null : <ViewNodeView node={shown} path="" />}
       </col>
     </RenderCtx.Provider>
   );

@@ -37,6 +37,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import Svg, { Path } from "react-native-svg";
 import type { ViewChild, ViewNode } from "@stella/views/protocol";
+import { centreViewContent } from "@stella/views/layout";
 import { AssistantMarkdown } from "../components/AssistantMarkdown";
 import { AudioPlayerView } from "../components/AudioPlayerView";
 import { SegmentedControl } from "../components/SegmentedControl";
@@ -929,6 +930,8 @@ function ViewList({ node }: { node: ViewNode }) {
 /** The whole tree, with the dispatch context; `modals` is false on a surface hidden behind another one showing the view. */
 export function ViewRoot({ tree, dispatch, colors, dark, modals = true }: { tree: ViewChild | null; dispatch: Dispatch; colors: Colors; dark: boolean; modals?: boolean }) {
   const paint = useMemo(() => paintFor(colors), [colors]);
+  // A narrow-first view sits in the middle of a wider card or screen (a tablet, landscape).
+  const shown = useMemo(() => centreViewContent(tree), [tree]);
   const ctx = useMemo(() => ({ dispatch, colors, paint, dark, modals }), [dispatch, colors, paint, dark, modals]);
-  return <RenderCtx.Provider value={ctx}>{tree === null ? null : <ViewNodeView node={tree} />}</RenderCtx.Provider>;
+  return <RenderCtx.Provider value={ctx}>{shown === null ? null : <ViewNodeView node={shown} />}</RenderCtx.Provider>;
 }

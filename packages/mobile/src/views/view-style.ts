@@ -3,6 +3,7 @@ import { mixSrgbCss } from "@stella/theme";
 import { oklchToHex } from "@stella/theme/color";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
+import { VIEW_CENTRE_PROP } from "@stella/views/layout";
 
 export type Paint = (value: unknown) => string | undefined;
 
@@ -83,6 +84,8 @@ export function boxStyle(p: Record<string, unknown>, colors: Colors, paint: Pain
     if (v !== undefined) s[key] = v;
   }
   if (p.width === "fit") s.alignSelf = "flex-start";
+  // The view's content column, narrower than the surface: in the middle of it.
+  if (p[VIEW_CENTRE_PROP] === true) s.alignSelf = "center";
   if (typeof p.aspect === "number" && p.aspect > 0) s.aspectRatio = p.aspect;
   const fill = paint(p.background);
   if (fill) s.backgroundColor = fill;

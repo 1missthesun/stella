@@ -3,7 +3,7 @@
 // calls through the platform's capabilities, and hands renderers the latest tree. A new source
 // (an agent's edit) swaps in place: the old run hands over its hook state and the new one starts
 // from it, so the view keeps what the user did.
-import { compileView, sourcePositions, type CompiledView } from "./compile";
+import { compileView, describeError, withPosition, type CompiledView } from "./compile";
 import {
   VIEW_LIMITS,
   VIEW_PROTOCOL,
@@ -48,7 +48,13 @@ export type ViewCallContext = { viewId: string; title: string };
 export type ViewCapability = (args: unknown[], context: ViewCallContext) => Promise<unknown>;
 export type ViewCapabilities = Partial<Record<ViewCallMethod, ViewCapability>>;
 
-export type ViewProblem = { phase: string; message: string };
+/** What broke, with where in the view's own source when it is known. */
+export type ViewProblem = { phase: string; message: string; line?: number; column?: number };
+
+const problemOf = (phase: string, message: string, stack: string | undefined, view: CompiledView): ViewProblem => {
+  const { message: text, position } = describeError(message, stack, view);
+  return { phase, message: text, ...(position ? { line: position.line, column: position.column } : {}) };
+};
 export type ViewLog = { level: string; text: string; at: number };
 
 export type ViewSnapshot = {
@@ -144,8 +150,11 @@ export class ViewSession {
     this.fileName = fileName;
     const compiled = compileView(source, fileName);
     if (!compiled.ok) {
-      const where = compiled.error.line ? ` (line ${compiled.error.line}${compiled.error.column ? `, col ${compiled.error.column}` : ""})` : "";
-      this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: { phase: "compile", message: compiled.error.message + where } });
+      const { line, column } = compiled.error;
+      this.publish({
+        status: this.snapshot.tree ? this.snapshot.status : "failed",
+        problem: { phase: "compile", message: line ? withPosition(compiled.error.message, line, column) : compiled.error.message, ...(line ? { line } : {}), ...(column ? { column } : {}) },
+      });
       return;
     }
     const restore = this.run ? await this.saveState() : undefined;
@@ -201,7 +210,7 @@ export class ViewSession {
           exit: (exit) => {
             if (token !== this.runToken) return;
             this.run = null;
-            if (exit.kind === "failed") this.publish({ status: "failed", problem: { phase: "run", message: sourcePositions(exit.message ?? "The view stopped", view) } });
+            if (exit.kind === "failed") this.publish({ status: "failed", problem: problemOf("run", exit.message ?? "The view stopped", undefined, view) });
             else if (exit.kind === "finished") this.publish({ status: "stopped" });
           },
           warning: (message) => this.log("warn", message),
@@ -216,7 +225,7 @@ export class ViewSession {
     } catch (caught) {
       if (token !== this.runToken) return;
       const message = caught instanceof Error ? caught.message : String(caught);
-      this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: { phase: "compile", message: sourcePositions(message, view) } });
+      this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: problemOf("compile", message, undefined, view) });
     }
   }
 
@@ -245,8 +254,10 @@ export class ViewSession {
         this.log(post.level, post.text);
         return;
       case "error":
-        this.publish({ problem: { phase: post.phase, message: sourcePositions(post.message, view) } });
-        this.log("error", `${post.phase}: ${post.message}`);
+        const problem = problemOf(post.phase, post.message, post.stack, view);
+        // Before its first tree the view has nothing to show: it failed, rather than still loading.
+        this.publish(this.snapshot.tree || this.snapshot.status !== "loading" ? { problem } : { status: "failed", problem });
+        this.log("error", `${post.phase}: ${problem.message}`);
         return;
       case "state": {
         const waiter = this.stateWaiter;

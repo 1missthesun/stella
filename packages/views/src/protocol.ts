@@ -49,7 +49,7 @@ export type ViewPost =
   | { t: "call"; id: number; m: ViewCallMethod; a: unknown[] }
   | { t: "frame" }
   | { t: "log"; level: "log" | "info" | "warn" | "error" | "debug"; text: string }
-  | { t: "error"; phase: "render" | "event" | "effect" | "timer" | "main"; message: string }
+  | { t: "error"; phase: "render" | "event" | "effect" | "timer" | "main"; message: string; stack?: string }
   | { t: "state"; hooks: ViewHookState }
   | { t: "title"; title: string };
 

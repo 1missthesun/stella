@@ -645,7 +645,14 @@ const __sv_main = (() => {
 
   function fail(phase, error) {
     const message = error && error.message ? (error.name && error.name !== "Error" ? error.name + ": " : "") + error.message : String(error);
-    post({ t: "error", phase, message });
+    // The stack's frames say where in the view it happened; the host maps them to its source.
+    let stack;
+    try {
+      stack = error && typeof error.stack === "string" ? error.stack.slice(0, 4000) : undefined;
+    } catch (e) {
+      stack = undefined;
+    }
+    post(stack ? { t: "error", phase, message, stack } : { t: "error", phase, message });
   }
 
   function guard(phase, fn) {

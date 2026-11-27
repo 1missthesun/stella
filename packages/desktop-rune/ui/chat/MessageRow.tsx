@@ -1,4 +1,4 @@
-import { Fragment, memo, useId, useMemo, useState, type ReactNode } from "react";
+import { Fragment, memo, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { serverNow } from "@stella/contracts/server-clock";
 import { EMAIL_PAGE_CANVAS } from "@stella/contracts/email-page";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
@@ -379,13 +379,21 @@ export const UserMessageRow = memo(
 );
 
 /** desktop-ui's `useReplyHandoffArrival`: a final reply that just landed takes the working indicator's place. */
+/**
+ * Tells the working indicator the reply it was holding a place for has landed, in the commit that
+ * first lays the reply out: from a layout effect, the indicator's handoff commits with it and both
+ * reach the engine as one frame, where a later microtask left a frame with the reply laid out under
+ * a still-standing indicator (the pinned list jumping up by the reply's height, then back).
+ */
 function useReplyArrival(justArrived: boolean, finalAnswer: boolean) {
   const controller = useReplyHandoffController();
-  const [announced, setAnnounced] = useState(false);
-  if (!announced && justArrived && finalAnswer && controller) {
-    setAnnounced(true);
-    queueMicrotask(() => controller.replyArrived());
-  }
+  const announced = useRef(false);
+  const due = !announced.current && justArrived && finalAnswer && controller !== null;
+  useLayoutEffect(() => {
+    if (!due || announced.current || !controller) return;
+    announced.current = true;
+    controller.replyArrived();
+  });
 }
 
 /** The Stella Views a reply made or changed, one per file, in the order it first touched them. */

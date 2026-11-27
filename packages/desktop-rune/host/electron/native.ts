@@ -242,16 +242,17 @@ class NativeTheme extends EventEmitter {
     this.emit("updated");
   }
   get systemPrefersDark() { return this.systemDark; }
-  setSystemAppearance(dark: boolean) {
-    if (this.systemDark === dark) return;
-    this.systemDark = dark;
+  setSystemAppearance(a: { dark: boolean; reduceTransparency?: boolean; increaseContrast?: boolean; forcedColors?: boolean }) {
+    const next = { systemDark: a.dark, prefersReducedTransparency: Boolean(a.reduceTransparency), shouldUseHighContrastColors: Boolean(a.increaseContrast || a.forcedColors), inForcedColorsMode: Boolean(a.forcedColors) };
+    if (this.systemDark === next.systemDark && this.prefersReducedTransparency === next.prefersReducedTransparency && this.shouldUseHighContrastColors === next.shouldUseHighContrastColors && this.inForcedColorsMode === next.inForcedColorsMode) return;
+    Object.assign(this, next);
     this.emit("updated");
   }
 }
 
 export const nativeTheme = new NativeTheme();
 
-onEngine("appearance", (event) => nativeTheme.setSystemAppearance(event.dark));
+onEngine("appearance", (event) => nativeTheme.setSystemAppearance(event));
 
 class PowerMonitor extends EventEmitter {
   private sleepWatcher: ChildProcess | null = null;

@@ -31,7 +31,14 @@ Engine → host lines (`onEngineEvent(t, fn)` in `bridge.ts`):
 - `reply` → resolves `request()`
 - `window` → `{id, kind}`, where kind is one of: close-requested, closed, focus, blur, resize (w, h),
   maximize, unmaximize, enter-full-screen, leave-full-screen
-- `menu`, `tray`, `shortcut`, `notification`, `appearance` (`{dark, accentColor}`), `rec`
+- `menu`, `tray`, `shortcut`, `notification`, `rec`
+- `appearance` → `{dark, accentColor, reduceTransparency, increaseContrast, forcedColors}`, sent when
+  any of them changes. `reduceTransparency` is macOS's Reduce Transparency or Windows with
+  Transparency effects off. `increaseContrast` is macOS's Increase Contrast, a Windows contrast
+  theme or GNOME's High Contrast. `forcedColors` is a Windows contrast theme. The web host reads
+  `prefers-reduced-transparency`, `prefers-contrast: more` and `forced-colors`.
+  `RUNE_REDUCE_TRANSPARENCY=1` and `RUNE_INCREASE_CONTRAST=1` turn them on for captures. The UI
+  draws its glass as opaque surfaces with a stronger edge for any of them (`ui/theme/accessibility.ts`).
 - `open-url` → `{url}`: a link the system opened with the app. On macOS this is the Apple Event.
   On Windows and Linux it is the launch's own links on the schemes in `STELLA_RUNE_URL_SCHEMES`
   (default `stella`). Later launches' links come through the host's single-instance lock.
@@ -543,7 +550,7 @@ that takes, and share it.
 - `shortcut.*`: register, unregister, unregisterAll. These are global and take Electron
   accelerators.
 - `screen.displays()`, `screen.primary()`
-- `appearance.get()`
+- `appearance.get()`: the `appearance` event's fields
 - `shell.*`: openExternal, openPath, showItemInFolder
 - `fonts({files, sans, mono})`, `background(color, window?)`, `colorMotion(dur)`
 - `scroll.*`: to (`"end"` or y), intoView, page, stop, toKey (`viewport, key, at`),

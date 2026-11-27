@@ -99,15 +99,51 @@ enum Install {
             return (bin, localVersion)
         }
 
+        bunLock.lock()
+        defer { bunLock.unlock() }
         let dir = paths.runtimes.appendingPathComponent("bun-\(version)")
         let bin = dir.appendingPathComponent("bun")
         if FileManager.default.isExecutableFile(atPath: bin.path) {
             return (bin, version)
         }
-        guard let asset, let url = URL(string: asset.url) else {
+        guard let asset else {
             throw LauncherError("No Bun \(version) for \(Pins.platformKey).")
         }
         progress("Downloading Bun \(version)…")
+        return try installBun(paths: paths, baseEnv: baseEnv, version: version, asset: asset)
+    }
+
+    private static let bunLock = NSLock()
+
+    /// The launcher's own Bun pin is almost always the one the app source
+    /// asks for, so a first install fetches it while git clones. ensureBun
+    /// waits on bunLock for it.
+    static func prefetchBun(paths: LauncherPaths, baseEnv: [String: String], localBun: String?) {
+        guard localBun == nil, let asset = Pins.bun[Pins.platformKey] else { return }
+        let version = Pins.bunVersion
+        let bin = paths.runtimes.appendingPathComponent("bun-\(version)/bun")
+        if FileManager.default.isExecutableFile(atPath: bin.path) { return }
+        let ready = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            bunLock.lock()
+            ready.signal()
+            defer { bunLock.unlock() }
+            if FileManager.default.isExecutableFile(atPath: bin.path) { return }
+            do {
+                _ = try installBun(paths: paths, baseEnv: baseEnv, version: version, asset: asset)
+            } catch {
+                log("install: early bun download failed (\(error)); trying again after the clone")
+            }
+        }
+        ready.wait()
+    }
+
+    private static func installBun(
+        paths: LauncherPaths, baseEnv: [String: String], version: String, asset: Pins.Asset
+    ) throws -> (URL, String) {
+        let dir = paths.runtimes.appendingPathComponent("bun-\(version)")
+        let bin = dir.appendingPathComponent("bun")
+        guard let url = URL(string: asset.url) else { throw LauncherError("Bad Bun URL \(asset.url).") }
         log("install: downloading bun \(version) from \(asset.url)")
         try FileManager.default.createDirectory(at: paths.runtimes, withIntermediateDirectories: true)
         let archive = paths.runtimes.appendingPathComponent("bun-\(version).zip")

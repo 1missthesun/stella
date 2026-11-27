@@ -38,6 +38,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <future>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -2333,6 +2334,9 @@ static void extractZip(const wstring &archive, const wstring &dir) {
     if (r.code != 0) fail(format("Could not unpack %s: %s", utf8(archive).c_str(), trim(r.err).c_str()));
 }
 
+static void installBun(const string &version, const string &url, const string &sha, const string &member);
+static void joinBunPrefetch();
+
 static void ensureBun() {
     string key = bunPlatformKey();
     string version = kBunVersion, url, sha, member;
@@ -2369,11 +2373,25 @@ static void ensureBun() {
         return;
     }
 
+    joinBunPrefetch();
     wstring dir = P.runtimes() + L"\\bun-" + wide(version);
     wstring bin = dir + L"\\bun.exe";
     if (!exists(bin)) {
         if (url.empty()) fail("No Bun " + version + " for " + key + ".");
         progress("Getting things ready…", 0.30, 0.40);
+        installBun(version, url, sha, member);
+    }
+    gBunBin = bin;
+    gBunVersion = version;
+}
+
+// Downloads Bun <version> into runtimes\bun-<version>\bun.exe. Also runs on
+// a thread while git and the app source download (startBunPrefetch), so
+// nothing here may touch the UI.
+static void installBun(const string &version, const string &url, const string &sha, const string &member) {
+    wstring dir = P.runtimes() + L"\\bun-" + wide(version);
+    wstring bin = dir + L"\\bun.exe";
+    {
         LOG("install: downloading bun %s from %s", version.c_str(), url.c_str());
         mkdirs(P.runtimes());
         wstring archive = P.runtimes() + L"\\bun-" + wide(version) + L".zip";
@@ -2390,8 +2408,38 @@ static void ensureBun() {
         DeleteFileW(archive.c_str());
         LOG("install: bun %s ready", version.c_str());
     }
-    gBunBin = bin;
-    gBunVersion = version;
+}
+
+// The launcher's own Bun pin is almost always the one the app source asks
+// for, so a first install fetches it while PortableGit and the source come.
+// Detached, so a launcher that quits mid-download never waits on it.
+static std::shared_future<void> gBunPrefetch;
+
+static void startBunPrefetch() {
+    if (!O.localBun.empty() || gBunPrefetch.valid()) return;
+    if (exists(P.runtimes() + L"\\bun-" + wide(kBunVersion) + L"\\bun.exe")) return;
+    string key = bunPlatformKey();
+    for (auto &a : kBunAssets) {
+        if (key != a.key) continue;
+        string url = a.url, sha = a.sha256, member = a.member;
+        auto done = std::make_shared<std::promise<void>>();
+        gBunPrefetch = done->get_future().share();
+        std::thread([url, sha, member, done]() {
+            try {
+                installBun(kBunVersion, url, sha, member);
+            } catch (const LauncherError &e) {
+                LOG("install: early bun download failed (%s); trying again after the clone", e.message.c_str());
+            } catch (...) {
+                LOG("install: early bun download failed; trying again after the clone");
+            }
+            done->set_value();
+        }).detach();
+        return;
+    }
+}
+
+static void joinBunPrefetch() {
+    if (gBunPrefetch.valid()) gBunPrefetch.wait();
 }
 
 static void bootstrapAccess(string &remote, string &token) {
@@ -2904,12 +2952,20 @@ static wstring prepare() {
     string lockHash = sha256File(app + L"\\bun.lock");
     if (S.bunLockHash != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
         progress("Installing Stella…", 0.40, 0.82);
-        LOG("prepare: bun install --frozen-lockfile (lock %s)", short12(lockHash).c_str());
+        // install-deps.mjs (newer app sources) starts bun's cache from a
+        // per-platform seed and fetches Electron and the prepare-install
+        // helpers alongside; older sources get a plain bun install.
+        wstring installDeps = app + L"\\packages\\desktop\\scripts\\install-deps.mjs";
+        bool seeded = exists(installDeps);
+        LOG("prepare: %s (lock %s)", seeded ? "install-deps.mjs" : "bun install --frozen-lockfile",
+            short12(lockHash).c_str());
         ULONGLONG started = GetTickCount64();
         Env env = baseEnvironment();
         env[L"STELLA_SKIP_BROWSER_HYDRATE"] = L"1";
         env[L"STELLA_SKIP_OFFICE_HYDRATE"] = L"1";
-        CmdResult r = runCmd({gBunBin, L"install", L"--frozen-lockfile"}, app, env, P.installLog(), 30 * 60);
+        vector<wstring> argv = seeded ? vector<wstring>{gBunBin, installDeps}
+                                      : vector<wstring>{gBunBin, L"install", L"--frozen-lockfile"};
+        CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60);
         if (r.timedOut) fail("bun install timed out after 30 minutes:\n" + lastLines(r.err, 20));
         if (r.code != 0) fail(format("bun install failed (exit %lu):\n", r.code) + lastLines(r.err, 20));
         LOG("prepare: bun install finished in %ds", (int)((GetTickCount64() - started) / 1000));
@@ -3603,6 +3659,10 @@ struct OutsideChangesFound {};
 static OutsideChanges gOutside;
 
 static wstring prepareForLaunch() {
+    if (!exists(P.app() + L"\\.git")) {
+        mkdirs(P.runtimes());
+        startBunPrefetch();
+    }
     ensureTools();
     followServerFile();
     if (!exists(P.app() + L"\\.git")) {

@@ -14,12 +14,18 @@ enum Prepare {
         let electronPackage = app.appendingPathComponent("node_modules/electron/package.json")
         if state.bunLockHash != lockHash || !FileManager.default.fileExists(atPath: electronPackage.path) {
             progress("Installing Stella's dependencies…")
-            log("prepare: bun install --frozen-lockfile (lock \(lockHash.prefix(12)))")
+            // install-deps.mjs (newer app sources) starts bun's cache from a
+            // per-platform seed and runs prepare-install alongside; older
+            // sources get a plain bun install.
+            let installDeps = app.appendingPathComponent("packages/desktop/scripts/install-deps.mjs")
+            let seeded = FileManager.default.fileExists(atPath: installDeps.path)
+            log("prepare: \(seeded ? "install-deps.mjs" : "bun install --frozen-lockfile") (lock \(lockHash.prefix(12)))")
             let started = Date()
             var installEnv = env
             installEnv["STELLA_SKIP_BROWSER_HYDRATE"] = "1"
             installEnv["STELLA_SKIP_OFFICE_HYDRATE"] = "1"
-            let result = try Shell.run(runtimes.bunBin.path, ["install", "--frozen-lockfile"],
+            let result = try Shell.run(runtimes.bunBin.path,
+                                       seeded ? [installDeps.path] : ["install", "--frozen-lockfile"],
                                        cwd: app, env: installEnv, outputFile: paths.installLog,
                                        timeout: 30 * 60)
             guard result.code == 0 else {
@@ -144,6 +150,35 @@ enum ElectronIdentity {
             return Resolved(app: older, pendingVersion: version)
         }
         throw DownloadFailure(version: version, underlying: failure)
+    }
+
+    /// A first install downloads the signed Stella.app while its dependencies
+    /// install. The version comes from the app's package.json, which pins
+    /// Electron exactly; ensure() waits on installLock and then finds it.
+    static func prefetch(paths: LauncherPaths, env: [String: String]) {
+        if ProcessInfo.processInfo.environment["STELLA_LAUNCHER_ENGINE"] == "rune" { return }
+        let manifest = paths.app.appendingPathComponent("package.json")
+        guard let data = try? Data(contentsOf: manifest),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let deps = json["dependencies"] as? [String: Any],
+              let version = deps["electron"] as? String,
+              version.range(of: #"^\d+\.\d+\.\d+(-[\w.]+)?$"#, options: .regularExpression) != nil
+        else { return }
+        if signedCopy(paths: paths, version: version) != nil { return }
+        let ready = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            installLock.lock()
+            ready.signal()
+            defer { installLock.unlock() }
+            if signedCopy(paths: paths, version: version) != nil { return }
+            do {
+                _ = try downloadSigned(paths: paths, version: version, env: env, progress: { _ in })
+            } catch {
+                log("identity: early download for Electron \(version) failed: \(error)")
+            }
+        }
+        // Hold the lock before returning, so ensure() can't start its own.
+        ready.wait()
     }
 
     static func retryDownload(paths: LauncherPaths, version: String, env: [String: String]) -> Bool {

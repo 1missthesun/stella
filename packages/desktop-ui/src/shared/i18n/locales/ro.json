@@ -1536,6 +1536,15 @@
         "themes": "Temă"
       }
     },
+    "p2p": {
+      "entry": "Folosește Stella de pe computer",
+      "intro": "Pe computer, deschide în Stella Setări › Cont › Conectează un dispozitiv. Scanează codul afișat sau introdu-l aici.",
+      "scan": "Scanează codul",
+      "orType": "sau introdu codul",
+      "cameraDenied": "Stella nu poate folosi camera. Permite accesul în Setări sau introdu codul.",
+      "noCamera": "Nu există cameră aici. Introdu codul.",
+      "leave": "Ieși"
+    },
     "search": {
       "cancelLabel": "Anulează căutarea",
       "clearLabel": "Șterge căutarea",

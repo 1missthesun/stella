@@ -1536,6 +1536,15 @@
         "themes": "Tema"
       }
     },
+    "p2p": {
+      "entry": "Usa Stella del tuo computer",
+      "intro": "Sul computer, apri Impostazioni › Account › Collega un dispositivo in Stella. Scansiona il codice che appare o digitalo qui.",
+      "scan": "Scansiona codice",
+      "orType": "o digita il codice",
+      "cameraDenied": "Stella non può usare la fotocamera. Consentilo in Impostazioni o digita il codice.",
+      "noCamera": "Qui non c'è una fotocamera. Digita il codice.",
+      "leave": "Esci"
+    },
     "search": {
       "cancelLabel": "Annulla ricerca",
       "clearLabel": "Cancella ricerca",

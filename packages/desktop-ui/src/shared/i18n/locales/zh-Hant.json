@@ -1516,6 +1516,15 @@
         "themes": "主題"
       }
     },
+    "p2p": {
+      "entry": "使用電腦上的 Stella",
+      "intro": "在電腦上開啟 Stella 的「設定 › 帳號 › 連接裝置」，掃描顯示的代碼，或在此輸入。",
+      "scan": "掃描代碼",
+      "orType": "或輸入代碼",
+      "cameraDenied": "Stella 無法使用相機。請在設定中允許，或輸入代碼。",
+      "noCamera": "這裡沒有相機。請改為輸入代碼。",
+      "leave": "離開"
+    },
     "search": {
       "cancelLabel": "取消搜尋",
       "clearLabel": "清除搜尋",

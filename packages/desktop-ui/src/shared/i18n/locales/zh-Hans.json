@@ -1516,6 +1516,15 @@
         "themes": "主题"
       }
     },
+    "p2p": {
+      "entry": "使用电脑上的 Stella",
+      "intro": "在电脑上打开 Stella 的「设置 › 账户 › 连接设备」，扫描显示的代码，或在此输入。",
+      "scan": "扫描代码",
+      "orType": "或输入代码",
+      "cameraDenied": "Stella 无法使用相机。请在设置中允许，或输入代码。",
+      "noCamera": "这里没有相机。请改为输入代码。",
+      "leave": "离开"
+    },
     "search": {
       "cancelLabel": "取消搜索",
       "clearLabel": "清除搜索",

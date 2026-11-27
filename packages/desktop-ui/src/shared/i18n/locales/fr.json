@@ -1536,6 +1536,15 @@
         "themes": "Thème"
       }
     },
+    "p2p": {
+      "entry": "Utiliser Stella sur votre ordinateur",
+      "intro": "Sur votre ordinateur, ouvrez Réglages › Compte › Connecter un appareil dans Stella. Scannez le code affiché ou saisissez-le ici.",
+      "scan": "Scanner le code",
+      "orType": "ou saisissez le code",
+      "cameraDenied": "Stella ne peut pas utiliser l'appareil photo. Autorisez-le dans Réglages ou saisissez le code.",
+      "noCamera": "Aucun appareil photo ici. Saisissez le code.",
+      "leave": "Quitter"
+    },
     "search": {
       "cancelLabel": "Annuler la recherche",
       "clearLabel": "Effacer la recherche",

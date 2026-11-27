@@ -1526,6 +1526,15 @@
         "themes": "Teema"
       }
     },
+    "p2p": {
+      "entry": "Käytä tietokoneesi Stellaa",
+      "intro": "Avaa tietokoneellasi Stellan Asetukset › Tili › Yhdistä laite. Skannaa näkyvä koodi tai kirjoita se tähän.",
+      "scan": "Skannaa koodi",
+      "orType": "tai kirjoita koodi",
+      "cameraDenied": "Stella ei voi käyttää kameraa. Salli se Asetuksissa tai kirjoita koodi.",
+      "noCamera": "Täällä ei ole kameraa. Kirjoita koodi.",
+      "leave": "Poistu"
+    },
     "search": {
       "cancelLabel": "Peruuta haku",
       "clearLabel": "Tyhjennä haku",

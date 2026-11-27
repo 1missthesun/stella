@@ -1536,6 +1536,15 @@
         "themes": "Tema"
       }
     },
+    "p2p": {
+      "entry": "Usar Stella de tu ordenador",
+      "intro": "En tu ordenador, abre Ajustes › Cuenta › Conectar un dispositivo en Stella. Escanea el código que aparece o escríbelo aquí.",
+      "scan": "Escanear código",
+      "orType": "o escribe el código",
+      "cameraDenied": "Stella no puede usar la cámara. Permítelo en Ajustes o escribe el código.",
+      "noCamera": "Aquí no hay cámara. Escribe el código.",
+      "leave": "Salir"
+    },
     "search": {
       "cancelLabel": "Cancelar búsqueda",
       "clearLabel": "Borrar búsqueda",

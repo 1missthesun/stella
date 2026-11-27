@@ -1546,6 +1546,15 @@
         "themes": "Motyw"
       }
     },
+    "p2p": {
+      "entry": "Użyj Stelli z komputera",
+      "intro": "Na komputerze otwórz w Stelli Ustawienia › Konto › Połącz urządzenie. Zeskanuj wyświetlony kod lub wpisz go tutaj.",
+      "scan": "Zeskanuj kod",
+      "orType": "lub wpisz kod",
+      "cameraDenied": "Stella nie może użyć aparatu. Zezwól na to w Ustawieniach lub wpisz kod.",
+      "noCamera": "Brak aparatu. Wpisz kod.",
+      "leave": "Wyjdź"
+    },
     "search": {
       "cancelLabel": "Anuluj wyszukiwanie",
       "clearLabel": "Wyczyść wyszukiwanie",

@@ -1546,6 +1546,15 @@
         "themes": "Motiv"
       }
     },
+    "p2p": {
+      "entry": "Použít Stellu z počítače",
+      "intro": "Na počítači otevřete ve Stelle Nastavení › Účet › Připojit zařízení. Naskenujte zobrazený kód nebo ho zadejte sem.",
+      "scan": "Naskenovat kód",
+      "orType": "nebo zadejte kód",
+      "cameraDenied": "Stella nemůže použít fotoaparát. Povolte ho v Nastavení, nebo zadejte kód.",
+      "noCamera": "Tady není fotoaparát. Zadejte kód ručně.",
+      "leave": "Odejít"
+    },
     "search": {
       "cancelLabel": "Zrušit hledání",
       "clearLabel": "Vymazat hledání",

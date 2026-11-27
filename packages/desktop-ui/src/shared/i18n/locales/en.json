@@ -1526,6 +1526,15 @@
         "themes": "Theme"
       }
     },
+    "p2p": {
+      "entry": "Use your computer's Stella",
+      "intro": "On your computer, open Stella's Settings › Account › Connect a device. Scan the code it shows, or type it here.",
+      "scan": "Scan code",
+      "orType": "or type the code",
+      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or type the code.",
+      "noCamera": "There's no camera here. Type the code instead.",
+      "leave": "Leave"
+    },
     "search": {
       "cancelLabel": "Cancel search",
       "clearLabel": "Clear search",

@@ -1526,6 +1526,15 @@
         "themes": "Thema"
       }
     },
+    "p2p": {
+      "entry": "Stella op je computer gebruiken",
+      "intro": "Open op je computer in Stella Instellingen › Account › Apparaat koppelen. Scan de code die verschijnt of typ hem hier.",
+      "scan": "Code scannen",
+      "orType": "of typ de code",
+      "cameraDenied": "Stella kan de camera niet gebruiken. Sta het toe in Instellingen of typ de code.",
+      "noCamera": "Hier is geen camera. Typ de code in plaats daarvan.",
+      "leave": "Verlaten"
+    },
     "search": {
       "cancelLabel": "Zoeken annuleren",
       "clearLabel": "Zoekopdracht wissen",

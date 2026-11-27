@@ -1516,6 +1516,15 @@
         "themes": "Chủ đề"
       }
     },
+    "p2p": {
+      "entry": "Dùng Stella trên máy tính của bạn",
+      "intro": "Trên máy tính, mở Cài đặt › Tài khoản › Kết nối thiết bị trong Stella. Quét mã hiển thị hoặc nhập mã ở đây.",
+      "scan": "Quét mã",
+      "orType": "hoặc nhập mã",
+      "cameraDenied": "Stella không thể dùng camera. Hãy cho phép trong Cài đặt hoặc nhập mã.",
+      "noCamera": "Không có camera. Hãy nhập mã.",
+      "leave": "Rời đi"
+    },
     "search": {
       "cancelLabel": "Hủy tìm kiếm",
       "clearLabel": "Xóa tìm kiếm",

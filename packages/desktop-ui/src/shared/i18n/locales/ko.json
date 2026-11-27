@@ -1516,6 +1516,15 @@
         "themes": "테마"
       }
     },
+    "p2p": {
+      "entry": "컴퓨터의 Stella 사용하기",
+      "intro": "컴퓨터의 Stella에서 설정 › 계정 › 기기 연결을 여세요. 표시된 코드를 스캔하거나 여기에 입력하세요.",
+      "scan": "코드 스캔",
+      "orType": "또는 코드 입력",
+      "cameraDenied": "Stella가 카메라를 사용할 수 없습니다. 설정에서 허용하거나 코드를 입력하세요.",
+      "noCamera": "카메라가 없습니다. 대신 코드를 입력하세요.",
+      "leave": "나가기"
+    },
     "search": {
       "cancelLabel": "검색 취소",
       "clearLabel": "검색 지우기",

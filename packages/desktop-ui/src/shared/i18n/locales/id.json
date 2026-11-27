@@ -1516,6 +1516,15 @@
         "themes": "Tema"
       }
     },
+    "p2p": {
+      "entry": "Gunakan Stella di komputer Anda",
+      "intro": "Di komputer Anda, buka Pengaturan › Akun › Hubungkan perangkat di Stella. Pindai kode yang muncul, atau ketik di sini.",
+      "scan": "Pindai kode",
+      "orType": "atau ketik kodenya",
+      "cameraDenied": "Stella tidak dapat menggunakan kamera. Izinkan di Pengaturan, atau ketik kodenya.",
+      "noCamera": "Tidak ada kamera di sini. Ketik kodenya saja.",
+      "leave": "Keluar"
+    },
     "search": {
       "cancelLabel": "Batalkan pencarian",
       "clearLabel": "Bersihkan pencarian",

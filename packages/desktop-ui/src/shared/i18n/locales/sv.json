@@ -1526,6 +1526,15 @@
         "themes": "Tema"
       }
     },
+    "p2p": {
+      "entry": "Använd Stella på din dator",
+      "intro": "Öppna Inställningar › Konto › Anslut en enhet i Stella på datorn. Skanna koden som visas, eller skriv den här.",
+      "scan": "Skanna kod",
+      "orType": "eller skriv koden",
+      "cameraDenied": "Stella kan inte använda kameran. Tillåt det i Inställningar, eller skriv koden.",
+      "noCamera": "Det finns ingen kamera här. Skriv koden i stället.",
+      "leave": "Lämna"
+    },
     "search": {
       "cancelLabel": "Avbryt sökning",
       "clearLabel": "Rensa sökning",

@@ -1526,6 +1526,15 @@
         "themes": "Tema"
       }
     },
+    "p2p": {
+      "entry": "Bilgisayarındaki Stella'yı kullan",
+      "intro": "Bilgisayarında Stella'da Ayarlar › Hesap › Cihaz bağla'yı aç. Gösterilen kodu tara veya buraya yaz.",
+      "scan": "Kodu tara",
+      "orType": "veya kodu yaz",
+      "cameraDenied": "Stella kamerayı kullanamıyor. Ayarlar'dan izin ver veya kodu yaz.",
+      "noCamera": "Burada kamera yok. Bunun yerine kodu yaz.",
+      "leave": "Ayrıl"
+    },
     "search": {
       "cancelLabel": "Aramayı iptal et",
       "clearLabel": "Aramayı temizle",

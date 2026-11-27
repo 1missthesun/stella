@@ -1526,6 +1526,15 @@
         "themes": "Téma"
       }
     },
+    "p2p": {
+      "entry": "A számítógéped Stellájának használata",
+      "intro": "A számítógépeden nyisd meg a Stellában a Beállítások › Fiók › Eszköz csatlakoztatása menüt. Olvasd be a megjelenő kódot, vagy írd be ide.",
+      "scan": "Kód beolvasása",
+      "orType": "vagy írd be a kódot",
+      "cameraDenied": "A Stella nem tudja használni a kamerát. Engedélyezd a Beállításokban, vagy írd be a kódot.",
+      "noCamera": "Itt nincs kamera. Írd be inkább a kódot.",
+      "leave": "Kilépés"
+    },
     "search": {
       "cancelLabel": "Keresés megszakítása",
       "clearLabel": "Keresés törlése",

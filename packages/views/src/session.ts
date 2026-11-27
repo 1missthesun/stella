@@ -1,0 +1,358 @@
+// The host side of one open view, the same on every platform: it compiles the source, starts the
+// program on the platform's VM (the Rune engine, psychoscript-mobile, or WebAssembly), answers its
+// calls through the platform's capabilities, and hands renderers the latest tree. A new source
+// (an agent's edit) swaps in place: the old run hands over its hook state and the new one starts
+// from it, so the view keeps what the user did.
+import { compileView, sourcePositions, type CompiledView } from "./compile";
+import {
+  VIEW_LIMITS,
+  VIEW_PROTOCOL,
+  type ViewCallMethod,
+  type ViewChild,
+  type ViewInput,
+  type ViewMessage,
+  type ViewPost,
+  type ViewTheme,
+  type ViewHookState,
+} from "./protocol";
+
+export type ViewExit = { kind: "finished" | "failed" | "stopped"; message?: string };
+
+/** One live run on the platform's VM. */
+export interface ViewRun {
+  deliver(messages: ViewMessage[]): void;
+  stop(): void;
+}
+
+/** Runs programs. `start` rejects with the message of a program that doesn't compile. */
+export interface ViewVm {
+  start(
+    program: string,
+    input: ViewInput,
+    events: { posts(posts: ViewPost[]): void; exit(exit: ViewExit): void; warning?(message: string): void },
+    limits: { sliceMs: number; heapBytes: number },
+  ): Promise<ViewRun>;
+}
+
+/** The view's saved key-value storage. */
+export interface ViewStorage {
+  load(): Promise<Record<string, unknown>>;
+  set(key: string, value: unknown): Promise<void>;
+  remove(key: string): Promise<void>;
+  clear(): Promise<void>;
+  /** Changes made elsewhere (another device, another window), when the platform syncs them. */
+  subscribe?(listener: (key: string, value: unknown) => void): () => void;
+}
+
+export type ViewCallContext = { viewId: string; title: string };
+export type ViewCapability = (args: unknown[], context: ViewCallContext) => Promise<unknown>;
+export type ViewCapabilities = Partial<Record<ViewCallMethod, ViewCapability>>;
+
+export type ViewProblem = { phase: string; message: string };
+export type ViewLog = { level: string; text: string; at: number };
+
+export type ViewSnapshot = {
+  status: "loading" | "running" | "failed" | "stopped";
+  tree: ViewChild | null;
+  rev: number;
+  /** The latest program error; the last good tree stays on screen with it. */
+  problem: ViewProblem | null;
+  keys: readonly string[];
+  /** Milliseconds from `load` to the first tree of the current source. */
+  firstRenderMs: number | null;
+  /** Milliseconds from the latest source change to its first tree. */
+  swapMs: number | null;
+};
+
+export type ViewSessionOptions = {
+  id: string;
+  title: string;
+  vm: ViewVm;
+  storage: ViewStorage;
+  capabilities: ViewCapabilities;
+  theme: ViewTheme;
+  viewport?: { width: number; height: number };
+  data?: unknown;
+  /** The platform's frame clock: calls `fn` once on the next display frame. */
+  requestFrame: (fn: (time: number) => void) => void;
+  now: () => number;
+  onLog?: (log: ViewLog) => void;
+};
+
+const LOG_LIMIT = 200;
+
+export class ViewSession {
+  readonly id: string;
+  private options: ViewSessionOptions;
+  private run: ViewRun | null = null;
+  private runToken = 0;
+  private view: CompiledView | null = null;
+  private source: string | null = null;
+  private fileName = "view.tsx";
+  private snapshot: ViewSnapshot = { status: "loading", tree: null, rev: 0, problem: null, keys: [], firstRenderMs: null, swapMs: null };
+  private listeners = new Set<(snapshot: ViewSnapshot) => void>();
+  private storageCache: Record<string, unknown> | null = null;
+  private viewport: { width: number; height: number };
+  private theme: ViewTheme;
+  private data: unknown;
+  private frameWanted = false;
+  private lastFrame: number | null = null;
+  private stateWaiter: ((hooks: ViewHookState | null) => void) | null = null;
+  private loadStartedAt = 0;
+  private disposed = false;
+  private unsubscribeStorage: (() => void) | null = null;
+  readonly logs: ViewLog[] = [];
+
+  constructor(options: ViewSessionOptions) {
+    this.id = options.id;
+    this.options = options;
+    this.viewport = options.viewport ?? { width: 0, height: 0 };
+    this.theme = options.theme;
+    this.data = options.data ?? null;
+    this.unsubscribeStorage =
+      options.storage.subscribe?.((key, value) => {
+        if (this.storageCache) {
+          if (value === undefined || value === null) delete this.storageCache[key];
+          else this.storageCache[key] = value;
+        }
+        this.deliver({ t: "storage", key, value });
+      }) ?? null;
+  }
+
+  get current(): ViewSnapshot {
+    return this.snapshot;
+  }
+
+  subscribe(listener: (snapshot: ViewSnapshot) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private publish(next: Partial<ViewSnapshot>) {
+    this.snapshot = { ...this.snapshot, ...next };
+    for (const listener of this.listeners) listener(this.snapshot);
+  }
+
+  /** Loads a source, or swaps a running view to a new one, keeping its state. */
+  async load(source: string, fileName = this.fileName): Promise<void> {
+    if (this.disposed) return;
+    if (source === this.source && fileName === this.fileName && this.run) return;
+    this.loadStartedAt = this.options.now();
+    this.source = source;
+    this.fileName = fileName;
+    const compiled = compileView(source, fileName);
+    if (!compiled.ok) {
+      const where = compiled.error.line ? ` (line ${compiled.error.line}${compiled.error.column ? `, col ${compiled.error.column}` : ""})` : "";
+      this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: { phase: "compile", message: compiled.error.message + where } });
+      return;
+    }
+    const restore = this.run ? await this.saveState() : undefined;
+    if (this.disposed || this.source !== source) return;
+    this.view = compiled.view;
+    await this.start(compiled.view, restore ?? undefined);
+  }
+
+  private async saveState(): Promise<ViewHookState | null> {
+    if (!this.run) return null;
+    const hooks = new Promise<ViewHookState | null>((resolve) => {
+      this.stateWaiter = resolve;
+      setTimeout(() => {
+        if (this.stateWaiter === resolve) {
+          this.stateWaiter = null;
+          resolve(null);
+        }
+      }, 100);
+    });
+    this.run.deliver([{ t: "save" }]);
+    return hooks;
+  }
+
+  private async start(view: CompiledView, restore?: ViewHookState) {
+    const token = ++this.runToken;
+    const previous = this.run;
+    this.run = null;
+    previous?.stop();
+    this.frameWanted = false;
+    this.lastFrame = null;
+    if (!this.storageCache) this.storageCache = await this.options.storage.load().catch(() => ({}));
+    const input: ViewInput = {
+      protocol: VIEW_PROTOCOL,
+      viewport: this.viewport,
+      theme: this.theme,
+      storage: this.storageCache,
+      data: this.data,
+      ...(restore ? { restore } : {}),
+    };
+    let firstTree = true;
+    try {
+      const run = await this.options.vm.start(
+        view.program,
+        input,
+        {
+          posts: (posts) => {
+            if (token !== this.runToken) return;
+            for (const post of posts) {
+              this.onPost(post, view, firstTree);
+              if (post.t === "render") firstTree = false;
+            }
+          },
+          exit: (exit) => {
+            if (token !== this.runToken) return;
+            this.run = null;
+            if (exit.kind === "failed") this.publish({ status: "failed", problem: { phase: "run", message: sourcePositions(exit.message ?? "The view stopped", view) } });
+            else if (exit.kind === "finished") this.publish({ status: "stopped" });
+          },
+          warning: (message) => this.log("warn", message),
+        },
+        { sliceMs: VIEW_LIMITS.sliceBudgetMs, heapBytes: VIEW_LIMITS.maxHeapBytes },
+      );
+      if (token !== this.runToken) {
+        run.stop();
+        return;
+      }
+      this.run = run;
+    } catch (caught) {
+      if (token !== this.runToken) return;
+      const message = caught instanceof Error ? caught.message : String(caught);
+      this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: { phase: "compile", message: sourcePositions(message, view) } });
+    }
+  }
+
+  private onPost(post: ViewPost, view: CompiledView, firstTree: boolean) {
+    switch (post.t) {
+      case "render": {
+        const elapsed = this.options.now() - this.loadStartedAt;
+        const next: Partial<ViewSnapshot> = { status: "running", tree: post.tree, rev: this.snapshot.rev + 1 };
+        if (firstTree) {
+          next.problem = null;
+          if (this.snapshot.firstRenderMs === null) next.firstRenderMs = elapsed;
+          else next.swapMs = elapsed;
+        }
+        const keys = (post as { keys?: string[] }).keys;
+        if (keys) next.keys = keys;
+        this.publish(next);
+        return;
+      }
+      case "call":
+        void this.answer(post.id, post.m, post.a);
+        return;
+      case "frame":
+        this.wantFrame();
+        return;
+      case "log":
+        this.log(post.level, post.text);
+        return;
+      case "error":
+        this.publish({ problem: { phase: post.phase, message: sourcePositions(post.message, view) } });
+        this.log("error", `${post.phase}: ${post.message}`);
+        return;
+      case "state": {
+        const waiter = this.stateWaiter;
+        this.stateWaiter = null;
+        waiter?.(post.hooks);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  private log(level: string, text: string) {
+    const entry = { level, text, at: this.options.now() };
+    this.logs.push(entry);
+    if (this.logs.length > LOG_LIMIT) this.logs.splice(0, this.logs.length - LOG_LIMIT);
+    this.options.onLog?.(entry);
+  }
+
+  private wantFrame() {
+    if (this.frameWanted) return;
+    this.frameWanted = true;
+    this.options.requestFrame((time) => {
+      this.frameWanted = false;
+      const dt = this.lastFrame === null ? 0 : time - this.lastFrame;
+      this.lastFrame = time;
+      this.deliver({ t: "frame", time, dt });
+    });
+  }
+
+  private async answer(id: number, method: ViewCallMethod, args: unknown[]) {
+    const context = { viewId: this.id, title: this.options.title };
+    try {
+      let value: unknown;
+      const storage = this.options.storage;
+      if (method === "storage.set") {
+        const [key, v] = args as [string, unknown];
+        if (this.storageCache) this.storageCache[key] = v;
+        value = await storage.set(key, v);
+      } else if (method === "storage.remove") {
+        if (this.storageCache) delete this.storageCache[args[0] as string];
+        value = await storage.remove(args[0] as string);
+      } else if (method === "storage.clear") {
+        this.storageCache = {};
+        value = await storage.clear();
+      } else {
+        const capability = this.options.capabilities[method];
+        if (!capability) throw new Error(`${method} isn't available here`);
+        value = await capability(args, context);
+      }
+      this.deliver({ t: "reply", id, ok: true, v: value === undefined ? null : value });
+    } catch (caught) {
+      this.deliver({ t: "reply", id, ok: false, e: caught instanceof Error ? caught.message : String(caught) });
+    }
+  }
+
+  private deliver(message: ViewMessage) {
+    this.run?.deliver([message]);
+  }
+
+  /** A problem the host found (the file went away, it can't be read). */
+  report(phase: string, message: string) {
+    this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: { phase, message } });
+  }
+
+  /** A handler id from the tree fired (a press, a change). */
+  dispatch(handler: number, value?: unknown) {
+    this.deliver(value === undefined ? { t: "event", h: handler } : { t: "event", h: handler, v: value });
+  }
+
+  key(chord: string, key = chord) {
+    this.deliver({ t: "key", chord, key });
+  }
+
+  setViewport(width: number, height: number) {
+    const w = Math.round(width);
+    const h = Math.round(height);
+    if (w === this.viewport.width && h === this.viewport.height) return;
+    this.viewport = { width: w, height: h };
+    this.deliver({ t: "viewport", width: w, height: h });
+  }
+
+  setTheme(theme: ViewTheme) {
+    if (theme.dark === this.theme.dark && theme.accent === this.theme.accent && theme.platform === this.theme.platform) return;
+    this.theme = theme;
+    this.deliver({ t: "theme", theme });
+  }
+
+  setData(data: unknown) {
+    this.data = data;
+    this.deliver({ t: "data", data });
+  }
+
+  /** Starts the current source again from scratch (after a crash, or "Restart"). */
+  async restart(): Promise<void> {
+    if (!this.view) return;
+    this.loadStartedAt = this.options.now();
+    await this.start(this.view);
+  }
+
+  dispose() {
+    this.disposed = true;
+    this.runToken++;
+    this.run?.stop();
+    this.run = null;
+    this.unsubscribeStorage?.();
+    this.listeners.clear();
+  }
+}

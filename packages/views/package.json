@@ -1,0 +1,29 @@
+{
+  "name": "@stella/views",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Stella Views: native, local, live-updating views and mini-apps. Authoring types, the in-VM runtime, the TSX compiler and the host-side session every platform (Rune desktop, web, mobile) runs.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./protocol": "./src/protocol.ts",
+    "./compile": "./src/compile.ts",
+    "./session": "./src/session.ts",
+    "./runtime": "./src/runtime.gen.ts",
+    "./types/view.d.ts": "./types/view.d.ts",
+    "./files": "./src/files.ts",
+    "./icons": "./src/icons.ts"
+  },
+  "scripts": {
+    "gen": "bun scripts/gen-runtime.ts && bun scripts/gen-icons.ts",
+    "check": "bun scripts/check.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "sucrase": "^3.35.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "lucide-react": "^1.51.0"
+  }
+}

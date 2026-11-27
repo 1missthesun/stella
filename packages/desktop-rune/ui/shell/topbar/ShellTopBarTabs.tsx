@@ -66,8 +66,8 @@ const openTab = (tab: SidebarTab) => {
 
 function tabLook(t: Tokens) {
   return derive(t, "topbar-tabs", (t) => ({
-    rest: t.c.textMuted,
-    hover: t.c.textBase,
+    rest: t.c.textBase,
+    hover: t.c.textStrong,
     strong: t.c.textStrong,
     selected: mixOklch(t.c.foreground, t.dark ? 12 : 8, "transparent"),
     hoverFill: mixOklch(t.c.foreground, 5, "transparent"),

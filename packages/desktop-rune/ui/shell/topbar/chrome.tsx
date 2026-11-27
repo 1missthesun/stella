@@ -7,7 +7,7 @@ import { withStroke, type IconData } from "../../kit";
 /** Colours of `.shell-topbar-full__right` controls: muted at rest, 5% / 9% foreground fills. */
 export function topbarLook(t: Tokens) {
   return derive(t, "topbar:controls", (t) => ({
-    rest: t.c.textMuted,
+    rest: t.c.textBase,
     strong: t.c.textStrong,
     hover: mixOklch(t.c.foreground, 5, "transparent"),
     open: mixOklch(t.c.foreground, 9, "transparent"),

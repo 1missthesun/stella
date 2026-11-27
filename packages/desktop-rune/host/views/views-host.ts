@@ -24,6 +24,7 @@ import {
 import type { engine as BridgeEngine, onEngineEvent as BridgeOn } from "../bridge";
 import { mainContext } from "../services/main-context";
 import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
+import { LLM_ROUTE_FAILURE_MARKERS } from "@stella/contracts/llm-route-failure";
 
 type Engine = typeof BridgeEngine;
 type On = typeof BridgeOn;
@@ -247,6 +248,8 @@ const ASK_SYSTEM = "You answer a request from a small app the user is using insi
 /** IP location is city-level at best. */
 const IP_ACCURACY_M = 25_000;
 const LOCATION_TTL_MS = 5 * 60_000;
+/** Views reopen as Stella starts, before the sign-in gives the model a route: an ask waits this long for one. */
+const ASK_ROUTE_WAIT_MS = 15_000;
 
 type Runner = { runOneShotCompletion(request: { agentType: string; systemPrompt?: string; userText: string; maxOutputTokens?: number; reasoningEffort?: "low" }): Promise<{ text: string }> };
 
@@ -298,17 +301,29 @@ function capabilities(engine: Engine, notice: (viewId: string, kind: ViewNotice[
       if (!allowed("all", ASK.perHour, 3_600_000)) throw new Error(`ask is limited to ${ASK.perHour} calls an hour`);
       const runner = mainContext()?.state.stellaHostRunner as Runner | null | undefined;
       if (!runner) throw new Error("Stella's model isn't ready yet");
-      const reply = await Promise.race([
-        runner.runOneShotCompletion({
-          agentType: "general",
-          systemPrompt: system ? `${ASK_SYSTEM}\n\n${system}` : ASK_SYSTEM,
-          userText: text,
-          maxOutputTokens: ASK.maxOutputTokens,
-          reasoningEffort: "low",
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Stella's model didn't answer within ${ASK.timeoutMs / 1000} s`)), ASK.timeoutMs).unref?.()),
-      ]);
-      return reply.text.trim();
+      const once = () =>
+        Promise.race([
+          runner.runOneShotCompletion({
+            agentType: "general",
+            systemPrompt: system ? `${ASK_SYSTEM}\n\n${system}` : ASK_SYSTEM,
+            userText: text,
+            maxOutputTokens: ASK.maxOutputTokens,
+            reasoningEffort: "low",
+          }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Stella's model didn't answer within ${ASK.timeoutMs / 1000} s`)), ASK.timeoutMs).unref?.()),
+        ]);
+      // Until the sign-in settles there is no route to Stella's model; a view asking as it opens
+      // waits for it (someone signed out still gets the error, after the wait).
+      const until = performance.now() + ASK_ROUTE_WAIT_MS;
+      for (let delay = 250; ; delay = Math.min(delay * 2, 2_000)) {
+        try {
+          return (await once()).text.trim();
+        } catch (error) {
+          const noRoute = error instanceof Error && error.message.includes(LLM_ROUTE_FAILURE_MARKERS["no-stella-route"]);
+          if (!noRoute || performance.now() + delay > until) throw error;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
     },
     share: async ([content], context) => {
       // No desktop here has a share sheet a view can open, so what would be shared is copied.

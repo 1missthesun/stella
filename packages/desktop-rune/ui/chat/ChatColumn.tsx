@@ -28,15 +28,18 @@ import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
 import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
 import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
-import type { LegendContentStyle } from "./ChatTimeline";
+import { UnderGlassContext, type LegendContentStyle } from "./ChatTimeline";
+import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
+import { chromeGlass } from "../shell/glass";
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
 import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
 import type { Layout } from "../../host/rune-jsx/props";
 import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
-import { panelSurface } from "./surfaces";
 
 export type { ChatColumnProps };
+
+const CONTENT_PAD_BOTTOM = 28;
 
 const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   maxWidth: "min(50rem, 100%)",
@@ -44,8 +47,8 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   marginRight: "auto",
   paddingLeft: 24,
   paddingRight: 24,
-  paddingTop: 112,
-  paddingBottom: 28,
+  paddingTop: SHELL_TOPBAR_HEIGHT + 112,
+  paddingBottom: CONTENT_PAD_BOTTOM,
 };
 
 const HOME_LEAVE_MS = 280;
@@ -102,12 +105,11 @@ function useComposerAreaReport(active: ComposerSurface | null) {
   }, [report]);
 }
 
-function ScrollToBottomButton({ onPress }: { onPress: () => void }) {
+function ScrollToBottomButton({ onPress, bottom }: { onPress: () => void; bottom: number }) {
   const t = useT();
   const tokens = useTokens();
-  const surface = panelSurface(tokens);
   return (
-    <box absolute={{ bottom: SCROLL_BUTTON_BOTTOM + COMPOSER_OVERLAP, left: 0, right: 0 }} h={SCROLL_BUTTON_SIZE} center inert={false}>
+    <box absolute={{ bottom: bottom + SCROLL_BUTTON_BOTTOM - COMPOSER_OVERLAP, left: 0, right: 0 }} h={SCROLL_BUTTON_SIZE} center inert={false}>
       <box
         role="button"
         focusable
@@ -116,10 +118,7 @@ function ScrollToBottomButton({ onPress }: { onPress: () => void }) {
         h={SCROLL_BUTTON_SIZE}
         center
         radius={SCROLL_BUTTON_SIZE / 2}
-        gradient={surface.gradient}
-        border={surface.border}
-        hoverBorder={tokens.c.panelSurfaceBorderHover}
-        shadows={[...tokens.shadow.sm, ...surface.shadows]}
+        fx={chromeGlass(tokens).controls}
         pressScale={0.95}
         hoverGroup
         focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
@@ -238,6 +237,8 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
     ],
   );
   const composerArea = useComposerAreaReport(homeObscuresChat ? "home" : "chat");
+  const [composerStackH, setComposerStackH] = useState(0);
+  const contentStyle = useMemo<LegendContentStyle>(() => ({ ...FULL_CHAT_CONTENT_STYLE, paddingBottom: CONTENT_PAD_BOTTOM + composerStackH - COMPOSER_OVERLAP }), [composerStackH]);
   const { isDragOver, dropHandlers } = useFileDrop({ setChatContext: composer.setChatContext });
 
   const replyComposerRef = useRef(composer);
@@ -298,35 +299,41 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
     <row w="full" h="full" grow={1} minW={0} minH={0} align="stretch">
       <row grow={1} minW={0} minH={0} align="stretch" opacity={homeObscuresChat ? 0 : 1} motion={{ dur: 0.22, bounce: 0 }} inert={homeObscuresChat}>
         <col grow={1} minW={0} minH={0} {...dropHandlers}>
-          <SignedOutBanner />
-          <SessionPausedBanner />
-          <box grow={1} minH={0} w="full" clip={0} mb={-COMPOSER_OVERLAP}>
+          <col absolute={{ left: 0, top: SHELL_TOPBAR_HEIGHT, right: 0 }} raise={2}>
+            <SignedOutBanner />
+            <SessionPausedBanner />
+          </col>
+          <box grow={1} minH={0} w="full" clip={0}>
             <box w="full" h="full" hidden={scroll.isOpeningScroll} inert={Boolean(focus)}>
               <MessageReplyContext.Provider value={handleReplyToMessage}>
-                <ConversationEvents
-                  messages={messages}
-                  conversationId={conversationId}
-                  pendingUserMessageId={conversation.streaming.pendingUserMessageId}
-                  indicator={indicatorProps}
-                  hasOlderMessages={conversation.history.hasOlderMessages}
-                  isLoadingOlder={conversation.history.isLoadingOlder}
-                  isLoadingHistory={conversation.history.isInitialLoading}
-                  list={list}
-                  className="session-content"
-                  contentContainerStyle={FULL_CHAT_CONTENT_STYLE}
-                  estimatedItemSize={140}
-                  extraTail={chatTail}
-                  takesMessageJumps
-                  onLoadOlder={conversation.history.loadOlder}
-                />
+                <UnderGlassContext.Provider value>
+                  <ConversationEvents
+                    messages={messages}
+                    conversationId={conversationId}
+                    pendingUserMessageId={conversation.streaming.pendingUserMessageId}
+                    indicator={indicatorProps}
+                    hasOlderMessages={conversation.history.hasOlderMessages}
+                    isLoadingOlder={conversation.history.isLoadingOlder}
+                    isLoadingHistory={conversation.history.isInitialLoading}
+                    list={list}
+                    className="session-content"
+                    contentContainerStyle={contentStyle}
+                    estimatedItemSize={140}
+                    extraTail={chatTail}
+                    takesMessageJumps
+                    onLoadOlder={conversation.history.loadOlder}
+                  />
+                </UnderGlassContext.Provider>
               </MessageReplyContext.Provider>
-              {showScrollButton && !assistantReplyPeek.visible ? <ScrollToBottomButton onPress={() => scrollToBottom("smooth")} /> : null}
+              {showScrollButton && !assistantReplyPeek.visible ? <ScrollToBottomButton bottom={composerStackH} onPress={() => scrollToBottom("smooth")} /> : null}
             </box>
             <ConversationFocusOverlay conversationId={conversationId} />
           </box>
-          <AboveComposerCards conversationId={conversationId} onLayout={composerArea.chatAbove} />
-          <col w="full" onLayout={composerArea.chatComposer} enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
-            {renderComposer("chat", chatReplyPeek)}
+          <col absolute={{ left: 0, right: 0, bottom: 0 }} raise={2} onLayout={(r) => setComposerStackH((h) => (Math.abs(h - r.h) < 0.5 ? h : r.h))}>
+            <AboveComposerCards conversationId={conversationId} onLayout={composerArea.chatAbove} />
+            <col w="full" onLayout={composerArea.chatComposer} enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
+              {renderComposer("chat", chatReplyPeek)}
+            </col>
           </col>
         </col>
         <ChatScrollbar bind={bindThumb} onDrag={handleThumbDrag} />

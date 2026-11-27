@@ -556,7 +556,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
       <col id="content-area" grow={1} minW={0} h="full" onLayout={onShellLayout}>
         <box absolute={{ left: 0, top: 0, right: 0 }} h={SHELL_TOPBAR_HEIGHT} windowDrag />
-        <col id="persistent-chat-surface" absolute={{ left: 0, top: SHELL_TOPBAR_HEIGHT, right: 0, bottom: 0 }} hidden={!isOnChatRoute}>
+        <col id="persistent-chat-surface" absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} hidden={!isOnChatRoute}>
           <ChatColumn
             conversation={chat.conversation}
             composer={chat.composer}

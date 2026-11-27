@@ -1,3 +1,4 @@
+import { chromeGlass } from "../shell/glass";
 import { memo, useCallback, useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
 import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store";
@@ -314,9 +315,9 @@ function ComposerImpl({
         pad={1}
         radius={radius}
         clip={radius}
-        gradient={look.gradient}
-        border={isDragOver ? look.dragBorder : focused ? look.focusBorder : look.border}
-        shadows={isDragOver ? [...look.shadows, ...look.dragRing] : look.shadows}
+        {...(sidebar
+          ? { gradient: look.gradient, border: isDragOver ? look.dragBorder : focused ? look.focusBorder : look.border, shadows: isDragOver ? [...look.shadows, ...look.dragRing] : look.shadows }
+          : { fx: chromeGlass(tokens).composer, border: isDragOver ? look.dragBorder : undefined, shadows: isDragOver ? [...tokens.shadow.md, ...look.dragRing] : tokens.shadow.md })}
         motion={SHELL_SPRING}
         layout={SHELL_SPRING.dur}
         onFocusWithin={setFocused}

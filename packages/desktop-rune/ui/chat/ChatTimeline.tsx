@@ -1,4 +1,4 @@
-import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ChatVariantContext, type ChatVariant } from "./chat-text";
 import type { ChatListBinding } from "./use-chat-scroll-management";
 import { buildChatTimelineItems, type ChatTimelineItem } from "@/features/chat/lib/chat-timeline-items";
@@ -48,6 +48,9 @@ type ChatTimelineProps = {
   /** The sidebar look (`.chat-conversation-surface--sidebar`); unset inherits ChatVariantContext. */
   variant?: ChatVariant;
 };
+
+/** The timeline runs under floating glass chrome at both ends, so it shows there instead of fading out. */
+export const UnderGlassContext = createContext(false);
 
 export const CHAT_DRAW_DISTANCE_COLD_PX = 300;
 export const CHAT_DRAW_DISTANCE_WARM_PX = 1_200;
@@ -251,6 +254,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   }, [dataKey, onReady]);
   useEffect(markReady, [markReady]);
   const padding = contentPadding(contentContainerStyle);
+  const underGlass = useContext(UnderGlassContext);
   const contextVariant = useContext(ChatVariantContext);
   const surfaceVariant = variant ?? contextVariant;
   const maxW = contentMaxWidth(contentContainerStyle);
@@ -307,7 +311,7 @@ export const ChatTimeline = memo(function ChatTimeline({
       scrollY
       stickBottom={list?.follow ?? true}
       selectionGroup
-      scrollFade={{ top: { size: SESSION_TOP_FADE, linear: true }, ...(padding.pb > 0 ? { bottom: { size: padding.pb, stops: SESSION_END_FADE_STOPS } } : {}) }}
+      scrollFade={underGlass ? undefined : { top: { size: SESSION_TOP_FADE, linear: true }, ...(padding.pb > 0 ? { bottom: { size: padding.pb, stops: SESSION_END_FADE_STOPS } } : {}) }}
       onScroll={list?.onScroll}
       onLayout={() => {
         laidOutRef.current = true;

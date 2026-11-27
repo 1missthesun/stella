@@ -279,7 +279,7 @@ async function evaluate(body: string) {
 
 async function shot(file: string) {
   const run = readRun();
-  if (MAC || WIN) {
+  if (MAC || WIN || !run.display) {
     const target = path.resolve(file);
     const window = flag("--window");
     const query = new URLSearchParams({ path: target, ...(window ? { window } : {}) });

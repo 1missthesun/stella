@@ -76,7 +76,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   const store = createStore(app.initialState?.() ?? {});
   const g = globalThis as any;
   // Everything the UI reaches through `stella` is owned by the generation that called it (ui-scope.ts).
-  const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys"];
+  const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys", "peers", "computerForConversation"];
   g.stella = scopeUiFacing({ store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys }, READS);
   if (services) g.stella.host = scopeUiFacing((await import("./services/ui-host")).createUiHost(), READS);
   g.stella.views = scopeUiFacing((await import("./views/views-host")).createViewsHost(engine, onEngineEvent), ["snapshot", "isViewPath", "logs", "syncState", "history", "previewing"]);

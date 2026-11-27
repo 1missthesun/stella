@@ -935,7 +935,7 @@
         "other": "Túl sok kérés. Próbáld újra {count} másodperc múlva."
       },
       "welcomeDescription": "Jelentkezz be az e-mail-címeddel a Stella használatához.",
-      "welcomeSub": "Jelentkezz be Google-fiókkal vagy e-mailben. Jelszó nem kell.",
+      "welcomeSub": "Használd a Stellát a telefonodon is, és minden legyen szinkronban az eszközeid között.",
       "welcomeTitle": "Üdv a Stellában"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "A bejelentkezéssel megkapod Stella modelljeit, a telefonos appot, a Drive-ot, a felhős feladatokat és az eszközök közötti szinkronizálást. A csevegéseid ezen a számítógépen maradnak, amíg nem döntesz.",
-      "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be Stella modelljeihez, a telefonos apphoz, a Drive-hoz, a felhős feladatokhoz és a szinkronizáláshoz.",
+      "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be, hogy a telefonodon is használhasd a Stellát, és minden szinkronban legyen.",
       "choiceBodyBoth": "Amíg itt fiók nélkül használtad a Stellát: {messages} és {notes}. Hozzáadáskor a fiókodba kerülnek. Semmi sem cserélődik le.",
       "choiceBodyChat": "Amíg itt fiók nélkül használtad a Stellát: {messages}. Hozzáadáskor a csevegésed végére kerülnek. Semmi sem cserélődik le.",
       "choiceBodyMemory": "Amíg itt fiók nélkül használtad a Stellát: {notes}. Hozzáadáskor a memóriádba másolódnak. Semmi sem cserélődik le.",

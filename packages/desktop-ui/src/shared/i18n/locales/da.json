@@ -935,7 +935,7 @@
         "other": "For mange anmodninger. Prøv igen om {count} sekunder."
       },
       "welcomeDescription": "Log ind med din e-mail for at komme i gang med Stella.",
-      "welcomeSub": "Brug Google eller din e-mail til at logge ind. Ingen adgangskode nødvendig.",
+      "welcomeSub": "Brug Stella på din telefon, og hold alt synkroniseret på tværs af dine enheder.",
       "welcomeTitle": "Velkommen til Stella"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "Når du logger ind, får du Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering mellem enheder. Dine chats bliver på denne computer, indtil du vælger.",
-      "banner": "Dine chats bliver på denne computer. Log ind for Stellas modeller, mobilappen, Drive, cloudopgaver og synkronisering.",
+      "banner": "Dine chats bliver på denne computer. Log ind for at bruge Stella på din telefon og holde alt synkroniseret.",
       "choiceBodyBoth": "Mens du brugte Stella her uden konto: {messages} og {notes}. Når du tilføjer dem, kommer de ind på din konto. Intet der erstattes.",
       "choiceBodyChat": "Mens du brugte Stella her uden konto: {messages}. Når du tilføjer dem, kommer de sidst i din chat. Intet der erstattes.",
       "choiceBodyMemory": "Mens du brugte Stella her uden konto: {notes}. Når du tilføjer dem, kopieres de til din hukommelse. Intet der erstattes.",

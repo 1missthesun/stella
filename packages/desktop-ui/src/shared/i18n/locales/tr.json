@@ -935,7 +935,7 @@
         "other": "Çok fazla istek. {count} saniye içinde tekrar deneyin."
       },
       "welcomeDescription": "Stella'yı kullanmaya başlamak için e-postanızla giriş yapın.",
-      "welcomeSub": "Giriş yapmak için Google'ı veya e-postanızı kullanın. Parolaya gerek yok.",
+      "welcomeSub": "Stella'yı telefonunda kullan ve her şeyi tüm cihazlarında eşitlenmiş tut.",
       "welcomeTitle": "Stella'ya hoş geldiniz"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "Giriş yapmak Stella'nın modellerini, telefon uygulamasını, Drive'ı, bulut görevlerini ve cihazlar arası eşitlemeyi ekler. Sen karar verene kadar sohbetlerin bu bilgisayarda kalır.",
-      "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'nın modelleri, telefon uygulaması, Drive, bulut görevleri ve eşitleme için giriş yap.",
+      "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'yı telefonunda kullanmak ve her şeyi eşitlenmiş tutmak için giriş yap.",
       "choiceBodyBoth": "Stella'yı burada hesapsız kullanırken: {messages} ve {notes}. Eklersen hesabına geçerler. Oradaki hiçbir şey değiştirilmez.",
       "choiceBodyChat": "Stella'yı burada hesapsız kullanırken: {messages}. Eklersen sohbetinin sonuna eklenirler. Oradaki hiçbir şey değiştirilmez.",
       "choiceBodyMemory": "Stella'yı burada hesapsız kullanırken: {notes}. Eklersen belleğine kopyalanırlar. Oradaki hiçbir şey değiştirilmez.",

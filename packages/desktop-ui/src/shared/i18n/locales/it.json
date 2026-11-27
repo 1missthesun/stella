@@ -944,7 +944,7 @@
         "other": "Troppe richieste. Riprova tra {count} secondi."
       },
       "welcomeDescription": "Accedi con la tua email per iniziare a usare Stella.",
-      "welcomeSub": "Usa Google o la tua email per accedere. Nessuna password necessaria.",
+      "welcomeSub": "Usa Stella sul telefono e tieni tutto sincronizzato su tutti i tuoi dispositivi.",
       "welcomeTitle": "Ti diamo il benvenuto in Stella"
     },
     "integrations": {
@@ -986,8 +986,7 @@
       }
     },
     "localMode": {
-      "authNote": "Accedendo ottieni i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione tra dispositivi. Le tue chat restano su questo computer finché non scegli.",
-      "banner": "Le tue chat restano su questo computer. Accedi per i modelli di Stella, l'app per telefono, Drive, le attività nel cloud e la sincronizzazione.",
+      "banner": "Le tue chat restano su questo computer. Accedi per usare Stella sul telefono e tenere tutto sincronizzato.",
       "choiceBodyBoth": "Mentre usavi Stella qui senza account: {messages} e {notes}. Aggiungendoli finiscono nel tuo account. Non viene sostituito nulla.",
       "choiceBodyChat": "Mentre usavi Stella qui senza account: {messages}. Aggiungendoli finiscono in fondo alla tua chat. Non viene sostituito nulla.",
       "choiceBodyMemory": "Mentre usavi Stella qui senza account: {notes}. Aggiungendole vengono copiate nella tua memoria. Non viene sostituito nulla.",

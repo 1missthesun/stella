@@ -935,7 +935,7 @@
         "other": "Liikaa pyyntöjä. Yritä uudelleen {count} sekunnin kuluttua."
       },
       "welcomeDescription": "Kirjaudu sisään sähköpostillasi aloittaaksesi Stellan käytön.",
-      "welcomeSub": "Kirjaudu sisään Googlella tai sähköpostillasi. Salasanaa ei tarvita.",
+      "welcomeSub": "Käytä Stellaa puhelimellasi ja pidä kaikki ajan tasalla kaikilla laitteillasi.",
       "welcomeTitle": "Tervetuloa Stellaan"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "Kirjautuminen tuo Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin laitteiden välillä. Keskustelusi pysyvät tällä tietokoneella, kunnes päätät toisin.",
-      "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään saadaksesi Stellan mallit, puhelinsovelluksen, Driven, pilvitehtävät ja synkronoinnin.",
+      "banner": "Keskustelusi pysyvät tällä tietokoneella. Kirjaudu sisään, niin voit käyttää Stellaa puhelimellasi ja kaikki pysyy ajan tasalla.",
       "choiceBodyBoth": "Kun käytit Stellaa täällä ilman tiliä: {messages} ja {notes}. Lisääminen siirtää ne tilillesi. Mitään ei korvata.",
       "choiceBodyChat": "Kun käytit Stellaa täällä ilman tiliä: {messages}. Lisääminen siirtää ne keskustelusi loppuun. Mitään ei korvata.",
       "choiceBodyMemory": "Kun käytit Stellaa täällä ilman tiliä: {notes}. Lisääminen kopioi ne muistiisi. Mitään ei korvata.",

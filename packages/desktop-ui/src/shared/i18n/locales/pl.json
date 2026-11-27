@@ -953,7 +953,7 @@
         "other": "Za dużo żądań. Spróbuj ponownie za {count} sekundy."
       },
       "welcomeDescription": "Zaloguj się e-mailem, aby zacząć korzystać ze Stelli.",
-      "welcomeSub": "Zaloguj się przez Google lub e-mailem. Hasło niepotrzebne.",
+      "welcomeSub": "Korzystaj ze Stelli na telefonie i miej wszystko zsynchronizowane na swoich urządzeniach.",
       "welcomeTitle": "Witamy w Stelli"
     },
     "integrations": {
@@ -995,8 +995,7 @@
       }
     },
     "localMode": {
-      "authNote": "Logowanie daje modele Stelli, aplikację na telefon, Drive, zadania w chmurze i synchronizację między urządzeniami. Twoje czaty zostają na tym komputerze, dopóki nie zdecydujesz.",
-      "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać z modeli Stelli, aplikacji na telefon, Drive, zadań w chmurze i synchronizacji.",
+      "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać ze Stelli na telefonie i mieć wszystko zsynchronizowane.",
       "choiceBodyBoth": "Gdy korzystałeś tu ze Stelli bez konta: {messages} i {notes}. Dodanie przeniesie je na Twoje konto. Nic nie zostanie zastąpione.",
       "choiceBodyChat": "Gdy korzystałeś tu ze Stelli bez konta: {messages}. Dodanie umieści je na końcu Twojego czatu. Nic nie zostanie zastąpione.",
       "choiceBodyMemory": "Gdy korzystałeś tu ze Stelli bez konta: {notes}. Dodanie skopiuje je do Twojej pamięci. Nic nie zostanie zastąpione.",

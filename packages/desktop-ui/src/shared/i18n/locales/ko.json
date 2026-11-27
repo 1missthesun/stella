@@ -926,7 +926,7 @@
         "other": "요청이 너무 많습니다. {count}초 후에 다시 시도하세요."
       },
       "welcomeDescription": "이메일로 로그인해 Stella를 사용해 보세요.",
-      "welcomeSub": "Google이나 이메일로 로그인하세요. 비밀번호는 필요 없습니다.",
+      "welcomeSub": "휴대폰에서도 Stella를 쓰고 모든 기기에서 동기화하세요.",
       "welcomeTitle": "Stella에 오신 것을 환영합니다"
     },
     "integrations": {
@@ -968,8 +968,7 @@
       }
     },
     "localMode": {
-      "authNote": "로그인하면 Stella 모델, 휴대폰 앱, Drive, 클라우드 작업, 기기 간 동기화를 쓸 수 있어요. 직접 선택하기 전까지 채팅은 이 컴퓨터에 남아 있어요.",
-      "banner": "채팅은 이 컴퓨터에 남아 있어요. 로그인하면 Stella 모델, 휴대폰 앱, Drive, 클라우드 작업, 동기화를 쓸 수 있어요.",
+      "banner": "채팅은 이 컴퓨터에 남아 있어요. 로그인하면 휴대폰에서도 Stella를 쓰고 모든 것을 동기화할 수 있어요.",
       "choiceBodyBoth": "계정 없이 여기서 Stella를 사용하는 동안: {messages}, {notes}. 추가하면 계정으로 들어가요. 계정의 내용은 바뀌지 않아요.",
       "choiceBodyChat": "계정 없이 여기서 Stella를 사용하는 동안: {messages}. 추가하면 채팅 끝에 들어가요. 계정의 내용은 바뀌지 않아요.",
       "choiceBodyMemory": "계정 없이 여기서 Stella를 사용하는 동안: {notes}. 추가하면 메모리에 복사돼요. 계정의 내용은 바뀌지 않아요.",

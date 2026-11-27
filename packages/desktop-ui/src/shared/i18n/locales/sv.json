@@ -935,7 +935,7 @@
         "other": "För många förfrågningar. Försök igen om {count} sekunder."
       },
       "welcomeDescription": "Logga in med din e-post för att börja använda Stella.",
-      "welcomeSub": "Använd Google eller din e-post för att logga in. Inget lösenord behövs.",
+      "welcomeSub": "Använd Stella på mobilen och håll allt synkat mellan dina enheter.",
       "welcomeTitle": "Välkommen till Stella"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "Inloggning ger dig Stellas modeller, mobilappen, Drive, molnuppgifter och synkning mellan enheter. Dina chattar stannar på den här datorn tills du väljer.",
-      "banner": "Dina chattar stannar på den här datorn. Logga in för Stellas modeller, mobilappen, Drive, molnuppgifter och synkning.",
+      "banner": "Dina chattar stannar på den här datorn. Logga in för att använda Stella på mobilen och hålla allt synkat.",
       "choiceBodyBoth": "Medan du använde Stella här utan konto: {messages} och {notes}. Om du lägger till dem hamnar de i ditt konto. Inget där ersätts.",
       "choiceBodyChat": "Medan du använde Stella här utan konto: {messages}. Om du lägger till dem hamnar de i slutet av din chatt. Inget där ersätts.",
       "choiceBodyMemory": "Medan du använde Stella här utan konto: {notes}. Om du lägger till dem kopieras de till ditt minne. Inget där ersätts.",

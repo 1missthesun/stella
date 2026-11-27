@@ -944,7 +944,7 @@
         "other": "Demasiadas peticiones. Inténtalo de nuevo dentro de {count} segundos."
       },
       "welcomeDescription": "Inicia sesión con tu correo para empezar a usar Stella.",
-      "welcomeSub": "Usa Google o tu correo para iniciar sesión. No hace falta contraseña.",
+      "welcomeSub": "Usa Stella en tu móvil y mantén todo sincronizado en todos tus dispositivos.",
       "welcomeTitle": "Te damos la bienvenida a Stella"
     },
     "integrations": {
@@ -986,8 +986,7 @@
       }
     },
     "localMode": {
-      "authNote": "Al iniciar sesión obtienes los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización entre dispositivos. Tus chats se quedan en este ordenador hasta que decidas.",
-      "banner": "Tus chats se quedan en este ordenador. Inicia sesión para usar los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización.",
+      "banner": "Tus chats se quedan en este ordenador. Inicia sesión para usar Stella en tu móvil y mantener todo sincronizado.",
       "choiceBodyBoth": "Mientras usabas Stella aquí sin cuenta: {messages} y {notes}. Al añadirlos pasan a tu cuenta. No se reemplaza nada.",
       "choiceBodyChat": "Mientras usabas Stella aquí sin cuenta: {messages}. Al añadirlos se colocan al final de tu chat. No se reemplaza nada.",
       "choiceBodyMemory": "Mientras usabas Stella aquí sin cuenta: {notes}. Al añadirlas se copian a tu memoria. No se reemplaza nada.",

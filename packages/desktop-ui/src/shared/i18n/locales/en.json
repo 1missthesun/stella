@@ -935,7 +935,7 @@
         "other": "Too many requests. Try again in {count} seconds."
       },
       "welcomeDescription": "Sign in with your email to start using Stella.",
-      "welcomeSub": "Use Google or your email to sign in. No password needed.",
+      "welcomeSub": "Use Stella on your phone and keep everything in sync across your devices.",
       "welcomeTitle": "Welcome to Stella"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "Signing in adds Stella's models, the phone app, Drive, cloud tasks and sync across devices. Your chats stay on this computer until you choose.",
-      "banner": "Your chats stay on this computer. Sign in for Stella's models, the phone app, Drive, cloud tasks and sync.",
+      "banner": "Your chats stay on this computer. Sign in to use Stella on your phone and keep everything in sync.",
       "choiceBodyBoth": "While you used Stella here without an account: {messages} and {notes}. Adding puts them into your account. Nothing there is replaced.",
       "choiceBodyChat": "While you used Stella here without an account: {messages}. Adding puts them at the end of your chat. Nothing there is replaced.",
       "choiceBodyMemory": "While you used Stella here without an account: {notes}. Adding copies them into your Memory. Nothing there is replaced.",

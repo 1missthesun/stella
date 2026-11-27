@@ -926,7 +926,7 @@
         "other": "Terlalu banyak permintaan. Coba lagi dalam {count} detik."
       },
       "welcomeDescription": "Masuk dengan email Anda untuk mulai memakai Stella.",
-      "welcomeSub": "Gunakan Google atau email Anda untuk masuk. Tidak perlu kata sandi.",
+      "welcomeSub": "Gunakan Stella di ponselmu dan jaga semuanya tetap sinkron di semua perangkatmu.",
       "welcomeTitle": "Selamat datang di Stella"
     },
     "integrations": {
@@ -968,8 +968,7 @@
       }
     },
     "localMode": {
-      "authNote": "Dengan masuk, kamu mendapat model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi antarperangkat. Obrolanmu tetap di komputer ini sampai kamu memilih.",
-      "banner": "Obrolanmu tetap di komputer ini. Masuk untuk model Stella, aplikasi ponsel, Drive, tugas cloud, dan sinkronisasi.",
+      "banner": "Obrolanmu tetap di komputer ini. Masuk untuk memakai Stella di ponselmu dan menjaga semuanya tetap sinkron.",
       "choiceBodyBoth": "Selama kamu memakai Stella di sini tanpa akun: {messages} dan {notes}. Menambahkannya akan memindahkannya ke akunmu. Tidak ada yang diganti.",
       "choiceBodyChat": "Selama kamu memakai Stella di sini tanpa akun: {messages}. Menambahkannya akan menaruhnya di akhir obrolanmu. Tidak ada yang diganti.",
       "choiceBodyMemory": "Selama kamu memakai Stella di sini tanpa akun: {notes}. Menambahkannya akan menyalinnya ke memorimu. Tidak ada yang diganti.",

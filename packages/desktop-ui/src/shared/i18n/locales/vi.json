@@ -926,7 +926,7 @@
         "other": "Quá nhiều yêu cầu. Hãy thử lại sau {count} giây."
       },
       "welcomeDescription": "Đăng nhập bằng email của bạn để bắt đầu dùng Stella.",
-      "welcomeSub": "Dùng Google hoặc email của bạn để đăng nhập. Không cần mật khẩu.",
+      "welcomeSub": "Dùng Stella trên điện thoại và giữ mọi thứ đồng bộ trên các thiết bị của bạn.",
       "welcomeTitle": "Chào mừng đến với Stella"
     },
     "integrations": {
@@ -968,8 +968,7 @@
       }
     },
     "localMode": {
-      "authNote": "Đăng nhập sẽ thêm các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ giữa các thiết bị. Các cuộc trò chuyện của bạn ở lại trên máy tính này cho đến khi bạn quyết định.",
-      "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ.",
+      "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng Stella trên điện thoại và giữ mọi thứ đồng bộ.",
       "choiceBodyBoth": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {messages} và {notes}. Thêm vào sẽ đưa chúng vào tài khoản của bạn. Không có gì bị thay thế.",
       "choiceBodyChat": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {messages}. Thêm vào sẽ đặt chúng ở cuối cuộc trò chuyện của bạn. Không có gì bị thay thế.",
       "choiceBodyMemory": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {notes}. Thêm vào sẽ sao chép chúng vào bộ nhớ của bạn. Không có gì bị thay thế.",

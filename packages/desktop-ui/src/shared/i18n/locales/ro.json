@@ -944,7 +944,7 @@
         "other": "Prea multe cereri. Încearcă din nou în {count} de secunde."
       },
       "welcomeDescription": "Conectează-te cu adresa ta de e-mail pentru a începe să folosești Stella.",
-      "welcomeSub": "Folosește Google sau e-mailul tău pentru conectare. Nu e nevoie de parolă.",
+      "welcomeSub": "Folosește Stella pe telefon și păstrează totul sincronizat pe dispozitivele tale.",
       "welcomeTitle": "Bun venit la Stella"
     },
     "integrations": {
@@ -986,8 +986,7 @@
       }
     },
     "localMode": {
-      "authNote": "Conectarea îți aduce modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare între dispozitive. Conversațiile tale rămân pe acest computer până alegi tu.",
-      "banner": "Conversațiile tale rămân pe acest computer. Conectează-te pentru modelele Stella, aplicația de telefon, Drive, sarcini în cloud și sincronizare.",
+      "banner": "Conversațiile tale rămân pe acest computer. Conectează-te ca să folosești Stella pe telefon și să păstrezi totul sincronizat.",
       "choiceBodyBoth": "Cât ai folosit Stella aici fără cont: {messages} și {notes}. Dacă le adaugi, ajung în contul tău. Nu se înlocuiește nimic.",
       "choiceBodyChat": "Cât ai folosit Stella aici fără cont: {messages}. Dacă le adaugi, ajung la finalul conversației tale. Nu se înlocuiește nimic.",
       "choiceBodyMemory": "Cât ai folosit Stella aici fără cont: {notes}. Dacă le adaugi, sunt copiate în memoria ta. Nu se înlocuiește nimic.",

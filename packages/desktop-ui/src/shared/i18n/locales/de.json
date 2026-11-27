@@ -935,7 +935,7 @@
         "other": "Zu viele Anfragen. Versuch es in {count} Sekunden erneut."
       },
       "welcomeDescription": "Melde dich mit deiner E-Mail an, um Stella zu nutzen.",
-      "welcomeSub": "Melde dich mit Google oder deiner E-Mail an. Kein Passwort nötig.",
+      "welcomeSub": "Nutze Stella auf deinem Handy und halte alles auf deinen Geräten synchron.",
       "welcomeTitle": "Willkommen bei Stella"
     },
     "integrations": {
@@ -977,8 +977,7 @@
       }
     },
     "localMode": {
-      "authNote": "Mit der Anmeldung bekommst du Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung zwischen Geräten. Deine Chats bleiben auf diesem Computer, bis du dich entscheidest.",
-      "banner": "Deine Chats bleiben auf diesem Computer. Melde dich an für Stellas Modelle, die Handy-App, Drive, Cloud-Aufgaben und Synchronisierung.",
+      "banner": "Deine Chats bleiben auf diesem Computer. Melde dich an, um Stella auf deinem Handy zu nutzen und alles synchron zu halten.",
       "choiceBodyBoth": "Während du Stella hier ohne Konto genutzt hast: {messages} und {notes}. Beim Hinzufügen kommen sie in dein Konto. Dort wird nichts ersetzt.",
       "choiceBodyChat": "Während du Stella hier ohne Konto genutzt hast: {messages}. Beim Hinzufügen kommen sie ans Ende deines Chats. Dort wird nichts ersetzt.",
       "choiceBodyMemory": "Während du Stella hier ohne Konto genutzt hast: {notes}. Beim Hinzufügen werden sie in deine Erinnerungen kopiert. Dort wird nichts ersetzt.",

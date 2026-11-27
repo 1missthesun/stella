@@ -926,7 +926,7 @@
         "other": "請求太過頻繁。請在 {count} 秒後再試。"
       },
       "welcomeDescription": "用你的電子郵件登入即可開始使用 Stella。",
-      "welcomeSub": "使用 Google 或你的電子郵件登入。不需要密碼。",
+      "welcomeSub": "在手機上也能使用 Stella，所有裝置保持同步。",
       "welcomeTitle": "歡迎使用 Stella"
     },
     "integrations": {
@@ -968,8 +968,7 @@
       }
     },
     "localMode": {
-      "authNote": "登入後可使用 Stella 的模型、手機 App、Drive、雲端任務和跨裝置同步。在你做出選擇之前，聊天會保留在這台電腦上。",
-      "banner": "你的聊天保留在這台電腦上。登入即可使用 Stella 的模型、手機 App、Drive、雲端任務和同步。",
+      "banner": "你的聊天保留在這台電腦上。登入後即可在手機上使用 Stella，並讓一切保持同步。",
       "choiceBodyBoth": "你在這裡未登入使用 Stella 時：{messages}和{notes}。加入後會放進你的帳號，不會取代任何內容。",
       "choiceBodyChat": "你在這裡未登入使用 Stella 時：{messages}。加入後會放在你的聊天末尾，不會取代任何內容。",
       "choiceBodyMemory": "你在這裡未登入使用 Stella 時：{notes}。加入後會複製到你的記憶中，不會取代任何內容。",

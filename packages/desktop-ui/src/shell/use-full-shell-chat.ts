@@ -24,11 +24,6 @@ import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
 import { useCapturedChatContext } from "./use-captured-chat-context";
 import { useTurnHandoff } from "./use-turn-handoff";
 import { useChatScrollManagement } from "./use-chat-scroll-management";
-import {
-  useChatHomeSurface,
-  type ConversationContent,
-} from "./use-chat-home-surface";
-import { useConversationUserAsks } from "@/features/user-ask/user-ask-store";
 import { useAgentInputRouting } from "./use-agent-input-routing";
 import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
 import { useChatStore } from "@/context/chat-store-context";
@@ -533,31 +528,6 @@ export function useFullShellChat({
     persistedMessages,
     optimisticEvents,
   });
-  const hasMessages = displayMessages.length > 0;
-  const conversationAsks = useConversationUserAsks(activeConversationId);
-  const hasOpenQuestion = conversationAsks.length > 0;
-  const journalCaughtUp =
-    journalState.recordsSource === "canonical" &&
-    (journalState.records.at(-1)?.seq ?? -1) >= journalState.headSeq;
-  const messagesKnown = isPrivateChat
-    ? !localMessageFeed.isInitialLoading
-    : cloudChatShown && journalCaughtUp;
-  const conversationContent: ConversationContent =
-    persistedMessages.length > 0
-      ? "has-messages"
-      : activeConversationId !== null && messagesKnown && !hasOlderMessages
-        ? "empty"
-        : "unknown";
-  const {
-    showHomeContent,
-    enterChatSurfaceForInteraction,
-    leaveChatSurfaceAfterFailedSend,
-  } = useChatHomeSurface({
-    conversationId: activeConversationId,
-    content: conversationContent,
-    hasVisibleMessages: hasMessages,
-    hasOpenQuestion,
-  });
   useEffect(() => {
     if (!isOnChatRoute) return;
     setComposerFocusRequestId((id) => id + 1);
@@ -569,7 +539,6 @@ export function useFullShellChat({
   } = useAgentInputRouting({
     activeConversationId,
     sendMessage,
-    enterChatSurfaceForInteraction,
   });
   useStellaSendMessageBridge({
     sendContextlessMessage,
@@ -608,13 +577,12 @@ export function useFullShellChat({
     isPlacingInitialScroll;
   const handleSend = useCallback(async () => {
     const shouldFollowSend =
-      showHomeContent || getIsEffectivelyAtBottom() || getShouldFollowSend();
+      getIsEffectivelyAtBottom() || getShouldFollowSend();
     const submittedConversationId = activeConversationId;
     const submittedMessage = composerMessageStore.getSnapshot();
     const submittedSelectedText = selectedText;
     const submittedChatContext = chatContext;
-    const submittedFromHome = showHomeContent;
-    const accepted = await sendMessage({
+    await sendMessage({
       text: submittedMessage,
       selectedText: submittedSelectedText,
       chatContext: submittedChatContext,
@@ -637,7 +605,6 @@ export function useFullShellChat({
       },
       onOptimisticStart: () => {
         if (activeConversationIdRef.current !== submittedConversationId) return;
-        enterChatSurfaceForInteraction();
         if (shouldFollowSend) {
           followAfterSend();
         } else if (!isStreaming) {
@@ -664,22 +631,11 @@ export function useFullShellChat({
         setMessage((current) => current || submittedMessage);
         setSelectedText((current) => current ?? submittedSelectedText);
         setChatContext((current) => current ?? submittedChatContext);
-        leaveChatSurfaceAfterFailedSend();
       },
     });
-    if (
-      !accepted ||
-      activeConversationIdRef.current !== submittedConversationId
-    ) {
-      return;
-    }
-    if (submittedFromHome) {
-      setComposerFocusRequestId((id) => id + 1);
-    }
   }, [
     activeConversationId,
     chatContext,
-    enterChatSurfaceForInteraction,
     getIsFollowing,
     getShouldFollowSend,
     getIsEffectivelyAtBottom,
@@ -687,13 +643,11 @@ export function useFullShellChat({
     composerMessageStore,
     followAfterSend,
     releaseFollow,
-    leaveChatSurfaceAfterFailedSend,
     selectedText,
     sendMessage,
     setChatContext,
     setMessage,
     setSelectedText,
-    showHomeContent,
   ]);
   const hasUnsentAttachments = useHasUnsentBrowserAttachments();
   const { canSubmit } = deriveComposerState({
@@ -896,14 +850,8 @@ export function useFullShellChat({
       conversation,
       composer,
       scroll: chatColumnScroll,
-      showHomeContent,
     }),
-    [
-      conversation,
-      composer,
-      chatColumnScroll,
-      showHomeContent,
-    ],
+    [conversation, composer, chatColumnScroll],
   );
   return { runtime, messages: displayMessages };
 }

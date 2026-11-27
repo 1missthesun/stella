@@ -72,11 +72,16 @@ const IDLE_CLOSE_MS = 30_000;
 const IDLE_CHECK_MS = 5_000;
 /** How long a page of a draft that doesn't exist waits before asking again. */
 const MISSING_POLL_MS = 10_000;
+/** How long a build that hit a missing file waits before deciding whether the draft is being removed. */
+const GONE_SETTLE_MS = 500;
 
 let opened = 0;
 
 type Frame = { seq: number; png: Uint8Array<ArrayBuffer> | null; hash: bigint | number; width: number; height: number; elements: PageElement[] };
 export type PageElement = { key: string; role: string; label: string | null; text: string | null; rect: [number, number, number, number]; focused: boolean; focusable: boolean };
+
+/** A build that failed opening a file or folder (Bun's resolver reports ENOENT in the message). */
+const missingFile = (error: unknown) => (error as { code?: unknown } | null)?.code === "ENOENT" || /\bENOENT\b/.test(String((error as Error | null)?.message ?? error));
 
 const errorText = (error: unknown) => (error instanceof Error ? error.stack ?? error.message : String(error)).slice(0, 4000);
 
@@ -300,9 +305,11 @@ class Preview {
     this.rebuildTimer = setTimeout(() => { this.rebuildTimer = null; void this.build(); }, 60);
   }
 
-  /** Finished or removed: its pages say so, and it closes. */
+  /** Finished or removed: its pages say so, and it closes. Removing a worktree deletes it file by
+   *  file, so its git link or its `ui/` going first counts too. */
   private closeIfGone() {
-    if (existsSync(this.worktree)) return false;
+    const present = (rel: string) => existsSync(path.join(this.worktree, rel));
+    if (present(".git") && present("packages/desktop-rune/ui")) return false;
     this.error = `The draft "${this.name}" is no longer in progress (it was finished or removed).`;
     console.error(`[preview] ${this.name}: the draft is gone`);
     this.close();
@@ -329,8 +336,14 @@ class Preview {
       const { kind, swap } = this.loader.lastLoad();
       console.error(`[preview] ${this.name}: built and rendered in ${(now() - t0).toFixed(0)} ms (${kind}${swap && kind !== "fresh" ? `, ${swap.evaluated} modules` : ""})`);
     } catch (error) {
-      // The draft went away mid-build (finished while an edit's rebuild ran).
+      // The draft went away mid-build (finished while an edit's rebuild ran). A file missing while
+      // the worktree is still there is usually its removal under way: look again once it has had
+      // time to finish, so the tab closes instead of showing the half-deleted draft's error.
       if (this.closeIfGone()) return;
+      if (missingFile(error)) {
+        await new Promise((resolve) => setTimeout(resolve, GONE_SETTLE_MS));
+        if (this.disposed || this.closeIfGone()) return;
+      }
       this.fail(error);
     }
     this.active();

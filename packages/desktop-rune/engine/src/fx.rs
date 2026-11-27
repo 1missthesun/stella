@@ -323,9 +323,26 @@ fn slot(id: u32, index: usize, role: f32, inset: f32, p: &Props) -> El {
     e
 }
 
+/// A `morphFrom` element's border and shadows, drawn by a child that fades in with its content
+/// once the glass has grown, and goes at once when it's removed (see `view::build_node`).
+fn morph_chrome(id: u32, p: &Props) -> El {
+    let chrome = Props { border: p.border, border_width: p.border_width, border_sides: p.border_sides, border_dash: p.border_dash, radius: p.radius, corners: p.corners, shadow: p.shadow, shadows: p.shadows.clone(), ..Props::default() };
+    crate::style::paint(rune::el(), &chrome).pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0)).key(format!("fx{id}.chrome"))
+}
+
+/// Without its border and shadows, which a `morphFrom` element's chrome child draws.
+pub fn without_chrome(p: &Props) -> Props {
+    Props { border: None, border_sides: None, border_dash: None, shadow: None, shadows: None, ..p.clone() }
+}
+
 /// The slots painted under the element's children: its occluder mark (`lit`) and its `fx` layers
 /// placed under (the default).
 pub fn under(mut e: El, id: u32, p: &Props) -> El {
+    if let Some(spring) = morph_spring(p)
+        && (p.border.is_some() || p.shadow.is_some() || p.shadows.is_some())
+    {
+        e = e.child(crate::view::reveal(morph_chrome(id, p), spring));
+    }
     if p.lit.is_some() {
         e = e.child(slot(id, 0, OCCLUDER, 0.0, p));
     }
@@ -435,6 +452,13 @@ impl Comp {
 thread_local! {
     /// Closing `morphFrom` elements whose glass is back in its source: removed at the next poll.
     static CLOSED: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// Each `morphFrom` element's size as last shown whole, which it keeps while it closes.
+    static WHOLE: std::cell::RefCell<HashMap<u32, [f32; 2]>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// The size `node` (a `morphFrom` element) was last shown at, while open.
+pub fn whole_size(node: u32) -> Option<[f32; 2]> {
+    WHOLE.with(|w| w.borrow().get(&node).copied())
 }
 
 /// How long a removed `morphFrom` element may stay to morph back before it goes regardless.
@@ -595,6 +619,7 @@ impl Compositor<Win> for Comp {
                                         (true, _) => morphs.get_mut(&node),
                                         (false, Some(key)) if !closing => source_shape(f.rt, eng, &key).map(|(from, from_lens)| {
                                             let start = if reduced { 1.0 } else { 0.0 };
+                                            WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
                                             morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, x0: start, v0: 0.0, target: 1.0, t0: now, seen: false })
                                         }),
                                         _ => None,
@@ -610,8 +635,9 @@ impl Compositor<Win> for Comp {
                                             if closing {
                                                 m.go(0.0, now);
                                                 shape = m.to;
-                                            } else {
+                                            } else if m.to != shape {
                                                 m.to = shape;
+                                                WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
                                             }
                                             let settled = reduced || m.settled(now);
                                             if settled && m.target == 0.0 {
@@ -684,6 +710,7 @@ impl Compositor<Win> for Comp {
             }
         });
         morphs.retain(|_, m| std::mem::take(&mut m.seen));
+        WHOLE.with(|w| w.borrow_mut().retain(|n, _| morphs.contains_key(n)));
         if !closed.is_empty() {
             CLOSED.with(|c| c.borrow_mut().extend(closed));
             moving = true;

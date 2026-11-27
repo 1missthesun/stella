@@ -186,6 +186,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   );
   imageBudget.bind(harness);
   handoff.bind(harness, settings);
+  agents.bind(harness);
   return {
     harness,
     registry,

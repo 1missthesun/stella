@@ -4,6 +4,7 @@ import { chatAtEnd } from "../../desktop-rune/ui/chat/chat-at-end";
 import { ToastPlacementContext } from "../../desktop-rune/ui/kit/Toast";
 import { usePhoneInsets } from "./phone/insets";
 import { barBase, barSpace, PHONE_TOPBAR_H } from "./phone/PhoneChrome";
+import { ConnectComputerLayer } from "./computer/ConnectComputer";
 
 /**
  * The phone's window: the shared Stella app (desktop-rune's FullWindow, with the phone's
@@ -35,6 +36,7 @@ export function PhoneRoot() {
       <col id="phone-safe-area" w="full" h="full" pt={insets.top} pb={rides.current ? base : barSpace(insets)} pl={insets.left} pr={insets.right} y={rides.current ? -lift : 0}>
         <ToastPlacementContext.Provider value={toastPlace}>{app}</ToastPlacementContext.Provider>
       </col>
+      <ConnectComputerLayer />
     </window>
   );
 }

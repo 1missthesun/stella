@@ -38,6 +38,18 @@ export const promises = {
   rm: async () => undefined,
   unlink: async () => undefined,
   stat: async (p: string) => statSync(p),
+  /** A read-only handle over the whole file (an attachment the device link sends in chunks). */
+  open: async (p: string) => {
+    const b = readFileSync(p) as Uint8Array;
+    return {
+      read: async (buf: Uint8Array, off: number, len: number, pos: number) => {
+        const part = b.subarray(pos, Math.min(b.length, pos + len));
+        buf.set(part, off);
+        return { bytesRead: part.length, buffer: buf };
+      },
+      close: async () => undefined,
+    };
+  },
 };
-export const { mkdtemp, readdir, readFile, rm, writeFile, stat, mkdir, unlink } = promises;
+export const { mkdtemp, readdir, readFile, rm, writeFile, stat, mkdir, unlink, open } = promises;
 export default { writeSync, existsSync, mkdirSync, rmSync, unlinkSync, readFileSync, writeFileSync, statSync, readdirSync, watch, promises };

@@ -1,7 +1,8 @@
 // The phone's signed-out screen, in place of the desktop's centred sign-in card: the phone app's
 // login layout (packages/mobile app/(auth)/login.tsx). A headline fills the top, and the ways in sit
 // at the bottom within thumb reach, riding up with the keyboard. Nothing is focused on open, so the
-// keyboard stays down until the email field is tapped.
+// keyboard stays down until the email field is tapped. Without an account, the phone can use a
+// computer's Stella instead (ui/computer).
 import { lazy, Suspense, useCallback, useState } from "react";
 import { useT } from "@/shared/i18n";
 import type { LegalDocument } from "@/global/legal/legal-text";
@@ -10,6 +11,7 @@ import { MagicLinkAuthFlow } from "../../../../../../../desktop-rune/ui/global/a
 import { nativeSignIn, type NativeSignInResult } from "../../../../../../../desktop-rune/ui/global/auth/native-sign-in";
 import { alpha, font, look, sheet, useTokens } from "../../../../../../../desktop-rune/ui/theme";
 import { usePhoneInsets } from "../../../../../../ui/phone/insets";
+import { UseComputerEntry } from "../../../../../../ui/computer/ConnectComputer";
 
 const LegalDialog = lazy(() => import("../../../../../../../desktop-rune/ui/global/legal/LegalDialog").then((m) => ({ default: m.LegalDialog })));
 
@@ -125,6 +127,7 @@ export function SignInScreen() {
           sentMessage={t("mobile.login.checkInbox")}
           styles={{ form: s.form, input: s.input, inputWrapper: s.inputWrapper, button: s.button, extras: s.extras, extrasOpen: s.extrasOpen, extrasInner: s.extrasInner, sent: s.sent, openInbox: s.openInbox, error: s.error }}
         />
+        <UseComputerEntry />
         <T w="full" size={12} lh={17 / 12} textAlign="center" color={muted} mt={4}>
           {t("mobile.login.legalPrefix")}
           <T underline color={tokens.c.foreground} onPress={() => setLegal("terms")}>{t("mobile.login.legalTerms")}</T>

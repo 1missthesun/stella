@@ -49,7 +49,7 @@ const SHIMS: Record<string, string> = {
   "fs/promises": path.join(JS, "shims", "node-fs.ts"),
   crypto: path.join(JS, "shims", "node-crypto.ts"),
   child_process: path.join(WEB_SHIMS, "node-misc.ts"),
-  os: path.join(WEB_SHIMS, "node-misc.ts"),
+  os: path.join(JS, "shims", "node-os.ts"),
   url: path.join(WEB_SHIMS, "node-misc.ts"),
   path: path.join(WEB_SHIMS, "node-path.ts"),
   events: path.join(JS, "shims", "node-events.ts"),
@@ -100,6 +100,60 @@ const namespaceFix: BunPlugin = {
       });
       const ext = a.path.match(/\.(m?js|jsx|tsx?)$/)![1];
       return { contents, loader: (ext === "mjs" ? "js" : ext) as "js" | "jsx" | "ts" | "tsx" };
+    });
+  },
+};
+// The chat layer's private-chat path (chat storage "local") reaches the desktop's chats through
+// `window.electronAPI`. On the phone those files read `globalThis.__stellaComputerChats` instead:
+// a computer's chats over the direct device link while the phone uses that computer
+// (ui/computer/computer-mode.ts), otherwise nothing. The rest of the app never sees a desktop
+// API, so it stays the phone's. The cloud chat bridge stands aside for that path meanwhile, as it
+// does on a computer, so the composer sends through it.
+const toComputerChats = (text: string) => text.replace(/\bwindow\.electronAPI\b/g, "globalThis.__stellaComputerChats");
+const COMPUTER_CHAT_FILES = new Map<string, (text: string) => string>([
+  ...[
+    "context/chat-store.tsx",
+    "features/chat/pi/pi-chat-store.ts",
+    "features/chat/services/chat-storage-preference.ts",
+    "features/chat/services/lineage-messages-store.ts",
+    "features/chat/services/local-activity-store.ts",
+    "features/chat/services/local-chat-store.ts",
+    "features/chat/services/local-files-store.ts",
+    "features/chat/services/local-message-timeline-store.ts",
+    "features/chat/services/thread-activity-store.ts",
+    "features/chat/streaming/use-local-agent-stream.ts",
+  ].map((file) => [path.join(DESKTOP_UI_SRC, file), toComputerChats] as const),
+  [
+    // A send names the device it came from; the computer sets its own, so the phone's link id does.
+    path.join(DESKTOP_UI_SRC, "platform/electron/device-id.ts"),
+    (text) => {
+      const start = "export const getOrCreateDeviceId = async () => {";
+      if (!text.includes(start)) throw new Error("computer chats: device-id.ts no longer starts getOrCreateDeviceId as before");
+      return text.replace(
+        start,
+        `${start}\n  const computer = (globalThis as { __stellaComputerChats?: { system: { getDeviceId(): Promise<string> } } }).__stellaComputerChats;\n  if (computer) return computer.system.getDeviceId();`,
+      );
+    },
+  ],
+  [
+    path.join(DESKTOP_UI_SRC, "features/cloud/use-cloud-chat-bridge.tsx"),
+    (text) => {
+      const webShell = "const webShell = isWebShell();";
+      if (!text.includes(webShell)) throw new Error("computer chats: use-cloud-chat-bridge.tsx no longer reads isWebShell() as before");
+      return text.replace(webShell, "const webShell = isWebShell() && !(globalThis as { __stellaComputerChats?: unknown }).__stellaComputerChats;");
+    },
+  ],
+]);
+const computerChats: BunPlugin = {
+  name: "stella-rune-computer-chats",
+  setup(build) {
+    build.onLoad({ filter: /\.tsx?$/ }, async (a) => {
+      const rewrite = COMPUTER_CHAT_FILES.get(a.path);
+      if (!rewrite) return undefined;
+      const text = await Bun.file(a.path).text();
+      // This hook takes the file whole, so the other plugins' rewrites must not be needed here.
+      if (NAMESPACE_FROM_RELATIVE.test(text) || text.includes("import.meta")) throw new Error(`computer chats: ${a.path} needs another plugin's rewrite too`);
+      return { contents: rewrite(text), loader: a.path.endsWith("x") ? "tsx" : "ts" };
     });
   },
 };
@@ -160,7 +214,7 @@ const result = await Bun.build({
   naming: { entry: "app.[ext]" },
   // STELLA_JS_NODE_ENV=development builds React's development bundle, whose errors and warnings name the component.
   define: { "process.env.NODE_ENV": JSON.stringify(process.env.STELLA_JS_NODE_ENV ?? "production"), "process.env.STELLA_EAS_PROJECT_ID": JSON.stringify(easProjectId), "import.meta.hot": "undefined", "import.meta.dir": "__native.env.resources", "import.meta.dirname": "__native.env.resources", "import.meta.url": JSON.stringify("file:///app/app.js") },
-  plugins: [namespaceFix, mobilePlugin, viteCompat],
+  plugins: [computerChats, namespaceFix, mobilePlugin, viteCompat],
   throw: false,
 });
 if (!result.success) {

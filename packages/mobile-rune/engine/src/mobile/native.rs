@@ -174,6 +174,12 @@ pub fn check_covers<S: 'static>(tx: &mut rune::Tx) {
     });
     for (n, window, key, r) in fields {
         tx.element_at(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0, move |_s: &mut S, picked: Option<rune::Picked>, _tx: &mut rune::Tx| {
+            // The pick answers after the next layout: a field that moved meanwhile (the composer
+            // riding up on the keyboard) was asked about where it no longer is. Ask again.
+            if RECTS.with(|m| m.borrow().get(&n).copied()) != Some(r) {
+                RECHECK.with(|c| c.set(c.get().max(2)));
+                return;
+            }
             let covered = !picked.is_some_and(|p| picked_is(&p, &key));
             let was = COVERED.with(|c| if covered { !c.borrow_mut().insert(n) } else { c.borrow_mut().remove(&n) });
             if covered == was {

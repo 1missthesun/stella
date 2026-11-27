@@ -1,15 +1,20 @@
 // A first-light screen: text, a long scroll, a press and a native text field.
 import { useState } from "react";
+import { usePhoneInsets } from "./phone/insets";
+
+const android = (globalThis as any).__native?.env?.platform === "android";
+const stack = android ? "Vulkan · V8" : "Metal · JavaScriptCore";
 
 export function Probe() {
   const [n, setN] = useState(0);
   const [text, setText] = useState("");
   const rows = Array.from({ length: 80 }, (_, i) => i);
+  const { bottom, keyboard } = usePhoneInsets();
   return (
     <col w="full" h="full" pt={64} gap={12} fill="#101012">
       <col px={20} gap={6}>
         <text size={28} weight={700} color="#ffffff">Stella on Rune</text>
-        <text size={15} color="#a0a0a8">{`Metal · JavaScriptCore · taps ${n} · typed “${text}”`}</text>
+        <text size={15} color="#a0a0a8">{`${stack} · taps ${n} · typed “${text}”`}</text>
       </col>
       <row px={20} gap={10}>
         <box px={16} py={10} radius={20} fill="#2f6df6" press="#1f4fc0" onPress={() => setN((v) => v + 1)}>
@@ -27,8 +32,8 @@ export function Probe() {
           </row>
         ))}
       </col>
-      <col px={16} pb={40} pt={8}>
-        <input id="probe-input" multiline maxLines={6} value={text} onInput={(e: any) => setText(e.value)} placeholder="Message Stella" placeholderColor="#77777f" color="#ffffff" size={16} px={16} py={12} radius={22} fill="#1c1c20" border="#2c2c32" />
+      <col px={16} pb={Math.max(keyboard, bottom) + 12} pt={8}>
+        <input id="probe-input" multiline maxLines={6} value={text} onInput={(v: string) => setText(v)} placeholder="Message Stella" placeholderColor="#77777f" color="#ffffff" size={16} px={16} py={12} radius={22} fill="#1c1c20" border="#2c2c32" />
       </col>
     </col>
   );

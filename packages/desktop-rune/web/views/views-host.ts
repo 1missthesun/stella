@@ -4,7 +4,7 @@
 // one for a file is the view that runs (an agent's edit arrives as a new result and swaps in, keeping
 // its state). Programs run in PsychoScript's WebAssembly in a worker each (wasm-vm.ts), storage is
 // kept in IndexedDB (storage.ts), and the capabilities are the browser's (capabilities.ts).
-import { ViewSession, type ViewSnapshot } from "@stella/views/session";
+import { ViewSession, type ViewCapabilities, type ViewSnapshot } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath, viewFileName, viewIdentityFromPath, viewKey, viewTitle } from "@stella/views/paths";
@@ -36,7 +36,12 @@ type Message = { toolEvents?: readonly ViewToolEvent[] };
 
 const asWeb = (theme: ViewTheme): ViewTheme => (theme.platform === "web" ? theme : { ...theme, platform: "web" });
 
-export function createWebViewsHost() {
+export type WebViewsHostOptions = {
+  /** Narrows the browser's capabilities (a shared view on stella.sh has no Stella to ask or chat to send to). */
+  capabilities?: (browser: ViewCapabilities) => ViewCapabilities;
+};
+
+export function createWebViewsHost(options: WebViewsHostOptions = {}) {
   const entries = new Map<string, Entry>();
   /** The newest version of each view the conversations shown so far carry. */
   const known = new Map<string, ConversationView>();
@@ -63,10 +68,11 @@ export function createWebViewsHost() {
   };
   const vm = createWasmVm();
   const noticeListeners = new Set<(notice: { filePath: string; kind: "copied" }) => void>();
-  const caps = browserCapabilities((viewId, kind) => {
+  const browserCaps = browserCapabilities((viewId, kind) => {
     const entry = [...entries.values()].find((e) => e.session.id === viewId);
     if (entry) for (const listener of noticeListeners) listener({ filePath: entry.filePath, kind });
   });
+  const caps = options.capabilities ? options.capabilities(browserCaps) : browserCaps;
   const now = () => performance.now();
   const requestFrame = (fn: (time: number) => void) => {
     requestAnimationFrame(() => fn(now()));

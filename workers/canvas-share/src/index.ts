@@ -6,6 +6,14 @@ import {
   verifyCanvasViewToken,
 } from "../../shared/canvas-view-grant.js";
 import { buildCanvasOwnerOpenUrl } from "../../../packages/contracts/canvas-share.js";
+import {
+  parseSharedViewPayload,
+  sharedViewPayloadScript,
+  VIEW_SHARE_KIND,
+  VIEW_SHARE_PAGE_PATH,
+  VIEW_SHARE_PAYLOAD_MARKER,
+  VIEW_SHARE_TITLE_MARKER,
+} from "../../../packages/contracts/view-share.js";
 
 const KEY_PREFIX = "shares";
 // A sandboxed page has an opaque origin, so its subresource requests never carry the Lax view cookie.
@@ -152,6 +160,55 @@ const parseCanvasPath = (pathname: string): CanvasPath | null => {
     return null;
   }
   return { slug, slash: true, asset: segments.join("/") };
+};
+
+// A shared Stella View: our own page (static assets under /_view/) runs the view's program in
+// PsychoScript's WebAssembly inside a worker, so the page itself isn't sandboxed (it needs its
+// origin's IndexedDB for the view's storage, and module workers). The view reaches only what the
+// page's capabilities give it; fetch goes to the public internet.
+const VIEW_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "worker-src 'self'",
+  "connect-src 'self' https:",
+  "img-src 'self' https: data: blob:",
+  "media-src 'self' https: blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+const serveView = async (
+  request: Request,
+  env: Env,
+  object: R2ObjectBody,
+  url: URL,
+  isPrivate: boolean,
+): Promise<Response> => {
+  let payload: ReturnType<typeof parseSharedViewPayload> = null;
+  try {
+    payload = parseSharedViewPayload(JSON.parse(await object.text()));
+  } catch {
+    payload = null;
+  }
+  if (!payload) return notFound();
+  const template = await env.ASSETS.fetch(new Request(new URL(VIEW_SHARE_PAGE_PATH, url.origin)));
+  if (!template.ok) return textResponse(503, "Shared views aren't available here yet.");
+  const html = (await template.text())
+    .replace(VIEW_SHARE_TITLE_MARKER, () => escapeHtml(payload.title || "Stella View"))
+    .replace(VIEW_SHARE_PAYLOAD_MARKER, () => sharedViewPayloadScript(JSON.stringify(payload)));
+  const headers = new Headers({
+    "content-type": "text/html; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    "x-robots-tag": "noindex, nofollow",
+    "referrer-policy": "no-referrer",
+    "cache-control": isPrivate ? "private, no-store" : "public, max-age=60",
+    "content-security-policy": VIEW_CSP,
+  });
+  if (object.httpEtag) headers.set("etag", object.httpEtag);
+  return new Response(request.method === "HEAD" ? null : html, { status: 200, headers });
 };
 
 const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
@@ -469,7 +526,8 @@ export default {
       }
     }
 
-    const pagePath = `/c/${slug}${object.customMetadata?.assets === "1" ? "/" : ""}`;
+    const isView = object.customMetadata?.kind === VIEW_SHARE_KIND;
+    const pagePath = `/c/${slug}${!isView && object.customMetadata?.assets === "1" ? "/" : ""}`;
     const isPrivate = object.customMetadata?.visibility === "private";
     if (isPrivate) {
       const owner = object.customMetadata?.owner;
@@ -507,6 +565,8 @@ export default {
         return privatePage(request.method, ownerOpenUrl);
       }
     }
+
+    if (isView) return serveView(request, env, object, url, isPrivate);
 
     if (!canvasPath.slash && pagePath.endsWith("/")) {
       object.body.cancel().catch(() => {});

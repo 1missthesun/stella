@@ -995,7 +995,6 @@
       }
     },
     "localMode": {
-      "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać ze Stelli na telefonie i mieć wszystko zsynchronizowane.",
       "needsAccount": "To działa w chmurze Stelli, więc wymaga konta Stella.",
       "syncFailed": "Nie udało się dodać czatu do konta. Nadal jest na tym komputerze.",
       "synced": "Czat został dodany do Twojego konta."

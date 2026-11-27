@@ -977,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Dine chats bliver på denne computer. Log ind for at bruge Stella på din telefon og holde alt synkroniseret.",
       "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
       "syncFailed": "Chatten kunne ikke føjes til din konto. Den er stadig på denne computer.",
       "synced": "Chatten er føjet til din konto."

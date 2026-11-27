@@ -995,7 +995,6 @@
       }
     },
     "localMode": {
-      "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se a používejte Stellu i v telefonu se vším synchronizovaným.",
       "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
       "syncFailed": "Chat se nepodařilo přidat do účtu. Pořád je na tomto počítači.",
       "synced": "Chat byl přidán do vašeho účtu."

@@ -977,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'yı telefonunda kullanmak ve her şeyi eşitlenmiş tutmak için giriş yap.",
       "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
       "syncFailed": "Bu sohbet hesabına eklenemedi. Hâlâ bu bilgisayarda.",
       "synced": "Bu sohbet hesabına eklendi."

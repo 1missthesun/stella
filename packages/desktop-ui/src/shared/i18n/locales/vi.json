@@ -968,7 +968,6 @@
       }
     },
     "localMode": {
-      "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng Stella trên điện thoại và giữ mọi thứ đồng bộ.",
       "needsAccount": "Tính năng này chạy trên đám mây của Stella nên cần tài khoản Stella.",
       "syncFailed": "Không thể thêm cuộc trò chuyện này vào tài khoản. Nó vẫn ở trên máy tính này.",
       "synced": "Đã thêm cuộc trò chuyện này vào tài khoản của bạn."

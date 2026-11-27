@@ -4,7 +4,6 @@ export const useLocalMode = sheet((c, t) => ({
   localModeBanner: { py: 6, pr: 8, pl: 14, absolute: { top: 6 }, raise: true, align: "center", gap: 10, w: "fit", radius: 16, fill: c.overlayTop, gradient: t.gradient.overlay, shadows: t.shadow.overlay, color: c.mutedForeground, size: 12, lh: 1.35 },
   localModeBannerText: { shrink: true, minW: 0 },
   localModeBannerAction: { py: 3, px: 10, radius: 999, fill: c.primary, color: c.primaryForeground, cursor: "pointer" },
-  localModeBannerClose: { pad: 4, radius: 999, cursor: "pointer", hoverColor: c.textBase },
   localModeChoiceActions: { justify: "end", gap: 10 },
   localModeBannerLead: { color: c.textBase, weight: 600 },
   waitingMessages: { mt: 10, mb: 4, align: "end", gap: 6 },

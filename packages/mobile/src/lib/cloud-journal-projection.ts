@@ -769,6 +769,18 @@ export const acknowledgedCloudDispatchIds = (
   return found;
 };
 
+export const createRecordedCloudDispatchIds = () => {
+  let recorded: ReadonlySet<string> = new Set();
+  return (acknowledged: ReadonlySet<string>): ReadonlySet<string> => {
+    let grown: Set<string> | null = null;
+    for (const id of acknowledged) {
+      if (!recorded.has(id)) (grown ??= new Set(recorded)).add(id);
+    }
+    if (grown) recorded = grown;
+    return recorded;
+  };
+};
+
 const SWITCH_RECORDS: JournalView = {
   id: "destination-switches",
   test: (record) => {
@@ -800,7 +812,7 @@ export const mergeCanonicalCloudMessages = (args: {
   canonical: readonly ChatMessage[];
   local: readonly ChatMessage[];
   dispatchBindings: ReadonlyMap<string, string | null>;
-  acknowledgedDispatchIds: ReadonlySet<string>;
+  recordedDispatchIds: ReadonlySet<string>;
 }): ChatMessage[] => {
   if (args.local.length === 0) return args.canonical as ChatMessage[];
   const canonicalIds = new Set(args.canonical.map((message) => message.id));
@@ -813,7 +825,7 @@ export const mergeCanonicalCloudMessages = (args: {
   );
   const pendingLocalIds = new Set(
     [...args.dispatchBindings].flatMap(([localId, dispatchId]) =>
-      dispatchId && args.acknowledgedDispatchIds.has(dispatchId)
+      dispatchId && args.recordedDispatchIds.has(dispatchId)
         ? []
         : [localId],
     ),
@@ -826,7 +838,8 @@ export const mergeCanonicalCloudMessages = (args: {
     return Boolean(
       owner &&
         trackedLocalIds.has(owner) &&
-        !canonicalAssistantOwners.has(owner),
+        !canonicalAssistantOwners.has(owner) &&
+        (pendingLocalIds.has(owner) || canonicalIds.has(owner)),
     );
   });
   const localById = new Map(args.local.map(message => [message.id, message]));

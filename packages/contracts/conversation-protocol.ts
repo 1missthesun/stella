@@ -25,6 +25,7 @@ import {
 } from "./schedule-notice.js";
 import { EMAIL_CARD_TYPE, parseEmailCard, type EmailCard } from "./email-card.js";
 import { parseWelcomeCard, WELCOME_CARD_TYPE, type WelcomeCard } from "./welcome-message.js";
+import { parseViewCard, VIEW_CARD_TYPE, type ViewCard } from "./view-card.js";
 import {
   parseAgentActivityEntry,
   type AgentActivityEntry,
@@ -100,7 +101,8 @@ export type JournalCard =
   | ReminderCard
   | ScheduleNoticeCard
   | EmailCard
-  | WelcomeCard;
+  | WelcomeCard
+  | ViewCard;
 
 type JournalRecordBase = {
   seq: number;
@@ -322,6 +324,7 @@ const decodeCard = (value: unknown): JournalCard | null => {
   if (type === SCHEDULE_NOTICE_CARD_TYPE) return parseScheduleNoticeCard(raw);
   if (type === EMAIL_CARD_TYPE) return parseEmailCard(raw);
   if (type === WELCOME_CARD_TYPE) return parseWelcomeCard(raw);
+  if (type === VIEW_CARD_TYPE) return parseViewCard(raw);
   if (type === "build") {
     const buildId = str(raw.buildId);
     if (!buildId) return null;

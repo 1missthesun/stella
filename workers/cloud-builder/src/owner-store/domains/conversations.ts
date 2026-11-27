@@ -19,7 +19,16 @@ import type {
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
 import { welcomeCard } from "@stella/contracts/welcome-message";
-import { empty, object, optional, string } from "../args.js";
+import type { PublishViewArgs } from "@stella/contracts/backend/conversations";
+import {
+  parseViewCard,
+  VIEW_CARD_MAX_DATA_BYTES,
+  VIEW_CARD_MAX_SOURCE_BYTES,
+  VIEW_CARD_TYPE,
+  viewCardTurnId,
+} from "@stella/contracts/view-card";
+import { empty, json, number, object, optional, string } from "../args.js";
+import { RpcError } from "../errors.js";
 import {
   CONVERSATION_PURGE_JOB,
   conversationPurgeJob,
@@ -458,6 +467,36 @@ export const applyConversationEvent = (
 
 const conversationIdArg = string({ pattern: CONVERSATION_ID_PATTERN, max: 64 });
 
+const publishViewArgs = object({
+  conversationId: conversationIdArg,
+  agentId: string({ min: 1, max: 128 }),
+  agentTitle: optional(string({ max: 200 })),
+  filePath: string({ min: 1, max: 1024 }),
+  slug: string({ min: 1, max: 128 }),
+  title: string({ min: 1, max: 200 }),
+  source: string({ min: 1, max: VIEW_CARD_MAX_SOURCE_BYTES }),
+  data: optional(json({ maxBytes: VIEW_CARD_MAX_DATA_BYTES })),
+  createdAt: number({ min: 0 }),
+});
+
+/** Puts a task's view into the user's chat as a view card, so the phone and web show it too. */
+const publishView = async (ctx: OwnerContext, args: PublishViewArgs): Promise<{ posted: boolean }> => {
+  if (!isLiveConversation(ctx.db, args.conversationId)) {
+    throw new RpcError("NOT_FOUND", "That conversation doesn't exist.");
+  }
+  const card = parseViewCard({ type: VIEW_CARD_TYPE, ...args });
+  if (!card) throw new RpcError("BAD_REQUEST", "That isn't a view.");
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) return { posted: false };
+  const posted = await ctx.host.postConversationCard({
+    conversationId: args.conversationId,
+    ownerGeneration: snapshot.ownerGeneration,
+    sourceTurnId: viewCardTurnId(card.agentId, card.slug),
+    card,
+  });
+  return { posted };
+};
+
 export const conversationsDomain = {
   name: "conversations",
   migrations: [
@@ -466,6 +505,10 @@ export const conversationsDomain = {
     CONVERSATIONS_MAIN_MIGRATION,
   ],
   purge: purgeConversationData,
+  internal: {
+    // A cloud task's `view` tool, through its turn broker.
+    "conversations.publishView": (ctx: OwnerContext, args: unknown) => publishView(ctx, publishViewArgs(args)),
+  },
   jobs: {
     [CONVERSATION_PURGE_JOB]: conversationPurgeJob,
     [CONVERSATION_WELCOME_JOB]: conversationWelcomeJob,
@@ -480,6 +523,12 @@ export const conversationsDomain = {
     scope: "owner",
     parse: empty(),
     handler: (ctx: OwnerContext) => exportData(ctx),
+  },
+  "conversations.publishView": {
+    scope: "owner",
+    maxBodyBytes: VIEW_CARD_MAX_SOURCE_BYTES + VIEW_CARD_MAX_DATA_BYTES + 16 * 1024,
+    parse: publishViewArgs,
+    handler: publishView,
   },
   "conversations.bootstrap": {
     scope: "owner",

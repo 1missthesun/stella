@@ -34,6 +34,20 @@ export type ConversationCalls = {
     result: OwnerIdentity & { conversationId: string };
   };
   "data.export": { args: Record<string, never>; result: DataExport };
+  /** A task's view, put into the user's chat so every device shows it (`@stella/contracts/view-card`). */
+  "conversations.publishView": { args: PublishViewArgs; result: { posted: boolean } };
+};
+
+export type PublishViewArgs = {
+  conversationId: string;
+  agentId: string;
+  agentTitle?: string;
+  filePath: string;
+  slug: string;
+  title: string;
+  source: string;
+  data?: unknown;
+  createdAt: number;
 };
 
 export type ConversationViews = {

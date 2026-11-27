@@ -313,6 +313,7 @@ class Preview {
     this.error = `The draft "${this.name}" is no longer in progress (it was finished or removed).`;
     console.error(`[preview] ${this.name}: the draft is gone`);
     this.close();
+    closePagesShowing(this.name);
     return true;
   }
 
@@ -604,6 +605,18 @@ serveInBrowser(SCHEME, {
     await (await openPreviewAt(contents.getURL()))?.fresh();
   },
 });
+
+/** Closes every page showing the draft's preview (the in-app browser drops a tab whose page is
+ *  destroyed), so a finished or removed draft leaves no "Preview: <draft>" tab behind. */
+const closePagesShowing = (name: string) => {
+  for (const contents of WebContents.getAllWebContents()) {
+    let url: URL;
+    try { url = new URL(contents.getURL()); } catch { continue; }
+    if (url.protocol !== `${SCHEME}:` || url.hostname !== name) continue;
+    console.error(`[preview] ${name}: closing the page that showed it (${contents.id})`);
+    contents.close();
+  }
+};
 
 /** The address of a draft's preview. */
 const previewUrl = (name: string) => `${SCHEME}://${name}/`;

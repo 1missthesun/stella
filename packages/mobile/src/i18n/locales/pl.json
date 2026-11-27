@@ -1376,5 +1376,29 @@
         "back": "Wróć do E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Więcej dla {name}",
+    "forget": "Zapomnij",
+    "forgetTitle": "Zapomnieć {name}?",
+    "forgetBody": "To urządzenie przestanie się z nim łączyć. Czaty zostaną na tamtym komputerze.",
+    "computerChat": "Stella na {name}",
+    "enter": {
+      "label": "Kod parowania",
+      "connect": "Połącz",
+      "connecting": "Łączenie…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online przez przekaźnik",
+      "offline": "Uśpiony lub offline",
+      "connecting": "Łączenie…",
+      "unpaired": "Już nie sparowano"
+    },
+    "chat": {
+      "offline": "{name} jest uśpiony lub offline. Połączy się ponownie automatycznie.",
+      "connecting": "Łączenie z {name}…",
+      "unpaired": "{name} rozłączył parowanie z tym urządzeniem."
+    }
   }
 }

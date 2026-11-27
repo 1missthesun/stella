@@ -1334,5 +1334,29 @@
         "back": "Zurück zu E-Mail"
       }
     }
+  },
+  "devices": {
+    "more": "Mehr für {name}",
+    "forget": "Vergessen",
+    "forgetTitle": "{name} vergessen?",
+    "forgetBody": "Dieses Gerät verbindet sich nicht mehr damit. Die Chats bleiben auf diesem Computer.",
+    "computerChat": "Stella auf {name}",
+    "enter": {
+      "label": "Kopplungscode",
+      "connect": "Verbinden",
+      "connecting": "Wird verbunden…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online über ein Relay",
+      "offline": "Im Ruhezustand oder offline",
+      "connecting": "Wird verbunden…",
+      "unpaired": "Nicht mehr gekoppelt"
+    },
+    "chat": {
+      "offline": "{name} ist im Ruhezustand oder offline. Verbindet sich automatisch wieder.",
+      "connecting": "Verbindung mit {name}…",
+      "unpaired": "{name} hat dieses Gerät entkoppelt."
+    }
   }
 }

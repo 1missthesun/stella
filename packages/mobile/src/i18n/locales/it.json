@@ -1355,5 +1355,29 @@
         "back": "Torna a Email"
       }
     }
+  },
+  "devices": {
+    "more": "Altro per {name}",
+    "forget": "Dimentica",
+    "forgetTitle": "Dimenticare {name}?",
+    "forgetBody": "Questo dispositivo smette di collegarsi. Le chat restano su quel computer.",
+    "computerChat": "Stella su {name}",
+    "enter": {
+      "label": "Codice di abbinamento",
+      "connect": "Collega",
+      "connecting": "Collegamento…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online tramite relay",
+      "offline": "In stop o offline",
+      "connecting": "Collegamento…",
+      "unpaired": "Non più abbinato"
+    },
+    "chat": {
+      "offline": "{name} è in stop o offline. Si ricollega automaticamente.",
+      "connecting": "Collegamento a {name}…",
+      "unpaired": "{name} ha scollegato questo dispositivo."
+    }
   }
 }

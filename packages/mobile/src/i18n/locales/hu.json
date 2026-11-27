@@ -1334,5 +1334,29 @@
         "back": "Vissza az E-mailhez"
       }
     }
+  },
+  "devices": {
+    "more": "Továbbiak: {name}",
+    "forget": "Elfelejtés",
+    "forgetTitle": "Elfelejted ezt: {name}?",
+    "forgetBody": "Ez az eszköz többé nem csatlakozik hozzá. A csevegések azon a számítógépen maradnak.",
+    "computerChat": "Stella itt: {name}",
+    "enter": {
+      "label": "Párosítási kód",
+      "connect": "Csatlakozás",
+      "connecting": "Csatlakozás…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online, továbbítón keresztül",
+      "offline": "Alvó módban vagy offline",
+      "connecting": "Csatlakozás…",
+      "unpaired": "Már nincs párosítva"
+    },
+    "chat": {
+      "offline": "{name} alvó módban vagy offline. Automatikusan újracsatlakozik.",
+      "connecting": "Csatlakozás ehhez: {name}…",
+      "unpaired": "{name} megszüntette a párosítást ezzel az eszközzel."
+    }
   }
 }

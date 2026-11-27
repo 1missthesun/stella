@@ -1355,5 +1355,29 @@
         "back": "Înapoi la E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Mai multe pentru {name}",
+    "forget": "Uită",
+    "forgetTitle": "Uiți {name}?",
+    "forgetBody": "Acest dispozitiv nu se mai conectează la el. Conversațiile rămân pe acel computer.",
+    "computerChat": "Stella de pe {name}",
+    "enter": {
+      "label": "Cod de asociere",
+      "connect": "Conectează",
+      "connecting": "Se conectează…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online printr-un releu",
+      "offline": "În repaus sau offline",
+      "connecting": "Se conectează…",
+      "unpaired": "Nu mai este asociat"
+    },
+    "chat": {
+      "offline": "{name} este în repaus sau offline. Se reconectează automat.",
+      "connecting": "Se conectează la {name}…",
+      "unpaired": "{name} a anulat asocierea cu acest dispozitiv."
+    }
   }
 }

@@ -1334,5 +1334,29 @@
         "back": "Tillbaka till E-post"
       }
     }
+  },
+  "devices": {
+    "more": "Mer för {name}",
+    "forget": "Glöm",
+    "forgetTitle": "Glöm {name}?",
+    "forgetBody": "Den här enheten slutar ansluta till den. Chattarna finns kvar på den datorn.",
+    "computerChat": "Stella på {name}",
+    "enter": {
+      "label": "Parkopplingskod",
+      "connect": "Anslut",
+      "connecting": "Ansluter…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online via ett relä",
+      "offline": "I viloläge eller offline",
+      "connecting": "Ansluter…",
+      "unpaired": "Inte längre parkopplad"
+    },
+    "chat": {
+      "offline": "{name} är i viloläge eller offline. Ansluter igen automatiskt.",
+      "connecting": "Ansluter till {name}…",
+      "unpaired": "{name} kopplade från den här enheten."
+    }
   }
 }

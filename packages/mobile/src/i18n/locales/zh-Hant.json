@@ -1313,5 +1313,29 @@
         "back": "返回郵件"
       }
     }
+  },
+  "devices": {
+    "more": "{name} 的更多選項",
+    "forget": "移除",
+    "forgetTitle": "要移除 {name} 嗎？",
+    "forgetBody": "此裝置將不再連線到它。聊天記錄仍保留在那台電腦上。",
+    "computerChat": "{name} 上的 Stella",
+    "enter": {
+      "label": "配對代碼",
+      "connect": "連線",
+      "connecting": "正在連線…"
+    },
+    "status": {
+      "online": "在線",
+      "onlineRelay": "透過中繼在線",
+      "offline": "睡眠或離線",
+      "connecting": "正在連線…",
+      "unpaired": "已不再配對"
+    },
+    "chat": {
+      "offline": "{name} 處於睡眠或離線狀態，會自動重新連線。",
+      "connecting": "正在連線到 {name}…",
+      "unpaired": "{name} 已取消與此裝置的配對。"
+    }
   }
 }

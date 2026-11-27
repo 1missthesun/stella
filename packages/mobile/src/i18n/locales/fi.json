@@ -1334,5 +1334,29 @@
         "back": "Takaisin Sähköpostiin"
       }
     }
+  },
+  "devices": {
+    "more": "Lisää: {name}",
+    "forget": "Unohda",
+    "forgetTitle": "Unohdetaanko {name}?",
+    "forgetBody": "Tämä laite lakkaa yhdistämästä siihen. Keskustelut jäävät sille tietokoneelle.",
+    "computerChat": "Stella: {name}",
+    "enter": {
+      "label": "Pariliitoskoodi",
+      "connect": "Yhdistä",
+      "connecting": "Yhdistetään…"
+    },
+    "status": {
+      "online": "Verkossa",
+      "onlineRelay": "Verkossa välityspalvelimen kautta",
+      "offline": "Lepotilassa tai offline-tilassa",
+      "connecting": "Yhdistetään…",
+      "unpaired": "Ei enää pariliitetty"
+    },
+    "chat": {
+      "offline": "{name} on lepotilassa tai offline-tilassa. Yhdistää automaattisesti uudelleen.",
+      "connecting": "Yhdistetään: {name}…",
+      "unpaired": "{name} poisti pariliitoksen tähän laitteeseen."
+    }
   }
 }

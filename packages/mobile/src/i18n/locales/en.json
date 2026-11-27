@@ -1334,5 +1334,29 @@
         "back": "Back to Email"
       }
     }
+  },
+  "devices": {
+    "more": "More for {name}",
+    "forget": "Forget",
+    "forgetTitle": "Forget {name}?",
+    "forgetBody": "This device stops connecting to it. Its chats stay on that computer.",
+    "computerChat": "{name}'s Stella",
+    "enter": {
+      "label": "Code",
+      "connect": "Connect",
+      "connecting": "Connecting…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online through a relay",
+      "offline": "Asleep or offline",
+      "connecting": "Connecting…",
+      "unpaired": "No longer paired"
+    },
+    "chat": {
+      "offline": "{name} is asleep or offline. Reconnects automatically.",
+      "connecting": "Connecting to {name}…",
+      "unpaired": "{name} unpaired this device."
+    }
   }
 }

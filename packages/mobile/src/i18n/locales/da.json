@@ -1334,5 +1334,29 @@
         "back": "Tilbage til E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Mere for {name}",
+    "forget": "Glem",
+    "forgetTitle": "Glem {name}?",
+    "forgetBody": "Denne enhed holder op med at forbinde til den. Chattene bliver på den computer.",
+    "computerChat": "Stella på {name}",
+    "enter": {
+      "label": "Parringskode",
+      "connect": "Forbind",
+      "connecting": "Forbinder…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online via et relæ",
+      "offline": "I dvale eller offline",
+      "connecting": "Forbinder…",
+      "unpaired": "Ikke længere parret"
+    },
+    "chat": {
+      "offline": "{name} er i dvale eller offline. Forbinder automatisk igen.",
+      "connecting": "Forbinder til {name}…",
+      "unpaired": "{name} fjernede parringen med denne enhed."
+    }
   }
 }

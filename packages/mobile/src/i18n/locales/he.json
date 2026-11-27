@@ -1355,5 +1355,29 @@
         "back": "חזרה לדוא\"ל"
       }
     }
+  },
+  "devices": {
+    "more": "עוד עבור {name}",
+    "forget": "שכחה",
+    "forgetTitle": "לשכוח את {name}?",
+    "forgetBody": "המכשיר הזה יפסיק להתחבר אליו. הצ׳אטים נשארים במחשב ההוא.",
+    "computerChat": "Stella ב-{name}",
+    "enter": {
+      "label": "קוד צימוד",
+      "connect": "התחברות",
+      "connecting": "מתחבר…"
+    },
+    "status": {
+      "online": "מקוון",
+      "onlineRelay": "מקוון דרך ממסר",
+      "offline": "במצב שינה או לא מקוון",
+      "connecting": "מתחבר…",
+      "unpaired": "כבר לא מצומד"
+    },
+    "chat": {
+      "offline": "{name} במצב שינה או לא מקוון. יתחבר מחדש אוטומטית.",
+      "connecting": "מתחבר אל {name}…",
+      "unpaired": "{name} ביטל את הצימוד של המכשיר הזה."
+    }
   }
 }

@@ -1313,5 +1313,29 @@
         "back": "返回邮件"
       }
     }
+  },
+  "devices": {
+    "more": "{name} 的更多选项",
+    "forget": "移除",
+    "forgetTitle": "要移除 {name} 吗？",
+    "forgetBody": "此设备将不再连接到它。聊天记录仍保留在那台电脑上。",
+    "computerChat": "{name} 上的 Stella",
+    "enter": {
+      "label": "配对代码",
+      "connect": "连接",
+      "connecting": "正在连接…"
+    },
+    "status": {
+      "online": "在线",
+      "onlineRelay": "通过中继在线",
+      "offline": "睡眠或离线",
+      "connecting": "正在连接…",
+      "unpaired": "已不再配对"
+    },
+    "chat": {
+      "offline": "{name} 处于睡眠或离线状态，会自动重新连接。",
+      "connecting": "正在连接到 {name}…",
+      "unpaired": "{name} 已取消与此设备的配对。"
+    }
   }
 }

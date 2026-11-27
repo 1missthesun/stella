@@ -1313,5 +1313,29 @@
         "back": "Quay lại Email"
       }
     }
+  },
+  "devices": {
+    "more": "Thêm cho {name}",
+    "forget": "Quên",
+    "forgetTitle": "Quên {name}?",
+    "forgetBody": "Thiết bị này sẽ ngừng kết nối với máy đó. Các cuộc trò chuyện vẫn ở trên máy tính đó.",
+    "computerChat": "Stella trên {name}",
+    "enter": {
+      "label": "Mã ghép đôi",
+      "connect": "Kết nối",
+      "connecting": "Đang kết nối…"
+    },
+    "status": {
+      "online": "Trực tuyến",
+      "onlineRelay": "Trực tuyến qua máy chuyển tiếp",
+      "offline": "Đang ngủ hoặc ngoại tuyến",
+      "connecting": "Đang kết nối…",
+      "unpaired": "Không còn ghép đôi"
+    },
+    "chat": {
+      "offline": "{name} đang ngủ hoặc ngoại tuyến. Sẽ tự động kết nối lại.",
+      "connecting": "Đang kết nối tới {name}…",
+      "unpaired": "{name} đã hủy ghép đôi thiết bị này."
+    }
   }
 }

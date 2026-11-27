@@ -1355,5 +1355,29 @@
         "back": "Volver a Correo"
       }
     }
+  },
+  "devices": {
+    "more": "Más opciones para {name}",
+    "forget": "Olvidar",
+    "forgetTitle": "¿Olvidar {name}?",
+    "forgetBody": "Este dispositivo dejará de conectarse a él. Sus chats siguen en ese ordenador.",
+    "computerChat": "Stella de {name}",
+    "enter": {
+      "label": "Código de vinculación",
+      "connect": "Conectar",
+      "connecting": "Conectando…"
+    },
+    "status": {
+      "online": "En línea",
+      "onlineRelay": "En línea a través de un relé",
+      "offline": "En reposo o sin conexión",
+      "connecting": "Conectando…",
+      "unpaired": "Ya no está vinculado"
+    },
+    "chat": {
+      "offline": "{name} está en reposo o sin conexión. Se reconecta automáticamente.",
+      "connecting": "Conectando con {name}…",
+      "unpaired": "{name} desvinculó este dispositivo."
+    }
   }
 }

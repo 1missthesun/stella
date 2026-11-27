@@ -1355,5 +1355,29 @@
         "back": "Voltar para E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Mais para {name}",
+    "forget": "Esquecer",
+    "forgetTitle": "Esquecer {name}?",
+    "forgetBody": "Este dispositivo deixa de se conectar a ele. As conversas continuam naquele computador.",
+    "computerChat": "Stella de {name}",
+    "enter": {
+      "label": "Código de pareamento",
+      "connect": "Conectar",
+      "connecting": "Conectando…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online por um relay",
+      "offline": "Em repouso ou offline",
+      "connecting": "Conectando…",
+      "unpaired": "Não está mais emparelhado"
+    },
+    "chat": {
+      "offline": "{name} está em repouso ou offline. Reconecta automaticamente.",
+      "connecting": "Conectando a {name}…",
+      "unpaired": "{name} desemparelhou este dispositivo."
+    }
   }
 }

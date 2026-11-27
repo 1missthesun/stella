@@ -1355,5 +1355,29 @@
         "back": "Retour à E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Plus pour {name}",
+    "forget": "Oublier",
+    "forgetTitle": "Oublier {name} ?",
+    "forgetBody": "Cet appareil ne s’y connectera plus. Ses conversations restent sur cet ordinateur.",
+    "computerChat": "Stella sur {name}",
+    "enter": {
+      "label": "Code d’association",
+      "connect": "Connecter",
+      "connecting": "Connexion…"
+    },
+    "status": {
+      "online": "En ligne",
+      "onlineRelay": "En ligne via un relais",
+      "offline": "En veille ou hors ligne",
+      "connecting": "Connexion…",
+      "unpaired": "N’est plus associé"
+    },
+    "chat": {
+      "offline": "{name} est en veille ou hors ligne. Reconnexion automatique.",
+      "connecting": "Connexion à {name}…",
+      "unpaired": "{name} a dissocié cet appareil."
+    }
   }
 }

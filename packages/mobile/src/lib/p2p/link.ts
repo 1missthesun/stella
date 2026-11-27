@@ -30,7 +30,7 @@ const deviceName = () => (Device.deviceName || Device.modelName || (Platform.OS 
 let started: Promise<void> | null = null;
 
 const startLink = (): Promise<void> =>
-  (started ??= startStellaP2p({ name: deviceName(), platform: Platform.OS, relay: "default" }).catch((error: unknown) => {
+  (started ??= startStellaP2p({ name: deviceName(), platform: Platform.OS, relay: "default", discoverable: false }).catch((error: unknown) => {
     started = null;
     throw error;
   }));

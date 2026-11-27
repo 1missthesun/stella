@@ -1334,5 +1334,29 @@
         "back": "Tilbake til E-post"
       }
     }
+  },
+  "devices": {
+    "more": "Mer for {name}",
+    "forget": "Glem",
+    "forgetTitle": "Glemme {name}?",
+    "forgetBody": "Denne enheten slutter å koble til den. Chattene blir værende på den datamaskinen.",
+    "computerChat": "Stella på {name}",
+    "enter": {
+      "label": "Paringskode",
+      "connect": "Koble til",
+      "connecting": "Kobler til …"
+    },
+    "status": {
+      "online": "På nett",
+      "onlineRelay": "På nett via et relé",
+      "offline": "I dvale eller frakoblet",
+      "connecting": "Kobler til …",
+      "unpaired": "Ikke lenger paret"
+    },
+    "chat": {
+      "offline": "{name} er i dvale eller frakoblet. Kobler til igjen automatisk.",
+      "connecting": "Kobler til {name} …",
+      "unpaired": "{name} fjernet paringen med denne enheten."
+    }
   }
 }

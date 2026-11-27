@@ -1313,5 +1313,29 @@
         "back": "이메일로 돌아가기"
       }
     }
+  },
+  "devices": {
+    "more": "{name} 더보기",
+    "forget": "삭제",
+    "forgetTitle": "{name}을(를) 삭제할까요?",
+    "forgetBody": "이 기기는 더 이상 그 컴퓨터에 연결하지 않습니다. 채팅은 그 컴퓨터에 남아 있습니다.",
+    "computerChat": "{name}의 Stella",
+    "enter": {
+      "label": "페어링 코드",
+      "connect": "연결",
+      "connecting": "연결 중…"
+    },
+    "status": {
+      "online": "온라인",
+      "onlineRelay": "릴레이를 통해 온라인",
+      "offline": "절전 중이거나 오프라인",
+      "connecting": "연결 중…",
+      "unpaired": "더 이상 페어링되지 않음"
+    },
+    "chat": {
+      "offline": "{name}이(가) 절전 중이거나 오프라인입니다. 자동으로 다시 연결됩니다.",
+      "connecting": "{name}에 연결 중…",
+      "unpaired": "{name}에서 이 기기의 페어링을 해제했습니다."
+    }
   }
 }

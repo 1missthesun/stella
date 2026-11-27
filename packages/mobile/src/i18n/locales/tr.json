@@ -1334,5 +1334,29 @@
         "back": "E-postaya dön"
       }
     }
+  },
+  "devices": {
+    "more": "{name} için diğer",
+    "forget": "Unut",
+    "forgetTitle": "{name} unutulsun mu?",
+    "forgetBody": "Bu cihaz artık ona bağlanmaz. Sohbetler o bilgisayarda kalır.",
+    "computerChat": "{name} üzerindeki Stella",
+    "enter": {
+      "label": "Eşleme kodu",
+      "connect": "Bağlan",
+      "connecting": "Bağlanıyor…"
+    },
+    "status": {
+      "online": "Çevrimiçi",
+      "onlineRelay": "Bir aktarıcı üzerinden çevrimiçi",
+      "offline": "Uykuda veya çevrimdışı",
+      "connecting": "Bağlanıyor…",
+      "unpaired": "Artık eşli değil"
+    },
+    "chat": {
+      "offline": "{name} uykuda veya çevrimdışı. Otomatik olarak yeniden bağlanır.",
+      "connecting": "{name} cihazına bağlanıyor…",
+      "unpaired": "{name} bu cihazın eşlemesini kaldırdı."
+    }
   }
 }

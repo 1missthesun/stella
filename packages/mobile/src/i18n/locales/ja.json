@@ -1313,5 +1313,29 @@
         "back": "メールに戻る"
       }
     }
+  },
+  "devices": {
+    "more": "{name} のその他",
+    "forget": "削除",
+    "forgetTitle": "{name} を削除しますか？",
+    "forgetBody": "このデバイスはそのコンピュータに接続しなくなります。チャットはそのコンピュータに残ります。",
+    "computerChat": "{name} の Stella",
+    "enter": {
+      "label": "ペアリングコード",
+      "connect": "接続",
+      "connecting": "接続中…"
+    },
+    "status": {
+      "online": "オンライン",
+      "onlineRelay": "リレー経由でオンライン",
+      "offline": "スリープ中またはオフライン",
+      "connecting": "接続中…",
+      "unpaired": "ペアリング解除済み"
+    },
+    "chat": {
+      "offline": "{name} はスリープ中かオフラインです。自動的に再接続します。",
+      "connecting": "{name} に接続中…",
+      "unpaired": "{name} がこのデバイスのペアリングを解除しました。"
+    }
   }
 }

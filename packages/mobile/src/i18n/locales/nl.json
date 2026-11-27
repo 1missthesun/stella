@@ -1334,5 +1334,29 @@
         "back": "Terug naar E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Meer voor {name}",
+    "forget": "Vergeten",
+    "forgetTitle": "{name} vergeten?",
+    "forgetBody": "Dit apparaat maakt er geen verbinding meer mee. De chats blijven op die computer.",
+    "computerChat": "Stella op {name}",
+    "enter": {
+      "label": "Koppelcode",
+      "connect": "Verbinden",
+      "connecting": "Verbinden…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online via een relay",
+      "offline": "In slaapstand of offline",
+      "connecting": "Verbinden…",
+      "unpaired": "Niet meer gekoppeld"
+    },
+    "chat": {
+      "offline": "{name} is in slaapstand of offline. Maakt automatisch opnieuw verbinding.",
+      "connecting": "Verbinden met {name}…",
+      "unpaired": "{name} heeft dit apparaat ontkoppeld."
+    }
   }
 }

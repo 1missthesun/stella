@@ -1313,5 +1313,29 @@
         "back": "Kembali ke Email"
       }
     }
+  },
+  "devices": {
+    "more": "Lainnya untuk {name}",
+    "forget": "Lupakan",
+    "forgetTitle": "Lupakan {name}?",
+    "forgetBody": "Perangkat ini berhenti terhubung ke sana. Chat tetap ada di komputer itu.",
+    "computerChat": "Stella di {name}",
+    "enter": {
+      "label": "Kode pemasangan",
+      "connect": "Hubungkan",
+      "connecting": "Menghubungkan…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online lewat relay",
+      "offline": "Tidur atau offline",
+      "connecting": "Menghubungkan…",
+      "unpaired": "Tidak lagi dipasangkan"
+    },
+    "chat": {
+      "offline": "{name} sedang tidur atau offline. Akan terhubung lagi otomatis.",
+      "connecting": "Menghubungkan ke {name}…",
+      "unpaired": "{name} memutuskan pasangan perangkat ini."
+    }
   }
 }

@@ -1376,5 +1376,29 @@
         "back": "Zpět na E-mail"
       }
     }
+  },
+  "devices": {
+    "more": "Další pro {name}",
+    "forget": "Zapomenout",
+    "forgetTitle": "Zapomenout {name}?",
+    "forgetBody": "Toto zařízení se k němu přestane připojovat. Chaty zůstanou na tom počítači.",
+    "computerChat": "Stella na {name}",
+    "enter": {
+      "label": "Párovací kód",
+      "connect": "Připojit",
+      "connecting": "Připojování…"
+    },
+    "status": {
+      "online": "Online",
+      "onlineRelay": "Online přes relay",
+      "offline": "V režimu spánku nebo offline",
+      "connecting": "Připojování…",
+      "unpaired": "Už není spárováno"
+    },
+    "chat": {
+      "offline": "{name} je v režimu spánku nebo offline. Znovu se připojí automaticky.",
+      "connecting": "Připojování k {name}…",
+      "unpaired": "{name} zrušil spárování s tímto zařízením."
+    }
   }
 }

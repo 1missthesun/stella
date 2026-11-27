@@ -1,4 +1,4 @@
-import { PLAN_CATALOG, planLabel, type BillingPlan } from "@stella/contracts/billing-plans";
+import { formatStorageSize, nextPlanUp, PLAN_CATALOG, planLabel, type BillingPlan } from "@stella/contracts/billing-plans";
 import { createHash } from "node:crypto";
 import {
   DRIVE_VERSIONS_MAX_PATHS,
@@ -34,16 +34,25 @@ import { billingPlan } from "./billing.js";
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
+const TB = 1024 * GB;
 
-type DriveQuota = { totalBytes: number; maxFiles: number; maxFileBytes: number };
+/**
+ * Plans limit Drive by size only. This ceiling is not a plan limit: every
+ * file is a row in the owner's object, which holds at most 10 GB of SQLite
+ * shared with everything else the account stores, so millions of empty
+ * files could fill it. A million rows is well under 1 GB, and real use
+ * sits around 10,000 files.
+ */
+export const DRIVE_MAX_FILES = 1_000_000;
+
+type DriveQuota = { totalBytes: number; maxFileBytes: number };
 
 const planQuota = (plan: BillingPlan): DriveQuota => {
-  const { driveBytes, driveFiles, driveFileBytes } = PLAN_CATALOG[plan].limits;
-  return { totalBytes: driveBytes, maxFiles: driveFiles, maxFileBytes: driveFileBytes };
+  const { driveBytes, driveFileBytes } = PLAN_CATALOG[plan].limits;
+  return { totalBytes: driveBytes, maxFileBytes: driveFileBytes };
 };
 const UNLIMITED_QUOTA: DriveQuota = {
-  totalBytes: 200 * GB,
-  maxFiles: 200_000,
+  totalBytes: 10 * TB,
   maxFileBytes: 2_048 * MB,
 };
 
@@ -196,6 +205,39 @@ export const DRIVE_SPACES_MIGRATION = {
        adopted_at INTEGER NOT NULL,
        PRIMARY KEY (space, home)
      )`,
+  ],
+};
+
+/**
+ * Running totals per space, so quota checks read a few rows instead of
+ * summing every file on each write. Triggers keep them exact on every path
+ * that writes drive_files, including Workers that predate this migration.
+ */
+export const DRIVE_USAGE_MIGRATION = {
+  id: "drive.4-usage",
+  statements: [
+    `CREATE TABLE drive_usage (
+       space TEXT PRIMARY KEY,
+       files INTEGER NOT NULL,
+       bytes INTEGER NOT NULL
+     )`,
+    `INSERT INTO drive_usage (space, files, bytes)
+     SELECT space, COUNT(*), COALESCE(SUM(size_bytes), 0) FROM drive_files GROUP BY space`,
+    `CREATE TRIGGER drive_usage_insert AFTER INSERT ON drive_files
+     BEGIN
+       INSERT INTO drive_usage (space, files, bytes) VALUES (NEW.space, 1, NEW.size_bytes)
+       ON CONFLICT (space) DO UPDATE SET files = files + 1, bytes = bytes + excluded.bytes;
+     END`,
+    `CREATE TRIGGER drive_usage_delete AFTER DELETE ON drive_files
+     BEGIN
+       UPDATE drive_usage SET files = files - 1, bytes = bytes - OLD.size_bytes WHERE space = OLD.space;
+     END`,
+    `CREATE TRIGGER drive_usage_update AFTER UPDATE OF space, size_bytes ON drive_files
+     BEGIN
+       UPDATE drive_usage SET files = files - 1, bytes = bytes - OLD.size_bytes WHERE space = OLD.space;
+       INSERT INTO drive_usage (space, files, bytes) VALUES (NEW.space, 1, NEW.size_bytes)
+       ON CONFLICT (space) DO UPDATE SET files = files + 1, bytes = bytes + excluded.bytes;
+     END`,
   ],
 };
 
@@ -385,9 +427,10 @@ const NOT_THUMBNAIL = `path NOT LIKE '${EVIDENCE_THUMBNAIL_DRIVE_ROOT}/%'`;
 const isKeyReferenced = (db: OwnerDbReader, r2Key: string): boolean =>
   db.one("SELECT 1 AS present FROM drive_files WHERE r2_key = ? LIMIT 1", r2Key) !== null;
 
+/** Kept by triggers on drive_files (DRIVE_USAGE_MIGRATION): one row per space. */
 const usage = (db: OwnerDbReader): { fileCount: number; totalBytes: number } => {
-  const row = db.one<{ files: number; bytes: number | null }>(
-    "SELECT COUNT(*) AS files, SUM(size_bytes) AS bytes FROM drive_files",
+  const row = db.one<{ files: number | null; bytes: number | null }>(
+    "SELECT SUM(files) AS files, SUM(bytes) AS bytes FROM drive_usage",
   );
   return { fileCount: row?.files ?? 0, totalBytes: row?.bytes ?? 0 };
 };
@@ -514,17 +557,21 @@ const partitionWrite = (
     const prior = getFile(ctx.db, spaceOf(ctx), file.path)?.size_bytes ?? null;
     const nextFileCount = prior === null ? fileCount + 1 : fileCount;
     const nextTotalBytes = totalBytes - (prior ?? 0) + file.sizeBytes;
-    if (nextFileCount > quota.maxFiles) {
-      skipped.push({
-        path: file.path,
-        reason: `Your drive is limited to ${quota.maxFiles} files on the ${label} plan.`,
-      });
-      continue;
-    }
     if (nextTotalBytes > quota.totalBytes) {
       skipped.push({
         path: file.path,
-        reason: `Your drive is limited to ${formatMb(quota.totalBytes)} on the ${label} plan.`,
+        reason: unlimited
+          ? `Your Drive is full at ${formatStorageSize(quota.totalBytes)}. Delete files to add more.`
+          : `Your Drive is full: the ${label} plan includes ${formatStorageSize(quota.totalBytes)}. ${
+              nextPlanUp(plan) ? "Delete files or upgrade to add more." : "Delete files to add more."
+            }`,
+      });
+      continue;
+    }
+    if (nextFileCount > DRIVE_MAX_FILES) {
+      skipped.push({
+        path: file.path,
+        reason: `Your Drive holds ${DRIVE_MAX_FILES.toLocaleString("en-US")} files, the most one account can keep. Delete files to add more.`,
       });
       continue;
     }
@@ -1868,7 +1915,7 @@ const pathArg = string({ min: 1, max: 4_000 });
 
 export const driveDomain = {
   name: "drive",
-  migrations: [DRIVE_MIGRATION, DRIVE_DEVICE_FILES_MIGRATION, DRIVE_SPACES_MIGRATION],
+  migrations: [DRIVE_MIGRATION, DRIVE_DEVICE_FILES_MIGRATION, DRIVE_SPACES_MIGRATION, DRIVE_USAGE_MIGRATION],
   calls: {
     "drive.prepareUpload": {
       scope: "owner",

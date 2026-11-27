@@ -293,7 +293,7 @@ final class Launcher {
             state = LauncherState()
             state.installedAt = ISO8601DateFormatter().string(from: Date())
             state.save(paths)
-            ElectronIdentity.prefetch(paths: paths, env: env)
+            if !engineRequested { ElectronIdentity.prefetch(paths: paths, env: env) }
         }
 
         if let changes = try signer.outsideChanges(git: git, app: paths.app) {
@@ -301,15 +301,17 @@ final class Launcher {
             throw OutsideChangesFound(changes: changes)
         }
         log("verify: HEAD signed and clean")
+        let rune = engineRequested
+        if rune && options.engineBin == nil { Install.prefetchEngine(paths: paths) }
 
         let (bun, bunVersion) = try Install.ensureBun(
             paths: paths, baseEnv: env, localBun: options.localBun, progress: status)
         let runtimes = Runtimes(bunBin: bun, bunVersion: bunVersion, git: git)
         self.runtimes = runtimes
         let electron = try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(),
-                                       state: &state, progress: status)
+                                       rune: rune, state: &state, progress: status)
         engine = nil
-        if engineRequested {
+        if rune {
             let engine = try Install.ensureEngine(paths: paths, localBin: options.engineBin, progress: status)
             log("launcher: starting stella-engine \(engine.version) (\(engine.bin.path)) instead of Electron")
             self.engine = engine

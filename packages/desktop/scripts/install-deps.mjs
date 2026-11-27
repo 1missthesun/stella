@@ -417,7 +417,9 @@ const main = async () => {
 
   await seeded;
   const env = { ...process.env };
-  if (plan) {
+  // Fetched alongside (plan), or not wanted at all under Rune, so bun
+  // install's postinstall leaves Electron's binary alone.
+  if (plan || process.env.STELLA_LAUNCHER_ENGINE === "rune") {
     env.STELLA_SKIP_ELECTRON_BINARY = "1";
     env.ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
   }

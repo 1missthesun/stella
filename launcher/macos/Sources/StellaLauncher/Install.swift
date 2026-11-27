@@ -175,6 +175,34 @@ enum Install {
             guard fm.isExecutableFile(atPath: localBin) else { throw LauncherError("\(localBin) is not an executable stella-engine.") }
             return (URL(fileURLWithPath: localBin), "local")
         }
+        engineLock.lock()
+        defer { engineLock.unlock() }
+        return try installEngine(paths: paths, progress: progress)
+    }
+
+    private static let engineLock = NSLock()
+
+    /// A first install fetches the engine while dependencies install. It
+    /// starts once the source is verified, since the engine's URL and checksum
+    /// come from that source's launcher.json; ensureEngine waits on
+    /// engineLock for it.
+    static func prefetchEngine(paths: LauncherPaths) {
+        let ready = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            engineLock.lock()
+            ready.signal()
+            defer { engineLock.unlock() }
+            do {
+                _ = try installEngine(paths: paths, progress: { _ in })
+            } catch {
+                log("install: early stella-engine download failed (\(error)); trying again")
+            }
+        }
+        ready.wait()
+    }
+
+    private static func installEngine(paths: LauncherPaths, progress: (String) -> Void) throws -> (bin: URL, version: String) {
+        let fm = FileManager.default
         let manifest = paths.app.appendingPathComponent("packages/desktop/launcher.json")
         guard let data = try? Data(contentsOf: manifest),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

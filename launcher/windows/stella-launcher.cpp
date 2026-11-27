@@ -2464,12 +2464,15 @@ static bool isEngine(const wstring &exe) { return !gEngineBin.empty() && exe == 
 
 // launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
 // an asset without "member" is the bare binary, one with it is a zip holding it.
-static void ensureEngine() {
+// Also runs on a thread while dependencies install (startEnginePrefetch), with
+// showProgress false, so nothing here may touch the UI then.
+static void installEngine(bool showProgress) {
     string key = bunPlatformKey();
     if (key == "win-x64-baseline") key = "win-x64";
     wstring host = P.app() + L"\\packages\\desktop-rune\\host\\main.tsx";
     if (!exists(host)) fail("This version of Stella has no Rune app (" + utf8(host) + " is missing).");
     if (!O.engineBin.empty()) {
+        if (!showProgress) return;
         if (!exists(O.engineBin)) fail(utf8(O.engineBin) + " is not a stella-engine.");
         gEngineBin = O.engineBin;
         gEngineVersion = "local";
@@ -2492,7 +2495,7 @@ static void ensureEngine() {
     wstring dir = P.runtimes() + L"\\stella-engine-" + wide(version);
     wstring bin = dir + L"\\stella-engine.exe";
     if (!exists(bin)) {
-        progress("Getting things ready…", 0.30, 0.40);
+        if (showProgress) progress("Getting things ready…", 0.30, 0.40);
         LOG("install: downloading stella-engine %s from %s", version.c_str(), url.c_str());
         mkdirs(dir);
         wstring downloaded = P.runtimes() + L"\\.stella-engine-" + wide(version) + L".download";
@@ -2512,8 +2515,42 @@ static void ensureEngine() {
         }
         LOG("install: stella-engine %s ready", version.c_str());
     }
+    if (!showProgress) return;
     gEngineBin = bin;
     gEngineVersion = version;
+}
+
+// A first install fetches the engine while dependencies install. It starts
+// once the source is verified, since the engine's URL and checksum come from
+// that source's launcher.json, and is joined before the launch. Detached, so a
+// launcher that quits mid-download never waits on it.
+static std::shared_future<void> gEnginePrefetch;
+
+static void startEnginePrefetch() {
+    if (!O.engineBin.empty() || gEnginePrefetch.valid() || !engineRequested()) return;
+    auto done = std::make_shared<std::promise<void>>();
+    gEnginePrefetch = done->get_future().share();
+    std::thread([done]() {
+        try {
+            installEngine(false);
+        } catch (const LauncherError &e) {
+            LOG("install: early stella-engine download failed (%s); trying again", e.message.c_str());
+        } catch (...) {
+            LOG("install: early stella-engine download failed; trying again");
+        }
+        done->set_value();
+    }).detach();
+}
+
+static void joinEnginePrefetch() {
+    if (!gEnginePrefetch.valid()) return;
+    gEnginePrefetch.wait();
+    gEnginePrefetch = {};
+}
+
+static void ensureEngine() {
+    joinEnginePrefetch();
+    installEngine(true);
 }
 
 static DWORD parentProcessId(DWORD pid) {
@@ -3032,7 +3069,9 @@ static string signHead(const string &expected) {
 
 // Electron keeps its own name: it decides app.isPackaged from the executable's
 // name, and launcher runs are source runs.
-static wstring prepare() {
+// With rune (the Rune engine starts instead) Electron is neither fetched nor
+// needed, and this returns "".
+static wstring prepare(bool rune) {
     wstring app = P.app();
     string lockHash = sha256File(app + L"\\bun.lock");
     if (S.bunLockHash != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
@@ -3048,6 +3087,9 @@ static wstring prepare() {
         Env env = baseEnvironment();
         env[L"STELLA_SKIP_BROWSER_HYDRATE"] = L"1";
         env[L"STELLA_SKIP_OFFICE_HYDRATE"] = L"1";
+        // baseEnvironment() strips the engine choice; install-deps.mjs skips
+        // Electron and its bundle for Rune.
+        if (rune) env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
         vector<wstring> argv = seeded ? vector<wstring>{gBunBin, installDeps}
                                       : vector<wstring>{gBunBin, L"install", L"--frozen-lockfile"};
         CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60);
@@ -3079,7 +3121,20 @@ static wstring prepare() {
         }
     }
 
+    if (rune) return L"";
     wstring electron = app + L"\\node_modules\\electron\\dist\\electron.exe";
+    wstring ensure = app + L"\\packages\\desktop\\scripts\\ensure-electron-binary.mjs";
+    if (!exists(electron) && exists(ensure)) {
+        // Dependencies installed for Rune have no Electron binary; fetch it
+        // now that Electron starts instead.
+        progress("Getting things ready…", 0.90, 0.96);
+        LOG("prepare: Electron is missing; running ensure-electron-binary.mjs");
+        try {
+            runCmd({gBunBin, ensure}, app, baseEnvironment(), P.installLog(), 10 * 60);
+        } catch (const LauncherError &e) {
+            LOG("prepare: ensure-electron-binary.mjs could not run: %s", e.message.c_str());
+        }
+    }
     if (!exists(electron)) fail("Electron is not installed (missing " + utf8(electron) + ").");
     return electron;
 }
@@ -3781,9 +3836,11 @@ static wstring prepareForLaunch() {
         LOG("catch-up: %s", e.message.c_str());
     }
     refreshInstallInfo();
+    startEnginePrefetch();
     ensureBun();
-    wstring electron = prepare();
-    if (!engineRequested()) return electron;
+    bool rune = engineRequested();
+    wstring electron = prepare(rune);
+    if (!rune) return electron;
     ensureEngine();
     LOG("launcher: starting stella-engine %s (%s) instead of Electron", gEngineVersion.c_str(), utf8(gEngineBin).c_str());
     return gEngineBin;

@@ -3032,6 +3032,22 @@
         "position": "{index} of {count} in this set",
         "previousSet": "Previous set",
         "nextSet": "Next set"
+      },
+      "viewHistory": {
+        "title": "Version history",
+        "stella": "Stella",
+        "task": "A task",
+        "you": "You",
+        "current": "Current",
+        "restoredFrom": "Restored the {time} version",
+        "undo": "Undo last change",
+        "back": "Back to current",
+        "restore": "Restore",
+        "ask": "Ask Stella to bring it back",
+        "askMessage": "Bring back the version of the \"{title}\" view from {time}, adapted to work with the data it has saved now.",
+        "restored": "Restored the {time} version",
+        "restoredHere": "Restored the {time} version on this device only",
+        "restoreFailed": "Couldn't restore this version"
       }
     },
     "displayPanel": {

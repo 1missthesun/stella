@@ -3032,6 +3032,22 @@
         "position": "{index} van {count} in deze set",
         "previousSet": "Vorige set",
         "nextSet": "Volgende set"
+      },
+      "viewHistory": {
+        "title": "Versiegeschiedenis",
+        "stella": "Stella",
+        "task": "Een taak",
+        "you": "Jij",
+        "current": "Huidige",
+        "restoredFrom": "Versie van {time} hersteld",
+        "undo": "Laatste wijziging ongedaan maken",
+        "back": "Terug naar huidige",
+        "restore": "Herstellen",
+        "ask": "Vraag Stella om hem terug te halen",
+        "askMessage": "Haal de versie van de weergave ‘{title}’ van {time} terug, aangepast zodat hij werkt met de gegevens die hij nu heeft opgeslagen.",
+        "restored": "Versie van {time} hersteld",
+        "restoredHere": "Versie van {time} alleen op dit apparaat hersteld",
+        "restoreFailed": "Kon deze versie niet herstellen"
       }
     },
     "displayPanel": {

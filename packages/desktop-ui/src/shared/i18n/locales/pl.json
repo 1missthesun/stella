@@ -3064,6 +3064,22 @@
         "position": "{index} z {count} w tym zestawie",
         "previousSet": "Poprzedni zestaw",
         "nextSet": "Następny zestaw"
+      },
+      "viewHistory": {
+        "title": "Historia wersji",
+        "stella": "Stella",
+        "task": "Zadanie",
+        "you": "Ty",
+        "current": "Bieżąca",
+        "restoredFrom": "Przywrócono wersję z {time}",
+        "undo": "Cofnij ostatnią zmianę",
+        "back": "Wróć do bieżącej",
+        "restore": "Przywróć",
+        "ask": "Poproś Stellę o przywrócenie",
+        "askMessage": "Przywróć wersję widoku „{title}” z {time}, dostosowaną tak, by działała z danymi, które ma teraz zapisane.",
+        "restored": "Przywrócono wersję z {time}",
+        "restoredHere": "Wersję z {time} przywrócono tylko na tym urządzeniu",
+        "restoreFailed": "Nie udało się przywrócić tej wersji"
       }
     },
     "displayPanel": {

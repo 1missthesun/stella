@@ -3014,6 +3014,22 @@
         "position": "{index} dari {count} di set ini",
         "previousSet": "Set sebelumnya",
         "nextSet": "Set berikutnya"
+      },
+      "viewHistory": {
+        "title": "Riwayat versi",
+        "stella": "Stella",
+        "task": "Sebuah tugas",
+        "you": "Kamu",
+        "current": "Saat ini",
+        "restoredFrom": "Versi {time} dipulihkan",
+        "undo": "Urungkan perubahan terakhir",
+        "back": "Kembali ke saat ini",
+        "restore": "Pulihkan",
+        "ask": "Minta Stella mengembalikannya",
+        "askMessage": "Kembalikan versi tampilan \"{title}\" dari {time}, disesuaikan agar berfungsi dengan data yang tersimpan sekarang.",
+        "restored": "Versi {time} dipulihkan",
+        "restoredHere": "Versi {time} dipulihkan hanya di perangkat ini",
+        "restoreFailed": "Tidak dapat memulihkan versi ini"
       }
     },
     "displayPanel": {

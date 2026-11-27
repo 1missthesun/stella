@@ -3032,6 +3032,22 @@
         "position": "Bu sette {index}/{count}",
         "previousSet": "Önceki set",
         "nextSet": "Sonraki set"
+      },
+      "viewHistory": {
+        "title": "Sürüm geçmişi",
+        "stella": "Stella",
+        "task": "Bir görev",
+        "you": "Sen",
+        "current": "Geçerli",
+        "restoredFrom": "{time} sürümü geri yüklendi",
+        "undo": "Son değişikliği geri al",
+        "back": "Geçerli sürüme dön",
+        "restore": "Geri yükle",
+        "ask": "Stella'dan geri getirmesini iste",
+        "askMessage": "\"{title}\" görünümünün {time} sürümünü, şu an kayıtlı verileriyle çalışacak şekilde uyarlayarak geri getir.",
+        "restored": "{time} sürümü geri yüklendi",
+        "restoredHere": "{time} sürümü yalnızca bu cihazda geri yüklendi",
+        "restoreFailed": "Bu sürüm geri yüklenemedi"
       }
     },
     "displayPanel": {

@@ -3032,6 +3032,22 @@
         "position": "{index} av {count} i dette settet",
         "previousSet": "Forrige sett",
         "nextSet": "Neste sett"
+      },
+      "viewHistory": {
+        "title": "Versjonslogg",
+        "stella": "Stella",
+        "task": "En oppgave",
+        "you": "Deg",
+        "current": "Gjeldende",
+        "restoredFrom": "Gjenopprettet versjonen fra {time}",
+        "undo": "Angre siste endring",
+        "back": "Tilbake til gjeldende",
+        "restore": "Gjenopprett",
+        "ask": "Be Stella hente den tilbake",
+        "askMessage": "Hent tilbake versjonen av visningen «{title}» fra {time}, tilpasset slik at den virker med dataene den har lagret nå.",
+        "restored": "Gjenopprettet versjonen fra {time}",
+        "restoredHere": "Gjenopprettet versjonen fra {time} bare på denne enheten",
+        "restoreFailed": "Kunne ikke gjenopprette denne versjonen"
       }
     },
     "displayPanel": {

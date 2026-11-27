@@ -3064,6 +3064,22 @@
         "position": "{index} z {count} v této sadě",
         "previousSet": "Předchozí sada",
         "nextSet": "Další sada"
+      },
+      "viewHistory": {
+        "title": "Historie verzí",
+        "stella": "Stella",
+        "task": "Úkol",
+        "you": "Vy",
+        "current": "Aktuální",
+        "restoredFrom": "Obnovena verze z {time}",
+        "undo": "Vrátit poslední změnu",
+        "back": "Zpět na aktuální",
+        "restore": "Obnovit",
+        "ask": "Požádat Stellu o obnovení",
+        "askMessage": "Obnov verzi zobrazení „{title}“ z {time}, upravenou tak, aby fungovala s daty, která má teď uložená.",
+        "restored": "Obnovena verze z {time}",
+        "restoredHere": "Verze z {time} obnovena jen na tomto zařízení",
+        "restoreFailed": "Tuto verzi se nepodařilo obnovit"
       }
     },
     "displayPanel": {

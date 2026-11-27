@@ -3048,6 +3048,22 @@
         "position": "{index} di {count} in questo gruppo",
         "previousSet": "Gruppo precedente",
         "nextSet": "Gruppo successivo"
+      },
+      "viewHistory": {
+        "title": "Cronologia versioni",
+        "stella": "Stella",
+        "task": "Un’attività",
+        "you": "Tu",
+        "current": "Attuale",
+        "restoredFrom": "Ripristinata la versione delle {time}",
+        "undo": "Annulla l’ultima modifica",
+        "back": "Torna all’attuale",
+        "restore": "Ripristina",
+        "ask": "Chiedi a Stella di recuperarla",
+        "askMessage": "Recupera la versione della vista “{title}” delle {time}, adattata per funzionare con i dati che ha salvato ora.",
+        "restored": "Ripristinata la versione delle {time}",
+        "restoredHere": "Versione delle {time} ripristinata solo su questo dispositivo",
+        "restoreFailed": "Impossibile ripristinare questa versione"
       }
     },
     "displayPanel": {

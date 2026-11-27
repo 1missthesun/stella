@@ -3032,6 +3032,22 @@
         "position": "{index}/{count} ebben a csoportban",
         "previousSet": "Előző csoport",
         "nextSet": "Következő csoport"
+      },
+      "viewHistory": {
+        "title": "Verzióelőzmények",
+        "stella": "Stella",
+        "task": "Egy feladat",
+        "you": "Te",
+        "current": "Jelenlegi",
+        "restoredFrom": "Visszaállítva a(z) {time} verzió",
+        "undo": "Utolsó módosítás visszavonása",
+        "back": "Vissza a jelenlegihez",
+        "restore": "Visszaállítás",
+        "ask": "Kérd meg Stellát, hogy hozza vissza",
+        "askMessage": "Hozd vissza a(z) „{title}” nézet {time} verzióját úgy módosítva, hogy működjön a most mentett adataival.",
+        "restored": "Visszaállítva a(z) {time} verzió",
+        "restoredHere": "A(z) {time} verzió csak ezen az eszközön lett visszaállítva",
+        "restoreFailed": "Ezt a verziót nem sikerült visszaállítani"
       }
     },
     "displayPanel": {

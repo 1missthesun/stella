@@ -3032,6 +3032,22 @@
         "position": "{index} av {count} i den här gruppen",
         "previousSet": "Föregående grupp",
         "nextSet": "Nästa grupp"
+      },
+      "viewHistory": {
+        "title": "Versionshistorik",
+        "stella": "Stella",
+        "task": "En uppgift",
+        "you": "Du",
+        "current": "Aktuell",
+        "restoredFrom": "Återställde versionen från {time}",
+        "undo": "Ångra senaste ändringen",
+        "back": "Tillbaka till aktuell",
+        "restore": "Återställ",
+        "ask": "Be Stella ta tillbaka den",
+        "askMessage": "Ta tillbaka versionen av vyn ”{title}” från {time}, anpassad så att den fungerar med den data den har sparad nu.",
+        "restored": "Återställde versionen från {time}",
+        "restoredHere": "Återställde versionen från {time} bara på den här enheten",
+        "restoreFailed": "Det gick inte att återställa den här versionen"
       }
     },
     "displayPanel": {

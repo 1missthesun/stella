@@ -6,6 +6,7 @@ import type { ViewTheme } from "@stella/views/protocol";
 import { VIEW_TOOL, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath } from "@stella/views/paths";
 import type { ViewStorageBackend } from "@stella/views/storage-sync";
+import type { ViewPublishBackend, ViewVersion } from "@stella/views/history";
 import type { WebViewsHost } from "./views-host";
 
 type Message = { toolEvents?: readonly ViewToolEvent[] };
@@ -31,9 +32,26 @@ const carriesView = (messages: readonly Message[]) =>
   messages.some((m) => m.toolEvents?.some((e) => e.type === "tool_result" && (e.payload as { toolName?: unknown } | undefined)?.toolName === VIEW_TOOL));
 
 let pending: { messages: readonly Message[]; conversationId: string | null } | null = null;
-let backend: ViewStorageBackend | null = null;
+let backend: (ViewStorageBackend & Partial<ViewPublishBackend>) | null = null;
 /** Not told yet: undefined. */
 let account: string | null | undefined;
+
+/** Calls `fn` with the host once it has loaded; the release stops it (or what it returned). */
+const whenLoaded = (fn: (h: WebViewsHost) => () => void): (() => void) => {
+  if (host) return fn(host);
+  let release: (() => void) | null = null;
+  let released = false;
+  load().then(
+    (h) => {
+      if (!released) release = fn(h);
+    },
+    (error: unknown) => console.error("[views] the views host didn't load", error),
+  );
+  return () => {
+    released = true;
+    release?.();
+  };
+};
 
 export const webViews = {
   isViewPath,
@@ -72,9 +90,16 @@ export const webViews = {
     };
   },
   reload: (filePath: string) => host?.reload(filePath),
+  history: (filePath: string): readonly ViewVersion[] => host?.history(filePath) ?? [],
+  previewing: (filePath: string): ViewVersion | null => host?.previewing(filePath) ?? null,
+  setPreview: (filePath: string, versionId: string | null) => host?.setPreview(filePath, versionId),
+  onHistory: (listener: (filePath: string) => void): (() => void) => whenLoaded((h) => h.onHistory(listener)),
+  subscribePreview: (filePath: string, versionId: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): (() => void) =>
+    whenLoaded((h) => h.subscribePreview(filePath, versionId, theme, listener)),
+  restore: async (filePath: string, versionId: string) => (await load()).restore(filePath, versionId),
   syncState: (filePath: string) => host?.syncState(filePath) ?? null,
-  /** The signed-in account (`account:<userId>`) and its backend, which views' storage syncs through. */
-  connectBackend(client: ViewStorageBackend | null, signedIn?: string | null) {
+  /** The signed-in account (`account:<userId>`) and its backend, which views' storage syncs and restores publish through. */
+  connectBackend(client: (ViewStorageBackend & Partial<ViewPublishBackend>) | null, signedIn?: string | null) {
     backend = client;
     account = signedIn ?? null;
     host?.connectBackend(client, account);

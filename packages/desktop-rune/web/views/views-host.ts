@@ -11,6 +11,7 @@ import { isViewPath, viewFileName, viewIdentityFromPath, viewKey, viewTitle } fr
 import { browserCapabilities } from "./capabilities";
 import { MovableViewStorage, ViewStorageSync, backendViewStorageRemote, syncedViewId, viewSlugFromPath, type ViewStorageBackend, type ViewStorageRemote } from "@stella/views/storage-sync";
 import { browserStorage, browserSyncedDisk, legacyBrowserStorage } from "./storage";
+import { ViewHistory, previewStorage, restoreCardArgs, restoredVersion, viewPreviewKey, type ViewPublishBackend, type ViewVersion } from "@stella/views/history";
 import { createWasmVm, preloadViews } from "./wasm-vm";
 
 const KEEP_ALIVE_MS = 60_000;
@@ -27,6 +28,8 @@ type Entry = {
   waitTimer: ReturnType<typeof setTimeout> | null;
   source: string | null;
   data: string | null;
+  /** A preview of an older version (its own run beside the live one): the source it runs. */
+  preview?: string;
 };
 
 type Message = { toolEvents?: readonly ViewToolEvent[] };
@@ -42,6 +45,9 @@ export function createWebViewsHost() {
   /** Which synced view each file is (`<conversationId>/<slug>`), from the conversation that made it. */
   const identities = new Map<string, string>();
   const sync = new ViewStorageSync(browserSyncedDisk(), (message, detail) => console.warn(`[views] ${message}`, detail));
+  /** Every version of each view the conversations carry, the restores made here, and what's being previewed. */
+  const history = new ViewHistory();
+  let backend: (ViewStorageBackend & Partial<ViewPublishBackend>) | null = null;
   if (typeof window !== "undefined") window.addEventListener("online", () => sync.retryNow());
   const remotes = new WeakMap<ViewStorageBackend, ViewStorageRemote>();
   const remoteFor = (client: ViewStorageBackend): ViewStorageRemote => {
@@ -67,6 +73,12 @@ export function createWebViewsHost() {
   };
 
   const apply = (entry: Entry) => {
+    if (entry.preview !== undefined) {
+      if (entry.source === entry.preview) return;
+      entry.source = entry.preview;
+      void entry.session.load(entry.preview, "preview.view.tsx");
+      return;
+    }
     const view = known.get(entry.filePath);
     if (!view) return;
     if (entry.waitTimer) clearTimeout(entry.waitTimer);
@@ -78,7 +90,7 @@ export function createWebViewsHost() {
     }
     if (view.source === entry.source) return;
     entry.source = view.source;
-    void entry.session.load(view.source, viewFileName(entry.filePath));
+    void entry.session.load(view.source, viewFileName(entry.filePath), { freshIfStateBreaks: view.by?.kind === "restore" });
   };
 
   const open = (filePath: string, theme: ViewTheme): Entry => {
@@ -125,6 +137,64 @@ export function createWebViewsHost() {
     entries.delete(filePath);
   };
 
+  /** An older version, run beside the live view: it starts from the view's saved values and data as they are now, and keeps its changes to itself. */
+  const openPreview = (filePath: string, version: ViewVersion, theme: ViewTheme): Entry => {
+    const key = viewPreviewKey(filePath, version.id);
+    const existing = entries.get(key);
+    if (existing) {
+      if (existing.closeTimer) clearTimeout(existing.closeTimer);
+      existing.closeTimer = null;
+      return existing;
+    }
+    const live = entries.get(filePath);
+    const storage = new MovableViewStorage(previewStorage(live?.storage ?? null));
+    const session = new ViewSession({ id: viewKey(key), title: version.title, vm, storage, capabilities: caps, theme: asWeb(theme), data: known.get(filePath)?.data ?? null, requestFrame, now });
+    const entry: Entry = { session, filePath: key, storage, viewId: null, refs: 0, closeTimer: null, waitTimer: null, source: null, data: null, preview: version.source };
+    entries.set(key, entry);
+    apply(entry);
+    return entry;
+  };
+
+  const attach = (entry: Entry, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void, keepAliveMs: number): (() => void) => {
+    if (entry.closeTimer) clearTimeout(entry.closeTimer);
+    entry.closeTimer = null;
+    entry.refs += 1;
+    entry.session.setTheme(asWeb(theme));
+    const off = entry.session.subscribe(listener);
+    listener(entry.session.current);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      off();
+      entry.refs -= 1;
+      if (entry.refs > 0) return;
+      entry.closeTimer = setTimeout(() => close(entry.filePath), keepAliveMs);
+    };
+  };
+
+  /** Makes `versionId` the view's newest version again, as a new version (so it can be undone too), on every device. */
+  const restore = async (filePath: string, versionId: string): Promise<{ restored: boolean; shared: boolean; error?: string }> => {
+    const target = history.find(filePath, versionId);
+    if (!target) return { restored: false, shared: false, error: "That version isn't in this conversation any more." };
+    const conversationId = history.conversationOf(filePath);
+    if (!conversationId || !backend?.call) return { restored: false, shared: false, error: "Restoring needs Stella Cloud, which isn't connected." };
+    const args = restoreCardArgs(target, history.latest(filePath), conversationId, Date.now());
+    const version = restoredVersion(args);
+    history.addPending(version);
+    history.setPreview(filePath, null);
+    // Here at once; the conversation brings the same version back (and to every other device).
+    const prior = known.get(filePath);
+    offer({ filePath, slug: args.slug, title: args.title, source: args.source, createdAt: args.createdAt, by: version.by, ...(prior?.data !== undefined ? { data: prior.data } : {}) });
+    try {
+      const { posted } = await backend.call("conversations.publishView", args);
+      return { restored: true, shared: posted };
+    } catch (error) {
+      console.error("[views] couldn't publish a restore:", error);
+      return { restored: true, shared: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
   const withEntry = (filePath: string, fn: (entry: Entry) => void) => {
     const entry = entries.get(filePath);
     if (entry) fn(entry);
@@ -143,21 +213,21 @@ export function createWebViewsHost() {
     isViewPath,
     /** Opens (or shares) the view at `filePath` and calls `listener` with each snapshot; returns the release. */
     subscribe(filePath: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): () => void {
-      const entry = open(filePath, theme);
-      entry.refs += 1;
-      entry.session.setTheme(asWeb(theme));
-      const off = entry.session.subscribe(listener);
-      listener(entry.session.current);
-      let released = false;
-      return () => {
-        if (released) return;
-        released = true;
-        off();
-        entry.refs -= 1;
-        if (entry.refs > 0) return;
-        entry.closeTimer = setTimeout(() => close(filePath), KEEP_ALIVE_MS);
-      };
+      return attach(open(filePath, theme), theme, listener, KEEP_ALIVE_MS);
     },
+    history: (filePath: string): readonly ViewVersion[] => history.versions(filePath),
+    previewing: (filePath: string): ViewVersion | null => history.preview(filePath),
+    setPreview: (filePath: string, versionId: string | null) => history.setPreview(filePath, versionId),
+    onHistory: (listener: (filePath: string) => void): (() => void) => history.subscribe(listener),
+    subscribePreview(filePath: string, versionId: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): () => void {
+      const version = history.find(filePath, versionId);
+      if (!version) {
+        listener({ status: "failed", tree: null, rev: 0, problem: { phase: "history", message: "That version isn't in this conversation any more." }, keys: [], firstRenderMs: null, swapMs: null });
+        return () => undefined;
+      }
+      return attach(openPreview(filePath, version, theme), theme, listener, 5_000);
+    },
+    restore,
     snapshot: (filePath: string): ViewSnapshot | null => entries.get(filePath)?.session.current ?? null,
     dispatch: (filePath: string, handler: number, value?: unknown) => withEntry(filePath, (e) => e.session.dispatch(handler, value)),
     key: (filePath: string, chord: string) => withEntry(filePath, (e) => e.session.key(chord)),
@@ -176,10 +246,11 @@ export function createWebViewsHost() {
       }),
     /**
      * The signed-in account (`account:<userId>`) and its backend, which views' storage syncs
-     * through; a null client while signed out. Each account keeps its own copy of every view's
-     * storage: after a switch, open views move onto the new account's.
+     * and restores publish through; a null client while signed out. Each account keeps its own
+     * copy of every view's storage: after a switch, open views move onto the new account's.
      */
-    connectBackend(client: ViewStorageBackend | null, account: string | null) {
+    connectBackend(client: (ViewStorageBackend & Partial<ViewPublishBackend>) | null, account: string | null) {
+      backend = client;
       if (!sync.connect(client ? account : null, client ? remoteFor(client) : null)) return;
       for (const entry of entries.values()) {
         if (!entry.viewId) continue;
@@ -194,6 +265,7 @@ export function createWebViewsHost() {
     },
     /** The views a conversation carries (its messages' `view` tool results): the newest of each runs. */
     offerMessages(messages: readonly Message[], conversationId?: string | null) {
+      history.offerMessages(messages, conversationId);
       let any = false;
       for (const message of messages) {
         const events = message.toolEvents;

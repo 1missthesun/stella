@@ -11,6 +11,7 @@ import { ViewSession, type ViewCapabilities, type ViewRun, type ViewSnapshot, ty
 import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import {
+  applyViewRestore,
   isViewPath,
   viewDataPath as dataPathFor,
   viewHostMarkerPath,
@@ -24,6 +25,7 @@ import {
   type ViewIdentityIndex,
   type ViewStatusFile,
 } from "@stella/views/files";
+import { ViewHistory, previewStorage, restoreCardArgs, restoredVersion, viewPreviewKey, type ViewPublishBackend, type ViewVersion } from "@stella/views/history";
 import {
   MovableViewStorage,
   ViewStorageSync,
@@ -441,6 +443,10 @@ type Entry = {
   sourceHash: string;
   /** The file isn't on this computer: the view runs from the conversation's copy. */
   remote: boolean;
+  /** A preview of an older version (its own run beside the live one): the source it runs. */
+  preview?: string;
+  /** A restored source on its way in from the file: it swaps in like an edit, fresh if the carried state breaks it. */
+  restoring?: string;
 };
 
 /** Whether a view's file is on this computer (a cloud view's path is a Drive path, not a local one). */
@@ -495,6 +501,12 @@ export function createViewsHost(engine: Engine, on: On) {
   const identities = identityIndex();
   /** Which conversation each message's views were last bound to, so a new message doesn't rebind the others. */
   const bound = new WeakMap<readonly ViewToolEvent[], string>();
+  /** Every version of each view the conversations carry, the restores made here, and what's being previewed. */
+  const history = new ViewHistory();
+  /** The signed-in account's backend: views' storage syncs through it, and restores reach the other devices through it. */
+  let backend: (ViewStorageBackend & Partial<ViewPublishBackend>) | null = null;
+  /** Restores from elsewhere already put into their files here. */
+  const landed = new Set<string>();
 
   /** Moves an open view onto its synced storage (its old storage comes along as the seed). */
   const bind = (entry: Entry, viewId: string) => {
@@ -513,6 +525,12 @@ export function createViewsHost(engine: Engine, on: On) {
   const requestFrame = displayFrameClock(engine, on, now);
 
   const readRemote = (entry: Entry) => {
+    if (entry.preview !== undefined) {
+      if (entry.lastSource === entry.preview) return;
+      entry.lastSource = entry.preview;
+      void entry.session.load(entry.preview, "preview.view.tsx");
+      return;
+    }
     // Not offered yet: the chat hands each conversation's views over as it renders.
     const view = known.get(entry.filePath);
     if (!view) return;
@@ -524,7 +542,7 @@ export function createViewsHost(engine: Engine, on: On) {
     if (view.source === entry.lastSource) return;
     entry.lastSource = view.source;
     entry.sourceHash = viewSourceHash(view.source);
-    void entry.session.load(view.source, basename(entry.filePath));
+    void entry.session.load(view.source, basename(entry.filePath), { freshIfStateBreaks: view.by?.kind === "restore" });
   };
 
   const readSource = (entry: Entry) => {
@@ -541,7 +559,10 @@ export function createViewsHost(engine: Engine, on: On) {
     entry.lastSource = source;
     entry.sourceHash = viewSourceHash(source);
     if (entry.viewId) identities.remember(entry.filePath, entry.viewId, source);
-    void entry.session.load(source, basename(entry.filePath));
+    const latest = history.latest(entry.filePath);
+    const restoring = entry.restoring === source || (latest?.by.kind === "restore" && latest.source === source);
+    entry.restoring = undefined;
+    void entry.session.load(source, basename(entry.filePath), { freshIfStateBreaks: restoring });
   };
 
   const readData = (entry: Entry) => {
@@ -645,7 +666,43 @@ export function createViewsHost(engine: Engine, on: On) {
     for (const watcher of entry.watchers) watcher.close();
     entry.session.dispose();
     entries.delete(filePath);
-    rmSync(viewStatusPath(filePath), { force: true });
+    if (entry.preview === undefined) rmSync(viewStatusPath(filePath), { force: true });
+  };
+
+  /**
+   * An older version, run beside the live view so the user can look at it: it starts from the
+   * view's saved values and data as they are now, and what it changes stays with the preview.
+   */
+  const openPreview = (filePath: string, version: ViewVersion, theme: ViewTheme): Entry => {
+    const key = viewPreviewKey(filePath, version.id);
+    const existing = entries.get(key);
+    if (existing) {
+      if (existing.closeTimer) clearTimeout(existing.closeTimer);
+      existing.closeTimer = null;
+      return existing;
+    }
+    const live = entries.get(filePath);
+    let data: unknown = known.get(filePath)?.data ?? null;
+    try {
+      if (live?.lastData) data = JSON.parse(live.lastData);
+    } catch {
+      // The live view's data is half-written: the conversation's copy.
+    }
+    const storage = new MovableViewStorage(previewStorage(live?.storage ?? null));
+    const session = new ViewSession({ id: hash(key), title: version.title, vm, storage, capabilities: caps, theme, data, requestFrame, now });
+    const entry: Entry = { session, filePath: key, storage, viewId: null, watchers: [], refs: 0, closeTimer: null, lastSource: null, lastData: null, sourceHash: "", remote: true, preview: version.source };
+    entries.set(key, entry);
+    readSource(entry);
+    return entry;
+  };
+
+  /** Puts a restore into the view's file here, when the file is here (every surface then swaps to it). */
+  const landRestore = async (version: ViewVersion) => {
+    if (version.by.kind !== "restore" || !isLocalViewFile(version.filePath)) return;
+    const entry = entries.get(version.filePath);
+    if (entry) entry.restoring = version.source;
+    const outcome = await applyViewRestore(dataDir(), { filePath: version.filePath, source: version.source, createdAt: version.createdAt, restoredFrom: version.by.from });
+    if (entry && outcome === "written") readSource(entry);
   };
 
   // A view the agent's `view` tool writes runs here at once, before its chat card exists: the
@@ -682,29 +739,79 @@ export function createViewsHost(engine: Engine, on: On) {
     if (entry) fn(entry);
   };
 
+  const attach = (entry: Entry, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void, keepAliveMs: number): (() => void) => {
+    if (entry.closeTimer) clearTimeout(entry.closeTimer);
+    entry.closeTimer = null;
+    entry.refs += 1;
+    entry.session.setTheme(theme);
+    const off = entry.session.subscribe(listener);
+    listener(entry.session.current);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      off();
+      entry.refs -= 1;
+      if (entry.refs > 0) return;
+      entry.closeTimer = setTimeout(() => close(entry.filePath), keepAliveMs);
+      entry.closeTimer.unref?.();
+    };
+  };
+
+  /** Makes `target` the view's newest version again, as a new version (so it can be undone too), on every device. */
+  const restore = async (filePath: string, versionId: string): Promise<{ restored: boolean; shared: boolean; error?: string }> => {
+    const target = history.find(filePath, versionId);
+    if (!target) return { restored: false, shared: false, error: "That version isn't in this conversation any more." };
+    const latest = history.latest(filePath);
+    const conversationId = history.conversationOf(filePath);
+    const args = restoreCardArgs(target, latest, conversationId ?? "", Date.now());
+    const version = restoredVersion(args);
+    history.addPending(version);
+    history.setPreview(filePath, null);
+    landed.add(version.id);
+    if (isLocalViewFile(filePath)) {
+      await landRestore(version);
+    } else {
+      const prior = known.get(filePath);
+      known.set(filePath, { filePath, slug: args.slug, title: args.title, source: args.source, createdAt: args.createdAt, by: version.by, ...(prior?.data !== undefined ? { data: prior.data } : {}) });
+      const entry = entries.get(filePath);
+      if (entry) readSource(entry);
+    }
+    if (!conversationId || !backend?.call) return { restored: true, shared: false };
+    try {
+      const { posted } = await backend.call("conversations.publishView", args);
+      return { restored: true, shared: posted };
+    } catch (error) {
+      console.error("[views] couldn't publish a restore:", error);
+      return { restored: true, shared: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
   return {
     isViewPath,
     /** Opens (or shares) the view at `filePath` and calls `listener` with each snapshot; returns the release. */
     subscribe(filePath: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): () => void {
       lastTheme = theme;
-      const entry = open(filePath, theme);
-      if (entry.closeTimer) clearTimeout(entry.closeTimer);
-      entry.closeTimer = null;
-      entry.refs += 1;
-      entry.session.setTheme(theme);
-      const off = entry.session.subscribe(listener);
-      listener(entry.session.current);
-      let released = false;
-      return () => {
-        if (released) return;
-        released = true;
-        off();
-        entry.refs -= 1;
-        if (entry.refs > 0) return;
-        entry.closeTimer = setTimeout(() => close(filePath), KEEP_ALIVE_MS);
-        entry.closeTimer.unref?.();
-      };
+      return attach(open(filePath, theme), theme, listener, KEEP_ALIVE_MS);
     },
+    /** The view's versions, oldest first (what the conversation carries, and restores made here). */
+    history: (filePath: string): readonly ViewVersion[] => history.versions(filePath),
+    /** The older version the view's surfaces show instead of the live one, or null. */
+    previewing: (filePath: string): ViewVersion | null => history.preview(filePath),
+    /** Shows an older version on every surface of the view (null goes back to the live one). */
+    setPreview: (filePath: string, versionId: string | null) => history.setPreview(filePath, versionId),
+    /** Calls `listener` with each file whose history or preview changed; returns the release. */
+    onHistory: (listener: (filePath: string) => void): (() => void) => history.subscribe(listener),
+    /** Runs an older version beside the live one (key `viewPreviewKey`, for dispatch and the rest); returns the release. */
+    subscribePreview(filePath: string, versionId: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): () => void {
+      const version = history.find(filePath, versionId);
+      if (!version) {
+        listener({ status: "failed", tree: null, rev: 0, problem: { phase: "history", message: "That version isn't in this conversation any more." }, keys: [], firstRenderMs: null, swapMs: null });
+        return () => undefined;
+      }
+      return attach(openPreview(filePath, version, theme), theme, listener, 5_000);
+    },
+    restore,
     snapshot: (filePath: string): ViewSnapshot | null => entries.get(filePath)?.session.current ?? null,
     dispatch: (filePath: string, handler: number, value?: unknown) => withEntry(filePath, (e) => e.session.dispatch(handler, value)),
     key: (filePath: string, chord: string) => withEntry(filePath, (e) => e.session.key(chord)),
@@ -719,6 +826,7 @@ export function createViewsHost(engine: Engine, on: On) {
      * across devices.
      */
     offerMessages(messages: readonly Message[], conversationId?: string | null) {
+      history.offerMessages(messages, conversationId);
       for (const message of messages) {
         const events = message.toolEvents;
         if (!events?.length) continue;
@@ -733,6 +841,12 @@ export function createViewsHost(engine: Engine, on: On) {
           known.set(view.filePath, view);
           const entry = entries.get(view.filePath);
           if (entry?.remote) readSource(entry);
+          // A restore made on another device: the file here takes it (unless it was written since).
+          const latest = history.latest(view.filePath);
+          if (latest?.by.kind === "restore" && !landed.has(latest.id)) {
+            landed.add(latest.id);
+            void landRestore(latest).catch((error: unknown) => console.error("[views] couldn't restore the view's file:", error));
+          }
         }
         if (!conversationId || bound.get(events) === conversationId) continue;
         bound.set(events, conversationId);
@@ -748,10 +862,11 @@ export function createViewsHost(engine: Engine, on: On) {
     },
     /**
      * The signed-in account (`account`, e.g. `account:<userId>`) and its backend, which views'
-     * storage syncs through; a null client while signed out. Each account keeps its own copy of every
-     * view's storage: after a switch, open views move onto the new account's.
+     * storage syncs and restores publish through; a null client while signed out. Each account
+     * keeps its own copy of every view's storage: after a switch, open views move onto the new account's.
      */
-    connectBackend(client: ViewStorageBackend | null, account?: string | null) {
+    connectBackend(client: (ViewStorageBackend & Partial<ViewPublishBackend>) | null, account?: string | null) {
+      backend = client;
       const remote = client ? remoteFor(client) : null;
       if (account === undefined) return sync.setRemote(remote);
       if (!sync.connect(client ? account : null, remote)) return;

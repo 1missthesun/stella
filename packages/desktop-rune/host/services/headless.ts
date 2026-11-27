@@ -3,9 +3,11 @@
 // (sign-in, chat) and memory measurements.
 
 import "./stdio";
-import { bootElectronMain } from "./electron-main";
-import { firstAppWindow, rendererApiFor } from "./renderer-api";
-import { startControlServer } from "./control";
+import "./bun-guard";
+
+const { bootElectronMain } = await import("./electron-main");
+const { firstAppWindow, rendererApiFor } = await import("./renderer-api");
+const { startControlServer } = await import("./control");
 
 await bootElectronMain({ exit: (code) => process.exit(code) });
 const win = await firstAppWindow();

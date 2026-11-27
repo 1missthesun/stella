@@ -2,7 +2,7 @@
 // (documentElement with classList/dataset/style), matchMedia, storage, animation frames,
 // navigator.clipboard, location/history, observers. Nothing here renders; the engine draws.
 
-import { createDomDocument, DomElement, type DomDocument } from "./document";
+import { createDomDocument, DomCanvasElement, DomElement, type DomDocument } from "./document";
 import { createMatchMedia, type MediaEnvironment } from "./media";
 import { MemoryStorage, UiStateStorage, type UiStateBackend } from "./storage";
 import { audioDevices } from "../electron/audio-player";
@@ -222,6 +222,7 @@ function installObservers(g: Record<string, any>) {
 }
 
 function installElementClasses(g: Record<string, any>) {
+  g.HTMLCanvasElement ??= DomCanvasElement;
   for (const name of [
     "Node", "Element", "HTMLElement", "SVGElement", "HTMLDivElement", "HTMLSpanElement", "HTMLInputElement",
     "HTMLTextAreaElement", "HTMLButtonElement", "HTMLAnchorElement", "HTMLImageElement", "HTMLVideoElement",

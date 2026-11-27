@@ -222,6 +222,14 @@ export class DomElement extends EventTarget {
   attachShadow() { return new DomElement("shadow-root"); }
 }
 
+export class DomCanvasElement extends DomElement {
+  width = 300;
+  height = 150;
+  getContext() { return null; }
+  toDataURL() { return "data:,"; }
+  toBlob(callback: (blob: Blob | null) => void) { callback(null); }
+}
+
 export class DomDocument extends EventTarget {
   readonly nodeType = 9;
   readonly documentElement = new DomElement("html");
@@ -247,7 +255,7 @@ export class DomDocument extends EventTarget {
   get defaultView() { return globalThis; }
   get fullscreenElement() { return null; }
   hasFocus() { return this.focused; }
-  createElement(tag: string) { const el = new DomElement(tag); el.ownerDocument = this; return el; }
+  createElement(tag: string) { const el = tag.toLowerCase() === "canvas" ? new DomCanvasElement(tag) : new DomElement(tag); el.ownerDocument = this; return el; }
   createElementNS(ns: string | null, tag: string) { const el = new DomElement(tag, ns); el.ownerDocument = this; return el; }
   createTextNode(text: string) { const el = new DomElement("#text"); el.textContent = text; return el; }
   createDocumentFragment() { return new DomElement("#document-fragment"); }

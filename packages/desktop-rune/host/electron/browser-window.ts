@@ -486,7 +486,7 @@ export class BrowserWindow extends BaseWindow {
   setTitleBarOverlay() {}
   setIcon() {}
   setOverlayIcon(overlay: unknown, description = "") {
-    const count = overlay ? Number(/^\d+/.exec(description)?.[0] ?? 1) : 0;
+    const count = Number(/^\d+/.exec(description)?.[0] ?? (overlay ? 1 : 0));
     app.showBadge(count > 0 ? String(count) : "", count);
   }
   setThumbarButtons() { return true; }

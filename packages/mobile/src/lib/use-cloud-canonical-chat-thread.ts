@@ -651,8 +651,32 @@ export const useCloudCanonicalChatThread = (
     paintedRef.current.store === store
       ? paintedRef.current
       : { store, messages: null, everShown: false };
+  // A window can hold nothing to show: after a long background the socket
+  // reloads only the newest records, and they may all sit inside one long
+  // turn whose prompt is earlier. Page back until a turn can be shown (or
+  // history runs out) instead of painting an empty chat nobody can scroll.
+  const oldestSeq = state.records[0]?.seq;
+  const needsEarlier =
+    projected.length === 0 &&
+    state.hasOlder &&
+    oldestSeq !== undefined &&
+    caughtUp &&
+    state.status === "live";
+  const [earlierRequest, setEarlierRequest] = useState<{
+    store: ConversationStore;
+    oldestSeq: number;
+  } | null>(null);
+  const earlierRequestedHere =
+    earlierRequest?.store === store && earlierRequest.oldestSeq === oldestSeq;
+  const fillingEarlier =
+    needsEarlier && (!earlierRequestedHere || state.loadingOlder);
+  useEffect(() => {
+    if (!needsEarlier || earlierRequestedHere || state.loadingOlder) return;
+    if (store.loadOlder()) setEarlierRequest({ store, oldestSeq: oldestSeq! });
+  }, [earlierRequestedHere, needsEarlier, oldestSeq, state.loadingOlder, store]);
   const display = planCloudTranscriptDisplay({
     caughtUp,
+    fillingEarlier,
     settledFailure,
     cacheVisible,
     cached: cachedProjection?.messages ?? null,

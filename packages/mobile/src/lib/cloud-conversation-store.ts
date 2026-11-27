@@ -225,24 +225,25 @@ class ConversationStore {
     this.socket?.wake();
   }
 
-  loadOlder(): void {
-    if (this.state.loadingOlder || !this.state.hasOlder) return;
+  loadOlder(): boolean {
+    if (this.state.loadingOlder || !this.state.hasOlder) return false;
     const oldest = this.state.records[0]?.seq;
     if (oldest === undefined || oldest <= this.state.floorSeq) {
       this.patch({ hasOlder: false });
-      return;
+      return false;
     }
     if (olderWouldExceedRetainedLimit(this.state.records)) {
       this.patch({ hasOlder: false, olderNotice: OLDER_LIMIT_NOTICE });
-      return;
+      return false;
     }
-    if (!this.socket?.requestOlder(oldest)) return;
+    if (!this.socket?.requestOlder(oldest)) return false;
     this.patch({ loadingOlder: true, olderNotice: null });
     if (this.olderTimer) clearTimeout(this.olderTimer);
     this.olderTimer = setTimeout(() => {
       this.olderTimer = null;
       if (this.state.loadingOlder) this.patch({ loadingOlder: false });
     }, OLDER_TIMEOUT_MS);
+    return true;
   }
 
   private ensureSocket(): void {

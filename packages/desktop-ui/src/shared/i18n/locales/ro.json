@@ -13,7 +13,12 @@
       "loadErrorTitle": "Nu am putut încărca aplicațiile tale",
       "loadErrorBody": "Stella nu poate accesa serverele acum. Verifică-ți conexiunea și încearcă din nou.",
       "refreshError": "Nu am putut reîmprospăta aplicațiile tale.",
-      "retry": "Încearcă din nou"
+      "retry": "Încearcă din nou",
+      "viewsHeading": "Vizualizări",
+      "cloudAppsHeading": "Aplicații cloud",
+      "removeView": "Elimină din Aplicații",
+      "viewOpenFailed": "Nu s-a putut deschide această vizualizare.",
+      "viewRemoveFailed": "Nu s-a putut elimina această vizualizare."
     },
     "chat": {
       "activityPill": {
@@ -1759,6 +1764,14 @@
       "problem": "Dispozitivele tale nu pot fi verificate",
       "startOverTitle": "O iei de la capăt?",
       "startOverBody": "Începe o listă nouă doar cu acest telefon. Fiecare dintre celelalte dispozitive va trebui permis din nou."
+    },
+    "views": {
+      "share": "Distribuie",
+      "publicLinkTitle": "Link public",
+      "shareLink": "Distribuie linkul",
+      "makePrivate": "Fă-l privat",
+      "shareFailed": "Nu s-a putut schimba linkul",
+      "missing": "Această vizualizare nu mai este în aplicațiile tale."
     }
   },
   "onboarding": {
@@ -3028,6 +3041,30 @@
         "position": "{index} din {count} în acest set",
         "previousSet": "Setul anterior",
         "nextSet": "Setul următor"
+      },
+      "viewHistory": {
+        "title": "Istoric versiuni",
+        "stella": "Stella",
+        "task": "O sarcină",
+        "you": "Tu",
+        "current": "Actuală",
+        "restoredFrom": "Versiunea de la {time} a fost restabilită",
+        "undo": "Anulează ultima modificare",
+        "back": "Înapoi la cea actuală",
+        "restore": "Restabilește",
+        "ask": "Cere-i Stellei să o aducă înapoi",
+        "askMessage": "Adu înapoi versiunea vizualizării „{title}” de la {time}, adaptată ca să funcționeze cu datele pe care le are salvate acum.",
+        "restored": "Versiunea de la {time} a fost restabilită",
+        "restoredHere": "Versiunea de la {time} a fost restabilită doar pe acest dispozitiv",
+        "restoreFailed": "Versiunea nu a putut fi restabilită"
+      },
+      "viewShare": {
+        "notSynced": "Această vizualizare nu a ajuns încă în contul tău. Încearcă din nou peste un moment.",
+        "noLink": "Distribuie un link care rulează această vizualizare în orice browser. Ce salvează vizitatorii rămâne în propriul lor browser.",
+        "makePrivateLink": "Link privat",
+        "madeWithStella": "Creat cu Stella",
+        "live": "Vizualizarea este publică",
+        "publicLink": "Link public al vizualizării"
       }
     },
     "displayPanel": {

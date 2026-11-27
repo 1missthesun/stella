@@ -39,6 +39,11 @@ export type CanvasShareContextValue = {
     visibility: ShareVisibility;
   }) => Promise<SavedCanvasShare>;
   viewLink: (args: { slug: string }) => Promise<string>;
+  /** Shares a Stella View (`<conversationId>/<slug>`) by link; it follows the view's newest version. */
+  saveView: (args: {
+    viewId: string;
+    visibility?: ShareVisibility;
+  }) => Promise<SavedCanvasShare>;
 };
 
 const CanvasShareContext = createContext<CanvasShareContextValue | null>(null);
@@ -62,6 +67,9 @@ const setVisibility: CanvasShareContextValue["setVisibility"] = (args) =>
 const viewLink = async ({ slug }: { slug: string }) =>
   (await backendClient.call("shares.viewLink", { slug })).url;
 
+const saveView: CanvasShareContextValue["saveView"] = (args) =>
+  backendClient.call("shares.saveView", args);
+
 export function CanvasShareProvider({ children }: { children: ReactNode }) {
   const value = useMemo<CanvasShareContextValue>(
     () => ({
@@ -72,6 +80,7 @@ export function CanvasShareProvider({ children }: { children: ReactNode }) {
       saveDriveDocument,
       setVisibility,
       viewLink,
+      saveView,
     }),
     [],
   );
@@ -93,3 +102,7 @@ export const canvasLinkKey = (slug: string | undefined): string | null =>
 
 export const useCanvasLink = (canvas: string | null) =>
   useBackendView("shares.canvas", canvas ? { canvas } : "skip");
+
+/** A Stella View's link (`<conversationId>/<slug>`), live; null when it has none. */
+export const useViewLink = (viewId: string | null) =>
+  useBackendView("shares.view", viewId ? { viewId } : "skip");

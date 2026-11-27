@@ -13,7 +13,12 @@
       "loadErrorTitle": "Aplikace se nepodařilo načíst",
       "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontroluj připojení a zkus to znovu.",
       "refreshError": "Aplikace se nepodařilo obnovit.",
-      "retry": "Zkusit znovu"
+      "retry": "Zkusit znovu",
+      "viewsHeading": "Zobrazení",
+      "cloudAppsHeading": "Cloudové aplikace",
+      "removeView": "Odebrat z aplikací",
+      "viewOpenFailed": "Toto zobrazení se nepodařilo otevřít.",
+      "viewRemoveFailed": "Toto zobrazení se nepodařilo odebrat."
     },
     "chat": {
       "activityPill": {
@@ -1769,6 +1774,14 @@
       "problem": "Tvá zařízení nelze ověřit",
       "startOverTitle": "Začít znovu?",
       "startOverBody": "Vznikne nový seznam jen s tímto telefonem. Ostatní zařízení bude potřeba znovu povolit."
+    },
+    "views": {
+      "share": "Sdílet",
+      "publicLinkTitle": "Veřejný odkaz",
+      "shareLink": "Sdílet odkaz",
+      "makePrivate": "Nastavit jako soukromé",
+      "shareFailed": "Odkaz se nepodařilo změnit",
+      "missing": "Toto zobrazení už ve vašich aplikacích není."
     }
   },
   "onboarding": {
@@ -3044,6 +3057,30 @@
         "position": "{index} z {count} v této sadě",
         "previousSet": "Předchozí sada",
         "nextSet": "Další sada"
+      },
+      "viewHistory": {
+        "title": "Historie verzí",
+        "stella": "Stella",
+        "task": "Úkol",
+        "you": "Vy",
+        "current": "Aktuální",
+        "restoredFrom": "Obnovena verze z {time}",
+        "undo": "Vrátit poslední změnu",
+        "back": "Zpět na aktuální",
+        "restore": "Obnovit",
+        "ask": "Požádat Stellu o obnovení",
+        "askMessage": "Obnov verzi zobrazení „{title}“ z {time}, upravenou tak, aby fungovala s daty, která má teď uložená.",
+        "restored": "Obnovena verze z {time}",
+        "restoredHere": "Verze z {time} obnovena jen na tomto zařízení",
+        "restoreFailed": "Tuto verzi se nepodařilo obnovit"
+      },
+      "viewShare": {
+        "notSynced": "Toto zobrazení se ještě nedostalo do vašeho účtu. Zkuste to za chvíli znovu.",
+        "noLink": "Sdílejte odkaz, který toto zobrazení spustí v jakémkoli prohlížeči. Co návštěvníci uloží, zůstane v jejich prohlížeči.",
+        "makePrivateLink": "Soukromý odkaz",
+        "madeWithStella": "Vytvořeno se Stellou",
+        "live": "Zobrazení je dostupné",
+        "publicLink": "Veřejný odkaz na zobrazení"
       }
     },
     "displayPanel": {

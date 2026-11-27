@@ -872,6 +872,14 @@
       "problem": "Laitteitasi ei voi tarkistaa",
       "startOverTitle": "Aloitetaanko alusta?",
       "startOverBody": "Tämä aloittaa uuden luettelon, jossa on vain tämä puhelin. Muut laitteesi on sallittava uudelleen yksitellen."
+    },
+    "views": {
+      "share": "Jaa",
+      "publicLinkTitle": "Julkinen linkki",
+      "shareLink": "Jaa linkki",
+      "makePrivate": "Tee yksityiseksi",
+      "shareFailed": "Linkkiä ei voitu muuttaa",
+      "missing": "Tämä näkymä ei ole enää sovelluksissasi."
     }
   },
   "settings": {
@@ -978,9 +986,27 @@
           "openFailed": "Linkkiä ei voitu avata"
         }
       },
+      "media": {
+        "expand": "Laajenna"
+      },
       "folder": {
         "emptyTitle": "Tämä kansio on tyhjä",
         "truncated": "Vain ensimmäiset {count} näytetään."
+      },
+      "viewHistory": {
+        "title": "Versiohistoria",
+        "stella": "Stella",
+        "task": "Tehtävä",
+        "you": "Sinä",
+        "current": "Nykyinen",
+        "restoredFrom": "Palautettiin versio ajalta {time}",
+        "undo": "Kumoa viimeisin muutos",
+        "back": "Takaisin nykyiseen",
+        "restore": "Palauta",
+        "ask": "Pyydä Stellaa tuomaan se takaisin",
+        "askMessage": "Tuo takaisin näkymän ”{title}” versio ajalta {time} niin muokattuna, että se toimii nyt tallennettujen tietojen kanssa.",
+        "restoredHere": "Versio ajalta {time} palautettiin vain tälle laitteelle",
+        "restoreFailed": "Tätä versiota ei voitu palauttaa"
       }
     },
     "sidebar": {

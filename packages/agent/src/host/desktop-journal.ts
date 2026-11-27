@@ -1,6 +1,7 @@
 import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import { parseWelcomeCard, welcomeAssistantMessage, welcomeMarkOf } from "@stella/contracts/welcome-message";
+import { parseViewCard, viewRestoreAssistantMessage, type ViewCard } from "@stella/contracts/view-card";
 import {
   isSafeguardBlock,
   parseSafeguardBlockInfo,
@@ -283,6 +284,8 @@ export async function journalMirror(args: {
   report: (error: unknown) => void;
   onRemoteTurns?: (turns: PiRemoteTurn[]) => void;
   onUsageLimit?: (card: ClaudeUsageLimitCard, createdAtMs: number) => void;
+  /** The user restored an earlier version of a view (on any device); Stella reads it in the conversation. */
+  onViewRestore?: (card: ViewCard) => Promise<void>;
   safeguardInfo?: (blocked: AssistantMessage) => Promise<SafeguardBlockInfo> | SafeguardBlockInfo;
   onSafeguard?: (event: SafeguardEvent) => Promise<void>;
   onSafeguardCard?: (card: SafeguardCard, record: { seq: number; ownPrompts: EntryId[]; own: boolean }) => Promise<void>;
@@ -505,6 +508,18 @@ export async function journalMirror(args: {
             hidden: false,
             message: welcomeAssistantMessage(record.createdAtMs ?? serverNow(), welcomeMarkOf(welcome)) as JournalMessage["message"],
           });
+          continue;
+        }
+        const viewCard = record.kind === "card" ? parseViewCard(record.card) : null;
+        if (viewCard?.restoredFrom !== undefined) {
+          messages.push({
+            seq: record.seq,
+            turnId: record.turnId,
+            role: "assistant",
+            hidden: false,
+            message: viewRestoreAssistantMessage(viewCard, record.createdAtMs ?? serverNow()) as JournalMessage["message"],
+          });
+          await args.onViewRestore?.(viewCard).catch(report);
           continue;
         }
         if (journal.ownTurn(record.turnId)) {

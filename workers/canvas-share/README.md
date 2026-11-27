@@ -59,6 +59,25 @@ deliberately **omits `allow-same-origin`**. That combination is the classic
 sandbox escape; omitting it gives every share an opaque origin so shares can't
 read cookies/localStorage or touch each other. Do not add `allow-same-origin`.
 
+## Shared Stella Views
+
+A `/c/<slug>` object tagged `kind: view` (owner-store `shares.saveView`) is a
+Stella View, not a page: its body is JSON (`SharedViewPayload` in
+`packages/contracts/view-share.ts`). After the usual expiry and private-grant
+checks the Worker fills the view page template (`/_view/page.html` from its
+static assets, binding `ASSETS`) with the payload and serves it. The page runs
+the view's program in PsychoScript's WebAssembly inside a worker and draws it
+with React DOM, for a visitor with no Stella account: its storage stays in the
+visitor's browser, `stella.ask` and `stella.send` say they work only inside
+Stella, and `fetch` reaches public https APIs subject to CORS.
+
+The page isn't sandboxed (it needs module workers and its origin's IndexedDB);
+only Stella's own scripts run in it, and the view's code never touches the DOM.
+Its CSP allows `'self'` scripts plus `'wasm-unsafe-eval'`.
+
+`bun run build:view` builds the page into `view-assets/` (gitignored);
+`dev`, `deploy` and `build:dry-run` run it first.
+
 ## Go-live checklist (not done here — no deploy)
 
 1. Provision the `stella-canvas-shares` R2 bucket (in progress).

@@ -30,5 +30,5 @@
     "web/**/*.tsx",
     "../desktop-ui/src/shared/types/electron.d.ts"
   ],
-  "exclude": ["node_modules", ".hot"]
+  "exclude": ["node_modules", ".hot", "**/*.view.tsx"]
 }

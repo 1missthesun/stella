@@ -13,7 +13,12 @@
       "loadErrorTitle": "Couldn't load your apps",
       "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
       "refreshError": "Couldn't refresh your apps.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "viewsHeading": "Views",
+      "cloudAppsHeading": "Cloud Apps",
+      "removeView": "Remove from Apps",
+      "viewOpenFailed": "Couldn't open this view.",
+      "viewRemoveFailed": "Couldn't remove this view."
     },
     "chat": {
       "activityPill": {
@@ -1749,6 +1754,14 @@
       "problem": "Can’t check your devices",
       "startOverTitle": "Start over?",
       "startOverBody": "This starts a new list with only this phone. Your other devices will each need to be allowed again."
+    },
+    "views": {
+      "share": "Share",
+      "publicLinkTitle": "Public link",
+      "shareLink": "Share link",
+      "makePrivate": "Make private",
+      "shareFailed": "Couldn't change the link",
+      "missing": "This view isn't in your Apps any more."
     }
   },
   "onboarding": {
@@ -3012,6 +3025,30 @@
         "position": "{index} of {count} in this set",
         "previousSet": "Previous set",
         "nextSet": "Next set"
+      },
+      "viewHistory": {
+        "title": "Version history",
+        "stella": "Stella",
+        "task": "A task",
+        "you": "You",
+        "current": "Current",
+        "restoredFrom": "Restored the {time} version",
+        "undo": "Undo last change",
+        "back": "Back to current",
+        "restore": "Restore",
+        "ask": "Ask Stella to bring it back",
+        "askMessage": "Bring back the version of the \"{title}\" view from {time}, adapted to work with the data it has saved now.",
+        "restored": "Restored the {time} version",
+        "restoredHere": "Restored the {time} version on this device only",
+        "restoreFailed": "Couldn't restore this version"
+      },
+      "viewShare": {
+        "notSynced": "This view hasn't reached your account yet. Try again in a moment.",
+        "noLink": "Share a link that runs this view in any browser. What visitors save stays in their own browser.",
+        "makePrivateLink": "Private link",
+        "madeWithStella": "Made with Stella",
+        "live": "View is live",
+        "publicLink": "Public view link"
       }
     },
     "displayPanel": {

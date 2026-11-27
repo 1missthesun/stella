@@ -874,6 +874,14 @@
       "problem": "Tvá zařízení nelze ověřit",
       "startOverTitle": "Začít znovu?",
       "startOverBody": "Vznikne nový seznam jen s tímto telefonem. Ostatní zařízení bude potřeba znovu povolit."
+    },
+    "views": {
+      "share": "Sdílet",
+      "publicLinkTitle": "Veřejný odkaz",
+      "shareLink": "Sdílet odkaz",
+      "makePrivate": "Nastavit jako soukromé",
+      "shareFailed": "Odkaz se nepodařilo změnit",
+      "missing": "Toto zobrazení už ve vašich aplikacích není."
     }
   },
   "settings": {
@@ -982,9 +990,27 @@
           "openFailed": "Odkaz se nepodařilo otevřít"
         }
       },
+      "media": {
+        "expand": "Rozbalit"
+      },
       "folder": {
         "emptyTitle": "Tato složka je prázdná",
         "truncated": "Zobrazuje se jen prvních {count}."
+      },
+      "viewHistory": {
+        "title": "Historie verzí",
+        "stella": "Stella",
+        "task": "Úkol",
+        "you": "Vy",
+        "current": "Aktuální",
+        "restoredFrom": "Obnovena verze z {time}",
+        "undo": "Vrátit poslední změnu",
+        "back": "Zpět na aktuální",
+        "restore": "Obnovit",
+        "ask": "Požádat Stellu o obnovení",
+        "askMessage": "Obnov verzi zobrazení „{title}“ z {time}, upravenou tak, aby fungovala s daty, která má teď uložená.",
+        "restoredHere": "Verze z {time} obnovena jen na tomto zařízení",
+        "restoreFailed": "Tuto verzi se nepodařilo obnovit"
       }
     },
     "sidebar": {

@@ -872,6 +872,14 @@
       "problem": "Kan je apparaten niet controleren",
       "startOverTitle": "Opnieuw beginnen?",
       "startOverBody": "Dit begint een nieuwe lijst met alleen deze telefoon. Je andere apparaten moeten elk opnieuw worden toegestaan."
+    },
+    "views": {
+      "share": "Delen",
+      "publicLinkTitle": "Openbare link",
+      "shareLink": "Link delen",
+      "makePrivate": "Privé maken",
+      "shareFailed": "Kan de link niet wijzigen",
+      "missing": "Deze weergave staat niet meer in je apps."
     }
   },
   "settings": {
@@ -978,9 +986,27 @@
           "openFailed": "Kan de link niet openen"
         }
       },
+      "media": {
+        "expand": "Uitvouwen"
+      },
       "folder": {
         "emptyTitle": "Deze map is leeg",
         "truncated": "Alleen de eerste {count} worden getoond."
+      },
+      "viewHistory": {
+        "title": "Versiegeschiedenis",
+        "stella": "Stella",
+        "task": "Een taak",
+        "you": "Jij",
+        "current": "Huidige",
+        "restoredFrom": "Versie van {time} hersteld",
+        "undo": "Laatste wijziging ongedaan maken",
+        "back": "Terug naar huidige",
+        "restore": "Herstellen",
+        "ask": "Vraag Stella om hem terug te halen",
+        "askMessage": "Haal de versie van de weergave ‘{title}’ van {time} terug, aangepast zodat hij werkt met de gegevens die hij nu heeft opgeslagen.",
+        "restoredHere": "Versie van {time} alleen op dit apparaat hersteld",
+        "restoreFailed": "Kon deze versie niet herstellen"
       }
     },
     "sidebar": {

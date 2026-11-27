@@ -872,6 +872,14 @@
       "problem": "Can’t check your devices",
       "startOverTitle": "Start over?",
       "startOverBody": "This starts a new list with only this phone. Your other devices will each need to be allowed again."
+    },
+    "views": {
+      "share": "Share",
+      "publicLinkTitle": "Public link",
+      "shareLink": "Share link",
+      "makePrivate": "Make private",
+      "shareFailed": "Couldn't change the link",
+      "missing": "This view isn't in your Apps any more."
     }
   },
   "settings": {
@@ -978,9 +986,27 @@
           "openFailed": "Couldn't open the link"
         }
       },
+      "media": {
+        "expand": "Expand"
+      },
       "folder": {
         "emptyTitle": "This folder is empty",
         "truncated": "Only the first {count} are shown."
+      },
+      "viewHistory": {
+        "title": "Version history",
+        "stella": "Stella",
+        "task": "A task",
+        "you": "You",
+        "current": "Current",
+        "restoredFrom": "Restored the {time} version",
+        "undo": "Undo last change",
+        "back": "Back to current",
+        "restore": "Restore",
+        "ask": "Ask Stella to bring it back",
+        "askMessage": "Bring back the version of the \"{title}\" view from {time}, adapted to work with the data it has saved now.",
+        "restoredHere": "Restored the {time} version on this device only",
+        "restoreFailed": "Couldn't restore this version"
       }
     },
     "sidebar": {

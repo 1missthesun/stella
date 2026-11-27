@@ -871,6 +871,14 @@
       "problem": "기기를 확인할 수 없음",
       "startOverTitle": "처음부터 다시 할까요?",
       "startOverBody": "이 휴대폰만 있는 새 목록을 시작합니다. 다른 기기는 각각 다시 허용해야 합니다."
+    },
+    "views": {
+      "share": "공유",
+      "publicLinkTitle": "공개 링크",
+      "shareLink": "링크 공유",
+      "makePrivate": "비공개로 전환",
+      "shareFailed": "링크를 변경할 수 없습니다",
+      "missing": "이 뷰는 더 이상 앱에 없습니다."
     }
   },
   "settings": {
@@ -976,9 +984,27 @@
           "openFailed": "링크를 열 수 없습니다"
         }
       },
+      "media": {
+        "expand": "확대"
+      },
       "folder": {
         "emptyTitle": "이 폴더는 비어 있습니다",
         "truncated": "처음 {count}개만 표시됩니다."
+      },
+      "viewHistory": {
+        "title": "버전 기록",
+        "stella": "Stella",
+        "task": "작업",
+        "you": "나",
+        "current": "현재",
+        "restoredFrom": "{time} 버전을 복원했어요",
+        "undo": "마지막 변경 실행 취소",
+        "back": "현재로 돌아가기",
+        "restore": "복원",
+        "ask": "Stella에게 되돌려 달라고 하기",
+        "askMessage": "\"{title}\" 뷰의 {time} 버전을 지금 저장된 데이터와 함께 작동하도록 맞춰서 되돌려 줘.",
+        "restoredHere": "{time} 버전을 이 기기에서만 복원했어요",
+        "restoreFailed": "이 버전을 복원할 수 없어요"
       }
     },
     "sidebar": {

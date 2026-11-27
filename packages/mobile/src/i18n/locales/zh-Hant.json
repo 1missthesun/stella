@@ -871,6 +871,14 @@
       "problem": "無法核對你的裝置",
       "startOverTitle": "重新開始？",
       "startOverBody": "這會建立一份只有這支手機的新清單。你的其他裝置都需要重新允許。"
+    },
+    "views": {
+      "share": "分享",
+      "publicLinkTitle": "公開連結",
+      "shareLink": "分享連結",
+      "makePrivate": "設為私人",
+      "shareFailed": "無法變更連結",
+      "missing": "此檢視已不在你的應用程式中。"
     }
   },
   "settings": {
@@ -976,9 +984,27 @@
           "openFailed": "無法開啟連結"
         }
       },
+      "media": {
+        "expand": "展開"
+      },
       "folder": {
         "emptyTitle": "此資料夾是空的",
         "truncated": "僅顯示前 {count} 項。"
+      },
+      "viewHistory": {
+        "title": "版本記錄",
+        "stella": "Stella",
+        "task": "一個任務",
+        "you": "你",
+        "current": "目前",
+        "restoredFrom": "已還原 {time} 的版本",
+        "undo": "復原上次變更",
+        "back": "回到目前版本",
+        "restore": "還原",
+        "ask": "請 Stella 找回它",
+        "askMessage": "把檢視「{title}」在 {time} 的版本找回來，並調整成能搭配它現在儲存的資料使用。",
+        "restoredHere": "已僅在此裝置上還原 {time} 的版本",
+        "restoreFailed": "無法還原此版本"
       }
     },
     "sidebar": {

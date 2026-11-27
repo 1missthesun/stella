@@ -874,6 +874,14 @@
       "problem": "Nie można sprawdzić twoich urządzeń",
       "startOverTitle": "Zacząć od nowa?",
       "startOverBody": "Powstanie nowa lista tylko z tym telefonem. Na każde z pozostałych urządzeń trzeba będzie zezwolić ponownie."
+    },
+    "views": {
+      "share": "Udostępnij",
+      "publicLinkTitle": "Link publiczny",
+      "shareLink": "Udostępnij link",
+      "makePrivate": "Ustaw jako prywatny",
+      "shareFailed": "Nie udało się zmienić linku",
+      "missing": "Tego widoku nie ma już w Twoich aplikacjach."
     }
   },
   "settings": {
@@ -982,9 +990,27 @@
           "openFailed": "Nie udało się otworzyć linku"
         }
       },
+      "media": {
+        "expand": "Rozwiń"
+      },
       "folder": {
         "emptyTitle": "Ten folder jest pusty",
         "truncated": "Wyświetlono tylko pierwsze {count}."
+      },
+      "viewHistory": {
+        "title": "Historia wersji",
+        "stella": "Stella",
+        "task": "Zadanie",
+        "you": "Ty",
+        "current": "Bieżąca",
+        "restoredFrom": "Przywrócono wersję z {time}",
+        "undo": "Cofnij ostatnią zmianę",
+        "back": "Wróć do bieżącej",
+        "restore": "Przywróć",
+        "ask": "Poproś Stellę o przywrócenie",
+        "askMessage": "Przywróć wersję widoku „{title}” z {time}, dostosowaną tak, by działała z danymi, które ma teraz zapisane.",
+        "restoredHere": "Wersję z {time} przywrócono tylko na tym urządzeniu",
+        "restoreFailed": "Nie udało się przywrócić tej wersji"
       }
     },
     "sidebar": {

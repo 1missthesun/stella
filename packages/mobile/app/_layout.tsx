@@ -17,6 +17,7 @@ import { loadAsync, useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { authClient } from "../src/lib/auth-client";
+import { setViewsAccount } from "../src/views/views-account";
 import { reconnectBackend } from "../src/lib/backend";
 import { clearEvidencePreviews } from "../src/lib/chat-evidence-previews";
 import { clearFileThumbnails } from "../src/lib/file-thumbnails";
@@ -170,8 +171,11 @@ function useBackendFollowsAccount(
     ? `${session.data.user?.id ?? ""}\u0000${session.data.session?.id ?? ""}`
     : null;
   const previous = useRef<string | null | undefined>(undefined);
+  const userId = session.data?.user?.id?.trim() || null;
   useEffect(() => {
     if (session.isPending) return;
+    // Views keep each account's saved values apart.
+    setViewsAccount(userId ? `account:${userId}` : null);
     const before = previous.current;
     previous.current = account;
     if (before !== undefined && before !== account) {
@@ -180,7 +184,7 @@ function useBackendFollowsAccount(
       clearFileThumbnails();
       reconnectBackend();
     }
-  }, [account, session.isPending]);
+  }, [account, session.isPending, userId]);
 }
 
 function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {

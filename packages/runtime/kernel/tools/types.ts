@@ -160,6 +160,8 @@ export type ToolHostOptions = {
   }>;
   getStellaSiteAuth?: () => { baseUrl: string; authToken: string } | null;
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
+  /** Where the host can't post a task's view through a Stella Cloud session (the cloud sandbox). */
+  publishView?: import("./defs/view.js").ViewPublisher;
   codeConnectClient?: import("../connectors/connect-service.js").ReplConnectClient;
   codeHistoryQuery?: (
     args: Record<string, unknown>,

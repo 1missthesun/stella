@@ -872,6 +872,14 @@
       "problem": "Deine Geräte lassen sich nicht prüfen",
       "startOverTitle": "Neu anfangen?",
       "startOverBody": "Damit beginnt eine neue Liste, auf der nur dieses Handy steht. Deine anderen Geräte müssen einzeln wieder erlaubt werden."
+    },
+    "views": {
+      "share": "Teilen",
+      "publicLinkTitle": "Öffentlicher Link",
+      "shareLink": "Link teilen",
+      "makePrivate": "Privat machen",
+      "shareFailed": "Link konnte nicht geändert werden",
+      "missing": "Diese Ansicht ist nicht mehr in deinen Apps."
     }
   },
   "settings": {
@@ -978,9 +986,27 @@
           "openFailed": "Link konnte nicht geöffnet werden"
         }
       },
+      "media": {
+        "expand": "Erweitern"
+      },
       "folder": {
         "emptyTitle": "Dieser Ordner ist leer",
         "truncated": "Nur die ersten {count} werden angezeigt."
+      },
+      "viewHistory": {
+        "title": "Versionsverlauf",
+        "stella": "Stella",
+        "task": "Eine Aufgabe",
+        "you": "Du",
+        "current": "Aktuell",
+        "restoredFrom": "Version von {time} wiederhergestellt",
+        "undo": "Letzte Änderung rückgängig",
+        "back": "Zurück zur aktuellen",
+        "restore": "Wiederherstellen",
+        "ask": "Stella bitten, sie zurückzuholen",
+        "askMessage": "Hol die Version der Ansicht „{title}“ von {time} zurück, angepasst an die Daten, die sie jetzt gespeichert hat.",
+        "restoredHere": "Version von {time} nur auf diesem Gerät wiederhergestellt",
+        "restoreFailed": "Diese Version konnte nicht wiederhergestellt werden"
       }
     },
     "sidebar": {

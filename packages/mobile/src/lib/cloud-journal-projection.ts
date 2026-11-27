@@ -1,3 +1,7 @@
+import { VIEW_TOOL, viewFromToolEvent } from "@stella/views/conversation";
+import { VIEW_FILE_RE, viewFileName, viewTitle } from "@stella/views/paths";
+import { viewResultHasProblems } from "@stella/views/history";
+import { parseViewCard, VIEW_RESTORE_AUTHOR, type ViewCard } from "@stella/contracts/view-card";
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { WELCOME_CARD_TYPE, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
@@ -16,7 +20,7 @@ import {
   type JournalView,
 } from "./journal-index";
 import { cloudFileArtifact } from "./cloud-file-payload";
-import type { ChatArtifact, ChatMessage } from "../types";
+import type { ChatArtifact, ChatMessage, ChatViewRef } from "../types";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
   journalMessageTimestamp as timestampOf,
@@ -109,6 +113,57 @@ const toolCalls = (
       { id, name, ...(args && Object.keys(args).length ? { args } : {}) },
     ];
   });
+};
+
+/** Who made a task's view card: the task, or the user's restore. */
+const cardAuthor = (card: ViewCard): NonNullable<ChatViewRef["by"]> =>
+  card.agentId === VIEW_RESTORE_AUTHOR && card.restoredFrom !== undefined
+    ? { kind: "restore", from: card.restoredFrom }
+    : { kind: "task", agentId: card.agentId, ...(card.agentTitle ? { title: card.agentTitle } : {}) };
+
+/** `views` (the last version per file) and, when the history differs from it, every version worth going back to. */
+const withVersions = (all: ChatViewRef[], byFile: ReadonlyMap<string, ChatViewRef>): Pick<ChatMessage, "views" | "viewVersions"> => {
+  const views = [...byFile.values()];
+  const same = all.length === views.length && all.every((ref, i) => ref === views[i]);
+  return { ...(views.length ? { views } : {}), ...(same ? {} : { viewVersions: all }) };
+};
+
+/** The Stella Views an assistant message's `view` calls made: the last version per file, and every version. */
+const viewRefs = (
+  record: JournalMessageRecord,
+  toolResults: ReadonlyMap<string, { error: boolean; payload: Record<string, unknown> }>,
+  createdAt: number,
+): Pick<ChatMessage, "views" | "viewVersions"> => {
+  if (!Array.isArray(record.payload.content)) return {};
+  const byFile = new Map<string, ChatViewRef>();
+  const all: ChatViewRef[] = [];
+  for (const value of record.payload.content) {
+    const block = asRecord(value);
+    if (!block || block.type !== "toolCall" || typeof block.id !== "string") continue;
+    const name = typeof block.name === "string" ? block.name.split("__").at(-1) : "";
+    if (name !== VIEW_TOOL) continue;
+    const result = toolResults.get(block.id);
+    if (!result) continue;
+    const view = viewFromToolEvent(
+      { type: "tool_result", timestamp: createdAt, payload: { ...result.payload, toolName: VIEW_TOOL, ...(result.error ? { error: true } : {}) } },
+      asRecord(block.arguments),
+    );
+    if (!view) continue;
+    const ref: ChatViewRef = {
+      filePath: view.filePath,
+      slug: view.slug ?? viewFileName(view.filePath).replace(VIEW_FILE_RE, ""),
+      title: view.title || viewTitle(view.filePath),
+      source: view.source,
+      ...(view.hasData ? { data: view.data } : {}),
+      createdAt: view.createdAt,
+      toolCallId: block.id,
+      by: view.by ?? { kind: "stella" },
+    };
+    if (!viewResultHasProblems(result.payload)) all.push(ref);
+    byFile.delete(view.filePath);
+    byFile.set(view.filePath, ref);
+  }
+  return withVersions(all, byFile);
 };
 
 const stringList = (value: unknown): string[] =>
@@ -294,6 +349,43 @@ const projectTurn = (
     });
     return out;
   }
+  // A task's view: one row per task and view, running its newest version.
+  const viewCards = turn.flatMap((record) => {
+    const card = record.kind === "card" ? parseViewCard(record.card) : null;
+    return card ? [{ record, card }] : [];
+  });
+  if (viewCards.length > 0) {
+    const first = viewCards[0]!.record;
+    const byFile = new Map<string, ChatViewRef>();
+    const all: ChatViewRef[] = [];
+    let data: unknown;
+    for (const { record, card } of viewCards) {
+      if (card.data !== undefined) data = card.data;
+      const ref: ChatViewRef = {
+        filePath: card.filePath,
+        slug: card.slug,
+        title: card.title,
+        source: card.source,
+        ...(data !== undefined ? { data } : {}),
+        createdAt: card.createdAt,
+        toolCallId: `cloud:${turnId}:view-call:${record.seq}`,
+        by: cardAuthor(card),
+      };
+      all.push(ref);
+      byFile.delete(card.filePath);
+      byFile.set(card.filePath, ref);
+    }
+    out.push({
+      id: `cloud:${turnId}:view:${first.seq}`,
+      role: "assistant",
+      text: "",
+      createdAt: first.createdAtMs,
+      canonicalCreatedAt: first.createdAtMs,
+      sequence: first.seq,
+      ...withVersions(all, byFile),
+    });
+    return out;
+  }
   for (const record of turn) {
     if (record.kind !== "card" || record.card.type !== SCHEDULE_NOTICE_CARD_TYPE) continue;
     out.push({
@@ -423,6 +515,7 @@ const projectTurn = (
         createdAt,
       }),
     ];
+    const viewed = viewRefs(record, toolResults, createdAt);
     const askRecords = toolCalls(record).flatMap((call): UserAskRecord[] => {
       if (call.name !== "ask_user" && call.name !== "request_secure_input") return [];
       const result = toolResults.get(call.id);
@@ -454,6 +547,7 @@ const projectTurn = (
       ...(spawnedThreadIds.length ? { spawnedThreadIds } : {}),
       ...(spawnedDescriptions.length ? { spawnedDescriptions } : {}),
       ...(artifacts.length ? { artifacts } : {}),
+      ...viewed,
       ...(askRecords.length ? { askRecords } : {}),
     });
   }

@@ -5,6 +5,15 @@
   "compatibility_date": "2026-08-30",
   "compatibility_flags": ["nodejs_compat"],
 
+  // The shared-view page (packages/desktop-rune/web/share/build.ts writes it here; `bun run build:view`).
+  "assets": {
+    "directory": "./view-assets",
+    "binding": "ASSETS",
+    // The page template is fetched by its exact name; never redirect `page.html` to `page`.
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+
   "r2_buckets": [
     {
       "binding": "SHARES_BUCKET",

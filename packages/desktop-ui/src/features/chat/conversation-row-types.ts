@@ -70,6 +70,8 @@ export type AssistantRowViewModel = {
   officePreviewRef?: OfficePreviewRef;
   linkedFiles?: ConversationFileEntry[];
   resourcePayload?: DisplayPayload;
+  /** Every Stella View the reply made or changed, one per file (`resourcePayload` is only the last thing it made). */
+  viewPayloads?: DisplayPayload[];
   inlineImagePayloads?: DisplayPayload[];
   mapArtifacts?: TurnMapArtifact[];
   askRecords?: UserAskRecord[];

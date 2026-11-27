@@ -51,6 +51,9 @@ import { MapRouteCards } from "./cards/MapRouteCard";
 import { OfficePreviewCard } from "./cards/OfficePreviewCard";
 import { InlineGeneratedImageStrip } from "./cards/InlineGeneratedImageCard";
 import { SourceDiffEndResource } from "./cards/SourceDiffEndResource";
+import { ViewChatCard, isViewFile } from "../views/ViewTabContent";
+import { getDisplayPayloadTitle } from "@stella/contracts/desktop/display-payload";
+import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { previewCard, pillColors } from "./surfaces";
 
 
@@ -387,8 +390,12 @@ function useReplyArrival(justArrived: boolean, finalAnswer: boolean) {
   }
 }
 
+/** The Stella Views a reply made or changed, one per file, in the order it first touched them. */
+export const rowViewPayloads = (row: AssistantRowViewModel): DisplayPayload[] =>
+  row.viewPayloads ?? (row.resourcePayload?.kind === "canvas-html" && isViewFile(row.resourcePayload.filePath) ? [row.resourcePayload] : []);
+
 export const AssistantMessageRow = memo(
-  function AssistantMessageRow({ row, conversationId, latestMedia = false }: { row: AssistantRowViewModel; conversationId?: string | null; latestMedia?: boolean }) {
+  function AssistantMessageRow({ row, conversationId, latestMedia = false, liveViews = "" }: { row: AssistantRowViewModel; conversationId?: string | null; latestMedia?: boolean; /** The files of the views this reply shows live (newline-separated): those it was the newest to touch. */ liveViews?: string }) {
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
     const reply = useMessageReply();
@@ -418,6 +425,16 @@ export const AssistantMessageRow = memo(
     const linkTargets = hasText ? extractFileLinkTargets(text) : [];
     const resourcePayload = row.resourcePayload;
     const canvasPage = resourcePayload?.kind === "canvas-html" && isHtmlPagePath(resourcePayload.filePath) ? resourcePayload : null;
+    // Each view the reply made: a live card where this is the newest reply to touch it, a chip otherwise.
+    const livePaths = new Set(liveViews ? liveViews.split("\n") : []);
+    const views = rowViewPayloads(row).filter((payload): payload is Extract<DisplayPayload, { kind: "canvas-html" }> => payload.kind === "canvas-html");
+    const liveViewCards = globalThis.stella.views ? views.filter((payload) => !payload.driveBacked && livePaths.has(payload.filePath)) : [];
+    const viewChips: ConversationFileEntry[] = views
+      .filter((payload) => !liveViewCards.includes(payload))
+      .flatMap((payload) => {
+        const path = localFilePathForPayload(payload);
+        return path ? [{ path, timestamp: payload.createdAt ?? row.timestampMs ?? 0, payload } as ConversationFileEntry] : [];
+      });
     const canvasDrivePath = canvasPage?.driveBacked ? canvasPage.filePath.replace(/^\/+/, "") : null;
     const canvasLocalPath = canvasPage && !canvasPage.driveBacked ? canvasPage.filePath : null;
     const evidencePaths = [...new Set([...linkTargets.filter((target) => !driveLinkPath(target)), ...(canvasLocalPath ? [canvasLocalPath] : [])])];
@@ -444,17 +461,18 @@ export const AssistantMessageRow = memo(
       !resourcePayload ||
       resourcePayload.kind === "source-diff" ||
       canvasLocalPath !== null ||
+      (resourcePayload.kind === "canvas-html" && isViewFile(resourcePayload.filePath)) ||
       (canvasDrivePath !== null && previewedDrivePaths.has(canvasDrivePath)) ||
       (resourcePayload.kind === "media" && resourcePayload.presentation === "inline-image") ||
       (resourcePayload.kind === "office" && Boolean(row.officePreviewRef));
     const resourceFilePath = resourcePayload && !resourceShownElsewhere ? localFilePathForPayload(resourcePayload) : null;
-    const attachedFiles: ConversationFileEntry[] =
-      resourcePayload && resourceFilePath
-        ? [
-            ...unpreviewableFiles,
-            { path: resourceFilePath, timestamp: ("createdAt" in resourcePayload ? resourcePayload.createdAt : undefined) ?? row.timestampMs ?? 0, payload: resourcePayload } as ConversationFileEntry,
-          ]
-        : unpreviewableFiles;
+    const attachedFiles: ConversationFileEntry[] = [
+      ...unpreviewableFiles,
+      ...viewChips,
+      ...(resourcePayload && resourceFilePath
+        ? [{ path: resourceFilePath, timestamp: ("createdAt" in resourcePayload ? resourcePayload.createdAt : undefined) ?? row.timestampMs ?? 0, payload: resourcePayload } as ConversationFileEntry]
+        : []),
+    ];
     const fileKey = (file: ConversationFileEntry) => (file.cloudDriveFile ? `cloud:${file.cloudDriveFile.path}` : `local:${file.path}`);
     const replyFiles = attachedFiles.filter(
       (file, index, all) => (file.cloudDriveFile ? !previewedDrivePaths.has(file.cloudDriveFile.path) : !evidencePathSet.has(file.path)) && all.findIndex((other) => fileKey(other) === fileKey(file)) === index,
@@ -496,6 +514,9 @@ export const AssistantMessageRow = memo(
               {!row.isIntraTurn ? <MessageActions text={text} messageKey={row.id} showReadAloud align="start" timestampMs={row.timestampMs} onReply={reply ?? undefined} /> : null}
             </row>
           ) : null}
+          {liveViewCards.map((payload) => (
+            <ViewChatCard key={`view:${payload.filePath}`} filePath={payload.filePath} title={getDisplayPayloadTitle(payload)} onOpen={() => openDisplayPayloadTab(payload)} />
+          ))}
           {row.reminder ? <ReminderFireCard mark={row.reminder} text={text} firedAtMs={row.timestampMs} /> : null}
           {hasBody && (inlineImageStrip || hasMedia) ? (
             <col w="full" gap={PART_GAP}>
@@ -520,5 +541,5 @@ export const AssistantMessageRow = memo(
       </col>
     );
   },
-  (prev, next) => prev.conversationId === next.conversationId && prev.latestMedia === next.latestMedia && eventRowEqual(prev.row, next.row),
+  (prev, next) => prev.conversationId === next.conversationId && prev.latestMedia === next.latestMedia && prev.liveViews === next.liveViews && eventRowEqual(prev.row, next.row),
 );

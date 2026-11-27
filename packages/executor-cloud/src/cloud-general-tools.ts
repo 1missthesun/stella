@@ -3,6 +3,7 @@ const CLOUD_GENERAL_TOOLS = [
   "write_stdin",
   "apply_patch",
   "web",
+  "view",
   "Read",
   "Write",
   "Edit",

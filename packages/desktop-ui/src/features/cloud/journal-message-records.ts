@@ -9,6 +9,7 @@ import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
 import { parseWelcomeCard, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import { parseEmailCard } from "@stella/contracts/email-card";
+import { parseViewCard, viewCardToolEvents } from "@stella/contracts/view-card";
 import {
   parseSafeguardCard,
   safeguardCardLabel,
@@ -318,6 +319,7 @@ export const journalRecordsToMessageRecords = (
       (record) => record.kind === "message" && record.role === "user",
     );
     const beforePrompt: EventRecord[] = [];
+    let viewRowOpened = false;
 
     for (const record of turnRecords) {
       const lifecycle = journalLifecycleEvent(record);
@@ -363,6 +365,38 @@ export const journalRecordsToMessageRecords = (
         continue;
       }
       if (record.kind === "card" && parseEmailCard(record.card)) continue;
+      // A task's view: its own row (one per task and view), carrying each version as the `view`
+      // call and result Stella's own views make, so every surface shows it the same way.
+      const viewCard = record.kind === "card" ? parseViewCard(record.card) : null;
+      if (viewCard) {
+        if (!viewRowOpened) {
+          viewRowOpened = true;
+          events.push({
+            _id: `cloud:${turnId}:view:${record.seq}`,
+            timestamp: record.createdAtMs,
+            sequence: record.seq,
+            type: "assistant_message",
+            payload: { text: "", source: "view-card" },
+          });
+        }
+        const requestId = `cloud:${turnId}:view-call:${record.seq}`;
+        const { call, result } = viewCardToolEvents(viewCard);
+        events.push({
+          _id: `cloud:${turnId}:view-request:${record.seq}`,
+          timestamp: record.createdAtMs,
+          type: "tool_request",
+          requestId,
+          payload: call,
+        });
+        events.push({
+          _id: `cloud:${turnId}:view-result:${record.seq}`,
+          timestamp: record.createdAtMs,
+          type: "tool_result",
+          requestId,
+          payload: { ...result, result: result.details, ...result.details },
+        });
+        continue;
+      }
       const safeguard = record.kind === "card" ? parseSafeguardCard(record.card) : null;
       const safeguardLabel = safeguard ? safeguardCardLabel(safeguard) : null;
       if (safeguardLabel) {

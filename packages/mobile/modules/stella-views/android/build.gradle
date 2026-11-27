@@ -1,0 +1,35 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.stella'
+version = '1.0.0'
+
+// The PsychoScript VM (libraries and UniFFI Kotlin bindings), built or copied from the per-rev cache.
+def vmReady = providers.exec {
+  commandLine file('../scripts/psychoscript.sh').absolutePath, 'android'
+  ignoreExitValue = true
+}
+if (vmReady.result.get().exitValue != 0) {
+  throw new GradleException("StellaViews: scripts/psychoscript.sh android failed:\n" + vmReady.standardError.asText.get())
+}
+
+android {
+  namespace 'com.stella.views'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+    consumerProguardFiles 'proguard-rules.pro'
+  }
+  sourceSets {
+    main {
+      jniLibs.srcDirs += ['vendor/jniLibs']
+      java.srcDirs += ['vendor/kotlin']
+    }
+  }
+}
+
+dependencies {
+  implementation 'net.java.dev.jna:jna:5.17.0@aar'
+}

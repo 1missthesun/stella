@@ -29,6 +29,7 @@ export const startLink = (): Promise<P2pStatus> =>
     name: computerName(),
     platform: process.platform,
     relay: process.env.STELLA_P2P_RELAY || "default",
+    rendezvous: process.env.STELLA_P2P_RENDEZVOUS || "default",
   }).catch((error: unknown) => {
     started = null;
     throw error;

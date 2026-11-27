@@ -1762,6 +1762,14 @@
       "makePrivate": "निजी बनाएँ",
       "shareFailed": "लिंक बदला नहीं जा सका",
       "missing": "यह व्यू अब आपके ऐप्स में नहीं है।"
+    },
+    "p2p": {
+      "title": "Use your computer's Stella",
+      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
+      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
+      "invalidCode": "That isn't a pairing code from Stella.",
+      "computers": "Your computers",
+      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
     }
   },
   "onboarding": {
@@ -3973,7 +3981,10 @@
     "computerChat": "{name} का Stella",
     "pair": {
       "intro": "इसे अपने फ़ोन पर Stella से स्कैन करें, या कोड को किसी दूसरे कंप्यूटर के Stella में पेस्ट करें। यह बिना अकाउंट के सीधे इस कंप्यूटर से जुड़ता है और एक बार काम करता है।",
-      "copy": "कोड कॉपी करें"
+      "copy": "कोड कॉपी करें",
+      "shortLabel": "Short pairing code",
+      "useOffline": "Use offline code",
+      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
     },
     "enter": {
       "title": "दूसरे कंप्यूटर का Stella इस्तेमाल करें",
@@ -3997,6 +4008,19 @@
       "connecting": "{name} से कनेक्ट हो रहा है…",
       "unpaired": "{name} ने इस डिवाइस को अनपेयर कर दिया।",
       "back": "इस कंप्यूटर पर वापस जाएँ"
+    },
+    "nearby": {
+      "title": "Nearby computers",
+      "looking": "Looking for computers on this network…",
+      "connectTo": "Connect to {name}",
+      "digitsTitle": "Connect to {name}",
+      "digitsIntro": "Enter the six digits {name} is showing now.",
+      "digitsLabel": "Six-digit code",
+      "denied": "{name} didn't allow it.",
+      "ended": "{name} ended the request. Try again.",
+      "requestTitle": "{name} wants to use this computer's Stella",
+      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
+      "deny": "Don't allow"
     }
   }
 }

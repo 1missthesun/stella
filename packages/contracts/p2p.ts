@@ -121,6 +121,17 @@ export type P2pPeers = { devices: P2pDevice[]; computers: P2pComputer[] };
 
 export type P2pPairing = { code: string; url: string; expiresAt: number };
 
+/** A short code (`K7M-49PX`) for the live pairing offer, through Stella's pairing mailbox. */
+export type P2pShortCode = P2pPairing & { short: string };
+
+/** A computer on this network that takes nearby devices. */
+export type P2pNearbyComputer = { id: string; name: string; platform: string; paired: boolean };
+
+/** A nearby device asking this computer to pair; `code` is what the device must type. */
+export type P2pConfirmRequest = { request: number; code: string; device: { id: string; name: string; platform: string } };
+
+export type P2pPairResult = { computer: P2pComputer; conversationId: string | null };
+
 export type P2pStatus = { id: string; name: string; platform: string; relay: string | null; addrs: string[] };
 
 /** What the UI reaches (Rune: `stella.host.p2p`). */
@@ -134,8 +145,25 @@ export type P2pApi = {
   /** Fires when a device pairs with the code on screen. */
   onPaired(listener: (device: P2pDevice) => void): () => void;
   revokeDevice(id: string): Promise<void>;
-  /** Pairs this device to the computer whose code this is; resolves with its chat. */
-  pair(code: string): Promise<{ computer: P2pComputer; conversationId: string | null }>;
+  /** A short code for the code on screen (making one if none is), good for 5 minutes. */
+  createShortCode(): Promise<P2pShortCode>;
+  /** Fires when the short code on screen stops working: a wrong guess spent it, or it expired. */
+  onShortCodeEnded(listener: (reason: string) => void): () => void;
+  /** Pairs this device to the computer whose code (full or short) this is; resolves with its chat. */
+  pair(code: string): Promise<P2pPairResult>;
+  /** Computers on this network, kept current while anyone watches. */
+  nearby(): P2pNearbyComputer[];
+  watchNearby(listener: () => void): () => void;
+  /** Asks a nearby computer to pair; it then shows six digits for `confirmNearby`. */
+  askNearby(id: string): Promise<void>;
+  confirmNearby(id: string, digits: string): Promise<P2pPairResult>;
+  cancelNearby(id: string): void;
+  /** Fires when the computer ended a request (`denied`, `failed`, `cancelled`). */
+  onNearbyEnded(listener: (id: string, reason: string) => void): () => void;
+  /** On the computer: the nearby device asking to pair right now. */
+  confirming(): P2pConfirmRequest | null;
+  subscribeConfirming(listener: () => void): () => void;
+  denyNearby(request: number): Promise<void>;
   forgetComputer(id: string): Promise<void>;
   /** The computer's chat on this device, once it has said which it is. */
   conversationFor(computerId: string): Promise<string | null>;
@@ -149,7 +177,13 @@ export type P2pNodeEvent =
   | { kind: "event"; from: string; body: unknown }
   | { kind: "device"; id: string; state: "paired" | "connected" | "disconnected" | "revoked" | "rejected"; device?: Omit<P2pDevice, "connected"> }
   | ({ kind: "computer"; id: string; name?: string } & (P2pComputerState | { state: "paired" | "forgotten" }))
-  | { kind: "pairing"; state: "used" | "expired" | "withdrawn" };
+  | { kind: "pairing"; state: "used" | "expired" | "withdrawn" }
+  | { kind: "pairing"; state: "short_ended"; reason: string }
+  | ({ kind: "pairing"; state: "confirm" } & P2pConfirmRequest)
+  | { kind: "pairing"; state: "confirm_done"; request: number; result: string }
+  | ({ kind: "nearby"; state: "found" } & P2pNearbyComputer)
+  | { kind: "nearby"; id: string; state: "lost" }
+  | { kind: "nearby"; id: string; state: "ended"; reason: string };
 
 /** The device link as the desktop engine and the phone engine expose it: `p2p.<name>` commands and their events. */
 export type P2pTransport = {

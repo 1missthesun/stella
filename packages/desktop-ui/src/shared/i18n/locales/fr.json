@@ -1772,6 +1772,14 @@
       "makePrivate": "Rendre privé",
       "shareFailed": "Impossible de modifier le lien",
       "missing": "Cette vue n'est plus dans tes apps."
+    },
+    "p2p": {
+      "title": "Use your computer's Stella",
+      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
+      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
+      "invalidCode": "That isn't a pairing code from Stella.",
+      "computers": "Your computers",
+      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
     }
   },
   "onboarding": {
@@ -4030,7 +4038,10 @@
     "computerChat": "Stella sur {name}",
     "pair": {
       "intro": "Scannez ceci avec Stella sur votre téléphone, ou collez le code dans Stella sur un autre ordinateur. La connexion se fait directement avec cet ordinateur, sans compte, et ne fonctionne qu’une fois.",
-      "copy": "Copier le code"
+      "copy": "Copier le code",
+      "shortLabel": "Short pairing code",
+      "useOffline": "Use offline code",
+      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
     },
     "enter": {
       "title": "Utiliser la Stella d’un autre ordinateur",
@@ -4054,6 +4065,19 @@
       "connecting": "Connexion à {name}…",
       "unpaired": "{name} a dissocié cet appareil.",
       "back": "Revenir à cet ordinateur"
+    },
+    "nearby": {
+      "title": "Nearby computers",
+      "looking": "Looking for computers on this network…",
+      "connectTo": "Connect to {name}",
+      "digitsTitle": "Connect to {name}",
+      "digitsIntro": "Enter the six digits {name} is showing now.",
+      "digitsLabel": "Six-digit code",
+      "denied": "{name} didn't allow it.",
+      "ended": "{name} ended the request. Try again.",
+      "requestTitle": "{name} wants to use this computer's Stella",
+      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
+      "deny": "Don't allow"
     }
   }
 }

@@ -1,7 +1,9 @@
 # stella-p2p on phones
 
 The same crate runs the desktop engine's direct device link and a phone's. A phone is a *device*:
-it pairs with a computer's code (`pair`), then talks to that computer (`request`, events).
+it pairs with a computer's code (`pair`, which takes the full code or a short `K7M-49PX` one as
+`pair.short`), then talks to that computer (`request`, events). Start phones with
+`discoverable: false`: they never answer nearby devices, since they are never anyone's computer.
 
 ## Rune phone app (`packages/mobile-rune`, branch `rune/mobile`)
 
@@ -11,9 +13,9 @@ it pairs with a computer's code (`pair`), then talks to that computer (`request`
 - The JS side is shared as is: `host/services/p2p/{link,peer-chats}.ts` only need a
   `P2pTransport` (`command`, `on`), which the phone host gets from its engine bridge.
   `computer.ts` (the host role) stays desktop-only.
-- Android: the app is a NativeActivity through winit/android-activity, which already hands
-  `ndk-context` the JVM and Context. Don't also call `stella_p2p_android_init` there; it would
-  initialize ndk-context a second time.
+- Android: `MainActivity` is a ComponentActivity driving the engine over JNI, so nothing
+  initializes `ndk-context` on its own (winit's NativeActivity entry never runs). Initialize it
+  once from the engine's JNI init with the application Context, as `stella_p2p_android_init` does.
 
 ## React Native app (`packages/mobile`)
 

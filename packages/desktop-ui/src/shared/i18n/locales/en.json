@@ -1762,6 +1762,14 @@
       "makePrivate": "Make private",
       "shareFailed": "Couldn't change the link",
       "missing": "This view isn't in your Apps any more."
+    },
+    "p2p": {
+      "title": "Use your computer's Stella",
+      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
+      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
+      "invalidCode": "That isn't a pairing code from Stella.",
+      "computers": "Your computers",
+      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
     }
   },
   "onboarding": {
@@ -3972,13 +3980,16 @@
     "forgetBody": "This device stops connecting to it. Its chats stay on that computer.",
     "computerChat": "{name}'s Stella",
     "pair": {
-      "intro": "Scan this with Stella on your phone, or paste the code into Stella on another computer. It connects straight to this computer, with no account, and works once.",
-      "copy": "Copy code"
+      "intro": "Scan this with Stella on your phone. On another computer, enter the code below in Stella under Use another computer's Stella.",
+      "copy": "Copy code",
+      "shortLabel": "Short pairing code",
+      "useOffline": "Use offline code",
+      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
     },
     "enter": {
       "title": "Use another computer's Stella",
-      "intro": "On that computer, open Settings › Account › Connect a device, then paste its code here.",
-      "label": "Pairing code",
+      "intro": "Or enter the code from that computer's Settings › Account › Connect a device.",
+      "label": "Code",
       "connect": "Connect",
       "connecting": "Connecting…"
     },
@@ -3997,6 +4008,19 @@
       "connecting": "Connecting to {name}…",
       "unpaired": "{name} unpaired this device.",
       "back": "Back to this computer"
+    },
+    "nearby": {
+      "title": "Nearby computers",
+      "looking": "Looking for computers on this network…",
+      "connectTo": "Connect to {name}",
+      "digitsTitle": "Connect to {name}",
+      "digitsIntro": "Enter the six digits {name} is showing now.",
+      "digitsLabel": "Six-digit code",
+      "denied": "{name} didn't allow it.",
+      "ended": "{name} ended the request. Try again.",
+      "requestTitle": "{name} wants to use this computer's Stella",
+      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
+      "deny": "Don't allow"
     }
   }
 }

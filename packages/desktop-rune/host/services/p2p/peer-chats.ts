@@ -2,12 +2,14 @@
 // their own ids (`local_p2p-…`), and everything the UI does with one of them (watch, send, read
 // history, attach files) goes to that computer instead of this one's runtime.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { open, stat } from "node:fs/promises";
+import { mkdir, open, rename, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { EvidenceCardSet } from "@stella/contracts/chat-evidence";
 import type { LocalChatUpdatedPayload } from "@stella/contracts/local-chat";
+import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import type { PiChatEventsPayload, PiChatRequest, PiChatSend } from "@stella/contracts/pi-chat";
 import {
   P2P_FILE_CHUNK,
@@ -17,6 +19,7 @@ import {
   remoteConversationId,
   type P2pComputer,
   type P2pEvent,
+  type P2pFileChunk,
   type P2pFilePut,
   type P2pHello,
   type P2pLocalChatOp,
@@ -40,6 +43,57 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
   const localListeners = new Set<(payload: LocalChatUpdatedPayload) => void>();
   const onlineWaiters = new Map<string, Set<() => void>>();
   const pendingWatches = new Set<string>();
+  /** Files a computer's replies link to (an image it made, say), by the path on that computer. */
+  const linked = new Map<string, string>();
+  const fetched = new Map<string, Promise<string | null>>();
+  const cacheDir = join(dataDir, "cache");
+
+  const noteLinks = (computerId: string, value: unknown, depth = 0) => {
+    if (depth > 12) return;
+    if (typeof value === "string") {
+      if (value.length < 4 || !(value.includes("](") || value.includes("file://"))) return;
+      for (const path of extractLocalFileLinkPaths(value)) linked.set(path, computerId);
+    } else if (Array.isArray(value)) {
+      for (const item of value) noteLinks(computerId, item, depth + 1);
+    } else if (value && typeof value === "object") {
+      for (const item of Object.values(value)) noteLinks(computerId, item, depth + 1);
+    }
+  };
+
+  /** A local copy of a file on a computer, fetched over the link once; null when it can't be. */
+  const fetchLinked = (path: string): Promise<string | null> => {
+    const known = fetched.get(path);
+    if (known) return known;
+    const computer = store.get().computers.find((c) => c.id === linked.get(path));
+    if (!computer || !online(computer.id)) return Promise.resolve(null);
+    const work = (async () => {
+      const dir = join(cacheDir, peerTag(computer.id));
+      await mkdir(dir, { recursive: true, mode: 0o700 });
+      const target = join(dir, `${createHash("sha256").update(path).digest("hex").slice(0, 12)}-${basename(path).replace(/[^\w.-]+/g, "_").slice(-80)}`);
+      if (await stat(target).then((s) => s.isFile(), () => false)) return target;
+      const partial = `${target}.part`;
+      const file = await open(partial, "w", 0o600);
+      try {
+        for (let offset = 0; ; ) {
+          const chunk = await send<P2pFileChunk>(computer, { m: "file.read", path, offset, length: P2P_FILE_CHUNK });
+          const data = Buffer.from(chunk.data, "base64");
+          await file.write(data, 0, data.length, offset);
+          offset += data.length;
+          if (chunk.done) break;
+          if (data.length === 0) throw new Error("Download stalled.");
+        }
+      } finally {
+        await file.close();
+      }
+      await rename(partial, target);
+      return target;
+    })().catch(() => {
+      fetched.delete(path);
+      return null;
+    });
+    fetched.set(path, work);
+    return work;
+  };
 
   const computerByTag = (tag: string) => store.get().computers.find((c) => peerTag(c.id) === tag) ?? null;
 
@@ -168,12 +222,15 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
     }
     const mapped = swapIds({ ...request }, remote.remoteId, conversationId) as PiChatRequest;
     if (mapped.op === "submit") mapped.send = await sendFor(computer, mapped.send);
-    return swapIds(await send(computer, { m: "pi", request: mapped }, mapped.op === "submit" ? 120_000 : 60_000), conversationId, remote.remoteId);
+    const result = await send(computer, { m: "pi", request: mapped }, mapped.op === "submit" ? 120_000 : 60_000);
+    noteLinks(computer.id, result);
+    return swapIds(result, conversationId, remote.remoteId);
   };
 
   const localChat = async (remote: Remote, op: P2pLocalChatOp, args: Record<string, unknown>) => {
     if (!(await reachable(remote.computer))) throw awayError(remote.computer.name);
     const result = await send(remote.computer, { m: "localChat", op, args: swapIds({ ...args }, remote.remoteId, remote.conversationId) });
+    noteLinks(remote.computer.id, result);
     return swapIds(result, remote.conversationId, remote.remoteId);
   };
 
@@ -185,6 +242,7 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
       if (parsed?.tag !== tag || pendingWatches.has(remoteId)) continue;
       void send<{ snapshot: PiChatEventsPayload["events"][number] }>(computer, { m: "pi", request: { op: "watch", conversationId: parsed.conversationId } })
         .then((result) => {
+          noteLinks(computer.id, result.snapshot);
           const events = [swapIds(result.snapshot, parsed.conversationId, remoteId)];
           for (const listener of piListeners) listener({ conversationId: remoteId, events });
         })
@@ -215,6 +273,7 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
     if (!computer) return;
     const body = event.body as P2pEvent;
     if (body?.t === "pi") {
+      noteLinks(computer.id, body.payload);
       const id = body.payload.conversationId;
       const payload = swapIds(body.payload, id, remoteConversationId(computer.id, id));
       for (const listener of piListeners) listener(payload);
@@ -252,8 +311,21 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
           return remote ? localChat(remote, op, args) : own(args);
         };
       }
+      const evidence = api.chatEvidence;
       return {
         ...api,
+        ...(evidence
+          ? {
+              chatEvidence: {
+                ...evidence,
+                // A computer's chat links to files on that computer; show local copies of them.
+                cards: async (filePaths: string[]) => {
+                  const local = await Promise.all(filePaths.map(async (path) => (linked.has(path) ? ((await fetchLinked(path)) ?? path) : path)));
+                  return await evidence.cards(local);
+                },
+              },
+            }
+          : null),
         piChat: {
           ...piChat,
           request: ((request: PiChatRequest) => {
@@ -292,6 +364,7 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
 export type PeerChats = ReturnType<typeof createPeerChats>;
 
 type WrappableApi = {
+  chatEvidence?: { cards(filePaths: string[]): Promise<EvidenceCardSet> };
   piChat: { request(...args: never[]): Promise<unknown>; onEvents(listener: never): () => void };
   localChat: {
     setActiveConversationId(...args: never[]): Promise<unknown>;

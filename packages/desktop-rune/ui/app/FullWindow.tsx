@@ -16,6 +16,7 @@ import { CloudMemoryPreferenceBridge } from "@/features/cloud/CloudMemoryPrefere
 import { CloudModelSelectionBridge } from "@/features/cloud/CloudModelSelectionBridge";
 import { TelemetryPreferenceBridge } from "@/features/cloud/TelemetryPreferenceBridge";
 import { SelfHostLayer } from "@/global/self-host/SelfHostLayer";
+import { NearbyRequestLayer } from "../global/devices/NearbyRequestLayer";
 import { platformCapabilities } from "@/platform/capabilities";
 import { prefetchAuthSessionBeforeRender } from "@/global/auth/services/auth-session";
 import { installRendererErrorReporting } from "@/platform/diagnostics/report-error";
@@ -102,6 +103,7 @@ function App() {
         {platformCapabilities.nativeBridges ? <DeviceWorkOfferLayer /> : null}
         {platformCapabilities.nativeBridges ? <SavedValuesDeviceLayer /> : null}
         {platformCapabilities.nativeBridges ? <SelfHostLayer /> : null}
+        {platformCapabilities.nativeBridges ? <NearbyRequestLayer /> : null}
         <FullShell />
       </ChatStoreProvider>
       <LaunchSplash />

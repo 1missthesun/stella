@@ -38,9 +38,6 @@ pub struct Tree {
     pub web_above: HashSet<u32>,
     /// Nodes with effect props (`fx`, `light`, `lit`): their windows draw through `fx::Comp`.
     pub fx: HashSet<u32>,
-    /// Removed `morphFrom` glass elements kept (childless, inert) while their glass morphs back
-    /// into its source, since when; `fx::Comp` reports when to let them go.
-    pub closing: HashMap<u32, std::time::Instant>,
     live_moved: bool,
 }
 
@@ -177,7 +174,6 @@ impl Tree {
 
     fn destroy(&mut self, id: u32) {
         if let Some(n) = self.nodes.remove(&id) {
-            self.closing.remove(&id);
             self.removed.push(id);
             self.lifted.remove(&id);
             self.fx.remove(&id);
@@ -196,23 +192,6 @@ impl Tree {
         {
             self.detach(old, child);
             self.touch(old);
-        }
-    }
-
-    /// Lets closing elements go: the ones `fx::Comp` reported back in their source, and any held
-    /// longer than `fx::CLOSE_MAX`.
-    pub fn finish_closing(&mut self, done: &[u32]) {
-        let now = std::time::Instant::now();
-        let gone: Vec<u32> = self.closing.iter().filter(|(id, at)| done.contains(id) || now.duration_since(**at) > crate::fx::CLOSE_MAX).map(|(id, _)| *id).collect();
-        for id in gone {
-            let parent = self.nodes.get(&id).map_or(0, |n| n.parent);
-            self.live_moved = true;
-            if parent == 0 {
-                self.dirty.insert(id);
-            }
-            self.detach(parent, id);
-            self.destroy(id);
-            self.touch(parent);
         }
     }
 
@@ -264,14 +243,6 @@ impl Tree {
                 if let Some(c) = self.nodes.get_mut(&child) {
                     c.parent = parent;
                 }
-                self.touch(child);
-            }
-            Op::Remove { parent, child } if parent != 0 && !self.closing.contains_key(&child) && self.nodes.get(&child).is_some_and(|n| crate::fx::morphs(&n.props)) => {
-                self.live_moved = true;
-                for c in self.nodes.get_mut(&child).map(|n| std::mem::take(&mut n.children)).unwrap_or_default() {
-                    self.destroy(c);
-                }
-                self.closing.insert(child, std::time::Instant::now());
                 self.touch(child);
             }
             Op::Remove { parent, child } => {

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { Globe, LoaderCircle, LogIn, Mail, Palette, Play, Plug, Smartphone, type IconComponent } from "@/ui/icons";
 import {
   WELCOME_CLOSING,
@@ -16,8 +16,9 @@ import { ChooseAiCard } from "./ChooseAiCard";
 import "./welcome.css";
 
 // Stella's first message. The words come from contracts so every client and
-// the model share them; each point sits on its own row with buttons for what
-// it describes, and a button disappears once that thing is done.
+// the model share them; each point is a row with its one button on the
+// right, like a settings row, and the button moves under the text when the
+// message is narrow.
 
 const ACTION_ICONS: Record<string, IconComponent> = {
   extension: Globe,
@@ -37,7 +38,7 @@ function ActionButton({ action, item }: { action: WelcomeAction; item: string })
       className={`welcome-message__action${variant}`}
       data-welcome-action={`${item}:${action.id}`}
       disabled={action.busy}
-      onClick={action.run}
+      onClick={action.theme ? undefined : action.run}
     >
       {Icon ? (
         <Icon
@@ -51,7 +52,23 @@ function ActionButton({ action, item }: { action: WelcomeAction; item: string })
       {action.label}
     </button>
   );
-  return action.theme ? <ThemePicker trigger={button} side="top" align="start" /> : button;
+  return action.theme ? <ThemeAction button={button} onClosed={action.run} /> : button;
+}
+
+function ThemeAction({ button, onClosed }: { button: ReactElement; onClosed?: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <ThemePicker
+      trigger={button}
+      side="top"
+      align="end"
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) onClosed?.();
+      }}
+    />
+  );
 }
 
 function LegalLine() {
@@ -99,7 +116,7 @@ function ChooseAiDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
 export function WelcomeMessage() {
   const [chooseAiOpen, setChooseAiOpen] = useState(false);
-  const actionsFor = useWelcomeActions({ openChooseAi: () => setChooseAiOpen(true) });
+  const actionFor = useWelcomeActions({ openChooseAi: () => setChooseAiOpen(true) });
 
   return (
     <div className="welcome-message" data-testid="welcome-message">
@@ -109,19 +126,13 @@ export function WelcomeMessage() {
         <p>{WELCOME_LEAD}</p>
         <div className="welcome-message__points">
           {WELCOME_ITEMS.map((item) => {
-            const actions = actionsFor(item.id);
+            const action = actionFor(item.id);
             return (
               <div key={item.id} className="welcome-message__point" data-welcome-item={item.id}>
                 <p>
                   <strong>{item.title}</strong> {item.body}
                 </p>
-                {actions.length > 0 ? (
-                  <div className="welcome-message__actions">
-                    {actions.map((action) => (
-                      <ActionButton key={action.id} action={action} item={item.id} />
-                    ))}
-                  </div>
-                ) : null}
+                {action ? <ActionButton action={action} item={item.id} /> : null}
               </div>
             );
           })}

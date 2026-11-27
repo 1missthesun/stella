@@ -13,7 +13,6 @@ Stella runs from its own git checkout at `$STELLA_APP_DIR`. That checkout is wha
 - `packages/runtime`: the runtime (agents, tools), a Bun process.
 - `packages/desktop/electron`: Electron main and preload.
 - `packages/contracts`: types and constants shared by all of them.
-- When `$STELLA_LAUNCHER_ENGINE` is `rune`, a native engine draws the interface from `packages/desktop-rune/ui` instead of `packages/desktop-ui`: read `packages/desktop-rune/SELF-MODIFY.md` before changing how Stella looks.
 
 ## Start a draft
 

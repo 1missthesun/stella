@@ -657,8 +657,12 @@ const liveReporters = async (
   for (const status of LIVE_TASK_STATUSES) {
     let cursor: Parameters<Tx["scanTasks"]>[2];
     do {
-      const page = await tx.scanTasks({ conversationId, kind: REPORTER_TASK, status }, 100, cursor);
-      for (const task of page.items) found.push({ id: Number(task.id), input: task.input as unknown as ReporterInput });
+      // Status alone: SQLite then reads only live tasks (tasks_by_status); adding the conversation makes it walk every task that conversation ever ran.
+      const page = await tx.scanTasks({ status }, 100, cursor);
+      for (const task of page.items) {
+        if (task.conversationId !== conversationId || task.kind !== REPORTER_TASK) continue;
+        found.push({ id: Number(task.id), input: task.input as unknown as ReporterInput });
+      }
       cursor = page.next;
     } while (cursor !== undefined);
   }

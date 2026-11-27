@@ -10,6 +10,10 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
   static let shared = NativeFields()
 
   weak var container: UIView?
+  /// When a finger last lifted. The keyboard comes up only for what the person just did: a
+  /// focus request (the desktop UI focuses its composer whenever a conversation opens) without a
+  /// tap just before it leaves the keyboard down, as iOS apps do on launch.
+  var lastTouchEnd: CFTimeInterval = 0
 
   private final class Field {
     let n: UInt32
@@ -41,7 +45,10 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
       f.view.isHidden = false
       layoutPlaceholder(f)
     case "hideField":
-      fields[n]?.view.isHidden = true
+      // Covered by something Rune draws (a page, a drawer, a dialog): out of sight, and done editing.
+      guard let f = fields[n] else { return }
+      if f.view.isFirstResponder { f.view.resignFirstResponder() }
+      f.view.isHidden = true
     case "fieldGone":
       if let f = fields.removeValue(forKey: n) {
         byView.removeValue(forKey: ObjectIdentifier(f.view))
@@ -63,7 +70,7 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
       let b = (m["end"] as? NSNumber)?.intValue ?? a
       select(f, a, b)
     case "focusField":
-      guard let f = fields[n] else { return }
+      guard let f = fields[n], CACurrentMediaTime() - lastTouchEnd < 1.5 else { return }
       f.view.becomeFirstResponder()
     case "blurField":
       container?.endEditing(true)

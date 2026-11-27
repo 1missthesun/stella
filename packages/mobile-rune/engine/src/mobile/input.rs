@@ -121,9 +121,10 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
         e = e.h(content.clamp(lo, hi.max(lo)) + pad_y);
     }
     let window = s.node;
+    let key = rune_key(n, p);
     e = e.on_drawn_layout_tx(move |_s: &mut Win, r: [f32; 4], tx: &mut Tx| {
         tx.live_only();
-        native::place(window, n, r);
+        native::place(window, n, &key, r);
     });
     let e = style::apply(e, &Props { on: p.on.iter().filter(|h| h.as_str() != "press").cloned().collect(), ..p.clone() });
     handlers(e, n, p, true)

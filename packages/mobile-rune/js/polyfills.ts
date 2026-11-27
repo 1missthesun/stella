@@ -289,7 +289,7 @@ class URLPoly {
     this._params = new URLSearchParamsPoly(this._search, this);
   }
 
-  private parseAbsolute(protocol: string, rest: string) {
+  private parseAbsolute(protocol: string, rest: string): void {
     this.protocol = protocol;
     const special = protocol in SPECIAL;
     const hi = rest.indexOf("#");

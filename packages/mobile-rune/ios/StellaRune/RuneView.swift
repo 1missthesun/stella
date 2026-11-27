@@ -147,6 +147,7 @@ final class RuneView: UIView {
   /// A synthetic finger (the dev debug driver): phase 0 began, 1 moved, 2 ended, 3 cancelled.
   func inject(id: UInt64, phase: UInt32, at p: CGPoint) {
     guard let host else { return }
+    if phase == 2 { NativeFields.shared.lastTouchEnd = CACurrentMediaTime() }
     sme_touch(host, id, phase, Float(p.x), Float(p.y), CACurrentMediaTime())
     wake()
   }
@@ -157,6 +158,7 @@ final class RuneView: UIView {
   }
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) { send(touches, 1) }
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+    NativeFields.shared.lastTouchEnd = CACurrentMediaTime()
     send(touches, 2)
     // A tap (not a scroll) outside the native fields ends editing, as a web page's blur does.
     for t in touches {

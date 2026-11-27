@@ -2,10 +2,26 @@
   "extends": "../desktop-rune/tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "rune-jsx/*": ["../desktop-rune/host/rune-jsx/*"],
-      "@/*": ["../desktop-ui/src/*"]
-    }
+      "rune-jsx/*": [
+        "../desktop-rune/host/rune-jsx/*"
+      ],
+      "@/*": [
+        "../desktop-ui/src/*"
+      ]
+    },
+    "typeRoots": [
+      "../desktop-rune/node_modules/@types"
+    ]
   },
-  "files": ["../desktop-rune/host/vite-env.d.ts", "js/natives.d.ts", "../desktop-rune/ui/rune.d.ts"],
-  "include": ["js/**/*.ts", "ui/**/*.ts", "ui/**/*.tsx"]
+  "files": [
+    "../desktop-rune/host/vite-env.d.ts",
+    "../desktop-ui/src/shared/types/electron.d.ts",
+    "js/natives.d.ts",
+    "../desktop-rune/ui/rune.d.ts"
+  ],
+  "include": [
+    "js/**/*.ts",
+    "ui/**/*.ts",
+    "ui/**/*.tsx"
+  ]
 }

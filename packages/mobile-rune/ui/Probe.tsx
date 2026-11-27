@@ -6,7 +6,7 @@ export function Probe() {
   const [text, setText] = useState("");
   const rows = Array.from({ length: 80 }, (_, i) => i);
   return (
-    <col w="full" h="full" pt={64} gap={12} bg="#101012">
+    <col w="full" h="full" pt={64} gap={12} fill="#101012">
       <col px={20} gap={6}>
         <text size={28} weight={700} color="#ffffff">Stella on Rune</text>
         <text size={15} color="#a0a0a8">{`Metal · JavaScriptCore · taps ${n} · typed “${text}”`}</text>
@@ -18,7 +18,7 @@ export function Probe() {
       </row>
       <col grow={1} scrollY>
         {rows.map((i) => (
-          <row key={i} px={20} py={14} gap={12} borderSides={{ bottom: 1 }} border="#222226">
+          <row key={i} px={20} py={14} gap={12} borderSides={[0, 0, 1, 0]} border="#222226">
             <box w={36} h={36} radius={18} fill={i % 2 ? "#2a2a30" : "#3a2f5a"} />
             <col gap={2}>
               <text size={16} weight={500} color="#f2f2f5">{`Row ${i + 1}`}</text>

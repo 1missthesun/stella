@@ -21,6 +21,12 @@ thread_local! {
     static RECTS: RefCell<HashMap<u32, [f32; 4]>> = RefCell::new(HashMap::new());
     /// Each field's text height as its text view last reported it.
     static HEIGHTS: RefCell<HashMap<u32, f32>> = RefCell::new(HashMap::new());
+    /// Each field's element key and window, for the cover check.
+    static KEYS: RefCell<HashMap<u32, (u32, String)>> = RefCell::new(HashMap::new());
+    /// Fields hidden because something Rune draws covers them (a page, a drawer, a dialog).
+    static COVERED: RefCell<std::collections::HashSet<u32>> = RefCell::new(Default::default());
+    /// Frames left to re-check covers after a commit, since a pick reads the last presented frame.
+    static RECHECK: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
 }
 
 pub fn set_callback(cb: NativeCb, ctx: *mut c_void) {
@@ -116,15 +122,69 @@ pub fn describe(n: u32, p: &Props, value: &str) {
     }
 }
 
-/// Places field `n` at its drawn rect (window points, as scrolled and clipped by nothing).
-pub fn place(window: u32, n: u32, r: [f32; 4]) {
+/// Places field `n` (element `key`) at its drawn rect (window points, as scrolled and clipped by nothing).
+pub fn place(window: u32, n: u32, key: &str, r: [f32; 4]) {
+    KEYS.with(|k| {
+        let mut k = k.borrow_mut();
+        if k.get(&n).is_none_or(|(w, old)| *w != window || old != key) {
+            k.insert(n, (window, key.to_string()));
+        }
+    });
     let moved = RECTS.with(|m| {
         let mut m = m.borrow_mut();
         let old = m.insert(n, r);
         old.is_none_or(|o| o.iter().zip(r.iter()).any(|(a, b)| (a - b).abs() > 0.01))
     });
-    if moved {
+    if moved && !COVERED.with(|c| c.borrow().contains(&n)) {
         send(json!({ "t": "place", "n": n, "window": window, "rect": r }));
+    }
+    note_commit();
+}
+
+/// Something changed on screen: check the fields' covers over the next few frames.
+pub fn note_commit() {
+    RECHECK.with(|c| c.set(3));
+}
+
+fn picked_is(p: &rune::Picked, key: &str) -> bool {
+    if p.key() == Some(key) {
+        return true;
+    }
+    let path = p.path();
+    path.match_indices(key).any(|(i, _)| {
+        let before = path[..i].chars().next_back();
+        let after = path[i + key.len()..].chars().next();
+        !before.is_some_and(|c| c.is_alphanumeric() || c == '-' || c == '_') && !after.is_some_and(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    })
+}
+
+/// A UIKit text view sits above everything Rune draws, so a field Rune covers (a page or a
+/// drawer slid over it, a dialog) is hidden until it's uncovered: each frame after a change,
+/// the topmost element at the field's centre must be the field.
+pub fn check_covers<S: 'static>(tx: &mut rune::Tx) {
+    let left = RECHECK.with(|c| c.get());
+    if left == 0 {
+        return;
+    }
+    RECHECK.with(|c| c.set(left - 1));
+    tx.wake_after(std::time::Duration::from_millis(16));
+    let fields: Vec<(u32, u32, String, [f32; 4])> = KEYS.with(|k| {
+        let k = k.borrow();
+        RECTS.with(|r| r.borrow().iter().filter_map(|(n, rect)| k.get(n).map(|(w, key)| (*n, *w, key.clone(), *rect))).collect())
+    });
+    for (n, window, key, r) in fields {
+        tx.element_at(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0, move |_s: &mut S, picked: Option<rune::Picked>, _tx: &mut rune::Tx| {
+            let covered = !picked.is_some_and(|p| picked_is(&p, &key));
+            let was = COVERED.with(|c| if covered { !c.borrow_mut().insert(n) } else { c.borrow_mut().remove(&n) });
+            if covered == was {
+                return;
+            }
+            if covered {
+                send(json!({ "t": "hideField", "n": n }));
+            } else if let Some(rect) = RECTS.with(|m| m.borrow().get(&n).copied()) {
+                send(json!({ "t": "place", "n": n, "window": window, "rect": rect }));
+            }
+        });
     }
 }
 
@@ -133,6 +193,8 @@ pub fn forget(n: u32) {
     let had = LOOKS.with(|l| l.borrow_mut().remove(&n)).is_some();
     RECTS.with(|m| m.borrow_mut().remove(&n));
     HEIGHTS.with(|h| h.borrow_mut().remove(&n));
+    KEYS.with(|k| k.borrow_mut().remove(&n));
+    COVERED.with(|c| c.borrow_mut().remove(&n));
     if had {
         send(json!({ "t": "fieldGone", "n": n }));
     }

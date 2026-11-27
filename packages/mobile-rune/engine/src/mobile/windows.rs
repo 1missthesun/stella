@@ -454,6 +454,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     });
     if let Some((dirty, cmds, first_commit, settling)) = taken {
         if dirty {
+            crate::native::note_commit();
             apply_window_props(node, tx);
             sync_inputs(s);
             if first_commit || sized || settling {
@@ -479,6 +480,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         }
         push_inputs(s);
     }
+    crate::native::check_covers::<Win>(tx);
     changed
 }
 

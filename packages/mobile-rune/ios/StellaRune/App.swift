@@ -17,6 +17,12 @@ final class App {
 
   func boot(in window: UIWindow) {
     self.window = window
+    #if STELLA_DEV
+    // The engine reports to stderr (`stella-engine: …`); dev builds keep it in Documents/engine.log.
+    let engineLog = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("engine.log").path
+    freopen(engineLog, "w", stderr)
+    setvbuf(stderr, nil, _IOLBF, 0)
+    #endif
     AppFonts.registerBundled()
     let vc = RootController()
     window.rootViewController = vc

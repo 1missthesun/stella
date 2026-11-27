@@ -16,9 +16,10 @@ import { EmptyState, Icons, useRetainedSurfaceActive, type EmptyStateMotif } fro
 import { CHAT_TEXT } from "../../kit";
 import { alpha, font, look, mixOklch, derive, useTokens, type Tokens } from "../../theme";
 import { Markdown } from "../../chat/Markdown";
-import { mounted } from "../../app/mount";
+import { lazyScreen } from "../../kit/lazy";
 
-export { MediaTabContent } from "./media-tab/MediaTabContent";
+// The viewers below load when a tab of their kind first opens; their loading states cover the wait.
+export const MediaTabContent = lazyScreen(() => import("./media-tab/MediaTabContent"), (module) => module.MediaTabContent);
 export { PreviewEmpty, PreviewProblem } from "./preview-states";
 import { PreviewEmpty, PreviewProblem } from "./preview-states";
 
@@ -135,7 +136,7 @@ export const UrlTabContent = ({ url, title }: { url: string; title: string }) =>
   );
 };
 
-const OfficeArtifactPanel = mounted<{ previewRef: OfficePreviewRef }>(import.meta.glob("./office-artifact-panel.tsx", { eager: true }), "OfficeArtifactPanel", () => <PreviewProblem error="Office previews aren't drawn here yet." />);
+const OfficeArtifactPanel = lazyScreen(() => import("./office-artifact-panel"), (module) => module.OfficeArtifactPanel);
 
 export const OfficeTabContent = ({ previewRef }: { previewRef: OfficePreviewRef }) => (
   <Rich id="display-office" pad="rich">
@@ -255,11 +256,11 @@ function DelimitedTableView({ filePath, title, onRetry }: { filePath: string; ti
   );
 }
 
-/** The PDF and Markdown viewers load with this module, so there is nothing to fetch ahead. */
-export const preloadPdfViewer = () => {};
-export const preloadMarkdownViewer = () => {};
+const PdfViewerCard = lazyScreen(() => import("./PdfViewerCard"), (module) => module.PdfViewerCard);
 
-const PdfViewerCard = mounted<{ filePath: string; title?: string; pageRail?: boolean; onPageChange?: (page: number, total: number) => void }>(import.meta.glob("./PdfViewerCard.tsx", { eager: true }), "PdfViewerCard", ({ filePath }) => <PreviewProblem error={`${fileName(filePath)} can't be shown here yet.`} />);
+export const preloadPdfViewer = () => void PdfViewerCard.preload();
+/** The Markdown viewer is the chat's own, already loaded. */
+export const preloadMarkdownViewer = () => {};
 
 export const PdfTabContent = ({ filePath, title }: { filePath: string; title?: string }) => {
   const reportDetail = useViewerDetailReporter();
@@ -558,5 +559,5 @@ export const SourceDiffTabContent = () => {
   );
 };
 
-const TrashTab = mounted<object>(import.meta.glob("./TrashTabContent.tsx", { eager: true }), "TrashTabContent", () => null);
+const TrashTab = lazyScreen(() => import("./TrashTabContent"), (module) => module.TrashTabContent);
 export const TrashTabContent = () => <TrashTab />;

@@ -2,18 +2,11 @@ import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogHeader, Dia
 import { usePlanUsageDialog } from "./plan-usage-dialog.styles";
 import { useBillingScreen } from "./BillingScreen.styles";
 import { preloadUsageSurface } from "../../usage/usage-cache";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { lazyScreen, useLazyReady } from "../../kit/lazy";
 
-const BillingPanel = lazy(() =>
-  import("./BillingScreen").then((module) => ({
-    default: module.BillingPanel,
-  })),
-);
-const UsagePanel = lazy(() =>
-  import("../../usage/App").then((module) => ({
-    default: module.UsagePanel,
-  })),
-);
+const BillingPanel = lazyScreen(() => import("./BillingScreen"), (module) => module.BillingPanel);
+const UsagePanel = lazyScreen(() => import("../../usage/App"), (module) => module.UsagePanel);
 
 const TABS = [
   { key: "plan", label: "Plan" },
@@ -31,6 +24,12 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
   const s = usePlanUsageDialog();
   const b = useBillingScreen();
   const [tab, setTab] = useState<PlanUsageTab>("plan");
+  const Panel = tab === "plan" ? BillingPanel : UsagePanel;
+  const ready = useLazyReady(open, Panel);
+  // The dialog first appears with its panel drawn; a later tab switch shows the loading panel meanwhile.
+  const shown = useRef(false);
+  if (!open) shown.current = false;
+  else if (ready) shown.current = true;
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +38,7 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={shown.current} onOpenChange={onOpenChange}>
       <DialogContent size="xl" frame={{ w: 880, h: 720 }} focusSelf enter={undefined} exit={undefined}>
         <DialogHeader {...s.planUsageDialogHeader}>
           <VisuallyHidden asChild>
@@ -70,9 +69,7 @@ export function PlanUsageDialog({ open, onOpenChange }: PlanUsageDialogProps) {
           <DialogCloseButton />
         </DialogHeader>
         <DialogBody {...s.planUsageDialogBody} role="tabpanel" id={`plan-usage-panel-${tab}`} aria-labelledby={`plan-usage-tab-${tab}`}>
-          <Suspense fallback={<col {...b.billingPanel} {...b.billingPanelLoading} aria-busy="true" />}>
-            {tab === "plan" ? <BillingPanel /> : <UsagePanel />}
-          </Suspense>
+          {ready ? <Panel /> : <col {...b.billingPanel} {...b.billingPanelLoading} aria-busy="true" />}
         </DialogBody>
       </DialogContent>
     </Dialog>

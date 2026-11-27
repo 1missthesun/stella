@@ -10,12 +10,12 @@ import { platformCapabilities } from "@/platform/capabilities";
 import { reportFirstAppPaint } from "@/shell/app-paint";
 import { ThemeBackdrop } from "../theme";
 import { appRouter } from "../app/routes";
-import { mounted, Nothing } from "../app/mount";
+import { lazyScreen, useLazyReady } from "../kit/lazy";
 import { dismissLaunchSplash, holdLaunchSplashUntilLive } from "./launch-splash";
 import { AskStellaSelectionChip } from "./selection/AskStellaSelectionChip";
 
-type OnboardingChatProps = { isAuthenticated: boolean; onComplete: (handoff: OnboardingChatHandoff) => void };
-const OnboardingChatView = mounted<OnboardingChatProps>(import.meta.glob("../replace/global/onboarding/chat/OnboardingChat.tsx", { eager: true }), "OnboardingChat", Nothing);
+// First run only: every later launch skips it.
+const OnboardingChatView = lazyScreen(() => import("../replace/global/onboarding/chat/OnboardingChat"), (module) => module.OnboardingChat);
 
 function OnboardingExperience({ onEnteredApp }: { onEnteredApp: () => void }) {
   const { completed: onboardingDone, complete: completeOnboarding } = useOnboardingState();
@@ -72,6 +72,7 @@ const DesktopFullShell = () => {
   const onboardingResolved = onboardingHydrated || onboardingDone;
   const appReady = onboardingResolved && onboardingDone && hasEnteredApp;
   const needsOnboarding = onboardingHydrated && !onboardingDone;
+  const onboardingReady = useLazyReady(needsOnboarding, OnboardingChatView);
 
   // A new install gets Stella's welcome in its chat once setup is done.
   useEffect(() => {
@@ -96,7 +97,7 @@ const DesktopFullShell = () => {
 
   return (
     <ShellChrome windowMode={needsOnboarding ? "onboarding" : "app"}>
-      {appReady ? <HostedChatSurface /> : needsOnboarding ? <OnboardingExperience onEnteredApp={() => setHasEnteredApp(true)} /> : null}
+      {appReady ? <HostedChatSurface /> : needsOnboarding && onboardingReady ? <OnboardingExperience onEnteredApp={() => setHasEnteredApp(true)} /> : null}
     </ShellChrome>
   );
 };

@@ -43,11 +43,13 @@ import { WorkspaceStage } from "../../shell/workspace-stage/WorkspaceStage";
 import { CloudStartupFailure } from "../../shell/CloudStartupFailure";
 import { SHELL_TOPBAR_HEIGHT } from "../../shell/metrics";
 import { mounted, Nothing } from "../mount";
+import { lazyScreen, useLazyReady } from "../../kit/lazy";
 
 const glob = <T,>(modules: Record<string, Record<string, unknown>>, name: string) => mounted<T>(modules, name, Nothing as never);
 const ChatColumn = mounted<ChatColumnProps>(import.meta.glob("../../chat/ChatColumn.tsx", { eager: true }), "ChatColumn", Nothing);
 const SelfHostPairScreen = glob<object>(import.meta.glob("../../replace/global/self-host/SelfHostPairScreen.tsx", { eager: true }), "SelfHostPairScreen");
-const SignInScreen = glob<object>(import.meta.glob("../../replace/global/auth/SignInScreen.tsx", { eager: true }), "SignInScreen");
+// Only signed-out launches show it.
+const SignInScreen = lazyScreen(() => import("../../replace/global/auth/SignInScreen"), (module) => module.SignInScreen);
 const SignedOutLocalSync = glob<{ signedIn: boolean; isPrivate: boolean; conversationId: string | null }>(import.meta.glob("../../replace/global/local-mode/SignedOutLocalSync.tsx", { eager: true }), "SignedOutLocalSync");
 const SignOutDialog = glob<object>(import.meta.glob("../../replace/global/auth/SignOutDialog.tsx", { eager: true }), "SignOutDialog");
 const AccountSwitchGuard = glob<object>(import.meta.glob("../../replace/global/local-mode/AccountSwitchGuard.tsx", { eager: true }), "AccountSwitchGuard");
@@ -331,12 +333,14 @@ export function RootLayout() {
   );
   const shellIsLive =
     conversationId !== null || (!isOnChatRoute && isCloudConversationReady);
+  const wantsSignIn = authBootstrapStatus === "signed_out" && !isPrivate;
+  const signInReady = useLazyReady(wantsSignIn, SignInScreen);
   const shouldDismissLaunchSplash =
     shellIsLive ||
     Boolean(authBootstrapError) ||
     showsMainConversationFailure ||
     authBootstrapStatus === "reauth_required" ||
-    authBootstrapStatus === "signed_out" ||
+    (authBootstrapStatus === "signed_out" && (signInReady || isPrivate)) ||
     authBootstrapStatus === "needs_pairing";
   useEffect(() => {
     if (shouldDismissLaunchSplash) dismissLaunchSplash();
@@ -355,8 +359,8 @@ export function RootLayout() {
     return <SelfHostPairScreen />;
   }
 
-  if (authBootstrapStatus === "signed_out" && !isPrivate) {
-    return <SignInScreen />;
+  if (wantsSignIn) {
+    return signInReady ? <SignInScreen /> : null;
   }
 
   if (!isPrivate && authBootstrapError) {

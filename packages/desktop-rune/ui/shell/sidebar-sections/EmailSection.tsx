@@ -9,7 +9,9 @@ import { openExternalUrl } from "@/platform/electron/open-external";
 import { useI18n } from "@/shared/i18n";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { EmptyState, Icons } from "../../kit";
-import { EmailWorkspace } from "./EmailWorkspace";
+import { lazyScreen, useLazyReady } from "../../kit/lazy";
+
+const EmailWorkspace = lazyScreen(() => import("./EmailWorkspace"), (module) => module.EmailWorkspace);
 
 /** desktop-ui's `EmailSection`: the sign-in, connect, reconnect and turn-on gates, then the workspace. */
 export function EmailSection({ active }: { active: boolean }) {
@@ -27,6 +29,8 @@ function EmailSectionBody({ active: selected }: { active: boolean }) {
   const [turningOn, setTurningOn] = useState(false);
   const { hasConnectedAccount } = useAuthSessionState();
   const feed = useBackendView("email.page", seen && hasConnectedAccount ? {} : "skip");
+  // Loads alongside the feed, so the workspace draws as soon as its data is in.
+  const workspaceReady = useLazyReady(seen && hasConnectedAccount, EmailWorkspace);
 
   useEffect(() => {
     if (active) setSeen(true);
@@ -120,5 +124,5 @@ function EmailSectionBody({ active: selected }: { active: boolean }) {
     );
   }
 
-  return <EmailWorkspace state={value} />;
+  return workspaceReady ? <EmailWorkspace state={value} /> : <col id="email-workspace-loading" grow={1} role="status" />;
 }

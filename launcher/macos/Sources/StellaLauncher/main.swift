@@ -28,7 +28,9 @@ STELLA_LAUNCHER_UPDATE_URL only: the code requirement an update must meet),
 STELLA_LAUNCHER_ENGINE=rune|electron or the file <root>/rune-engine or
 <root>/electron-engine (the engine; by default Rune wherever the source pins a
 stella-engine build for this platform), STELLA_LAUNCHER_ENGINE_BIN (a local
-stella-engine binary; implies rune).
+stella-engine binary; implies rune), STELLA_LAUNCHER_BUNDLE_MANIFEST (a URL or path
+of the app bundle a first install opens from, instead of the one the backend's
+bootstrap offers).
 """
 
 func parseOptions() -> Options {

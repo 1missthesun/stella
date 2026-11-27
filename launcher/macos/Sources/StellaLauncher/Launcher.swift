@@ -50,10 +50,33 @@ final class Launcher {
     private let hold = HoldWindow()
     private let updater: LauncherUpdater
     private var lastHold: [String: Any]?
-    private var state: LauncherState
-    private var git: GitTool?
-    private var signer: TreeSigner?
-    private var runtimes: Runtimes?
+    private let state: StateStore
+    /// Hydration's thread sets git and the signer while the launcher's may read them.
+    private let toolsLock = NSLock()
+    private var _git: GitTool?
+    private var git: GitTool? {
+        get { toolsLock.lock(); defer { toolsLock.unlock() }; return _git }
+        set { toolsLock.lock(); _git = newValue; toolsLock.unlock() }
+    }
+    private var _signer: TreeSigner?
+    private var signer: TreeSigner? {
+        get { toolsLock.lock(); defer { toolsLock.unlock() }; return _signer }
+        set { toolsLock.lock(); _signer = newValue; toolsLock.unlock() }
+    }
+    private var _runtimes: Runtimes?
+    private var runtimes: Runtimes? {
+        get { toolsLock.lock(); defer { toolsLock.unlock() }; return _runtimes }
+        set { toolsLock.lock(); _runtimes = newValue; toolsLock.unlock() }
+    }
+    /// Bun before git is there (a first install's app bundle).
+    private var bun: (bin: URL, version: String)?
+    /// Stella runs from a first install's app bundle this session: git and the
+    /// packages come in behind it (hydrate).
+    private var bundleStage = false
+    private let hydrationLock = NSLock()
+    private var hydrating = false
+    private var hydrationFinished = false
+    private var hydrationStepName = "pending"
     private var engine: (bin: URL, version: String)?
     private var recoveryCount = 0
     private var identityRetry: String?
@@ -67,7 +90,7 @@ final class Launcher {
         if options.backend == nil { paths.server = ServerConfig.load(paths.serverFile) }
         self.paths = paths
         ui = LauncherWindow(logs: paths.logs, captureDir: options.captureDir)
-        state = LauncherState.load(paths)
+        state = StateStore(LauncherState.load(paths))
         updater = LauncherUpdater(paths: paths, selfTest: options.selfTest)
     }
 
@@ -256,7 +279,7 @@ final class Launcher {
         guard next != paths.server else { return }
         log("server: \(paths.server?.origin ?? "default") -> \(next?.origin ?? "default")")
         paths.server = next
-        state = LauncherState.load(paths)
+        state.replace(LauncherState.load(paths))
     }
 
     private func retryIdentityInBackground(_ version: String) {
@@ -279,20 +302,79 @@ final class Launcher {
     private func prepareForLaunch() throws -> ElectronIdentity.Resolved {
         let fm = FileManager.default
         followServerFile()
-        let firstInstall = !fm.fileExists(atPath: paths.app.appendingPathComponent(".git").path)
+        let gitDir = paths.app.appendingPathComponent(".git")
+        let firstInstall = !fm.fileExists(atPath: gitDir.path)
         if firstInstall {
             try fm.createDirectory(at: paths.runtimes, withIntermediateDirectories: true)
+            try fm.createDirectory(at: paths.logs, withIntermediateDirectories: true)
             Install.prefetchBun(paths: paths, baseEnv: baseEnvironment(), localBun: options.localBun)
         }
+
+        if firstInstall && !fm.fileExists(atPath: paths.app.path) && !electronForced {
+            // A first install: from the app bundle when there is one.
+            var manifest = Options.nonEmpty("STELLA_LAUNCHER_BUNDLE_MANIFEST")
+            if manifest == nil && options.source == nil {
+                do {
+                    manifest = try Install.bootstrapAccess(backend: backend).bundleManifest
+                } catch {
+                    log("install: bootstrap failed (\(error))")
+                }
+            }
+            if let manifest {
+                do {
+                    let commit = try Install.installBundle(
+                        paths: paths, manifest: manifest, prefetchEngine: options.engineBin == nil, progress: status)
+                    var fresh = LauncherState()
+                    fresh.installedAt = ISO8601DateFormatter().string(from: Date())
+                    fresh.bundleCommit = commit
+                    state.replace(fresh)
+                    state.update(paths) { _ in }
+                } catch {
+                    log("install: the app bundle failed (\(error)); cloning instead")
+                }
+            }
+        }
+
+        if !fm.fileExists(atPath: gitDir.path), let commit = state.current.bundleCommit, fm.fileExists(atPath: paths.app.path) {
+            for dir in [paths.root, paths.logs, paths.runtimes, paths.bundles] {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+            if signer == nil { signer = try TreeSigner(paths: paths) }
+            if engineRequested {
+                // Rune opens from the bundle; hydration follows once it is up.
+                let bun = try Install.ensureBun(paths: paths, baseEnv: baseEnvironment(), localBun: options.localBun, progress: status)
+                self.bun = bun
+                let engine = try Install.ensureEngine(paths: paths, localBin: options.engineBin, progress: status)
+                self.engine = engine
+                bundleStage = true
+                if !hydrationStarted {
+                    hydrationStepName = "pending"
+                    writeHydration("pending")
+                }
+                log("install: starting stella-engine \(engine.version) from the app bundle \(commit.prefix(12)); hydrating once Stella is up")
+                return ElectronIdentity.Resolved(app: paths.app, pendingVersion: nil)
+            }
+            // Electron needs the packages: hydrate before the window.
+            log("install: Electron starts here; hydrating the app bundle first")
+            status("Installing Stella's dependencies…")
+            self.bun = try Install.ensureBun(paths: paths, baseEnv: baseEnvironment(), localBun: options.localBun, progress: status)
+            try hydrate(rune: false)
+        }
+        bundleStage = false
+        // A relaunch while hydration still installs the packages waits for it, rather than
+        // installing them beside it.
+        while hydrationRunning { Thread.sleep(forTimeInterval: 0.25) }
+
         let (git, signer) = try tools()
         let env = baseEnvironment()
 
-        if firstInstall {
+        if !fm.fileExists(atPath: gitDir.path) {
             try Install.cloneSource(paths: paths, git: git, source: source, progress: status)
             try signer.signHead(git: git, app: paths.app, expected: nil)
-            state = LauncherState()
-            state.installedAt = ISO8601DateFormatter().string(from: Date())
-            state.save(paths)
+            var fresh = LauncherState()
+            fresh.installedAt = ISO8601DateFormatter().string(from: Date())
+            state.replace(fresh)
+            state.update(paths) { _ in }
             if !engineRequested { ElectronIdentity.prefetch(paths: paths, env: env) }
         }
 
@@ -306,10 +388,11 @@ final class Launcher {
 
         let (bun, bunVersion) = try Install.ensureBun(
             paths: paths, baseEnv: env, localBun: options.localBun, progress: status)
+        self.bun = (bun, bunVersion)
         let runtimes = Runtimes(bunBin: bun, bunVersion: bunVersion, git: git)
         self.runtimes = runtimes
         let electron = try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(),
-                                       rune: rune, state: &state, progress: status)
+                                       rune: rune, state: state, progress: status)
         engine = nil
         if rune {
             let engine = try Install.ensureEngine(paths: paths, localBin: options.engineBin, progress: status)
@@ -317,6 +400,162 @@ final class Launcher {
             self.engine = engine
         }
         return electron
+    }
+
+    /// Electron chosen by hand (engineRequested's flag, environment or <root>/electron-engine):
+    /// a first install then clones, since the app bundle is for Rune.
+    private var electronForced: Bool {
+        if let engine = options.engine { return engine != "rune" }
+        if options.engineBin != nil { return false }
+        return FileManager.default.fileExists(atPath: paths.root.appendingPathComponent("electron-engine").path)
+    }
+
+    // MARK: - Hydration (stage 2 of a first install from an app bundle)
+    //
+    // Stage 1 (prepareForLaunch, before the window): download the app bundle while Bun
+    // downloads, unpack it, fetch the engine and start Stella. Stage 2 (hydrate, once Stella is
+    // ready): check the same commit out in place, sign it, install the packages and prepare the
+    // install, then mark hydration.json done; what in Stella needs git or the packages waits on
+    // that file meanwhile (packages/node-shared/integrations/app-hydration.ts). Without a bundle
+    // (none offered, Electron forced, any step failing) a first install clones and installs
+    // before the window, as before.
+
+    private var hydrationStarted: Bool {
+        hydrationLock.lock()
+        defer { hydrationLock.unlock() }
+        return hydrating
+    }
+
+    private var hydrationRunning: Bool {
+        hydrationLock.lock()
+        defer { hydrationLock.unlock() }
+        return hydrating && !hydrationFinished
+    }
+
+    private func writeHydration(_ status: String, error: String? = nil) {
+        var body: [String: Any] = ["status": status, "pid": Int(getpid()), "step": hydrationStepName]
+        if let error { body["error"] = error }
+        guard var data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]) else { return }
+        data.append(0x0A)
+        try? data.write(to: paths.hydrationFile, options: .atomic)
+    }
+
+    private func hydrationStep(_ step: String) {
+        hydrationStepName = step
+        writeHydration("running")
+        log("hydrate: \(step)")
+    }
+
+    private func startHydration() {
+        hydrationLock.lock()
+        guard !hydrating else {
+            hydrationLock.unlock()
+            return
+        }
+        hydrating = true
+        hydrationFinished = false
+        hydrationLock.unlock()
+        let thread = Thread { [self] in
+            let started = Date()
+            do {
+                try hydrate(rune: true)
+                hydrationStepName = "done"
+                writeHydration("done")
+                log("hydrate: done in \(String(format: "%.1f", Date().timeIntervalSince(started)))s")
+            } catch {
+                log("hydrate: failed at \(hydrationStepName): \(error)")
+                writeHydration("failed", error: "\(error)")
+            }
+            hydrationLock.lock()
+            hydrationFinished = true
+            hydrationLock.unlock()
+        }
+        // Behind the open window: never ahead of it for the CPU (Shell.run passes it on).
+        thread.qualityOfService = .utility
+        thread.start()
+    }
+
+    /// Stage 2: the git checkout of the bundle's commit, its signature, the packages.
+    private func hydrate(rune: Bool) throws {
+        let fm = FileManager.default
+        guard let commit = state.current.bundleCommit else { throw LauncherError("No app bundle to hydrate.") }
+        let app = paths.app
+        let hydrateDir = app.appendingPathComponent(".git-hydrate")
+        let finalDir = app.appendingPathComponent(".git")
+        let branch = options.sourceRef ?? Pins.upstreamBranch
+        let main = Pins.upstreamBranch
+        let upstream = Pins.upstreamRemoteName
+        var placed = false
+        var succeeded = false
+        defer {
+            if !succeeded {
+                try? fm.removeItem(at: hydrateDir)
+                // An unsigned checkout would read as changed outside Stella.
+                if placed { try? fm.removeItem(at: finalDir) }
+            }
+        }
+
+        hydrationStep("git")
+        let (git, signer) = try tools(quiet: bundleStage)
+        let remote: String
+        var auth: [String: String] = [:]
+        if let source = options.source {
+            remote = source
+        } else {
+            let access = try Install.bootstrapAccess(backend: backend)
+            remote = access.remote
+            auth = [
+                "GIT_CONFIG_COUNT": "2",
+                "GIT_CONFIG_KEY_0": "http.extraHeader",
+                "GIT_CONFIG_VALUE_0": "Authorization: Bearer \(access.token)",
+                "GIT_CONFIG_KEY_1": "protocol.version",
+                "GIT_CONFIG_VALUE_1": "1",
+            ]
+        }
+        let gd = ["--git-dir", hydrateDir.path]
+        let hgit = { (args: [String]) throws -> String in
+            try git.run(gd + ["--work-tree", app.path] + args, cwd: app)
+        }
+        try? fm.removeItem(at: hydrateDir)
+        _ = try hgit(["init", "-q"])
+        _ = try hgit(["symbolic-ref", "HEAD", "refs/heads/\(main)"])
+        _ = try hgit(["remote", "add", upstream, remote])
+        let fetchStarted = Date()
+        try git.run(gd + ["fetch", "-q", "--no-tags", upstream, "+refs/heads/\(branch):refs/remotes/\(upstream)/\(branch)"],
+                    cwd: app, extraEnv: auth)
+        log("hydrate: fetched \(branch) in \(String(format: "%.1f", Date().timeIntervalSince(fetchStarted)))s")
+        if try git.raw(gd + ["cat-file", "-e", "\(commit)^{commit}"], cwd: app).code != 0 {
+            // The branch moved past the bundle's commit without keeping it: ask for it by name.
+            try git.run(gd + ["fetch", "-q", "--no-tags", upstream, commit], cwd: app, extraEnv: auth)
+        }
+        _ = try hgit(["update-ref", "refs/heads/\(main)", commit])
+        _ = try hgit(["config", "branch.\(main).remote", upstream])
+        _ = try hgit(["config", "branch.\(main).merge", "refs/heads/\(main)"])
+        // The index from the commit, against the files already there.
+        _ = try hgit(["reset", "-q"])
+        let changed = try hgit(["status", "--porcelain=v1", "--untracked-files=no"])
+        guard changed.isEmpty else {
+            throw LauncherError("The app bundle differs from \(commit.prefix(12)): \(changed.prefix(300))")
+        }
+        try fm.moveItem(at: hydrateDir, to: finalDir)
+        placed = true
+        // init with --work-tree records it; a clone does not.
+        _ = try? git.raw(["config", "--unset", "core.worktree"], cwd: app)
+
+        hydrationStep("sign")
+        try signer.signHead(git: git, app: app, expected: commit)
+        // A signed checkout: from here on the launcher treats it as installed,
+        // and installs what is missing before the window if this run stops.
+        state.update(paths) { $0.bundleCommit = nil }
+        placed = false
+
+        hydrationStep("packages")
+        guard let bun else { throw LauncherError("Bun is not set up yet.") }
+        let runtimes = Runtimes(bunBin: bun.bin, bunVersion: bun.version, git: git)
+        self.runtimes = runtimes
+        _ = try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(), rune: rune, state: state,
+                            hydration: paths.hydrationFile, progress: { _ in })
+        succeeded = true
     }
 
     /// Rune is the engine wherever the source supports it; --engine, the environment and the files
@@ -330,11 +569,13 @@ final class Launcher {
         return Install.engineAvailable(paths: paths)
     }
 
-    private func tools() throws -> (GitTool, TreeSigner) {
+    /// quiet: hydration's (Stella is already open; the launcher window stays hidden).
+    private func tools(quiet: Bool = false) throws -> (GitTool, TreeSigner) {
         for dir in [paths.root, paths.logs, paths.runtimes, paths.bundles] {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
-        let git = try self.git ?? Install.ensureGit(paths: paths, baseEnv: baseEnvironment(), progress: status)
+        let progress: (String) -> Void = quiet ? { log("hydrate: \($0)") } : status
+        let git = try self.git ?? Install.ensureGit(paths: paths, baseEnv: baseEnvironment(), progress: progress)
         self.git = git
         let signer = try self.signer ?? TreeSigner(paths: paths)
         self.signer = signer
@@ -366,7 +607,7 @@ final class Launcher {
                         "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
                         "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
                         "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN",
-                        "STELLA_RUNE_SERVICES"]
+                        "STELLA_RUNE_SERVICES", "STELLA_APP_HYDRATION"]
         let harness = ["STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                        "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN"]
         if !(paths.isolated && usesTestKey) { stripped += harness }
@@ -380,8 +621,10 @@ final class Launcher {
             env["STELLA_RELEASES_URL"] = Deployment.releasesURL
         }
         var front: [String] = []
-        if let runtimes { front.append(runtimes.bunBin.deletingLastPathComponent().path) }
-        if let root = git?.root { front.append(root.appendingPathComponent("bin").path) }
+        if let bin = runtimes?.bunBin ?? bun?.bin { front.append(bin.deletingLastPathComponent().path) }
+        if let root = (git ?? (bundleStage ? Install.plannedGit(paths: paths, baseEnv: [:]) : nil))?.root {
+            front.append(root.appendingPathComponent("bin").path)
+        }
         let existing = env["PATH"].flatMap { $0.isEmpty ? nil : $0 } ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         env["PATH"] = (front + [existing]).joined(separator: ":")
         return env
@@ -399,11 +642,21 @@ final class Launcher {
             env["STELLA_LAUNCHER_SERVER_ID"] = server.serverId
             env["STELLA_LAUNCHER_SERVER_NAME"] = server.name
         }
+        if let bin = runtimes?.bunBin ?? bun?.bin { env["STELLA_BUN_PATH"] = bin.path }
         if let runtimes {
-            env["STELLA_BUN_PATH"] = runtimes.bunBin.path
             for (key, value) in runtimes.git.runtimeEnv { env[key] = value }
+        } else if bundleStage {
+            // The pinned git hydration puts in place: what runs git waits for hydration, and
+            // then finds it there (rather than /usr/bin/git, which may only offer to install
+            // the Command Line Tools).
+            for (key, value) in Install.plannedGit(paths: paths, baseEnv: [:]).runtimeEnv { env[key] = value }
         }
         if let signer { env["STELLA_LAUNCHER_PUBKEY"] = signer.publicKeySPKIBase64 }
+        if bundleStage {
+            // What needs git or the packages waits on this file (app-hydration.ts).
+            env["STELLA_APP_HYDRATION"] = paths.hydrationFile.path
+            env["GIT_CEILING_DIRECTORIES"] = paths.root.path
+        }
         if paths.isolated {
             env["STELLA_LAUNCHER_USER_DATA_DIR"] = paths.isolatedUserData.path
             env["STELLA_DATA_DIR"] = paths.isolatedHome.path
@@ -420,8 +673,9 @@ final class Launcher {
     }
 
     private func supervise(electronApp: URL) -> Outcome {
-        guard let git, let signer else { return .failed("The launcher is not set up.", []) }
-        let spawnedHead = (try? git.run(["rev-parse", "HEAD"], cwd: paths.app)) ?? ""
+        guard signer != nil else { return .failed("The launcher is not set up.", []) }
+        // A first install's app bundle has no checkout yet (bundleStage).
+        let spawnedHead = (try? git?.run(["rev-parse", "HEAD"], cwd: paths.app)) ?? ""
         let child = engine == nil ? "Electron" : "stella-engine"
         let process: ElectronProcess
         do {
@@ -432,7 +686,7 @@ final class Launcher {
                 env.removeValue(forKey: "BUN_RUNTIME_TRANSPILER_CACHE_PATH")
                 env["MIMALLOC_PURGE_DELAY"] = "0"
                 env["STELLA_RUNE_ROOT"] = paths.app.appendingPathComponent("packages/desktop-rune").path
-                if let runtimes { env["STELLA_RUNE_BUN"] = runtimes.bunBin.path }
+                if let bin = runtimes?.bunBin ?? bun?.bin { env["STELLA_RUNE_BUN"] = bin.path }
                 process = try ElectronProcess(
                     executable: engine.bin, args: [], cwd: paths.app, env: env, logFile: paths.electronLog, isEngine: true)
             } else {
@@ -470,6 +724,7 @@ final class Launcher {
                     guard readyAt == nil else { break }
                     readyAt = Date()
                     log("supervisor: ready")
+                    if bundleStage { startHydration() }
                     hold.hide(after: 0.25)
                     ui.update(show: .hide) {
                         $0.phase = .running
@@ -482,9 +737,9 @@ final class Launcher {
                         process.after(options.captureDir != nil ? max(options.hold, 4) : options.hold, "self-test-quit")
                     }
                 case "sign":
-                    handleSign(message, process: process, git: git, signer: signer)
+                    handleSign(message, process: process)
                 case "prepared":
-                    adoptPrepared(message, git: git)
+                    adoptPrepared(message)
                 case "hold":
                     if let update = UpdateHold(message) {
                         log("supervisor: holding the window for a restart")
@@ -512,13 +767,17 @@ final class Launcher {
                     log("supervisor: no ready within \(Int(options.readyTimeout))s")
                     pending = ("Stella didn't finish starting within \(Int(options.readyTimeout)) seconds.", process.output.lastLines)
                     process.terminate()
-                case "stable" where pending == nil:
+                case "stable" where pending == nil && !spawnedHead.isEmpty:
+                    guard let git else { break }
                     do {
                         try git.run(["update-ref", Launcher.knownGoodRef, spawnedHead], cwd: paths.app)
                         log("supervisor: \(Int(options.stableSeconds))s stable; \(Launcher.knownGoodRef) = \(spawnedHead.prefix(12))")
                     } catch {
                         log("supervisor: could not mark known-good: \(error)")
                     }
+                case "self-test-quit" where hydrationRunning:
+                    // A self-test proves the whole install, hydration included.
+                    process.after(0.5, "self-test-quit")
                 case "self-test-quit", "shutdown":
                     log("supervisor: \(name == "shutdown" ? "Shut down" : "self-test") asks \(child) to quit")
                     quitRequested = true
@@ -566,28 +825,34 @@ final class Launcher {
         return .failed("Lost track of Stella.", [])
     }
 
-    private func adoptPrepared(_ message: [String: Any], git: GitTool) {
+    private func adoptPrepared(_ message: [String: Any]) {
         var noted: [String] = []
-        if let lockHash = message["lockHash"] as? String,
+        var lockHash: String?
+        var preparedHead: String?
+        if let hash = message["lockHash"] as? String,
            let actual = try? sha256File(paths.app.appendingPathComponent("bun.lock")),
-           actual == lockHash {
-            state.bunLockHash = actual
+           actual == hash {
+            lockHash = actual
             noted.append("dependencies for lock \(actual.prefix(12))")
         }
         if let head = message["head"] as? String,
-           let actual = try? git.run(["rev-parse", "HEAD"], cwd: paths.app),
+           let actual = try? git?.run(["rev-parse", "HEAD"], cwd: paths.app),
            actual == head {
-            state.preparedHead = actual
+            preparedHead = actual
             noted.append("setup for \(actual.prefix(12))")
         }
         guard !noted.isEmpty else { return }
-        state.save(paths)
+        state.update(paths) {
+            if let lockHash { $0.bunLockHash = lockHash }
+            if let preparedHead { $0.preparedHead = preparedHead }
+        }
         log("supervisor: Stella prepared \(noted.joined(separator: " and "))")
     }
 
-    private func handleSign(_ message: [String: Any], process: ElectronProcess, git: GitTool, signer: TreeSigner) {
+    private func handleSign(_ message: [String: Any], process: ElectronProcess) {
         let id = message["id"] ?? NSNull()
         do {
+            guard let git, let signer else { throw LauncherError("git is not set up yet.") }
             let head = try signer.signHead(git: git, app: paths.app, expected: message["commit"] as? String)
             process.send(["op": "sign-result", "id": id, "ok": true, "commit": head])
         } catch {
@@ -691,8 +956,9 @@ final class Launcher {
         }
         try Install.cloneSource(paths: paths, git: git, source: source, progress: status)
         try signer.signHead(git: git, app: paths.app, expected: nil)
-        state = LauncherState()
-        state.installedAt = ISO8601DateFormatter().string(from: Date())
-        state.save(paths)
+        var fresh = LauncherState()
+        fresh.installedAt = ISO8601DateFormatter().string(from: Date())
+        state.replace(fresh)
+        state.update(paths) { _ in }
     }
 }

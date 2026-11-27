@@ -3,19 +3,22 @@ import Foundation
 
 enum Prepare {
     /// With rune (the Rune engine starts instead) Electron's signed app is
-    /// neither fetched nor needed, and the result's app is unused.
+    /// neither fetched nor needed, and the result's app is unused. `hydration`
+    /// is hydration's run (its own thread, Stella already open from its app
+    /// bundle): nothing to show, and nothing to return but the app folder.
     static func run(
         paths: LauncherPaths,
         runtimes: Runtimes,
         env: [String: String],
         rune: Bool,
-        state: inout LauncherState,
+        state: StateStore,
+        hydration: URL? = nil,
         progress: (String) -> Void
     ) throws -> ElectronIdentity.Resolved {
         let app = paths.app
         let lockHash = try sha256File(app.appendingPathComponent("bun.lock"))
         let electronPackage = app.appendingPathComponent("node_modules/electron/package.json")
-        if state.bunLockHash != lockHash || !FileManager.default.fileExists(atPath: electronPackage.path) {
+        if state.current.bunLockHash != lockHash || !FileManager.default.fileExists(atPath: electronPackage.path) {
             progress("Installing Stella's dependencies…")
             // install-deps.mjs (newer app sources) starts bun's cache from a
             // per-platform seed and runs prepare-install alongside; older
@@ -30,6 +33,9 @@ enum Prepare {
             // baseEnvironment() strips the engine choice; install-deps.mjs
             // skips Electron and its bundle for Rune.
             if rune { installEnv["STELLA_LAUNCHER_ENGINE"] = "rune" }
+            // Stella is already up: what install-deps holds back for its start
+            // (Claude Code and Antigravity) can go now.
+            if let hydration { installEnv["STELLA_APP_HYDRATION"] = hydration.path }
             let result = try Shell.run(runtimes.bunBin.path,
                                        seeded ? [installDeps.path] : ["install", "--frozen-lockfile"],
                                        cwd: app, env: installEnv, outputFile: paths.installLog,
@@ -38,28 +44,26 @@ enum Prepare {
                 throw LauncherError("bun install failed (exit \(result.code)):\n\(lastLines(result.stderr, 20))")
             }
             log("prepare: bun install finished in \(Int(Date().timeIntervalSince(started)))s")
-            state.bunLockHash = lockHash
-            state.save(paths)
+            state.update(paths) { $0.bunLockHash = lockHash }
         }
 
         let head = try runtimes.git.run(["rev-parse", "HEAD"], cwd: app)
         let script = app.appendingPathComponent("packages/desktop/scripts/prepare-install.mjs")
-        if state.preparedHead != head, FileManager.default.fileExists(atPath: script.path) {
+        if state.current.preparedHead != head, FileManager.default.fileExists(atPath: script.path) {
             progress("Preparing Stella…")
             log("prepare: prepare-install.mjs for \(head.prefix(12))")
             let timeout = Options.seconds("STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS", 10 * 60)
             let result = try? Shell.run(runtimes.bunBin.path, [script.path],
                                         cwd: app, env: env, outputFile: paths.installLog, timeout: timeout)
             if let result, result.code == 0 {
-                state.preparedHead = head
-                state.save(paths)
+                state.update(paths) { $0.preparedHead = head }
             } else {
                 let detail = result.map { "exit \($0.code)" } ?? "timed out after \(Int(timeout))s"
                 log("prepare: prepare-install.mjs incomplete (\(detail)):\n\(lastLines(result?.stderr ?? "", 10))")
             }
         }
 
-        if rune { return ElectronIdentity.Resolved(app: paths.app, pendingVersion: nil) }
+        if rune || hydration != nil { return ElectronIdentity.Resolved(app: paths.app, pendingVersion: nil) }
         return try ElectronIdentity.ensure(paths: paths, env: env, progress: progress)
     }
 

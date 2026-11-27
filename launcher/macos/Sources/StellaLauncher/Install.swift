@@ -4,6 +4,7 @@ struct GitTool {
     let bin: String
     let root: URL?
     let baseEnv: [String: String]
+    var ceiling: String? = nil
 
     var runtimeEnv: [String: String] {
         guard let root else { return ["STELLA_GIT_BIN": bin] }
@@ -21,6 +22,9 @@ struct GitTool {
             env[key] = value
         }
         env["GIT_TERMINAL_PROMPT"] = "0"
+        // An app folder without .git (a first install's app bundle, before
+        // hydration) must not find a repository above it.
+        if let ceiling { env["GIT_CEILING_DIRECTORIES"] = ceiling }
         for (key, value) in extraEnv { env[key] = value }
         return try Shell.run(bin, args, cwd: cwd, env: env)
     }
@@ -50,11 +54,21 @@ struct Runtimes {
 }
 
 enum Install {
-    static func ensureGit(paths: LauncherPaths, baseEnv: [String: String], progress: (String) -> Void) throws -> GitTool {
+    /// The pinned git runtime, where ensureGit puts it (whether or not it is there yet).
+    static func plannedGit(paths: LauncherPaths, baseEnv: [String: String]) -> GitTool {
         let root = paths.runtimes.appendingPathComponent("git-\(Pins.gitVersion)")
-        let bin = root.appendingPathComponent("bin/git")
+        return GitTool(bin: root.appendingPathComponent("bin/git").path, root: root, baseEnv: baseEnv,
+                       ceiling: paths.root.path)
+    }
+
+    static func ensureGit(paths: LauncherPaths, baseEnv: [String: String], progress: (String) -> Void) throws -> GitTool {
+        gitLock.lock()
+        defer { gitLock.unlock() }
+        let planned = plannedGit(paths: paths, baseEnv: baseEnv)
+        guard let root = planned.root else { return planned }
+        let bin = URL(fileURLWithPath: planned.bin)
         if FileManager.default.isExecutableFile(atPath: bin.path) {
-            return GitTool(bin: bin.path, root: root, baseEnv: baseEnv)
+            return planned
         }
         guard let asset = Pins.git[Pins.platformKey], let url = URL(string: asset.url) else {
             throw LauncherError("No git runtime for \(Pins.platformKey).")
@@ -72,10 +86,12 @@ enum Install {
         try? FileManager.default.removeItem(at: archive)
         try? FileManager.default.removeItem(at: root)
         try FileManager.default.moveItem(at: staging, to: root)
-        let git = GitTool(bin: bin.path, root: root, baseEnv: baseEnv)
-        log("install: git ready: \(try git.run(["--version"], cwd: nil))")
-        return git
+        log("install: git ready: \(try planned.run(["--version"], cwd: nil))")
+        return planned
     }
+
+    /// Hydration's thread and the launcher's may both want git.
+    private static let gitLock = NSLock()
 
     static func ensureBun(paths: LauncherPaths, baseEnv: [String: String], localBun: String?, progress: (String) -> Void) throws -> (URL, String) {
         var version = Pins.bunVersion
@@ -218,14 +234,40 @@ enum Install {
     }
 
     private static func installEngine(paths: LauncherPaths, progress: (String) -> Void) throws -> (bin: URL, version: String) {
-        let fm = FileManager.default
         let manifest = paths.app.appendingPathComponent("packages/desktop/launcher.json")
         guard let data = try? Data(contentsOf: manifest),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let engine = json["stellaEngine"] as? [String: Any],
               let version = engine["version"] as? String,
-              let entry = (engine["assets"] as? [String: Any])?[Pins.platformKey] as? [String: Any],
-              let rawURL = entry["url"] as? String, let url = URL(string: rawURL),
+              let entry = (engine["assets"] as? [String: Any])?[Pins.platformKey] as? [String: Any]
+        else { throw LauncherError("This version of Stella has no Rune engine for \(Pins.platformKey).") }
+        return try installEngineAsset(paths: paths, version: version, entry: entry, progress: progress)
+    }
+
+    /// The engine an app bundle's manifest names (the bundle's own launcher.json pin), fetched
+    /// beside the bundle rather than after it; ensureEngine waits on engineLock for it.
+    static func prefetchEngineAsset(paths: LauncherPaths, version: String, entry: [String: Any]) {
+        let ready = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            engineLock.lock()
+            ready.signal()
+            defer { engineLock.unlock() }
+            do {
+                _ = try installEngineAsset(paths: paths, version: version, entry: entry, progress: { _ in })
+            } catch {
+                log("install: early stella-engine download failed (\(error)); trying again")
+            }
+        }
+        ready.wait()
+    }
+
+    /// Downloads one stella-engine build (an asset of launcher.json's "stellaEngine") unless it
+    /// is already there.
+    private static func installEngineAsset(
+        paths: LauncherPaths, version: String, entry: [String: Any], progress: (String) -> Void
+    ) throws -> (bin: URL, version: String) {
+        let fm = FileManager.default
+        guard let rawURL = entry["url"] as? String, let url = URL(string: rawURL),
               let sha = entry["sha256"] as? String
         else { throw LauncherError("This version of Stella has no Rune engine for \(Pins.platformKey).") }
         let dir = paths.runtimes.appendingPathComponent("stella-engine-\(version)")
@@ -292,6 +334,83 @@ enum Install {
         case explicit(String, ref: String?)
     }
 
+    /// Stage 1 of a first install: the app bundle (scripts/build-app-bundle.mjs: the published
+    /// tree plus the Rune host and UI boot bundles, the runtime bytecode and React, without
+    /// node_modules or .git) unpacked into the app folder, with the engine its manifest names
+    /// downloading beside it. `manifest` is a URL or a path; returns the bundle's commit.
+    ///
+    ///   { format, commit, platforms: { <platform>: { file, url?, sha256, bytes, files, backend,
+    ///     engine?: { version, url, sha256, member?, app? } } } }
+    static func installBundle(
+        paths: LauncherPaths, manifest: String, prefetchEngine: Bool, progress: (String) -> Void
+    ) throws -> String {
+        let fm = FileManager.default
+        let started = Date()
+        let data: Data
+        if isURL(manifest) {
+            guard let url = URL(string: manifest) else { throw LauncherError("Bad app bundle manifest URL \(manifest).") }
+            let (body, response) = try Net.fetch(URLRequest(url: url))
+            guard response.statusCode == 200 else {
+                throw LauncherError("The app bundle manifest returned HTTP \(response.statusCode).")
+            }
+            data = body
+        } else {
+            data = try Data(contentsOf: URL(fileURLWithPath: manifest))
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LauncherError("Could not read the app bundle manifest \(manifest).")
+        }
+        let platform = (json["platforms"] as? [String: Any])?[Pins.platformKey] as? [String: Any]
+        guard let commit = json["commit"] as? String,
+              let file = (platform?["url"] as? String) ?? (platform?["file"] as? String),
+              let sha = platform?["sha256"] as? String
+        else { throw LauncherError("The app bundle manifest has no \(Pins.platformKey) bundle.") }
+        let ref = resolve(manifest: manifest, ref: file)
+        if prefetchEngine, let engine = platform?["engine"] as? [String: Any],
+           let version = engine["version"] as? String, engine["url"] is String, engine["sha256"] is String {
+            prefetchEngineAsset(paths: paths, version: version, entry: engine)
+        }
+        progress("Downloading Stella…")
+        log("install: app bundle \(commit.prefix(12)) from \(ref)")
+        try fm.createDirectory(at: paths.runtimes, withIntermediateDirectories: true)
+        let archive = paths.runtimes.appendingPathComponent("app-bundle.tar.gz")
+        defer { try? fm.removeItem(at: archive) }
+        if isURL(ref) {
+            guard let url = URL(string: ref) else { throw LauncherError("Bad app bundle URL \(ref).") }
+            try Net.download(url, to: archive, sha256: sha)
+        } else {
+            try? fm.removeItem(at: archive)
+            try fm.copyItem(at: URL(fileURLWithPath: ref), to: archive)
+            let actual = try sha256File(archive)
+            guard actual == sha.lowercased() else {
+                throw LauncherError("Checksum mismatch for \(ref): expected \(sha), got \(actual).")
+            }
+        }
+        let staging = paths.appStaging
+        try? fm.removeItem(at: staging)
+        do {
+            try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+            let untar = try Shell.run("/usr/bin/tar", ["-xzf", archive.path, "-C", staging.path], env: [:])
+            guard untar.code == 0 else { throw LauncherError("Could not unpack the app bundle: \(untar.stderr)") }
+            try fm.createDirectory(at: paths.app.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.moveItem(at: staging, to: paths.app)
+        } catch {
+            try? fm.removeItem(at: staging)
+            throw error
+        }
+        log("install: app bundle in place in \(String(format: "%.1f", Date().timeIntervalSince(started)))s")
+        return commit
+    }
+
+    static func isURL(_ value: String) -> Bool { value.hasPrefix("https://") || value.hasPrefix("http://") }
+
+    /// A manifest entry's file is relative to the manifest unless it is a URL.
+    private static func resolve(manifest: String, ref: String) -> String {
+        if isURL(ref) || ref.hasPrefix("/") { return ref }
+        guard let slash = manifest.lastIndex(of: "/") else { return ref }
+        return "\(manifest[..<slash])/\(ref)"
+    }
+
     static func cloneSource(paths: LauncherPaths, git: GitTool, source: Source, progress: (String) -> Void) throws {
         progress("Downloading Stella…")
         let staging = paths.appStaging
@@ -322,7 +441,8 @@ enum Install {
         log("install: source at \(try git.run(["rev-parse", "HEAD"], cwd: paths.app))")
     }
 
-    private static func bootstrapAccess(backend: String) throws -> (remote: String, token: String) {
+    /// The upstream's remote and token, and the app bundle offered to a first install ("bundle").
+    static func bootstrapAccess(backend: String) throws -> (remote: String, token: String, bundleManifest: String?) {
         let trimmed = backend.hasSuffix("/") ? String(backend.dropLast()) : backend
         guard let url = URL(string: "\(trimmed)/api/app-source/bootstrap") else {
             throw LauncherError("Invalid backend URL \(backend).")
@@ -339,10 +459,11 @@ enum Install {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw LauncherError("The app source bootstrap returned an unexpected body.")
         }
+        let manifest = ((json["bundle"] as? [String: Any])?["manifest"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let body = (json["upstream"] as? [String: Any]) ?? json
         guard let remote = body["remote"] as? String, let token = body["token"] as? String else {
             throw LauncherError("The app source bootstrap response has no remote and token.")
         }
-        return (remote, token)
+        return (remote, token, manifest)
     }
 }

@@ -241,6 +241,26 @@ fn linux_backend() {
     }
 }
 
+/// The main window comes on screen with the host's first content, which shows it
+/// (`apply_window_props`), not with the empty frame before it; or a second after launch when
+/// the host has sent none.
+#[cfg(target_os = "macos")]
+fn hidden_until_content(mut options: rune::WindowOptions, p: &props::Props) -> rune::WindowOptions {
+    if p.visible.is_some() {
+        return options;
+    }
+    options.visible = false;
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        if !windows::MAIN_BOUND.load(std::sync::atomic::Ordering::Acquire)
+            && let Some(app) = services::APP.get()
+        {
+            app.show();
+        }
+    });
+    options
+}
+
 fn main() {
     #[cfg(unix)]
     block_quit_signals();
@@ -297,7 +317,10 @@ fn main() {
     spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
     // Electron's globalShortcut takes a bare key (Show Stella's Escape discard).
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running().allow_unmodified_shortcuts();
-    let app = windows::decorate_main(app, &p).window_options(windows::options(&p));
+    let options = windows::options(&p);
+    #[cfg(target_os = "macos")]
+    let options = hidden_until_content(options, &p);
+    let app = windows::decorate_main(app, &p).window_options(options);
     #[cfg(target_os = "linux")]
     let app = {
         let desktop = desktop_fonts::wait(&desktop_fonts, std::time::Duration::from_millis(250));
@@ -311,7 +334,7 @@ fn main() {
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
     let _ = services::APP.set(app.handle());
-    app.on_ready(|h| {
+    app.on_window(|h| {
         let h = h.clone();
         engine::with(|e| {
             e.main_handle = Some(h.clone());

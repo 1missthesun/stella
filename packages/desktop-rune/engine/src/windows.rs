@@ -230,6 +230,9 @@ fn size_of(p: &Props) -> (f32, f32) {
     (w, h)
 }
 
+/// Whether the host's tree has a main window yet.
+pub static MAIN_BOUND: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn options(p: &Props) -> WindowOptions {
     let overlay = p.kind.as_deref() == Some("overlay");
     let background = is_background(p);
@@ -425,6 +428,7 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
         }
         if bind_main {
             let swap_view = freed.iter_mut().find(|(_, s)| s.is_main).and_then(|(_, s)| s.swap_view.take());
+            MAIN_BOUND.store(true, std::sync::atomic::Ordering::Release);
             engine::with(|e| {
                 e.main_node = Some(node);
                 let handle = e.main_handle.clone();

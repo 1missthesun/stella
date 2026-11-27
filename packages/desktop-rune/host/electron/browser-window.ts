@@ -502,7 +502,7 @@ export class BrowserWindow extends BaseWindow {
   setIcon() {}
   setOverlayIcon(overlay: unknown, description = "") {
     const count = Number(/^\d+/.exec(description)?.[0] ?? (overlay ? 1 : 0));
-    app.showBadge(count > 0 ? String(count) : "", count);
+    app.showBadge(count > 0 ? String(count) : "", count, description);
   }
   setThumbarButtons() { return true; }
   setThumbnailClip() {}

@@ -268,8 +268,9 @@ pub fn shortcut(cmd: &str, v: &Value) -> Result<Value, String> {
 }
 
 /// `app.setBadge`: Electron's `app.dock.setBadge` / `app.setBadgeCount`. macOS shows `label` as
-/// given on the Dock icon; Windows shows its count over the main window's taskbar button (Rune's
-/// overlay reads "9+" above 9); Linux has no badge yet.
+/// given on the Dock icon; Windows shows its count over the main window's taskbar button in
+/// desktop-ui's badge red (`ChatMessageAlerts`' overlay), with `description` for screen readers;
+/// Linux has no badge yet.
 pub fn badge(v: &Value) -> Result<Value, String> {
     let label = s(v, "label");
     #[cfg(target_os = "macos")]
@@ -285,7 +286,8 @@ pub fn badge(v: &Value) -> Result<Value, String> {
     {
         let count = v.get("count").and_then(|c| c.as_u64()).or_else(|| label.trim_end_matches('+').parse().ok()).unwrap_or(0);
         let handle = crate::engine::read(|e| e.main_handle.clone()).ok_or("app.setBadge: no main window")?;
-        handle.set_taskbar(rune::Taskbar::new().badge(count.min(u64::from(u32::MAX)) as u32, label));
+        let description = v.get("description").and_then(Value::as_str).filter(|d| !d.is_empty()).unwrap_or(label);
+        handle.set_taskbar(rune::Taskbar::new().badge(count.min(u64::from(u32::MAX)) as u32, description).badge_color([0xE5, 0x48, 0x4D]));
         Ok(json!(cfg!(target_os = "windows")))
     }
 }

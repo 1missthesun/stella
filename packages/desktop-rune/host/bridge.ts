@@ -300,7 +300,7 @@ export const engine = {
   notify: (n: { id: string; title: string; body?: string; icon?: string; silent?: boolean; actions?: { id: string; label: string }[] }) => request("notify", n),
   app: {
     /** The app badge: macOS shows `label` on the Dock icon ("3", "99+"; null or "" clears it); Windows shows the count over the main window's taskbar button. Resolves false where nothing shows it (Linux). */
-    setBadge: (label: string | null, count?: number) => request<boolean>("app.setBadge", { label: label ?? "", count }),
+    setBadge: (label: string | null, count?: number, description?: string) => request<boolean>("app.setBadge", { label: label ?? "", count, description }),
     /** Windows: the process's AppUserModelID, which toasts post under; nothing elsewhere. */
     setAppUserModelId: (id: string) => request("app.setAppUserModelId", { id }),
   },

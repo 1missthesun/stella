@@ -129,12 +129,14 @@ function MessageLongPress({
   onPressIn,
   onPressOut,
   style,
+  hasControls = false,
   children,
 }: {
   onLongPress: () => void;
   onPressIn: () => void;
   onPressOut: () => void;
   style?: StyleProp<ViewStyle>;
+  hasControls?: boolean;
   children: ReactNode;
 }) {
   const gesture = Gesture.LongPress()
@@ -147,7 +149,7 @@ function MessageLongPress({
     <GestureDetector gesture={gesture}>
       <View
         style={style}
-        accessible
+        accessible={!hasControls}
         accessibilityHint="Long press for message actions"
         accessibilityActions={MESSAGE_ACCESSIBILITY_ACTIONS}
         onAccessibilityAction={onLongPress}
@@ -1220,6 +1222,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
               onLongPress={openMenu}
               onPressIn={pressIn}
               onPressOut={pressOut}
+              hasControls={Boolean(item.welcome)}
             >
               {assistantBubble}
             </MessageLongPress>

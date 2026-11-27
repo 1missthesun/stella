@@ -48,7 +48,8 @@ const byteLength = (text: string) => encoder.encode(text).length;
 
 const change = object({
   key: string({ min: 1, max: VIEW_STORAGE_LIMITS.maxKeyLength }),
-  value: json({ maxBytes: VIEW_STORAGE_LIMITS.maxViewBytes }),
+  // Sized loosely here; the write itself checks the view's total, with a message that says why.
+  value: json({ maxBytes: VIEW_STORAGE_LIMITS.maxViewBytes * 2 }),
 });
 const changes = array(change, { max: VIEW_STORAGE_LIMITS.maxChanges });
 const viewId = string({ min: 3, max: VIEW_STORAGE_LIMITS.maxViewIdLength, pattern: VIEW_ID_PATTERN });

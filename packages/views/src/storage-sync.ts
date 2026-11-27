@@ -225,6 +225,15 @@ export class SyncedViewStorage implements ViewStorage {
     this.kick();
   }
 
+  /** Sends what's queued now instead of waiting out the retry delay (the network is back). */
+  retryNow(): void {
+    if (!this.retryTimer) return;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.retryMs = RETRY_MIN_MS;
+    this.kick();
+  }
+
   /** Whether every change made here has reached the server. */
   get synced(): boolean {
     return this.pending.size === 0 && !this.clearing && !this.seed && !this.sending;
@@ -410,6 +419,11 @@ export class ViewStorageSync {
     if (remote === this.remote) return;
     this.remote = remote;
     for (const store of this.stores.values()) store.setRemote(remote);
+  }
+
+  /** The network is back (or the app came to the front): replay queued changes now. */
+  retryNow(): void {
+    for (const store of this.stores.values()) store.retryNow();
   }
 
   get connected(): boolean {

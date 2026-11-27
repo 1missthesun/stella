@@ -108,6 +108,7 @@ function register(subject: string): Promise<void> {
 }
 
 async function tearDown(): Promise<void> {
+  log("signed out: unregistering");
   registeredSubject = null;
   const token = __native.storageGet(TOKEN_KEY);
   __native.storageRemove(TOKEN_KEY);
@@ -189,7 +190,8 @@ export function startPush(): void {
       wasSignedIn = true;
       void register(subject);
       void phoneRequest<PushResponse[]>("push.takeLaunch").then((list) => list.forEach(respond), () => undefined);
-    } else if (wasSignedIn) {
+    } else if (wasSignedIn && !getAuthSessionSnapshot().isPending) {
+      // Signed out for real, not a session refresh in flight (which reads as no account).
       wasSignedIn = false;
       void tearDown();
     }

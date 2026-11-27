@@ -83,8 +83,16 @@
   color: var(--text-strong);
 }
 
-.choose-ai-dialog {
-  width: min(480px, calc(100vw - 32px));
+.choose-ai-dialog[data-slot="dialog-content"] {
+  width: min(500px, calc(100vw - 32px));
+}
+
+.choose-ai-dialog [data-slot="dialog-body"] {
+  padding: 26px 24px 22px;
+}
+
+.choose-ai-dialog .choose-ai-card__title {
+  padding-inline-end: 32px;
 }
 
 .choose-ai-dialog__close {

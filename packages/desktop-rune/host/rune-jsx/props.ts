@@ -391,6 +391,8 @@ export type WindowProps = {
   visible?: boolean;
   /** Leaves the window out of screen captures and recordings (macOS sharingType none, Windows WDA_EXCLUDEFROMCAPTURE; Linux has none). */
   contentProtection?: boolean;
+  /** The window's element keys are its own: a command that names a key without naming this window never reaches inside it, so another window (the draft preview's copy of the app) can hold the same keys. */
+  isolated?: boolean;
   /** Window background (also `fill`). */
   bg?: Color; fill?: Color; gradient?: Gradient;
   /** Custom titlebar height: the app draws it, the window keeps its controls over it. */

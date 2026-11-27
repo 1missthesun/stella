@@ -204,11 +204,11 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   // ---------------------------------------------------------------- services
   let control: ControlContext | null = null;
   if (services) {
-    const { WebContents, contentsKindOf } = await import("./electron/web-contents");
+    const { WebContents } = await import("./electron/web-contents");
     const reloadWindow = WebContents.host.onReload;
     WebContents.host.onReload = (contents) => {
       reloadWindow?.(contents);
-      if (contentsKindOf(contents.getURL()) === "app") void applySwap("reload", now());
+      if (contents.kind === "app") void applySwap("reload", now());
     };
     const { setUiSwapTarget } = await import("./services/renderer-source");
     setUiSwapTarget({

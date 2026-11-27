@@ -656,6 +656,9 @@ pub struct Props {
     pub click_through: bool,
     pub forward_mouse: bool,
     pub content_protection: bool,
+    /// Its elements' `id`s are its own: a command reaches them only by naming this window, and one
+    /// that names none never finds them (the draft preview's copy of the interface).
+    pub isolated: bool,
     pub visible: Option<bool>,
     pub bg: Option<C>,
     pub titlebar: Option<f32>,

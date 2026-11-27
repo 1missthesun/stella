@@ -11,10 +11,11 @@ no engine build.
   are in `host/ELEMENTS.md`, types in `host/rune-jsx/props.ts`; colours and sizes come from
   `useTokens()` in `ui/theme`. The chat composer is `ui/chat/Composer.tsx`.
 - Typecheck from the draft root: `bun packages/desktop-rune/scripts/typecheck.ts`.
-- Check: `stella-preview://<name>` doesn't show Rune's interface yet (the tab stays blank), and
-  computer use never drives Stella's own window, so you can't look before you finish. Typecheck,
-  keep to the recipes below, and finish: the change swaps in within a second, and one that throws
-  is taken back by itself. Say in your report that you couldn't see it.
+- Check in the skill's preview: `stella-preview://<name>` runs the draft's `ui/` in an off-screen
+  engine window of its own and shows it in the tab, which you click, type into and screenshot as
+  usual. Edits under `ui/` rebuild it by themselves (`tab.reload()` does too); a broken one shows
+  its error over the last good frame. The window takes the tab's size. Computer use never drives
+  Stella's own window, so look through the preview.
 
 ## Effects: glass, metal, light
 

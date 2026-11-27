@@ -525,10 +525,11 @@ impl Morph {
     }
 }
 
-/// Where the element keyed `key` was drawn last frame, with its corner radius, and its glass.
-fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, key: &str) -> Option<(Shape, Option<LensParams>)> {
+/// Where the element keyed `key` (in `node`'s window) was drawn last frame, with its corner radius, and its glass.
+fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, node: u32, key: &str) -> Option<(Shape, Option<LensParams>)> {
     let ([x, y, w, h], _) = rt.presented(key)?;
-    let p = eng.tree.find_key(key).and_then(|n| eng.tree.get(n)).map(|n| &*n.props);
+    let found = eng.tree.window_of(node).and_then(|w| eng.tree.find_key_in(key, w)).or_else(|| eng.tree.find_key(key));
+    let p = found.and_then(|n| eng.tree.get(n)).map(|n| &*n.props);
     let r = p.and_then(|p| p.corners.map(|c| c.iter().fold(0.0f32, |a, v| a.max(*v))).or(p.radius)).unwrap_or(0.0);
     let lens = p.and_then(|p| p.fx.as_ref()).and_then(|l| {
         l.0.iter().find_map(|s| match &s.effect {
@@ -656,7 +657,7 @@ impl Compositor<Win> for Comp {
                                     let source = ms.from.clone().or_else(|| p.anchor.as_ref().map(|a| a.to.clone()));
                                     let m = match (morphs.contains_key(&node), source) {
                                         (true, _) => morphs.get_mut(&node),
-                                        (false, Some(key)) if !closing => source_shape(f.rt, eng, &key).map(|(from, from_lens)| {
+                                        (false, Some(key)) if !closing => source_shape(f.rt, eng, node, &key).map(|(from, from_lens)| {
                                             // Reopened while the last one still goes back into the same source: carry on
                                             // from where that one is drawn, and let it go.
                                             let (mut x0, mut v0) = (if reduced { 1.0 } else { 0.0 }, 0.0);
@@ -691,7 +692,7 @@ impl Compositor<Win> for Comp {
                                                 closed.push(node);
                                                 continue;
                                             }
-                                            if !settled && let Some((from, _)) = source_shape(f.rt, eng, &m.key) {
+                                            if !settled && let Some((from, _)) = source_shape(f.rt, eng, node, &m.key) {
                                                 m.from = from;
                                             }
                                             let at = if settled { m.target } else { m.at(now).0 };

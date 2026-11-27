@@ -88,19 +88,30 @@ impl Tree {
         None
     }
 
-    /// The node whose `id` prop is `key`.
-    /// The node with `id` `key`, one shown in a window over one React holds detached.
+    /// The node with `id` `key`, one shown in a window over one React holds detached. Elements of
+    /// an `isolated` window are found only by [`Tree::find_key_in`].
     pub fn find_key(&self, key: &str) -> Option<u32> {
         let mut detached = None;
         for (id, n) in &self.nodes {
             if n.props.id.as_deref() == Some(key) {
-                if self.window_of(*id).is_some() {
-                    return Some(*id);
+                match self.window_of(*id) {
+                    Some(w) if self.nodes.get(&w).is_some_and(|w| w.props.isolated) => {}
+                    Some(_) => return Some(*id),
+                    None => { detached.get_or_insert(*id); }
                 }
-                detached.get_or_insert(*id);
             }
         }
         detached
+    }
+
+    /// The node with `id` `key` in `window`.
+    pub fn find_key_in(&self, key: &str, window: u32) -> Option<u32> {
+        self.nodes.iter().find(|(id, n)| n.props.id.as_deref() == Some(key) && self.window_of(**id) == Some(window)).map(|(id, _)| *id)
+    }
+
+    /// The window whose `id` is `key`.
+    pub fn find_window(&self, key: &str) -> Option<u32> {
+        self.nodes.get(&0)?.children.iter().copied().find(|w| self.nodes.get(w).is_some_and(|n| n.props.id.as_deref() == Some(key)))
     }
 
     /// Recomputes `live_above` after the tree's shape changed.

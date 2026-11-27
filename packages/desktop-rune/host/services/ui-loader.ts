@@ -36,6 +36,14 @@ export type UiLoaderOptions = {
   idleStopMs?: number;
   /** Boot from the bytecode boot bundle while it matches the sources, and keep it current (ui-cache.ts). */
   bootCache?: boolean;
+  /** The bundler process's script: a draft's own, so its `@/` and `ui/replace` resolve in the draft. */
+  builder?: string;
+  /** Where the bundle's externals (`react`) resolve from: the entry by default. A draft's UI takes the host's React. */
+  requireFrom?: string;
+  /** The first generation's id; another loader's ids start past this one's (the draft preview's). */
+  firstGeneration?: number;
+  /** Free identifiers the bundle sees in place of the host's globals (`window`, `stella`), read at each load. */
+  globals?: () => Record<string, unknown>;
 };
 
 type Child = { proc: Subprocess; ready: Promise<void>; builds: number; pending: Map<number, (reply: UiBuildReply) => void> };
@@ -43,7 +51,7 @@ type Child = { proc: Subprocess; ready: Promise<void>; builds: number; pending: 
 export function createUiLoader(options: UiLoaderOptions) {
   const recycleAfter = options.recycleAfter ?? 25;
   const recycleAboveMb = options.recycleAboveMb ?? 400;
-  const hostRequire = createRequire(options.entry);
+  const hostRequire = createRequire(options.requireFrom ?? options.entry);
   let nextId = 0;
   let child: Child | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -51,7 +59,7 @@ export function createUiLoader(options: UiLoaderOptions) {
   const spawnChild = (onGone: (c: Child) => void = (c) => { if (child === c) child = null; }): Child => {
     let resolveReady!: () => void;
     const c: Child = { proc: null!, ready: new Promise((r) => (resolveReady = r)), builds: 0, pending: new Map() };
-    c.proc = Bun.spawn([process.execPath, CHILD], {
+    c.proc = Bun.spawn([process.execPath, options.builder ?? CHILD], {
       cwd: path.dirname(options.entry),
       env: { ...process.env, NODE_ENV: uiBuildMode() },
       stdio: ["ignore", "ignore", "inherit"],
@@ -130,7 +138,14 @@ export function createUiLoader(options: UiLoaderOptions) {
   const evaluate = (code: string, generation: number): UiModule => {
     const filename = options.entry;
     const module = { exports: {} as UiModule };
-    const factory = (0, eval)(`${code}\n//# sourceURL=${filename}?swap=${generation}`) as (...args: unknown[]) => void;
+    const globals = options.globals?.();
+    const names = Object.keys(globals ?? {}).filter((name) => /^[A-Za-z_$][\w$]*$/.test(name));
+    // Shadowed on the bundle's first line, so its line numbers stay its own.
+    const source = globals
+      ? `(function (__globals) { var ${names.map((n) => `${n} = __globals.${n}`).join(", ")}; return (${code}\n); })\n//# sourceURL=${filename}?swap=${generation}`
+      : `${code}\n//# sourceURL=${filename}?swap=${generation}`;
+    const evaluated = (0, eval)(source);
+    const factory = (globals ? evaluated(globals) : evaluated) as (...args: unknown[]) => void;
     factory.call(module.exports, module.exports, hostRequire, module, filename, path.dirname(filename));
     return module.exports;
   };
@@ -147,7 +162,8 @@ export function createUiLoader(options: UiLoaderOptions) {
     }
   };
 
-  let generation = 0;
+  const first = options.firstGeneration ?? 0;
+  let generation = first;
   let bootBundle: ReturnType<typeof validUiCache> | null = null;
   let liveScope: UiScope | null = null;
   const replaced: UiScope[] = [];
@@ -168,13 +184,13 @@ export function createUiLoader(options: UiLoaderOptions) {
   return {
     /** Checks the boot bundle, and spawns the bundler ahead of the first load when it can't be used. */
     warm() {
-      if (generation > 0 || bootBundle) return;
+      if (generation > first || bootBundle) return;
       bootBundle = options.bootCache ? validUiCache().catch(() => null) : Promise.resolve(null);
-      void bootBundle.then((found) => { if (!found && generation === 0) child ??= spawnChild(); });
+      void bootBundle.then((found) => { if (!found && generation === first) child ??= spawnChild(); });
     },
     async load(): Promise<UiModule> {
-      if (generation === 0 && !bootBundle) this.warm();
-      const found = generation === 0 ? await bootBundle : null;
+      if (generation === first && !bootBundle) this.warm();
+      const found = generation === first ? await bootBundle : null;
       const boot = found && found.key === uiCacheKey(options) ? found.file : null;
       let loaded: { value: UiModule; scope: UiScope } | null = null;
       let id = 0;
@@ -204,6 +220,12 @@ export function createUiLoader(options: UiLoaderOptions) {
     /** Undoes what replaced generations registered; call once the new generation's tree has replaced theirs (their unmount cleanups ran). */
     retireReplaced() {
       for (const scope of replaced.splice(0)) scope.dispose();
+    },
+    /** Undoes what every generation registered, the live one too: the UI is gone. */
+    retireAll() {
+      for (const scope of replaced.splice(0)) scope.dispose();
+      liveScope?.dispose();
+      liveScope = null;
     },
     /** Generations not yet garbage collected: one after a settled swap, more means a leak. */
     liveGenerations(): number[] {

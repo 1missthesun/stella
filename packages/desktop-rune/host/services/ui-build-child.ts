@@ -48,7 +48,10 @@ process.on("message", async (request: UiBuildRequest) => {
     if (!result.success) return send({ id: request.id, ok: false, error: result.logs.map(String).join("\n"), rssMb: rssMb() });
     send({ id: request.id, ok: true, code: await result.outputs[0]!.text(), inputs: request.cache ? inputsOf(result) : undefined, rssMb: rssMb() });
   } catch (error) {
-    const inner = (error as { errors?: Array<{ message?: string; position?: { file?: string; line?: number } }> }).errors ?? [];
+    const all = (error as { errors?: Array<{ message?: string; level?: string; position?: { file?: string; line?: number } }> }).errors ?? [];
+    // Warnings (a deprecated JSX form somewhere else) ride along; the errors are what broke.
+    const errors = all.filter((e) => e.level === "error");
+    const inner = errors.length ? errors : all;
     const detail = inner.map((e) => `${e.message ?? String(e)}${e.position?.file ? ` (${e.position.file}:${e.position.line})` : ""}`).join("\n");
     const message = detail || (error instanceof Error ? error.stack ?? error.message : String(error));
     send({ id: request.id, ok: false, error: message, rssMb: rssMb() });

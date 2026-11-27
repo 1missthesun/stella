@@ -142,7 +142,7 @@ export function stellaPromptExtension(sources: StellaContextSources, imageBudget
       section("skills", async (_input, context) => sources.skillsCatalog(context), { tag: false }),
       section("execution-devices", async (input, context) => {
         const orchestrator = (await role(input, context)).agentType === "orchestrator";
-        if (!orchestrator && !input.agent.tools.some((tool) => tool.name === "switch_destination")) return undefined;
+        if (!orchestrator && !input.agent.tools.some((tool) => tool.name === "switch_to" || tool.name === "switch_destination")) return undefined;
         const snapshot = await sources.executionContext(input.conversationId, context);
         return snapshot && renderExecutionDevices(snapshot, orchestrator ? "orchestrator" : "agent");
       }),

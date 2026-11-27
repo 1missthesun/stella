@@ -25,6 +25,7 @@ const HARNESS_TOOL_NAMES = new Set([
   "multi_tool_use_parallel",
   "NoResponse",
   "node_repl",
+  "switch_to",
   "switch_destination",
 ]);
 

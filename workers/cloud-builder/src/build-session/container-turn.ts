@@ -962,7 +962,7 @@ export const runContainerAgentTurn = async (
           ...pending,
           payload: {
             ...(pending.payload as Record<string, unknown>),
-            finalText: `${finalText}\n\n[switch_destination: the move did not happen: ${move.failed} The agent still runs in the cloud; message it to carry on there.]`.trim(),
+            finalText: `${finalText}\n\n[switch_to: the move did not happen: ${move.failed} The agent still runs in the cloud; message it to carry on there.]`.trim(),
           },
         } as PendingTerminal;
       }

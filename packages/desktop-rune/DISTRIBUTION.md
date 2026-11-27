@@ -1,12 +1,13 @@
 # Distributing the Rune engine
 
-How `stella-engine` is built, shipped and started by the launchers. Nothing here is published;
-installed Stellas keep starting Electron until the opt-in below is turned on by hand.
+How `stella-engine` is built, published and started by the launchers. Rune is the desktop engine:
+a launcher starts it for every source that pins an engine build, and Electron only for sources
+from before Rune or platforms without a published build.
 
 ## Builds
 
-`.github/workflows/build-rune-engine.yml` runs on every push to `rune/**` that touches
-`packages/desktop-rune/**` or `launcher/**`.
+`.github/workflows/build-rune-engine.yml` builds and smoke-tests the engine on pushes to `master`
+and `rune/**` that touch `packages/desktop-rune/**` or `launcher/**`.
 
 | platform     | runner          | target                    |
 |--------------|-----------------|---------------------------|
@@ -22,43 +23,101 @@ installed Stellas keep starting Electron until the opt-in below is turned on by 
   bytes and build seconds; the job summary shows the same.
 - Rune is a private git dependency (`github.com/1missthesun/rune`). CI reads it with the read-only
   deploy key `stella CI (read-only)` on that repo, stored as the Actions secret `RUNE_DEPLOY_KEY`
-  on `1missthesun/stella`; git rewrites the https URL to ssh for that one repo.
+  on `1missthesun/stella`; git rewrites the https URL to ssh for that one repo. Only binaries leave
+  CI, so Rune can stay private; the one cost is that a builder without the key can't compile the
+  engine (they can still run Stella with a published engine, or `--engine-bin`).
 - `launch (linux-x64)` starts the built binary on Xvfb with lavapipe and the TS host, waits for
   `first_content_frame` and uploads a screenshot and metrics (`stella-engine-linux-x64-launch`).
 - `launch (win-x64, WebView2)` builds master's native helpers, starts the engine and host
   services on the runner's desktop, opens a window and the WebView2 media page, plays audio,
   records the screen, reads input through the hook, runs meeting capture and uploads a
   screenshot (`stella-engine-win-x64-launch`).
-- `launcher compiles` builds the three launchers with the opt-in (compile only, nothing signed).
-- Manual runs (`workflow_dispatch`, `profile: dist|release`) work once the workflow is on the
-  default branch; until then push to a `rune/**` branch.
+- `launcher compiles` builds the three launchers (compile only, nothing signed).
 
-## Launcher opt-in
+## Publishing
 
-Electron stays the default. A launcher starts the engine instead when any of these is set:
+`.github/workflows/publish-rune-engine.yml`, run by hand (`workflow_dispatch`); nothing publishes
+on push.
 
-- `--engine rune` (or `--engine electron` to force Electron),
-- `STELLA_LAUNCHER_ENGINE=rune` in the launcher's environment,
-- the file `<launcher root>/rune-engine` exists (`~/.local/share/stella/rune-engine`,
-  `~/Library/Application Support/Stella/rune-engine` on the Mac's launcher root,
-  `%LOCALAPPDATA%\Stella\rune-engine`),
-- `--engine-bin <path>` / `STELLA_LAUNCHER_ENGINE_BIN=<path>`: a local engine binary (a CI
-  artifact or `engine/target/dist/stella-engine`); implies rune.
+- Version: the first 12 hex digits of the git tree of `packages/desktop-rune/engine`
+  (`git rev-parse HEAD:packages/desktop-rune/engine`). The engine directory is self-contained
+  (sources, `Cargo.lock`, vendored wry), so the same engine always gets the same version and a run
+  for an already-published version stops early (`force` rebuilds).
+- Builds the six targets with `dist`, then packages:
+  - Linux: `stella-engine-linux-<arch>.zip` holding `stella-engine` (manifest `member`).
+  - macOS: `stella-engine-darwin-<arch>.zip` holding `Stella.app` (manifest `app`), with the
+    Info.plist below, the Stella icon, and a Developer ID signature with the identity Electron
+    Stella has (secrets `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
+    `APPLE_SIGNING_IDENTITY`, team `vars.STELLA_APPLE_TEAM_ID`), verified against
+    `ElectronIdentity.requirement`. Without `publish` it is signed ad hoc.
+  - Windows: `stella-engine-win-<arch>.zip` holding `stella-engine.exe`, Authenticode-signed
+    with the launcher's DigiCert certificate (same checks as `build-launchers.yml`).
+- With `publish` on, uploads every zip and then `manifest.json`
+  (`{"version", "assets": {<platform>: {"url", "sha256", "member"|"app"}}}`) to R2
+  `runtimes/stella-engine/<version>/`, immutable. The manifest goes last, so its presence means
+  the whole build is there.
+- Pinning: `node scripts/pin-rune-engine.mjs [--version <v>]` downloads the published manifest
+  and every asset, checks each sha256, and writes the `stellaEngine` entry into
+  `packages/desktop/launcher.json`. Committing that is what moves installs onto the engine: the
+  launcher reads the entry from the source it is about to start.
 
-What changes when it is on (Linux `stella-launcher.c`, Windows `stella-launcher.cpp`, macOS
-`Launcher.swift` + `Install.swift`):
+Ship order: publish the engine, pin it and commit, publish the launchers
+(`build-launchers.yml`, `publish`), then publish the app source.
 
-1. Install, verification, Bun, `bun install` and `prepare-install.mjs` run exactly as for Electron
+## Choosing the engine
+
+Linux `stella-launcher.c`, Windows `stella-launcher.cpp`, macOS `Launcher.swift` + `Install.swift`,
+in this order:
+
+1. `--engine rune|electron` or `STELLA_LAUNCHER_ENGINE=rune|electron`.
+2. `--engine-bin <path>` / `STELLA_LAUNCHER_ENGINE_BIN=<path>`: a local engine binary (a CI
+   artifact or `engine/target/dist/stella-engine`); implies rune.
+3. The file `<launcher root>/electron-engine` forces Electron and `<launcher root>/rune-engine`
+   forces Rune (`~/.local/share/stella/`, `~/Library/Application Support/Stella/`,
+   `%LOCALAPPDATA%\Stella\`).
+4. Otherwise Rune when the source has `packages/desktop-rune/host/main.tsx` and its
+   `launcher.json` pins an engine asset for this platform; Electron when it doesn't.
+
+The choice reads the source and its `launcher.json`, never `node_modules`, so it is made the same
+way on a first install before dependencies exist, and again on every start and every relaunch
+after an Update (the launcher re-reads the updated source).
+
+## Upgrading from Electron
+
+Nothing is migrated: Rune uses Electron Stella's userData, data directories and account, so the
+same chats, settings and sign-in open.
+
+- New launcher, new source: Rune. The first start downloads the engine (about 15 MB) next to Bun
+  and builds the host and UI bundles once.
+- Old launcher (Electron only), new source: Electron. The source keeps the `electron` dependency
+  and the Electron main process, so a launcher that hasn't updated itself yet still starts Stella.
+- New launcher, old source (or a source without a pin for the platform): Electron.
+- Launchers update themselves from R2 `launcher/stable` (checked at start and every 6 hours, and
+  handed over before the app starts), so installs move to Rune at the first launcher start after
+  the new launcher is published. That self-update is the one-time step; nothing else is asked of
+  the user.
+- Under Rune nothing Electron-side is fetched or started: `install-deps.mjs` skips Electron's
+  binary download (`STELLA_SKIP_ELECTRON_BINARY`) when `STELLA_LAUNCHER_ENGINE=rune`, and the Mac
+  launcher skips the Electron identity bundle.
+- Deleting Electron's main process and dependency can follow once published launchers are all
+  Rune-capable; the Rune host still runs its services through the `electron` shim, and the web
+  chat and Rune UI import `packages/desktop-ui`.
+
+## How a launcher runs the engine
+
+1. Install, verification, Bun, `bun install` and `prepare-install.mjs` run as for Electron
    (the host runs master's Electron-main services, so it needs the same `node_modules`).
-2. The engine is a versioned runtime like Bun: `packages/desktop/launcher.json` gains
+2. The engine is a versioned runtime like Bun: `packages/desktop/launcher.json` has
    ```json
-   "stellaEngine": { "version": "<v>", "assets": { "<platform>": { "url": "…", "sha256": "…", "member": "<path in zip, optional>" } } }
+   "stellaEngine": { "version": "<v>", "assets": { "<platform>": { "url": "…", "sha256": "…", "member": "<path in zip>" } } }
    ```
    and the launcher installs it to `<root>/runtimes/stella-engine-<v>/stella-engine[.exe]`
    (checksum-verified, GitHub URLs go through the releases mirror like Bun). An asset without
-   `member` is the bare binary. `linux-x64-baseline` and `win-x64-baseline` use the x64 build.
-   A source without `packages/desktop-rune/host/main.tsx` or without an asset for the platform
-   fails with a clear message rather than falling back silently.
+   `member` is the bare binary. On macOS an asset with `"app": "Stella.app"` is a zipped bundle:
+   the launcher checks its signature against `ElectronIdentity.requirement` and installs it as
+   `<root>/runtimes/stella-engine-<v>/Stella.app`. `linux-x64-baseline` and `win-x64-baseline`
+   use the x64 build. Asking for Rune by hand on a source without
+   `packages/desktop-rune/host/main.tsx` or without an asset fails with a clear message.
 3. The launcher spawns `stella-engine` (no arguments, cwd = app source) with the usual Stella
    environment plus `STELLA_LAUNCHER_ENGINE=rune`, `STELLA_RUNE_ROOT=<app>/packages/desktop-rune`,
    `STELLA_RUNE_BUN=<runtimes>/bun-<v>/bun` and `STELLA_RUNE_SERVICES=1` (the host boots Stella's
@@ -68,31 +127,17 @@ What changes when it is on (Linux `stella-launcher.c`, Windows `stella-launcher.
    sources (HOST.md, "Boot bundles"), so the app source must stay writable, as it is for
    self-modification.
 4. The supervisor protocol is unchanged. On Linux and macOS the launcher's channel is fd 3, which
-   the engine passes to the host (proven on Linux: the host process holds the launcher's
-   socket on fd 3). On Windows the host connects to `STELLA_LAUNCHER_PIPE`; the pipe accepts the
-   engine's direct child as well as the engine itself. Master's `launcher-client.ts`, running in
-   the host, sends `ready` on the shim's `BrowserWindow` `ready-to-show`, and handles `quit` and
-   `sign`, so the host track must emit those events from the `electron` shim. The engine must
-   spawn the host with fd 3 inherited unchanged; the bridge pipes live elsewhere (fd 4/5).
+   the engine passes to the host. On Windows the host connects to `STELLA_LAUNCHER_PIPE`; the pipe
+   accepts the engine's direct child as well as the engine itself. Master's `launcher-client.ts`,
+   running in the host, sends `ready` on the shim's `BrowserWindow` `ready-to-show`, and handles
+   `quit` and `sign`. The engine spawns the host with fd 3 inherited unchanged; the bridge pipes
+   live elsewhere (fd 4/5).
 
-Not done yet (ship-time work):
+Known gaps:
 
-- Hosting: engine builds go to R2 `runtimes/stella-engine/<v>/` from a publish step, and
-  `launcher.json` gets the `stellaEngine` entry. CI artifacts expire and need auth, so they are
-  only for testing with `--engine-bin`.
-- macOS identity: Electron runs inside a signed `Stella.app` (`ElectronIdentity`); the engine
-  needs the same (a signed, notarized bundle so the Dock, menu bar, TCC prompts and notifications
-  say Stella). Windows needs the engine Authenticode-signed with the launcher's certificate.
-- macOS media access (microphone, screen) needs that bundle; see "macOS bundle and media access".
-- Rune is private: an outside builder can't compile the engine until the mirror is public or the
-  engine ships only as a binary.
-- The Linux launcher's log is still `logs/electron.log` for both.
-- User data: a launcher-started engine uses Electron Stella's userData and data dirs (same account,
-  same files) but its own single-instance lock (`RuneSingleton.sock`), so Electron Stella and Rune
-  Stella can run at once against the same data. One lock for both before anyone opts in.
-- Proven on Linux (omarchy, Xvfb): `stella-launcher --self-test --engine-bin <dist engine>` clones
-  the source, installs Bun and deps, starts the engine, gets `ready` 0.5-10 s after spawn, sends
-  `quit`, gets `exiting 0`, exits 0; the runtime worker then stops by itself.
+- The Linux launcher's log is still `logs/electron.log` for both engines (other tools read it).
+- Rune has its own single-instance lock (`RuneSingleton.sock`), separate from Electron's. One
+  launcher starts one engine, so this only matters when someone runs both by hand.
 
 ## Linux: realtime voice needs a Chrome
 

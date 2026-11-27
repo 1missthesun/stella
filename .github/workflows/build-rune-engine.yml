@@ -2,7 +2,7 @@ name: Build Rune Engine
 
 on:
   push:
-    branches: ["rune/**"]
+    branches: ["master", "rune/**"]
     paths:
       - "packages/desktop-rune/**"
       - "launcher/**"

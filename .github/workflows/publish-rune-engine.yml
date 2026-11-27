@@ -1,0 +1,373 @@
+name: Publish Rune Engine
+
+# Builds stella-engine for every desktop platform, signs it (macOS: inside a Developer ID signed
+# Stella.app, the identity Electron Stella had; Windows: Authenticode with the launcher's
+# certificate) and, with publish on, uploads it to R2 runtimes/stella-engine/<version>/ with a
+# manifest.json. <version> is the git tree of packages/desktop-rune/engine, so a build is only
+# published once and nothing installed changes until `node scripts/pin-rune-engine.mjs` copies
+# the manifest into packages/desktop/launcher.json and that source is released.
+# Rune is private: the build reads it with RUNE_DEPLOY_KEY and only binaries leave CI.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload to R2 runtimes/stella-engine/<version>/ (off: build and sign only)"
+        type: boolean
+        default: false
+      force:
+        description: "Rebuild even if this engine version is already published"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-rune-engine
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  PUBLIC_BASE: ${{ vars.STELLA_RELEASES_URL || 'https://pub-a319aaada8144dc9be5a83625033769c.r2.dev' }}/runtimes/stella-engine
+  APPLE_TEAM: ${{ vars.STELLA_APPLE_TEAM_ID || '7UVYHQ763X' }}
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      published: ${{ steps.v.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - id: v
+        run: |
+          set -euo pipefail
+          version="$(git rev-parse HEAD:packages/desktop-rune/engine | cut -c1-12)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.force }}" != "true" ]] && curl -sfI "$PUBLIC_BASE/$version/manifest.json" > /dev/null; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "stella-engine $version is already published: $PUBLIC_BASE/$version/manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    needs: version
+    if: needs.version.outputs.published != 'true'
+    name: build (${{ matrix.platform }})
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - platform: darwin-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - platform: darwin-x64
+            runner: macos-15
+            target: x86_64-apple-darwin
+          - platform: win-x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            exe: .exe
+          - platform: win-arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            exe: .exe
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/desktop-rune/engine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: packages/desktop-rune
+
+      - name: Rune access
+        env:
+          RUNE_DEPLOY_KEY: ${{ secrets.RUNE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          temp="${RUNNER_TEMP//\\//}"
+          key="$temp/rune_deploy_key"
+          (umask 077 && printf '%s\n' "$RUNE_DEPLOY_KEY" > "$key")
+          echo "GIT_SSH_COMMAND=ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          git config --global url."ssh://git@github.com/1missthesun/rune".insteadOf "https://github.com/1missthesun/rune"
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libfontconfig-dev libxkbcommon-dev libwayland-dev libasound2-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --locked --profile dist --target ${{ matrix.target }}
+
+      - name: Collect
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          cp "target/${{ matrix.target }}/dist/stella-engine${{ matrix.exe }}" "$RUNNER_TEMP/out/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-${{ matrix.platform }}
+          path: ${{ runner.temp }}/out/
+          if-no-files-found: error
+
+      - name: Remove the Rune key
+        if: always()
+        run: rm -f "${RUNNER_TEMP//\\//}/rune_deploy_key"
+
+  # Stella.app/Contents/MacOS/stella-engine, signed like the Electron identity (Developer ID, no
+  # hardened runtime), so privacy grants already given to Stella carry over (DISTRIBUTION.md).
+  macos:
+    needs: [version, build]
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: packages/desktop/build
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raw-darwin-*
+          path: raw
+      - name: Bundle and sign
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          identity="-"
+          if [[ "$PUBLISH" == "true" ]]; then
+            cert_path="$RUNNER_TEMP/stella-certificate.p12"
+            keychain_path="$RUNNER_TEMP/stella-signing.keychain-db"
+            keychain_password="$(openssl rand -base64 32)"
+            printf '%s' "$APPLE_CERTIFICATE" | base64 --decode -o "$cert_path"
+            security create-keychain -p "$keychain_password" "$keychain_path"
+            security set-keychain-settings -lut 21600 "$keychain_path"
+            security unlock-keychain -p "$keychain_password" "$keychain_path"
+            security import "$cert_path" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+            security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_path"
+            security list-keychains -d user -s "$keychain_path" login.keychain-db
+            rm -f "$cert_path"
+            identity="$APPLE_SIGNING_IDENTITY"
+            [[ "$identity" == "Developer ID Application:"* ]] || identity="Developer ID Application: $identity"
+          fi
+          requirement="anchor apple generic and identifier \"com.stella.app\" and certificate leaf[subject.OU] = \"$APPLE_TEAM\""
+          mkdir -p out
+          for platform in darwin-arm64 darwin-x64; do
+            work="$RUNNER_TEMP/$platform"
+            app="$work/Stella.app"
+            rm -rf "$work" && mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+            cp "raw/raw-$platform/stella-engine" "$app/Contents/MacOS/stella-engine"
+            chmod 755 "$app/Contents/MacOS/stella-engine"
+            cp packages/desktop/build/icon.icns "$app/Contents/Resources/Stella.icns"
+            cat > "$app/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleIdentifier</key><string>com.stella.app</string>
+            <key>CFBundleExecutable</key><string>stella-engine</string>
+            <key>CFBundleName</key><string>Stella</string>
+            <key>CFBundleDisplayName</key><string>Stella</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>Stella</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>CFBundleVersion</key><string>$VERSION</string>
+            <key>LSMinimumSystemVersion</key><string>12.3</string>
+            <key>NSHighResolutionCapable</key><true/>
+            <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+            <key>NSMicrophoneUsageDescription</key><string>Stella uses your microphone for voice conversations and screen recordings.</string>
+            <key>NSSpeechRecognitionUsageDescription</key><string>Stella turns your dictation into text on this Mac.</string>
+          </dict>
+          </plist>
+          PLIST
+            plutil -lint "$app/Contents/Info.plist"
+            if [[ "$identity" == "-" ]]; then
+              codesign --force --deep --sign - "$app"
+            else
+              codesign --force --deep --timestamp --keychain "$keychain_path" --sign "$identity" "$app"
+              codesign --verify --deep --strict --verbose=2 -R="$requirement" "$app"
+            fi
+            ditto -c -k --keepParent "$app" "out/stella-engine-$platform.zip"
+          done
+          [[ -n "${keychain_path:-}" ]] && security delete-keychain "$keychain_path"
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packaged-darwin
+          path: out/
+          if-no-files-found: error
+
+  windows:
+    needs: [version, build]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raw-win-*
+          path: raw
+
+      # DigiCert's certsync can return more than one certificate.
+      - name: Reconstruct DigiCert client authentication certificate
+        if: inputs.publish
+        env:
+          SM_CLIENT_CERT_FILE_B64: ${{ secrets.SM_CLIENT_CERT_FILE_B64 }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $certificatePath = Join-Path $env:RUNNER_TEMP "stella-digicert-client-auth.p12"
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:SM_CLIENT_CERT_FILE_B64))
+          "SM_CLIENT_CERT_FILE=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install DigiCert Software Trust Manager tools
+        if: inputs.publish
+        uses: digicert/code-signing-software-trust-action@fae23a455ba4bde62b64fd7cb2f81ade788f5a95
+        env:
+          SM_HOST: ${{ vars.SM_HOST }}
+          SM_API_KEY: ${{ secrets.SM_API_KEY }}
+          SM_CLIENT_CERT_FILE: ${{ env.SM_CLIENT_CERT_FILE }}
+          SM_CLIENT_CERT_PASSWORD: ${{ secrets.SM_CLIENT_CERT_PASSWORD }}
+
+      - name: Sign stella-engine.exe
+        if: inputs.publish
+        env:
+          SM_HOST: ${{ vars.SM_HOST }}
+          SM_API_KEY: ${{ secrets.SM_API_KEY }}
+          SM_CLIENT_CERT_FILE: ${{ env.SM_CLIENT_CERT_FILE }}
+          SM_CLIENT_CERT_PASSWORD: ${{ secrets.SM_CLIENT_CERT_PASSWORD }}
+          SM_KEYPAIR_ALIAS: ${{ vars.SM_KEYPAIR_ALIAS }}
+          EXPECTED_THUMBPRINT: ${{ vars.STELLA_WINDOWS_CERT_SHA1 }}
+          EXPECTED_SERIAL: ${{ vars.STELLA_WINDOWS_CERT_SERIAL }}
+          STELLA_UPDATE_SIGNER: ${{ vars.STELLA_UPDATE_SIGNER }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $false
+          Write-Output "::add-mask::$env:SM_KEYPAIR_ALIAS"
+          & smctl windows certsync --keypair-alias $env:SM_KEYPAIR_ALIAS 2>&1 | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "DigiCert certificate synchronization failed" }
+          $hex = { param($v) ($v -replace "[^0-9A-Fa-f]", "").ToUpperInvariant() }
+          $certificates = @(Get-ChildItem Cert:\CurrentUser\My | Where-Object { (& $hex $_.Thumbprint) -eq (& $hex $env:EXPECTED_THUMBPRINT) })
+          if ($certificates.Count -ne 1) { throw "Exactly one approved Windows signing certificate must be synchronized" }
+          $certificate = $certificates[0]
+          if ((& $hex $certificate.SerialNumber) -ne (& $hex $env:EXPECTED_SERIAL)) { throw "Wrong certificate serial" }
+          if ($env:STELLA_UPDATE_SIGNER -and $certificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) -ne $env:STELLA_UPDATE_SIGNER) { throw "Wrong certificate publisher" }
+          $publicCertificatePath = Join-Path $env:RUNNER_TEMP "stella-windows-signing-public.cer"
+          Export-Certificate -Cert $certificate -FilePath $publicCertificatePath -Type CERT | Out-Null
+          $signTool = Get-ChildItem (Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin") -Filter signtool.exe -Recurse -File |
+            Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signTool) { throw "Microsoft SignTool was not found" }
+          foreach ($platform in @("win-x64", "win-arm64")) {
+            $exe = "raw\raw-$platform\stella-engine.exe"
+            & $signTool.FullName sign /csp "DigiCert Signing Manager KSP" /kc $env:SM_KEYPAIR_ALIAS /f $publicCertificatePath `
+              /tr http://timestamp.digicert.com /td SHA256 /fd SHA256 /d Stella /du https://stella.sh $exe
+            if ($LASTEXITCODE -ne 0) { throw "SignTool failed for $platform" }
+            $signature = Get-AuthenticodeSignature $exe
+            if ($signature.Status -ne "Valid") { throw "$platform stella-engine.exe signature is $($signature.Status)" }
+          }
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force out | Out-Null
+          foreach ($platform in @("win-x64", "win-arm64")) {
+            Compress-Archive -Path "raw\raw-$platform\stella-engine.exe" -DestinationPath "out\stella-engine-$platform.zip" -CompressionLevel Optimal
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packaged-win
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    needs: [version, macos, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Package Linux and write the manifest
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for platform in linux-x64 linux-arm64; do
+            chmod 755 "art/raw-$platform/stella-engine"
+            (cd "art/raw-$platform" && zip -9 -X "$GITHUB_WORKSPACE/out/stella-engine-$platform.zip" stella-engine)
+          done
+          cp art/packaged-darwin/*.zip art/packaged-win/*.zip out/
+          node - "$VERSION" "$PUBLIC_BASE/$VERSION" <<'NODE'
+          const fs = require("node:fs");
+          const crypto = require("node:crypto");
+          const [version, base] = process.argv.slice(2);
+          const fields = {
+            "linux-x64": { member: "stella-engine" },
+            "linux-arm64": { member: "stella-engine" },
+            "darwin-arm64": { app: "Stella.app" },
+            "darwin-x64": { app: "Stella.app" },
+            "win-x64": { member: "stella-engine.exe" },
+            "win-arm64": { member: "stella-engine.exe" },
+          };
+          const assets = {};
+          for (const [platform, extra] of Object.entries(fields)) {
+            const file = `stella-engine-${platform}.zip`;
+            const bytes = fs.readFileSync(`out/${file}`);
+            assets[platform] = { url: `${base}/${file}`, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), ...extra };
+          }
+          fs.writeFileSync("out/manifest.json", JSON.stringify({ version, assets }, null, 2) + "\n");
+          console.log(fs.readFileSync("out/manifest.json", "utf8"));
+          NODE
+          ls -la out | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stella-engine-${{ needs.version.outputs.version }}
+          path: out/
+      - name: Upload to R2 runtimes/stella-engine/<version>/
+        if: inputs.publish
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          # The manifest goes last: its presence means every file it names is there.
+          for file in out/*.zip; do
+            aws s3 cp "$file" "s3://${R2_BUCKET}/runtimes/stella-engine/$VERSION/$(basename "$file")" \
+              --cache-control "public, max-age=31536000, immutable" --endpoint-url "$R2_ENDPOINT"
+          done
+          aws s3 cp out/manifest.json "s3://${R2_BUCKET}/runtimes/stella-engine/$VERSION/manifest.json" \
+            --cache-control "public, max-age=31536000, immutable" --content-type application/json --endpoint-url "$R2_ENDPOINT"
+          echo "Published stella-engine $VERSION: $PUBLIC_BASE/$VERSION/manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Pin it: node scripts/pin-rune-engine.mjs --version $VERSION" | tee -a "$GITHUB_STEP_SUMMARY"

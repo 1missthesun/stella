@@ -102,7 +102,7 @@ These live on rune/desktop only and go to master at ship time:
   lazily, and some call `process.binding`). Under Rune the REPL child is Bun, not
   Electron-as-Node; without this every agent's `code` tool exits at start. Electron is unaffected.
 - `packages/desktop/electron/services/app-source/update-plan.ts`: with `STELLA_LAUNCHER_ENGINE=rune`
-  (the launcher's opt-in; the host sets it too), `interfaceOnly()` also matches
+  (the launcher sets it when it starts the engine; the host sets it too), `interfaceOnly()` also matches
   `packages/desktop-rune/ui/`, so a Rune UI draft is added without a click and taken by the UI
   swap, and `relaunches()` also matches `packages/desktop-rune/host/` (the host's own code needs a
   new process). Under Electron both keep master's prefixes.

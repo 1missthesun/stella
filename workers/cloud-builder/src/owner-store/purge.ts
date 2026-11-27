@@ -3,6 +3,7 @@ import { deleteConversationAgentEvents } from "./domains/agent-events.js";
 import { deleteConversationAgentLogs } from "./domains/agent-logs.js";
 import { AGENT_REPORT_JOB, deleteConversationAgentReports } from "./domains/agent-reports.js";
 import { deleteConversationViewStorage } from "./domains/view-storage.js";
+import { deleteConversationViewIndex } from "./domains/view-index.js";
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
 
 const PURGE_BATCH = 25;
@@ -106,6 +107,7 @@ const runConversationPurge = async (ctx: OwnerContext, payload: unknown): Promis
   deleteThreadRows(ctx.db, ctx.jobs, conversationId);
   deleteConversationCatchUps(ctx.db, ctx.jobs, conversationId);
   deleteConversationViewStorage(ctx.db, conversationId);
+  deleteConversationViewIndex(ctx.db, conversationId);
   ctx.db.run(
     `UPDATE conversations SET title = '', last_preview = NULL, last_role = NULL, activity = NULL
       WHERE conversation_id = ? AND deleted_at IS NOT NULL`,

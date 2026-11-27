@@ -26,7 +26,7 @@ const MAX_DATA_BYTES = 1024 * 1024;
 
 export type CloudViewToolContext = Readonly<{
   turnId: string;
-  /** Each chat keeps its views in a folder of its own, so the same slug in two chats is two views. */
+  /** Each chat keeps its views in a folder of its own, so the same slug in two chats is two views; with its slug, the view's name in the account's view index. */
   conversationId: string;
   ownerInternal: OwnerInternalCall;
 }>;
@@ -126,6 +126,22 @@ export const createCloudViewTool = (context: CloudViewToolContext): CloudCodeSou
     signal?.throwIfAborted();
 
     const createdAt = Date.now();
+    // Apps on every device lists it (and a shared link follows it) from the account's view index.
+    if (problems.length === 0) {
+      try {
+        await context.ownerInternal("viewIndex.record", {
+          conversationId: context.conversationId,
+          filePath,
+          slug,
+          title,
+          source,
+          ...(hasData ? { data: args.data } : {}),
+          createdAt,
+        });
+      } catch {
+        // The version still reaches the devices through this call; only the Apps list misses it.
+      }
+    }
     const where = saved ? ` A copy is in their Drive at ${filePath}${hasData ? ` (data in ${slug}.data.json)` : ""}.` : "";
     const text =
       problems.length > 0

@@ -28,6 +28,8 @@ export type ShareLink = {
   visibility?: ShareVisibility;
   canvas?: string | null;
   file?: string | null;
+  /** The Stella View it shares (`<conversationId>/<slug>`); its link always runs the view's newest version. */
+  view?: string | null;
 };
 
 export type SavedDriveDocumentShare = SavedCanvasShare & {
@@ -80,9 +82,15 @@ export type ShareCalls = {
     args: { slug: string };
     result: { revoked: true };
   };
+  /** Shares a Stella View (`<conversationId>/<slug>`, from the account's view index) at a `/c/` link. */
+  "shares.saveView": {
+    args: { viewId: string; visibility?: ShareVisibility };
+    result: SavedCanvasShare;
+  };
 };
 
 export type ShareViews = {
   "shares.list": { args: Record<string, never>; result: ShareLink[] };
   "shares.canvas": { args: { canvas: string }; result: ShareLink | null };
+  "shares.view": { args: { viewId: string }; result: ShareLink | null };
 };

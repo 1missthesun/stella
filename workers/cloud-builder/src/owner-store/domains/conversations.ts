@@ -28,6 +28,7 @@ import {
   viewCardGroup,
 } from "@stella/contracts/view-card";
 import { empty, json, number, object, optional, string } from "../args.js";
+import { recordViewVersion } from "./view-index.js";
 import { RpcError } from "../errors.js";
 import {
   CONVERSATION_PURGE_JOB,
@@ -489,6 +490,23 @@ const publishView = async (ctx: OwnerContext, args: PublishViewArgs): Promise<{ 
   if (!card) throw new RpcError("BAD_REQUEST", "That isn't a view.");
   const snapshot = await ctx.host.snapshot();
   if (!snapshot.writable) return { posted: false };
+  // The Apps list on every device has it as soon as the card is posted (or staged for a running turn).
+  try {
+    await recordViewVersion(ctx, {
+      conversationId: args.conversationId,
+      filePath: card.filePath,
+      slug: card.slug,
+      title: card.title,
+      source: card.source,
+      ...(card.data !== undefined ? { data: card.data } : {}),
+      createdAt: card.createdAt,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "view_index_record_failed",
+      message: error instanceof Error ? error.message : String(error),
+    }));
+  }
   const posted = await ctx.host.postConversationCard({
     conversationId: args.conversationId,
     ownerGeneration: snapshot.ownerGeneration,

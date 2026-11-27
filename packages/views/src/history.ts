@@ -6,7 +6,7 @@
 import type { PublishViewArgs } from "@stella/contracts/backend/conversations";
 import { VIEW_RESTORE_AUTHOR } from "@stella/contracts/view-card";
 import { viewAuthorOf, viewFromToolEvent, viewToolCallArgs, type ViewAuthor, type ViewToolEvent } from "./conversation";
-import { viewSourceHash } from "./paths";
+import { viewLiveKey, viewSourceHash } from "./paths";
 import type { ViewStorage } from "./session";
 
 export type { ViewAuthor } from "./conversation";
@@ -67,8 +67,10 @@ export function viewVersionsOf(events: readonly ViewToolEvent[]): ViewVersion[] 
 type Message = { toolEvents?: readonly ViewToolEvent[] };
 
 /**
- * The versions of each view, by file, from what the conversations shown so far carry, plus the
- * restores made here that haven't come back with the conversation yet.
+ * The versions of each view, from what the conversations shown so far carry, plus the restores
+ * made here that haven't come back with the conversation yet. A view is its `viewLiveKey`, so a
+ * computer's file and the cloud's Drive copy of it share one history; every method takes either
+ * path, and listeners hear the key.
  */
 export class ViewHistory {
   private byFile = new Map<string, ViewVersion[]>();
@@ -98,9 +100,10 @@ export class ViewHistory {
   offerVersions(versions: readonly ViewVersion[], conversationId?: string | null) {
     const grouped = new Map<string, ViewVersion[]>();
     for (const version of versions) {
-      const list = grouped.get(version.filePath) ?? [];
+      const key = viewLiveKey(version.filePath);
+      const list = grouped.get(key) ?? [];
       list.push(version);
-      grouped.set(version.filePath, list);
+      grouped.set(key, list);
     }
     for (const [filePath, list] of grouped) {
       if (conversationId) this.conversations.set(filePath, conversationId);
@@ -117,8 +120,9 @@ export class ViewHistory {
 
   /** A restore made here, shown until the conversation brings it back. */
   addPending(version: ViewVersion) {
-    this.pending.set(version.filePath, [...(this.pending.get(version.filePath) ?? []), version]);
-    this.set(version.filePath, this.byFile.get(version.filePath) ?? []);
+    const key = viewLiveKey(version.filePath);
+    this.pending.set(key, [...(this.pending.get(key) ?? []), version]);
+    this.set(key, this.byFile.get(key) ?? []);
   }
 
   private set(filePath: string, list: readonly ViewVersion[]) {
@@ -133,36 +137,37 @@ export class ViewHistory {
 
   /** The view's versions, oldest first. */
   versions(filePath: string): readonly ViewVersion[] {
-    return this.byFile.get(filePath) ?? [];
+    return this.byFile.get(viewLiveKey(filePath)) ?? [];
   }
 
   latest(filePath: string): ViewVersion | null {
-    return this.byFile.get(filePath)?.at(-1) ?? null;
+    return this.byFile.get(viewLiveKey(filePath))?.at(-1) ?? null;
   }
 
   find(filePath: string, id: string): ViewVersion | null {
-    return this.byFile.get(filePath)?.find((v) => v.id === id) ?? null;
+    return this.byFile.get(viewLiveKey(filePath))?.find((v) => v.id === id) ?? null;
   }
 
   /** The conversation that carries the view (where its restores go). */
   conversationOf(filePath: string): string | null {
-    return this.conversations.get(filePath) ?? null;
+    return this.conversations.get(viewLiveKey(filePath)) ?? null;
   }
 
   /** The older version every surface of the view shows instead of the live one, while the user looks at it. */
   preview(filePath: string): ViewVersion | null {
-    const id = this.previews.get(filePath);
+    const id = this.previews.get(viewLiveKey(filePath));
     return id ? this.find(filePath, id) : null;
   }
 
   setPreview(filePath: string, id: string | null) {
-    if ((this.previews.get(filePath) ?? null) === id) return;
-    if (id) this.previews.set(filePath, id);
-    else this.previews.delete(filePath);
-    for (const listener of this.listeners) listener(filePath);
+    const key = viewLiveKey(filePath);
+    if ((this.previews.get(key) ?? null) === id) return;
+    if (id) this.previews.set(key, id);
+    else this.previews.delete(key);
+    for (const listener of this.listeners) listener(key);
   }
 
-  /** Calls `listener` with the file whose history (or preview) changed; returns the release. */
+  /** Calls `listener` with the `viewLiveKey` of the view whose history (or preview) changed; returns the release. */
   subscribe(listener: (filePath: string) => void): () => void {
     this.listeners.add(listener);
     return () => {

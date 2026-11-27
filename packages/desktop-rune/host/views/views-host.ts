@@ -12,6 +12,7 @@ import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import {
   applyViewRestore,
+  conversationViewRelPath,
   isViewPath,
   viewDataPath as dataPathFor,
   viewHostMarkerPath,
@@ -697,11 +698,21 @@ export function createViewsHost(engine: Engine, on: On) {
   };
 
   /** Puts a restore into the view's file here, when the file is here (every surface then swaps to it). */
+  /** This computer's file of the view at `filePath` (itself, or the file a cloud Drive copy of it mirrors), or null. */
+  const localFileOf = (filePath: string): string | null => {
+    if (isLocalViewFile(filePath)) return filePath;
+    const named = viewIdentityFromPath(filePath);
+    if (!named) return null;
+    const local = join(dataDir(), ...conversationViewRelPath(named.conversationId, named.slug).split("/"));
+    return isLocalViewFile(local) ? local : null;
+  };
+
   const landRestore = async (version: ViewVersion) => {
-    if (version.by.kind !== "restore" || !isLocalViewFile(version.filePath)) return;
-    const entry = entries.get(version.filePath);
+    const filePath = version.by.kind === "restore" ? localFileOf(version.filePath) : null;
+    if (!filePath || version.by.kind !== "restore") return;
+    const entry = entries.get(filePath);
     if (entry) entry.restoring = version.source;
-    const outcome = await applyViewRestore(dataDir(), { filePath: version.filePath, source: version.source, createdAt: version.createdAt, restoredFrom: version.by.from });
+    const outcome = await applyViewRestore(dataDir(), { filePath, source: version.source, createdAt: version.createdAt, restoredFrom: version.by.from });
     if (entry && outcome === "written") readSource(entry);
   };
 
@@ -769,7 +780,7 @@ export function createViewsHost(engine: Engine, on: On) {
     history.addPending(version);
     history.setPreview(filePath, null);
     landed.add(version.id);
-    if (isLocalViewFile(filePath)) {
+    if (localFileOf(filePath)) {
       await landRestore(version);
     } else {
       const prior = known.get(filePath);

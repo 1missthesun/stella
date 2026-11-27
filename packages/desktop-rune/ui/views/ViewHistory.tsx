@@ -4,6 +4,7 @@
 // restore is a new version, so it can be undone like any other change.
 import { useCallback, useEffect, useState } from "react";
 import { undoTarget, type ViewVersion } from "@stella/views/history";
+import { viewLiveKey } from "@stella/views/paths";
 import type { ViewSnapshot } from "@stella/views/session";
 import { useT } from "@/shared/i18n";
 import { STELLA_SEND_MESSAGE_EVENT } from "@/shared/lib/stella-send-message";
@@ -25,8 +26,9 @@ export function useViewHistory(filePath: string): { versions: readonly ViewVersi
   const [state, setState] = useState(read);
   useEffect(() => {
     setState(read());
+    const key = viewLiveKey(filePath);
     return views?.onHistory?.((changed) => {
-      if (changed === filePath || changed === "*") setState(read());
+      if (changed === key || changed === "*") setState(read());
     });
   }, [views, filePath, read]);
   return state;

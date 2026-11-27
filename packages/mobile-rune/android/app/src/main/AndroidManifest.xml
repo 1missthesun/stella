@@ -27,5 +27,13 @@
         <data android:scheme="stella-rune" />
       </intent-filter>
     </activity>
+    <!-- Files the share sheet hands to other apps (picks, downloads, the app's documents). -->
+    <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.files"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+    </provider>
   </application>
 </manifest>

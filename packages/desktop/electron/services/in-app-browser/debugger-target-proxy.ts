@@ -45,6 +45,9 @@ type DebuggerTargetProxyOptions = {
 
 export const isRendererUrl = (value: string) =>
   value.startsWith(`${RENDERER_ORIGIN}/`);
+/** What a Stella preview tab may show: Stella, or a draft's preview (Rune serves it at its own address). */
+export const isPreviewTabUrl = (value: string) =>
+  isRendererUrl(value) || value.startsWith("stella-preview://");
 const DRAWABLE_HOST_BOUNDS: Rectangle = {
   x: -100_000,
   y: -100_000,
@@ -117,7 +120,7 @@ export class DebuggerTargetProxy {
     if (
       tab.preview &&
       method === "Page.navigate" &&
-      !isRendererUrl(String(params?.url ?? ""))
+      !isPreviewTabUrl(String(params?.url ?? ""))
     ) {
       throw new Error(
         "A Stella preview tab only shows Stella. Open web pages in a new tab.",

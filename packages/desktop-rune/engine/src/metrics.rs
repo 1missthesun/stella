@@ -86,6 +86,16 @@ impl Metrics {
         }
     }
 
+    /// macOS: reports pipelines Rune's Metal backend compiled at runtime because its precompiled
+    /// library lacked them (stale `builtin_native.metallib`), whenever the count grows.
+    pub fn runtime_compiles(device: &wgpu::Device) {
+        static SEEN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let Some(n) = rune::render::precompiled_misses(device) else { return };
+        if n > SEEN.swap(n, std::sync::atomic::Ordering::Relaxed) {
+            METRICS.lock().unwrap_or_else(|e| e.into_inner()).say(serde_json::json!({ "metric": "metal_runtime_compiles", "count": n, "at": epoch_ms() }));
+        }
+    }
+
     fn say(&self, v: serde_json::Value) {
         eprintln!("stella-engine metric {v}");
         self.log(v);

@@ -445,7 +445,8 @@ struct Gpu {
     format: wgpu::TextureFormat,
     fx: FxRenderer,
     lights: HashMap<u32, Lit>,
-    blit: Blit,
+    /// Built with the window's first light: its WGSL compiles at runtime (Metal has no precompiled copy).
+    blit: Option<Blit>,
     clear: wgpu::TextureView,
 }
 
@@ -457,11 +458,13 @@ pub struct Comp {
     animating: bool,
     /// Glass growing out of (or going back into) its `morphFrom` source, by effect node.
     morphs: HashMap<u32, Morph>,
+    /// The main window's hot swap transition (`swapfx`).
+    swap: crate::swapfx::Swap,
 }
 
 impl Comp {
     pub fn new(window: Option<u32>) -> Comp {
-        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new() }
+        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new(), swap: Default::default() }
     }
 }
 
@@ -606,15 +609,16 @@ impl Compositor<Win> for Comp {
         if let Some(on) = window_has_fx(self.window) {
             self.engaged.set(on || !self.morphs.is_empty());
         }
-        self.engaged.get()
+        self.engaged.get() || (self.window.is_none() && (self.swap.engaged() || crate::swapfx::warm_wanted()))
     }
 
     fn animating(&self) -> bool {
-        self.animating
+        self.animating || (self.window.is_none() && self.swap.animating())
     }
 
     fn release_gpu(&mut self) {
         self.gpu = None;
+        self.swap.release_gpu();
     }
 
     fn render(&mut self, f: &mut Frame<'_, Win>) {
@@ -800,7 +804,7 @@ impl Compositor<Win> for Comp {
                     view_formats: &[],
                 })
                 .create_view(&Default::default());
-            self.gpu = Some(Gpu { key, format: f.format, fx, lights: HashMap::new(), blit: Blit::new(device), clear });
+            self.gpu = Some(Gpu { key, format: f.format, fx, lights: HashMap::new(), blit: None, clear });
         }
         let Some(gpu) = self.gpu.as_mut() else { return };
         gpu.fx.set_srgb_blend(f.srgb_blend());
@@ -809,10 +813,26 @@ impl Compositor<Win> for Comp {
         for lit in gpu.lights.values_mut() {
             lit.seen = false;
         }
+        let swapping = self.window.is_none() && crate::swapfx::active();
+        if swapping {
+            self.swap.prepare(f);
+        } else {
+            self.swap.settle();
+        }
+        if self.window.is_none() && crate::swapfx::warm_wanted() {
+            self.swap.warm(f);
+        }
+        let swap = &mut self.swap;
         let clear = f.rt.clear_color();
         f.prepare_ui();
         let Gpu { fx, lights: lits, blit, clear: clear_tex, .. } = gpu;
         f.ui.draw_with_backdrop(f.encoder, f.target, clear, &mut |phase, s: &EffectSite<'_>| {
+            if s.mark == crate::swapfx::MARK {
+                if swapping {
+                    swap.hook(device, phase, s);
+                }
+                return;
+            }
             if let Some(on) = shown.iter().find(|o| o.instance == s.index) {
                 match phase {
                     EffectPhase::Backdrop(enc) => {
@@ -840,6 +860,7 @@ impl Compositor<Win> for Comp {
                     let scene = Scene { prims: &prims, lights: &lights, settings: settings(&l.spec, t), emission: None };
                     lit.drew = lit.renderer.render(device, queue, enc, &scene, bd, clear_tex, &lit.view);
                     let rect = [l.rect[0] - o[0], l.rect[1] - o[1], l.rect[2], l.rect[3]];
+                    let blit = blit.get_or_insert_with(|| Blit::new(device));
                     blit.write(queue, &lit.uniform, rect, l.radii, want);
                     if lit.bind.is_none() {
                         lit.bind = Some(blit.bind(device, &lit.uniform, &lit.view));
@@ -847,13 +868,14 @@ impl Compositor<Win> for Comp {
                 }
                 EffectPhase::Draw(pass) => {
                     let Some(lit) = lits.get(&l.node).filter(|x| x.drew) else { return };
-                    if let Some(bind) = &lit.bind {
+                    if let (Some(bind), Some(blit)) = (&lit.bind, blit.as_ref()) {
                         blit.draw(device, pass, s.format, bind);
                     }
                 }
             }
         });
         gpu.lights.retain(|_, l| l.seen);
+        crate::metrics::Metrics::runtime_compiles(device);
         if !watched.is_empty() {
             let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let landed = done.clone();

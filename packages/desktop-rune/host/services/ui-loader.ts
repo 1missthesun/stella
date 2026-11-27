@@ -3,7 +3,8 @@
 // recycled as it grows; another, at low priority, writes the boot file once edits go quiet and is
 // stopped when a build starts, so a swap never waits for it). The UI runs as separate modules
 // (ui-registry.ts): a swap evaluates only what changed and keeps the rest, and the app's tree
-// refreshes in place. A builder that predates modules (an older draft's) sends one bundle, which is
+// refreshes in place. The app launches as one bundle, which holds less than separate modules, and
+// moves to modules on its first swap (that swap mounts afresh, as a bundle swap does). A builder that predates modules (an older draft's) sends one bundle, which is
 // evaluated as a CommonJS factory no module registry keeps and mounts afresh. Either way what code
 // registers is scoped (ui-scope.ts), so replaced code is garbage once React lets go of it, and
 // once loads settle the compiled code of replaced UIs is released.
@@ -50,8 +51,12 @@ export type UiLoaderOptions = {
   firstGeneration?: number;
   /** Free identifiers the bundle sees in place of the host's globals (`window`, `stella`), read at each load. */
   globals?: () => Record<string, unknown>;
-  /** Run the UI as one bundle, remounted by every swap (`STELLA_RUNE_UI_MODULES=0`). */
-  bundle?: boolean;
+  /**
+   * When the UI runs as separate modules: from the first load (`boot`), from the first swap after
+   * launching as one bundle (`swap`), or never, every swap remounting a bundle (`never`).
+   * `STELLA_RUNE_UI_MODULES` (`boot`, `swap`, `0`) overrides it.
+   */
+  modules?: "boot" | "swap" | "never";
 };
 
 /** How the last load replaced the UI: mounted afresh (`fresh`), refreshed in place, or remounted over kept modules. */
@@ -62,7 +67,12 @@ type Child = { proc: Subprocess; ready: Promise<void>; builds: number; pending: 
 export function createUiLoader(options: UiLoaderOptions) {
   const recycleAfter = options.recycleAfter ?? 25;
   const recycleAboveMb = options.recycleAboveMb ?? 400;
-  const bundleMode = options.bundle ?? process.env.STELLA_RUNE_UI_MODULES === "0";
+  const envModules = process.env.STELLA_RUNE_UI_MODULES;
+  const modulesFrom = envModules === "0" ? "never" : envModules === "boot" || envModules === "swap" ? envModules : options.modules ?? "boot";
+  /** What the boot file holds: the launch's form. */
+  const bootModules = modulesFrom === "boot";
+  /** Whether the next load is one bundle. */
+  const bundleNext = () => modulesFrom === "never" || (modulesFrom === "swap" && loads <= 1 && !registry);
   const hostRequire = createRequire(options.requireFrom ?? options.entry);
   let nextId = 0;
   let child: Child | null = null;
@@ -122,7 +132,7 @@ export function createUiLoader(options: UiLoaderOptions) {
       const id = ++nextId;
       await new Promise<UiBuildReply>((resolve) => {
         c.pending.set(id, resolve);
-        c.proc.send({ id, entry: options.entry, tsconfig: options.tsconfig, external: options.external, writeCache: inputs, modules: bundleMode ? undefined : { have: {}, deps: null } } satisfies UiBuildRequest);
+        c.proc.send({ id, entry: options.entry, tsconfig: options.tsconfig, external: options.external, writeCache: inputs, modules: bootModules ? { have: {}, deps: null } : undefined } satisfies UiBuildRequest);
       });
       if (cacheChild === c) cancelCache();
     }, CACHE_SETTLE_MS);
@@ -135,7 +145,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     const c = (child ??= spawnChild());
     await c.ready;
     const id = ++nextId;
-    const modules = bundleMode ? undefined : (registry?.have() ?? { have: {}, deps: null });
+    const modules = bundleNext() ? undefined : (registry?.have() ?? { have: {}, deps: null });
     const reply = await new Promise<UiBuildReply>((resolve) => {
       c.pending.set(id, resolve);
       c.proc.send({ id, entry: options.entry, tsconfig: options.tsconfig, external: options.external, cache: options.bootCache, modules } satisfies UiBuildRequest);
@@ -269,8 +279,8 @@ export function createUiLoader(options: UiLoaderOptions) {
       if (loads === 0 && !bootBundle) this.warm();
       const booting = loads++ === 0;
       const found = booting ? await bootBundle : null;
-      const boot = found && found.key === uiCacheKey({ ...options, modules: !bundleMode }) ? found.file : null;
-      if (boot && !bundleMode) {
+      const boot = found && found.key === uiCacheKey({ ...options, modules: bootModules }) ? found.file : null;
+      if (boot && bootModules) {
         try {
           registry = await loadBootModules(boot);
           lastKind = "fresh";
@@ -285,7 +295,7 @@ export function createUiLoader(options: UiLoaderOptions) {
       }
       let loaded: { value: UiModule; scope: UiScope } | null = null;
       let id = 0;
-      if (boot && bundleMode) {
+      if (boot && !bootModules) {
         id = ++generation;
         try {
           loaded = evaluateInScope(id, () => loadBootBundle(boot));

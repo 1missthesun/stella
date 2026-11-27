@@ -33,6 +33,7 @@ mod services;
 mod style;
 mod surface;
 mod swap_view;
+mod swapfx;
 mod text;
 mod text_services;
 mod trim;

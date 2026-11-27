@@ -106,6 +106,10 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         }
         None => root,
     };
+    let root = match crate::swapfx::slot().filter(|_| s.main) {
+        Some(slot) => root.child(slot),
+        None => root,
+    };
     note_state(node, dark, maximized, full, accent, a11y);
     settle_rect(node, cx);
     // As in CSS, a change lands at once unless its element asks for motion (`motion`, `layout`).
@@ -260,7 +264,7 @@ pub fn options(p: &Props) -> WindowOptions {
         click_through: p.click_through || background,
         always_on_top: p.always_on_top || overlay,
         visible: p.visible.unwrap_or(true),
-        logical_position: p.position.map(|[x, y]| (f64::from(x), f64::from(y))),
+        logical_position: placed(p).map(|[x, y]| (f64::from(x), f64::from(y))),
         min_size: if background { Some((0.0, 0.0)) } else { p.min_size.map(|[w, h]| (w, h)) },
         max_size: p.max_size.map(|[w, h]| (w, h)),
         resizable: p.resizable.unwrap_or(true) && !background,
@@ -275,7 +279,19 @@ fn is_background(p: &Props) -> bool {
     p.kind.as_deref() == Some("background")
 }
 
-fn background_window(app: rune::App<Win>) -> rune::App<Win> {
+/// An `isolated` background window draws an app nobody sees (the draft preview reads its frames).
+/// On macOS a window off every screen, or one AppKit reports occluded, gets no frames, so it sits
+/// on screen unseen (`MacWindowOptions::unseen`) wherever the system puts it.
+pub fn unseen(p: &Props) -> bool {
+    cfg!(target_os = "macos") && is_background(p) && p.isolated
+}
+
+/// Where the window goes: an unseen one ignores its position.
+fn placed(p: &Props) -> Option<[i32; 2]> {
+    p.position.filter(|_| !unseen(p))
+}
+
+fn background_window(app: rune::App<Win>, unseen: bool) -> rune::App<Win> {
     const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
     const STATIONARY: usize = 1 << 4;
     const IGNORES_CYCLE: usize = 1 << 6;
@@ -285,7 +301,8 @@ fn background_window(app: rune::App<Win>) -> rune::App<Win> {
             .nonactivating_panel(true)
             .shadow(false)
             .accepts_first_mouse(false)
-            .collection_behavior(CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY),
+            .collection_behavior(CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY)
+            .unseen(unseen),
     )
     .windows_window(rune::WindowsWindowOptions::default().no_activate(true).tool_window(true))
     .linux_window(rune::LinuxWindowOptions::default().unmanaged(true))
@@ -373,7 +390,7 @@ pub fn decorate(app: rune::App<Win>, p: &Props, node: Option<u32>) -> rune::App<
         app = app.chrome(rune::Chrome { traffic_lights: Some((x, y)), ..rune::Chrome::DEFAULT });
     }
     if is_background(p) {
-        app = background_window(app);
+        app = background_window(app, unseen(p));
     } else if p.content_protection {
         app = app.exclude_from_capture(true);
     }
@@ -507,6 +524,11 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
     }
 }
 
+thread_local! {
+    /// Bridge batches held back until a swap's before is kept (`swapfx::hold_commit`).
+    static HELD: std::cell::Cell<Vec<Msg>> = const { std::cell::Cell::new(Vec::new()) };
+}
+
 /// How long after a hot swap lands its follow-up commits (layout-driven reveals) skip motion.
 const SWAP_SETTLE: std::time::Duration = std::time::Duration::from_millis(600);
 
@@ -528,15 +550,31 @@ fn drain(polling: u32) {
         engine::with(|e| e.ts_dead = true);
         eprintln!("stella-engine: TS host disconnected; keeping the last tree on screen");
     }
-    if batches.is_empty() {
+    let mut held = HELD.take();
+    if held.is_empty() && batches.is_empty() {
         return;
     }
+    held.extend(batches);
     let mut cmds: Vec<serde_json::Value> = Vec::new();
     let mut added = Vec::new();
     let mut gone = Vec::new();
-    for Msg::Batch(ops, received_at) in batches {
+    let mut queue = held.into_iter();
+    while let Some(Msg::Batch(ops, received_at)) = queue.next() {
+        if crate::swapfx::hold_commit() && ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
+            // The swap's before is kept on the next frame; the swap lands after it.
+            HELD.set(std::iter::once(Msg::Batch(ops, received_at)).chain(queue).collect());
+            std::thread::spawn(|| {
+                std::thread::sleep(crate::swapfx::WANT_MAX);
+                wake_all();
+            });
+            break;
+        }
+        if ops.iter().any(|op| !matches!(op, Op::Commit { .. } | Op::Cmd(_) | Op::Blob { .. } | Op::FreeBlob { .. })) {
+            crate::swapfx::note_ops();
+        }
         engine::with(|e| {
             if ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
+                crate::swapfx::landed();
                 crate::swap_view::remember(e);
                 e.swap_settle = Some((std::time::Instant::now() + SWAP_SETTLE, crate::swap_view::USER_INPUT.load(std::sync::atomic::Ordering::Relaxed)));
             }
@@ -654,8 +692,8 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
             h.set_always_on_top(p.always_on_top);
             next.on_top = Some(p.always_on_top);
         }
-        if p.position.is_some() && p.position != applied.position {
-            if let Some([x, y]) = p.position
+        if placed(&p).is_some() && p.position != applied.position {
+            if let Some([x, y]) = placed(&p)
                 && let Some(k) = h.scale()
             {
                 h.set_position(((f64::from(x) * k).round() as i32, (f64::from(y) * k).round() as i32));
@@ -779,6 +817,14 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         }
         held
     }) {
+        wake_dirty(s.node);
+    }
+    if s.main && crate::swapfx::take_rebuild() {
+        engine::with(|e| {
+            if let Some(m) = e.main_node {
+                e.tree.touch(m);
+            }
+        });
         wake_dirty(s.node);
     }
     let decoded = crate::media::decoded_since_built();

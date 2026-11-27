@@ -120,6 +120,9 @@ pub fn route(v: Value) {
         "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" => reply(rid, crate::services::tray(&cmd, &v)),
         "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" => reply(rid, crate::services::shortcut(&cmd, &v)),
         "quit" => quit(),
+        "swapfx.begin" => engine::with(crate::swapfx::begin),
+        "swapfx.cancel" => engine::with(crate::swapfx::cancel),
+        "swapfx.warm" => engine::with(crate::swapfx::warm),
         "view.restore" => {
             let marked: Vec<u32> = engine::read(|e| e.windows.iter().filter(|(_, s)| s.swap_view.is_some()).map(|(w, _)| *w).collect());
             for w in marked {
@@ -399,7 +402,10 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                 let at = h.placement();
                 let k = at.as_ref().map(|p| p.scale).filter(|k| *k > 0.0).unwrap_or(1.0);
                 let pt = |v: i32| (v as f64 / k) as f32;
-                let origin = match (f(&v, "x"), f(&v, "y")) {
+                let node = window_node(st);
+                let unseen = engine::read(|e| e.tree.get(node).is_some_and(|n| crate::windows::unseen(&n.props)));
+                let (x, y) = if unseen { (None, None) } else { (f(&v, "x"), f(&v, "y")) };
+                let origin = match (x, y) {
                     (Some(x), Some(y)) => Some((x, y)),
                     (x, y) => at.as_ref().map(|p| (x.unwrap_or(pt(p.position.0)), y.unwrap_or(pt(p.position.1)))),
                 };

@@ -132,6 +132,9 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
     const last = i === lastIndex ? { mb: 0 } : null;
     return collapsed || last ? cloneElement(child as ReactElement<Style>, { ...collapsed, ...last }) : child;
   });
+  // `laid` is an array (children flattened through fragments), so each element needs a key; a keyless
+  // child keeps its position as one, as React gives children passed directly.
+  const keyed = laid.map((el, i) => (isValidElement(el) && el.key == null ? cloneElement(el, { key: keyOf(kids[i], i) }) : el));
   const isLast = tab ? tab.last === cardId : false;
   const divider = tab && !isLast ? { pb: 24 + 1, border: mixOklch(t.c.foreground, 7, "transparent"), borderSides: [0, 0, 1, 0] as [number, number, number, number] } : tab ? { pb: 0 } : null;
   return (
@@ -151,7 +154,7 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
         if (titleKey) noteCardPlace(titleKey, cardId, r.y);
       }}
     >
-      <CardCtx.Provider value={reg}>{laid}</CardCtx.Provider>
+      <CardCtx.Provider value={reg}>{keyed}</CardCtx.Provider>
     </col>
   );
 }

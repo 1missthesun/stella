@@ -133,6 +133,8 @@ export class UpdateTransition {
   async cover(): Promise<CoveredWindow | null> {
     const win = this.visibleWindow();
     if (!win) return null;
+    // The engine transitions only the parts the swap changed (engine/src/swapfx.rs).
+    if (process.env.STELLA_RUNE_SWAP_FX !== "0") return { cancel: async () => {}, reveal: (swap) => swap() };
     const started = performance.now();
     let before: string;
     try {

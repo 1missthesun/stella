@@ -7,6 +7,7 @@ export const useAuthDialog = sheet((c, t) => ({
   authDialogGoogleWrap: { gap: 10 },
   authDialogGoogle: { family: "sans", pad: 1, align: "center", justify: "center", gap: 10, w: "full", minH: 44, border: c.border, radius: 999, fill: mixOklch(c.foreground, 4, c.card), color: c.textStrong, size: 14, weight: 600, em: 0, motion: { dur: 0.16 }, hoverBorder: mixOklch(c.foreground, 18, c.border), hover: mixOklch(c.foreground, 6, c.card) },
   authDialogGoogleDisabled: { opacity: 0.65 },
+  authDialogApple: { fill: c.foreground, color: c.background, border: c.foreground, hover: mixOklch(c.foreground, 88, c.background), hoverBorder: mixOklch(c.foreground, 88, c.background) },
   authDialogGoogleIcon: { w: 18, h: 18 },
   authDialogMethodDivider: { align: "center", gap: 12, color: c.mutedForeground, mono: true, size: 10, weight: 500, em: 0, textCase: "upper", w: "full" },
   authDialogMethodDividerLine: { grow: 1, h: 1, fill: c.borderWeak },

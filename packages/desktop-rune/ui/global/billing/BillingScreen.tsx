@@ -19,6 +19,7 @@ import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
+import { storeCheckoutFields } from "./store-checkout";
 import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
 import { useTopInset } from "../../shell/top-inset";
 import {
@@ -253,7 +254,7 @@ export function BillingPanel() {
   );
 
   const checkout = useCallback(
-    (plan: PaidBillingPlan) => void run("checkout", (returnUrl) => backendClient.call("billing.checkout", { plan, returnUrl })),
+    (plan: PaidBillingPlan) => void run("checkout", async (returnUrl) => backendClient.call("billing.checkout", { plan, returnUrl, ...(await storeCheckoutFields()) })),
     [run],
   );
   const portal = useCallback(

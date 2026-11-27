@@ -229,6 +229,10 @@ final class JSRuntime: NSObject, URLSessionDataDelegate, URLSessionWebSocketDele
     for (k, v) in (req["headers"] as? [String: String]) ?? [:] { r.setValue(v, forHTTPHeaderField: k) }
     if !body.isUndefined && !body.isNull { r.httpBody = bytes(of: body) }
     if (req["redirect"] as? String) == "manual" { r.setValue("manual", forHTTPHeaderField: "X-Stella-Redirect") }
+    // Cookies as a browser page at stella-app:// has them: every backend is another origin, so only
+    // `credentials: "include"` sends or keeps them (a stray cookie otherwise trips the backend's
+    // origin check on requests the web build makes cookie-free).
+    r.httpShouldHandleCookies = (req["credentials"] as? String) == "include"
     let task = session.dataTask(with: r)
     fetchIds[task.taskIdentifier] = id
     task.resume()

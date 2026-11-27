@@ -17,6 +17,7 @@ import {
   type SendState,
 } from "@stella/contracts/send-state";
 import { isWebShell } from "./cloud-composer-store";
+import { rememberSentMessageId } from "./sent-message-ids";
 
 export type CloudConversationOutboxAuthority = {
   accountScope: string;
@@ -764,6 +765,9 @@ export const pendingPrompts = {
     if (!acknowledged.length) return;
     const removed = new Set<string>();
     for (const entry of acknowledged) {
+      if (record.kind === "message" && record.role === "user") {
+        rememberSentMessageId(record, entry.clientMsgId);
+      }
       try {
         if (!entry.durable || cloudConversationOutbox.remove(entry)) {
           removed.add(entry.clientMsgId);

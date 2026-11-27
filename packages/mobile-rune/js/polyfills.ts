@@ -785,7 +785,7 @@ g.fetch = async (input: string | URLPoly | RequestPoly, init: any = {}): Promise
       if (p?.response) p.controller?.error(reason);
       else reject(reason);
     }, { once: true });
-    N.fetch(id, { url, method: req.method, headers: req.headers.toObject(), redirect: req.redirect }, body);
+    N.fetch(id, { url, method: req.method, headers: req.headers.toObject(), redirect: req.redirect, credentials: req.credentials }, body);
   });
 };
 

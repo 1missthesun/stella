@@ -150,25 +150,63 @@ export type HistoryRecord = {
 
 const SNIPPET_TOKENS = 32;
 
+export type HistorySearchPlan = {
+  terms: string[][];
+  kinds: ReadonlySet<HistorySearchKind>;
+  limit: number;
+  order?: "relevance" | "newest";
+  beforeSeq?: number;
+};
+
+export const historySearchPlan = (text: string, options: HistorySearchOptions = {}): HistorySearchPlan => {
+  const terms = historySearchTerms(text).map((tokens) => tokens.map(stem));
+  if (!terms.length) throw new Error("history.search needs at least one word to look for.");
+  const kinds = new Set(historySearchKinds(options));
+  const limit = historySearchLimit(options);
+  return {
+    terms,
+    kinds,
+    limit,
+    ...(options.order ? { order: options.order } : {}),
+    ...(Number.isSafeInteger(options.beforeSeq) ? { beforeSeq: options.beforeSeq as number } : {}),
+  };
+};
+
+/** A record's words as search compares them: one stem per letter-and-digit run, in order (empty where a run normalizes to nothing). */
+export const historyRecordTokens = (text: string): { raw: RegExpMatchArray[]; tokens: string[] } => {
+  const raw = [...text.matchAll(/[\p{L}\p{N}]+/gu)];
+  return { raw, tokens: raw.map((match) => stem(historyTokens(match[0])[0] ?? "")) };
+};
+
 export const searchHistoryRecords = (
   records: readonly HistoryRecord[],
   text: string,
   options: HistorySearchOptions = {},
 ): HistorySearchHit[] => {
-  const terms = historySearchTerms(text).map((tokens) => tokens.map(stem));
-  if (!terms.length) throw new Error("history.search needs at least one word to look for.");
-  const kinds = new Set(historySearchKinds(options));
-  const limit = historySearchLimit(options);
+  const plan = historySearchPlan(text, options);
   const candidates = records.filter(
     (record) =>
-      (kinds.size === 0 || kinds.has(record.kind)) &&
-      (!Number.isSafeInteger(options.beforeSeq) || record.seq < (options.beforeSeq as number)),
+      (plan.kinds.size === 0 || plan.kinds.has(record.kind)) &&
+      (plan.beforeSeq === undefined || record.seq < plan.beforeSeq),
   );
-  const tokenized = candidates.map((record) => {
-    const raw = [...record.text.matchAll(/[\p{L}\p{N}]+/gu)];
-    const tokens = raw.map((match) => stem(historyTokens(match[0])[0] ?? ""));
-    return { record, raw, tokens };
+  const tokenized = candidates.map((record) => ({ record, ...historyRecordTokens(record.text) }));
+  return rankHistoryMatches(plan, tokenized, {
+    documents: tokenized.length,
+    tokens: tokenized.reduce((sum, entry) => sum + entry.tokens.length, 0),
   });
+};
+
+/**
+ * Ranks and snippets the records that contain every term. `corpus` counts all the records searched (after the kinds
+ * and beforeSeq filters) and their tokens, so a caller that found the matching records with an index ranks them
+ * exactly as a full scan would.
+ */
+export const rankHistoryMatches = (
+  plan: HistorySearchPlan,
+  tokenized: ReadonlyArray<{ record: HistoryRecord; raw: RegExpMatchArray[]; tokens: string[] }>,
+  corpus: { documents: number; tokens: number },
+): HistorySearchHit[] => {
+  const { terms, limit } = plan;
   const positions = (tokens: string[], phrase: string[]): number[] => {
     const found: number[] = [];
     for (let index = 0; index + phrase.length <= tokens.length; index += 1) {
@@ -179,19 +217,22 @@ export const searchHistoryRecords = (
   const matches = tokenized
     .map((entry) => ({ ...entry, hits: terms.map((phrase) => positions(entry.tokens, phrase)) }))
     .filter((entry) => entry.hits.every((found) => found.length > 0));
-  const averageLength = tokenized.reduce((sum, entry) => sum + entry.tokens.length, 0) / Math.max(1, tokenized.length);
-  const documents = Math.max(1, tokenized.length);
+  const averageLength = corpus.tokens / Math.max(1, corpus.documents);
+  const documents = Math.max(1, corpus.documents);
+  const idfs = terms.map((_, index) => {
+    const containing = matches.filter((other) => other.hits[index]!.length > 0).length;
+    return Math.log(1 + (documents - containing + 0.5) / (containing + 0.5));
+  });
   const score = (entry: (typeof matches)[number]): number =>
     entry.hits.reduce((sum, found, index) => {
-      const containing = matches.filter((other) => other.hits[index]!.length > 0).length;
-      const idf = Math.log(1 + (documents - containing + 0.5) / (containing + 0.5));
       const frequency = found.length;
-      return sum + (idf * frequency * 2.2) / (frequency + 1.2 * (0.25 + 0.75 * (entry.tokens.length / averageLength)));
+      return sum + (idfs[index]! * frequency * 2.2) / (frequency + 1.2 * (0.25 + 0.75 * (entry.tokens.length / averageLength)));
     }, 0);
+  const scores = new Map(plan.order === "newest" ? [] : matches.map((entry) => [entry, score(entry)]));
   const ranked =
-    options.order === "newest"
+    plan.order === "newest"
       ? [...matches].sort((a, b) => b.record.seq - a.record.seq)
-      : [...matches].sort((a, b) => score(b) - score(a) || b.record.seq - a.record.seq);
+      : [...matches].sort((a, b) => scores.get(b)! - scores.get(a)! || b.record.seq - a.record.seq);
   return ranked.slice(0, limit).map((entry) => {
     const marked = new Set<number>();
     entry.hits.forEach((found, index) => {
@@ -233,8 +274,6 @@ export type OwnHistoryRow = {
   payload: unknown;
 };
 
-export type OwnHistorySql = (rows: readonly OwnHistoryRow[], query: string, params: readonly unknown[]) => unknown;
-
 export const withoutThinking = (message: object): unknown => {
   const content = (message as { content?: unknown }).content;
   if (!Array.isArray(content)) return message;
@@ -249,31 +288,45 @@ export const ownHistoryRecords = (rows: readonly OwnHistoryRow[]): HistoryRecord
     return kind && text ? [{ seq: row.seq, kind, turnId: row.turnId, createdAtMs: row.createdAtMs, text }] : [];
   });
 
-const OWN_READ_RECORDS_MAX = 200;
+export const OWN_READ_RECORDS_MAX = 200;
 
-export const answerOwnHistory = (
-  rows: readonly OwnHistoryRow[],
-  args: Record<string, unknown>,
-  sql?: OwnHistorySql,
-): unknown => {
+/** How one thread's history answers each query op; `answerOwnHistoryWith` checks the arguments first. */
+export type OwnHistoryEngine = {
+  search(text: string, options: HistorySearchOptions): unknown;
+  read(fromSeq: number, toSeq: number): unknown;
+  sql?(query: string, params: readonly unknown[]): unknown;
+};
+
+export const answerOwnHistoryWith = (engine: OwnHistoryEngine, args: Record<string, unknown>): unknown => {
   if (args.op === "search") {
     if (typeof args.text !== "string" || !args.text.trim()) throw new Error("history.search requires the text to look for.");
-    return searchHistoryRecords(ownHistoryRecords(rows), args.text, historySearchOptions(args.options));
+    return engine.search(args.text, historySearchOptions(args.options));
   }
   if (args.op === "read") {
     if (!Number.isSafeInteger(args.fromSeq) || !Number.isSafeInteger(args.toSeq)) {
       throw new Error("history.read requires integer fromSeq and toSeq.");
     }
-    const inRange = rows.filter((row) => row.seq >= (args.fromSeq as number) && row.seq <= (args.toSeq as number));
-    return { records: inRange.slice(0, OWN_READ_RECORDS_MAX), complete: inRange.length <= OWN_READ_RECORDS_MAX };
+    return engine.read(args.fromSeq as number, args.toSeq as number);
   }
   if (args.op === "sql") {
     if (typeof args.query !== "string" || !args.query.trim()) throw new Error("history.sql requires a non-empty query string.");
-    if (!sql) throw new Error("history.sql is not available for your thread here; use history.search and history.read.");
-    return sql(rows, args.query, Array.isArray(args.params) ? args.params : []);
+    if (!engine.sql) throw new Error("history.sql is not available for your thread here; use history.search and history.read.");
+    return engine.sql(args.query, Array.isArray(args.params) ? args.params : []);
   }
   throw new Error('history query op must be "search", "read" or "sql".');
 };
+
+export const answerOwnHistory = (rows: readonly OwnHistoryRow[], args: Record<string, unknown>): unknown =>
+  answerOwnHistoryWith(
+    {
+      search: (text, options) => searchHistoryRecords(ownHistoryRecords(rows), text, options),
+      read: (fromSeq, toSeq) => {
+        const inRange = rows.filter((row) => row.seq >= fromSeq && row.seq <= toSeq);
+        return { records: inRange.slice(0, OWN_READ_RECORDS_MAX), complete: inRange.length <= OWN_READ_RECORDS_MAX };
+      },
+    },
+    args,
+  );
 
 export type HistoryReadEntry = {
   seq: number;

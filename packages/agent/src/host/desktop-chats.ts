@@ -142,6 +142,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { accountProviderOfRegistryId, accountRegistryId } from "../provider/account-byok-ids.ts";
 import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
+import { historyIndexes } from "../storage/history-index.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import { desktopExecution, type DesktopBrain, type DesktopDevices, type DesktopExecution } from "./desktop-execution.ts";
@@ -160,7 +161,6 @@ import {
   type ConversationEvents,
 } from "../stella/conversation-events.ts";
 import { ownHistoryQuery } from "../stella/own-history.ts";
-import { ownHistorySql } from "@stella/runtime/kernel/storage/own-history-sql";
 import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
 import { ANTIGRAVITY_CLI_ENGINE_EXTENSION, ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onAntigravityCli, onClaudeCode, onCliEngine } from "../engine/selection.ts";
 import { agentLogDeviceHolder, type AgentLogCalls } from "@stella/contracts/backend/agent-logs";
@@ -501,6 +501,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   const placedIn = new Map<string, string>();
   const placedRuns = new Map<string, { runKey: string; cancel: AbortController }>();
   const directory = path.join(options.dataDir, "agent");
+  const historyIndex = historyIndexes(path.join(directory, "history-index"));
 
   const activeFile = path.join(directory, "active.json");
   let active: Promise<Set<string>> | undefined;
@@ -2752,7 +2753,14 @@ export function desktopChats(options: DesktopChatsOptions) {
 
   const agentHistory = async (conversationId: string, threadId: string, args: Record<string, unknown>): Promise<unknown> => {
     const chat = await ready(conversationId);
-    return await ownHistoryQuery(chat.harness, chat.root.id, threadId, args, context, ownHistorySql);
+    return await ownHistoryQuery(
+      chat.harness,
+      chat.root.id,
+      threadId,
+      args,
+      context,
+      historyIndex.forStore(fileName(conversationId)),
+    );
   };
 
   const steerPlacedAgent = async (message: { key: string; agentKey: string; message: string }): Promise<boolean> => {

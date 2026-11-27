@@ -52,6 +52,13 @@ type ChatTimelineProps = {
 /** The timeline runs under floating glass chrome at both ends, so it shows there instead of fading out. */
 export const UnderGlassContext = createContext(false);
 
+/**
+ * desktop-ui lays a new or longer message out whole at once and only the pinned scroll eases after it
+ * (use-chat-scroll-management's follow). Rows still ease their height so the pinned viewport glides,
+ * but draw whole, unclipped and unfeathered, so a message never reads as growing open.
+ */
+const MESSAGE_GROWTH = { edge: "none", clip: false } as const;
+
 export const CHAT_DRAW_DISTANCE_COLD_PX = 300;
 export const CHAT_DRAW_DISTANCE_WARM_PX = 1_200;
 
@@ -385,7 +392,7 @@ export const ChatTimeline = memo(function ChatTimeline({
       {viewport(
         <>
           {isLoadingOlder && hasOlderEvents ? <HistoryStatus /> : null}
-          <list w="full" estimate={estimatedItemSize}>
+          <list w="full" estimate={estimatedItemSize} growth={MESSAGE_GROWTH}>
             {listItems.map((item) => (
               <col key={rowKeys.get(item.id) ?? item.id} id={`chat-row:${rowKeys.get(item.id) ?? item.id}`} w="full" arrivesWhole={item.type === "message"}>
                 {renderItem(item)}

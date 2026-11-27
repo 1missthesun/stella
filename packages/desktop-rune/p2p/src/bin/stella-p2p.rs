@@ -1,8 +1,12 @@
 //! A bare node for checking a link from a terminal, with no Stella around it.
 //!
 //!   stella-p2p --data <dir> [--name <name>] status
-//!   stella-p2p --data <dir> serve                       print a pairing code, answer requests with {echo}
+//!   stella-p2p --data <dir> serve [--short]             print a pairing code (and a short one), answer
+//!       requests with {echo}; nearby devices that ask print a `confirm` event with six digits
 //!   stella-p2p --data <dir> pair <code>                 pair, then stay connected and print events
+//!   stella-p2p --data <dir> pair-short <K7M-49PX>       pair through the rendezvous, then stay connected
+//!   stella-p2p --data <dir> nearby                      list computers on this network for 10 seconds
+//!   stella-p2p --data <dir> pair-nearby <id>            ask a nearby computer, read its six digits from stdin
 //!   stella-p2p --data <dir> request <id> '<json body>'  one request to a paired computer
 //!   stella-p2p --data <dir> impostor <code>             connect to the code's computer WITHOUT
 //!       pairing (as a device that was never shown the code, or was unpaired): prints how the
@@ -31,6 +35,9 @@ fn main() {
         Some(url) => Relay::Custom(url.into()),
         None => Relay::Default,
     };
+    let rendezvous = take("--rendezvous");
+    let short = args.iter().position(|a| a == "--short").map(|i| args.remove(i)).is_some();
+    let start = |data: &str, name: &str, relay: Relay, emit: stella_p2p::Emit| start(data, name, relay, rendezvous.clone(), emit);
     let command = args.first().cloned().unwrap_or_else(|| die("a command is required"));
 
     if command == "impostor" {
@@ -74,6 +81,9 @@ fn main() {
         let node = node.get().expect("started");
         println!("{}", node.command_blocking("status", Value::Null).unwrap_or_else(|e| die(&e)));
         println!("{}", node.command_blocking("pairing.create", Value::Null).unwrap_or_else(|e| die(&e)));
+        if short {
+            println!("{}", node.command_blocking("pairing.short", Value::Null).unwrap_or_else(|e| die(&e)));
+        }
         loop {
             std::thread::sleep(Duration::from_secs(3600));
         }
@@ -82,11 +92,34 @@ fn main() {
     let node = start(&data, &name, relay, Arc::new(|e| println!("{e}")));
     match command.as_str() {
         "status" => println!("{}", node.command_blocking("status", Value::Null).unwrap_or_else(|e| die(&e))),
-        "pair" => {
+        "pair" | "pair-short" => {
             let code = args.get(1).cloned().unwrap_or_else(|| die("pair <code>"));
-            println!("{}", node.command_blocking("pair", json!({ "code": code })).unwrap_or_else(|e| die(&e)));
+            let cmd = if command == "pair" { "pair" } else { "pair.short" };
+            println!("{}", node.command_blocking(cmd, json!({ "code": code })).unwrap_or_else(|e| die(&e)));
             loop {
                 std::thread::sleep(Duration::from_secs(3600));
+            }
+        }
+        "nearby" => {
+            println!("{}", node.command_blocking("nearby.start", Value::Null).unwrap_or_else(|e| die(&e)));
+            std::thread::sleep(Duration::from_secs(10));
+            println!("{}", node.command_blocking("nearby.list", Value::Null).unwrap_or_else(|e| die(&e)));
+        }
+        "pair-nearby" => {
+            let id = args.get(1).cloned().unwrap_or_else(|| die("pair-nearby <id>"));
+            node.command_blocking("nearby.start", Value::Null).unwrap_or_else(|e| die(&e));
+            std::thread::sleep(Duration::from_secs(3));
+            println!("{}", node.command_blocking("pair.nearby", json!({ "id": id })).unwrap_or_else(|e| die(&e)));
+            let mut line = String::new();
+            while std::io::stdin().read_line(&mut line).is_ok_and(|n| n > 0) {
+                match node.command_blocking("pair.nearby.confirm", json!({ "id": id, "code": line.trim() })) {
+                    Ok(computer) => {
+                        println!("{computer}");
+                        break;
+                    }
+                    Err(e) => println!("{}", json!({ "error": e })),
+                }
+                line.clear();
             }
         }
         "request" => {
@@ -109,8 +142,14 @@ fn main() {
     node.shutdown();
 }
 
-fn start(data: &str, name: &str, relay: Relay, emit: stella_p2p::Emit) -> Node {
-    Node::start(Config { data_dir: data.into(), name: name.into(), platform: std::env::consts::OS.into(), relay, port: Some(0) }, emit).unwrap_or_else(|e| die(&e))
+fn start(data: &str, name: &str, relay: Relay, rendezvous: Option<String>, emit: stella_p2p::Emit) -> Node {
+    let rendezvous = match rendezvous.as_deref() {
+        Some("off") => None,
+        Some(url) => Some(url.to_owned()),
+        None => Some(stella_p2p::DEFAULT_RENDEZVOUS.to_owned()),
+    };
+    let config = Config { data_dir: data.into(), name: name.into(), platform: std::env::consts::OS.into(), relay, port: Some(0), discoverable: true, rendezvous };
+    Node::start(config, emit).unwrap_or_else(|e| die(&e))
 }
 
 fn die(message: &str) -> ! {

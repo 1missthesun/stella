@@ -66,6 +66,7 @@ pub fn endpoint_addr(id: EndpointId, relay: Option<&str>, addrs: &[String]) -> E
 }
 
 pub struct Offer {
+    pub code: String,
     pub secret: [u8; 16],
     pub expires: Instant,
     pub expires_at_ms: u64,

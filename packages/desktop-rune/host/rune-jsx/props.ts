@@ -36,6 +36,8 @@ export type KeyEvent = { key: string; chord: string; mods: Mods };
 export type InputKeyEvent = KeyEvent & { value: string; start: number; end: number; length: number };
 export type Layout = { x: number; y: number; w: number; h: number };
 export type ScrollPos = { x: number; y: number; maxX: number; maxY: number; viewport: [number, number] };
+/** `onBackdrop`: perceptual (sRGB) luminance behind a glass element and its standard deviation, 0..1. */
+export type Backdrop = { lum: number; contrast: number };
 export type Drag = { phase: "start" | "move" | "end"; dx: number; dy: number; x: number; y: number };
 
 /** A Liquid Glass lens: refracts and lenses what is painted behind the element, with a bevelled rim catching the light. */
@@ -50,6 +52,8 @@ export type Glass = {
   /** Edge highlight strength (1.6) and the light's angle, radians (-2.09: from the top left). */ rim?: number; lightAngle?: number;
   /** Multiplies the backdrop by `tint` by `tintAmount`; `veil` (0..1) mixes the body toward `tint` so labels stay legible over busy content. */
   tint?: Color; tintAmount?: number; veil?: number;
+  /** 0..1 adaptive dimming (0, off): scales `veil` and `shadow` from what is behind the glass, denser over busy content or content far from `tint`, lighter over a plain backdrop. */
+  adapt?: number;
   /** A second shape the glass flows into (a gooey merge), in the element's points; `unionK` is the merge radius (22), `morph` 0..1 moves toward it alone. */
   merge?: { x: number; y: number; w: number; h: number; radius?: number }; unionK?: number; morph?: number;
 };
@@ -199,6 +203,8 @@ export type BoxProps = {
   onLayout?: (r: Layout) => void;
   onScroll?: (p: ScrollPos) => void;
   onAtBottom?: (atBottom: boolean) => void;
+  /** What a `glass` element sees behind it: mean luminance and its contrast (standard deviation), 0..1, sent when either moves by 0.04, at most every 120 ms. */
+  onBackdrop?: (b: Backdrop) => void;
   onFarFromBottom?: (far: boolean) => void;
   onKey?: (e: KeyEvent) => void;
   onDismiss?: () => void;

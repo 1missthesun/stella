@@ -210,6 +210,24 @@ these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lightin
   `rim` (1.6), `lightAngle` (radians, -2.09), `tint` + `tintAmount`, `veil` (0..1: mixes the
   body toward `tint` so labels stay legible), `merge: {x,y,w,h,radius}` + `unionK` (22) + `morph`
   (a second shape it flows into, in the element's points).
+- Adaptive dimming: `adapt` (0..1, default 0, off) measures what is behind the glass on every
+  frame that draws it and scales `veil` and `shadow` from it, after Apple's regular glass: a
+  denser veil and shadow over busy content (text, images) or content far from `tint`, a lighter
+  veil over a plain backdrop, and a softer shadow over a plain light one.
+- `onBackdrop={(b) => …}` on a glass element reports what it sees behind it, `{ lum, contrast }`:
+  mean perceptual (sRGB) luminance and its standard deviation, 0..1 (`contrast` is near 0 over a
+  plain fill, 0.15 and up over text or images). It fires once when the element first draws, then
+  only when either value moves by 0.04, at most every 120 ms (a held reading follows once the gap
+  has passed), so scrolling content under it sends a handful of events and a window at rest sends
+  none. Use it to flip glyphs and tint between light and dark, with some hysteresis:
+
+```tsx
+const [light, setLight] = useState(false);
+<row radius={20} fx={{ glass: { adapt: 1, veil: 0.5, tint: light ? "#f5f5f7" : "#1c1c1e" } }}
+  onBackdrop={(b) => setLight((was) => (was ? b.lum > 0.45 : b.lum > 0.6))}>
+  <text color={light ? "#1d1d1f" : "#f5f5f7"}>Share</text>
+</row>
+```
 - Fills: `{ fill: "<id>", preset?, …params }`. `liquidMetal` (presets `chrome` `gold` `rose`
   `gunmetal`; `tint light flow scale speed bevel dome angle iridescence contrast`, `anchor:
   "world" | "element"`), `flutedGlass` (presets `reeded` `fine` `frosted` `wide`; `rib angle

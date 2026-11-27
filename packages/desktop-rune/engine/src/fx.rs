@@ -150,6 +150,7 @@ fn glass(v: &J) -> Result<Effect, String> {
             ("lightAngle", Some(x)) => lens.light_angle = x,
             ("tintAmount", Some(x)) => lens.tint_amount = x,
             ("veil", Some(x)) => lens.veil = x,
+            ("adapt", Some(x)) => lens.adapt = x,
             ("unionK", Some(x)) => lens.union_k = x,
             ("morph", Some(x)) => lens.morph = x,
             ("tint", _) => lens.tint = rgb(val).ok_or("glass `tint` is a colour")?,
@@ -418,6 +419,7 @@ impl Compositor<Win> for Comp {
         let mut shown: Vec<OnScreen> = Vec::new();
         let mut lights: Vec<Lighting> = Vec::new();
         let mut occluders: Vec<(u32, Prim)> = Vec::new();
+        let mut watched: Vec<(usize, u32)> = Vec::new();
         crate::engine::read(|eng| {
             for (n, i) in f.rt.instances.iter().enumerate() {
                 if i.params[1] != KIND_EFFECT {
@@ -431,6 +433,7 @@ impl Compositor<Win> for Comp {
                 match i.uv[1] {
                     LAYER => {
                         let Some(s) = p.fx.as_ref().and_then(|l| l.0.get(i.uv[0] as usize)) else { continue };
+                        let watch = matches!(s.effect, Effect::Glass { .. }) && p.on.iter().any(|h| h == "backdrop") && !watched.iter().any(|w| w.1 == node);
                         let fx = match &s.effect {
                             Effect::Glass { lens, merge } => {
                                 let mut lens = *lens;
@@ -441,9 +444,12 @@ impl Compositor<Win> for Comp {
                         };
                         let mut l = fx.on(Shape::rounded(x, y, w, h, r)).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity);
                         l.place = rune_fx::Place::Over;
+                        if watch {
+                            watched.push((layers.len(), node));
+                        }
                         shown.push(OnScreen { instance: n as u32, layer: layers.len() });
                         layers.push(l);
-                        slots.push(FxSlot::default().scale(k).clip(i.clip, i.fade).blend(s.blend));
+                        slots.push(FxSlot::default().scale(k).clip(i.clip, i.fade).blend(s.blend).measure(watch));
                     }
                     LIGHT => {
                         let Some(spec) = p.light.as_deref() else { continue };
@@ -476,6 +482,9 @@ impl Compositor<Win> for Comp {
             }
             for l in &mut lights {
                 l.prims = occluders.iter().filter(|(n, _)| *n != l.node && inside(&eng.tree, *n, l.node)).map(|(_, p)| *p).collect();
+            }
+            if !watched.is_empty() {
+                crate::backdrop::forget(|n| eng.tree.get(n).is_some());
             }
         });
         self.animating = layers.iter().any(FxLayer::is_animating);
@@ -550,6 +559,17 @@ impl Compositor<Win> for Comp {
             }
         });
         gpu.lights.retain(|_, l| l.seen);
+        if !watched.is_empty() {
+            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let landed = done.clone();
+            let asked = gpu.fx.read_backdrop_stats(device, f.encoder, move |stats| {
+                crate::backdrop::report(stats.into_iter().filter_map(|(layer, s)| watched.iter().find(|w| w.0 == layer).map(|w| (w.1, s))));
+                landed.store(true, std::sync::atomic::Ordering::Release);
+            });
+            if asked {
+                crate::backdrop::await_readback(device, done);
+            }
+        }
     }
 }
 

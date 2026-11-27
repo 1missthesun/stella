@@ -1,57 +1,127 @@
-/* Stella's welcome message: an ordinary assistant message whose lines carry
-   small buttons, styled like chat card actions. */
+/* Stella's welcome message: an ordinary assistant message whose points sit on
+   hairline-separated rows, each with one family of small buttons. */
 
-.welcome-message .markdown li {
-  margin-bottom: 0.5rem;
+.welcome-message {
+  --welcome-hairline: color-mix(in srgb, var(--chat-assistant-bubble-text, var(--foreground)) 11%, transparent);
+}
+
+.welcome-message__body > p {
+  margin: 0;
+}
+
+.welcome-message__body > p + p {
+  margin-top: 4px;
+}
+
+.welcome-message .markdown.welcome-message__body p.welcome-message__greeting {
+  font-weight: var(--chat-text-strong-weight, 600);
+}
+
+.welcome-message__points {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  border-top: 1px solid var(--welcome-hairline);
+}
+
+.welcome-message__point {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--welcome-hairline);
+}
+
+.welcome-message__point > p {
+  margin: 0;
+}
+
+.welcome-message__body .welcome-message__closing {
+  margin-top: 12px;
 }
 
 .welcome-message__actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 14px;
-  row-gap: 8px;
-  margin-top: 6px;
-  font-size: var(--font-size-sm);
+  align-items: center;
+  gap: 6px;
 }
 
 .welcome-message__action {
   display: inline-flex;
-  align-items: baseline;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-weak);
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--welcome-hairline);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-strong);
   font: inherit;
-  font-weight: var(--weight-medium, 500);
-  line-height: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.welcome-message__icon {
+  flex: none;
+  color: var(--text-weak);
 }
 
 .welcome-message__action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 4%, var(--card));
+  border-color: color-mix(in srgb, var(--foreground) 17%, transparent);
+}
+
+.welcome-message__action:active:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 8%, var(--card));
+}
+
+.welcome-message__action--demo {
+  background: transparent;
+  color: var(--text-weak);
+}
+
+.welcome-message__action--demo:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
   color: var(--text-strong);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+}
+
+.welcome-message__action--demo:hover:not(:disabled) .welcome-message__icon {
+  color: var(--text-strong);
+}
+
+.welcome-message__action--demo:active:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .welcome-message__action--primary {
-  margin-block: -2px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  border-color: transparent;
   background: var(--interactive);
   color: var(--interactive-foreground);
-  line-height: 14px;
+}
+
+.welcome-message__action--primary .welcome-message__icon {
+  color: var(--interactive-foreground);
+  opacity: 0.92;
 }
 
 .welcome-message__action--primary:hover:not(:disabled) {
-  color: var(--interactive-foreground);
-  text-decoration: none;
+  border-color: transparent;
   background: color-mix(in srgb, var(--foreground) 10%, var(--interactive));
+}
+
+.welcome-message__action--primary:active:not(:disabled) {
+  background: var(--interactive);
+  opacity: 0.88;
 }
 
 .welcome-message__action:focus-visible {
   outline: none;
-  border-radius: 999px;
   box-shadow: var(--focus-ring);
 }
 
@@ -60,8 +130,18 @@
   cursor: default;
 }
 
+.welcome-message__icon--busy {
+  animation: welcome-message-spin 1s linear infinite;
+}
+
+@keyframes welcome-message-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .welcome-message__legal {
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   font-size: var(--font-size-xs);
   line-height: 1.5;
   color: var(--text-weaker);

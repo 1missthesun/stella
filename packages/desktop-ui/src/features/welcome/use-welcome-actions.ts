@@ -18,8 +18,9 @@ export type WelcomeAction = {
   label: string;
   run?: () => void;
   busy?: boolean;
-  // Demos read as a quiet link; doing something gets the accent pill.
-  quiet?: boolean;
+  // The one step everything else waits on (signing in) gets the accent;
+  // demos are the plainer sibling of the other buttons.
+  primary?: boolean;
   demo?: boolean;
   // Opens the theme picker, which the client anchors to the button.
   theme?: boolean;
@@ -174,10 +175,10 @@ export function useWelcomeActions({
                   },
                 ]
               : []),
-            { id: "demo", label: t("welcome.actions.watchErrands"), run: () => openWelcomeDemo("errands"), quiet: true, demo: true },
+            { id: "demo", label: t("welcome.actions.watchErrands"), run: () => openWelcomeDemo("errands"), demo: true },
           ];
         case "anywhere":
-          if (!signedIn) return [{ id: "signin", label: t("welcome.actions.signIn"), run: () => openRootDialog("auth") }];
+          if (!signedIn) return [{ id: "signin", label: t("welcome.actions.signIn"), run: () => openRootDialog("auth"), primary: true }];
           return platformCapabilities.phoneAccess && phoneLinked === false
             ? [
                 {
@@ -191,7 +192,7 @@ export function useWelcomeActions({
               ]
             : [];
         case "memory":
-          return [{ id: "demo", label: t("welcome.actions.watchMemory"), run: () => openWelcomeDemo("memory"), quiet: true, demo: true }];
+          return [{ id: "demo", label: t("welcome.actions.watchMemory"), run: () => openWelcomeDemo("memory"), demo: true }];
         case "plans":
           return native && !planConnected
             ? [{ id: "plan", label: t("welcome.actions.connectPlan"), run: openChooseAi }]
@@ -199,7 +200,7 @@ export function useWelcomeActions({
         case "customize":
           return [
             { id: "theme", label: t("welcome.actions.changeLook"), theme: true },
-            { id: "demo", label: t("welcome.actions.watchCustomize"), run: () => openWelcomeDemo("customize"), quiet: true, demo: true },
+            { id: "demo", label: t("welcome.actions.watchCustomize"), run: () => openWelcomeDemo("customize"), demo: true },
           ];
       }
     })();

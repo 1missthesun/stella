@@ -1150,11 +1150,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       animate={!menuClone && (animate || mountedEmptyRef.current)}
     >
       {item.welcome ? (
-        <WelcomeMessage
-          colors={colors}
-          fill={boundedAssistantBubble}
-          onStellaFileLink={onOpenStellaFile}
-        />
+        <WelcomeMessage colors={colors} fill={boundedAssistantBubble} />
       ) : (
         <AssistantMarkdown
           text={bodyText}

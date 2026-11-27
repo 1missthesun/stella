@@ -22,27 +22,27 @@ export const WELCOME_ITEMS: readonly WelcomeItem[] = [
   {
     id: "errands",
     title: "I can handle real errands:",
-    body: "click through websites you're already logged into, fill out forms, compare options, organize your downloads and photos, or make Word, Excel, and PDFs — even several things at once while we keep chatting.",
+    body: "click through websites you're logged into, fill out forms, organize your downloads and photos, or make Word, Excel, and PDFs — even several at once while we keep chatting.",
   },
   {
     id: "anywhere",
     title: "Text me from anywhere:",
-    body: "message me on your phone to do something on your computer at home (or keep working even when your computer is turned off), and anything I make shows up on all your devices.",
+    body: "message me from your phone to do things on your home computer (or keep working while it's off), and anything I make shows up on all your devices.",
   },
   {
     id: "memory",
     title: "One chat that remembers everything:",
-    body: 'you never have to start a "new chat" — I remember how you like things done and can find anything we talked about months ago.',
+    body: 'no need to start a "new chat" — I remember how you like things done and can find anything we talked about months ago.',
   },
   {
     id: "plans",
     title: "Already pay for ChatGPT, Claude, or Gemini?",
-    body: "Connect them in Settings at no extra cost, and tell me whenever you want me to use a specific one.",
+    body: "Connect them at no extra cost, and tell me whenever you want me to use a specific one.",
   },
   {
     id: "customize",
     title: "Change anything about me or this app:",
-    body: "tell me how to talk, give me rules to always follow, or ask me in plain English to change how this app looks, add a button, or build a custom tool right inside it.",
+    body: "tell me how to talk, give me rules to follow, or ask in plain English to change how this app looks, add a button, or build a custom tool right inside it.",
   },
 ];
 

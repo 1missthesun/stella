@@ -64,7 +64,8 @@ pub struct Engine {
     pub windows: HashMap<u32, WinSlot>,
     /// The `<window>` node shown in the window the engine opened at launch.
     pub main_node: Option<u32>,
-    /// Windows a replacing `<window>` took over: old node to new, read by the window's next poll.
+    /// Windows a replacing `<window>` took over: each earlier node to the one holding the native
+    /// window now (see [`Engine::window_now`]), until that window closes.
     pub rebound: HashMap<u32, u32>,
     pub main_handle: Option<WindowHandle>,
     pub main_waker: Arc<Mutex<Option<Waker>>>,
@@ -87,6 +88,12 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// The `<window>` node holding the native window opened for `node`: `node`, or the one that
+    /// took it over on a remount. A window's state, compositor and move events follow it.
+    pub fn window_now(&self, node: u32) -> u32 {
+        self.rebound.get(&node).copied().unwrap_or(node)
+    }
+
     fn new() -> Self {
         Engine {
             tree: Tree::new(),

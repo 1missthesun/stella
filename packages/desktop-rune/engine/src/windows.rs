@@ -314,7 +314,7 @@ fn visibility(s: &mut Win, shown: bool, _tx: &mut Tx) {
 
 /// Electron's `move` event, with the bounds `getBounds` answers after it.
 fn moved(node: Option<u32>, h: &rune::WindowHandle) {
-    let Some(node) = node.or_else(|| engine::read(|e| e.main_node)) else { return };
+    let Some(node) = engine::read(|e| node.map(|n| e.window_now(n)).or(e.main_node)) else { return };
     // A minimized window sits off screen at -32000 on Windows; Electron reports no move there.
     let Some(p) = h.placement().filter(|p| !p.minimized) else { return };
     let k = if p.scale > 0.0 { p.scale } else { 1.0 };
@@ -439,6 +439,9 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
                 if slot.is_main {
                     e.main_node = Some(node);
                 } else {
+                    for now in e.rebound.values_mut().filter(|n| **n == old) {
+                        *now = node;
+                    }
                     e.rebound.insert(old, node);
                 }
                 e.windows.insert(node, slot);
@@ -473,6 +476,7 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
         }
     }
     for (node, slot) in freed {
+        engine::with(|e| e.rebound.retain(|_, now| *now != node));
         #[cfg(feature = "webview")]
         crate::webview::close_window(node);
         if let Some(h) = slot.handle {
@@ -773,8 +777,8 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     if s.main && let Some(m) = engine::read(|e| e.main_node) && s.node != m {
         s.node = m;
     }
-    while !s.main && let Some(n) = engine::with(|e| e.rebound.remove(&s.node)) {
-        s.node = n;
+    if !s.main {
+        s.node = engine::read(|e| e.window_now(s.node));
     }
     let node = s.node;
     let focus = crate::swap_view::seen(s, tx);

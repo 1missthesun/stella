@@ -405,7 +405,7 @@ fn layer_slot(id: u32, i: usize, s: &FxSpec, p: &Props) -> El {
 fn window_has_fx(window: Option<u32>) -> Option<bool> {
     crate::engine::ENGINE.with(|e| {
         let e = e.try_borrow().ok()?;
-        let w = window.or(e.main_node)?;
+        let w = window.map(|w| e.window_now(w)).or(e.main_node)?;
         Some(e.tree.fx.iter().any(|n| e.tree.window_of(*n) == Some(w)))
     })
 }

@@ -53,6 +53,11 @@ const IDLE_FRAME_MS = 1000;
 const ACTIVE_FOR_MS = 3000;
 /** The tab stopped asking for frames (closed, or its page gone): captures stop. */
 const POLL_GONE_MS = 4000;
+/** How long a capture waits for a build in progress (dependencies, bundle, render) and the page. */
+const FIRST_FRAME_MS = 20_000;
+/** A capture this soon after a build first waits (up to SETTLE_MAX_MS) for its entrances to end. */
+const SETTLE_AFTER_MS = 3000;
+const SETTLE_MAX_MS = 2000;
 const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys"];
 const API_PATH = "/__preview/";
 
@@ -95,6 +100,7 @@ class Preview {
   private lastPoll = 0;
   private lastActive = 0;
   private pageLoads = 0;
+  private renderedAt = 0;
 
   constructor(readonly name: string, readonly worktree: string, readonly contents: WebContents, readonly url: string) {
     const n = ++opened;
@@ -285,6 +291,7 @@ class Preview {
       this.error = null;
       this.root.render(createElement(Root));
       this.rendered = true;
+      this.renderedAt = Date.now();
       this.loader.retireReplaced();
       console.error(`[preview] ${this.name}: built and rendered in ${(now() - t0).toFixed(0)} ms`);
     } catch (error) {
@@ -356,7 +363,12 @@ class Preview {
 
   /** Brings the tab's frame up to date before the page is captured (an agent's screenshot). */
   async fresh() {
+    // A screenshot right after opening, reloading or an edit shows the build that started, once
+    // the page shows frames.
+    const until = Date.now() + FIRST_FRAME_MS;
+    while (!this.disposed && Date.now() < until && (this.building || this.rebuildTimer || (!this.rendered && !this.error) || !this.lastPoll)) await Bun.sleep(25);
     if (this.disposed || !this.rendered) return;
+    if (Date.now() - this.renderedAt < SETTLE_AFTER_MS) await this.settled();
     await this.capture(true);
     if (Date.now() - this.lastPoll > POLL_GONE_MS) return;
     const seq = this.frame.seq;
@@ -365,6 +377,19 @@ class Preview {
       function done() { clearTimeout(timer); resolve(); }
       this.ackWaiters.push({ seq, resolve: done });
     });
+  }
+
+  /** Waits for a new build's entrances to finish: its elements' places and opacities hold still. */
+  private async settled() {
+    const until = Date.now() + SETTLE_MAX_MS;
+    let last = "";
+    while (!this.disposed && Date.now() < until) {
+      const list = await engine.control.elements(this.engineId).catch(() => [] as ElementInfo[]);
+      const now = JSON.stringify(list.map((e) => [e.key, e.rect, e.opacity]));
+      if (now === last) return;
+      last = now;
+      await Bun.sleep(120);
+    }
   }
 
   private acked(seen: number) {

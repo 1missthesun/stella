@@ -8,8 +8,7 @@ import { finishNudge } from "@/features/nudges/usage-nudges-store";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { platformCapabilities } from "@/platform/capabilities";
 import { useT } from "@/shared/i18n";
-import { uiState } from "@/platform/ui-state";
-import { openWelcomeDemo, type WelcomeDemoId } from "./demos/open-welcome-demo";
+import { openWelcomeDemo } from "./demos/open-welcome-demo";
 
 // The welcome message's buttons, by line: what each does, and which are
 // already done (those don't show). Every client draws them its own way.
@@ -23,8 +22,7 @@ export type WelcomeAction = {
   // demos are the plainer sibling of the other buttons.
   primary?: boolean;
   demo?: boolean;
-  // Opens the theme picker, which the client anchors to the button; `run`
-  // is then called when the picker closes.
+  // Opens the theme picker, which the client anchors to the button.
   theme?: boolean;
 };
 
@@ -132,28 +130,13 @@ function usePlanConnected(): boolean {
   return connected;
 }
 
-// Once the theme picker has been opened and closed from the welcome, the look
-// line offers its demo instead.
-const LOOK_SEEN_KEY = "stella-welcome-look-seen";
-
-function useLookSeen(): [boolean, () => void] {
-  const [seen, setSeen] = useState(() => uiState.getItem(LOOK_SEEN_KEY) === "1");
-  const markSeen = useCallback(() => {
-    uiState.setItem(LOOK_SEEN_KEY, "1");
-    setSeen(true);
-  }, []);
-  return [seen, markSeen];
-}
-
-// Each line offers at most one button, on the right of its text: the setup
-// step it describes while that isn't done, else a demo of it.
 export function useWelcomeActions({
   openChooseAi,
   demos = true,
 }: {
   openChooseAi: () => void;
   demos?: boolean;
-}): (id: WelcomeItemId) => WelcomeAction | null {
+}): (id: WelcomeItemId) => WelcomeAction[] {
   const t = useT();
   const native = platformCapabilities.nativeBridges;
   const { hasConnectedAccount: signedIn } = useAuthSessionState();
@@ -162,55 +145,65 @@ export function useWelcomeActions({
   const gmail = useGmail(canConnectGmail);
   const phoneLinked = usePhoneLinked(signedIn);
   const planConnected = usePlanConnected();
-  const [lookSeen, markLookSeen] = useLookSeen();
 
-  const demo = (id: WelcomeDemoId, label: string): WelcomeAction | null =>
-    demos ? { id: "demo", label, run: () => openWelcomeDemo(id), demo: true } : null;
-
-  return (id: WelcomeItemId): WelcomeAction | null => {
-    switch (id) {
-      case "errands":
-        if (native && !extensionConnected) {
-          return {
-            id: "extension",
-            label: t("welcome.actions.getExtension"),
-            run: () => openExternalUrl(STELLA_BROWSER_EXTENSION_STORE_URL),
-          };
-        }
-        if (canConnectGmail && (gmail.phase === "off" || gmail.phase === "connecting" || gmail.phase === "error")) {
-          return {
-            id: "gmail",
-            label:
-              gmail.phase === "connecting"
-                ? t("welcome.actions.gmailWaiting")
-                : gmail.phase === "error"
-                  ? t("welcome.actions.gmailRetry")
-                  : t("welcome.actions.connectGmail"),
-            busy: gmail.phase === "connecting",
-            run: () => void gmail.connect(),
-          };
-        }
-        return demo("errands", t("welcome.actions.watchErrands"));
-      case "anywhere":
-        if (!signedIn) return { id: "signin", label: t("welcome.actions.signIn"), run: () => openRootDialog("auth"), primary: true };
-        return platformCapabilities.phoneAccess && phoneLinked === false
-          ? {
-              id: "phone",
-              label: t("welcome.actions.getPhoneApp"),
-              run: () => {
-                finishNudge("phoneApp");
-                openRootDialog("connect");
-              },
-            }
-          : null;
-      case "memory":
-        return demo("memory", t("welcome.actions.watchMemory"));
-      case "plans":
-        return native && !planConnected ? { id: "plan", label: t("welcome.actions.connectPlan"), run: openChooseAi } : null;
-      case "customize":
-        return lookSeen
-          ? demo("customize", t("welcome.actions.watchCustomize"))
-          : { id: "theme", label: t("welcome.actions.changeLook"), theme: true, run: markLookSeen };
-    }
+  return (id: WelcomeItemId): WelcomeAction[] => {
+    const actions = ((): WelcomeAction[] => {
+      switch (id) {
+        case "errands":
+          return [
+            ...(native && !extensionConnected
+              ? [
+                  {
+                    id: "extension",
+                    label: t("welcome.actions.getExtension"),
+                    run: () => openExternalUrl(STELLA_BROWSER_EXTENSION_STORE_URL),
+                  },
+                ]
+              : []),
+            ...(canConnectGmail && (gmail.phase === "off" || gmail.phase === "connecting" || gmail.phase === "error")
+              ? [
+                  {
+                    id: "gmail",
+                    label:
+                      gmail.phase === "connecting"
+                        ? t("welcome.actions.gmailWaiting")
+                        : gmail.phase === "error"
+                          ? t("welcome.actions.gmailRetry")
+                          : t("welcome.actions.connectGmail"),
+                    busy: gmail.phase === "connecting",
+                    run: () => void gmail.connect(),
+                  },
+                ]
+              : []),
+            { id: "demo", label: t("welcome.actions.watchErrands"), run: () => openWelcomeDemo("errands"), demo: true },
+          ];
+        case "anywhere":
+          if (!signedIn) return [{ id: "signin", label: t("welcome.actions.signIn"), run: () => openRootDialog("auth"), primary: true }];
+          return platformCapabilities.phoneAccess && phoneLinked === false
+            ? [
+                {
+                  id: "phone",
+                  label: t("welcome.actions.getPhoneApp"),
+                  run: () => {
+                    finishNudge("phoneApp");
+                    openRootDialog("connect");
+                  },
+                },
+              ]
+            : [];
+        case "memory":
+          return [{ id: "demo", label: t("welcome.actions.watchMemory"), run: () => openWelcomeDemo("memory"), demo: true }];
+        case "plans":
+          return native && !planConnected
+            ? [{ id: "plan", label: t("welcome.actions.connectPlan"), run: openChooseAi }]
+            : [];
+        case "customize":
+          return [
+            { id: "theme", label: t("welcome.actions.changeLook"), theme: true },
+            { id: "demo", label: t("welcome.actions.watchCustomize"), run: () => openWelcomeDemo("customize"), demo: true },
+          ];
+      }
+    })();
+    return demos ? actions : actions.filter((action) => !action.demo);
   };
 }

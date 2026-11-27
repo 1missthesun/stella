@@ -8,6 +8,7 @@ import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import com.caoccao.javet.annotations.V8Function
+import com.caoccao.javet.enums.JavetPromiseRejectEvent
 import com.caoccao.javet.enums.V8ValueType
 import com.caoccao.javet.interop.V8Host
 import com.caoccao.javet.interop.V8Runtime
@@ -53,6 +54,7 @@ class JSRuntime(private val context: Context) {
   private lateinit var v8: V8Runtime
   private lateinit var global: V8ValueObject
   private val timers = HashMap<Int, Runnable>()
+  private val pendingRejections = HashMap<Int, String>()
   private val storage = context.getSharedPreferences("stella-rune-storage", Context.MODE_PRIVATE)
   private val http = OkHttpClient.Builder()
     .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -76,8 +78,20 @@ class JSRuntime(private val context: Context) {
       // V8's Intl data (ICU), which it reads when its library loads.
       V8RuntimeOptions.V8_FLAGS.setIcuDataFile(File(bundle.parentFile, "icudtl.dat").path)
       v8 = V8Host.getV8I18nInstance().createV8Runtime()
-      v8.setPromiseRejectCallback { _, _, value ->
-        AppLog.write("error", "unhandled rejection: ${describe(value)}")
+      // V8 reports a rejection before an `await` or `.catch` later in the same turn handles it:
+      // only those still unhandled once the turn is over are logged.
+      v8.setPromiseRejectCallback { event, promise, value ->
+        val id = try { promise?.identityHash ?: 0 } catch (_: Throwable) { 0 }
+        when (event) {
+          JavetPromiseRejectEvent.PromiseRejectWithNoHandler -> {
+            pendingRejections[id] = describe(value)
+            handler.post {
+              pendingRejections.remove(id)?.let { AppLog.write("error", "unhandled rejection: $it") }
+            }
+          }
+          JavetPromiseRejectEvent.PromiseHandlerAddedAfterReject -> pendingRejections.remove(id)
+          else -> {}
+        }
       }
       global = v8.globalObject
       install(env)

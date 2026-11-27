@@ -54,8 +54,8 @@ fn close_spring(open: Spring) -> Spring {
 
 /// How far through a morph its glass is drawn: none at the source's shape, so the source
 /// (glass, icon and label) shows as itself at both ends, and all of it from `MORPH_SHOWN`.
-const MORPH_HIDDEN: f32 = 0.03;
-const MORPH_SHOWN: f32 = 0.3;
+const MORPH_HIDDEN: f32 = 0.04;
+const MORPH_SHOWN: f32 = 0.55;
 
 fn morph_alpha(at: f32) -> f32 {
     let t = ((at - MORPH_HIDDEN) / (MORPH_SHOWN - MORPH_HIDDEN)).clamp(0.0, 1.0);

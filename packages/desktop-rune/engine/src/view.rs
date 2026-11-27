@@ -97,8 +97,8 @@ fn sees_through(p: &Props) -> bool {
 
 /// Fades `e` in a beat behind a `morphFrom` glass growing on `spring`, once it's mostly grown.
 pub fn reveal(e: El, spring: rune::Spring) -> El {
-    let fade = rune::Spring::new(spring.duration * 0.6, 0.0);
-    e.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, rune::Spring::new(0.14, 0.0)))).enter_delay(spring.duration * 0.3)
+    let fade = rune::Spring::new(spring.duration * 0.5, 0.0);
+    e.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, rune::Spring::new(0.14, 0.0)))).enter_delay(spring.duration * 0.4)
 }
 
 /// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,

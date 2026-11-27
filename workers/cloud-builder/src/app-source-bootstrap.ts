@@ -77,9 +77,17 @@ const upstreamAccess = async (artifacts: Artifacts, host: string): Promise<AppSo
   return minted;
 };
 
+// A first install opens Stella from a prebuilt app bundle when one is offered (the launcher's
+// two-stage install; scripts/build-app-bundle.mjs). APP_BUNDLE_MANIFEST_URL points at the
+// published app-bundle.json; unset, launchers clone and install as before.
+const bundleOffer = (manifest: string | undefined) => {
+  const url = manifest?.trim();
+  return url?.startsWith("https://") ? { bundle: { manifest: url } } : {};
+};
+
 export const handleAppSourceBootstrap = async (
   request: Request,
-  env: { ARTIFACTS: Artifacts },
+  env: { ARTIFACTS: Artifacts; APP_BUNDLE_MANIFEST_URL?: string },
 ): Promise<Response | null> => {
   const url = new URL(request.url);
   if (url.pathname !== APP_SOURCE_BOOTSTRAP_PATH) return null;
@@ -88,7 +96,10 @@ export const handleAppSourceBootstrap = async (
   }
   try {
     const upstream = await upstreamAccess(env.ARTIFACTS, url.host);
-    return Response.json({ upstream }, { headers: { "cache-control": "no-store" } });
+    return Response.json(
+      { upstream, ...bundleOffer(env.APP_BUNDLE_MANIFEST_URL) },
+      { headers: { "cache-control": "no-store" } },
+    );
   } catch (error) {
     log("error", "app_source_bootstrap_failed", { message: errorMessage(error) });
     return Response.json(

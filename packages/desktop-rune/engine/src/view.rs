@@ -40,6 +40,7 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             .collect()
     };
     let morph = crate::fx::morph_spring(&n.props);
+    let grow_from = morph.map(|_| source_origin(&n.props));
     for (i, c) in n.children.iter().enumerate() {
         let Some(child) = eng.tree.get(*c) else {
             e = e.child(build(s, eng, *c));
@@ -55,7 +56,7 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             && toward_web.iter().any(|(j, order)| paint_order(p) > *order || (paint_order(p) == *order && i > *j));
         let mut ce = if over { build_over(s, eng, *c) } else { build(s, eng, *c) };
         if let Some(spring) = morph.filter(|_| p.enter.is_none() && p.exit.is_none()) {
-            ce = reveal(ce, spring);
+            ce = reveal(ce, spring, grow_from.unwrap_or(([0.5, 0.5], None)));
         }
         e = e.child(ce);
     }
@@ -95,11 +96,33 @@ fn sees_through(p: &Props) -> bool {
     p.backdrop_blur.is_some_and(|b| b > 0.0) || p.fill.as_ref().is_some_and(|c| c.0.a < 1.0)
 }
 
-/// Brings a `morphFrom` glass's content in as the glass starts to grow: it's there to press
-/// from the first frame, and fades and scales in well before the glass reaches its size.
-pub fn reveal(e: El, spring: rune::Spring) -> El {
-    let fade = rune::Spring::new((spring.duration * 0.6).max(0.01), 0.0);
-    e.transition(rune::Transition::scale(0.97).combined(rune::Transition::opacity()).springs(rune::SpringPair::new(fade, CONTENT_OUT)))
+/// Brings a `morphFrom` glass's content in with the glass: there to press from the first frame,
+/// growing out of the source's side (see `source_origin`) on the glass's own spring as it fades in.
+/// It's uncovered from the source's edge as it grows, so it stays inside the growing glass.
+pub fn reveal(e: El, spring: rune::Spring, (from, edge): ([f32; 2], Option<rune::Edge>)) -> El {
+    let mut grow = rune::Transition::scale_anchor(0.8, rune::Vec2::new(from[0], from[1])).allow_small_scale();
+    if let Some(edge) = edge {
+        grow = grow.combined(rune::Transition::reveal(edge));
+    }
+    e.transition(grow.springs(rune::SpringPair::new(spring, CONTENT_OUT)))
+}
+
+/// Where a `morphFrom` element's source sits, in units of the element's size, for its content
+/// to grow out of, and the edge it's on: the anchor's side and alignment (a menu above its
+/// button, aligned to the start, grows from its bottom-left corner); its centre without an anchor.
+fn source_origin(p: &Props) -> ([f32; 2], Option<rune::Edge>) {
+    let Some(a) = &p.anchor else { return ([0.5, 0.5], None) };
+    let along = match a.align.as_deref() {
+        Some("center") => 0.5,
+        Some("end") => 1.0,
+        _ => 0.0,
+    };
+    match a.side.as_deref() {
+        Some("top") => ([along, 1.0], Some(rune::Edge::Bottom)),
+        Some("left") => ([1.0, along], Some(rune::Edge::Trailing)),
+        Some("right") => ([0.0, along], Some(rune::Edge::Leading)),
+        _ => ([along, 0.0], Some(rune::Edge::Top)),
+    }
 }
 
 /// A `morphFrom` glass's border and shadows, which only fit its own shape: they come in as the
@@ -110,7 +133,7 @@ pub fn reveal_chrome(e: El, spring: rune::Spring) -> El {
 }
 
 /// How fast a closing `morphFrom` glass's content goes, ahead of the glass shrinking back.
-const CONTENT_OUT: rune::Spring = rune::Spring::new(0.07, 0.0);
+const CONTENT_OUT: rune::Spring = rune::Spring::new(0.045, 0.0);
 
 /// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,
 /// focus or dismiss.

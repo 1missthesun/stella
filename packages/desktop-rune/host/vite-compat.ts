@@ -70,20 +70,24 @@ function closeOf(src: string, open: number): number {
 
 type GlobOptions = { eager?: boolean; import?: string; query?: string | Record<string, string>; as?: string };
 
+const slashed = (path: string) => (sep === "\\" ? path.replaceAll("\\", "/") : path);
+
 function expandGlob(file: string, patterns: string[]): Map<string, string> {
   const dir = dirname(file);
   const out = new Map<string, string>();
   const include = patterns.filter((p) => !p.startsWith("!"));
   const exclude = patterns.filter((p) => p.startsWith("!")).map((p) => new Bun.Glob(p.slice(1)));
   for (const pattern of include) {
-    const absolute = pattern.startsWith("/") ? join(DESKTOP_UI_SRC, "..", pattern) : resolve(dir, pattern.startsWith("@/") ? join(DESKTOP_UI_SRC, pattern.slice(2)) : pattern);
+    const absolute = slashed(pattern.startsWith("/") ? join(DESKTOP_UI_SRC, "..", pattern) : resolve(dir, pattern.startsWith("@/") ? join(DESKTOP_UI_SRC, pattern.slice(2)) : pattern));
     const wildcard = absolute.search(/[*{[?]/);
     const root = (wildcard < 0 ? absolute : absolute.slice(0, wildcard)).replace(/[^/]*$/, "");
     if (!existsSync(root)) continue;
-    const glob = new Bun.Glob(relative(root, absolute));
-    for (const match of glob.scanSync({ cwd: root, onlyFiles: true })) {
-      const path = join(root, match);
-      const key = pattern.startsWith("./") || pattern.startsWith("../") ? (relative(dir, path).startsWith(".") ? relative(dir, path) : `./${relative(dir, path)}`) : pattern.startsWith("@/") ? `@/${relative(DESKTOP_UI_SRC, path)}` : `/${relative(join(DESKTOP_UI_SRC, ".."), path)}`;
+    const glob = new Bun.Glob(absolute.slice(root.length));
+    for (const found of glob.scanSync({ cwd: root, onlyFiles: true })) {
+      const match = slashed(found);
+      const path = root + match;
+      const fromDir = slashed(relative(dir, path));
+      const key = pattern.startsWith("./") || pattern.startsWith("../") ? (fromDir.startsWith(".") ? fromDir : `./${fromDir}`) : pattern.startsWith("@/") ? `@/${slashed(relative(DESKTOP_UI_SRC, path))}` : `/${slashed(relative(join(DESKTOP_UI_SRC, ".."), path))}`;
       if (exclude.some((g) => g.match(key) || g.match(match))) continue;
       out.set(key, path);
     }

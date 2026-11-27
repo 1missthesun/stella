@@ -234,7 +234,10 @@ class App extends EventEmitter {
   isDefaultProtocolClient() { return false; }
   getApplicationNameForProtocol() { return ""; }
   getApplicationInfoForProtocol() { return Promise.resolve({ icon: nativeImage.createEmpty(), path: "", name: "" }); }
-  setAppUserModelId() {}
+  setAppUserModelId(id: string) {
+    if (process.platform !== "win32") return;
+    void engine()?.app.setAppUserModelId(id).catch((error: Error) => warnOnce("app.setAppUserModelId", `engine app.setAppUserModelId failed: ${error.message}`));
+  }
   setActivationPolicy() {}
   setBadgeCount(count?: number) {
     this.badgeCount = Math.max(0, Math.floor(count ?? 0));

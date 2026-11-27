@@ -259,6 +259,18 @@ fn main() {
         rune::set_accessibility_app_name("electron");
         let _ = rune_notify::register(&rune_notify::Identity::new("stella", "Stella"));
     }
+    // Electron Stella's AppUserModelID (STELLA_WINDOWS_APP_USER_MODEL_ID), taken before any window
+    // opens so the windows group under the launcher's Start-menu shortcut, which also names the toasts.
+    #[cfg(windows)]
+    if rune_notify::adopt(&rune_notify::Identity::new("com.stella.app", "Stella")).is_ok() {
+        // Electron writes its own shortcut for the id with a toast activator class, which then
+        // takes the toasts' clicks: serve that class here, as Electron does, so they reach Stella.
+        std::thread::spawn(|| {
+            for clsid in rune_notify::shortcut_activators() {
+                let _ = rune_notify::serve_activations(&clsid);
+            }
+        });
+    }
     // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.
     let boot = spawn_ts();
     engine::set_out(boot.to_host);

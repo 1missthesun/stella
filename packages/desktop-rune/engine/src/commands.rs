@@ -92,6 +92,7 @@ pub fn route(v: Value) {
         "menu.setApplicationMenu" => reply(rid, crate::services::app_menu(&v)),
         "screen.cursorPoint" => reply(rid, Err("screen.cursorPoint: Rune doesn't report the pointer outside its windows".into())),
         "notify" => reply(rid, crate::services::notify(&v)),
+        "app.setAppUserModelId" => reply(rid, crate::services::set_app_user_model_id(&v)),
         "app.setBadge" => reply(rid, crate::services::badge(&v)),
         "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" => reply(rid, crate::services::tray(&cmd, &v)),
         "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" => reply(rid, crate::services::shortcut(&cmd, &v)),

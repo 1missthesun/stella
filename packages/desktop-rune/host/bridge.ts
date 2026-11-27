@@ -301,6 +301,8 @@ export const engine = {
   app: {
     /** The app badge: macOS shows `label` on the Dock icon ("3", "99+"; null or "" clears it); Windows shows the count over the main window's taskbar button. Resolves false where nothing shows it (Linux). */
     setBadge: (label: string | null, count?: number) => request<boolean>("app.setBadge", { label: label ?? "", count }),
+    /** Windows: the process's AppUserModelID, which toasts post under; nothing elsewhere. */
+    setAppUserModelId: (id: string) => request("app.setAppUserModelId", { id }),
   },
   menu: {
     /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */

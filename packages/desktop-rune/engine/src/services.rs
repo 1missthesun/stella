@@ -27,13 +27,20 @@ pub fn notify(v: &Value) -> Result<Value, String> {
         });
     });
     let id = s(v, "id").to_owned();
-    let mut n = rune_notify::Notification::new(id.clone(), s(v, "title")).body(s(v, "body")).info("id", id);
+    let silent = v.get("silent").and_then(|b| b.as_bool()).unwrap_or(false);
+    let mut n = rune_notify::Notification::new(id.clone(), s(v, "title")).body(s(v, "body")).sound(!silent).info("id", id);
     if let Some(actions) = v.get("actions").and_then(|a| a.as_array()) {
         for a in actions {
             n = n.action(s(a, "id"), s(a, "label"));
         }
     }
     Ok(json!(rune_notify::post(&n)))
+}
+
+/// Electron's `app.setAppUserModelId`: the process's identity, which its toasts post under.
+pub fn set_app_user_model_id(v: &Value) -> Result<Value, String> {
+    rune_notify::adopt(&rune_notify::Identity::new(s(v, "id"), "Stella"))?;
+    Ok(Value::Null)
 }
 
 fn icon(v: &Value) -> Result<TrayIcon, String> {

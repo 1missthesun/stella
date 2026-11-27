@@ -157,7 +157,7 @@ export const webEngine: Engine = {
       emit({ t: "notification", id: n.id, action: "click" });
     };
   },
-  app: { setBadge: async () => false },
+  app: { setBadge: async () => false, setAppUserModelId: async () => {} },
   menu: {
     popup: (items: MenuItem[], at) => popupMenu(items, at),
     setApplicationMenu: async () => {},

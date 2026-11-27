@@ -8,13 +8,14 @@ import { buildFolder, currentBuild, discardFolder, recordBuild, stampAll, stampO
 import { uiBuildMode } from "./ui-mode";
 
 const UI_CACHE_DIR = path.resolve(import.meta.dir, "../../.cache/ui");
-const BUILD_TOOLS = ["../vite-compat.ts", "ui-build-child.ts", "ui-cache.ts", "source-stamps.ts", "ui-env.ts", "ui-mode.ts", "../../tsconfig.build.json"].map((f) => path.resolve(import.meta.dir, f));
+const BUILD_TOOLS = ["../vite-compat.ts", "ui-build-child.ts", "ui-modules-build.ts", "ui-modules-format.ts", "ui-cache.ts", "source-stamps.ts", "ui-env.ts", "ui-mode.ts", "../../tsconfig.build.json"].map((f) => path.resolve(import.meta.dir, f));
 
-export type UiCacheSpec = { entry: string; tsconfig: string; external: string[] };
+/** `modules`: the boot file holds the UI as separate modules (ui-modules-build.ts), not one bundle. */
+export type UiCacheSpec = { entry: string; tsconfig: string; external: string[]; modules?: boolean };
 
 export function uiCacheKey(spec: UiCacheSpec): string {
   const env = Object.entries(process.env).filter(([k]) => k.startsWith("VITE_") || k === "STELLA_UI_BASE_URL").sort(([a], [b]) => (a < b ? -1 : 1));
-  return JSON.stringify({ bun: `${Bun.version}+${Bun.revision}`, platform: process.platform, arch: process.arch, mode: uiBuildMode(), entry: spec.entry, tsconfig: spec.tsconfig, external: spec.external, env });
+  return JSON.stringify({ bun: `${Bun.version}+${Bun.revision}`, platform: process.platform, arch: process.arch, mode: uiBuildMode(), entry: spec.entry, tsconfig: spec.tsconfig, external: spec.external, modules: !!spec.modules, env });
 }
 
 /** The boot bundle when it was built from exactly the files there now; its key is checked at load (the env settles during boot). */

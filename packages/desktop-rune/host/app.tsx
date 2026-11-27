@@ -77,7 +77,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   if (services) g.stella.host = scopeUiFacing((await import("./services/ui-host")).createUiHost(), READS);
 
   /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */
-  const root = () => app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App));
+  const root = () => ui.wrap(app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App)));
   const t_loaded = now();
   render(root(), { t0: t_boot });
   bootMark("ui-rendered");
@@ -167,6 +167,18 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       const next = await loadApp();
       const t_built = now();
       app = next;
+      const { kind, swap } = ui.lastLoad();
+      const how = swap && kind !== "fresh" ? `${kind}, ${swap.evaluated} module${swap.evaluated === 1 ? "" : "s"}${swap.reason ? `: ${swap.reason}` : ""}` : kind;
+      if (kind === "refresh") {
+        // The tree stays mounted and only re-renders: nothing to load, so nothing to hold.
+        store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
+        render(root(), { t0, kind: 1 });
+        ui.retireReplaced();
+        const t_rendered = now();
+        store.set({ lastSwapMs: Math.round(t_rendered - t0) });
+        console.error(`[ui] hot swap #${swapN} ${label} (${how}): save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render ${(t_rendered - t_built).toFixed(1)} ms`);
+        return true;
+      }
       if (SWAP_HOLD_MAX_MS > 0) bridge.holdFrames();
       replayLayouts(true);
       store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
@@ -179,7 +191,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       replayLayouts(false);
       const t_committed = now();
       store.set({ lastSwapMs: Math.round(t_committed - t0) });
-      console.error(`[ui] hot swap #${swapN} ${label}: save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render ${(t_rendered - t_built).toFixed(1)} ms, held ${(t_committed - t_rendered).toFixed(1)} ms (${held})`);
+      console.error(`[ui] hot swap #${swapN} ${label} (${how}): save→seen ${(t0 - mtime).toFixed(1)} ms, bundle+load ${(t_built - t0).toFixed(1)} ms, render ${(t_rendered - t_built).toFixed(1)} ms, held ${(t_committed - t_rendered).toFixed(1)} ms (${held})`);
       return true;
     } catch (err) {
       // A broken edit never takes the UI down: the old app keeps running, the error shows.

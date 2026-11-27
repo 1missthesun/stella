@@ -282,18 +282,19 @@ class Preview {
       await this.navigated();
       const mod = await this.loader.load();
       if (this.disposed) return;
-      const Root = (mod.Root ?? (mod.App ? () => createElement("window", { id: this.engineId }, createElement(mod.App)) : null)) as ComponentType | null;
-      if (!Root) throw new Error("The draft's ui/App.tsx exports neither Root nor App.");
+      const tree = mod.Root ? createElement(mod.Root as ComponentType) : mod.App ? createElement("window", { id: this.engineId }, createElement(mod.App as ComponentType)) : null;
+      if (!tree) throw new Error("The draft's ui/App.tsx exports neither Root nor App.");
       if (!this.seeded) {
         this.seeded = true;
         this.store.set(mod.initialState?.() ?? {});
       }
       this.error = null;
-      this.root.render(createElement(Root));
+      this.root.render(this.loader.wrap(tree));
       this.rendered = true;
       this.renderedAt = Date.now();
       this.loader.retireReplaced();
-      console.error(`[preview] ${this.name}: built and rendered in ${(now() - t0).toFixed(0)} ms`);
+      const { kind, swap } = this.loader.lastLoad();
+      console.error(`[preview] ${this.name}: built and rendered in ${(now() - t0).toFixed(0)} ms (${kind}${swap && kind !== "fresh" ? `, ${swap.evaluated} modules` : ""})`);
     } catch (error) {
       this.fail(error);
     }

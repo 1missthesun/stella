@@ -7,7 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
 import { ViewSession, type ViewSnapshot, type ViewStorage } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
-import { viewFileName, viewIdentityFromPath, viewKey } from "@stella/views/paths";
+import { viewFileName, viewIdentityFromPath, viewKey, viewLiveKey } from "@stella/views/paths";
 import { ViewStorageSync, backendViewStorageRemote, normalizeViewStorageRecord, syncedViewId, viewSlugFromPath, type ViewStorageDisk } from "@stella/views/storage-sync";
 import { getBackendClient } from "../lib/backend";
 import type { ChatMessage, ChatViewRef } from "../types";
@@ -35,7 +35,9 @@ export function publishConversationViews(conversationId: string, messages: reado
     if (!message.views) continue;
     for (let v = message.views.length - 1; v >= 0; v -= 1) {
       const ref = message.views[v]!;
-      if (!next.has(ref.filePath)) next.set(ref.filePath, { messageId: message.id, ref });
+      // One view, wherever its copy lives (a computer's file, the cloud's Drive copy).
+      const key = viewLiveKey(ref.filePath);
+      if (!next.has(key)) next.set(key, { messageId: message.id, ref });
     }
   }
   const changed =
@@ -54,7 +56,7 @@ export function publishConversationViews(conversationId: string, messages: reado
   }
   scope = conversationId;
   newest = next;
-  for (const [file, entry] of next) entries.get(file)?.load(entry.ref);
+  for (const [key, entry] of next) entries.get(key)?.load(entry.ref);
   for (const listener of newestListeners) listener();
 }
 
@@ -65,11 +67,11 @@ const subscribeNewest = (listener: () => void) => {
 
 /** Whether `messageId` is the newest reply that made or changed the view at `file`. */
 export function useIsLiveView(file: string, messageId: string): boolean {
-  return useSyncExternalStore(subscribeNewest, () => newest.get(file)?.messageId === messageId);
+  return useSyncExternalStore(subscribeNewest, () => newest.get(viewLiveKey(file))?.messageId === messageId);
 }
 
 export function useNewestView(file: string | null): ChatViewRef | null {
-  return useSyncExternalStore(subscribeNewest, () => (file ? (newest.get(file)?.ref ?? null) : null));
+  return useSyncExternalStore(subscribeNewest, () => (file ? (newest.get(viewLiveKey(file))?.ref ?? null) : null));
 }
 
 // ------------------------------------------------------------------ storage
@@ -191,6 +193,8 @@ class Entry {
   private loaded: ChatViewRef | null = null;
 
   constructor(
+    /** The view's key in `entries` and `newest` (see `viewLiveKey`). */
+    readonly key: string,
     readonly file: string,
     ref: ChatViewRef,
     theme: ViewTheme,
@@ -240,7 +244,7 @@ class Entry {
     this.closeTimer = setTimeout(() => {
       if (this.refs > 0) return;
       this.dispose();
-      entries.delete(this.file);
+      entries.delete(this.key);
     }, KEEP_ALIVE_MS);
   }
 
@@ -254,19 +258,20 @@ const entries = new Map<string, Entry>();
 
 /** The running session of the view at `file` (its newest source) while the caller is mounted. */
 export function useViewSession(file: string, theme: ViewTheme): { session: ViewSession | null; snapshot: ViewSnapshot | null } {
-  const hasRef = useSyncExternalStore(subscribeNewest, () => newest.has(file));
+  const key = viewLiveKey(file);
+  const hasRef = useSyncExternalStore(subscribeNewest, () => newest.has(key));
   const scopeGeneration = useSyncExternalStore(subscribeNewest, () => generation);
   const [session, setSession] = useState<ViewSession | null>(null);
   const [snapshot, setSnapshot] = useState<ViewSnapshot | null>(null);
   const themeRef = useRef(theme);
   themeRef.current = theme;
   useEffect(() => {
-    const current = newest.get(file)?.ref;
+    const current = newest.get(key)?.ref;
     if (!hasRef || !current) return;
-    let entry = entries.get(file);
+    let entry = entries.get(key);
     if (!entry) {
-      entry = new Entry(file, current, themeRef.current);
-      entries.set(file, entry);
+      entry = new Entry(key, current.filePath, current, themeRef.current);
+      entries.set(key, entry);
     }
     entry.acquire();
     const held = entry;
@@ -277,7 +282,7 @@ export function useViewSession(file: string, theme: ViewTheme): { session: ViewS
       off();
       held.release();
     };
-  }, [file, hasRef, scopeGeneration]);
+  }, [key, hasRef, scopeGeneration]);
   useEffect(() => {
     session?.setTheme(theme);
   }, [session, theme]);

@@ -20,6 +20,7 @@ import { AssistantMessageRow, UserMessageRow, rowViewPayloads } from "./MessageR
 import { UserAskRecordCard } from "./UserAskRecordCard";
 import { panelSurface } from "./surfaces";
 import { isViewFile } from "../views/ViewTabContent";
+import { viewLiveKey } from "@stella/views/paths";
 
 type LegendSummedPadding = "padding" | "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft";
 
@@ -203,8 +204,11 @@ export const ChatTimeline = memo(function ChatTimeline({
       if (row?.kind !== "assistant") continue;
       const live: string[] = [];
       for (const payload of rowViewPayloads(row)) {
-        if (payload.kind !== "canvas-html" || payload.driveBacked || !isViewFile(payload.filePath) || seen.has(payload.filePath)) continue;
-        seen.add(payload.filePath);
+        if (payload.kind !== "canvas-html" || payload.driveBacked || !isViewFile(payload.filePath)) continue;
+        // One view, wherever its copy lives (this desktop's file, the cloud's Drive copy).
+        const key = viewLiveKey(payload.filePath);
+        if (seen.has(key)) continue;
+        seen.add(key);
         live.push(payload.filePath);
       }
       if (live.length > 0) byRow.set(row.id, live.join("\n"));

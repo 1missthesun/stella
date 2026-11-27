@@ -78,3 +78,13 @@ export const viewIdentityFromPath = (filePath: string): { conversationId: string
   const conversationId = conversationIdFromViewDirName(match[1]!);
   return conversationId ? { conversationId, slug: match[2]! } : null;
 };
+
+/**
+ * What makes two of a chat's view files the same view, for one live card per view: the chat and
+ * slug a per-chat path names (the desktop's file and the cloud's Drive copy are one view), else
+ * the path itself.
+ */
+export const viewLiveKey = (filePath: string): string => {
+  const named = viewIdentityFromPath(filePath);
+  return named ? `view:${named.conversationId}/${named.slug}` : filePath;
+};

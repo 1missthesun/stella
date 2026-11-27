@@ -1,42 +1,43 @@
 //! Hot swap transitions where the interface changed. The host asks for one (`swapfx.begin`)
-//! right before it holds the new UI's frames back; the main window's compositor keeps the frame on
-//! screen then (the "before"). When the swap's commit lands, the first frame of the new tree draws
-//! the before over itself, compares the two on the GPU in 8 px cells, and reads the changed cells
-//! back. From the next frame on only the changed regions transition: the old picture blurs and
-//! fades out while the new one comes into focus, and an element whose box changed (matched by its
-//! place in the tree) morphs its rounded rect from the old shape to the new one. A change over most
-//! of the window transitions all of it. The engine runs every frame of it; TS sends two commands.
+//! right before the new UI renders; the main window's compositor keeps the frame on screen then
+//! (the "before") together with every shape Rune painted in it. Once the swap's commit has landed
+//! and the new tree has gone quiet, the shapes painted now are set-diffed against the kept ones by
+//! content (kind, size, corners, colours, glyph or image), not by element ids:
 //!
-//! Costs nothing at rest: the slot, the compositor's engagement and the textures exist only while
-//! a swap is in flight, and are dropped when its transition ends.
+//! - a shape in both at the same place is untouched;
+//! - shapes that moved together (a pushed layout) slide from where they were;
+//! - a scroll container's content that moved as one is the user scrolling, not the swap;
+//! - a box replaced in the same spot morphs its shape and crossfades into the new one;
+//! - a shape only in the before dissolves out, one only in the new tree comes into focus, each in
+//!   its own shape;
+//! - a change over most of the window transitions all of it.
+//!
+//! The engine runs every frame of it; TS sends two commands and hears when the after is taken
+//! (`{"t":"swapfx"}`), so it can hold live updates back until then. Costs nothing at rest: the
+//! slot, the compositor's engagement and the textures exist only while a swap is in flight.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use rune::render::{EffectPhase, Instance, Kind};
 use rune::{El, Spring};
-use rune::render::EffectPhase;
 
 use crate::engine::Engine;
-use crate::props::Kind;
 
 /// The swap slot's effect mark: no node id comes near it.
 pub const MARK: u32 = 0xFFFF_FFF8;
-/// Device pixels per compared cell.
-const CELL: u32 = 8;
-/// A cell changed when a channel moved more than this (of 255), as Electron's picture-diff.ts.
-const THRESHOLD: u8 = 12;
-/// Changes closer than this (points) join one region.
-const JOIN_PT: f32 = 16.0;
-/// A region's soft edge, and how far it reaches past its changed cells (points).
-const FEATHER_PT: f32 = 10.0;
-const MARGIN_PT: f32 = 16.0;
-/// Past this share of the window, or this many regions, the whole window transitions.
+/// Past this share of the window changed, or this much changed or moved, all of it transitions.
 const WHOLE_SHARE: f32 = 0.4;
-const MAX_REGIONS: usize = 8;
+const WHOLE_MOVED_SHARE: f32 = 0.7;
+/// Displacements shared by fewer shapes than this are not a move; more groups than this are a
+/// rewritten layout.
+const MIN_VOTES: usize = 3;
+const MAX_SLIDES: usize = 8;
+const MAX_RECS: usize = 24_000;
+/// Device pixels per cell of the grid that measures changed area and groups changes.
+const GRID: f32 = 8.0;
 /// What the old picture and the new one blur by (points), as Electron's focus pull.
 const OUT_BLUR_PT: f32 = 12.0;
 const OUT_END_BLUR_PT: f32 = 14.0;
@@ -47,22 +48,25 @@ const IN_SPRING: Spring = Spring::new(0.34, 0.0);
 const MORPH_SPRING: Spring = Spring::new(0.45, 0.12);
 /// A swap whose commit never lands (a build that failed without a cancel) stops waiting.
 const HAVE_MAX: Duration = Duration::from_secs(5);
-/// The cells' readback normally takes a frame or two; past this the whole window transitions.
-const DIFF_MAX: Duration = Duration::from_millis(250);
-const MIPS: u32 = 7;
-/// The new tree is compared once no commit has landed for this long (layout-driven re-renders
-/// follow a swap's first frame).
+/// A swap commit that comes before the before was kept waits at most this long for it.
+pub const WANT_MAX: Duration = Duration::from_millis(120);
+/// The new tree is diffed once no commit has landed for this long (layout-driven re-renders
+/// follow a swap's first frame), or this long after it landed at the latest.
 const QUIET: Duration = Duration::from_millis(24);
+const SETTLE_MAX: Duration = Duration::from_millis(250);
+const MIPS: u32 = 7;
+/// Bytes per record in the shader's `Rec`.
+const REC_BYTES: usize = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Stage {
     /// Waiting for a frame to keep as the before.
     Want,
-    /// The before is kept; waiting for the swap's commit.
+    /// The before is kept (and refreshed each frame); waiting for the swap's commit.
     Have,
-    /// The new tree is on screen under the before; its cells are being compared.
+    /// The new tree is on screen under the before; waiting for it to go quiet.
     Land,
-    /// Changed regions are transitioning.
+    /// The changed shapes are transitioning.
     Run,
 }
 
@@ -96,6 +100,10 @@ fn set(stage: Option<Stage>) {
         REBUILD.set(true);
         crate::windows::wake_all();
     }
+    let deciding = |s: Option<Stage>| matches!(s, Some(Stage::Want | Stage::Have | Stage::Land));
+    if deciding(was) && !deciding(stage) {
+        crate::windows::send_any_thread(serde_json::json!({ "t": "swapfx", "stage": if stage.is_some() { "run" } else { "none" } }));
+    }
 }
 
 fn since() -> Duration {
@@ -118,6 +126,11 @@ pub fn cancel(e: &mut Engine) {
         set(None);
         touch_main(e);
     }
+}
+
+/// A swap commit arrived before the before was kept: the bridge holds it back a frame.
+pub fn hold_commit() -> bool {
+    stage() == Some(Stage::Want) && since() < WANT_MAX
 }
 
 /// A hot swap's commit is being applied (its ops are in this batch).
@@ -160,367 +173,619 @@ pub fn slot() -> Option<El> {
     })
 }
 
-/// A box drawn in the main window, by its place in the tree: its rect and corner radius (points).
+fn debug() -> Option<std::ffi::OsString> {
+    std::env::var_os("STELLA_RUNE_SWAP_FX_DEBUG")
+}
+
+/// One shape Rune painted, in device pixels.
 #[derive(Clone, Copy, Debug)]
-struct Shape {
-    rect: [f32; 4],
+struct Prim {
+    /// What it looks like, wherever it is.
+    key: u64,
+    /// Its rect's corner, where it is.
+    at: [f32; 2],
+    /// What it covers on screen: x0, y0, x1, y1.
+    vis: [f32; 4],
+    /// Its whole rect, clipped or not: x0, y0, x1, y1.
+    full: [f32; 4],
+    /// What its clips leave of the window: x0, y0, x1, y1.
+    clip: [f32; 4],
     radius: f32,
+    /// Its place in the paint order.
+    order: u32,
+    glyph: bool,
+    /// A box that can morph into another (a rect, gradient, image, glass).
+    boxy: bool,
+    kind: u8,
 }
 
-/// Every painted box in the main window, keyed by its place in the tree (ids, else kind and
-/// index, with React's generated ids masked), so a remounted element finds its old self.
-fn shapes(rt: &rune::Runtime<crate::windows::Win>, eng: &Engine) -> Snap {
-    let Some(window) = eng.main_node else { return Snap::default() };
-    let by_id: HashMap<&str, u32> = eng.tree.nodes.iter().filter_map(|(n, node)| node.props.id.as_deref().map(|id| (id, *n))).collect();
-    let mut paths: HashMap<u32, Option<u64>> = HashMap::new();
-    let mut out = HashMap::new();
-    let mut all: HashMap<u64, Seen> = HashMap::new();
-    let mut dup: Vec<u64> = Vec::new();
-    let found: Vec<(u32, rune::ElementInfo)> = rt
-        .elements()
-        .into_iter()
-        .filter(|info| !info.exiting)
-        .filter_map(|info| {
-            let key = info.key.as_deref()?;
-            let node = match key.strip_prefix('n').and_then(|d| d.parse::<u32>().ok()) {
-                Some(n) if eng.tree.get(n).is_some_and(|x| x.props.id.is_none()) => n,
-                _ => *by_id.get(key)?,
-            };
-            Some((node, info))
-        })
-        .collect();
-    let rects: HashMap<u32, [f32; 4]> = found.iter().map(|(n, info)| (*n, info.rect)).collect();
-    for (node, info) in found {
-        let Some(node_ref) = eng.tree.get(node) else { continue };
-        let Some(h) = path_hash(eng, window, node, &mut paths) else { continue };
-        let p = &node_ref.props;
-        let boxed = p.fill.is_some() || p.gradient.is_some() || p.border.is_some() || p.fx.as_ref().is_some_and(|f| !f.0.is_empty());
-        let visible = info.opacity > 0.01;
-        let paints = visible && (boxed || !matches!(node_ref.kind, Kind::Col | Kind::Row | Kind::Box | Kind::List | Kind::Window));
-        let name = if debug() { format!("{} {:?}", info.path, node_ref.kind) } else { String::new() };
-        let o = scroll_origin(eng, node, &rects);
-        let rel = [info.rect[0] - o[0], info.rect[1] - o[1], info.rect[2], info.rect[3]];
-        if all.insert(h, Seen { rect: info.rect, rel, sig: signature(node_ref, &info), paints, visible, name }).is_some() {
-            dup.push(h);
-        }
-        if !boxed || info.rect[2] < 4.0 || info.rect[3] < 4.0 {
+fn q(v: f32, step: f32) -> i32 {
+    (v / step).round() as i32
+}
+
+fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
+    a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
+/// Every shape the frame paints, but the swap's own slot and what nothing can see.
+fn painted(list: &[Instance], size: (u32, u32), caret: Option<[f32; 4]>) -> Vec<Prim> {
+    let (w, h) = (size.0 as f32, size.1 as f32);
+    let mut out = Vec::with_capacity(list.len());
+    for (order, inst) in list.iter().enumerate() {
+        let Some(kind) = inst.kind() else { continue };
+        let r = inst.rect;
+        let own = [r[0], r[1], r[0] + r[2], r[1] + r[3]];
+        let (bounds, boxy) = match kind {
+            Kind::Layer | Kind::LayerEnd => continue,
+            Kind::Effect => {
+                let mark = inst.border[0] as u32 | ((inst.border[1] as u32) << 16);
+                if mark == MARK {
+                    continue;
+                }
+                (own, true)
+            }
+            Kind::BackdropBlur => (own, true),
+            _ => match inst.quad_bounds() {
+                Some(b) => (b, matches!(kind, Kind::Rect | Kind::Gradient | Kind::Image | Kind::Dashed | Kind::Inset | Kind::Radial)),
+                None => continue,
+            },
+        };
+        let seen = match kind {
+            Kind::Rect | Kind::Dashed => inst.fill[3] > 0.004 || (inst.params[0] > 0.0 && inst.border[3] > 0.004),
+            Kind::Gradient => inst.fill[3] > 0.004 || inst.uv[3] > 0.004,
+            Kind::Effect | Kind::BackdropBlur => true,
+            _ => inst.fill[3] > 0.004,
+        };
+        if !seen {
             continue;
         }
-        out.insert(h, Shape { rect: info.rect, radius: info.radius.max(0.0) });
-    }
-    for h in dup {
-        out.remove(&h);
-        all.remove(&h);
-    }
-    Snap { shapes: out, all }
-}
-
-/// Where the content of the scroll container `n` sits in (its scrolled origin), or the window's.
-fn scroll_origin(eng: &Engine, n: u32, rects: &HashMap<u32, [f32; 4]>) -> [f32; 2] {
-    let mut cur = n;
-    while let Some(node) = eng.tree.get(cur) {
-        let parent = node.parent;
-        let Some(up) = (parent != 0).then(|| eng.tree.get(parent)).flatten() else { break };
-        if up.props.scroll_y || up.props.scroll_x {
-            return rects.get(&cur).map_or([0.0, 0.0], |r| [r[0], r[1]]);
-        }
-        cur = parent;
-    }
-    [0.0, 0.0]
-}
-
-/// What an element paints, minus its identity and handlers (React's generated ids differ
-/// between generations).
-fn signature(node: &crate::tree::Node, info: &rune::ElementInfo) -> u64 {
-    let mut props = (*node.props).clone();
-    props.id = None;
-    props.on.clear();
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    format!("{:?}{:?}{:?}", node.kind, props, info.text).hash(&mut hasher);
-    hasher.finish()
-}
-
-#[derive(Default)]
-struct Snap {
-    /// Painted boxes, for the shape morph.
-    shapes: HashMap<u64, Shape>,
-    /// Every element's rect and paint signature.
-    all: HashMap<u64, Seen>,
-}
-
-struct Seen {
-    rect: [f32; 4],
-    /// The rect within its scroll container's content: scrolling moves nothing.
-    rel: [f32; 4],
-    sig: u64,
-    /// Draws something itself: a layout container that only moved changes no pixels of its own.
-    paints: bool,
-    visible: bool,
-    name: String,
-}
-
-fn debug() -> bool {
-    std::env::var_os("STELLA_RUNE_SWAP_FX_DEBUG").is_some()
-}
-
-/// Cells over an element that changed, came or went between the two trees: a picture change
-/// anywhere else (a spinner, a scrollbar fading, a caret) is the app living, not the swap.
-fn changed_cells(old: &Snap, new: &Snap, scale: f32, cols: u32, rows: u32) -> Vec<bool> {
-    let mut mask = vec![false; (cols * rows) as usize];
-    let mut mark = |r: [f32; 4]| {
-        let c = CELL as f32;
-        let x0 = ((r[0] * scale - 2.0) / c).floor().max(0.0) as u32;
-        let y0 = ((r[1] * scale - 2.0) / c).floor().max(0.0) as u32;
-        let x1 = (((r[0] + r[2]) * scale + 2.0) / c).ceil().min(cols as f32) as u32;
-        let y1 = (((r[1] + r[3]) * scale + 2.0) / c).ceil().min(rows as f32) as u32;
-        for y in y0..y1 {
-            for x in x0..x1 {
-                mask[(y * cols + x) as usize] = true;
-            }
-        }
-    };
-    let moved = |a: [f32; 4], b: [f32; 4]| (0..4).any(|i| (a[i] - b[i]).abs() > 0.5);
-    for (h, now) in &new.all {
-        match old.all.get(h) {
-            Some(was) if !was.visible && !now.visible => {}
-            None if !now.visible => {}
-            Some(was) if was.sig == now.sig && (!now.paints || !moved(was.rel, now.rel)) => {}
-            Some(was) => {
-                if debug() {
-                    eprintln!("stella-engine: swapfx: changed {} {:?} → {:?}{}", now.name, was.rect, now.rect, if was.sig == now.sig { "" } else { " (paint)" });
-                }
-                mark(was.rect);
-                mark(now.rect);
-            }
-            None => {
-                if debug() {
-                    eprintln!("stella-engine: swapfx: came {} {:?}", now.name, now.rect);
-                }
-                mark(now.rect)
-            }
-        }
-    }
-    for (h, was) in &old.all {
-        if was.visible && !new.all.contains_key(h) {
-            if debug() {
-                eprintln!("stella-engine: swapfx: went {} {:?}", was.name, was.rect);
-            }
-            mark(was.rect);
-        }
-    }
-    mask
-}
-
-fn path_hash(eng: &Engine, window: u32, n: u32, memo: &mut HashMap<u32, Option<u64>>) -> Option<u64> {
-    if n == window {
-        return Some(0x5eed);
-    }
-    if let Some(h) = memo.get(&n) {
-        return *h;
-    }
-    let node = eng.tree.get(n)?;
-    let parent = node.parent;
-    let up = if parent == 0 { None } else { path_hash(eng, window, parent, memo) };
-    let h = up.and_then(|up| {
-        let mut s = std::collections::hash_map::DefaultHasher::new();
-        up.hash(&mut s);
-        match node.props.id.as_deref() {
-            Some(id) => crate::swap_view::stable_id(id).hash(&mut s),
-            None => {
-                (node.kind as u8).hash(&mut s);
-                eng.tree.get(parent)?.children.iter().position(|c| *c == n)?.hash(&mut s);
-            }
-        }
-        Some(s.finish())
-    });
-    memo.insert(n, h);
-    h
-}
-
-/// One region transitioning, in device pixels; `morph` is a box that changed shape in it (old,
-/// new: rect + radius).
-#[derive(Clone, Copy, Debug)]
-struct Region {
-    rect: [f32; 4],
-    feather: f32,
-    blur: f32,
-    morph: Option<([f32; 5], [f32; 5])>,
-}
-
-/// The changed cells → regions (picture-diff.ts): cells past the threshold, joined across
-/// `JOIN_PT`, each group's bounds grown by the margin, overlapping ones merged. `None`: the whole
-/// window.
-fn regions(diff: &[u8], cols: u32, rows: u32, scale: f32, size: (u32, u32), painted: &[[f32; 4]]) -> Option<Vec<[f32; 4]>> {
-    let (w, h) = (cols as usize, rows as usize);
-    let on: Vec<u8> = diff.iter().map(|v| u8::from(*v > THRESHOLD)).collect();
-    let r = ((JOIN_PT * scale) / CELL as f32).ceil().max(1.0) as usize;
-    let grown = dilate(&on, w, h, r);
-    let mut seen = vec![false; w * h];
-    let mut queue: Vec<usize> = Vec::new();
-    let mut found: Vec<[f32; 4]> = Vec::new();
-    for s in 0..w * h {
-        if grown[s] == 0 || seen[s] {
+        let c = inst.clip;
+        let clip = [c[0].max(0.0), c[1].max(0.0), c[2].min(w), c[3].min(h)];
+        let vis = [bounds[0].max(clip[0]), bounds[1].max(clip[1]), bounds[2].min(clip[2]), bounds[3].min(clip[3])];
+        if vis[2] - vis[0] < 0.5 || vis[3] - vis[1] < 0.5 {
             continue;
         }
-        let (mut x0, mut y0, mut x1, mut y1, mut count) = (w, h, 0, 0, 0usize);
-        queue.clear();
-        queue.push(s);
-        seen[s] = true;
-        let mut head = 0;
-        while head < queue.len() {
-            let i = queue[head];
-            head += 1;
-            let (x, y) = (i % w, i / w);
-            if on[i] != 0 {
-                count += 1;
-                x0 = x0.min(x);
-                y0 = y0.min(y);
-                x1 = x1.max(x);
-                y1 = y1.max(y);
-            }
-            let mut visit = |j: usize| {
-                if grown[j] != 0 && !seen[j] {
-                    seen[j] = true;
-                    queue.push(j);
-                }
-            };
-            if x > 0 {
-                visit(i - 1);
-            }
-            if x + 1 < w {
-                visit(i + 1);
-            }
-            if y > 0 {
-                visit(i - w);
-            }
-            if y + 1 < h {
-                visit(i + w);
-            }
-        }
-        if count < 3 {
+        if kind == Kind::Rect && r[2] <= 3.0 && caret.is_some_and(|k| overlaps(vis, k)) {
             continue;
         }
-        let c = CELL as f32;
-        found.push([x0 as f32 * c, y0 as f32 * c, (x1 - x0 + 1) as f32 * c, (y1 - y0 + 1) as f32 * c]);
-    }
-    let (vw, vh) = (size.0 as f32, size.1 as f32);
-    let m = MARGIN_PT * scale;
-    let mut grown_rects: Vec<[f32; 4]> = found
-        .iter()
-        .map(|[x, y, rw, rh]| {
-            let (a, b) = ((x - m).max(0.0), (y - m).max(0.0));
-            [a, b, (x + rw + m).min(vw) - a, (y + rh + m).min(vh) - b]
-        })
-        .collect();
-    // A region ends at the edges of what it mostly covers, never through the middle of a label.
-    let pad = m * 0.5;
-    for r in &mut grown_rects {
-        let area = r[2] * r[3];
-        for e in painted {
-            let ix = (r[0] + r[2]).min(e[0] + e[2]) - r[0].max(e[0]);
-            let iy = (r[1] + r[3]).min(e[1] + e[3]) - r[1].max(e[1]);
-            let e_area = e[2] * e[3];
-            if ix <= 0.0 || iy <= 0.0 || ix * iy < 0.25 * e_area || e_area > 4.0 * area {
-                continue;
+        let mut hs = std::collections::hash_map::DefaultHasher::new();
+        (kind as u8).hash(&mut hs);
+        for v in [r[2], r[3]].into_iter().chain(inst.radii) {
+            q(v, 0.25).hash(&mut hs);
+        }
+        for v in inst.fill {
+            q(v, 1.0 / 64.0).hash(&mut hs);
+        }
+        match kind {
+            Kind::Glyph => inst.uv.map(f32::to_bits).hash(&mut hs),
+            // Where an image sits in the atlas changes when its element remounts; its size does not.
+            Kind::Image => [inst.uv[2], inst.uv[3]].map(f32::to_bits).hash(&mut hs),
+            Kind::Effect => {
+                inst.uv.map(f32::to_bits).hash(&mut hs);
+                [inst.border[0], inst.border[1]].map(f32::to_bits).hash(&mut hs);
             }
-            let (x0, y0) = (r[0].min(e[0] - pad).max(0.0), r[1].min(e[1] - pad).max(0.0));
-            let (x1, y1) = ((r[0] + r[2]).max(e[0] + e[2] + pad).min(vw), (r[1] + r[3]).max(e[1] + e[3] + pad).min(vh));
-            *r = [x0, y0, x1 - x0, y1 - y0];
+            Kind::Gradient => inst.uv.map(|v| q(v, 1.0 / 64.0)).hash(&mut hs),
+            _ => {}
         }
-    }
-    loop {
-        let mut merged = false;
-        'outer: for i in 0..grown_rects.len() {
-            for j in i + 1..grown_rects.len() {
-                let (a, b) = (grown_rects[i], grown_rects[j]);
-                if a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3] {
-                    let (x, y) = (a[0].min(b[0]), a[1].min(b[1]));
-                    grown_rects[i] = [x, y, (a[0] + a[2]).max(b[0] + b[2]) - x, (a[1] + a[3]).max(b[1] + b[3]) - y];
-                    grown_rects.swap_remove(j);
-                    merged = true;
-                    break 'outer;
-                }
-            }
+        if matches!(kind, Kind::Rect | Kind::Gradient | Kind::Dashed | Kind::Radial | Kind::Shadow) {
+            inst.border.map(|v| q(v, 1.0 / 64.0)).hash(&mut hs);
         }
-        if !merged {
-            break;
-        }
-    }
-    let covered: f32 = grown_rects.iter().map(|r| r[2] * r[3]).sum();
-    if covered > WHOLE_SHARE * vw * vh || grown_rects.len() > MAX_REGIONS {
-        return None;
-    }
-    // A region at the window's edge runs past it, so its feather never fades the edge in early.
-    const PAST: f32 = 64.0;
-    for r in &mut grown_rects {
-        let (x1, y1) = (r[0] + r[2], r[1] + r[3]);
-        let (x0, y0) = (if r[0] <= 0.5 { -PAST } else { r[0] }, if r[1] <= 0.5 { -PAST } else { r[1] });
-        let x1 = if x1 >= vw - 0.5 { vw + PAST } else { x1 };
-        let y1 = if y1 >= vh - 0.5 { vh + PAST } else { y1 };
-        *r = [x0, y0, x1 - x0, y1 - y0];
-    }
-    Some(grown_rects)
-}
-
-fn dilate(src: &[u8], w: usize, h: usize, r: usize) -> Vec<u8> {
-    let mut rows = vec![0u8; w * h];
-    for y in 0..h {
-        let o = y * w;
-        let mut n = 0usize;
-        for k in 0..r.min(w) {
-            n += src[o + k] as usize;
-        }
-        for x in 0..w {
-            if x + r < w {
-                n += src[o + x + r] as usize;
-            }
-            if x > r {
-                n -= src[o + x - r - 1] as usize;
-            }
-            rows[o + x] = u8::from(n > 0);
-        }
-    }
-    let mut out = vec![0u8; w * h];
-    for x in 0..w {
-        let mut n = 0usize;
-        for k in 0..r.min(h) {
-            n += rows[k * w + x] as usize;
-        }
-        for y in 0..h {
-            if y + r < h {
-                n += rows[(y + r) * w + x] as usize;
-            }
-            if y > r {
-                n -= rows[(y - r - 1) * w + x] as usize;
-            }
-            out[y * w + x] = u8::from(n > 0);
-        }
+        [q(inst.params[0], 0.25), q(inst.params[2], 0.25), q(inst.params[3], 1.0 / 64.0)].hash(&mut hs);
+        let radius = if kind == Kind::Glyph { 0.0 } else { inst.radii.iter().fold(0.0f32, |m, v| m.max(v.abs())) };
+        out.push(Prim { key: hs.finish(), at: [r[0], r[1]], vis, full: bounds, clip, radius, order: order as u32, glyph: kind == Kind::Glyph, boxy, kind: kind as u8 });
     }
     out
 }
 
-/// The box in `region` whose shape changed the most visibly: matched old → new, both inside the
-/// region, covering a fair share of it.
-fn morph_in(region: [f32; 4], old: &HashMap<u64, Shape>, new: &HashMap<u64, Shape>, scale: f32, size: (u32, u32)) -> Option<([f32; 5], [f32; 5])> {
-    let px = |s: &Shape| [s.rect[0] * scale, s.rect[1] * scale, s.rect[2] * scale, s.rect[3] * scale, s.radius * scale];
-    let inside = |r: [f32; 5]| r[0] >= region[0] - 2.0 && r[1] >= region[1] - 2.0 && r[0] + r[2] <= region[0] + region[2] + 2.0 && r[1] + r[3] <= region[1] + region[3] + 2.0;
-    let seen = |a: f32, len: f32, max: u32| (a + len).min(max as f32) - a.max(0.0);
-    let area = seen(region[0], region[2], size.0) * seen(region[1], region[3], size.1);
-    let mut best: Option<(f32, [f32; 5], [f32; 5])> = None;
-    for (h, b) in new {
-        let Some(a) = old.get(h) else { continue };
-        let (a, b) = (px(a), px(b));
-        let moved = (0..4).any(|i| (a[i] - b[i]).abs() > scale) || (a[4].min(a[2].min(a[3]) * 0.5) - b[4].min(b[2].min(b[3]) * 0.5)).abs() > 0.5 * scale;
-        if !moved || !inside(a) || !inside(b) {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Fate {
+    /// In both, where it was.
+    Same,
+    /// Scrolled within its container (or in or out of view): the user, not the swap.
+    Scrolled,
+    /// Moved with its group (`slides[i]`).
+    Slide(usize),
+    /// Carried past its clip's edge with its group (`slides[i]`): out of view, or into it.
+    Edge(usize),
+    Gone,
+    New,
+    /// Replaced in place by the other side's shape.
+    Morph(usize),
+}
+
+struct Diff {
+    old: Vec<Fate>,
+    new: Vec<Fate>,
+    slides: Vec<Group>,
+}
+
+/// Shapes that moved by the same displacement.
+struct Group {
+    d: [f32; 2],
+    /// A scroll container's content: the user scrolled, nothing to show.
+    scroll: bool,
+    /// One shape of its kind that moved on its own (a neighbour pushed aside).
+    single: bool,
+}
+
+/// A scroll viewport whose offset changed between the before and the after: where it shows
+/// (device pixels) and how far its content moved.
+struct Scrolled {
+    vis: [f32; 4],
+    moved: [f32; 2],
+}
+
+/// Each scroll viewport's visible rect and offset (device pixels), by its place in the tree.
+fn viewports(rt: &rune::Runtime<crate::windows::Win>, scale: f32) -> HashMap<String, View> {
+    let list = rt.elements();
+    let mut out = HashMap::new();
+    for (k, e) in list.iter().enumerate() {
+        if !(e.scroll_axes[0] || e.scroll_axes[1]) || e.exiting {
             continue;
         }
-        let size = a[2] * a[3].max(1.0) + b[2] * b[3];
-        if size < 0.15 * area || best.is_some_and(|(s, ..)| s >= size) {
-            continue;
-        }
-        best = Some((size, a, b));
+        let Some(child) = list.iter().find(|c| c.parent == Some(k)) else { continue };
+        let off = [(child.scrolled[0] - e.scrolled[0]) * scale, (child.scrolled[1] - e.scrolled[1]) * scale];
+        out.insert(e.path.clone(), View { vis: e.visible.map(|v| v * scale), off, riding: e.scrolling || child.scrolling });
     }
-    best.map(|(_, a, b)| (a, b))
+    out
+}
+
+/// A scroll viewport in one frame: its visible rect (x, y, w, h) and offset, device pixels, and
+/// whether a wheel, its momentum or a glide is carrying it.
+#[derive(Clone, Copy)]
+struct View {
+    vis: [f32; 4],
+    off: [f32; 2],
+    riding: bool,
+}
+
+/// The viewports a scroll moved between two snapshots. An offset the swap's own layout moved
+/// (a list held to its bottom as its viewport shrinks) is the swap's, and transitions with it.
+fn scrolled(old: &HashMap<String, View>, new: &HashMap<String, View>) -> Vec<Scrolled> {
+    new.iter()
+        .filter_map(|(path, n)| {
+            let o = old.get(path)?;
+            let moved = [o.off[0] - n.off[0], o.off[1] - n.off[1]];
+            let v = n.vis;
+            ((moved[0].abs() > 0.5 || moved[1].abs() > 0.5) && (o.riding || n.riding)).then_some(Scrolled { vis: [v[0], v[1], v[0] + v[2], v[1] + v[3]], moved })
+        })
+        .collect()
+}
+
+/// A single shape slides this far at most (device pixels); past it, it fades out and in.
+const SINGLE_REACH: f32 = 160.0;
+
+fn same_spot(a: [f32; 4], b: [f32; 4]) -> bool {
+    (0..4).all(|i| (a[i] - b[i]).abs() <= 2.0)
+}
+
+/// Matches the shapes painted before and after the swap by what they look like.
+fn diff(old: &[Prim], new: &[Prim], lively: &[[f32; 4]], scrolls: &[Scrolled]) -> Diff {
+    let mut fo = vec![Fate::Gone; old.len()];
+    let mut fnew = vec![Fate::New; new.len()];
+    let mut at: HashMap<(u64, i32, i32), Vec<usize>> = HashMap::new();
+    for (i, p) in old.iter().enumerate().rev() {
+        at.entry((p.key, q(p.at[0], 0.5), q(p.at[1], 0.5))).or_default().push(i);
+    }
+    for (j, p) in new.iter().enumerate() {
+        if let Some(i) = at.get_mut(&(p.key, q(p.at[0], 0.5), q(p.at[1], 0.5))).and_then(Vec::pop) {
+            fo[i] = Fate::Same;
+            fnew[j] = Fate::Same;
+        }
+    }
+
+    // Moves: displacements voted for by shapes rare enough to pair, then each taken in turn.
+    let mut by_key: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (i, p) in old.iter().enumerate().filter(|(i, _)| fo[*i] == Fate::Gone) {
+        by_key.entry(p.key).or_default().push(i);
+    }
+    let mut votes: HashMap<(i32, i32), usize> = HashMap::new();
+    for (_, p) in new.iter().enumerate().filter(|(j, _)| fnew[*j] == Fate::New) {
+        let Some(c) = by_key.get(&p.key).filter(|c| c.len() <= 6) else { continue };
+        for &i in c {
+            *votes.entry((q(p.at[0] - old[i].at[0], 1.0), q(p.at[1] - old[i].at[1], 1.0))).or_default() += 1;
+        }
+    }
+    let mut cands: Vec<((i32, i32), usize)> = votes.into_iter().filter(|(d, n)| *n >= MIN_VOTES && *d != (0, 0)).collect();
+    cands.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    cands.truncate(32);
+    let mut slides: Vec<Group> = Vec::new();
+    for (d, _) in cands {
+        let mut left: HashMap<(u64, i32, i32), Vec<usize>> = HashMap::new();
+        for (i, p) in old.iter().enumerate().filter(|(i, _)| fo[*i] == Fate::Gone) {
+            left.entry((p.key, q(p.at[0], 1.0), q(p.at[1], 1.0))).or_default().push(i);
+        }
+        let mut pairs = Vec::new();
+        for (j, p) in new.iter().enumerate().filter(|(j, _)| fnew[*j] == Fate::New) {
+            let (x, y) = (q(p.at[0], 1.0) - d.0, q(p.at[1], 1.0) - d.1);
+            let hit = [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)].into_iter().find_map(|(ox, oy)| left.get_mut(&(p.key, x + ox, y + oy)).and_then(Vec::pop));
+            if let Some(i) = hit {
+                pairs.push((i, j));
+            }
+        }
+        if pairs.len() < MIN_VOTES {
+            for (i, _) in pairs {
+                let p = old[i];
+                left.entry((p.key, q(p.at[0], 1.0), q(p.at[1], 1.0))).or_default().push(i);
+            }
+            continue;
+        }
+        let c = slides.len();
+        slides.push(Group { d: [d.0 as f32, d.1 as f32], scroll: false, single: false });
+        for (i, j) in pairs {
+            fo[i] = Fate::Slide(c);
+            fnew[j] = Fate::Slide(c);
+        }
+    }
+
+    // What moved with a scroll viewport's own offset is the user scrolling; what scrolled in or
+    // out of view with it came and went with the scroll, not the swap.
+    for v in scrolls {
+        let inside = |r: [f32; 4]| {
+            let (cx, cy) = ((r[0] + r[2]) * 0.5, (r[1] + r[3]) * 0.5);
+            cx >= v.vis[0] && cx <= v.vis[2] && cy >= v.vis[1] && cy <= v.vis[3]
+        };
+        let d = v.moved;
+        for (c, g) in slides.iter_mut().enumerate() {
+            if (g.d[0] - d[0]).abs() > 1.5 || (g.d[1] - d[1]).abs() > 1.5 {
+                continue;
+            }
+            g.scroll = true;
+            for (j, p) in new.iter().enumerate() {
+                if fnew[j] == Fate::Slide(c) && inside(p.vis) {
+                    fnew[j] = Fate::Scrolled;
+                }
+            }
+            for (i, p) in old.iter().enumerate() {
+                if fo[i] == Fate::Slide(c) && inside(p.vis) {
+                    fo[i] = Fate::Scrolled;
+                }
+            }
+        }
+        for (i, p) in old.iter().enumerate() {
+            let shifted = [p.vis[0] + d[0], p.vis[1] + d[1], p.vis[2] + d[0], p.vis[3] + d[1]];
+            if fo[i] == Fate::Gone && inside(p.vis) && !overlaps(shifted, v.vis) {
+                fo[i] = Fate::Scrolled;
+            }
+        }
+        for (j, p) in new.iter().enumerate() {
+            let back = [p.vis[0] - d[0], p.vis[1] - d[1], p.vis[2] - d[0], p.vis[3] - d[1]];
+            if fnew[j] == Fate::New && inside(p.vis) && !overlaps(back, v.vis) {
+                fnew[j] = Fate::Scrolled;
+            }
+        }
+    }
+
+    // Inside a clip whose content moved as one, what moved past the clip's edge went with it.
+    let ck = |c: [f32; 4]| c.map(|v| q(v, 1.0));
+    let mut by_clip: HashMap<[i32; 4], HashMap<usize, usize>> = HashMap::new();
+    for (p, f) in old.iter().zip(&fo).chain(new.iter().zip(&fnew)) {
+        if let Fate::Slide(c) = f {
+            *by_clip.entry(ck(p.clip)).or_default().entry(*c).or_default() += 1;
+        }
+    }
+    let group_of: HashMap<[i32; 4], usize> = by_clip.into_iter().filter_map(|(k, v)| v.into_iter().max_by_key(|(c, n)| (*n, usize::MAX - c)).map(|(c, _)| (k, c))).collect();
+    let past = |p: &Prim, d: [f32; 2]| {
+        let r = [p.full[0] + d[0], p.full[1] + d[1], p.full[2] + d[0], p.full[3] + d[1]];
+        !overlaps(r, p.clip)
+    };
+    for (i, p) in old.iter().enumerate() {
+        if let (Fate::Gone, Some(&c)) = (fo[i], group_of.get(&ck(p.clip))) {
+            if past(p, slides[c].d) {
+                fo[i] = if slides[c].scroll { Fate::Scrolled } else { Fate::Edge(c) };
+            }
+        }
+    }
+    for (j, p) in new.iter().enumerate() {
+        if let (Fate::New, Some(&c)) = (fnew[j], group_of.get(&ck(p.clip))) {
+            let d = slides[c].d;
+            if past(p, [-d[0], -d[1]]) {
+                fnew[j] = if slides[c].scroll { Fate::Scrolled } else { Fate::Edge(c) };
+            }
+        }
+    }
+
+    // One of a kind gone here and come there, nearby: it moved on its own.
+    let mut gone_by: HashMap<u64, Vec<usize>> = HashMap::new();
+    let mut new_by: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (i, p) in old.iter().enumerate().filter(|(i, _)| fo[*i] == Fate::Gone) {
+        gone_by.entry(p.key).or_default().push(i);
+    }
+    for (j, p) in new.iter().enumerate().filter(|(j, _)| fnew[*j] == Fate::New) {
+        new_by.entry(p.key).or_default().push(j);
+    }
+    for (key, js) in &new_by {
+        let (&[j], Some(&[i])) = (js.as_slice(), gone_by.get(key).map(Vec::as_slice)) else { continue };
+        let d = [new[j].at[0] - old[i].at[0], new[j].at[1] - old[i].at[1]];
+        if d[0].hypot(d[1]) > SINGLE_REACH {
+            continue;
+        }
+        fo[i] = Fate::Slide(slides.len());
+        fnew[j] = Fate::Slide(slides.len());
+        slides.push(Group { d, scroll: false, single: true });
+    }
+
+    // What changes by itself in place (a blinking mascot, a spinner, the caret) is not the swap.
+    for (i, p) in old.iter().enumerate() {
+        if fo[i] == Fate::Gone && lively.iter().any(|l| same_spot(*l, p.vis)) {
+            fo[i] = Fate::Same;
+        }
+    }
+    for (j, p) in new.iter().enumerate() {
+        if fnew[j] == Fate::New && lively.iter().any(|l| same_spot(*l, p.vis)) {
+            fnew[j] = Fate::Same;
+        }
+    }
+
+    // A box gone where a box came is that box changing: it morphs.
+    const CELL: f32 = 64.0;
+    let mut grid: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
+    for (j, p) in new.iter().enumerate().filter(|(j, p)| fnew[*j] == Fate::New && p.boxy) {
+        for gy in (p.vis[1] / CELL) as i32..=(p.vis[3] / CELL) as i32 {
+            for gx in (p.vis[0] / CELL) as i32..=(p.vis[2] / CELL) as i32 {
+                grid.entry((gx, gy)).or_default().push(j);
+            }
+        }
+    }
+    let area = |r: [f32; 4]| (r[2] - r[0]).max(0.0) * (r[3] - r[1]).max(0.0);
+    let mut gone: Vec<usize> = (0..old.len()).filter(|&i| fo[i] == Fate::Gone && old[i].boxy).collect();
+    gone.sort_by(|a, b| area(old[*b].vis).total_cmp(&area(old[*a].vis)));
+    for i in gone {
+        let a = old[i].vis;
+        let mut best: Option<(f32, usize)> = None;
+        for gy in (a[1] / CELL) as i32..=(a[3] / CELL) as i32 {
+            for gx in (a[0] / CELL) as i32..=(a[2] / CELL) as i32 {
+                for &j in grid.get(&(gx, gy)).map_or(&[][..], Vec::as_slice) {
+                    if fnew[j] != Fate::New {
+                        continue;
+                    }
+                    let b = new[j].vis;
+                    let inter = area([a[0].max(b[0]), a[1].max(b[1]), a[2].min(b[2]), a[3].min(b[3])]);
+                    let iou = inter / (area(a) + area(b) - inter).max(1.0);
+                    if iou >= 0.3 && best.is_none_or(|(s, _)| iou > s) {
+                        best = Some((iou, j));
+                    }
+                }
+            }
+        }
+        if let Some((_, j)) = best {
+            fo[i] = Fate::Morph(j);
+            fnew[j] = Fate::Morph(i);
+        }
+    }
+    Diff { old: fo, new: fnew, slides }
+}
+
+/// One shape's transition (`Rec` in the WGSL): `a` where it starts, `b` where it ends (x, y, w,
+/// h), `p` = radius at a, radius at b, mode, blur share; `c` the clip it never leaves (x0, y0,
+/// x1, y1).
+#[derive(Clone, Copy, Debug)]
+struct Rec {
+    a: [f32; 4],
+    b: [f32; 4],
+    p: [f32; 4],
+    c: [f32; 4],
+}
+
+const UNCLIPPED: [f32; 4] = [-1e6, -1e6, 1e6, 1e6];
+
+const HOLE: f32 = 0.0;
+const SLIDE: f32 = 1.0;
+const FADE: f32 = 2.0;
+const MORPH: f32 = 3.0;
+/// A slide of the before (what slid out of view).
+const SLIDE_OLD: f32 = 4.0;
+
+fn xywh(v: [f32; 4], pad: f32) -> [f32; 4] {
+    [v[0] - pad, v[1] - pad, v[2] - v[0] + 2.0 * pad, v[3] - v[1] + 2.0 * pad]
+}
+
+/// What the swap does: nothing, the whole window, or these shapes (in drawing order: morphs,
+/// the spots slides are headed for, slides, then what fades).
+enum Outcome {
+    Nothing,
+    Whole(&'static str),
+    Local(Vec<Rec>),
+}
+
+/// Each clip whose content moves, less the bands along its top and bottom edges where something
+/// that stays is painted over it (a top bar over a chat): moving content neither shows there nor
+/// brings those bands' pixels along.
+fn uncovered(list: &[Prim], fates: &[Fate], out: &mut HashMap<[i32; 4], [f32; 4]>) {
+    let ck = |c: [f32; 4]| c.map(|v| q(v, 1.0));
+    let mut moving: HashMap<[i32; 4], ([f32; 4], u32)> = HashMap::new();
+    for (p, f) in list.iter().zip(fates) {
+        if matches!(f, Fate::Slide(_) | Fate::Edge(_)) {
+            let e = moving.entry(ck(p.clip)).or_insert((p.clip, p.order));
+            e.1 = e.1.min(p.order);
+        }
+    }
+    for (key, (c, first)) in moving {
+        let (mut top, mut bottom) = (c[1], c[3]);
+        let edge = (c[3] - c[1]) * 0.15;
+        for (p, f) in list.iter().zip(fates) {
+            if *f != Fate::Same || p.order < first || !overlaps(p.vis, c) {
+                continue;
+            }
+            if p.vis[3] <= c[1] + edge {
+                top = top.max(p.vis[3]);
+            } else if p.vis[1] >= c[3] - edge {
+                bottom = bottom.min(p.vis[1]);
+            }
+        }
+        if bottom - top >= (c[3] - c[1]) * 0.5 && (top > c[1] || bottom < c[3]) {
+            out.insert(key, [c[0], top, c[2], bottom]);
+        }
+    }
+}
+
+fn outcome(old: &[Prim], new: &[Prim], d: &Diff, scale: f32, size: (u32, u32)) -> Outcome {
+    let mut bands = HashMap::new();
+    uncovered(old, &d.old, &mut bands);
+    uncovered(new, &d.new, &mut bands);
+    if debug().is_some() {
+        eprintln!("stella-engine: swapfx: bands {bands:?}");
+    }
+    let clip_of = |p: &Prim| bands.get(&p.clip.map(|v| q(v, 1.0))).copied().unwrap_or(p.clip);
+    let pad = |p: &Prim| if p.glyph { 1.5 * scale } else { scale };
+    let mut morphs = Vec::new();
+    let mut holes = Vec::new();
+    let mut slides = Vec::new();
+    let mut fades = Vec::new();
+    let mut edges = Vec::new();
+    for (i, p) in old.iter().enumerate() {
+        match d.old[i] {
+            Fate::Gone => fades.push(Rec { a: xywh(p.vis, pad(p)), b: xywh(p.vis, pad(p)), p: [p.radius + pad(p), 0.0, FADE, 1.0], c: p.clip }),
+            Fate::Morph(j) => {
+                let n = &new[j];
+                morphs.push(Rec { a: xywh(p.vis, 0.0), b: xywh(n.vis, 0.0), p: [p.radius, n.radius, MORPH, 1.0], c: UNCLIPPED });
+            }
+            Fate::Edge(c) => {
+                let from = xywh(p.vis, 0.0);
+                let dv = d.slides[c].d;
+                edges.push(Rec { a: from, b: [from[0] + dv[0], from[1] + dv[1], from[2], from[3]], p: [p.radius, p.radius, SLIDE_OLD, 0.0], c: clip_of(p) });
+            }
+            _ => {}
+        }
+    }
+    for (j, p) in new.iter().enumerate() {
+        match d.new[j] {
+            Fate::New => fades.push(Rec { a: xywh(p.vis, pad(p)), b: xywh(p.vis, pad(p)), p: [p.radius + pad(p), 0.0, FADE, 1.0], c: p.clip }),
+            Fate::Slide(c) if !d.slides[c].scroll => {
+                // A pixel wider: glyphs sit at fractions of a pixel, and their edges must move too.
+                let to = xywh(p.vis, 1.0);
+                let dv = d.slides[c].d;
+                let from = [to[0] - dv[0], to[1] - dv[1], to[2], to[3]];
+                holes.push(Rec { a: to, b: to, p: [p.radius, p.radius, HOLE, 0.0], c: clip_of(p) });
+                slides.push(Rec { a: from, b: to, p: [p.radius, p.radius, SLIDE, 0.0], c: clip_of(p) });
+            }
+            Fate::Edge(c) => {
+                let to = xywh(p.vis, 0.0);
+                let dv = d.slides[c].d;
+                edges.push(Rec { a: [to[0] - dv[0], to[1] - dv[1], to[2], to[3]], b: to, p: [p.radius, p.radius, SLIDE, 0.0], c: clip_of(p) });
+            }
+            _ => {}
+        }
+    }
+    // A shape moving on or off something that morphs or fades (lying mostly on it) goes with it,
+    // not on its own.
+    let rect = |r: [f32; 4]| [r[0], r[1], r[0] + r[2], r[1] + r[3]];
+    let mut buckets: HashMap<(i32, i32), Vec<[f32; 4]>> = HashMap::new();
+    for r in morphs.iter().flat_map(|m| [m.a, m.b]).chain(fades.iter().map(|f| f.a)) {
+        let v = rect(r);
+        for gy in (v[1] / 64.0) as i32..=(v[3] / 64.0) as i32 {
+            for gx in (v[0] / 64.0) as i32..=(v[2] / 64.0) as i32 {
+                buckets.entry((gx, gy)).or_default().push(v);
+            }
+        }
+    }
+    let on_change = |r: [f32; 4]| {
+        let v = rect(r);
+        let half = r[2] * r[3] * 0.5;
+        let lies_on = |c: &[f32; 4]| (c[2].min(v[2]) - c[0].max(v[0])).max(0.0) * (c[3].min(v[3]) - c[1].max(v[1])).max(0.0) >= half;
+        (v[1] as i32 / 64..=v[3] as i32 / 64).any(|gy| (v[0] as i32 / 64..=v[2] as i32 / 64).any(|gx| buckets.get(&(gx, gy)).is_some_and(|list| list.iter().any(lies_on))))
+    };
+    let carried: Vec<bool> = slides.iter().map(|s| on_change(s.a) || on_change(s.b)).collect();
+    let mut keep = carried.iter().map(|c| !c);
+    holes.retain(|_| keep.next().unwrap_or(true));
+    let mut keep = carried.iter().map(|c| !c);
+    slides.retain(|_| keep.next().unwrap_or(true));
+    let groups = d.slides.iter().filter(|g| !g.scroll && !g.single).count();
+    if morphs.is_empty() && fades.is_empty() && slides.is_empty() && edges.is_empty() {
+        return Outcome::Nothing;
+    }
+    if groups > MAX_SLIDES {
+        return Outcome::Whole("rewritten layout");
+    }
+    let n = morphs.len() + holes.len() + slides.len() + edges.len() + fades.len();
+    if n > MAX_RECS {
+        return Outcome::Whole("too many shapes");
+    }
+
+    // Changed and moved area on a grid; connected changes share one blur, sized by their extent.
+    let (cols, rows) = ((size.0 as f32 / GRID).ceil() as usize, (size.1 as f32 / GRID).ceil() as usize);
+    let mut changed = vec![0u32; cols * rows];
+    let mut moved = vec![false; cols * rows];
+    let cells = |r: [f32; 4]| {
+        let x0 = (r[0] / GRID).floor().max(0.0) as usize;
+        let y0 = (r[1] / GRID).floor().max(0.0) as usize;
+        let x1 = ((r[0] + r[2]) / GRID).ceil().clamp(0.0, cols as f32) as usize;
+        let y1 = ((r[1] + r[3]) / GRID).ceil().clamp(0.0, rows as f32) as usize;
+        (x0, y0, x1, y1)
+    };
+    for r in morphs.iter().flat_map(|m| [m.a, m.b]).chain(fades.iter().map(|f| f.a)) {
+        let (x0, y0, x1, y1) = cells(r);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                changed[y * cols + x] = u32::MAX;
+            }
+        }
+    }
+    for r in slides.iter().chain(&edges).flat_map(|s| [s.a, s.b]) {
+        let (x0, y0, x1, y1) = cells(r);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                moved[y * cols + x] = true;
+            }
+        }
+    }
+    let total = (cols * rows).max(1) as f32;
+    let changed_n = changed.iter().filter(|c| **c != 0).count() as f32;
+    let either_n = changed.iter().zip(&moved).filter(|(c, m)| **c != 0 || **m).count() as f32;
+    if changed_n / total > WHOLE_SHARE {
+        return Outcome::Whole("most of it changed");
+    }
+    if either_n / total > WHOLE_MOVED_SHARE {
+        return Outcome::Whole("most of it changed or moved");
+    }
+    let mut blur_of = Vec::new();
+    let mut queue = VecDeque::new();
+    for start in 0..changed.len() {
+        if changed[start] != u32::MAX {
+            continue;
+        }
+        let id = blur_of.len() as u32;
+        let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0, 0);
+        changed[start] = id + 1;
+        queue.push_back(start);
+        while let Some(k) = queue.pop_front() {
+            let (x, y) = (k % cols, k / cols);
+            (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+            let mut visit = |k: usize| {
+                if changed[k] == u32::MAX {
+                    changed[k] = id + 1;
+                    queue.push_back(k);
+                }
+            };
+            if x > 0 {
+                visit(k - 1);
+            }
+            if x + 1 < cols {
+                visit(k + 1);
+            }
+            if y > 0 {
+                visit(k - cols);
+            }
+            if y + 1 < rows {
+                visit(k + cols);
+            }
+        }
+        let side = ((x1 - x0 + 1).min(y1 - y0 + 1)) as f32 * GRID / scale;
+        blur_of.push((side / 64.0).clamp(0.3, 1.0));
+    }
+    for r in morphs.iter_mut().chain(fades.iter_mut()) {
+        let cx = ((r.a[0] + r.a[2] * 0.5) / GRID).clamp(0.0, cols as f32 - 1.0) as usize;
+        let cy = ((r.a[1] + r.a[3] * 0.5) / GRID).clamp(0.0, rows as f32 - 1.0) as usize;
+        let id = changed[cy * cols + cx];
+        r.p[3] = if id == 0 || id == u32::MAX { 0.5 } else { blur_of[(id - 1) as usize] };
+    }
+    fades.sort_by(|a, b| (b.a[2] * b.a[3]).total_cmp(&(a.a[2] * a.a[3])));
+    let mut recs = morphs;
+    recs.extend(holes);
+    recs.extend(slides);
+    recs.extend(edges);
+    recs.extend(fades);
+    Outcome::Local(recs)
 }
 
 /// The transition's values at `t` seconds: the old picture's opacity and blur, and the new
@@ -544,21 +809,24 @@ fn timeline(t: f32) -> (f32, f32, f32, f32, bool) {
 }
 
 /// The compositor's side: GPU copies of the before and of the live frame (with mips for the
-/// blur), the cell comparison and its readback, and the transition's regions.
+/// blur), the shapes painted in the before, and the transition's records.
 pub struct Swap {
     gpu: Option<Gpu>,
     res: Option<Res>,
-    old: Snap,
-    diff: Option<Arc<Mutex<Option<Vec<u8>>>>>,
+    old: Vec<Prim>,
+    old_views: HashMap<String, View>,
+    /// The last frame's shapes, when they were taken, and where shapes changed by themselves
+    /// from one frame to the next with no commit between (live, not the swap).
+    prev: Vec<Prim>,
+    prev_at: Instant,
+    lively: Vec<[f32; 4]>,
     land_at: Option<Instant>,
-    /// When the comparison in flight was asked for.
-    asked_at: Instant,
-    /// A comparison a later commit made stale: used if the tree never goes quiet.
-    last_cells: Option<Vec<u8>>,
     whole: bool,
-    regions: Vec<Region>,
+    /// Records, and their GPU copy with the bind groups reading it.
+    recs: usize,
+    bound: Option<Bound>,
     t0: f64,
-    uniform: Vec<u8>,
+    uniform: [f32; 8],
     /// What the hook does this frame.
     plan: Plan,
 }
@@ -569,11 +837,9 @@ enum Plan {
     Nothing,
     /// Keep the backdrop as the before.
     Keep,
-    /// Copy the live frame, compare it with the before, draw the before over it.
-    Compare,
-    /// Draw the before over everything (the comparison is on its way back).
+    /// Draw the before over everything.
     Cover,
-    /// Copy the live frame and draw the regions' transition.
+    /// Copy the live frame, find each pixel's shape, draw the transition.
     Run,
 }
 
@@ -581,26 +847,30 @@ struct Gpu {
     key: rune::compose::DeviceKey,
     copy_layout: wgpu::BindGroupLayout,
     down_layout: wgpu::BindGroupLayout,
-    diff_layout: wgpu::BindGroupLayout,
+    index_layout: wgpu::BindGroupLayout,
     comp_layout: wgpu::BindGroupLayout,
     module: wgpu::ShaderModule,
     sampler: wgpu::Sampler,
     pipes: RefCell<HashMap<(&'static str, wgpu::TextureFormat), wgpu::RenderPipeline>>,
     uniform: wgpu::Buffer,
+    /// Stands in for the records until a swap has some.
+    no_recs: wgpu::Buffer,
 }
 
-/// Sized resources: the before and live textures (mipped), their level views, the cells.
+/// Sized resources: the before and live textures (mipped), each pixel's record.
 struct Res {
     size: (u32, u32),
     format: wgpu::TextureFormat,
     before: Mipped,
     live: Mipped,
-    cells: wgpu::Texture,
-    cells_view: wgpu::TextureView,
-    cols: u32,
-    rows: u32,
+    index: wgpu::TextureView,
     comp: wgpu::BindGroup,
-    diff: wgpu::BindGroup,
+}
+
+/// Bind groups over one swap's records.
+struct Bound {
+    index: wgpu::BindGroup,
+    comp: wgpu::BindGroup,
 }
 
 struct Mipped {
@@ -611,20 +881,7 @@ struct Mipped {
 
 impl Default for Swap {
     fn default() -> Swap {
-        Swap {
-            gpu: None,
-            res: None,
-            old: Snap::default(),
-            diff: None,
-            land_at: None,
-            asked_at: Instant::now(),
-            last_cells: None,
-            whole: false,
-            regions: Vec::new(),
-            t0: 0.0,
-            uniform: Vec::new(),
-            plan: Plan::Nothing,
-        }
+        Swap { gpu: None, res: None, old: Vec::new(), old_views: HashMap::new(), prev: Vec::new(), prev_at: Instant::now(), lively: Vec::new(), land_at: None, whole: false, recs: 0, bound: None, t0: 0.0, uniform: [0.0; 8], plan: Plan::Nothing }
     }
 }
 
@@ -633,26 +890,29 @@ impl Swap {
         active()
     }
 
-    /// True while frames must keep coming (the comparison's readback, the transition).
+    /// True while frames must keep coming (waiting for the new tree to settle, the transition).
     pub fn animating(&self) -> bool {
         matches!(stage(), Some(Stage::Land | Stage::Run))
     }
 
-    /// After a swap: the pictures it kept go.
+    /// After a swap: the pictures and shapes it kept go.
     pub fn settle(&mut self) {
-        if self.res.is_some() || !self.old.all.is_empty() {
+        if self.res.is_some() || !self.old.is_empty() || !self.prev.is_empty() || self.bound.is_some() {
             self.res = None;
-            self.old = Snap::default();
-            self.regions.clear();
-            self.diff = None;
+            self.old = Vec::new();
+            self.old_views = HashMap::new();
+            self.prev = Vec::new();
+            self.lively = Vec::new();
+            self.bound = None;
+            self.recs = 0;
             self.land_at = None;
-            self.last_cells = None;
         }
     }
 
     pub fn release_gpu(&mut self) {
         self.gpu = None;
         self.res = None;
+        self.bound = None;
     }
 
     /// Before the frame draws: moves the swap along and says what the slot's hook does.
@@ -660,24 +920,28 @@ impl Swap {
         let key = f.device_key();
         if self.gpu.as_ref().is_none_or(|g| g.key != key) {
             self.res = None;
+            self.bound = None;
             self.gpu = Some(Gpu::new(f.device, key));
         }
         let scale = f.rt.window_scale().max(0.5);
+        let size = f.size;
         self.plan = match stage() {
             None => {
                 self.settle();
                 Plan::Nothing
             }
-            Some(Stage::Want) => {
-                self.old = crate::engine::read(|eng| shapes(f.rt, eng));
-                Plan::Keep
-            }
-            Some(Stage::Have) => {
-                if since() > HAVE_MAX {
+            Some(Stage::Want | Stage::Have) => {
+                if stage() == Some(Stage::Have) && since() > HAVE_MAX {
                     set(None);
                     crate::engine::with(touch_main);
+                    Plan::Nothing
+                } else {
+                    let snap = painted(&f.rt.instances, size, caret(f.rt.ime_area, scale));
+                    self.watch(&snap);
+                    self.old = snap;
+                    self.old_views = viewports(f.rt, scale);
+                    Plan::Keep
                 }
-                Plan::Nothing
             }
             Some(Stage::Land) if self.res.is_none() => {
                 set(None);
@@ -686,45 +950,22 @@ impl Swap {
             Some(Stage::Land) => {
                 let now = Instant::now();
                 let landed = *self.land_at.get_or_insert(now);
-                let late = now - landed > DIFF_MAX;
-                let got = self.diff.as_ref().and_then(|c| c.lock().unwrap_or_else(|e| e.into_inner()).take());
-                if got.is_some() {
-                    self.diff = None;
-                }
-                // Cells compared after the last commit landed are the new tree as it settled; a
-                // commit since (a layout-driven re-render) asks for another look.
-                let fresh = got.is_some() && last_ops() <= self.asked_at;
-                if fresh || (late && self.diff.is_none()) {
-                    let cells = got.or(self.last_cells.take());
-                    self.start(f, cells, scale, now - landed)
+                let snap = painted(&f.rt.instances, size, caret(f.rt.ime_area, scale));
+                self.watch(&snap);
+                if now - last_ops() >= QUIET || now - landed >= SETTLE_MAX {
+                    self.start(f, scale, now - landed, snap)
                 } else {
-                    if got.is_some() {
-                        self.last_cells = got;
-                    }
-                    if self.diff.is_none() && (now - last_ops() >= QUIET || late) {
-                        if std::env::var_os("STELLA_RUNE_SWAP_FX_DEBUG").is_some() {
-                            eprintln!("stella-engine: swapfx: compare at {:.1} ms (stale result: {})", (now - landed).as_secs_f64() * 1000.0, self.last_cells.is_some());
-                        }
-                        self.asked_at = now;
-                        Plan::Compare
-                    } else {
-                        Plan::Cover
-                    }
+                    Plan::Cover
                 }
             }
             Some(Stage::Run) => Plan::Run,
         };
-        let scale_px = scale;
-        let size = f.size;
         match self.plan {
-            Plan::Compare | Plan::Cover => {
-                let whole = [Region { rect: [-64.0, -64.0, size.0 as f32 + 128.0, size.1 as f32 + 128.0], feather: 1.0, blur: 1.0, morph: None }];
-                self.uniform = uniform(size, &whole, (1.0, 0.0, 0.0, 0.0), scale_px, self.max_lod());
-            }
+            Plan::Cover => self.uniform = [size.0 as f32, size.1 as f32, (MIPS - 1) as f32, 2.0, 1.0, 0.0, 0.0, 0.0],
             Plan::Run => {
                 let t = (f.rt.t - self.t0) as f32;
                 let (a_out, b_out, b_in, morph, done) = timeline(if f.rt.system_reduced_motion() { 10.0 } else { t });
-                self.uniform = uniform(size, &self.regions, (a_out, b_out, b_in, morph), scale_px, self.max_lod());
+                self.uniform = [size.0 as f32, size.1 as f32, (MIPS - 1) as f32, if self.whole { 1.0 } else { 0.0 }, a_out, b_out * OUT_END_BLUR_PT * scale, b_in * IN_BLUR_PT * scale, morph];
                 if done {
                     set(None);
                     crate::engine::with(touch_main);
@@ -732,60 +973,107 @@ impl Swap {
             }
             _ => {}
         }
-        if !self.uniform.is_empty()
-            && let Some(g) = &self.gpu
-            && matches!(self.plan, Plan::Compare | Plan::Cover | Plan::Run)
+        if let Some(g) = &self.gpu
+            && matches!(self.plan, Plan::Cover | Plan::Run)
         {
-            f.write_buffer(&g.uniform, 0, &self.uniform.clone());
+            let bytes: Vec<u8> = self.uniform.iter().flat_map(|x| x.to_le_bytes()).collect();
+            f.write_buffer(&g.uniform, 0, &bytes);
         }
     }
 
-    /// The comparison is in: the regions (or the whole window) start transitioning.
-    fn start(&mut self, f: &mut rune::compose::Frame<'_, crate::windows::Win>, cells: Option<Vec<u8>>, scale: f32, waited: Duration) -> Plan {
-        let Some(res) = self.res.as_ref() else {
-            set(None);
-            return Plan::Nothing;
-        };
-        let size = res.size;
-        if let (Some(d), Some(dir)) = (&cells, std::env::var_os("STELLA_RUNE_SWAP_FX_DEBUG")) {
-            let mut pgm = format!("P5 {} {} 255\n", res.cols, res.rows).into_bytes();
-            pgm.extend(d.iter().map(|v| v.saturating_mul(8)));
-            let _ = std::fs::write(std::path::Path::new(&dir).join(format!("cells-{:.0}.pgm", f.rt.t * 1000.0)), pgm);
-        }
-        let new = crate::engine::read(|eng| shapes(f.rt, eng));
-        let found = cells.and_then(|mut d| {
-            if !self.old.all.is_empty() {
-                let mask = changed_cells(&self.old, &new, scale, res.cols, res.rows);
-                for (v, keep) in d.iter_mut().zip(mask) {
-                    if !keep {
-                        *v = 0;
+    /// The new tree has settled: its shapes against the before's decide what transitions.
+    /// Notes where shapes changed since the last frame without a commit between.
+    fn watch(&mut self, snap: &[Prim]) {
+        if !self.prev.is_empty() && last_ops() <= self.prev_at {
+            let spots = |list: &[Prim]| {
+                let mut m: HashMap<[i32; 4], Vec<u64>> = HashMap::new();
+                for p in list {
+                    m.entry(p.vis.map(|v| q(v, 1.0))).or_default().push(p.key);
+                }
+                for keys in m.values_mut() {
+                    keys.sort_unstable();
+                }
+                m
+            };
+            let (a, b) = (spots(&self.prev), spots(snap));
+            // Only what changed where it is: a shape moving or resizing on a spring is the
+            // swap's own change settling. Many at once is a scroll or a relayout.
+            let changed: Vec<[f32; 4]> = a.iter().filter(|(k, v)| b.get(*k).is_some_and(|w| w != *v)).map(|(k, _)| k.map(|v| v as f32)).collect();
+            if changed.len() <= 24 {
+                for c in changed {
+                    if !self.lively.iter().any(|l| same_spot(*l, c)) {
+                        self.lively.push(c);
                     }
                 }
             }
-            let painted: Vec<[f32; 4]> = new.all.values().filter(|e| e.paints).map(|e| [e.rect[0] * scale, e.rect[1] * scale, e.rect[2] * scale, e.rect[3] * scale]).collect();
-            regions(&d, res.cols, res.rows, scale, size, &painted)
-        });
-        self.whole = found.is_none();
-        self.regions = match found {
-            None => vec![Region { rect: [-64.0, -64.0, size.0 as f32 + 128.0, size.1 as f32 + 128.0], feather: 1.0, blur: 1.0, morph: None }],
-            Some(list) => list
-                .into_iter()
-                .map(|rect| {
-                    let side = rect[2].min(rect[3]) / scale;
-                    Region { rect, feather: FEATHER_PT * scale, blur: (side / 64.0).clamp(0.35, 1.0), morph: morph_in(rect, &self.old.shapes, &new.shapes, scale, size) }
-                })
-                .collect(),
-        };
+        }
+        self.prev = snap.to_vec();
+        self.prev_at = Instant::now();
+    }
+
+    fn start(&mut self, f: &mut rune::compose::Frame<'_, crate::windows::Win>, scale: f32, waited: Duration, new: Vec<Prim>) -> Plan {
+        let size = f.size;
+        let t = Instant::now();
+        let views = scrolled(&self.old_views, &viewports(f.rt, scale));
+        let d = diff(&self.old, &new, &self.lively, &views);
+        let out = outcome(&self.old, &new, &d, scale, size);
+        let cost = t.elapsed();
+        let count = |fates: &[Fate], m: fn(&Fate) -> bool| fates.iter().filter(|f| m(f)).count();
+        let summary = format!(
+            "{} → {} shapes: same {}, moved {} in {} group(s), past a clip's edge {}, scrolled {}, gone {}, new {}, morphed {} (diff {:.1} ms)",
+            self.old.len(),
+            new.len(),
+            count(&d.new, |f| *f == Fate::Same),
+            count(&d.new, |f| matches!(f, Fate::Slide(_))),
+            d.slides.iter().filter(|g| !g.scroll).count(),
+            count(&d.old, |f| matches!(f, Fate::Edge(_))) + count(&d.new, |f| matches!(f, Fate::Edge(_))),
+            count(&d.new, |f| *f == Fate::Scrolled),
+            count(&d.old, |f| *f == Fate::Gone),
+            count(&d.new, |f| *f == Fate::New),
+            count(&d.new, |f| matches!(f, Fate::Morph(_))),
+            cost.as_secs_f64() * 1000.0
+        );
+        if let Some(dir) = debug() {
+            let dump = |name: &str, list: &[Prim], fates: &[Fate]| {
+                let rows: Vec<String> = list
+                    .iter()
+                    .zip(fates)
+                    .filter(|(_, f)| !matches!(f, Fate::Same | Fate::Scrolled))
+                    .map(|(p, f)| format!("{:?} {:.0},{:.0},{:.0},{:.0} r{:.0} kind {}", f, p.vis[0], p.vis[1], p.vis[2] - p.vis[0], p.vis[3] - p.vis[1], p.radius, p.kind))
+                    .collect();
+                let _ = std::fs::write(std::path::Path::new(&dir).join(format!("{name}-{:.0}.txt", f.rt.t * 1000.0)), rows.join("\n"));
+            };
+            dump("before", &self.old, &d.old);
+            dump("after", &new, &d.new);
+        }
+        self.whole = false;
+        self.recs = 0;
+        self.bound = None;
         self.t0 = f.rt.t;
         self.land_at = None;
-        self.last_cells = None;
-        eprintln!(
-            "stella-engine: swapfx: {} after {:.1} ms: {}",
-            if self.whole { "whole window" } else if self.regions.is_empty() { "nothing changed" } else { "regions" },
-            waited.as_secs_f64() * 1000.0,
-            self.regions.iter().map(|r| format!("{:.0},{:.0} {:.0}x{:.0}{}", r.rect[0], r.rect[1], r.rect[2], r.rect[3], if r.morph.is_some() { " morph" } else { "" })).collect::<Vec<_>>().join(" | ")
-        );
-        if self.regions.is_empty() {
+        let verdict = match out {
+            Outcome::Nothing => "nothing changed".to_string(),
+            Outcome::Whole(why) => {
+                self.whole = true;
+                format!("whole window ({why})")
+            }
+            Outcome::Local(recs) => {
+                self.recs = recs.len();
+                if let (Some(g), Some(res)) = (&self.gpu, &self.res) {
+                    self.bound = Some(g.bind(f.device, res, &recs));
+                }
+                format!("{} shapes", recs.len())
+            }
+        };
+        eprintln!("stella-engine: swapfx: {verdict} after {:.1} ms; {summary}", waited.as_secs_f64() * 1000.0);
+        if !self.lively.is_empty() {
+            eprintln!("stella-engine: swapfx: live, not the swap: {}", self.lively.iter().map(|l| format!("{:.0},{:.0} {:.0}x{:.0}", l[0], l[1], l[2] - l[0], l[3] - l[1])).collect::<Vec<_>>().join(" | "));
+        }
+        self.old = Vec::new();
+        self.old_views = HashMap::new();
+        self.prev = Vec::new();
+        self.lively = Vec::new();
+        if !self.whole && self.bound.is_none() {
             set(None);
             crate::engine::with(touch_main);
             Plan::Nothing
@@ -793,10 +1081,6 @@ impl Swap {
             set(Some(Stage::Run));
             Plan::Run
         }
-    }
-
-    fn max_lod(&self) -> f32 {
-        (MIPS - 1) as f32
     }
 
     /// The slot's hook: `phase` at the swap slot, `bd` what is painted under it.
@@ -808,6 +1092,7 @@ impl Swap {
                 let size = (s.size[0].max(1), s.size[1].max(1));
                 if matches!(self.plan, Plan::Keep) && self.res.as_ref().is_none_or(|r| r.size != size || r.format != s.format) {
                     self.res = Some(Res::new(device, gpu, size, s.format));
+                    self.bound = None;
                 }
                 let Some(res) = self.res.as_ref().filter(|r| r.size == size && r.format == s.format) else {
                     if !matches!(self.plan, Plan::Nothing) {
@@ -818,60 +1103,48 @@ impl Swap {
                 match self.plan {
                     Plan::Keep => {
                         gpu.copy(device, enc, bd, &res.before, s.format);
-                        gpu.pipe(device, "cells", wgpu::TextureFormat::R8Unorm);
                         gpu.pipe(device, "comp", s.format);
-                        set(Some(Stage::Have));
+                        gpu.pipe(device, "index", wgpu::TextureFormat::R32Uint);
+                        if stage() == Some(Stage::Want) {
+                            set(Some(Stage::Have));
+                            crate::windows::wake_all();
+                        }
                     }
-                    Plan::Compare => {
+                    Plan::Run => {
                         gpu.copy(device, enc, bd, &res.live, s.format);
-                        self.diff = Some(gpu.compare(device, enc, res, s.format.is_srgb()));
+                        if let Some(b) = &self.bound {
+                            gpu.index(device, enc, &res.index, &b.index, self.recs as u32);
+                        }
                     }
-                    Plan::Run => gpu.copy(device, enc, bd, &res.live, s.format),
                     Plan::Cover | Plan::Nothing => {}
                 }
             }
             EffectPhase::Draw(pass) => {
-                if !matches!(self.plan, Plan::Compare | Plan::Cover | Plan::Run) {
+                if !matches!(self.plan, Plan::Cover | Plan::Run) {
                     return;
                 }
                 let Some(res) = self.res.as_ref() else { return };
                 let pipe = gpu.pipe(device, "comp", s.format);
                 pass.set_pipeline(&pipe);
-                pass.set_bind_group(0, &res.comp, &[]);
+                pass.set_bind_group(0, self.bound.as_ref().map_or(&res.comp, |b| &b.comp), &[]);
                 pass.draw(0..3, 0..1);
             }
         }
     }
 }
 
-/// The composite's uniform: the target, the transition's values, the regions (`U` in the WGSL).
-fn uniform(size: (u32, u32), regions: &[Region], (a_out, b_out, b_in, morph): (f32, f32, f32, f32), scale: f32, max_lod: f32) -> Vec<u8> {
-    let mut v: Vec<f32> = vec![size.0 as f32, size.1 as f32, max_lod, regions.len().min(MAX_REGIONS) as f32];
-    v.extend([a_out, b_out * OUT_END_BLUR_PT * scale, b_in * IN_BLUR_PT * scale, morph]);
-    for i in 0..MAX_REGIONS {
-        let Some(r) = regions.get(i) else {
-            v.extend([0.0; 24]);
-            continue;
-        };
-        v.extend(r.rect);
-        v.extend([r.feather, r.blur, if r.morph.is_some() { 1.0 } else { 0.0 }, 0.0]);
-        let (a, b) = r.morph.unwrap_or(([0.0; 5], [0.0; 5]));
-        let t = morph;
-        let m = |x: f32, y: f32| x + (y - x) * t;
-        let s = [m(a[0], b[0]), m(a[1], b[1]), m(a[2], b[2]).max(1.0), m(a[3], b[3]).max(1.0)];
-        let cap = |r: f32, w: f32, h: f32| r.min(w.min(h) * 0.5).max(0.0);
-        let (ra, rb) = (cap(a[4], a[2], a[3]), cap(b[4], b[2], b[3]));
-        v.extend(&a[..4]);
-        v.extend(&b[..4]);
-        v.extend(s);
-        v.extend([ra, rb, cap(m(ra, rb), s[2], s[3]), 0.0]);
-    }
-    v.iter().flat_map(|x| x.to_le_bytes()).collect()
+/// The text caret's neighbourhood (device pixels): its blink is not a change.
+fn caret(ime: Option<[f32; 4]>, scale: f32) -> Option<[f32; 4]> {
+    ime.map(|r| [r[0] * scale - 4.0, r[1] * scale - 4.0, (r[0] + r[2]) * scale + 4.0, (r[1] + r[3]) * scale + 4.0])
 }
 
 const WGSL: &str = r#"
-struct R { rect: vec4f, p: vec4f, a: vec4f, b: vec4f, s: vec4f, rad: vec4f }
-struct U { size: vec4f, t: vec4f, r: array<R, 8> }
+struct Rec { a: vec4f, b: vec4f, p: vec4f, c: vec4f }
+// size: w, h, max lod, mode (0 shapes, 1 whole window, 2 cover); t: old opacity, old blur,
+// new blur (px), morph progress.
+struct U { size: vec4f, t: vec4f }
+@group(0) @binding(0) var<uniform> u: U;
+@group(0) @binding(5) var<storage, read> recs: array<Rec>;
 
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
     let p = array(vec2f(-1., -1.), vec2f(3., -1.), vec2f(-1., 3.));
@@ -892,40 +1165,66 @@ struct U { size: vec4f, t: vec4f, r: array<R, 8> }
     return textureSampleLevel(up, smp_d, pos.xy / dim, 0.);
 }
 
-// Cells: the largest channel change in each 8 x 8 cell, in sRGB terms.
-@group(0) @binding(0) var a_tex: texture_2d<f32>;
-@group(0) @binding(1) var b_tex: texture_2d<f32>;
-@group(0) @binding(2) var<uniform> enc: vec4f;
-fn perceived(c: vec4f) -> vec3f {
-    if (enc.x > 0.5) { return pow(max(c.rgb, vec3f(0.)), vec3f(1. / 2.2)); }
-    return c.rgb;
+fn sd(p: vec2f, rect: vec4f, r: f32) -> f32 {
+    let half = rect.zw * 0.5;
+    let rr = min(r, min(half.x, half.y));
+    let q = abs(p - rect.xy - half) - half + vec2f(rr);
+    return length(max(q, vec2f(0.))) + min(max(q.x, q.y), 0.) - rr;
 }
-@fragment fn cells(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-    let dim = vec2i(textureDimensions(a_tex));
-    let o = vec2i(pos.xy) * 8;
-    var m = 0.;
-    for (var y = 0; y < 8; y++) {
-        for (var x = 0; x < 8; x++) {
-            let q = min(o + vec2i(x, y), dim - vec2i(1));
-            let d = abs(perceived(textureLoad(a_tex, q, 0)) - perceived(textureLoad(b_tex, q, 0)));
-            m = max(m, max(d.r, max(d.g, d.b)));
-        }
-    }
-    return vec4f(m, 0., 0., 1.);
+fn mode(r: Rec) -> u32 { return u32(r.p.z + 0.5); }
+// Where a record's shape is now.
+fn now(r: Rec) -> vec4f {
+    let s = u.t.w;
+    var c = r.a;
+    if (mode(r) == 1u || mode(r) == 4u) { c = vec4f(mix(r.a.xy, r.b.xy, s), r.b.zw); }
+    if (mode(r) == 3u) { c = mix(r.a, r.b, s); }
+    return c;
+}
+fn now_r(r: Rec) -> f32 {
+    if (mode(r) == 3u) { return mix(r.p.x, r.p.y, u.t.w); }
+    return r.p.x;
 }
 
-// Composite: inside each region the old picture blurs and fades over the new one coming into
-// focus; a box that changed shape morphs its rounded rect from the old to the new.
-@group(0) @binding(0) var<uniform> u: U;
+// Index: each pixel's topmost record (+1), 0 where nothing transitions.
+struct VOut { @builtin(position) pos: vec4f, @location(0) @interpolate(flat) k: u32 }
+@vertex fn vs_index(@builtin(vertex_index) v: u32, @builtin(instance_index) k: u32) -> VOut {
+    let r = recs[k];
+    let c = now(r);
+    var lo = c.xy;
+    var hi = c.xy + c.zw;
+    if (mode(r) == 3u) {
+        lo = min(lo, min(r.a.xy, r.b.xy));
+        hi = max(hi, max(r.a.xy + r.a.zw, r.b.xy + r.b.zw));
+    }
+    lo -= vec2f(1.);
+    hi += vec2f(1.);
+    let corner = array(vec2f(0., 0.), vec2f(1., 0.), vec2f(0., 1.), vec2f(0., 1.), vec2f(1., 0.), vec2f(1., 1.));
+    let p = mix(lo, hi, corner[v]);
+    var o: VOut;
+    o.pos = vec4f(p.x / u.size.x * 2. - 1., 1. - p.y / u.size.y * 2., 0., 1.);
+    o.k = k;
+    return o;
+}
+@fragment fn index(i: VOut) -> @location(0) vec4u {
+    let r = recs[i.k];
+    let p = i.pos.xy;
+    if (any(p < r.c.xy) || any(p > r.c.zw)) { discard; }
+    var d = sd(p, now(r), now_r(r));
+    if (mode(r) == 3u) { d = min(d, min(sd(p, r.a, r.p.x), sd(p, r.b, r.p.y))); }
+    // Moved pixels carry their own antialiasing: a slide or hole owns whole pixels, so the
+    // record under it (not the live frame) shows at its edge.
+    var edge = 0.5;
+    if (mode(r) <= 1u || mode(r) == 4u) { edge = 0.; }
+    if (d > edge) { discard; }
+    return vec4u(i.k + 1u, 0u, 0u, 0u);
+}
+
+// Composite over the live frame.
 @group(0) @binding(1) var before: texture_2d<f32>;
 @group(0) @binding(2) var live: texture_2d<f32>;
 @group(0) @binding(3) var smp: sampler;
+@group(0) @binding(4) var idx: texture_2d<u32>;
 
-fn sd(p: vec2f, rect: vec4f, r: f32) -> f32 {
-    let half = rect.zw * 0.5;
-    let q = abs(p - rect.xy - half) - half + vec2f(r);
-    return length(max(q, vec2f(0.))) + min(max(q.x, q.y), 0.) - r;
-}
 fn blur(t: texture_2d<f32>, uv: vec2f, r: f32) -> vec4f {
     if (r < 0.75) { return textureSampleLevel(t, smp, uv, 0.); }
     let lod = clamp(log2(r) - 0.6, 0., u.size.z);
@@ -945,53 +1244,63 @@ fn mixed(uv_old: vec2f, uv_new: vec2f, k: f32) -> vec4f {
 @fragment fn comp(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     let p = pos.xy;
     let size = u.size.xy;
-    var m = 0.;
-    var best = 0u;
-    let n = u32(u.size.w);
-    for (var i = 0u; i < n; i++) {
-        let r = u.r[i];
-        let f = max(r.p.x, 1.);
-        let d = sd(p, r.rect, f);
-        let k = clamp(-d / f, 0., 1.);
-        if (k > m) { m = k; best = i; }
-    }
-    if (m <= 0.) { discard; }
-    let r = u.r[best];
     let uv = p / size;
-    var c = mixed(uv, uv, r.p.y);
-    if (r.p.z > 0.5) {
-        let ds = sd(p, r.s, r.rad.z);
-        let inside = clamp(0.5 - ds, 0., 1.);
-        let local = (p - r.s.xy) / r.s.zw;
-        let warped = mixed((r.a.xy + local * r.a.zw) / size, (r.b.xy + local * r.b.zw) / size, r.p.y);
-        let in_a = sd(p, r.a, r.rad.x) <= 0.;
-        let in_b = sd(p, r.b, r.rad.y) <= 0.;
-        var outer = c;
+    if (u.size.w > 1.5) { return textureSampleLevel(before, smp, uv, 0.); }
+    if (u.size.w > 0.5) { return mixed(uv, uv, 1.); }
+    let k = textureLoad(idx, vec2i(p), 0).r;
+    if (k == 0u) { discard; }
+    let r = recs[k - 1u];
+    let shape = now(r);
+    let inside = clamp(0.5 - sd(p, shape, now_r(r)), 0., 1.);
+    let m = mode(r);
+    var c = vec4f(0.);
+    if (m == 0u) {
+        c = textureSampleLevel(before, smp, uv, 0.);
+    } else if (m == 1u || m == 4u) {
+        // A moving shape never brings along what lies outside its clip.
+        var look = p + r.b.xy - shape.xy;
+        if (m == 4u) { look = p + r.a.xy - shape.xy; }
+        if (any(look < r.c.xy) || any(look > r.c.zw)) { discard; }
+        if (m == 1u) { c = textureSampleLevel(live, smp, look / size, 0.); } else { c = textureSampleLevel(before, smp, look / size, 0.); }
+    } else if (m == 2u) {
+        c = mixed(uv, uv, r.p.w) * inside;
+    } else {
+        let local = (p - shape.xy) / max(shape.zw, vec2f(1.));
+        let warped = mixed((r.a.xy + local * r.a.zw) / size, (r.b.xy + local * r.b.zw) / size, r.p.w);
+        let in_a = sd(p, r.a, r.p.x) <= 0.;
+        let in_b = sd(p, r.b, r.p.y) <= 0.;
+        var outer = textureSampleLevel(live, smp, uv, 0.);
         if (in_b && !in_a) { outer = textureSampleLevel(before, smp, uv, 0.); }
-        else if (in_a) { outer = textureSampleLevel(live, smp, uv, 0.); }
         c = mix(outer, warped, inside);
     }
-    return c * m;
+    return c;
 }
 "#;
 
-fn tex_entry(binding: u32, filterable: bool) -> wgpu::BindGroupLayoutEntry {
+fn tex_entry(binding: u32, sample_type: wgpu::TextureSampleType) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
         visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+        ty: wgpu::BindingType::Texture { sample_type, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
         count: None,
     }
 }
 
-fn uniform_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+fn float(filterable: bool) -> wgpu::TextureSampleType {
+    wgpu::TextureSampleType::Float { filterable }
+}
+
+fn buffer_entry(binding: u32, ty: wgpu::BufferBindingType) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Buffer { ty, has_dynamic_offset: false, min_binding_size: None },
         count: None,
     }
 }
+
+const UNIFORM: wgpu::BufferBindingType = wgpu::BufferBindingType::Uniform;
+const STORAGE: wgpu::BufferBindingType = wgpu::BufferBindingType::Storage { read_only: true };
 
 fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None }
@@ -1000,10 +1309,13 @@ fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 impl Gpu {
     fn new(device: &wgpu::Device, key: rune::compose::DeviceKey) -> Gpu {
         let layout = |label: &str, entries: &[wgpu::BindGroupLayoutEntry]| device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries });
-        let copy_layout = layout("swapfx copy", &[tex_entry(0, false)]);
-        let down_layout = layout("swapfx down", &[tex_entry(0, true), sampler_entry(1)]);
-        let diff_layout = layout("swapfx cells", &[tex_entry(0, false), tex_entry(1, false), uniform_entry(2)]);
-        let comp_layout = layout("swapfx composite", &[uniform_entry(0), tex_entry(1, true), tex_entry(2, true), sampler_entry(3)]);
+        let copy_layout = layout("swapfx copy", &[tex_entry(0, float(false))]);
+        let down_layout = layout("swapfx down", &[tex_entry(0, float(true)), sampler_entry(1)]);
+        let index_layout = layout("swapfx index", &[buffer_entry(0, UNIFORM), buffer_entry(5, STORAGE)]);
+        let comp_layout = layout(
+            "swapfx composite",
+            &[buffer_entry(0, UNIFORM), tex_entry(1, float(true)), tex_entry(2, float(true)), sampler_entry(3), tex_entry(4, wgpu::TextureSampleType::Uint), buffer_entry(5, STORAGE)],
+        );
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("swapfx"), source: wgpu::ShaderSource::Wgsl(WGSL.into()) });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("swapfx"),
@@ -1014,13 +1326,9 @@ impl Gpu {
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             ..Default::default()
         });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("swapfx"),
-            size: 8 * 4 + MAX_REGIONS as u64 * 24 * 4,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        Gpu { key, copy_layout, down_layout, diff_layout, comp_layout, module, sampler, pipes: RefCell::default(), uniform }
+        let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("swapfx"), size: 32, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let no_recs = device.create_buffer(&wgpu::BufferDescriptor { label: Some("swapfx records"), size: REC_BYTES as u64, usage: wgpu::BufferUsages::STORAGE, mapped_at_creation: false });
+        Gpu { key, copy_layout, down_layout, index_layout, comp_layout, module, sampler, pipes: RefCell::default(), uniform, no_recs }
     }
 
     fn pipe(&self, device: &wgpu::Device, entry: &'static str, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
@@ -1031,7 +1339,7 @@ impl Gpu {
                 let bind = match entry {
                     "copy" => &self.copy_layout,
                     "down" => &self.down_layout,
-                    "cells" => &self.diff_layout,
+                    "index" => &self.index_layout,
                     _ => &self.comp_layout,
                 };
                 let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("swapfx"), bind_group_layouts: &[Some(bind)], immediate_size: 0 });
@@ -1039,7 +1347,7 @@ impl Gpu {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("swapfx"),
                     layout: Some(&layout),
-                    vertex: wgpu::VertexState { module: &self.module, entry_point: Some("vs"), compilation_options: Default::default(), buffers: &[] },
+                    vertex: wgpu::VertexState { module: &self.module, entry_point: Some(if entry == "index" { "vs_index" } else { "vs" }), compilation_options: Default::default(), buffers: &[] },
                     fragment: Some(wgpu::FragmentState {
                         module: &self.module,
                         entry_point: Some(entry),
@@ -1056,7 +1364,7 @@ impl Gpu {
             .clone()
     }
 
-    fn pass(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, entry: &'static str, format: wgpu::TextureFormat, target: &wgpu::TextureView, bind: &wgpu::BindGroup) {
+    fn pass(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, entry: &'static str, format: wgpu::TextureFormat, target: &wgpu::TextureView, bind: &wgpu::BindGroup, draw: (u32, u32)) {
         let pipe = self.pipe(device, entry, format);
         let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("swapfx"),
@@ -1073,7 +1381,7 @@ impl Gpu {
         });
         pass.set_pipeline(&pipe);
         pass.set_bind_group(0, bind, &[]);
-        pass.draw(0..3, 0..1);
+        pass.draw(0..draw.0, 0..draw.1);
     }
 
     /// The backdrop into `dst`'s first level, then its mips.
@@ -1083,48 +1391,52 @@ impl Gpu {
             layout: &self.copy_layout,
             entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(src) }],
         });
-        self.pass(device, enc, "copy", format, &dst.levels[0], &bind);
+        self.pass(device, enc, "copy", format, &dst.levels[0], &bind, (3, 1));
         for (i, down) in dst.downs.iter().enumerate() {
-            self.pass(device, enc, "down", format, &dst.levels[i + 1], down);
+            self.pass(device, enc, "down", format, &dst.levels[i + 1], down, (3, 1));
         }
     }
 
-    /// Compares the before and the live copy in cells and reads the cells back.
-    fn compare(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, res: &Res, srgb: bool) -> Arc<Mutex<Option<Vec<u8>>>> {
-        self.pass(device, enc, "cells", wgpu::TextureFormat::R8Unorm, &res.cells_view, &res.diff);
-        let row = res.cols.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("swapfx cells"),
-            size: u64::from(row) * u64::from(res.rows),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        enc.copy_texture_to_buffer(
-            res.cells.as_image_copy(),
-            wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(res.rows) } },
-            wgpu::Extent3d { width: res.cols, height: res.rows, depth_or_array_layers: 1 },
-        );
-        let _ = srgb;
-        let out: Arc<Mutex<Option<Vec<u8>>>> = Arc::new(Mutex::new(None));
-        let done = Arc::new(AtomicBool::new(false));
-        let (cell, landed, held, cols, rows) = (out.clone(), done.clone(), buffer.clone(), res.cols as usize, res.rows as usize);
-        enc.map_buffer_on_submit(&buffer, wgpu::MapMode::Read, .., move |r| {
-            if r.is_ok()
-                && let Ok(bytes) = held.slice(..).get_mapped_range()
-            {
-                let mut cells = Vec::with_capacity(cols * rows);
-                for y in 0..rows {
-                    cells.extend_from_slice(&bytes[y * row as usize..y * row as usize + cols]);
-                }
-                drop(bytes);
-                *cell.lock().unwrap_or_else(|e| e.into_inner()) = Some(cells);
+    /// Each pixel's topmost record, where the shapes are this frame.
+    fn index(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, target: &wgpu::TextureView, bind: &wgpu::BindGroup, recs: u32) {
+        self.pass(device, enc, "index", wgpu::TextureFormat::R32Uint, target, bind, (6, recs));
+    }
+
+    fn comp_group(&self, device: &wgpu::Device, before: &Mipped, live: &Mipped, index: &wgpu::TextureView, recs: &wgpu::Buffer) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("swapfx composite"),
+            layout: &self.comp_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: self.uniform.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&before.full) },
+                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&live.full) },
+                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                wgpu::BindGroupEntry { binding: 4, resource: wgpu::BindingResource::TextureView(index) },
+                wgpu::BindGroupEntry { binding: 5, resource: recs.as_entire_binding() },
+            ],
+        })
+    }
+
+    /// One swap's records on the GPU, with the bind groups that read them.
+    fn bind(&self, device: &wgpu::Device, res: &Res, recs: &[Rec]) -> Bound {
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("swapfx records"), size: (recs.len().max(1) * REC_BYTES) as u64, usage: wgpu::BufferUsages::STORAGE, mapped_at_creation: true });
+        let mut data = vec![0u8; recs.len().max(1) * REC_BYTES];
+        for (k, r) in recs.iter().enumerate() {
+            for (w, v) in r.a.iter().chain(&r.b).chain(&r.p).chain(&r.c).enumerate() {
+                let o = k * REC_BYTES + w * 4;
+                data[o..o + 4].copy_from_slice(&v.to_le_bytes());
             }
-            held.unmap();
-            landed.store(true, Ordering::Release);
-            crate::windows::wake_all();
+        }
+        if let Ok(mut bytes) = buffer.slice(..).get_mapped_range_mut() {
+            bytes.copy_from_slice(&data);
+        }
+        buffer.unmap();
+        let index = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("swapfx index"),
+            layout: &self.index_layout,
+            entries: &[wgpu::BindGroupEntry { binding: 0, resource: self.uniform.as_entire_binding() }, wgpu::BindGroupEntry { binding: 5, resource: buffer.as_entire_binding() }],
         });
-        crate::backdrop::await_readback(device, done);
-        out
+        Bound { index, comp: self.comp_group(device, &res.before, &res.live, &res.index, &buffer) }
     }
 }
 
@@ -1158,45 +1470,19 @@ impl Res {
         };
         let before = mipped("swapfx before");
         let live = mipped("swapfx live");
-        let (cols, rows) = (size.0.div_ceil(CELL), size.1.div_ceil(CELL));
-        let cells = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("swapfx cells"),
-            size: wgpu::Extent3d { width: cols, height: rows, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::R8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let cells_view = cells.create_view(&Default::default());
-        let enc_flag = device.create_buffer(&wgpu::BufferDescriptor { label: Some("swapfx cells"), size: 16, usage: wgpu::BufferUsages::UNIFORM, mapped_at_creation: true });
-        {
-            let flag: [f32; 4] = [if format.is_srgb() { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0];
-            if let Ok(mut bytes) = enc_flag.slice(..).get_mapped_range_mut() {
-                bytes.copy_from_slice(&flag.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>());
-            }
-        }
-        enc_flag.unmap();
-        let diff = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("swapfx cells"),
-            layout: &gpu.diff_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&before.levels[0]) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&live.levels[0]) },
-                wgpu::BindGroupEntry { binding: 2, resource: enc_flag.as_entire_binding() },
-            ],
-        });
-        let comp = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("swapfx composite"),
-            layout: &gpu.comp_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: gpu.uniform.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&before.full) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&live.full) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(&gpu.sampler) },
-            ],
-        });
-        Res { size, format, before, live, cells, cells_view, cols, rows, comp, diff }
+        let index = device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("swapfx index"),
+                size: wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R32Uint,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+            .create_view(&Default::default());
+        let comp = gpu.comp_group(device, &before, &live, &index, &gpu.no_recs);
+        Res { size, format, before, live, index, comp }
     }
 }

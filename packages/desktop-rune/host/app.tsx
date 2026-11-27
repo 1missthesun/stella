@@ -13,6 +13,7 @@ import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
 import { scopeUiFacing } from "./services/ui-scope";
 import { installRendererErrorRouting } from "./services/renderer-errors";
+import { holdDeliveries, releaseDeliveries } from "./electron/ipc";
 import type { RuneServices } from "./services/boot";
 import type { ControlContext } from "./services/control";
 
@@ -164,12 +165,29 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
     });
   }
 
+  // Live updates wait while the engine takes the swap's before and after (it says when), so
+  // a streaming reply or a notification is not mistaken for part of the change.
+  let releaseAt: ReturnType<typeof setTimeout> | undefined;
+  const release = () => {
+    clearTimeout(releaseAt);
+    releaseDeliveries();
+  };
+  onEngineEvent("swapfx", release);
+  const holdForSwap = () => {
+    holdDeliveries();
+    clearTimeout(releaseAt);
+    releaseAt = setTimeout(release, SWAP_HOLD_MAX_MS + 1500);
+  };
+
   async function runSwap(label: string, t0: number, mtime: number): Promise<boolean> {
     try {
       const next = await loadApp();
       const t_built = now();
       app = next;
-      if (SWAP_FX) command({ cmd: "swapfx.begin" });
+      if (SWAP_FX) {
+        holdForSwap();
+        command({ cmd: "swapfx.begin" });
+      }
       if (SWAP_HOLD_MAX_MS > 0) bridge.holdFrames();
       replayLayouts(true);
       store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
@@ -188,7 +206,10 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       // A broken edit never takes the UI down: the old app keeps running, the error shows.
       bridge.releaseFrames();
       replayLayouts(false);
-      if (SWAP_FX) command({ cmd: "swapfx.cancel" });
+      if (SWAP_FX) {
+        command({ cmd: "swapfx.cancel" });
+        release();
+      }
       console.error("[ui] hot swap failed, keeping the running UI:", err);
       store.set({ error: String((err as Error).message ?? err).slice(0, 400) });
       return false;

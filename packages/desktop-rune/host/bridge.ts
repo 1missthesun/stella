@@ -152,6 +152,7 @@ export type EngineEvent =
   /** A link the system opened with the app (macOS Apple Event; Windows/Linux the launch's own `stella://` arguments). Later launches' links come through the host's single-instance lock. */
   | { t: "open-url"; url: string }
   | { t: "rec"; result: unknown }
+  | { t: "swapfx"; stage: "run" | "none" }
   /** A window's selection settled (a drag, double/triple-click, shift-extend or select-all released) with its line boxes' union in window points as scrolled, or cleared. */
   | { t: "selection"; window: string | null; n: number; text: string; rect: SelectionRect }
   | { t: "selection"; window: string | null; n: number; cleared: true }

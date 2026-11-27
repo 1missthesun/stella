@@ -74,10 +74,8 @@ function CloudBrowserDataCardImpl() {
             </DialogDescription>
           </DialogHeader>
           <div
+            className="settings-confirm-actions settings-confirm-actions--flush"
             style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 8,
               marginTop: 20,
             }}
           >

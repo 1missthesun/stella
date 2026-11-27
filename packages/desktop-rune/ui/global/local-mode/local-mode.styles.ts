@@ -9,7 +9,6 @@ export const useLocalMode = sheet((c, t) => ({
   localModeChoiceBody: { pt: 4, pb: 24, px: 24, gap: 16, align: "stretch" },
   localModeChoice_localModeChoiceText: { pad: 0, pl: 0, pr: 0, pb: 0, mt: 0, color: c.textBase, size: 14, lh: 1.5 },
   localModeChoiceActions: { justify: "end", gap: 10 },
-  authDialogLocalNote: { color: c.mutedForeground, size: 12, lh: 1.45, textAlign: "center" },
   localModeBannerLead: { color: c.textBase, weight: 600 },
   waitingMessages: { mt: 10, mb: 4, align: "end", gap: 6 },
   waitingMessage: { py: 10, px: 14, maxW: "78%", border: mix(c.primary, 55, "transparent"), borderDash: 4, radius: 18, color: c.textBase, size: 14, lh: 1.45 },

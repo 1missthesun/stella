@@ -21,9 +21,9 @@
         <div class="content-area">
           <div class="persistent-chat-surface persistent-chat-surface--active">
             <div class="full-body-row">
-              <div class="full-body-home-overlay full-body-main--home">
-                <div class="home-content">
-                  <h1 class="home-stella-title" id="stella-static-home-greeting"></h1>
+              <div class="full-body-chat-layer">
+                <div class="full-body-main">
+                  <div class="chat-viewport-region"></div>
                   <div class="composer-wrap">
                     <div class="composer">
                       <div class="composer-context-peek-anchor"><div class="composer-context-lead-row"></div></div>
@@ -64,15 +64,12 @@
     var shell = document.getElementById("stella-static-home");
     if (!shell) return;
     var params = new URLSearchParams(window.location.search);
-    var surface = null;
     var lastPath = "/chat";
     try {
-      surface = window.localStorage.getItem("stella.chatHomeSurface");
       var last = window.localStorage.getItem("stella:lastLocation");
       if (last && last.charAt(0) === "/") lastPath = last.split(/[?#]/)[0];
     } catch (error) {}
     if (
-      surface === "chat" ||
       (lastPath !== "/chat" && lastPath !== "/") ||
       params.get("mobile") === "1" ||
       params.get("window") === "mini" ||
@@ -97,21 +94,6 @@
       for (var attribute in firstVisit.attributes) root.setAttribute(attribute, firstVisit.attributes[attribute]);
       for (var i = 0; i < firstVisit.properties.length; i++) root.style.setProperty(firstVisit.properties[i][0], firstVisit.properties[i][1]);
     }
-    var funGreetings = __STELLA_FUN_GREETINGS__;
-    var hour = new Date().getHours();
-    var greeting = { kind: "time" };
-    var text =
-      hour < 5 ? "Good night"
-      : hour < 12 ? "Good morning"
-      : hour < 17 ? "Good afternoon"
-      : hour < 21 ? "Good evening"
-      : "Good night";
-    if (funGreetings.length > 0 && Math.random() < __STELLA_FUN_GREETING_CHANCE__) {
-      text = funGreetings[Math.floor(Math.random() * funGreetings.length)];
-      greeting = { kind: "fun", text: text };
-    }
-    window.__stellaStaticGreeting = greeting;
-    document.getElementById("stella-static-home-greeting").textContent = text;
     var draft = shell.querySelector("textarea");
     draft.addEventListener("keydown", function (event) {
       if (event.key === "Enter" && !event.shiftKey && !event.isComposing) event.preventDefault();

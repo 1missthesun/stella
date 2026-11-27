@@ -6,6 +6,7 @@ import type {
 } from "@stella/contracts/local-chat";
 import { isPiAgentText, isPiAskFirstText } from "@stella/contracts/pi-chat";
 import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
+import { parseWelcomeCard, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import { parseEmailCard } from "@stella/contracts/email-card";
 import {
@@ -336,6 +337,17 @@ export const journalRecordsToMessageRecords = (
             text: reminder.text,
             metadata: { reminder: reminderMarkOf(reminder) },
           },
+        });
+        continue;
+      }
+      const welcome = record.kind === "card" ? parseWelcomeCard(record.card) : null;
+      if (welcome) {
+        events.push({
+          _id: `cloud:${turnId}:welcome:${record.seq}`,
+          timestamp: record.createdAtMs,
+          sequence: record.seq,
+          type: "assistant_message",
+          payload: { text: WELCOME_TEXT, metadata: { welcome: welcomeMarkOf(welcome) } },
         });
         continue;
       }

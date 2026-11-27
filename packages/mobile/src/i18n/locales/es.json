@@ -921,7 +921,17 @@
         "thisComputerInline": "este ordenador",
         "rowNotChosen": "Usa {email}, no {chosen}",
         "rowEnded": "El inicio de sesión ha caducado",
-        "rowEnding": "El inicio de sesión caduca el {date}"
+        "rowEnding": "El inicio de sesión caduca el {date}",
+        "automaticHint": "Usa la cuenta con la que Claude Code ya tenga la sesión iniciada en cada ordenador",
+        "chooseNote": "La cuenta que elijas se usa en todos tus ordenadores y en la nube.",
+        "inUseTitle": "En uso ahora",
+        "missingChosen": "{email} no tiene la sesión iniciada aquí.",
+        "missingChosenFallback": "{email} no tiene la sesión iniciada aquí, así que se usa el inicio de sesión propio.",
+        "ownLoginNote": "Inicio de sesión de Claude Code de este ordenador: {email}",
+        "reasonCloudLogin": "El inicio de sesión de la nube",
+        "reasonOtherLogin": "Añadido en Stella",
+        "reasonOwnLogin": "El inicio de sesión de Claude Code de este ordenador",
+        "reasonSelected": "Elegida en Stella"
       },
       "claudeLogin": {
         "whereCloud": "Iniciando sesión en Claude Code en tu nube.",

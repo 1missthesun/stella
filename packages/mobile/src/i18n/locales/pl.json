@@ -922,7 +922,17 @@
         "thisComputerInline": "ten komputer",
         "rowNotChosen": "Używa {email}, nie {chosen}",
         "rowEnded": "Logowanie wygasło",
-        "rowEnding": "Logowanie wygasa {date}"
+        "rowEnding": "Logowanie wygasa {date}",
+        "automaticHint": "Używa konta, do którego Claude Code jest już zalogowany na danym komputerze",
+        "chooseNote": "Wybrane konto jest używane na wszystkich Twoich komputerach i w chmurze.",
+        "inUseTitle": "Teraz w użyciu",
+        "missingChosen": "{email} nie jest tu zalogowane.",
+        "missingChosenFallback": "{email} nie jest tu zalogowane, więc używane jest własne logowanie.",
+        "ownLoginNote": "Własne logowanie tego komputera do Claude Code: {email}",
+        "reasonCloudLogin": "Logowanie chmury",
+        "reasonOtherLogin": "Dodane w Stella",
+        "reasonOwnLogin": "Własne logowanie tego komputera do Claude Code",
+        "reasonSelected": "Wybrane w Stella"
       },
       "claudeLogin": {
         "whereCloud": "Logowanie do Claude Code w Twojej chmurze.",

@@ -56,6 +56,34 @@ export const releaseDateLabel = (
 
 export const stellaReleases: readonly StellaRelease[] = [
   {
+    date: "2026-11-26",
+    title: "Helpers no longer get stuck waiting",
+    summary: "When a helper asks the task that started it a question, that task now hears it and answers, wherever each of them runs.",
+    tags: ["Polish", "Fixes"],
+    highlights: [
+      "A helper that asks its task for an answer and pauses no longer waits forever: the task is reminded and replies, whether they run on the same computer, on different computers or in the cloud.",
+      "A finished helper that gets a note from a teammate no longer shows up as having ended without reporting.",
+    ],
+    more: [
+      "Buttons in Settings are quieter and more consistent, with red kept only for things that really delete.",
+      { text: "When you come back to a chat on your phone after a while, it opens on your newest messages in the right order, instead of showing older ones below the latest reply or an empty screen.", product: "Mobile" },
+    ],
+  },
+  {
+    date: "2026-11-25",
+    title: "Chats carry on from your other computers",
+    summary: "When the computer a chat runs on is away, Stella carries on from another of your computers before turning to the cloud.",
+    tags: ["Polish"],
+    highlights: [
+      "If the computer a chat runs on is asleep or offline, another of your computers that is on picks the chat up, and the cloud steps in only when none can.",
+      "This works for messages you send from your phone or the web too, and when you write from a computer, that computer can answer itself.",
+      "If Antigravity isn't signed in on the computer that picks a chat up, Stella answers there with Claude Code when it can.",
+    ],
+    more: [
+      "When a long conversation needs fresh notes, Stella now writes them in the background and keeps going, and anything you send in the meantime stays in order after them.",
+    ],
+  },
+  {
     date: "2026-11-25",
     title: "A lighter Settings and instant Plans & Usage",
     summary: "Settings has a cleaner, roomier look, Plans & Usage opens instantly, and files you open again appear right away.",

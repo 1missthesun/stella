@@ -1,3 +1,5 @@
+import { parseWelcomeCard, WELCOME_TEXT } from "./welcome-message.js";
+
 export const HISTORY_SEARCH_KINDS = [
   "user",
   "assistant",
@@ -290,6 +292,7 @@ const historyEntryOf = (input: unknown): HistoryReadEntry | null => {
       : undefined;
   const base = { seq: record.seq, ...(at ? { at } : {}) };
   if (record.kind === "card") {
+    if (parseWelcomeCard(record.card)) return { ...base, role: "assistant", text: WELCOME_TEXT };
     const card = record.card as { type?: unknown } | undefined;
     return { ...base, role: "card", text: typeof card?.type === "string" ? card.type : "" };
   }

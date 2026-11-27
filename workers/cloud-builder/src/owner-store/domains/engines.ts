@@ -631,9 +631,10 @@ const connectedPlanDefault = (
 export const snapshotEngines = (
   db: OwnerDbReader,
   options: { cloudSandbox: boolean; ownerMode?: boolean; managedModels?: boolean },
-): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders"> => {
+): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders" | "cloudClaudeLoginEnded"> => {
   const connectedEngines = connectedEnginesOf(db);
   const connectedProviders = connectedProvidersOf(db);
+  const loginEnded = cloudClaudeLoginEnded(db);
   const { selection } = readSelection(db);
   const runnable =
     selection.engine === "stella" ||
@@ -648,9 +649,10 @@ export const snapshotEngines = (
     execution:
       runnable && !prefersOwnPlan
         ? selection
-        : connectedPlanDefault(db, connectedEngines, options.cloudSandbox && !cloudClaudeLoginEnded(db)),
+        : connectedPlanDefault(db, connectedEngines, options.cloudSandbox && !loginEnded),
     connectedEngines,
     connectedProviders,
+    ...(loginEnded ? { cloudClaudeLoginEnded: true as const } : {}),
   };
 };
 

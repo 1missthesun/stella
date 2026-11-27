@@ -1,10 +1,8 @@
 import {
   memo,
   useCallback,
-  useEffect,
   useMemo,
   useRef,
-  useState,
   type ComponentProps,
 } from "react";
 import { ChevronDown } from "@/ui/icons";
@@ -22,7 +20,6 @@ import { ConversationFocusOverlay } from "./ConversationFocusOverlay";
 import { useConversationFocus } from "@/features/chat/services/conversation-focus-store";
 import { useChatMessages } from "@/context/use-chat-messages";
 import { Composer } from "./Composer";
-import { HomeContent } from "@/app/home/HomeContent";
 import { buildInlineWorkingIndicatorProps } from "@/features/chat/working-indicator-state";
 import { useFileDrop } from "@/features/chat/hooks/use-file-drop";
 import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-aloud";
@@ -36,7 +33,6 @@ import {
 } from "@/features/chat/hooks/use-composer-message-state";
 import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
-import { useTabStageVisible } from "@/features/workspace-display/tab-stage-visible";
 import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
 import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
 import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
@@ -51,8 +47,6 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   paddingTop: 112,
   paddingBottom: 28,
 };
-
-const HOME_LEAVE_MS = 280;
 
 type StoreBackedComposerProps = Omit<
   ComponentProps<typeof Composer>,
@@ -93,13 +87,9 @@ export const ChatColumn = memo(function ChatColumn({
   scroll,
   composerEntering,
   conversationId,
-  showHomeContent: homeSurface,
 }: ChatColumnProps) {
   const t = useT();
-  const tabStageVisible = useTabStageVisible();
-  const showHomeContent = Boolean(homeSurface) && !tabStageVisible;
   const focus = useConversationFocus(conversationId);
-  const homeObscuresChat = showHomeContent && !focus;
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ y: number; scrollTop: number } | null>(null);
   const { noteManualScroll } = scroll;
@@ -176,16 +166,6 @@ export const ChatColumn = memo(function ChatColumn({
     isNearBottom,
   });
 
-  const [homeVisible, setHomeVisible] = useState(Boolean(showHomeContent));
-  if (showHomeContent && !homeVisible) setHomeVisible(true);
-  const homeLeaving = homeVisible && !showHomeContent;
-
-  useEffect(() => {
-    if (!homeLeaving) return;
-    const timer = setTimeout(() => setHomeVisible(false), HOME_LEAVE_MS);
-    return () => clearTimeout(timer);
-  }, [homeLeaving]);
-
   useReadAloud(messages);
 
   const overdueStop = useOverdueStop({
@@ -231,11 +211,8 @@ export const ChatColumn = memo(function ChatColumn({
   }, []);
 
   const renderComposer = (
-    surface: "chat" | "home",
     replyPeek: ComponentProps<typeof Composer>["replyPeek"],
   ) => {
-    const isActiveSurface =
-      surface === "home" ? showHomeContent : !showHomeContent;
     return (
       <StoreBackedComposer
         messageStore={composer.messageStore}
@@ -246,14 +223,13 @@ export const ChatColumn = memo(function ChatColumn({
         setSelectedText={composer.setSelectedText}
         isStreaming={conversation.streaming.isStreaming}
         canSubmit={composer.canSubmit}
-        focusRequestId={isActiveSurface ? composer.focusRequestId : undefined}
+        focusRequestId={composer.focusRequestId}
         conversationId={conversationId}
         onSend={composer.onSend}
         onStop={composer.onStop}
         isDragOver={isDragOver}
         replyPeek={replyPeek}
-        catchUp={CATCH_UP_ENABLED && surface === "chat"}
-        suggestionsActive={isActiveSurface}
+        catchUp={CATCH_UP_ENABLED}
       />
     );
   };
@@ -291,13 +267,8 @@ export const ChatColumn = memo(function ChatColumn({
 
   return (
     <div className="full-body-row">
-      {/* The whole chat layer (messages + composer + workspace strip +
-          scrollbar) fades as one unit under the home overlay. Hiding the
-          layer wholesale — rather than toggling the workspace strip's own
-          `forceHidden` — avoids re-running the strip's 460ms width/slide
-          animation on every home↔chat switch. */}
       <div
-        className={`full-body-chat-layer${homeObscuresChat ? " full-body-chat-layer--hidden" : ""}`}
+        className="full-body-chat-layer"
         data-testid="chat-surface"
         data-conversation-id={conversationId ?? undefined}
         data-has-older-messages={
@@ -306,7 +277,6 @@ export const ChatColumn = memo(function ChatColumn({
         data-loading-older-messages={
           conversation.history.isLoadingOlder ? "true" : "false"
         }
-        inert={homeObscuresChat || undefined}
       >
         <div className="full-body-main" {...dropHandlers}>
           <SignedOutBanner />
@@ -374,7 +344,7 @@ export const ChatColumn = memo(function ChatColumn({
                 : "composer-wrap"
             }
           >
-            {renderComposer("chat", chatReplyPeek)}
+            {renderComposer(chatReplyPeek)}
           </div>
         </div>
 
@@ -392,33 +362,6 @@ export const ChatColumn = memo(function ChatColumn({
           />
         </div>
       </div>
-
-      {homeVisible && !focus && (
-        <div
-          className={`full-body-home-overlay full-body-main--home${homeLeaving ? " full-body-main--home-leaving" : ""}`}
-          {...dropHandlers}
-        >
-          <HomeContent>
-            {conversation.extraTail ? (
-              <div
-                className="full-body-home-status"
-                inert={showHomeContent ? undefined : true}
-              >
-                {conversation.extraTail}
-              </div>
-            ) : null}
-            <div
-              className="composer-wrap"
-              inert={showHomeContent ? undefined : true}
-            >
-              {showHomeContent ? (
-                <ComposerNotice conversationId={conversationId} />
-              ) : null}
-              {renderComposer("home", null)}
-            </div>
-          </HomeContent>
-        </div>
-      )}
     </div>
   );
 });

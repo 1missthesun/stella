@@ -920,7 +920,17 @@
         "thisComputerInline": "tämä tietokone",
         "rowNotChosen": "Käyttää tiliä {email}, ei {chosen}",
         "rowEnded": "Kirjautuminen päättyi",
-        "rowEnding": "Kirjautuminen päättyy {date}"
+        "rowEnding": "Kirjautuminen päättyy {date}",
+        "automaticHint": "Käyttää tiliä, jolla Claude Code on jo kirjautunut kullakin tietokoneella",
+        "chooseNote": "Valitsemaasi tiliä käytetään kaikilla tietokoneillasi ja pilvessä.",
+        "inUseTitle": "Käytössä nyt",
+        "missingChosen": "{email} ei ole kirjautunut täällä.",
+        "missingChosenFallback": "{email} ei ole kirjautunut täällä, joten käytetään omaa kirjautumista.",
+        "ownLoginNote": "Tämän tietokoneen oma Claude Code -kirjautuminen: {email}",
+        "reasonCloudLogin": "Pilven kirjautuminen",
+        "reasonOtherLogin": "Lisätty Stellassa",
+        "reasonOwnLogin": "Tämän tietokoneen oma Claude Code -kirjautuminen",
+        "reasonSelected": "Valittu Stellassa"
       },
       "claudeLogin": {
         "whereCloud": "Kirjaudutaan Claude Codeen pilvessäsi.",

@@ -47,6 +47,8 @@ import { AGENT_REPORT_TARGET_PATH } from "./agent-report-target.js";
 import type { AgentReportTarget } from "./owner-store/registry.js";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { PI_BRAIN_KEY } from "./orchestrator/constants.js";
+import { composerPrewarmTargetOf } from "@stella/contracts/composer-prewarm";
+import { parseCloudExecutionSelection } from "./turn-start-request.js";
 import { parseSlackWorkspaceContext } from "./slack/workspace.js";
 import type { SessionRevocations } from "./session-revocation.js";
 
@@ -327,7 +329,18 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     }
     if (url.pathname === "/prewarm") {
       const owner = request.headers.get(HEADER_OWNER);
-      if (owner && owner === this.journal.ownerId()) this.prewarmForComposer();
+      if (owner && owner === this.journal.ownerId()) {
+        const body = (await request.json().catch(() => null)) as {
+          target?: unknown;
+          execution?: unknown;
+        } | null;
+        const target = composerPrewarmTargetOf(body?.target);
+        const execution = parseCloudExecutionSelection(body?.execution);
+        this.prewarmForComposer({
+          ...(target ? { target } : {}),
+          ...(execution ? { execution } : {}),
+        });
+      }
       return json({ ok: true }, 202);
     }
     if (url.pathname === AGENT_REPORT_TARGET_PATH) {

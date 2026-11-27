@@ -65,6 +65,7 @@ export const runsHandlers: WorkerRpcHandlers = {
       userAuthoredPrompt?: boolean;
       scheduled?: boolean;
       handoff?: boolean;
+      failover?: boolean;
       attachments?: RuntimeAttachmentRef[];
       context?: unknown;
     };
@@ -85,6 +86,7 @@ export const runsHandlers: WorkerRpcHandlers = {
           : {}),
         ...(automation.scheduled ? { scheduled: true } : {}),
         ...(automation.handoff ? { handoff: true } : {}),
+        ...(automation.failover ? { failover: true } : {}),
       });
     }
     return await (await piChatsFor(session, ctx.hostBus)).automation(

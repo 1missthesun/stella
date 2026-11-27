@@ -181,22 +181,14 @@ const firstVisitLook = (isDark: boolean): StaticHomeLook => {
   return { ...staticHomeLook(buildTokens({ themeId: custom.id, colors, dark, flat })), dark: isDark };
 };
 
-const HOME_GREETINGS = /const FUN_GREETINGS = (\[[\s\S]*?\]);/;
-const HOME_GREETING_CHANCE = /const FUN_GREETING_CHANCE = ([0-9.]+);/;
-
 function staticHomeMarkup(): string {
-  const home = fs.readFileSync(path.join(RUNE, "ui", "shell", "home", "HomeContent.tsx"), "utf8");
-  const greetings = JSON.parse(HOME_GREETINGS.exec(home)?.[1]?.replace(/,\s*\]$/, "]") ?? "[]") as string[];
-  const chance = Number(HOME_GREETING_CHANCE.exec(home)?.[1] ?? 0);
   const icon = (data: { body: string; name: string; view: number }) => withStroke(data, 1.75).body;
   return fs.readFileSync(path.join(WEB, "static-home", "shell.html"), "utf8")
     .replace("__STELLA_ICON_PLUS__", () => icon(Icons.stella.Plus))
     .replace("__STELLA_ICON_MIC__", () => icon(Icons.stella.Mic))
     .replace("__STELLA_ICON_SEND__", () => icon(Icons.stella.ArrowUp))
     .replace("__STELLA_LOOK_KEY__", () => STATIC_HOME_LOOK_KEY)
-    .replace("__STELLA_FIRST_VISIT__", () => JSON.stringify({ dark: firstVisitLook(true), light: firstVisitLook(false) }))
-    .replace("__STELLA_FUN_GREETINGS__", () => JSON.stringify(greetings))
-    .replace("__STELLA_FUN_GREETING_CHANCE__", () => String(Number.isFinite(chance) ? chance : 0));
+    .replace("__STELLA_FIRST_VISIT__", () => JSON.stringify({ dark: firstVisitLook(true), light: firstVisitLook(false) }));
 }
 const staticHome = !process.argv.includes("--no-static-home");
 const publicDir = path.join(UI_ROOT, "public");

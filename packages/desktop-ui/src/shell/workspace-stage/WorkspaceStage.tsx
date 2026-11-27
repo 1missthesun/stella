@@ -1148,7 +1148,9 @@ function useViewerChatAttachment(
     );
     chat.composer.requestFocus?.();
   }, [added, chat.composer, detail, item, setChatContext]);
-  if (item.kind === "chat" || item.kind === "home") return null;
+  if (item.kind === "chat" || item.kind === "home" || item.kind === "demo") {
+    return null;
+  }
   return { added, toggle };
 }
 

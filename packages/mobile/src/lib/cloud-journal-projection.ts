@@ -1,4 +1,5 @@
 import { reminderMarkOf } from "@stella/contracts/reminders";
+import { WELCOME_CARD_TYPE, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
 import { EMAIL_CARD_TYPE } from "@stella/contracts/email-card";
 import {
@@ -260,6 +261,22 @@ const projectTurn = (
   const { recordsBySeq, reactions } = context;
   const args = { conversationId: context.conversationId };
   const out: ChatMessage[] = [];
+  const welcomeRecord = turn.find(
+    (record): record is Extract<JournalRecord, { kind: "card" }> =>
+      record.kind === "card" && record.card.type === WELCOME_CARD_TYPE,
+  );
+  if (welcomeRecord && welcomeRecord.card.type === WELCOME_CARD_TYPE) {
+    out.push({
+      id: `cloud:${turnId}:welcome:${welcomeRecord.seq}`,
+      role: "assistant",
+      text: WELCOME_TEXT,
+      createdAt: welcomeRecord.createdAtMs,
+      canonicalCreatedAt: welcomeRecord.createdAtMs,
+      sequence: welcomeRecord.seq,
+      welcome: welcomeMarkOf(welcomeRecord.card),
+    });
+    return out;
+  }
   const reminderRecord = turn.find(
     (record): record is Extract<JournalRecord, { kind: "card" }> =>
       record.kind === "card" && record.card.type === "reminder",
@@ -594,6 +611,7 @@ const leadingTurnLacksPrompt = (turn: JournalTurn): boolean =>
       (record.kind === "message" && record.role === "user") ||
       (record.kind === "card" &&
         (record.card.type === "reminder" ||
+          record.card.type === WELCOME_CARD_TYPE ||
           record.card.type === SCHEDULE_NOTICE_CARD_TYPE ||
           record.card.type === EMAIL_CARD_TYPE)),
   );
@@ -769,6 +787,18 @@ export const acknowledgedCloudDispatchIds = (
   return found;
 };
 
+export const createRecordedCloudDispatchIds = () => {
+  let recorded: ReadonlySet<string> = new Set();
+  return (acknowledged: ReadonlySet<string>): ReadonlySet<string> => {
+    let grown: Set<string> | null = null;
+    for (const id of acknowledged) {
+      if (!recorded.has(id)) (grown ??= new Set(recorded)).add(id);
+    }
+    if (grown) recorded = grown;
+    return recorded;
+  };
+};
+
 const SWITCH_RECORDS: JournalView = {
   id: "destination-switches",
   test: (record) => {
@@ -800,7 +830,7 @@ export const mergeCanonicalCloudMessages = (args: {
   canonical: readonly ChatMessage[];
   local: readonly ChatMessage[];
   dispatchBindings: ReadonlyMap<string, string | null>;
-  acknowledgedDispatchIds: ReadonlySet<string>;
+  recordedDispatchIds: ReadonlySet<string>;
 }): ChatMessage[] => {
   if (args.local.length === 0) return args.canonical as ChatMessage[];
   const canonicalIds = new Set(args.canonical.map((message) => message.id));
@@ -813,7 +843,7 @@ export const mergeCanonicalCloudMessages = (args: {
   );
   const pendingLocalIds = new Set(
     [...args.dispatchBindings].flatMap(([localId, dispatchId]) =>
-      dispatchId && args.acknowledgedDispatchIds.has(dispatchId)
+      dispatchId && args.recordedDispatchIds.has(dispatchId)
         ? []
         : [localId],
     ),
@@ -826,7 +856,8 @@ export const mergeCanonicalCloudMessages = (args: {
     return Boolean(
       owner &&
         trackedLocalIds.has(owner) &&
-        !canonicalAssistantOwners.has(owner),
+        !canonicalAssistantOwners.has(owner) &&
+        (pendingLocalIds.has(owner) || canonicalIds.has(owner)),
     );
   });
   const localById = new Map(args.local.map(message => [message.id, message]));

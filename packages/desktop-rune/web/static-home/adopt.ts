@@ -1,15 +1,13 @@
 declare global {
   interface Window {
-    __stellaStaticGreeting?: { kind: "time" } | { kind: "fun"; text: string };
     __stellaStaticHomeKeepInput?: (event: FocusEvent) => void;
-    __stellaStaticHandoff?: { at: number; target: "home" | "chat" | "none"; chars: number; dx: number; dy: number; dw: number; dh: number };
+    __stellaStaticHandoff?: { at: number; target: "chat" | "none"; chars: number; dx: number; dy: number; dw: number; dh: number };
   }
 }
 
 const SHELL_ID = "stella-static-home";
 const COMPOSER = '#root [data-rid^="composer-input:"] > textarea';
-const HOME_COMPOSER = `#root [data-rid="home-content"] [data-rid^="composer-input:"] > textarea`;
-const CHAT_FALLBACK_MS = 1500;
+const ELSEWHERE_MS = 1500;
 const GIVE_UP_MS = 20_000;
 const GUARD_MS = 15_000;
 const SETTLED_MS = 2000;
@@ -31,7 +29,6 @@ export function adoptStaticHome(): void {
   const draft = shell?.querySelector("textarea");
   if (!shell || !draft) return;
   const startedAt = performance.now();
-  let chatSince: number | null = null;
   let renderedSince: number | null = null;
   let lastRect = "";
 
@@ -102,13 +99,13 @@ export function adoptStaticHome(): void {
     requestAnimationFrame(check);
   };
 
-  const handOff = (field: HTMLTextAreaElement, target: "home" | "chat") => {
+  const handOff = (field: HTMLTextAreaElement) => {
     stopKeepingInput();
     const text = draft.value;
     const focused = document.activeElement === draft || shell.dataset.appFocused === "true";
     const from = draft.getBoundingClientRect();
     const to = field.getBoundingClientRect();
-    window.__stellaStaticHandoff = { at: performance.now(), target, chars: text.length, dx: to.x - from.x, dy: to.y - from.y, dw: to.width - from.width, dh: to.height - from.height };
+    window.__stellaStaticHandoff = { at: performance.now(), target: "chat", chars: text.length, dx: to.x - from.x, dy: to.y - from.y, dw: to.width - from.width, dh: to.height - from.height };
     place(field, text, focused, draft.selectionStart, draft.selectionEnd);
     release();
     if (text) guard(text, focused);
@@ -116,19 +113,16 @@ export function adoptStaticHome(): void {
 
   const wait = () => {
     if (!shell.isConnected) return;
-    const home = first(HOME_COMPOSER);
-    if (home) {
-      const r = home.getBoundingClientRect();
+    const chat = first(COMPOSER);
+    if (chat) {
+      const r = chat.getBoundingClientRect();
       const rect = `${r.x},${r.y},${r.width},${r.height}`;
-      if (rect === lastRect && r.width > 0) return handOff(home, "home");
+      if (rect === lastRect && r.width > 0) return handOff(chat);
       lastRect = rect;
       return void requestAnimationFrame(wait);
     }
-    const chat = first(COMPOSER);
-    chatSince = chat ? (chatSince ?? performance.now()) : null;
-    if (chat && chatSince !== null && performance.now() - chatSince > CHAT_FALLBACK_MS) return handOff(chat, "chat");
-    renderedSince = chat || !document.querySelector("#root [data-rid]") ? null : (renderedSince ?? performance.now());
-    const elsewhere = renderedSince !== null && performance.now() - renderedSince > CHAT_FALLBACK_MS;
+    renderedSince = !document.querySelector("#root [data-rid]") ? null : (renderedSince ?? performance.now());
+    const elsewhere = renderedSince !== null && performance.now() - renderedSince > ELSEWHERE_MS;
     if (elsewhere || performance.now() - startedAt > GIVE_UP_MS) {
       window.__stellaStaticHandoff = { at: performance.now(), target: "none", chars: draft.value.length, dx: 0, dy: 0, dw: 0, dh: 0 };
       release();

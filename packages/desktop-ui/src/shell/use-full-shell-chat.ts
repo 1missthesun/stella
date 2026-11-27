@@ -17,18 +17,13 @@ import {
   useComposerMessageSelector,
   useComposerMessageStore,
 } from "@/features/chat/hooks/use-composer-message-state";
-import { takePendingComposerDraft } from "@/global/onboarding/chat/pending-handoff";
+import { useFirstRunWelcome } from "@/features/welcome/first-run";
 import { useStreamingChat } from "@/features/chat/hooks/use-streaming-chat";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
 import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
 import { useCapturedChatContext } from "./use-captured-chat-context";
 import { useTurnHandoff } from "./use-turn-handoff";
 import { useChatScrollManagement } from "./use-chat-scroll-management";
-import {
-  useChatHomeSurface,
-  type ConversationContent,
-} from "./use-chat-home-surface";
-import { useConversationUserAsks } from "@/features/user-ask/user-ask-store";
 import { useAgentInputRouting } from "./use-agent-input-routing";
 import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
 import { useChatStore } from "@/context/chat-store-context";
@@ -129,7 +124,6 @@ export function useFullShellChat({
   const previousComposerConversationIdRef = useRef<string | null>(
     activeConversationId,
   );
-  const pendingAutoSendTextRef = useRef<string | null>(null);
   useLayoutEffect(() => {
     if (sessionIsLoading) return;
     const scope = `${accountScope}\0${storageMode}`;
@@ -174,15 +168,9 @@ export function useFullShellChat({
     }
     if (activeConversationId) {
       const remembered = composerTabMemory.take(activeConversationId);
-      const pendingDraft = remembered?.message
-        ? null
-        : takePendingComposerDraft();
-      pendingAutoSendTextRef.current = pendingDraft?.send
-        ? pendingDraft.text
-        : null;
       const cameFromAnother = previousConversationId !== null;
-      if (cameFromAnother || remembered || pendingDraft) {
-        setMessage(remembered?.message ?? pendingDraft?.text ?? "");
+      if (cameFromAnother || remembered) {
+        setMessage(remembered?.message ?? "");
         setChatContext(remembered?.chatContext ?? null);
         setSelectedText(remembered?.selectedText ?? null);
       }
@@ -234,6 +222,7 @@ export function useFullShellChat({
     [threadActivityRecords],
   );
   const piChat = usePiChat(activeConversationId);
+  useFirstRunWelcome(activeConversationId);
   const cloudChat = useCloudChatBridge({
     conversationId: activeConversationId,
     enabled: cloudChatShown,
@@ -533,31 +522,6 @@ export function useFullShellChat({
     persistedMessages,
     optimisticEvents,
   });
-  const hasMessages = displayMessages.length > 0;
-  const conversationAsks = useConversationUserAsks(activeConversationId);
-  const hasOpenQuestion = conversationAsks.length > 0;
-  const journalCaughtUp =
-    journalState.recordsSource === "canonical" &&
-    (journalState.records.at(-1)?.seq ?? -1) >= journalState.headSeq;
-  const messagesKnown = isPrivateChat
-    ? !localMessageFeed.isInitialLoading
-    : cloudChatShown && journalCaughtUp;
-  const conversationContent: ConversationContent =
-    persistedMessages.length > 0
-      ? "has-messages"
-      : activeConversationId !== null && messagesKnown && !hasOlderMessages
-        ? "empty"
-        : "unknown";
-  const {
-    showHomeContent,
-    enterChatSurfaceForInteraction,
-    leaveChatSurfaceAfterFailedSend,
-  } = useChatHomeSurface({
-    conversationId: activeConversationId,
-    content: conversationContent,
-    hasVisibleMessages: hasMessages,
-    hasOpenQuestion,
-  });
   useEffect(() => {
     if (!isOnChatRoute) return;
     setComposerFocusRequestId((id) => id + 1);
@@ -569,7 +533,6 @@ export function useFullShellChat({
   } = useAgentInputRouting({
     activeConversationId,
     sendMessage,
-    enterChatSurfaceForInteraction,
   });
   useStellaSendMessageBridge({
     sendContextlessMessage,
@@ -608,13 +571,12 @@ export function useFullShellChat({
     isPlacingInitialScroll;
   const handleSend = useCallback(async () => {
     const shouldFollowSend =
-      showHomeContent || getIsEffectivelyAtBottom() || getShouldFollowSend();
+      getIsEffectivelyAtBottom() || getShouldFollowSend();
     const submittedConversationId = activeConversationId;
     const submittedMessage = composerMessageStore.getSnapshot();
     const submittedSelectedText = selectedText;
     const submittedChatContext = chatContext;
-    const submittedFromHome = showHomeContent;
-    const accepted = await sendMessage({
+    await sendMessage({
       text: submittedMessage,
       selectedText: submittedSelectedText,
       chatContext: submittedChatContext,
@@ -637,7 +599,6 @@ export function useFullShellChat({
       },
       onOptimisticStart: () => {
         if (activeConversationIdRef.current !== submittedConversationId) return;
-        enterChatSurfaceForInteraction();
         if (shouldFollowSend) {
           followAfterSend();
         } else if (!isStreaming) {
@@ -664,22 +625,11 @@ export function useFullShellChat({
         setMessage((current) => current || submittedMessage);
         setSelectedText((current) => current ?? submittedSelectedText);
         setChatContext((current) => current ?? submittedChatContext);
-        leaveChatSurfaceAfterFailedSend();
       },
     });
-    if (
-      !accepted ||
-      activeConversationIdRef.current !== submittedConversationId
-    ) {
-      return;
-    }
-    if (submittedFromHome) {
-      setComposerFocusRequestId((id) => id + 1);
-    }
   }, [
     activeConversationId,
     chatContext,
-    enterChatSurfaceForInteraction,
     getIsFollowing,
     getShouldFollowSend,
     getIsEffectivelyAtBottom,
@@ -687,13 +637,11 @@ export function useFullShellChat({
     composerMessageStore,
     followAfterSend,
     releaseFollow,
-    leaveChatSurfaceAfterFailedSend,
     selectedText,
     sendMessage,
     setChatContext,
     setMessage,
     setSelectedText,
-    showHomeContent,
   ]);
   const hasUnsentAttachments = useHasUnsentBrowserAttachments();
   const { canSubmit } = deriveComposerState({
@@ -703,25 +651,6 @@ export function useFullShellChat({
     conversationId: activeConversationId,
     requireConversationId: true,
   });
-  const autoSendDraftReady = useComposerMessageSelector(
-    composerMessageStore,
-    (text) =>
-      pendingAutoSendTextRef.current !== null &&
-      text === pendingAutoSendTextRef.current,
-  );
-  useEffect(() => {
-    const text = pendingAutoSendTextRef.current;
-    if (!text || !canSubmit || isStreaming) return;
-    if (composerMessageStore.getSnapshot() !== text) return;
-    pendingAutoSendTextRef.current = null;
-    void handleSend();
-  }, [
-    autoSendDraftReady,
-    canSubmit,
-    handleSend,
-    isStreaming,
-    composerMessageStore,
-  ]);
   const chatColumnConversation = useMemo(
     () => ({
       conversationId: activeConversationId,
@@ -896,14 +825,8 @@ export function useFullShellChat({
       conversation,
       composer,
       scroll: chatColumnScroll,
-      showHomeContent,
     }),
-    [
-      conversation,
-      composer,
-      chatColumnScroll,
-      showHomeContent,
-    ],
+    [conversation, composer, chatColumnScroll],
   );
   return { runtime, messages: displayMessages };
 }

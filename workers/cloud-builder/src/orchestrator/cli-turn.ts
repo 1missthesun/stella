@@ -1,6 +1,11 @@
 import type { ExecutionContextSnapshot } from "@stella/contracts/execution-context";
 import { formatTurnClock } from "@stella/contracts/schedule-zone";
-import type { ClaudeUsageLimit, ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
+import {
+  foldUsageLimitPauses,
+  usageLimitHoldsCloudReply,
+  type ClaudeUsageLimit,
+  type ClaudeUsageLimitCard,
+} from "@stella/contracts/claude-usage-limit";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { runToolEffect, sleepWithAbortEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { Effect } from "effect";
@@ -23,11 +28,11 @@ import {
 } from "./claude-code-transport.js";
 import type { WakeReport, ChatTurnRequest } from "./types.js";
 import {
-  CONVERSATION_EXECUTION_KEY,
   LIVE_TOOL_LIMIT,
   LOCAL_TURN_LEASE_KEY,
 } from "./constants.js";
-import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import type { ComposerPrewarmRequest } from "@stella/contracts/composer-prewarm";
+import { cloudTurnRefusal, snapshotAdmissionRefusal } from "../owner-gate/support.js";
 import { json, log, previewArgs } from "./support.js";
 import { OrchestratorTools } from "./tools.js";
 import { ownerGateStub } from "../rpc-release.js";
@@ -35,9 +40,19 @@ import { ownerGateStub } from "../rpc-release.js";
 const CLAUDE_CODE_TURN_WAIT_MS = 60_000;
 const CLAUDE_CODE_ATTEMPT_KEY = "claudeCodeAttempt";
 const CLAUDE_CODE_MODELS_KEY = "claudeCodeModels";
+const COMPOSER_PREWARM_INTERVAL_MS = 60_000;
+const COMPOSER_PREWARM_RECHECK_MS = 5_000;
 
 export abstract class OrchestratorCliTurn extends OrchestratorTools {
   #claudeCode?: CloudClaudeCodeTransport;
+
+  protected abstract usageLimitHolds(): Array<{
+    threadId?: string;
+    until?: number;
+    deviceId?: string;
+    monthly?: true;
+    createdAtMs: number;
+  }>;
 
   protected claudeCodeTransport(): CloudClaudeCodeTransport {
     this.#claudeCode ??= createCloudClaudeCodeTransport({
@@ -156,10 +171,12 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
   }
 
   private composerPrewarmAt = 0;
+  private composerPrewarmCheckedAt = 0;
 
-  protected prewarmForComposer(): void {
+  protected prewarmForComposer(request: ComposerPrewarmRequest): void {
     const now = Date.now();
-    if (now - this.composerPrewarmAt < 60_000) return;
+    if (now - this.composerPrewarmAt < COMPOSER_PREWARM_INTERVAL_MS) return;
+    if (now - this.composerPrewarmCheckedAt < COMPOSER_PREWARM_RECHECK_MS) return;
     if (this.current || this.turnExecutions.size > 0) return;
     const kv = this.ctx.storage.kv;
     if (!kv || kv.get(LOCAL_TURN_LEASE_KEY)) return;
@@ -167,16 +184,58 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     const ownerId = this.journal.ownerId();
     const conversationId = this.conversationId();
     if (!ownerId || !conversationId) return;
-    this.composerPrewarmAt = now;
+    this.composerPrewarmCheckedAt = now;
     this.ctx.waitUntil(
-      this.ctx.storage
-        .get<CloudExecutionSelection>(CONVERSATION_EXECUTION_KEY)
-        .then((execution) => {
-          if (execution?.engine !== "anthropic") return;
-          log("info", "orchestrator_composer_prewarm", { conversationId });
+      this.composerPrewarmSkipReason(ownerId, request)
+        .then((skip) => {
+          if (skip) {
+            log("info", "orchestrator_composer_prewarm_skipped", {
+              conversationId,
+              reason: skip,
+            });
+            return;
+          }
+          this.composerPrewarmAt = Date.now();
+          log("info", "orchestrator_composer_prewarm", {
+            conversationId,
+            target: request.target ?? null,
+          });
           this.prewarmCliContainer(ownerId, conversationId);
         })
         .catch(() => undefined),
+    );
+  }
+
+  private async composerPrewarmSkipReason(
+    ownerId: string,
+    request: ComposerPrewarmRequest,
+  ): Promise<string | null> {
+    if (this.claudeUsageLimitHeldHere()) return "claude_usage_limit";
+    const snapshot = await this.ownerGateSnapshot(ownerId);
+    const held = snapshotAdmissionRefusal(snapshot);
+    if (held) return held.code;
+    const execution = request.execution ?? snapshot.execution;
+    if (execution.engine !== "anthropic") return "not_claude_code";
+    const refusal = cloudTurnRefusal(snapshot, execution, "chat");
+    if (refusal) return refusal.code;
+    if (snapshot.cloudClaudeLoginEnded) return "claude_login_ended";
+    if (request.target === "cloud") return null;
+    return (await this.piBrainPlacesChat(ownerId))
+      ? "computer_holds_conversation"
+      : null;
+  }
+
+  private claudeUsageLimitHeldHere(): boolean {
+    const now = Date.now();
+    return usageLimitHoldsCloudReply(
+      foldUsageLimitPauses(
+        this.usageLimitHolds().map(({ createdAtMs, ...hold }) => ({
+          card: { type: "usage-limit" as const, state: "held" as const, ...hold },
+          createdAtMs,
+        })),
+        now,
+      ),
+      now,
     );
   }
 

@@ -4,6 +4,7 @@ import {
   createAssistantMessageEventStream,
   type AssistantMessage,
   type AssistantMessageEvent,
+  type Message,
   type Models,
 } from "@earendil-works/pi-ai";
 import {
@@ -21,6 +22,14 @@ import {
 import { LOCAL_PROVIDER_ID } from "../provider/byok.ts";
 import { STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
+import { isContextHandoffNotesRequest } from "@stella/contracts/context-handoff";
+
+const isBackgroundHandoffRequest = (messages: readonly Message[]): boolean => {
+  const last = messages.at(-1);
+  if (last?.role !== "user") return false;
+  const text = typeof last.content === "string" ? last.content : last.content.map((part) => (part.type === "text" ? part.text : "")).join("");
+  return isContextHandoffNotesRequest(text);
+};
 
 export const TURN_LIMITS_EXTENSION = "stella-turn-limits";
 
@@ -105,7 +114,8 @@ export function createTurnLimits(options: TurnLimitsOptions, report: (error: unk
   const stream = (models: Models, args: StreamArgs) => {
     const [model, transcript, streamOptions] = args;
     const sessionId = streamOptions?.sessionId;
-    if (!sessionId || sessionId !== rootSession) return models.streamSimple(...args);
+    // A background handoff's notes request runs beside the turn, which the watchdog guards; it has a deadline of its own.
+    if (!sessionId || sessionId !== rootSession || isBackgroundHandoffRequest(transcript.messages)) return models.streamSimple(...args);
     const out = createAssistantMessageEventStream();
     const controller = new AbortController();
     const outer = streamOptions?.signal;

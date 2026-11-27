@@ -919,7 +919,17 @@
         "thisComputerInline": "komputer ini",
         "rowNotChosen": "Memakai {email}, bukan {chosen}",
         "rowEnded": "Login berakhir",
-        "rowEnding": "Login berakhir {date}"
+        "rowEnding": "Login berakhir {date}",
+        "automaticHint": "Memakai akun yang sudah masuk di Claude Code pada tiap komputer",
+        "chooseNote": "Akun yang Anda pilih dipakai di semua komputer Anda dan di cloud.",
+        "inUseTitle": "Sedang dipakai",
+        "missingChosen": "{email} belum masuk di sini.",
+        "missingChosenFallback": "{email} belum masuk di sini, jadi login lokal yang dipakai.",
+        "ownLoginNote": "Login Claude Code milik komputer ini: {email}",
+        "reasonCloudLogin": "Login cloud",
+        "reasonOtherLogin": "Ditambahkan di Stella",
+        "reasonOwnLogin": "Login Claude Code milik komputer ini",
+        "reasonSelected": "Dipilih di Stella"
       },
       "claudeLogin": {
         "whereCloud": "Masuk ke Claude Code di cloud Anda.",

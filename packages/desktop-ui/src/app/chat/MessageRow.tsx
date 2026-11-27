@@ -60,6 +60,7 @@ import { AppPreviewCard } from "@/features/cloud/AppPreviewCard";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
 import { ReminderFireCard } from "@/features/reminders/ReminderFireCard";
+import { WelcomeMessage } from "@/features/welcome/WelcomeMessage";
 import { ScheduleNotices } from "@/features/schedule/ScheduleNotices";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
@@ -825,9 +826,13 @@ export const AssistantMessageRow = memo(
           {hasBody && (
             <div className="message-line message-line--assistant">
               <div className="assistant-message-text chat-bubble-text">
-                <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules
-                  hiddenFilePaths={hiddenFileKeys}
-                />
+                {row.welcome ? (
+                  <WelcomeMessage />
+                ) : (
+                  <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules
+                    hiddenFilePaths={hiddenFileKeys}
+                  />
+                )}
                 {evidencePaths.length > 0 ? (
                   <MessageAttachments filePaths={evidencePaths} part="documents" />
                 ) : null}

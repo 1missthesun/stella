@@ -249,7 +249,7 @@ export function EngineAccountRow({
               ? t("mobile.engineAccounts.statusPlanUsageOff")
               : row.plan;
     } else {
-      label = t("settings.engineAccounts.addChatgpt");
+      label = t("mobile.engineAccounts.connectChatgpt");
     }
   }
   if (!engines) label = "";

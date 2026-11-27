@@ -2,6 +2,7 @@ import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/global/auth/lib/auth-client";
 import { Button } from "@/ui/button";
+import { Trash2 } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
 
 type PasskeyRow = {
@@ -102,11 +103,13 @@ export function PasskeysCard() {
             <Button
               type="button"
               variant="ghost"
-              className="pill-btn pill-btn--danger"
+              className="settings-icon-btn settings-icon-btn--danger"
               disabled={busy}
+              aria-label={`${t("settings.passkeys.remove")} — ${passkey.name || t("settings.passkeys.unnamed")}`}
+              title={t("settings.passkeys.remove")}
               onClick={() => remove(passkey.id)}
             >
-              {t("settings.passkeys.remove")}
+              <Trash2 size={15} aria-hidden />
             </Button>
           </div>
         </div>

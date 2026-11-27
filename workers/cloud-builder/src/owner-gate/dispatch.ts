@@ -23,9 +23,13 @@ import {
 import {
   type DevicePresenceState,
   type DeviceRegistration,
+  FAILOVER_REASON_PREFIX,
+  failsOverToDevices,
   isDispatchTransition,
   isEligibleDevice,
   isOwnScheduledWork,
+  isOwnSend,
+  runsExecutionOn,
   isTerminalDispatchState,
   MAX_OFFERS_PER_DISPATCH,
 } from "../dispatch-policy.js";
@@ -56,6 +60,8 @@ import {
 } from "./support.js";
 import { OwnerGateDeviceSockets } from "./device-sockets.js";
 
+
+const FAILOVER_MAX_DEVICES = 3;
 
 const NEVER_STARTED_STATES: ReadonlySet<DispatchState> = new Set<DispatchState>(["offering", "computer_claimed"]);
 
@@ -438,6 +444,112 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     row.gate_held = 0;
   }
 
+  protected failoverCandidates(
+    row: Pick<
+      DispatchRow,
+      | "dispatch_id"
+      | "kind"
+      | "subject"
+      | "ingress"
+      | "requested_target_mode"
+      | "requested_executor_device_id"
+      | "requesting_device_id"
+      | "required_capabilities"
+      | "on_no_eligible_computer"
+    >,
+    snapshot: OwnerSnapshot,
+    now: number,
+  ): DevicePresenceState[] {
+    if (!failsOverToDevices(row)) return [];
+    const offered = this.ctx.storage.sql
+      .exec<{ device_id: string }>(
+        `SELECT device_id FROM dispatch_offers WHERE dispatch_id = ?`,
+        row.dispatch_id,
+      )
+      .toArray()
+      .map((offer) => offer.device_id)
+      .filter((deviceId) => deviceId !== row.requested_executor_device_id);
+    if (offered.length >= FAILOVER_MAX_DEVICES) return [];
+    const skip = new Set([...offered, row.requested_executor_device_id]);
+    const required = JSON.parse(row.required_capabilities) as ExecutionCapability[];
+    const ranked: Array<{ presence: DevicePresenceState; rank: number[] }> = [];
+    for (const device of snapshot.devices ?? []) {
+      if (skip.has(device.deviceId)) continue;
+      const presence = this.presenceRow(device.deviceId);
+      if (!presence?.capabilities.includes("chat-failover")) continue;
+      const own = isOwnSend(row, device.deviceId);
+      if (
+        !isEligibleDevice({
+          presence,
+          device,
+          kind: row.kind as ExecutionKind,
+          requiredCapabilities: required,
+          now,
+          staleAfterMs: DEVICE_PRESENCE_STALE_AFTER_MS,
+          ownWork: own,
+        })
+      ) {
+        continue;
+      }
+      ranked.push({
+        presence,
+        rank: [
+          runsExecutionOn(presence, snapshot.execution) ? 1 : 0,
+          device.brainHome ? 1 : 0,
+          own ? 1 : 0,
+          presence.lastSeenAt,
+        ],
+      });
+    }
+    ranked.sort((a, b) => {
+      for (let index = 0; index < a.rank.length; index += 1) {
+        const order = b.rank[index]! - a.rank[index]!;
+        if (order !== 0) return order;
+      }
+      return 0;
+    });
+    return ranked.map((entry) => entry.presence);
+  }
+
+  protected async offerFailover(
+    row: DispatchRow,
+    now: number,
+    fallbackReason: string,
+  ): Promise<DispatchRow | null> {
+    if (!failsOverToDevices(row)) return null;
+    const snapshot = await this.snapshot({ now }).catch(() => null);
+    const next = snapshot ? this.failoverCandidates(row, snapshot, now)[0] : undefined;
+    if (!next) return null;
+    const deadline = now + DISPATCH_OFFER_WINDOW_MS;
+    const reason = fallbackReason.startsWith(FAILOVER_REASON_PREFIX)
+      ? fallbackReason
+      : `${FAILOVER_REASON_PREFIX}${fallbackReason}`;
+    const moved = await this.transitionDispatch(
+      row,
+      "offering",
+      {
+        executor_device_id: null,
+        executor_presence_session_id: null,
+        lease_expires_at: null,
+        offer_deadline_at: deadline,
+        fallback_reason: reason.slice(0, 200),
+      },
+      now,
+      { notifyExecutor: false },
+    );
+    if (!moved.applied) return null;
+    this.openOffer(row.dispatch_id, next, deadline, now);
+    this.pushOffer(moved.row, next.deviceId, deadline);
+    log("info", "dispatch_failover_offered", {
+      dispatchId: row.dispatch_id,
+      fromDeviceId: row.requested_executor_device_id,
+      deviceId: next.deviceId,
+      reason: fallbackReason,
+    });
+    await this.scheduleAlarm(now);
+    return moved.row;
+  }
+
   protected async resolveUnaccepted(
     row: DispatchRow,
     now: number,
@@ -447,6 +559,8 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       return row;
     }
     this.withdrawOffers(row.dispatch_id, null, fallbackReason, now);
+    const failedOver = await this.offerFailover(row, now, row.fallback_reason?.startsWith(FAILOVER_REASON_PREFIX) ? row.fallback_reason : fallbackReason);
+    if (failedOver) return failedOver;
     if (row.on_no_eligible_computer === "cloud" && row.kind === "agent") {
       const snapshot = await this.snapshot({ now }).catch(() => null);
       if (snapshot && !snapshotAllowsCloudSandbox(snapshot)) {
@@ -916,7 +1030,8 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       kind: row.kind as ExecutionKind,
       requiredCapabilities: required,
       now,
-      ...(isOwnScheduledWork(row, attachment.deviceId)
+      ...(isOwnScheduledWork(row, attachment.deviceId) ||
+      (failsOverToDevices(row) && isOwnSend(row, attachment.deviceId))
         ? { ownWorkOf: attachment.deviceId }
         : {}),
     });

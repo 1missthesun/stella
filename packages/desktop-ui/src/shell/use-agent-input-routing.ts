@@ -9,7 +9,6 @@ const NO_OP = () => {}
 type UseAgentInputRoutingOptions = {
   activeConversationId: string | null
   sendMessage: (args: SendMessageArgs) => Promise<boolean>
-  enterChatSurfaceForInteraction: () => void
 }
 
 type UseAgentInputRoutingResult = {
@@ -33,7 +32,6 @@ type UseAgentInputRoutingResult = {
 export function useAgentInputRouting({
   activeConversationId,
   sendMessage,
-  enterChatSurfaceForInteraction,
 }: UseAgentInputRoutingOptions): UseAgentInputRoutingResult {
   const sendMessageRef = useRef(sendMessage)
   useEffect(() => {
@@ -42,17 +40,15 @@ export function useAgentInputRouting({
 
   const sendContextlessMessage = useCallback(
     async (text: string, metadata?: MessageMetadata) => {
-      const accepted = await sendMessageRef.current({
+      return await sendMessageRef.current({
         text,
         selectedText: null,
         chatContext: null,
         onClear: NO_OP,
         metadata,
       })
-      if (accepted) enterChatSurfaceForInteraction()
-      return accepted
     },
-    [enterChatSurfaceForInteraction],
+    [],
   )
 
   const sendAgentInputMessage = useCallback(
@@ -66,7 +62,6 @@ export function useAgentInputRouting({
         void sendContextlessMessage(detail.text, metadata)
         return
       }
-      enterChatSurfaceForInteraction()
       void window.electronAPI.agent
         .sendInput({
           conversationId: activeConversationId,
@@ -82,7 +77,7 @@ export function useAgentInputRouting({
           void sendContextlessMessage(detail.text, metadata)
         })
     },
-    [activeConversationId, enterChatSurfaceForInteraction, sendContextlessMessage],
+    [activeConversationId, sendContextlessMessage],
   )
 
   const sendMessageWithContext = useCallback(
@@ -93,7 +88,7 @@ export function useAgentInputRouting({
       onOptimisticStart?: () => void,
       metadata?: MessageMetadata,
     ) => {
-      const accepted = await sendMessageRef.current({
+      return await sendMessageRef.current({
         text,
         selectedText: selectedTextCtx ?? null,
         chatContext: chatCtx ?? null,
@@ -101,10 +96,8 @@ export function useAgentInputRouting({
         onOptimisticStart,
         metadata,
       })
-      if (accepted) enterChatSurfaceForInteraction()
-      return accepted
     },
-    [enterChatSurfaceForInteraction],
+    [],
   )
 
   return {

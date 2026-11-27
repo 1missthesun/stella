@@ -107,6 +107,8 @@ export type OwnerHost = {
     ownerGeneration: string;
     sourceTurnId: string;
     card: unknown;
+    /** Post only while the journal is still empty; true (nothing posted) once it isn't. */
+    onlyFirst?: boolean;
   }): Promise<boolean>;
   resolveSafeguard(input: {
     conversationId: string;

@@ -21,6 +21,7 @@ import type { MessageRecord } from "@stella/contracts/local-chat";
 import { isOrchestratorReservedBuiltinAgentId } from "@stella/contracts/agent-runtime";
 import { isOfficePreviewRef } from "@stella/contracts/office-preview";
 import { parseReminderMark } from "@stella/contracts/reminders";
+import { parseWelcomeMark, WELCOME_TEXT } from "@stella/contracts/welcome-message";
 import { parseScheduleNoticeCard } from "@stella/contracts/schedule-notice";
 import {
   collectTurnSourceDiffPayloads,
@@ -757,6 +758,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const officePreviewRef = getOfficePreviewRef(ownToolEvents);
         const voiceSession = payload?.metadata?.voiceSession;
         const reminder = parseReminderMark(payload?.metadata?.reminder);
+        const welcome = parseWelcomeMark(payload?.metadata?.welcome);
         const scheduleNotice = parseScheduleNoticeCard(payload?.metadata?.scheduleNotice);
         const backgroundWorks = buildBackgroundWorks(toolEvents);
         const backgroundWork = backgroundWorks[0];
@@ -771,7 +773,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         const row: AssistantRowViewModel = {
           kind: "assistant",
           id: stableKey,
-          text: voiceSession ? "" : text,
+          text: voiceSession ? "" : welcome ? WELCOME_TEXT : text,
           timestampMs: message.timestamp,
           cacheKey: stableKey,
           sourceMessageId: message._id,
@@ -794,6 +796,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           ...(sourceDiffPayloads.length > 0 ? { sourceDiffPayloads } : {}),
           ...(voiceSession ? { voiceSession } : {}),
           ...(reminder ? { reminder } : {}),
+          ...(welcome ? { welcome } : {}),
           ...(scheduleNotice ? { scheduleNotice } : {}),
           ...(backgroundWork ? { backgroundWork } : {}),
           ...(spawnedThreadIds.length > 0 ? { spawnedThreadIds } : {}),

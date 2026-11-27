@@ -710,7 +710,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
             composer={chat.composer}
             scroll={chat.scroll}
             conversationId={conversationId}
-            showHomeContent={chat.showHomeContent}
           />
         </div>
         <div

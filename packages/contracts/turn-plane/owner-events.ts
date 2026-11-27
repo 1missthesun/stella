@@ -109,6 +109,20 @@ export type ThreadCompletedEvent = OwnerEventBase & {
   wakeCheck?: true;
 };
 
+/**
+ * A cloud task whose attempt stays open across its waits (one started from another place, run by
+ * the cloud orchestrator) ended a turn with nothing running (`idle`), or started one again. Its
+ * owner keeps this beside the open attempt, so it knows the task is idle without a turn ending.
+ */
+export type ThreadIdleEvent = OwnerEventBase & {
+  kind: "thread.idle";
+  threadId: string;
+  idle: boolean;
+  waitingFor?: string;
+  wakers?: string[];
+  at: number;
+};
+
 export type OwnerEvent =
   | ConversationCreatedEvent
   | ConversationIndexEvent
@@ -116,6 +130,7 @@ export type OwnerEvent =
   | TurnStartedEvent
   | TurnEventEvent
   | ThreadSpawnedEvent
+  | ThreadIdleEvent
   | ThreadCompletedEvent;
 
 export const ownerReadsTurnEvent = (

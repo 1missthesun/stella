@@ -562,7 +562,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
             composer={chat.composer}
             scroll={chat.scroll}
             conversationId={conversationId}
-            showHomeContent={chat.showHomeContent}
           />
         </col>
         <col id="route-outlet-surface" absolute={{ left: 0, top: SHELL_TOPBAR_HEIGHT, right: 0, bottom: 0 }} hidden={isOnChatRoute}>

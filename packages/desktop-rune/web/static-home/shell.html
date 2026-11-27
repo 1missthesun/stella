@@ -2,10 +2,8 @@
   #stella-static-home { position: fixed; inset: 0; z-index: 2147483000; background: var(--sh-bg); font-family: "Manrope", "Manrope Fallback", system-ui, -apple-system, sans-serif; font-kerning: normal; }
   #stella-static-home:not([data-ready]) .sh-area { visibility: hidden; }
   #stella-static-home[data-leaving] { opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
-  #stella-static-home .sh-area { position: absolute; inset: 38px 0 0; display: flex; justify-content: center; }
-  #stella-static-home .sh-home { box-sizing: border-box; width: 100%; max-width: 780px; padding: 48px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  #stella-static-home h1 { margin: 0 0 20px; font: 600 36px/43.2px "Mona Sans", "Manrope", "Manrope Fallback", system-ui, -apple-system, sans-serif; letter-spacing: -1.08px; color: var(--sh-title); text-align: center; white-space: pre-wrap; overflow-wrap: break-word; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-  #stella-static-home .sh-col { box-sizing: border-box; width: 100%; padding: 12px 24px 10px; display: flex; flex-direction: column; align-items: center; }
+  #stella-static-home .sh-area { position: absolute; inset: 38px 0 0; display: flex; flex-direction: column; justify-content: flex-end; }
+  #stella-static-home .sh-col { box-sizing: border-box; width: 100%; padding: 4px 24px 10px; display: flex; flex-direction: column; align-items: center; }
   #stella-static-home .sh-shell { box-sizing: border-box; width: 100%; max-width: min(800px, 100% - 48px); min-height: 46px; padding: 1px; border-radius: 23px; background: var(--sh-panel); box-shadow: inset 0 0 0 1px var(--sh-border), inset 0 1px 0 0 var(--sh-hl); }
   #stella-static-home .sh-shell:focus-within { box-shadow: inset 0 0 0 1px var(--sh-focus), inset 0 1px 0 0 var(--sh-hl); }
   #stella-static-home form { box-sizing: border-box; display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0; padding: 6px 8px; }
@@ -22,25 +20,19 @@
     #stella-static-home .sh-col { padding-left: 8px; padding-right: 8px; }
     #stella-static-home .sh-shell { max-width: none; }
   }
-  @media (max-width: 640px) {
-    #stella-static-home h1 { font-size: 29px; line-height: 34.8px; letter-spacing: -0.87px; }
-  }
 </style>
 <div id="stella-static-home" aria-label="Stella">
   <div class="sh-area">
-    <div class="sh-home">
-      <h1 id="stella-static-home-greeting"></h1>
-      <div class="sh-col">
-        <div class="sh-shell">
-          <form>
-            <button type="button" tabindex="-1" class="sh-add" title="Add" aria-label="Add"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">__STELLA_ICON_PLUS__</svg></button>
-            <div class="sh-field"><textarea placeholder="Do anything" rows="1" aria-label="Do anything" spellcheck="true"></textarea></div>
-            <div class="sh-right">
-              <button type="button" tabindex="-1" class="sh-mic" title="Start dictation" aria-label="Start dictation"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">__STELLA_ICON_MIC__</svg></button>
-              <button type="submit" tabindex="-1" class="sh-send" disabled><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">__STELLA_ICON_SEND__</svg></button>
-            </div>
-          </form>
-        </div>
+    <div class="sh-col">
+      <div class="sh-shell">
+        <form>
+          <button type="button" tabindex="-1" class="sh-add" title="Add" aria-label="Add"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">__STELLA_ICON_PLUS__</svg></button>
+          <div class="sh-field"><textarea placeholder="Do anything" rows="1" aria-label="Do anything" spellcheck="true"></textarea></div>
+          <div class="sh-right">
+            <button type="button" tabindex="-1" class="sh-mic" title="Start dictation" aria-label="Start dictation"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">__STELLA_ICON_MIC__</svg></button>
+            <button type="submit" tabindex="-1" class="sh-send" disabled><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">__STELLA_ICON_SEND__</svg></button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -51,17 +43,14 @@
     if (!shell) return;
     var root = document.documentElement;
     var params = new URLSearchParams(window.location.search);
-    var surface = null;
     var lastPath = "/chat";
     var look = null;
     try {
-      surface = window.localStorage.getItem("stella.chatHomeSurface");
       var last = window.localStorage.getItem("stella:lastLocation");
       if (last && last.charAt(0) === "/") lastPath = last.split(/[?#]/)[0];
       look = JSON.parse(window.localStorage.getItem("__STELLA_LOOK_KEY__") || "null");
     } catch (error) {}
     if (
-      surface === "chat" ||
       (lastPath !== "/chat" && lastPath !== "/") ||
       params.get("mobile") === "1" ||
       params.get("window") === "mini" ||
@@ -73,21 +62,6 @@
     var dark = root.getAttribute("data-stella-boot-theme") !== "light";
     if (!look || typeof look !== "object" || !look.vars || look.dark !== dark) look = __STELLA_FIRST_VISIT__[dark ? "dark" : "light"];
     for (var name in look.vars) shell.style.setProperty(name, look.vars[name]);
-    var funGreetings = __STELLA_FUN_GREETINGS__;
-    var hour = new Date().getHours();
-    var greeting = { kind: "time" };
-    var text =
-      hour < 5 ? "Good night"
-      : hour < 12 ? "Good morning"
-      : hour < 17 ? "Good afternoon"
-      : hour < 21 ? "Good evening"
-      : "Good night";
-    if (funGreetings.length > 0 && Math.random() < __STELLA_FUN_GREETING_CHANCE__) {
-      text = funGreetings[Math.floor(Math.random() * funGreetings.length)];
-      greeting = { kind: "fun", text: text };
-    }
-    window.__stellaStaticGreeting = greeting;
-    document.getElementById("stella-static-home-greeting").textContent = text;
     var draft = shell.querySelector("textarea");
     shell.querySelector("form").addEventListener("submit", function (event) {
       event.preventDefault();

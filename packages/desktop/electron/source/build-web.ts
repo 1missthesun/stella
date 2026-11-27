@@ -79,28 +79,13 @@ const CSS_URL = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
 const LAUNCH_RESCUE =
   /    <div id="stella-launch"[\s\S]*?<script src="[^"\n]*\/stella-launch-rescue\.js"><\/script>\s*/;
 
-const FUN_GREETINGS = /const FUN_GREETINGS = (\[[\s\S]*?\]);/;
-const FUN_GREETING_CHANCE = /const FUN_GREETING_CHANCE = ([0-9.]+);/;
-
 const staticHomeMarkup = (
   uiRoot: string,
-  log: (message: string) => void,
   firstVisit: Record<"dark" | "light", StaticHomeRoot>,
-): string => {
-  const partial = fs.readFileSync(path.join(uiRoot, "web-static-home.html"), "utf8");
-  const home = fs.readFileSync(path.join(uiRoot, "src", "app", "home", "HomeContent.jsx"), "utf8");
-  let greetings: string[] = [];
-  try {
-    greetings = JSON.parse(FUN_GREETINGS.exec(home)?.[1]?.replace(/,\s*\]$/, "]") ?? "[]");
-  } catch {
-    log("[web-build] HomeContent's greetings were not found; the static Home uses the time of day only.");
-  }
-  const chance = Number(FUN_GREETING_CHANCE.exec(home)?.[1] ?? 0);
-  return partial
-    .replace("__STELLA_FUN_GREETINGS__", () => JSON.stringify(greetings))
-    .replace("__STELLA_FUN_GREETING_CHANCE__", () => String(Number.isFinite(chance) ? chance : 0))
+): string =>
+  fs
+    .readFileSync(path.join(uiRoot, "web-static-home.html"), "utf8")
     .replace("__STELLA_FIRST_VISIT_ROOTS__", () => JSON.stringify(firstVisit));
-};
 
 const isExternalUrl = (value: string) =>
   !value || value.startsWith("#") || value.startsWith("//") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value);
@@ -354,7 +339,7 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     ? emitFile("app.css", Buffer.from((await Promise.all(criticalCss.map((id) => stylesheet(id, "../")))).join("\n")))
     : null;
   if (options.staticHome) {
-    const markup = staticHomeMarkup(uiRoot, log, options.staticHome.firstVisit);
+    const markup = staticHomeMarkup(uiRoot, options.staticHome.firstVisit);
     html = html.replace(/(\s*)<div id="root">/, (match, indent: string) => `${indent}${markup.trim().split("\n").join(indent)}${match}`);
   }
   const entryTags = [

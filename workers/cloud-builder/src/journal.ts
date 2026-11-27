@@ -1859,6 +1859,15 @@ export class Journal {
     return start < scan.length ? scan[start]!.seq : this.meta().next_seq;
   }
 
+  /** The seq to read from so cards before the first message (a welcome, a fired reminder) reach the model too. */
+  importStartSeq(contextStartSeq: number): number {
+    if (this.meta().hot_min_seq > 0) return contextStartSeq;
+    const earlier = this.sql
+      .exec(`SELECT 1 FROM journal WHERE kind = 'message' AND seq < ? LIMIT 1`, contextStartSeq)
+      .toArray();
+    return earlier.length > 0 ? contextStartSeq : 0;
+  }
+
   turnStartSeq(turnId: string): number | undefined {
     return this.sql
       .exec<{ seq: number | null }>(

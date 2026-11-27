@@ -210,7 +210,7 @@ export function CloudMemoryWipeSettings() {
               so it can prove the wipe finished.
             </DialogDescription>
           </DialogHeader>
-          <div style={dialogActionsStyle}>
+          <div className="settings-confirm-actions settings-confirm-actions--flush" style={dialogActionsStyle}>
             <Button
               type="button"
               variant="ghost"
@@ -253,7 +253,7 @@ export function CloudMemoryWipeSettings() {
             autoComplete="off"
             spellCheck={false}
           />
-          <div style={dialogActionsStyle}>
+          <div className="settings-confirm-actions settings-confirm-actions--flush" style={dialogActionsStyle}>
             <Button
               type="button"
               variant="ghost"

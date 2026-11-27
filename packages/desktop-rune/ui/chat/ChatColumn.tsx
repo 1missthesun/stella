@@ -12,7 +12,6 @@ import { ConversationFocusOverlay } from "@/app/chat/ConversationFocusOverlay";
 import { useConversationFocus } from "@/features/chat/services/conversation-focus-store";
 import { useChatMessages } from "@/context/use-chat-messages";
 import { Composer } from "@/app/chat/Composer";
-import { HomeContent } from "../shell/home/HomeContent";
 import { buildInlineWorkingIndicatorProps } from "@/features/chat/working-indicator-state";
 import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-aloud";
 import type { ChatColumnProps } from "@/features/chat/chat-column-types";
@@ -22,7 +21,6 @@ import { useDeferredChatMessages } from "@/features/chat/hooks/use-deferred-chat
 import { useComposerMessage, type ComposerMessageStore } from "@/features/chat/hooks/use-composer-message-state";
 import { CATCH_UP_ENABLED } from "@stella/contracts/catch-up";
 import { useT } from "@/shared/i18n";
-import { useTabStageVisible } from "@/features/workspace-display/tab-stage-visible";
 import { SignedOutBanner } from "@/global/local-mode/SignedOutBanner";
 import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
 import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
@@ -35,6 +33,7 @@ import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geom
 import type { Layout } from "../../host/rune-jsx/props";
 import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
 import { panelSurface } from "./surfaces";
+import { useStaticHomeLook } from "./static-home";
 
 export type { ChatColumnProps };
 
@@ -48,7 +47,6 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   paddingBottom: 28,
 };
 
-const HOME_LEAVE_MS = 280;
 const COMPOSER_OVERLAP = 12;
 const SCROLL_BUTTON_SIZE = 32;
 const SCROLL_BUTTON_BOTTOM = 28;
@@ -73,17 +71,13 @@ const AboveComposerCards = memo(function AboveComposerCards({ conversationId, on
   );
 });
 
-type ComposerSurface = "chat" | "home";
 type ComposerAreaParts = { above: Layout | null; composer: Layout | null };
 
-function useComposerAreaReport(active: ComposerSurface | null) {
-  const parts = useRef<Record<ComposerSurface, ComposerAreaParts>>({ chat: { above: null, composer: null }, home: { above: null, composer: null } });
-  const activeRef = useRef(active);
-  activeRef.current = active;
+function useComposerAreaReport() {
+  const parts = useRef<ComposerAreaParts>({ above: null, composer: null });
   const report = useCallback(() => {
-    const surface = activeRef.current;
-    const area = surface ? parts.current[surface] : null;
-    const composer = area?.composer;
+    const area = parts.current;
+    const composer = area.composer;
     if (!composer || composer.w <= 0) return reportComposerArea(null);
     const narrow = composer.w < COMPOSER_NARROW_W;
     const width = narrow ? composer.w - 16 : composerShellMaxW(composer.w);
@@ -91,14 +85,13 @@ function useComposerAreaReport(active: ComposerSurface | null) {
     const top = area.above && area.above.h > 0 ? Math.min(area.above.y, shellTop) : shellTop;
     reportComposerArea({ top, left: composer.x + (composer.w - width) / 2, width });
   }, []);
-  useEffect(() => report(), [active, report]);
   useEffect(() => () => reportComposerArea(null), []);
   return useMemo(() => {
-    const on = (surface: ComposerSurface, part: keyof ComposerAreaParts) => (r: Layout) => {
-      parts.current[surface][part] = r;
-      if (activeRef.current === surface) report();
+    const on = (part: keyof ComposerAreaParts) => (r: Layout) => {
+      parts.current[part] = r;
+      report();
     };
-    return { chatAbove: on("chat", "above"), chatComposer: on("chat", "composer"), homeAbove: on("home", "above"), homeComposer: on("home", "composer") };
+    return { chatAbove: on("above"), chatComposer: on("composer") };
   }, [report]);
 }
 
@@ -170,11 +163,9 @@ function ChatScrollbar({ bind, onDrag }: { bind: (handle: ChatScrollThumbHandle 
   );
 }
 
-export const ChatColumn = memo(function ChatColumn({ conversation, composer, scroll, composerEntering, conversationId, showHomeContent: homeSurface }: ChatColumnProps) {
-  const tabStageVisible = useTabStageVisible();
-  const showHomeContent = Boolean(homeSurface) && !tabStageVisible;
+export const ChatColumn = memo(function ChatColumn({ conversation, composer, scroll, composerEntering, conversationId }: ChatColumnProps) {
+  useStaticHomeLook(useTokens());
   const focus = useConversationFocus(conversationId);
-  const homeObscuresChat = showHomeContent && !focus;
   const { noteManualScroll, showScrollButton, scrollToBottom, list, isFollowingLatest, isNearBottom, isUserScrolling } = scroll;
   const bindThumb = scroll.thumbRef as unknown as (handle: ChatScrollThumbHandle | null) => void;
 
@@ -202,15 +193,6 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
   const messages = useDeferredChatMessages(liveMessages, isUserScrolling, conversationId);
   const assistantReplyPeek = useAssistantReplyPeek({ messages, isFollowingLatest, isNearBottom });
 
-  const [homeVisible, setHomeVisible] = useState(Boolean(showHomeContent));
-  if (showHomeContent && !homeVisible) setHomeVisible(true);
-  const homeLeaving = homeVisible && !showHomeContent;
-  useEffect(() => {
-    if (!homeLeaving) return;
-    const timer = setTimeout(() => setHomeVisible(false), HOME_LEAVE_MS);
-    return () => clearTimeout(timer);
-  }, [homeLeaving]);
-
   useReadAloud(messages);
 
   const overdueStop = useOverdueStop({ working: Boolean(conversation.streaming.isStreaming), messageId: conversation.streaming.pendingUserMessageId, stop: composer.onStop });
@@ -237,7 +219,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
       overdueStop,
     ],
   );
-  const composerArea = useComposerAreaReport(homeObscuresChat ? "home" : "chat");
+  const composerArea = useComposerAreaReport();
   const { isDragOver, dropHandlers } = useFileDrop({ setChatContext: composer.setChatContext });
 
   const replyComposerRef = useRef(composer);
@@ -250,8 +232,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
     current.requestFocus?.();
   }, []);
 
-  const renderComposer = (surface: "chat" | "home", replyPeek: ComponentProps<typeof Composer>["replyPeek"]) => {
-    const isActiveSurface = surface === "home" ? showHomeContent : !showHomeContent;
+  const renderComposer = (replyPeek: ComponentProps<typeof Composer>["replyPeek"]) => {
     return (
       <StoreBackedComposer
         messageStore={composer.messageStore}
@@ -262,14 +243,13 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
         setSelectedText={composer.setSelectedText}
         isStreaming={conversation.streaming.isStreaming}
         canSubmit={composer.canSubmit}
-        focusRequestId={isActiveSurface ? composer.focusRequestId : undefined}
+        focusRequestId={composer.focusRequestId}
         conversationId={conversationId}
         onSend={composer.onSend}
         onStop={composer.onStop}
         isDragOver={isDragOver}
         replyPeek={replyPeek}
-        catchUp={CATCH_UP_ENABLED && surface === "chat"}
-        suggestionsActive={isActiveSurface}
+        catchUp={CATCH_UP_ENABLED}
       />
     );
   };
@@ -296,7 +276,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
 
   return (
     <row w="full" h="full" grow={1} minW={0} minH={0} align="stretch">
-      <row grow={1} minW={0} minH={0} align="stretch" opacity={homeObscuresChat ? 0 : 1} motion={{ dur: 0.22, bounce: 0 }} inert={homeObscuresChat}>
+      <row grow={1} minW={0} minH={0} align="stretch">
         <col grow={1} minW={0} minH={0} {...dropHandlers}>
           <SignedOutBanner />
           <SessionPausedBanner />
@@ -326,28 +306,11 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
           </box>
           <AboveComposerCards conversationId={conversationId} onLayout={composerArea.chatAbove} />
           <col w="full" onLayout={composerArea.chatComposer} enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
-            {renderComposer("chat", chatReplyPeek)}
+            {renderComposer(chatReplyPeek)}
           </col>
         </col>
         <ChatScrollbar bind={bindThumb} onDrag={handleThumbDrag} />
       </row>
-      {homeVisible && !focus ? (
-        <col absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} raise={10} inert={homeLeaving} {...dropHandlers}>
-          <HomeContent leaving={homeLeaving}>
-            {conversation.extraTail ? <col inert={!showHomeContent}>{conversation.extraTail}</col> : null}
-            <col w="full" inert={!showHomeContent}>
-              {showHomeContent ? (
-                <col w="full" onLayout={composerArea.homeAbove}>
-                  <ComposerNotice conversationId={conversationId} />
-                </col>
-              ) : null}
-              <col w="full" onLayout={composerArea.homeComposer}>
-                {renderComposer("home", null)}
-              </col>
-            </col>
-          </HomeContent>
-        </col>
-      ) : null}
     </row>
   );
 });

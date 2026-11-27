@@ -920,7 +920,17 @@
         "thisComputerInline": "dieser Computer",
         "rowNotChosen": "Nutzt {email}, nicht {chosen}",
         "rowEnded": "Anmeldung abgelaufen",
-        "rowEnding": "Anmeldung läuft am {date} ab"
+        "rowEnding": "Anmeldung läuft am {date} ab",
+        "automaticHint": "Nutzt das Konto, mit dem Claude Code auf dem jeweiligen Computer bereits angemeldet ist",
+        "chooseNote": "Das gewählte Konto wird auf all deinen Computern und in der Cloud verwendet.",
+        "inUseTitle": "Gerade in Verwendung",
+        "missingChosen": "{email} ist hier nicht angemeldet.",
+        "missingChosenFallback": "{email} ist hier nicht angemeldet, daher wird die eigene Anmeldung verwendet.",
+        "ownLoginNote": "Eigene Claude Code-Anmeldung dieses Computers: {email}",
+        "reasonCloudLogin": "Anmeldung der Cloud",
+        "reasonOtherLogin": "In Stella hinzugefügt",
+        "reasonOwnLogin": "Eigene Claude Code-Anmeldung dieses Computers",
+        "reasonSelected": "In Stella ausgewählt"
       },
       "claudeLogin": {
         "whereCloud": "Anmeldung bei Claude Code in deiner Cloud.",

@@ -2,6 +2,8 @@ import type { ChatMessage } from "../types";
 
 export type CloudTranscriptDisplayInput = {
   caughtUp: boolean;
+  /** The window is still fetching earlier records because nothing in it can be shown yet. */
+  fillingEarlier: boolean;
   settledFailure: boolean;
   cacheVisible: boolean;
   cached: readonly ChatMessage[] | null;
@@ -22,7 +24,7 @@ export const planCloudTranscriptDisplay = (
   const source =
     input.cacheVisible && input.cached ? input.cached : input.projected;
   const holding =
-    !input.caughtUp &&
+    (!input.caughtUp || input.fillingEarlier) &&
     !input.settledFailure &&
     source.length === 0 &&
     input.lastShown !== null &&
@@ -30,7 +32,7 @@ export const planCloudTranscriptDisplay = (
   const messages = holding ? input.lastShown! : source;
   const shown =
     input.everShown ||
-    input.caughtUp ||
+    (input.caughtUp && !input.fillingEarlier) ||
     input.settledFailure ||
     input.cacheVisible ||
     holding;

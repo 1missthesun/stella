@@ -893,6 +893,68 @@
         "discard": "Kasta"
       },
       "tagline": "Prata och rita för att visa Stella vad du menar."
+    },
+    "welcomeDemos": {
+      "play": "Spela upp den här demon",
+      "replay": "Spela upp demon igen",
+      "errands": {
+        "title": "Den snabba rundturen",
+        "tablist": "Demos av vad jag kan",
+        "chapters": {
+          "errands": {
+            "word": "Ärenden",
+            "title": "Fråga en gång. Saken är klar.",
+            "caption": "Jag hittar rätt ställe, fyller i formuläret och lägger in det i din kalender, precis som du skulle göra."
+          },
+          "shopping": {
+            "word": "Shopping",
+            "title": "Jag kan köpa saker, med ditt OK.",
+            "caption": "Jag hittar det och tar det hela vägen till kassan. Du bekräftar summan, och jag lägger beställningen."
+          },
+          "work": {
+            "word": "Arbete",
+            "title": "Riktiga filer. Flera jobb samtidigt.",
+            "caption": "Jag arbetar i de riktiga apparna på den här datorn, och jag kan köra fler än ett jobb åt gången."
+          },
+          "build": {
+            "word": "Bygg",
+            "title": "Säg det. Jag bygger det.",
+            "caption": "Appar och webbplatser på beställning. Beskriv det med vanliga ord så bygger jag det, kör det och lägger ut det på nätet."
+          },
+          "routines": {
+            "word": "Rutiner",
+            "title": "Fråga en gång. Det händer varje dag.",
+            "caption": "Schemalägg vad som helst så gör jag det i tid, även medan du sover."
+          }
+        }
+      },
+      "customize": {
+        "title": "Jag kan ändra mig själv",
+        "body": "Saknar du en funktion, eller vill du att något ska fungera annorlunda? Fråga bara. Jag skriver om min egen kod, du får prova den, och du bestämmer om du vill behålla den.",
+        "hint": "Ändringar stannar på den här datorn.",
+        "steps": {
+          "ask": {
+            "title": "Fråga",
+            "body": "Beskriv ändringen med vanliga ord."
+          },
+          "preview": {
+            "title": "Förhandsvisa",
+            "body": "En uppgift bygger den och öppnar en live-förhandsvisning."
+          },
+          "update": {
+            "title": "Uppdatera",
+            "body": "Ett klick för att tillämpa den. Ångra när du vill."
+          }
+        }
+      },
+      "memory": {
+        "title": "Ett samtal",
+        "titleChatbot": "Det här känner du igen",
+        "bodyChatbot": "En ny chatt varje gång, ett sidofält fullt av gamla och inget minne av vad du sa förra veckan.",
+        "titleStella": "Med mig är det ett samtal",
+        "bodyStella": "Inga nya chattar, inga trådar. Allt du någonsin har berättat för mig finns på samma ställe, så när du frågar om förra veckan letar jag upp det.",
+        "showStella": "Fråga mig nu"
+      }
     }
   },
   "global": {
@@ -935,7 +997,7 @@
         "other": "För många förfrågningar. Försök igen om {count} sekunder."
       },
       "welcomeDescription": "Logga in med din e-post för att börja använda Stella.",
-      "welcomeSub": "Använd Google eller din e-post för att logga in. Inget lösenord behövs.",
+      "welcomeSub": "Använd Stella på mobilen och håll allt synkat mellan dina enheter.",
       "welcomeTitle": "Välkommen till Stella"
     },
     "integrations": {
@@ -977,8 +1039,7 @@
       }
     },
     "localMode": {
-      "authNote": "Inloggning ger dig Stellas modeller, mobilappen, Drive, molnuppgifter och synkning mellan enheter. Dina chattar stannar på den här datorn tills du väljer.",
-      "banner": "Dina chattar stannar på den här datorn. Logga in för Stellas modeller, mobilappen, Drive, molnuppgifter och synkning.",
+      "banner": "Dina chattar stannar på den här datorn. Logga in för att använda Stella på mobilen och hålla allt synkat.",
       "choiceBodyBoth": "Medan du använde Stella här utan konto: {messages} och {notes}. Om du lägger till dem hamnar de i ditt konto. Inget där ersätts.",
       "choiceBodyChat": "Medan du använde Stella här utan konto: {messages}. Om du lägger till dem hamnar de i slutet av din chatt. Inget där ersätts.",
       "choiceBodyMemory": "Medan du använde Stella här utan konto: {notes}. Om du lägger till dem kopieras de till ditt minne. Inget där ersätts.",
@@ -1770,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Valfria tillägg",
-        "lead": "Inget av detta krävs, men vart och ett gör mig mer användbar.",
-        "start": "Börja chatta"
-      },
-      "gmail": {
-        "body": "Hitta mejl, kom ikapp med trådar och skriv utkast till svar, bara genom att fråga.",
-        "connect": "Anslut Gmail",
-        "connected": "Ansluten",
-        "connecting": "Väntar på Google…",
-        "error": "Det gick inte att ansluta Gmail. Försök igen eller hoppa över tills vidare.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hej, jag är Stella. Välj först hur jag tänker: ditt Claude- eller ChatGPT-abonnemang, din egen nyckel eller ett Stella-konto."
-      },
-      "progress": "Installationsförlopp",
-      "replies": {
-        "signinDone": "Klart."
-      },
-      "send": "Send",
       "signin": {
         "body": "Vilket som helst av dessa räcker. Du kan lägga till de andra senare.",
         "claudeCliMissing": "Installera Claude Code först och försök sedan igen.",
@@ -1842,8 +1866,7 @@
         "settledNone": "Ingen AI vald än",
         "settledNoneDesc": "Logga in eller anslut ett abonnemang när som helst för att börja chatta.",
         "fineOwnPlan": "ChatGPT och Claude Code använder ditt eget abonnemang hos OpenAI eller Anthropic. Ändra det när som helst i Inställningar."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Genom att använda Stella godkänner du våra {terms} och {privacy}.",
     "privacyPolicy": "Integritetspolicy",
@@ -2149,7 +2172,17 @@
         "thisComputerInline": "den här datorn",
         "rowNotChosen": "Använder {email}, inte {chosen}",
         "rowEnded": "Inloggningen har gått ut",
-        "rowEnding": "Inloggningen går ut {date}"
+        "rowEnding": "Inloggningen går ut {date}",
+        "automaticHint": "Använder det konto som Claude Code redan är inloggat med på varje dator",
+        "chooseNote": "Kontot du väljer används på alla dina datorer och i molnet.",
+        "inUseTitle": "Används nu",
+        "missingChosen": "{email} är inte inloggat här.",
+        "missingChosenFallback": "{email} är inte inloggat här, så den egna inloggningen används.",
+        "ownLoginNote": "Den här datorns egen Claude Code-inloggning: {email}",
+        "reasonCloudLogin": "Molnets inloggning",
+        "reasonOtherLogin": "Tillagd i Stella",
+        "reasonOwnLogin": "Den här datorns egen Claude Code-inloggning",
+        "reasonSelected": "Vald i Stella"
       },
       "claudeLogin": {
         "approve": "Godkänn på Anthropics sida som öppnades, så slutförs det av sig självt.",
@@ -2420,11 +2453,6 @@
         "twinkle": "Glitter"
       },
       "title": "Meddelandeljud"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Kör introduktionen igen. Dina data behålls.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3433,11 +3461,9 @@
     },
     "onboarding": {
       "link": "Har du en egen Stella-server? Anslut den",
-      "prose": "Du är ansluten till {name} och inloggad som ägare. Välj nu vad jag tänker med: din Claude- eller ChatGPT-plan, eller din egen API-nyckel.",
       "title": "Ansluten till {name}",
       "body": "Du är inloggad som ägare. Välj vad Stella tänker med. Ett räcker.",
-      "bodyOptional": "Du är inloggad som ägare. Den här servern har egna modeller, så det här är valfritt: du kan också använda din Claude- eller ChatGPT-plan, eller en API-nyckel.",
-      "settled": "Ansluten till {name}"
+      "bodyOptional": "Du är inloggad som ägare. Den här servern har egna modeller, så det här är valfritt: du kan också använda din Claude- eller ChatGPT-plan, eller en API-nyckel."
     }
   },
   "contextMenu": {
@@ -3929,6 +3955,21 @@
     "phoneApp": {
       "title": "Stella finns i din telefon också",
       "detail": "Hämta appen för att skriva till Stella och hålla koll på dina uppgifter när du inte sitter vid den här datorn."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Hämta Stella for Chrome",
+      "connectGmail": "Anslut Gmail",
+      "gmailWaiting": "Väntar på Google…",
+      "gmailRetry": "Försök med Gmail igen",
+      "watchErrands": "Se den arbeta",
+      "signIn": "Logga in",
+      "getPhoneApp": "Hämta mobilappen",
+      "watchMemory": "Se hur",
+      "connectPlan": "Anslut ett abonnemang",
+      "changeLook": "Ändra mitt utseende",
+      "watchCustomize": "Se den förändras"
     }
   }
 }

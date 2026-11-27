@@ -1,5 +1,6 @@
 import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
+import { parseWelcomeCard, welcomeAssistantMessage, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import {
   isSafeguardBlock,
   parseSafeguardBlockInfo,
@@ -492,6 +493,17 @@ export async function journalMirror(args: {
             role: "assistant",
             hidden: false,
             message: reminderAssistantMessage(reminder, record.createdAtMs ?? serverNow()) as JournalMessage["message"],
+          });
+          continue;
+        }
+        const welcome = record.kind === "card" ? parseWelcomeCard(record.card) : null;
+        if (welcome) {
+          messages.push({
+            seq: record.seq,
+            turnId: record.turnId,
+            role: "assistant",
+            hidden: false,
+            message: welcomeAssistantMessage(record.createdAtMs ?? serverNow(), welcomeMarkOf(welcome)) as JournalMessage["message"],
           });
           continue;
         }

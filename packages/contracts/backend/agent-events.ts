@@ -41,6 +41,8 @@ export const AGENT_EVENT_KINDS = [
   "terminal_ignored",
   "usage_limit_held",
   "usage_limit_released",
+  "idle",
+  "busy",
 ] as const;
 
 export type AgentEventKind = (typeof AGENT_EVENT_KINDS)[number];

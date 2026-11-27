@@ -28,7 +28,7 @@ The [desktop reference](../references/desktop.md) covers harness setup and diagn
 - [Account, models and billing](./account-models-billing.md) covers the Account menu, where Stella works, the Models dialog and live model lists, usage, and billing.
 - [Claude Code engine](./claude-code.md) covers running on the user's Claude Code: install, plain tool names, auto-update, login ends, and limits.
 - [Memory](./memory.md) covers main, rules and area files, who reads them, and sync limits.
-- [Desktop onboarding](./onboarding.md) covers the first-run walkthrough and signed-out use.
+- [Desktop first run](./onboarding.md) covers the welcome message, its buttons, and signed-out use.
 
 Personal drafts may be present on the developer's own installs; they are not product features and have no notes here.
 

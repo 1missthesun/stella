@@ -167,6 +167,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   embeddedImages = false,
   onStellaFileLink,
   onAskStella,
+  listItemFooter,
 }: {
   text: string;
   colors: Colors;
@@ -175,6 +176,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   embeddedImages?: boolean;
   onStellaFileLink?: (path: string) => void;
   onAskStella?: (text: string) => void;
+  listItemFooter?: (index: number) => ReactNode;
 }) {
   const theme = useMemo(() => buildTheme(colors), [colors]);
   const nodeStyles = useMemo(() => buildNodeStyles(colors), [colors]);
@@ -245,6 +247,17 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
               textStyle={{ fontFamily: fonts.sans.semiBold, color: colors.textStrong, fontSize: [22, 20, 18, 17, 15, 14][(level ?? 1) - 1] }} />
           </View>
         ),
+      } : listItemFooter ? {
+        list: ({ node, Renderer }: CustomRendererProps) => (
+          <List ordered={node.ordered ?? false} start={node.start} depth={0} style={nodeStyles.list}>
+            {(node.children ?? []).map((item, index) => (
+              <ListItem key={index} index={index} ordered={node.ordered ?? false} start={node.start ?? 1}>
+                <Renderer node={item} depth={1} inListItem parentIsText={false} />
+                {listItemFooter(index)}
+              </ListItem>
+            ))}
+          </List>
+        ),
       } : {}),
       code_block: ({ node }: CustomRendererProps) => (
         <View style={nodeStyles.code_block}>
@@ -272,7 +285,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         />
       ),
     }),
-    [colors, selectable, nodeStyles, onLinkPress, onAskStella],
+    [colors, selectable, nodeStyles, onLinkPress, onAskStella, listItemFooter],
   );
 
   const content: ReactNode = (

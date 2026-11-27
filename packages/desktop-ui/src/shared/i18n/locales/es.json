@@ -901,6 +901,68 @@
         "discard": "Descartar"
       },
       "tagline": "Habla y dibuja para mostrarle a Stella lo que quieres decir."
+    },
+    "welcomeDemos": {
+      "play": "Reproducir esta demo",
+      "replay": "Volver a ver esta demo",
+      "errands": {
+        "title": "El recorrido rápido",
+        "tablist": "Demos de lo que puedo hacer",
+        "chapters": {
+          "errands": {
+            "word": "Recados",
+            "title": "Pídelo una vez. Considéralo hecho.",
+            "caption": "Encuentro el sitio correcto, relleno el formulario y lo añado a tu calendario, igual que lo harías tú."
+          },
+          "shopping": {
+            "word": "Compras",
+            "title": "Puedo comprar cosas, con tu permiso.",
+            "caption": "Lo encuentro y lo llevo hasta el pago. Tú confirmas el total y yo hago el pedido."
+          },
+          "work": {
+            "word": "Trabajo",
+            "title": "Archivos reales. Varias tareas a la vez.",
+            "caption": "Trabajo dentro de las aplicaciones reales de este ordenador y puedo hacer más de una tarea a la vez."
+          },
+          "build": {
+            "word": "Crear",
+            "title": "Dilo. Yo lo creo.",
+            "caption": "Apps y sitios web a medida. Descríbelo con tus palabras y lo creo, lo pongo en marcha y lo publico."
+          },
+          "routines": {
+            "word": "Rutinas",
+            "title": "Pídelo una vez. Ocurre cada día.",
+            "caption": "Programa lo que quieras y lo haré a su hora, incluso mientras duermes."
+          }
+        }
+      },
+      "customize": {
+        "title": "Puedo cambiarme a mí misma",
+        "body": "¿Te falta una función o quieres que algo funcione de otra manera? Solo pídelo. Reescribiré mi propio código, te dejaré probarlo y tú decides si te lo quedas.",
+        "hint": "Los cambios se quedan en este ordenador.",
+        "steps": {
+          "ask": {
+            "title": "Pedir",
+            "body": "Describe el cambio con palabras sencillas."
+          },
+          "preview": {
+            "title": "Vista previa",
+            "body": "Una tarea lo construye y abre una vista previa en vivo."
+          },
+          "update": {
+            "title": "Actualizar",
+            "body": "Un clic para aplicarlo. Deshaz cuando quieras."
+          }
+        }
+      },
+      "memory": {
+        "title": "Una sola conversación",
+        "titleChatbot": "Esto ya lo conoces",
+        "bodyChatbot": "Un chat nuevo cada vez, una barra lateral llena de chats viejos y ningún recuerdo de lo que dijiste la semana pasada.",
+        "titleStella": "Conmigo es una sola conversación",
+        "bodyStella": "Sin chats nuevos ni hilos. Todo lo que me has dicho está en el mismo lugar, así que cuando preguntas por la semana pasada, voy y lo encuentro.",
+        "showStella": "Ahora pregúntame"
+      }
     }
   },
   "global": {
@@ -944,7 +1006,7 @@
         "other": "Demasiadas peticiones. Inténtalo de nuevo dentro de {count} segundos."
       },
       "welcomeDescription": "Inicia sesión con tu correo para empezar a usar Stella.",
-      "welcomeSub": "Usa Google o tu correo para iniciar sesión. No hace falta contraseña.",
+      "welcomeSub": "Usa Stella en tu móvil y mantén todo sincronizado en todos tus dispositivos.",
       "welcomeTitle": "Te damos la bienvenida a Stella"
     },
     "integrations": {
@@ -986,8 +1048,7 @@
       }
     },
     "localMode": {
-      "authNote": "Al iniciar sesión obtienes los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización entre dispositivos. Tus chats se quedan en este ordenador hasta que decidas.",
-      "banner": "Tus chats se quedan en este ordenador. Inicia sesión para usar los modelos de Stella, la app del móvil, Drive, tareas en la nube y sincronización.",
+      "banner": "Tus chats se quedan en este ordenador. Inicia sesión para usar Stella en tu móvil y mantener todo sincronizado.",
       "choiceBodyBoth": "Mientras usabas Stella aquí sin cuenta: {messages} y {notes}. Al añadirlos pasan a tu cuenta. No se reemplaza nada.",
       "choiceBodyChat": "Mientras usabas Stella aquí sin cuenta: {messages}. Al añadirlos se colocan al final de tu chat. No se reemplaza nada.",
       "choiceBodyMemory": "Mientras usabas Stella aquí sin cuenta: {notes}. Al añadirlas se copian a tu memoria. No se reemplaza nada.",
@@ -1780,43 +1841,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Extras opcionales",
-        "lead": "Nada de esto es obligatorio, pero cada uno me hace más útil.",
-        "start": "Empezar a chatear"
-      },
-      "gmail": {
-        "body": "Encuentra correos, ponte al día con hilos y redacta respuestas, con solo pedirlo.",
-        "connect": "Conectar Gmail",
-        "connected": "Conectado",
-        "connecting": "Esperando a Google…",
-        "error": "No se pudo conectar Gmail. Inténtalo de nuevo u omítelo por ahora.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hola, soy Stella. Primero, elige cómo pienso: el plan de Claude o ChatGPT que ya tienes, tu propia clave o una cuenta de Stella."
-      },
-      "progress": "Progreso de configuración",
-      "replies": {
-        "signinDone": "Hecho."
-      },
-      "send": "Send",
       "signin": {
         "body": "Con una de estas opciones basta. Puedes añadir las demás más tarde.",
         "claudeCliMissing": "Primero instala Claude Code y vuelve a intentarlo.",
@@ -1852,8 +1876,7 @@
         "settledNone": "Aún no has elegido una IA",
         "settledNoneDesc": "Inicia sesión o conecta un plan cuando quieras para empezar a chatear.",
         "fineOwnPlan": "ChatGPT y Claude Code usan tu propia suscripción con OpenAI o Anthropic. Puedes cambiarlo cuando quieras en Ajustes."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Al usar Stella, aceptas nuestros {terms} y {privacy}.",
     "privacyPolicy": "Política de privacidad",
@@ -2159,7 +2182,17 @@
         "thisComputerInline": "este ordenador",
         "rowNotChosen": "Usa {email}, no {chosen}",
         "rowEnded": "El inicio de sesión ha caducado",
-        "rowEnding": "El inicio de sesión caduca el {date}"
+        "rowEnding": "El inicio de sesión caduca el {date}",
+        "automaticHint": "Usa la cuenta con la que Claude Code ya tenga la sesión iniciada en cada ordenador",
+        "chooseNote": "La cuenta que elijas se usa en todos tus ordenadores y en la nube.",
+        "inUseTitle": "En uso ahora",
+        "missingChosen": "{email} no tiene la sesión iniciada aquí.",
+        "missingChosenFallback": "{email} no tiene la sesión iniciada aquí, así que se usa el inicio de sesión propio.",
+        "ownLoginNote": "Inicio de sesión de Claude Code de este ordenador: {email}",
+        "reasonCloudLogin": "El inicio de sesión de la nube",
+        "reasonOtherLogin": "Añadido en Stella",
+        "reasonOwnLogin": "El inicio de sesión de Claude Code de este ordenador",
+        "reasonSelected": "Elegida en Stella"
       },
       "claudeLogin": {
         "approve": "Aprueba en la página de Anthropic que se abrió y terminará solo.",
@@ -2430,11 +2463,6 @@
         "twinkle": "Destello"
       },
       "title": "Sonido de mensajes"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Repite la introducción. Tus datos se conservan.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3465,11 +3493,9 @@
     },
     "onboarding": {
       "link": "¿Tienes tu propio servidor de Stella? Conéctalo",
-      "prose": "Estás conectado a {name} como propietario. Ahora elige con qué pienso: tu plan de Claude o ChatGPT, o tu propia clave de API.",
       "title": "Conectado a {name}",
       "body": "Has iniciado sesión como propietario. Elige con qué piensa Stella. Con uno basta.",
-      "bodyOptional": "Has iniciado sesión como propietario. Este servidor tiene sus propios modelos, así que es opcional: también puedes usar tu plan de Claude o ChatGPT, o una clave de API.",
-      "settled": "Conectado a {name}"
+      "bodyOptional": "Has iniciado sesión como propietario. Este servidor tiene sus propios modelos, así que es opcional: también puedes usar tu plan de Claude o ChatGPT, o una clave de API."
     }
   },
   "contextMenu": {
@@ -3986,6 +4012,21 @@
     "phoneApp": {
       "title": "Stella también está en tu teléfono",
       "detail": "Descarga la app para escribirle a Stella y seguir tus tareas cuando no estés en este ordenador."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Obtener Stella for Chrome",
+      "connectGmail": "Conectar Gmail",
+      "gmailWaiting": "Esperando a Google…",
+      "gmailRetry": "Reintentar Gmail",
+      "watchErrands": "Verlo en acción",
+      "signIn": "Iniciar sesión",
+      "getPhoneApp": "Obtener la app del móvil",
+      "watchMemory": "Ver cómo",
+      "connectPlan": "Conectar un plan",
+      "changeLook": "Cambiar mi aspecto",
+      "watchCustomize": "Verlo cambiar"
     }
   }
 }

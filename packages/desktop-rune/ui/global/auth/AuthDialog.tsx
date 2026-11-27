@@ -1,6 +1,5 @@
 import { Dialog, DialogBody, DialogCloseButton, DialogContent, DialogDescription, DialogTitle, Press, T, tx, VisuallyHidden } from "../../kit/compat";
 import { useAuthDialog } from "./AuthDialog.styles";
-import { useLocalMode } from "../local-mode/local-mode.styles";
 import { useCallback, useEffect, useState } from "react";
 import { MagicLinkAuthFlow } from "./MagicLinkAuthFlow";
 import { authClient } from "@/global/auth/lib/auth-client";
@@ -27,7 +26,6 @@ import {
   isTransientRequestError,
   REQUEST_BUDGET_MS,
 } from "@stella/contracts/request-deadline";
-import { useSignedOutLocalMode } from "@/features/chat/services/chat-storage-preference";
 
 interface AuthDialogProps {
   open: boolean;
@@ -181,9 +179,7 @@ function SignInChoices({ onDismiss }: { onDismiss: () => void }) {
 
 export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
   const s = useAuthDialog();
-  const sLocalMode = useLocalMode();
   const t = useT();
-  const localMode = useSignedOutLocalMode();
   const { user } = useAuthSessionState();
   const bootstrapStatus = useAuthBootstrapState().status;
   const accountHint =
@@ -194,7 +190,6 @@ export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
       <col {...s.authDialogHero}>
         <T {...tx(s.authDialogHero)} w="full" {...s.authDialogHeadline}>{t("global.auth.welcomeTitle")}</T>
         <T {...tx(s.authDialogHero)} w="full" {...s.authDialogSub}>{t("global.auth.welcomeSub")}</T>
-        {localMode ? <T {...tx(s.authDialogHero)} w="full" {...sLocalMode.authDialogLocalNote}>{t("global.localMode.authNote")}</T> : null}
       </col>
       <GoogleAuthButton loginHint={accountHint} />
       <PasskeyAuthButton />

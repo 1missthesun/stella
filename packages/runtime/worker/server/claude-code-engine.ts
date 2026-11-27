@@ -209,6 +209,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
   };
 
   return {
+    forks: true,
     resume: async (ref, { held, lastReply }) => {
       const cwd = cwdOf(ref);
       const live = claudeCodeResumableSessionId(ref.sessionKey, cwd);
@@ -259,6 +260,8 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         allowEmptyFinal: true,
         ...(spec.quiet ? { quietFinal: true } : {}),
         ...(spec.compact ? { vanilla: true } : {}),
+        ...(spec.fork ? { forkSession: true } : {}),
+        ...(spec.textOnly ? { denyTools: true } : {}),
         ...(ref.role === "worker" ? { autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } : {}),
         abortSignal: spec.signal,
         holdOnUsageLimit: true,

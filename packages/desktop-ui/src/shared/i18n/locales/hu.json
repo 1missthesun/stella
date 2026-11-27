@@ -893,6 +893,68 @@
         "discard": "Elvetés"
       },
       "tagline": "Beszélj és rajzolj, hogy megmutasd Stellának, mire gondolsz."
+    },
+    "welcomeDemos": {
+      "play": "A bemutató lejátszása",
+      "replay": "Bemutató újrajátszása",
+      "errands": {
+        "title": "A gyors körút",
+        "tablist": "Bemutatók arról, mit tudok",
+        "chapters": {
+          "errands": {
+            "word": "Ügyintézés",
+            "title": "Kérd egyszer. Elintézve.",
+            "caption": "Megkeresem a megfelelő oldalt, kitöltöm az űrlapot, és felveszem a naptáradba, pont úgy, ahogy te tennéd."
+          },
+          "shopping": {
+            "word": "Vásárlás",
+            "title": "Tudok vásárolni, a jóváhagyásoddal.",
+            "caption": "Megkeresem, és elviszem a pénztárig. Te jóváhagyod a végösszeget, én pedig leadom a rendelést."
+          },
+          "work": {
+            "word": "Munka",
+            "title": "Valódi fájlok. Több feladat egyszerre.",
+            "caption": "A számítógép valódi alkalmazásaiban dolgozom, és egyszerre több feladatot is tudok futtatni."
+          },
+          "build": {
+            "word": "Építés",
+            "title": "Mondd ki. Megépítem.",
+            "caption": "Alkalmazások és weboldalak megrendelésre. Írd le egyszerű szavakkal, és megépítem, elindítom, majd felteszem az internetre."
+          },
+          "routines": {
+            "word": "Rutinok",
+            "title": "Kérd meg egyszer. Minden nap megtörténik.",
+            "caption": "Ütemezz bármit, és időben elvégzem, még akkor is, amikor alszol."
+          }
+        }
+      },
+      "customize": {
+        "title": "Át tudom alakítani magamat",
+        "body": "Hiányzik egy funkció, vagy valamit másképp szeretnél? Csak kérd. Átírom a saját kódomat, kipróbálhatod, és te döntöd el, megtartod-e.",
+        "hint": "A módosítások ezen a számítógépen maradnak.",
+        "steps": {
+          "ask": {
+            "title": "Kérés",
+            "body": "Írd le a változtatást egyszerű szavakkal."
+          },
+          "preview": {
+            "title": "Előnézet",
+            "body": "Egy feladat megépíti, és megnyit egy élő előnézetet."
+          },
+          "update": {
+            "title": "Frissítés",
+            "body": "Egy kattintással alkalmazod. Bármikor visszavonhatod."
+          }
+        }
+      },
+      "memory": {
+        "title": "Egyetlen beszélgetés",
+        "titleChatbot": "Ezt ismered",
+        "bodyChatbot": "Minden alkalommal új chat, egy oldalsáv tele régiekkel, és semmi emlék arról, amit múlt héten mondtál.",
+        "titleStella": "Velem ez egyetlen beszélgetés",
+        "bodyStella": "Nincsenek új chatek, nincsenek szálak. Minden, amit valaha mondtál nekem, egy helyen van, így ha a múlt hétről kérdezel, megkeresem.",
+        "showStella": "Most kérdezz engem"
+      }
     }
   },
   "global": {
@@ -935,7 +997,7 @@
         "other": "Túl sok kérés. Próbáld újra {count} másodperc múlva."
       },
       "welcomeDescription": "Jelentkezz be az e-mail-címeddel a Stella használatához.",
-      "welcomeSub": "Jelentkezz be Google-fiókkal vagy e-mailben. Jelszó nem kell.",
+      "welcomeSub": "Használd a Stellát a telefonodon is, és minden legyen szinkronban az eszközeid között.",
       "welcomeTitle": "Üdv a Stellában"
     },
     "integrations": {
@@ -977,8 +1039,7 @@
       }
     },
     "localMode": {
-      "authNote": "A bejelentkezéssel megkapod Stella modelljeit, a telefonos appot, a Drive-ot, a felhős feladatokat és az eszközök közötti szinkronizálást. A csevegéseid ezen a számítógépen maradnak, amíg nem döntesz.",
-      "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be Stella modelljeihez, a telefonos apphoz, a Drive-hoz, a felhős feladatokhoz és a szinkronizáláshoz.",
+      "banner": "A csevegéseid ezen a számítógépen maradnak. Jelentkezz be, hogy a telefonodon is használhasd a Stellát, és minden szinkronban legyen.",
       "choiceBodyBoth": "Amíg itt fiók nélkül használtad a Stellát: {messages} és {notes}. Hozzáadáskor a fiókodba kerülnek. Semmi sem cserélődik le.",
       "choiceBodyChat": "Amíg itt fiók nélkül használtad a Stellát: {messages}. Hozzáadáskor a csevegésed végére kerülnek. Semmi sem cserélődik le.",
       "choiceBodyMemory": "Amíg itt fiók nélkül használtad a Stellát: {notes}. Hozzáadáskor a memóriádba másolódnak. Semmi sem cserélődik le.",
@@ -1770,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Opcionális extrák",
-        "lead": "Egyik sem kötelező, de mindegyik hasznosabbá tesz.",
-        "start": "Csevegés indítása"
-      },
-      "gmail": {
-        "body": "Keress e-maileket, zárkózz fel a beszélgetésekre, és írass válaszvázlatokat, csak kérned kell.",
-        "connect": "Gmail csatlakoztatása",
-        "connected": "Csatlakoztatva",
-        "connecting": "Várakozás a Google-re…",
-        "error": "Nem sikerült csatlakoztatni a Gmailt. Próbáld újra, vagy most hagyd ki.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Szia, én Stella vagyok. Először válaszd ki, hogyan gondolkodjak: a meglévő Claude- vagy ChatGPT-előfizetésed, a saját kulcsod vagy egy Stella-fiók."
-      },
-      "progress": "Beállítás állapota",
-      "replies": {
-        "signinDone": "Kész."
-      },
-      "send": "Send",
       "signin": {
         "body": "Bármelyik elég. A többit később is hozzáadhatod.",
         "claudeCliMissing": "Előbb telepítsd a Claude Code-ot, majd próbáld újra.",
@@ -1842,8 +1866,7 @@
         "settledNone": "Még nincs kiválasztva AI",
         "settledNoneDesc": "Jelentkezz be vagy kapcsolj össze egy előfizetést bármikor, és kezdhetsz is.",
         "fineOwnPlan": "A ChatGPT és a Claude Code a saját OpenAI- vagy Anthropic-előfizetésedet használja. Ezt bármikor módosíthatod a Beállításokban."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "A Stella használatával elfogadod a {terms} és az {privacy} feltételeit.",
     "privacyPolicy": "Adatvédelmi szabályzat",
@@ -2149,7 +2172,17 @@
         "thisComputerInline": "ez a számítógép",
         "rowNotChosen": "{email} fiókot használ, nem ezt: {chosen}",
         "rowEnded": "A bejelentkezés lejárt",
-        "rowEnding": "A bejelentkezés lejár: {date}"
+        "rowEnding": "A bejelentkezés lejár: {date}",
+        "automaticHint": "Azt a fiókot használja, amellyel a Claude Code az adott számítógépen már be van jelentkezve",
+        "chooseNote": "A kiválasztott fiókot az összes számítógépeden és a felhőben is használjuk.",
+        "inUseTitle": "Most használatban",
+        "missingChosen": "{email} itt nincs bejelentkezve.",
+        "missingChosenFallback": "{email} itt nincs bejelentkezve, ezért a saját bejelentkezés használatos.",
+        "ownLoginNote": "Ennek a számítógépnek a saját Claude Code-bejelentkezése: {email}",
+        "reasonCloudLogin": "A felhő bejelentkezése",
+        "reasonOtherLogin": "Stellában hozzáadva",
+        "reasonOwnLogin": "Ennek a számítógépnek a saját Claude Code-bejelentkezése",
+        "reasonSelected": "Kiválasztva a Stellában"
       },
       "claudeLogin": {
         "approve": "Hagyd jóvá a megnyílt Anthropic-oldalon, és a bejelentkezés magától befejeződik.",
@@ -2420,11 +2453,6 @@
         "twinkle": "Csillogás"
       },
       "title": "Üzenethang"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "A bevezetés újrafuttatása. Az adataid megmaradnak.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3433,11 +3461,9 @@
     },
     "onboarding": {
       "link": "Van saját Stella-szervered? Csatlakoztasd",
-      "prose": "Tulajdonosként csatlakoztál ehhez: {name}. Most válaszd ki, mivel gondolkodjak: a Claude- vagy ChatGPT-előfizetésed, vagy a saját API-kulcsod.",
       "title": "Csatlakozva: {name}",
       "body": "Tulajdonosként vagy bejelentkezve. Válaszd ki, mivel gondolkodjon a Stella. Egy is elég.",
-      "bodyOptional": "Tulajdonosként vagy bejelentkezve. Ennek a szervernek saját modelljei vannak, így ez nem kötelező: használhatod a Claude- vagy ChatGPT-előfizetésedet, vagy egy API-kulcsot is.",
-      "settled": "Csatlakozva: {name}"
+      "bodyOptional": "Tulajdonosként vagy bejelentkezve. Ennek a szervernek saját modelljei vannak, így ez nem kötelező: használhatod a Claude- vagy ChatGPT-előfizetésedet, vagy egy API-kulcsot is."
     }
   },
   "contextMenu": {
@@ -3929,6 +3955,21 @@
     "phoneApp": {
       "title": "Stella a telefonodon is ott van",
       "detail": "Töltsd le az appot, hogy írhass Stellának és követhesd a feladataidat, amikor nem ennél a számítógépnél vagy."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome letöltése",
+      "connectGmail": "Gmail csatlakoztatása",
+      "gmailWaiting": "Várakozás a Google-re…",
+      "gmailRetry": "Gmail újrapróbálása",
+      "watchErrands": "Nézd meg munka közben",
+      "signIn": "Bejelentkezés",
+      "getPhoneApp": "Telefonos app letöltése",
+      "watchMemory": "Mutasd, hogyan",
+      "connectPlan": "Előfizetés csatlakoztatása",
+      "changeLook": "Kinézetem módosítása",
+      "watchCustomize": "Nézd meg, ahogy változik"
     }
   }
 }

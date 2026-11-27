@@ -83,6 +83,7 @@ export type ConversationCard =
   | import("@stella/contracts/reminders").ReminderCard
   | import("@stella/contracts/schedule-notice").ScheduleNoticeCard
   | import("@stella/contracts/email-card").EmailCard
+  | import("@stella/contracts/welcome-message").WelcomeCard
   | { type: "build"; buildId: string; appId?: string }
   | { type: "operation"; operation: string; args?: unknown; result?: unknown }
   | {

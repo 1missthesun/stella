@@ -833,6 +833,7 @@ export class StellaRuntimeHost {
             ...platformCapabilities,
             "engine-sign-ins",
             "email-page",
+            "chat-failover",
             ...(claudeCode ? (["claude-code"] as const) : []),
             ...(chatGpt ? (["chatgpt"] as const) : []),
             ...(antigravity ? (["antigravity"] as const) : []),
@@ -960,6 +961,10 @@ export class StellaRuntimeHost {
           return { status: "ok", finalText: "" };
         }
         const userAuthored = !handoff && !scheduled;
+        const failover =
+          dispatch.requestedTargetMode === "device" &&
+          Boolean(dispatch.requestedExecutorDeviceId) &&
+          dispatch.requestedExecutorDeviceId !== this.deviceIdentity?.deviceId;
         const result = await this.requestWorker<RuntimeAutomationTurnResult>(
           METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
           {
@@ -969,6 +974,7 @@ export class StellaRuntimeHost {
             userAuthoredPrompt: userAuthored,
             ...(scheduled ? { scheduled: true } : {}),
             ...(handoff ? { handoff: true } : {}),
+            ...(failover ? { failover: true } : {}),
             rejectIfBusy: false,
             executionPlacementRunId: placementLocalChatRunId(
               dispatch.dispatchId,
@@ -1750,6 +1756,20 @@ export class StellaRuntimeHost {
           { ensureWorker: true, recordActivity: true },
         );
         return;
+      }
+      if (here.mode === "device") {
+        const tookOver = await this.requestWorker(
+          METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
+          { ...request, send: { ...send, followSender: true, failover: true } },
+          { ensureWorker: true, recordActivity: true },
+        ).then(
+          () => true,
+          (error: unknown) => {
+            console.warn("[pi-chat] This computer could not take over a send its holder did not take.", error);
+            return false;
+          },
+        );
+        if (tookOver) return;
       }
       const moved = await this.startPlacedChat(
         {

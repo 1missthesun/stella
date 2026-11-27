@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { uiState } from "@/platform/ui-state";
-import { clearPostOnboardingHints } from "./post-onboarding-hints";
 
 const ONBOARDING_COMPLETE_KEY = "stella-onboarding-complete";
 const ONBOARDING_COMPLETE_EVENT = "stella:onboarding-complete-changed";
@@ -153,20 +152,5 @@ export function useOnboardingState() {
       });
   }, []);
 
-  const reset = useCallback(() => {
-    durableRevision += 1;
-    durableCompleted = false;
-    durableHydrated = true;
-    writeLocalOnboardingCompleted(false);
-    clearPostOnboardingHints();
-    window.dispatchEvent(new Event(ONBOARDING_COMPLETE_EVENT));
-    notifyAll();
-    void window.electronAPI?.system
-      .setOnboardingCompleted?.(false)
-      .catch((error) => {
-        console.warn("Failed to reset onboarding completion", error);
-      });
-  }, []);
-
-  return { completed, hydrated, complete, reset };
+  return { completed, hydrated, complete };
 }

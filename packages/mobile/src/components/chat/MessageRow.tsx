@@ -44,6 +44,7 @@ import {
 } from "../ReplyPreview";
 import { Icon } from "../Icon";
 import { AssistantMarkdown } from "../AssistantMarkdown";
+import { WelcomeMessage } from "./WelcomeMessage";
 import { MESSAGE_PRESS_SCALE } from "../MessageContextMenu";
 import { MessageEvidenceStrip } from "../evidence/MessageEvidenceStrip";
 import { AppPreviewCard } from "../AppPreviewCard";
@@ -128,12 +129,14 @@ function MessageLongPress({
   onPressIn,
   onPressOut,
   style,
+  hasControls = false,
   children,
 }: {
   onLongPress: () => void;
   onPressIn: () => void;
   onPressOut: () => void;
   style?: StyleProp<ViewStyle>;
+  hasControls?: boolean;
   children: ReactNode;
 }) {
   const gesture = Gesture.LongPress()
@@ -146,7 +149,7 @@ function MessageLongPress({
     <GestureDetector gesture={gesture}>
       <View
         style={style}
-        accessible
+        accessible={!hasControls}
         accessibilityHint="Long press for message actions"
         accessibilityActions={MESSAGE_ACCESSIBILITY_ACTIONS}
         onAccessibilityAction={onLongPress}
@@ -1146,12 +1149,20 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ]}
       animate={!menuClone && (animate || mountedEmptyRef.current)}
     >
-      <AssistantMarkdown
-        text={bodyText}
-        colors={colors}
-        fill={boundedAssistantBubble}
-        onStellaFileLink={onOpenStellaFile}
-      />
+      {item.welcome ? (
+        <WelcomeMessage
+          colors={colors}
+          fill={boundedAssistantBubble}
+          onStellaFileLink={onOpenStellaFile}
+        />
+      ) : (
+        <AssistantMarkdown
+          text={bodyText}
+          colors={colors}
+          fill={boundedAssistantBubble}
+          onStellaFileLink={onOpenStellaFile}
+        />
+      )}
       {evidenceDocuments}
     </AssistantBubble>
   );
@@ -1211,6 +1222,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
               onLongPress={openMenu}
               onPressIn={pressIn}
               onPressOut={pressOut}
+              hasControls={Boolean(item.welcome)}
             >
               {assistantBubble}
             </MessageLongPress>

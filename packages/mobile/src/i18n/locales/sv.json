@@ -920,7 +920,17 @@
         "thisComputerInline": "den här datorn",
         "rowNotChosen": "Använder {email}, inte {chosen}",
         "rowEnded": "Inloggningen har gått ut",
-        "rowEnding": "Inloggningen går ut {date}"
+        "rowEnding": "Inloggningen går ut {date}",
+        "automaticHint": "Använder det konto som Claude Code redan är inloggat med på varje dator",
+        "chooseNote": "Kontot du väljer används på alla dina datorer och i molnet.",
+        "inUseTitle": "Används nu",
+        "missingChosen": "{email} är inte inloggat här.",
+        "missingChosenFallback": "{email} är inte inloggat här, så den egna inloggningen används.",
+        "ownLoginNote": "Den här datorns egen Claude Code-inloggning: {email}",
+        "reasonCloudLogin": "Molnets inloggning",
+        "reasonOtherLogin": "Tillagd i Stella",
+        "reasonOwnLogin": "Den här datorns egen Claude Code-inloggning",
+        "reasonSelected": "Vald i Stella"
       },
       "claudeLogin": {
         "whereCloud": "Loggar in på Claude Code i ditt moln.",

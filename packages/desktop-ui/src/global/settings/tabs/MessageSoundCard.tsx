@@ -50,8 +50,9 @@ export function MessageSoundCard() {
         </div>
         <div className="settings-row-control">
           <Button
+            type="button"
             variant="ghost"
-            size="small"
+            className="settings-icon-btn"
             aria-label={t("settings.messageSound.preview")}
             title={t("settings.messageSound.preview")}
             onClick={() => void playMessageSound(preferences.sound)}

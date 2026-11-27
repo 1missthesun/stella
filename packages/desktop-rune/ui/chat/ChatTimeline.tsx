@@ -16,7 +16,7 @@ import { Icon, Icons, withStroke } from "../kit";
 import { derive, fontSize, mixOklch, radius, useTokens } from "../theme";
 import { ChatTimeDivider } from "./ChatTimeDivider";
 import { InlineWorkingIndicator, type InlineIndicatorPhase, type InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
-import { AssistantMessageRow, UserMessageRow } from "./MessageRow";
+import { AssistantMessageRow, UserMessageRow, rowViewPayloads } from "./MessageRow";
 import { UserAskRecordCard } from "./UserAskRecordCard";
 import { panelSurface } from "./surfaces";
 import { isViewFile } from "../views/ViewTabContent";
@@ -72,7 +72,7 @@ const SESSION_END_FADE_STOPS: [number, number][] = [
 const isCardRow = (row: EventRowViewModel): boolean =>
   row.kind === "assistant" &&
   row.text.trim().length === 0 &&
-  Boolean(row.resourcePayload || row.sourceDiffPayloads?.length || row.inlineImagePayloads?.length || row.officePreviewRef || row.backgroundWork);
+  Boolean(row.resourcePayload || row.viewPayloads?.length || row.sourceDiffPayloads?.length || row.inlineImagePayloads?.length || row.officePreviewRef || row.backgroundWork);
 
 const hasReplyPreview = (row: EventRowViewModel): boolean => row.kind === "assistant" && Boolean(row.replyRefs?.some((ref) => ref.kind === "message") || shownAgentLabelIds(row).length);
 
@@ -194,17 +194,22 @@ export const ChatTimeline = memo(function ChatTimeline({
     return null;
   }, [rows]);
   // A view lives in one card, in the newest reply that made or changed it; older replies keep a chip.
-  const liveViewRowIds = useMemo(() => {
-    const ids = new Set<string>();
+  // A reply can make several views: it holds the live card of each it was the newest to touch.
+  const liveViewsByRow = useMemo(() => {
+    const byRow = new Map<string, string>();
     const seen = new Set<string>();
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
-      const payload = row?.kind === "assistant" ? row.resourcePayload : undefined;
-      if (!row || payload?.kind !== "canvas-html" || payload.driveBacked || !isViewFile(payload.filePath) || seen.has(payload.filePath)) continue;
-      seen.add(payload.filePath);
-      ids.add(row.id);
+      if (row?.kind !== "assistant") continue;
+      const live: string[] = [];
+      for (const payload of rowViewPayloads(row)) {
+        if (payload.kind !== "canvas-html" || payload.driveBacked || !isViewFile(payload.filePath) || seen.has(payload.filePath)) continue;
+        seen.add(payload.filePath);
+        live.push(payload.filePath);
+      }
+      if (live.length > 0) byRow.set(row.id, live.join("\n"));
     }
-    return ids;
+    return byRow;
   }, [rows]);
   const tailUserRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -280,7 +285,7 @@ export const ChatTimeline = memo(function ChatTimeline({
           {item.row.kind === "user" ? (
             <UserMessageRow row={item.row} />
           ) : (
-            <AssistantMessageRow row={item.row} conversationId={conversationId} latestMedia={item.row.id === latestMediaRowId} liveView={liveViewRowIds.has(item.row.id)} />
+            <AssistantMessageRow row={item.row} conversationId={conversationId} latestMedia={item.row.id === latestMediaRowId} liveViews={liveViewsByRow.get(item.row.id) ?? ""} />
           )}
           {flashItemId === item.id ? <JumpFlash /> : null}
         </box>

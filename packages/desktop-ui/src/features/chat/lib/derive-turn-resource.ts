@@ -126,6 +126,45 @@ const orchestratorHtmlPayload = (
   return null;
 };
 
+/**
+ * Every Stella View a reply made or changed (its orchestrator `view` calls, a task's view cards),
+ * one per file in the order the reply first touched each, carrying the newest version's title.
+ * A reply can make several views, and each shows its own card.
+ */
+export const deriveTurnViewPayloads = (
+  toolEvents: readonly EventRecord[],
+): CanvasHtmlPayload[] => {
+  const byFile = new Map<string, CanvasHtmlPayload>();
+  for (const event of toolEvents) {
+    if (!isToolResult(event)) continue;
+    if (event.payload.toolName !== "view" || event.payload.error) continue;
+    if (event.payload.agentType !== "orchestrator") continue;
+    const candidate =
+      event.payload.details && typeof event.payload.details === "object"
+        ? event.payload.details
+        : event.payload.result;
+    if (!candidate || typeof candidate !== "object") continue;
+    const record = candidate as Record<string, unknown>;
+    const filePath = asNonEmptyString(record.filePath);
+    if (!filePath || !VIEW_PATH_RE.test(filePath)) continue;
+    const title = asNonEmptyString(record.title) ?? undefined;
+    const slug = asNonEmptyString(record.slug) ?? undefined;
+    const createdAt =
+      typeof record.createdAt === "number" && Number.isFinite(record.createdAt)
+        ? record.createdAt
+        : event.timestamp;
+    byFile.set(filePath, {
+      kind: "canvas-html",
+      filePath,
+      ...(title ? { title } : {}),
+      ...(slug ? { slug } : {}),
+      createdAt,
+      ...(record.driveBacked === true ? { driveBacked: true } : {}),
+    });
+  }
+  return [...byFile.values()];
+};
+
 const HTML_OUTPUT_PATH_RE =
   /(?:^|\/)(?:\.stella|state)\/outputs\/(?:.+\/)?([^/]+)\.html$/;
 

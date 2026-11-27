@@ -158,6 +158,7 @@ impl InnerWebView {
 
     let x11_display = unsafe { gdkx11::ffi::gdk_x11_display_get_xdisplay(raw) };
 
+    let background = Self::container_background(&attributes);
     let x11_window = match is_child {
       true => Self::create_container_x11_window(&xlib, x11_display as _, parent, &attributes),
       false => parent,
@@ -174,6 +175,16 @@ impl InnerWebView {
       // calling gtk_window.show_all() then hiding it again
       // seems to fix the issue.
       gtk_window.show_all();
+      if is_child {
+        // GDK creates the view's own X windows with a black background, which the X server
+        // paints as they show; they take the container's colour before the container maps.
+        if let Some(window) = w.webview.window() {
+          Self::paint_background(&window, &background);
+        }
+        if visible {
+          unsafe { (xlib.XMapWindow)(x11_display as _, x11_window) };
+        }
+      }
       if !visible {
         let _ = w.set_visible(false);
       }
@@ -188,6 +199,29 @@ impl InnerWebView {
 
       w
     })
+  }
+
+  /// The colour the X server fills the view's windows with before WebKit draws: the view's
+  /// background colour, WebKit's default white, or black for a transparent view.
+  #[cfg(feature = "x11")]
+  fn container_background(attributes: &WebViewAttributes) -> gtk::gdk::RGBA {
+    let (red, green, blue) = match attributes.background_color {
+      Some((r, g, b, _)) => (r, g, b),
+      None if attributes.transparent => (0, 0, 0),
+      None => (255, 255, 255),
+    };
+    gtk::gdk::RGBA::new(red as f64 / 255.0, green as f64 / 255.0, blue as f64 / 255.0, 1.0)
+  }
+
+  /// Gives `window` and every window under it the opaque background `color`.
+  #[cfg(feature = "x11")]
+  fn paint_background(window: &gdk::Window, color: &gtk::gdk::RGBA) {
+    use gtk::gdk::prelude::WindowExtManual;
+    let solid = gtk::cairo::SolidPattern::from_rgb(color.red(), color.green(), color.blue());
+    window.set_background_pattern(Some(&solid));
+    for child in window.children() {
+      Self::paint_background(&child, color);
+    }
   }
 
   #[cfg(feature = "x11")]
@@ -212,12 +246,45 @@ impl InnerWebView {
       // and we need to use 1 not 0 here otherwise xlib will crash
       .unwrap_or((1, 1));
 
-    let window =
-      unsafe { (xlib.XCreateSimpleWindow)(display, parent, x, y, width, height, 0, 0, 0) };
-
-    if attributes.visible {
-      unsafe { (xlib.XMapWindow)(display, window) };
-    }
+    // The X server paints a child's background pixel wherever it exposes the window (mapping it,
+    // growing it) before WebKit draws. NorthWest bit gravity keeps the drawn pixels when the
+    // window grows instead of exposing all of it again. The container maps once its GTK windows
+    // have their background too (`new_x11`).
+    let background = Self::container_background(attributes);
+    let channel = |v: f64| (v * 255.0).round() as c_ulong;
+    let mut set = XSetWindowAttributes {
+      background_pixmap: 0,
+      background_pixel: 0xff00_0000 | channel(background.red()) << 16 | channel(background.green()) << 8 | channel(background.blue()),
+      border_pixmap: 0,
+      border_pixel: 0,
+      bit_gravity: NorthWestGravity,
+      win_gravity: NorthWestGravity,
+      backing_store: 0,
+      backing_planes: 0,
+      backing_pixel: 0,
+      save_under: 0,
+      event_mask: 0,
+      do_not_propagate_mask: 0,
+      override_redirect: 0,
+      colormap: 0,
+      cursor: 0,
+    };
+    let window = unsafe {
+      (xlib.XCreateWindow)(
+        display,
+        parent,
+        x,
+        y,
+        width,
+        height,
+        0,
+        CopyFromParent,
+        InputOutput as _,
+        std::ptr::null_mut(),
+        CWBackPixel | CWBorderPixel | CWBitGravity,
+        &mut set,
+      )
+    };
 
     window
   }
@@ -1001,6 +1068,8 @@ impl InnerWebView {
     if let Some(x11_data) = &self.x11 {
       let window = &x11_data.gtk_window;
       window.move_(x, y);
+      // GTK shows a hidden window again at its requested size, not at the GDK window's.
+      window.resize(width, height);
       if let Some(window) = window.window() {
         window.resize(width, height);
       }
@@ -1044,8 +1113,11 @@ impl InnerWebView {
   }
 
   pub fn set_visible(&self, visible: bool) -> Result<()> {
+    // The container maps last, once GTK has its windows shown at their size.
     #[cfg(feature = "x11")]
-    self.set_visible_x11(visible);
+    if !visible {
+      self.set_visible_x11(visible);
+    }
 
     if visible {
       self.webview.show_all();
@@ -1057,6 +1129,11 @@ impl InnerWebView {
 
     #[cfg(feature = "x11")]
     self.set_visible_gtk(visible);
+
+    #[cfg(feature = "x11")]
+    if visible {
+      self.set_visible_x11(visible);
+    }
 
     Ok(())
   }

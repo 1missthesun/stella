@@ -2,7 +2,9 @@
 # Re-makes engine/vendor/wry: wry exactly as published on crates.io at <version>, plus
 # engine/vendor/wry.patch (an IPC message from a page whose URL http::Uri can't parse, such as a
 # data: or about:blank page, reaches the ipc handler instead of being dropped, so executeJavaScript
-# and window.parent.postMessage work there). Run it when wry is bumped, then build: a patch that no
+# and window.parent.postMessage work there; on X11 the child webview's container and GDK windows
+# paint the page's background colour and keep their pixels on resize, so a dark page never shows
+# black or white before WebKit paints). Run it when wry is bumped, then build: a patch that no
 # longer applies fails here. If upstream wry takes the change, delete vendor/wry and its patch entry.
 # Usage: scripts/vendor-wry.sh <version>     e.g. scripts/vendor-wry.sh 0.58.1
 set -euo pipefail

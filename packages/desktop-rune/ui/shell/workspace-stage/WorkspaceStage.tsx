@@ -531,18 +531,21 @@ function ViewerBody({ item, surface, active }: { item: DisplayTab; surface: View
 function ViewerMain({ item, bodies, surface, wide, idBase }: { item: DisplayTab | null; bodies: PlacedBody[]; surface: ViewerSurface; wide: boolean; idBase: string }) {
   const { nav: bodyNav } = useViewerItem(item?.id ?? null);
   const siblingNav = useSiblingNav(item);
-  const Main = wide ? "row" : "col";
+  // Both layouts keep the body at the same place in the tree: crossing the wide breakpoint while
+  // resizing must not remount the bodies and their native webviews.
   return (
-    <Main grow={1} minW={0} minH={0}>
+    <row grow={1} minW={0} minH={0}>
       {item && wide ? <ViewerStrip item={item} vertical /> : null}
-      <col id={`${idBase}-body`} grow={1} minW={0} minH={0} clip={0} hoverGroup>
-        {bodies.filter((body) => body.surface === surface).map((body) => (
-          <ViewerBody key={body.item.id} {...body} />
-        ))}
-        <EdgeArrows nav={bodyNav ?? siblingNav} idBase={idBase} />
+      <col grow={1} minW={0} minH={0}>
+        <col id={`${idBase}-body`} grow={1} minW={0} minH={0} clip={0} hoverGroup>
+          {bodies.filter((body) => body.surface === surface).map((body) => (
+            <ViewerBody key={body.item.id} {...body} />
+          ))}
+          <EdgeArrows nav={bodyNav ?? siblingNav} idBase={idBase} />
+        </col>
+        {item && !wide ? <ViewerStrip item={item} vertical={false} /> : null}
       </col>
-      {item && !wide ? <ViewerStrip item={item} vertical={false} /> : null}
-    </Main>
+    </row>
   );
 }
 
@@ -588,6 +591,11 @@ const resized = (edge: ResizeEdge, start: FileViewerRect, dx: number, dy: number
 
 function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: { item: DisplayTab | null; carried: DisplayTab | null; bodies: PlacedBody[]; hiddenForExclusiveTab: boolean }) {
   const item = docked ?? carried;
+  // A closed viewer keeps its last item's header and strip laid out, so its warm webview reopens
+  // at the rect it closed at instead of jumping when they come back.
+  const last = useRef(item);
+  if (item) last.current = item;
+  const framed = item ?? last.current;
   const t = useTokens();
   const l = stageLook(t);
   const { mode, rect } = useFileViewer();
@@ -642,16 +650,21 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
     setLive(next);
   };
 
+  const opened = useRef(false);
+  const opening = Boolean(item) && !opened.current;
+  useEffect(() => {
+    opened.current = Boolean(item);
+  });
+  const rest = item ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 8, scale: 0.985 };
   const frame = stage
-    ? { absolute: stageInsets(geo) }
+    ? { absolute: stageInsets(geo), ...rest }
     : held
       ? { absolute: { left: held.rect.x, top: held.rect.y }, w: held.rect.width, h: held.rect.height, x: held.dx, y: held.dy, scale: held.scale, origin: [held.grab.x / held.rect.width, held.grab.y / held.rect.height] as [number, number] }
-      : { absolute: { left: shown.x, top: shown.y }, w: shown.width, h: shown.height };
+      : { absolute: { left: shown.x, top: shown.y }, w: shown.width, h: shown.height, ...rest };
 
   return (
     <col
       id="file-viewer-docked"
-      key={item ? "open" : "closed"}
       role="dialog"
       label={item?.title}
       {...frame}
@@ -662,22 +675,21 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
       clip={STAGE_RADIUS}
       hidden={hidden}
       inert={hidden}
-      enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
-      motion={{ dur: 0.26 }}
-      instant={Boolean(held || live)}
+      motion={{ dur: opening ? 0.18 : 0.26 }}
+      instant={Boolean(held || live) || !item}
       onContextMenu={item ? (at) => itemMenu(item.id, at) : undefined}
     >
-      {item ? (
+      {framed ? (
         <ViewerHeader
-          item={item}
+          item={framed}
           placement={mode}
           width={width}
           onDrag={onHeaderDrag}
-          onDetach={detachable ? () => void popOutViewer(item.id, floatRect) : null}
+          onDetach={detachable ? () => void popOutViewer(framed.id, floatRect) : null}
           onClose={() => fileViewer.close()}
         />
       ) : null}
-      <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
+      <ViewerMain item={framed} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
       {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
       {stage ? <StageEdge fill={t.c.background} /> : null}
     </col>

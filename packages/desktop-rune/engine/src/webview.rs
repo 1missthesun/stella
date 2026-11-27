@@ -886,6 +886,10 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
                 reback(live(n));
             }
         });
+    #[cfg(target_os = "linux")]
+    if let Some([r, g, b_, _]) = backdrop(n) {
+        b = b.with_background_color((r, g, b_, 255));
+    }
     #[cfg(not(target_os = "linux"))]
     {
         let protocols = protocols.clone();
@@ -1256,7 +1260,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 }
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
-                    v.borrow_mut().insert(n, View { view, window, born: n, key: p.id.clone(), baked: baked(&p), protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, backed: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })
+                    v.borrow_mut().insert(n, View { view, window, born: n, key: p.id.clone(), baked: baked(&p), protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, backed: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: backdrop(n) })
                 });
                 #[cfg(target_os = "linux")]
                 bridge_views();
@@ -1295,6 +1299,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             view.backdrop = Some(color);
             let [r, g, b, a] = color.map(|c| c as f64 / 255.0);
             webkit2gtk::WebViewExt::set_background_color(&view.view.webview(), &gtk::gdk::RGBA::new(r, g, b, a));
+            native_shape::background(&view.view, color);
         }
         if !hidden && let Some(s) = shape {
             let key = (s, r, view.corners, k * z);
@@ -1309,10 +1314,6 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
         if view.visible == hidden {
             let _ = view.view.set_visible(!hidden);
             view.visible = !hidden;
-            // Showing wry's GTK toplevel again restores the size it had when it was hidden.
-            if !hidden {
-                let _ = view.view.set_bounds(rect(window, r));
-            }
         }
     });
 }
@@ -1384,6 +1385,9 @@ mod native_shape {
     }
 
     #[cfg(target_os = "linux")]
+    pub use platform::background;
+
+    #[cfg(target_os = "linux")]
     mod platform {
         use gtk::prelude::{Cast, WidgetExt};
         use std::sync::OnceLock;
@@ -1399,19 +1403,45 @@ mod native_shape {
             LIB.get_or_init(|| xfixes::Xlib::open().ok()).as_ref()
         }
 
+        /// wry's X11 container (the foreign window its GTK toplevel wraps) with GDK's display.
+        fn container(view: &wry::WebView) -> Option<(*mut x11_dl::xlib::Display, std::os::raw::c_ulong, gtk::gdk::Display)> {
+            let top = view.webview().toplevel().and_then(|t| t.downcast::<gtk::Window>().ok())?;
+            let xw = top.window()?.downcast::<gdkx11::X11Window>().ok()?;
+            let display = gtk::gdk::Display::default()?;
+            let xd = display.clone().downcast::<gdkx11::X11Display>().ok()?;
+            // SAFETY: GDK's Xlib display, alive as long as GDK is.
+            let dpy = unsafe { xd.xdisplay() } as *mut x11_dl::xlib::Display;
+            Some((dpy, xw.xid(), display))
+        }
+
+        /// What the X server fills the container and the view's own windows with where it exposes
+        /// them before WebKit draws.
+        pub fn background(view: &wry::WebView, [r, g, b, _]: [u8; 4]) {
+            fn paint(window: &gtk::gdk::Window, color: &gtk::cairo::SolidPattern) {
+                use gtk::gdk::prelude::WindowExtManual;
+                window.set_background_pattern(Some(color));
+                window.children().iter().for_each(|child| paint(child, color));
+            }
+            if let Some(window) = view.webview().window() {
+                paint(&window, &gtk::cairo::SolidPattern::from_rgb(f64::from(r) / 255.0, f64::from(g) / 255.0, f64::from(b) / 255.0));
+            }
+            static XLIB: OnceLock<Option<x11_dl::xlib::Xlib>> = OnceLock::new();
+            let Some(x) = XLIB.get_or_init(|| x11_dl::xlib::Xlib::open().ok()).as_ref() else { return };
+            let Some((dpy, win, display)) = container(view) else { return };
+            let pixel = 0xff00_0000 | std::os::raw::c_ulong::from(r) << 16 | std::os::raw::c_ulong::from(g) << 8 | std::os::raw::c_ulong::from(b);
+            gtk::gdk::error_trap_push();
+            // SAFETY: `dpy` is GDK's live Xlib display and `win` wry's container.
+            unsafe { (x.XSetWindowBackground)(dpy, win, pixel) };
+            display.flush();
+            gtk::gdk::error_trap_pop_ignored();
+        }
+
         /// Shapes wry's X11 container (the foreign window its GTK toplevel wraps): the X server
         /// clips the page's drawing and pointer hits to the region, and the engine window under
         /// it gets what falls outside.
         pub fn set(view: &wry::WebView, region: Option<super::Region<'_>>) {
             let Some(x) = lib() else { return };
-            let Some(top) = view.webview().toplevel().and_then(|t| t.downcast::<gtk::Window>().ok()) else { return };
-            let Some(gdk_window) = top.window() else { return };
-            let Ok(xw) = gdk_window.downcast::<gdkx11::X11Window>() else { return };
-            let Some(display) = gtk::gdk::Display::default() else { return };
-            let Ok(xd) = display.clone().downcast::<gdkx11::X11Display>() else { return };
-            // SAFETY: GDK's Xlib display, alive as long as GDK is.
-            let dpy = unsafe { xd.xdisplay() } as *mut x11_dl::xlib::Display;
-            let win = xw.xid();
+            let Some((dpy, win, display)) = container(view) else { return };
             let make = |rects: &[[i32; 4]]| {
                 let mut xr: Vec<XRectangle> = rects.iter().map(|q| XRectangle { x: q[0] as i16, y: q[1] as i16, width: q[2].max(0) as u16, height: q[3].max(0) as u16 }).collect();
                 // SAFETY: `dpy` is GDK's live Xlib display; the rects outlive the call.
@@ -2059,11 +2089,21 @@ pub fn active() -> bool {
         || TEARDOWN.with(|t| t.get().is_some_and(|until| std::time::Instant::now() < until))
 }
 
-/// Whether the views need the loop to keep ticking without a frame of their own: WebKitGTK's
-/// events are pumped from it, a view waiting for its window's native handle retries on it, and
-/// parked views expire on it.
-pub fn needs_ticks() -> bool {
-    cfg!(target_os = "linux") || WAITING.with(|w| !w.borrow().is_empty()) || PARKED.with(|p| !p.borrow().is_empty())
+/// How soon the loop must tick again without a frame of its own: WebKitGTK's events are pumped
+/// from it, a view waiting for its window's native handle retries on it, and parked views expire
+/// on it. Slow while every page is hidden (a closed viewer's warm page, which WebKit throttles),
+/// so its few messages still get through without an idle poll.
+pub fn tick_every() -> Option<std::time::Duration> {
+    const SHOWN: std::time::Duration = std::time::Duration::from_millis(8);
+    const HIDDEN: std::time::Duration = std::time::Duration::from_secs(1);
+    if WAITING.with(|w| !w.borrow().is_empty()) || PARKED.with(|p| !p.borrow().is_empty()) {
+        return Some(SHOWN);
+    }
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let tearing_down = TEARDOWN.with(|t| t.get().is_some_and(|until| std::time::Instant::now() < until));
+    if tearing_down || VIEWS.with(|v| v.borrow().values().any(|view| view.visible)) { Some(SHOWN) } else { Some(HIDDEN) }
 }
 
 /// Creates the views whose window had no native handle yet when they were first placed (a

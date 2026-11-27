@@ -93,9 +93,10 @@ const CANVAS_PRELOAD = `(() => {
 /**
  * Chromium's backdrop for an iframe: transparent when the page's used color scheme is the
  * embedder's, otherwise opaque in the page's canvas colour (white for a page that sets none).
- * Before the page reports, it is a page that sets none.
+ * Transparent until the page reports its scheme, as an iframe is before its document paints.
  */
-const pageBackdrop = (scheme: string, appDark: boolean): string | undefined => {
+const pageBackdrop = (scheme: string | null, appDark: boolean): string | undefined => {
+  if (scheme === null) return undefined;
   const offered = scheme.split(/\s+/).filter((s) => s === "light" || s === "dark");
   const used = offered.includes(appDark ? "dark" : "light") ? (appDark ? "dark" : "light") : (offered[0] ?? "light");
   if ((used === "dark") === appDark) return undefined;
@@ -180,7 +181,7 @@ export function CanvasFrame({
   const activeRef = useRef(active);
   activeRef.current = active;
   const appDark = useTokens().dark;
-  const [scheme, setScheme] = useState("normal");
+  const [scheme, setScheme] = useState<string | null>(null);
 
   useEffect(() => {
     host.post({ type: "stella:canvas-visibility", active });

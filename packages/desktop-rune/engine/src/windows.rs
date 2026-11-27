@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::Duration;
 
 use rune::{AppSpec, CloseResponse, Cx, El, Spring, Tx, Waker, WindowOptions, WindowSpec, col};
 use serde_json::json;
@@ -891,8 +890,8 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         crate::webview::retry_waiting();
         crate::webview::refresh_all();
         crate::webview::pump();
-        if crate::webview::needs_ticks() {
-            tx.wake_after(Duration::from_millis(8));
+        if let Some(every) = crate::webview::tick_every() {
+            tx.wake_after(every);
         }
     }
     changed

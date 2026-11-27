@@ -104,6 +104,9 @@ function TabStage({ visible }: { visible: boolean }) {
   // cold home stays light while an app tab opened from chat still gets the Apps section's app list.
   const [opened, setOpened] = useState(visible);
   if ((visible || tabs.length > 0) && !opened) setOpened(true);
+  // The stage follows the window's geometry (every live-resize step moves the composer); the same
+  // element keeps that from re-rendering every mounted section, shown or not.
+  const body = useMemo(() => (opened ? <SidebarSectionBody /> : null), [opened]);
   return (
     <col
       id="workspace-stage"
@@ -120,7 +123,7 @@ function TabStage({ visible }: { visible: boolean }) {
     >
       <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
         <RetainedSurface active={visible} grow={1}>
-          {opened ? <SidebarSectionBody /> : null}
+          {body}
         </RetainedSurface>
       </col>
       <StageEdge fill={t.c.background} />

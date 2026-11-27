@@ -57,6 +57,15 @@ export function ThemeScope({ themeId, mode, customBase, children }: { themeId: s
   return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
 }
 
+/** Its children in `mode` with the user's own theme: glass chrome that takes the other mode while what is behind it calls for that. */
+export function ModeScope({ mode, children }: { mode: "light" | "dark"; children: ReactNode }) {
+  const outer = useTokens();
+  const { selectedThemeId } = useTheme();
+  const tokens = useMemo(() => (outer.dark === (mode === "dark") ? outer : tokensFor(selectedThemeId, mode)), [outer, mode, selectedThemeId]);
+  useSpringOnChange(tokens);
+  return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
+}
+
 let fallback: Tokens | null = null;
 
 export function useTokens(): Tokens {

@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { getPlatform } from "@/platform/electron/platform";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { NotificationBell } from "../features/notifications/NotificationBell";
@@ -10,15 +10,32 @@ import { GlobalModelsControl } from "./GlobalModelsControl";
 import { ShellTopBarAccount } from "./sidebar/ShellTopBarAccount";
 import { SettingsMenuButton } from "./SettingsMenuButton";
 import { WindowControls } from "./WindowControls";
-import { chromeGlass } from "./glass";
+import { AdaptiveGlass, chromeGlass, useGlassBackdrop } from "./glass";
 import { useTokens } from "../theme";
 import { ShellTopBarTabs } from "./topbar/ShellTopBarTabs";
+import type { BoxProps } from "../../host/rune-jsx/props";
 
 const COLUMN_GAP = 8;
 const REACH_GAP = 12;
 const MARK_TRIGGER = 22 + 12;
 const CAPSULE_H = 32;
 const CAPSULE_PAD = 3;
+
+function CapsuleGlass({ children, ...props }: BoxProps & { children: ReactNode }) {
+  return (
+    <row h={CAPSULE_H} radius={CAPSULE_H / 2} align="center" windowDrag {...props} fx={chromeGlass(useTokens()).controls} onBackdrop={useGlassBackdrop()}>
+      {children}
+    </row>
+  );
+}
+
+function Capsule(props: BoxProps & { children: ReactNode }) {
+  return (
+    <AdaptiveGlass>
+      <CapsuleGlass {...props} />
+    </AdaptiveGlass>
+  );
+}
 
 /** `grid-template-columns: minmax(0,1fr) minmax(40px, min(30rem, max(40px, 40vw - 200px))) minmax(max-content,1fr)`. */
 function columns(width: number, rightContent: number) {
@@ -40,7 +57,6 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: { onS
   const { left, middle, right } = columns(width, rightContent);
   const reach = Math.max(0, Math.floor((middle - MARK_TRIGGER) / 2 - REACH_GAP));
   const padLeft = isMac ? 84 : 12;
-  const glass = chromeGlass(useTokens()).controls;
 
   return (
     <row
@@ -54,21 +70,21 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: { onS
       onLayout={(r) => setWidth((w) => (Math.abs(w - r.w) < 0.5 ? w : r.w))}
     >
       <row id="shell-topbar-full-left" w={left + reach} mr={-reach} raise={1} h="full" align="center" gap={8} pl={padLeft} pr={12} minW={0} windowDrag>
-        <row h={CAPSULE_H} radius={CAPSULE_H / 2} px={CAPSULE_PAD} align="center" minW={0} shrink fx={glass} windowDrag>
+        <Capsule px={CAPSULE_PAD} minW={0} shrink>
           <ShellTopBarTabs room={left + reach - padLeft - 12 - CAPSULE_PAD * 2} />
-        </row>
+        </Capsule>
       </row>
       <ShellTopBarActivity width={middle} />
       <row id="shell-topbar-full-right" w={right} h="full" align="center" justify="end" pr={isWin ? 0 : 12} windowDrag>
         <row gap={8} align="center" h="full" onLayout={(r) => setRightContent((w) => (Math.abs(w - (r.w + (isWin ? 0 : 12))) < 0.5 ? w : r.w + (isWin ? 0 : 12)))}>
-          <row h={CAPSULE_H} radius={CAPSULE_H / 2} px={CAPSULE_PAD + 2} gap={4} align="center" fx={glass} windowDrag>
+          <Capsule px={CAPSULE_PAD + 2} gap={4}>
             <ShellTopBarUpdatePill />
             <GlobalExecutionTargetControl />
             <NotificationBell />
             <GlobalModelsControl placement="topbar" />
             <ShellTopBarAccount onSignIn={onSignIn} />
             {!hasConnectedAccount ? <SettingsMenuButton /> : null}
-          </row>
+          </Capsule>
           {isWin ? <WindowControls useWindowsIcons /> : null}
         </row>
       </row>

@@ -1,4 +1,4 @@
-import { chromeGlass } from "../shell/glass";
+import { chromeGlass, useGlassBackdrop } from "../shell/glass";
 import { memo, useCallback, useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
 import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store";
@@ -136,6 +136,7 @@ function ComposerImpl({
   const suggestionsActive = suggestionsRequested && !sidebar;
   const t = useT();
   const tokens = useTokens();
+  const glassBackdrop = useGlassBackdrop();
   const { state: uiState } = useUiState();
   const voiceVisible = useRealtimeVoiceVisible() && !sidebar;
   const inputId = `composer-input:${useId()}`;
@@ -317,7 +318,7 @@ function ComposerImpl({
         clip={radius}
         {...(sidebar
           ? { gradient: look.gradient, border: isDragOver ? look.dragBorder : focused ? look.focusBorder : look.border, shadows: isDragOver ? [...look.shadows, ...look.dragRing] : look.shadows }
-          : { fx: chromeGlass(tokens).composer, border: isDragOver ? look.dragBorder : undefined, shadows: isDragOver ? [...tokens.shadow.md, ...look.dragRing] : tokens.shadow.md })}
+          : { fx: chromeGlass(tokens).composer, onBackdrop: glassBackdrop, border: isDragOver ? look.dragBorder : undefined, shadows: isDragOver ? [...tokens.shadow.md, ...look.dragRing] : tokens.shadow.md })}
         motion={SHELL_SPRING}
         layout={SHELL_SPRING.dur}
         onFocusWithin={setFocused}

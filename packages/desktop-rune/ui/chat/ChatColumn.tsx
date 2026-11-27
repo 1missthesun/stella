@@ -30,7 +30,7 @@ import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
 import { UnderGlassContext, type LegendContentStyle } from "./ChatTimeline";
 import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
-import { chromeGlass } from "../shell/glass";
+import { AdaptiveGlass, chromeGlass, useGlassBackdrop } from "../shell/glass";
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
 import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
@@ -61,7 +61,11 @@ type StoreBackedComposerProps = Omit<ComponentProps<typeof Composer>, "message">
 
 const StoreBackedComposer = memo(function StoreBackedComposer({ messageStore, ...props }: StoreBackedComposerProps) {
   const message = useComposerMessage(messageStore);
-  return <Composer {...props} message={message} />;
+  return (
+    <AdaptiveGlass>
+      <Composer {...props} message={message} />
+    </AdaptiveGlass>
+  );
 });
 
 const AboveComposerCards = memo(function AboveComposerCards({ conversationId, onLayout }: { conversationId: string | null; onLayout: (r: Layout) => void }) {
@@ -119,6 +123,7 @@ function ScrollToBottomButton({ onPress, bottom }: { onPress: () => void; bottom
         center
         radius={SCROLL_BUTTON_SIZE / 2}
         fx={chromeGlass(tokens).controls}
+        onBackdrop={useGlassBackdrop()}
         pressScale={0.95}
         hoverGroup
         focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
@@ -325,7 +330,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
                   />
                 </UnderGlassContext.Provider>
               </MessageReplyContext.Provider>
-              {showScrollButton && !assistantReplyPeek.visible ? <ScrollToBottomButton bottom={composerStackH} onPress={() => scrollToBottom("smooth")} /> : null}
+              {showScrollButton && !assistantReplyPeek.visible ? <AdaptiveGlass><ScrollToBottomButton bottom={composerStackH} onPress={() => scrollToBottom("smooth")} /></AdaptiveGlass> : null}
             </box>
             <ConversationFocusOverlay conversationId={conversationId} />
           </box>

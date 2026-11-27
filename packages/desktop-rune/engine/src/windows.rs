@@ -246,7 +246,7 @@ pub fn options(p: &Props) -> WindowOptions {
         click_through: p.click_through || background,
         always_on_top: p.always_on_top || overlay,
         visible: p.visible.unwrap_or(true),
-        logical_position: p.position.map(|[x, y]| (f64::from(x), f64::from(y))),
+        logical_position: placed(p).map(|[x, y]| (f64::from(x), f64::from(y))),
         min_size: if background { Some((0.0, 0.0)) } else { p.min_size.map(|[w, h]| (w, h)) },
         max_size: p.max_size.map(|[w, h]| (w, h)),
         resizable: p.resizable.unwrap_or(true) && !background,
@@ -261,7 +261,19 @@ fn is_background(p: &Props) -> bool {
     p.kind.as_deref() == Some("background")
 }
 
-fn background_window(app: rune::App<Win>) -> rune::App<Win> {
+/// An `isolated` background window draws an app nobody sees (the draft preview reads its frames).
+/// On macOS a window off every screen, or one AppKit reports occluded, gets no frames, so it sits
+/// on screen unseen (`MacWindowOptions::unseen`) wherever the system puts it.
+pub fn unseen(p: &Props) -> bool {
+    cfg!(target_os = "macos") && is_background(p) && p.isolated
+}
+
+/// Where the window goes: an unseen one ignores its position.
+fn placed(p: &Props) -> Option<[i32; 2]> {
+    p.position.filter(|_| !unseen(p))
+}
+
+fn background_window(app: rune::App<Win>, unseen: bool) -> rune::App<Win> {
     const CAN_JOIN_ALL_SPACES: usize = 1 << 0;
     const STATIONARY: usize = 1 << 4;
     const IGNORES_CYCLE: usize = 1 << 6;
@@ -271,7 +283,8 @@ fn background_window(app: rune::App<Win>) -> rune::App<Win> {
             .nonactivating_panel(true)
             .shadow(false)
             .accepts_first_mouse(false)
-            .collection_behavior(CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY),
+            .collection_behavior(CAN_JOIN_ALL_SPACES | STATIONARY | IGNORES_CYCLE | FULL_SCREEN_AUXILIARY)
+            .unseen(unseen),
     )
     .windows_window(rune::WindowsWindowOptions::default().no_activate(true).tool_window(true))
     .linux_window(rune::LinuxWindowOptions::default().unmanaged(true))
@@ -359,7 +372,7 @@ pub fn decorate(app: rune::App<Win>, p: &Props, node: Option<u32>) -> rune::App<
         app = app.chrome(rune::Chrome { traffic_lights: Some((x, y)), ..rune::Chrome::DEFAULT });
     }
     if is_background(p) {
-        app = background_window(app);
+        app = background_window(app, unseen(p));
     } else if p.content_protection {
         app = app.exclude_from_capture(true);
     }
@@ -661,8 +674,8 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
             h.set_always_on_top(p.always_on_top);
             next.on_top = Some(p.always_on_top);
         }
-        if p.position.is_some() && p.position != applied.position {
-            if let Some([x, y]) = p.position
+        if placed(&p).is_some() && p.position != applied.position {
+            if let Some([x, y]) = placed(&p)
                 && let Some(k) = h.scale()
             {
                 h.set_position(((f64::from(x) * k).round() as i32, (f64::from(y) * k).round() as i32));

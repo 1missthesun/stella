@@ -2,8 +2,10 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--first-run] [--keep-data] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--first-run] [--keep-data] [--claude-login host] [--name <run>]
 // --keep-data restarts a stopped run on its own data, user-data and home (a real app restart).
+// --claude-login host lends the run this computer's Claude Code login (access token only, in the run's own
+// CLAUDE_CONFIG_DIR, deleted on stop) and picks Claude Code on Haiku, so a signed-out run gets real replies.
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png> [--window <window id>]
 //   bun scripts/session.ts stop
@@ -19,6 +21,7 @@ import { randomBytes } from "node:crypto";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { borrowClaudeLogin, removeBorrowedClaudeLogin } from "../../../.agents/skills/verify-stella/cli/isolation.mjs";
 
 const ROOT = path.resolve(import.meta.dir, "..");
 const REPO = path.resolve(ROOT, "../..");
@@ -155,10 +158,15 @@ async function start() {
   if (!keepData || !existsSync(keyFile)) writeFileSync(keyFile, randomBytes(32).toString("base64url"), { mode: 0o600 });
   const accountMode = flag("--account") ?? "pro";
   const firstRun = has("--first-run");
+  const claudeLogin = flag("--claude-login");
+  if (claudeLogin && claudeLogin !== "host") throw new Error("--claude-login takes host.");
+  const claudeConfigDir = path.join(RUN_DIR, "provider-homes", "claude");
   if (!keepData) {
     writeFileSync(path.join(dataDir, "ui-state.json"), JSON.stringify(firstRun ? {} : { "stella-onboarding-complete": "true" }));
-    writeFileSync(path.join(dataDir, "preferences.json"), JSON.stringify(firstRun ? {} : { onboardingCompleted: true }));
+    const prefs = { ...(firstRun ? {} : { onboardingCompleted: true }), ...(claudeLogin ? { agentRuntimeEngine: "claude_code_local", claudeCodeModel: "haiku" } : {}) };
+    writeFileSync(path.join(dataDir, "preferences.json"), JSON.stringify(prefs));
   }
+  if (claudeLogin) borrowClaudeLogin({ claudeConfigDir, oauthToken: process.env.STELLA_VERIFY_CLAUDE_OAUTH_TOKEN });
   const minted = accountMode === "signed-out" ? null : await mint(accountMode);
   const ctlPort = await freePort();
   const headless = has("--headless");
@@ -194,6 +202,9 @@ async function start() {
     STELLA_RUNE_EXTERNAL_OPEN: "log",
     STELLA_RUNE_CTL_PORT: String(ctlPort),
     STELLA_BUN_PATH: BUN,
+    ...(claudeLogin ? { CLAUDE_CONFIG_DIR: claudeConfigDir } : {}),
+    ...(process.env.STELLA_P2P_NAME?.trim() ? { STELLA_P2P_NAME: process.env.STELLA_P2P_NAME.trim() } : {}),
+    ...(process.env.STELLA_P2P_RELAY?.trim() ? { STELLA_P2P_RELAY: process.env.STELLA_P2P_RELAY.trim() } : {}),
     ...(process.env.STELLA_BACKEND_URL?.trim() ? { VITE_STELLA_BACKEND_URL: process.env.STELLA_BACKEND_URL.trim() } : {}),
     ...(minted ? { STELLA_DEV_HARNESS_SESSION_TOKEN: minted.sessionToken } : {}),
   });
@@ -348,7 +359,8 @@ async function stop() {
   releaseSlot(run.slot);
   if (pids.some(alive)) throw new Error(`Run ${runName} did not stop: ${pids.filter(alive).join(", ")}`);
   rmSync(POINTER, { force: true });
-  console.log(JSON.stringify({ stopped: run.pids, appExitMs, lingeringAfterQuit: lingering }));
+  const claudeLoginRemoved = removeBorrowedClaudeLogin(path.join(RUN_DIR, "provider-homes", "claude"));
+  console.log(JSON.stringify({ stopped: run.pids, appExitMs, lingeringAfterQuit: lingering, ...(claudeLoginRemoved ? { claudeLoginRemoved } : {}) }));
 }
 
 const [command, ...rest] = args;

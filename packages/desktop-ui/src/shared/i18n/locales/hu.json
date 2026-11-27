@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "A csevegésed a fiókodban marad. A Stella elrejti ezen a számítógépen, amíg újra be nem jelentkezel.",
       "failed": "Nem sikerült kijelentkezni. Próbáld újra.",
+      "phoneBody": "A csevegésed a fiókodban marad. A Stella elrejti ezen a telefonon, amíg újra be nem jelentkezel.",
+      "phoneRemove": "A csevegés eltávolítása erről a telefonról is",
+      "phoneRemoveNote": "Közös vagy kölcsönkapott telefonhoz. Bejelentkezéskor újra letöltődik.",
+      "phoneTitle": "Kijelentkezel erről a telefonról?",
       "remove": "A csevegés eltávolítása erről a számítógépről is",
       "removeNote": "Közös vagy kölcsönkapott számítógéphez. Bejelentkezéskor újra letöltődik.",
       "title": "Kijelentkezel erről a számítógépről?"

@@ -36,6 +36,35 @@ thread_local! {
     static VOTES: RefCell<HashMap<u32, u8>> = RefCell::new(HashMap::new());
     /// Frames left to re-check covers after a commit, since a pick reads the last presented frame.
     static RECHECK: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+    /// Each field's window, element key and drawn rect, which the frame writes as it draws.
+    static DRAWN: RefCell<HashMap<u32, (u32, String, rune::Live<[f32; 4]>)>> = RefCell::new(HashMap::new());
+}
+
+/// Where the frame draws field `n`: written while it draws (`El::drawn_rect_into`), through the
+/// keyboard's ride, its box growing and every spring, so [`sync`] places the text view in the
+/// frame that shows the box there rather than a frame or more behind it.
+pub fn drawn_rect(window: u32, n: u32, key: &str) -> rune::Live<[f32; 4]> {
+    DRAWN.with(|d| {
+        let mut d = d.borrow_mut();
+        let e = d.entry(n).or_insert_with(|| (window, key.to_owned(), rune::Live::new([0.0; 4])));
+        if e.0 != window || e.1 != key {
+            e.0 = window;
+            e.1 = key.to_owned();
+        }
+        e.2.clone()
+    })
+}
+
+/// After each frame: places every field where that frame drew its box. The app applies it in
+/// the same Core Animation transaction the frame presents in (its Metal layer presents with
+/// the transaction), so the text never comes loose from its box.
+pub fn sync() {
+    let fields: Vec<(u32, u32, String, [f32; 4])> = DRAWN.with(|d| d.borrow().iter().map(|(n, (w, k, r))| (*n, *w, k.clone(), r.get())).collect());
+    for (n, window, key, r) in fields {
+        if r[2] > 0.0 || r[3] > 0.0 {
+            place(window, n, &key, r);
+        }
+    }
 }
 
 pub fn set_callback(cb: NativeCb, ctx: *mut c_void) {
@@ -149,8 +178,8 @@ pub fn place(window: u32, n: u32, key: &str, r: [f32; 4]) {
         if !COVERED.with(|c| c.borrow().contains(&n)) {
             send(json!({ "t": "place", "n": n, "window": window, "rect": r }));
         }
+        note_commit();
     }
-    note_commit();
 }
 
 /// Something changed on screen: check the fields' covers over the next few frames.
@@ -241,6 +270,7 @@ pub fn forget(n: u32) {
     VOTES.with(|v| v.borrow_mut().remove(&n));
     PATHS.with(|m| m.borrow_mut().remove(&n));
     MOVED.with(|m| m.borrow_mut().remove(&n));
+    DRAWN.with(|d| d.borrow_mut().remove(&n));
     if had {
         send(json!({ "t": "fieldGone", "n": n }));
     }

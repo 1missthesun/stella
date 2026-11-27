@@ -15,6 +15,7 @@ final class JSRuntime: NSObject, URLSessionDataDelegate, URLSessionWebSocketDele
   private let ready = DispatchSemaphore(value: 0)
   private(set) var context: JSContext!
   private var timers: [Int: Timer] = [:]
+  private var repeating = Set<Int>()
   private lazy var session: URLSession = {
     let q = OperationQueue()
     q.maxConcurrentOperationCount = 1
@@ -52,10 +53,33 @@ final class JSRuntime: NSObject, URLSessionDataDelegate, URLSessionWebSocketDele
   }
 
   /// Runs `block` on the JS thread.
+  /// Runs `block` (an event from outside: input, a fetch, a socket message) as the JS thread's next
+  /// task, after any timer already due. The run loop serves every performed block in one pass before
+  /// its timers, so a burst of socket messages would otherwise all run ahead of a `setTimeout(0)`
+  /// queued by the first (React's scheduler, which flushes effects there); a browser runs that task
+  /// in between, and without it each message's effects pile onto the next until React gives up
+  /// ("Maximum update depth exceeded").
   func perform(_ block: @escaping () -> Void) {
     guard let rl = runLoop else { return }
-    CFRunLoopPerformBlock(rl, CFRunLoopMode.defaultMode.rawValue, block)
+    CFRunLoopPerformBlock(rl, CFRunLoopMode.defaultMode.rawValue) { [weak self] in
+      self?.fireDueTimers()
+      block()
+    }
     CFRunLoopWakeUp(rl)
+  }
+
+  /// Fires the one-shot timers whose time has come, oldest first, each as its own call (so its
+  /// microtasks settle before the next). Ones they queue that are already due run too, up to a bound.
+  private func fireDueTimers() {
+    var budget = 64
+    while budget > 0 {
+      let now = Date()
+      guard let (id, t) = timers.filter({ $0.value.isValid && !repeating.contains($0.key) && $0.value.fireDate <= now }).min(by: { $0.value.fireDate < $1.value.fireDate }) else { return }
+      t.invalidate()
+      timers.removeValue(forKey: id)
+      call("__timerFire", [id])
+      budget -= 1
+    }
   }
 
   private func main(bundle: URL, env: [String: Any]) {
@@ -143,9 +167,10 @@ final class JSRuntime: NSObject, URLSessionDataDelegate, URLSessionWebSocketDele
         self.call("__timerFire", [id])
       }
       self.timers[id] = t
+      if repeats { self.repeating.insert(id) } else { self.repeating.remove(id) }
       RunLoop.current.add(t, forMode: .default)
     } as @convention(block) (Int, Double, Bool) -> Void)
-    set("clearTimer", { [weak self] (id: Int) in self?.timers.removeValue(forKey: id)?.invalidate() } as @convention(block) (Int) -> Void)
+    set("clearTimer", { [weak self] (id: Int) in self?.repeating.remove(id); self?.timers.removeValue(forKey: id)?.invalidate() } as @convention(block) (Int) -> Void)
     set("post", { [weak self] (json: String) in
       guard let data = json.data(using: .utf8), let m = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
       DispatchQueue.main.async { self?.onAppCommand?(m) }

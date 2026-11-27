@@ -7,6 +7,6 @@ export { Markdown, markdownStyle, codeAction as markdownCodeAction, useCodeActio
 export { TABLE_ACTIONS, useTableActions } from "./table-actions";
 export { Switch, type SwitchProps } from "./Switch";
 export { TextField, type TextFieldProps } from "./TextField";
-export { ToastItem, ToastRegion, dismissToast, showToast, type ToastOptions } from "./Toast";
+export { ToastItem, ToastPlacementContext, ToastRegion, dismissToast, showToast, type ToastOptions } from "./Toast";
 export { showContextMenu, type ContextMenuItem } from "./contextMenu";
 export { Icon, Icons, withStroke, type IconData } from "./icons";

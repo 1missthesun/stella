@@ -41,9 +41,17 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
     case "field": configure(n, m)
     case "place":
       guard let f = fields[n], let r = m["rect"] as? [NSNumber], r.count == 4 else { return }
-      f.view.frame = CGRect(x: CGFloat(r[0].doubleValue), y: CGFloat(r[1].doubleValue), width: CGFloat(r[2].doubleValue), height: CGFloat(r[3].doubleValue))
+      let frame = CGRect(x: CGFloat(r[0].doubleValue), y: CGFloat(r[1].doubleValue), width: CGFloat(r[2].doubleValue), height: CGFloat(r[3].doubleValue))
+      if f.view.frame != frame {
+        // Exactly where this frame drew the box, with no implicit animation of its own (a place
+        // can land inside the keyboard's animation block).
+        UIView.performWithoutAnimation {
+          f.view.frame = frame
+          layoutPlaceholder(f)
+          if let tv = f.textView { settleOffset(tv) }
+        }
+      }
       f.view.isHidden = false
-      layoutPlaceholder(f)
     case "hideField":
       // Covered by something Rune draws (a page, a drawer, a dialog): out of sight, and done editing.
       guard let f = fields[n] else { return }
@@ -217,6 +225,17 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
       f.placeholder.frame = CGRect(x: pad[3], y: pad[0], width: max(0, b.width - pad[1] - pad[3]), height: lh)
     } else {
       f.placeholder.frame = CGRect(x: pad[3], y: 0, width: max(0, b.width - pad[1] - pad[3]), height: b.height)
+    }
+  }
+
+  /// A text view that grew (pasted lines) scrolled its text up to keep the caret in sight while it
+  /// was still short. Once its box is tall enough for the text, the text comes back to the top
+  /// instead of staying sliced off above it; a box at its line limit keeps the caret in view.
+  private func settleOffset(_ tv: UITextView) {
+    tv.layoutIfNeeded()
+    let maxY = max(0, tv.contentSize.height - tv.bounds.height)
+    if tv.contentOffset.y > maxY + 0.5 || (maxY < 0.5 && tv.contentOffset.y != 0) {
+      tv.setContentOffset(CGPoint(x: 0, y: min(tv.contentOffset.y, maxY)), animated: false)
     }
   }
 

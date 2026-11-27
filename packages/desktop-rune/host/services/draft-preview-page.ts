@@ -5,6 +5,8 @@
 
 const script = String.raw`
 const API = "/__preview/";
+// The API answers only requests carrying this header, which no other page can send unasked.
+const OWN = { "x-stella-preview": "1" };
 const isMac = navigator.platform.startsWith("Mac");
 const frame = document.getElementById("frame");
 const layer = document.getElementById("layer");
@@ -84,13 +86,13 @@ async function poll() {
   for (;;) {
     try {
       waiting = new AbortController();
-      const r = await fetch(API + "next?seen=" + seen + "&w=" + innerWidth + "&h=" + innerHeight, { cache: "no-store", signal: waiting.signal });
+      const r = await fetch(API + "next?seen=" + seen + "&w=" + innerWidth + "&h=" + innerHeight, { cache: "no-store", headers: OWN, signal: waiting.signal });
       if (!r.ok) throw new Error(String(r.status));
       const s = await r.json();
       problem.hidden = !s.error;
       problem.textContent = s.error ?? "";
       if (s.png && s.seq > seen) {
-        const blob = await (await fetch(API + "frame/" + s.png + ".png", { cache: "no-store" })).blob();
+        const blob = await (await fetch(API + "frame/" + s.png + ".png", { cache: "no-store", headers: OWN })).blob();
         const url = URL.createObjectURL(blob);
         const img = new Image();
         img.src = url;
@@ -118,7 +120,7 @@ function send(event) {
   queueMicrotask(() => {
     const events = queue;
     queue = [];
-    sending = sending.then(() => fetch(API + "input", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(events) })).catch(() => {});
+    sending = sending.then(() => fetch(API + "input", { method: "POST", headers: { ...OWN, "content-type": "application/json" }, body: JSON.stringify(events) })).catch(() => {});
   });
 }
 

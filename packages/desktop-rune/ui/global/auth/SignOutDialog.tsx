@@ -7,6 +7,7 @@ import { secureSignOut } from "@/global/auth/services/auth";
 import { wipeAccountsFromThisComputer } from "@/features/cloud/paused-account";
 import { accountHintChanged } from "@/global/auth/hooks/use-account-hint";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
+import { onPhone } from "../../shell/phone";
 
 let open = false;
 const listeners = new Set<() => void>();
@@ -36,6 +37,7 @@ export function SignOutDialog() {
   const [remove, setRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!isOpen) return null;
+  const phone = onPhone();
   const close = () => {
     if (busy) return;
     setOpen(false);
@@ -58,17 +60,17 @@ export function SignOutDialog() {
     <Dialog open onOpenChange={(next) => !next && close()}>
       <DialogContent fit {...s.signOutChoice}>
         <DialogHeader>
-          <DialogTitle>{t("global.signOut.title")}</DialogTitle>
+          <DialogTitle>{t(phone ? "global.signOut.phoneTitle" : "global.signOut.title")}</DialogTitle>
         </DialogHeader>
         <DialogBody {...s.signOutChoiceBody}>
           <DialogDescription {...s.signOutChoice_signOutChoiceText}>
-            {t("global.signOut.body")}
+            {t(phone ? "global.signOut.phoneBody" : "global.signOut.body")}
           </DialogDescription>
           <row {...s.signOutChoiceCheck} onPress={busy ? undefined : () => setRemove(!remove)}>
-            <NativeCheckbox {...s.signOutChoiceCheck_input} checked={remove} disabled={busy} onChange={setRemove} label={t("global.signOut.remove")} />
+            <NativeCheckbox {...s.signOutChoiceCheck_input} checked={remove} disabled={busy} onChange={setRemove} label={t(phone ? "global.signOut.phoneRemove" : "global.signOut.remove")} />
             <col grow={1} shrink minW={0}>
-              <T {...tx(s.signOutChoiceCheck)}>{t("global.signOut.remove")}</T>
-              <T {...tx(s.signOutChoiceCheck)} {...s.signOutChoiceCheck_small}>{t("global.signOut.removeNote")}</T>
+              <T {...tx(s.signOutChoiceCheck)}>{t(phone ? "global.signOut.phoneRemove" : "global.signOut.remove")}</T>
+              <T {...tx(s.signOutChoiceCheck)} {...s.signOutChoiceCheck_small}>{t(phone ? "global.signOut.phoneRemoveNote" : "global.signOut.removeNote")}</T>
             </col>
           </row>
           <row {...s.localModeChoiceActions}>

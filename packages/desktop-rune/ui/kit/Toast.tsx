@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useState, useSyncExternalStore } from "react";
 import { fontSize, look, mix, radius, useTokens, derive } from "../theme";
 import { useT } from "../i18n";
 import { Icon, Icons } from "./icons";
@@ -68,12 +68,16 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 
+/** Where a window that is not the desktop's places its toasts instead (the phone: full width, under its status and top bars). */
+export const ToastPlacementContext = createContext<{ top: number; left: number; right: number } | null>(null);
+
 /** The toast stack (`[data-component="toast-region"]`), top right under the 48pt top bar. Render once per window. */
 export function ToastRegion({ top = 48 }: { top?: number }) {
   const list = useSyncExternalStore(subscribe, () => toasts);
+  const placed = useContext(ToastPlacementContext);
   if (list.length === 0) return null;
   return (
-    <col id="toast-region" fixed absolute={{ top, right: 16 }} raise={1000} w={400} maxW="100%" gap={8}>
+    <col id="toast-region" fixed absolute={placed ?? { top, right: 16 }} raise={1000} {...(placed ? {} : { w: 400 })} maxW="100%" gap={8}>
       {list.map((t) => (
         <ToastItem key={t.id} toast={t} onClose={() => dismissToast(t.id)} />
       ))}

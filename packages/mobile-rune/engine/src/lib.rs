@@ -43,6 +43,8 @@ mod style;
 mod surface;
 #[path = "../../../desktop-rune/engine/src/swap_view.rs"]
 mod swap_view;
+#[path = "../../../desktop-rune/engine/src/swapfx.rs"]
+mod swapfx;
 #[path = "../../../desktop-rune/engine/src/text.rs"]
 mod text;
 #[path = "../../../desktop-rune/engine/src/tree.rs"]

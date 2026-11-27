@@ -1041,6 +1041,10 @@
     "signOut": {
       "body": "Votre conversation reste dans votre compte. Stella la masque sur cet ordinateur jusqu'à votre prochaine connexion.",
       "failed": "Impossible de se déconnecter. Réessayez.",
+      "phoneBody": "Votre conversation reste dans votre compte. Stella la masque sur ce téléphone jusqu'à votre prochaine connexion.",
+      "phoneRemove": "Supprimer aussi la conversation de ce téléphone",
+      "phoneRemoveNote": "Pour un téléphone partagé ou emprunté. Elle sera retéléchargée à la prochaine connexion.",
+      "phoneTitle": "Se déconnecter de ce téléphone ?",
       "remove": "Supprimer aussi la conversation de cet ordinateur",
       "removeNote": "Pour un ordinateur partagé ou emprunté. Elle sera retéléchargée à la prochaine connexion.",
       "title": "Se déconnecter de cet ordinateur ?"

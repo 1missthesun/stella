@@ -1041,6 +1041,10 @@
     "signOut": {
       "body": "Conversația rămâne în contul tău. Stella o ascunde pe acest computer până te conectezi din nou.",
       "failed": "Nu te-ai putut deconecta. Încearcă din nou.",
+      "phoneBody": "Conversația rămâne în contul tău. Stella o ascunde pe acest telefon până te conectezi din nou.",
+      "phoneRemove": "Elimină și conversația de pe acest telefon",
+      "phoneRemoveNote": "Pentru un telefon comun sau împrumutat. La conectare va fi descărcată din nou.",
+      "phoneTitle": "Te deconectezi de pe acest telefon?",
       "remove": "Elimină și conversația de pe acest computer",
       "removeNote": "Pentru un computer comun sau împrumutat. La conectare va fi descărcată din nou.",
       "title": "Te deconectezi de pe acest computer?"

@@ -1,4 +1,4 @@
-import { Fragment, memo, useId, useMemo, useState, type ReactNode } from "react";
+import { Fragment, memo, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { serverNow } from "@stella/contracts/server-clock";
 import { EMAIL_PAGE_CANVAS } from "@stella/contracts/email-page";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
@@ -9,7 +9,6 @@ import { isHtmlPagePath } from "@stella/contracts/page-preview";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
-import { useEntrance } from "@/features/chat/lib/message-entry-animation-state";
 import { pastedTextPreview, type PastedTextDescriptor } from "@/features/chat/lib/paste-context";
 import type { Attachment, ChannelEnvelope } from "@/features/chat/lib/event-transforms";
 import { localFilePathForPayload } from "@/features/workspace-display/path-to-viewer";
@@ -55,13 +54,12 @@ import { ViewChatCard, isViewFile } from "../views/ViewTabContent";
 import { getDisplayPayloadTitle } from "@stella/contracts/desktop/display-payload";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { previewCard, pillColors } from "./surfaces";
+import { useBubblePop } from "./bubble-pop";
 
 
 type Translate = ReturnType<typeof useT>;
 
 export const PART_GAP = 8;
-const MESSAGE_ENTRANCE_MS = 360;
-const MESSAGE_ENTRANCE_ANIMATION = "bubble-pop";
 const BUBBLE_MAX_FRACTION = 0.85;
 const CHIP_GAP = 6;
 
@@ -260,21 +258,9 @@ function AttachmentImage({ attachment, index, safeUrl }: { attachment: Attachmen
   return <ImageAttachmentChip thumbnailUrl={safeUrl} fullImageUrl={safeUrl} alt={attachment.name ?? t("app.chat.messageRow.attachmentAlt")} title={t("app.chat.messageRow.clickToEnlarge", { label })} />;
 }
 
-/** The `bubble-pop` entrance of a sent message: rise 14pt and grow from 84% on a 360ms spring. */
-const BUBBLE_POP = { opacity: 0, y: 14, scale: 0.84, dur: MESSAGE_ENTRANCE_MS / 1000, bounce: 0.15 };
-/** A reply fades in where it lands, without growing. */
-const REPLY_FADE = { opacity: 0, dur: 0.12 };
-/** How soon after its arrival a row must mount for its entrance to play. */
-const ENTRANCE_MOUNT_WINDOW_MS = 80;
-
-/**
- * Whether this mount is the message arriving. Rune's `enter` plays from the start whenever an
- * element mounts, so a row that remounts (its id changing from the optimistic one to the one the
- * runtime accepted, or its list cell rebuilt) or that learns of its arrival after its first frame
- * must not play it again: decided once, at mount.
- */
-const useArrivingMount = (arrivedAt: number | undefined): boolean =>
-  useState(() => arrivedAt !== undefined && performance.now() - arrivedAt < ENTRANCE_MOUNT_WINDOW_MS)[0];
+/** desktop-ui pops a sent bubble from its bottom right (`transform-origin: right bottom`) and a reply from its bottom left. */
+const USER_POP_ORIGIN: [number, number] = [1, 1];
+const ASSISTANT_POP_ORIGIN: [number, number] = [0, 1];
 
 const reactionLook = (t: ReturnType<typeof useTokens>) => derive(t, "reaction", (k) => ({ fill: k.c.surfaceInset, border: k.c.background }));
 
@@ -283,7 +269,7 @@ export const UserMessageRow = memo(
     const t = useT();
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
-    const arriving = useArrivingMount(row.arrivedAt);
+    const pop = useBubblePop(row.arrivedAt, USER_POP_ORIGIN);
     const reply = useMessageReply();
     const { text, windowLabel, attachments, channelEnvelope } = row;
     const copyAttachment = useMemo(() => primaryCopyAttachment(attachments), [attachments]);
@@ -352,8 +338,7 @@ export const UserMessageRow = memo(
                 px={surface.user.px}
                 radius={surface.user.radius}
                 fill={tokens.c.chatUserBubbleFill}
-                origin={[1, 1]}
-                enter={arriving ? BUBBLE_POP : undefined}
+                loop={pop.loop}
               >
                 {reaction ? (
                   <box
@@ -394,13 +379,21 @@ export const UserMessageRow = memo(
 );
 
 /** desktop-ui's `useReplyHandoffArrival`: a final reply that just landed takes the working indicator's place. */
+/**
+ * Tells the working indicator the reply it was holding a place for has landed, in the commit that
+ * first lays the reply out: from a layout effect, the indicator's handoff commits with it and both
+ * reach the engine as one frame, where a later microtask left a frame with the reply laid out under
+ * a still-standing indicator (the pinned list jumping up by the reply's height, then back).
+ */
 function useReplyArrival(justArrived: boolean, finalAnswer: boolean) {
   const controller = useReplyHandoffController();
-  const [announced, setAnnounced] = useState(false);
-  if (!announced && justArrived && finalAnswer && controller) {
-    setAnnounced(true);
-    queueMicrotask(() => controller.replyArrived());
-  }
+  const announced = useRef(false);
+  const due = !announced.current && justArrived && finalAnswer && controller !== null;
+  useLayoutEffect(() => {
+    if (!due || announced.current || !controller) return;
+    announced.current = true;
+    controller.replyArrived();
+  });
 }
 
 /** The Stella Views a reply made or changed, one per file, in the order it first touched them. */
@@ -412,9 +405,8 @@ export const AssistantMessageRow = memo(
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
     const reply = useMessageReply();
-    const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
-    const arriving = useArrivingMount(row.arrivedAt);
-    useReplyArrival(entrance.delayMs !== null, !row.isIntraTurn);
+    const pop = useBubblePop(row.arrivedAt, ASSISTANT_POP_ORIGIN);
+    useReplyArrival(pop.fresh, !row.isIntraTurn);
     const text = row.text;
     const hasText = text.trim().length > 0;
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
@@ -511,7 +503,7 @@ export const AssistantMessageRow = memo(
     const menu = contextMenu(messageMenu({ text: hasBody ? text : "", messageKey: row.id, renderedText: () => (!hasBody ? null : shouldUseBoundedMarkdownPlaintext(bodyText.length) ? bodyText : markdownPlainText(bodyText)), onReply: row.isIntraTurn ? null : reply, readAloud: !row.isIntraTurn }));
     return (
       <col w="full" hoverGroup onContextMenu={menu}>
-        <col w="full" gap={PART_GAP} enter={arriving ? REPLY_FADE : undefined}>
+        <col w="full" gap={PART_GAP} loop={pop.loop}>
           {row.voiceSession ? <VoiceSessionCard durationMs={row.voiceSession.durationMs} /> : null}
           {conversationId && (pillRefs.length > 0 || pillCompletions.length > 0) ? <ReplyPreview refs={pillRefs} completions={pillCompletions} conversationId={conversationId} /> : null}
           {row.askRecords?.map((record) => <UserAskRecordCard key={record.id} record={record} />)}

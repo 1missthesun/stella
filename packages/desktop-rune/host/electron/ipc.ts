@@ -186,7 +186,7 @@ export class RendererIpc {
     const set = this.listeners.get(channel);
     if (!set || set.size === 0) return;
     const payload = cloneArgs(args);
-    queueMicrotask(() => {
+    const run = () => {
       const event = { sender: null, senderId: 0, ports: [] };
       for (const listener of [...set]) {
         try {
@@ -195,6 +195,23 @@ export class RendererIpc {
           console.error(`[ipc] renderer listener for ${channel} failed:`, error);
         }
       }
-    });
+    };
+    if (held) held.push(run);
+    else queueMicrotask(run);
   }
+}
+
+let held: Array<() => void> | null = null;
+
+/** Holds main → renderer deliveries (streaming replies, notifications) while a hot swap's
+ *  before and after are taken, so the swap compares the same app state on both sides. */
+export function holdDeliveries() {
+  held ??= [];
+}
+
+/** Delivers what was held, in order. */
+export function releaseDeliveries() {
+  const queued = held;
+  held = null;
+  for (const run of queued ?? []) queueMicrotask(run);
 }

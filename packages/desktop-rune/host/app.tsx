@@ -13,11 +13,14 @@ import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
 import { scopeUiFacing } from "./services/ui-scope";
 import { installRendererErrorRouting } from "./services/renderer-errors";
+import { holdDeliveries, releaseDeliveries } from "./electron/ipc";
 import type { RuneServices } from "./services/boot";
 import type { ControlContext } from "./services/control";
 
 const SWAP_QUIET_MS = 80;
 const SWAP_HOLD_MAX_MS = Number(process.env.STELLA_RUNE_SWAP_HOLD_MS ?? 1000);
+/** The engine transitions only what a swap changed (engine/src/swapfx.rs); `STELLA_RUNE_SWAP_FX=0` lands swaps at once. */
+const SWAP_FX = process.env.STELLA_RUNE_SWAP_FX !== "0";
 
 export async function runHost(options: { bundled?: boolean } = {}): Promise<void> {
   const t_boot = now();
@@ -34,6 +37,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
     tsconfig: join(ROOT, "tsconfig.build.json"),
     external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
     bootCache: process.env.STELLA_RUNE_UI_CACHE !== "0",
+    modules: "swap",
   });
   ui.warm();
 
@@ -164,14 +168,37 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
     });
   }
 
+  // Live updates wait while the engine takes the swap's before and after (it says when), so
+  // a streaming reply or a notification is not mistaken for part of the change.
+  let releaseAt: ReturnType<typeof setTimeout> | undefined;
+  const release = () => {
+    clearTimeout(releaseAt);
+    releaseDeliveries();
+  };
+  onEngineEvent("swapfx", release);
+  const holdForSwap = () => {
+    holdDeliveries();
+    clearTimeout(releaseAt);
+    releaseAt = setTimeout(release, SWAP_HOLD_MAX_MS + 1500);
+  };
+
   async function runSwap(label: string, t0: number, mtime: number): Promise<boolean> {
     try {
+      // The transition's pipelines compile on an engine thread while this builds.
+      if (SWAP_FX) command({ cmd: "swapfx.warm" });
       const next = await loadApp();
       const t_built = now();
       app = next;
       const { kind, swap } = ui.lastLoad();
       const how = swap && kind !== "fresh" ? `${kind}, ${swap.evaluated} module${swap.evaluated === 1 ? "" : "s"}${swap.reason ? `: ${swap.reason}` : ""}` : kind;
-      if (kind === "refresh" && swap?.evaluated === 0) return true;
+      if (kind === "refresh" && swap?.evaluated === 0) {
+        console.error(`[ui] hot swap #${swapN} ${label}: no module changed (bundle+load ${(t_built - t0).toFixed(1)} ms)`);
+        return true;
+      }
+      if (SWAP_FX) {
+        holdForSwap();
+        command({ cmd: "swapfx.begin" });
+      }
       if (kind === "refresh") {
         // The tree stays mounted and only re-renders: nothing to load, so nothing to hold.
         store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
@@ -200,6 +227,10 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       // A broken edit never takes the UI down: the old app keeps running, the error shows.
       bridge.releaseFrames();
       replayLayouts(false);
+      if (SWAP_FX) {
+        command({ cmd: "swapfx.cancel" });
+        release();
+      }
       console.error("[ui] hot swap failed, keeping the running UI:", err);
       store.set({ error: String((err as Error).message ?? err).slice(0, 400) });
       return false;

@@ -28,6 +28,10 @@ final class RuneView: UIView {
     let layer = self.layer as! CAMetalLayer
     layer.pixelFormat = .bgra8Unorm
     layer.framebufferOnly = true
+    // A frame shows in the Core Animation transaction it was drawn in, the one that moves the
+    // native text fields to where it drew their boxes (NativeFields `place`), so a field never
+    // trails its box while the keyboard or a growing composer moves it.
+    layer.presentsWithTransaction = true
     layer.isOpaque = true
     contentScaleFactor = UIScreen.main.scale
   }

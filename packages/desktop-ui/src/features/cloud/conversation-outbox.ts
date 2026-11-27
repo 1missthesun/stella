@@ -532,6 +532,15 @@ let activePendingAuthorityReady = false;
 const authorityKey = (authority: CloudConversationOutboxAuthority): string =>
   `${authority.accountScope}\u0000${authority.ownerGeneration}`;
 
+/**
+ * The journal can echo a sent message before its send learns the id the echo carries (the
+ * dispatch id from the submit response, or the cloud turn id once the dispatch settles). Such an
+ * echo matches no pending prompt when it lands, so it's kept here, and the prompt is resolved by it
+ * as soon as the send learns that id, instead of showing twice until a later record of the turn.
+ */
+const earlyEchoes: { authority: string; record: JournalRecord }[] = [];
+const EARLY_ECHO_LIMIT = 16;
+
 const pendingKey = (
   authority: CloudConversationOutboxAuthority,
   clientMsgId: string,
@@ -678,7 +687,22 @@ export const pendingPrompts = {
       }
     }
     replacePending(authority, clientMsgId, next);
+    if (bindings.dispatchId || bindings.turnId) this.claimEarlyEcho(authority, next);
     return next;
+  },
+  /** Resolves `entry` by an echo of it that arrived before it knew its dispatch or turn id. */
+  claimEarlyEcho(authority: CloudConversationOutboxAuthority, entry: PendingPrompt): void {
+    const key = authorityKey(authority);
+    const at = earlyEchoes.findIndex(
+      ({ authority: owner, record }) =>
+        owner === key &&
+        record.kind === "message" &&
+        ((entry.dispatchId != null && record.clientMsgId === entry.dispatchId) ||
+          (entry.turnId != null && record.turnId === entry.turnId)),
+    );
+    if (at < 0) return;
+    const [echo] = earlyEchoes.splice(at, 1);
+    this.resolve(authority, echo!.record);
   },
   bind(
     authority: CloudConversationOutboxAuthority,
@@ -697,6 +721,7 @@ export const pendingPrompts = {
       }
     }
     replacePending(authority, clientMsgId, next);
+    this.claimEarlyEcho(authority, next);
   },
   drop(authority: CloudConversationOutboxAuthority, clientMsgId: string): void {
     const found = this.find(authority, clientMsgId);
@@ -762,7 +787,13 @@ export const pendingPrompts = {
           (clientMsgId !== undefined && entry.dispatchId === clientMsgId) ||
           (entry.turnId !== null && entry.turnId === record.turnId)),
     );
-    if (!acknowledged.length) return;
+    if (!acknowledged.length) {
+      if (record.kind === "message" && record.role === "user") {
+        earlyEchoes.push({ authority: authorityKey(authority), record });
+        if (earlyEchoes.length > EARLY_ECHO_LIMIT) earlyEchoes.shift();
+      }
+      return;
+    }
     const removed = new Set<string>();
     for (const entry of acknowledged) {
       if (record.kind === "message" && record.role === "user") {
@@ -782,6 +813,7 @@ export const pendingPrompts = {
     if (next.length !== pending.length) emitPending(next);
   },
   retainAccountScope(accountScope: string): void {
+    earlyEchoes.length = 0;
     activePendingAuthorityKey = null;
     activePendingAuthorityReady = false;
     inFlightPending.clear();

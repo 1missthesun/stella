@@ -17,6 +17,7 @@ export type StellaCharacterProps = {
 
 type Node = {
   tagName: string;
+  parentNode: Node | null;
   attributes: Map<string, string>;
   style: { getPropertyValue(name: string): string };
   childNodes: Node[];
@@ -31,7 +32,7 @@ type Running = { frames: Keyframe[]; duration: number; delay: number; iterations
 
 /** WAAPI on the rig's layer spans (the working dots' bounce), sampled when the frame is drawn. */
 const animations = new WeakMap<Node, Running>();
-const fakeAnimate = (el: Node) => (frames: Keyframe[], options: KeyframeAnimationOptions | number) => {
+const fakeAnimate = (el: Node, live: Set<Running>) => (frames: Keyframe[], options: KeyframeAnimationOptions | number) => {
   const opts = typeof options === "number" ? { duration: options } : options;
   const run: Running = {
     frames,
@@ -43,6 +44,7 @@ const fakeAnimate = (el: Node) => (frames: Keyframe[], options: KeyframeAnimatio
     done: false,
   };
   animations.set(el, run);
+  live.add(run);
   return {
     get playState() {
       return run.done ? "finished" : run.pausedAt !== null ? "paused" : "running";
@@ -57,6 +59,7 @@ const fakeAnimate = (el: Node) => (frames: Keyframe[], options: KeyframeAnimatio
     },
     cancel() {
       run.done = true;
+      live.delete(run);
       if (animations.get(el) === run) animations.delete(el);
     },
     finish() {
@@ -77,6 +80,18 @@ const sampleFrame = (run: Running): Keyframe | null => {
   const u = (local % run.duration) / run.duration;
   const index = Math.min(run.frames.length - 1, Math.round(u * (run.frames.length - 1)));
   return run.frames[index] ?? null;
+};
+
+/** Whether a WAAPI run still changes what it samples (paused runs hold one frame). */
+const moving = (run: Running) => !run.done && run.pausedAt === null && performance.now() - run.start - run.delay < run.duration * run.iterations;
+
+/** The host DOM's change feed (Rune's `document.observeElementChanges`), when there is one. */
+type ChangeFeed = (listener: (change: { element: unknown }) => void) => () => void;
+const changeFeed = (): ChangeFeed | null => (document as unknown as { observeElementChanges?: ChangeFeed }).observeElementChanges ?? null;
+
+const within = (el: unknown, root: Node) => {
+  for (let n = el as Node | null, depth = 0; n && depth < 64; n = n.parentNode, depth++) if (n === root) return true;
+  return false;
 };
 
 const pct = (value: string, axis: "x" | "y") => (axis === "x" ? VIEW_X : VIEW_Y) + (parseFloat(value) / 100) * VIEW_SPAN;
@@ -132,16 +147,17 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
 
   useLayoutEffect(() => {
     const host = document.createElement("span") as unknown as HTMLElement;
+    const live = new Set<Running>();
     const createElement = document.createElement.bind(document);
     const createElementNS = document.createElementNS.bind(document);
     document.createElement = ((tag: string) => {
       const el = createElement(tag) as unknown as Node;
-      el.animate = fakeAnimate(el);
+      el.animate = fakeAnimate(el, live);
       return el;
     }) as typeof document.createElement;
     document.createElementNS = ((ns: string, tag: string) => {
       const el = createElementNS(ns, tag) as unknown as Node;
-      el.animate = fakeAnimate(el);
+      el.animate = fakeAnimate(el, live);
       return el;
     }) as typeof document.createElementNS;
     let mark: StellaMarkHandle;
@@ -159,17 +175,56 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
         : value;
     let last = "";
     let raf = 0;
+    const root = mark.el as unknown as Node;
+    const feed = changeFeed();
+    // With the host's change feed, a frame is drawn only after the rig changed its own subtree
+    // (the ambient motion steps ~16 times a second) or while a WAAPI run moves, instead of
+    // serializing the whole drawing on every animation frame to find out.
+    let dirty = true;
+    const animating = () => {
+      for (const run of live) if (moving(run)) return true;
+      return false;
+    };
     const draw = () => {
-      raf = motion.current.paused ? 0 : requestAnimationFrame(draw);
-      const next = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}">${serialize(mark.el as unknown as Node, resolve)}</svg>`;
+      raf = 0;
+      const keepGoing = !motion.current.paused && (!feed || animating());
+      if (keepGoing) raf = requestAnimationFrame(draw);
+      if (feed && !dirty && !keepGoing) return;
+      dirty = false;
+      const next = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}">${serialize(root, resolve)}</svg>`;
       if (next === last) return;
       last = next;
       if (vector.current) vector.current.set({ svg: next });
       else setSvg(next);
     };
+    // Drawn right after the rig's frame (a microtask), so its changes show on the same frame.
+    let queued = false;
+    let alive = true;
+    const schedule = () => {
+      if (queued || motion.current.paused) return;
+      queued = true;
+      queueMicrotask(() => {
+        queued = false;
+        if (alive && dirty && !motion.current.paused) {
+          if (raf) cancelAnimationFrame(raf);
+          draw();
+        }
+      });
+    };
+    const unsubscribe = feed?.((change) => {
+      if (within(change.element, root)) {
+        dirty = true;
+        schedule();
+      }
+    });
     draw();
-    resumeDrawing.current = () => { if (!raf) draw(); };
+    resumeDrawing.current = () => {
+      dirty = true;
+      if (!raf) draw();
+    };
     return () => {
+      alive = false;
+      unsubscribe?.();
       resumeDrawing.current = () => {};
       cancelAnimationFrame(raf);
       markRef.current = null;

@@ -158,7 +158,8 @@ const result = await Bun.build({
   minify: minify ? { whitespace: true, syntax: true, identifiers: false } : false,
   sourcemap: "none",
   naming: { entry: "app.[ext]" },
-  define: { "process.env.NODE_ENV": JSON.stringify("production"), "process.env.STELLA_EAS_PROJECT_ID": JSON.stringify(easProjectId), "import.meta.hot": "undefined", "import.meta.dir": "__native.env.resources", "import.meta.dirname": "__native.env.resources", "import.meta.url": JSON.stringify("file:///app/app.js") },
+  // STELLA_JS_NODE_ENV=development builds React's development bundle, whose errors and warnings name the component.
+  define: { "process.env.NODE_ENV": JSON.stringify(process.env.STELLA_JS_NODE_ENV ?? "production"), "process.env.STELLA_EAS_PROJECT_ID": JSON.stringify(easProjectId), "import.meta.hot": "undefined", "import.meta.dir": "__native.env.resources", "import.meta.dirname": "__native.env.resources", "import.meta.url": JSON.stringify("file:///app/app.js") },
   plugins: [namespaceFix, mobilePlugin, viteCompat],
   throw: false,
 });

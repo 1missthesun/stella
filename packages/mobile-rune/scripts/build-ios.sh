@@ -33,7 +33,7 @@ lib="$target_dir/$rust_target/$profile/libstella_mobile_engine.a"
 if [[ $skip_js == 0 ]]; then
   # Dev builds talk to the dev backend; --dist builds to prod (STELLA_MOBILE_BACKEND overrides).
   backend="${STELLA_MOBILE_BACKEND:-$([[ $profile == dist ]] && echo prod || echo dev)}"
-  bun "$here/js/build.ts" --out "$out/js" --backend "$backend"
+  bun "$here/js/build.ts" --out "$out/js" --backend "$backend" ${STELLA_JS_NO_MINIFY:+--no-minify}
 fi
 
 rm -rf "$app"

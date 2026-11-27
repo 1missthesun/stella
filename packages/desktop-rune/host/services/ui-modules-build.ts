@@ -88,11 +88,13 @@ async function wholeGraph(spec: UiBuildSpec): Promise<Graph> {
       changed.push(file);
     }
     if (reusable) {
+      // Stamped before reading: a write landing during the read shows as a change next time.
+      const stamps = changed.map(stampSync);
       const texts = await Promise.all(changed.map(textOf));
       if (changed.every((file, n) => importsOf(file, texts[n]!) === last.imports.get(file))) {
         changed.forEach((file, n) => {
           last.text.set(file, texts[n]!);
-          last.stamps.set(file, stampSync(file));
+          last.stamps.set(file, stamps[n]!);
         });
         return last;
       }
@@ -115,12 +117,13 @@ async function wholeGraph(spec: UiBuildSpec): Promise<Graph> {
     formats.set(abs(file), input.format ?? "esm");
   }
   const sources = [...edges.keys()].filter((file) => !isPackage(file));
+  const stamps = sources.map(stampSync);
   const texts = await Promise.all(sources.map(textOf));
   const graph: Graph = { key, edges, formats, inputs: [...edges.keys()], stamps: new Map(), imports: new Map(), text: new Map() };
   const folders = new Set<string>();
   sources.forEach((file, n) => {
     graph.text.set(file, texts[n]!);
-    graph.stamps.set(file, stampSync(file));
+    graph.stamps.set(file, stamps[n]!);
     if (JS.test(file)) graph.imports.set(file, importsOf(file, texts[n]!));
     folders.add(path.dirname(file));
   });

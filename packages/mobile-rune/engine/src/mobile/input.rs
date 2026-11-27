@@ -4,14 +4,15 @@
 //! trackpad are the system's own; Rune draws the field's box (fill, border, radius, glass) at
 //! display rate and keeps its place in layout.
 //!
-//! Rune → app: each frame's drawn rect and the field's look (`native::field`). App → Rune: the
+//! Rune → app: each frame's drawn rect, placed after the frame that drew it (`native::sync`), and
+//! the field's look (`native::describe`). App → Rune: the
 //! text and focus (`ffi::sme_field_event`), reported to TS as the same `input`/`submit`/`focus`/
 //! `key` element events a desktop field sends, and the text view's content height, which sizes
 //! a growing field's box (`native::height_of`).
 
 use std::collections::VecDeque;
 
-use rune::{El, TextEdit, Tx, el};
+use rune::{El, TextEdit, el};
 
 use crate::engine::byte_of;
 use crate::props::Props;
@@ -122,10 +123,7 @@ pub fn build(s: &Win, n: u32, p: &Props) -> El {
     }
     let window = s.node;
     let key = rune_key(n, p);
-    e = e.on_drawn_layout_tx(move |_s: &mut Win, r: [f32; 4], tx: &mut Tx| {
-        tx.live_only();
-        native::place(window, n, &key, r);
-    });
+    e = e.drawn_rect_into(&native::drawn_rect(window, n, &key));
     let e = style::apply(e, &Props { on: p.on.iter().filter(|h| h.as_str() != "press").cloned().collect(), ..p.clone() });
     handlers(e, n, p, true)
 }

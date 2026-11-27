@@ -1051,6 +1051,10 @@
     "signOut": {
       "body": "Twój czat zostaje na koncie. Stella ukrywa go na tym komputerze, dopóki się nie zalogujesz ponownie.",
       "failed": "Nie udało się wylogować. Spróbuj ponownie.",
+      "phoneBody": "Twój czat zostaje na koncie. Stella ukrywa go na tym telefonie, dopóki się nie zalogujesz ponownie.",
+      "phoneRemove": "Usuń też czat z tego telefonu",
+      "phoneRemoveNote": "Dla wspólnego lub pożyczonego telefonu. Po zalogowaniu zostanie pobrany ponownie.",
+      "phoneTitle": "Wylogować się z tego telefonu?",
       "remove": "Usuń też czat z tego komputera",
       "removeNote": "Dla wspólnego lub pożyczonego komputera. Po zalogowaniu zostanie pobrany ponownie.",
       "title": "Wylogować się z tego komputera?"

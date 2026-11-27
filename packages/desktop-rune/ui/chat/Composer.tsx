@@ -315,9 +315,10 @@ function ComposerImpl({
         pad={1}
         radius={radius}
         clip={radius}
-        fx={chromeGlass(tokens).composer}
+        fx={chromeGlass(tokens).composer.fx}
+        fill={chromeGlass(tokens).composer.fill}
         onBackdrop={glassBackdrop}
-        border={isDragOver ? look.dragBorder : chromeGlass(tokens).hairline}
+        border={isDragOver ? look.dragBorder : chromeGlass(tokens).composer.border}
         shadows={isDragOver ? look.dragRing : undefined}
         motion={SHELL_SPRING}
         layout={SHELL_SPRING.dur}

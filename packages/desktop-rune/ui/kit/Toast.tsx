@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import { fontSize, look, mix, radius, useTokens, derive } from "../theme";
 import { useT } from "../i18n";
 import { Icon, Icons } from "./icons";
+import { legibleGlass } from "./legible-glass";
 
 export type ToastAction = { label: string; onClick: () => void };
 export type ToastDetail = { label: string; text: string };
@@ -90,6 +91,7 @@ export function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => voi
   const [detailOpen, setDetailOpen] = useState(false);
   const rail = toast.variant === "success" ? c.success : toast.variant === "error" ? c.destructive : toast.variant === "loading" ? c.textWeak : undefined;
   const actionHover = derive(t, "toast-action", (t) => mix(t.c.foreground, 10, t.c.interactive));
+  const g = derive(t, "toast-glass", (t) => legibleGlass(t, t.shadow.overlay));
   const hasActions = toast.action || toast.secondaryAction;
   return (
     <row
@@ -101,13 +103,13 @@ export function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => voi
       px={16 + 1}
       py={14 + 1}
       radius={radius.lg}
-      border={c.borderBase}
-      fill={c.glassTop}
-      gradient={t.gradient.glass}
-      shadows={t.shadow.overlay}
+      border={g.border}
+      fx={g.fx}
+      fill={g.fill}
+      shadows={g.shadows}
       clip={radius.lg}
-      enter={{ opacity: 0, y: -12, dur: 0.15 }}
-      exit={{ opacity: 0, dur: 0.15 }}
+      enter={{ y: -12, scale: 0.98, dur: 0.18 }}
+      exit={{ scale: 0.96, dur: 0.12 }}
       layout={0.15}
     >
       {rail ? <box absolute={{ left: 0, top: 8, bottom: 8 }} w={3} radius={3} fill={rail} /> : null}

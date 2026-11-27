@@ -1,5 +1,6 @@
-import type { Effect, FxLayer, Glass } from "../../host/rune-jsx/props";
-import { alpha, derive, mix, mixOklch, type Tokens } from "../theme";
+import type { FxLayer, Glass } from "../../host/rune-jsx/props";
+import { derive, mixOklch, type Tokens } from "../theme";
+import { GLASS_ENTER, legibleGlass } from "./legible-glass";
 
 /** Corner radius of a glass menu; its items are pills inset by the menu's padding. */
 export const MENU_GLASS_RADIUS = 22;
@@ -7,41 +8,18 @@ export const MENU_GLASS_RADIUS = 22;
 export const POPOVER_GLASS_RADIUS = 18;
 
 /**
- * Liquid Glass for menus and popovers, after the phone app's `regular` + `legible` glass
- * (`tintColor = fadeHex(surface, 0.78)`, packages/mobile glass.tsx): the composer's material under
- * a denser surface veil, so rows stay readable over any content. One glass element per menu,
- * anchored to its trigger. The glass carries no shadow of its own: menus clip and scroll, and a
- * clip cuts the slab's shadow, so the element's `shadows` lift it instead. An anchored one grows
- * out of its trigger (`morph`: `morphFrom` the anchor) and goes back into it; anything else opens
- * by scaling rather than fading: an element below full opacity paints in an isolated layer, where
- * glass sees no backdrop and reads as a grey slab until the fade ends.
+ * Liquid Glass for menus and popovers (`legibleGlass`): one glass element per menu. An anchored one
+ * grows out of its trigger (`morph`: `morphFrom` the anchor) and goes back into it; anything else,
+ * and a solid menu under Reduce Transparency, opens by scaling (`enter`).
  */
 export function menuGlass(t: Tokens) {
   return derive(t, "menu-glass", (t) => {
-    const fx: FxLayer = {
-      glass: {
-        bevel: 8,
-        depth: 14,
-        dispersion: 0.06,
-        magnification: 1.02,
-        frost: 0.1,
-        frostSigma: 40,
-        saturation: t.dark ? 1.6 : 1.7,
-        perceptual: true,
-        rim: t.dark ? 0.2 : 0.04,
-        shadow: 0,
-        veil: t.dark ? 0.9 : 0.92,
-        adapt: 0.25,
-        tint: t.dark ? mix(t.c.overlaySurface, 85, t.c.background) : t.c.background,
-      },
-    };
+    const m = legibleGlass(t, t.dark ? [{ x: 0, y: 12, blur: 36, spread: -6, color: "rgba(0,0,0,0.5)" }] : [{ x: 0, y: 10, blur: 30, spread: -6, color: "rgba(0,0,0,0.14)" }]);
     return {
-      fx,
+      ...m,
       /** `fx` growing out of the element's anchor: a menu's or popover's own entrance, with no `enter`. */
-      morph: { glass: { ...(fx.glass as Glass), morphFrom: true } } satisfies FxLayer,
-      enter: { scale: 0.96, dur: 0.18 } satisfies Effect,
-      border: t.dark ? t.c.border : alpha(t.c.border, 0.6),
-      shadows: t.dark ? [{ x: 0, y: 12, blur: 36, spread: -6, color: "rgba(0,0,0,0.5)" }] : [{ x: 0, y: 10, blur: 30, spread: -6, color: "rgba(0,0,0,0.14)" }],
+      morph: m.fx ? ({ glass: { ...((m.fx as { glass: Glass }).glass), morphFrom: true } } satisfies FxLayer) : undefined,
+      enter: GLASS_ENTER,
       /** The hover and selection pill, as the top bar's shown tab. */
       pill: mixOklch(t.c.foreground, t.dark ? 12 : 8, "transparent"),
     };

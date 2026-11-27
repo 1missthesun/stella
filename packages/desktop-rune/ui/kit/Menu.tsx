@@ -17,7 +17,7 @@ export const useMenuClose = () => useContext(MenuClose);
 /** desktop-ui's dropdown chrome (`[data-component="dropdown-menu-content"]`) as Liquid Glass (`menuGlass`). */
 export function menuSurface(t: Tokens) {
   const g = menuGlass(t);
-  return { radius: MENU_GLASS_RADIUS, border: g.border, fx: g.morph, shadows: g.shadows } as const;
+  return { radius: MENU_GLASS_RADIUS, border: g.border, fx: g.morph, fill: g.fill, shadows: g.shadows, enter: g.morph ? undefined : g.enter } as const;
 }
 
 /**
@@ -362,6 +362,8 @@ function PopoverGlass({ id, triggerId, side, align, sideOffset, width, padded, c
       radius={POPOVER_GLASS_RADIUS}
       border={g.border}
       fx={g.morph}
+      fill={g.fill}
+      enter={g.morph ? undefined : g.enter}
       shadows={g.shadows}
       pad={padded ? 12 + 1 : 1}
     >

@@ -3,6 +3,7 @@ import { Children, cloneElement, createContext, isValidElement, useContext, useI
 import { Scrim } from "../Dialog";
 import { menuSurface, useMenuEntryFocus } from "../Menu";
 import { AppModeScope, font, fontSize, layer, look, mix, radius, useTokens, type Style } from "../../theme";
+import { dialogGlass } from "../legible-glass";
 import { menuGlass, POPOVER_GLASS_RADIUS } from "../menu-glass";
 import { useT } from "../../i18n";
 import { Icon, Icons } from "../icons";
@@ -56,9 +57,10 @@ export type DialogContentProps = Omit<Style, "size"> & {
   "aria-label"?: string;
 };
 
-/** desktop-ui's `DialogContent`: scrim, and an overlay-surface panel 480×512 (md), 720 (lg), 860×640 (xl) or 1120×820 (page), its text in the portal's body face. */
+/** desktop-ui's `DialogContent`: scrim, and a legible-glass panel 480×512 (md), 720 (lg), 860×640 (xl) or 1120×820 (page), its text in the portal's body face. */
 export function DialogContent({ size = "md", fit = false, frame, focusSelf = false, children, onEscapeKeyDown, onPointerDownOutside, onInteractOutside, className: _c, onOpenAutoFocus: _f, "aria-describedby": _d, "aria-label": label, ...panel }: DialogContentProps) {
   const t = useTokens();
+  const g = dialogGlass(t);
   const { open, setOpen, id } = useContext(DialogState);
   if (!open) return null;
   const sized = typeof size === "number" ? "md" : size;
@@ -89,14 +91,14 @@ export function DialogContent({ size = "md", fit = false, frame, focusSelf = fal
             minH={fit ? undefined : 280}
             align="start"
             radius={radius["2xl"]}
-            border={t.c.borderWeak}
-            fill={t.c.overlayTop}
-            gradient={t.gradient.overlay}
-            shadows={t.shadow.xl}
+            border={g.border}
+            fx={g.fx}
+            fill={g.fill}
+            shadows={g.shadows}
             clip={radius["2xl"]}
             pad={1}
-            enter={{ opacity: 0, scale: 0.96, dur: 0.3 }}
-            exit={{ opacity: 0, scale: 0.96, dur: 0.15 }}
+            enter={g.enter}
+            exit={g.exit}
             onPress={() => {}}
             {...panel}
           >
@@ -299,6 +301,8 @@ function PopoverGlass({ side = "bottom", align = "center", sideOffset = 4, ancho
       radius={POPOVER_GLASS_RADIUS}
       border={g.border}
       fx={g.morph}
+      fill={g.fill}
+      enter={g.morph ? undefined : g.enter}
       shadows={g.shadows}
       pad={1}
       {...style}

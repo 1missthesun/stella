@@ -37,10 +37,21 @@ type ColorTokens = { [K in keyof ThemeTokens]: string } & {
   scrim: string;
 };
 
+/** The system's accessibility display settings that change materials (`theme/accessibility.ts`). */
+export type MaterialPrefs = {
+  /** Reduce Transparency (or a contrast setting, which implies it): glass and translucent chrome draw as opaque surfaces. */
+  solid: boolean;
+  /** Increase Contrast or a high-contrast theme: those surfaces also get a stronger edge. */
+  contrast: boolean;
+};
+
+export const GLASS_MATERIAL: MaterialPrefs = { solid: false, contrast: false };
+
 export type Tokens = {
   themeId: string;
   dark: boolean;
   flat: boolean;
+  material: MaterialPrefs;
   /** The theme's input colours, for what derives its own (gradient backdrop, previews). */
   colors: ThemeColors;
   c: ColorTokens;
@@ -114,8 +125,8 @@ function shadows(dark: boolean, background: string, ringColor: string): Tokens["
 const camelToVar = (k: string) => `--${k.replace(/[A-Z0-9]/g, (m) => `-${m.toLowerCase()}`)}`;
 
 /** desktop-ui's whole token set for one theme, as `applyThemeToDocument` + index.css resolve it. */
-export function buildTokens(input: { themeId: string; colors: ThemeColors; dark: boolean; flat: boolean }): Tokens {
-  const { colors, dark, flat, themeId } = input;
+export function buildTokens(input: { themeId: string; colors: ThemeColors; dark: boolean; flat: boolean; material?: MaterialPrefs }): Tokens {
+  const { colors, dark, flat, themeId, material = GLASS_MATERIAL } = input;
   const raw = deriveTokens(colors, dark, { flat });
   const t = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, hex(v)])) as { [K in keyof ThemeTokens]: string };
   const chart = (dark ? STATIC.dark : STATIC.light).chart;
@@ -169,6 +180,7 @@ export function buildTokens(input: { themeId: string; colors: ThemeColors; dark:
     themeId,
     dark,
     flat,
+    material,
     colors,
     c,
     shadow: shadows(dark, t.background, c.ring),

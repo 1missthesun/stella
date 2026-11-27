@@ -117,6 +117,8 @@ function PanelGlass({ id, anchor, onClose, side = "bottom", align = "end", gap =
         radius={r}
         border={g.border}
         fx={g.morph}
+        fill={g.fill}
+        enter={g.morph ? undefined : g.enter}
         shadows={g.shadows}
         pad={1}
       >

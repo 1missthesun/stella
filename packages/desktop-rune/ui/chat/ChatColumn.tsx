@@ -115,7 +115,9 @@ function ScrollToBottomButton({ onPress, bottom }: { onPress: () => void; bottom
         h={SCROLL_BUTTON_SIZE}
         center
         radius={SCROLL_BUTTON_SIZE / 2}
-        fx={chromeGlass(tokens).controls}
+        fx={chromeGlass(tokens).controls.fx}
+        fill={chromeGlass(tokens).controls.fill}
+        border={chromeGlass(tokens).controls.border}
         onBackdrop={useGlassBackdrop()}
         pressScale={0.95}
         hoverGroup

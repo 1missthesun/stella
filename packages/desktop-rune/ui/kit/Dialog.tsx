@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { IconButton } from "./Button";
 import { Icon, Icons } from "./icons";
 import { DismissLayer } from "./dismiss-layer";
+import { dialogGlass } from "./legible-glass";
 
 const SIZES = { md: { w: 480, h: 512 }, lg: { w: 720, h: 512 }, xl: { w: 860, h: 640 }, page: { w: 1120, h: 820 } } as const;
 
@@ -26,12 +27,13 @@ export function Scrim({ id, color, onPress }: { id: string; color: string; onPre
 }
 
 /**
- * desktop-ui's `Dialog` (Radix): scrim plus a centred overlay-surface panel, 480×512 (md), 720 (lg),
+ * desktop-ui's `Dialog` (Radix): scrim plus a centred legible-glass panel, 480×512 (md), 720 (lg),
  * 860×640 (xl) or 1120×820 (page), shrinking with the window. The panel hangs from the top of its
  * box and grows to its content (`fit` centres it instead); Escape and the scrim close it.
  */
 export function Dialog({ id, open, onOpenChange, size = "md", fit = false, label, closeOnBackdrop = true, children }: DialogProps) {
   const t = useTokens();
+  const g = dialogGlass(t);
   if (!open) return null;
   const s = SIZES[size];
   const close = () => onOpenChange(false);
@@ -52,14 +54,14 @@ export function Dialog({ id, open, onOpenChange, size = "md", fit = false, label
             minH={fit ? undefined : 280}
             align="start"
             radius={radius["2xl"]}
-            border={t.c.borderWeak}
-            fill={t.c.overlayTop}
-            gradient={t.gradient.overlay}
-            shadows={t.shadow.xl}
+            border={g.border}
+            fx={g.fx}
+            fill={g.fill}
+            shadows={g.shadows}
             clip={radius["2xl"]}
             pad={1}
-            enter={{ opacity: 0, scale: 0.96, dur: 0.3 }}
-            exit={{ opacity: 0, scale: 0.96, dur: 0.15 }}
+            enter={g.enter}
+            exit={g.exit}
             onPress={() => {}}
           >
             <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>

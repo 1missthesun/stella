@@ -22,8 +22,9 @@ const CAPSULE_H = 32;
 const CAPSULE_PAD = 3;
 
 function CapsuleGlass({ children, ...props }: BoxProps & { children: ReactNode }) {
+  const m = chromeGlass(useTokens()).controls;
   return (
-    <row h={CAPSULE_H} radius={CAPSULE_H / 2} align="center" windowDrag {...props} fx={chromeGlass(useTokens()).controls} onBackdrop={useGlassBackdrop()}>
+    <row h={CAPSULE_H} radius={CAPSULE_H / 2} align="center" windowDrag {...props} fx={m.fx} fill={m.fill} border={m.border} onBackdrop={useGlassBackdrop()}>
       {children}
     </row>
   );

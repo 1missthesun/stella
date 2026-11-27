@@ -5,7 +5,7 @@
 import Reconciler from "react-reconciler";
 import { ConcurrentRoot, ContinuousEventPriority, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { createContext, type ReactNode } from "react";
-import { blob, command, commitCtx, flushFrame, freeBlob, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
+import { blob, command, commitCtx, flushFrame, freeBlob, joinTask, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
 
 type Handlers = Record<string, (...args: any[]) => void>;
 /** Props set through a ref, outside React. They stay over React's until set again. */
@@ -413,6 +413,7 @@ const config: any = {
   getPublicInstance: (i: Instance) => i,
   prepareForCommit: () => null,
   resetAfterCommit: () => {
+    joinTask();
     flushFrame(true);
     if (fresh.length && (swapping || gone.size)) queueMicrotask(replayFresh);
     else if (!swapping) { fresh = []; gone.clear(); }

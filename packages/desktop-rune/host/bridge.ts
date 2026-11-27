@@ -60,10 +60,40 @@ function writeAll(frame: Uint8Array) {
 const EMPTY_COMMIT_FRAME = 4 + 18;
 let held: Uint8Array[] | null = null;
 let heldAt = 0;
+let task: Uint8Array[] | null = null;
 function write(frame: Uint8Array) {
+  if (task) return void task.push(frame.slice());
   if (!held) return writeAll(frame);
   held.push(frame.slice());
   if (frame.length > EMPTY_COMMIT_FRAME) heldAt = now();
+}
+
+/** Frames as one: their ops back to back under one length prefix. */
+function joinFrames(q: Uint8Array[]): Uint8Array {
+  const body = q.reduce((n, f) => n + f.length - 4, 0);
+  const all = new Uint8Array(body + 4);
+  new DataView(all.buffer).setUint32(0, body, true);
+  let at = 4;
+  for (const f of q) { all.set(f.subarray(4), at); at += f.length - 4; }
+  return all;
+}
+
+/**
+ * Collects every frame written until this task's microtasks run and sends them as one frame, which
+ * the engine applies in a single poll. A commit is followed in the same task by the commits its
+ * layout effects cause (desktop-ui stamps a message's arrival that way, so its entrance starts a
+ * commit after the row is drawn); a browser paints only after them, and so does the engine now.
+ */
+export function joinTask() {
+  if (task) return;
+  task = [];
+  queueMicrotask(() => {
+    const q = task!;
+    task = null;
+    if (!q.length) return;
+    const frame = q.length === 1 ? q[0]! : joinFrames(q);
+    write(frame);
+  });
 }
 
 /** Keeps every frame back (in order) until `releaseFrames`, so the engine goes on showing what it has. */
@@ -75,12 +105,7 @@ export function releaseFrames() {
   const q = held;
   held = null;
   if (!q?.length) return;
-  const body = q.reduce((n, f) => n + f.length - 4, 0);
-  const all = new Uint8Array(body + 4);
-  new DataView(all.buffer).setUint32(0, body, true);
-  let at = 4;
-  for (const f of q) { all.set(f.subarray(4), at); at += f.length - 4; }
-  writeAll(all);
+  writeAll(joinFrames(q));
 }
 
 /** Whether ops are waiting for the next frame. */

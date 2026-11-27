@@ -37,9 +37,9 @@ type ColorTokens = { [K in keyof ThemeTokens]: string } & {
   scrim: string;
 };
 
-/** The system's accessibility display settings that change materials (`theme/accessibility.ts`). */
+/** The system's accessibility display settings that change materials, and low-power hardware (`theme/accessibility.ts`). */
 export type MaterialPrefs = {
-  /** Reduce Transparency (or a contrast setting, which implies it): glass and translucent chrome draw as opaque surfaces. */
+  /** Reduce Transparency (or a contrast setting, which implies it) or low-power hardware: glass and translucent chrome draw as opaque surfaces. */
   solid: boolean;
   /** Increase Contrast or a high-contrast theme: those surfaces also get a stronger edge. */
   contrast: boolean;

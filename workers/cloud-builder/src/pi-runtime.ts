@@ -74,6 +74,7 @@ import {
   deviceStanding,
   movedAgentBrief,
   offlineMoveRefusal,
+  switchedBrainBrief,
   type AgentMove,
   type StellaExecutionHost,
 } from "@stella/agent/stella/execution";
@@ -1477,6 +1478,17 @@ export class PiConversationRuntime {
               const turn = await this.#turn(context.abortSignal);
               await this.#options.moveBrain!(turn.authority, { host: "device", deviceId: device.deviceId, label: name }, brief);
               return { moved: { kind: "device", deviceId: device.deviceId, label: name } };
+            },
+            switchBrainModel: async (model, brief, context) => {
+              const turn = await this.#turn(context.abortSignal);
+              const requestId = (await sha256Hex(`${turn.turnId}\0${model}`)).slice(0, 48);
+              return await this.#ownerCall<{ label: string }>(turn.authority, "agentThreads.switchOwnModel", {
+                ownerGeneration: turn.authority.ownerGeneration,
+                conversationId: turn.authority.conversationId,
+                requestId,
+                pick: model,
+                ...(brief ? { brief: switchedBrainBrief(model, brief) } : {}),
+              });
             },
           }
         : {}),

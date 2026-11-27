@@ -50,7 +50,7 @@ import {
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import { DEVICE_OFFLINE_REASON, deviceOfflineText } from "@stella/contracts/device-offline";
-import { deviceEngineSignIns } from "@stella/contracts/execution-context";
+import { deviceEngineSignIns, deviceModelRefusal } from "@stella/contracts/execution-context";
 import {
   findDeviceDestination,
   SELECTED_DEVICE_NEEDS_CONSENT,
@@ -1682,14 +1682,14 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
   if (executor.kind === "cloud" || executor.kind === "harness") {
     throw new RpcError(
       "CONFLICT",
-      `${requested} runs in Stella's cloud, which is always available, so nothing moved. To have it carry on somewhere else, ask it with send_message to move itself with switch_destination.`,
+      `${requested} runs in Stella's cloud, which is always available, so nothing moved. To have it carry on somewhere else, ask it with send_message to move itself with switch_to.`,
       { reason: "move_from_cloud" },
     );
   }
   if (executor.kind === "local" || !executor.deviceId) {
     throw new RpcError(
       "CONFLICT",
-      `${requested} runs inside Stella on the computer that started it and moves only from there, so nothing moved. Ask it with send_message to move itself with switch_destination.`,
+      `${requested} runs inside Stella on the computer that started it and moves only from there, so nothing moved. Ask it with send_message to move itself with switch_to.`,
       { reason: "thread_local_to_device" },
     );
   }
@@ -1701,7 +1701,7 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
   if (!why) {
     throw new RpcError(
       "CONFLICT",
-      `${name} is online and can carry ${requested} on itself, so nothing moved. To move it anyway, ask it with send_message to move itself with switch_destination; it saves its work first.`,
+      `${name} is online and can carry ${requested} on itself, so nothing moved. To move it anyway, ask it with send_message to move itself with switch_to; it saves its work first.`,
       { reason: "device_online" },
     );
   }
@@ -1756,6 +1756,7 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
       ...(unstarted ? { unstarted: unstarted.prompt, unstartedAttachments: unstarted.attachments !== null } : {}),
     }),
     ...(execution ? { execution } : {}),
+    ...(args.model?.trim() ? { model: args.model.trim() } : {}),
     from: { kind: "device", deviceId: executor.deviceId },
     notRunning: "continue",
     source: `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`,
@@ -1803,11 +1804,16 @@ const moveFromOutside = async (ctx: OwnerContext, args: MoveArgs): Promise<MoveR
 };
 
 const cancelMovedTurn = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
-  const { turnId, cancelRequestId } = payload as { turnId?: unknown; cancelRequestId?: unknown };
+  const { turnId, cancelRequestId, reason } = payload as { turnId?: unknown; cancelRequestId?: unknown; reason?: unknown };
   if (typeof turnId !== "string" || typeof cancelRequestId !== "string") return;
   const dispatchId = readTurn(ctx.db, turnId)?.dispatch_id;
   if (!dispatchId) return;
-  await ctx.host.cancelDeviceAgentTurn({ dispatchId, cancelRequestId, reason: AGENT_STOP_WIRE_REASON });
+  // A moved turn stops there for good; a model switch ends only that run, as its next attempt follows.
+  await ctx.host.cancelDeviceAgentTurn({
+    dispatchId,
+    cancelRequestId,
+    reason: reason === MODEL_SWITCH_CANCEL_REASON ? MODEL_SWITCH_CANCEL_REASON : AGENT_STOP_WIRE_REASON,
+  });
 };
 
 
@@ -1952,7 +1958,15 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
     throw new RpcError("NOT_FOUND", "No agent or session has that thread_id.");
   }
   const fingerprint = await sha256Hex(
-    JSON.stringify(["agent-message/v1", to, text, args.from.threadId, args.from.label, args.framed === true]),
+    JSON.stringify([
+      "agent-message/v1",
+      to,
+      text,
+      args.from.threadId,
+      args.from.label,
+      args.framed === true,
+      ...(args.model?.trim() ? [args.model.trim()] : []),
+    ]),
   );
   const receipt = ctx.db.one<{ fingerprint: string; result_json: string }>(
     "SELECT fingerprint, result_json FROM agent_message_receipts WHERE message_id = ?",
@@ -1980,6 +1994,7 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
       text,
       from: args.from,
       ...(args.framed ? { framed: true } : {}),
+      ...(args.model?.trim() ? { model: args.model.trim() } : {}),
       kind: "message",
       source: `${ctx.caller ? "client" : "cloud"}:${args.from.threadId}`,
       refuseOffline: true,
@@ -2116,6 +2131,120 @@ const taskMessage = async (ctx: OwnerContext, args: TaskMessageArgs): Promise<Ag
   return { text: [`Delivered to ${toStella ? "Stella" : delivery.threadId}. ${how}`, delivery.note].filter(Boolean).join(" "), starter };
 };
 
+const notSwitchable = (what: string): RpcError =>
+  new RpcError("BAD_REQUEST", `model switches an agent you started; ${what} keeps its own. Nothing was sent.`, {
+    reason: "model_switch_not_starter",
+  });
+
+const MODEL_SWITCH_CANCEL_REASON = "Switched to another model.";
+
+/**
+ * The starter's message with a new model for a task on another computer: that computer runs its
+ * next attempt on the model, from the task's history. A run under way is replaced by that attempt.
+ */
+const switchAgentModel = async (
+  ctx: OwnerContext,
+  args: { ownerGeneration: string; commandId: string; model: string; thread: ThreadRow; text: string; source: string; from: AgentMessageSender },
+): Promise<AgentControlResult> => {
+  const { thread, model } = args;
+  const fingerprint = await sha256Hex(JSON.stringify(["agent-model-switch/v1", thread.thread_id, model, args.text]));
+  const replay = replayAttempt(ctx.db, args.commandId, fingerprint, args.ownerGeneration);
+  if (replay) return { threadId: thread.thread_id, command: "message", outcome: "resumed" };
+  const executor = threadExecutor(thread);
+  if (executor.kind === "cloud" || executor.kind === "harness") {
+    throw new RpcError(
+      "CONFLICT",
+      `${thread.thread_id} runs in Stella's cloud, where a task keeps the model it started on. Nothing was sent. Message it without model, or start a new task on that model.`,
+      { reason: "model_switch_in_cloud" },
+    );
+  }
+  if (executor.kind === "local" || !executor.deviceId) {
+    throw new RpcError(
+      "CONFLICT",
+      `${thread.thread_id} runs inside Stella on the computer that started it, so only that Stella can switch its model. Nothing was sent.`,
+      { reason: "thread_local_to_device" },
+    );
+  }
+  const deviceId = resolveCurrentDeviceId(ctx.db, executor.deviceId);
+  const device = (await ctx.host.deviceDestinations()).find((candidate) => candidate.deviceId === deviceId);
+  const name = device?.label?.trim() || "its computer";
+  if (!device) throw new RpcError("NOT_FOUND", `${thread.thread_id}'s computer is no longer connected. Nothing was sent.`);
+  if (!device.online) throw offlineRefusal(device, "Nothing was sent or queued.");
+  if (!device.availability?.capabilities.includes("agent-model-switch")) {
+    throw new RpcError("CONFLICT", `${name} needs a Stella update before a task there can switch models. Nothing was sent.`, {
+      reason: "model_switch_unsupported",
+    });
+  }
+  const unfit = deviceModelRefusal(device, model);
+  if (unfit) throw new RpcError("CONFLICT", `${unfit} Nothing was sent.`, { reason: "model_unavailable" });
+  if (hostedAttemptRunning(ctx.db, thread)) {
+    throw new RpcError(
+      "CONFLICT",
+      `${thread.thread_id} is in the middle of a step ${name} runs itself, so its model can't switch yet. Nothing was sent. Message it with model once that step ends.`,
+      { reason: "model_switch_hosted" },
+    );
+  }
+  const running = ACTIVE_STATUSES.has(thread.status)
+    ? ctx.db.one<TurnRow>(
+        `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
+           AND status IN ('running', 'waiting_for_user') ORDER BY created_at DESC LIMIT 1`,
+        thread.thread_id,
+        thread.attempt_generation,
+      )
+    : null;
+  if (running) {
+    ctx.jobs.cancel(`dispatch:${running.turn_id}`);
+    ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", running.turn_id);
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId: thread.thread_id,
+        turnId: running.turn_id,
+        kind: endedKind,
+        outcome: "canceled",
+        source: `owner:model-switch:${args.commandId}`,
+        detail: { switchedTo: model },
+        now: ctx.now,
+      },
+      () =>
+        ctx.db.run(
+          "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ? AND status IN ('running', 'waiting_for_user')",
+          ctx.now,
+          running.turn_id,
+        ),
+    );
+    if (running.dispatch_id) {
+      ctx.jobs.schedule(
+        MOVED_TURN_CANCEL_JOB,
+        ctx.now,
+        { turnId: running.turn_id, cancelRequestId: args.commandId, reason: MODEL_SWITCH_CANCEL_REASON },
+        { id: `moved-cancel:${running.turn_id}` },
+      );
+    }
+  }
+  supersedeHeldStops(ctx, thread.thread_id, args.commandId);
+  ctx.db.run("UPDATE agent_threads SET requested_model = ? WHERE thread_id = ?", model, thread.thread_id);
+  beginNextAttempt(ctx, readThread(ctx.db, thread.thread_id)!, {
+    clientMsgId: args.commandId,
+    fingerprint,
+    prompt: args.text,
+    source: args.source,
+    detail: { messageId: args.commandId, from: args.from.threadId, model: { to: model, ...(thread.requested_model ? { from: thread.requested_model } : {}) } },
+    sql: `UPDATE agent_threads SET attempt_generation = ?, status = 'running', result_json = NULL, error_message = NULL,
+            origin_delivery_ack_at = NULL, updated_at = ? WHERE thread_id = ?`,
+  });
+  let rerouted = 0;
+  for (const pending of ctx.db.all<{ command_id: string }>(
+    "SELECT command_id FROM agent_commands WHERE thread_id = ? AND state = 'pending' AND kind IN ('message', 'resume') ORDER BY created_at ASC",
+    thread.thread_id,
+  )) {
+    ctx.jobs.schedule(COMMAND_JOB, ctx.now + rerouted, { messageId: pending.command_id }, { id: commandJobId(pending.command_id) });
+    rerouted += 1;
+  }
+  console.log(JSON.stringify({ event: "agent_thread_model_switched", threadId: thread.thread_id, to: model, interrupted: running !== null }));
+  return { threadId: thread.thread_id, command: "message", outcome: running ? "steered" : "resumed" };
+};
+
 const deliverAgentMessage = async (
   ctx: OwnerContext,
   args: {
@@ -2125,6 +2254,8 @@ const deliverAgentMessage = async (
     text: string;
     from: AgentMessageSender;
     framed?: boolean;
+    /** From the agent's starter: the model it runs on from this message on. */
+    model?: string;
     kind: "message" | "resume";
     source: string;
     refuseOffline?: true;
@@ -2137,6 +2268,7 @@ const deliverAgentMessage = async (
     "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
     to,
   );
+  if (conversation && args.model) throw notSwitchable("a Stella session");
   if (conversation) {
     queueStellaNote(ctx, {
       noteId: `msg:${(await sha256Hex(args.commandId)).slice(0, 48)}`,
@@ -2157,6 +2289,10 @@ const deliverAgentMessage = async (
       `No agent or Stella session has the thread_id ${to}. agent_status without a thread_id lists who you can reach.`,
       { reason: "message_target_not_found" },
     );
+  }
+  if (args.model) {
+    if (!sentByStarter(thread, args.from)) throw notSwitchable("an agent you didn't start");
+    return await switchAgentModel(ctx, { ...args, model: args.model, thread, text: framed(true) });
   }
   if (args.kind === "message" && senderThread(ctx, args.from)?.parent_thread_id === thread.thread_id) {
     queueAgentNote(ctx, {
@@ -4859,6 +4995,37 @@ const resolveSafeguard = async (
   return { card };
 };
 
+/** Cloud Stella's switch_to with a model: the account's pick changes, and her brief runs next on it. */
+const switchOwnModel = async (ctx: OwnerContext, raw: unknown): Promise<{ label: string }> => {
+  const args = object({
+    ownerGeneration: generation,
+    conversationId: id(256),
+    requestId: id(),
+    pick: string({ min: 1, max: 200 }),
+    brief: optional(string({ max: AGENT_PROMPT_MAX_CHARS })),
+  })(raw);
+  await assertGeneration(ctx, args.ownerGeneration);
+  const pick = args.pick.trim();
+  let execution: CloudExecutionSelection;
+  try {
+    execution = resolveCloudSpawnExecution(pick, (await ctx.host.snapshot()).execution);
+  } catch (error) {
+    throw new RpcError("BAD_REQUEST", error instanceof Error ? error.message : `"${pick}" isn't a model Stella's cloud runs.`);
+  }
+  await assertExecutionAvailable(ctx, execution);
+  const selected = selectCloudModel(ctx, pick);
+  if (args.brief?.trim()) {
+    await ctx.host.startAgentMessageTurn({
+      ownerGeneration: args.ownerGeneration,
+      conversationId: args.conversationId,
+      clientMsgId: `swm-${(await sha256Hex(`${args.conversationId}\0${args.requestId}`)).slice(0, 48)}`,
+      prompt: args.brief,
+      execution: selected,
+    });
+  }
+  return { label: pick };
+};
+
 export type AgentThreadEffects = {
   cards: Array<{ conversationId: string; ownerGeneration: string; sourceTurnId: string; card: unknown }>;
 };
@@ -5376,6 +5543,7 @@ const moveParser = object({
   prompt: string({ max: AGENT_PROMPT_MAX_CHARS }),
   requesterThreadId: optional(id(256)),
   execution: optional(executionParser),
+  model: optional(string({ max: 200 })),
 });
 const origin = { originDeviceId: id(256), originConversationId: id(256) };
 const senderParser = object({ threadId: id(256), label: string({ max: 2_000 }) });
@@ -5386,6 +5554,7 @@ const messageParser = object({
   text: string({ max: AGENT_MESSAGE_MAX_CHARS * 2 }),
   from: senderParser,
   framed: optional(boolean()),
+  model: optional(string({ max: 200 })),
 });
 const pauseParser = object({
   ownerGeneration: generation,
@@ -5824,6 +5993,7 @@ export const agentThreadsDomain = {
     "agentThreads.continueOnDevice": continueDeviceForCloud,
     "agentThreads.cancelOnDevice": cancelDeviceForCloud,
     "agentThreads.deviceSettled": deviceSettled,
+    "agentThreads.switchOwnModel": switchOwnModel,
     "agentThreads.invariants": (ctx, raw) =>
       agentInvariants(ctx.db, ctx.now, object({ days: optional(number({ int: true, min: 1, max: 90 })) })(raw ?? {}).days ?? 7),
     "agentThreads.cloudHandoff": async (ctx, raw) =>

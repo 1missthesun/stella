@@ -20,6 +20,7 @@ export const SANDBOX_CODE_PACKAGES = Object.freeze([
   "model-catalog",
   "agent",
   "node-shared",
+  "views",
 ]);
 
 export const sandboxCodeAssetsDirectory = path.join(

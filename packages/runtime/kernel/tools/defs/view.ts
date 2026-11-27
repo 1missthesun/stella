@@ -58,6 +58,8 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
           : run
             ? `View "${title}" is on screen (rendered in ${Math.round(run.renderMs ?? 0)} ms); saved at ${where}.`
             : `View "${title}" opened; saved at ${where}.`;
+      // Other devices (the phone, the web chat) run the newest version of each slug from this
+      // call's arguments, which sync as written; tool results are redacted on the way to the cloud.
       return {
         result,
         details: {
@@ -66,10 +68,6 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
           title,
           createdAt,
           bytes: Buffer.byteLength(source, "utf8"),
-          // The whole view travels with the turn, so the user's other devices (the phone) run
-          // the newest version of each slug locally even when this computer is offline.
-          source,
-          ...(args.data !== undefined ? { data: args.data } : {}),
           ...(problems.length > 0 ? { problems } : {}),
           ...(run?.renderMs != null ? { renderMs: run.renderMs } : {}),
         },

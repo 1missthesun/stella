@@ -28,6 +28,7 @@ import type { McpServerCalls } from "./mcp-servers.js";
 import type { CatchUpCalls, CatchUpViews } from "./catch-ups.js";
 import type { SavedValueCalls, SavedValueViews } from "./saved-values.js";
 import type { ViewStorageCalls, ViewStorageViews } from "./view-storage.js";
+import type { ViewCalls } from "./views.js";
 
 type SystemCalls = {
   "system.ping": { args: Record<string, never>; result: { now: number } };
@@ -62,7 +63,8 @@ export type BackendCalls = SystemCalls &
   McpServerCalls &
   CatchUpCalls &
   SavedValueCalls &
-  ViewStorageCalls;
+  ViewStorageCalls &
+  ViewCalls;
 export type BackendViews = ConversationViews &
   AppSourceViews &
   AgentThreadViews &

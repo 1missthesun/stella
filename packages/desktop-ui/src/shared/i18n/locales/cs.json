@@ -1784,12 +1784,12 @@
       "missing": "Toto zobrazení už ve vašich aplikacích není."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Použít Stella na svém počítači",
+      "intro": "Na počítači otevřete Nastavení › Účet › Připojit zařízení a naskenujte zobrazený kód. Připojí se přímo k vašemu počítači bez účtu.",
+      "cameraDenied": "Stella nemůže používat fotoaparát. Povolte ho v Nastavení nebo místo toho vložte kód.",
+      "invalidCode": "To není párovací kód aplikace Stella.",
+      "computers": "Vaše počítače",
+      "cloudChats": "{name} ukládá své chaty do vašeho účtu Stella. Přihlaste se tu tímto účtem a zobrazte je."
     }
   },
   "onboarding": {
@@ -4094,16 +4094,16 @@
     "forgetBody": "Toto zařízení se k němu přestane připojovat. Chaty zůstanou na tom počítači.",
     "computerChat": "Stella na {name}",
     "pair": {
-      "intro": "Naskenujte to ve Stelle v telefonu, nebo vložte kód do Stelly na jiném počítači. Připojí se přímo k tomuto počítači, bez účtu, a funguje jednou.",
+      "intro": "Naskenujte to pomocí Stella na telefonu. Na jiném počítači zadejte kód níže v aplikaci Stella v části „Použít Stellu jiného počítače“.",
       "copy": "Kopírovat kód",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Krátký párovací kód",
+      "useOffline": "Použít offline kód",
+      "noShort": "Krátké kódy potřebují internet. Místo toho vložte tento kód na druhém počítači."
     },
     "enter": {
       "title": "Použít Stellu jiného počítače",
-      "intro": "Na tom počítači otevřete Nastavení › Účet › Připojit zařízení a vložte sem kód.",
-      "label": "Párovací kód",
+      "intro": "Nebo zadejte kód z nabídky Nastavení › Účet › Připojit zařízení na daném počítači.",
+      "label": "Kód",
       "connect": "Připojit",
       "connecting": "Připojování…"
     },
@@ -4124,17 +4124,17 @@
       "back": "Zpět na tento počítač"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Počítače v okolí",
+      "looking": "Hledání počítačů v této síti…",
+      "connectTo": "Připojit k {name}",
+      "digitsTitle": "Připojit k {name}",
+      "digitsIntro": "Zadejte šest číslic, které teď zobrazuje {name}.",
+      "digitsLabel": "Šestimístný kód",
+      "denied": "{name} připojení nepovolil.",
+      "ended": "{name} ukončil žádost. Zkuste to znovu.",
+      "requestTitle": "{name} chce používat Stella na tomto počítači",
+      "requestIntro": "Zadejte tento kód na {name} a povolte přístup. Pokud jste o to nežádali, přístup nepovolujte.",
+      "deny": "Nepovolit"
     }
   }
 }

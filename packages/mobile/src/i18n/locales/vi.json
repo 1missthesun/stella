@@ -881,12 +881,12 @@
       "missing": "Chế độ xem này không còn trong Ứng dụng của bạn."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Dùng Stella của máy tính bạn",
+      "intro": "Trên máy tính, mở Cài đặt › Tài khoản › Kết nối thiết bị rồi quét mã hiển thị. Kết nối trực tiếp với máy tính của bạn, không cần tài khoản.",
+      "cameraDenied": "Stella không dùng được camera. Cho phép trong Cài đặt hoặc dán mã thay thế.",
+      "invalidCode": "Đây không phải mã ghép nối của Stella.",
+      "computers": "Máy tính của bạn",
+      "cloudChats": "{name} lưu các cuộc trò chuyện trong tài khoản Stella của bạn. Đăng nhập tại đây bằng tài khoản đó để xem."
     }
   },
   "settings": {

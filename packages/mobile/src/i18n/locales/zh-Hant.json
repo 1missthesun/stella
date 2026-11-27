@@ -881,12 +881,12 @@
       "missing": "此檢視已不在你的應用程式中。"
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "使用你電腦上的 Stella",
+      "intro": "在電腦上開啟「設定 › 帳號 › 連線裝置」，掃描顯示的代碼。它會直接連線到你的電腦，不需要帳號。",
+      "cameraDenied": "Stella 無法使用相機。請在設定中允許，或改為貼上代碼。",
+      "invalidCode": "這不是 Stella 的配對碼。",
+      "computers": "你的電腦",
+      "cloudChats": "{name} 的聊天保存在你的 Stella 帳號中。在這裡登入該帳號即可查看。"
     }
   },
   "settings": {

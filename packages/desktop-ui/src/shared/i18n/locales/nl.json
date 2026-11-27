@@ -1764,12 +1764,12 @@
       "missing": "Deze weergave staat niet meer in je apps."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Stella op je computer gebruiken",
+      "intro": "Open Instellingen › Account › Apparaat verbinden op je computer en scan de getoonde code. Er wordt rechtstreeks verbinding gemaakt met je computer, zonder account.",
+      "cameraDenied": "Stella kan de camera niet gebruiken. Sta dit toe in Instellingen of plak de code.",
+      "invalidCode": "Dat is geen koppelcode van Stella.",
+      "computers": "Je computers",
+      "cloudChats": "{name} bewaart zijn chats in je Stella-account. Log hier met dat account in om ze te zien."
     }
   },
   "onboarding": {
@@ -3980,16 +3980,16 @@
     "forgetBody": "Dit apparaat maakt er geen verbinding meer mee. De chats blijven op die computer.",
     "computerChat": "Stella op {name}",
     "pair": {
-      "intro": "Scan dit met Stella op je telefoon of plak de code in Stella op een andere computer. Die maakt rechtstreeks verbinding met deze computer, zonder account, en werkt één keer.",
+      "intro": "Scan dit met Stella op je telefoon. Voer op een andere computer de code hieronder in Stella in onder ‘Stella van een andere computer gebruiken’.",
       "copy": "Code kopiëren",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Korte koppelcode",
+      "useOffline": "Offlinecode gebruiken",
+      "noShort": "Korte codes hebben internet nodig. Plak in plaats daarvan deze code op de andere computer."
     },
     "enter": {
       "title": "Stella van een andere computer gebruiken",
-      "intro": "Open op die computer Instellingen › Account › Apparaat verbinden en plak de code hier.",
-      "label": "Koppelcode",
+      "intro": "Of voer de code in uit Instellingen › Account › Apparaat verbinden op die computer.",
+      "label": "Code",
       "connect": "Verbinden",
       "connecting": "Verbinden…"
     },
@@ -4010,17 +4010,17 @@
       "back": "Terug naar deze computer"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Computers in de buurt",
+      "looking": "Zoeken naar computers op dit netwerk…",
+      "connectTo": "Verbinden met {name}",
+      "digitsTitle": "Verbinden met {name}",
+      "digitsIntro": "Voer de zes cijfers in die {name} nu toont.",
+      "digitsLabel": "Code van zes cijfers",
+      "denied": "{name} heeft het niet toegestaan.",
+      "ended": "{name} heeft het verzoek beëindigd. Probeer het opnieuw.",
+      "requestTitle": "{name} wil Stella op deze computer gebruiken",
+      "requestIntro": "Voer deze code in op {name} om toegang te geven. Sta het niet toe als je hier niet om hebt gevraagd.",
+      "deny": "Niet toestaan"
     }
   }
 }

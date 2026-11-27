@@ -1754,12 +1754,12 @@
       "missing": "此檢視已不在你的應用程式中。"
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "使用你電腦上的 Stella",
+      "intro": "在電腦上開啟「設定 › 帳號 › 連線裝置」，掃描顯示的代碼。它會直接連線到你的電腦，不需要帳號。",
+      "cameraDenied": "Stella 無法使用相機。請在設定中允許，或改為貼上代碼。",
+      "invalidCode": "這不是 Stella 的配對碼。",
+      "computers": "你的電腦",
+      "cloudChats": "{name} 的聊天保存在你的 Stella 帳號中。在這裡登入該帳號即可查看。"
     }
   },
   "onboarding": {
@@ -3921,16 +3921,16 @@
     "forgetBody": "此裝置將不再連線到它。聊天記錄仍保留在那台電腦上。",
     "computerChat": "{name} 上的 Stella",
     "pair": {
-      "intro": "用手機上的 Stella 掃描，或將代碼貼到另一台電腦上的 Stella。它會直接連線到這台電腦，不需要帳號，且只能使用一次。",
+      "intro": "用手機上的 Stella 掃描。在另一台電腦上，開啟 Stella 的「使用另一台電腦上的 Stella」，輸入下方代碼。",
       "copy": "複製代碼",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "短配對碼",
+      "useOffline": "使用離線代碼",
+      "noShort": "短碼需要網路連線。請改為在另一台電腦上貼上此代碼。"
     },
     "enter": {
       "title": "使用另一台電腦上的 Stella",
-      "intro": "在那台電腦上開啟「設定 › 帳號 › 連接裝置」，然後把代碼貼到這裡。",
-      "label": "配對代碼",
+      "intro": "或輸入那台電腦的「設定 › 帳號 › 連線裝置」中顯示的代碼。",
+      "label": "代碼",
       "connect": "連線",
       "connecting": "正在連線…"
     },
@@ -3951,17 +3951,17 @@
       "back": "返回這台電腦"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "附近的電腦",
+      "looking": "正在尋找此網路上的電腦…",
+      "connectTo": "連線至 {name}",
+      "digitsTitle": "連線至 {name}",
+      "digitsIntro": "輸入 {name} 目前顯示的六位數字。",
+      "digitsLabel": "六位數代碼",
+      "denied": "{name} 未允許連線。",
+      "ended": "{name} 已結束請求。請重試。",
+      "requestTitle": "{name} 想使用這台電腦上的 Stella",
+      "requestIntro": "在 {name} 上輸入此代碼以允許存取。如果不是你發起的請求，請勿允許。",
+      "deny": "不允許"
     }
   }
 }

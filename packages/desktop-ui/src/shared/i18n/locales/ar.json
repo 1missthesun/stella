@@ -1804,12 +1804,12 @@
       "missing": "لم يعد هذا العرض ضمن تطبيقاتك."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "استخدام Stella على كمبيوترك",
+      "intro": "على كمبيوترك، افتح الإعدادات › الحساب › توصيل جهاز وامسح الرمز المعروض. يتصل مباشرة بكمبيوترك دون حساب.",
+      "cameraDenied": "لا يستطيع Stella استخدام الكاميرا. اسمح بذلك في الإعدادات، أو الصق الرمز بدلاً من ذلك.",
+      "invalidCode": "هذا ليس رمز اقتران من Stella.",
+      "computers": "أجهزة الكمبيوتر الخاصة بك",
+      "cloudChats": "يحتفظ {name} بمحادثاته في حسابك على Stella. سجّل الدخول هنا بذلك الحساب لرؤيتها."
     }
   },
   "onboarding": {
@@ -4208,16 +4208,16 @@
     "forgetBody": "سيتوقف هذا الجهاز عن الاتصال به. تبقى المحادثات على ذلك الكمبيوتر.",
     "computerChat": "Stella على {name}",
     "pair": {
-      "intro": "امسح هذا باستخدام Stella على هاتفك، أو الصق الرمز في Stella على كمبيوتر آخر. يتصل مباشرة بهذا الكمبيوتر دون حساب، ويعمل مرة واحدة.",
+      "intro": "امسح هذا باستخدام Stella على هاتفك. على كمبيوتر آخر، أدخل الرمز أدناه في Stella ضمن «استخدام Stella على كمبيوتر آخر».",
       "copy": "نسخ الرمز",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "رمز اقتران قصير",
+      "useOffline": "استخدام رمز دون إنترنت",
+      "noShort": "تحتاج الرموز القصيرة إلى الإنترنت. الصق هذا الرمز على الكمبيوتر الآخر بدلاً من ذلك."
     },
     "enter": {
       "title": "استخدام Stella على كمبيوتر آخر",
-      "intro": "على ذلك الكمبيوتر، افتح الإعدادات › الحساب › توصيل جهاز، ثم الصق الرمز هنا.",
-      "label": "رمز الإقران",
+      "intro": "أو أدخل الرمز من الإعدادات › الحساب › توصيل جهاز على ذلك الكمبيوتر.",
+      "label": "الرمز",
       "connect": "اتصال",
       "connecting": "جارٍ الاتصال…"
     },
@@ -4238,17 +4238,17 @@
       "back": "العودة إلى هذا الكمبيوتر"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "أجهزة الكمبيوتر القريبة",
+      "looking": "جارٍ البحث عن أجهزة كمبيوتر على هذه الشبكة…",
+      "connectTo": "الاتصال بـ {name}",
+      "digitsTitle": "الاتصال بـ {name}",
+      "digitsIntro": "أدخل الأرقام الستة التي يعرضها {name} الآن.",
+      "digitsLabel": "رمز من ستة أرقام",
+      "denied": "لم يسمح {name} بذلك.",
+      "ended": "أنهى {name} الطلب. حاول مجددًا.",
+      "requestTitle": "يريد {name} استخدام Stella على هذا الكمبيوتر",
+      "requestIntro": "أدخل هذا الرمز على {name} للسماح له بالاتصال. إن لم تطلب ذلك، فلا تسمح به.",
+      "deny": "عدم السماح"
     }
   }
 }

@@ -881,12 +881,12 @@
       "missing": "Tampilan ini sudah tidak ada di Aplikasimu."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Gunakan Stella di komputermu",
+      "intro": "Di komputermu, buka Pengaturan › Akun › Hubungkan perangkat dan pindai kode yang ditampilkan. Koneksi langsung ke komputermu, tanpa akun.",
+      "cameraDenied": "Stella tidak dapat menggunakan kamera. Izinkan di Pengaturan, atau tempel kode sebagai gantinya.",
+      "invalidCode": "Itu bukan kode penyandingan dari Stella.",
+      "computers": "Komputermu",
+      "cloudChats": "{name} menyimpan chat di akun Stella milikmu. Masuk di sini dengan akun tersebut untuk melihatnya."
     }
   },
   "settings": {

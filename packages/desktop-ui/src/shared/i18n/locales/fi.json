@@ -1764,12 +1764,12 @@
       "missing": "Tämä näkymä ei ole enää sovelluksissasi."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Käytä tietokoneesi Stella-sovellusta",
+      "intro": "Avaa tietokoneellasi Asetukset › Tili › Yhdistä laite ja skannaa näkyvä koodi. Se yhdistää suoraan tietokoneeseesi ilman tiliä.",
+      "cameraDenied": "Stella ei voi käyttää kameraa. Salli se asetuksissa tai liitä koodi sen sijaan.",
+      "invalidCode": "Tämä ei ole Stella-pariliitoskoodi.",
+      "computers": "Omat tietokoneet",
+      "cloudChats": "{name} säilyttää keskustelunsa Stella-tililläsi. Kirjaudu täällä samalla tilillä nähdäksesi ne."
     }
   },
   "onboarding": {
@@ -3980,16 +3980,16 @@
     "forgetBody": "Tämä laite lakkaa yhdistämästä siihen. Keskustelut jäävät sille tietokoneelle.",
     "computerChat": "Stella: {name}",
     "pair": {
-      "intro": "Skannaa tämä puhelimesi Stellalla tai liitä koodi toisen tietokoneen Stellaan. Se yhdistää suoraan tähän tietokoneeseen ilman tiliä, ja koodi toimii kerran.",
+      "intro": "Skannaa tämä puhelimesi Stella-sovelluksella. Syötä toisella tietokoneella alla oleva koodi Stella-sovelluksen kohdassa ”Käytä toisen tietokoneen Stellaa”.",
       "copy": "Kopioi koodi",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Lyhyt pariliitoskoodi",
+      "useOffline": "Käytä offline-koodia",
+      "noShort": "Lyhyet koodit tarvitsevat internetyhteyden. Liitä sen sijaan tämä koodi toisella tietokoneella."
     },
     "enter": {
       "title": "Käytä toisen tietokoneen Stellaa",
-      "intro": "Avaa sillä tietokoneella Asetukset › Tili › Yhdistä laite ja liitä koodi tähän.",
-      "label": "Pariliitoskoodi",
+      "intro": "Tai syötä koodi toisen tietokoneen kohdasta Asetukset › Tili › Yhdistä laite.",
+      "label": "Koodi",
       "connect": "Yhdistä",
       "connecting": "Yhdistetään…"
     },
@@ -4010,17 +4010,17 @@
       "back": "Takaisin tähän tietokoneeseen"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Lähellä olevat tietokoneet",
+      "looking": "Etsitään tietokoneita tästä verkosta…",
+      "connectTo": "Yhdistä laitteeseen {name}",
+      "digitsTitle": "Yhdistä laitteeseen {name}",
+      "digitsIntro": "Syötä kuusi numeroa, jotka {name} näyttää nyt.",
+      "digitsLabel": "Kuusinumeroinen koodi",
+      "denied": "{name} ei sallinut yhteyttä.",
+      "ended": "{name} päätti pyynnön. Yritä uudelleen.",
+      "requestTitle": "{name} haluaa käyttää tämän tietokoneen Stella-sovellusta",
+      "requestIntro": "Syötä tämä koodi laitteella {name} salliaksesi pääsyn. Jos et pyytänyt tätä, älä salli sitä.",
+      "deny": "Älä salli"
     }
   }
 }

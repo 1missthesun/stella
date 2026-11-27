@@ -1764,12 +1764,12 @@
       "missing": "यह व्यू अब आपके ऐप्स में नहीं है।"
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "अपने कंप्यूटर का Stella इस्तेमाल करें",
+      "intro": "अपने कंप्यूटर पर सेटिंग्स › खाता › डिवाइस कनेक्ट करें खोलें और दिख रहा कोड स्कैन करें। यह बिना खाते के सीधे आपके कंप्यूटर से कनेक्ट होता है।",
+      "cameraDenied": "Stella कैमरा इस्तेमाल नहीं कर पा रहा है। सेटिंग्स में अनुमति दें या इसके बजाय कोड पेस्ट करें।",
+      "invalidCode": "यह Stella का पेयरिंग कोड नहीं है।",
+      "computers": "आपके कंप्यूटर",
+      "cloudChats": "{name} अपनी चैट आपके Stella खाते में रखता है। उन्हें देखने के लिए यहाँ उसी खाते से साइन इन करें।"
     }
   },
   "onboarding": {
@@ -3980,16 +3980,16 @@
     "forgetBody": "यह डिवाइस उससे जुड़ना बंद कर देगा। चैट उसी कंप्यूटर पर रहेंगी।",
     "computerChat": "{name} का Stella",
     "pair": {
-      "intro": "इसे अपने फ़ोन पर Stella से स्कैन करें, या कोड को किसी दूसरे कंप्यूटर के Stella में पेस्ट करें। यह बिना अकाउंट के सीधे इस कंप्यूटर से जुड़ता है और एक बार काम करता है।",
+      "intro": "इसे अपने फ़ोन पर Stella से स्कैन करें। दूसरे कंप्यूटर पर, Stella में «दूसरे कंप्यूटर का Stella इस्तेमाल करें» के तहत नीचे दिया कोड डालें।",
       "copy": "कोड कॉपी करें",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "छोटा पेयरिंग कोड",
+      "useOffline": "ऑफ़लाइन कोड इस्तेमाल करें",
+      "noShort": "छोटे कोड के लिए इंटरनेट चाहिए। इसके बजाय यह कोड दूसरे कंप्यूटर पर पेस्ट करें।"
     },
     "enter": {
       "title": "दूसरे कंप्यूटर का Stella इस्तेमाल करें",
-      "intro": "उस कंप्यूटर पर सेटिंग्स › अकाउंट › डिवाइस कनेक्ट करें खोलें, फिर उसका कोड यहाँ पेस्ट करें।",
-      "label": "पेयरिंग कोड",
+      "intro": "या उस कंप्यूटर के सेटिंग्स › खाता › डिवाइस कनेक्ट करें से कोड डालें।",
+      "label": "कोड",
       "connect": "कनेक्ट करें",
       "connecting": "कनेक्ट हो रहा है…"
     },
@@ -4010,17 +4010,17 @@
       "back": "इस कंप्यूटर पर वापस जाएँ"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "आस-पास के कंप्यूटर",
+      "looking": "इस नेटवर्क पर कंप्यूटर ढूँढ रहे हैं…",
+      "connectTo": "{name} से कनेक्ट करें",
+      "digitsTitle": "{name} से कनेक्ट करें",
+      "digitsIntro": "{name} पर अभी दिख रहे छह अंक डालें।",
+      "digitsLabel": "छह अंकों का कोड",
+      "denied": "{name} ने अनुमति नहीं दी।",
+      "ended": "{name} ने अनुरोध समाप्त कर दिया। फिर कोशिश करें।",
+      "requestTitle": "{name} इस कंप्यूटर का Stella इस्तेमाल करना चाहता है",
+      "requestIntro": "पहुँच देने के लिए यह कोड {name} पर डालें। अगर आपने यह अनुरोध नहीं किया है, तो अनुमति न दें।",
+      "deny": "अनुमति न दें"
     }
   }
 }

@@ -1764,12 +1764,12 @@
       "missing": "Denne visning er ikke længere i dine apps."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Brug din computers Stella",
+      "intro": "Åbn Indstillinger › Konto › Forbind en enhed på din computer, og scan den viste kode. Den forbinder direkte til din computer uden en konto.",
+      "cameraDenied": "Stella kan ikke bruge kameraet. Tillad det i Indstillinger, eller indsæt koden i stedet.",
+      "invalidCode": "Det er ikke en parringskode fra Stella.",
+      "computers": "Dine computere",
+      "cloudChats": "{name} gemmer sine chats på din Stella-konto. Log ind her med den for at se dem."
     }
   },
   "onboarding": {
@@ -3980,16 +3980,16 @@
     "forgetBody": "Denne enhed holder op med at forbinde til den. Chattene bliver på den computer.",
     "computerChat": "Stella på {name}",
     "pair": {
-      "intro": "Scan dette med Stella på din telefon, eller indsæt koden i Stella på en anden computer. Den forbinder direkte til denne computer, uden konto, og virker én gang.",
+      "intro": "Scan dette med Stella på din telefon. På en anden computer skal du indtaste koden nedenfor i Stella under Brug en anden computers Stella.",
       "copy": "Kopiér kode",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Kort parringskode",
+      "useOffline": "Brug offlinekode",
+      "noShort": "Korte koder kræver internet. Indsæt i stedet denne kode på den anden computer."
     },
     "enter": {
       "title": "Brug en anden computers Stella",
-      "intro": "Åbn Indstillinger › Konto › Forbind en enhed på den computer, og indsæt koden her.",
-      "label": "Parringskode",
+      "intro": "Eller indtast koden fra den computers Indstillinger › Konto › Forbind en enhed.",
+      "label": "Kode",
       "connect": "Forbind",
       "connecting": "Forbinder…"
     },
@@ -4010,17 +4010,17 @@
       "back": "Tilbage til denne computer"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Computere i nærheden",
+      "looking": "Leder efter computere på dette netværk…",
+      "connectTo": "Forbind til {name}",
+      "digitsTitle": "Forbind til {name}",
+      "digitsIntro": "Indtast de seks cifre, som {name} viser nu.",
+      "digitsLabel": "Sekscifret kode",
+      "denied": "{name} tillod det ikke.",
+      "ended": "{name} afsluttede anmodningen. Prøv igen.",
+      "requestTitle": "{name} vil bruge denne computers Stella",
+      "requestIntro": "Indtast denne kode på {name} for at give adgang. Tillad det ikke, hvis du ikke bad om det.",
+      "deny": "Tillad ikke"
     }
   }
 }

@@ -882,12 +882,12 @@
       "missing": "Denne visningen er ikke lenger i appene dine."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Bruk Stella på datamaskinen din",
+      "intro": "Åpne Innstillinger › Konto › Koble til en enhet på datamaskinen din, og skann koden som vises. Den kobler direkte til datamaskinen din, uten konto.",
+      "cameraDenied": "Stella kan ikke bruke kameraet. Tillat det i Innstillinger, eller lim inn koden i stedet.",
+      "invalidCode": "Det er ikke en paringskode fra Stella.",
+      "computers": "Datamaskinene dine",
+      "cloudChats": "{name} lagrer chattene sine i Stella-kontoen din. Logg inn her med den for å se dem."
     }
   },
   "settings": {

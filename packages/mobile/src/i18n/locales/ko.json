@@ -881,12 +881,12 @@
       "missing": "이 뷰는 더 이상 앱에 없습니다."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "내 컴퓨터의 Stella 사용",
+      "intro": "컴퓨터에서 설정 › 계정 › 기기 연결을 열고 표시된 코드를 스캔하세요. 계정 없이 컴퓨터에 직접 연결됩니다.",
+      "cameraDenied": "Stella가 카메라를 사용할 수 없습니다. 설정에서 허용하거나 대신 코드를 붙여넣으세요.",
+      "invalidCode": "Stella의 페어링 코드가 아닙니다.",
+      "computers": "내 컴퓨터",
+      "cloudChats": "{name}의 채팅은 내 Stella 계정에 저장됩니다. 보려면 여기에서 해당 계정으로 로그인하세요."
     }
   },
   "settings": {

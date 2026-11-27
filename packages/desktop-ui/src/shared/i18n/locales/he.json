@@ -1774,12 +1774,12 @@
       "missing": "התצוגה הזו כבר לא נמצאת באפליקציות שלך."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "שימוש ב-Stella של המחשב שלכם",
+      "intro": "במחשב שלכם, פתחו את הגדרות › חשבון › חיבור מכשיר וסרקו את הקוד שמוצג. החיבור ישיר למחשב שלכם, ללא חשבון.",
+      "cameraDenied": "ל-Stella אין גישה למצלמה. אפשרו זאת בהגדרות, או הדביקו את הקוד במקום.",
+      "invalidCode": "זה אינו קוד צימוד של Stella.",
+      "computers": "המחשבים שלכם",
+      "cloudChats": "{name} שומר את השיחות שלו בחשבון Stella שלכם. היכנסו כאן עם החשבון הזה כדי לראות אותן."
     }
   },
   "onboarding": {
@@ -4037,16 +4037,16 @@
     "forgetBody": "המכשיר הזה יפסיק להתחבר אליו. הצ׳אטים נשארים במחשב ההוא.",
     "computerChat": "Stella ב-{name}",
     "pair": {
-      "intro": "סרקו את זה עם Stella בטלפון, או הדביקו את הקוד ב-Stella במחשב אחר. החיבור הוא ישירות למחשב הזה, בלי חשבון, ועובד פעם אחת.",
+      "intro": "סרקו את זה עם Stella בטלפון שלכם. במחשב אחר, הזינו את הקוד שלמטה ב-Stella תחת „שימוש ב-Stella של מחשב אחר”.",
       "copy": "העתקת הקוד",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "קוד צימוד קצר",
+      "useOffline": "שימוש בקוד לא מקוון",
+      "noShort": "קודים קצרים דורשים אינטרנט. במקום זאת, הדביקו את הקוד הזה במחשב האחר."
     },
     "enter": {
       "title": "שימוש ב-Stella של מחשב אחר",
-      "intro": "במחשב ההוא, פתחו הגדרות › חשבון › חיבור מכשיר, והדביקו כאן את הקוד.",
-      "label": "קוד צימוד",
+      "intro": "או הזינו את הקוד מתוך הגדרות › חשבון › חיבור מכשיר במחשב ההוא.",
+      "label": "קוד",
       "connect": "התחברות",
       "connecting": "מתחבר…"
     },
@@ -4067,17 +4067,17 @@
       "back": "חזרה למחשב הזה"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "מחשבים קרובים",
+      "looking": "מחפש מחשבים ברשת הזו…",
+      "connectTo": "התחברות אל {name}",
+      "digitsTitle": "התחברות אל {name}",
+      "digitsIntro": "הזינו את שש הספרות שמוצגות עכשיו ב-{name}.",
+      "digitsLabel": "קוד בן שש ספרות",
+      "denied": "{name} לא אישר את החיבור.",
+      "ended": "{name} סיים את הבקשה. נסו שוב.",
+      "requestTitle": "{name} רוצה להשתמש ב-Stella של המחשב הזה",
+      "requestIntro": "הזינו את הקוד הזה ב-{name} כדי לאפשר גישה. אם לא ביקשתם זאת, אל תאשרו.",
+      "deny": "לא לאפשר"
     }
   }
 }

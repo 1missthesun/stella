@@ -883,12 +883,12 @@
       "missing": "Această vizualizare nu mai este în aplicațiile tale."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Folosește Stella de pe computerul tău",
+      "intro": "Pe computer, deschide Setări › Cont › Conectează un dispozitiv și scanează codul afișat. Se conectează direct la computerul tău, fără cont.",
+      "cameraDenied": "Stella nu poate folosi camera. Permite accesul în Setări sau lipește codul.",
+      "invalidCode": "Acesta nu este un cod de asociere Stella.",
+      "computers": "Computerele tale",
+      "cloudChats": "{name} își păstrează conversațiile în contul tău Stella. Autentifică-te aici cu acel cont ca să le vezi."
     }
   },
   "settings": {

@@ -1764,12 +1764,12 @@
       "missing": "Αυτή η προβολή δεν είναι πια στις εφαρμογές σου."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Χρήση του Stella του υπολογιστή σας",
+      "intro": "Στον υπολογιστή σας, ανοίξτε το Ρυθμίσεις › Λογαριασμός › Σύνδεση συσκευής και σαρώστε τον κωδικό που εμφανίζεται. Συνδέεται απευθείας στον υπολογιστή σας, χωρίς λογαριασμό.",
+      "cameraDenied": "Το Stella δεν μπορεί να χρησιμοποιήσει την κάμερα. Επιτρέψτε το στις Ρυθμίσεις ή επικολλήστε τον κωδικό.",
+      "invalidCode": "Αυτός δεν είναι κωδικός σύζευξης του Stella.",
+      "computers": "Οι υπολογιστές σας",
+      "cloudChats": "Το {name} κρατά τις συνομιλίες του στον λογαριασμό σας στο Stella. Συνδεθείτε εδώ με αυτόν για να τις δείτε."
     }
   },
   "onboarding": {
@@ -3980,16 +3980,16 @@
     "forgetBody": "Αυτή η συσκευή σταματά να συνδέεται σε αυτόν. Οι συνομιλίες μένουν σε εκείνον τον υπολογιστή.",
     "computerChat": "Stella στο {name}",
     "pair": {
-      "intro": "Σαρώστε αυτό με τη Stella στο τηλέφωνό σας ή επικολλήστε τον κωδικό στη Stella σε άλλον υπολογιστή. Συνδέεται απευθείας με αυτόν τον υπολογιστή, χωρίς λογαριασμό, και λειτουργεί μία φορά.",
+      "intro": "Σαρώστε το με το Stella στο τηλέφωνό σας. Σε άλλον υπολογιστή, εισαγάγετε τον παρακάτω κωδικό στο Stella, στην επιλογή «Χρήση της Stella άλλου υπολογιστή».",
       "copy": "Αντιγραφή κωδικού",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Σύντομος κωδικός σύζευξης",
+      "useOffline": "Χρήση κωδικού εκτός σύνδεσης",
+      "noShort": "Οι σύντομοι κωδικοί χρειάζονται διαδίκτυο. Επικολλήστε αυτόν τον κωδικό στον άλλο υπολογιστή."
     },
     "enter": {
       "title": "Χρήση της Stella άλλου υπολογιστή",
-      "intro": "Σε εκείνον τον υπολογιστή, ανοίξτε Ρυθμίσεις › Λογαριασμός › Σύνδεση συσκευής και επικολλήστε εδώ τον κωδικό.",
-      "label": "Κωδικός σύζευξης",
+      "intro": "Ή εισαγάγετε τον κωδικό από το Ρυθμίσεις › Λογαριασμός › Σύνδεση συσκευής εκείνου του υπολογιστή.",
+      "label": "Κωδικός",
       "connect": "Σύνδεση",
       "connecting": "Σύνδεση…"
     },
@@ -4010,17 +4010,17 @@
       "back": "Πίσω σε αυτόν τον υπολογιστή"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Κοντινοί υπολογιστές",
+      "looking": "Αναζήτηση υπολογιστών σε αυτό το δίκτυο…",
+      "connectTo": "Σύνδεση με {name}",
+      "digitsTitle": "Σύνδεση με {name}",
+      "digitsIntro": "Εισαγάγετε τα έξι ψηφία που εμφανίζει τώρα το {name}.",
+      "digitsLabel": "Εξαψήφιος κωδικός",
+      "denied": "Το {name} δεν το επέτρεψε.",
+      "ended": "Το {name} τερμάτισε το αίτημα. Δοκιμάστε ξανά.",
+      "requestTitle": "Το {name} θέλει να χρησιμοποιήσει το Stella αυτού του υπολογιστή",
+      "requestIntro": "Εισαγάγετε αυτόν τον κωδικό στο {name} για να επιτρέψετε την πρόσβαση. Αν δεν το ζητήσατε, μην το επιτρέψετε.",
+      "deny": "Να μην επιτραπεί"
     }
   }
 }

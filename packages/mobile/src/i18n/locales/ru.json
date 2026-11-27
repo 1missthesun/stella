@@ -884,12 +884,12 @@
       "missing": "Этого представления больше нет в ваших приложениях."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Использовать Stella своего компьютера",
+      "intro": "На компьютере откройте Настройки › Аккаунт › Подключить устройство и отсканируйте показанный код. Подключение идёт напрямую к вашему компьютеру, без аккаунта.",
+      "cameraDenied": "Stella не может использовать камеру. Разрешите доступ в Настройках или вставьте код.",
+      "invalidCode": "Это не код сопряжения Stella.",
+      "computers": "Ваши компьютеры",
+      "cloudChats": "{name} хранит чаты в вашем аккаунте Stella. Войдите здесь в этот аккаунт, чтобы увидеть их."
     }
   },
   "settings": {

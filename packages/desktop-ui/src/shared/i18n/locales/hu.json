@@ -1764,12 +1764,12 @@
       "missing": "Ez a nézet már nincs az appjaid között."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "A Stella használata a számítógépeden",
+      "intro": "A számítógépeden nyisd meg a Beállítások › Fiók › Eszköz csatlakoztatása menüt, és olvasd be a megjelenő kódot. Közvetlenül a számítógépedhez csatlakozik, fiók nélkül.",
+      "cameraDenied": "A Stella nem tudja használni a kamerát. Engedélyezd a Beállításokban, vagy illeszd be a kódot.",
+      "invalidCode": "Ez nem Stella párosítási kód.",
+      "computers": "Saját számítógépek",
+      "cloudChats": "{name} a Stella-fiókodban tárolja a beszélgetéseit. Jelentkezz be itt azzal a fiókkal, hogy lásd őket."
     }
   },
   "onboarding": {
@@ -3980,16 +3980,16 @@
     "forgetBody": "Ez az eszköz többé nem csatlakozik hozzá. A csevegések azon a számítógépen maradnak.",
     "computerChat": "Stella itt: {name}",
     "pair": {
-      "intro": "Olvasd be a telefonodon a Stellával, vagy illeszd be a kódot egy másik számítógép Stellájába. Közvetlenül ehhez a számítógéphez csatlakozik, fiók nélkül, és egyszer működik.",
+      "intro": "Olvasd be a telefonodon a Stella alkalmazással. Másik számítógépen írd be az alábbi kódot a Stella „Másik számítógép Stellájának használata” részében.",
       "copy": "Kód másolása",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Rövid párosítási kód",
+      "useOffline": "Offline kód használata",
+      "noShort": "A rövid kódokhoz internet kell. Inkább illeszd be ezt a kódot a másik számítógépen."
     },
     "enter": {
       "title": "Másik számítógép Stellájának használata",
-      "intro": "Azon a számítógépen nyisd meg a Beállítások › Fiók › Eszköz csatlakoztatása menüt, és illeszd be ide a kódot.",
-      "label": "Párosítási kód",
+      "intro": "Vagy írd be a másik számítógép Beállítások › Fiók › Eszköz csatlakoztatása menüjében látható kódot.",
+      "label": "Kód",
       "connect": "Csatlakozás",
       "connecting": "Csatlakozás…"
     },
@@ -4010,17 +4010,17 @@
       "back": "Vissza ehhez a számítógéphez"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Közeli számítógépek",
+      "looking": "Számítógépek keresése ezen a hálózaton…",
+      "connectTo": "Csatlakozás ehhez: {name}",
+      "digitsTitle": "Csatlakozás ehhez: {name}",
+      "digitsIntro": "Írd be a {name} által most mutatott hat számjegyet.",
+      "digitsLabel": "Hatjegyű kód",
+      "denied": "{name} nem engedélyezte.",
+      "ended": "{name} lezárta a kérést. Próbáld újra.",
+      "requestTitle": "{name} használni szeretné a Stella alkalmazást ezen a számítógépen",
+      "requestIntro": "Írd be ezt a kódot a(z) {name} eszközön a hozzáféréshez. Ha nem te kérted, ne engedélyezd.",
+      "deny": "Tiltás"
     }
   }
 }

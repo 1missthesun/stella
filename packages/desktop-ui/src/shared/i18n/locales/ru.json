@@ -1784,12 +1784,12 @@
       "missing": "Этого представления больше нет в ваших приложениях."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Использовать Stella своего компьютера",
+      "intro": "На компьютере откройте Настройки › Аккаунт › Подключить устройство и отсканируйте показанный код. Подключение идёт напрямую к вашему компьютеру, без аккаунта.",
+      "cameraDenied": "Stella не может использовать камеру. Разрешите доступ в Настройках или вставьте код.",
+      "invalidCode": "Это не код сопряжения Stella.",
+      "computers": "Ваши компьютеры",
+      "cloudChats": "{name} хранит чаты в вашем аккаунте Stella. Войдите здесь в этот аккаунт, чтобы увидеть их."
     }
   },
   "onboarding": {
@@ -4094,16 +4094,16 @@
     "forgetBody": "Это устройство перестанет к нему подключаться. Чаты останутся на том компьютере.",
     "computerChat": "Stella на {name}",
     "pair": {
-      "intro": "Отсканируйте это в Stella на телефоне или вставьте код в Stella на другом компьютере. Подключение идёт напрямую к этому компьютеру, без аккаунта, и код работает один раз.",
+      "intro": "Отсканируйте это в Stella на телефоне. На другом компьютере введите код ниже в Stella в разделе «Использовать Stella другого компьютера».",
       "copy": "Скопировать код",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Короткий код сопряжения",
+      "useOffline": "Использовать офлайн-код",
+      "noShort": "Для коротких кодов нужен интернет. Вместо этого вставьте этот код на другом компьютере."
     },
     "enter": {
       "title": "Использовать Stella другого компьютера",
-      "intro": "На том компьютере откройте Настройки › Аккаунт › Подключить устройство и вставьте сюда код.",
-      "label": "Код привязки",
+      "intro": "Или введите код из раздела Настройки › Аккаунт › Подключить устройство на том компьютере.",
+      "label": "Код",
       "connect": "Подключить",
       "connecting": "Подключение…"
     },
@@ -4124,17 +4124,17 @@
       "back": "Вернуться к этому компьютеру"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Компьютеры поблизости",
+      "looking": "Поиск компьютеров в этой сети…",
+      "connectTo": "Подключиться к {name}",
+      "digitsTitle": "Подключиться к {name}",
+      "digitsIntro": "Введите шесть цифр, которые сейчас показывает {name}.",
+      "digitsLabel": "Шестизначный код",
+      "denied": "{name} не разрешил подключение.",
+      "ended": "{name} завершил запрос. Попробуйте ещё раз.",
+      "requestTitle": "{name} хочет использовать Stella на этом компьютере",
+      "requestIntro": "Введите этот код на {name}, чтобы разрешить доступ. Если вы этого не запрашивали, не разрешайте.",
+      "deny": "Не разрешать"
     }
   }
 }

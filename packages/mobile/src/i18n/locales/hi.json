@@ -882,12 +882,12 @@
       "missing": "यह व्यू अब आपके ऐप्स में नहीं है।"
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "अपने कंप्यूटर का Stella इस्तेमाल करें",
+      "intro": "अपने कंप्यूटर पर सेटिंग्स › खाता › डिवाइस कनेक्ट करें खोलें और दिख रहा कोड स्कैन करें। यह बिना खाते के सीधे आपके कंप्यूटर से कनेक्ट होता है।",
+      "cameraDenied": "Stella कैमरा इस्तेमाल नहीं कर पा रहा है। सेटिंग्स में अनुमति दें या इसके बजाय कोड पेस्ट करें।",
+      "invalidCode": "यह Stella का पेयरिंग कोड नहीं है।",
+      "computers": "आपके कंप्यूटर",
+      "cloudChats": "{name} अपनी चैट आपके Stella खाते में रखता है। उन्हें देखने के लिए यहाँ उसी खाते से साइन इन करें।"
     }
   },
   "settings": {

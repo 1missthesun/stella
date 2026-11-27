@@ -1774,12 +1774,12 @@
       "missing": "Esta vista ya no está en tus apps."
     },
     "p2p": {
-      "title": "Use your computer's Stella",
-      "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
-      "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
-      "invalidCode": "That isn't a pairing code from Stella.",
-      "computers": "Your computers",
-      "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
+      "title": "Usar la Stella de tu ordenador",
+      "intro": "En tu ordenador, abre Ajustes › Cuenta › Conectar un dispositivo y escanea el código que aparece. Se conecta directamente a tu ordenador, sin cuenta.",
+      "cameraDenied": "Stella no puede usar la cámara. Permítelo en Ajustes o pega el código en su lugar.",
+      "invalidCode": "Ese no es un código de vinculación de Stella.",
+      "computers": "Tus ordenadores",
+      "cloudChats": "{name} guarda sus chats en tu cuenta de Stella. Inicia sesión aquí con ella para verlos."
     }
   },
   "onboarding": {
@@ -4037,16 +4037,16 @@
     "forgetBody": "Este dispositivo dejará de conectarse a él. Sus chats siguen en ese ordenador.",
     "computerChat": "Stella de {name}",
     "pair": {
-      "intro": "Escanea esto con Stella en tu teléfono o pega el código en Stella en otro ordenador. Se conecta directamente a este ordenador, sin cuenta, y funciona una sola vez.",
+      "intro": "Escanea esto con Stella en tu teléfono. En otro ordenador, introduce el código de abajo en Stella, en «Usar la Stella de otro ordenador».",
       "copy": "Copiar código",
-      "shortLabel": "Short pairing code",
-      "useOffline": "Use offline code",
-      "noShort": "Short codes need the internet. Paste this code on the other computer instead."
+      "shortLabel": "Código corto de vinculación",
+      "useOffline": "Usar código sin conexión",
+      "noShort": "Los códigos cortos necesitan internet. Pega este código en el otro ordenador en su lugar."
     },
     "enter": {
       "title": "Usar la Stella de otro ordenador",
-      "intro": "En ese ordenador, abre Ajustes › Cuenta › Conectar un dispositivo y pega aquí su código.",
-      "label": "Código de vinculación",
+      "intro": "O introduce el código de Ajustes › Cuenta › Conectar un dispositivo de ese ordenador.",
+      "label": "Código",
       "connect": "Conectar",
       "connecting": "Conectando…"
     },
@@ -4067,17 +4067,17 @@
       "back": "Volver a este ordenador"
     },
     "nearby": {
-      "title": "Nearby computers",
-      "looking": "Looking for computers on this network…",
-      "connectTo": "Connect to {name}",
-      "digitsTitle": "Connect to {name}",
-      "digitsIntro": "Enter the six digits {name} is showing now.",
-      "digitsLabel": "Six-digit code",
-      "denied": "{name} didn't allow it.",
-      "ended": "{name} ended the request. Try again.",
-      "requestTitle": "{name} wants to use this computer's Stella",
-      "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "title": "Ordenadores cercanos",
+      "looking": "Buscando ordenadores en esta red…",
+      "connectTo": "Conectar con {name}",
+      "digitsTitle": "Conectar con {name}",
+      "digitsIntro": "Introduce los seis dígitos que muestra {name} ahora.",
+      "digitsLabel": "Código de seis dígitos",
+      "denied": "{name} no lo ha permitido.",
+      "ended": "{name} ha cerrado la solicitud. Inténtalo de nuevo.",
+      "requestTitle": "{name} quiere usar la Stella de este ordenador",
+      "requestIntro": "Introduce este código en {name} para permitirle el acceso. Si no lo has solicitado, no lo permitas.",
+      "deny": "No permitir"
     }
   }
 }

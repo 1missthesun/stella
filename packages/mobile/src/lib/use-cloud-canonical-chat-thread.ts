@@ -52,6 +52,7 @@ import {
   acknowledgedCloudDispatchIds,
   activeCloudTurnId,
   canonicalCloudDispatchIdForTurn,
+  createRecordedCloudDispatchIds,
   mergeCanonicalCloudMessages,
   projectCloudConversationMessages,
   latestJournalDestinationSwitch,
@@ -668,9 +669,10 @@ export const useCloudCanonicalChatThread = (
   });
   const displayedProjection = display.messages;
 
-  const acknowledgedDispatchIds = useMemo(
-    () => acknowledgedCloudDispatchIds(journalWindow, dispatchBindings),
-    [dispatchBindings, journalWindow],
+  const [recordDispatchIds] = useState(createRecordedCloudDispatchIds);
+  const recordedDispatchIds = useMemo(
+    () => recordDispatchIds(acknowledgedCloudDispatchIds(journalWindow, dispatchBindings)),
+    [dispatchBindings, journalWindow, recordDispatchIds],
   );
   const canonical = useMemo(
     () => rebindCanonicalCloudMessages(displayedProjection, dispatchBindings),
@@ -693,13 +695,13 @@ export const useCloudCanonicalChatThread = (
         canonical,
         local: localMessages,
         dispatchBindings,
-        acknowledgedDispatchIds,
+        recordedDispatchIds,
       }),
     [
-      acknowledgedDispatchIds,
       canonical,
       dispatchBindings,
       localMessages,
+      recordedDispatchIds,
     ],
   );
   const messages = useStableChatMessages(

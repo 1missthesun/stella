@@ -105,6 +105,10 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         }
         None => root,
     };
+    let root = match crate::swapfx::slot().filter(|_| s.main) {
+        Some(slot) => root.child(slot),
+        None => root,
+    };
     note_state(node, dark, maximized, full, accent);
     settle_rect(node, cx);
     // As in CSS, a change lands at once unless its element asks for motion (`motion`, `layout`).
@@ -489,6 +493,11 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
     }
 }
 
+thread_local! {
+    /// Bridge batches held back until a swap's before is kept (`swapfx::hold_commit`).
+    static HELD: std::cell::Cell<Vec<Msg>> = const { std::cell::Cell::new(Vec::new()) };
+}
+
 /// How long after a hot swap lands its follow-up commits (layout-driven reveals) skip motion.
 const SWAP_SETTLE: std::time::Duration = std::time::Duration::from_millis(600);
 
@@ -510,15 +519,31 @@ fn drain(polling: u32) {
         engine::with(|e| e.ts_dead = true);
         eprintln!("stella-engine: TS host disconnected; keeping the last tree on screen");
     }
-    if batches.is_empty() {
+    let mut held = HELD.take();
+    if held.is_empty() && batches.is_empty() {
         return;
     }
+    held.extend(batches);
     let mut cmds: Vec<serde_json::Value> = Vec::new();
     let mut added = Vec::new();
     let mut gone = Vec::new();
-    for Msg::Batch(ops, received_at) in batches {
+    let mut queue = held.into_iter();
+    while let Some(Msg::Batch(ops, received_at)) = queue.next() {
+        if crate::swapfx::hold_commit() && ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
+            // The swap's before is kept on the next frame; the swap lands after it.
+            HELD.set(std::iter::once(Msg::Batch(ops, received_at)).chain(queue).collect());
+            std::thread::spawn(|| {
+                std::thread::sleep(crate::swapfx::WANT_MAX);
+                wake_all();
+            });
+            break;
+        }
+        if ops.iter().any(|op| !matches!(op, Op::Commit { .. } | Op::Cmd(_) | Op::Blob { .. } | Op::FreeBlob { .. })) {
+            crate::swapfx::note_ops();
+        }
         engine::with(|e| {
             if ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
+                crate::swapfx::landed();
                 crate::swap_view::remember(e);
                 e.swap_settle = Some((std::time::Instant::now() + SWAP_SETTLE, crate::swap_view::USER_INPUT.load(std::sync::atomic::Ordering::Relaxed)));
             }
@@ -761,6 +786,14 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         }
         held
     }) {
+        wake_dirty(s.node);
+    }
+    if s.main && crate::swapfx::take_rebuild() {
+        engine::with(|e| {
+            if let Some(m) = e.main_node {
+                e.tree.touch(m);
+            }
+        });
         wake_dirty(s.node);
     }
     let decoded = crate::media::decoded_since_built();

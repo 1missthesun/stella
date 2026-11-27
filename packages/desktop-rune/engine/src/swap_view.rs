@@ -75,7 +75,7 @@ struct Armed {
 pub type Seen = (String, bool, Option<(usize, usize)>);
 
 /// `_r_4a_`, `«r4a»` and `:r4a:` (React's `useId` across versions) differ per mount.
-fn stable_id(id: &str) -> String {
+pub fn stable_id(id: &str) -> String {
     let mut out = String::with_capacity(id.len());
     let mut rest = id;
     while !rest.is_empty() {

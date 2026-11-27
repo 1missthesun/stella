@@ -11,6 +11,16 @@ import { ViewSession, type ViewCapabilities, type ViewRun, type ViewSnapshot, ty
 import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath, viewDataPath as dataPathFor, viewKey as hash, viewSourceHash, viewStatusPath, viewTitle as titleFor, type ViewStatusFile } from "@stella/views/files";
+import {
+  MovableViewStorage,
+  ViewStorageSync,
+  backendViewStorageRemote,
+  normalizeViewStorageRecord,
+  syncedViewId,
+  viewSlugFromPath,
+  type ViewStorageBackend,
+  type ViewStorageDisk,
+} from "@stella/views/storage-sync";
 import type { engine as BridgeEngine, onEngineEvent as BridgeOn } from "../bridge";
 
 type Engine = typeof BridgeEngine;
@@ -55,29 +65,39 @@ function engineVm(engine: Engine, on: On): ViewVm {
   };
 }
 
+/** Where a view kept its storage before it synced: by its file's path (still used for a file no conversation names). */
+const legacyStorageFile = (filePath: string) => join(dataDir(), "views", `${basename(filePath).replace(/[^\w.-]+/gu, "_").slice(0, 60)}-${hash(filePath)}`, "storage.json");
+
+const readJsonFile = (file: string): unknown => {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+const writeJsonFile = (file: string, value: unknown) => {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(value));
+  renameSync(tmp, file);
+};
+
+const readLegacy = (filePath: string): Record<string, unknown> | null => {
+  const parsed = readJsonFile(legacyStorageFile(filePath));
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+};
+
 function fileStorage(filePath: string): ViewStorage {
-  const dir = join(dataDir(), "views", `${basename(filePath).replace(/[^\w.-]+/gu, "_").slice(0, 60)}-${hash(filePath)}`);
-  const file = join(dir, "storage.json");
+  const file = legacyStorageFile(filePath);
   let values: Record<string, unknown> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  const read = (): Record<string, unknown> => {
-    if (values) return values;
-    try {
-      const parsed = JSON.parse(readFileSync(file, "utf8")) as unknown;
-      values = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-    } catch {
-      values = {};
-    }
-    return values;
-  };
+  const read = (): Record<string, unknown> => (values ??= readLegacy(filePath) ?? {});
   const write = () => {
     if (timer) return;
     timer = setTimeout(() => {
       timer = null;
-      mkdirSync(dir, { recursive: true });
-      const tmp = `${file}.${process.pid}.tmp`;
-      writeFileSync(tmp, JSON.stringify(read()));
-      renameSync(tmp, file);
+      writeJsonFile(file, read());
     }, 150);
   };
   return {
@@ -93,6 +113,76 @@ function fileStorage(filePath: string): ViewStorage {
     clear: async () => {
       values = {};
       write();
+    },
+  };
+}
+
+/** Synced views' storage on this computer: one file per view, named by its synced id. */
+const syncedDisk = (): ViewStorageDisk => {
+  const fileFor = (viewId: string) => join(dataDir(), "views", "synced", `${viewId.split("/").pop()!.replace(/[^\w.-]+/gu, "_").slice(0, 60)}-${hash(viewId)}.json`);
+  return {
+    read: async (viewId) => normalizeViewStorageRecord(readJsonFile(fileFor(viewId))),
+    write: async (viewId, record) => writeJsonFile(fileFor(viewId), record),
+  };
+};
+
+/**
+ * Which synced view each file is, learned from the conversations that made them (the `view` tool's
+ * calls) and kept on disk, so a view opened from its file (the panel after a restart, a file moved
+ * elsewhere) still finds its storage: by path, and by source, which a moved file keeps.
+ */
+function identityIndex() {
+  const file = join(dataDir(), "views", "identity.json");
+  const LIMIT = 2000;
+  type Index = { byPath: Record<string, string>; bySource: Record<string, string> };
+  let index: Index | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const read = (): Index => {
+    if (index) return index;
+    const parsed = readJsonFile(file) as Partial<Index> | null;
+    index = { byPath: { ...(parsed?.byPath ?? {}) }, bySource: { ...(parsed?.bySource ?? {}) } };
+    return index;
+  };
+  const trim = (map: Record<string, string>) => {
+    const keys = Object.keys(map);
+    for (const key of keys.slice(0, Math.max(0, keys.length - LIMIT))) delete map[key];
+  };
+  const save = () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      try {
+        writeJsonFile(file, read());
+      } catch (error) {
+        console.error("[views] couldn't save the views identity index:", error);
+      }
+    }, 300);
+    timer.unref?.();
+  };
+  return {
+    lookup(filePath: string, source: string | null): string | null {
+      const { byPath, bySource } = read();
+      return byPath[filePath] ?? (source ? (bySource[viewSourceHash(source)] ?? null) : null);
+    },
+    remember(filePath: string, viewId: string, source: string | null) {
+      const current = read();
+      let changed = false;
+      if (current.byPath[filePath] !== viewId) {
+        delete current.byPath[filePath];
+        current.byPath[filePath] = viewId;
+        changed = true;
+      }
+      if (source) {
+        const key = viewSourceHash(source);
+        if (current.bySource[key] !== viewId) {
+          current.bySource[key] = viewId;
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      trim(current.byPath);
+      trim(current.bySource);
+      save();
     },
   };
 }
@@ -160,6 +250,8 @@ function capabilities(engine: Engine): ViewCapabilities {
 type Entry = {
   session: ViewSession;
   filePath: string;
+  storage: MovableViewStorage;
+  viewId: string | null;
   watchers: FSWatcher[];
   refs: number;
   closeTimer: ReturnType<typeof setTimeout> | null;
@@ -204,11 +296,25 @@ function statusWriter(entry: { filePath: string; sourceHash: string }) {
   };
 }
 
+type Message = { toolEvents?: readonly ViewToolEvent[] };
+
 export function createViewsHost(engine: Engine, on: On) {
   const entries = new Map<string, Entry>();
   /** The newest version of each view the open conversations carry, by file path. */
   const known = new Map<string, ConversationView>();
   const scanned = new WeakMap<readonly ViewToolEvent[], Map<string, ConversationView>>();
+  const sync = new ViewStorageSync(syncedDisk(), (message, detail) => console.error(`[views] ${message}:`, detail instanceof Error ? detail.message : (detail ?? "")));
+  const identities = identityIndex();
+  /** Which conversation each message's views were last bound to, so a new message doesn't rebind the others. */
+  const bound = new WeakMap<readonly ViewToolEvent[], string>();
+
+  /** Moves an open view onto its synced storage (its old storage comes along as the seed). */
+  const bind = (entry: Entry, viewId: string) => {
+    if (entry.viewId === viewId) return;
+    entry.viewId = viewId;
+    const filePath = entry.filePath;
+    void entry.storage.move(sync.storage(viewId, async () => readLegacy(filePath)));
+  };
   const vm = engineVm(engine, on);
   const caps = capabilities(engine);
   const now = () => performance.now();
@@ -256,6 +362,7 @@ export function createViewsHost(engine: Engine, on: On) {
     if (source === entry.lastSource) return;
     entry.lastSource = source;
     entry.sourceHash = viewSourceHash(source);
+    if (entry.viewId) identities.remember(entry.filePath, entry.viewId, source);
     void entry.session.load(source, basename(entry.filePath));
   };
 
@@ -292,11 +399,20 @@ export function createViewsHost(engine: Engine, on: On) {
     } catch {
       data = null;
     }
+    let source: string | null = null;
+    try {
+      source = readFileSync(filePath, "utf8");
+    } catch {
+      source = null;
+    }
+    const viewId = identities.lookup(filePath, source);
+    const storage = new MovableViewStorage(viewId ? sync.storage(viewId, async () => readLegacy(filePath)) : fileStorage(filePath));
+    if (viewId) identities.remember(filePath, viewId, source);
     const session = new ViewSession({
       id: hash(filePath),
       title: titleFor(filePath),
       vm,
-      storage: fileStorage(filePath),
+      storage,
       capabilities: caps,
       theme,
       data,
@@ -306,7 +422,7 @@ export function createViewsHost(engine: Engine, on: On) {
         if (process.env.STELLA_VIEWS_LOG === "1" || log.level === "error") console.error(`[view ${basename(filePath)}] ${log.level}: ${log.text}`);
       },
     });
-    const entry: Entry = { session, filePath, watchers: [], refs: 0, closeTimer: null, lastSource: null, lastData: data === null ? null : JSON.stringify(data), sourceHash: "", remote };
+    const entry: Entry = { session, filePath, storage, viewId, watchers: [], refs: 0, closeTimer: null, lastSource: null, lastData: data === null ? null : JSON.stringify(data), sourceHash: "", remote };
     session.subscribe(statusWriter(entry));
     if (process.env.STELLA_VIEWS_LOG === "1") {
       let seen = { first: null as number | null, swap: null as number | null, problem: null as string | null };
@@ -386,10 +502,12 @@ export function createViewsHost(engine: Engine, on: On) {
     restart: (filePath: string) => withEntry(filePath, (e) => void e.session.restart()),
     logs: (filePath: string) => entries.get(filePath)?.session.logs.slice() ?? [],
     /**
-     * The views a conversation carries (its `view` tool calls and view cards): a view whose file
-     * isn't on this computer runs the newest of them, and swaps when a newer one arrives.
+     * The views a conversation carries (its `view` tool calls and tasks' view cards): a view whose
+     * file isn't on this computer runs the newest of them, and swaps when a newer one arrives; and
+     * each file learns which synced view it is, `<conversationId>/<slug>`, so its storage follows it
+     * across devices.
      */
-    offerMessages(messages: readonly { toolEvents?: readonly ViewToolEvent[] }[]) {
+    offerMessages(messages: readonly Message[], conversationId?: string | null) {
       for (const message of messages) {
         const events = message.toolEvents;
         if (!events?.length) continue;
@@ -405,7 +523,27 @@ export function createViewsHost(engine: Engine, on: On) {
           const entry = entries.get(view.filePath);
           if (entry?.remote) readSource(entry);
         }
+        if (!conversationId || bound.get(events) === conversationId) continue;
+        bound.set(events, conversationId);
+        for (const view of views.values()) {
+          const viewId = syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath));
+          if (!viewId) continue;
+          const entry = entries.get(view.filePath);
+          identities.remember(view.filePath, viewId, entry?.lastSource ?? view.source);
+          if (entry) bind(entry, viewId);
+        }
       }
+    },
+    /** The signed-in account's backend, which views' storage syncs through; null while signed out. */
+    connectBackend(client: ViewStorageBackend | null) {
+      sync.setRemote(client ? backendViewStorageRemote(client) : null);
+    },
+    /** Which synced view the file is, and whether everything changed here reached the server. */
+    syncState: (filePath: string): { viewId: string | null; connected: boolean; synced: boolean } | null => {
+      const entry = entries.get(filePath);
+      if (!entry) return null;
+      const target = entry.storage.target as { synced?: boolean };
+      return { viewId: entry.viewId, connected: sync.connected, synced: target.synced ?? true };
     },
     /** Loads a source without a file (the gallery, previews of a view an agent is writing). */
     reload: (filePath: string) => withEntry(filePath, (e) => {

@@ -4,9 +4,12 @@
 // views host. A newer source swaps into the running session in place, keeping its state.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from "react-native";
 import { ViewSession, type ViewSnapshot, type ViewStorage } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
 import { viewFileName, viewKey } from "@stella/views/paths";
+import { ViewStorageSync, backendViewStorageRemote, normalizeViewStorageRecord, syncedViewId, viewSlugFromPath, type ViewStorageDisk } from "@stella/views/storage-sync";
+import { getBackendClient } from "../lib/backend";
 import type { ChatMessage, ChatViewRef } from "../types";
 import { nativeViewVm } from "./native-vm";
 import { viewCapabilities } from "./view-capabilities";
@@ -110,6 +113,53 @@ function phoneStorage(file: string): ViewStorage {
   };
 }
 
+/** What the view kept on this phone before it synced, for its first sync. */
+const legacyPhoneStorage = async (file: string): Promise<Record<string, unknown> | null> => {
+  try {
+    const parsed = JSON.parse((await AsyncStorage.getItem(storageKey(file))) ?? "null") as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length > 0 ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const syncedDisk: ViewStorageDisk = {
+  read: async (viewId) => {
+    try {
+      return normalizeViewStorageRecord(JSON.parse((await AsyncStorage.getItem(`stella-views:synced:v1:${viewId}`)) ?? "null"));
+    } catch {
+      return null;
+    }
+  },
+  write: (viewId, record) => AsyncStorage.setItem(`stella-views:synced:v1:${viewId}`, JSON.stringify(record)),
+};
+
+/** Views' storage, synced through Stella Cloud as `<conversationId>/<slug>` (packages/views/src/storage-sync.ts). */
+const sync = new ViewStorageSync(syncedDisk, (message, detail) => console.warn(`[views] ${message}`, detail));
+let syncConnected = false;
+
+const connectSync = () => {
+  if (syncConnected) return;
+  try {
+    sync.setRemote(backendViewStorageRemote(getBackendClient()));
+    syncConnected = true;
+    // Back in front (often back online too): replay what's queued instead of waiting out a retry.
+    AppState.addEventListener("change", (state) => {
+      if (state === "active") sync.retryNow();
+    });
+  } catch {
+    // No backend configured (a build without one): views keep their storage on the phone.
+  }
+};
+
+/** A view's storage: synced when the conversation names it, else on the phone alone. */
+function viewStorage(file: string, ref: ChatViewRef): ViewStorage {
+  const viewId = scope ? syncedViewId(scope, ref.slug || viewSlugFromPath(file)) : null;
+  if (!viewId) return phoneStorage(file);
+  connectSync();
+  return sync.storage(viewId, () => legacyPhoneStorage(file));
+}
+
 // ------------------------------------------------------------------ sessions
 
 const requestFrame = (fn: (time: number) => void) => requestAnimationFrame(fn);
@@ -130,7 +180,7 @@ class Entry {
       id: file,
       title: ref.title,
       vm: nativeViewVm,
-      storage: phoneStorage(file),
+      storage: viewStorage(file, ref),
       capabilities: viewCapabilities,
       theme,
       data: ref.data ?? null,

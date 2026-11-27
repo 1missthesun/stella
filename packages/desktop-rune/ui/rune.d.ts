@@ -21,9 +21,6 @@ declare global {
     /** Electron main's windows, their electronAPI and message boxes, when the host runs Stella's services. */
     host?: import("../host/services/ui-host").UiHost;
     /** Runs Stella Views (`*.view.tsx`) on the engine's script VM and hands their trees to the UI. */
-    views?: import("../host/views/views-host").ViewsHost & {
-      /** Views whose files aren't on this device run the newest version the conversation carries (`view` calls and view cards). */
-      offerMessages?(messages: readonly { toolEvents?: readonly import("@stella/views/conversation").ViewToolEvent[] }[]): void;
-    };
+    views?: import("../host/views/views-host").ViewsHost;
   };
 }

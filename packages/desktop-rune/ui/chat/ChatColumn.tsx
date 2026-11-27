@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
+import { backendClient } from "@/platform/backend/backend-client";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import { ComposerNotice } from "@/app/chat/ComposerNotice";
@@ -190,10 +191,14 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
   );
 
   const liveMessages = useChatMessages();
-  // Where a view's file isn't on this device (the web, a view made in the cloud or elsewhere), the conversation carries its source.
+  // The conversation names its views (their storage syncs as `<conversationId>/<slug>`), and where a
+  // view's file isn't on this device (the web, a view made in the cloud or elsewhere) it carries its source.
   useEffect(() => {
-    globalThis.stella.views?.offerMessages?.(liveMessages);
-  }, [liveMessages]);
+    globalThis.stella.views?.offerMessages?.(liveMessages, conversationId);
+  }, [liveMessages, conversationId]);
+  useEffect(() => {
+    globalThis.stella.views?.connectBackend?.(backendClient);
+  }, []);
   const messages = useDeferredChatMessages(liveMessages, isUserScrolling, conversationId);
   const assistantReplyPeek = useAssistantReplyPeek({ messages, isFollowingLatest, isNearBottom });
 

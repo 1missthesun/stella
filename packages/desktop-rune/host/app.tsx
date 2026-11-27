@@ -75,7 +75,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys"];
   g.stella = scopeUiFacing({ store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys }, READS);
   if (services) g.stella.host = scopeUiFacing((await import("./services/ui-host")).createUiHost(), READS);
-  g.stella.views = scopeUiFacing((await import("./views/views-host")).createViewsHost(engine, onEngineEvent), ["snapshot", "isViewPath", "logs"]);
+  g.stella.views = scopeUiFacing((await import("./views/views-host")).createViewsHost(engine, onEngineEvent), ["snapshot", "isViewPath", "logs", "syncState"]);
 
   /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */
   const root = () => app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App));

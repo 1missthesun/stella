@@ -5,6 +5,7 @@ import type { ViewSnapshot } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
 import { VIEW_TOOL, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath } from "@stella/views/paths";
+import type { ViewStorageBackend } from "@stella/views/storage-sync";
 import type { WebViewsHost } from "./views-host";
 
 type Message = { toolEvents?: readonly ViewToolEvent[] };
@@ -14,7 +15,11 @@ let loading: Promise<WebViewsHost> | null = null;
 
 const load = (): Promise<WebViewsHost> =>
   (loading ??= import("./views-host").then(
-    (m) => (host = m.createWebViewsHost()),
+    (m) => {
+      host = m.createWebViewsHost();
+      host.connectBackend(backend);
+      return host;
+    },
     (error: unknown) => {
       loading = null;
       throw error;
@@ -25,7 +30,8 @@ const load = (): Promise<WebViewsHost> =>
 const carriesView = (messages: readonly Message[]) =>
   messages.some((m) => m.toolEvents?.some((e) => e.type === "tool_result" && (e.payload as { toolName?: unknown } | undefined)?.toolName === VIEW_TOOL));
 
-let pending: readonly Message[] | null = null;
+let pending: { messages: readonly Message[]; conversationId: string | null } | null = null;
+let backend: ViewStorageBackend | null = null;
 
 export const webViews = {
   isViewPath,
@@ -52,18 +58,24 @@ export const webViews = {
   restart: (filePath: string) => host?.restart(filePath),
   logs: (filePath: string) => host?.logs(filePath) ?? [],
   reload: (filePath: string) => host?.reload(filePath),
+  syncState: (filePath: string) => host?.syncState(filePath) ?? null,
+  /** The signed-in account's backend, which views' storage syncs through. */
+  connectBackend(client: ViewStorageBackend | null) {
+    backend = client;
+    host?.connectBackend(client);
+  },
   /** The views a conversation carries (its messages' `view` tool results): the newest of each runs. */
-  offerMessages(messages: readonly Message[]) {
-    if (host) return host.offerMessages(messages);
+  offerMessages(messages: readonly Message[], conversationId?: string | null) {
+    if (host) return host.offerMessages(messages, conversationId);
     if (!pending && !carriesView(messages)) return;
     const first = !pending;
-    pending = messages;
+    pending = { messages, conversationId: conversationId ?? null };
     if (!first) return;
     load().then(
       (h) => {
         const latest = pending;
         pending = null;
-        if (latest) h.offerMessages(latest);
+        if (latest) h.offerMessages(latest.messages, latest.conversationId);
       },
       (error: unknown) => {
         pending = null;

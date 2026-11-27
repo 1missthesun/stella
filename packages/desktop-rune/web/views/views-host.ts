@@ -9,7 +9,8 @@ import type { ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath, viewFileName, viewKey, viewTitle } from "@stella/views/paths";
 import { browserCapabilities } from "./capabilities";
-import { browserStorage } from "./storage";
+import { MovableViewStorage, ViewStorageSync, backendViewStorageRemote, syncedViewId, viewSlugFromPath, type ViewStorageBackend } from "@stella/views/storage-sync";
+import { browserStorage, browserSyncedDisk, legacyBrowserStorage } from "./storage";
 import { createWasmVm, preloadViews } from "./wasm-vm";
 
 const KEEP_ALIVE_MS = 60_000;
@@ -19,6 +20,8 @@ const SOURCE_WAIT_MS = 4_000;
 type Entry = {
   session: ViewSession;
   filePath: string;
+  storage: MovableViewStorage;
+  viewId: string | null;
   refs: number;
   closeTimer: ReturnType<typeof setTimeout> | null;
   waitTimer: ReturnType<typeof setTimeout> | null;
@@ -36,6 +39,16 @@ export function createWebViewsHost() {
   const known = new Map<string, ConversationView>();
   /** Each message's views, by its tool events array, so a new message doesn't rescan the others. */
   const scanned = new WeakMap<readonly ViewToolEvent[], Map<string, ConversationView>>();
+  /** Which synced view each file is (`<conversationId>/<slug>`), from the conversation that made it. */
+  const identities = new Map<string, string>();
+  const sync = new ViewStorageSync(browserSyncedDisk(), (message, detail) => console.warn(`[views] ${message}`, detail));
+  if (typeof window !== "undefined") window.addEventListener("online", () => sync.retryNow());
+  const syncedStorage = (filePath: string, viewId: string) => sync.storage(viewId, () => legacyBrowserStorage(viewKey(filePath)));
+  const bind = (entry: Entry, viewId: string) => {
+    if (entry.viewId === viewId) return;
+    entry.viewId = viewId;
+    void entry.storage.move(syncedStorage(entry.filePath, viewId));
+  };
   const vm = createWasmVm();
   const caps = browserCapabilities();
   const now = () => performance.now();
@@ -66,11 +79,13 @@ export function createWebViewsHost() {
       return existing;
     }
     const view = known.get(filePath);
+    const viewId = identities.get(filePath) ?? null;
+    const storage = new MovableViewStorage(viewId ? syncedStorage(filePath, viewId) : browserStorage(viewKey(filePath)));
     const session = new ViewSession({
       id: viewKey(filePath),
       title: view?.title ?? viewTitle(filePath),
       vm,
-      storage: browserStorage(viewKey(filePath)),
+      storage,
       capabilities: caps,
       theme: asWeb(theme),
       data: view?.data ?? null,
@@ -80,7 +95,7 @@ export function createWebViewsHost() {
         if (log.level === "error") console.error(`[view ${viewFileName(filePath)}] ${log.text}`);
       },
     });
-    const entry: Entry = { session, filePath, refs: 0, closeTimer: null, waitTimer: null, source: null, data: view?.data === undefined ? null : JSON.stringify(view.data) };
+    const entry: Entry = { session, filePath, storage, viewId, refs: 0, closeTimer: null, waitTimer: null, source: null, data: view?.data === undefined ? null : JSON.stringify(view.data) };
     entries.set(filePath, entry);
     if (view) apply(entry);
     else
@@ -144,8 +159,18 @@ export function createWebViewsHost() {
         e.source = null;
         apply(e);
       }),
+    /** The signed-in account's backend, which views' storage syncs through; null while signed out. */
+    connectBackend(client: ViewStorageBackend | null) {
+      sync.setRemote(client ? backendViewStorageRemote(client) : null);
+    },
+    syncState: (filePath: string): { viewId: string | null; connected: boolean; synced: boolean } | null => {
+      const entry = entries.get(filePath);
+      if (!entry) return null;
+      const target = entry.storage.target as { synced?: boolean };
+      return { viewId: entry.viewId, connected: sync.connected, synced: target.synced ?? true };
+    },
     /** The views a conversation carries (its messages' `view` tool results): the newest of each runs. */
-    offerMessages(messages: readonly Message[]) {
+    offerMessages(messages: readonly Message[], conversationId?: string | null) {
       let any = false;
       for (const message of messages) {
         const events = message.toolEvents;
@@ -157,7 +182,11 @@ export function createWebViewsHost() {
         }
         for (const view of views.values()) {
           any = true;
+          const viewId = conversationId ? syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath)) : null;
+          if (viewId) identities.set(view.filePath, viewId);
           offer(view);
+          const entry = entries.get(view.filePath);
+          if (entry && viewId) bind(entry, viewId);
         }
       }
       // A view is on its way to the screen: start compiling the WebAssembly now.

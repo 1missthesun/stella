@@ -984,6 +984,21 @@
       "folder": {
         "emptyTitle": "Denne mappe er tom",
         "truncated": "Kun de første {count} vises."
+      },
+      "viewHistory": {
+        "title": "Versionshistorik",
+        "stella": "Stella",
+        "task": "En opgave",
+        "you": "Dig",
+        "current": "Aktuel",
+        "restoredFrom": "Gendannede versionen fra {time}",
+        "undo": "Fortryd seneste ændring",
+        "back": "Tilbage til aktuel",
+        "restore": "Gendan",
+        "ask": "Bed Stella om at hente den tilbage",
+        "askMessage": "Hent versionen af visningen \"{title}\" fra {time} tilbage, tilpasset så den virker med de data, den har gemt nu.",
+        "restoredHere": "Gendannede versionen fra {time} kun på denne enhed",
+        "restoreFailed": "Kunne ikke gendanne denne version"
       }
     },
     "sidebar": {

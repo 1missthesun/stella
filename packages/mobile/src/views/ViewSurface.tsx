@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ViewTheme } from "@stella/views/protocol";
@@ -11,7 +11,8 @@ import { useColors, useTheme } from "../theme/theme-context";
 import type { Colors } from "../theme/colors";
 import { NativeKeyCapture, viewsAvailable } from "./native-vm";
 import { chordTable } from "./view-keys";
-import { closeViewFullScreen, openViewFullScreen, useFullScreenView, useIsLiveView, useNewestView, useViewSession } from "./view-host";
+import { closeViewFullScreen, openViewFullScreen, useFullScreenView, useIsLiveView, useNewestView, useViewHistory, useViewSession } from "./view-host";
+import { HeaderButton, ViewPreviewBar, ViewUndoButton, ViewVersionList } from "./ViewHistory";
 import { ViewIcon } from "./ViewIcon";
 import { ViewRoot } from "./ViewRenderer";
 import { mix } from "./view-style";
@@ -100,6 +101,13 @@ function KeyChords({ session, keys, autoFocus, fill, children }: { session: View
   );
 }
 
+/** The full screen opens on the version list when the card's history button opened it. */
+let historyOnOpen: string | null = null;
+const openViewHistory = (file: string) => {
+  historyOnOpen = file;
+  openViewFullScreen(file);
+};
+
 /** A view live in a chat reply: the newest reply that made or changed it. */
 export function ViewChatCard({ file, title }: { file: string; title: string }) {
   const t = useT();
@@ -108,6 +116,7 @@ export function ViewChatCard({ file, title }: { file: string; title: string }) {
   const open = useFullScreenView();
   const covered = open === file;
   const { session, snapshot } = useViewSession(file, theme);
+  const { versions, preview } = useViewHistory(file);
   const area = useRef<{ w: number; h: number } | null>(null);
   const report = useCallback(
     (w: number, h: number) => {
@@ -126,6 +135,8 @@ export function ViewChatCard({ file, title }: { file: string; title: string }) {
         <Text style={{ flex: 1, fontFamily: fonts.sans.semiBold, fontSize: 14, color: colors.text }} numberOfLines={1}>
           {title}
         </Text>
+        <ViewUndoButton file={file} versions={versions} preview={preview} colors={colors} />
+        {versions.length > 1 ? <HeaderButton icon="clock" label={t("shell.display.viewHistory.title")} colors={colors} active={preview !== null} onPress={() => openViewHistory(file)} /> : null}
         <Pressable
           onPress={() => {
             selectionTick();
@@ -139,6 +150,7 @@ export function ViewChatCard({ file, title }: { file: string; title: string }) {
           <ViewIcon name="maximize-2" size={16} color={colors.textMuted} />
         </Pressable>
       </View>
+      {preview ? <ViewPreviewBar file={file} title={title} version={preview} snapshot={snapshot} colors={colors} /> : null}
       <ViewBody session={session} snapshot={snapshot} colors={colors} dark={theme.dark} covered={covered} scroll="card" onArea={report} />
     </View>
   );
@@ -163,7 +175,7 @@ export function ViewChip({ file, title }: { file: string; title: string }) {
   );
 }
 
-function FullScreenFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function FullScreenFrame({ title, actions, onClose, children }: { title: string; actions?: ReactNode; onClose: () => void; children: ReactNode }) {
   const t = useT();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -173,6 +185,7 @@ function FullScreenFrame({ title, onClose, children }: { title: string; onClose:
         <Text style={{ flex: 1, fontFamily: fonts.sans.semiBold, fontSize: 17, color: colors.text }} numberOfLines={1}>
           {title}
         </Text>
+        {actions}
         <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel={t("common.close")} style={({ pressed }) => ({ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: mix(colors.text, pressed ? 12 : 7, colors.background) })}>
           <ViewIcon name="x" size={16} color={colors.textMuted} />
         </Pressable>
@@ -182,12 +195,36 @@ function FullScreenFrame({ title, onClose, children }: { title: string; onClose:
   );
 }
 
-function FullScreenBody({ file }: { file: string }) {
+function FullScreenBody({ file, title }: { file: string; title: string }) {
+  const t = useT();
   const colors = useColors();
   const theme = useViewTheme();
   const { session, snapshot } = useViewSession(file, theme);
+  const { versions, preview } = useViewHistory(file);
+  const [listing, setListing] = useState(() => {
+    const open = historyOnOpen === file;
+    historyOnOpen = null;
+    return open;
+  });
   const report = useCallback((w: number, h: number) => session?.setViewport(Math.round(w - CARD_PAD * 2), Math.round(h - CARD_PAD * 2)), [session]);
-  return <ViewBody session={session} snapshot={snapshot} colors={colors} dark={theme.dark} covered={false} scroll="fill" onArea={report} />;
+  const actions = (
+    <>
+      {listing ? null : <ViewUndoButton file={file} versions={versions} preview={preview} colors={colors} />}
+      {versions.length > 1 ? <HeaderButton icon="clock" label={t("shell.display.viewHistory.title")} colors={colors} active={listing || preview !== null} onPress={() => setListing((on) => !on)} /> : null}
+    </>
+  );
+  return (
+    <FullScreenFrame title={title} actions={actions} onClose={closeViewFullScreen}>
+      {listing ? (
+        <ViewVersionList file={file} versions={versions} preview={preview} colors={colors} onChosen={() => setListing(false)} />
+      ) : (
+        <>
+          {preview ? <ViewPreviewBar file={file} title={title} version={preview} snapshot={snapshot} colors={colors} /> : null}
+          <ViewBody session={session} snapshot={snapshot} colors={colors} dark={theme.dark} covered={false} scroll="fill" onArea={report} />
+        </>
+      )}
+    </FullScreenFrame>
+  );
 }
 
 /** The open view, full screen over the chat; mounted once beside the chat list. */
@@ -197,11 +234,7 @@ export function ViewFullScreenHost() {
   const visible = file !== null && ref !== null;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"} onRequestClose={closeViewFullScreen}>
-      {visible ? (
-        <FullScreenFrame title={ref.title} onClose={closeViewFullScreen}>
-          <FullScreenBody file={file} />
-        </FullScreenFrame>
-      ) : null}
+      {visible ? <FullScreenBody key={file} file={file} title={ref.title} /> : null}
     </Modal>
   );
 }

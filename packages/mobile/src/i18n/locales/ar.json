@@ -992,6 +992,21 @@
       "folder": {
         "emptyTitle": "هذا المجلد فارغ",
         "truncated": "يتم عرض أول {count} فقط."
+      },
+      "viewHistory": {
+        "title": "سجل الإصدارات",
+        "stella": "Stella",
+        "task": "مهمة",
+        "you": "أنت",
+        "current": "الحالي",
+        "restoredFrom": "تمت استعادة إصدار {time}",
+        "undo": "تراجع عن آخر تغيير",
+        "back": "العودة إلى الحالي",
+        "restore": "استعادة",
+        "ask": "اطلب من Stella استعادته",
+        "askMessage": "أعد إصدار العرض \"{title}\" من {time}، مع تعديله ليعمل مع البيانات المحفوظة فيه الآن.",
+        "restoredHere": "تمت استعادة إصدار {time} على هذا الجهاز فقط",
+        "restoreFailed": "تعذّرت استعادة هذا الإصدار"
       }
     },
     "sidebar": {

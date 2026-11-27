@@ -984,6 +984,21 @@
       "folder": {
         "emptyTitle": "Den här mappen är tom",
         "truncated": "Endast de första {count} visas."
+      },
+      "viewHistory": {
+        "title": "Versionshistorik",
+        "stella": "Stella",
+        "task": "En uppgift",
+        "you": "Du",
+        "current": "Aktuell",
+        "restoredFrom": "Återställde versionen från {time}",
+        "undo": "Ångra senaste ändringen",
+        "back": "Tillbaka till aktuell",
+        "restore": "Återställ",
+        "ask": "Be Stella ta tillbaka den",
+        "askMessage": "Ta tillbaka versionen av vyn ”{title}” från {time}, anpassad så att den fungerar med den data den har sparad nu.",
+        "restoredHere": "Återställde versionen från {time} bara på den här enheten",
+        "restoreFailed": "Det gick inte att återställa den här versionen"
       }
     },
     "sidebar": {

@@ -1,3 +1,4 @@
+import type { ViewAuthor } from "@stella/views/conversation";
 import type { AgentPause } from "@stella/contracts/agent-pause";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
@@ -180,6 +181,8 @@ export type ChatMessage = {
   artifacts?: ChatArtifact[];
   /** Stella Views this reply made or changed (the orchestrator's `view` tool). */
   views?: ChatViewRef[];
+  /** Every version of a view the message made, oldest first, when it made more than `views` keeps (the version history). */
+  viewVersions?: ChatViewRef[];
   toolSteps?: ToolStep[];
   tasks?: MobileTask[];
   hasImage?: boolean;
@@ -210,6 +213,8 @@ export type ChatViewRef = {
   data?: unknown;
   createdAt: number;
   toolCallId: string;
+  /** Who made this version: Stella, a task, or the user's restore. */
+  by?: ViewAuthor;
 };
 
 export type MobileTask = {

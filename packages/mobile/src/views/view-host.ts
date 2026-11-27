@@ -2,12 +2,16 @@
 // orchestrator's `view` tool results, which carry the whole source), and one running session per
 // view that every surface showing it shares (the chat card and the full screen), like the desktop's
 // views host. A newer source swaps into the running session in place, keeping its state.
+// Every version the conversation carries feeds the view's history: an older one can be previewed
+// (a second session beside the live one, on the view's current data, its writes kept to itself) and
+// restored, which publishes a restore card so every device runs it as the newest version.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
 import { ViewSession, type ViewSnapshot, type ViewStorage } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
 import { viewFileName, viewIdentityFromPath, viewKey, viewLiveKey } from "@stella/views/paths";
+import { ViewHistory, previewStorage, restoreCardArgs, restoredVersion, viewPreviewKey, viewVersionId, type ViewVersion } from "@stella/views/history";
 import { ViewStorageSync, backendViewStorageRemote, normalizeViewStorageRecord, syncedViewId, viewSlugFromPath, type ViewStorageDisk } from "@stella/views/storage-sync";
 import { getBackendClient } from "../lib/backend";
 import type { ChatMessage, ChatViewRef } from "../types";
@@ -25,10 +29,38 @@ let newest = new Map<string, Newest>();
 let lastMessages: readonly ChatMessage[] | null = null;
 const newestListeners = new Set<() => void>();
 
+// ------------------------------------------------------------------ history
+
+let history = new ViewHistory();
+const historyListeners = new Set<(file: string) => void>();
+const forwardHistory = (file: string) => {
+  for (const listener of historyListeners) listener(file);
+};
+let releaseHistory = history.subscribe(forwardHistory);
+/** Restores made here (by `viewLiveKey`), run at once and until the conversation brings back their card. */
+const restoring = new Map<string, ChatViewRef>();
+
+const versionOf = (ref: ChatViewRef): ViewVersion => ({
+  id: viewVersionId(ref.createdAt, ref.source),
+  filePath: ref.filePath,
+  slug: ref.slug,
+  title: ref.title,
+  source: ref.source,
+  createdAt: ref.createdAt,
+  by: ref.by ?? { kind: "stella" },
+});
+
 /** Reads every view the conversation's replies made; the newest reply per file holds its live card. */
 export function publishConversationViews(conversationId: string, messages: readonly ChatMessage[]) {
   if (messages === lastMessages && conversationId === scope) return;
   lastMessages = messages;
+  if (conversationId !== scope) {
+    releaseHistory();
+    history = new ViewHistory();
+    releaseHistory = history.subscribe(forwardHistory);
+    restoring.clear();
+  }
+  history.offerVersions(messages.flatMap((message) => (message.viewVersions ?? message.views ?? []).map(versionOf)), conversationId);
   const next = new Map<string, Newest>();
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]!;
@@ -39,6 +71,11 @@ export function publishConversationViews(conversationId: string, messages: reado
       const key = viewLiveKey(ref.filePath);
       if (!next.has(key)) next.set(key, { messageId: message.id, ref });
     }
+  }
+  for (const [key, ref] of restoring) {
+    const seen = next.get(key);
+    if (seen && seen.ref.createdAt >= ref.createdAt) restoring.delete(key);
+    else if (seen) next.set(key, { messageId: seen.messageId, ref });
   }
   const changed =
     conversationId !== scope ||
@@ -58,6 +95,51 @@ export function publishConversationViews(conversationId: string, messages: reado
   newest = next;
   for (const [key, entry] of next) entries.get(key)?.load(entry.ref);
   for (const listener of newestListeners) listener();
+}
+
+const subscribeHistory = (listener: () => void) => {
+  const forward = () => listener();
+  historyListeners.add(forward);
+  return () => void historyListeners.delete(forward);
+};
+
+/** The view's versions (oldest first) and the older one its surfaces preview, kept current. */
+export function useViewHistory(file: string | null): { versions: readonly ViewVersion[]; preview: ViewVersion | null } {
+  const versions = useSyncExternalStore(subscribeHistory, () => (file ? history.versions(file) : NO_VERSIONS));
+  const preview = useSyncExternalStore(subscribeHistory, () => (file ? history.preview(file) : null));
+  return { versions, preview };
+}
+const NO_VERSIONS: readonly ViewVersion[] = [];
+
+/** Shows an older version on every surface of the view (null goes back to the live one). */
+export const setViewPreview = (file: string, versionId: string | null) => history.setPreview(file, versionId);
+
+/**
+ * Makes `versionId` the view's newest version again, as a new version (so it can be undone too):
+ * it runs here at once and goes to the conversation as a restore card, which every device runs.
+ * The view's saved data stays as it is.
+ */
+export async function restoreViewVersion(file: string, versionId: string): Promise<{ restored: boolean; shared: boolean }> {
+  const key = viewLiveKey(file);
+  const target = history.find(file, versionId);
+  const live = newest.get(key);
+  if (!target || !live || !scope) return { restored: false, shared: false };
+  const args = restoreCardArgs(target, history.latest(file), history.conversationOf(file) ?? scope, Date.now());
+  const version = restoredVersion(args);
+  const ref: ChatViewRef = { filePath: live.ref.filePath, slug: args.slug, title: args.title, source: args.source, ...(live.ref.data !== undefined ? { data: live.ref.data } : {}), createdAt: args.createdAt, toolCallId: `restore:${version.id}`, by: version.by };
+  history.addPending(version);
+  history.setPreview(file, null);
+  restoring.set(key, ref);
+  newest = new Map(newest).set(key, { messageId: live.messageId, ref });
+  entries.get(key)?.load(ref);
+  for (const listener of newestListeners) listener();
+  try {
+    const { posted } = await getBackendClient().call("conversations.publishView", args);
+    return { restored: true, shared: posted };
+  } catch (error) {
+    console.warn("[views] couldn't publish a restore", error);
+    return { restored: true, shared: false };
+  }
 }
 
 const subscribeNewest = (listener: () => void) => {
@@ -188,22 +270,26 @@ const now = () => performance.now();
 
 class Entry {
   readonly session: ViewSession;
+  readonly storage: ViewStorage;
   refs = 0;
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
   private loaded: ChatViewRef | null = null;
 
+  /** A preview's `key` is `viewPreviewKey`, with the storage it overlays. */
   constructor(
     /** The view's key in `entries` and `newest` (see `viewLiveKey`). */
     readonly key: string,
     readonly file: string,
     ref: ChatViewRef,
     theme: ViewTheme,
+    storage?: ViewStorage,
   ) {
+    this.storage = storage ?? viewStorage(file, ref);
     this.session = new ViewSession({
       id: file,
       title: ref.title,
       vm: nativeViewVm,
-      storage: viewStorage(file, ref),
+      storage: this.storage,
       capabilities: viewCapabilities,
       theme,
       data: ref.data ?? null,
@@ -229,7 +315,8 @@ class Entry {
     const prior = this.loaded;
     this.loaded = ref;
     if (prior && JSON.stringify(prior.data ?? null) !== JSON.stringify(ref.data ?? null)) this.session.setData(ref.data ?? null);
-    void this.session.load(ref.source, viewFileName(ref.filePath));
+    // A restored version may not fit the state the newer one left: it starts fresh then (its saved data stays).
+    void this.session.load(ref.source, viewFileName(ref.filePath), ref.by?.kind === "restore" ? { freshIfStateBreaks: true } : {});
   }
 
   acquire() {
@@ -256,11 +343,15 @@ class Entry {
 
 const entries = new Map<string, Entry>();
 
-/** The running session of the view at `file` (its newest source) while the caller is mounted. */
+/**
+ * The running session of the view at `file` while the caller is mounted: its newest source, or
+ * the older version being previewed (run beside it, on the view's current data).
+ */
 export function useViewSession(file: string, theme: ViewTheme): { session: ViewSession | null; snapshot: ViewSnapshot | null } {
   const key = viewLiveKey(file);
   const hasRef = useSyncExternalStore(subscribeNewest, () => newest.has(key));
   const scopeGeneration = useSyncExternalStore(subscribeNewest, () => generation);
+  const { preview } = useViewHistory(file);
   const [session, setSession] = useState<ViewSession | null>(null);
   const [snapshot, setSnapshot] = useState<ViewSnapshot | null>(null);
   const themeRef = useRef(theme);
@@ -268,10 +359,16 @@ export function useViewSession(file: string, theme: ViewTheme): { session: ViewS
   useEffect(() => {
     const current = newest.get(key)?.ref;
     if (!hasRef || !current) return;
-    let entry = entries.get(key);
+    const entryKey = preview ? viewPreviewKey(key, preview.id) : key;
+    let entry = entries.get(entryKey);
     if (!entry) {
-      entry = new Entry(key, current.filePath, current, themeRef.current);
-      entries.set(key, entry);
+      if (preview) {
+        const ref: ChatViewRef = { ...current, title: preview.title, source: preview.source, createdAt: preview.createdAt, by: preview.by };
+        entry = new Entry(entryKey, current.filePath, ref, themeRef.current, previewStorage(entries.get(key)?.storage ?? viewStorage(current.filePath, current)));
+      } else {
+        entry = new Entry(key, current.filePath, current, themeRef.current);
+      }
+      entries.set(entryKey, entry);
     }
     entry.acquire();
     const held = entry;
@@ -282,7 +379,7 @@ export function useViewSession(file: string, theme: ViewTheme): { session: ViewS
       off();
       held.release();
     };
-  }, [key, hasRef, scopeGeneration]);
+  }, [key, hasRef, scopeGeneration, preview]);
   useEffect(() => {
     session?.setTheme(theme);
   }, [session, theme]);

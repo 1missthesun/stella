@@ -984,6 +984,21 @@
       "folder": {
         "emptyTitle": "Ez a mappa üres",
         "truncated": "Csak az első {count} látható."
+      },
+      "viewHistory": {
+        "title": "Verzióelőzmények",
+        "stella": "Stella",
+        "task": "Egy feladat",
+        "you": "Te",
+        "current": "Jelenlegi",
+        "restoredFrom": "Visszaállítva a(z) {time} verzió",
+        "undo": "Utolsó módosítás visszavonása",
+        "back": "Vissza a jelenlegihez",
+        "restore": "Visszaállítás",
+        "ask": "Kérd meg Stellát, hogy hozza vissza",
+        "askMessage": "Hozd vissza a(z) „{title}” nézet {time} verzióját úgy módosítva, hogy működjön a most mentett adataival.",
+        "restoredHere": "A(z) {time} verzió csak ezen az eszközön lett visszaállítva",
+        "restoreFailed": "Ezt a verziót nem sikerült visszaállítani"
       }
     },
     "sidebar": {

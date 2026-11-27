@@ -982,6 +982,21 @@
       "folder": {
         "emptyTitle": "Thư mục này trống",
         "truncated": "Chỉ hiển thị {count} mục đầu tiên."
+      },
+      "viewHistory": {
+        "title": "Lịch sử phiên bản",
+        "stella": "Stella",
+        "task": "Một tác vụ",
+        "you": "Bạn",
+        "current": "Hiện tại",
+        "restoredFrom": "Đã khôi phục phiên bản lúc {time}",
+        "undo": "Hoàn tác thay đổi gần nhất",
+        "back": "Quay lại bản hiện tại",
+        "restore": "Khôi phục",
+        "ask": "Nhờ Stella đưa nó trở lại",
+        "askMessage": "Đưa phiên bản của chế độ xem \"{title}\" lúc {time} trở lại, điều chỉnh để nó hoạt động với dữ liệu đang được lưu hiện giờ.",
+        "restoredHere": "Đã khôi phục phiên bản lúc {time} chỉ trên thiết bị này",
+        "restoreFailed": "Không thể khôi phục phiên bản này"
       }
     },
     "sidebar": {

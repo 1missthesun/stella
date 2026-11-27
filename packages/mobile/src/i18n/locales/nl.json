@@ -984,6 +984,21 @@
       "folder": {
         "emptyTitle": "Deze map is leeg",
         "truncated": "Alleen de eerste {count} worden getoond."
+      },
+      "viewHistory": {
+        "title": "Versiegeschiedenis",
+        "stella": "Stella",
+        "task": "Een taak",
+        "you": "Jij",
+        "current": "Huidige",
+        "restoredFrom": "Versie van {time} hersteld",
+        "undo": "Laatste wijziging ongedaan maken",
+        "back": "Terug naar huidige",
+        "restore": "Herstellen",
+        "ask": "Vraag Stella om hem terug te halen",
+        "askMessage": "Haal de versie van de weergave ‘{title}’ van {time} terug, aangepast zodat hij werkt met de gegevens die hij nu heeft opgeslagen.",
+        "restoredHere": "Versie van {time} alleen op dit apparaat hersteld",
+        "restoreFailed": "Kon deze versie niet herstellen"
       }
     },
     "sidebar": {

@@ -982,6 +982,21 @@
       "folder": {
         "emptyTitle": "このフォルダは空です",
         "truncated": "最初の {count} 件のみ表示しています。"
+      },
+      "viewHistory": {
+        "title": "バージョン履歴",
+        "stella": "Stella",
+        "task": "タスク",
+        "you": "あなた",
+        "current": "現在",
+        "restoredFrom": "{time} のバージョンを復元しました",
+        "undo": "最後の変更を元に戻す",
+        "back": "現在に戻る",
+        "restore": "復元",
+        "ask": "Stella に戻してもらう",
+        "askMessage": "ビュー「{title}」の {time} のバージョンを、いま保存されているデータで動くように調整して戻してください。",
+        "restoredHere": "{time} のバージョンをこのデバイスでのみ復元しました",
+        "restoreFailed": "このバージョンを復元できませんでした"
       }
     },
     "sidebar": {

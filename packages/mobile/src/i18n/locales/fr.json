@@ -986,6 +986,21 @@
       "folder": {
         "emptyTitle": "Ce dossier est vide",
         "truncated": "Seuls les {count} premiers sont affichés."
+      },
+      "viewHistory": {
+        "title": "Historique des versions",
+        "stella": "Stella",
+        "task": "Une tâche",
+        "you": "Vous",
+        "current": "Actuelle",
+        "restoredFrom": "Version de {time} restaurée",
+        "undo": "Annuler la dernière modification",
+        "back": "Revenir à l’actuelle",
+        "restore": "Restaurer",
+        "ask": "Demander à Stella de la rétablir",
+        "askMessage": "Rétablis la version de la vue « {title} » de {time}, adaptée pour fonctionner avec les données qu’elle a enregistrées maintenant.",
+        "restoredHere": "Version de {time} restaurée sur cet appareil uniquement",
+        "restoreFailed": "Impossible de restaurer cette version"
       }
     },
     "sidebar": {

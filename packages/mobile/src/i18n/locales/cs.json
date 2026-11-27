@@ -988,6 +988,21 @@
       "folder": {
         "emptyTitle": "Tato složka je prázdná",
         "truncated": "Zobrazuje se jen prvních {count}."
+      },
+      "viewHistory": {
+        "title": "Historie verzí",
+        "stella": "Stella",
+        "task": "Úkol",
+        "you": "Vy",
+        "current": "Aktuální",
+        "restoredFrom": "Obnovena verze z {time}",
+        "undo": "Vrátit poslední změnu",
+        "back": "Zpět na aktuální",
+        "restore": "Obnovit",
+        "ask": "Požádat Stellu o obnovení",
+        "askMessage": "Obnov verzi zobrazení „{title}“ z {time}, upravenou tak, aby fungovala s daty, která má teď uložená.",
+        "restoredHere": "Verze z {time} obnovena jen na tomto zařízení",
+        "restoreFailed": "Tuto verzi se nepodařilo obnovit"
       }
     },
     "sidebar": {

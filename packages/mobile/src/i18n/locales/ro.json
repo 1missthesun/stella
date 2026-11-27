@@ -986,6 +986,21 @@
       "folder": {
         "emptyTitle": "Acest dosar este gol",
         "truncated": "Sunt afișate doar primele {count}."
+      },
+      "viewHistory": {
+        "title": "Istoric versiuni",
+        "stella": "Stella",
+        "task": "O sarcină",
+        "you": "Tu",
+        "current": "Actuală",
+        "restoredFrom": "Versiunea de la {time} a fost restabilită",
+        "undo": "Anulează ultima modificare",
+        "back": "Înapoi la cea actuală",
+        "restore": "Restabilește",
+        "ask": "Cere-i Stellei să o aducă înapoi",
+        "askMessage": "Adu înapoi versiunea vizualizării „{title}” de la {time}, adaptată ca să funcționeze cu datele pe care le are salvate acum.",
+        "restoredHere": "Versiunea de la {time} a fost restabilită doar pe acest dispozitiv",
+        "restoreFailed": "Versiunea nu a putut fi restabilită"
       }
     },
     "sidebar": {

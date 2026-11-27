@@ -982,6 +982,21 @@
       "folder": {
         "emptyTitle": "Folder ini kosong",
         "truncated": "Hanya {count} item pertama yang ditampilkan."
+      },
+      "viewHistory": {
+        "title": "Riwayat versi",
+        "stella": "Stella",
+        "task": "Sebuah tugas",
+        "you": "Kamu",
+        "current": "Saat ini",
+        "restoredFrom": "Versi {time} dipulihkan",
+        "undo": "Urungkan perubahan terakhir",
+        "back": "Kembali ke saat ini",
+        "restore": "Pulihkan",
+        "ask": "Minta Stella mengembalikannya",
+        "askMessage": "Kembalikan versi tampilan \"{title}\" dari {time}, disesuaikan agar berfungsi dengan data yang tersimpan sekarang.",
+        "restoredHere": "Versi {time} dipulihkan hanya di perangkat ini",
+        "restoreFailed": "Tidak dapat memulihkan versi ini"
       }
     },
     "sidebar": {

@@ -982,6 +982,21 @@
       "folder": {
         "emptyTitle": "此文件夹为空",
         "truncated": "仅显示前 {count} 项。"
+      },
+      "viewHistory": {
+        "title": "版本历史",
+        "stella": "Stella",
+        "task": "一个任务",
+        "you": "你",
+        "current": "当前",
+        "restoredFrom": "已恢复 {time} 的版本",
+        "undo": "撤销上次更改",
+        "back": "回到当前版本",
+        "restore": "恢复",
+        "ask": "请 Stella 找回它",
+        "askMessage": "把视图“{title}”在 {time} 的版本找回来，并调整为能配合它现在保存的数据使用。",
+        "restoredHere": "已仅在此设备上恢复 {time} 的版本",
+        "restoreFailed": "无法恢复此版本"
       }
     },
     "sidebar": {

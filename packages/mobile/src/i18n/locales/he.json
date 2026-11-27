@@ -986,6 +986,21 @@
       "folder": {
         "emptyTitle": "התיקייה הזו ריקה",
         "truncated": "מוצגים רק {count} הראשונים."
+      },
+      "viewHistory": {
+        "title": "היסטוריית גרסאות",
+        "stella": "Stella",
+        "task": "משימה",
+        "you": "את/ה",
+        "current": "נוכחית",
+        "restoredFrom": "הגרסה מ־{time} שוחזרה",
+        "undo": "ביטול השינוי האחרון",
+        "back": "חזרה לנוכחית",
+        "restore": "שחזור",
+        "ask": "לבקש מ־Stella להחזיר אותה",
+        "askMessage": "החזר את הגרסה של התצוגה \"{title}\" מ־{time}, מותאמת לעבוד עם הנתונים השמורים בה עכשיו.",
+        "restoredHere": "הגרסה מ־{time} שוחזרה במכשיר הזה בלבד",
+        "restoreFailed": "לא ניתן היה לשחזר את הגרסה הזו"
       }
     },
     "sidebar": {

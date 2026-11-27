@@ -431,6 +431,15 @@ function parseStoredTasks(value: unknown): MobileTask[] {
   return tasks;
 }
 
+function parseStoredViewAuthor(value: unknown): ChatViewRef["by"] | null {
+  if (!value || typeof value !== "object") return null;
+  const by = value as Record<string, unknown>;
+  if (by.kind === "stella") return { kind: "stella" };
+  if (by.kind === "restore" && typeof by.from === "number") return { kind: "restore", from: by.from };
+  if (by.kind === "task" && typeof by.agentId === "string") return { kind: "task", agentId: by.agentId, ...(typeof by.title === "string" ? { title: by.title } : {}) };
+  return null;
+}
+
 function parseStoredViews(value: unknown): ChatViewRef[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry): ChatViewRef[] => {
@@ -445,6 +454,7 @@ function parseStoredViews(value: unknown): ChatViewRef[] {
       ...("data" in v && v.data !== undefined ? { data: v.data } : {}),
       createdAt: typeof v.createdAt === "number" ? v.createdAt : 0,
       toolCallId: v.toolCallId,
+      ...(parseStoredViewAuthor(v.by) ? { by: parseStoredViewAuthor(v.by)! } : {}),
     }];
   });
 }
@@ -475,6 +485,7 @@ function parseRow(row: unknown): ChatMessage | null {
   const tasks = parseStoredTasks(o.tasks);
   const toolSteps = parseStoredToolSteps(o.toolSteps);
   const views = parseStoredViews(o.views);
+  const viewVersions = parseStoredViews(o.viewVersions);
   return {
     id: o.id,
     ...(typeof o.canonicalId === "string" && o.canonicalId.trim()
@@ -509,6 +520,7 @@ function parseRow(row: unknown): ChatMessage | null {
     ...(artifacts.length > 0 ? { artifacts } : {}),
     ...(toolSteps.length > 0 ? { toolSteps } : {}),
     ...(views.length > 0 ? { views } : {}),
+    ...(viewVersions.length > 0 ? { viewVersions } : {}),
     ...(tasks.length > 0 ? { tasks } : {}),
     ...(o.hasImage === true ? { hasImage: true } : {}),
     ...(thumbnailUris.length > 0 ? { thumbnailUris } : {}),

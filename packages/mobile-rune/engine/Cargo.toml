@@ -26,6 +26,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 # Stella Views: view programs run in PsychoScript live runs (the desktop's src/views.rs, included
 # by path). No GPU canvases (the default `widget-gpu` feature): views draw through Rune.
 psychoscript-mobile = { git = "https://github.com/anomalyco/psychoscript", rev = "e289f8ba62aa2b21c19a7ff20e8440c04d3f444c", default-features = false }
+# Direct device link (Iroh): the desktop engine's crate, so a phone pairs with a computer's Stella
+# without an account (the desktop's src/p2p.rs, included by path).
+stella-p2p = { path = "../../desktop-rune/p2p" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -34,6 +37,9 @@ libc = "0.2"
 # names it only for the NativeActivity entry winit's Android backend links.
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
+# The app's JVM and Context for crates that reach Android's Java APIs themselves (Iroh's DNS
+# resolver in stella-p2p reads the system's DNS servers through it); set in `nativeInit`.
+ndk-context = "0.1.1"
 winit = { version = "0.30.13", default-features = false, features = ["android-native-activity"] }
 
 [patch.crates-io]

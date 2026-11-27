@@ -13,9 +13,9 @@
 //!   desktop host reads, through the app's event callback.
 //!
 //! Tree, props, styles, text, markdown, media, effects (`rune-fx` Liquid Glass) and the hot-swap
-//! view, and Stella Views' program runs (`views.rs`, PsychoScript) are the desktop modules
-//! themselves, included by path. Only windowing, commands, native
-//! text fields and the transport live in `mobile/`.
+//! view, Stella Views' program runs (`views.rs`, PsychoScript) and the direct device link
+//! (`p2p.rs`, crate stella-p2p) are the desktop modules themselves, included by path. Only
+//! windowing, commands, native text fields and the transport live in `mobile/`.
 
 #![allow(dead_code)]
 
@@ -33,6 +33,8 @@ mod markdown;
 mod media;
 #[path = "../../../desktop-rune/engine/src/metrics.rs"]
 mod metrics;
+#[path = "../../../desktop-rune/engine/src/p2p.rs"]
+mod p2p;
 #[path = "../../../desktop-rune/engine/src/props.rs"]
 mod props;
 #[path = "../../../desktop-rune/engine/src/protocol.rs"]

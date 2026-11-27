@@ -40,6 +40,7 @@ rm -rf "$app"
 mkdir -p "$app/fonts"
 sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
 swift_defines=(); [[ $profile == dist ]] || swift_defines=(-D STELLA_DEV)
+# libresolv: the system's DNS servers, which the direct device link (Iroh, in stella-p2p) reads.
 # Push (aps-environment) and Sign in with Apple are entitlements. The simulator reads them from
 # the binary's __entitlements section, as Xcode builds it (an ad-hoc signature that carries them
 # is refused at launch); a device build signs them in with a real identity.
@@ -53,7 +54,7 @@ xcrun --sdk "$sdk" swiftc -O "${swift_defines[@]}" -target "$swift_target" -sdk 
   -framework UIKit -framework Metal -framework QuartzCore -framework JavaScriptCore -framework CoreText \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework AVFoundation -framework IOSurface \
   -framework Security -framework SafariServices -framework PhotosUI -framework Photos -framework UniformTypeIdentifiers -framework UserNotifications -framework AudioToolbox -framework AuthenticationServices -framework StoreKit \
-  -framework CoreFoundation -framework Foundation -framework SystemConfiguration -lc++ -liconv \
+  -framework CoreFoundation -framework Foundation -framework SystemConfiguration -lc++ -liconv -lresolv \
   -o "$app/StellaRune"
 cp "$here/ios/StellaRune/Info.plist" "$app/Info.plist"
 if [[ $sdk == iphoneos ]]; then

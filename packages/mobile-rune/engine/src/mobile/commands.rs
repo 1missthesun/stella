@@ -84,6 +84,9 @@ pub fn route(v: Value) {
         }
         // Stella Views' programs run on threads of their own (the desktop's views.rs).
         "views.start" | "views.deliver" | "views.stop" | "views.pause" | "views.resume" => crate::views::command(&cmd, rid, &v),
+        // The direct device link (crate stella-p2p, the desktop's p2p.rs): replies and events come
+        // from its own runtime's threads.
+        c if c.starts_with("p2p.") => crate::p2p::command(c, rid, &v),
         "views.frame" => {
             crate::view_frames::want();
             reply(rid, Ok(Value::Null));

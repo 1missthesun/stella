@@ -108,14 +108,32 @@ fn stderr_to_logcat() {
     });
 }
 
+/// Hands ndk-context the JVM and the application Context, once. The app is an ordinary Activity
+/// with a JNI bridge, not a NativeActivity, so nothing else sets it; the direct device link's DNS
+/// resolver (Iroh, in stella-p2p) reads Android's system DNS servers through it.
+fn init_android_context(env: &JNIEnv, vm: &JavaVM, context: &JObject) {
+    static CONTEXT: OnceLock<GlobalRef> = OnceLock::new();
+    if CONTEXT.get().is_some() || context.is_null() {
+        return;
+    }
+    let Ok(global) = env.new_global_ref(context) else { return };
+    let raw = global.as_obj().as_raw();
+    if CONTEXT.set(global).is_ok() {
+        // SAFETY: the VM pointer is this process's JavaVM and `raw` a global reference kept alive
+        // in CONTEXT for the life of the process; this runs once.
+        unsafe { ndk_context::initialize_android_context(vm.get_java_vm_pointer().cast(), raw.cast()) };
+    }
+}
+
 fn host(h: jlong) -> *mut Host {
     h as usize as *mut Host
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_stella_rune_Engine_nativeInit(env: JNIEnv, _class: JClass, callbacks: JObject) {
+pub extern "system" fn Java_com_stella_rune_Engine_nativeInit(env: JNIEnv, _class: JClass, callbacks: JObject, context: JObject) {
     stderr_to_logcat();
     if let Ok(vm) = env.get_java_vm() {
+        init_android_context(&env, &vm, &context);
         let _ = JVM.set(vm);
     }
     if let Ok(g) = env.new_global_ref(callbacks) {
